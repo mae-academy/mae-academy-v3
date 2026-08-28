@@ -1,0 +1,4 @@
+Visual review completed on 2026-08-16:
+- The phase-angle figure clearly separates source and output voltage, shades conduction, labels alpha and beta, displays gate/conduction states, and shows integral-cycle spectral content at the burst fundamental below the 50 Hz source frequency.
+- The three-phase floating-star figure shows distinct van, vbn, and vcn traces, visible zero intervals, and a scaled simultaneous-conduction count trace.
+- No clipping or unreadable labels were observed in either high-resolution PNG.

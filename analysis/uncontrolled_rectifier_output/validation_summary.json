@@ -1,0 +1,166 @@
+{
+  "tolerance_percent": 0.0001,
+  "records": [
+    {
+      "case": "1phi_half_R",
+      "points_per_cycle": 2097152,
+      "Vdc_sim": 54.11268925222475,
+      "Vdc_analytical": 54.11268065124442,
+      "Vdc_error_percent": 1.589457448091469e-05,
+      "Vrms_sim": 85.0000067551939,
+      "Vrms_analytical": 85.0,
+      "Vrms_error_percent": 7.947286934161051e-06,
+      "Idc_sim": 2.705634462611237
+    },
+    {
+      "case": "1phi_full_R",
+      "points_per_cycle": 2097152,
+      "Vdc_sim": 108.22537850444948,
+      "Vdc_analytical": 108.22536130248884,
+      "Vdc_error_percent": 1.589457446778389e-05,
+      "Vrms_sim": 120.2081623549999,
+      "Vrms_analytical": 120.20815280171307,
+      "Vrms_error_percent": 7.947286941355481e-06,
+      "Idc_sim": 5.411268925222474
+    },
+    {
+      "case": "3phi_half_R",
+      "points_per_cycle": 262144,
+      "Vdc_sim": 140.5888598955088,
+      "Vdc_analytical": 140.58886833255698,
+      "Vdc_error_percent": 6.00122064739308e-06,
+      "Vrms_sim": 142.9161478447143,
+      "Vrms_analytical": 142.91615340518257,
+      "Vrms_error_percent": 3.890720642060079e-06,
+      "Idc_sim": 7.02944299477544
+    },
+    {
+      "case": "3phi_full_R",
+      "points_per_cycle": 262144,
+      "Vdc_sim": 281.1777197910176,
+      "Vdc_analytical": 281.17773666511397,
+      "Vdc_error_percent": 6.00122064739308e-06,
+      "Vrms_sim": 281.4252154456551,
+      "Vrms_analytical": 281.42523238828824,
+      "Vrms_error_percent": 6.020296396394672e-06,
+      "Idc_sim": 14.058885989550877
+    }
+  ],
+  "numerical_coverage": [
+    {
+      "topology": "1phi_half",
+      "load": "RL",
+      "Vdc_numerical": 54.11335704039123,
+      "Vrms_numerical": 85.00053125497888,
+      "Idc_numerical": 2.7056676774356734
+    },
+    {
+      "topology": "1phi_half",
+      "load": "RLE",
+      "Vdc_numerical": 67.12504089661634,
+      "Vrms_numerical": 87.29074239671559,
+      "Idc_numerical": 1.8562503768861547
+    },
+    {
+      "topology": "1phi_half",
+      "load": "RC",
+      "Vdc_numerical": 101.25722274500738,
+      "Vrms_numerical": 108.79078614886474,
+      "Idc_numerical": 3.6227299316972092
+    },
+    {
+      "topology": "1phi_half",
+      "load": "RLC",
+      "Vdc_numerical": 112.45964602147139,
+      "Vrms_numerical": 112.70135191343893,
+      "Idc_numerical": 0.5081588666314427
+    },
+    {
+      "topology": "1phi_full",
+      "load": "RL",
+      "Vdc_numerical": 108.22671408078246,
+      "Vrms_numerical": 120.2089041097093,
+      "Idc_numerical": 5.41128983224334
+    },
+    {
+      "topology": "1phi_full",
+      "load": "RLE",
+      "Vdc_numerical": 108.22671408078246,
+      "Vrms_numerical": 120.2089041097093,
+      "Idc_numerical": 3.9112898322787415
+    },
+    {
+      "topology": "1phi_full",
+      "load": "RC",
+      "Vdc_numerical": 135.81838465545596,
+      "Vrms_numerical": 137.81980532542,
+      "Idc_numerical": 4.291675463395749
+    },
+    {
+      "topology": "1phi_full",
+      "load": "RLC",
+      "Vdc_numerical": 135.69277079510854,
+      "Vrms_numerical": 135.76488597661688,
+      "Idc_numerical": 0.37115592913385204
+    },
+    {
+      "topology": "3phi_half",
+      "load": "RL",
+      "Vdc_numerical": 140.5887853924077,
+      "Vrms_numerical": 142.9160987431349,
+      "Idc_numerical": 7.0294337754936285
+    },
+    {
+      "topology": "3phi_half",
+      "load": "RLE",
+      "Vdc_numerical": 140.5887853924077,
+      "Vrms_numerical": 142.9160987431349,
+      "Idc_numerical": 5.529433775523769
+    },
+    {
+      "topology": "3phi_half",
+      "load": "RC",
+      "Vdc_numerical": 149.4995490289315,
+      "Vrms_numerical": 150.2733276700563,
+      "Idc_numerical": 4.245577597909237
+    },
+    {
+      "topology": "3phi_half",
+      "load": "RLC",
+      "Vdc_numerical": 148.40167477901255,
+      "Vrms_numerical": 148.42415197609193,
+      "Idc_numerical": 0.25617086963774127
+    },
+    {
+      "topology": "3phi_full",
+      "load": "RL",
+      "Vdc_numerical": 281.1775707848154,
+      "Vrms_numerical": 281.4250658341309,
+      "Idc_numerical": 14.058886074455396
+    },
+    {
+      "topology": "3phi_full",
+      "load": "RLE",
+      "Vdc_numerical": 281.1775707848154,
+      "Vrms_numerical": 281.4250658341309,
+      "Idc_numerical": 12.558886074485558
+    },
+    {
+      "topology": "3phi_full",
+      "load": "RC",
+      "Vdc_numerical": 282.09383928061646,
+      "Vrms_numerical": 282.286208510302,
+      "Idc_numerical": 6.2233393686748855
+    },
+    {
+      "topology": "3phi_full",
+      "load": "RLC",
+      "Vdc_numerical": 280.0726557187413,
+      "Vrms_numerical": 280.0776658790303,
+      "Idc_numerical": 0.16927749799907893
+    }
+  ],
+  "figures": [
+    "uncontrolled_rectifier_waveforms.png"
+  ]
+}

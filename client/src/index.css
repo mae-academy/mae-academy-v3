@@ -1,0 +1,105 @@
+/*
+ * MAE Academy visual system: Luminous Technical Atelier.
+ * Technical editorial surfaces, signal violet accents, and SVG-friendly background texture.
+ */
+@import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap');
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --font-sans: "Apple Gothic", "Apple SD Gothic Neo", "Avenir Next", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Apple SD Gothic Neo", "Apple Gothic", "Helvetica Neue", ui-sans-serif, system-ui, sans-serif;
+  --font-arabic: "Tajawal", ui-sans-serif, system-ui, sans-serif;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-border: var(--border);
+  --color-ring: var(--ring);
+}
+
+:root { --background: #f7f8fc; --foreground: #0f172a; --border: #dbe3ef; --ring: #7c3aed; --mae-header-height: 120px; }
+.dark { --background: #07111f; --foreground: #f8fafc; --border: rgb(255 255 255 / .1); --ring: #a78bfa; }
+
+@layer base {
+  * { @apply border-border outline-ring/50; }
+  html { min-width: 320px; scroll-behavior: smooth; }
+  body { @apply m-0 bg-background text-foreground; font-family: var(--font-sans); }
+  html[lang="ar"] body { font-family: var(--font-arabic); }
+  button:not(:disabled), a[href], select:not(:disabled) { @apply cursor-pointer; }
+  ::selection { background: rgb(139 92 246 / .25); color: inherit; }
+}
+
+@layer components {
+  .container { width: 100%; margin-inline: auto; padding-inline: 1.25rem; }
+  .border-gradient-signal { border-image: linear-gradient(to bottom, #2563eb, #8b5cf6, #f43f5e) 1; }
+  .mae-display { font-family: var(--font-display); font-weight: 800; letter-spacing: -0.066em; }
+  .mae-card-title { font-family: var(--font-display); font-weight: 700; letter-spacing: -0.04em; }
+  html[dir="rtl"] .mae-display,
+  html[dir="rtl"] .mae-card-title { font-family: var(--font-arabic); letter-spacing: 0; }
+  .mae-signal-word { background: linear-gradient(90deg, #2563EB 0%, #8B5CF6 52%, #F43F5E 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .mae-signal-rule { width: 4rem; height: 1px; background: linear-gradient(90deg, #2563EB, #8B5CF6, #FB7185); }
+  .mae-station-section { position: relative; }
+  .mae-station-section::before { content: ""; position: absolute; inset-inline-start: max(1.25rem, calc((100vw - 1360px) / 2 + 2.5rem)); top: 0; bottom: 0; width: 1px; background: linear-gradient(to bottom, transparent, rgb(139 92 246 / .35), transparent); pointer-events: none; }
+  .simulation-title-block { box-shadow: inset 3px 0 0 rgb(124 58 237 / .65); }
+  .simulation-station::after { content: ""; position: absolute; inset-inline-start: .75rem; bottom: .75rem; width: .65rem; height: .65rem; border-inline-start: 1px solid rgb(139 92 246 / .55); border-bottom: 1px solid rgb(139 92 246 / .55); opacity: .8; }
+  .simulation-tool-rail { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); overflow: hidden; border: 1px solid rgb(148 163 184 / .35); border-radius: .9rem; background: rgb(255 255 255 / .45); }
+  .dark .simulation-tool-rail { border-color: rgb(255 255 255 / .12); background: rgb(255 255 255 / .025); }
+  .mae-noise { background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.95'/%3E%3C/svg%3E"); }
+  /* Assembler Studio: Tajawal labels, strict monospaced machine values, and sharp technical-paper frames. */
+  .assembler-studio { font-family: var(--font-arabic); }
+  .assembler-token-instruction { color: #7c3aed; font-weight: 800; }
+  .assembler-token-register { color: #0f766e; font-weight: 700; }
+  .assembler-token-number { color: #b45309; font-weight: 700; }
+  .assembler-token-directive { color: #2563eb; font-weight: 700; }
+  .assembler-token-comment { color: #64748b; font-style: italic; }
+  .dark .assembler-token-instruction { color: #c4b5fd; }
+  .dark .assembler-token-register { color: #5eead4; }
+  .dark .assembler-token-number { color: #fbbf24; }
+  .dark .assembler-token-directive { color: #93c5fd; }
+  .dark .assembler-token-comment { color: #94a3b8; }
+  .assembler-studio { position: relative; isolation: isolate; }
+  .assembler-studio::before { content: ""; position: absolute; inset: .75rem 0 auto; height: 26rem; z-index: -1; opacity: .55; background-image: linear-gradient(rgb(124 58 237 / .08) 1px, transparent 1px), linear-gradient(90deg, rgb(124 58 237 / .08) 1px, transparent 1px); background-size: 24px 24px; mask-image: linear-gradient(to bottom, black, transparent); pointer-events: none; }
+  .assembler-register-flash { animation: assembler-register-flash 1s ease-out; }
+  @keyframes assembler-register-flash { 0% { box-shadow: 0 0 0 0 rgb(16 185 129 / .78); background-color: rgb(209 250 229); } 100% { box-shadow: 0 0 0 8px rgb(16 185 129 / 0); } }
+  .dark .assembler-register-flash { animation-name: assembler-register-flash-dark; }
+  @keyframes assembler-register-flash-dark { 0% { box-shadow: 0 0 0 0 rgb(52 211 153 / .72); background-color: rgb(6 78 59 / .65); } 100% { box-shadow: 0 0 0 8px rgb(52 211 153 / 0); } }
+  /* PLC Studio: a monochrome Siemens worksheet contained within the MAE blueprint chassis. */
+  .plc-studio { position: relative; }
+  .plc-studio > div { background-image: linear-gradient(rgb(148 163 184 / .08) 1px, transparent 1px), linear-gradient(90deg, rgb(148 163 184 / .08) 1px, transparent 1px); background-size: 22px 22px; }
+  .dark .plc-studio > div { background-image: linear-gradient(rgb(255 255 255 / .045) 1px, transparent 1px), linear-gradient(90deg, rgb(255 255 255 / .045) 1px, transparent 1px); }
+  .plc-studio > div > * { position: relative; }
+  /* Circuit Studio: drafting-field annotations, Tajawal controls, and a restrained MAE signal edge. */
+  .circuit-studio { position: relative; isolation: isolate; }
+  .circuit-studio::before { content: ""; position: absolute; inset: .5rem 1rem auto; height: 18rem; z-index: -1; opacity: .45; background-image: linear-gradient(90deg, transparent 0 8%, rgb(139 92 246 / .11) 8% calc(8% + 1px), transparent calc(8% + 1px) 92%, rgb(244 63 94 / .14) 92% calc(92% + 1px), transparent calc(92% + 1px)); pointer-events: none; }
+  .circuit-studio h2, .circuit-studio button, .circuit-studio label { font-family: var(--font-arabic); }
+  .circuit-studio input, .circuit-studio .font-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+  .circuit-studio { --circuit-canvas: #fff; }
+  .dark .circuit-studio { --circuit-canvas: #020617; }
+  .circuit-studio .aspect-\[16\/9\] { background-color: var(--circuit-canvas); }
+  /* Circuit Lab is an anchored MAE instrument rail rather than a centered landing hero. */
+  .circuit-lab-station-header { position: relative; padding: 1rem 1.25rem 1.15rem; border-top: 1px solid rgb(148 163 184 / .28); border-bottom: 1px solid rgb(148 163 184 / .18); background: linear-gradient(90deg, rgb(37 99 235 / .05), transparent 26%, transparent 74%, rgb(244 63 94 / .05)); }
+  .circuit-lab-station-header::before, .circuit-lab-station-header::after { content: ""; position: absolute; width: .7rem; height: .7rem; border-color: rgb(139 92 246 / .7); pointer-events: none; }
+  .circuit-lab-station-header::before { inset: -.12rem auto auto -.12rem; border-top: 1px solid; border-left: 1px solid; }
+  .circuit-lab-station-header::after { inset: auto -.12rem -.12rem auto; border-right: 1px solid; border-bottom: 1px solid; }
+  html[dir="rtl"] .circuit-lab-station-header { text-align: right; }
+  /* Tab C is deliberately an archival embedded instrument, surrounded by MAE drafting cues. */
+  .legacy-archive-frame { position: relative; isolation: isolate; background: #0b1525; }
+  .legacy-archive-frame::before { content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none; background-image: linear-gradient(rgb(148 163 184 / .055) 1px, transparent 1px), linear-gradient(90deg, rgb(148 163 184 / .055) 1px, transparent 1px); background-size: 24px 24px; mask-image: linear-gradient(to bottom, black, transparent 72%); }
+  .legacy-archive-frame header { background: linear-gradient(90deg, rgb(15 30 54 / .96), rgb(11 21 37 / .96)); }
+  .legacy-archive-sheet { border-top: 1px solid rgb(244 63 94 / .38); background: linear-gradient(135deg, rgb(37 99 235 / .14), transparent 33%, rgb(244 63 94 / .11)); }
+  .legacy-archive-sheet::before, .legacy-archive-sheet::after { content: ""; position: absolute; z-index: 2; width: 1.1rem; height: 1.1rem; pointer-events: none; border-color: rgb(139 92 246 / .72); }
+  .legacy-archive-sheet::before { inset: .65rem auto auto .65rem; border-top: 1px solid; border-left: 1px solid; }
+  .legacy-archive-sheet::after { inset: auto .65rem .65rem auto; border-right: 1px solid; border-bottom: 1px solid; }
+  .legacy-archive-sheet iframe { box-shadow: 0 0 0 1px rgb(148 163 184 / .44), 0 18px 34px rgb(2 6 23 / .32); }
+  .v3-mae-layout { position: relative; isolation: isolate; }
+  .v3-mae-layout::before { content: ""; position: absolute; inset: .5rem 1.25rem auto; height: 11rem; z-index: -1; pointer-events: none; background: linear-gradient(90deg, transparent 0 7%, rgb(37 99 235 / .1) 7% calc(7% + 1px), transparent calc(7% + 1px) 93%, rgb(244 63 94 / .12) 93% calc(93% + 1px), transparent calc(93% + 1px)); }
+  /* V3 has its own source tree and mounts only inside Tab B. Its standalone
+     global stylesheet is intentionally excluded; this scope is the future
+     visual-theme boundary and prevents accidental inheritance into Tab A. */
+  .v3-simulator-root { isolation: isolate; }
+  @media (min-width: 640px) { .container { padding-inline: 2rem; } }
+  @media (min-width: 1280px) { .container { max-width: 1360px; padding-inline: 2.5rem; } }
+}
+
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: .01ms !important; } }
