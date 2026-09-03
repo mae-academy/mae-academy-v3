@@ -3,7 +3,6 @@ import { useEffect, useMemo, useState } from "react";
    shoot-through state uses a constrained crimson signal to inhibit the scope and mark the leg. */
 import { CartesianGrid, Label, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { KatexMath } from "@/components/ui/KatexMath";
-import { PowerStationRail } from "@/components/power/PowerStationRail";
 import { defaultInverterParameters, simulateInverter, type InverterLoad, type InverterParameters, type InverterPhase, type InverterSample, type SinglePhaseSubtype, type SwitchingTechnique, type ThreePhaseConduction } from "@/lib/inverterMath";
 
 const tex = String.raw;
@@ -100,7 +99,7 @@ export function InverterStudio() {
 
   const metricsPanel = <section className={`${card} p-4`}><div><h3 className={heading}>Steady-State Metrics</h3><KatexMath math={tex`\mathrm{DFT}\{V_{an},I_o\}_{T}`} className="mt-1 block text-xs text-slate-500 dark:text-slate-400" /></div><div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4"><Metric label={tex`V_{\mathrm{RMS}}`} value={tex`${numberTex(metrics.voltageRms)}\,\mathrm{V}`} /><Metric label={tex`V_1`} value={tex`${numberTex(metrics.voltageFundamentalRms)}\,\mathrm{V}`} /><Metric label={tex`I_{\mathrm{RMS}}`} value={tex`${numberTex(metrics.currentRms)}\,\mathrm{A}`} /><Metric label={tex`I_1`} value={tex`${numberTex(metrics.currentFundamentalRms)}\,\mathrm{A}`} /><Metric label={tex`\mathrm{THD}_v`} value={tex`${numberTex(metrics.voltageThd)}\%`} /><Metric label={tex`\mathrm{THD}_i`} value={tex`${numberTex(metrics.currentThd)}\%`} /><Metric label={tex`\mathrm{DF}`} value={numberTex(metrics.distortionFactor, 3)} /><Metric label={tex`\mathrm{HF}`} value={numberTex(metrics.harmonicFactor, 3)} /><Metric label="P" value={tex`${numberTex(metrics.activePower)}\,\mathrm{W}`} /><Metric label="S" value={tex`${numberTex(metrics.apparentPower)}\,\mathrm{VA}`} /><Metric label={tex`\mathrm{PF}`} value={numberTex(metrics.powerFactor, 3)} /><Metric label={tex`f_o`} value={tex`${numberTex(metrics.outputFrequency)}\,\mathrm{Hz}`} /></div></section>;
 
-  return <div className="space-y-6"><PowerStationRail code="PE / A02" title="Voltage Source Inverter Station" topology={`${parameters.phase === "three" ? `${parameters.threePhaseConduction}° 3Φ` : parameters.singlePhaseSubtype} · ${parameters.technique.toUpperCase()}`} solverState={shootThroughFault ? "FAULT / OUTPUT INHIBITED" : "FINITE WAVEFORM / READY"} reference="REF / DC-LINK-02" /><div className="grid gap-6 xl:grid-cols-2"><aside className="min-w-0 space-y-6">{topology}{control}{sourceLoad}{metricsPanel}</aside><main className="min-w-0 w-full space-y-6">{vectorScope}<Circuit parameters={parameters} faulted={shootThroughFault} /></main></div></div>;
+  return <div className="space-y-6"><div className="grid gap-6 xl:grid-cols-2"><aside className="min-w-0 space-y-6">{topology}{control}{sourceLoad}{metricsPanel}</aside><main className="min-w-0 w-full space-y-6">{vectorScope}<Circuit parameters={parameters} faulted={shootThroughFault} /></main></div></div>;
 }
 
 export default InverterStudio;

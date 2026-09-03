@@ -102,8 +102,8 @@ export default function SimulationDetail() {
   const toolContent = circuitToolContent ?? (isSignalsAndSystems && tool === "a" ? <SignalOperationsLab /> : isSignalsAndSystems && tool === "b" ? <SystemClassificationLab /> : isSignalsAndSystems && tool === "c" ? <ConvolutionLab /> : isSignalsAndSystems && tool === "d" ? <FourierAnalysisLab /> : isSignalsAndSystems && tool === "e" ? <LaplaceZPlaneLab /> : isDigitalLogicWorkspace ? <DigitalLogicSimulator /> : isRootLocus ? <RootLocusStudio /> : isPidStudio ? <PIDStudio /> : isFrequencyResponse ? <FrequencyResponseStudio /> : isStateSpaceStudio ? <StateSpaceStudio /> : isRectifierStudio ? <RectifierStudio /> : isInverterStudio ? <InverterStudio /> : isAcVoltageControllerStudio ? <ACVoltageControllerStudio /> : isChopperStudio ? <ChopperStudio /> : isSiemensS7200Studio ? <SiemensS7200Studio /> : isAssemblerStudio ? <AssemblerStudioCompact /> : isLinearAlgebraStudio ? <LinearAlgebraStudio section={tool as "a" | "b" | "c" | "d" | "e"} /> : <SimulationToolWorkspace toolKey={`${meta.slug}-${tool}`} />);
 
   return <motion.div variants={container} initial="hidden" animate="visible">
-    <SimulatorLayout title={isPlc ? simulation.title : isSignalsAndSystems && tool === "d" ? "Fourier Analysis" : isSignalsAndSystems && tool === "e" ? "Laplace & Z-Plane" : simulation.title} tabs={tools} activeTab={tool} routePrefix={`/simulations/${meta.slug}`} backLabel={copy.footer.simulations} isRtl={isRtl} hideToolNavigation={isDigitalLogicDesign} compact={isSignalsAndSystems && ["d", "e"].includes(tool)}>
-      <motion.div variants={item} className={isSignalsAndSystems && ["d", "e"].includes(tool) ? "mt-3" : "mt-12"}>{toolContent}</motion.div>
+    <SimulatorLayout title={simulation.title} tabs={tools} activeTab={tool} routePrefix={`/simulations/${meta.slug}`} backLabel={copy.footer.simulations} isRtl={isRtl} hideToolNavigation={isDigitalLogicDesign}>
+      <motion.div variants={item} className="mt-12">{toolContent}</motion.div>
     </SimulatorLayout>
   </motion.div>;
 }

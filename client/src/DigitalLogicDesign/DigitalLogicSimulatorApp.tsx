@@ -6,6 +6,7 @@ import { TimingWaveforms } from './pages/TimingWaveforms';
 import { StateMachineExplorer } from './pages/StateMachineExplorer';
 import { DiscreteEventLogicEngine } from './lib/desLogicCore';
 import { useState } from 'react';
+import SimulationPageHeader from '@/components/SimulationPageHeader';
 
 /**
  * Luminous Technical Atelier: Power Electronics-style white segmented controls;
@@ -33,14 +34,13 @@ export function DigitalLogicSimulatorApp() {
   const [activeTool, setActiveTool] = useState<DigitalLogicTool>(initialDigitalLogicTool);
   const activeLabel = DIGITAL_LOGIC_TOOLS.find(tool => tool.id === activeTool)?.label ?? 'Digital Logic Lab';
   return <div className="v3-simulator-root simulator-theme-b" data-simulator-theme="b">
-    <section aria-label="Digital Logic Lab tools" style={{ overflow: 'hidden', marginBottom: 24, border: '1px solid #e5e7eb', borderRadius: 14, background: '#ffffff', boxShadow: '0 2px 4px rgba(15, 23, 42, .06)' }}>
-      <div role="tablist" aria-label="Digital Logic Lab tools" style={{ display: 'flex', minWidth: 760, background: '#ffffff' }}>
-        {DIGITAL_LOGIC_TOOLS.map(tool => {
-          const active = tool.id === activeTool;
-          return <button key={tool.id} id={`digital-logic-tab-${tool.id}`} role="tab" aria-selected={active} aria-controls={`digital-logic-panel-${tool.id}`} onClick={() => setActiveTool(tool.id)} style={{ flex: '1 1 0', minHeight: 72, border: 'none', borderLeft: tool.id === 'schematic' ? 'none' : '1px solid #e5e7eb', color: active ? '#ffffff' : '#475569', background: active ? 'linear-gradient(100deg, #2563eb 0%, #8b5cf6 52%, #f43f5e 100%)' : '#ffffff', boxShadow: active ? '0 6px 16px rgba(37, 99, 235, .16)' : 'none', fontSize: 14, fontWeight: active ? 800 : 650, whiteSpace: 'nowrap', cursor: 'pointer', transition: 'background 160ms cubic-bezier(.23, 1, .32, 1), color 160ms cubic-bezier(.23, 1, .32, 1)' }}>{tool.label}</button>;
-        })}
-      </div>
-    </section>
+    <SimulationPageHeader
+      tools={DIGITAL_LOGIC_TOOLS}
+      activeTool={activeTool}
+      onSelectTool={(toolId) => setActiveTool(toolId as DigitalLogicTool)}
+      showBack={false}
+      showTitle={false}
+    />
 
     <div id="digital-logic-panel-schematic" role="tabpanel" aria-labelledby="digital-logic-tab-schematic" style={{ display: activeTool === 'schematic' ? 'block' : 'none' }}>
       <DigitalLogicSimulatorHome createSimulationEngine={createDigitalLogicEngine} tabDUiRefinement digitalLogicOnly />
