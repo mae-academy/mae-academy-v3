@@ -35,6 +35,7 @@ import { toast } from 'sonner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { V3Math } from '@/v3-simulator/components/V3Math';
 import { AnalysisBox } from '@/v3-simulator/components/AnalysisBox';
+import CircuitAnalysisAssistant from '@/components/CircuitAnalysisAssistant';
 import type { AnalysisTrace, MeshCycle, NodalNodeLabel } from '@/v3-simulator/lib/analysisTypes';
 import {
   CATEGORIES,
@@ -214,18 +215,33 @@ function ComponentPaletteIcon({ definition, colors, documented }: { definition: 
   return <svg width="102" height="88" viewBox={`${-span / 2} ${-span / 2} ${span} ${span}`} aria-hidden="true" style={{ overflow: 'visible', color: colors.text, pointerEvents: 'none' }}><g transform="scale(1.08)">{renderSymbol(definition.symbol, false, { ...defaultProps(definition), _documentedStyle: documented }, 0)}</g></svg>;
 }
 
+/**
+ * Nominal visual clearance between a label edge and the component's outermost
+ * schematic stroke. Derived from the component footprint so the gap stays
+ * tight (4px–8px) at every scale and rotation, never a per-component constant.
+ */
+function labelClearance(definition: ComponentDef, scale = 1): number {
+  const footprint = Math.min(definition.width, definition.height) * scale;
+  return Math.min(8, Math.max(4, footprint * 0.15));
+}
+
 /** Labels are outside the rotated symbol group, so their baseline stays horizontal at every angle. */
 function horizontalLabelOffset(definition: ComponentDef, rotation: number, scale = 1): Point {
   const normalized = ((rotation % 360) + 360) % 360;
-  if (normalized === 90) return [definition.height * scale / 2 + 30, -8];
-  if (normalized === 270) return [-(definition.height * scale / 2 + 30), -8];
+  const snug = labelClearance(definition, scale);
+  if (normalized === 90) return [definition.height * scale / 2 + snug, 0];
+  if (normalized === 270) return [-(definition.height * scale / 2 + snug), 0];
   const direction = normalized === 180 ? -1 : 1;
-  return [0, direction * (definition.height * scale / 2 + 18)];
+  return [0, direction * (definition.height * scale / 2 + snug)];
 }
 
 /** Two-terminal labels sit perpendicular to the actual terminal axis, regardless of rotation or reflection. */
-function componentLabelOffset(definition: ComponentDef, component: CircuitComponent, scale = 1): Point {
-  if (definition.terminals.length !== 2) return horizontalLabelOffset(definition, component.rotation, scale);
+function componentLabelAnchors(definition: ComponentDef, component: CircuitComponent, scale = 1): { reference: Point; value: Point } {
+  if (definition.terminals.length !== 2) {
+    const reference = horizontalLabelOffset(definition, component.rotation, scale);
+    const value: Point = [reference[0], reference[1] >= 0 ? reference[1] + 16 : reference[1] - 16];
+    return { reference, value };
+  }
   const [first, second] = definition.terminals;
   const localX = (first.x - second.x) * (component.flipH ? -1 : 1) * scale;
   const localY = (first.y - second.y) * (component.flipV ? -1 : 1) * scale;
@@ -233,9 +249,28 @@ function componentLabelOffset(definition: ComponentDef, component: CircuitCompon
   const actualX = localX * Math.cos(radians) - localY * Math.sin(radians);
   const actualY = localX * Math.sin(radians) + localY * Math.cos(radians);
   const terminalsAreHorizontal = Math.abs(actualX) >= Math.abs(actualY);
-  return terminalsAreHorizontal
-    ? [0, -(definition.height * scale / 2 + 22)]
-    : [definition.width * scale / 2 + 30, -8];
+  const halfH = definition.height * scale / 2;
+  const halfW = definition.width * scale / 2;
+  if (terminalsAreHorizontal) {
+    // Horizontal: Reference sits tightly above the body, Value directly below,
+    // both centred on the component axis.
+    const above = -Math.max(12, halfH + 3);
+    const below = Math.max(16, halfH + 3);
+    return { reference: [0, above], value: [0, below] };
+  }
+  // Vertical: both labels sit snug to the right of the body, centred vertically.
+  const side = Math.max(14, halfW + 3);
+  return { reference: [side, -8], value: [side, 8] };
+}
+
+/** Reference anchor only (kept for hit-testing). */
+function componentLabelOffset(definition: ComponentDef, component: CircuitComponent, scale = 1): Point {
+  return componentLabelAnchors(definition, component, scale).reference;
+}
+
+/** Value anchor, so Reference and Value never stack on the same side. */
+function componentValueAnchor(definition: ComponentDef, component: CircuitComponent, scale = 1): Point {
+  return componentLabelAnchors(definition, component, scale).value;
 }
 
 function componentDisplayValue(definition: ComponentDef, component: CircuitComponent): string | null {
@@ -253,7 +288,13 @@ function componentDisplayValue(definition: ComponentDef, component: CircuitCompo
 
 function NodalNodeOverlay({ node }: { node: NodalNodeLabel }) {
   const [x, y] = node.centroid;
-  return <g pointerEvents="none" aria-label={`Nodal voltage V ${node.index}`}><circle cx={x} cy={y} r={13} fill="white" fillOpacity={0.94} stroke={node.color} strokeWidth={1.5} /><circle cx={x - 8} cy={y - 8} r={2.5} fill={node.color} /><SvgKaTeXLabel x={x + 1} y={y + 1} math={`V_{${node.index}}`} color={node.color} ariaLabel={`Nodal voltage V ${node.index}`} width={46} height={24} /></g>;
+  // The node coordinate is the resolved topological junction (degree >= 3), never a
+  // component body. The V_k label is lifted cleanly above the junction dot so it does
+  // not sit on an adjacent resistor/pin.
+  return <g pointerEvents="none" aria-label={`Nodal voltage V ${node.index}`}>
+    <circle cx={x} cy={y} r={4} fill="white" stroke={node.color} strokeWidth={2} />
+    <SvgKaTeXLabel x={x} y={y - 14} math={`V_{${node.index}}`} color={node.color} ariaLabel={`Nodal voltage V ${node.index}`} width={48} height={20} />
+  </g>;
 }
 
 export interface V3HomeProps {
@@ -284,6 +325,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
   const [simulationRunning, setSimulationRunning] = useState(false);
   const [simulationSpeed, setSimulationSpeed] = useState(1);
+  const hasStartedSimulation = useRef(false);
   const [snapshot, setSnapshot] = useState<SimulationSnapshot>(EMPTY_SNAPSHOT);
   const [animationTime, setAnimationTime] = useState(0);
   const [darkPreview, setDarkPreview] = useState(() => typeof document !== 'undefined' && document.documentElement.classList.contains('dark'));
@@ -997,22 +1039,22 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
             {tabDUiRefinement && <><ToolbarDivider colors={colors} /><ToolbarButton colors={colors} icon={<RotateCw size={14} />} label="90°" title="Rotate selected component 90°" onClick={() => rotateSelected(90)} disabled={!selectedComponent} /><ToolbarButton colors={colors} icon={<RotateCw size={14} />} label="45°" title="Rotate selected component 45°" onClick={() => rotateSelected(45)} disabled={!selectedComponent} /><ToolbarButton colors={colors} icon={<FlipHorizontal size={14} />} label="Flip X" title="Reflect selected component horizontally" onClick={() => flipSelected('h')} disabled={!selectedComponent} /><ToolbarButton colors={colors} icon={<FlipVertical size={14} />} label="Flip Y" title="Reflect selected component vertically" onClick={() => flipSelected('v')} disabled={!selectedComponent} /></>}
           </div>
           <div className="flex flex-nowrap items-center gap-1.5 border-t px-2 py-2" style={{ borderColor: colors.line, minHeight: 36 }}>
-            <ToolbarButton colors={colors} icon={<Download size={14} />} label="NAD" title="Export circuit as NAD" onClick={exportNad} />
-            <ToolbarButton colors={colors} icon={<Upload size={14} />} label="NAD" title="Import circuit from NAD" onClick={() => nadInputRef.current?.click()} />
+            <ToolbarButton colors={colors} icon={<Download size={14} />} label="Export" title="Export circuit as NAD netlist" onClick={exportNad} />
+            <ToolbarButton colors={colors} icon={<Upload size={14} />} label="Import" title="Import circuit from NAD netlist" onClick={() => nadInputRef.current?.click()} />
             <input ref={nadInputRef} type="file" accept=".nad,application/x-mae-nad+json,application/json" onChange={importNad} style={{ display: 'none' }} />
             <ToolbarDivider colors={colors} />
             <ToolbarButton colors={colors} icon={<Copy size={14} />} title="Copy selected component (Ctrl/Cmd+C)" onClick={copySelection} disabled={!selectedComponent} />
             <ToolbarButton colors={colors} icon={<Scissors size={14} />} title="Cut selected component (Ctrl/Cmd+X)" onClick={cutSelection} disabled={!selectedComponent} />
             <ToolbarButton colors={colors} icon={<Clipboard size={14} />} title="Paste component (Ctrl/Cmd+V)" onClick={pasteComponent} disabled={!clipboardComponent} />
             <ToolbarDivider colors={colors} />
-            <button onClick={() => setSimulationRunning(value => !value)} title={simulationRunning ? 'Pause simulation' : 'Run simulation'} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: simulationRunning ? TAB_GRADIENT : TAB_GRADIENT_REV, color: '#ffffff', fontWeight: 700, padding: '5px 14px', minHeight: 28, borderRadius: 8, fontSize: 11, boxShadow: TAB_ACTIVE_SHADOW, border: '1px solid transparent', cursor: 'pointer', whiteSpace: 'nowrap', transition: 'background .25s ease' }}>
+            <button onClick={() => { hasStartedSimulation.current = true; setSimulationRunning(value => !value); }} title={simulationRunning ? 'Pause simulation' : 'Run simulation'} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: (!simulationRunning && hasStartedSimulation.current) ? TAB_GRADIENT_REV : TAB_GRADIENT, color: '#ffffff', fontWeight: 500, padding: '6px 14px', minHeight: 30, borderRadius: 8, fontSize: 12, boxShadow: TAB_ACTIVE_SHADOW, border: '1px solid transparent', cursor: 'pointer', whiteSpace: 'nowrap', transition: 'background .3s ease' }}>
               {simulationRunning ? <Pause size={14} /> : <Play size={14} />}{simulationRunning ? 'Pause' : 'Run'}
             </button>
             <ToolbarButton colors={colors} icon={<RotateCcw size={14} />} title="Reset simulation" onClick={resetSimulation} />
             <span style={{ fontSize: 11, minWidth: 55, color: colors.muted, fontVariantNumeric: 'tabular-nums' }}>{snapshot.time.toFixed(3)} s</span>
             <ToolbarDivider colors={colors} />
-            <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-              <input aria-label="Simulation speed" type="range" min={.25} max={4} step={.25} value={simulationSpeed} onChange={event => setSimulationSpeed(numeric(event.target.value, 1))} style={{ width: 58, accentColor: colors.accent }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <input aria-label="Simulation speed" type="range" min={.25} max={4} step={.25} value={simulationSpeed} onChange={event => setSimulationSpeed(numeric(event.target.value, 1))} className="h-1.5 w-24 cursor-pointer appearance-none rounded-full bg-gradient-to-r from-blue-600 to-pink-500 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-0 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:ring-2 [&::-webkit-slider-thumb]:ring-blue-500 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:shadow" />
               <span style={{ color: colors.muted, fontSize: 10 }}>{simulationSpeed.toFixed(2)}×</span>
             </div>
           </div>
@@ -1105,6 +1147,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                 const transform = `translate(${component.x},${component.y})`;
                 const symbolTransform = `rotate(${component.rotation}) scale(${component.flipH ? -1 : 1},${component.flipV ? -1 : 1}) scale(${visualSymbolScale})`;
                 const labelOffset = componentLabelOffset(definition, component, visualSymbolScale);
+                const valueAnchor = componentValueAnchor(definition, component, visualSymbolScale);
                 const value = componentDisplayValue(definition, component);
                 return (
                   <g key={component.id} transform={transform}>
@@ -1134,7 +1177,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                       </g>;
                     })}
                     <SvgKaTeXLabel x={labelOffset[0]} y={labelOffset[1]} math={component.label.replace(/^([A-Za-z]+)(\d+)$/, '$1_{$2}')} color={colors.text} ariaLabel={component.label} width={Math.max(54, component.label.length * 10)} height={22} />
-                    {value && <SvgKaTeXLabel x={labelOffset[0]} y={labelOffset[1] + 17} math={value} color={colors.muted} ariaLabel={`${component.label} value`} width={80} height={20} />}
+                    {value && <SvgKaTeXLabel x={valueAnchor[0]} y={valueAnchor[1]} math={value} color={colors.muted} ariaLabel={`${component.label} value`} width={80} height={20} />}
                   </g>
                 );
               })}
@@ -1189,6 +1232,9 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
       <section className="mt-3 overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-950" style={{ background: colors.panel, borderColor: colors.line }}>
         <div className="border-b px-5 py-3" style={{ borderColor: colors.line }}><div className={CONTROL_SYSTEMS_HEADING}>Academic Analysis Workspace</div></div>
         <AnalysisBox elements={dcMna.elements} geometry={meshGeometry} nodalNodes={nodalGeometry} colors={colors} standalone onTraceChange={handleAnalysisTrace} />
+        <div className="border-t border-slate-200/80 p-4 dark:border-slate-800">
+          <CircuitAnalysisAssistant />
+        </div>
       </section>
     </div>
   );
@@ -1203,7 +1249,7 @@ interface Palette { background: string; canvas: string; panel: string; panelAlt:
 
 function ToolbarButton({ colors, icon, label, title, onClick, active, disabled }: { colors: Palette; icon?: React.ReactNode; label?: string; title: string; onClick: () => void; active?: boolean; disabled?: boolean }) {
   const isActive = Boolean(active) && !disabled;
-  return <button title={title} onClick={onClick} disabled={disabled} style={{ border: isActive ? '1px solid transparent' : `1px solid ${colors.line}`, background: isActive ? TAB_GRADIENT : colors.panelAlt, color: isActive ? '#ffffff' : disabled ? colors.subtle : colors.muted, borderRadius: 8, padding: '4px 9px', minHeight: 27, display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10.5, fontWeight: 700, cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? .5 : 1, boxShadow: isActive ? TAB_ACTIVE_SHADOW : 'none', flexShrink: 0, whiteSpace: 'nowrap', transition: 'background .15s ease' }}>{icon}{label}</button>;
+  return <button title={title} onClick={onClick} disabled={disabled} style={{ border: isActive ? '1px solid transparent' : `1px solid ${colors.line}`, background: isActive ? TAB_GRADIENT : colors.panelAlt, color: isActive ? '#ffffff' : disabled ? colors.subtle : colors.muted, borderRadius: 9, padding: '6px 12px', minHeight: 32, display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 500, cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? .5 : 1, boxShadow: isActive ? TAB_ACTIVE_SHADOW : 'none', flexShrink: 0, whiteSpace: 'nowrap', transition: 'background .15s ease' }}>{icon}{label}</button>;
 }
 
 function ToolbarDivider({ colors }: { colors: Palette }) { return <span style={{ width: 1, height: 20, background: colors.line, margin: '0 1px', flexShrink: 0 }} />; }

@@ -16,6 +16,11 @@ type CurrentConstraint = { sourceId: string; coefficients: number[]; value: numb
 export type MeshTopology = { branchCount: number; netCount: number; connectedComponents: number; expectedMeshCount: number; extractedFaceCount: number };
 
 const POINT_EPSILON = 1e-6;
+// The I_k indicator must stay strictly inside the face's clear interior cavity:
+// R = max(12, min(20, min(W,H)/2 - 16))
+const MESH_ARROW_MIN_RADIUS = 12;
+const MESH_ARROW_MAX_RADIUS = 20;
+const MESH_ARROW_CLEARANCE_PAD = 16;
 
 const pointKey = ([x, y]: Point) => `${Math.round(x / POINT_EPSILON)}:${Math.round(y / POINT_EPSILON)}`;
 const signedScreenArea = (points: Point[]) => points.reduce((area, point, index) => {
@@ -79,11 +84,35 @@ const pointToSegmentDistance = (point: Point, from: Point, to: Point) => {
 /** Keep the mesh current reference inside both its local box and its actual perimeter clearance. */
 export const calculateMeshArrowRadius = (points: Point[], centroid = calculateMeshCentroid(points)) => {
   if (!points.length) return 0;
-  const xs = points.map(([x]) => x);
-  const ys = points.map(([, y]) => y);
-  const boxBound = Math.min(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)) * 0.25;
+  // R_max = minimum perpendicular distance from the interior centroid to every
+  // enclosing loop segment, so the inscribed arrow can never cross a component.
   const clearance = points.reduce((closest, point, index) => Math.min(closest, pointToSegmentDistance(centroid, point, points[(index + 1) % points.length])), Number.POSITIVE_INFINITY);
-  return Math.max(0, Math.min(boxBound, clearance * 0.7));
+  // R = max(12, min(22, R_max - 12))
+  return Math.max(MESH_ARROW_MIN_RADIUS, Math.min(MESH_ARROW_MAX_RADIUS, clearance - MESH_ARROW_CLEARANCE_PAD));
+};
+
+/**
+ * Strict clear-interior cavity of a planar face. The centre is the middle of the
+ * face's bounding window (not the area centroid, which can drift onto a wire or
+ * component row) and the radius is clamped so the curved arrow and its I_k label
+ * float entirely inside the empty window.
+ */
+export const calculateMeshCavity = (points: Point[]): { center: Point; radius: number } => {
+  if (!points.length) return { center: [0, 0], radius: MESH_ARROW_MIN_RADIUS };
+  let xMin = Infinity;
+  let yMin = Infinity;
+  let xMax = -Infinity;
+  let yMax = -Infinity;
+  for (const [x, y] of points) {
+    if (x < xMin) xMin = x;
+    if (x > xMax) xMax = x;
+    if (y < yMin) yMin = y;
+    if (y > yMax) yMax = y;
+  }
+  const center: Point = [(xMin + xMax) / 2, (yMin + yMax) / 2];
+  const availableRadius = Math.min((xMax - xMin) / 2, (yMax - yMin) / 2) - MESH_ARROW_CLEARANCE_PAD;
+  const radius = Math.max(MESH_ARROW_MIN_RADIUS, Math.min(MESH_ARROW_MAX_RADIUS, availableRadius));
+  return { center, radius };
 };
 
 class DisjointSet {
@@ -121,15 +150,15 @@ const clockwiseFaces = (geometry: MeshGeometry): GeometricCycle[] => {
   const graph: NormalizedCircuitGraph | undefined = geometry.graph;
   if (graph) {
     return graph.faces.map((face) => {
-      const centroid = calculateMeshCentroid(face.points);
+      const { center, radius } = calculateMeshCavity(face.points);
       return {
         signed: new Map(face.branchDirections),
         cycle: {
           index: face.index,
           color: MESH_COLORS[face.index % MESH_COLORS.length],
           points: face.points,
-          centroid,
-          radius: calculateMeshArrowRadius(face.points, centroid),
+          centroid: center,
+          radius,
           nodes: [],
           branchIds: face.branchIds,
         },
@@ -195,8 +224,8 @@ const clockwiseFaces = (geometry: MeshGeometry): GeometricCycle[] => {
       if (half.segment.branchId) signed.set(half.segment.branchId, half.direction * (half.segment.direction ?? 1));
     });
     if (!signed.size) continue;
-    const centroid = calculateMeshCentroid(points);
-    faces.push({ signed, points, centroid, radius: calculateMeshArrowRadius(points, centroid), branchIds: Array.from(signed.keys()) });
+    const { center, radius } = calculateMeshCavity(points);
+    faces.push({ signed, points, centroid: center, radius, branchIds: Array.from(signed.keys()) });
   }
   // Assign I_1, I_2, … from the spatial layout rather than the arbitrary
   // half-edge insertion order: left-to-right, then top-to-bottom on a column.
@@ -252,6 +281,31 @@ const stampCurrentConstraints = (cycles: SignedCycle[], edges: MeshEdge[], imped
   return constraints;
 };
 
+/** When no bounded planar face survives (pure topology fallback), anchor the
+    I_k arrow to the polygon formed by the cycle's own branch/wire coordinates. */
+const synthesizeFallbackMeshCycles = (cycles: SignedCycle[], geometry?: MeshGeometry): MeshCycle[] => {
+  if (!geometry) return [];
+  return cycles.map((signed, index) => {
+    const points: Point[] = [];
+    for (const id of Array.from(signed.keys())) {
+      const branch = geometry.branches.find((item) => item.id === id);
+      if (branch && branch.path.length) points.push(branch.path[0], branch.path[branch.path.length - 1]);
+      const wire = geometry.wires.find((item) => item.id === id);
+      if (wire) points.push(...wire.path);
+    }
+    const { center, radius } = calculateMeshCavity(points);
+    return {
+      index,
+      color: MESH_COLORS[index % MESH_COLORS.length],
+      points,
+      centroid: center,
+      radius,
+      nodes: [],
+      branchIds: Array.from(signed.keys()),
+    };
+  });
+};
+
 /** Builds a clockwise mesh-current system; geometric bounded faces take precedence over the topology fallback. */
 export const buildMeshSystem = (elements: MNAElement[], geometry?: MeshGeometry): MeshSystem => {
   const edges = meshEdges(elements);
@@ -288,7 +342,9 @@ export const buildMeshSystem = (elements: MNAElement[], geometry?: MeshGeometry)
     // Edge direction is + terminal → − terminal: entering − is traversal −1, a +V rise.
     return sum + (-traversal * edge.value);
   }, 0));
-  const meshCycles = resistorFaces.map((face) => face.cycle);
+  const meshCycles = resistorFaces.length
+    ? resistorFaces.map((face) => face.cycle)
+    : synthesizeFallbackMeshCycles(cycles, geometry);
   const currentConstraints = stampCurrentConstraints(cycles, edges, impedance, source);
   const rank = matrixRank(impedance);
   return { impedance, source, cycles, edges, meshCycles, currentConstraints, topology, rank, fullRank: rank === cycles.length };
@@ -335,19 +391,20 @@ export class MeshSolver {
       const solvedMesh = system.impedance.length ? solveMeshCurrents(z, rhs) : [0];
       const meshCurrents = Object.fromEntries(solvedMesh.map((value, index) => [`I_${index + 1}`, value]));
       const loopSystem = `${coloredMatrix(z)}${coloredVector(loops)}=${coloredMatrix(rhs.map((value) => [value]))}`;
-      const solvedVector = solvedMesh.map((value, index) => `I_{${index + 1}}=${value}\\,\\mathrm{A}`).join(',\\qquad ');
+      const solvedVector = solvedMesh.map((value, index) => `I_{${index + 1}}=${formatAcademicNumber(value)}\\,\\mathrm{A}`).join(',\\qquad ');
       const branch = Object.entries(result.branchCurrents).map(([key, value]) => {
         const element = this.elements.find((item) => item.id === key);
-        return `${element ? `I_{${dictionary.element(element)}}` : 'I_x'}=${value}\,\mathrm{A}`;
-      }).join(',\qquad ');
-      const topologyMath = `M=B-N+C=${system.topology.branchCount}-${system.topology.netCount}+${system.topology.connectedComponents}=${system.topology.expectedMeshCount},\qquad\operatorname{rank}(Z_m)=${system.rank}`;
-      const supermeshMath = currentConstraints.map((constraint) => `${constraint.coefficients.map((coefficient, index) => coefficient === 0 ? '' : `${coefficient < 0 ? '-' : coefficient === 1 ? '' : coefficient}I_{${index + 1}}`).filter(Boolean).join('+')}=${formatAcademicNumber(constraint.value)}\,\mathrm{A}`).join(',\qquad ');
+        return `${element ? `I_{${dictionary.element(element)}}` : 'I_x'}=${formatAcademicNumber(value)}\\,\\mathrm{A}`;
+      }).join(',\\qquad ');
+      const topologyMath = `M=B-N+C=${system.topology.branchCount}-${system.topology.netCount}+${system.topology.connectedComponents}=${system.topology.expectedMeshCount}`;
+      const rankMath = `\\mathrm{rank}(Z_m)=${system.rank}`;
+      const supermeshMath = currentConstraints.map((constraint) => `${constraint.coefficients.map((coefficient, index) => coefficient === 0 ? '' : `${coefficient < 0 ? '-' : coefficient === 1 ? '' : coefficient}I_{${index + 1}}`).filter(Boolean).join('+')}=${formatAcademicNumber(constraint.value)}\\,\\mathrm{A}`).join(',\\qquad ');
       const steps = [
-        { title: '1. Planar graph and clockwise face-mesh assignment', math: `${topologyMath}\qquad${coloredVector(loops)}`, prose: `Merged electrical rails produce ${system.topology.netCount} nets and ${system.topology.branchCount} branches. Euler’s relation predicts ${system.topology.expectedMeshCount} independent bounded meshes; ${system.topology.extractedFaceCount || meshCount} geometric faces were extracted from the workspace. The stamped Supermesh system is rank-certified at ${system.rank} of ${system.cycles.length}.` },
-        { title: '2. KVL loop equations · assembled mesh-current coefficient system', math: `${loopSystem}\qquad\left[Z_m\right]\left[I_m\right]=\left[E_m\right]`, prose: 'Each diagonal entry is the sum of resistances in its mesh. An off-diagonal entry is the signed negative shared resistance, so this system has exactly one row and one column per mesh.' },
+        { title: '1. Planar graph and clockwise face-mesh assignment', math: `${topologyMath}\\qquad${rankMath}`, prose: `Merged electrical rails produce ${system.topology.netCount} nets and ${system.topology.branchCount} branches. Euler’s relation predicts ${system.topology.expectedMeshCount} independent bounded meshes; ${system.topology.extractedFaceCount || meshCount} geometric faces were extracted from the workspace. The stamped Supermesh system is rank-certified at ${system.rank} of ${system.cycles.length}.` },
+        { title: '2. KVL loop equations · assembled mesh-current coefficient system', math: `${loopSystem}\\qquad\\left[Z_m\\right]\\left[I_m\\right]=\\left[E_m\\right]`, prose: 'Each diagonal entry is the sum of resistances in its mesh. An off-diagonal entry is the signed negative shared resistance, so this system has exactly one row and one column per mesh.' },
         ...(hasSupermesh ? [{ title: '3. Supermesh constraints', math: supermeshMath || 'i_b-i_a=I_s', prose: currentConstraints.length ? 'Each ideal current-source branch replaces one KVL row with its signed mesh-current constraint, preventing a singular mesh-current system.' : 'A dependent current-source branch is excluded from the KVL perimeter and restored by its explicit controlled-current constraint.' }] : []),
         { title: hasSupermesh ? '4. Solved mesh-current vector' : '3. Solved mesh-current vector', math: solvedVector, prose: 'The solved I_1 through I_n values come directly from the displayed mesh coefficient system and are the mesh-level current readings.' },
-        { title: hasSupermesh ? '5. MNA branch-current verification' : '4. MNA branch-current verification', math: branch || '\text{No voltage-defined branch currents}', prose: 'MNA source and constrained-branch currents are retained as an independent verification of the mesh-current solution.' },
+        { title: hasSupermesh ? '5. MNA branch-current verification' : '4. MNA branch-current verification', math: branch || '\\text{No voltage-defined branch currents}', prose: 'MNA source and constrained-branch currents are retained as an independent verification of the mesh-current solution.' },
       ];
       return { method: 'mesh', status: 'ready', heading: 'Mesh Analysis · KVL / Supermesh', steps, result, meshCurrents, meshCycles: system.meshCycles };
     } catch (error) { return { method: 'mesh', status: 'error', heading: 'Mesh Analysis', steps: [], warning: error instanceof Error ? error.message : 'Mesh analysis failed.' }; }
