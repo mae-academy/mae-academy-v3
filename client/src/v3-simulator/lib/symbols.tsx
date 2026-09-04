@@ -818,12 +818,10 @@ const Opamp: SymbolFC = ({ props }) => {
   return <g data-documented-opamp="ieee-boundary-aligned">
     <polygon points="-22,-22 -22,22 26,0" fill="white" stroke="#1a2744" strokeWidth={2} strokeLinejoin="round" />
     <line x1={-DOCUMENTED_GRID_LOCAL} y1={-100 / 6} x2={-22} y2={-100 / 6} stroke="#1a2744" strokeWidth={2} />
-    <text x={-25} y={-100 / 6} textAnchor="end" dominantBaseline="middle" fontSize={11} fontWeight={800} fill="#1a2744">−</text>
     <line x1={-DOCUMENTED_GRID_LOCAL} y1={100 / 6} x2={-22} y2={100 / 6} stroke="#1a2744" strokeWidth={2} />
-    <text x={-25} y={100 / 6} textAnchor="end" dominantBaseline="middle" fontSize={11} fontWeight={800} fill="#1a2744">+</text>
     <line x1={26} y1={0} x2={DOCUMENTED_GRID_LOCAL} y2={0} stroke="#1a2744" strokeWidth={2} />
-    <line x1={0} y1={-DOCUMENTED_GRID_LOCAL} x2={0} y2={-(11 / 2)} stroke="#1a2744" strokeWidth={1.5} />
-    <line x1={0} y1={DOCUMENTED_GRID_LOCAL} x2={0} y2={11 / 2} stroke="#1a2744" strokeWidth={1.5} />
+    <line x1={0} y1={-DOCUMENTED_GRID_LOCAL} x2={0} y2={-12} stroke="#1a2744" strokeWidth={1.5} />
+    <line x1={0} y1={DOCUMENTED_GRID_LOCAL} x2={0} y2={12} stroke="#1a2744" strokeWidth={1.5} />
   </g>;
 };
 

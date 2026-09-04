@@ -189,34 +189,34 @@ export function TransferFunctionInput({ onUpdate, defaultData, gainK }: Transfer
   }, [mode, numStr, denStr, kStr, zStr, pStr]);
 
   return (
-    <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-bold text-slate-800 dark:text-white uppercase tracking-wider">Transfer Function Engine</h3>
-        
+    <div className="bg-white dark:bg-slate-900 border border-slate-200/80 shadow-sm rounded-2xl p-6">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <h3 className="text-sm font-bold uppercase tracking-wider text-slate-800 dark:text-white">Transfer Function Engine</h3>
+
         {/* Toggle Mode */}
-        <div className="flex bg-slate-200 dark:bg-slate-800 p-1 rounded-xl">
+        <div className="flex flex-wrap gap-2">
           <button
             onClick={() => setMode("polynomial")}
-            className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${mode === "polynomial" ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm" : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"}`}
+            className={`rounded-lg px-3 py-1.5 text-xs font-medium shadow-sm ${mode === "polynomial" ? "bg-gradient-to-r from-blue-600 to-pink-500 text-white" : "border border-slate-200 bg-white text-slate-500 hover:border-blue-400 hover:text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400 dark:hover:border-blue-400 dark:hover:text-slate-200"}`}
           >
-            Polynomial (Expanded)
+            Polynomial
           </button>
           <button
             onClick={() => setMode("zpk")}
-            className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${mode === "zpk" ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm" : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"}`}
+            className={`rounded-lg px-3 py-1.5 text-xs font-medium shadow-sm ${mode === "zpk" ? "bg-gradient-to-r from-blue-600 to-pink-500 text-white" : "border border-slate-200 bg-white text-slate-500 hover:border-blue-400 hover:text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400 dark:hover:border-blue-400 dark:hover:text-slate-200"}`}
           >
-            ZPK (Factored)
+            ZPK
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+      <div className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-2">
         {/* Inputs */}
         <div className="space-y-4">
           {mode === "polynomial" ? (
             <>
               <div>
-                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">Numerator Coefficients N(s)</label>
+                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1"><KatexMath math="N(s) \text{ coefficients}" /></label>
                 <input
                   type="text"
                   value={numStr}
@@ -227,7 +227,7 @@ export function TransferFunctionInput({ onUpdate, defaultData, gainK }: Transfer
                 <p className="text-[10px] text-slate-400 mt-1">Space-separated from highest to lowest power.</p>
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">Denominator Coefficients D(s)</label>
+                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1"><KatexMath math="D(s) \text{ coefficients}" /></label>
                 <input
                   type="text"
                   value={denStr}
@@ -240,7 +240,7 @@ export function TransferFunctionInput({ onUpdate, defaultData, gainK }: Transfer
           ) : (
             <>
               <div>
-                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">DC Gain (K)</label>
+                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1"><KatexMath math="\text{DC Gain } (K)" /></label>
                 <input
                   type="text"
                   value={kStr}
@@ -250,7 +250,7 @@ export function TransferFunctionInput({ onUpdate, defaultData, gainK }: Transfer
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">Zeros (z_i)</label>
+                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1"><KatexMath math="\text{Zeros } z_i" /></label>
                 <input
                   type="text"
                   value={zStr}
@@ -260,7 +260,7 @@ export function TransferFunctionInput({ onUpdate, defaultData, gainK }: Transfer
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">Poles (p_i)</label>
+                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1"><KatexMath math="\text{Poles } p_i" /></label>
                 <input
                   type="text"
                   value={pStr}
@@ -275,8 +275,8 @@ export function TransferFunctionInput({ onUpdate, defaultData, gainK }: Transfer
         </div>
 
         {/* Display */}
-        <div className="flex items-center justify-center bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 min-h-[160px]">
-          <KatexMath math={renderedMath} displayMode={true} className="text-xl md:text-2xl text-slate-900 dark:text-white" />
+        <div className="flex min-h-[180px] items-center justify-center overflow-x-auto rounded-2xl border border-slate-200 bg-white px-4 py-6 dark:border-slate-800 dark:bg-slate-950">
+          <KatexMath math={renderedMath} displayMode={true} className="text-xl text-slate-900 dark:text-white" />
         </div>
       </div>
     </div>

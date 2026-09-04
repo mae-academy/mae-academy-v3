@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 /* MAE Luminous Technical Atelier: Tab D keeps documented 25 px terminal geometry,
    direct electromechanical controls, and a quiet Control Systems-aligned inspector. */
 import {
-  Activity,
   ArrowDown,
   ArrowLeft,
   ArrowRight,
@@ -26,7 +25,6 @@ import {
   RotateCw,
   Scissors,
   Search,
-  Settings2,
   Trash2,
   Type,
   Upload,
@@ -91,6 +89,10 @@ const TAB_D_SYMBOL_SCALE = 1.5;
 const TERMINAL_HIT_RADIUS = 13;
 const TERMINAL_RADIUS = 4;
 const CONTROL_SYSTEMS_HEADING = 'text-sm font-bold uppercase tracking-wider text-slate-800 dark:text-white';
+/* Unified signature gradient pills (blue-600 -> pink-500). */
+const TAB_GRADIENT = 'linear-gradient(90deg, #2563eb 0%, #ec4899 100%)';
+const TAB_GRADIENT_REV = 'linear-gradient(90deg, #ec4899 0%, #2563eb 100%)';
+const TAB_ACTIVE_SHADOW = '0 1px 3px rgba(2, 6, 23, 0.18)';
 const EMPTY_SNAPSHOT: SimulationSnapshot = {
   time: 0,
   nodeVoltages: {},
@@ -976,75 +978,50 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
 
   const linkedCoils = components.filter(component => ['contactor', 'relay-spst', 'relay-spdt', 'relay-dpst', 'relay-dpdt'].includes(component.type));
 
-  const sidebarButton = (active = false): React.CSSProperties => ({
-    border: `1px solid ${active ? colors.primary : colors.line}`,
-    background: active ? `${colors.primary}14` : colors.panel,
-    color: active ? colors.primary : colors.muted,
-    borderRadius: 7,
-    minHeight: 30,
-    padding: '5px 7px',
-    fontSize: 11,
-    fontWeight: 650,
-    cursor: 'pointer',
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 5,
-  });
-
   return (
     <div className="v3-mae-layout font-sans text-slate-900 dark:text-slate-100" style={{ minHeight: 760, color: colors.text }}>
-      {tabDUiRefinement && <section className="mb-3 overflow-hidden rounded-xl border" style={{ borderColor: colors.line, background: `linear-gradient(90deg, ${colors.panel} 0%, ${colors.panelAlt} 50%, ${colors.panel} 100%)` }}>
-        <div style={{ height: 2, background: 'linear-gradient(90deg, #2563eb 0%, #7c3aed 48%, #ef476f 100%)' }} />
-        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 px-4 py-2.5">
-          <div className="min-w-[190px]">
-            <div className={CONTROL_SYSTEMS_HEADING}>MAE / E-LAB · TAB D</div>
-            <div className="mt-0.5 font-mono text-[9px] uppercase tracking-[.13em]" style={{ color: colors.muted }}>Documented topology station · MNA record</div>
-          </div>
-          <div className="flex items-center gap-2 border-l pl-5 font-mono text-[10px] uppercase tracking-[.1em]" style={{ borderColor: colors.line, color: colors.muted }}><span className="h-2 w-2 rounded-full" style={{ background: '#ef476f', boxShadow: '0 0 0 3px #ef476f18' }} />External 0 V reference</div>
-          <div className="flex items-center gap-2 border-l pl-5 font-mono text-[10px] uppercase tracking-[.1em]" style={{ borderColor: colors.line, color: colors.muted }}>Topology {components.length} CMP · {wires.length} NET</div>
-          <div className="ml-auto font-mono text-[10px] uppercase tracking-[.1em]" style={{ color: snapshot.converged ? colors.accent : colors.danger }}>{snapshot.converged ? 'Document trace ready' : 'Reference check required'}</div>
-        </div>
-      </section>}
       <section className="mb-4 overflow-x-auto rounded-xl border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-950" style={{ borderColor: colors.line, background: colors.panel }}>
-        <header className="flex min-w-max flex-nowrap items-center gap-1 px-2 py-1.5" style={{ minHeight: 40, background: colors.panel, boxShadow: 'none', zIndex: 5 }}>
-          <ToolbarButton colors={colors} label="−" title="Zoom out" onClick={() => setZoom(value => Math.max(.2, value / 1.15))} />
-          <span style={{ color: colors.muted, fontSize: 11, minWidth: 42, textAlign: 'center' }}>{Math.round(zoom * 100)}%</span>
-          <ToolbarButton colors={colors} label="+" title="Zoom in" onClick={() => setZoom(value => Math.min(3, value * 1.15))} />
-          <ToolbarDivider colors={colors} />
-          <ToolbarButton colors={colors} icon={<Grid3X3 size={14} />} title="Grid" onClick={() => setGridVisible(value => !value)} active={gridVisible} />
-          {tabDUiRefinement && <><ToolbarButton colors={colors} label="Dot" title="Dot grid · 25 px" onClick={() => { setTabDGridMode('dots'); setGridVisible(true); }} active={tabDGridMode === 'dots' && gridVisible} /><ToolbarButton colors={colors} label="Cartesian" title="Cartesian grid · 25 px" onClick={() => { setTabDGridMode('cartesian'); setGridVisible(true); }} active={tabDGridMode === 'cartesian' && gridVisible} /><ToolbarButton colors={colors} label="Hidden" title="Hide grid" onClick={() => setTabDGridMode('hidden')} active={tabDGridMode === 'hidden'} /></>}
-          <ToolbarButton colors={colors} icon={<Move size={14} />} title="Snap to grid" onClick={() => setSnapEnabled(value => !value)} active={snapEnabled} />
-          <ToolbarButton colors={colors} icon={<Cable size={14} />} label="Wire" title="Click one terminal, then another" onClick={() => { setWiring({}); toast.message('Click a terminal to start wiring'); }} active={Boolean(wiring.from)} />
-          <ToolbarDivider colors={colors} />
-          <ToolbarButton colors={colors} icon={<Download size={14} />} label="NAD" title="Export circuit as NAD" onClick={exportNad} />
-          <ToolbarButton colors={colors} icon={<Upload size={14} />} label="NAD" title="Import circuit from NAD" onClick={() => nadInputRef.current?.click()} />
-          <input ref={nadInputRef} type="file" accept=".nad,application/x-mae-nad+json,application/json" onChange={importNad} style={{ display: 'none' }} />
-          <ToolbarButton colors={colors} icon={<Copy size={14} />} title="Copy selected component (Ctrl/Cmd+C)" onClick={copySelection} disabled={!selectedComponent} />
-          <ToolbarButton colors={colors} icon={<Scissors size={14} />} title="Cut selected component (Ctrl/Cmd+X)" onClick={cutSelection} disabled={!selectedComponent} />
-          <ToolbarButton colors={colors} icon={<Clipboard size={14} />} title="Paste component (Ctrl/Cmd+V)" onClick={pasteComponent} disabled={!clipboardComponent} />
-          <ToolbarButton colors={colors} icon={<Type size={14} />} label="Text" title="Add editable workspace text (T)" onClick={addText} />
-          {tabDUiRefinement && <><ToolbarDivider colors={colors} /><ToolbarButton colors={colors} icon={<RotateCw size={14} />} label="90°" title="Rotate selected component 90°" onClick={() => rotateSelected(90)} disabled={!selectedComponent} /><ToolbarButton colors={colors} icon={<RotateCw size={14} />} label="45°" title="Rotate selected component 45°" onClick={() => rotateSelected(45)} disabled={!selectedComponent} /><ToolbarButton colors={colors} icon={<FlipHorizontal size={14} />} label="Flip X" title="Reflect selected component horizontally" onClick={() => flipSelected('h')} disabled={!selectedComponent} /><ToolbarButton colors={colors} icon={<FlipVertical size={14} />} label="Flip Y" title="Reflect selected component vertically" onClick={() => flipSelected('v')} disabled={!selectedComponent} /></>}
-          <ToolbarDivider colors={colors} />
-          <ToolbarButton colors={colors} icon={<Zap size={14} />} label="DMM" title="Add a movable DMM with probe terminals" onClick={() => addComponent('dmm')} />
-          <ToolbarButton colors={colors} icon={<Activity size={14} />} label="Scope" title="Add a movable 4-channel oscilloscope" onClick={() => addComponent('oscilloscope')} />
-          <ToolbarDivider colors={colors} />
-          <button onClick={() => setSimulationRunning(value => !value)} style={{ ...sidebarButton(simulationRunning), borderColor: simulationRunning ? colors.danger : colors.accent, color: simulationRunning ? colors.danger : colors.accent, padding: '4px 8px' }}>
-            {simulationRunning ? <Pause size={14} /> : <Play size={14} />}{simulationRunning ? 'Pause' : 'Run'}
-          </button>
-          <ToolbarButton colors={colors} icon={<RotateCcw size={14} />} title="Reset simulation" onClick={resetSimulation} />
-          <span style={{ fontSize: 11, minWidth: 55, color: colors.primary, fontVariantNumeric: 'tabular-nums' }}>{snapshot.time.toFixed(3)} s</span>
-          <ToolbarDivider colors={colors} />
-          <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-          <input aria-label="Simulation speed" type="range" min={.25} max={4} step={.25} value={simulationSpeed} onChange={event => setSimulationSpeed(numeric(event.target.value, 1))} style={{ width: 58, accentColor: colors.accent }} />
-          <span style={{ color: colors.muted, fontSize: 10 }}>{simulationSpeed.toFixed(2)}×</span>
+        <header className="min-w-max" style={{ background: colors.panel, zIndex: 5 }}>
+          <div className="flex flex-nowrap items-center gap-1.5 px-2 pt-2" style={{ minHeight: 36 }}>
+            <ToolbarButton colors={colors} label="−" title="Zoom out" onClick={() => setZoom(value => Math.max(.2, value / 1.15))} />
+            <span style={{ color: colors.muted, fontSize: 11, minWidth: 42, textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>{Math.round(zoom * 100)}%</span>
+            <ToolbarButton colors={colors} label="+" title="Zoom in" onClick={() => setZoom(value => Math.min(3, value * 1.15))} />
+            <ToolbarDivider colors={colors} />
+            <ToolbarButton colors={colors} icon={<Grid3X3 size={14} />} title="Grid" onClick={() => setGridVisible(value => !value)} active={gridVisible} />
+            {tabDUiRefinement && <><ToolbarButton colors={colors} label="Dot" title="Dot grid · 25 px" onClick={() => { setTabDGridMode('dots'); setGridVisible(true); }} active={tabDGridMode === 'dots' && gridVisible} /><ToolbarButton colors={colors} label="Cartesian" title="Cartesian grid · 25 px" onClick={() => { setTabDGridMode('cartesian'); setGridVisible(true); }} active={tabDGridMode === 'cartesian' && gridVisible} /><ToolbarButton colors={colors} label="Hidden" title="Hide grid" onClick={() => setTabDGridMode('hidden')} active={tabDGridMode === 'hidden'} /></>}
+            <ToolbarDivider colors={colors} />
+            <ToolbarButton colors={colors} icon={<Move size={14} />} title="Snap to grid" onClick={() => setSnapEnabled(value => !value)} active={snapEnabled} />
+            <ToolbarButton colors={colors} icon={<Cable size={14} />} label="Wire" title="Click one terminal, then another" onClick={() => { setWiring({}); toast.message('Click a terminal to start wiring'); }} active={Boolean(wiring.from)} />
+            <ToolbarDivider colors={colors} />
+            <ToolbarButton colors={colors} icon={<Type size={14} />} label="Text" title="Add editable workspace text (T)" onClick={addText} />
+            {tabDUiRefinement && <><ToolbarDivider colors={colors} /><ToolbarButton colors={colors} icon={<RotateCw size={14} />} label="90°" title="Rotate selected component 90°" onClick={() => rotateSelected(90)} disabled={!selectedComponent} /><ToolbarButton colors={colors} icon={<RotateCw size={14} />} label="45°" title="Rotate selected component 45°" onClick={() => rotateSelected(45)} disabled={!selectedComponent} /><ToolbarButton colors={colors} icon={<FlipHorizontal size={14} />} label="Flip X" title="Reflect selected component horizontally" onClick={() => flipSelected('h')} disabled={!selectedComponent} /><ToolbarButton colors={colors} icon={<FlipVertical size={14} />} label="Flip Y" title="Reflect selected component vertically" onClick={() => flipSelected('v')} disabled={!selectedComponent} /></>}
+          </div>
+          <div className="flex flex-nowrap items-center gap-1.5 border-t px-2 py-2" style={{ borderColor: colors.line, minHeight: 36 }}>
+            <ToolbarButton colors={colors} icon={<Download size={14} />} label="NAD" title="Export circuit as NAD" onClick={exportNad} />
+            <ToolbarButton colors={colors} icon={<Upload size={14} />} label="NAD" title="Import circuit from NAD" onClick={() => nadInputRef.current?.click()} />
+            <input ref={nadInputRef} type="file" accept=".nad,application/x-mae-nad+json,application/json" onChange={importNad} style={{ display: 'none' }} />
+            <ToolbarDivider colors={colors} />
+            <ToolbarButton colors={colors} icon={<Copy size={14} />} title="Copy selected component (Ctrl/Cmd+C)" onClick={copySelection} disabled={!selectedComponent} />
+            <ToolbarButton colors={colors} icon={<Scissors size={14} />} title="Cut selected component (Ctrl/Cmd+X)" onClick={cutSelection} disabled={!selectedComponent} />
+            <ToolbarButton colors={colors} icon={<Clipboard size={14} />} title="Paste component (Ctrl/Cmd+V)" onClick={pasteComponent} disabled={!clipboardComponent} />
+            <ToolbarDivider colors={colors} />
+            <button onClick={() => setSimulationRunning(value => !value)} title={simulationRunning ? 'Pause simulation' : 'Run simulation'} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: simulationRunning ? TAB_GRADIENT : TAB_GRADIENT_REV, color: '#ffffff', fontWeight: 700, padding: '5px 14px', minHeight: 28, borderRadius: 8, fontSize: 11, boxShadow: TAB_ACTIVE_SHADOW, border: '1px solid transparent', cursor: 'pointer', whiteSpace: 'nowrap', transition: 'background .25s ease' }}>
+              {simulationRunning ? <Pause size={14} /> : <Play size={14} />}{simulationRunning ? 'Pause' : 'Run'}
+            </button>
+            <ToolbarButton colors={colors} icon={<RotateCcw size={14} />} title="Reset simulation" onClick={resetSimulation} />
+            <span style={{ fontSize: 11, minWidth: 55, color: colors.muted, fontVariantNumeric: 'tabular-nums' }}>{snapshot.time.toFixed(3)} s</span>
+            <ToolbarDivider colors={colors} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+              <input aria-label="Simulation speed" type="range" min={.25} max={4} step={.25} value={simulationSpeed} onChange={event => setSimulationSpeed(numeric(event.target.value, 1))} style={{ width: 58, accentColor: colors.accent }} />
+              <span style={{ color: colors.muted, fontSize: 10 }}>{simulationSpeed.toFixed(2)}×</span>
+            </div>
           </div>
         </header>
       </section>
 
       <div className="grid min-h-[680px] gap-4 xl:grid-cols-[236px_minmax(0,1fr)_286px]">
         <aside className="min-h-0 overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-950" style={{ background: colors.panel, borderColor: colors.line, display: 'flex', flexDirection: 'column', height: '700px' }}>
-          <div className="border-b px-3 py-2" style={{ borderColor: colors.line }}><div className={CONTROL_SYSTEMS_HEADING}>Component Library</div><div className="mt-0.5 font-mono text-[9px] uppercase tracking-[.1em]" style={{ color: colors.muted }}>Topology parts · 25 px grid</div></div>
+          <div className="border-b px-3 py-2" style={{ borderColor: colors.line }}><div className={CONTROL_SYSTEMS_HEADING}>Component Library</div></div>
           <div style={{ padding: 10, borderBottom: `1px solid ${colors.line}` }}>
             <div style={{ position: 'relative' }}>
               <Search size={14} style={{ position: 'absolute', left: 9, top: 9, color: colors.subtle }} />
@@ -1080,7 +1057,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
         </aside>
 
         <main className="relative min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-950" style={{ background: colors.canvas, borderColor: colors.line }}>
-          <div className="flex items-start justify-between border-b px-4 py-2" style={{ borderColor: colors.line }}><div><div className={CONTROL_SYSTEMS_HEADING}>Interactive Electrical Canvas</div>{tabDUiRefinement && <div className="mt-0.5 font-mono text-[9px] uppercase tracking-[.1em]" style={{ color: colors.muted }}>M-plane · terminal lattice · documented nets</div>}</div><div className="flex items-center gap-2 font-mono text-[10px]" style={{ color: colors.muted }}>{tabDUiRefinement && <span className="inline-flex items-center gap-1" style={{ color: '#ef476f' }}><span className="h-1.5 w-1.5 rounded-full" style={{ background: '#ef476f' }} />0 V</span>}{components.length} CMP · {wires.length} NET</div></div>
+          <div className="flex items-start justify-between border-b px-4 py-2" style={{ borderColor: colors.line }}><div><div className={CONTROL_SYSTEMS_HEADING}>Interactive Electrical Canvas</div></div><div className="flex items-center gap-2 font-mono text-[10px]" style={{ color: colors.muted }}>{components.length} CMP · {wires.length} NET</div></div>
           {workspaceAlert && <div className="border-b px-3 py-3" style={{ borderColor: `${colors.danger}55`, background: `${colors.danger}09` }}><Alert variant="destructive" style={{ borderColor: `${colors.danger}66`, background: `${colors.panel}e8`, color: colors.text }}><Info /><AlertTitle className="flex items-center justify-between gap-3" style={{ color: colors.danger, fontSize: 12, fontWeight: 800 }}><span>{workspaceAlert.title}</span><span className="font-mono text-[9px] font-bold tracking-[.12em]" style={{ color: colors.muted }}>{workspaceAlert.label}</span></AlertTitle><AlertDescription style={{ color: colors.muted, fontSize: 11, lineHeight: 1.45 }}>{workspaceAlert.message}</AlertDescription></Alert></div>}
           <svg ref={svgRef} onMouseDown={handleCanvasMouseDown} onMouseMove={handleCanvasMouseMove} onMouseUp={handleCanvasMouseUp} onMouseLeave={handleCanvasMouseUp} onContextMenu={event => event.preventDefault()} onDragOver={event => event.preventDefault()} onDrop={handleDrop} style={{ width: '100%', height: '100%', display: 'block', cursor: dragState?.kind === 'pan' ? 'grabbing' : wiring.from ? 'crosshair' : 'default', touchAction: 'none' }}>
             <defs>
@@ -1090,15 +1067,6 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
             </defs>
             <g transform={`translate(${pan[0]},${pan[1]}) scale(${zoom})`}>
               {gridVisible && (!tabDUiRefinement || tabDGridMode !== 'hidden') && <rect key={`grid-surface-${tabDUiRefinement ? tabDGridMode : 'base'}`} x={-5000} y={-5000} width={10000} height={10000} fill={`url(#workspace-grid-${tabDUiRefinement ? tabDGridMode : 'base'})`} />}
-              {tabDUiRefinement && <g pointerEvents="none" opacity={0.66} aria-label="MAE documented circuit M-plane reference">
-                <path d="M 38 98 L 90 48 L 142 98 L 90 146 Z M 38 98 L 142 98 M 90 48 L 90 146" fill="none" stroke={colors.primary} strokeWidth={1.15} strokeDasharray="4 5" />
-                <path d="M 142 98 L 182 98 M 90 146 L 90 172" fill="none" stroke={colors.wire} strokeWidth={1.15} />
-                <circle cx={90} cy={146} r={4} fill="#ef476f" />
-                <circle cx={90} cy={146} r={9} fill="none" stroke="#ef476f" strokeOpacity={0.38} strokeWidth={1} />
-                <text x={38} y={34} fill={colors.muted} fontSize={9} fontFamily="ui-monospace, SFMono-Regular, Menlo, monospace" letterSpacing={1.1}>M-PLANE / TAB D</text>
-                <text x={104} y={161} fill="#ef476f" fontSize={8} fontFamily="ui-monospace, SFMono-Regular, Menlo, monospace" letterSpacing={.9}>0 V / REF</text>
-                <text x={146} y={92} fill={colors.muted} fontSize={8} fontFamily="ui-monospace, SFMono-Regular, Menlo, monospace">NET</text>
-              </g>}
               {dragState?.kind === 'marquee' && <rect x={Math.min(dragState.start[0], dragState.end[0])} y={Math.min(dragState.start[1], dragState.end[1])} width={Math.abs(dragState.end[0] - dragState.start[0])} height={Math.abs(dragState.end[1] - dragState.start[1])} fill={`${colors.selection}18`} stroke={colors.selection} strokeWidth={1.2} strokeDasharray="5 4" pointerEvents="none" />}
 
               {activeMeshTrace?.meshCycles?.map((cycle) => <MeshLoopOverlay key={`mesh-cycle-${cycle.index}`} cycle={cycle} />)}
@@ -1184,10 +1152,12 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
 
           {components.length === 0 && (
             <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', pointerEvents: 'none' }}>
-              <div style={{ maxWidth: 350, textAlign: 'center', background: `${colors.panel}dd`, border: `1px solid ${colors.line}`, boxShadow: colors.shadow, borderRadius: 14, padding: '24px 28px' }}>
-                <div style={{ width: 46, height: 46, display: 'grid', placeItems: 'center', margin: '0 auto 12px', borderRadius: 14, background: `${colors.primary}12`, color: colors.primary }}><Settings2 size={23} /></div>
-                <div style={{ fontWeight: 780, fontSize: 15 }}>Topology field awaiting a reference</div>
-                <p style={{ color: colors.muted, fontSize: 12, lineHeight: 1.5, margin: '8px 0 0' }}>Place a source, a load, and the external 0 V reference; then route the terminals.</p>
+              <div style={{ maxWidth: 430, textAlign: 'center' }}>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 12, background: colors.panel, border: `1px solid ${colors.line}`, boxShadow: colors.shadow, borderRadius: 16, padding: '14px 18px' }}>
+                  <span style={{ width: 40, height: 40, display: 'grid', placeItems: 'center', borderRadius: 12, background: `${colors.primary}12`, color: colors.primary, flexShrink: 0 }}><Zap size={20} /></span>
+                  <span style={{ color: colors.text, fontSize: 13, fontWeight: 700, lineHeight: 1.4 }}>Canvas Ready</span>
+                </div>
+                <p style={{ color: colors.muted, fontSize: 12.5, lineHeight: 1.6, margin: '14px 0 0' }}>Drag and drop components from the library to begin circuit design.</p>
               </div>
             </div>
           )}
@@ -1200,16 +1170,14 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
         </main>
 
         <aside className="min-h-0 overflow-y-auto rounded-xl border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-950" style={{ background: colors.panel, borderColor: colors.line, display: 'flex', flexDirection: 'column' }}>
-          <div className="border-b px-3 py-2" style={{ borderColor: colors.line }}><div className={CONTROL_SYSTEMS_HEADING}>Active Element &amp; Properties</div>{tabDUiRefinement && <div className="mt-0.5 font-mono text-[9px] uppercase tracking-[.1em]" style={{ color: colors.muted }}>Node · contact · measurement readback</div>}</div>
+          <div className="border-b px-3 py-2" style={{ borderColor: colors.line }}><div className={CONTROL_SYSTEMS_HEADING}>Active Element &amp; Properties</div></div>
           {selectedComponent ? (
             <ComponentInspector colors={colors} component={selectedComponent} definition={getDef(selectedComponent.type)!} linkedCoils={linkedCoils} reading={snapshot.instrumentReadings[selectedComponent.id]} snapshot={snapshot} tabDUiRefinement={tabDUiRefinement} onLabelChange={label => updateComponent(selectedComponent.id, { label })} onPropertyChange={updateComponentProperty} onDelete={removeSelection} />
           ) : selectedWire ? (
             <WireInspector colors={colors} wire={selectedWire} tabDUiRefinement={tabDUiRefinement} onRouting={updateWireRouting} onAddCorner={addSelectedWireCorner} onNudge={nudgeSelectedWire} onDelete={removeSelection} />
           ) : selectedText ? (
             <TextInspector colors={colors} text={selectedText} onUpdate={updateText} onMove={moveSelected} onDelete={removeSelection} />
-          ) : (
-            <WelcomeInspector colors={colors} />
-          )}
+          ) : null}
           {snapshot.warnings.length > 0 && (
             <div style={{ margin: 'auto 10px 10px', border: `1px solid ${colors.danger}55`, background: `${colors.danger}0d`, borderRadius: 8, padding: 9 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 5, color: colors.danger, fontSize: 10, fontWeight: 780 }}><Info size={13} /> Circuit status</div>
@@ -1218,9 +1186,8 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
           )}
         </aside>
       </div>
-      {tabDUiRefinement && <div className="mx-4 mt-4 h-px" style={{ background: 'linear-gradient(90deg, transparent 0%, #2563eb 18%, #7c3aed 50%, #ef476f 82%, transparent 100%)' }} />}
       <section className="mt-3 overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-950" style={{ background: colors.panel, borderColor: colors.line }}>
-        <div className="flex flex-wrap items-end justify-between gap-2 border-b px-5 py-3" style={{ borderColor: colors.line }}><div><div className={CONTROL_SYSTEMS_HEADING}>Academic Analysis Workspace</div>{tabDUiRefinement && <div className="mt-0.5 font-mono text-[9px] uppercase tracking-[.1em]" style={{ color: colors.muted }}>Derivation plane · [A][x]=[z] · reference-aware</div>}</div>{tabDUiRefinement && <div className="font-mono text-[9px] uppercase tracking-[.1em]" style={{ color: '#ef476f' }}>0 V / trace anchor</div>}</div>
+        <div className="border-b px-5 py-3" style={{ borderColor: colors.line }}><div className={CONTROL_SYSTEMS_HEADING}>Academic Analysis Workspace</div></div>
         <AnalysisBox elements={dcMna.elements} geometry={meshGeometry} nodalNodes={nodalGeometry} colors={colors} standalone onTraceChange={handleAnalysisTrace} />
       </section>
     </div>
@@ -1235,7 +1202,8 @@ export default function Home() {
 interface Palette { background: string; canvas: string; panel: string; panelAlt: string; line: string; text: string; muted: string; subtle: string; primary: string; accent: string; danger: string; selection: string; grid: string; wire: string; powered: string; input: string; shadow: string; }
 
 function ToolbarButton({ colors, icon, label, title, onClick, active, disabled }: { colors: Palette; icon?: React.ReactNode; label?: string; title: string; onClick: () => void; active?: boolean; disabled?: boolean }) {
-  return <button title={title} onClick={onClick} disabled={disabled} style={{ border: `1px solid ${active ? colors.primary : colors.line}`, background: active ? `${colors.primary}14` : colors.panel, color: active ? colors.primary : disabled ? colors.subtle : colors.muted, borderRadius: 6, padding: '4px 5px', minHeight: 27, display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 10, fontWeight: 700, cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? .55 : 1, flexShrink: 0, whiteSpace: 'nowrap' }}>{icon}{label}</button>;
+  const isActive = Boolean(active) && !disabled;
+  return <button title={title} onClick={onClick} disabled={disabled} style={{ border: isActive ? '1px solid transparent' : `1px solid ${colors.line}`, background: isActive ? TAB_GRADIENT : colors.panelAlt, color: isActive ? '#ffffff' : disabled ? colors.subtle : colors.muted, borderRadius: 8, padding: '4px 9px', minHeight: 27, display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10.5, fontWeight: 700, cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? .5 : 1, boxShadow: isActive ? TAB_ACTIVE_SHADOW : 'none', flexShrink: 0, whiteSpace: 'nowrap', transition: 'background .15s ease' }}>{icon}{label}</button>;
 }
 
 function ToolbarDivider({ colors }: { colors: Palette }) { return <span style={{ width: 1, height: 20, background: colors.line, margin: '0 1px', flexShrink: 0 }} />; }
@@ -1307,8 +1275,6 @@ function WireInspector({ colors, wire, tabDUiRefinement, onRouting, onAddCorner,
 function TextInspector({ colors, text, onUpdate, onMove, onDelete }: { colors: Palette; text: WorkspaceText; onUpdate: (update: Partial<WorkspaceText>) => void; onMove: (dx: number, dy: number) => void; onDelete: () => void }) {
   return <div style={{ overflowY: 'auto' }}><InspectorHeader colors={colors} title="Workspace text" subtitle="Editable annotation that can be placed anywhere in the schematic." /><InspectorSection colors={colors} label="Text properties"><PropertyRow colors={colors} label="Content"><input value={text.text} onChange={event => onUpdate({ text: event.target.value })} style={inputStyle(colors)} /></PropertyRow><PropertyRow colors={colors} label="Size"><input type="number" min={8} max={72} value={text.fontSize} onChange={event => onUpdate({ fontSize: numeric(event.target.value, 16) })} style={inputStyle(colors)} /></PropertyRow><PropertyRow colors={colors} label="Color"><input type="color" value={text.color} onChange={event => onUpdate({ color: event.target.value })} style={{ width: '100%', height: 30, border: `1px solid ${colors.line}`, borderRadius: 5, background: colors.input }} /></PropertyRow></InspectorSection><InspectorSection colors={colors} label="Move"><div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 5 }}><InspectorButton colors={colors} onClick={() => onMove(0, -20)}><ArrowUp size={13} /></InspectorButton><InspectorButton colors={colors} onClick={() => onMove(-20, 0)}><ArrowLeft size={13} /></InspectorButton><InspectorButton colors={colors} onClick={() => onMove(20, 0)}><ArrowRight size={13} /></InspectorButton><InspectorButton colors={colors} onClick={() => onMove(0, 20)}><ArrowDown size={13} /></InspectorButton></div></InspectorSection><InspectorSection colors={colors} label="Actions"><InspectorButton colors={colors} danger onClick={onDelete}><Trash2 size={13} />Delete text</InspectorButton></InspectorSection></div>;
 }
-
-function WelcomeInspector({ colors }: { colors: Palette }) { return <div><InspectorHeader colors={colors} title="Topology Ready" subtitle="Select a component or net to inspect its electrical contract." /></div>; }
 
 function DmmReadingInspector({ colors, reading }: { colors: Palette; reading?: InstrumentReading }) { return <InspectorSection colors={colors} label="Live DMM result"><div style={{ padding: 10, background: '#e8f5ea', border: '1px solid #b6dfbc', borderRadius: 7, textAlign: 'right', color: '#166534', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}><div style={{ fontSize: 22, fontWeight: 800 }}>{reading?.status === 'open' ? 'OL' : reading ? <EngineeringMath value={reading.value} unit={reading.unit} /> : '—'}</div><div style={{ marginTop: 4, fontSize: 10, color: '#4b7b56' }}>{reading?.status === 'ready' ? 'Probe-linked measurement' : reading?.status === 'open' ? 'Open / not fully connected' : 'Connect HI and COM probes'}</div></div>{reading?.continuity !== undefined && <div style={{ marginTop: 7, fontSize: 10, color: colors.muted }}>Continuity: <strong>{reading.continuity ? 'closed' : 'open'}</strong>{reading.frequency ? <> · <EngineeringMath value={reading.frequency} unit="Hz" /></> : ''}</div>}</InspectorSection>; }
 

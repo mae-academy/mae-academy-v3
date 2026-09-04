@@ -120,8 +120,8 @@ export function RootLocusStudio() {
       ctx.stroke();
 
       // Ticks / labels
-      ctx.fillStyle = isDark ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.7)";
-      ctx.font = "10px sans-serif";
+      ctx.fillStyle = isDark ? "rgba(255,255,255,0.75)" : "rgba(0,0,0,0.72)";
+      ctx.font = "italic 10px 'KaTeX_Math', 'Times New Roman', Georgia, serif";
       const dp = stepX < 1 ? Math.ceil(-Math.log10(stepX)) : 0;
       ctx.textAlign = "center";
       ctx.textBaseline = "top";
@@ -500,7 +500,7 @@ export function RootLocusStudio() {
       const rect = canvas.getBoundingClientRect();
       const mouseX = e.clientX - rect.left;
       const mouseY = e.clientY - rect.top;
-      const zoomFactor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
+      const zoomFactor = Math.exp(-e.deltaY * 0.0005);
       setViewport(prev => {
         const newScale = Math.max(0.05, Math.min(100, prev.scale * zoomFactor));
         const ratio = newScale / prev.scale;
@@ -931,37 +931,35 @@ const charPoly = dAligned.map((d_val, idx) => d_val + K * nAligned[idx]);
               <h3 className="text-sm font-bold text-slate-800 dark:text-white uppercase tracking-wider">
                 S-Plane Root Locus
               </h3>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 {/* Grid mode toggle */}
-                <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-lg p-0.5 text-xs font-bold">
-                  <button
-                    onClick={() => setGridMode('cartesian')}
-                    className={`px-2.5 py-1 rounded-md transition-all ${
-                      gridMode === 'cartesian'
-                        ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
-                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-700'
-                    }`}
-                  >
-                    Cartesian
-                  </button>
-                  <button
-                    onClick={() => setGridMode('polar')}
-                    className={`px-2.5 py-1 rounded-md transition-all ${
-                      gridMode === 'polar'
-                        ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
-                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-700'
-                    }`}
-                  >
-                    Polar
-                  </button>
-                </div>
-                {/* Reset view button */}
+                <button
+                  onClick={() => setGridMode('cartesian')}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-medium shadow-sm ${
+                    gridMode === 'cartesian'
+                      ? 'bg-gradient-to-r from-blue-600 to-pink-500 text-white'
+                      : 'border border-slate-200 bg-white text-slate-600 hover:border-blue-400 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400 dark:hover:border-blue-400'
+                  }`}
+                >
+                  Cartesian
+                </button>
+                <button
+                  onClick={() => setGridMode('polar')}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-medium shadow-sm ${
+                    gridMode === 'polar'
+                      ? 'bg-gradient-to-r from-blue-600 to-pink-500 text-white'
+                      : 'border border-slate-200 bg-white text-slate-600 hover:border-blue-400 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400 dark:hover:border-blue-400'
+                  }`}
+                >
+                  Polar
+                </button>
+                {/* Auto Scale button */}
                 <button
                   onClick={() => setViewport({ scale: 1, offsetX: 0, offsetY: 0 })}
-                  title="Reset view"
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-all text-xs"
+                  title="Auto scale / fit to default bounds"
+                  className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 shadow-sm hover:border-blue-400 hover:text-slate-800 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400 dark:hover:border-blue-400 dark:hover:text-slate-200"
                 >
-                  ⟳
+                  Auto Scale
                 </button>
               </div>
             </div>
@@ -1022,7 +1020,7 @@ const charPoly = dAligned.map((d_val, idx) => d_val + K * nAligned[idx]);
                 const mouseX = e.clientX - rect.left;
                 const mouseY = e.clientY - rect.top;
 
-                const zoomFactor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
+                const zoomFactor = Math.exp(-e.deltaY * 0.0005);
                 setViewport(prev => {
                   const newScale = Math.max(0.1, Math.min(50, prev.scale * zoomFactor));
                   // Zoom toward mouse cursor
@@ -1041,16 +1039,16 @@ const charPoly = dAligned.map((d_val, idx) => d_val + K * nAligned[idx]);
               )}
               {tooltip && (
                 <div
-                  className="absolute pointer-events-none bg-slate-800/90 dark:bg-slate-950/90 text-white text-xs p-3 rounded-xl shadow-lg border border-slate-700 backdrop-blur-md z-10"
+                  className="absolute pointer-events-none bg-white/95 border border-slate-200 text-slate-800 shadow-md backdrop-blur-sm text-xs p-3 rounded-xl dark:bg-slate-900/95 dark:border-slate-800 dark:text-slate-100 z-10"
                   style={{ left: tooltip.x + 15, top: tooltip.y + 15 }}
                 >
-                  <div className="font-mono mb-1 font-bold text-blue-400">
-                    s = {parseFloat(tooltip.s.re.toFixed(3))} {tooltip.s.im < 0 ? '-' : '+'} j{parseFloat(Math.abs(tooltip.s.im).toFixed(3))}
+                  <div className="mb-1 font-bold text-blue-500 dark:text-blue-400">
+                    <span className="font-serif italic">s</span> = {parseFloat(tooltip.s.re.toFixed(3))} {tooltip.s.im < 0 ? '-' : '+'} j{parseFloat(Math.abs(tooltip.s.im).toFixed(3))}
                   </div>
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-slate-300">
-                    <span>Distance (ω_n)</span><span className="font-mono text-right">{parseFloat(tooltip.wn.toFixed(3))} rad/s</span>
-                    <span>Angle (θ)</span><span className="font-mono text-right">{parseFloat(tooltip.theta.toFixed(1))}°</span>
-                    <span>Damping (ζ)</span><span className="font-mono text-right">{parseFloat(tooltip.zeta.toFixed(4))}</span>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-slate-600 dark:text-slate-300">
+                    <span>Distance (<span className="font-serif italic">ω</span><sub>n</sub>)</span><span className="font-mono text-right">{parseFloat(tooltip.wn.toFixed(3))} rad/s</span>
+                    <span>Angle (<span className="font-serif italic">θ</span>)</span><span className="font-mono text-right">{parseFloat(tooltip.theta.toFixed(1))}°</span>
+                    <span>Damping (<span className="font-serif italic">ζ</span>)</span><span className="font-mono text-right">{parseFloat(tooltip.zeta.toFixed(4))}</span>
                   </div>
                 </div>
               )}
