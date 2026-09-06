@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Gauge, Radio, RotateCw, SlidersHorizontal } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
+import { BrandSlider } from "@/components/ui/BrandSlider";
 import { SignalProcessor, type TimeVoltageSample } from "@/lib/signalProcessor";
 
 export type DmmMode = "DCV" | "ACV" | "DCA" | "ACA" | "OHM" | "CONT";
@@ -112,7 +113,7 @@ export function OscilloscopePanel({ channel1, channel2 }: { channel1: TimeVoltag
     <div className="flex items-center justify-between"><div><p className="font-mono text-[10px] font-bold tracking-[.16em] text-violet-500">OSC / DIGITAL STORAGE</p><h2 className="mt-1 text-sm font-bold text-slate-900 dark:text-white">Triggered Oscilloscope</h2></div><Radio className="h-5 w-5 text-cyan-500"/></div>
     <canvas ref={canvasRef} className="mt-3 h-48 w-full rounded-lg border border-slate-700 bg-black" aria-label="10 by 8 oscilloscope graticule"/>
     <div className="mt-3 grid gap-3"><label className="text-[10px] font-bold text-slate-500 dark:text-slate-400">TIME/DIV · {formatSeconds(timeDiv)}<Slider value={[timeDiv]} min={.001} max={.1} step={.001} onValueChange={([value]) => setTimeDiv(value)}/></label><label className="text-[10px] font-bold text-yellow-600 dark:text-yellow-300">CH1 VOLTS/DIV · {ch1Div.toFixed(2)} V<Slider value={[ch1Div]} min={.01} max={10} step={.01} onValueChange={([value]) => setCh1Div(value)}/></label><label className="text-[10px] font-bold text-cyan-600 dark:text-cyan-300">CH2 VOLTS/DIV · {ch2Div.toFixed(3)} A<Slider value={[ch2Div]} min={.001} max={1} step={.001} onValueChange={([value]) => setCh2Div(value)}/></label></div>
-    <div className="mt-3 flex items-center gap-2"><label className="min-w-0 flex-1 text-[10px] font-bold text-slate-500 dark:text-slate-400">RISING TRIGGER · {triggerLevel.toFixed(2)} V<input type="range" min="-10" max="10" step=".1" value={triggerLevel} onChange={(event) => setTriggerLevel(Number(event.target.value))} className="mt-1 w-full"/></label><button type="button" onClick={autoScale} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-2 text-[10px] font-bold text-slate-600 dark:border-slate-700 dark:text-slate-200"><RotateCw className="h-3.5 w-3.5"/>Auto</button></div>
+    <div className="mt-3 flex items-center gap-2"><label className="min-w-0 flex-1 text-[10px] font-bold text-slate-500 dark:text-slate-400">RISING TRIGGER · {triggerLevel.toFixed(2)} V<BrandSlider min={-10} max={10} step={0.1} value={triggerLevel} onChange={(event) => setTriggerLevel(Number(event.target.value))} className="mt-1" /></label><button type="button" onClick={autoScale} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-2 text-[10px] font-bold text-slate-600 dark:border-slate-700 dark:text-slate-200"><RotateCw className="h-3.5 w-3.5"/>Auto</button></div>
     <p className="mt-3 flex items-center gap-1 text-[10px] text-slate-500 dark:text-slate-400"><SlidersHorizontal className="h-3.5 w-3.5"/>Rising-edge trigger locks CH1 (yellow); CH2 current sense is cyan.</p>
   </section>;
 }

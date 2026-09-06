@@ -39,13 +39,13 @@ export function TransferFunctionInput({ onUpdate, defaultData, gainK }: Transfer
   const [mode, setMode] = useState<TfInputMode>(defaultData?.mode || "polynomial");
 
   // State for Mode A: Polynomial
-  const [numStr, setNumStr] = useState(defaultData?.polyStr?.num || "1 2");
-  const [denStr, setDenStr] = useState(defaultData?.polyStr?.den || "1 3 2 0");
+  const [numStr, setNumStr] = useState(defaultData?.polyStr?.num ?? "1 2");
+  const [denStr, setDenStr] = useState(defaultData?.polyStr?.den ?? "1 3 2 0");
 
   // State for Mode B: ZPK
-  const [kStr, setKStr] = useState(defaultData?.zpk?.k?.toString() || "1");
-  const [zStr, setZStr] = useState(defaultData?.zpk?.z || "-2");
-  const [pStr, setPStr] = useState(defaultData?.zpk?.p || "0, -1, -2");
+  const [kStr, setKStr] = useState(defaultData?.zpk?.k !== undefined ? String(defaultData.zpk.k) : "1");
+  const [zStr, setZStr] = useState(defaultData?.zpk?.z ?? "-2");
+  const [pStr, setPStr] = useState(defaultData?.zpk?.p ?? "0, -1, -2");
 
   // Convert ZPK strings to polynomial
   const zpkToPoly = useMemo(() => {
@@ -197,13 +197,13 @@ export function TransferFunctionInput({ onUpdate, defaultData, gainK }: Transfer
         <div className="flex flex-wrap gap-2">
           <button
             onClick={() => setMode("polynomial")}
-            className={`rounded-lg px-3 py-1.5 text-xs font-medium shadow-sm ${mode === "polynomial" ? "bg-gradient-to-r from-blue-600 to-pink-500 text-white" : "border border-slate-200 bg-white text-slate-500 hover:border-blue-400 hover:text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400 dark:hover:border-blue-400 dark:hover:text-slate-200"}`}
+            className={`rounded-lg px-3 py-1.5 text-xs font-medium shadow-sm ${mode === "polynomial" ? "bg-brand-gradient text-white" : "border border-slate-200 bg-white text-slate-500 hover:border-blue-400 hover:text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400 dark:hover:border-blue-400 dark:hover:text-slate-200"}`}
           >
             Polynomial
           </button>
           <button
             onClick={() => setMode("zpk")}
-            className={`rounded-lg px-3 py-1.5 text-xs font-medium shadow-sm ${mode === "zpk" ? "bg-gradient-to-r from-blue-600 to-pink-500 text-white" : "border border-slate-200 bg-white text-slate-500 hover:border-blue-400 hover:text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400 dark:hover:border-blue-400 dark:hover:text-slate-200"}`}
+            className={`rounded-lg px-3 py-1.5 text-xs font-medium shadow-sm ${mode === "zpk" ? "bg-brand-gradient text-white" : "border border-slate-200 bg-white text-slate-500 hover:border-blue-400 hover:text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400 dark:hover:border-blue-400 dark:hover:text-slate-200"}`}
           >
             ZPK
           </button>
@@ -221,7 +221,8 @@ export function TransferFunctionInput({ onUpdate, defaultData, gainK }: Transfer
                   type="text"
                   value={numStr}
                   onChange={(e) => setNumStr(e.target.value)}
-                  className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2 text-sm text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  style={{ fontFamily: "'KaTeX_Main', 'Times New Roman', serif" }}
+                  className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2 text-slate-800 text-lg tracking-wide dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="e.g. 1 2"
                 />
                 <p className="text-[10px] text-slate-400 mt-1">Space-separated from highest to lowest power.</p>
@@ -232,7 +233,8 @@ export function TransferFunctionInput({ onUpdate, defaultData, gainK }: Transfer
                   type="text"
                   value={denStr}
                   onChange={(e) => setDenStr(e.target.value)}
-                  className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2 text-sm text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  style={{ fontFamily: "'KaTeX_Main', 'Times New Roman', serif" }}
+                  className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2 text-slate-800 text-lg tracking-wide dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="e.g. 1 3 2 0"
                 />
               </div>
@@ -246,7 +248,8 @@ export function TransferFunctionInput({ onUpdate, defaultData, gainK }: Transfer
                   value={kStr}
                   placeholder="1"
                   onChange={(e) => setKStr(e.target.value)}
-                  className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2 text-sm text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  style={{ fontFamily: "'KaTeX_Main', 'Times New Roman', serif" }}
+                  className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2 text-slate-800 text-lg tracking-wide dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
               <div>
@@ -255,7 +258,8 @@ export function TransferFunctionInput({ onUpdate, defaultData, gainK }: Transfer
                   type="text"
                   value={zStr}
                   onChange={(e) => setZStr(e.target.value)}
-                  className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2 text-sm text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  style={{ fontFamily: "'KaTeX_Main', 'Times New Roman', serif" }}
+                  className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2 text-slate-800 text-lg tracking-wide dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="e.g. -2, -3+4j"
                 />
               </div>
@@ -265,7 +269,8 @@ export function TransferFunctionInput({ onUpdate, defaultData, gainK }: Transfer
                   type="text"
                   value={pStr}
                   onChange={(e) => setPStr(e.target.value)}
-                  className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2 text-sm text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  style={{ fontFamily: "'KaTeX_Main', 'Times New Roman', serif" }}
+                  className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2 text-slate-800 text-lg tracking-wide dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="e.g. 0, -1, -2"
                 />
                 <p className="text-[10px] text-slate-400 mt-1">Comma-separated roots. Use 'j' for complex conjugate pairs.</p>

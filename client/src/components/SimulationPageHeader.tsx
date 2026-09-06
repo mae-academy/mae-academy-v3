@@ -80,7 +80,7 @@ export default function SimulationPageHeader({
                   role="tab"
                   aria-selected={active}
                   onClick={() => onSelectTool(tool.id)}
-                  className={`flex min-h-14 flex-1 items-center justify-center px-6 py-4 text-center text-sm font-semibold transition-all focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-blue-600 ${active ? (compact ? "bg-violet-700 text-white" : "bg-gradient-to-r from-blue-600 to-pink-500 text-white") : `bg-white text-slate-500 hover:bg-gray-50 hover:text-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-slate-100 ${index === 0 ? "" : "border-s border-gray-200 dark:border-slate-700"}`}`}
+                  className={`flex min-h-14 flex-1 items-center justify-center px-6 py-4 text-center text-sm font-semibold transition-all focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-blue-600 ${active ? (compact ? "bg-violet-700 text-white" : "bg-brand-gradient text-white") : `bg-white text-slate-500 hover:bg-gray-50 hover:text-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-slate-100 ${index === 0 ? "" : "border-s border-gray-200 dark:border-slate-700"}`}`}
                 >
                   {tool.label}
                 </button>

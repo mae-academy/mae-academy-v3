@@ -1,4 +1,8 @@
-type MNAIdentity = { id: string; label?: string };
+export interface MNAIdentity {
+  id: string;
+  name?: string;
+  label?: string;
+}
 export type MNAElement =
   | (MNAIdentity & { type: 'resistor'; positive: string; negative: string; resistance: number })
   | (MNAIdentity & { type: 'current'; from: string; to: string; current: number })
@@ -131,6 +135,15 @@ export class MNASolver {
     nodeOrder.forEach((id, index) => { nodeVoltages[id] = solution[index]; });
     const branchCurrents: Record<string, number> = {};
     voltageBranches.forEach((element, index) => { branchCurrents[element.id] = solution[nodeOrder.length + index]; });
+    for (const element of this.elements) {
+      if (element.type === 'resistor') {
+        const vp = nodeVoltages[element.positive] ?? 0;
+        const vn = nodeVoltages[element.negative] ?? 0;
+        branchCurrents[element.id] = (vp - vn) / element.resistance;
+      } else if (element.type === 'current') {
+        branchCurrents[element.id] = element.current;
+      }
+    }
     const voltageSourceCurrents = Object.fromEntries(voltageBranches.filter(element => element.type === 'voltage' || element.type === 'vcvs' || element.type === 'ccvs').map(element => [element.id, branchCurrents[element.id]]));
     return { nodeVoltages, voltageSourceCurrents, branchCurrents, matrix, rhs, nodeOrder, voltageBranchOrder: voltageBranches.map((element) => element.id), residualInfinity };
   }

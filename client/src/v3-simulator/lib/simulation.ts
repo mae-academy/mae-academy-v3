@@ -299,6 +299,16 @@ export class SimulationEngine {
         wiredTerminals.add(to);
       }
     }
+    const groundComponents = this.components.filter(c => c.type === 'ground');
+    if (groundComponents.length > 1) {
+      const gnd0 = terminalKey(groundComponents[0].id, 'gnd');
+      for (let i = 1; i < groundComponents.length; i++) {
+        const gndi = terminalKey(groundComponents[i].id, 'gnd');
+        if (existing.has(gnd0) && existing.has(gndi)) {
+          union.union(gnd0, gndi);
+        }
+      }
+    }
     const terminalRoots = new Map<string, string>();
     for (const key of Array.from(existing)) terminalRoots.set(key, union.find(key));
     const roots = Array.from(new Set(Array.from(terminalRoots.values())));

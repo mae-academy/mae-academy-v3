@@ -7,6 +7,7 @@ import { Activity, Braces, CheckCircle2, ChevronRight, CircleAlert, FunctionSqua
 import { useMemo, useRef, useState } from "react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { KatexMath } from "@/components/ui/KatexMath";
+import { BrandSlider } from "@/components/ui/BrandSlider";
 import { MathLiveSignalInput, type MathLiveSignalInputHandle } from "@/components/signals/MathLiveSignalInput";
 import SystemProofCanvas from "@/components/signals/SystemProofCanvas";
 import { classifySystem, parseSystemExpression, type Pillar, type PillarId } from "@/lib/signals/systemClassifier";
@@ -26,7 +27,7 @@ const keyboard = [
 ] as const;
 
 function PillarIcon({ id }: { id: PillarId }) { const icons = { linearity: FunctionSquare, time: Timer, causality: ChevronRight, memory: Braces, stability: Activity }; const Icon = icons[id]; return <Icon className="h-4 w-4" />; }
-function Slider({ label, value, onChange, min, max, step = 0.1 }: { label: string; value: number; onChange: (next: number) => void; min: number; max: number; step?: number }) { return <label className="grid gap-1.5 text-xs font-bold text-slate-600 dark:text-slate-300"><span className="flex items-center justify-between"><KatexMath math={label} /><span className="font-mono text-violet-600 dark:text-violet-300">{value.toFixed(1)}</span></span><input type="range" min={min} max={max} step={step} value={value} onChange={(event) => onChange(Number(event.target.value))} className="accent-violet-500" /></label>; }
+function Slider({ label, value, onChange, min, max, step = 0.1 }: { label: string; value: number; onChange: (next: number) => void; min: number; max: number; step?: number }) { return <label className="grid gap-1.5 text-xs font-bold text-slate-600 dark:text-slate-300"><span className="flex items-center justify-between"><KatexMath math={label} /><span className="font-sans font-semibold text-violet-600 dark:text-violet-300">{value.toFixed(1)}</span></span><BrandSlider min={min} max={max} step={step} value={value} onChange={(event) => onChange(Number(event.target.value))} /></label>; }
 
 function VerdictBadge({ pillar }: { pillar: Pillar }) { return <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.1em] ${pillar.passed ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-200" : "bg-rose-100 text-rose-700 dark:bg-rose-400/10 dark:text-rose-200"}`}>{pillar.passed ? <CheckCircle2 className="h-3.5 w-3.5" /> : <CircleAlert className="h-3.5 w-3.5" />}{pillar.verdict}</span>; }
 

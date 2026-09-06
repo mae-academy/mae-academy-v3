@@ -234,26 +234,6 @@ const DependentDiamond: SymbolFC = ({ props }) => {
   </g>;
 };
 
-const StarResistorPack: SymbolFC = ({ props }) => props?._documentedStyle === true ? <g data-resistor-network="star">
-  <g transform={`rotate(0) translate(${DOCUMENTED_NETWORK_ARM_HALF_LENGTH},0)`}><RectangularResistor strokeWidth={1.35} halfLength={DOCUMENTED_NETWORK_ARM_HALF_LENGTH} bodyWidth={DOCUMENTED_NETWORK_ARM_BODY_WIDTH} bodyHeight={DOCUMENTED_NETWORK_ARM_BODY_HEIGHT} /></g>
-  <g transform={`rotate(120) translate(${DOCUMENTED_NETWORK_ARM_HALF_LENGTH},0)`}><RectangularResistor strokeWidth={1.35} halfLength={DOCUMENTED_NETWORK_ARM_HALF_LENGTH} bodyWidth={DOCUMENTED_NETWORK_ARM_BODY_WIDTH} bodyHeight={DOCUMENTED_NETWORK_ARM_BODY_HEIGHT} /></g>
-  <g transform={`rotate(240) translate(${DOCUMENTED_NETWORK_ARM_HALF_LENGTH},0)`}><RectangularResistor strokeWidth={1.35} halfLength={DOCUMENTED_NETWORK_ARM_HALF_LENGTH} bodyWidth={DOCUMENTED_NETWORK_ARM_BODY_WIDTH} bodyHeight={DOCUMENTED_NETWORK_ARM_BODY_HEIGHT} /></g>
-  <circle cx={0} cy={0} r={2.6} fill="#1a2744" />
-</g> : <g>
-  <line x1={-40} y1={-25} x2={-18} y2={-12} stroke="#1a2744" strokeWidth={2} /><line x1={-40} y1={25} x2={-18} y2={12} stroke="#1a2744" strokeWidth={2} /><line x1={40} y1={0} x2={18} y2={0} stroke="#1a2744" strokeWidth={2} />
-  <path d="M-18,-12 l8,-5 7,10 7,-10 7,5 M-18,12 l8,5 7,-10 7,10 7,-5 M18,0 l-9,-6 -8,12 -8,-12 -9,6" fill="none" stroke="#1a2744" strokeWidth={1.7} strokeLinejoin="round" />
-  <circle cx={0} cy={0} r={3} fill="#1a2744" />
-</g>;
-
-const DeltaResistorPack: SymbolFC = ({ props }) => props?._documentedStyle === true ? <g data-resistor-network="delta">
-  <g transform="translate(0,9.6225) rotate(0)"><RectangularResistor strokeWidth={1.35} halfLength={DOCUMENTED_NETWORK_ARM_HALF_LENGTH} bodyWidth={DOCUMENTED_NETWORK_ARM_BODY_WIDTH} bodyHeight={DOCUMENTED_NETWORK_ARM_BODY_HEIGHT} /></g>
-  <g transform="translate(8.3333,-4.81125) rotate(60)"><RectangularResistor strokeWidth={1.35} halfLength={DOCUMENTED_NETWORK_ARM_HALF_LENGTH} bodyWidth={DOCUMENTED_NETWORK_ARM_BODY_WIDTH} bodyHeight={DOCUMENTED_NETWORK_ARM_BODY_HEIGHT} /></g>
-  <g transform="translate(-8.3333,-4.81125) rotate(120)"><RectangularResistor strokeWidth={1.35} halfLength={DOCUMENTED_NETWORK_ARM_HALF_LENGTH} bodyWidth={DOCUMENTED_NETWORK_ARM_BODY_WIDTH} bodyHeight={DOCUMENTED_NETWORK_ARM_BODY_HEIGHT} /></g>
-</g> : <g>
-  <line x1={-40} y1={-25} x2={-28} y2={-18} stroke="#1a2744" strokeWidth={2} /><line x1={-40} y1={25} x2={-28} y2={18} stroke="#1a2744" strokeWidth={2} /><line x1={40} y1={0} x2={28} y2={0} stroke="#1a2744" strokeWidth={2} />
-  <path d="M-28,-18 l10,-4 7,7 7,-7 8,4 M-28,18 l10,4 7,-7 7,7 8,-4 M-18,-22 l-4,9 8,5 -8,5 -4,9" fill="none" stroke="#1a2744" strokeWidth={1.7} strokeLinejoin="round" />
-</g>;
-
 // ─── DIODES ───────────────────────────────────────────────────────────────────
 
 const DiodeBase: SymbolFC = ({ powered, props }) => {
@@ -1046,8 +1026,6 @@ export const SYMBOL_MAP: Record<string, SymbolFC> = {
   'vcvs': (p) => <DependentDiamond {...p} props={{ ...p.props, _type: 'vcvs' }} />,
   'cccs': (p) => <DependentDiamond {...p} props={{ ...p.props, _type: 'cccs' }} />,
   'ccvs': (p) => <DependentDiamond {...p} props={{ ...p.props, _type: 'ccvs' }} />,
-  'star-resistor-pack': StarResistorPack,
-  'delta-resistor-pack': DeltaResistorPack,
   'diode': DiodeBase,
   'diode-ideal': DiodeBase,
   'diode-silicon': DiodeBase,

@@ -54,7 +54,7 @@ const SOURCES: Record<string, ComponentDef> = {
     id: 'dc-rail', name: 'DC Power Rail', category: 'Sources',
     width: 70, height: 50, symbol: 'dc-rail',
     terminals: [
-      { id: 'pos', name: '+V', x: 0, y: -25, type: 'output' },
+      { id: 'pos', name: '+V', x: 0, y: 0, type: 'output' },
     ],
     properties: {
       voltage: { type: 'number', value: 24, unit: 'V', min: 0, max: 10000, label: 'Rail Voltage' },
@@ -83,10 +83,10 @@ const SOURCES: Record<string, ComponentDef> = {
     id: 'three-phase-source', name: '3-Phase Source', category: 'Sources',
     width: 80, height: 90, symbol: 'three-phase-source',
     terminals: [
-      { id: 'l1', name: 'L1', x: -40, y: -30, type: 'output' },
-      { id: 'l2', name: 'L2', x: -40, y: -10, type: 'output' },
-      { id: 'l3', name: 'L3', x: -40, y: 10, type: 'output' },
-      { id: 'n', name: 'N', x: -40, y: 30, type: 'output' },
+      { id: 'l1', name: 'L1', x: 100 / 3, y: -50 / 3, type: 'output' },
+      { id: 'l2', name: 'L2', x: 100 / 3, y: 0, type: 'output' },
+      { id: 'l3', name: 'L3', x: 100 / 3, y: 50 / 3, type: 'output' },
+      { id: 'n', name: 'N', x: -100 / 3, y: 0, type: 'output' },
     ],
     properties: {
       lineVoltage: { type: 'number', value: 400, unit: 'V RMS', min: 1, max: 100000, label: 'Line Voltage (L-L)' },
@@ -101,10 +101,10 @@ const SOURCES: Record<string, ComponentDef> = {
     id: 'three-phase-rail', name: '3-Phase Power Rail', category: 'Sources',
     width: 90, height: 90, symbol: 'three-phase-rail',
     terminals: [
-      { id: 'l1', name: 'L1', x: -45, y: -30, type: 'output' },
-      { id: 'l2', name: 'L2', x: -45, y: -10, type: 'output' },
-      { id: 'l3', name: 'L3', x: -45, y: 10, type: 'output' },
-      { id: 'n', name: 'N', x: -45, y: 30, type: 'output' },
+      { id: 'l1', name: 'L1', x: -100 / 3, y: -100 / 3, type: 'output' },
+      { id: 'l2', name: 'L2', x: -100 / 3, y: -50 / 3, type: 'output' },
+      { id: 'l3', name: 'L3', x: -100 / 3, y: 50 / 3, type: 'output' },
+      { id: 'n', name: 'N', x: -100 / 3, y: 100 / 3, type: 'output' },
     ],
     properties: {
       lineVoltage: { type: 'number', value: 400, unit: 'V RMS', min: 1, max: 100000, label: 'Rail Voltage (L-L)' },
@@ -173,9 +173,9 @@ const PASSIVE: Record<string, ComponentDef> = {
     id: 'potentiometer', name: 'Variable Resistor', category: 'Passive',
     width: 70, height: 60, symbol: 'potentiometer',
     terminals: [
-      { id: 'a', name: 'A', x: -35, y: -20, type: 'bidirectional' },
-      { id: 'wiper', name: 'W', x: 35, y: 0, type: 'bidirectional' },
-      { id: 'b', name: 'B', x: -35, y: 20, type: 'bidirectional' },
+      { id: 't1', name: 'A', x: -30, y: 0, type: 'bidirectional' },
+      { id: 't2', name: 'B', x: 30, y: 0, type: 'bidirectional' },
+      { id: 'wiper', name: 'W', x: 0, y: -30, type: 'bidirectional' },
     ],
     properties: {
       resistance: { type: 'number', value: 10000, unit: 'Ω', min: 1, max: 1e9, label: 'End-to-End Resistance' },
@@ -186,10 +186,10 @@ const PASSIVE: Record<string, ComponentDef> = {
   },
   'capacitor': {
     id: 'capacitor', name: 'Capacitor', category: 'Passive',
-    width: 20, height: 60, symbol: 'capacitor',
+    width: 60, height: 30, symbol: 'capacitor',
     terminals: [
-      { id: 'a', name: 'A', x: 0, y: -30, type: 'bidirectional' },
-      { id: 'b', name: 'B', x: 0, y: 30, type: 'bidirectional' },
+      { id: 'a', name: 'A', x: -30, y: 0, type: 'bidirectional' },
+      { id: 'b', name: 'B', x: 30, y: 0, type: 'bidirectional' },
     ],
     properties: {
       capacitance: { type: 'number', value: 1e-6, unit: 'F', min: 1e-15, max: 1, label: 'Capacitance' },
@@ -217,37 +217,46 @@ const PASSIVE: Record<string, ComponentDef> = {
 const CONTROLLED_NETWORKS: Record<string, ComponentDef> = {
   'vccs': {
     id: 'vccs', name: 'VCCS', category: 'Controlled Sources & Networks', width: 70, height: 70, symbol: 'vccs',
-    terminals: [{ id: 'pos', name: '+', x: 0, y: -35, type: 'output' }, { id: 'neg', name: '−', x: 0, y: 35, type: 'output' }, { id: 'cp', name: 'C+', x: -35, y: -20, type: 'input' }, { id: 'cn', name: 'C−', x: -35, y: 20, type: 'input' }],
-    properties: { transconductance: { type: 'number', value: 0.001, unit: 'S', min: -1e6, max: 1e6, label: 'Transconductance' } },
+    terminals: [{ id: 'pos', name: '+', x: 0, y: -30, type: 'output' }, { id: 'neg', name: '−', x: 0, y: 30, type: 'output' }],
+    properties: { transconductance: { type: 'number', value: 0.001, unit: 'S', min: -1e6, max: 1e6, label: 'Transconductance' }, controlSourceId: { type: 'text', value: '', label: 'Control Source ID' } },
     description: 'Voltage-controlled current source (IEEE dependent source)',
   },
   'vcvs': {
     id: 'vcvs', name: 'VCVS', category: 'Controlled Sources & Networks', width: 70, height: 70, symbol: 'vcvs',
-    terminals: [{ id: 'pos', name: '+', x: 0, y: -35, type: 'output' }, { id: 'neg', name: '−', x: 0, y: 35, type: 'output' }, { id: 'cp', name: 'C+', x: -35, y: -20, type: 'input' }, { id: 'cn', name: 'C−', x: -35, y: 20, type: 'input' }],
-    properties: { gain: { type: 'number', value: 2, unit: 'V/V', min: -1e6, max: 1e6, label: 'Voltage Gain' } },
+    terminals: [{ id: 'pos', name: '+', x: 0, y: -30, type: 'output' }, { id: 'neg', name: '−', x: 0, y: 30, type: 'output' }],
+    properties: { gain: { type: 'number', value: 2, unit: 'V/V', min: -1e6, max: 1e6, label: 'Voltage Gain' }, controlSourceId: { type: 'text', value: '', label: 'Control Source ID' } },
     description: 'Voltage-controlled voltage source (IEEE dependent source)',
   },
   'cccs': {
     id: 'cccs', name: 'CCCS', category: 'Controlled Sources & Networks', width: 70, height: 70, symbol: 'cccs',
-    terminals: [{ id: 'pos', name: '+', x: 0, y: -35, type: 'output' }, { id: 'neg', name: '−', x: 0, y: 35, type: 'output' }, { id: 'cp', name: 'S+', x: -35, y: -20, type: 'input' }, { id: 'cn', name: 'S−', x: -35, y: 20, type: 'input' }],
-    properties: { gain: { type: 'number', value: 1, unit: 'A/A', min: -1e6, max: 1e6, label: 'Current Gain' } },
+    terminals: [{ id: 'pos', name: '+', x: 0, y: -30, type: 'output' }, { id: 'neg', name: '−', x: 0, y: 30, type: 'output' }],
+    properties: { gain: { type: 'number', value: 1, unit: 'A/A', min: -1e6, max: 1e6, label: 'Current Gain' }, controlSourceId: { type: 'text', value: '', label: 'Control Source ID' } },
     description: 'Current-controlled current source with inline 0 V current-sense branch',
   },
   'ccvs': {
     id: 'ccvs', name: 'CCVS', category: 'Controlled Sources & Networks', width: 70, height: 70, symbol: 'ccvs',
-    terminals: [{ id: 'pos', name: '+', x: 0, y: -35, type: 'output' }, { id: 'neg', name: '−', x: 0, y: 35, type: 'output' }, { id: 'cp', name: 'S+', x: -35, y: -20, type: 'input' }, { id: 'cn', name: 'S−', x: -35, y: 20, type: 'input' }],
-    properties: { transresistance: { type: 'number', value: 1000, unit: 'Ω', min: -1e9, max: 1e9, label: 'Transresistance' } },
+    terminals: [{ id: 'pos', name: '+', x: 0, y: -30, type: 'output' }, { id: 'neg', name: '−', x: 0, y: 30, type: 'output' }],
+    properties: { transresistance: { type: 'number', value: 1000, unit: 'Ω', min: -1e9, max: 1e9, label: 'Transresistance' }, controlSourceId: { type: 'text', value: '', label: 'Control Source ID' } },
     description: 'Current-controlled voltage source with inline 0 V current-sense branch',
   },
   'star-resistor-pack': {
     id: 'star-resistor-pack', name: 'Star (Y) Resistor Pack', category: 'Controlled Sources & Networks', width: 80, height: 70, symbol: 'star-resistor-pack',
-    terminals: [{ id: 'a', name: 'A', x: -40, y: -25, type: 'bidirectional' }, { id: 'b', name: 'B', x: -40, y: 25, type: 'bidirectional' }, { id: 'c', name: 'C', x: 40, y: 0, type: 'bidirectional' }],
+    terminals: [
+      { id: 'c', name: 'C', x: 30, y: 0, type: 'bidirectional' },
+      { id: 'a', name: 'A', x: -15, y: -30, type: 'bidirectional' },
+      { id: 'b', name: 'B', x: -15, y: 30, type: 'bidirectional' },
+      { id: 'n', name: 'N', x: 0, y: 0, type: 'bidirectional' },
+    ],
     properties: { rA: { type: 'number', value: 30, unit: 'Ω', min: 0.001, max: 1e9, label: 'R_A' }, rB: { type: 'number', value: 30, unit: 'Ω', min: 0.001, max: 1e9, label: 'R_B' }, rC: { type: 'number', value: 30, unit: 'Ω', min: 0.001, max: 1e9, label: 'R_C' } },
-    description: 'Grouped three-terminal Star (Y) resistor network',
+    description: 'Grouped four-terminal Star (Y) resistor network',
   },
   'delta-resistor-pack': {
     id: 'delta-resistor-pack', name: 'Delta (Δ) Resistor Pack', category: 'Controlled Sources & Networks', width: 80, height: 70, symbol: 'delta-resistor-pack',
-    terminals: [{ id: 'a', name: 'A', x: -40, y: -25, type: 'bidirectional' }, { id: 'b', name: 'B', x: -40, y: 25, type: 'bidirectional' }, { id: 'c', name: 'C', x: 40, y: 0, type: 'bidirectional' }],
+    terminals: [
+      { id: 'top', name: 'A', x: 0, y: -20, type: 'bidirectional' },
+      { id: 'left', name: 'B', x: -20, y: 20, type: 'bidirectional' },
+      { id: 'right', name: 'C', x: 20, y: 20, type: 'bidirectional' },
+    ],
     properties: { rAB: { type: 'number', value: 30, unit: 'Ω', min: 0.001, max: 1e9, label: 'R_{AB}' }, rBC: { type: 'number', value: 30, unit: 'Ω', min: 0.001, max: 1e9, label: 'R_{BC}' }, rCA: { type: 'number', value: 30, unit: 'Ω', min: 0.001, max: 1e9, label: 'R_{CA}' } },
     description: 'Grouped three-terminal Delta (Δ) resistor network',
   },
@@ -559,10 +568,10 @@ const SWITCHES: Record<string, ComponentDef> = {
   },
   'aux-contact-no': {
     id: 'aux-contact-no', name: 'Auxiliary Contact NO', category: 'Switches',
-    width: 60, height: 30, symbol: 'aux-contact-no',
+    width: 50, height: 30, symbol: 'aux-contact-no',
     terminals: [
-      { id: 'a', name: '13', x: -30, y: 0, type: 'bidirectional' },
-      { id: 'b', name: '14', x: 30, y: 0, type: 'bidirectional' },
+      { id: 'a', name: '13', x: -25, y: 0, type: 'bidirectional' },
+      { id: 'b', name: '14', x: 25, y: 0, type: 'bidirectional' },
     ],
     properties: {
       linkedTo: { type: 'text', value: '', label: 'Linked Coil Label' },
@@ -571,10 +580,10 @@ const SWITCHES: Record<string, ComponentDef> = {
   },
   'aux-contact-nc': {
     id: 'aux-contact-nc', name: 'Auxiliary Contact NC', category: 'Switches',
-    width: 60, height: 30, symbol: 'aux-contact-nc',
+    width: 50, height: 30, symbol: 'aux-contact-nc',
     terminals: [
-      { id: 'a', name: '21', x: -30, y: 0, type: 'bidirectional' },
-      { id: 'b', name: '22', x: 30, y: 0, type: 'bidirectional' },
+      { id: 'a', name: '21', x: -25, y: 0, type: 'bidirectional' },
+      { id: 'b', name: '22', x: 25, y: 0, type: 'bidirectional' },
     ],
     properties: {
       linkedTo: { type: 'text', value: '', label: 'Linked Coil Label' },
@@ -589,8 +598,8 @@ const PROTECTION: Record<string, ComponentDef> = {
     id: 'relay-spst', name: 'Relay SPST', category: 'Protection',
     width: 60, height: 70, symbol: 'relay-spst',
     terminals: [
-      { id: 'coil+', name: 'A1', x: -30, y: -35, type: 'input' },
-      { id: 'coil-', name: 'A2', x: 30, y: -35, type: 'input' },
+      { id: 'coil+', name: 'A1', x: -30, y: -25, type: 'input' },
+      { id: 'coil-', name: 'A2', x: 30, y: -25, type: 'input' },
       { id: 'com', name: 'C', x: -30, y: 35, type: 'bidirectional' },
       { id: 'no', name: 'NO', x: 30, y: 35, type: 'bidirectional' },
     ],
@@ -607,9 +616,9 @@ const PROTECTION: Record<string, ComponentDef> = {
     terminals: [
       { id: 'coil+', name: 'A1', x: -30, y: -40, type: 'input' },
       { id: 'coil-', name: 'A2', x: 30, y: -40, type: 'input' },
-      { id: 'com', name: 'C', x: -30, y: 40, type: 'bidirectional' },
-      { id: 'no', name: 'NO', x: 30, y: 25, type: 'bidirectional' },
-      { id: 'nc', name: 'NC', x: 30, y: 40, type: 'bidirectional' },
+      { id: 'com', name: 'C', x: -30, y: 20, type: 'bidirectional' },
+      { id: 'no', name: 'NO', x: 30, y: 10, type: 'bidirectional' },
+      { id: 'nc', name: 'NC', x: 30, y: 30, type: 'bidirectional' },
     ],
     properties: {
       coilVoltage: { type: 'number', value: 12, unit: 'V', min: 3, max: 480, label: 'Coil Voltage' },
@@ -621,12 +630,12 @@ const PROTECTION: Record<string, ComponentDef> = {
     id: 'relay-dpst', name: 'Relay DPST', category: 'Protection',
     width: 70, height: 80, symbol: 'relay-dpst',
     terminals: [
-      { id: 'coil+', name: 'A1', x: -35, y: -40, type: 'input' },
-      { id: 'coil-', name: 'A2', x: 35, y: -40, type: 'input' },
-      { id: 'c1', name: 'C1', x: -35, y: 20, type: 'bidirectional' },
-      { id: 'no1', name: 'NO1', x: 35, y: 20, type: 'bidirectional' },
-      { id: 'c2', name: 'C2', x: -35, y: 40, type: 'bidirectional' },
-      { id: 'no2', name: 'NO2', x: 35, y: 40, type: 'bidirectional' },
+      { id: 'coil+', name: 'A1', x: -30, y: -40, type: 'input' },
+      { id: 'coil-', name: 'A2', x: 30, y: -40, type: 'input' },
+      { id: 'c1', name: 'C1', x: -30, y: 10, type: 'bidirectional' },
+      { id: 'no1', name: 'NO1', x: 30, y: 10, type: 'bidirectional' },
+      { id: 'c2', name: 'C2', x: -30, y: 35, type: 'bidirectional' },
+      { id: 'no2', name: 'NO2', x: 30, y: 35, type: 'bidirectional' },
     ],
     properties: {
       coilVoltage: { type: 'number', value: 12, unit: 'V', min: 3, max: 480, label: 'Coil Voltage' },
@@ -638,14 +647,14 @@ const PROTECTION: Record<string, ComponentDef> = {
     id: 'relay-dpdt', name: 'Relay DPDT', category: 'Protection',
     width: 80, height: 90, symbol: 'relay-dpdt',
     terminals: [
-      { id: 'coil+', name: 'A1', x: -40, y: -45, type: 'input' },
-      { id: 'coil-', name: 'A2', x: 40, y: -45, type: 'input' },
-      { id: 'c1', name: 'C1', x: -40, y: 15, type: 'bidirectional' },
-      { id: 'no1', name: 'NO1', x: 40, y: 5, type: 'bidirectional' },
-      { id: 'nc1', name: 'NC1', x: 40, y: 25, type: 'bidirectional' },
-      { id: 'c2', name: 'C2', x: -40, y: 45, type: 'bidirectional' },
-      { id: 'no2', name: 'NO2', x: 40, y: 35, type: 'bidirectional' },
-      { id: 'nc2', name: 'NC2', x: 40, y: 45, type: 'bidirectional' },
+      { id: 'coil+', name: 'A1', x: -30, y: -45, type: 'input' },
+      { id: 'coil-', name: 'A2', x: 30, y: -45, type: 'input' },
+      { id: 'c1', name: 'C1', x: -35, y: 5, type: 'bidirectional' },
+      { id: 'no1', name: 'NO1', x: 35, y: -5, type: 'bidirectional' },
+      { id: 'nc1', name: 'NC1', x: 35, y: 15, type: 'bidirectional' },
+      { id: 'c2', name: 'C2', x: -35, y: 35, type: 'bidirectional' },
+      { id: 'no2', name: 'NO2', x: 35, y: 25, type: 'bidirectional' },
+      { id: 'nc2', name: 'NC2', x: 35, y: 45, type: 'bidirectional' },
     ],
     properties: {
       coilVoltage: { type: 'number', value: 12, unit: 'V', min: 3, max: 480, label: 'Coil Voltage' },
@@ -815,8 +824,8 @@ const MOTORS_LAMPS: Record<string, ComponentDef> = {
     id: 'motor-dc', name: 'DC Motor', category: 'Motors & Lamps',
     width: 60, height: 60, symbol: 'motor-dc',
     terminals: [
-      { id: 'pos', name: '+', x: -30, y: 0, type: 'input' },
-      { id: 'neg', name: '−', x: 30, y: 0, type: 'input' },
+      { id: 'pos', name: '+', x: -25, y: 0, type: 'input' },
+      { id: 'neg', name: '−', x: 25, y: 0, type: 'input' },
     ],
     properties: {
       nominalV: { type: 'number', value: 12, unit: 'V', min: 1, max: 1000, label: 'Nominal Voltage' },
@@ -829,10 +838,10 @@ const MOTORS_LAMPS: Record<string, ComponentDef> = {
     id: 'motor-3phase', name: '3-Phase Motor', category: 'Motors & Lamps',
     width: 60, height: 70, symbol: 'motor-3phase',
     terminals: [
-      { id: 'u', name: 'U', x: -30, y: -20, type: 'input' },
-      { id: 'v', name: 'V', x: -30, y: 0, type: 'input' },
-      { id: 'w', name: 'W', x: -30, y: 20, type: 'input' },
-      { id: 'pe', name: 'PE', x: 30, y: 0, type: 'input' },
+      { id: 'u', name: 'U', x: -25, y: -25, type: 'input' },
+      { id: 'v', name: 'V', x: -25, y: 0, type: 'input' },
+      { id: 'w', name: 'W', x: -25, y: 25, type: 'input' },
+      { id: 'pe', name: 'PE', x: 25, y: 0, type: 'input' },
     ],
     properties: {
       nominalV: { type: 'number', value: 400, unit: 'V', min: 100, max: 10000, label: 'Nominal Voltage (L-L)' },
@@ -844,10 +853,10 @@ const MOTORS_LAMPS: Record<string, ComponentDef> = {
   },
   'lamp': {
     id: 'lamp', name: 'Lamp', category: 'Motors & Lamps',
-    width: 40, height: 40, symbol: 'lamp',
+    width: 50, height: 50, symbol: 'lamp',
     terminals: [
-      { id: 'a', name: 'A', x: -20, y: 0, type: 'bidirectional' },
-      { id: 'b', name: 'B', x: 20, y: 0, type: 'bidirectional' },
+      { id: 'a', name: 'A', x: -25, y: 0, type: 'bidirectional' },
+      { id: 'b', name: 'B', x: 25, y: 0, type: 'bidirectional' },
     ],
     properties: {
       ratedV: { type: 'number', value: 230, unit: 'V', min: 1, max: 1000, label: 'Rated Voltage' },
@@ -863,11 +872,11 @@ const OPAMPS: Record<string, ComponentDef> = {
     id: 'opamp', name: 'Op-Amp', category: 'Op-Amps',
     width: 60, height: 60, symbol: 'opamp',
     terminals: [
-      { id: 'in+', name: '+', x: -30, y: -15, type: 'input' },
-      { id: 'in-', name: '−', x: -30, y: 15, type: 'input' },
-      { id: 'out', name: 'OUT', x: 30, y: 0, type: 'output' },
-      { id: 'vcc', name: 'V+', x: 0, y: -30, type: 'input' },
-      { id: 'vee', name: 'V−', x: 0, y: 30, type: 'input' },
+      { id: 'in+', name: '+', x: -25, y: -25, type: 'input' },
+      { id: 'in-', name: '−', x: -25, y: 25, type: 'input' },
+      { id: 'out', name: 'OUT', x: 25, y: 0, type: 'output' },
+      { id: 'vcc', name: 'V+', x: 0, y: -25, type: 'input' },
+      { id: 'vee', name: 'V−', x: 0, y: 25, type: 'input' },
     ],
     properties: {
       gain: { type: 'number', value: 10, unit: 'V/V', min: 1, max: 1e8, label: 'Open-Loop Gain' },

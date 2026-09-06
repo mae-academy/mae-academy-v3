@@ -95,6 +95,12 @@ const TERMINAL_HIT_RADIUS = 13;
 const TERMINAL_RADIUS = 4;
 const DIGITAL_LOGIC_COMPONENT_IDS = LOGIC_COMPONENT_TYPES;
 const DIGITAL_LOGIC_IO_TYPES = new Set(['digital-input', 'digital-output']);
+
+const TAB_GRADIENT = 'linear-gradient(90deg, #2563eb 0%, #7c3aed 50%, #f43f5e 100%)';
+const TAB_GRADIENT_REV = 'linear-gradient(90deg, #f43f5e 0%, #7c3aed 50%, #2563eb 100%)';
+const TAB_ACTIVE_SHADOW = '0 1px 3px rgba(2, 6, 23, 0.18)';
+const CONTROL_SYSTEMS_HEADING = 'text-sm font-bold uppercase tracking-wider text-slate-800 dark:text-white';
+
 const DIGITAL_LOGIC_CATEGORY_ORDER = ['I/O', 'Logic Gates', 'Combinational Circuits', 'Sequential Circuits'] as const;
 const digitalLogicCategory = (id: string) => id === 'digital-input' || id === 'digital-output' ? 'I/O' : id.startsWith('gate-') ? 'Logic Gates' : id.startsWith('logic-ff') || id === 'logic-clock' || id === 'logic-shift-register' || id === 'logic-counter' || id === 'logic-nbit-register' || id === 'logic-ram-16x8' || id === 'logic-rom-16x8' || id === 'logic-frequency-divider' ? 'Sequential Circuits' : 'Combinational Circuits';
 const idealLogicProps = (type: string, props: Record<string, unknown> = {}) => {
@@ -227,7 +233,9 @@ function ComponentPaletteIcon({ definition, colors, documented }: { definition: 
     ? logicBlockLayoutFor(definition.id, definition.terminals.filter(terminal => terminal.type === 'input').map(terminal => terminal.id), definition.terminals.filter(terminal => terminal.type === 'output').map(terminal => terminal.id))
     : undefined;
   const span = Math.max(definition.width, blockGeometry?.width ?? 0, blockGeometry?.height ?? definition.height, 108) + 10;
-  return <svg width="102" height="88" viewBox={`${-span / 2} ${-span / 2} ${span} ${span}`} aria-hidden="true" style={{ overflow: 'visible', color: colors.text, pointerEvents: 'none' }}><g transform="scale(1.08)">{renderSymbol(definition.symbol, false, { ...defaultProps(definition), _documentedStyle: documented, _componentType: definition.id, _terminals: blockGeometry?.pins, _blockLabel: definition.name, _inputCount: definition.terminals.filter(terminal => terminal.type === 'input').length, _outputCount: definition.terminals.filter(terminal => terminal.type === 'output').length }, 0)}</g></svg>;
+  const isPot = definition.id === 'potentiometer';
+  const groupTransform = isPot ? 'scale(1.08) translate(0, 6)' : 'scale(1.08)';
+  return <svg width="102" height="88" viewBox={`${-span / 2} ${-span / 2} ${span} ${span}`} aria-hidden="true" style={{ overflow: 'visible', color: colors.text, pointerEvents: 'none' }}><g transform={groupTransform}>{renderSymbol(definition.symbol, false, { ...defaultProps(definition), _documentedStyle: documented, _componentType: definition.id, _terminals: blockGeometry?.pins, _blockLabel: definition.name, _inputCount: definition.terminals.filter(terminal => terminal.type === 'input').length, _outputCount: definition.terminals.filter(terminal => terminal.type === 'output').length }, 0)}</g></svg>;
 }
 
 /** Labels are outside the rotated symbol group, so their baseline stays horizontal at every angle. */
@@ -301,6 +309,7 @@ export function DigitalLogicSimulatorHome({ createSimulationEngine = () => new S
   const [search, setSearch] = useState('');
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
   const [simulationRunning, setSimulationRunning] = useState(false);
+  const hasStartedSimulation = useRef(false);
   const [simulationSpeed, setSimulationSpeed] = useState(1);
   const [dynamicScaleEditorId, setDynamicScaleEditorId] = useState<string | null>(null);
   const [pendingDynamicScale, setPendingDynamicScale] = useState(2);
@@ -415,14 +424,10 @@ export function DigitalLogicSimulatorHome({ createSimulationEngine = () => new S
       : tabDUiRefinement && component.type === 'potentiometer'
         ? ({ a: [-(100 / 3), 0], b: [100 / 3, 0], wiper: [0, -(100 / 3)] } as Record<string, Point>)[terminalId]
       : tabDUiRefinement && component.type === 'three-phase-source'
-      ? ({ l1: [40, -18], l2: [40, 0], l3: [40, 18], n: [-40, 0] } as Record<string, Point>)[terminalId]
-      : tabDUiRefinement && component.type === 'star-resistor-pack'
-        ? ({ a: [-(100 / 6), -(100 * Math.sqrt(3) / 6)], b: [-(100 / 6), 100 * Math.sqrt(3) / 6], c: [100 / 3, 0] } as Record<string, Point>)[terminalId]
-        : tabDUiRefinement && component.type === 'delta-resistor-pack'
-          ? ({ a: [0, -(100 * Math.sqrt(3) / 9)], b: [-(100 / 6), 100 * Math.sqrt(3) / 18], c: [100 / 6, 100 * Math.sqrt(3) / 18] } as Record<string, Point>)[terminalId]
-          : tabDUiRefinement && component.type === 'opamp'
-            ? ({ 'in-': [-(100 / 3), -(100 / 6)], 'in+': [-(100 / 3), 100 / 6], out: [100 / 3, 0], vcc: [0, -(100 / 3)], vee: [0, 100 / 3] } as Record<string, Point>)[terminalId]
-            : undefined;
+      ? ({ l1: [40, -15], l2: [40, 0], l3: [40, 15], n: [-40, 0] } as Record<string, Point>)[terminalId]
+      : tabDUiRefinement && component.type === 'opamp'
+        ? ({ 'in-': [-(100 / 3), -(100 / 6)], 'in+': [-(100 / 3), 100 / 6], out: [100 / 3, 0], vcc: [0, -(100 / 3)], vee: [0, 100 / 3] } as Record<string, Point>)[terminalId]
+        : undefined;
     const [x, y] = documentedTerminal ?? [terminal.x, terminal.y];
     return getTerminalWorldPos(component.x, component.y, x * visualSymbolScale, y * visualSymbolScale, component.rotation, component.flipH, component.flipV);
   }, [getRuntimeTerminals, tabDUiRefinement, visualSymbolScale]);
@@ -1059,12 +1064,6 @@ export function DigitalLogicSimulatorHome({ createSimulationEngine = () => new S
       let categoryItems = digitalLogicOnly
         ? Object.values(COMPONENT_DEFS).filter(item => DIGITAL_LOGIC_COMPONENT_IDS.has(item.id) && digitalLogicCategory(item.id) === category)
         : getComponentsByCategory(category);
-      if (tabDUiRefinement && category === 'Passive') {
-        categoryItems = [...categoryItems, ...['star-resistor-pack', 'delta-resistor-pack'].map(getDef).filter((item): item is ComponentDef => Boolean(item))];
-      }
-      if (tabDUiRefinement && category === 'Controlled Sources & Networks') {
-        categoryItems = categoryItems.filter(item => !['star-resistor-pack', 'delta-resistor-pack'].includes(item.id));
-      }
       if (tabDUiRefinement && category === 'Diodes') {
         categoryItems = categoryItems.filter(item => !['diode-ideal', 'diode-silicon', 'diode-germanium', 'diode-gaas'].includes(item.id));
       }
@@ -1101,56 +1100,49 @@ export function DigitalLogicSimulatorHome({ createSimulationEngine = () => new S
 
   return (
     <div className="v3-mae-layout font-sans text-slate-900 dark:text-slate-100" style={{ minHeight: 760, color: colors.text }}>
-      <section className="mb-4 overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-950" style={{ borderColor: colors.line, background: colors.panel }}>
-        <div className="flex items-center justify-between border-b px-4 py-2" style={{ borderColor: colors.line }}>
-          <div><div className="font-mono text-[10px] font-bold tracking-[.16em] text-violet-600 dark:text-violet-300">COMMAND CENTER · V3 RUNTIME</div><div className="mt-1 text-xs" style={{ color: colors.muted }}>Isolated ElectroLab engine · topology controls</div></div>
-          <div className="font-mono text-[10px] font-bold tracking-[.14em]" style={{ color: colors.muted }}>NET / V3</div>
-        </div>
-        <header style={{ minHeight: 58, display: 'flex', alignItems: 'center', gap: 14, padding: '8px 14px', background: colors.panel, boxShadow: 'none', zIndex: 5 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 9, minWidth: 178 }}>
-          <div style={{ width: 34, height: 34, display: 'grid', placeItems: 'center', color: '#ffffff', background: 'linear-gradient(135deg, #2563eb, #8b5cf6 58%, #f43f5e)', borderRadius: 9, fontWeight: 850, fontSize: 18 }}>E</div>
-          <div>
-            <div style={{ fontWeight: 800, letterSpacing: '-.02em', lineHeight: 1.1 }}>MAE / ElectroLab</div>
-            <div style={{ fontSize: 10, color: colors.muted, marginTop: 2 }}>Verified electrical topology field</div>
+      <section className="mb-4 overflow-x-auto rounded-xl border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-950" style={{ borderColor: colors.line, background: colors.panel }}>
+        <header className="min-w-max" style={{ background: colors.panel, zIndex: 5 }}>
+          <div className="flex flex-nowrap items-center gap-1.5 px-2 pt-2" style={{ minHeight: 36 }}>
+            <ToolbarButton colors={colors} label="−" title="Zoom out" onClick={() => setZoom(value => Math.max(.2, value / 1.15))} />
+            <span style={{ color: colors.muted, fontSize: 11, minWidth: 42, textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>{Math.round(zoom * 100)}%</span>
+            <ToolbarButton colors={colors} label="+" title="Zoom in" onClick={() => setZoom(value => Math.min(3, value * 1.15))} />
+            <ToolbarDivider colors={colors} />
+            <ToolbarButton colors={colors} icon={<Grid3X3 size={14} />} title="Grid" onClick={() => setGridVisible(value => !value)} active={gridVisible} />
+            {tabDUiRefinement && <><ToolbarButton colors={colors} label="Dot" title="Dot grid · 25 px" onClick={() => { setTabDGridMode('dots'); setGridVisible(true); }} active={tabDGridMode === 'dots' && gridVisible} /><ToolbarButton colors={colors} label="Cartesian" title="Cartesian grid · 25 px" onClick={() => { setTabDGridMode('cartesian'); setGridVisible(true); }} active={tabDGridMode === 'cartesian' && gridVisible} /><ToolbarButton colors={colors} label="Hidden" title="Hide grid" onClick={() => setTabDGridMode('hidden')} active={tabDGridMode === 'hidden'} /></>}
+            <ToolbarDivider colors={colors} />
+            <ToolbarButton colors={colors} icon={<Move size={14} />} title="Snap to grid" onClick={() => setSnapEnabled(value => !value)} active={snapEnabled} />
+            <ToolbarButton colors={colors} icon={<Cable size={14} />} label="Wire" title="Click one terminal, then another" onClick={() => { setWiring({}); toast.message('Click a terminal to start wiring'); }} active={Boolean(wiring.from)} />
+            <ToolbarDivider colors={colors} />
+            <ToolbarButton colors={colors} icon={<Type size={14} />} label="Text" title="Add editable workspace text (T)" onClick={addText} />
+            {tabDUiRefinement && <><ToolbarDivider colors={colors} /><ToolbarButton colors={colors} icon={<RotateCw size={14} />} label="90°" title="Rotate selected component 90°" onClick={() => rotateSelected(90)} disabled={!selectedComponent} /><ToolbarButton colors={colors} icon={<RotateCw size={14} />} label="45°" title="Rotate selected component 45°" onClick={() => rotateSelected(45)} disabled={!selectedComponent} /><ToolbarButton colors={colors} icon={<FlipHorizontal size={14} />} label="Flip X" title="Reflect selected component horizontally" onClick={() => flipSelected('h')} disabled={!selectedComponent} /><ToolbarButton colors={colors} icon={<FlipVertical size={14} />} label="Flip Y" title="Reflect selected component vertically" onClick={() => flipSelected('v')} disabled={!selectedComponent} /></>}
+            {!digitalLogicOnly && <><ToolbarDivider colors={colors} /><ToolbarButton colors={colors} icon={<Zap size={14} />} label="DMM" title="Add a movable DMM with probe terminals" onClick={() => addComponent('dmm')} /><ToolbarButton colors={colors} icon={<Activity size={14} />} label="Scope" title="Add a movable 4-channel oscilloscope" onClick={() => addComponent('oscilloscope')} /></>}
           </div>
-        </div>
-
-        <div style={{ display: 'flex', flex: 1, justifyContent: 'center', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
-          <ToolbarButton colors={colors} label="−" title="Zoom out" onClick={() => setZoom(value => Math.max(.2, value / 1.15))} />
-          <span style={{ color: colors.muted, fontSize: 11, minWidth: 42, textAlign: 'center' }}>{Math.round(zoom * 100)}%</span>
-          <ToolbarButton colors={colors} label="+" title="Zoom in" onClick={() => setZoom(value => Math.min(3, value * 1.15))} />
-          <ToolbarDivider colors={colors} />
-          <ToolbarButton colors={colors} icon={<Grid3X3 size={14} />} title="Grid" onClick={() => setGridVisible(value => !value)} active={gridVisible} />
-          {tabDUiRefinement && <><ToolbarButton colors={colors} label="Dot" title="Dot grid · 25 px" onClick={() => { setTabDGridMode('dots'); setGridVisible(true); }} active={tabDGridMode === 'dots' && gridVisible} /><ToolbarButton colors={colors} label="Cartesian" title="Cartesian grid · 25 px" onClick={() => { setTabDGridMode('cartesian'); setGridVisible(true); }} active={tabDGridMode === 'cartesian' && gridVisible} /><ToolbarButton colors={colors} label="Hidden" title="Hide grid" onClick={() => setTabDGridMode('hidden')} active={tabDGridMode === 'hidden'} /></>}
-          <ToolbarButton colors={colors} icon={<Move size={14} />} title="Snap to grid" onClick={() => setSnapEnabled(value => !value)} active={snapEnabled} />
-          <ToolbarButton colors={colors} icon={<Cable size={14} />} label="Wire" title="Click one terminal, then another" onClick={() => { setWiring({}); toast.message('Click a terminal to start wiring'); }} active={Boolean(wiring.from)} />
-          <ToolbarDivider colors={colors} />
-          <ToolbarButton colors={colors} icon={<Download size={14} />} label="NAD" title="Export circuit as NAD" onClick={exportNad} />
-          <ToolbarButton colors={colors} icon={<Upload size={14} />} label="NAD" title="Import circuit from NAD" onClick={() => nadInputRef.current?.click()} />
-          <input ref={nadInputRef} type="file" accept=".nad,application/x-mae-nad+json,application/json" onChange={importNad} style={{ display: 'none' }} />
-          <ToolbarButton colors={colors} icon={<Copy size={14} />} title="Copy selected component (Ctrl/Cmd+C)" onClick={copySelection} disabled={!selectedComponent} />
-          <ToolbarButton colors={colors} icon={<Scissors size={14} />} title="Cut selected component (Ctrl/Cmd+X)" onClick={cutSelection} disabled={!selectedComponent} />
-          <ToolbarButton colors={colors} icon={<Clipboard size={14} />} title="Paste component (Ctrl/Cmd+V)" onClick={pasteComponent} disabled={!clipboardComponent} />
-          <ToolbarButton colors={colors} icon={<Type size={14} />} label="Text" title="Add editable workspace text (T)" onClick={addText} />
-          {tabDUiRefinement && <><ToolbarDivider colors={colors} /><ToolbarButton colors={colors} icon={<RotateCw size={14} />} label="90°" title="Rotate selected component 90°" onClick={() => rotateSelected(90)} disabled={!selectedComponent} /><ToolbarButton colors={colors} icon={<RotateCw size={14} />} label="45°" title="Rotate selected component 45°" onClick={() => rotateSelected(45)} disabled={!selectedComponent} /><ToolbarButton colors={colors} icon={<FlipHorizontal size={14} />} label="Flip X" title="Reflect selected component horizontally" onClick={() => flipSelected('h')} disabled={!selectedComponent} /><ToolbarButton colors={colors} icon={<FlipVertical size={14} />} label="Flip Y" title="Reflect selected component vertically" onClick={() => flipSelected('v')} disabled={!selectedComponent} /></>}
-          {!digitalLogicOnly && <><ToolbarDivider colors={colors} /><ToolbarButton colors={colors} icon={<Zap size={14} />} label="DMM" title="Add a movable DMM with probe terminals" onClick={() => addComponent('dmm')} /><ToolbarButton colors={colors} icon={<Activity size={14} />} label="Scope" title="Add a movable 4-channel oscilloscope" onClick={() => addComponent('oscilloscope')} /><ToolbarDivider colors={colors} /></>}
-          <button onClick={() => setSimulationRunning(value => !value)} style={{ ...sidebarButton(simulationRunning), borderColor: simulationRunning ? colors.danger : colors.accent, color: simulationRunning ? colors.danger : colors.accent, padding: '6px 11px' }}>
-            {simulationRunning ? <Pause size={14} /> : <Play size={14} />}{simulationRunning ? 'Pause' : 'Run'}
-          </button>
-          <ToolbarButton colors={colors} icon={<RotateCcw size={14} />} title="Reset simulation" onClick={resetSimulation} />
-          <span style={{ fontSize: 11, minWidth: 55, color: colors.primary, fontVariantNumeric: 'tabular-nums' }}>{snapshot.time.toFixed(3)} s</span>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 152, justifyContent: 'flex-end' }}>
-          <input aria-label="Simulation speed" type="range" min={.25} max={4} step={.25} value={simulationSpeed} onChange={event => setSimulationSpeed(numeric(event.target.value, 1))} style={{ width: 70, accentColor: colors.accent }} />
-          <span style={{ color: colors.muted, fontSize: 10 }}>{simulationSpeed.toFixed(2)}×</span>
-        </div>
+          <div className="flex flex-nowrap items-center gap-1.5 border-t px-2 py-2" style={{ borderColor: colors.line, minHeight: 36 }}>
+            <ToolbarButton colors={colors} icon={<Download size={14} />} label="Export" title="Export circuit as NAD netlist" onClick={exportNad} />
+            <ToolbarButton colors={colors} icon={<Upload size={14} />} label="Import" title="Import circuit from NAD netlist" onClick={() => nadInputRef.current?.click()} />
+            <input ref={nadInputRef} type="file" accept=".nad,application/x-mae-nad+json,application/json" onChange={importNad} style={{ display: 'none' }} />
+            <ToolbarDivider colors={colors} />
+            <ToolbarButton colors={colors} icon={<Copy size={14} />} title="Copy selected component (Ctrl/Cmd+C)" onClick={copySelection} disabled={!selectedComponent} />
+            <ToolbarButton colors={colors} icon={<Scissors size={14} />} title="Cut selected component (Ctrl/Cmd+X)" onClick={cutSelection} disabled={!selectedComponent} />
+            <ToolbarButton colors={colors} icon={<Clipboard size={14} />} title="Paste component (Ctrl/Cmd+V)" onClick={pasteComponent} disabled={!clipboardComponent} />
+            <ToolbarDivider colors={colors} />
+            <button onClick={() => { hasStartedSimulation.current = true; setSimulationRunning(value => !value); }} title={simulationRunning ? 'Pause simulation' : 'Run simulation'} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: TAB_GRADIENT, color: '#ffffff', fontWeight: 500, padding: '6px 14px', minHeight: 32, borderRadius: 9, fontSize: 12, boxShadow: TAB_ACTIVE_SHADOW, border: '1px solid transparent', cursor: 'pointer', whiteSpace: 'nowrap', transition: 'background .3s ease' }}>
+              {simulationRunning ? <Pause size={14} /> : <Play size={14} />}{simulationRunning ? 'Pause' : 'Run'}
+            </button>
+            <ToolbarButton colors={colors} icon={<RotateCcw size={14} />} title="Reset simulation" onClick={resetSimulation} />
+            <span style={{ fontSize: 11, minWidth: 55, color: colors.muted, fontVariantNumeric: 'tabular-nums' }}>{snapshot.time.toFixed(3)} s</span>
+            <ToolbarDivider colors={colors} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <input aria-label="Simulation speed" type="range" min={.25} max={4} step={.25} value={simulationSpeed} onChange={event => setSimulationSpeed(numeric(event.target.value, 1))} className="h-1.5 w-24 cursor-pointer appearance-none rounded-full bg-brand-gradient [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-0 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:ring-2 [&::-webkit-slider-thumb]:ring-blue-500 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:shadow" />
+              <span style={{ color: colors.muted, fontSize: 10 }}>{simulationSpeed.toFixed(2)}×</span>
+            </div>
+          </div>
         </header>
       </section>
 
       <div className="grid min-h-[680px] gap-4 xl:grid-cols-[236px_minmax(0,1fr)_286px]">
         <aside className="min-h-0 overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-950" style={{ background: colors.panel, borderColor: colors.line, display: 'flex', flexDirection: 'column', height: '700px' }}>
-          <div className="border-b px-3 py-2" style={{ borderColor: colors.line }}><div className="font-mono text-[10px] font-bold tracking-[.14em] text-violet-600 dark:text-violet-300">ZONE A / COMPONENT LIBRARY</div></div>
+          <div className="border-b px-3 py-2" style={{ borderColor: colors.line }}><div className={CONTROL_SYSTEMS_HEADING}>Component Library</div></div>
           <div style={{ padding: 10, borderBottom: `1px solid ${colors.line}` }}>
             <div style={{ position: 'relative' }}>
               <Search size={14} style={{ position: 'absolute', left: 9, top: 9, color: colors.subtle }} />
@@ -1186,7 +1178,7 @@ export function DigitalLogicSimulatorHome({ createSimulationEngine = () => new S
         </aside>
 
         <main className="relative min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-950" style={{ background: colors.canvas, borderColor: colors.line }}>
-          <div className="flex items-start justify-between border-b px-4 py-2" style={{ borderColor: colors.line }}><div><div className="font-mono text-[10px] font-bold tracking-[.14em] text-violet-600 dark:text-violet-300">ZONE C / NATIVE GRID WORKSPACE</div><div className="mt-1 text-sm font-bold">Interactive Electrical Canvas</div></div><div className="font-mono text-[10px]" style={{ color: colors.muted }}>{components.length} CMP · {wires.length} NET</div></div>
+          <div className="flex items-start justify-between border-b px-4 py-2" style={{ borderColor: colors.line }}><div><div className={CONTROL_SYSTEMS_HEADING}>Interactive Electrical Canvas</div></div><div className="flex items-center gap-2 font-mono text-[10px]" style={{ color: colors.muted }}>{components.length} CMP · {wires.length} NET</div></div>
           <svg ref={svgRef} onMouseDown={handleCanvasMouseDown} onDoubleClick={handleCanvasDoubleClick} onMouseMove={handleCanvasMouseMove} onMouseUp={handleCanvasMouseUp} onMouseLeave={handleCanvasMouseUp} onContextMenu={event => event.preventDefault()} onDragOver={event => event.preventDefault()} onDrop={handleDrop} style={{ width: '100%', height: '100%', display: 'block', cursor: dragState?.kind === 'pan' ? 'grabbing' : wiring.from ? 'crosshair' : 'default', touchAction: 'none' }}>
             <defs>
               <marker id="arrow" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M 0,0 L 6,3 L 0,6 Z" fill="#64748b" /></marker>
@@ -1291,23 +1283,28 @@ export function DigitalLogicSimulatorHome({ createSimulationEngine = () => new S
 
           {components.length === 0 && (
             <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', pointerEvents: 'none' }}>
-              <div style={{ maxWidth: 350, textAlign: 'center', background: `${colors.panel}dd`, border: `1px solid ${colors.line}`, boxShadow: colors.shadow, borderRadius: 14, padding: '24px 28px' }}>
-                <div style={{ width: 46, height: 46, display: 'grid', placeItems: 'center', margin: '0 auto 12px', borderRadius: 14, background: `${colors.primary}12`, color: colors.primary }}><Settings2 size={23} /></div>
-                <div style={{ fontWeight: 780, fontSize: 15 }}>Build a circuit on the workspace</div>
-                <p style={{ color: colors.muted, fontSize: 12, lineHeight: 1.5, margin: '8px 0 0' }}>{digitalLogicOnly ? 'Drag I/O, gates, or behavioral logic blocks from the library, connect terminals, then press Run. The DES engine resolves 0, 1, Z, and X states; no ground is required.' : 'Drag a component from the library, click two terminals to wire them, then press Run. Measurement tools are physical workspace components with real probe terminals.'}</p>
+              <div className="flex flex-col items-center justify-center pointer-events-none select-none">
+                <div className="px-6 py-2.5 bg-white border border-slate-100 rounded-2xl shadow-sm mb-3 dark:bg-slate-900 dark:border-slate-800">
+                  <span className="text-base font-semibold text-slate-900 tracking-tight dark:text-white">
+                    Canvas Ready
+                  </span>
+                </div>
+                <p className="text-xs text-slate-400 font-normal">
+                  Drag and drop components from the library to begin circuit design.
+                </p>
               </div>
             </div>
           )}
 
           <div style={{ position: 'absolute', bottom: 10, left: 10, right: 10, display: 'flex', alignItems: 'center', gap: 10, padding: '7px 10px', background: `${colors.panel}e8`, border: `1px solid ${colors.line}`, color: colors.muted, borderRadius: 8, fontSize: 10, boxShadow: 'none', pointerEvents: 'none' }}>
-            <span>{components.length} components</span><span>•</span><span>{wires.length} wires</span><span>•</span><span>Arrows move selected item</span><span>•</span><span>Double-click wire to add a corner</span>
+            <span>{components.length} components</span><span>•</span><span>{wires.length} wires</span>
             {simulationRunning && <span style={{ marginLeft: 'auto', color: colors.accent, fontWeight: 750 }}>SIMULATION RUNNING</span>}
             {!snapshot.converged && <span style={{ marginLeft: 'auto', color: colors.danger, fontWeight: 750 }}>CHECK CIRCUIT WARNINGS</span>}
           </div>
         </main>
 
         <aside className="min-h-0 overflow-y-auto rounded-xl border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-950" style={{ background: colors.panel, borderColor: colors.line, display: 'flex', flexDirection: 'column' }}>
-          <div className="border-b px-3 py-2" style={{ borderColor: colors.line }}><div className="font-mono text-[10px] font-bold tracking-[.14em] text-violet-600 dark:text-violet-300">ZONE B / ACTIVE ELEMENT & PROPERTIES</div></div>
+          <div className="border-b px-3 py-2" style={{ borderColor: colors.line }}><div className={CONTROL_SYSTEMS_HEADING}>Active Element &amp; Properties</div></div>
           {!digitalLogicOnly && <MnaStatus colors={colors} result={dcMna.result} error={dcMna.error} />}
           {selectedComponent ? (
             <ComponentInspector colors={colors} component={selectedComponent} definition={getDef(selectedComponent.type)!} linkedCoils={linkedCoils} reading={snapshot.instrumentReadings[selectedComponent.id]} snapshot={snapshot} tabDUiRefinement={tabDUiRefinement} digitalLogicOnly={digitalLogicOnly} defaultInputShortcut={selectedComponent.type === 'digital-input' ? defaultInputShortcut(selectedComponent, components) : ''} onLabelChange={label => updateComponent(selectedComponent.id, { label })} onPropertyChange={(key, value) => {
@@ -1328,7 +1325,7 @@ export function DigitalLogicSimulatorHome({ createSimulationEngine = () => new S
           ) : selectedText ? (
             <TextInspector colors={colors} text={selectedText} onUpdate={updateText} onMove={moveSelected} onDelete={removeSelection} />
           ) : (
-            digitalLogicOnly ? <div style={{ padding: 16, color: colors.muted, fontSize: 11, lineHeight: 1.55 }}>Discrete-event logic workspace. Select an I/O, gate, or behavioral block to edit its logical state, label, or timing. Ground, voltage, and threshold settings are not used.</div> : <WelcomeInspector colors={colors} onAddDmm={() => addComponent('dmm')} onAddScope={() => addComponent('oscilloscope')} />
+            digitalLogicOnly ? null : <WelcomeInspector colors={colors} onAddDmm={() => addComponent('dmm')} onAddScope={() => addComponent('oscilloscope')} />
           )}
           {snapshot.warnings.length > 0 && (
             <div style={{ margin: 'auto 10px 10px', border: `1px solid ${colors.danger}55`, background: `${colors.danger}0d`, borderRadius: 8, padding: 9 }}>
@@ -1338,8 +1335,8 @@ export function DigitalLogicSimulatorHome({ createSimulationEngine = () => new S
           )}
         </aside>
       </div>
-      <section className="mt-4 overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-950" style={{ background: colors.panel, borderColor: colors.line }}>
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b px-5 py-3" style={{ borderColor: colors.line }}><div><div className="font-mono text-[10px] font-bold tracking-[.14em] text-violet-600 dark:text-violet-300">PHASE 3 / ACADEMIC ANALYSIS WORKSPACE</div><div className="mt-1 text-sm font-bold">Detailed Derivations, Matrices &amp; Solution Trace</div></div><div className="font-mono text-[10px]" style={{ color: colors.muted }}>TAB B / ISOLATED ANALYSIS ENGINE</div></div>
+      <section className="mt-3 overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-950" style={{ background: colors.panel, borderColor: colors.line }}>
+        <div className="border-b px-5 py-3" style={{ borderColor: colors.line }}><div className={CONTROL_SYSTEMS_HEADING}>Academic Analysis Workspace</div></div>
         <AnalysisBox elements={dcMna.elements} geometry={meshGeometry} nodalNodes={nodalGeometry} colors={colors} standalone onTraceChange={handleAnalysisTrace} />
       </section>
     </div>
@@ -1354,7 +1351,8 @@ export default function DigitalLogicDesignHome() {
 interface Palette { background: string; canvas: string; panel: string; panelAlt: string; line: string; text: string; muted: string; subtle: string; primary: string; accent: string; danger: string; selection: string; grid: string; wire: string; powered: string; input: string; shadow: string; }
 
 function ToolbarButton({ colors, icon, label, title, onClick, active, disabled }: { colors: Palette; icon?: React.ReactNode; label?: string; title: string; onClick: () => void; active?: boolean; disabled?: boolean }) {
-  return <button title={title} onClick={onClick} disabled={disabled} style={{ border: `1px solid ${active ? colors.primary : colors.line}`, background: active ? `${colors.primary}14` : colors.panel, color: active ? colors.primary : disabled ? colors.subtle : colors.muted, borderRadius: 7, padding: '5px 7px', minHeight: 30, display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 700, cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? .55 : 1 }}>{icon}{label}</button>;
+  const isActive = Boolean(active) && !disabled;
+  return <button title={title} onClick={onClick} disabled={disabled} style={{ border: isActive ? '1px solid transparent' : `1px solid ${colors.line}`, background: isActive ? TAB_GRADIENT : colors.panelAlt, color: isActive ? '#ffffff' : disabled ? colors.subtle : colors.muted, borderRadius: 9, padding: '6px 12px', minHeight: 32, display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 500, cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? .5 : 1, boxShadow: isActive ? TAB_ACTIVE_SHADOW : 'none', flexShrink: 0, whiteSpace: 'nowrap', transition: 'background .15s ease' }}>{icon}{label}</button>;
 }
 
 function ToolbarDivider({ colors }: { colors: Palette }) { return <span style={{ width: 1, height: 23, background: colors.line, margin: '0 2px' }} />; }

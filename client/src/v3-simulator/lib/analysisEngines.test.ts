@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { MNAElement } from './mnaSolver';
-import { NodalSolver } from './NodalSolver';
-import { MeshSolver } from './MeshSolver';
+import { MNASolver } from './mnaSolver';
+import { NodalSolver, identifyFloatingSupernodes, identifyCompoundSupernodes, validateNodalLogic } from './NodalSolver';
+import { MeshSolver, buildMeshSystem, solveMeshCurrents } from './MeshSolver';
 import { SuperpositionSolver } from './SuperpositionSolver';
 import { SourceTransformationSolver } from './SourceTransformationSolver';
 import { TheveninSolver } from './TheveninSolver';
-import { identifyFloatingSupernodes, validateNodalLogic } from './NodalSolver';
 import { academicDisplayNodes, extractPolarityAwareKnownNodes, filterEssentialNodes, generateReducedNodalMatrix, reindexUINodes } from './reducedNodalMatrix';
+import type { MeshGeometry } from './meshGeometry';
 
 const bridge: MNAElement[] = [
   { type: 'voltage', id: 'Vs', positive: 'n1', negative: '0', voltage: 24 },
@@ -35,12 +36,12 @@ describe('Phase 3 academic analysis benchmarks', () => {
   it('reindexes supplied visual net centroids from V_1 after essential-node filtering', () => {
     const trace = new NodalSolver(bridge, [
       { node: 'n1', index: 1, label: 'V_1', color: '#2563eb', centroid: [20, 20] },
-      { node: 'n2', index: 2, label: 'V_2', color: '#16a34a', centroid: [120, 40] },
+      { node: 'n2', index: 2, label: 'V_2', color: '#7c3aed', centroid: [120, 40] },
       { node: 'n3', index: 3, label: 'V_3', color: '#db2777', centroid: [120, 80] },
     ]).analyze();
     expect(trace.nodalNodes).toEqual(expect.arrayContaining([
       expect.objectContaining({ node: 'n2', index: 1, label: 'V_1', color: '#2563eb', centroid: [120, 40] }),
-      expect.objectContaining({ node: 'n3', index: 2, label: 'V_2', color: '#16a34a', centroid: [120, 80] }),
+      expect.objectContaining({ node: 'n3', index: 2, label: 'V_2', color: '#7c3aed', centroid: [120, 80] }),
     ]));
   });
 
@@ -66,7 +67,7 @@ describe('Phase 3 academic analysis benchmarks', () => {
     const matrix = trace.steps.find((step) => step.title.includes('Reduced nodal coefficient system'))?.math ?? '';
     const kcl = trace.steps.find((step) => step.title.includes('Independent-node KCL'))?.math ?? '';
     expect(matrix).toContain('\\textcolor{#2563eb}{V_{1}}');
-    expect(matrix).toContain('\\textcolor{#16a34a}{V_{2}}');
+    expect(matrix).toContain('\\textcolor{#7c3aed}{V_{2}}');
     expect(matrix).not.toMatch(/V_\{3\}|V_\{4\}|I_\{V/);
     expect(kcl).toContain('\\textcolor{#2563eb}{V_{1}}-24');
     expect(trace.result?.matrix).toHaveLength(6);
@@ -204,10 +205,161 @@ describe('Phase 3 academic analysis benchmarks', () => {
   it('validateNodalLogic: translates opaque topology IDs into textbook symbols and solves the two-source five-resistor circuit exactly', () => {
     const report = validateNodalLogic();
     expect(report.passed).toBe(true);
-    expect(report.equations).toContain('\\frac{\\textcolor{#2563eb}{V_{1}}-\\textcolor{#16a34a}{V_{2}}}{R_{2}}');
+    expect(report.equations).toContain('\\frac{\\textcolor{#2563eb}{V_{1}}-\\textcolor{#7c3aed}{V_{2}}}{R_{2}}');
     expect(report.equations).toMatch(/V_\{1\}\}=15\.582/);
     expect(report.equations).not.toMatch(/V_\{10\}|V_\{20\}|raw-left|opaque|nA|nB/);
     expect(report.nodeVoltages.V1).toBeCloseTo(15.5820895522388, 10);
     expect(report.nodeVoltages.V2).toBeCloseTo(9.13432835820896, 10);
+  });
+
+  it('Test A (2-Mesh Shared Current Source): correctly solves 2-mesh system with shared 2A current source matching theoretical values and MNA', () => {
+    const testACircuit: MNAElement[] = [
+      { id: 'V1', name: 'V1', type: 'voltage', positive: 'n1', negative: '0', voltage: 10 },
+      { id: 'R1', name: 'R1', type: 'resistor', positive: 'n1', negative: 'n2', resistance: 5 },
+      { id: 'Is', name: 'Is', type: 'current', from: '0', to: 'n2', current: 2 },
+      { id: 'R2', name: 'R2', type: 'resistor', positive: 'n2', negative: '0', resistance: 10 },
+    ];
+    const testAGeometry: MeshGeometry = {
+      branches: [
+        { id: 'V1', path: [[0, 0], [0, 100]] },
+        { id: 'R1', path: [[0, 0], [100, 0]] },
+        { id: 'Is', path: [[100, 100], [100, 0]] },
+        { id: 'R2', path: [[200, 0], [200, 100]] },
+      ],
+      wires: [
+        { id: 'w_bot1', path: [[0, 100], [100, 100]] },
+        { id: 'w_top2', path: [[100, 0], [200, 0]] },
+        { id: 'w_bot2', path: [[100, 100], [200, 100]] },
+      ],
+    };
+
+    const system = buildMeshSystem(testACircuit, testAGeometry);
+    expect(system.cycles).toHaveLength(2);
+    // Row 0: Constraint -I_1 + I_2 = 2
+    expect(system.impedance[0]).toEqual([-1, 1]);
+    expect(system.source[0]).toBe(2);
+    // Row 1: Merged Supermesh KVL row 5*I_1 + 10*I_2 = 10
+    expect(system.impedance[1]).toEqual([5, 10]);
+    expect(system.source[1]).toBe(10);
+
+    const solved = solveMeshCurrents(system.impedance, system.source);
+    // Theoretical: I_1 = -2/3 A, I_2 = 4/3 A
+    expect(solved[0]).toBeCloseTo(-2 / 3, 10);
+    expect(solved[1]).toBeCloseTo(4 / 3, 10);
+
+    const trace = new MeshSolver(testACircuit, testAGeometry).analyze();
+    expect(trace.status).toBe('ready');
+    expect(trace.meshCurrents?.I_1).toBeCloseTo(-2 / 3, 10);
+    expect(trace.meshCurrents?.I_2).toBeCloseTo(4 / 3, 10);
+
+    const mna = new MNASolver(testACircuit).solve();
+    const ir1Mna = ((mna.nodeVoltages.n1 ?? 0) - (mna.nodeVoltages.n2 ?? 0)) / 5;
+    const ir2Mna = (mna.nodeVoltages.n2 ?? 0) / 10;
+    expect(trace.meshCurrents?.I_1).toBeCloseTo(ir1Mna, 10);
+    expect(trace.meshCurrents?.I_2).toBeCloseTo(ir2Mna, 10);
+  });
+
+  it('Test B (3-Mesh Double Supermesh): 3 adjacent meshes sharing 2 ideal current sources correctly merges into 1 supermesh KVL row', () => {
+    const testBCircuit: MNAElement[] = [
+      { id: 'V1', name: 'V1', type: 'voltage', positive: 'n1', negative: '0', voltage: 20 },
+      { id: 'R1', name: 'R1', type: 'resistor', positive: 'n1', negative: 'n2', resistance: 4 },
+      { id: 'Is1', name: 'Is1', type: 'current', from: '0', to: 'n2', current: 2 },
+      { id: 'R2', name: 'R2', type: 'resistor', positive: 'n2', negative: 'n3', resistance: 2 },
+      { id: 'Is2', name: 'Is2', type: 'current', from: '0', to: 'n3', current: 1 },
+      { id: 'R3', name: 'R3', type: 'resistor', positive: 'n3', negative: '0', resistance: 6 },
+    ];
+    const testBGeometry: MeshGeometry = {
+      branches: [
+        { id: 'V1', path: [[0, 0], [0, 100]] },
+        { id: 'R1', path: [[0, 0], [100, 0]] },
+        { id: 'Is1', path: [[100, 100], [100, 0]] },
+        { id: 'R2', path: [[100, 0], [200, 0]] },
+        { id: 'Is2', path: [[200, 100], [200, 0]] },
+        { id: 'R3', path: [[300, 0], [300, 100]] },
+      ],
+      wires: [
+        { id: 'w_b1', path: [[0, 100], [100, 100]] },
+        { id: 'w_b2', path: [[100, 100], [200, 100]] },
+        { id: 'w_t3', path: [[200, 0], [300, 0]] },
+        { id: 'w_b3', path: [[200, 100], [300, 100]] },
+      ],
+    };
+
+    const system = buildMeshSystem(testBCircuit, testBGeometry);
+    expect(system.cycles).toHaveLength(3);
+    expect(system.currentConstraints).toHaveLength(2);
+
+    // Row 0: Constraint 1 (-I_1 + I_2 = 2)
+    expect(system.impedance[0]).toEqual([-1, 1, 0]);
+    expect(system.source[0]).toBe(2);
+
+    // Row 1: Constraint 2 (-I_2 + I_3 = 1)
+    expect(system.impedance[1]).toEqual([0, -1, 1]);
+    expect(system.source[1]).toBe(1);
+
+    // Row 2: Merged Supermesh KVL row (4*I_1 + 2*I_2 + 6*I_3 = 20)
+    expect(system.impedance[2]).toEqual([4, 2, 6]);
+    expect(system.source[2]).toBe(20);
+
+    const solved = solveMeshCurrents(system.impedance, system.source);
+    // Theoretical: I_1 = -1/6 A, I_2 = 11/6 A, I_3 = 17/6 A
+    expect(solved[0]).toBeCloseTo(-1 / 6, 10);
+    expect(solved[1]).toBeCloseTo(11 / 6, 10);
+    expect(solved[2]).toBeCloseTo(17 / 6, 10);
+
+    const trace = new MeshSolver(testBCircuit, testBGeometry).analyze();
+    expect(trace.status).toBe('ready');
+    expect(trace.meshCurrents?.I_1).toBeCloseTo(-1 / 6, 10);
+    expect(trace.meshCurrents?.I_2).toBeCloseTo(11 / 6, 10);
+    expect(trace.meshCurrents?.I_3).toBeCloseTo(17 / 6, 10);
+
+    const mna = new MNASolver(testBCircuit).solve();
+    const ir1Mna = ((mna.nodeVoltages.n1 ?? 0) - (mna.nodeVoltages.n2 ?? 0)) / 4;
+    const ir2Mna = ((mna.nodeVoltages.n2 ?? 0) - (mna.nodeVoltages.n3 ?? 0)) / 2;
+    const ir3Mna = (mna.nodeVoltages.n3 ?? 0) / 6;
+    expect(trace.meshCurrents?.I_1).toBeCloseTo(ir1Mna, 10);
+    expect(trace.meshCurrents?.I_2).toBeCloseTo(ir2Mna, 10);
+    expect(trace.meshCurrents?.I_3).toBeCloseTo(ir3Mna, 10);
+  });
+
+  it('Test C (Compound Supernode): series floating voltage sources sharing an intermediate node with resistive loads to ground', () => {
+    const testCCircuit: MNAElement[] = [
+      { type: 'voltage', id: 'V1', positive: 'nA', negative: 'nB', voltage: 5 },
+      { type: 'voltage', id: 'V2', positive: 'nB', negative: 'nC', voltage: 10 },
+      { type: 'resistor', id: 'RA', positive: 'nA', negative: '0', resistance: 10 },
+      { type: 'resistor', id: 'RB', positive: 'nB', negative: '0', resistance: 20 },
+      { type: 'resistor', id: 'RC', positive: 'nC', negative: '0', resistance: 5 },
+    ];
+
+    const compound = identifyCompoundSupernodes(testCCircuit);
+    expect(compound).toHaveLength(1);
+    expect(compound[0].nodes.sort()).toEqual(['nA', 'nB', 'nC']);
+    expect(compound[0].sources).toHaveLength(2);
+
+    const reduced = generateReducedNodalMatrix(testCCircuit);
+    expect(reduced.unknownNodes).toEqual(['nA', 'nB', 'nC']);
+    expect(reduced.conductance).toEqual([
+      [0.1, 0.05, 0.2],
+      [1, -1, 0],
+      [0, 1, -1],
+    ]);
+    expect(reduced.rhs).toEqual([0, 5, 10]);
+    expect(reduced.residualInfinity).toBeLessThanOrEqual(1e-7);
+
+    const trace = new NodalSolver(testCCircuit).analyze();
+    expect(trace.status).toBe('ready');
+
+    // Theoretical values: V_A = 65/7 V, V_B = 30/7 V, V_C = -40/7 V
+    expect(trace.result?.nodeVoltages.nA).toBeCloseTo(65 / 7, 10);
+    expect(trace.result?.nodeVoltages.nB).toBeCloseTo(30 / 7, 10);
+    expect(trace.result?.nodeVoltages.nC).toBeCloseTo(-40 / 7, 10);
+
+    const supernodeStep = trace.steps.find((s) => s.title.includes('Supernode'))?.math ?? '';
+    expect(supernodeStep).toContain('Boundary KCL');
+    expect(supernodeStep).toContain('Constraint');
+
+    const reducedStep = trace.steps.find((s) => s.title.includes('Reduced nodal coefficient system'));
+    expect(reducedStep).toBeDefined();
+    expect(reducedStep?.prose).toMatch(/The residual certificate is \|\|G·V-z\|\|∞≤/);
   });
 });

@@ -84,10 +84,10 @@ const SOURCES: Record<string, ComponentDef> = {
     id: 'three-phase-source', name: '3-Phase Source', category: 'Sources',
     width: 80, height: 90, symbol: 'three-phase-source',
     terminals: [
-      { id: 'l1', name: 'L1', x: -40, y: -30, type: 'output' },
-      { id: 'l2', name: 'L2', x: -40, y: -10, type: 'output' },
-      { id: 'l3', name: 'L3', x: -40, y: 10, type: 'output' },
-      { id: 'n', name: 'N', x: -40, y: 30, type: 'output' },
+      { id: 'l1', name: 'L1', x: 40, y: -15, type: 'output' },
+      { id: 'l2', name: 'L2', x: 40, y: 0, type: 'output' },
+      { id: 'l3', name: 'L3', x: 40, y: 15, type: 'output' },
+      { id: 'n', name: 'N', x: -40, y: 0, type: 'output' },
     ],
     properties: {
       lineVoltage: { type: 'number', value: 400, unit: 'V RMS', min: 1, max: 100000, label: 'Line Voltage (L-L)' },
@@ -102,10 +102,10 @@ const SOURCES: Record<string, ComponentDef> = {
     id: 'three-phase-rail', name: '3-Phase Power Rail', category: 'Sources',
     width: 90, height: 90, symbol: 'three-phase-rail',
     terminals: [
-      { id: 'l1', name: 'L1', x: -45, y: -30, type: 'output' },
-      { id: 'l2', name: 'L2', x: -45, y: -10, type: 'output' },
-      { id: 'l3', name: 'L3', x: -45, y: 10, type: 'output' },
-      { id: 'n', name: 'N', x: -45, y: 30, type: 'output' },
+      { id: 'l1', name: 'L1', x: -40, y: -30, type: 'output' },
+      { id: 'l2', name: 'L2', x: -40, y: -10, type: 'output' },
+      { id: 'l3', name: 'L3', x: -40, y: 10, type: 'output' },
+      { id: 'n', name: 'N', x: -40, y: 30, type: 'output' },
     ],
     properties: {
       lineVoltage: { type: 'number', value: 400, unit: 'V RMS', min: 1, max: 100000, label: 'Rail Voltage (L-L)' },
@@ -174,9 +174,9 @@ const PASSIVE: Record<string, ComponentDef> = {
     id: 'potentiometer', name: 'Variable Resistor', category: 'Passive',
     width: 70, height: 60, symbol: 'potentiometer',
     terminals: [
-      { id: 'a', name: 'A', x: -35, y: -20, type: 'bidirectional' },
-      { id: 'wiper', name: 'W', x: 35, y: 0, type: 'bidirectional' },
-      { id: 'b', name: 'B', x: -35, y: 20, type: 'bidirectional' },
+      { id: 't1', name: 'A', x: -30, y: 0, type: 'bidirectional' },
+      { id: 't2', name: 'B', x: 30, y: 0, type: 'bidirectional' },
+      { id: 'wiper', name: 'W', x: 0, y: -30, type: 'bidirectional' },
     ],
     properties: {
       resistance: { type: 'number', value: 10000, unit: 'Ω', min: 1, max: 1e9, label: 'End-to-End Resistance' },
@@ -187,10 +187,10 @@ const PASSIVE: Record<string, ComponentDef> = {
   },
   'capacitor': {
     id: 'capacitor', name: 'Capacitor', category: 'Passive',
-    width: 20, height: 60, symbol: 'capacitor',
+    width: 60, height: 30, symbol: 'capacitor',
     terminals: [
-      { id: 'a', name: 'A', x: 0, y: -30, type: 'bidirectional' },
-      { id: 'b', name: 'B', x: 0, y: 30, type: 'bidirectional' },
+      { id: 'a', name: 'A', x: -30, y: 0, type: 'bidirectional' },
+      { id: 'b', name: 'B', x: 30, y: 0, type: 'bidirectional' },
     ],
     properties: {
       capacitance: { type: 'number', value: 1e-6, unit: 'F', min: 1e-15, max: 1, label: 'Capacitance' },
@@ -239,18 +239,6 @@ const CONTROLLED_NETWORKS: Record<string, ComponentDef> = {
     terminals: [{ id: 'pos', name: '+', x: 0, y: -35, type: 'output' }, { id: 'neg', name: '−', x: 0, y: 35, type: 'output' }, { id: 'cp', name: 'S+', x: -35, y: -20, type: 'input' }, { id: 'cn', name: 'S−', x: -35, y: 20, type: 'input' }],
     properties: { transresistance: { type: 'number', value: 1000, unit: 'Ω', min: -1e9, max: 1e9, label: 'Transresistance' } },
     description: 'Current-controlled voltage source with inline 0 V current-sense branch',
-  },
-  'star-resistor-pack': {
-    id: 'star-resistor-pack', name: 'Star (Y) Resistor Pack', category: 'Controlled Sources & Networks', width: 80, height: 70, symbol: 'star-resistor-pack',
-    terminals: [{ id: 'a', name: 'A', x: -40, y: -25, type: 'bidirectional' }, { id: 'b', name: 'B', x: -40, y: 25, type: 'bidirectional' }, { id: 'c', name: 'C', x: 40, y: 0, type: 'bidirectional' }],
-    properties: { rA: { type: 'number', value: 30, unit: 'Ω', min: 0.001, max: 1e9, label: 'R_A' }, rB: { type: 'number', value: 30, unit: 'Ω', min: 0.001, max: 1e9, label: 'R_B' }, rC: { type: 'number', value: 30, unit: 'Ω', min: 0.001, max: 1e9, label: 'R_C' } },
-    description: 'Grouped three-terminal Star (Y) resistor network',
-  },
-  'delta-resistor-pack': {
-    id: 'delta-resistor-pack', name: 'Delta (Δ) Resistor Pack', category: 'Controlled Sources & Networks', width: 80, height: 70, symbol: 'delta-resistor-pack',
-    terminals: [{ id: 'a', name: 'A', x: -40, y: -25, type: 'bidirectional' }, { id: 'b', name: 'B', x: -40, y: 25, type: 'bidirectional' }, { id: 'c', name: 'C', x: 40, y: 0, type: 'bidirectional' }],
-    properties: { rAB: { type: 'number', value: 30, unit: 'Ω', min: 0.001, max: 1e9, label: 'R_{AB}' }, rBC: { type: 'number', value: 30, unit: 'Ω', min: 0.001, max: 1e9, label: 'R_{BC}' }, rCA: { type: 'number', value: 30, unit: 'Ω', min: 0.001, max: 1e9, label: 'R_{CA}' } },
-    description: 'Grouped three-terminal Delta (Δ) resistor network',
   },
 };
 

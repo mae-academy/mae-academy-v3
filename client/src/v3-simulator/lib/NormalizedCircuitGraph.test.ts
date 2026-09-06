@@ -33,6 +33,30 @@ describe('NormalizedCircuitGraph', () => {
     ]));
     expect(graph.essentialJunctions).toHaveLength(1);
     expect(graph.essentialJunctions[0].degree).toBe(3);
+    // T-junction vertex at R1 pin 'a' is at [100, 70], badge offset by textOffset
+    expect(graph.essentialJunctions[0].point).toEqual([100, 70]);
+    expect(graph.essentialJunctions[0].textOffset).toEqual([0, -14]);
+  });
+
+  it('places badge on principal active component terminal pin offset by (-14, -10) for 2-terminal branch and filters ghost nets', () => {
+    const source = component('V1', 'dc-voltage', 100, 200); // pos pin at [100, 170], neg pin at [100, 230]
+    const r1 = component('R1', 'resistor', 200, 170); // a pin at [170, 170], b pin at [230, 170]
+    const ground = component('GND', 'ground', 100, 300);
+    // Unconnected component (has isolated pins with 0 connections)
+    const orphan = component('R_orphan', 'resistor', 500, 500);
+
+    const wires = [
+      wire('w1', source, 'pos', r1, 'a'),
+      wire('w_gnd', source, 'neg', ground, 'gnd'),
+    ];
+
+    const graph = NormalizedCircuitGraph.fromCanvas([source, r1, ground, orphan], wires);
+    // Ghost net with <= 1 terminal (orphan or dangling r1.b) must be completely filtered out
+    const activeJunctions = graph.essentialJunctions;
+    expect(activeJunctions).toHaveLength(1);
+    // Source pos is at [100, 170], resistor is at [170, 170], midpoint is [135, 170]
+    expect(activeJunctions[0].point).toEqual([135, 170]);
+    expect(activeJunctions[0].textOffset).toEqual([0, -12]);
   });
 
   it('splits an actual crossing into a graph vertex instead of silently allowing a half-edge pass-through', () => {

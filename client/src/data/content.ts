@@ -193,7 +193,7 @@ localizedContent.en.collections.simulations = {
   description: "Nine applied laboratories for control, electronics, computation, mathematics, and connected engineering systems.",
   cards: [
     { title: "Control Systems", description: "Tune feedback, stability, and transient response inside a visible control loop.", code: "S.01" },
-    { title: "E-Circuits", description: "Probe current, voltage, and signal behavior across an interactive circuit bench.", code: "S.02" },
+    { title: "Electrical Circuits", description: "Probe current, voltage, and signal behavior across an interactive circuit bench.", code: "S.02" },
     { title: "Power Electronics", description: "Test switching topologies, conversion stages, and power-flow decisions.", code: "S.03" },
     { title: "Assembler", description: "Trace instructions, registers, memory flow, and low-level program logic.", code: "S.04" },
     { title: "PLC", description: "Build ladder logic and observe industrial control sequences in motion.", code: "S.05" },
@@ -201,9 +201,9 @@ localizedContent.en.collections.simulations = {
     { title: "Digital Logic Design", description: "Compose gates, truth states, and logic paths into working digital systems.", code: "S.07" },
     { title: "Linear Algebra", description: "Explore matrices, vectors, transformations, and the geometry behind engineering models.", code: "S.08" },
     { title: "Communication and Network", description: "Model transmission paths, network nodes, and connected-system behavior.", code: "S.09" },
-    { title: "Digital Logic Lab", description: "Use the complete E-Circuits bench for independent circuit modeling and analysis.", code: "S.10" },
-    { title: "Block diagram", description: "Use the complete E-Circuits bench for a second independent circuit workspace.", code: "S.11" },
-    { title: "extra lab", description: "Use the complete E-Circuits bench for a third independent circuit workspace.", code: "S.12" },
+    { title: "Digital Logic Lab", description: "Use the complete Electrical Circuits bench for independent circuit modeling and analysis.", code: "S.10" },
+    { title: "Block diagram", description: "Use the complete Electrical Circuits bench for a second independent circuit workspace.", code: "S.11" },
+    { title: "extra lab", description: "Use the complete Electrical Circuits bench for a third independent circuit workspace.", code: "S.12" },
   ],
 };
 localizedContent.ar.collections.simulations = {
@@ -212,7 +212,7 @@ localizedContent.ar.collections.simulations = {
   description: "تسعة مختبرات تطبيقية للتحكم والإلكترونيات والحوسبة والرياضيات والأنظمة الهندسية المتصلة.",
   cards: [
     { title: "أنظمة التحكم", description: "اضبط التغذية الراجعة والاستقرار والاستجابة العابرة داخل حلقة تحكم مرئية.", code: "S.01" },
-    { title: "E-Circuits", description: "افحص التيار والجهد وسلوك الإشارة عبر منصة دوائر تفاعلية.", code: "S.02" },
+    { title: "الدوائر الكهربائية", description: "افحص التيار والجهد وسلوك الإشارة عبر منصة دوائر تفاعلية.", code: "S.02" },
     { title: "إلكترونيات القدرة", description: "اختبر طوبولوجيا التبديل ومراحل التحويل وقرارات تدفق القدرة.", code: "S.03" },
     { title: "لغة التجميع", description: "تتبّع التعليمات والسجلات وتدفق الذاكرة ومنطق البرنامج منخفض المستوى.", code: "S.04" },
     { title: "PLC", description: "ابنِ منطق السلم وراقب تسلسلات التحكم الصناعي أثناء الحركة.", code: "S.05" },
@@ -220,9 +220,9 @@ localizedContent.ar.collections.simulations = {
     { title: "تصميم المنطق الرقمي", description: "ركّب البوابات وحالات الحقيقة ومسارات المنطق في أنظمة رقمية عاملة.", code: "S.07" },
     { title: "الجبر الخطي", description: "استكشف المصفوفات والمتجهات والتحويلات والهندسة الكامنة خلف النماذج الهندسية.", code: "S.08" },
     { title: "الاتصالات والشبكات", description: "نمذج مسارات الإرسال وعُقد الشبكة وسلوك الأنظمة المتصلة.", code: "S.09" },
-    { title: "Digital Logic Lab", description: "استخدم منصة E-Circuits الكاملة لنمذجة الدوائر وتحليلها في مساحة مستقلة.", code: "S.10" },
-    { title: "Block diagram", description: "استخدم منصة E-Circuits الكاملة لمساحة دوائر مستقلة ثانية.", code: "S.11" },
-    { title: "extra lab", description: "استخدم منصة E-Circuits الكاملة لمساحة دوائر مستقلة ثالثة.", code: "S.12" },
+    { title: "Digital Logic Lab", description: "استخدم منصة الدوائر الكهربائية الكاملة لنمذجة الدوائر وتحليلها في مساحة مستقلة.", code: "S.10" },
+    { title: "Block diagram", description: "استخدم منصة الدوائر الكهربائية الكاملة لمساحة دوائر مستقلة ثانية.", code: "S.11" },
+    { title: "extra lab", description: "استخدم منصة الدوائر الكهربائية الكاملة لمساحة دوائر مستقلة ثالثة.", code: "S.12" },
   ],
 };
 localizedContent.es.collections.simulations = {
@@ -231,7 +231,7 @@ localizedContent.es.collections.simulations = {
   description: "Nueve laboratorios aplicados para control, electrónica, computación, matemáticas y sistemas de ingeniería conectados.",
   cards: [
     { title: "Sistemas de control", description: "Ajusta retroalimentación, estabilidad y respuesta transitoria en un bucle de control visible.", code: "S.01" },
-    { title: "E-Circuits", description: "Mide corriente, voltaje y comportamiento de señales en un banco de circuitos interactivo.", code: "S.02" },
+    { title: "Circuitos Eléctricos", description: "Mide corriente, voltaje y comportamiento de señales en un banco de circuitos interactivo.", code: "S.02" },
     { title: "Electrónica de potencia", description: "Prueba topologías de conmutación, etapas de conversión y decisiones de flujo de potencia.", code: "S.03" },
     { title: "Ensamblador", description: "Sigue instrucciones, registros, flujo de memoria y lógica de programas de bajo nivel.", code: "S.04" },
     { title: "PLC", description: "Construye lógica de escalera y observa secuencias de control industrial en movimiento.", code: "S.05" },
@@ -239,18 +239,18 @@ localizedContent.es.collections.simulations = {
     { title: "Diseño de lógica digital", description: "Compone compuertas, estados de verdad y rutas lógicas en sistemas digitales funcionales.", code: "S.07" },
     { title: "Álgebra lineal", description: "Explora matrices, vectores, transformaciones y la geometría detrás de los modelos de ingeniería.", code: "S.08" },
     { title: "Comunicación y redes", description: "Modela rutas de transmisión, nodos de red y comportamiento de sistemas conectados.", code: "S.09" },
-    { title: "Digital Logic Lab", description: "Usa el banco E-Circuits completo para modelado y análisis de circuitos independiente.", code: "S.10" },
-    { title: "Block diagram", description: "Usa el banco E-Circuits completo como un segundo espacio de trabajo independiente.", code: "S.11" },
-    { title: "extra lab", description: "Usa el banco E-Circuits completo como un tercer espacio de trabajo independiente.", code: "S.12" },
+    { title: "Digital Logic Lab", description: "Usa el banco de Circuitos Eléctricos completo para modelado y análisis de circuitos independiente.", code: "S.10" },
+    { title: "Block diagram", description: "Usa el banco de Circuitos Eléctricos completo como un segundo espacio de trabajo independiente.", code: "S.11" },
+    { title: "extra lab", description: "Usa el banco de Circuitos Eléctricos completo como un tercer espacio de trabajo independiente.", code: "S.12" },
   ],
 };
 
 localizedContent.en.blueprints.stations.simulations = [
-  { label: "CONTROL LOOP", sublabel: "Control systems" }, { label: "CIRCUIT BENCH", sublabel: "E-Circuits" }, { label: "POWER STAGE", sublabel: "Power electronics" }, { label: "INSTRUCTION MAP", sublabel: "Assembler" }, { label: "LADDER LOGIC", sublabel: "PLC" }, { label: "SIGNAL FIELD", sublabel: "Signals and systems" }, { label: "GATE ARRAY", sublabel: "Digital logic design" }, { label: "MATRIX PLANE", sublabel: "Linear algebra" }, { label: "NETWORK LINK", sublabel: "Communication and network" },
+  { label: "CONTROL LOOP", sublabel: "Control systems" }, { label: "CIRCUIT BENCH", sublabel: "Electrical Circuits" }, { label: "POWER STAGE", sublabel: "Power electronics" }, { label: "INSTRUCTION MAP", sublabel: "Assembler" }, { label: "LADDER LOGIC", sublabel: "PLC" }, { label: "SIGNAL FIELD", sublabel: "Signals and systems" }, { label: "GATE ARRAY", sublabel: "Digital logic design" }, { label: "MATRIX PLANE", sublabel: "Linear algebra" }, { label: "NETWORK LINK", sublabel: "Communication and network" },
 ];
 localizedContent.ar.blueprints.stations.simulations = [
-  { label: "حلقة التحكم", sublabel: "أنظمة التحكم" }, { label: "منصة الدوائر", sublabel: "مختبر الدوائر" }, { label: "مرحلة القدرة", sublabel: "إلكترونيات القدرة" }, { label: "خريطة التعليمات", sublabel: "لغة التجميع" }, { label: "منطق السلم", sublabel: "PLC" }, { label: "مجال الإشارة", sublabel: "الإشارات والأنظمة" }, { label: "مصفوفة البوابات", sublabel: "تصميم المنطق الرقمي" }, { label: "مستوى المصفوفة", sublabel: "الجبر الخطي" }, { label: "وصلة الشبكة", sublabel: "الاتصالات والشبكات" },
+  { label: "حلقة التحكم", sublabel: "أنظمة التحكم" }, { label: "منصة الدوائر", sublabel: "الدوائر الكهربائية" }, { label: "مرحلة القدرة", sublabel: "إلكترونيات القدرة" }, { label: "خريطة التعليمات", sublabel: "لغة التجميع" }, { label: "منطق السلم", sublabel: "PLC" }, { label: "مجال الإشارة", sublabel: "الإشارات والأنظمة" }, { label: "مصفوفة البوابات", sublabel: "تصميم المنطق الرقمي" }, { label: "مستوى المصفوفة", sublabel: "الجبر الخطي" }, { label: "وصلة الشبكة", sublabel: "الاتصالات والشبكات" },
 ];
 localizedContent.es.blueprints.stations.simulations = [
-  { label: "BUCLE DE CONTROL", sublabel: "Sistemas de control" }, { label: "BANCO DE CIRCUITOS", sublabel: "Laboratorio de circuitos" }, { label: "ETAPA DE POTENCIA", sublabel: "Electrónica de potencia" }, { label: "MAPA DE INSTRUCCIONES", sublabel: "Ensamblador" }, { label: "LÓGICA DE ESCALERA", sublabel: "PLC" }, { label: "CAMPO DE SEÑAL", sublabel: "Señales y sistemas" }, { label: "MATRIZ DE COMPUERTAS", sublabel: "Diseño de lógica digital" }, { label: "PLANO MATRICIAL", sublabel: "Álgebra lineal" }, { label: "ENLACE DE RED", sublabel: "Comunicación y redes" },
+  { label: "BUCLE DE CONTROL", sublabel: "Sistemas de control" }, { label: "BANCO DE CIRCUITOS", sublabel: "Circuitos Eléctricos" }, { label: "ETAPA DE POTENCIA", sublabel: "Electrónica de potencia" }, { label: "MAPA DE INSTRUCCIONES", sublabel: "Ensamblador" }, { label: "LÓGICA DE ESCALERA", sublabel: "PLC" }, { label: "CAMPO DE SEÑAL", sublabel: "Señales y sistemas" }, { label: "MATRIZ DE COMPUERTAS", sublabel: "Diseño de lógica digital" }, { label: "PLANO MATRICIAL", sublabel: "Álgebra lineal" }, { label: "ENLACE DE RED", sublabel: "Comunicación y redes" },
 ];

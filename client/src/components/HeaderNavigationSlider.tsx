@@ -29,7 +29,7 @@ export default function HeaderNavigationSlider({ locale }: HeaderNavigationSlide
           const active = item.href === "/simulations" ? location === item.href || location.startsWith("/simulations/") : location === item.href;
           return <CarouselItem key={item.href} className="basis-auto pl-2">
             <Link href={item.href} className={`group relative flex h-9 items-center overflow-hidden whitespace-nowrap rounded-full px-4 text-[11px] font-bold tracking-[0.055em] transition-colors duration-200 ${active ? "text-white" : "text-slate-500 hover:text-slate-950 dark:text-slate-400 dark:hover:text-white"}`}>
-              {active && <motion.span layoutId="mae-navigation-cursor" className="absolute inset-0 rounded-full bg-gradient-to-r from-blue-600 via-violet-500 to-rose-500 shadow-lg shadow-violet-500/20" transition={{ type: "spring", stiffness: 350, damping: 30 }} />}
+              {active && <motion.span layoutId="mae-navigation-cursor" className="absolute inset-0 rounded-full bg-brand-gradient shadow-lg shadow-violet-500/20" transition={{ type: "spring", stiffness: 350, damping: 30 }} />}
               <span className="relative z-10">{copy.navigation[item.index]}</span>
             </Link>
           </CarouselItem>;

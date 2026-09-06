@@ -21,8 +21,11 @@ export interface CircuitWire {
   toComp: string;
   toTerm: string;
   path: Point[];
+  waypoints?: Point[];
   routing: WireRouting;
   color?: string;
+  junctionPoint?: Point;
+  junctionWireId?: string;
 }
 
 export interface WorkspaceText {
@@ -144,6 +147,7 @@ export function componentPrefix(type: string): string {
 }
 
 export function nextComponentLabel(type: string, components: CircuitComponent[]): string {
+  if (type === 'ground') return 'GND';
   const prefix = componentPrefix(type);
   const expression = new RegExp(`^${prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\d+)$`, 'i');
   const next = components.reduce((max, component) => {
@@ -167,7 +171,7 @@ export function copyComponentForPaste(
   return {
     ...source,
     id,
-    label,
+    label: source.type === 'ground' ? 'GND' : label,
     x,
     y,
     props: structuredClone(source.props),

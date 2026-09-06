@@ -1,4 +1,4 @@
-import React from "react";
+import * as React from "react";
 import { KatexMath } from "../ui/KatexMath";
 import { Complex } from "../../lib/controlMath";
 

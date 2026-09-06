@@ -31,9 +31,40 @@ export function AnalysisBox({ elements, geometry, nodalNodes = [], colors, stand
   }, [elements, geometry, method, nodalNodes, targetResistor, targetSource]);
   useEffect(() => { onTraceChange?.(trace); }, [onTraceChange, trace]);
   const displayMath = (math: string) => compactMathNumbers(math, precision);
-  return <section style={{ borderTop: standalone ? 'none' : `1px solid ${colors.line}`, padding: standalone ? '18px 20px 22px' : '12px 15px' }}>
-    <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginBottom: 12 }}><div><div style={{ color: colors.muted, fontSize: 9, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 3 }}>Phase 3 · Academic Analysis</div><div style={{ color: colors.text, fontSize: standalone ? 16 : 11, fontWeight: 800 }}>{trace.heading}</div></div><label style={{ display: 'flex', alignItems: 'center', gap: 6, color: colors.muted, fontSize: 10, fontWeight: 750 }}>DECIMAL PLACES<select value={precision} onChange={(event) => setPrecision(Number(event.target.value))} style={{ border: `1px solid ${colors.line}`, borderRadius: 6, padding: '5px 7px', background: colors.panelAlt, color: colors.text, fontSize: 10 }}>{[0, 1, 2, 3, 4, 5, 6].map((digits) => <option key={digits} value={digits}>{digits}</option>)}</select></label></div>
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 12 }}>{METHODS.map((item) => <button key={item.id} onClick={() => setMethod(item.id)} style={{ border: `1px solid ${method === item.id ? colors.primary : colors.line}`, background: method === item.id ? `${colors.primary}15` : colors.panelAlt, color: method === item.id ? colors.primary : colors.muted, borderRadius: 6, padding: '6px 9px', fontSize: 10, fontWeight: 800, cursor: 'pointer' }}>{item.label}</button>)}</div>
+  return <section className="rounded-xl border border-slate-200/80 bg-slate-50/70 dark:border-slate-700/60 dark:bg-slate-800/40" style={{ padding: standalone ? '18px 20px 22px' : '12px 15px', borderTop: standalone ? 'none' : `1px solid ${colors.line}` }}>
+    <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+      <div>
+        <div className="text-sm font-bold uppercase tracking-wider text-slate-800 dark:text-white">{trace.heading}</div>
+        {trace.status === 'ready' && <div style={{ marginTop: 3, color: colors.muted, fontSize: 10 }}>Solver-backed derivation</div>}
+      </div>
+      <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: colors.muted, fontSize: 10, fontWeight: 750 }}>
+        DECIMAL PLACES
+        <select value={precision} onChange={(event) => setPrecision(Number(event.target.value))} style={{ border: `1px solid ${colors.line}`, borderRadius: 6, padding: '5px 7px', background: colors.panelAlt, color: colors.text, fontSize: 10 }}>
+          {[0, 1, 2, 3, 4, 5, 6].map((digits) => <option key={digits} value={digits}>{digits}</option>)}
+        </select>
+      </label>
+    </div>
+    <div className="mb-4 flex flex-wrap gap-2">
+      {METHODS.map((item) => {
+        const sel = method === item.id;
+        return (
+          <button
+            key={item.id}
+            type="button"
+            role="tab"
+            aria-selected={sel}
+            onClick={() => setMethod(item.id)}
+            className={`inline-flex min-h-[36px] items-center justify-center rounded-lg px-4 py-2 text-xs font-medium transition-colors ${
+              sel
+                ? 'bg-brand-gradient text-white shadow-sm'
+                : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400 dark:hover:bg-slate-800'
+            }`}
+          >
+            {item.label}
+          </button>
+        );
+      })}
+    </div>
     {(method === 'superposition' || method === 'transform' || method === 'thevenin') && <div style={{ display: 'grid', gap: 5, marginBottom: 10 }}>
       <label style={{ display: 'grid', gap: 3, color: colors.muted, fontSize: 9, fontWeight: 800 }}>TARGET LOAD / BRANCH<select value={targetResistor} onChange={(event) => setTargetResistor(event.target.value)} style={{ border: `1px solid ${colors.line}`, borderRadius: 5, padding: 5, background: colors.panelAlt, color: colors.text, fontSize: 10 }}><option value="">Automatic first resistor</option>{resistors.map((item) => <option key={item.id} value={item.id}>{item.id} · {item.resistance} Ω</option>)}</select></label>
       {method === 'transform' && <label style={{ display: 'grid', gap: 3, color: colors.muted, fontSize: 9, fontWeight: 800 }}>SOURCE / RESISTOR PAIR<select value={targetSource} onChange={(event) => setTargetSource(event.target.value)} style={{ border: `1px solid ${colors.line}`, borderRadius: 5, padding: 5, background: colors.panelAlt, color: colors.text, fontSize: 10 }}><option value="">Automatic first voltage source</option>{sources.map((item) => <option key={item.id} value={item.id}>{item.id} · {item.voltage} V</option>)}</select></label>}

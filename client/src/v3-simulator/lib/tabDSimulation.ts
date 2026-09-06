@@ -67,7 +67,8 @@ export class TabDSimulationEngine extends SimulationEngine {
     try {
       const compiled = this.compileDocumentedPrimitives();
       if (!compiled) return super.step(elapsedSeconds);
-      const result = this.documentedMna.solve(compiled.primitives, compiled.nonlinear, elapsedSeconds);
+      const initialGuess = this.documentedSnapshot?.converged ? this.documentedSnapshot.nodeVoltages : undefined;
+      const result = this.documentedMna.solve(compiled.primitives, compiled.nonlinear, elapsedSeconds, { initialGuess });
       const branchCurrents = {
         ...result.branchCurrents,
         ...Object.fromEntries(compiled.nonlinear.map(device => [device.id, device.current(result.nodeVoltages)])),
@@ -120,9 +121,12 @@ export class TabDSimulationEngine extends SimulationEngine {
       const from = terminalKey(wire.fromComp, wire.fromTerm); const to = terminalKey(wire.toComp, wire.toTerm);
       join(from, to); wiredTerminals.add(from); wiredTerminals.add(to);
     }
-    const ground = this.tabDComponents.find(component => component.type === 'ground');
-    const groundKey = ground ? terminalKey(ground.id, 'gnd') : null;
-    if (!groundKey) throw new TabDMnaError('Tab D documented MNA requires an explicit ground reference named 0.');
+    const groundComponents = this.tabDComponents.filter(component => component.type === 'ground');
+    if (!groundComponents.length) throw new TabDMnaError('Tab D documented MNA requires an explicit ground reference named 0.');
+    const groundKey = terminalKey(groundComponents[0].id, 'gnd');
+    for (let i = 1; i < groundComponents.length; i++) {
+      join(groundKey, terminalKey(groundComponents[i].id, 'gnd'));
+    }
     const reference = find(groundKey);
     const netForTerminal = (componentId: string, terminalId: string) => {
       const root = find(terminalKey(componentId, terminalId));
@@ -162,10 +166,12 @@ export class TabDSimulationEngine extends SimulationEngine {
         case 'ground': break;
         case 'resistor': primitives.push({ kind: 'resistor', id: component.id, positive: p('a'), negative: p('b'), resistance: value(component, 'resistance', 1000) }); break;
         case 'potentiometer': {
+          const a = p('t1') ?? p('a');
+          const b = p('t2') ?? p('b');
           const total = Math.max(1e-9, value(component, 'resistance', 10000));
           const wiper = Math.max(0, Math.min(1, value(component, 'wiper', 0.5)));
-          primitives.push({ kind: 'resistor', id: `${component.id}:a`, positive: p('a'), negative: p('wiper'), resistance: Math.max(1e-9, total * wiper) });
-          primitives.push({ kind: 'resistor', id: `${component.id}:b`, positive: p('wiper'), negative: p('b'), resistance: Math.max(1e-9, total * (1 - wiper)) });
+          primitives.push({ kind: 'resistor', id: `${component.id}:a`, positive: a, negative: p('wiper'), resistance: Math.max(1e-9, total * wiper) });
+          primitives.push({ kind: 'resistor', id: `${component.id}:b`, positive: p('wiper'), negative: b, resistance: Math.max(1e-9, total * (1 - wiper)) });
           break;
         }
         case 'capacitor': primitives.push({ kind: 'capacitor', id: component.id, positive: p('a'), negative: p('b'), capacitance: value(component, 'capacitance', 1e-6) }); break;
@@ -181,22 +187,33 @@ export class TabDSimulationEngine extends SimulationEngine {
         }
         case 'dc-current': primitives.push({ kind: 'current', id: component.id, positive: p('pos'), negative: p('neg'), current: value(component, 'current', 1) }); break;
         case 'ac-current': primitives.push({ kind: 'current', id: component.id, positive: p('pos'), negative: p('neg'), current: sourceValue(component, 'amplitude', 1) }); break;
-        case 'vccs': primitives.push({ kind: 'vccs', id: component.id, positive: p('pos'), negative: p('neg'), controlPositive: p('cp'), controlNegative: p('cn'), transconductance: value(component, 'transconductance', 0.001) }); break;
-        case 'vcvs': primitives.push({ kind: 'vcvs', id: component.id, positive: p('pos'), negative: p('neg'), controlPositive: p('cp'), controlNegative: p('cn'), gain: value(component, 'gain', 2) }); break;
+        case 'vccs': case 'vcvs': {
+          const controlSourceId = String(component.props.controlSourceId ?? '');
+          const controlComponent = this.tabDComponents.find((c: CircuitComponent) => c.id === controlSourceId || c.label === controlSourceId);
+          const cp = controlComponent ? netForTerminal(controlComponent.id, 'pos') : '0';
+          const cn = controlComponent ? netForTerminal(controlComponent.id, 'neg') : '0';
+          if (component.type === 'vccs') primitives.push({ kind: 'vccs', id: component.id, positive: p('pos'), negative: p('neg'), controlPositive: cp, controlNegative: cn, transconductance: value(component, 'transconductance', 0.001) });
+          else primitives.push({ kind: 'vcvs', id: component.id, positive: p('pos'), negative: p('neg'), controlPositive: cp, controlNegative: cn, gain: value(component, 'gain', 2) });
+          break;
+        }
         case 'cccs': primitives.push({ kind: 'cccs', id: component.id, positive: p('pos'), negative: p('neg'), controlBranchId: String(component.props.controlSourceId ?? ''), gain: value(component, 'gain', 1) }); break;
         case 'ccvs': primitives.push({ kind: 'ccvs', id: component.id, positive: p('pos'), negative: p('neg'), controlBranchId: String(component.props.controlSourceId ?? ''), transresistance: value(component, 'transresistance', 1000) }); break;
         case 'star-resistor-pack': {
-          const ra = value(component, 'rA', value(component, 'rAB', 30)); const rb = value(component, 'rB', value(component, 'rBC', 30)); const rc = value(component, 'rC', value(component, 'rCA', 30)); const center = `@${component.id}:center`;
+          const ra = value(component, 'rA', value(component, 'rAB', 30)); const rb = value(component, 'rB', value(component, 'rBC', 30)); const rc = value(component, 'rC', value(component, 'rCA', 30)); const center = p('n') ?? `@${component.id}:center`;
           primitives.push({ kind: 'resistor', id: `${component.id}:a`, positive: p('a'), negative: center, resistance: ra });
           primitives.push({ kind: 'resistor', id: `${component.id}:b`, positive: p('b'), negative: center, resistance: rb });
           primitives.push({ kind: 'resistor', id: `${component.id}:c`, positive: p('c'), negative: center, resistance: rc });
           break;
         }
-        case 'delta-resistor-pack':
-          primitives.push({ kind: 'resistor', id: `${component.id}:ab`, positive: p('a'), negative: p('b'), resistance: value(component, 'rAB', 30) });
-          primitives.push({ kind: 'resistor', id: `${component.id}:bc`, positive: p('b'), negative: p('c'), resistance: value(component, 'rBC', 30) });
-          primitives.push({ kind: 'resistor', id: `${component.id}:ca`, positive: p('c'), negative: p('a'), resistance: value(component, 'rCA', 30) });
+        case 'delta-resistor-pack': {
+          const a = p('top') ?? p('a');
+          const b = p('left') ?? p('b');
+          const c = p('right') ?? p('c');
+          primitives.push({ kind: 'resistor', id: `${component.id}:ab`, positive: a, negative: b, resistance: value(component, 'rAB', 30) });
+          primitives.push({ kind: 'resistor', id: `${component.id}:bc`, positive: b, negative: c, resistance: value(component, 'rBC', 30) });
+          primitives.push({ kind: 'resistor', id: `${component.id}:ca`, positive: c, negative: a, resistance: value(component, 'rCA', 30) });
           break;
+        }
         case 'sw-spst-no': case 'pb-no': primitives.push({ kind: 'resistive-switch', id: component.id, positive: p('a'), negative: p('b'), closed: component.props.state === (component.type === 'pb-no' ? 'pressed' : 'closed') }); break;
         case 'sw-spst-nc': case 'pb-nc': primitives.push({ kind: 'resistive-switch', id: component.id, positive: p('a'), negative: p('b'), closed: component.props.state !== (component.type === 'pb-nc' ? 'pressed' : 'open') }); break;
         case 'sw-spdt': {

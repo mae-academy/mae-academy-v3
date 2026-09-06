@@ -35,9 +35,15 @@ export function compileDcTopology(components: CircuitComponent[], wires: Circuit
   const union = new UnionFind();
   for (const component of components) for (const terminal of getDef(component.type)?.terminals ?? []) union.find(terminalKey(component.id, terminal.id));
   for (const wire of wires) union.union(terminalKey(wire.fromComp, wire.fromTerm), terminalKey(wire.toComp, wire.toTerm));
-  const ground = components.find(component => component.type === 'ground');
-  const groundTerminal = ground ? getDef(ground.type)?.terminals[0] : undefined;
-  const reference = ground && groundTerminal ? union.find(terminalKey(ground.id, groundTerminal.id)) : null;
+  const groundComponents = components.filter(component => component.type === 'ground');
+  if (groundComponents.length > 0) {
+    const gnd0 = terminalKey(groundComponents[0].id, 'gnd');
+    for (let i = 1; i < groundComponents.length; i++) {
+      union.union(gnd0, terminalKey(groundComponents[i].id, 'gnd'));
+    }
+  }
+  const groundTerminal = groundComponents[0] ? getDef(groundComponents[0].type)?.terminals[0] : undefined;
+  const reference = groundComponents.length && groundTerminal ? union.find(terminalKey(groundComponents[0].id, groundTerminal.id)) : null;
   const nodeFor = (component: CircuitComponent, terminal: string) => {
     if (normalizedGraph) return normalizedGraph.netForTerminal(component.id, terminal);
     const root = union.find(terminalKey(component.id, terminal));
@@ -53,16 +59,27 @@ export function compileDcTopology(components: CircuitComponent[], wires: Circuit
     if (component.type === 'dc-voltage') elements.push({ type: 'voltage', id: component.id, positive: nodeFor(component, 'pos'), negative: nodeFor(component, 'neg'), voltage: number(component, 'voltage', 12) });
     if (component.type === 'dc-rail') elements.push({ type: 'voltage', id: component.id, positive: nodeFor(component, 'pos'), negative: '0', voltage: number(component, 'voltage', 24) });
     if (component.type === 'dc-current') elements.push({ type: 'current', id: component.id, from: nodeFor(component, 'pos'), to: nodeFor(component, 'neg'), current: number(component, 'current', 1) });
-    if (component.type === 'vccs') elements.push({ type: 'vccs', id: component.id, positive: nodeFor(component, 'pos'), negative: nodeFor(component, 'neg'), controlPositive: nodeFor(component, 'cp'), controlNegative: nodeFor(component, 'cn'), transconductance: number(component, 'transconductance', 0.001) });
-    if (component.type === 'vcvs') elements.push({ type: 'vcvs', id: component.id, positive: nodeFor(component, 'pos'), negative: nodeFor(component, 'neg'), controlPositive: nodeFor(component, 'cp'), controlNegative: nodeFor(component, 'cn'), gain: number(component, 'gain', 2) });
+    if (component.type === 'vccs' || component.type === 'vcvs') {
+      const controlSourceId = String(component.props.controlSourceId ?? '');
+      const controlComponent = components.find(c => c.id === controlSourceId || c.label === controlSourceId);
+      const cp = controlComponent ? nodeFor(controlComponent, 'pos') : '0';
+      const cn = controlComponent ? nodeFor(controlComponent, 'neg') : '0';
+      if (component.type === 'vccs') elements.push({ type: 'vccs', id: component.id, positive: nodeFor(component, 'pos'), negative: nodeFor(component, 'neg'), controlPositive: cp, controlNegative: cn, transconductance: number(component, 'transconductance', 0.001) });
+      else elements.push({ type: 'vcvs', id: component.id, positive: nodeFor(component, 'pos'), negative: nodeFor(component, 'neg'), controlPositive: cp, controlNegative: cn, gain: number(component, 'gain', 2) });
+    }
     if (component.type === 'cccs' || component.type === 'ccvs') {
-      // A zero-volt sense branch is valid only when it is explicitly inserted
-      // in series by a topology editor. Stamping one across cp/cn here would
-      // short a user net in parallel, so controlled sources reference a
-      // selected existing voltage/current-sense branch instead.
       const controlSourceId = String(component.props.controlSourceId ?? '');
       if (component.type === 'cccs') elements.push({ type: 'cccs', id: component.id, positive: nodeFor(component, 'pos'), negative: nodeFor(component, 'neg'), controlSourceId, gain: number(component, 'gain', 1) });
       else elements.push({ type: 'ccvs', id: component.id, positive: nodeFor(component, 'pos'), negative: nodeFor(component, 'neg'), controlSourceId, transresistance: number(component, 'transresistance', 1000) });
+    }
+    if (component.type === 'potentiometer') {
+      const a = nodeFor(component, 't1') ?? nodeFor(component, 'a');
+      const b = nodeFor(component, 't2') ?? nodeFor(component, 'b');
+      const w = nodeFor(component, 'wiper');
+      const total = Math.max(1e-9, number(component, 'resistance', 10000));
+      const wiper = Math.max(0, Math.min(1, number(component, 'wiper', 0.5)));
+      elements.push({ type: 'resistor', id: `${component.id}:ra`, positive: a, negative: w, resistance: Math.max(1e-9, total * wiper) });
+      elements.push({ type: 'resistor', id: `${component.id}:rb`, positive: w, negative: b, resistance: Math.max(1e-9, total * (1 - wiper)) });
     }
     if (component.type === 'star-resistor-pack') {
       const center = `internal:${component.id}:star`;
@@ -71,7 +88,9 @@ export function compileDcTopology(components: CircuitComponent[], wires: Circuit
       elements.push({ type: 'resistor', id: `${component.id}:rc`, positive: nodeFor(component, 'c'), negative: center, resistance: number(component, 'rC', 30) });
     }
     if (component.type === 'delta-resistor-pack') {
-      const a = nodeFor(component, 'a'); const b = nodeFor(component, 'b'); const c = nodeFor(component, 'c');
+      const a = nodeFor(component, 'top') ?? nodeFor(component, 'a');
+      const b = nodeFor(component, 'left') ?? nodeFor(component, 'b');
+      const c = nodeFor(component, 'right') ?? nodeFor(component, 'c');
       elements.push({ type: 'resistor', id: `${component.id}:rab`, positive: a, negative: b, resistance: number(component, 'rAB', 30) });
       elements.push({ type: 'resistor', id: `${component.id}:rbc`, positive: b, negative: c, resistance: number(component, 'rBC', 30) });
       elements.push({ type: 'resistor', id: `${component.id}:rca`, positive: c, negative: a, resistance: number(component, 'rCA', 30) });
@@ -92,15 +111,23 @@ export function compileNodalGeometry(components: CircuitComponent[], wires: Circ
       label: `V_${index + 1}`,
       color: NODAL_COLORS[index % NODAL_COLORS.length],
       centroid: junction.point,
+      textOffset: junction.textOffset,
     }));
   }
   const union = new UnionFind();
   for (const component of components) for (const terminal of getDef(component.type)?.terminals ?? []) union.find(terminalKey(component.id, terminal.id));
   for (const wire of wires) union.union(terminalKey(wire.fromComp, wire.fromTerm), terminalKey(wire.toComp, wire.toTerm));
-  const ground = components.find((component) => component.type === 'ground');
-  const groundTerminal = ground ? getDef(ground.type)?.terminals[0] : undefined;
-  const reference = ground && groundTerminal ? union.find(terminalKey(ground.id, groundTerminal.id)) : null;
+  const groundComponents = components.filter((component) => component.type === 'ground');
+  if (groundComponents.length > 0) {
+    const gnd0 = terminalKey(groundComponents[0].id, 'gnd');
+    for (let i = 1; i < groundComponents.length; i++) {
+      union.union(gnd0, terminalKey(groundComponents[i].id, 'gnd'));
+    }
+  }
+  const groundTerminal = groundComponents[0] ? getDef(groundComponents[0].type)?.terminals[0] : undefined;
+  const reference = groundComponents.length && groundTerminal ? union.find(terminalKey(groundComponents[0].id, groundTerminal.id)) : null;
   const pointsByRoot = new Map<string, Point[]>();
+  const terminalCountByRoot = new Map<string, number>();
   const addPoint = (root: string, point: Point) => {
     if (root === reference) return;
     const points = pointsByRoot.get(root) ?? [];
@@ -110,6 +137,9 @@ export function compileNodalGeometry(components: CircuitComponent[], wires: Circ
     const definition = getDef(component.type);
     for (const terminal of definition?.terminals ?? []) {
       const root = union.find(terminalKey(component.id, terminal.id));
+      if (root !== reference) {
+        terminalCountByRoot.set(root, (terminalCountByRoot.get(root) ?? 0) + 1);
+      }
       addPoint(root, getTerminalWorldPos(component.x, component.y, terminal.x, terminal.y, component.rotation, component.flipH, component.flipV));
     }
   }
@@ -117,11 +147,15 @@ export function compileNodalGeometry(components: CircuitComponent[], wires: Circ
     const root = union.find(terminalKey(wire.fromComp, wire.fromTerm));
     wire.path.forEach((point) => addPoint(root, point));
   }
-  return Array.from(pointsByRoot.entries()).map(([root, points]) => ({ node: `n:${root}`, points })).sort((left, right) => left.node.localeCompare(right.node)).map(({ node, points }, index) => ({
-    node,
-    index: index + 1,
-    label: `V_${index + 1}`,
-    color: NODAL_COLORS[index % NODAL_COLORS.length],
-    centroid: [points.reduce((sum, [x]) => sum + x, 0) / points.length, points.reduce((sum, [, y]) => sum + y, 0) / points.length],
-  }));
+  return Array.from(pointsByRoot.entries())
+    .filter(([root]) => (terminalCountByRoot.get(root) ?? 0) >= 2)
+    .map(([root, points]) => ({ node: `n:${root}`, points }))
+    .sort((left, right) => left.node.localeCompare(right.node))
+    .map(({ node, points }, index) => ({
+      node,
+      index: index + 1,
+      label: `V_${index + 1}`,
+      color: NODAL_COLORS[index % NODAL_COLORS.length],
+      centroid: [points.reduce((sum, [x]) => sum + x, 0) / points.length, points.reduce((sum, [, y]) => sum + y, 0) / points.length],
+    }));
 }

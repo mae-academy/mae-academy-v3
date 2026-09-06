@@ -3,6 +3,7 @@ import { findPolynomialRoots, simulateLtiStepResponse, findBreakawayPoints, comp
 import { TransferFunctionInput, TransferFunctionData } from "./TransferFunctionInput";
 import { RootLocusStepsPanel } from "./RootLocusStepsPanel";
 import { KatexMath } from "../ui/KatexMath";
+import { BrandSlider } from "@/components/ui/BrandSlider";
 
 export function RootLocusStudio() {
   const locusCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -937,7 +938,7 @@ const charPoly = dAligned.map((d_val, idx) => d_val + K * nAligned[idx]);
                   onClick={() => setGridMode('cartesian')}
                   className={`rounded-lg px-3 py-1.5 text-xs font-medium shadow-sm ${
                     gridMode === 'cartesian'
-                      ? 'bg-gradient-to-r from-blue-600 to-pink-500 text-white'
+                      ? 'bg-brand-gradient text-white'
                       : 'border border-slate-200 bg-white text-slate-600 hover:border-blue-400 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400 dark:hover:border-blue-400'
                   }`}
                 >
@@ -947,7 +948,7 @@ const charPoly = dAligned.map((d_val, idx) => d_val + K * nAligned[idx]);
                   onClick={() => setGridMode('polar')}
                   className={`rounded-lg px-3 py-1.5 text-xs font-medium shadow-sm ${
                     gridMode === 'polar'
-                      ? 'bg-gradient-to-r from-blue-600 to-pink-500 text-white'
+                      ? 'bg-brand-gradient text-white'
                       : 'border border-slate-200 bg-white text-slate-600 hover:border-blue-400 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400 dark:hover:border-blue-400'
                   }`}
                 >
@@ -1068,7 +1069,8 @@ const charPoly = dAligned.map((d_val, idx) => d_val + K * nAligned[idx]);
                     const val = parseFloat(e.target.value);
                     if (!isNaN(val) && val > 0) setMaxTime(val);
                   }}
-                  className="bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 text-sm font-mono w-20 text-right focus:outline-blue-500 text-slate-900 dark:text-white"
+                  style={{ fontFamily: "'KaTeX_Main', 'Times New Roman', serif" }}
+                  className="bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 text-slate-800 text-lg tracking-wide dark:text-white w-20 text-right focus:outline-blue-500 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [-moz-appearance:textfield] m-0"
                 />
               </div>
             </div>
@@ -1182,15 +1184,16 @@ const charPoly = dAligned.map((d_val, idx) => d_val + K * nAligned[idx]);
             </h3>
             <div className="space-y-4">
               <div className="flex justify-between items-center">
-                <span className="text-xs font-bold text-slate-500">K =</span>
+                <span style={{ fontFamily: "'KaTeX_Main', 'Times New Roman', serif" }} className="italic font-serif text-slate-800 text-lg tracking-wide dark:text-white">K =</span>
                 <input 
                   type="number"
-                  value={gainK.toFixed(4)}
+                  value={Number(gainK.toFixed(4))}
                   onChange={(e) => {
                     const k = parseFloat(e.target.value);
                     if (!isNaN(k) && k > 0) setGainK(k);
                   }}
-                  className="bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 text-sm font-mono w-28 text-right focus:outline-blue-500 text-slate-900 dark:text-white"
+                  style={{ fontFamily: "'KaTeX_Main', 'Times New Roman', serif" }}
+                  className="bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 text-slate-800 text-lg tracking-wide dark:text-white w-28 text-right focus:outline-blue-500 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [-moz-appearance:textfield] m-0"
                 />
               </div>
               <div className="flex items-center gap-3">
@@ -1202,16 +1205,16 @@ const charPoly = dAligned.map((d_val, idx) => d_val + K * nAligned[idx]);
                     const v = parseFloat(e.target.value);
                     if (!isNaN(v) && v >= 0 && v < kMax) setKMin(v);
                   }}
-                  className="w-16 bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-1 py-1 text-xs font-mono text-center focus:outline-blue-500 text-slate-900 dark:text-white"
+                  style={{ fontFamily: "'KaTeX_Main', 'Times New Roman', serif" }}
+                  className="font-serif text-slate-800 text-lg tracking-wide bg-transparent border-none outline-none w-16 text-center [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [-moz-appearance:textfield] m-0 dark:text-white"
                 />
-                <input
-                  type="range"
+                <BrandSlider
                   min={kMin}
                   max={kMax}
                   step={(kMax - kMin) / 1000}
                   value={gainK}
                   onChange={(e) => setGainK(parseFloat(e.target.value))}
-                  className="flex-1 accent-blue-600"
+                  className="flex-1"
                 />
                 <input
                   type="number"
@@ -1221,7 +1224,8 @@ const charPoly = dAligned.map((d_val, idx) => d_val + K * nAligned[idx]);
                     const v = parseFloat(e.target.value);
                     if (!isNaN(v) && v > kMin) setKMax(v);
                   }}
-                  className="w-16 bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-1 py-1 text-xs font-mono text-center focus:outline-blue-500 text-slate-900 dark:text-white"
+                  style={{ fontFamily: "'KaTeX_Main', 'Times New Roman', serif" }}
+                  className="font-serif text-slate-800 text-lg tracking-wide bg-transparent border-none outline-none w-16 text-center [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [-moz-appearance:textfield] m-0 dark:text-white"
                 />
               </div>
             </div>

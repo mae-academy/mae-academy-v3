@@ -20,22 +20,20 @@ import {
   logspace,
   type FrequencyFactor,
 } from "@/lib/frequencyResponseMath";
-import { FrequencyTransferFunctionInput, type FrequencyTransferFunction } from "./FrequencyTransferFunctionInput";
+import { TransferFunctionInput, type TransferFunctionData } from "./TransferFunctionInput";
 
 type PrimaryView = "bode" | "nyquist" | "nichols";
 
 const PANEL = "rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900";
 const HEADING = "text-sm font-bold uppercase tracking-wider text-slate-800 dark:text-white";
-const RANGE_TRACK = "h-2 cursor-pointer appearance-none rounded-full bg-slate-200 dark:bg-slate-700 [&::-webkit-slider-thumb]:size-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-blue-600 [&::-webkit-slider-thumb]:-mt-1 [&::-webkit-slider-thumb]:cursor-pointer [&::-moz-range-thumb]:size-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-blue-600 [&::-moz-range-track]:h-2 [&::-moz-range-track]:rounded-full";
+const RANGE_TRACK = "h-1.5 cursor-pointer appearance-none rounded-full bg-gradient-to-r from-[#2563eb] via-[#7c3aed] to-[#f43f5e] [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white [&::-webkit-slider-thumb]:bg-[#2563eb] [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:cursor-pointer [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-white [&::-moz-range-thumb]:bg-[#2563eb] [&::-moz-range-thumb]:shadow-md [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-track]:h-1.5 [&::-moz-range-track]:rounded-full [&::-moz-range-track]:bg-transparent";
 
-const INITIAL_MODEL: FrequencyTransferFunction = {
-  mode: "second-order",
-  numerator: [1],
-  denominator: [1, 1.2, 1],
-  numeratorText: "1",
-  denominatorText: "1 1.2 1",
-  zpk: { gain: 1, zeros: "", poles: "-0.6+0.8j, -0.6-0.8j" },
-  secondOrder: { wn: 1, zeta: 0.6 },
+const INITIAL_TF: TransferFunctionData = {
+  mode: "polynomial",
+  numPoly: [1],
+  denPoly: [1, 1.2, 1],
+  zpk: { k: 1, z: "", p: "-0.6+0.8j, -0.6-0.8j" },
+  polyStr: { num: "1", den: "1 1.2 1" },
 };
 
 function matchDegrees(left: number[], right: number[]) {
@@ -51,9 +49,9 @@ function factorSymbol(factor: FrequencyFactor) {
   return factor.label;
 }
 
-function makeClosedLoop(model: FrequencyTransferFunction, gain: number) {
-  const numerator = model.numerator.map((coefficient) => coefficient * gain);
-  const { left: denominatorAligned, right: numeratorAligned } = matchDegrees(model.denominator, numerator);
+function makeClosedLoop(numPoly: number[], denPoly: number[], gain: number) {
+  const numerator = numPoly.map((coefficient) => coefficient * gain);
+  const { left: denominatorAligned, right: numeratorAligned } = matchDegrees(denPoly, numerator);
   return {
     numerator: numeratorAligned,
     denominator: denominatorAligned.map((coefficient, index) => coefficient + numeratorAligned[index]),
@@ -75,8 +73,10 @@ function ChartFrame({ title, children, legend = false }: { title: string; childr
 }
 
 export function FrequencyResponseStudio() {
-  const [model, setModel] = useState<FrequencyTransferFunction>(INITIAL_MODEL);
+  const [tfData, setTfData] = useState<TransferFunctionData>(INITIAL_TF);
   const [gain, setGain] = useState(1);
+  const [gainMin, setGainMin] = useState(0.05);
+  const [gainMax, setGainMax] = useState(20);
   const [selectedFactorIds, setSelectedFactorIds] = useState<string[]>([]);
   const [primaryView, setPrimaryView] = useState<PrimaryView>("bode");
   const [timeHorizon, setTimeHorizon] = useState(12);
@@ -88,9 +88,9 @@ export function FrequencyResponseStudio() {
   }, []);
 
   const openLoop = useMemo(() => ({
-    numerator: model.numerator.map((coefficient) => coefficient * gain),
-    denominator: model.denominator,
-  }), [gain, model.denominator, model.numerator]);
+    numerator: tfData.numPoly.map((coefficient) => coefficient * gain),
+    denominator: tfData.denPoly,
+  }), [gain, tfData.denPoly, tfData.numPoly]);
   const factors = useMemo(() => buildFrequencyFactors(openLoop.numerator, openLoop.denominator), [openLoop.denominator, openLoop.numerator]);
 
   useEffect(() => {
@@ -103,7 +103,7 @@ export function FrequencyResponseStudio() {
   const response = useMemo(() => computeFrequencyResponse(factors, selectedFactorIds, logspace(-2, 4, 360)), [factors, selectedFactorIds]);
   const margins = useMemo(() => extractStabilityMargins(response), [response]);
   const slopeLogic = useMemo(() => factorSlopeEvents(factors.filter((factor) => selectedFactorIds.includes(factor.id))), [factors, selectedFactorIds]);
-  const closedLoop = useMemo(() => makeClosedLoop(model, gain), [gain, model]);
+  const closedLoop = useMemo(() => makeClosedLoop(tfData.numPoly, tfData.denPoly, gain), [gain, tfData.denPoly, tfData.numPoly]);
   const stepResponse = useMemo(() => simulateLtiStepResponse(closedLoop.numerator, closedLoop.denominator, 1, timeHorizon, Math.min(0.02, timeHorizon / 700)), [closedLoop.denominator, closedLoop.numerator, timeHorizon]);
 
   const bodeData = useMemo(() => response.map((point) => ({
@@ -120,11 +120,63 @@ export function FrequencyResponseStudio() {
   const toggleFactor = (id: string) => setSelectedFactorIds((current) => current.includes(id) ? current.filter((factorId) => factorId !== id) : [...current, id]);
 
   return <div className="space-y-6">
-    <FrequencyTransferFunctionInput onChange={setModel} />
+    <TransferFunctionInput onUpdate={setTfData} defaultData={tfData} gainK={gain} />
 
     <section className={`${PANEL} grid gap-6 lg:grid-cols-[1fr_auto] lg:items-end`}>
-      <div><h3 className={HEADING}>Live Gain Compensation</h3><div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center"><KatexMath math="K" className="w-7 text-xl text-slate-950 dark:text-white" /><input aria-label="System gain K" className={`${RANGE_TRACK} w-full`} type="range" min={0.05} max={20} step={0.05} value={gain} onChange={(event) => setGain(Number(event.target.value))} /><div className="min-w-24 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-center dark:border-slate-800 dark:bg-slate-950"><KatexMath math={gain.toFixed(2)} className="font-mono text-sm text-violet-700 dark:text-violet-300" /></div></div></div>
-      <div className="grid grid-cols-2 gap-2"><MetricTile label="\mathrm{PM}" value={margins.gainCrossover ? `${formatEngineering(margins.gainCrossover.phaseMarginDeg)}^\\circ` : "\\mathrm{N/A}"} /><MetricTile label="\mathrm{GM}" value={margins.phaseCrossover ? `${formatEngineering(margins.phaseCrossover.gainMarginDb)}\\,\\mathrm{dB}` : "\\mathrm{N/A}"} /></div>
+      <div>
+        <h3 className={HEADING}>Live Gain Compensation</h3>
+        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+          <span style={{ fontFamily: "'KaTeX_Main', 'Times New Roman', serif" }} className="w-7 text-xl italic font-serif text-slate-800 dark:text-white">K</span>
+          <div className="flex items-center gap-3 w-full">
+            <input
+              type="number"
+              step="0.01"
+              value={gainMin}
+              onChange={(e) => {
+                const v = parseFloat(e.target.value);
+                if (!isNaN(v) && v >= 0 && v < gainMax) setGainMin(v);
+              }}
+              style={{ fontFamily: "'KaTeX_Main', 'Times New Roman', serif" }}
+              className="font-serif text-slate-800 text-lg tracking-wide bg-transparent border-none outline-none w-16 text-center [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [-moz-appearance:textfield] m-0 dark:text-white"
+            />
+            <input
+              aria-label="System gain K"
+              className={`${RANGE_TRACK} flex-1`}
+              type="range"
+              min={gainMin}
+              max={gainMax}
+              step={(gainMax - gainMin) / 1000}
+              value={gain}
+              onChange={(event) => setGain(Number(event.target.value))}
+            />
+            <input
+              type="number"
+              step="1"
+              value={gainMax}
+              onChange={(e) => {
+                const v = parseFloat(e.target.value);
+                if (!isNaN(v) && v > gainMin) setGainMax(v);
+              }}
+              style={{ fontFamily: "'KaTeX_Main', 'Times New Roman', serif" }}
+              className="font-serif text-slate-800 text-lg tracking-wide bg-transparent border-none outline-none w-16 text-center [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [-moz-appearance:textfield] m-0 dark:text-white"
+            />
+          </div>
+          <div className="min-w-24 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-center dark:border-slate-800 dark:bg-slate-950">
+            <input
+              type="number"
+              step="any"
+              value={Number(gain.toFixed(4))}
+              onChange={(event) => {
+                const v = parseFloat(event.target.value);
+                if (!isNaN(v) && v > 0) setGain(v);
+              }}
+              style={{ fontFamily: "'KaTeX_Main', 'Times New Roman', serif" }}
+              className="w-full bg-transparent text-center text-lg text-violet-700 dark:text-violet-300 outline-none border-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [-moz-appearance:textfield] m-0"
+            />
+          </div>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-2"><MetricTile label="\mathrm{PM}" value={margins.gainCrossover ? `${formatEngineering(margins.gainCrossover.phaseMarginDeg)}^\circ` : "\\mathrm{N/A}"} /><MetricTile label="\mathrm{GM}" value={margins.phaseCrossover ? `${formatEngineering(margins.phaseCrossover.gainMarginDb)}\\,\\mathrm{dB}` : "\\mathrm{N/A}"} /></div>
     </section>
 
     <section className="grid gap-6 2xl:grid-cols-[minmax(0,1fr)_300px]">
@@ -141,7 +193,7 @@ export function FrequencyResponseStudio() {
     </section>
 
     <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_330px]">
-      <ChartFrame title="\mathrm{Closed\! -\! Loop\ Step\ Response}"><div className="mb-3 flex flex-wrap items-center justify-between gap-2"><KatexMath math="T(s)=\frac{G(s)}{1+G(s)}" className="text-xs text-slate-500 dark:text-slate-400" /><label className="flex items-center gap-2"><KatexMath math="t_{max}" className="text-xs text-slate-600 dark:text-slate-300" /><input aria-label="Step response time horizon" className={`${RANGE_TRACK} w-28`} type="range" min={3} max={30} step={1} value={timeHorizon} onChange={(event) => setTimeHorizon(Number(event.target.value))} /><KatexMath math={`${timeHorizon}\\,\\mathrm{s}`} className="w-10 font-mono text-[10px] text-violet-700 dark:text-violet-300" /></label></div><div className="h-72 min-w-0">{chartsReady && <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={240}><LineChart data={stepData} margin={{ top: 10, right: 20, bottom: 4, left: 0 }}><CartesianGrid strokeDasharray="3 5" stroke="currentColor" opacity={0.12} /><XAxis dataKey="time" type="number" domain={[0, timeHorizon]} tick={{ fontSize: 10 }} tickFormatter={(value) => `${value.toFixed(0)}s`} /><YAxis tick={{ fontSize: 10 }} width={34} /><Tooltip content={<StepTooltip />} /><ReferenceLine y={1} stroke="#94a3b8" strokeDasharray="5 5" /><Line dataKey="reference" stroke="#a78bfa" strokeWidth={1.5} dot={false} strokeDasharray="5 4" isAnimationActive={false} /><Line dataKey="output" stroke="#60a5fa" strokeWidth={2.5} dot={false} isAnimationActive={false} /></LineChart></ResponsiveContainer>}</div></ChartFrame>
+      <ChartFrame title="\mathrm{Closed\! -\! Loop\ Step\ Response}"><div className="mb-3 flex flex-wrap items-center justify-between gap-2"><KatexMath math="T(s)=\frac{G(s)}{1+G(s)}" className="text-xs text-slate-500 dark:text-slate-400" /><label className="flex items-center gap-2"><KatexMath math="t_{max}" className="text-xs text-slate-600 dark:text-slate-300" /><input aria-label="Step response time horizon" className={`${RANGE_TRACK} w-28`} type="range" min={3} max={30} step={1} value={timeHorizon} onChange={(event) => setTimeHorizon(Number(event.target.value))} /><span style={{ fontFamily: "'KaTeX_Main', 'Times New Roman', serif" }} className="w-12 text-sm text-violet-700 dark:text-violet-300">{timeHorizon} s</span></label></div><div className="h-72 min-w-0">{chartsReady && <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={240}><LineChart data={stepData} margin={{ top: 10, right: 20, bottom: 4, left: 0 }}><CartesianGrid strokeDasharray="3 5" stroke="currentColor" opacity={0.12} /><XAxis dataKey="time" type="number" domain={[0, timeHorizon]} tick={{ fontSize: 10 }} tickFormatter={(value) => `${value.toFixed(0)}s`} /><YAxis tick={{ fontSize: 10 }} width={34} /><Tooltip content={<StepTooltip />} /><ReferenceLine y={1} stroke="#94a3b8" strokeDasharray="5 5" /><Line dataKey="reference" stroke="#a78bfa" strokeWidth={1.5} dot={false} strokeDasharray="5 4" isAnimationActive={false} /><Line dataKey="output" stroke="#60a5fa" strokeWidth={2.5} dot={false} isAnimationActive={false} /></LineChart></ResponsiveContainer>}</div></ChartFrame>
       <section className={PANEL}><h3 className={HEADING}>Time-Domain Correlation</h3><div className="mt-4 grid grid-cols-2 gap-2"><MetricTile label="M_p" value={`${formatEngineering(stepResponse.overshootPercent)}\\%`} /><MetricTile label="t_r" value={`${formatEngineering(stepResponse.riseTime)}\\,\\mathrm{s}`} /><MetricTile label="t_s" value={`${formatEngineering(stepResponse.settlingTime)}\\,\\mathrm{s}`} /><MetricTile label="e_{ss}" value={formatEngineering(stepResponse.steadyStateError)} /></div></section>
     </section>
 
@@ -150,7 +202,7 @@ export function FrequencyResponseStudio() {
 }
 
 function MetricTile({ label, value }: { label: string; value: string }) {
-  return <div className="min-w-0 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 dark:border-slate-800 dark:bg-slate-950"><KatexMath math={label} className="block text-[10px] text-slate-500 dark:text-slate-400" /><KatexMath math={value} className="mt-1 block overflow-x-auto font-mono text-sm text-slate-950 dark:text-white" /></div>;
+  return <div className="min-w-0 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 dark:border-slate-800 dark:bg-slate-950"><KatexMath math={label} className="block text-[10px] text-slate-500 dark:text-slate-400" /><KatexMath math={value} className="mt-1 block overflow-x-auto text-sm text-slate-950 dark:text-white" /></div>;
 }
 
 function StepTooltip({ active, payload }: { active?: boolean; payload?: Array<{ payload: { time: number; output: number; reference: number } }> }) {

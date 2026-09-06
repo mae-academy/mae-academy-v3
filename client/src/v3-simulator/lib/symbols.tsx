@@ -4,7 +4,8 @@
  * Terminals are at the exact boundary of the symbol.
  */
 
-import React from 'react';
+import * as React from 'react';
+import type { ReactNode, FC } from 'react';
 
 interface SymbolProps {
   powered?: boolean;
@@ -12,7 +13,7 @@ interface SymbolProps {
   animTime?: number; // 0..1 for motor rotation etc.
 }
 
-type SymbolFC = React.FC<SymbolProps>;
+type SymbolFC = FC<SymbolProps>;
 
 /** Manual contact position overrides coil sensing only after direct canvas interaction. */
 function relayContactClosed(powered: boolean | undefined, props?: Record<string, any>): boolean {
@@ -41,14 +42,16 @@ function SemicircularVerticalCoil({ x, y1, y2, bulge }: { x: number; y1: number;
   return <path d={`M ${x},${y1} ${d}`} fill="none" stroke="#1a2744" strokeWidth={2} strokeLinecap="round" />;
 }
 
-const DOCUMENTED_GRID_LOCAL = 100 / 3;
-const DOCUMENTED_PHASE_OUTPUT_X = Math.sqrt(22 ** 2 - 18 ** 2);
+
+const DOCUMENTED_PHASE_LEAD_Y = 50 / 3;
+const DOCUMENTED_PHASE_OUTPUT_X = 100 / 3;
+const DOCUMENTED_PHASE_CIRCLE_X = Math.sqrt(22 ** 2 - DOCUMENTED_PHASE_LEAD_Y ** 2);
 const DOCUMENTED_NETWORK_ARM_HALF_LENGTH = 100 / 6;
 const DOCUMENTED_NETWORK_ARM_BODY_WIDTH = 12;
 const DOCUMENTED_NETWORK_ARM_BODY_HEIGHT = 4.2;
 
 /** Tab D resistor body: the potentiometer's IEEE-style rectangle with no wiper branch. */
-function RectangularResistor({ strokeWidth = 2, halfLength = DOCUMENTED_GRID_LOCAL, bodyWidth = 40, bodyHeight = 14 }: { strokeWidth?: number; halfLength?: number; bodyWidth?: number; bodyHeight?: number }) {
+function RectangularResistor({ strokeWidth = 2, halfLength = 30, bodyWidth = 40, bodyHeight = 14 }: { strokeWidth?: number; halfLength?: number; bodyWidth?: number; bodyHeight?: number }) {
   const bodyStart = -bodyWidth / 2;
   const bodyEnd = bodyWidth / 2;
   return <g data-rectangular-resistor="potentiometer-style">
@@ -124,44 +127,44 @@ const AcCurrent: SymbolFC = ({ props }) => {
   </g>;
 };
 
-const DcRail: SymbolFC = ({ props }) => {
-  if (props?._documentedStyle !== true) return <g>
-    <line x1={0} y1={-25} x2={0} y2={-14} stroke="#1a2744" strokeWidth={2} strokeLinecap="square" />
-    <rect x={-30} y={-14} width={60} height={28} rx={4} fill="#eff6ff" stroke="#1a2744" strokeWidth={2} />
-    <text x={0} y={-3} textAnchor="middle" fontSize={11} fontWeight={800} fill="#1a2744">+</text>
-    <text x={0} y={4} textAnchor="middle" fontSize={10} fontWeight={700} fill="#1a2744">{String(props?.voltage ?? 24)} V DC</text>
-  </g>;
+const DcRail: SymbolFC = () => {
   return <g data-documented-dc-rail="positive-reference">
-    <line x1={0} y1={-25} x2={0} y2={0} stroke="#1a2744" strokeWidth={2.4} strokeLinecap="square" />
-    <line x1={-30} y1={0} x2={30} y2={0} stroke="#1a2744" strokeWidth={2.4} strokeLinecap="square" />
-    <text x={0} y={-6} textAnchor="middle" fontSize={11} fontWeight={800} fill="#1a2744">+</text>
+    <line x1={-24} y1={-10} x2={24} y2={-10} stroke="#1a2744" strokeWidth={3} strokeLinecap="square" />
+    <line x1={0} y1={-10} x2={0} y2={0} stroke="#1a2744" strokeWidth={2.5} strokeLinecap="square" />
   </g>;
 };
 
-const ThreePhaseSource: SymbolFC = ({ props }) => {
-  if (props?._documentedStyle !== true) {
-    const voltage = Number(props?.lineVoltage ?? 400);
-    return <g>
-      <rect x={-22} y={-37} width={54} height={74} rx={8} fill="#fff7ed" stroke="#1a2744" strokeWidth={2} />
-      <text x={5} y={-10} textAnchor="middle" fontSize={13} fontWeight={700} fill="#b45309">3~</text>
-      <text x={5} y={8} textAnchor="middle" fontSize={7} fill="#1a2744">{`${voltage} V 3~`}</text>
-      {[-30, -10, 10, 30].map((y, index) => <g key={y}><line x1={-40} y1={y} x2={-22} y2={y} stroke="#1a2744" strokeWidth={2} /><text x={-18} y={y + 3} fontSize={7} fill="#1a2744">{['L1', 'L2', 'L3', 'N'][index]}</text></g>)}
-    </g>;
-  }
+const ThreePhaseSource: SymbolFC = () => {
   return <g>
     <circle cx={0} cy={0} r={22} fill="white" stroke="#1a2744" strokeWidth={2.2} />
     <text x={0} y={4} textAnchor="middle" fontSize={8.5} fontWeight={750} fill="#1a2744">PHASE</text>
-    {[-18, 0, 18].map((y) => <line key={y} data-phase-lead={y === 0 ? 'axis' : 'circle'} x1={y === 0 ? 22 : DOCUMENTED_PHASE_OUTPUT_X} y1={y} x2={40} y2={y} stroke="#1a2744" strokeWidth={2} strokeLinecap="square" />)}
-    <line x1={-22} y1={0} x2={-40} y2={0} stroke="#1a2744" strokeWidth={2} strokeLinecap="square" />
+    {[-DOCUMENTED_PHASE_LEAD_Y, 0, DOCUMENTED_PHASE_LEAD_Y].map((y) => (
+      <line
+        key={y}
+        data-phase-lead={y === 0 ? 'axis' : 'circle'}
+        x1={y === 0 ? 22 : DOCUMENTED_PHASE_CIRCLE_X}
+        y1={y}
+        x2={DOCUMENTED_PHASE_OUTPUT_X}
+        y2={y}
+        stroke="#1a2744"
+        strokeWidth={2}
+        strokeLinecap="square"
+      />
+    ))}
+    <line x1={-22} y1={0} x2={-DOCUMENTED_PHASE_OUTPUT_X} y2={0} stroke="#1a2744" strokeWidth={2} strokeLinecap="square" />
   </g>;
 };
 
-const ThreePhaseRail: SymbolFC = () => <g>
-  <line x1={-45} y1={-30} x2={45} y2={-30} stroke="#d14343" strokeWidth={2.2} strokeLinecap="square" />
-  <line x1={-45} y1={-10} x2={45} y2={-10} stroke="#d6a720" strokeWidth={2.2} strokeLinecap="square" />
-  <line x1={-45} y1={10} x2={45} y2={10} stroke="#2d73b7" strokeWidth={2.2} strokeLinecap="square" />
-  <line x1={-45} y1={30} x2={45} y2={30} stroke="#1a2744" strokeWidth={1.9} strokeLinecap="square" />
-</g>;
+const ThreePhaseRail: SymbolFC = () => {
+  const x1 = -100 / 3;
+  const x2 = 50;
+  return <g>
+    <line x1={x1} y1={-100 / 3} x2={x2} y2={-100 / 3} stroke="#d14343" strokeWidth={2.2} strokeLinecap="square" />
+    <line x1={x1} y1={-50 / 3} x2={x2} y2={-50 / 3} stroke="#d6a720" strokeWidth={2.2} strokeLinecap="square" />
+    <line x1={x1} y1={50 / 3} x2={x2} y2={50 / 3} stroke="#2d73b7" strokeWidth={2.2} strokeLinecap="square" />
+    <line x1={x1} y1={100 / 3} x2={x2} y2={100 / 3} stroke="#1a2744" strokeWidth={1.9} strokeLinecap="square" />
+  </g>;
+};
 
 const Ground: SymbolFC = () => (
   <g>
@@ -187,46 +190,45 @@ const Resistor: SymbolFC = ({ props }) => {
 
 const Capacitor: SymbolFC = () => (
   <g>
-    <line x1={0} y1={-30} x2={0} y2={-6} stroke="#1a2744" strokeWidth={2} />
-    <line x1={-14} y1={-6} x2={14} y2={-6} stroke="#1a2744" strokeWidth={2.5} />
-    <line x1={-14} y1={6} x2={14} y2={6} stroke="#1a2744" strokeWidth={2.5} />
-    <line x1={0} y1={6} x2={0} y2={30} stroke="#1a2744" strokeWidth={2} />
+    <line x1={-30} y1={0} x2={-4} y2={0} stroke="#1a2744" strokeWidth={2} />
+    <line x1={-4} y1={-14} x2={-4} y2={14} stroke="#1a2744" strokeWidth={2} />
+    <line x1={4} y1={-14} x2={4} y2={14} stroke="#1a2744" strokeWidth={2} />
+    <line x1={4} y1={0} x2={30} y2={0} stroke="#1a2744" strokeWidth={2} />
   </g>
 );
 
-const Inductor: SymbolFC = ({ props }) => {
-  if (props?._documentedStyle !== true) return <g>
-    <line x1={-30} y1={0} x2={-18} y2={0} stroke="#1a2744" strokeWidth={2} />
-    <path d="M -18,0 Q -15,-10 -9,-10 Q -3,-10 0,-10 Q 6,-10 9,-10 Q 15,-10 18,0" fill="none" stroke="#1a2744" strokeWidth={2} />
-    <line x1={18} y1={0} x2={30} y2={0} stroke="#1a2744" strokeWidth={2} />
-  </g>;
-  return <g>
-    <line x1={-30} y1={0} x2={-18} y2={0} stroke="#1a2744" strokeWidth={2} />
-    <path d="M -18,0 C -18,-9 -6,-9 -6,0 C -6,-9 6,-9 6,0 C 6,-9 18,-9 18,0" fill="none" stroke="#1a2744" strokeWidth={2} strokeLinecap="round" />
-    <line x1={18} y1={0} x2={30} y2={0} stroke="#1a2744" strokeWidth={2} />
-  </g>;
+const Inductor: SymbolFC = () => {
+  return (
+    <g>
+      <line x1={-30} y1={0} x2={-20} y2={0} stroke="#1a2744" strokeWidth={2} />
+      <path
+        d="M -20,0 A 5,5 0 0,1 -10,0 A 5,5 0 0,1 0,0 A 5,5 0 0,1 10,0 A 5,5 0 0,1 20,0"
+        fill="none"
+        stroke="#1a2744"
+        strokeWidth={2}
+        strokeLinecap="round"
+      />
+      <line x1={20} y1={0} x2={30} y2={0} stroke="#1a2744" strokeWidth={2} />
+    </g>
+  );
 };
 
-const Potentiometer: SymbolFC = ({ props }) => {
-  const documented = props?._documentedStyle === true;
+export const Potentiometer: SymbolFC = ({ props }) => {
   const position = Math.max(0, Math.min(1, Number(props?.wiper ?? 0.5)));
-  const y = documented ? -7 : -20 + position * 40;
-  if (!documented) return <g>
-    <line x1={-35} y1={-20} x2={-18} y2={-20} stroke="#1a2744" strokeWidth={2} />
-    <line x1={-35} y1={20} x2={-18} y2={20} stroke="#1a2744" strokeWidth={2} />
-    <rect x={-18} y={-24} width={36} height={48} rx={3} fill="white" stroke="#1a2744" strokeWidth={2} />
-    <line x1={-10} y1={-18} x2={10} y2={18} stroke="#1a2744" strokeWidth={1.5} opacity={0.35} />
-    <line x1={35} y1={0} x2={18} y2={y} stroke="#1a2744" strokeWidth={2} />
-    <polygon points={`${18},${y} ${25},${y - 4} ${25},${y + 4}`} fill="#1a2744" />
-    <line x1={18} y1={-20} x2={18} y2={20} stroke="#1a2744" strokeWidth={1.5} />
-  </g>;
+  // مسار حركة الوايبر الأفقي فوق جسم المقاومة
+  const wiperX = props?._documentedStyle === true ? 0 : -20 + position * 40;
+
   return (
     <g data-rigid-body="potentiometer">
-      <line x1={-DOCUMENTED_GRID_LOCAL} y1={0} x2={-20} y2={0} stroke="#1a2744" strokeWidth={2} />
+      {/* الطرفان الأفقيان الرئيسيان A و B */}
+      <line x1={-30} y1={0} x2={-20} y2={0} stroke="#1a2744" strokeWidth={2} />
       <rect x={-20} y={-7} width={40} height={14} rx={2} fill="white" stroke="#1a2744" strokeWidth={2} />
-      <line x1={20} y1={0} x2={DOCUMENTED_GRID_LOCAL} y2={0} stroke="#1a2744" strokeWidth={2} />
-      <line x1={0} y1={-DOCUMENTED_GRID_LOCAL} x2={0} y2={y} stroke="#1a2744" strokeWidth={2} strokeLinecap="round" />
-      <polygon points={`0,${y} -4,${y - 8} 4,${y - 8}`} fill="#1a2744" />
+      <line x1={20} y1={0} x2={30} y2={0} stroke="#1a2744" strokeWidth={2} />
+
+      {/* ساق الوايبر ممتدة من نقطة التيرمينال المرفوعة y = -30 وصولاً إلى السهم */}
+      <line x1={0} y1={-30} x2={wiperX} y2={-11} stroke="#1a2744" strokeWidth={2} strokeLinecap="round" />
+      {/* رأس السهم المتجه لأسفل */}
+      <polygon points={`${wiperX},${-7} ${wiperX - 4},${-12} ${wiperX + 4},${-12}`} fill="#1a2744" />
     </g>
   );
 };
@@ -234,32 +236,89 @@ const Potentiometer: SymbolFC = ({ props }) => {
 const DependentDiamond: SymbolFC = ({ props }) => {
   const currentControlled = String(props?._type) === 'vccs' || String(props?._type) === 'cccs';
   return <g>
-    <line x1={0} y1={-35} x2={0} y2={-25} stroke="#1a2744" strokeWidth={2} /><line x1={0} y1={25} x2={0} y2={35} stroke="#1a2744" strokeWidth={2} />
-    <polygon points="0,-25 20,0 0,25 -20,0" fill="white" stroke="#1a2744" strokeWidth={2} />
-    {currentControlled ? <><line x1={0} y1={12} x2={0} y2={-12} stroke="#1a2744" strokeWidth={2} /><polyline points="-5,-6 0,-13 5,-6" fill="none" stroke="#1a2744" strokeWidth={2} /></> : <><text x={0} y={-7} textAnchor="middle" fontSize={14} fontWeight={700}>+</text><text x={0} y={13} textAnchor="middle" fontSize={16} fontWeight={700}>−</text></>}
-    <line x1={-35} y1={-20} x2={-20} y2={-20} stroke="#1a2744" strokeWidth={2} /><line x1={-35} y1={20} x2={-20} y2={20} stroke="#1a2744" strokeWidth={2} />
+    <polygon points="0,-18 18,0 0,18 -18,0" fill="white" stroke="#1a2744" strokeWidth={2} />
+    {currentControlled ? <><line x1={0} y1={10} x2={0} y2={-10} stroke="#1a2744" strokeWidth={2} /><polyline points="-4,-4 0,-10 4,-4" fill="none" stroke="#1a2744" strokeWidth={2} /></> : <><text x={0} y={-3} textAnchor="middle" fontSize={12} fontWeight={700}>+</text><text x={0} y={11} textAnchor="middle" fontSize={14} fontWeight={700}>−</text></>}
+    <line x1={0} y1={-18} x2={0} y2={-30} stroke="#1a2744" strokeWidth={2} />
+    <line x1={0} y1={18} x2={0} y2={30} stroke="#1a2744" strokeWidth={2} />
   </g>;
 };
 
-const StarResistorPack: SymbolFC = ({ props }) => props?._documentedStyle === true ? <g data-resistor-network="star">
-  <g transform={`rotate(0) translate(${DOCUMENTED_NETWORK_ARM_HALF_LENGTH},0)`}><RectangularResistor strokeWidth={1.35} halfLength={DOCUMENTED_NETWORK_ARM_HALF_LENGTH} bodyWidth={DOCUMENTED_NETWORK_ARM_BODY_WIDTH} bodyHeight={DOCUMENTED_NETWORK_ARM_BODY_HEIGHT} /></g>
-  <g transform={`rotate(120) translate(${DOCUMENTED_NETWORK_ARM_HALF_LENGTH},0)`}><RectangularResistor strokeWidth={1.35} halfLength={DOCUMENTED_NETWORK_ARM_HALF_LENGTH} bodyWidth={DOCUMENTED_NETWORK_ARM_BODY_WIDTH} bodyHeight={DOCUMENTED_NETWORK_ARM_BODY_HEIGHT} /></g>
-  <g transform={`rotate(240) translate(${DOCUMENTED_NETWORK_ARM_HALF_LENGTH},0)`}><RectangularResistor strokeWidth={1.35} halfLength={DOCUMENTED_NETWORK_ARM_HALF_LENGTH} bodyWidth={DOCUMENTED_NETWORK_ARM_BODY_WIDTH} bodyHeight={DOCUMENTED_NETWORK_ARM_BODY_HEIGHT} /></g>
-  <circle cx={0} cy={0} r={2.6} fill="#1a2744" />
-</g> : <g>
-  <line x1={-40} y1={-25} x2={-18} y2={-12} stroke="#1a2744" strokeWidth={2} /><line x1={-40} y1={25} x2={-18} y2={12} stroke="#1a2744" strokeWidth={2} /><line x1={40} y1={0} x2={18} y2={0} stroke="#1a2744" strokeWidth={2} />
-  <path d="M-18,-12 l8,-5 7,10 7,-10 7,5 M-18,12 l8,5 7,-10 7,10 7,-5 M18,0 l-9,-6 -8,12 -8,-12 -9,6" fill="none" stroke="#1a2744" strokeWidth={1.7} strokeLinejoin="round" />
-  <circle cx={0} cy={0} r={3} fill="#1a2744" />
-</g>;
+export const StarResistorPack: SymbolFC = () => {
+  // إحداثيات التيرمينالز الحقيقية
+  const pRight: [number, number] = [30, 0];
+  const pTopLeft: [number, number] = [-15, -30];
+  const pBottomLeft: [number, number] = [-15, 30];
 
-const DeltaResistorPack: SymbolFC = ({ props }) => props?._documentedStyle === true ? <g data-resistor-network="delta">
-  <g transform="translate(0,9.6225) rotate(0)"><RectangularResistor strokeWidth={1.35} halfLength={DOCUMENTED_NETWORK_ARM_HALF_LENGTH} bodyWidth={DOCUMENTED_NETWORK_ARM_BODY_WIDTH} bodyHeight={DOCUMENTED_NETWORK_ARM_BODY_HEIGHT} /></g>
-  <g transform="translate(8.3333,-4.81125) rotate(60)"><RectangularResistor strokeWidth={1.35} halfLength={DOCUMENTED_NETWORK_ARM_HALF_LENGTH} bodyWidth={DOCUMENTED_NETWORK_ARM_BODY_WIDTH} bodyHeight={DOCUMENTED_NETWORK_ARM_BODY_HEIGHT} /></g>
-  <g transform="translate(-8.3333,-4.81125) rotate(120)"><RectangularResistor strokeWidth={1.35} halfLength={DOCUMENTED_NETWORK_ARM_HALF_LENGTH} bodyWidth={DOCUMENTED_NETWORK_ARM_BODY_WIDTH} bodyHeight={DOCUMENTED_NETWORK_ARM_BODY_HEIGHT} /></g>
-</g> : <g>
-  <line x1={-40} y1={-25} x2={-28} y2={-18} stroke="#1a2744" strokeWidth={2} /><line x1={-40} y1={25} x2={-28} y2={18} stroke="#1a2744" strokeWidth={2} /><line x1={40} y1={0} x2={28} y2={0} stroke="#1a2744" strokeWidth={2} />
-  <path d="M-28,-18 l10,-4 7,7 7,-7 8,4 M-28,18 l10,4 7,-7 7,7 8,-4 M-18,-22 l-4,9 8,5 -8,5 -4,9" fill="none" stroke="#1a2744" strokeWidth={1.7} strokeLinejoin="round" />
-</g>;
+  const lenDiag = Math.hypot(15, 30); // ~33.54px
+  const angleTop = (Math.atan2(-30, -15) * 180) / Math.PI; // -116.57°
+  const angleBottom = (Math.atan2(30, -15) * 180) / Math.PI; // 116.57°
+
+  return (
+    <g data-resistor-network="star">
+      {/* خطوط أساسية متصلة من نقطة المركز إلى مراكز التيرمينالز لضمان عدم وجود فجوات */}
+      <line x1={0} y1={0} x2={pRight[0]} y2={pRight[1]} stroke="#1a2744" strokeWidth={1.8} />
+      <line x1={0} y1={0} x2={pTopLeft[0]} y2={pTopLeft[1]} stroke="#1a2744" strokeWidth={1.8} />
+      <line x1={0} y1={0} x2={pBottomLeft[0]} y2={pBottomLeft[1]} stroke="#1a2744" strokeWidth={1.8} />
+
+      {/* فرع الطور الأيمن */}
+      <g transform={`rotate(0) translate(${15}, 0)`}>
+        <RectangularResistor strokeWidth={1.4} halfLength={15} bodyWidth={13} bodyHeight={4.5} />
+      </g>
+      {/* فرع الطور العلوي الأيسر */}
+      <g transform={`rotate(${angleTop}) translate(${lenDiag / 2}, 0)`}>
+        <RectangularResistor strokeWidth={1.4} halfLength={lenDiag / 2} bodyWidth={13} bodyHeight={4.5} />
+      </g>
+      {/* فرع الطور السفلي الأيسر */}
+      <g transform={`rotate(${angleBottom}) translate(${lenDiag / 2}, 0)`}>
+        <RectangularResistor strokeWidth={1.4} halfLength={lenDiag / 2} bodyWidth={13} bodyHeight={4.5} />
+      </g>
+
+      {/* عقدة التعادل المركزية (Neutral) */}
+      <circle cx={0} cy={0} r={2.5} fill="#1a2744" />
+    </g>
+  );
+};
+
+export const DeltaResistorPack: SymbolFC = () => {
+  // إحداثيات الرؤوس الثلاثة المتطابقة مع شبكة الكانفاس والتيرمينالز
+  const pTop: [number, number] = [0, -20];
+  const pLeft: [number, number] = [-20, 20];
+  const pRight: [number, number] = [20, 20];
+
+  // طول الضلع المائل والزوايا
+  const lenSide = Math.hypot(20, 40); // ~44.72px
+  const halfSide = lenSide / 2;
+
+  const midLeft: [number, number] = [(pTop[0] + pLeft[0]) / 2, (pTop[1] + pLeft[1]) / 2]; // [-10, 0]
+  const angleLeft = (Math.atan2(pLeft[1] - pTop[1], pLeft[0] - pTop[0]) * 180) / Math.PI; // ~116.57°
+
+  const midRight: [number, number] = [(pTop[0] + pRight[0]) / 2, (pTop[1] + pRight[1]) / 2]; // [10, 0]
+  const angleRight = (Math.atan2(pRight[1] - pTop[1], pRight[0] - pTop[0]) * 180) / Math.PI; // ~63.43°
+
+  const midBottom: [number, number] = [0, 20];
+
+  return (
+    <g data-resistor-network="delta">
+      {/* الخطوط الواصلة تماماً من المركز للرؤوس لضمان عدم وجود أي فراغ */}
+      <line x1={pTop[0]} y1={pTop[1]} x2={pLeft[0]} y2={pLeft[1]} stroke="#1a2744" strokeWidth={1.8} />
+      <line x1={pTop[0]} y1={pTop[1]} x2={pRight[0]} y2={pRight[1]} stroke="#1a2744" strokeWidth={1.8} />
+      <line x1={pLeft[0]} y1={pLeft[1]} x2={pRight[0]} y2={pRight[1]} stroke="#1a2744" strokeWidth={1.8} />
+
+      {/* الضلع الأيسر */}
+      <g transform={`translate(${midLeft[0]}, ${midLeft[1]}) rotate(${angleLeft})`}>
+        <RectangularResistor strokeWidth={1.4} halfLength={halfSide} bodyWidth={13} bodyHeight={4.5} />
+      </g>
+      {/* الضلع الأيمن */}
+      <g transform={`translate(${midRight[0]}, ${midRight[1]}) rotate(${angleRight})`}>
+        <RectangularResistor strokeWidth={1.4} halfLength={halfSide} bodyWidth={13} bodyHeight={4.5} />
+      </g>
+      {/* الضلع السفلي الأفقي */}
+      <g transform={`translate(${midBottom[0]}, ${midBottom[1]}) rotate(0)`}>
+        <RectangularResistor strokeWidth={1.4} halfLength={20} bodyWidth={13} bodyHeight={4.5} />
+      </g>
+    </g>
+  );
+};
 
 // ─── DIODES ───────────────────────────────────────────────────────────────────
 
@@ -313,99 +372,96 @@ const DiodeBase: SymbolFC = ({ powered, props }) => {
 // ─── TRANSISTORS ──────────────────────────────────────────────────────────────
 
 const BjtNpn: SymbolFC = ({ props }) => props?._documentedStyle === true ? <g>
-  <line x1={-20} y1={0} x2={-6} y2={0} stroke="#1a2744" strokeWidth={2} />
-  <line x1={-6} y1={-20} x2={-6} y2={20} stroke="#1a2744" strokeWidth={2.6} />
-  <line x1={-6} y1={-10} x2={20} y2={-30} stroke="#1a2744" strokeWidth={2} strokeLinecap="round" />
-  <line x1={-6} y1={10} x2={20} y2={30} stroke="#1a2744" strokeWidth={2} strokeLinecap="round" />
-  <g data-emitter-arrow="npn" transform="translate(12 23.846) rotate(37.5686)"><polygon points="10,0 0,-4 0,4" fill="#1a2744" /></g>
+  <line x1={-20} y1={0} x2={0} y2={0} stroke="#1a2744" strokeWidth={2} />
+  <line x1={0} y1={-20} x2={0} y2={20} stroke="#1a2744" strokeWidth={2.6} />
+  <line x1={0} y1={-10} x2={20} y2={-30} stroke="#1a2744" strokeWidth={2} strokeLinecap="round" />
+  <line x1={0} y1={10} x2={20} y2={30} stroke="#1a2744" strokeWidth={2} strokeLinecap="round" />
+  <g data-emitter-arrow="npn" transform="translate(14 24) rotate(45)"><polygon points="5,0 -5,-4 -5,4" fill="#1a2744" /></g>
 </g> : <g>
-  <line x1={-20} y1={0} x2={-6} y2={0} stroke="#1a2744" strokeWidth={2} />
-  <line x1={-6} y1={-22} x2={-6} y2={22} stroke="#1a2744" strokeWidth={3} />
-  <line x1={-6} y1={-12} x2={10} y2={-24} stroke="#1a2744" strokeWidth={2} /><line x1={10} y1={-24} x2={10} y2={-30} stroke="#1a2744" strokeWidth={2} />
-  <line x1={-6} y1={12} x2={10} y2={24} stroke="#1a2744" strokeWidth={2} /><line x1={10} y1={24} x2={10} y2={30} stroke="#1a2744" strokeWidth={2} />
-  <polygon points="4,18 12,26 14,16" fill="#1a2744" /><line x1={10} y1={-30} x2={20} y2={-30} stroke="#1a2744" strokeWidth={2} /><line x1={10} y1={30} x2={20} y2={30} stroke="#1a2744" strokeWidth={2} />
+  <line x1={-20} y1={0} x2={0} y2={0} stroke="#1a2744" strokeWidth={2} />
+  <line x1={0} y1={-22} x2={0} y2={22} stroke="#1a2744" strokeWidth={3} />
+  <line x1={0} y1={-10} x2={20} y2={-30} stroke="#1a2744" strokeWidth={2} />
+  <line x1={0} y1={10} x2={20} y2={30} stroke="#1a2744" strokeWidth={2} />
+  <g transform="translate(14 24) rotate(45)"><polygon points="5,0 -5,-4 -5,4" fill="#1a2744" /></g>
 </g>;
 
 const BjtPnp: SymbolFC = ({ props }) => props?._documentedStyle === true ? <g>
-  <line x1={-20} y1={0} x2={-6} y2={0} stroke="#1a2744" strokeWidth={2} />
-  <line x1={-6} y1={-20} x2={-6} y2={20} stroke="#1a2744" strokeWidth={2.6} />
-  <line x1={-6} y1={-10} x2={20} y2={-30} stroke="#1a2744" strokeWidth={2} strokeLinecap="round" />
-  <line x1={-6} y1={10} x2={20} y2={30} stroke="#1a2744" strokeWidth={2} strokeLinecap="round" />
-  <g data-emitter-arrow="pnp" transform="translate(12 23.846) rotate(37.5686)"><polygon points="-10,0 0,-4 0,4" fill="#1a2744" /></g>
+  <line x1={-20} y1={0} x2={0} y2={0} stroke="#1a2744" strokeWidth={2} />
+  <line x1={0} y1={-20} x2={0} y2={20} stroke="#1a2744" strokeWidth={2.6} />
+  <line x1={0} y1={-10} x2={20} y2={-30} stroke="#1a2744" strokeWidth={2} strokeLinecap="round" />
+  <line x1={0} y1={10} x2={20} y2={30} stroke="#1a2744" strokeWidth={2} strokeLinecap="round" />
+  <g data-emitter-arrow="pnp" transform="translate(14 24) rotate(45)"><polygon points="-5,0 5,-4 5,4" fill="#1a2744" /></g>
 </g> : <g>
-  <line x1={-20} y1={0} x2={-6} y2={0} stroke="#1a2744" strokeWidth={2} /><line x1={-6} y1={-22} x2={-6} y2={22} stroke="#1a2744" strokeWidth={3} />
-  <line x1={-6} y1={-12} x2={10} y2={-24} stroke="#1a2744" strokeWidth={2} /><line x1={10} y1={-24} x2={10} y2={-30} stroke="#1a2744" strokeWidth={2} />
-  <line x1={-6} y1={12} x2={10} y2={24} stroke="#1a2744" strokeWidth={2} /><line x1={10} y1={24} x2={10} y2={30} stroke="#1a2744" strokeWidth={2} />
-  <polygon points="-2,8 6,16 -4,18" fill="#1a2744" /><line x1={10} y1={-30} x2={20} y2={-30} stroke="#1a2744" strokeWidth={2} /><line x1={10} y1={30} x2={20} y2={30} stroke="#1a2744" strokeWidth={2} />
+  <line x1={-20} y1={0} x2={0} y2={0} stroke="#1a2744" strokeWidth={2} />
+  <line x1={0} y1={-22} x2={0} y2={22} stroke="#1a2744" strokeWidth={3} />
+  <line x1={0} y1={-10} x2={20} y2={-30} stroke="#1a2744" strokeWidth={2} />
+  <line x1={0} y1={10} x2={20} y2={30} stroke="#1a2744" strokeWidth={2} />
+  <g transform="translate(14 24) rotate(45)"><polygon points="-5,0 5,-4 5,4" fill="#1a2744" /></g>
 </g>;
 
 const MosfetN: SymbolFC = () => (
   <g>
     {/* Gate */}
-    <line x1={-20} y1={0} x2={-10} y2={0} stroke="#1a2744" strokeWidth={2} />
-    <line x1={-10} y1={-18} x2={-10} y2={18} stroke="#1a2744" strokeWidth={2.5} />
+    <line x1={-20} y1={0} x2={0} y2={0} stroke="#1a2744" strokeWidth={2} />
+    <line x1={0} y1={-18} x2={0} y2={18} stroke="#1a2744" strokeWidth={2.5} />
     {/* Channel */}
-    <line x1={-5} y1={-18} x2={-5} y2={-8} stroke="#1a2744" strokeWidth={2.5} />
-    <line x1={-5} y1={-4} x2={-5} y2={4} stroke="#1a2744" strokeWidth={2.5} />
-    <line x1={-5} y1={8} x2={-5} y2={18} stroke="#1a2744" strokeWidth={2.5} />
+    <line x1={4} y1={-18} x2={4} y2={-8} stroke="#1a2744" strokeWidth={2.5} />
+    <line x1={4} y1={-4} x2={4} y2={4} stroke="#1a2744" strokeWidth={2.5} />
+    <line x1={4} y1={8} x2={4} y2={18} stroke="#1a2744" strokeWidth={2.5} />
     {/* Drain */}
-    <line x1={-5} y1={-18} x2={10} y2={-18} stroke="#1a2744" strokeWidth={2} />
-    <line x1={10} y1={-18} x2={10} y2={-30} stroke="#1a2744" strokeWidth={2} />
-    {/* Source with arrow */}
-    <line x1={-5} y1={18} x2={10} y2={18} stroke="#1a2744" strokeWidth={2} />
-    <line x1={10} y1={18} x2={10} y2={30} stroke="#1a2744" strokeWidth={2} />
+    <path d="M 4,-14 L 14,-14 L 14,-30 L 20,-30" fill="none" stroke="#1a2744" strokeWidth={2} />
+    {/* Source */}
+    <path d="M 4,14 L 14,14 L 14,30 L 20,30" fill="none" stroke="#1a2744" strokeWidth={2} />
     {/* N-ch arrow pointing inward */}
-    <polygon points="-5,0 5,5 5,-5" fill="#1a2744" />
-    <line x1={10} y1={-30} x2={20} y2={-30} stroke="#1a2744" strokeWidth={2} />
-    <line x1={10} y1={30} x2={20} y2={30} stroke="#1a2744" strokeWidth={2} />
+    <polygon points="4,0 0,4 0,-4" fill="#1a2744" />
   </g>
 );
 
 const MosfetP: SymbolFC = () => (
   <g>
-    <line x1={-20} y1={0} x2={-10} y2={0} stroke="#1a2744" strokeWidth={2} />
-    <line x1={-10} y1={-18} x2={-10} y2={18} stroke="#1a2744" strokeWidth={2.5} />
-    <line x1={-5} y1={-18} x2={-5} y2={-8} stroke="#1a2744" strokeWidth={2.5} />
-    <line x1={-5} y1={-4} x2={-5} y2={4} stroke="#1a2744" strokeWidth={2.5} />
-    <line x1={-5} y1={8} x2={-5} y2={18} stroke="#1a2744" strokeWidth={2.5} />
-    <line x1={-5} y1={-18} x2={10} y2={-18} stroke="#1a2744" strokeWidth={2} />
-    <line x1={10} y1={-18} x2={10} y2={-30} stroke="#1a2744" strokeWidth={2} />
-    <line x1={-5} y1={18} x2={10} y2={18} stroke="#1a2744" strokeWidth={2} />
-    <line x1={10} y1={18} x2={10} y2={30} stroke="#1a2744" strokeWidth={2} />
+    {/* Gate */}
+    <line x1={-20} y1={0} x2={0} y2={0} stroke="#1a2744" strokeWidth={2} />
+    <line x1={0} y1={-18} x2={0} y2={18} stroke="#1a2744" strokeWidth={2.5} />
+    {/* Channel */}
+    <line x1={4} y1={-18} x2={4} y2={-8} stroke="#1a2744" strokeWidth={2.5} />
+    <line x1={4} y1={-4} x2={4} y2={4} stroke="#1a2744" strokeWidth={2.5} />
+    <line x1={4} y1={8} x2={4} y2={18} stroke="#1a2744" strokeWidth={2.5} />
+    {/* Drain */}
+    <path d="M 4,-14 L 14,-14 L 14,-30 L 20,-30" fill="none" stroke="#1a2744" strokeWidth={2} />
+    {/* Source */}
+    <path d="M 4,14 L 14,14 L 14,30 L 20,-30" fill="none" stroke="#1a2744" strokeWidth={2} />
     {/* P-ch arrow pointing outward */}
-    <polygon points="-5,0 -15,5 -15,-5" fill="#1a2744" />
-    <line x1={10} y1={-30} x2={20} y2={-30} stroke="#1a2744" strokeWidth={2} />
-    <line x1={10} y1={30} x2={20} y2={30} stroke="#1a2744" strokeWidth={2} />
+    <polygon points="0,0 4,4 4,-4" fill="#1a2744" />
   </g>
 );
 
 const JfetN: SymbolFC = () => (
   <g>
-    <line x1={-20} y1={0} x2={-5} y2={0} stroke="#1a2744" strokeWidth={2} />
-    <line x1={-5} y1={-22} x2={-5} y2={22} stroke="#1a2744" strokeWidth={3} />
-    <line x1={-5} y1={-14} x2={10} y2={-14} stroke="#1a2744" strokeWidth={2} />
-    <line x1={10} y1={-14} x2={10} y2={-30} stroke="#1a2744" strokeWidth={2} />
-    <line x1={-5} y1={14} x2={10} y2={14} stroke="#1a2744" strokeWidth={2} />
-    <line x1={10} y1={14} x2={10} y2={30} stroke="#1a2744" strokeWidth={2} />
-    {/* N-ch arrow on gate pointing in */}
-    <polygon points="-5,0 3,4 3,-4" fill="#1a2744" />
-    <line x1={10} y1={-30} x2={20} y2={-30} stroke="#1a2744" strokeWidth={2} />
-    <line x1={10} y1={30} x2={20} y2={30} stroke="#1a2744" strokeWidth={2} />
+    {/* Gate */}
+    <line x1={-20} y1={0} x2={0} y2={0} stroke="#1a2744" strokeWidth={2} />
+    {/* Channel */}
+    <line x1={0} y1={-22} x2={0} y2={22} stroke="#1a2744" strokeWidth={3} />
+    {/* Drain */}
+    <path d="M 0,-14 L 14,-14 L 14,-30 L 20,-30" fill="none" stroke="#1a2744" strokeWidth={2} />
+    {/* Source */}
+    <path d="M 0,14 L 14,14 L 14,30 L 20,30" fill="none" stroke="#1a2744" strokeWidth={2} />
+    {/* N-ch arrow on gate pointing in (right) */}
+    <polygon points="-2,0 -10,4 -10,-4" fill="#1a2744" />
   </g>
 );
 
 const JfetP: SymbolFC = () => (
   <g>
-    <line x1={-20} y1={0} x2={-5} y2={0} stroke="#1a2744" strokeWidth={2} />
-    <line x1={-5} y1={-22} x2={-5} y2={22} stroke="#1a2744" strokeWidth={3} />
-    <line x1={-5} y1={-14} x2={10} y2={-14} stroke="#1a2744" strokeWidth={2} />
-    <line x1={10} y1={-14} x2={10} y2={-30} stroke="#1a2744" strokeWidth={2} />
-    <line x1={-5} y1={14} x2={10} y2={14} stroke="#1a2744" strokeWidth={2} />
-    <line x1={10} y1={14} x2={10} y2={30} stroke="#1a2744" strokeWidth={2} />
-    {/* P-ch arrow on gate pointing out */}
-    <polygon points="-5,0 -13,4 -13,-4" fill="#1a2744" />
-    <line x1={10} y1={-30} x2={20} y2={-30} stroke="#1a2744" strokeWidth={2} />
-    <line x1={10} y1={30} x2={20} y2={30} stroke="#1a2744" strokeWidth={2} />
+    {/* Gate */}
+    <line x1={-20} y1={0} x2={0} y2={0} stroke="#1a2744" strokeWidth={2} />
+    {/* Channel */}
+    <line x1={0} y1={-22} x2={0} y2={22} stroke="#1a2744" strokeWidth={3} />
+    {/* Drain */}
+    <path d="M 0,-14 L 14,-14 L 14,-30 L 20,-30" fill="none" stroke="#1a2744" strokeWidth={2} />
+    {/* Source */}
+    <path d="M 0,14 L 14,14 L 14,30 L 20,30" fill="none" stroke="#1a2744" strokeWidth={2} />
+    {/* P-ch arrow on gate pointing out (left) */}
+    <polygon points="-10,0 -2,4 -2,-4" fill="#1a2744" />
   </g>
 );
 
@@ -640,23 +696,21 @@ const Transformer: SymbolFC = ({ props }) => props?._documentedStyle === true ? 
   <line x1={-6} y1={-25} x2={-6} y2={25} stroke="#1a2744" strokeWidth={2.5} />
   <line x1={6} y1={-25} x2={6} y2={25} stroke="#1a2744" strokeWidth={2.5} />
 </g> : <g>
-    {/* Primary coil */}
-    {[-20, -8, 4].map((y, i) => (
-      <path key={i} d={`M -35,${y} Q -28,${y - 10} -22,${y} Q -16,${y + 10} -10,${y}`} fill="none" stroke="#1a2744" strokeWidth={2} />
-    ))}
-    <line x1={-35} y1={-20} x2={-35} y2={-30} stroke="#1a2744" strokeWidth={2} />
-    <line x1={-35} y1={4} x2={-35} y2={20} stroke="#1a2744" strokeWidth={2} />
-    {/* Core */}
-    <line x1={-6} y1={-25} x2={-6} y2={25} stroke="#1a2744" strokeWidth={3} />
-    <line x1={6} y1={-25} x2={6} y2={25} stroke="#1a2744" strokeWidth={3} />
-    {/* Secondary coil */}
-    {[-20, -8, 4].map((y, i) => (
-      <path key={i} d={`M 10,${y} Q 16,${y - 10} 22,${y} Q 28,${y + 10} 35,${y}`} fill="none" stroke="#1a2744" strokeWidth={2} />
-    ))}
-    <line x1={35} y1={-20} x2={35} y2={-30} stroke="#1a2744" strokeWidth={2} />
-    <line x1={35} y1={4} x2={35} y2={20} stroke="#1a2744" strokeWidth={2} />
-  </g>
-;
+  {/* Primary coil */}
+  {[-20, -8, 4].map((y, i) => (
+    <path key={i} d={`M -35,${y} Q -28,${y - 10} -22,${y} Q -16,${y + 10} -10,${y}`} fill="none" stroke="#1a2744" strokeWidth={2} />
+  ))}
+  <line x1={-35} y1={4} x2={-35} y2={20} stroke="#1a2744" strokeWidth={2} />
+  {/* Core */}
+  <line x1={-6} y1={-25} x2={-6} y2={25} stroke="#1a2744" strokeWidth={3} />
+  <line x1={6} y1={-25} x2={6} y2={25} stroke="#1a2744" strokeWidth={3} />
+  {/* Secondary coil */}
+  {[-20, -8, 4].map((y, i) => (
+    <path key={i} d={`M 10,${y} Q 16,${y - 10} 22,${y} Q 28,${y + 10} 35,${y}`} fill="none" stroke="#1a2744" strokeWidth={2} />
+  ))}
+  <line x1={35} y1={4} x2={35} y2={20} stroke="#1a2744" strokeWidth={2} />
+</g>
+  ;
 
 const TransformerCt: SymbolFC = ({ props }) => props?._documentedStyle === true ? <g>
   <line x1={-35} y1={-25} x2={-24} y2={-25} stroke="#1a2744" strokeWidth={2} />
@@ -669,22 +723,20 @@ const TransformerCt: SymbolFC = ({ props }) => props?._documentedStyle === true 
   <line x1={-6} y1={-30} x2={-6} y2={30} stroke="#1a2744" strokeWidth={2.5} />
   <line x1={6} y1={-30} x2={6} y2={30} stroke="#1a2744" strokeWidth={2.5} />
 </g> : <g>
-    {[-25, -10, 5].map((y, i) => (
-      <path key={i} d={`M -35,${y} Q -28,${y - 10} -22,${y} Q -16,${y + 10} -10,${y}`} fill="none" stroke="#1a2744" strokeWidth={2} />
-    ))}
-    <line x1={-35} y1={-25} x2={-35} y2={-35} stroke="#1a2744" strokeWidth={2} />
-    <line x1={-35} y1={5} x2={-35} y2={25} stroke="#1a2744" strokeWidth={2} />
-    <line x1={-6} y1={-30} x2={-6} y2={30} stroke="#1a2744" strokeWidth={3} />
-    <line x1={6} y1={-30} x2={6} y2={30} stroke="#1a2744" strokeWidth={3} />
-    {[-25, -10, 5].map((y, i) => (
-      <path key={i} d={`M 10,${y} Q 16,${y - 10} 22,${y} Q 28,${y + 10} 35,${y}`} fill="none" stroke="#1a2744" strokeWidth={2} />
-    ))}
-    <line x1={35} y1={-25} x2={35} y2={-35} stroke="#1a2744" strokeWidth={2} />
-    {/* Center tap */}
-    <line x1={35} y1={-10} x2={45} y2={-10} stroke="#1a2744" strokeWidth={2} />
-    <line x1={35} y1={5} x2={35} y2={25} stroke="#1a2744" strokeWidth={2} />
-  </g>
-;
+  {[-25, -10, 5].map((y, i) => (
+    <path key={i} d={`M -35,${y} Q -28,${y - 10} -22,${y} Q -16,${y + 10} -10,${y}`} fill="none" stroke="#1a2744" strokeWidth={2} />
+  ))}
+  <line x1={-35} y1={5} x2={-35} y2={25} stroke="#1a2744" strokeWidth={2} />
+  <line x1={-6} y1={-30} x2={-6} y2={30} stroke="#1a2744" strokeWidth={3} />
+  <line x1={6} y1={-30} x2={6} y2={30} stroke="#1a2744" strokeWidth={3} />
+  {[-25, -10, 5].map((y, i) => (
+    <path key={i} d={`M 10,${y} Q 16,${y - 10} 22,${y} Q 28,${y + 10} 35,${y}`} fill="none" stroke="#1a2744" strokeWidth={2} />
+  ))}
+  {/* Center tap */}
+  <line x1={35} y1={-10} x2={45} y2={-10} stroke="#1a2744" strokeWidth={2} />
+  <line x1={35} y1={5} x2={35} y2={25} stroke="#1a2744" strokeWidth={2} />
+</g>
+  ;
 
 const Autotransformer: SymbolFC = ({ props }) => props?._documentedStyle === true ? <g>
   <line x1={-30} y1={-25} x2={-10} y2={-25} stroke="#1a2744" strokeWidth={2} />
@@ -692,19 +744,18 @@ const Autotransformer: SymbolFC = ({ props }) => props?._documentedStyle === tru
   <SemicircularVerticalCoil x={-10} y1={-25} y2={25} bulge={12} />
   <line x1={-10} y1={-25} x2={30} y2={-25} stroke="#1a2744" strokeWidth={2} />
   <line x1={-10} y1={25} x2={30} y2={25} stroke="#1a2744" strokeWidth={2} />
-  <line x1={2} y1={0} x2={18} y2={0} stroke="#1a2744" strokeWidth={2} />
+  <line x1={2} y1={0} x2={20} y2={0} stroke="#1a2744" strokeWidth={2} />
   <circle cx={2} cy={0} r={2.2} fill="#1a2744" />
 </g> : <g>
-    {[-25, -10, 5].map((y, i) => (
-      <path key={i} d={`M -30,${y} Q -22,${y - 10} -15,${y} Q -8,${y + 10} 0,${y}`} fill="none" stroke="#1a2744" strokeWidth={2} />
-    ))}
-    <line x1={-30} y1={-25} x2={-30} y2={-35} stroke="#1a2744" strokeWidth={2} />
-    <line x1={-30} y1={5} x2={-30} y2={25} stroke="#1a2744" strokeWidth={2} />
-    {/* Tap */}
-    <line x1={0} y1={-10} x2={30} y2={-10} stroke="#1a2744" strokeWidth={2} />
-    <line x1={0} y1={5} x2={30} y2={5} stroke="#1a2744" strokeWidth={2} />
-  </g>
-;
+  {[-25, -10, 5].map((y, i) => (
+    <path key={i} d={`M -30,${y} Q -22,${y - 10} -15,${y} Q -8,${y + 10} 0,${y}`} fill="none" stroke="#1a2744" strokeWidth={2} />
+  ))}
+  <line x1={-30} y1={5} x2={-30} y2={25} stroke="#1a2744" strokeWidth={2} />
+  {/* Tap */}
+  <line x1={0} y1={-10} x2={30} y2={-10} stroke="#1a2744" strokeWidth={2} />
+  <line x1={0} y1={5} x2={30} y2={5} stroke="#1a2744" strokeWidth={2} />
+</g>
+  ;
 
 // ─── POWER SEMICONDUCTORS ─────────────────────────────────────────────────────
 
@@ -817,11 +868,13 @@ const Opamp: SymbolFC = ({ props }) => {
   </g>;
   return <g data-documented-opamp="ieee-boundary-aligned">
     <polygon points="-22,-22 -22,22 26,0" fill="white" stroke="#1a2744" strokeWidth={2} strokeLinejoin="round" />
-    <line x1={-DOCUMENTED_GRID_LOCAL} y1={-100 / 6} x2={-22} y2={-100 / 6} stroke="#1a2744" strokeWidth={2} />
-    <line x1={-DOCUMENTED_GRID_LOCAL} y1={100 / 6} x2={-22} y2={100 / 6} stroke="#1a2744" strokeWidth={2} />
-    <line x1={26} y1={0} x2={DOCUMENTED_GRID_LOCAL} y2={0} stroke="#1a2744" strokeWidth={2} />
-    <line x1={0} y1={-DOCUMENTED_GRID_LOCAL} x2={0} y2={-12} stroke="#1a2744" strokeWidth={1.5} />
-    <line x1={0} y1={DOCUMENTED_GRID_LOCAL} x2={0} y2={12} stroke="#1a2744" strokeWidth={1.5} />
+    <line x1={-30} y1={-15} x2={-22} y2={-15} stroke="#1a2744" strokeWidth={2} />
+    <line x1={-30} y1={15} x2={-22} y2={15} stroke="#1a2744" strokeWidth={2} />
+    <line x1={26} y1={0} x2={30} y2={0} stroke="#1a2744" strokeWidth={2} />
+    <line x1={0} y1={-30} x2={0} y2={-12} stroke="#1a2744" strokeWidth={1.5} />
+    <line x1={0} y1={30} x2={0} y2={12} stroke="#1a2744" strokeWidth={1.5} />
+    <text x={-25} y={-15} textAnchor="end" dominantBaseline="middle" fontSize={11} fill="#1a2744">+</text>
+    <text x={-25} y={15} textAnchor="end" dominantBaseline="middle" fontSize={11} fill="#1a2744">−</text>
   </g>;
 };
 
@@ -1058,8 +1111,9 @@ export function renderSymbol(
   powered: boolean,
   props: Record<string, any>,
   animTime: number,
-): React.ReactNode {
+): ReactNode {
   const Sym = SYMBOL_MAP[symbolId];
   if (!Sym) return <text x={0} y={5} textAnchor="middle" fontSize={10} fill="#666">?</text>;
   return <Sym powered={powered} props={props} animTime={animTime} />;
 }
+

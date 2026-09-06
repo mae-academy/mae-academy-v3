@@ -1,7 +1,7 @@
 import type { MNAElement, MNAResult } from './mnaSolver';
 
-export const MESH_COLORS = ['#3b82f6', '#8b5cf6', '#ef4444', '#10b981', '#f59e0b', '#06b6d4'] as const;
-export const NODAL_COLORS = ['#2563eb', '#16a34a', '#db2777', '#d97706', '#7c3aed', '#0891b2'] as const;
+export const MESH_COLORS = ['#2563eb', '#7c3aed', '#e11d48', '#d97706'] as const;
+export const NODAL_COLORS = ['#2563eb', '#7c3aed', '#e11d48', '#d97706', '#16a34a', '#0891b2'] as const;
 
 export interface NodalNodeLabel {
   /** Exact MNA node identity; never displayed directly. */
@@ -10,6 +10,7 @@ export interface NodalNodeLabel {
   label: string;
   color: string;
   centroid: [number, number];
+  textOffset?: [number, number];
 }
 
 export interface MeshCycle {

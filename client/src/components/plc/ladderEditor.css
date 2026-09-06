@@ -105,9 +105,9 @@
 .le-palette-branch::before,.le-palette-branch::after { content: ''; position: absolute; left: 0; right: 0; border-top: 1px solid currentColor; }
 .le-palette-branch::before { top: .2rem; }.le-palette-branch::after { bottom: .2rem; }
 .le-palette-name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .54rem; font-weight: 900; line-height: .8rem; letter-spacing: .06em; text-align: center; white-space: nowrap; }
-.plc-studio button.bg-gradient-to-r { background: rgb(124 58 237); }
-.plc-studio button.bg-gradient-to-r:hover { background: rgb(109 40 217); }
+.plc-studio button.bg-brand-gradient { background: rgb(124 58 237) !important; }
+.plc-studio button.bg-brand-gradient:hover { background: rgb(109 40 217) !important; }
 .plc-studio button.rounded-full { border-radius: .75rem; }
-.dark .plc-studio button.bg-gradient-to-r { background: rgb(139 92 246); }
-.dark .plc-studio button.bg-gradient-to-r:hover { background: rgb(167 139 250); }
+.dark .plc-studio button.bg-brand-gradient { background: rgb(139 92 246) !important; }
+.dark .plc-studio button.bg-brand-gradient:hover { background: rgb(167 139 250) !important; }
 @media (max-width: 640px) { .le-canvas { max-height: none; min-height: 18rem; padding: .5rem; } .le-block-instruction-wrap { min-width: 8.75rem; } .le-rung-number-cell { width: 1.8rem; flex-basis: 1.8rem; } }

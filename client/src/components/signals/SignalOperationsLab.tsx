@@ -6,6 +6,7 @@
 import { Activity, CircleDashed, Move, Sigma, ZoomIn } from "lucide-react";
 import { useMemo, useState } from "react";
 import { KatexMath } from "@/components/ui/KatexMath";
+import { NativeSelect } from "@/components/ui/NativeSelect";
 import PiecewiseSignalScope from "@/components/signals/PiecewiseSignalScope";
 import { createPiecewiseSignal, SIGNAL_DICTIONARY, type BasicSignalKind, type PiecewiseSignalModel, type SignalSelection } from "@/utils/signalsEngine";
 
@@ -19,7 +20,7 @@ function Field({ label, value, onChange, step = 0.1, hint }: { label: string; va
 }
 
 function SignalSelect({ label, value, onChange, optional = false }: { label: string; value: BasicSignalKind | "none"; onChange: (value: BasicSignalKind | "none") => void; optional?: boolean }) {
-  return <label className="block"><span className="text-xs font-bold text-slate-500 dark:text-slate-400">{label}</span><select value={value} onChange={(event) => onChange(event.target.value as BasicSignalKind | "none")} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-400/20 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100">{optional && <option value="none">No secondary signal</option>}{signalKinds.map(kind => <option key={kind} value={kind}>{SIGNAL_DICTIONARY[kind].label}</option>)}</select></label>;
+  return <label className="block"><span className="text-xs font-bold text-slate-500 dark:text-slate-400">{label}</span><NativeSelect value={value} onChange={(event) => onChange(event.target.value as BasicSignalKind | "none")} containerClassName="mt-1.5">{optional && <option value="none">No secondary signal</option>}{signalKinds.map(kind => <option key={kind} value={kind}>{SIGNAL_DICTIONARY[kind].label}</option>)}</NativeSelect></label>;
 }
 
 function value(value: number | null) { return value === null ? "\\text{symbolic}" : value === Infinity ? "\\infty" : Number.isFinite(value) ? Number(value.toFixed(5)).toString() : "\\text{undefined}"; }

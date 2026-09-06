@@ -7,13 +7,13 @@ import { useLocale } from "@/contexts/LocaleContext";
 
 const copy = {
   en: {
-    frameTitle: "E-Circuits editor",
+    frameTitle: "Electrical Circuits editor",
   },
   ar: {
-    frameTitle: "محرر E-Circuits",
+    frameTitle: "محرر الدوائر الكهربائية",
   },
   es: {
-    frameTitle: "Editor de E-Circuits",
+    frameTitle: "Editor de Circuitos Eléctricos",
   },
 } as const;
 
