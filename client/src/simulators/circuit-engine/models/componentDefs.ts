@@ -363,11 +363,11 @@ const DIODES: Record<string, ComponentDef> = {
 const TRANSISTORS: Record<string, ComponentDef> = {
   'bjt-npn': {
     id: 'bjt-npn', name: 'BJT NPN', category: 'Transistors',
-    width: 50, height: 60, symbol: 'bjt-npn',
+    width: 50, height: 50, symbol: 'bjt-npn',
     terminals: [
       { id: 'base', name: 'B', x: -25, y: 0, type: 'input' },
-      { id: 'collector', name: 'C', x: 20, y: -26, type: 'output' },
-      { id: 'emitter', name: 'E', x: 20, y: 26, type: 'output' },
+      { id: 'collector', name: 'C', x: 25, y: -25, type: 'output' },
+      { id: 'emitter', name: 'E', x: 25, y: 25, type: 'output' },
     ],
     properties: {
       beta: { type: 'number', value: 100, unit: '', min: 10, max: 1000, label: 'β (hFE)' },
@@ -379,11 +379,11 @@ const TRANSISTORS: Record<string, ComponentDef> = {
   },
   'bjt-pnp': {
     id: 'bjt-pnp', name: 'BJT PNP', category: 'Transistors',
-    width: 50, height: 60, symbol: 'bjt-pnp',
+    width: 50, height: 50, symbol: 'bjt-pnp',
     terminals: [
       { id: 'base', name: 'B', x: -25, y: 0, type: 'input' },
-      { id: 'collector', name: 'C', x: 20, y: -26, type: 'output' },
-      { id: 'emitter', name: 'E', x: 20, y: 26, type: 'output' },
+      { id: 'collector', name: 'C', x: 25, y: -25, type: 'output' },
+      { id: 'emitter', name: 'E', x: 25, y: 25, type: 'output' },
     ],
     properties: {
       beta: { type: 'number', value: 100, unit: '', min: 10, max: 1000, label: 'β (hFE)' },
@@ -397,9 +397,9 @@ const TRANSISTORS: Record<string, ComponentDef> = {
     id: 'mosfet-n', name: 'MOSFET N-ch', category: 'Transistors',
     width: 50, height: 50, symbol: 'mosfet-n',
     terminals: [
-      { id: 'gate', name: 'G', x: -22, y: 0, type: 'input' },
-      { id: 'drain', name: 'D', x: 25, y: -22, type: 'output' },
-      { id: 'source', name: 'S', x: 25, y: 20, type: 'output' },
+      { id: 'gate', name: 'G', x: -25, y: 0, type: 'input' },
+      { id: 'drain', name: 'D', x: 25, y: -25, type: 'output' },
+      { id: 'source', name: 'S', x: 25, y: 25, type: 'output' },
     ],
     properties: {
       vth: { type: 'number', value: 2, unit: 'V', min: 0.5, max: 10, label: 'Threshold Voltage (Vth)' },
@@ -412,9 +412,9 @@ const TRANSISTORS: Record<string, ComponentDef> = {
     id: 'mosfet-p', name: 'MOSFET P-ch', category: 'Transistors',
     width: 50, height: 50, symbol: 'mosfet-p',
     terminals: [
-      { id: 'gate', name: 'G', x: -22, y: 0, type: 'input' },
-      { id: 'drain', name: 'D', x: 25, y: -22, type: 'output' },
-      { id: 'source', name: 'S', x: 25, y: 20, type: 'output' },
+      { id: 'gate', name: 'G', x: -25, y: 0, type: 'input' },
+      { id: 'drain', name: 'D', x: 25, y: -25, type: 'output' },
+      { id: 'source', name: 'S', x: 25, y: 25, type: 'output' },
     ],
     properties: {
       vth: { type: 'number', value: -2, unit: 'V', min: -10, max: -0.5, label: 'Threshold Voltage (Vth)' },
@@ -428,8 +428,8 @@ const TRANSISTORS: Record<string, ComponentDef> = {
     width: 50, height: 50, symbol: 'jfet-n',
     terminals: [
       { id: 'gate', name: 'G', x: -25, y: 0, type: 'input' },
-      { id: 'drain', name: 'D', x: 20, y: -22, type: 'output' },
-      { id: 'source', name: 'S', x: 20, y: 20, type: 'output' },
+      { id: 'drain', name: 'D', x: 25, y: -25, type: 'output' },
+      { id: 'source', name: 'S', x: 25, y: 25, type: 'output' },
     ],
     properties: {
       rd: { type: 'number', value: 2, unit: 'Ω', min: -1000, max: 1000, label: 'Rd' },
@@ -443,8 +443,8 @@ const TRANSISTORS: Record<string, ComponentDef> = {
     width: 50, height: 50, symbol: 'jfet-p',
     terminals: [
       { id: 'gate', name: 'G', x: -25, y: 0, type: 'input' },
-      { id: 'drain', name: 'D', x: 20, y: -22, type: 'output' },
-      { id: 'source', name: 'S', x: 20, y: 20, type: 'output' },
+      { id: 'drain', name: 'D', x: 25, y: -25, type: 'output' },
+      { id: 'source', name: 'S', x: 25, y: 25, type: 'output' },
     ],
     properties: {
       rd: { type: 'number', value: -2, unit: 'Ω', min: -1000, max: 1000, label: 'Rd' },
