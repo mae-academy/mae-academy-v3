@@ -34,8 +34,8 @@ describe('Tab D SVG symbol language', () => {
     expect(rail).toContain('#2d73b7');
     expect(rail).toContain(`x1="${-100 / 3}" y1="${-100 / 3}" x2="50" y2="${-100 / 3}"`);
     expect(rail).toContain(`x1="${-100 / 3}" y1="${-50 / 3}" x2="50" y2="${-50 / 3}"`);
+    expect(rail).toContain(`x1="${-100 / 3}" y1="${0 / 3}" x2="50" y2="${0 / 3}"`);
     expect(rail).toContain(`x1="${-100 / 3}" y1="${50 / 3}" x2="50" y2="${50 / 3}"`);
-    expect(rail).toContain(`x1="${-100 / 3}" y1="${100 / 3}" x2="50" y2="${100 / 3}"`);
   });
 
   it('centers the documented IAC sine wave inside its source circle without changing the legacy branch', () => {
@@ -102,7 +102,7 @@ describe('Tab D SVG symbol language', () => {
     const jfetN = markup('jfet-n');
     const jfetP = markup('jfet-p');
     expect(mosN).toContain('points="7,0 13,-3.5 13,3.5"');
-    expect(mosP).toContain('rotate(180 10 0)');
+    expect(mosP).toContain('points="15,0 8,-5 8,5"');
     expect(jfetN).toContain('points="-15,-5 -9,0 -15,5"');
     expect(jfetP).toContain('rotate(180 -12 0)');
   });

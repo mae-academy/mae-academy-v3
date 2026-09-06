@@ -217,6 +217,14 @@ describe('Tab D canvas geometry', () => {
     expect(verticalSource.value).toEqual([26, 12]);
   });
 
+  it('positions transistor labels with reference at (0, -32) and value at (0, 36)', () => {
+    for (const type of ['bjt-npn', 'bjt-pnp', 'mosfet-n', 'mosfet-p', 'jfet-n', 'jfet-p']) {
+      const anchors = tabDComponentLabelAnchors(type, true, 25, 25);
+      expect(anchors.reference).toEqual([0, -32]);
+      expect(anchors.value).toEqual([0, 36]);
+    }
+  });
+
   describe('Strict Dynamic Orthogonal Router & Rubber-Banding', () => {
     it('enforces Zero-Diagonal Invariant: every segment is strictly horizontal or vertical', () => {
       const from: Point = [100, 100];

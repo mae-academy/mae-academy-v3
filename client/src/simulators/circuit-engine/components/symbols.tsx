@@ -424,7 +424,7 @@ const JfetP: SymbolFC = () => (
     <line x1={20} y1={-13} x2={20} y2={-22} stroke="currentColor" strokeWidth={2} />
     <line x1={-6} y1={12} x2={20} y2={12} stroke="currentColor" strokeWidth={2} />
     <line x1={20} y1={11} x2={20} y2={20} stroke="currentColor" strokeWidth={2} />
-    <polygon points="-15,-5 -9,0 -15,5" strokeWidth={1} stroke="currentColor" fill="currentColor" transform="rotate(180 -12 0)" />
+    <polygon points="-13,-5 -7,0 -13,5" strokeWidth={1} stroke="currentColor" fill="currentColor" transform="rotate(180 -12 0)" />
   </g>
 );
 

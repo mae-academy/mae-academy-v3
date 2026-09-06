@@ -422,6 +422,9 @@ export function tabDComponentLabelAnchors(
   if (componentType === 'opamp') {
     return { reference: [0, -35], value: [0, 35] };
   }
+  if (['bjt-npn', 'bjt-pnp', 'mosfet-n', 'mosfet-p', 'jfet-n', 'jfet-p'].includes(componentType)) {
+    return { reference: [0, -32], value: [0, 36] };
+  }
   if (terminalsAreHorizontal) {
     return { reference: [0, -18], value: [0, 22] };
   }

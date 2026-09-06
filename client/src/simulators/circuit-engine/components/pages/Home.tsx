@@ -376,6 +376,17 @@ function componentLabelAnchors(definition: ComponentDef, component: CircuitCompo
     };
   }
 
+  const TRANSISTOR_TYPES = new Set(['bjt-npn', 'bjt-pnp', 'mosfet-n', 'mosfet-p', 'jfet-n', 'jfet-p']);
+
+  if (TRANSISTOR_TYPES.has(component.type)) {
+    return {
+      reference: [0, -32], // Moved down closer to top terminals
+      value: [0, 36],       // Lifted up closer to bottom terminals
+      isHorizontal: true,
+      refTextAnchor: 'middle',
+      valTextAnchor: 'middle',
+    };
+  }
 
   if (definition.terminals.length !== 2) {
     const isHorizontal = component.rotation % 180 === 0;
