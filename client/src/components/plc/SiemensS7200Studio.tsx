@@ -5,7 +5,7 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent, type MouseEvent } from 'react';
 import { FilePlus2, Play, Plus, RefreshCw, RotateCcw, Square, Trash2 } from 'lucide-react';
 import { KatexMath } from '@/components/ui/KatexMath';
-import { PlcLadderEngine, type PlcAoi, type PlcInstructionType, type PlcRuntimeValue, type PlcTag } from '@/lib/plc-ladder';
+import { PlcLadderEngine, type PlcAoi, type PlcInstructionType, type PlcRuntimeValue, type PlcTag } from '@/features/plc/ladder';
 import { PLCLadderCanvas, type LadderDragPayload, type LadderDropTarget } from '@/components/plc/PLCLadderCanvas';
 import { addLadderBranchLevel, addLadderParallelBranch, appendLadderRung, createInitialLadderDocument, createLadderInstruction, deleteLadderElements, emptyLadderSelection, findLadderElement, findLadderRungForCircuit, insertLadderInstruction, isOutputCoilInstruction, ladderToolGroups, moveLadderInstruction, serializeLadderDocument, updateLadderInstruction, type LadderEditorDocument, type LadderEditorInstruction, type LadderEditorSelection, type LadderEditorTool } from '@/components/plc/ladderEditorModel';
 

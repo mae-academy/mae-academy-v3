@@ -1,7 +1,7 @@
 /** Tab E direct S/Z-plane canvas: viewport and root drag state live only in refs. */
 import type { PointerEvent as ReactPointerEvent, WheelEvent as ReactWheelEvent } from "react";
 import { useEffect, useRef } from "react";
-import { type Complex, type RocKind, type RocResult, type TransferFunction, withMovedRoot } from "@/lib/signals/laplaceEngine";
+import { type Complex, type RocKind, type RocResult, type TransferFunction, withMovedRoot } from "@/features/signals/engines/laplaceEngine";
 
 type Props = { system: TransferFunction; roc: RocResult; extractSlice: boolean; onPreview: (system: TransferFunction) => void; onCommit: (system: TransferFunction) => void };
 type View = { x: number; y: number; unit: number };

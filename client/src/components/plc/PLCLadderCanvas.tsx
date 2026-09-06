@@ -3,7 +3,7 @@
  * terminal coils are rendered immediately before the right rail, never mid-rung.
  */
 import { Fragment, type DragEvent, type KeyboardEvent, type MouseEvent } from 'react';
-import type { PlcRuntimeValue } from '@/lib/plc-ladder';
+import type { PlcRuntimeValue } from '@/features/plc/ladder';
 import './ladderEditor.css';
 import { isOutputCoilInstruction, type LadderEditorBranch, type LadderEditorCircuit, type LadderEditorDocument, type LadderEditorInstruction, type LadderEditorSelection } from './ladderEditorModel';
 

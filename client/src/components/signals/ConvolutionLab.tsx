@@ -11,8 +11,8 @@ import { BrandSlider } from "@/components/ui/BrandSlider";
 import { MathLiveSignalInput, type MathLiveSignalInputHandle } from "@/components/signals/MathLiveSignalInput";
 import { ConvolutionCanvas, type ConvolutionCanvasHandle } from "@/components/signals/ConvolutionCanvas";
 import { DiscreteConvolutionTable } from "@/components/signals/DiscreteConvolutionTable";
-import { continuousConvolutionAt, type ContinuousConvolutionResult } from "@/lib/signals/convolutionEngine";
-import { parseSignalExpression } from "@/lib/signals/signalEngine";
+import { continuousConvolutionAt, type ContinuousConvolutionResult } from "@/features/signals/engines/convolutionEngine";
+import { parseSignalExpression } from "@/features/signals/engines/signalEngine";
 
 const panel = "rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900";
 const subpanel = "rounded-2xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-800 dark:bg-slate-950/75";

@@ -10,7 +10,7 @@ import {
   YAxis,
 } from "recharts";
 import { KatexMath } from "@/components/ui/KatexMath";
-import { simulateLtiStepResponse } from "@/lib/controlMath";
+import { simulateLtiStepResponse } from "@/features/control/controlMath";
 import {
   buildFrequencyFactors,
   computeFrequencyResponse,
@@ -19,7 +19,7 @@ import {
   formatEngineering,
   logspace,
   type FrequencyFactor,
-} from "@/lib/frequencyResponseMath";
+} from "@/features/control/frequencyResponseMath";
 import { TransferFunctionInput, type TransferFunctionData } from "./TransferFunctionInput";
 
 type PrimaryView = "bode" | "nyquist" | "nichols";

@@ -10,8 +10,8 @@ import { BrandSlider } from "@/components/ui/BrandSlider";
 import { MathLiveSignalInput, type MathLiveSignalInputHandle } from "@/components/signals/MathLiveSignalInput";
 import FourierCanvases from "@/components/signals/FourierCanvases";
 import { FourierWaterfall3D } from "@/components/signals/FourierWaterfall3D";
-import { fourierSeries, fourierTransform } from "@/lib/signals/fourierEngine";
-import { parseSignalExpression } from "@/lib/signals/signalEngine";
+import { fourierSeries, fourierTransform } from "@/features/signals/engines/fourierEngine";
+import { parseSignalExpression } from "@/features/signals/engines/signalEngine";
 import "./fourierAcademic.css";
 
 const panel = "rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900";

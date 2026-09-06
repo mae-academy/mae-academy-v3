@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { KatexMath } from "@/components/ui/KatexMath";
 import { PowerSlider } from "./PowerSlider";
 import { NativeSelect } from "@/components/ui/NativeSelect";
-import { defaultChopperParameters, simulateChopper, type ChopperControl, type ChopperLoad, type ChopperParameters, type ChopperTopology, type QuadrantClass } from "@/lib/chopperMath";
+import { defaultChopperParameters, simulateChopper, type ChopperControl, type ChopperLoad, type ChopperParameters, type ChopperTopology, type QuadrantClass } from "@/features/power-electronics/chopperMath";
 
 const tex = String.raw;
 const card = "rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900";

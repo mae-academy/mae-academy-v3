@@ -1,6 +1,6 @@
 import * as React from "react";
 import { KatexMath } from "../ui/KatexMath";
-import { Complex } from "../../lib/controlMath";
+import { Complex } from "@/features/control/controlMath";
 
 interface RootLocusStepsPanelProps {
   openLoopZeros: Complex[];

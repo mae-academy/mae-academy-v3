@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocale } from "@/contexts/LocaleContext";
 import { KatexMath } from "@/components/ui/KatexMath";
 import { LinearAlgebraCanvas } from "@/components/linearAlgebra/LinearAlgebraCanvas";
-import { analyzeLinearAlgebra, identity, matrixToLatex, MAX_PEDAGOGICAL_MATRIX_DIMENSION, MAX_PEDAGOGICAL_RHS_COLUMNS, type LinearOperation, type MathStep, type Matrix } from "@/lib/linearAlgebraMath";
+import { analyzeLinearAlgebra, identity, matrixToLatex, MAX_PEDAGOGICAL_MATRIX_DIMENSION, MAX_PEDAGOGICAL_RHS_COLUMNS, type LinearOperation, type MathStep, type Matrix } from "@/features/linear-algebra/linearAlgebraMath";
 
 type LocaleCode = "en" | "ar" | "es";
 type Section = "a" | "b" | "c" | "d" | "e";

@@ -19,8 +19,8 @@ import { ACVoltageControllerStudio } from "@/components/power/ACVoltageControlle
 import { ChopperStudio } from "@/components/power/ChopperStudio";
 import { SiemensS7200Studio } from "@/components/plc/SiemensS7200Studio";
 import { AssemblerStudioCompact } from "@/components/assembler/AssemblerStudioCompact";
-import { SimulatorTabC } from "@/components/circuit/SimulatorTabC";
-import { SimulatorTabD } from "@/components/circuit/SimulatorTabD";
+import { AnalogCircuitSimulator } from "@/simulators/circuit-engine/components/AnalogCircuitSimulator";
+import { DigitalCircuitSimulator } from "@/simulators/digital-logic/components/DigitalCircuitSimulator";
 import { DigitalLogicSimulator } from "@/components/digitalLogic/DigitalLogicSimulator";
 import { LinearAlgebraStudio } from "@/components/linearAlgebra/LinearAlgebraStudio";
 import { SignalOperationsLab } from "@/components/signals/SignalOperationsLab";
@@ -93,8 +93,8 @@ export default function SimulationDetail() {
   const isDigitalLogicWorkspace = isDigitalLogicDesign && tool === "workspace";
   const isLinearAlgebraStudio = isLinearAlgebra && ["a", "b", "c", "d", "e"].includes(tool);
   const circuitToolContent = isCircuitLab
-    ? <SimulatorTabD />
-    : circuitLabClone ? <SimulatorTabC instanceId={meta.slug} label={simulation.title} /> : null;
+    ? <DigitalCircuitSimulator />
+    : circuitLabClone ? <AnalogCircuitSimulator instanceId={meta.slug} label={simulation.title} /> : null;
   const toolContent = circuitToolContent ?? (isSignalsAndSystems && tool === "a" ? <SignalOperationsLab /> : isSignalsAndSystems && tool === "b" ? <SystemClassificationLab /> : isSignalsAndSystems && tool === "c" ? <ConvolutionLab /> : isSignalsAndSystems && tool === "d" ? <FourierAnalysisLab /> : isSignalsAndSystems && tool === "e" ? <LaplaceZPlaneLab /> : isDigitalLogicWorkspace ? <DigitalLogicSimulator /> : isRootLocus ? <RootLocusStudio /> : isPidStudio ? <PIDStudio /> : isFrequencyResponse ? <FrequencyResponseStudio /> : isStateSpaceStudio ? <StateSpaceStudio /> : isBlockDiagram ? <BlockDiagramStudio /> : isRectifierStudio ? <RectifierStudio /> : isInverterStudio ? <InverterStudio /> : isAcVoltageControllerStudio ? <ACVoltageControllerStudio /> : isChopperStudio ? <ChopperStudio /> : isSiemensS7200Studio ? <SiemensS7200Studio /> : isAssemblerStudio ? <AssemblerStudioCompact /> : isLinearAlgebraStudio ? <LinearAlgebraStudio section={tool as "a" | "b" | "c" | "d" | "e"} /> : <SimulationToolWorkspace toolKey={`${meta.slug}-${tool}`} />);
 
   return <motion.div variants={container} initial="hidden" animate="visible">

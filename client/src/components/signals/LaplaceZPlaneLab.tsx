@@ -10,7 +10,7 @@ import { MathLiveSignalInput, type MathLiveSignalInputHandle } from "@/component
 import SZPlaneCanvas from "@/components/signals/SZPlaneCanvas";
 import { FrequencyResponseCanvases, ImpulseResponseCanvas, type ImpulseResponseCanvasHandle } from "@/components/signals/LaplaceCanvases";
 import { LaplaceLandscape3D } from "@/components/signals/LaplaceLandscape3D";
-import { complexLatex, formatTransferLatex, parseTransferFunction, rocFor, type PlaneMode, type RocKind, type TransferFunction } from "@/lib/signals/laplaceEngine";
+import { complexLatex, formatTransferLatex, parseTransferFunction, rocFor, type PlaneMode, type RocKind, type TransferFunction } from "@/features/signals/engines/laplaceEngine";
 import "./laplaceAcademic.css";
 
 const panel = "rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900";

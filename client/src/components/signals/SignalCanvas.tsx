@@ -6,7 +6,7 @@
 import type { PointerEvent as ReactPointerEvent, WheelEvent as ReactWheelEvent } from "react";
 import { useEffect, useRef } from "react";
 import { KatexMath } from "@/components/ui/KatexMath";
-import { evaluateWindowedSignal, plotWindowedSegments, type ImpulseMarker, type PeriodMode, type SignalNode, type SignalWindow } from "@/lib/signals/signalEngine";
+import { evaluateWindowedSignal, plotWindowedSegments, type ImpulseMarker, type PeriodMode, type SignalNode, type SignalWindow } from "@/features/signals/engines/signalEngine";
 
 type ScreenRect = { width: number; height: number };
 type Viewport = { centerT: number; centerY: number; secondsPerPixel: number };

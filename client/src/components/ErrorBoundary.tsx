@@ -1,64 +1,34 @@
-import { cn } from "@/lib/utils";
-import { AlertTriangle, RotateCcw } from "lucide-react";
-import { Component, ReactNode } from "react";
-import { localizedContent } from "@/data/content";
-import type { Locale } from "@/data/platform";
+import React from 'react';
 
-interface Props {
-  children: ReactNode;
-}
+interface Props { children: React.ReactNode; }
+interface State { hasError: boolean; error: Error | null; }
 
-interface State {
-  hasError: boolean;
-  error: Error | null;
-}
-
-class ErrorBoundary extends Component<Props, State> {
+export class ErrorBoundary extends React.Component<Props, State> {
   constructor(props: Props) {
     super(props);
     this.state = { hasError: false, error: null };
   }
 
-  static getDerivedStateFromError(error: Error): State {
+  static getDerivedStateFromError(error: Error) {
     return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error("ErrorBoundary caught an error:", error, errorInfo);
   }
 
   render() {
     if (this.state.hasError) {
-      const savedLocale = localStorage.getItem("mae-locale") as Locale | null;
-      const copy = localizedContent[savedLocale || "en"];
       return (
-        <div className="flex items-center justify-center min-h-screen p-8 bg-background">
-          <div className="flex flex-col items-center w-full max-w-2xl p-8">
-            <AlertTriangle
-              size={48}
-              className="text-destructive mb-6 flex-shrink-0"
-            />
-
-            <h2 className="text-xl mb-4">{copy.notFound.title}</h2>
-
-            <div className="p-4 w-full rounded bg-muted overflow-auto mb-6">
-              <pre className="text-sm text-muted-foreground whitespace-break-spaces">
-                {this.state.error?.stack}
-              </pre>
-            </div>
-
-            <button
-              onClick={() => window.location.reload()}
-              className={cn(
-                "flex items-center gap-2 px-4 py-2 rounded-lg",
-                "bg-primary text-primary-foreground",
-                "hover:opacity-90 cursor-pointer"
-              )}
-            >
-              <RotateCcw size={16} />
-              {copy.notFound.action}
-            </button>
+        <div className="p-8 bg-red-50 text-red-900 font-mono w-full h-full min-h-screen z-50 fixed top-0 left-0">
+          <h2 className="text-2xl font-bold mb-4">🚨 Application Crashed at Runtime!</h2>
+          <p className="text-lg font-semibold mb-4">{this.state.error?.name}: {this.state.error?.message}</p>
+          <div className="bg-red-100 p-4 rounded overflow-x-auto whitespace-pre-wrap">
+            {this.state.error?.stack}
           </div>
         </div>
       );
     }
-
     return this.props.children;
   }
 }

@@ -4,8 +4,8 @@
  * contexts are updated in requestAnimationFrame; React never stores animation t.
  */
 import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
-import { continuousConvolutionAt, type ContinuousConvolutionResult } from "@/lib/signals/convolutionEngine";
-import { evaluateSignal, extractImpulseMarkers, type SignalNode } from "@/lib/signals/signalEngine";
+import { continuousConvolutionAt, type ContinuousConvolutionResult } from "@/features/signals/engines/convolutionEngine";
+import { evaluateSignal, extractImpulseMarkers, type SignalNode } from "@/features/signals/engines/signalEngine";
 
 type Props = { x: SignalNode; h: SignalNode; isPlaying: boolean; speed: number; onFrame: (result: ContinuousConvolutionResult) => void; onManualReadout: (result: ContinuousConvolutionResult) => void };
 export type ConvolutionCanvasHandle = { setTime: (time: number) => void; nudge: (delta: number) => void; currentTime: () => number };

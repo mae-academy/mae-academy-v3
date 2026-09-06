@@ -10,7 +10,7 @@ import { KatexMath } from "@/components/ui/KatexMath";
 import { BrandSlider } from "@/components/ui/BrandSlider";
 import { MathLiveSignalInput, type MathLiveSignalInputHandle } from "@/components/signals/MathLiveSignalInput";
 import SystemProofCanvas from "@/components/signals/SystemProofCanvas";
-import { classifySystem, parseSystemExpression, type Pillar, type PillarId } from "@/lib/signals/systemClassifier";
+import { classifySystem, parseSystemExpression, type Pillar, type PillarId } from "@/features/signals/engines/systemClassifier";
 
 const tex = String.raw;
 const panel = "rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900";

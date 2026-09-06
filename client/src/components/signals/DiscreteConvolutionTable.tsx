@@ -2,7 +2,7 @@
 import { useMemo, useState } from "react";
 import { KatexMath } from "@/components/ui/KatexMath";
 import { BrandSlider } from "@/components/ui/BrandSlider";
-import { discreteConvolution } from "@/lib/signals/convolutionEngine";
+import { discreteConvolution } from "@/features/signals/engines/convolutionEngine";
 
 function parseSequence(source: string) { const values = source.split(",").map((item) => Number(item.trim())).filter(Number.isFinite); return values.length ? values : [0]; }
 export function DiscreteConvolutionTable() {

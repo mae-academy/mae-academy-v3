@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { CartesianGrid, Label, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { KatexMath } from "@/components/ui/KatexMath";
 import { PowerSlider } from "./PowerSlider";
-import { defaultInverterParameters, simulateInverter, type InverterLoad, type InverterParameters, type InverterPhase, type InverterSample, type SinglePhaseSubtype, type SwitchingTechnique, type ThreePhaseConduction } from "@/lib/inverterMath";
+import { defaultInverterParameters, simulateInverter, type InverterLoad, type InverterParameters, type InverterPhase, type InverterSample, type SinglePhaseSubtype, type SwitchingTechnique, type ThreePhaseConduction } from "@/features/power-electronics/inverterMath";
 
 const tex = String.raw;
 const card = "rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900";

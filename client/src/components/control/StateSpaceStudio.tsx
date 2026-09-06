@@ -19,7 +19,7 @@ import {
   observabilityMatrix,
   rank,
   type Matrix,
-} from "@/lib/matrixMath";
+} from "@/features/linear-algebra/matrixMath";
 
 type SystemModel = { A: Matrix; B: Matrix; C: Matrix; D: Matrix };
 type Order = 2 | 3;

@@ -1,7 +1,7 @@
 /** MAE Linear Algebra Studio: sharp Canvas vector field, no third-party rendering engine. */
 import { useEffect, useRef, useState } from "react";
-import type { EigenPair } from "@/lib/linearAlgebraMath";
-import { BasisFrameGeometry } from "@/lib/BasisFrameGeometry";
+import type { EigenPair } from "@/features/linear-algebra/linearAlgebraMath";
+import { BasisFrameGeometry } from "@/features/linear-algebra/BasisFrameGeometry";
 
 type Props = { original: number[]; transformed: number[]; eigenpairs?: EigenPair[]; nullBasis?: number[][]; columnBasis?: number[][]; operation: string };
 type Point = [number, number, number];

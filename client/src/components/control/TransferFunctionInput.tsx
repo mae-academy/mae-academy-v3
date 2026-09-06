@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { KatexMath } from "../ui/KatexMath";
-import { rootsToPolynomial, parseRootsList, Complex } from "../../lib/controlMath";
+import { rootsToPolynomial, parseRootsList, Complex } from "@/features/control/controlMath";
 
 export type TfInputMode = "polynomial" | "zpk";
 

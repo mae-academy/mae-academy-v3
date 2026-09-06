@@ -4,7 +4,7 @@
  * slider motion never stores chart geometry in React state.
  */
 import { useEffect, useRef } from "react";
-import { classifySystem, evaluateSystem, shiftTestSamples, stabilitySamples, superpositionSamples, x1, x2, type PillarId, type SystemSemantic } from "@/lib/signals/systemClassifier";
+import { classifySystem, evaluateSystem, shiftTestSamples, stabilitySamples, superpositionSamples, x1, x2, type PillarId, type SystemSemantic } from "@/features/signals/engines/systemClassifier";
 
 type Props = { system: SystemSemantic; pillar: PillarId; a: number; b: number; t0: number };
 type Point = { t: number; value: number };

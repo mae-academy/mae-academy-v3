@@ -4,8 +4,8 @@
  * enter a virtual plot tree, and partial-sum slider updates remain direct draws.
  */
 import { useEffect, useRef } from "react";
-import { partialSum, type FourierSeriesResult, type FourierTransformResult } from "@/lib/signals/fourierEngine";
-import { evaluateSignal, type SignalNode } from "@/lib/signals/signalEngine";
+import { partialSum, type FourierSeriesResult, type FourierTransformResult } from "@/features/signals/engines/fourierEngine";
+import { evaluateSignal, type SignalNode } from "@/features/signals/engines/signalEngine";
 
 type Props = { mode: "fs" | "ft"; series: FourierSeriesResult | null; transform: FourierTransformResult | null; node: SignalNode; harmonics: number; scale: number };
 type Point = { x: number; y: number };

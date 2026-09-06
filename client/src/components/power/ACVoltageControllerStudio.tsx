@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { KatexMath } from "@/components/ui/KatexMath";
 import { PowerSlider } from "./PowerSlider";
-import { defaultAcVoltageControllerParameters, simulateAcVoltageController, type AcControlMode, type AcLoad, type AcPhase, type AcTopology, type AcVoltageControllerParameters, type AcVoltageFormat, type ThreePhaseConnection } from "@/lib/acVoltageControllerMath";
+import { defaultAcVoltageControllerParameters, simulateAcVoltageController, type AcControlMode, type AcLoad, type AcPhase, type AcTopology, type AcVoltageControllerParameters, type AcVoltageFormat, type ThreePhaseConnection } from "@/features/power-electronics/acVoltageControllerMath";
 
 const tex = String.raw;
 const card = "rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900";

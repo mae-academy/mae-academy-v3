@@ -4,7 +4,7 @@
  * individual harmonic trajectory in (time, harmonic frequency, amplitude).
  */
 import { useEffect, useRef, useState } from "react";
-import { waterfallHarmonics, type FourierSeriesResult } from "@/lib/signals/fourierEngine";
+import { waterfallHarmonics, type FourierSeriesResult } from "@/features/signals/engines/fourierEngine";
 
 type Props = { series: FourierSeriesResult; harmonics: number };
 type PlotlyRuntime = { react: (root: HTMLDivElement, traces: unknown[], layout: unknown, config: unknown) => Promise<unknown>; purge: (root: HTMLDivElement) => void };

@@ -13,7 +13,7 @@ import {
   type RectifierPhase,
   type RectifierType,
   type VoltageFormat,
-} from "@/lib/rectifierMath";
+} from "@/features/power-electronics/rectifierMath";
 
 const card = "rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900";
 const heading = "text-sm font-bold text-slate-800 dark:text-white";

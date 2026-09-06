@@ -1,5 +1,5 @@
 import * as React from "react";
-import { cn } from "@/lib/utils";
+import { cn } from "@/simulators/circuit-engine/models/utils";
 
 export interface BrandSliderProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "type"> {
   className?: string;

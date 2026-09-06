@@ -6,7 +6,7 @@ import { AssemblerToolbar, type AssemblerTemplateGroup } from "@/components/asse
 import { AssemblerRegisters, type RegisterSnapshot } from "@/components/assembler/AssemblerRegisters";
 import type { AssemblerFlag } from "@/components/assembler/AssemblerFlags";
 import { AssemblerStack } from "@/components/assembler/AssemblerStack";
-import { EmulatorCore, type CpuState, type ExecutionTraceEntry } from "@/lib/emulator";
+import { EmulatorCore, type CpuState, type ExecutionTraceEntry } from "@/features/emulator";
 
 type LocaleCode = "en" | "ar" | "es";
 type MemoryMode = "hex" | "decimal" | "ascii";

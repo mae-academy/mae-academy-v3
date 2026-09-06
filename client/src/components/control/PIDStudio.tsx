@@ -13,7 +13,7 @@ import { BrandRadio } from "@/components/ui/BrandRadio";
 import {
   controllerTransfer, defaultControllerSubtype, estimatePidFromSpecs, getControllerSubtypes, inputSignalTransfer,
   PidGains, ControllerPrimary, ControllerSubtype, SignalType, simulatePidScope,
-} from "@/lib/pidMath";
+} from "@/features/control/pidMath";
 
 type SignalState = { type: SignalType; magnitude: number; parameter: number };
 const primaryOptions: ControllerPrimary[] = ["P", "I", "D", "PI", "PD", "PID"];

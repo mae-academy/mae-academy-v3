@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { compileLadder, type PlcAoi, type PlcTag } from '@/lib/plc-ladder';
+import { compileLadder, type PlcAoi, type PlcTag } from '@/features/plc/ladder';
 import { addLadderBranchLevel, addLadderParallelBranch, createInitialLadderDocument, createLadderInstruction, findLadderCircuit, insertLadderInstruction, moveLadderInstruction, serializeLadderDocument, updateLadderInstruction } from './ladderEditorModel';
 
 const tags: PlcTag[] = [

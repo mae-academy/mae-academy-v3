@@ -7,7 +7,7 @@ import { MousePointer2, Orbit } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocale } from "@/contexts/LocaleContext";
 import { KatexMath } from "@/components/ui/KatexMath";
-import { integrateStateRK4, type Matrix, type Vector } from "@/lib/matrixMath";
+import { integrateStateRK4, type Matrix, type Vector } from "@/features/linear-algebra/matrixMath";
 
 type LocaleCode = "en" | "ar" | "es";
 type Props = { matrix: Matrix; closedLoopMatrix?: Matrix; order: 2 | 3 };

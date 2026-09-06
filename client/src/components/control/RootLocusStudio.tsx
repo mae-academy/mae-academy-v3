@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useMemo } from "react";
-import { findPolynomialRoots, simulateLtiStepResponse, findBreakawayPoints, complexAdd, complexSub, complexMul, complexDiv, complexMag, polyDeriv, evalPolyComplex, generateFlawlessRootLocus, type Complex } from "../../lib/controlMath";
+import { findPolynomialRoots, simulateLtiStepResponse, findBreakawayPoints, complexAdd, complexSub, complexMul, complexDiv, complexMag, polyDeriv, evalPolyComplex, generateFlawlessRootLocus, type Complex } from "@/features/control/controlMath";
 import { TransferFunctionInput, TransferFunctionData } from "./TransferFunctionInput";
 import { RootLocusStepsPanel } from "./RootLocusStepsPanel";
 import { KatexMath } from "../ui/KatexMath";

@@ -1,6 +1,6 @@
 import * as React from "react";
 import { ChevronDown } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn } from "@/simulators/circuit-engine/models/utils";
 
 export interface NativeSelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
   containerClassName?: string;

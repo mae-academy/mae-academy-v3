@@ -3,7 +3,7 @@
  * All terminal output coils are normalized to the end of their parent rung circuit before source
  * is serialized for the isolated generic PLC engine.
  */
-import type { PlcInstructionType } from '@/lib/plc-ladder';
+import type { PlcInstructionType } from '@/features/plc/ladder';
 
 export type LadderEditorElement = LadderEditorInstruction | LadderEditorBranch;
 export interface LadderEditorInstruction { type: 'INSTRUCTION'; id: string; instructionType: PlcInstructionType; parameters: string[]; }
