@@ -34,7 +34,7 @@ export function lockTabDWireCorner(anchor: Point, pointer: Point): Point {
 export function tabDOrthogonalDraftPath(from: Point, to: Point, lockedCorners: Point[] = [], fromAxis?: TabDTerminalAxis): Point[] {
   const anchor = lockedCorners.at(-1) ?? from;
   if (anchor[0] === to[0] || anchor[1] === to[1]) return [...lockedCorners.length ? [from, ...lockedCorners] : [from], to];
-  
+
   let corner: Point;
   if (lockedCorners.length === 0 && fromAxis) {
     // Starting from a pin with known terminal exit direction
@@ -44,7 +44,7 @@ export function tabDOrthogonalDraftPath(from: Point, to: Point, lockedCorners: P
     // Follow the cursor pull direction (|dy| > |dx| -> vertical-first, else horizontal-first)
     corner = lockTabDWireCorner(anchor, to);
   }
-  
+
   return [...lockedCorners.length ? [from, ...lockedCorners] : [from], corner, to];
 }
 
@@ -404,31 +404,22 @@ export function tabDComponentLabelAnchors(
   halfWidth: number,
   halfHeight: number,
 ): { reference: Point; value: Point } {
-  if (componentType === 'dc-rail') {
-    return { reference: [0, -22], value: [32, -10] };
-  }
-  if (componentType === 'three-phase-source') {
-    return { reference: [0, -39], value: [0, 39] };
-  }
-  if (componentType === 'dmm') {
-    return { reference: [0, -65], value: [0, 65] };
-  }
-  if (componentType === 'three-phase-rail') {
-    return { reference: [0, -57], value: [0, 57] };
-  }
-  if (componentType === 'potentiometer') {
-    return { reference: [14, -24], value: [0, 18] };
-  }
-  if (componentType === 'opamp') {
-    return { reference: [0, -35], value: [0, 35] };
-  }
-  if (['bjt-npn', 'bjt-pnp', 'mosfet-n', 'mosfet-p', 'jfet-n', 'jfet-p'].includes(componentType)) {
-    return { reference: [0, -32], value: [0, 36] };
-  }
-  if (terminalsAreHorizontal) {
-    return { reference: [0, -18], value: [0, 22] };
-  }
-  return { reference: [26, -6], value: [26, 12] };
+  if (componentType === 'dc-rail') return { reference: [0, -16], value: [24, -8] };
+
+  const CIRCULAR_SOURCES = new Set(['dc-voltage', 'ac-voltage', 'dc-current', 'ac-current', 'voltmeter', 'ammeter', 'lamp', 'motor-dc', 'motor-3phase', 'three-phase-source']);
+  if (CIRCULAR_SOURCES.has(componentType)) return { reference: [0, -36], value: [0, 36] };
+
+  if (componentType === 'dmm') return { reference: [0, -75], value: [0, 75] };
+  if (componentType === 'opamp') return { reference: [0, -32], value: [0, 32] };
+  if (componentType === 'fuse') return { reference: [0, -16], value: [0, 16] };
+
+  // توحيد الأرقام الدقيقة للريليهات
+  if (componentType === 'relay-spst') return { reference: [0, -45], value: [0, 45] };
+  if (['relay-spdt', 'relay-dpst'].includes(componentType)) return { reference: [0, -45], value: [0, 70] };
+  if (componentType === 'contactor') return { reference: [0, -70], value: [0, 95] };
+
+  if (terminalsAreHorizontal) return { reference: [0, -12], value: [0, 16] };
+  return { reference: [16, -6], value: [16, 12] };
 }
 
 /**
@@ -436,59 +427,66 @@ export function tabDComponentLabelAnchors(
  * Guarantees zero offset with visual port extremities.
  */
 export const EXACT_ANALOG_TERMINAL_OFFSETS: Record<string, Record<string, Point>> = {
-  'opamp': {
-    'in+': [-35, -20],
-    'in-': [-35, 20],
-    'out': [35, 0],
-  },
-  'three-phase-source': {
-    'n': [-36, 0],
-    'l1': [31, -25],
-    'l2': [30, 0],
-    'l3': [31, 25],
-  },
-  'bjt-npn': {
-    'base': [-25, 0],
-    'collector': [20, -26],
-    'emitter': [20, 26],
-  },
-  'bjt-pnp': {
-    'base': [-25, 0],
-    'collector': [20, -26],
-    'emitter': [20, 26],
-  },
-  'mosfet-n': {
-    'gate': [-22, 0],
-    'drain': [25, -22],
-    'source': [25, 20],
-  },
-  'mosfet-p': {
-    'gate': [-22, 0],
-    'drain': [25, -22],
-    'source': [25, 20],
-  },
-  'jfet-n': {
-    'gate': [-25, 0],
-    'drain': [20, -22],
-    'source': [20, 20],
-  },
-  'jfet-p': {
-    'gate': [-25, 0],
-    'drain': [20, -22],
-    'source': [20, 20],
+  'opamp': { 'in-': [-40, -15], 'in+': [-40, 15], 'out': [40, 0] },
+  'bjt-npn': { 'base': [-25, 0], 'collector': [25, -25], 'emitter': [25, 25] },
+  'bjt-pnp': { 'base': [-25, 0], 'collector': [25, -25], 'emitter': [25, 25] },
+  'mosfet-n': { 'gate': [-25, 0], 'drain': [25, -25], 'source': [25, 25] },
+  'mosfet-p': { 'gate': [-25, 0], 'drain': [25, -25], 'source': [25, 25] },
+  'jfet-n': { 'gate': [-25, 0], 'drain': [25, -25], 'source': [25, 25] },
+  'jfet-p': { 'gate': [-25, 0], 'drain': [25, -25], 'source': [25, 25] },
+  // Universal Circular Components (All mapped to precise grid extremities)
+  'dc-voltage': { 'pos': [0, -50], 'neg': [0, 50] },
+  'ac-voltage': { 'pos': [0, -50], 'neg': [0, 50] },
+  'dc-current': { 'pos': [0, -50], 'neg': [0, 50] },
+  'ac-current': { 'pos': [0, -50], 'neg': [0, 50] },
+  'voltmeter': { 'pos': [-50, 0], 'neg': [50, 0] },
+  'ammeter': { 'pos': [-50, 0], 'neg': [50, 0] },
+  'lamp': { 'a': [-50, 0], 'b': [50, 0] },
+  'motor-dc': { 'pos': [-50, 0], 'neg': [50, 0] },
+  'motor-3phase': { 'u': [-50, -25], 'v': [-50, 0], 'w': [-50, 25], 'pe': [50, 0] },
+  // Transformers
+  'transformer': { 'p1': [-50, -50], 'p2': [-50, 50], 's1': [50, -50], 's2': [50, 50] },
+  'transformer-ct': { 'p1': [-50, -50], 'p2': [-50, 50], 's1': [50, -50], 'ct': [50, 0], 's2': [50, 50] },
+  'autotransformer': { 'in1': [-50, -50], 'in2': [-50, 50], 'tap': [50, 0], 'out1': [50, -50], 'out2': [50, 50] },
+  'oscilloscope': { 'ch1': [-75, -50], 'ch2': [-75, -25], 'ch3': [-75, 0], 'ch4': [-75, 25], 'gnd': [75, 25] },
+  'dmm': { 'hi': [-25, 50], 'com': [25, 50] },
+  // Universal Switches & Relays
+  'sw-spst-no': { 'a': [-25, 0], 'b': [25, 0] },
+  'sw-spst-nc': { 'a': [-25, 0], 'b': [25, 0] },
+  'aux-contact-no': { 'a': [-25, 0], 'b': [25, 0] },
+  'aux-contact-nc': { 'a': [-25, 0], 'b': [25, 0] },
+  'pb-no': { 'a': [-25, 0], 'b': [25, 0] },
+  'pb-nc': { 'a': [-25, 0], 'b': [25, 0] },
+  'sw-spdt': { 'common': [-25, 0], 'a': [25, 0], 'b': [25, 25] },
+  'sw-dpst': { 'a1': [-25, -25], 'b1': [25, -25], 'a2': [-25, 0], 'b2': [25, 0] },
+  'sw-dpdt': { 'c1': [-25, -25], 'a1': [25, -25], 'b1': [25, 0], 'c2': [-25, 25], 'a2': [25, 25], 'b2': [25, 50] },
+  // Universal Protection
+  'fuse': { 'a': [-50, 0], 'b': [50, 0] },
+  'fuse-3phase': { 'l1': [-50, -25], 't1': [50, -25], 'l2': [-50, 0], 't2': [50, 0], 'l3': [-50, 25], 't3': [50, 25] },
+  'circuit-breaker': { 'a': [-50, 0], 'b': [50, 0] },
+  'circuit-breaker-3phase': { 'l1': [-50, -25], 't1': [50, -25], 'l2': [-50, 0], 't2': [50, 0], 'l3': [-50, 25], 't3': [50, 25] },
+  'relay-spst': { 'coil+': [-50, -25], 'coil-': [50, -25], 'com': [-50, 25], 'no': [50, 25] },
+  'relay-spdt': { 'coil+': [-50, -25], 'coil-': [50, -25], 'com': [-50, 0], 'nc': [50, 0], 'no': [50, 25] },
+  'relay-dpst': { 'coil+': [-50, -25], 'coil-': [50, -25], 'c1': [-50, 0], 'no1': [50, 0], 'c2': [-50, 25], 'no2': [50, 25] },
+  'contactor': {
+    'coil+': [-50, -50], 'coil-': [50, -50],
+    'l1': [-50, -25], 't1': [50, -25],
+    'l2': [-50, 0], 't2': [50, 0],
+    'l3': [-50, 25], 't3': [50, 25],
+    'aux-no-a': [-50, 50], 'aux-no-b': [50, 50],
+    'aux-nc-a': [-50, 75], 'aux-nc-b': [50, 75]
   },
 };
 
 export const EXACT_CAD_COMPONENTS = new Set<string>([
-  'dmm',
-  'opamp',
-  'three-phase-source',
-  'bjt-npn',
-  'bjt-pnp',
-  'mosfet-n',
-  'mosfet-p',
-  'jfet-n',
-  'jfet-p',
+  'dmm', 'opamp', 'bjt-npn', 'bjt-pnp', 'mosfet-n', 'mosfet-p', 'jfet-n', 'jfet-p',
+  'dc-voltage', 'ac-voltage', 'dc-current', 'ac-current',
+  'voltmeter', 'ammeter', 'lamp', 'motor-dc', 'motor-3phase', 'three-phase-source',
+  'sw-spst-no', 'sw-spst-nc', 'pb-no', 'pb-nc', 'sw-spdt', 'sw-dpst', 'sw-dpdt',
+  'aux-contact-no', 'aux-contact-nc',
+  'fuse', 'fuse-3phase', 'circuit-breaker', 'circuit-breaker-3phase',
+  'relay-spst', 'relay-spdt', 'relay-dpst', 'contactor',
+  'transformer', 'transformer-ct', 'autotransformer', 'oscilloscope'
 ]);
 
 export function isExactCadComponent(type: string): boolean {

@@ -23,7 +23,6 @@ export class TabDSimulationEngine extends SimulationEngine {
   private readonly tabDRelayStates = new Map<string, boolean>();
   private readonly tabDPowerLatchStates = new Map<string, boolean>();
   private readonly tabDFuseBlown = new Set<string>();
-  private readonly tabDBreakerTripped = new Set<string>();
   private readonly tabDDigitalLevels = new Map<string, number>();
 
   override setCircuit(components: CircuitComponent[], wires: CircuitWire[]) {
@@ -35,7 +34,6 @@ export class TabDSimulationEngine extends SimulationEngine {
     this.tabDRelayStates.clear();
     this.tabDPowerLatchStates.clear();
     this.tabDFuseBlown.clear();
-    this.tabDBreakerTripped.clear();
     this.tabDDigitalLevels.clear();
   }
 
@@ -46,7 +44,6 @@ export class TabDSimulationEngine extends SimulationEngine {
     this.tabDRelayStates.clear();
     this.tabDPowerLatchStates.clear();
     this.tabDFuseBlown.clear();
-    this.tabDBreakerTripped.clear();
     this.tabDDigitalLevels.clear();
   }
 
@@ -159,7 +156,6 @@ export class TabDSimulationEngine extends SimulationEngine {
     const relayModels: Array<{ id: string; coilPositive: string; coilNegative: string; ratedVoltage: number }> = [];
     const powerLatchModels: Array<{ id: string; gate: string; cathode: string; triggerVoltage: number; holdCurrent: number }> = [];
     const fuseModels: Array<{ id: string; ratedCurrent: number }> = [];
-    const breakerModels: Array<{ id: string; tripCurrent: number }> = [];
     const digitalModels: Array<{ id: string; inputs: string[]; output: string; ground: string; threshold: number; highVoltage: number; delay: number; rule: (levels: boolean[]) => boolean }> = [];
     const priorVoltage = (node: string) => priorNodeVoltages[node] ?? 0;
     const relayClosed = (component: CircuitComponent) => manualRelayClosed(component.props, this.tabDRelayStates.get(component.id) ?? false);
@@ -202,7 +198,14 @@ export class TabDSimulationEngine extends SimulationEngine {
         }
         case 'cccs': primitives.push({ kind: 'cccs', id: component.id, positive: p('pos'), negative: p('neg'), controlBranchId: String(component.props.controlSourceId ?? ''), gain: value(component, 'gain', 1) }); break;
         case 'ccvs': primitives.push({ kind: 'ccvs', id: component.id, positive: p('pos'), negative: p('neg'), controlBranchId: String(component.props.controlSourceId ?? ''), transresistance: value(component, 'transresistance', 1000) }); break;
-        case 'sw-spst-no': case 'pb-no': primitives.push({ kind: 'resistive-switch', id: component.id, positive: p('a'), negative: p('b'), closed: component.props.state === (component.type === 'pb-no' ? 'pressed' : 'closed') }); break;
+        case 'sw-spst-no': case 'pb-no': case 'circuit-breaker': primitives.push({ kind: 'resistive-switch', id: component.id, positive: p('a'), negative: p('b'), closed: component.props.state === (component.type === 'pb-no' ? 'pressed' : 'closed') }); break;
+        case 'circuit-breaker-3phase': {
+          const closed = component.props.state === 'closed';
+          for (const phase of ['1', '2', '3']) {
+            primitives.push({ kind: 'resistive-switch', id: `${component.id}:${phase}`, positive: p(`l${phase}`), negative: p(`t${phase}`), closed });
+          }
+          break;
+        }
         case 'sw-spst-nc': case 'pb-nc': primitives.push({ kind: 'resistive-switch', id: component.id, positive: p('a'), negative: p('b'), closed: component.props.state !== (component.type === 'pb-nc' ? 'pressed' : 'open') }); break;
         case 'sw-spdt': {
           const aSelected = component.props.state !== 'b';
@@ -253,16 +256,6 @@ export class TabDSimulationEngine extends SimulationEngine {
           relayModels.push({ id: component.id, coilPositive: p('coil+'), coilNegative: p('coil-'), ratedVoltage: value(component, 'coilVoltage', 12) });
           break;
         }
-        case 'relay-dpdt': {
-          const closed = relayClosed(component);
-          primitives.push({ kind: 'resistor', id: `${component.id}:coil`, positive: p('coil+'), negative: p('coil-'), resistance: value(component, 'coilR', 400) });
-          for (const pole of ['1', '2']) {
-            primitives.push({ kind: 'resistive-switch', id: `${component.id}:${pole}no`, positive: p(`c${pole}`), negative: p(`no${pole}`), closed });
-            primitives.push({ kind: 'resistive-switch', id: `${component.id}:${pole}nc`, positive: p(`c${pole}`), negative: p(`nc${pole}`), closed: !closed });
-          }
-          relayModels.push({ id: component.id, coilPositive: p('coil+'), coilNegative: p('coil-'), ratedVoltage: value(component, 'coilVoltage', 12) });
-          break;
-        }
         case 'contactor': {
           const closed = relayClosed(component);
           primitives.push({ kind: 'resistor', id: `${component.id}:coil`, positive: p('coil+'), negative: p('coil-'), resistance: value(component, 'coilR', 500) });
@@ -277,10 +270,12 @@ export class TabDSimulationEngine extends SimulationEngine {
           fuseModels.push({ id: component.id, ratedCurrent: value(component, 'ratedCurrent', 10) });
           break;
         }
-        case 'circuit-breaker': {
-          const closed = component.props.state !== 'tripped' && !this.tabDBreakerTripped.has(component.id);
-          primitives.push({ kind: 'resistive-switch', id: component.id, positive: p('a'), negative: p('b'), closed });
-          breakerModels.push({ id: component.id, tripCurrent: value(component, 'tripCurrent', value(component, 'ratedCurrent', 20) * 1.25) });
+        case 'fuse-3phase': {
+          const blown = this.tabDFuseBlown.has(component.id);
+          for (const phase of ['1', '2', '3']) {
+            primitives.push({ kind: 'resistive-switch', id: `${component.id}:${phase}`, positive: p(`l${phase}`), negative: p(`t${phase}`), closed: !blown });
+          }
+          fuseModels.push({ id: component.id, ratedCurrent: value(component, 'ratedCurrent', 10) });
           break;
         }
         case 'diode-ideal': {
@@ -392,7 +387,9 @@ export class TabDSimulationEngine extends SimulationEngine {
           break;
         }
         case 'autotransformer': {
-          primitives.push({ kind: 'vcvs', id: component.id, positive: p('out1'), negative: p('out2'), controlPositive: p('in1'), controlNegative: p('in2'), gain: 1 / Math.max(1e-6, value(component, 'turnRatio', 1.92)) });
+          primitives.push({ kind: 'vcvs', id: component.id, positive: p('tap'), negative: p('out2'), controlPositive: p('in1'), controlNegative: p('in2'), gain: 1 / Math.max(1e-6, value(component, 'turnRatio', 1.92)) });
+          primitives.push({ kind: 'resistor', id: `${component.id}:top`, positive: p('in1'), negative: p('out1'), resistance: 1e-6 });
+          primitives.push({ kind: 'resistor', id: `${component.id}:bot`, positive: p('in2'), negative: p('out2'), resistance: 1e-6 });
           break;
         }
         case 'scr': case 'triac': {
@@ -475,8 +472,12 @@ export class TabDSimulationEngine extends SimulationEngine {
           const current = Math.abs(branchCurrents[power.id] ?? 0);
           this.tabDPowerLatchStates.set(power.id, gateVoltage >= power.triggerVoltage || (held && current >= power.holdCurrent));
         }
-        for (const fuse of fuseModels) if (Math.abs(branchCurrents[fuse.id] ?? 0) > fuse.ratedCurrent) this.tabDFuseBlown.add(fuse.id);
-        for (const breaker of breakerModels) if (Math.abs(branchCurrents[breaker.id] ?? 0) > breaker.tripCurrent) this.tabDBreakerTripped.add(breaker.id);
+        for (const fuse of fuseModels) {
+          const i1 = Math.abs(branchCurrents[fuse.id] ?? branchCurrents[`${fuse.id}:1`] ?? 0);
+          const i2 = Math.abs(branchCurrents[`${fuse.id}:2`] ?? 0);
+          const i3 = Math.abs(branchCurrents[`${fuse.id}:3`] ?? 0);
+          if (Math.max(i1, i2, i3) > fuse.ratedCurrent) this.tabDFuseBlown.add(fuse.id);
+        }
         for (const gate of digitalModels) {
           const levels = gate.inputs.map(input => (nodeVoltages[input] ?? 0) - (nodeVoltages[gate.ground] ?? 0) >= gate.threshold);
           const target = gate.rule(levels) ? gate.highVoltage : 0;
@@ -505,13 +506,16 @@ export class TabDSimulationEngine extends SimulationEngine {
       if (component.type === 'dmm') {
         const mode = String(component.props.mode ?? 'DCV');
         const connected = wiredTerminals.has(terminalKey(component.id, 'hi')) && wiredTerminals.has(terminalKey(component.id, 'com'));
-        if (!connected) readings[component.id] = { value: 0, unit: 'V', status: 'open' };
+        const unit = mode.includes('A') ? 'A' : mode === 'OHM' || mode === 'CONT' ? 'Ω' : mode === 'HZ' ? 'Hz' : 'V';
+
+        if (!connected) readings[component.id] = { value: 0, unit, status: 'open' };
         else if (mode === 'DCV' || mode === 'ACV') readings[component.id] = { value: difference(component, 'hi', 'com'), unit: 'V', status: 'ready' };
         else if (mode === 'DCA' || mode === 'ACA') readings[component.id] = { value: branchCurrents[component.id] ?? 0, unit: 'A', status: 'ready' };
+        else if (mode === 'HZ') readings[component.id] = { value: 0, unit: 'Hz', status: 'ready' }; // Placeholder for frequency
         else {
           const voltage = difference(component, 'hi', 'com');
-          if (mode === 'OHM') readings[component.id] = { value: Math.abs(voltage) / 0.001, unit: 'Ω', status: 'ready' };
-          else readings[component.id] = { value: voltage, unit: 'V', status: 'ready', continuity: Math.abs(voltage) < 0.05 };
+          const resistance = Math.abs(voltage) / 0.001; // 1mA test current
+          readings[component.id] = { value: resistance, unit: 'Ω', status: 'ready', continuity: mode === 'CONT' ? resistance < 50 : undefined };
         }
       }
     }

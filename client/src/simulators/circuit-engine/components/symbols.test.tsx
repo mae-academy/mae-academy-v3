@@ -87,12 +87,10 @@ describe('Tab D SVG symbol language', () => {
   it('uses orthogonal collector/emitter routing and distinct regular arrowheads for NPN and PNP symbols', () => {
     const npn = markup('bjt-npn');
     const pnp = markup('bjt-pnp');
-    expect(npn).toContain('d="M 0,-10 L 20,-18 L 20,-26"');
-    expect(npn).toContain('d="M 0,10 L 20,18 L 20,26"');
-    expect(npn).toContain('points="19,14.5 9,17 9,12"');
-    expect(npn).toContain('rotate(26)');
-    expect(pnp).toContain('points="17,14.5 7,17 7,12"');
-    expect(pnp).toContain('rotate(206)');
+    expect(npn).toContain('d="M 0 -10 L 15 -25 L 25 -25"');
+    expect(npn).toContain('d="M 0 10 L 15 25 L 25 25"');
+    expect(npn).toContain('points="15,25 9,25 15,19"');
+    expect(pnp).toContain('points="9,19 15,19 9,25"');
     expect(npn).not.toBe(pnp);
   });
 
@@ -103,6 +101,8 @@ describe('Tab D SVG symbol language', () => {
     const jfetP = markup('jfet-p');
     expect(mosN).toContain('points="7,0 13,-3.5 13,3.5"');
     expect(mosP).toContain('points="15,0 8,-5 8,5"');
+    expect(mosN).toContain('d="M 5 0 L 25 0 L 25 13"');
+    expect(mosP).toContain('d="M 5 0 L 25 0 L 25 13"');
     expect(jfetN).toContain('points="-15,-5 -9,0 -15,5"');
     expect(jfetP).toContain('rotate(180 -12 0)');
   });
@@ -112,14 +112,16 @@ describe('Tab D SVG symbol language', () => {
     const transformerCt = markup('transformer-ct', { _documentedStyle: true });
     const relay = markup('relay-spdt', { _documentedStyle: true });
     const contactor = markup('contactor', { _documentedStyle: true });
-    expect((transformer.match(/ C /g) ?? []).length).toBeGreaterThanOrEqual(2);
-    expect(transformer).toContain('x1="-35" y1="-20" x2="-24" y2="-20"');
-    expect(transformer).toContain('x1="24" y1="20" x2="35" y2="20"');
-    expect(transformerCt).toContain('x1="24" y1="0" x2="35" y2="0"');
-    expect((relay.match(/ C /g) ?? []).length).toBeGreaterThanOrEqual(1);
-    expect(relay).toContain('cx="-8" cy="20"');
-    expect((contactor.match(/ C /g) ?? []).length).toBeGreaterThanOrEqual(1);
-    expect(contactor).toContain('x1="-40" y1="0"');
+    
+    // The redesigned Transformer uses exact SVG Arc (A) paths with inductor geometry
+    expect((transformer.match(/ A /g) ?? []).length).toBeGreaterThanOrEqual(4);
+    expect(transformer).toContain('x1="-20" y1="-50" x2="-50" y2="-50"');
+    expect(transformer).toContain('x1="-20" y1="50" x2="-50" y2="50"');
+    expect(transformerCt).toContain('x1="20" y1="0" x2="50" y2="0"');
+    
+    // Relays and Contactors utilize exact SVG Arc (A) paths for their coils
+    expect((relay.match(/ A /g) ?? []).length).toBeGreaterThanOrEqual(4);
+    expect((contactor.match(/ A /g) ?? []).length).toBeGreaterThanOrEqual(4);
   });
 
   it('uses an explicit manual relay state to display a latched contact position', () => {

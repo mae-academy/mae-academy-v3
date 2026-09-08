@@ -272,12 +272,23 @@ function SvgKaTeXLabel({ x, y, math, color, ariaLabel, width = 64, height = 28 }
   return <foreignObject x={x - width / 2} y={y - height / 2} width={width} height={height} pointerEvents="none" aria-label={ariaLabel} style={{ overflow: 'visible' }}><div className="flex h-full w-full items-center justify-center whitespace-nowrap" style={{ color, fontSize: 13, fontWeight: 400, lineHeight: 1, overflow: 'visible' }}><V3Math math={math} /></div></foreignObject>;
 }
 
-/** A small visual-only symbol preview used by Tab D's component palette. */
 function ComponentPaletteIcon({ definition, colors, documented }: { definition: ComponentDef; colors: Palette; documented: boolean }) {
-  const span = Math.max(definition.width, definition.height, 108) + 10;
-  const isPot = definition.id === 'potentiometer';
-  const groupTransform = isPot ? 'scale(1.08) translate(0, 6)' : 'scale(1.08)';
-  return <svg width="102" height="88" viewBox={`${-span / 2} ${-span / 2} ${span} ${span}`} aria-hidden="true" style={{ overflow: 'visible', color: colors.text, pointerEvents: 'none' }}><g transform={groupTransform}>{renderSymbol(definition.symbol, false, { ...defaultProps(definition), _documentedStyle: documented }, 0)}</g></svg>;
+  const padding = 20; // Safe optical padding
+  const w = definition.width + padding;
+  const h = definition.height + padding;
+  return (
+    <svg 
+      width="100%" 
+      height="100%" 
+      viewBox={`${-w / 2} ${-h / 2} ${w} ${h}`} 
+      aria-hidden="true" 
+      style={{ overflow: 'visible', color: colors.text, pointerEvents: 'none' }}
+    >
+      <g>
+        {renderSymbol(definition.symbol, false, { ...defaultProps(definition), _documentedStyle: documented }, 0)}
+      </g>
+    </svg>
+  );
 }
 
 /**
@@ -294,12 +305,11 @@ function labelClearance(definition: ComponentDef, scale = 1): number {
 function horizontalLabelOffset(definition: ComponentDef, rotation: number, scale = 1): Point {
   const normalized = ((rotation % 360) + 360) % 360;
   if (normalized === 90 || normalized === 270) {
-    return [definition.width * scale / 2 + 26, -6];
+    return [definition.width * scale / 2 + 12, -6]; // تم التقليل من 26
   }
-  return [0, -(definition.height * scale / 2 + 18)];
+  return [0, -(definition.height * scale / 2 + 8)]; // تم التقليل من 18
 }
 
-/** Two-terminal labels sit perpendicular to the actual terminal axis, regardless of rotation or reflection. */
 function componentLabelAnchors(definition: ComponentDef, component: CircuitComponent, scale = 1): {
   reference: Point;
   value: Point;
@@ -310,78 +320,72 @@ function componentLabelAnchors(definition: ComponentDef, component: CircuitCompo
   if (component.type === 'dc-rail') {
     const rot = ((component.rotation % 360) + 360) % 360;
     if (rot === 0) {
-      return {
-        reference: [0, -22],
-        value: [32, -10],
-        isHorizontal: false,
-        refTextAnchor: 'middle',
-        valTextAnchor: 'start',
-      };
+      return { reference: [0, -16], value: [24, -8], isHorizontal: false, refTextAnchor: 'middle', valTextAnchor: 'start' };
     }
     const rad = rot * Math.PI / 180;
-    const refRot: Point = [
-      Math.round(0 * Math.cos(rad) - (-22) * Math.sin(rad)),
-      Math.round(0 * Math.sin(rad) + (-22) * Math.cos(rad)),
-    ];
-    const valRot: Point = [
-      Math.round(32 * Math.cos(rad) - (-10) * Math.sin(rad)),
-      Math.round(32 * Math.sin(rad) + (-10) * Math.cos(rad)),
-    ];
     return {
-      reference: refRot,
-      value: valRot,
+      reference: [Math.round(0 * Math.cos(rad) - (-16) * Math.sin(rad)), Math.round(0 * Math.sin(rad) + (-16) * Math.cos(rad))],
+      value: [Math.round(24 * Math.cos(rad) - (-8) * Math.sin(rad)), Math.round(24 * Math.sin(rad) + (-8) * Math.cos(rad))],
       isHorizontal: rot === 90 || rot === 270,
       refTextAnchor: 'middle',
       valTextAnchor: rot === 180 ? 'end' : 'start',
     };
   }
 
-  if (component.type === 'three-phase-source') {
-    return {
-      reference: [0, -39],
-      value: [0, 39],
-      isHorizontal: true,
-      refTextAnchor: 'middle',
-      valTextAnchor: 'middle',
-    };
+  const CIRCULAR_SOURCES = new Set(['dc-voltage', 'ac-voltage', 'dc-current', 'ac-current', 'voltmeter', 'ammeter', 'lamp', 'motor-dc', 'motor-3phase', 'three-phase-source']);
+  if (CIRCULAR_SOURCES.has(component.type)) {
+    return { reference: [0, -36], value: [0, 36], isHorizontal: true, refTextAnchor: 'middle', valTextAnchor: 'middle' };
   }
 
   if (component.type === 'dmm') {
-    return {
-      reference: [0, -60],
-      value: [0, 60],
-      isHorizontal: true,
-      refTextAnchor: 'middle',
-      valTextAnchor: 'middle',
-    };
+    return { reference: [0, -75], value: [0, 75], isHorizontal: true, refTextAnchor: 'middle', valTextAnchor: 'middle' };
   }
 
   if (component.type === 'three-phase-rail') {
-    return {
-      reference: [0, -57],
-      value: [0, 57],
-      isHorizontal: true,
-      refTextAnchor: 'middle',
-      valTextAnchor: 'middle',
-    };
+    return { reference: [0, -40], value: [0, 40], isHorizontal: true, refTextAnchor: 'middle', valTextAnchor: 'middle' };
   }
 
   if (component.type === 'potentiometer') {
-    return {
-      reference: [14, -24],
-      value: [0, 18],
-      isHorizontal: true,
-      refTextAnchor: 'middle',
-      valTextAnchor: 'middle',
-    };
+    return { reference: [12, -18], value: [0, 14], isHorizontal: true, refTextAnchor: 'middle', valTextAnchor: 'middle' };
   }
 
   const TRANSISTOR_TYPES = new Set(['bjt-npn', 'bjt-pnp', 'mosfet-n', 'mosfet-p', 'jfet-n', 'jfet-p']);
-
   if (TRANSISTOR_TYPES.has(component.type)) {
+    return { reference: [0, -24], value: [0, 26], isHorizontal: true, refTextAnchor: 'middle', valTextAnchor: 'middle' };
+  }
+
+  // -------------------------------------------------------------------------
+  // الحل الجذري للريليهات والكونتاكتورز (تخطي الشرط ولصقها بالمستطيل الوهمي)
+  // -------------------------------------------------------------------------
+  const RELAY_TYPES = new Set(['relay-spst', 'relay-spdt', 'relay-dpst', 'contactor']);
+  if (RELAY_TYPES.has(component.type)) {
+    const isHorizontal = component.rotation % 180 === 0;
+    
+    let refY = -45;
+    let valY = 45;
+    
+    // حساب الأبعاد بدقة للمستطيل الوهمي الخاص بكل نوع
+    if (component.type === 'relay-spdt' || component.type === 'relay-dpst') {
+      valY = 70;
+    } else if (component.type === 'contactor') {
+      refY = -70;
+      valY = 95;
+    }
+
+    // في حال تم تدوير المكون 90 درجة
+    if (!isHorizontal) {
+      return {
+        reference: [refY, -15],
+        value: [valY, -15],
+        isHorizontal: true,
+        refTextAnchor: 'middle',
+        valTextAnchor: 'middle',
+      };
+    }
+
     return {
-      reference: [0, -32], // Moved down closer to top terminals
-      value: [0, 36],       // Lifted up closer to bottom terminals
+      reference: [0, refY],
+      value: [0, valY],
       isHorizontal: true,
       refTextAnchor: 'middle',
       valTextAnchor: 'middle',
@@ -392,10 +396,11 @@ function componentLabelAnchors(definition: ComponentDef, component: CircuitCompo
     const isHorizontal = component.rotation % 180 === 0;
     const reference = horizontalLabelOffset(definition, component.rotation, scale);
     const value: Point = isHorizontal
-      ? [0, definition.height * scale / 2 + 22]
-      : [definition.width * scale / 2 + 26, 12];
+      ? [0, definition.height * scale / 2 + 12]
+      : [definition.width * scale / 2 + 14, 12];
     return { reference, value, isHorizontal };
   }
+
   const [first, second] = definition.terminals;
   const localX = (first.x - second.x) * (component.flipH ? -1 : 1) * scale;
   const localY = (first.y - second.y) * (component.flipV ? -1 : 1) * scale;
@@ -1169,10 +1174,6 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
         updateComponentPropsById(component.id, momentaryControlProps(true));
         return;
       }
-      if (control === 'latching') {
-        updateComponentPropsById(component.id, nextLatchingControlProps(component));
-        return;
-      }
       setDragState({ kind: 'component', id: component.id, offset: [point[0] - component.x, point[1] - component.y] });
       return;
     }
@@ -1351,6 +1352,73 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     };
   }, [simulationRunning, simulationSpeed]);
 
+  // --- Switch & Push-Button Keyboard Controls ---
+  useEffect(() => {
+    const handleSwitchKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target && ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) return;
+      if (event.ctrlKey || event.metaKey || event.altKey || event.repeat) return;
+
+      if (/^[0-9]$/.test(event.key)) {
+        setComponents(prev => {
+          let changed = false;
+          const next = prev.map(comp => {
+            // Only affect switches and push-buttons
+            if (!comp.type.startsWith('sw-') && !comp.type.startsWith('pb-')) return comp;
+            
+            // Extract the number at the end of the label (e.g., "S1" -> "1")
+            const match = comp.label.match(/\d+$/);
+            if (!match || match[0] !== event.key) return comp;
+
+            changed = true;
+            if (comp.type.startsWith('sw-')) {
+              // Toggle Latching Switch
+              const isSpdt = comp.type === 'sw-spdt' || comp.type === 'sw-dpdt';
+              const nextState = isSpdt 
+                ? (comp.props.state === 'b' ? 'a' : 'b') 
+                : (comp.props.state === 'closed' ? 'open' : 'closed');
+              return { ...comp, props: { ...comp.props, state: nextState } };
+            } else if (comp.type.startsWith('pb-')) {
+              // Press Momentary Button
+              return { ...comp, props: { ...comp.props, state: 'pressed' } };
+            }
+            return comp;
+          });
+          return changed ? next : prev;
+        });
+      }
+    };
+
+    const handleSwitchKeyUp = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target && ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) return;
+
+      if (/^[0-9]$/.test(event.key)) {
+        setComponents(prev => {
+          let changed = false;
+          const next = prev.map(comp => {
+            // Only momentary push buttons react to keyup
+            if (!comp.type.startsWith('pb-')) return comp;
+            
+            const match = comp.label.match(/\d+$/);
+            if (!match || match[0] !== event.key) return comp;
+
+            changed = true;
+            return { ...comp, props: { ...comp.props, state: 'released' } };
+          });
+          return changed ? next : prev;
+        });
+      }
+    };
+
+    window.addEventListener('keydown', handleSwitchKeyDown);
+    window.addEventListener('keyup', handleSwitchKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleSwitchKeyDown);
+      window.removeEventListener('keyup', handleSwitchKeyUp);
+    };
+  }, []);
+
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
@@ -1422,7 +1490,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
       if (tabDUiRefinement && category === 'Passive') {
         categoryItems = [...categoryItems, ...['star-resistor-pack', 'delta-resistor-pack'].map(getDef).filter((item): item is ComponentDef => Boolean(item))];
       }
-      if (tabDUiRefinement && category === 'Controlled Sources & Networks') {
+      if (tabDUiRefinement && category === 'Controlled Sources') {
         categoryItems = categoryItems.filter(item => !['star-resistor-pack', 'delta-resistor-pack'].includes(item.id));
       }
       if (tabDUiRefinement && category === 'Diodes') {
@@ -1440,7 +1508,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     }, {});
   }, [search, tabDUiRefinement]);
 
-  const linkedCoils = components.filter(component => ['contactor', 'relay-spst', 'relay-spdt', 'relay-dpst', 'relay-dpdt'].includes(component.type));
+  const linkedCoils = components.filter(component => ['contactor', 'relay-spst', 'relay-spdt', 'relay-dpst'].includes(component.type));
 
   const wireSnapProjection = useMemo(() => {
     if (wiring.from && dragState?.kind !== 'pan') {
@@ -1517,12 +1585,38 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                     <span style={{ color: colors.subtle, fontWeight: 600 }}>{items.length}</span>
                   </button>
                   {!collapsed && <div className={tabDUiRefinement ? 'grid grid-cols-2 gap-2 px-1 pb-3' : undefined}>{items.map(item => (
-                    <button key={item.id} draggable onDragStart={event => {
-                      event.dataTransfer.setData('application/electrolab-component', item.id);
-                      event.dataTransfer.effectAllowed = 'copy';
-                    }} onClick={() => addComponent(item.id)} className={tabDUiRefinement ? 'flex min-h-[142px] flex-col items-center justify-center rounded-md border px-1 py-2 text-center transition-colors active:scale-[.97]' : undefined} style={tabDUiRefinement ? { borderColor: colors.line, background: colors.panel, color: colors.muted, cursor: 'grab', fontSize: 8, fontWeight: 650 } : { width: '100%', textAlign: 'left', border: 'none', background: 'transparent', color: colors.muted, cursor: 'grab', borderRadius: 6, padding: '7px 8px', fontSize: 11, display: 'flex', flexDirection: 'column', gap: 2 }} onMouseEnter={event => { event.currentTarget.style.background = colors.panelAlt; event.currentTarget.style.color = colors.text; }} onMouseLeave={event => { event.currentTarget.style.background = tabDUiRefinement ? colors.panel : 'transparent'; event.currentTarget.style.color = colors.muted; }}>
-                      {tabDUiRefinement ? <ComponentPaletteIcon definition={item} colors={colors} documented={tabDUiRefinement} /> : <><span style={{ color: 'inherit', fontWeight: 650 }}><ElectricalLabel label={item.name} /></span><span style={{ color: colors.subtle, fontSize: 9, lineHeight: 1.25 }}>{item.description}</span></>}
-                      {tabDUiRefinement && <span className="mt-0.5 line-clamp-2 text-center text-[8px] leading-tight" style={{ color: 'inherit' }}><ElectricalLabel label={item.name} /></span>}
+                    <button 
+                      key={item.id} 
+                      draggable 
+                      onDragStart={event => {
+                        event.dataTransfer.setData('application/electrolab-component', item.id);
+                        event.dataTransfer.effectAllowed = 'copy';
+                      }} 
+                      onClick={() => addComponent(item.id)} 
+                      className={tabDUiRefinement ? 'flex h-[110px] flex-col overflow-hidden rounded-md border transition-all active:scale-[.97]' : undefined} 
+                      style={tabDUiRefinement ? { borderColor: colors.line, background: colors.panel, cursor: 'grab' } : { width: '100%', textAlign: 'left', border: 'none', background: 'transparent', color: colors.muted, cursor: 'grab', borderRadius: 6, padding: '7px 8px', fontSize: 11, display: 'flex', flexDirection: 'column', gap: 2 }} 
+                      onMouseEnter={event => { event.currentTarget.style.background = colors.panelAlt; if(!tabDUiRefinement) event.currentTarget.style.color = colors.text; }} 
+                      onMouseLeave={event => { event.currentTarget.style.background = tabDUiRefinement ? colors.panel : 'transparent'; if(!tabDUiRefinement) event.currentTarget.style.color = colors.muted; }}
+                    >
+                      {tabDUiRefinement ? (
+                        <>
+                          {/* Top Section: Scaled & Centered Canvas */}
+                          <div className="flex flex-1 min-h-0 w-full items-center justify-center p-2">
+                            <ComponentPaletteIcon definition={item} colors={colors} documented={tabDUiRefinement} />
+                          </div>
+                          {/* Bottom Section: Fixed height banner with overflow-visible to prevent KaTeX clipping */}
+                          <div className="flex h-7 w-full shrink-0 items-center justify-center border-t overflow-visible px-2" style={{ borderColor: colors.line, background: `${colors.line}15` }}>
+                            <span className="flex items-center justify-center text-[10px] font-bold tracking-wider overflow-visible" style={{ color: colors.muted, lineHeight: 1 }}>
+                              <ElectricalLabel label={item.name} />
+                            </span>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <span style={{ color: 'inherit', fontWeight: 650 }}><ElectricalLabel label={item.name} /></span>
+                          <span style={{ color: colors.subtle, fontSize: 9, lineHeight: 1.25 }}>{item.description}</span>
+                        </>
+                      )}
                     </button>
                   ))}</div>}
                 </section>
@@ -1591,7 +1685,6 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                     <g transform={symbolTransform}>
                       {isSelected && <rect x={-definition.width / 2 - 9} y={-definition.height / 2 - 9} width={definition.width + 18} height={definition.height + 18} rx={7} fill={`${colors.selection}0d`} stroke={colors.selection} strokeWidth={1.2} strokeDasharray="4 3" pointerEvents="none" />}
                       {renderSymbol(definition.symbol, powered, { ...component.props, _intensity: intensity, _documentedStyle: tabDUiRefinement }, animationTime)}
-                      {component.type === 'dmm' && <InstrumentText reading={reading} x={0} y={-14} color={colors.text} />}
                       {component.type === 'oscilloscope' && <ScopeTrace reading={snapshot.instrumentReadings[`${component.id}:ch1`]} color="#38bdf8" />}
                     </g>
                     {definition.terminals.map(terminal => {
@@ -1625,8 +1718,14 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
               {/* Dedicated Component Labels World Overlay Layer (0° Upright Orientation, No Upside Down / Rotated Labels) */}
               <g className="v3-component-labels-layer" pointerEvents="none" style={{ userSelect: 'none' }}>
                 {components.map(component => {
+                  if (component.type === 'dmm') return null; // Completely hide DMM canvas label
                   const definition = getDef(component.type);
                   if (!definition) return null;
+                  
+                  // Read the display visibility flags
+                  const hideLabel = component.props._hideLabel === true;
+                  const hideValue = component.props._hideValue === true;
+
                   const anchors = componentLabelAnchors(definition, component, visualSymbolScale);
                   const isHorizontal = anchors.isHorizontal;
                   const refTextAnchor = anchors.refTextAnchor ?? (isHorizontal ? 'middle' : 'start');
@@ -1647,51 +1746,53 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                   return (
                     <g key={`labels-${component.id}`}>
                       {/* Component Reference Label */}
-                      <text
-                        x={refX}
-                        y={refY}
-                        textAnchor={refTextAnchor}
-                        dominantBaseline="central"
-                        style={{
-                          fontFamily: "'KaTeX_Main', 'KaTeX_Math', system-ui, sans-serif",
-                          fontSize: 13,
-                          fontWeight: 400,
-                          fill: refFill,
-                          paintOrder: 'stroke fill',
-                          stroke: colors.canvas,
-                          strokeWidth: 3.5,
-                          strokeLinejoin: 'round',
-                          strokeLinecap: 'round',
-                        }}
-                      >
-                        {labelMatch ? (
-                          <>
-                            <tspan style={{ fontStyle: 'italic', fontFamily: "'KaTeX_Math', 'KaTeX_Main', system-ui, sans-serif" }}>
-                              {labelMatch[1]}
+                      {!hideLabel && (
+                        <text
+                          x={refX}
+                          y={refY}
+                          textAnchor={refTextAnchor}
+                          dominantBaseline="central"
+                          style={{
+                            fontFamily: "'KaTeX_Main', 'KaTeX_Math', system-ui, sans-serif",
+                            fontSize: 13,
+                            fontWeight: 400,
+                            fill: refFill,
+                            paintOrder: 'stroke fill',
+                            stroke: colors.canvas,
+                            strokeWidth: 3.5,
+                            strokeLinejoin: 'round',
+                            strokeLinecap: 'round',
+                          }}
+                        >
+                          {labelMatch ? (
+                            <>
+                              <tspan style={{ fontStyle: 'italic', fontFamily: "'KaTeX_Math', 'KaTeX_Main', system-ui, sans-serif" }}>
+                                {labelMatch[1]}
+                              </tspan>
+                              <tspan
+                                dy="2.5"
+                                style={{
+                                  fontSize: '9.5px',
+                                  fontWeight: 400,
+                                  fontStyle: 'normal',
+                                  fontFamily: "'KaTeX_Main', system-ui, sans-serif",
+                                }}
+                              >
+                                {labelMatch[2]}
+                              </tspan>
+                            </>
+                          ) : isGround ? (
+                            <tspan style={{ fontStyle: 'normal', fontFamily: "'KaTeX_Main', sans-serif" }}>
+                              GND
                             </tspan>
-                            <tspan
-                              dy="2.5"
-                              style={{
-                                fontSize: '9.5px',
-                                fontWeight: 400,
-                                fontStyle: 'normal',
-                                fontFamily: "'KaTeX_Main', system-ui, sans-serif",
-                              }}
-                            >
-                              {labelMatch[2]}
-                            </tspan>
-                          </>
-                        ) : isGround ? (
-                          <tspan style={{ fontStyle: 'normal', fontFamily: "'KaTeX_Main', sans-serif" }}>
-                            GND
-                          </tspan>
-                        ) : (
-                          component.label
-                        )}
-                      </text>
+                          ) : (
+                            component.label
+                          )}
+                        </text>
+                      )}
 
                       {/* Component Value Label */}
-                      {value && (
+                      {value && !hideValue && (
                         <text
                           x={valX}
                           y={valY}
@@ -1816,11 +1917,35 @@ function InspectorSection({ colors, label, children }: { colors: Palette; label:
 function PropertyRow({ colors, label, unit, children }: { colors: Palette; label: string; unit?: string; children: React.ReactNode }) { return <label style={{ display: 'grid', gridTemplateColumns: '1fr 132px', gap: 8, alignItems: 'center', marginBottom: 8 }}><span style={{ fontSize: 10, color: colors.muted, lineHeight: 1.25 }}><ElectricalLabel label={label} unit={unit} /></span>{children}</label>; }
 
 function ComponentInspector({ colors, component, definition, allComponents, linkedCoils, reading, snapshot, tabDUiRefinement, onLabelChange, onPropertyChange, onDelete }: { colors: Palette; component: CircuitComponent; definition: ComponentDef; allComponents: CircuitComponent[]; linkedCoils: CircuitComponent[]; reading?: InstrumentReading; snapshot: SimulationSnapshot; tabDUiRefinement: boolean; onLabelChange: (value: string) => void; onPropertyChange: (key: string, value: unknown) => void; onDelete: () => void }) {
+  // Check if the component actually has a numeric value to display
+  const hasValue = Object.values(definition.properties).some(p => p.type === 'number' && p.unit);
+
   return <div style={{ overflowY: 'auto', minHeight: 0 }}>
     <InspectorHeader colors={colors} title={<span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 5 }}><V3Math math={componentLabelToLatex(component.type === 'ground' ? 'GND' : component.label)} /><span style={{ color: colors.muted, fontSize: 10, letterSpacing: 0, textTransform: 'none' }}><ElectricalLabel label={definition.name} /></span></span>} subtitle={definition.description} />
     <InspectorSection colors={colors} label="Instance label">
-      <PropertyRow colors={colors} label="Reference"><input value={component.type === 'ground' ? 'GND' : component.label} disabled={component.type === 'ground'} onChange={event => onLabelChange(component.type === 'ground' ? 'GND' : event.target.value)} style={inputStyle(colors)} /></PropertyRow>
-      <div style={{ color: colors.subtle, fontSize: 9 }}>Auto reference prefix: {componentPrefix(component.type)}. Auxiliary contacts link to this reference.</div>
+      <PropertyRow colors={colors} label="Reference">
+        <input value={component.type === 'ground' ? 'GND' : component.label} disabled={component.type === 'ground'} onChange={event => onLabelChange(component.type === 'ground' ? 'GND' : event.target.value)} style={inputStyle(colors)} />
+      </PropertyRow>
+      
+      {/* NEW: Label Visibility Toggle */}
+      <PropertyRow colors={colors} label="Show Label">
+        <select value={component.props._hideLabel ? 'hide' : 'show'} onChange={event => onPropertyChange('_hideLabel', event.target.value === 'hide')} style={inputStyle(colors)}>
+          <option value="show">Show</option>
+          <option value="hide">Hide</option>
+        </select>
+      </PropertyRow>
+      
+      {/* NEW: Value Visibility Toggle (only if applicable) */}
+      {hasValue && (
+        <PropertyRow colors={colors} label="Show Value">
+          <select value={component.props._hideValue ? 'hide' : 'show'} onChange={event => onPropertyChange('_hideValue', event.target.value === 'hide')} style={inputStyle(colors)}>
+            <option value="show">Show</option>
+            <option value="hide">Hide</option>
+          </select>
+        </PropertyRow>
+      )}
+
+      <div style={{ color: colors.subtle, fontSize: 9, marginTop: 8 }}>Auto reference prefix: {componentPrefix(component.type)}. Auxiliary contacts link to this reference.</div>
     </InspectorSection>
     <InspectorSection colors={colors} label="Electrical properties">
       {Object.entries(definition.properties).map(([key, property]) => {
@@ -1871,6 +1996,45 @@ function TextInspector({ colors, text, onUpdate, onMove, onDelete }: { colors: P
 }
 
 function PersistentDmmPanel({ colors, dmms, snapshot }: { colors: Palette; dmms: CircuitComponent[]; snapshot: SimulationSnapshot }) {
+  const audioRef = useRef<{ ctx: AudioContext, osc: OscillatorNode, gain: GainNode } | null>(null);
+
+  useEffect(() => {
+    const anyShorted = dmms.some(dmm => snapshot.instrumentReadings[dmm.id]?.continuity === true);
+    if (anyShorted && !audioRef.current) {
+      try {
+        const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = 2700; // Realistic multimeter beep frequency
+        gain.gain.value = 0.1; // Moderate volume
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        audioRef.current = { ctx, osc, gain };
+      } catch (e) {
+        // Suppress audio context strict auto-play policy warnings
+      }
+    } else if (!anyShorted && audioRef.current) {
+      try {
+        audioRef.current.osc.stop();
+        audioRef.current.ctx.close();
+      } catch (e) {}
+      audioRef.current = null;
+    }
+  }, [dmms, snapshot.instrumentReadings]);
+
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        try {
+          audioRef.current.osc.stop();
+          audioRef.current.ctx.close();
+        } catch (e) {}
+      }
+    };
+  }, []);
+
   if (dmms.length === 0) return null;
   return (
     <div style={{ marginTop: 'auto', borderTop: `1px solid ${colors.line}`, background: `${colors.line}22` }}>
@@ -1878,16 +2042,14 @@ function PersistentDmmPanel({ colors, dmms, snapshot }: { colors: Palette; dmms:
       <div style={{ display: 'flex', flexDirection: 'column', padding: 10, gap: 10 }}>
         {dmms.map(dmm => {
           const reading = snapshot.instrumentReadings[dmm.id];
+          const isShorted = reading?.continuity === true;
           return (
             <div key={dmm.id} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               <div style={{ fontSize: 10, fontWeight: 700, color: colors.subtle, textTransform: 'uppercase', letterSpacing: '.05em' }}>{dmm.label}</div>
-              <div style={{ padding: 10, background: '#e8f5ea', border: '1px solid #b6dfbc', borderRadius: 7, textAlign: 'right', color: '#166534', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>
-                <div style={{ fontSize: 22, fontWeight: 800 }}>{reading?.status === 'open' ? 'OL' : reading ? <EngineeringMath value={reading.value} unit={reading.unit} /> : '—'}</div>
-                <div style={{ marginTop: 4, fontSize: 10, color: '#4b7b56' }}>{reading?.status === 'ready' ? 'Probe-linked measurement' : reading?.status === 'open' ? 'Open / not fully connected' : 'Connect HI and COM probes'}</div>
+              <div style={{ padding: 10, background: '#e0f2fe', border: '1px solid #7dd3fc', borderRadius: 7, textAlign: 'right', color: '#0284c7', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>
+                <div style={{ fontSize: 22, fontWeight: 800 }}>{reading?.status === 'open' ? 'OL' : isShorted ? 'SHORTED' : reading ? <EngineeringMath value={reading.value} unit={reading.unit} /> : '—'}</div>
+                <div style={{ marginTop: 4, fontSize: 10, color: '#0369a1' }}>{reading?.status === 'ready' ? (isShorted ? 'Continuity detected' : 'Probe-linked measurement') : reading?.status === 'open' ? 'Open / not fully connected' : 'Connect HI and COM probes'}</div>
               </div>
-              {reading?.continuity !== undefined && (
-                <div style={{ fontSize: 10, color: colors.muted }}>Continuity: <strong>{reading.continuity ? 'closed' : 'open'}</strong>{reading.frequency ? <> · <EngineeringMath value={reading.frequency} unit="Hz" /></> : ''}</div>
-              )}
             </div>
           );
         })}

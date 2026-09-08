@@ -4,7 +4,7 @@ export type DirectControlKind = 'latching' | 'momentary' | null;
 
 const MOMENTARY_TYPES = new Set(['pb-no', 'pb-nc']);
 const LATCHING_SWITCH_TYPES = new Set(['sw-spst-no', 'sw-spst-nc', 'sw-spdt', 'sw-dpst', 'sw-dpdt']);
-const LATCHING_RELAY_TYPES = new Set(['relay-spst', 'relay-spdt', 'relay-dpst', 'relay-dpdt', 'contactor']);
+const LATCHING_RELAY_TYPES = new Set(['relay-spst', 'relay-spdt', 'relay-dpst', 'contactor']);
 
 /** Identifies canvas controls without changing the generic Tab B interaction contract. */
 export function directControlKind(componentType: string): DirectControlKind {

@@ -5,6 +5,7 @@ export const TAB_D_EXCLUDED_COMPONENT_IDS = new Set([
   'scr', 'diac', 'triac',
   'digital-input', 'digital-output', 'gate-and', 'gate-or', 'gate-not',
   'gate-nand', 'gate-nor', 'gate-xor', 'gate-xnor',
+  'sw-dpdt',
 ]);
 
 export function isTabDComponentAvailable(componentId: string): boolean {

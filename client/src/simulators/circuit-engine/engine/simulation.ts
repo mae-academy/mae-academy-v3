@@ -212,7 +212,6 @@ export class SimulationEngine {
   private relayStates = new Map<string, boolean>();
   private scrLatched = new Set<string>();
   private fuseBlown = new Set<string>();
-  private breakerTripped = new Set<string>();
   private terminalHistory = new Map<string, SamplePoint[]>();
   private nodeHistory = new Map<string, SamplePoint[]>();
   private branchHistory = new Map<string, SamplePoint[]>();
@@ -225,7 +224,6 @@ export class SimulationEngine {
     this.relayStates.clear();
     this.scrLatched.clear();
     this.fuseBlown.clear();
-    this.breakerTripped.clear();
     this.terminalHistory.clear();
     this.nodeHistory.clear();
     this.branchHistory.clear();
@@ -384,6 +382,8 @@ export class SimulationEngine {
       case 'sw-spst-nc': return state !== 'open';
       case 'pb-no': return state === 'pressed';
       case 'pb-nc': return state !== 'pressed';
+      case 'circuit-breaker':
+      case 'circuit-breaker-3phase': return state === 'closed';
       case 'aux-contact-no': {
         const linked = propString(component.props, 'linkedTo');
         const controller = this.components.find(item => item.label === linked);
@@ -401,7 +401,7 @@ export class SimulationEngine {
   private calculateControls(solution: number[]): Map<string, boolean> {
     const next = new Map<string, boolean>();
     for (const component of this.components) {
-      if (!['relay-spst', 'relay-spdt', 'relay-dpst', 'relay-dpdt', 'contactor'].includes(component.type)) continue;
+      if (!['relay-spst', 'relay-spdt', 'relay-dpst', 'contactor'].includes(component.type)) continue;
       const manualState = propString(component.props, 'manualState');
       if (manualState === 'open' || manualState === 'closed') {
         next.set(component.id, manualState === 'closed');
@@ -668,10 +668,20 @@ export class SimulationEngine {
         case 'sw-spst-nc':
         case 'pb-no':
         case 'pb-nc':
+        case 'circuit-breaker':
         case 'aux-contact-no':
         case 'aux-contact-nc': {
           const closed = this.contactClosed(component, controls);
           current = stampResistance(component, 'a', 'b', closed ? CLOSED_RESISTANCE : OPEN_RESISTANCE);
+          isPowered = closed;
+          break;
+        }
+        case 'circuit-breaker-3phase': {
+          const closed = this.contactClosed(component, controls);
+          const l1 = stampResistance(component, 'l1', 't1', closed ? CLOSED_RESISTANCE : OPEN_RESISTANCE);
+          const l2 = stampResistance(component, 'l2', 't2', closed ? CLOSED_RESISTANCE : OPEN_RESISTANCE);
+          const l3 = stampResistance(component, 'l3', 't3', closed ? CLOSED_RESISTANCE : OPEN_RESISTANCE);
+          current = Math.max(Math.abs(l1), Math.abs(l2), Math.abs(l3));
           isPowered = closed;
           break;
         }
@@ -705,7 +715,6 @@ export class SimulationEngine {
         case 'relay-spst':
         case 'relay-spdt':
         case 'relay-dpst':
-        case 'relay-dpdt':
         case 'contactor': {
           const coilResistance = type === 'contactor' ? Math.max(100, propNumber(props, 'coilVoltage', 24) ** 2 / 8) : Math.max(10, propNumber(props, 'coilR', 400));
           const coilCurrent = stampResistance(component, 'coil+', 'coil-', coilResistance);
@@ -721,12 +730,6 @@ export class SimulationEngine {
             const closed = energized === !normallyClosed;
             const one = stampResistance(component, 'c1', 'no1', closed ? CLOSED_RESISTANCE : OPEN_RESISTANCE);
             const two = stampResistance(component, 'c2', 'no2', closed ? CLOSED_RESISTANCE : OPEN_RESISTANCE);
-            current = Math.max(Math.abs(one), Math.abs(two));
-          } else if (type === 'relay-dpdt') {
-            const one = stampResistance(component, 'c1', 'no1', energized ? CLOSED_RESISTANCE : OPEN_RESISTANCE);
-            const two = stampResistance(component, 'c2', 'no2', energized ? CLOSED_RESISTANCE : OPEN_RESISTANCE);
-            stampResistance(component, 'c1', 'nc1', energized ? OPEN_RESISTANCE : CLOSED_RESISTANCE);
-            stampResistance(component, 'c2', 'nc2', energized ? OPEN_RESISTANCE : CLOSED_RESISTANCE);
             current = Math.max(Math.abs(one), Math.abs(two));
           } else {
             const contacts = ['l1', 'l2', 'l3'].map((line, index) => stampResistance(component, line, `t${index + 1}`, energized ? CLOSED_RESISTANCE : OPEN_RESISTANCE));
@@ -745,10 +748,13 @@ export class SimulationEngine {
           isPowered = !blown;
           break;
         }
-        case 'circuit-breaker': {
-          const tripped = this.breakerTripped.has(component.id) || propString(props, 'state', 'closed') === 'tripped';
-          current = stampResistance(component, 'a', 'b', tripped ? OPEN_RESISTANCE : 0.01);
-          isPowered = !tripped;
+        case 'fuse-3phase': {
+          const blown = this.fuseBlown.has(component.id);
+          const l1 = stampResistance(component, 'l1', 't1', blown ? OPEN_RESISTANCE : 0.01);
+          const l2 = stampResistance(component, 'l2', 't2', blown ? OPEN_RESISTANCE : 0.01);
+          const l3 = stampResistance(component, 'l3', 't3', blown ? OPEN_RESISTANCE : 0.01);
+          current = Math.max(Math.abs(l1), Math.abs(l2), Math.abs(l3));
+          isPowered = !blown;
           break;
         }
         case 'motor-dc': {
@@ -830,15 +836,12 @@ export class SimulationEngine {
           break;
         }
         case 'transformer':
-        case 'transformer-ct':
-        case 'autotransformer': {
-          const ratio = type === 'autotransformer'
-            ? propNumber(props, 'outputV', 120) / Math.max(0.1, propNumber(props, 'inputV', 230))
-            : propNumber(props, 'secondaryV', type === 'transformer-ct' ? 24 : 12) / Math.max(0.1, propNumber(props, 'primaryV', 230));
-          const inputA = type === 'autotransformer' ? 'in1' : 'p1';
-          const inputB = type === 'autotransformer' ? 'in2' : 'p2';
-          const outputA = type === 'autotransformer' ? 'out1' : 's1';
-          const outputB = type === 'autotransformer' ? 'out2' : 's2';
+        case 'transformer-ct': {
+          const ratio = propNumber(props, 'secondaryV', type === 'transformer-ct' ? 24 : 12) / Math.max(0.1, propNumber(props, 'primaryV', 230));
+          const inputA = 'p1';
+          const inputB = 'p2';
+          const outputA = 's1';
+          const outputB = 's2';
           const target = ratio * (this.terminalVoltage(component, inputA, guess) - this.terminalVoltage(component, inputB, guess));
           current = stampSource(component, outputA, outputB, target, 0.5);
           stampResistance(component, inputA, inputB, 100000);
@@ -849,6 +852,16 @@ export class SimulationEngine {
             system.conductance(s1, ct, 2);
             system.conductance(ct, s2, 2);
           }
+          isPowered = Math.abs(target) > 1e-5;
+          break;
+        }
+        case 'autotransformer': {
+          const ratio = propNumber(props, 'outputV', 120) / Math.max(0.1, propNumber(props, 'inputV', 230));
+          const target = ratio * (this.terminalVoltage(component, 'in1', guess) - this.terminalVoltage(component, 'in2', guess));
+          current = stampSource(component, 'tap', 'out2', target, 0.5);
+          stampResistance(component, 'in1', 'in2', 100000);
+          stampResistance(component, 'in1', 'out1', 1e-5);
+          stampResistance(component, 'in2', 'out2', 1e-5);
           isPowered = Math.abs(target) > 1e-5;
           break;
         }
@@ -939,13 +952,9 @@ export class SimulationEngine {
         if (Math.abs(voltage) < 0.05) this.scrLatched.delete(component.id);
         else if (result.powered[component.id]) this.scrLatched.add(component.id);
       }
-      if (component.type === 'fuse' && !this.fuseBlown.has(component.id)) {
+      if ((component.type === 'fuse' || component.type === 'fuse-3phase') && !this.fuseBlown.has(component.id)) {
         const rated = Math.max(0.01, propNumber(component.props, 'ratedCurrent', 10));
         if (Math.abs(result.branchCurrents[component.id] ?? 0) > rated * 1.25) this.fuseBlown.add(component.id);
-      }
-      if (component.type === 'circuit-breaker' && !this.breakerTripped.has(component.id)) {
-        const trip = Math.max(0.01, propNumber(component.props, 'tripCurrent', propNumber(component.props, 'ratedCurrent', 20)));
-        if (Math.abs(result.branchCurrents[component.id] ?? 0) > trip) this.breakerTripped.add(component.id);
       }
     }
   }
