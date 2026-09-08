@@ -96,7 +96,7 @@ const AcVoltage: SymbolFC = ({ props }) => {
 const DcCurrent: SymbolFC = () => (
   <g>
     <circle cx={0} cy={0} r={33} fill="none" stroke="currentColor" strokeWidth={1.5} />
-    <line x1={0} y1={18} x2={0} y2={-18} stroke="currentColor" strokeWidth={1.5} />
+    <line x1={0} y1={18} x2={0} y2={-19} stroke="currentColor" strokeWidth={1.5} />
     <polyline points="-8,-10 0,-20 8,-10" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinejoin="round" />
     <line x1={0} y1={-33} x2={0} y2={-50} stroke="currentColor" strokeWidth={1.5} />
     <line x1={0} y1={33} x2={0} y2={50} stroke="currentColor" strokeWidth={1.5} />
@@ -1059,6 +1059,7 @@ export const SYMBOL_MAP: Record<string, SymbolFC> = {
   'potentiometer': Potentiometer,
   'capacitor': Capacitor,
   'inductor': Inductor,
+  'impedance': Resistor,
   'vccs': (p) => <DependentDiamond {...p} props={{ ...p.props, _type: 'vccs' }} />,
   'vcvs': (p) => <DependentDiamond {...p} props={{ ...p.props, _type: 'vcvs' }} />,
   'cccs': (p) => <DependentDiamond {...p} props={{ ...p.props, _type: 'cccs' }} />,

@@ -137,19 +137,35 @@ export class TabDSimulationEngine extends SimulationEngine {
       const number = Number(component.props[key]); return Number.isFinite(number) ? number : fallback;
     };
     const sourceValue = (component: CircuitComponent, amplitudeKey: string, fallback: number) => {
-      const amplitude = value(component, amplitudeKey, fallback);
+      const format = String(component.props.format ?? 'polar');
+      let effectiveAmplitude = 0;
+      let effectivePhase = 0;
+
+      if (format === 'rectangular') {
+        const r = value(component, 'real', fallback);
+        const i = value(component, 'imag', 0);
+        effectiveAmplitude = Math.sqrt(r * r + i * i);
+        effectivePhase = Math.atan2(i, r);
+      } else {
+        effectiveAmplitude = value(component, amplitudeKey, fallback);
+        const phaseRaw = value(component, 'phase', 0);
+        const isRad = String(component.props.angleUnit) === 'radian';
+        effectivePhase = isRad ? phaseRaw : phaseRaw * Math.PI / 180;
+      }
+
       const frequency = value(component, 'frequency', 60);
-      const phase = value(component, 'phase', 0) * Math.PI / 180;
       const offset = value(component, 'offset', 0);
-      const angle = 2 * Math.PI * Math.max(0, frequency) * this.documentedMna.getTime() + phase;
+      const angle = 2 * Math.PI * Math.max(0, frequency) * this.documentedMna.getTime() + effectivePhase;
       const cycle = ((angle / (2 * Math.PI)) % 1 + 1) % 1;
       const waveform = String(component.props.waveform ?? 'sine');
       const normalized = waveform === 'square' ? (Math.sin(angle) >= 0 ? 1 : -1)
         : waveform === 'sawtooth' ? (2 * cycle - 1)
           : waveform === 'triangle' ? (1 - 4 * Math.abs(cycle - 0.5))
             : Math.sin(angle);
-      return offset + amplitude * normalized;
+      return offset + effectiveAmplitude * normalized;
     };
+    const acSource = this.tabDComponents.find((c) => ['ac-voltage', 'ac-current', 'three-phase-source', 'three-phase-rail'].includes(c.type));
+    const systemFrequency = acSource ? Number(acSource.props.frequency ?? 50) : 50;
     const primitives: TabDPrimitive[] = [];
     const nonlinear: TabDNonlinearDevice[] = [];
     const priorNodeVoltages = this.documentedSnapshot?.nodeVoltages ?? { '0': 0 };
@@ -164,7 +180,22 @@ export class TabDSimulationEngine extends SimulationEngine {
       const p = (terminal: string) => netForTerminal(component.id, terminal);
       switch (component.type) {
         case 'ground': break;
-        case 'resistor': primitives.push({ kind: 'resistor', id: component.id, positive: p('a'), negative: p('b'), resistance: value(component, 'resistance', 1000) }); break;
+        case 'resistor': primitives.push({ kind: 'resistor', id: component.id, positive: p('a'), negative: p('b'), resistance: Math.max(1e-9, value(component, 'resistance', 1000)) }); break;
+        case 'star-resistor-pack': {
+          const resistance = Math.max(1e-9, value(component, 'resistance', 1000));
+          const neutral = p('n');
+          primitives.push({ kind: 'resistor', id: `${component.id}:1`, positive: p('l1'), negative: neutral, resistance });
+          primitives.push({ kind: 'resistor', id: `${component.id}:2`, positive: p('l2'), negative: neutral, resistance });
+          primitives.push({ kind: 'resistor', id: `${component.id}:3`, positive: p('l3'), negative: neutral, resistance });
+          break;
+        }
+        case 'delta-resistor-pack': {
+          const resistance = Math.max(1e-9, value(component, 'resistance', 1000));
+          primitives.push({ kind: 'resistor', id: `${component.id}:12`, positive: p('l1'), negative: p('l2'), resistance });
+          primitives.push({ kind: 'resistor', id: `${component.id}:23`, positive: p('l2'), negative: p('l3'), resistance });
+          primitives.push({ kind: 'resistor', id: `${component.id}:31`, positive: p('l3'), negative: p('l1'), resistance });
+          break;
+        }
         case 'potentiometer': {
           const a = p('t1') ?? p('a');
           const b = p('t2') ?? p('b');
@@ -176,6 +207,34 @@ export class TabDSimulationEngine extends SimulationEngine {
         }
         case 'capacitor': primitives.push({ kind: 'capacitor', id: component.id, positive: p('a'), negative: p('b'), capacitance: value(component, 'capacitance', 1e-6) }); break;
         case 'inductor': primitives.push({ kind: 'inductor', id: component.id, positive: p('a'), negative: p('b'), inductance: value(component, 'inductance', 1e-3), seriesResistance: value(component, 'dcr', 0) }); break;
+        case 'impedance': {
+          const format = String(component.props.format ?? 'rectangular');
+          let r = 0, x = 0;
+          if (format === 'polar') {
+            const mag = value(component, 'mag', 5);
+            const angRaw = value(component, 'ang', 53.13);
+            const isRad = String(component.props.angleUnit) === 'radian';
+            const ang = isRad ? angRaw : angRaw * Math.PI / 180;
+            r = mag * Math.cos(ang);
+            x = mag * Math.sin(ang);
+          } else {
+            r = value(component, 'r', 3);
+            x = value(component, 'x', 4);
+          }
+          const w = 2 * Math.PI * Math.max(0.001, systemFrequency);
+          if (Math.abs(x) < 1e-6) {
+            primitives.push({ kind: 'resistor', id: component.id, positive: p('a'), negative: p('b'), resistance: Math.max(1e-9, r) });
+          } else {
+            const mid = `@${component.id}:mid`;
+            primitives.push({ kind: 'resistor', id: `${component.id}:R`, positive: p('a'), negative: mid, resistance: Math.max(1e-9, r) });
+            if (x > 0) {
+              primitives.push({ kind: 'inductor', id: `${component.id}:L`, positive: mid, negative: p('b'), inductance: x / w });
+            } else {
+              primitives.push({ kind: 'capacitor', id: `${component.id}:C`, positive: mid, negative: p('b'), capacitance: -1 / (x * w) });
+            }
+          }
+          break;
+        }
         case 'dc-voltage': primitives.push({ kind: 'voltage', id: component.id, positive: p('pos'), negative: p('neg'), voltage: value(component, 'voltage', 12) }); break;
         case 'dc-rail': primitives.push({ kind: 'voltage', id: component.id, positive: p('pos'), negative: '0', voltage: value(component, 'voltage', 24) }); break;
         case 'ac-voltage': primitives.push({ kind: 'voltage', id: component.id, positive: p('pos'), negative: p('neg'), voltage: sourceValue(component, 'amplitude', 10) }); break;

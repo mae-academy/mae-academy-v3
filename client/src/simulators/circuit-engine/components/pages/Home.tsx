@@ -277,11 +277,11 @@ function ComponentPaletteIcon({ definition, colors, documented }: { definition: 
   const w = definition.width + padding;
   const h = definition.height + padding;
   return (
-    <svg 
-      width="100%" 
-      height="100%" 
-      viewBox={`${-w / 2} ${-h / 2} ${w} ${h}`} 
-      aria-hidden="true" 
+    <svg
+      width="100%"
+      height="100%"
+      viewBox={`${-w / 2} ${-h / 2} ${w} ${h}`}
+      aria-hidden="true"
       style={{ overflow: 'visible', color: colors.text, pointerEvents: 'none' }}
     >
       <g>
@@ -360,10 +360,10 @@ function componentLabelAnchors(definition: ComponentDef, component: CircuitCompo
   const RELAY_TYPES = new Set(['relay-spst', 'relay-spdt', 'relay-dpst', 'contactor']);
   if (RELAY_TYPES.has(component.type)) {
     const isHorizontal = component.rotation % 180 === 0;
-    
+
     let refY = -45;
     let valY = 45;
-    
+
     // حساب الأبعاد بدقة للمستطيل الوهمي الخاص بكل نوع
     if (component.type === 'relay-spdt' || component.type === 'relay-dpst') {
       valY = 70;
@@ -425,6 +425,31 @@ function componentValueAnchor(definition: ComponentDef, component: CircuitCompon
 }
 
 function componentDisplayValue(definition: ComponentDef, component: CircuitComponent): string | null {
+  if (component.type === 'impedance' || component.type === 'ac-voltage' || component.type === 'ac-current') {
+    const isImpedance = component.type === 'impedance';
+    const format = String(component.props.format ?? (isImpedance ? 'rectangular' : 'polar'));
+    const unit = component.type === 'ac-voltage' ? 'V' : component.type === 'ac-current' ? 'A' : 'Ω';
+    
+    if (format === 'polar') {
+      const magKey = isImpedance ? 'mag' : 'amplitude';
+      const angKey = isImpedance ? 'ang' : 'phase';
+      const defaultMag = component.type === 'ac-voltage' ? 10 : component.type === 'ac-current' ? 1 : 5;
+      const defaultAng = isImpedance ? 53.13 : 0;
+      const mag = numeric(component.props[magKey], defaultMag);
+      const ang = numeric(component.props[angKey], defaultAng);
+      const isRad = String(component.props.angleUnit) === 'radian';
+      return `${mag} ∠ ${ang}${isRad ? ' rad' : '°'} ${unit}`;
+    }
+    
+    const rKey = isImpedance ? 'r' : 'real';
+    const xKey = isImpedance ? 'x' : 'imag';
+    const defaultR = component.type === 'ac-voltage' ? 10 : component.type === 'ac-current' ? 1 : 3;
+    const defaultX = isImpedance ? 4 : 0;
+    const r = numeric(component.props[rKey], defaultR);
+    const x = numeric(component.props[xKey], defaultX);
+    const sign = x >= 0 ? '+' : '-';
+    return `${r} ${sign} j${Math.abs(x)} ${unit}`;
+  }
   const entry = Object.entries(definition.properties).find(([, property]) => property.type === 'number' && property.unit);
   if (!entry) return null;
   const [key, property] = entry;
@@ -821,7 +846,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
       return;
     }
     const origin = sourcePointFromElement(svgRef.current, pan, zoom);
-    
+
     // Find bounding box top-left of clipboard items
     let minX = Infinity; let minY = Infinity;
     clipboard.components.forEach(c => { minX = Math.min(minX, c.x); minY = Math.min(minY, c.y); });
@@ -835,7 +860,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
 
     const idMap = new Map<string, string>();
     const nextComponents = [...components];
-    
+
     const pastedComponents = clipboard.components.map(c => {
       const newId = nanoid(10);
       idMap.set(c.id, newId);
@@ -1365,7 +1390,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
           const next = prev.map(comp => {
             // Only affect switches and push-buttons
             if (!comp.type.startsWith('sw-') && !comp.type.startsWith('pb-')) return comp;
-            
+
             // Extract the number at the end of the label (e.g., "S1" -> "1")
             const match = comp.label.match(/\d+$/);
             if (!match || match[0] !== event.key) return comp;
@@ -1374,8 +1399,8 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
             if (comp.type.startsWith('sw-')) {
               // Toggle Latching Switch
               const isSpdt = comp.type === 'sw-spdt' || comp.type === 'sw-dpdt';
-              const nextState = isSpdt 
-                ? (comp.props.state === 'b' ? 'a' : 'b') 
+              const nextState = isSpdt
+                ? (comp.props.state === 'b' ? 'a' : 'b')
                 : (comp.props.state === 'closed' ? 'open' : 'closed');
               return { ...comp, props: { ...comp.props, state: nextState } };
             } else if (comp.type.startsWith('pb-')) {
@@ -1399,7 +1424,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
           const next = prev.map(comp => {
             // Only momentary push buttons react to keyup
             if (!comp.type.startsWith('pb-')) return comp;
-            
+
             const match = comp.label.match(/\d+$/);
             if (!match || match[0] !== event.key) return comp;
 
@@ -1585,18 +1610,18 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                     <span style={{ color: colors.subtle, fontWeight: 600 }}>{items.length}</span>
                   </button>
                   {!collapsed && <div className={tabDUiRefinement ? 'grid grid-cols-2 gap-2 px-1 pb-3' : undefined}>{items.map(item => (
-                    <button 
-                      key={item.id} 
-                      draggable 
+                    <button
+                      key={item.id}
+                      draggable
                       onDragStart={event => {
                         event.dataTransfer.setData('application/electrolab-component', item.id);
                         event.dataTransfer.effectAllowed = 'copy';
-                      }} 
-                      onClick={() => addComponent(item.id)} 
-                      className={tabDUiRefinement ? 'flex h-[110px] flex-col overflow-hidden rounded-md border transition-all active:scale-[.97]' : undefined} 
-                      style={tabDUiRefinement ? { borderColor: colors.line, background: colors.panel, cursor: 'grab' } : { width: '100%', textAlign: 'left', border: 'none', background: 'transparent', color: colors.muted, cursor: 'grab', borderRadius: 6, padding: '7px 8px', fontSize: 11, display: 'flex', flexDirection: 'column', gap: 2 }} 
-                      onMouseEnter={event => { event.currentTarget.style.background = colors.panelAlt; if(!tabDUiRefinement) event.currentTarget.style.color = colors.text; }} 
-                      onMouseLeave={event => { event.currentTarget.style.background = tabDUiRefinement ? colors.panel : 'transparent'; if(!tabDUiRefinement) event.currentTarget.style.color = colors.muted; }}
+                      }}
+                      onClick={() => addComponent(item.id)}
+                      className={tabDUiRefinement ? 'flex h-[110px] flex-col overflow-hidden rounded-md border transition-all active:scale-[.97]' : undefined}
+                      style={tabDUiRefinement ? { borderColor: colors.line, background: colors.panel, cursor: 'grab' } : { width: '100%', textAlign: 'left', border: 'none', background: 'transparent', color: colors.muted, cursor: 'grab', borderRadius: 6, padding: '7px 8px', fontSize: 11, display: 'flex', flexDirection: 'column', gap: 2 }}
+                      onMouseEnter={event => { event.currentTarget.style.background = colors.panelAlt; if (!tabDUiRefinement) event.currentTarget.style.color = colors.text; }}
+                      onMouseLeave={event => { event.currentTarget.style.background = tabDUiRefinement ? colors.panel : 'transparent'; if (!tabDUiRefinement) event.currentTarget.style.color = colors.muted; }}
                     >
                       {tabDUiRefinement ? (
                         <>
@@ -1721,7 +1746,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                   if (component.type === 'dmm') return null; // Completely hide DMM canvas label
                   const definition = getDef(component.type);
                   if (!definition) return null;
-                  
+
                   // Read the display visibility flags
                   const hideLabel = component.props._hideLabel === true;
                   const hideValue = component.props._hideValue === true;
@@ -1926,7 +1951,7 @@ function ComponentInspector({ colors, component, definition, allComponents, link
       <PropertyRow colors={colors} label="Reference">
         <input value={component.type === 'ground' ? 'GND' : component.label} disabled={component.type === 'ground'} onChange={event => onLabelChange(component.type === 'ground' ? 'GND' : event.target.value)} style={inputStyle(colors)} />
       </PropertyRow>
-      
+
       {/* NEW: Label Visibility Toggle */}
       <PropertyRow colors={colors} label="Show Label">
         <select value={component.props._hideLabel ? 'hide' : 'show'} onChange={event => onPropertyChange('_hideLabel', event.target.value === 'hide')} style={inputStyle(colors)}>
@@ -1934,7 +1959,7 @@ function ComponentInspector({ colors, component, definition, allComponents, link
           <option value="hide">Hide</option>
         </select>
       </PropertyRow>
-      
+
       {/* NEW: Value Visibility Toggle (only if applicable) */}
       {hasValue && (
         <PropertyRow colors={colors} label="Show Value">
@@ -1949,6 +1974,28 @@ function ComponentInspector({ colors, component, definition, allComponents, link
     </InspectorSection>
     <InspectorSection colors={colors} label="Electrical properties">
       {Object.entries(definition.properties).map(([key, property]) => {
+        if (component.type === 'impedance' || component.type === 'ac-voltage' || component.type === 'ac-current') {
+          const isImpedance = component.type === 'impedance';
+          const format = String(component.props.format ?? (isImpedance ? 'rectangular' : 'polar'));
+          
+          if (format === 'rectangular' && ['mag', 'ang', 'amplitude', 'phase', 'angleUnit'].includes(key)) return null;
+          if (format === 'polar' && ['r', 'x', 'real', 'imag', 'angleUnit'].includes(key)) return null;
+          
+          if (format === 'polar' && (key === 'ang' || key === 'phase')) {
+            const defaultAng = isImpedance ? 53.13 : 0;
+            return (
+              <PropertyRow key={key} colors={colors} label={property.label ?? key}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 60px', gap: 5 }}>
+                  <input type="number" step="any" value={numeric(component.props[key], defaultAng)} onChange={event => onPropertyChange(key, numeric(event.target.value, defaultAng))} style={inputStyle(colors)} />
+                  <select value={String(component.props.angleUnit ?? 'degree')} onChange={event => onPropertyChange('angleUnit', event.target.value)} style={{ ...inputStyle(colors), paddingInline: 5 }}>
+                    <option value="degree">deg</option>
+                    <option value="radian">rad</option>
+                  </select>
+                </div>
+              </PropertyRow>
+            );
+          }
+        }
         if (key === 'linkedTo') return <PropertyRow key={key} colors={colors} label={property.label ?? key}><select value={String(component.props[key] ?? '')} onChange={event => onPropertyChange(key, event.target.value)} style={inputStyle(colors)}><option value="">Select coil reference</option>{linkedCoils.filter(coil => coil.id !== component.id).map(coil => <option key={coil.id} value={coil.label}>{coil.label} · {getDef(coil.type)?.name}</option>)}</select></PropertyRow>;
         if (key === 'controlSourceId') return <PropertyRow key={key} colors={colors} label={property.label ?? key}><select value={String(component.props[key] ?? '')} onChange={event => onPropertyChange(key, event.target.value)} style={inputStyle(colors)}><option value="">Select target branch/node</option>{allComponents.filter(c => c.id !== component.id && c.type !== 'ground').map(c => <option key={c.id} value={c.label}>{c.label} · {getDef(c.type)?.name}</option>)}</select></PropertyRow>;
         const value = component.props[key] ?? property.value;
@@ -2019,7 +2066,7 @@ function PersistentDmmPanel({ colors, dmms, snapshot }: { colors: Palette; dmms:
       try {
         audioRef.current.osc.stop();
         audioRef.current.ctx.close();
-      } catch (e) {}
+      } catch (e) { }
       audioRef.current = null;
     }
   }, [dmms, snapshot.instrumentReadings]);
@@ -2030,7 +2077,7 @@ function PersistentDmmPanel({ colors, dmms, snapshot }: { colors: Palette; dmms:
         try {
           audioRef.current.osc.stop();
           audioRef.current.ctx.close();
-        } catch (e) {}
+        } catch (e) { }
       }
     };
   }, []);

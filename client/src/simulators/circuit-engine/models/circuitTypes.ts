@@ -97,6 +97,7 @@ const PREFIXES: Record<string, string> = {
   potentiometer: 'RV',
   capacitor: 'C',
   inductor: 'L',
+  impedance: 'Z',
   'diode-ideal': 'D',
   'diode-silicon': 'D',
   'diode-germanium': 'D',

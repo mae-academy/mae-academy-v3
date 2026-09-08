@@ -56,6 +56,23 @@ export function compileDcTopology(components: CircuitComponent[], wires: Circuit
   const elements: MNAElement[] = [];
   for (const component of components) {
     if (component.type === 'resistor') elements.push({ type: 'resistor', id: component.id, positive: nodeFor(component, 'a'), negative: nodeFor(component, 'b'), resistance: number(component, 'resistance', 1000) });
+    if (component.type === 'impedance') {
+      const format = String(component.props.format ?? 'rectangular');
+      let r = 0, x = 0;
+      if (format === 'polar') {
+        const mag = number(component, 'mag', 5);
+        const angRaw = number(component, 'ang', 53.13);
+        const isRad = String(component.props.angleUnit) === 'radian';
+        const ang = isRad ? angRaw : angRaw * Math.PI / 180;
+        r = mag * Math.cos(ang);
+        x = mag * Math.sin(ang);
+      } else {
+        r = number(component, 'r', 3);
+        x = number(component, 'x', 4);
+      }
+      const effectiveR = x < -1e-6 ? 1e12 : Math.max(1e-9, r); // DC: Cap is open, Inductor is short
+      elements.push({ type: 'resistor', id: component.id, positive: nodeFor(component, 'a'), negative: nodeFor(component, 'b'), resistance: effectiveR });
+    }
     if (component.type === 'dc-voltage') elements.push({ type: 'voltage', id: component.id, positive: nodeFor(component, 'pos'), negative: nodeFor(component, 'neg'), voltage: number(component, 'voltage', 12) });
     if (component.type === 'dc-rail') elements.push({ type: 'voltage', id: component.id, positive: nodeFor(component, 'pos'), negative: '0', voltage: number(component, 'voltage', 24) });
     if (component.type === 'dc-current') elements.push({ type: 'current', id: component.id, from: nodeFor(component, 'pos'), to: nodeFor(component, 'neg'), current: number(component, 'current', 1) });
