@@ -393,33 +393,70 @@ export function resolveTabDNodeJunction(
   return { point: [0, 0], degree: 0, isJunction: false };
 }
 
-/**
- * Resolves component label positions with exact distance verification.
- * For horizontal elements: Reference at (0, -18), Value at (0, 22) with text-anchor="middle".
- * For vertical elements: Reference at (26, -6), Value at (26, 12) with text-anchor="start".
- */
 export function tabDComponentLabelAnchors(
   componentType: string,
   terminalsAreHorizontal: boolean,
   halfWidth: number,
   halfHeight: number,
-): { reference: Point; value: Point } {
-  if (componentType === 'dc-rail') return { reference: [0, -16], value: [24, -8] };
-
+): { reference: Point; value: Point; refTextAnchor?: 'start' | 'middle' | 'end'; valTextAnchor?: 'start' | 'middle' | 'end' } {
   const CIRCULAR_SOURCES = new Set(['dc-voltage', 'ac-voltage', 'dc-current', 'ac-current', 'voltmeter', 'ammeter', 'lamp', 'motor-dc', 'motor-3phase', 'three-phase-source']);
-  if (CIRCULAR_SOURCES.has(componentType)) return { reference: [0, -36], value: [0, 36] };
+  const CONTROLLED_SOURCES = new Set(['vccs', 'vcvs', 'cccs', 'ccvs']);
 
-  if (componentType === 'dmm') return { reference: [0, -75], value: [0, 75] };
-  if (componentType === 'opamp') return { reference: [0, -32], value: [0, 32] };
-  if (componentType === 'fuse') return { reference: [0, -16], value: [0, 16] };
+  if (componentType === 'ground') {
+    return { reference: [0, 16], value: [0, 28], refTextAnchor: 'middle', valTextAnchor: 'middle' };
+  }
 
-  // توحيد الأرقام الدقيقة للريليهات
-  if (componentType === 'relay-spst') return { reference: [0, -45], value: [0, 45] };
-  if (['relay-spdt', 'relay-dpst'].includes(componentType)) return { reference: [0, -45], value: [0, 70] };
-  if (componentType === 'contactor') return { reference: [0, -70], value: [0, 95] };
+  if (componentType === 'three-phase-rail') {
+    return { reference: [60, -12], value: [60, 8], refTextAnchor: 'start', valTextAnchor: 'start' };
+  }
 
-  if (terminalsAreHorizontal) return { reference: [0, -12], value: [0, 16] };
-  return { reference: [16, -6], value: [16, 12] };
+  let bodyHalfW = Math.max(10, halfWidth);
+  let bodyHalfH = Math.max(10, halfHeight);
+  let padding = 6;
+  let yShift = 0;
+
+  // Hardcode actual visual boundaries to ignore long wire extensions
+  if (CIRCULAR_SOURCES.has(componentType)) {
+    bodyHalfW = 33; bodyHalfH = 33; padding = 4;
+  } else if (CONTROLLED_SOURCES.has(componentType)) {
+    bodyHalfW = 18; bodyHalfH = 18; padding = 4;
+  } else if (componentType.startsWith('transformer') || componentType === 'autotransformer') {
+    bodyHalfW = 20; bodyHalfH = 50; padding = 6; // Connectors reach ±50, labels sit cleanly outside
+  } else if (['relay-spst', 'relay-spdt', 'relay-dpst'].includes(componentType)) {
+    bodyHalfW = 35; bodyHalfH = 35; padding = 6; // Tight to dashed box
+  } else if (componentType === 'contactor') {
+    bodyHalfW = 35; bodyHalfH = 75; padding = 4;
+    yShift = 12.5; // Centers around rect [-35, -60, 70, 145] which spans y from -60 to +85 (center = +12.5)
+  } else if (['fuse-3phase', 'circuit-breaker-3phase'].includes(componentType)) {
+    bodyHalfW = 20; bodyHalfH = 35; padding = 4; // Tight to 3-phase lines
+  } else if (componentType === 'sw-dpst') {
+    bodyHalfW = 25; bodyHalfH = 25; padding = 12; // Retain user-approved spacing
+  } else if (['sw-spst-no', 'sw-spst-nc', 'pb-no', 'pb-nc', 'fuse', 'circuit-breaker', 'aux-contact-no', 'aux-contact-nc'].includes(componentType)) {
+    bodyHalfW = 20; bodyHalfH = 12; padding = 4;
+  } else if (['sw-spdt', 'sw-dpdt'].includes(componentType)) {
+    bodyHalfW = 25; bodyHalfH = componentType === 'sw-spdt' ? 12.5 : 37.5; padding = 6;
+    yShift = 12.5; // Offset to match the shifted asymmetrical center
+  } else if (componentType === 'opamp') {
+    bodyHalfW = 25; bodyHalfH = 25;
+  }
+
+  if (CIRCULAR_SOURCES.has(componentType) || CONTROLLED_SOURCES.has(componentType)) {
+    if (!terminalsAreHorizontal) {
+      const offsetX = Math.round(bodyHalfW + padding);
+      return { reference: [-offsetX, yShift], value: [offsetX, yShift], refTextAnchor: 'end', valTextAnchor: 'start' };
+    } else {
+      const offsetY = Math.round(bodyHalfH + padding);
+      return { reference: [0, -offsetY + yShift], value: [0, offsetY + yShift], refTextAnchor: 'middle', valTextAnchor: 'middle' };
+    }
+  }
+
+  if (terminalsAreHorizontal) {
+    const offsetY = Math.round(bodyHalfH + padding);
+    return { reference: [0, -offsetY + yShift], value: [0, offsetY + yShift], refTextAnchor: 'middle', valTextAnchor: 'middle' };
+  }
+
+  const offsetX = Math.round(bodyHalfW + padding);
+  return { reference: [offsetX, -6 + yShift], value: [offsetX, 10 + yShift], refTextAnchor: 'start', valTextAnchor: 'start' };
 }
 
 /**

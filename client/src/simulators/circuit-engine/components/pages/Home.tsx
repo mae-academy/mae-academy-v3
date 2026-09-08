@@ -332,17 +332,12 @@ function componentLabelAnchors(definition: ComponentDef, component: CircuitCompo
     };
   }
 
-  const CIRCULAR_SOURCES = new Set(['dc-voltage', 'ac-voltage', 'dc-current', 'ac-current', 'voltmeter', 'ammeter', 'lamp', 'motor-dc', 'motor-3phase', 'three-phase-source']);
-  if (CIRCULAR_SOURCES.has(component.type)) {
-    return { reference: [0, -36], value: [0, 36], isHorizontal: true, refTextAnchor: 'middle', valTextAnchor: 'middle' };
-  }
-
   if (component.type === 'dmm') {
     return { reference: [0, -75], value: [0, 75], isHorizontal: true, refTextAnchor: 'middle', valTextAnchor: 'middle' };
   }
 
   if (component.type === 'three-phase-rail') {
-    return { reference: [0, -40], value: [0, 40], isHorizontal: true, refTextAnchor: 'middle', valTextAnchor: 'middle' };
+    return { reference: [60, -12], value: [60, 8], isHorizontal: false, refTextAnchor: 'start', valTextAnchor: 'start' };
   }
 
   if (component.type === 'potentiometer') {
@@ -354,60 +349,21 @@ function componentLabelAnchors(definition: ComponentDef, component: CircuitCompo
     return { reference: [0, -24], value: [0, 26], isHorizontal: true, refTextAnchor: 'middle', valTextAnchor: 'middle' };
   }
 
-  // -------------------------------------------------------------------------
-  // الحل الجذري للريليهات والكونتاكتورز (تخطي الشرط ولصقها بالمستطيل الوهمي)
-  // -------------------------------------------------------------------------
-  const RELAY_TYPES = new Set(['relay-spst', 'relay-spdt', 'relay-dpst', 'contactor']);
-  if (RELAY_TYPES.has(component.type)) {
-    const isHorizontal = component.rotation % 180 === 0;
-
-    let refY = -45;
-    let valY = 45;
-
-    // حساب الأبعاد بدقة للمستطيل الوهمي الخاص بكل نوع
-    if (component.type === 'relay-spdt' || component.type === 'relay-dpst') {
-      valY = 70;
-    } else if (component.type === 'contactor') {
-      refY = -70;
-      valY = 95;
-    }
-
-    // في حال تم تدوير المكون 90 درجة
-    if (!isHorizontal) {
-      return {
-        reference: [refY, -15],
-        value: [valY, -15],
-        isHorizontal: true,
-        refTextAnchor: 'middle',
-        valTextAnchor: 'middle',
-      };
-    }
-
-    return {
-      reference: [0, refY],
-      value: [0, valY],
-      isHorizontal: true,
-      refTextAnchor: 'middle',
-      valTextAnchor: 'middle',
-    };
+  let terminalsAreHorizontal = component.rotation % 180 === 0;
+  if (definition.terminals.length === 2) {
+    const [first, second] = definition.terminals;
+    const localX = (first.x - second.x) * (component.flipH ? -1 : 1) * scale;
+    const localY = (first.y - second.y) * (component.flipV ? -1 : 1) * scale;
+    const radians = component.rotation * Math.PI / 180;
+    const actualX = localX * Math.cos(radians) - localY * Math.sin(radians);
+    const actualY = localX * Math.sin(radians) + localY * Math.cos(radians);
+    terminalsAreHorizontal = Math.abs(actualX) >= Math.abs(actualY);
+  } else if (component.type.startsWith('transformer') || component.type === 'autotransformer') {
+    // Transformers default orientation has primary left and secondary right.
+    // Horizontal rotation (0°/180°) means labels sit ABOVE and BELOW the core ([0, -offsetY] & [0, offsetY]).
+    terminalsAreHorizontal = component.rotation % 180 === 0;
   }
 
-  if (definition.terminals.length !== 2) {
-    const isHorizontal = component.rotation % 180 === 0;
-    const reference = horizontalLabelOffset(definition, component.rotation, scale);
-    const value: Point = isHorizontal
-      ? [0, definition.height * scale / 2 + 12]
-      : [definition.width * scale / 2 + 14, 12];
-    return { reference, value, isHorizontal };
-  }
-
-  const [first, second] = definition.terminals;
-  const localX = (first.x - second.x) * (component.flipH ? -1 : 1) * scale;
-  const localY = (first.y - second.y) * (component.flipV ? -1 : 1) * scale;
-  const radians = component.rotation * Math.PI / 180;
-  const actualX = localX * Math.cos(radians) - localY * Math.sin(radians);
-  const actualY = localX * Math.sin(radians) + localY * Math.cos(radians);
-  const terminalsAreHorizontal = Math.abs(actualX) >= Math.abs(actualY);
   const halfH = definition.height * scale / 2;
   const halfW = definition.width * scale / 2;
   const anchors = tabDComponentLabelAnchors(component.type, terminalsAreHorizontal, halfW, halfH);
@@ -749,7 +705,26 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
       const localY = dx * Math.sin(radians) + dy * Math.cos(radians);
       const flippedX = component.flipH ? -localX : localX;
       const flippedY = component.flipV ? -localY : localY;
-      if (Math.abs(flippedX) <= definition.width * visualSymbolScale / 2 + 10 && Math.abs(flippedY) <= definition.height * visualSymbolScale / 2 + 16) return component;
+
+      let actualHalfW = (definition.width * visualSymbolScale) / 2;
+      let actualHalfH = (definition.height * visualSymbolScale) / 2;
+      let offsetY = 0;
+
+      if (component.type === 'sw-spdt') {
+        actualHalfW = 25; actualHalfH = 12.5; offsetY = 12.5;
+      } else if (component.type === 'sw-dpdt') {
+        actualHalfW = 25; actualHalfH = 37.5; offsetY = 12.5;
+      } else if (component.type === 'contactor') {
+        actualHalfW = 35; actualHalfH = 75; offsetY = 0;
+      } else if (['relay-spst', 'relay-spdt', 'relay-dpst'].includes(component.type)) {
+        actualHalfW = 35; actualHalfH = 35; offsetY = 0;
+      } else if (['transformer', 'transformer-ct', 'autotransformer'].includes(component.type)) {
+        actualHalfW = 25; actualHalfH = 50; offsetY = 0;
+      } else if (/voltage|current|meter|motor|lamp|source/.test(component.type)) {
+        actualHalfW = 33; actualHalfH = 33; offsetY = 0;
+      }
+
+      if (Math.abs(flippedX) <= actualHalfW + 10 && Math.abs(flippedY - offsetY) <= actualHalfH + 10) return component;
       const [labelX, labelY] = componentLabelOffset(definition, component, visualSymbolScale);
       const [valX, valY] = componentValueAnchor(definition, component, visualSymbolScale);
       const labelWidth = Math.max(48, component.label.length * 9);
@@ -1707,8 +1682,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                 const symbolTransform = `rotate(${component.rotation}) scale(${component.flipH ? -1 : 1},${component.flipV ? -1 : 1}) scale(${isExactCadComponent(component.type) ? 1 : visualSymbolScale})`;
                 return (
                   <g key={component.id} transform={transform}>
-                    <g transform={symbolTransform}>
-                      {isSelected && <rect x={-definition.width / 2 - 9} y={-definition.height / 2 - 9} width={definition.width + 18} height={definition.height + 18} rx={7} fill={`${colors.selection}0d`} stroke={colors.selection} strokeWidth={1.2} strokeDasharray="4 3" pointerEvents="none" />}
+                    <g transform={symbolTransform} color={isSelected ? colors.selection : undefined}>
                       {renderSymbol(definition.symbol, powered, { ...component.props, _intensity: intensity, _documentedStyle: tabDUiRefinement }, animationTime)}
                       {component.type === 'oscilloscope' && <ScopeTrace reading={snapshot.instrumentReadings[`${component.id}:ch1`]} color="#38bdf8" />}
                     </g>

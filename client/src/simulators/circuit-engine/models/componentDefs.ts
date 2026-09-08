@@ -525,7 +525,7 @@ const SWITCHES: Record<string, ComponentDef> = {
   },
   'sw-spdt': {
     id: 'sw-spdt', name: 'Switch SPDT', category: 'Switches',
-    width: 50, height: 50, symbol: 'sw-spdt',
+    width: 50, height: 25, symbol: 'sw-spdt',
     terminals: [
       { id: 'common', name: 'C', x: -25, y: 0, type: 'bidirectional' },
       { id: 'a', name: 'A', x: 25, y: 0, type: 'bidirectional' },
@@ -629,7 +629,7 @@ const PROTECTION: Record<string, ComponentDef> = {
   },
   'contactor': {
     id: 'contactor', name: 'Contactor', category: 'Protection',
-    width: 100, height: 170, symbol: 'contactor',
+    width: 100, height: 160, symbol: 'contactor',
     terminals: [
       { id: 'coil+', name: 'A1', x: -50, y: -50, type: 'input' },
       { id: 'coil-', name: 'A2', x: 50, y: -50, type: 'input' },
@@ -662,7 +662,7 @@ const PROTECTION: Record<string, ComponentDef> = {
   },
   'fuse-3phase': {
     id: 'fuse-3phase', name: '3-Phase Fuse', category: 'Protection',
-    width: 100, height: 100, symbol: 'fuse-3phase',
+    width: 100, height: 50, symbol: 'fuse-3phase',
     terminals: [
       { id: 'l1', name: 'L1', x: -50, y: -25, type: 'input' },
       { id: 't1', name: 'T1', x: 50, y: -25, type: 'output' },
@@ -689,7 +689,7 @@ const PROTECTION: Record<string, ComponentDef> = {
   },
   'circuit-breaker-3phase': {
     id: 'circuit-breaker-3phase', name: '3-Phase Circuit Breaker', category: 'Protection',
-    width: 100, height: 100, symbol: 'circuit-breaker-3phase',
+    width: 100, height: 50, symbol: 'circuit-breaker-3phase',
     terminals: [
       { id: 'l1', name: 'L1', x: -50, y: -25, type: 'input' },
       { id: 't1', name: 'T1', x: 50, y: -25, type: 'output' },

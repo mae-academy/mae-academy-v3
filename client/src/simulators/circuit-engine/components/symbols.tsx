@@ -471,19 +471,12 @@ const SwSpdt: SymbolFC = ({ props }) => {
   const state = props?.state || 'a';
   return (
     <g>
-      {/* COM Terminal */}
       <line x1={-25} y1={0} x2={-10} y2={0} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
       <circle cx={-10} cy={0} r={2.5} fill="currentColor" />
-
-      {/* A Terminal */}
       <line x1={25} y1={0} x2={10} y2={0} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
       <circle cx={10} cy={0} r={2.5} fill="currentColor" />
-
-      {/* B Terminal */}
       <line x1={25} y1={25} x2={10} y2={25} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
       <circle cx={10} cy={25} r={2.5} fill="currentColor" />
-
-      {/* Toggle Arm */}
       <line x1={-10} y1={0} x2={8} y2={state === 'a' ? 0 : 25} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
     </g>
   );
@@ -524,7 +517,7 @@ const SwDpdt: SymbolFC = ({ props }) => {
       <circle cx={10} cy={-25} r={2.5} fill="currentColor" />
       <line x1={25} y1={0} x2={10} y2={0} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
       <circle cx={10} cy={0} r={2.5} fill="currentColor" />
-      <line x1={-10} y1={-25} x2={8} y2={state === 'a' ? -25 : -2} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+      <line x1={-10} y1={-25} x2={8} y2={state === 'a' ? -25 : 0} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
 
       {/* Pole 2 */}
       <line x1={-25} y1={25} x2={-10} y2={25} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
@@ -533,10 +526,9 @@ const SwDpdt: SymbolFC = ({ props }) => {
       <circle cx={10} cy={25} r={2.5} fill="currentColor" />
       <line x1={25} y1={50} x2={10} y2={50} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
       <circle cx={10} cy={50} r={2.5} fill="currentColor" />
-      <line x1={-10} y1={25} x2={8} y2={state === 'a' ? 25 : 48} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+      <line x1={-10} y1={25} x2={8} y2={state === 'a' ? 25 : 50} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
 
-      {/* Linkage */}
-      <line x1={0} y1={-25} x2={0} y2={25} stroke="currentColor" strokeWidth={1.5} strokeDasharray="3,3" />
+      <line x1={0} y1={-12.5} x2={0} y2={37.5} stroke="currentColor" strokeWidth={1.5} strokeDasharray="3,3" />
     </g>
   );
 };
