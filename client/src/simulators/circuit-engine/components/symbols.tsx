@@ -224,10 +224,10 @@ const DependentDiamond: SymbolFC = ({ props }) => {
     ) : (
       <>
         {/* Top Plus */}
-        <line x1={0} y1={-13} x2={0} y2={-7} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
-        <line x1={-3} y1={-10} x2={3} y2={-10} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+        <line x1={0} y1={-13} x2={0} y2={-7} stroke="currentColor" strokeWidth={1} strokeLinecap="round" />
+        <line x1={-3} y1={-10} x2={3} y2={-10} stroke="currentColor" strokeWidth={1} strokeLinecap="round" />
         {/* Bottom Minus */}
-        <line x1={-3} y1={10} x2={3} y2={10} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+        <line x1={-3} y1={10} x2={3} y2={10} stroke="currentColor" strokeWidth={1} strokeLinecap="round" />
       </>
     )}
     <line x1={0} y1={-18} x2={0} y2={-30} stroke="currentColor" strokeWidth={sw} />
@@ -743,7 +743,6 @@ const TransformerCt: SymbolFC = () => (
     <line x1={20} y1={50} x2={50} y2={50} stroke="currentColor" strokeWidth={1.5} />
 
     {/* Center Tap Wire exactly at y=0 */}
-    <circle cx={20} cy={0} r={2} fill="currentColor" />
     <line x1={20} y1={0} x2={50} y2={0} stroke="currentColor" strokeWidth={1.5} />
   </g>
 );
@@ -760,12 +759,10 @@ const Autotransformer: SymbolFC = () => (
     {/* Output Connections (Full bypass) */}
     <line x1={0} y1={-50} x2={50} y2={-50} stroke="currentColor" strokeWidth={1.5} />
     <line x1={0} y1={50} x2={50} y2={50} stroke="currentColor" strokeWidth={1.5} />
-    <circle cx={0} cy={-50} r={2} fill="currentColor" />
-    <circle cx={0} cy={50} r={2} fill="currentColor" />
+
 
     {/* Tap Connection - Arrow perfectly touches the inward-facing cusp of the arc at (0,0) */}
-    <line x1={50} y1={0} x2={6} y2={0} stroke="currentColor" strokeWidth={1.5} />
-    <polygon points="0,0 6,-3 6,3" fill="currentColor" />
+    <line x1={50} y1={0} x2={0} y2={0} stroke="currentColor" strokeWidth={1.5} />
   </g>
 );
 
