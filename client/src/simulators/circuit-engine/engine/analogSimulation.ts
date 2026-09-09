@@ -7,6 +7,64 @@ import { TabDMnaError, type TabDPrimitive } from '@/simulators/circuit-engine/en
 import { shockleyCurrent, TabDNewtonMna, type TabDNonlinearDevice } from '@/simulators/circuit-engine/engine/analogNewtonMna';
 import { toTabDObservableOperatingPoint, type TabDObservableOperatingPoint } from '@/simulators/circuit-engine/models/analogResultAdapter';
 
+class SignalIntegrator {
+  private window: { val: number; sq: number; dt: number }[] = [];
+  private readonly windowSize = 0.1;
+
+  push(val: number, dt: number) {
+    this.window.push({ val, sq: val * val, dt });
+    let currentWindowTime = 0;
+    let keepCount = 0;
+    for (let i = this.window.length - 1; i >= 0; i--) {
+      currentWindowTime += this.window[i].dt;
+      keepCount++;
+      if (currentWindowTime >= this.windowSize) break;
+    }
+    if (keepCount < this.window.length) {
+      this.window = this.window.slice(-keepCount);
+    }
+  }
+
+  getDC(): number {
+    if (this.window.length === 0) return 0;
+    let totalDt = 0;
+    let sumVal = 0;
+    for (let i = this.window.length - 1; i >= 0; i--) {
+      const item = this.window[i];
+      if (totalDt + item.dt > this.windowSize + 1e-9) {
+        const needed = Math.max(0, this.windowSize - totalDt);
+        totalDt += needed;
+        sumVal += item.val * needed;
+        break;
+      } else {
+        totalDt += item.dt;
+        sumVal += item.val * item.dt;
+      }
+    }
+    const result = totalDt > 0 ? sumVal / totalDt : 0;
+    return Math.abs(result) < 1e-9 ? 0 : result;
+  }
+
+  getAC(): number {
+    if (this.window.length === 0) return 0;
+    let totalDt = 0;
+    let sumSq = 0;
+    for (let i = this.window.length - 1; i >= 0; i--) {
+      const item = this.window[i];
+      if (totalDt + item.dt > this.windowSize + 1e-9) {
+        const needed = Math.max(0, this.windowSize - totalDt);
+        totalDt += needed;
+        sumSq += item.sq * needed;
+        break;
+      } else {
+        totalDt += item.dt;
+        sumSq += item.sq * item.dt;
+      }
+    }
+    return totalDt > 0 ? Math.sqrt(Math.max(0, sumSq / totalDt)) : 0;
+  }
+}
+
 /**
  * Dedicated Tab D runtime boundary.
  *
@@ -24,6 +82,12 @@ export class TabDSimulationEngine extends SimulationEngine {
   private readonly tabDPowerLatchStates = new Map<string, boolean>();
   private readonly tabDFuseBlown = new Set<string>();
   private readonly tabDDigitalLevels = new Map<string, number>();
+  private integrators = new Map<string, SignalIntegrator>();
+  private displayReadings: Record<string, InstrumentReading> = {};
+  private lastDisplayTime = -1;
+  private timeAccumulator = 0;
+  private wirePhases = new Map<string, number>();
+  private lastWireCurrents: Record<string, number> = {};
 
   override setCircuit(components: CircuitComponent[], wires: CircuitWire[]) {
     super.setCircuit(components, wires);
@@ -35,6 +99,12 @@ export class TabDSimulationEngine extends SimulationEngine {
     this.tabDPowerLatchStates.clear();
     this.tabDFuseBlown.clear();
     this.tabDDigitalLevels.clear();
+    this.integrators.clear();
+    this.displayReadings = {};
+    this.lastDisplayTime = -1;
+    this.timeAccumulator = 0;
+    this.wirePhases.clear();
+    this.lastWireCurrents = {};
   }
 
   override reset() {
@@ -45,6 +115,12 @@ export class TabDSimulationEngine extends SimulationEngine {
     this.tabDPowerLatchStates.clear();
     this.tabDFuseBlown.clear();
     this.tabDDigitalLevels.clear();
+    this.integrators.clear();
+    this.displayReadings = {};
+    this.lastDisplayTime = -1;
+    this.timeAccumulator = 0;
+    this.wirePhases.clear();
+    this.lastWireCurrents = {};
   }
 
   override getSnapshot(): SimulationSnapshot {
@@ -62,38 +138,183 @@ export class TabDSimulationEngine extends SimulationEngine {
 
   override step(elapsedSeconds = 1 / 1000): SimulationSnapshot {
     try {
-      const compiled = this.compileDocumentedPrimitives();
-      if (!compiled) return super.step(elapsedSeconds);
-      const initialGuess = this.documentedSnapshot?.converged ? this.documentedSnapshot.nodeVoltages : undefined;
-      const result = this.documentedMna.solve(compiled.primitives, compiled.nonlinear, elapsedSeconds, { initialGuess });
-      const branchCurrents = {
-        ...result.branchCurrents,
-        ...Object.fromEntries(compiled.nonlinear.map(device => [device.id, device.current(result.nodeVoltages)])),
-      };
-      compiled.commit(result.nodeVoltages, branchCurrents, Math.max(1e-9, elapsedSeconds));
-      const terminalVoltages = this.terminalVoltages(compiled.netForTerminal, result.nodeVoltages);
-      const instrumentReadings = this.instrumentReadings(terminalVoltages, branchCurrents, compiled.wiredTerminals);
+      const highestFrequency = this.tabDComponents.reduce((highest, component) => {
+        if (['ac-voltage', 'ac-current', 'three-phase-source', 'three-phase-rail'].includes(component.type)) {
+          return Math.max(highest, Number(component.props.frequency) || 0);
+        }
+        return highest;
+      }, 0);
+
+      // FIXED TIMESTEP (Decoupled from UI frame to guarantee uniform sampling integration)
+      let baseDt = 0.0005; // 2000 Hz base resolution
+      if (highestFrequency > 0) {
+        const requiredDt = 1 / (highestFrequency * 50); // Minimum 50 samples per cycle
+        if (requiredDt < baseDt) baseDt = requiredDt;
+      }
+      const fixedDt = baseDt;
+
+      // Accumulate real-world elapsed time (cap at 0.1s to prevent death spiral)
+      this.timeAccumulator += Math.max(1e-6, Math.min(0.1, elapsedSeconds));
+
+      let finalResult: any = null;
+      let finalTerminalVoltages: any = {};
+      let finalBranchCurrents: any = {};
+      let finalWiredTerminals = new Set<string>();
+      let finalWireCurrents: Record<string, number> = {};
+      let stepped = false;
+
+      while (this.timeAccumulator >= fixedDt) {
+        this.timeAccumulator -= fixedDt;
+        stepped = true;
+
+        const compiled = this.compileDocumentedPrimitives();
+        if (!compiled) return super.step(elapsedSeconds);
+        finalWiredTerminals = compiled.wiredTerminals;
+
+        const initialGuess = this.documentedSnapshot?.converged ? this.documentedSnapshot.nodeVoltages : undefined;
+        const result = this.documentedMna.solve(compiled.primitives, compiled.nonlinear, fixedDt, { initialGuess });
+
+        const branchCurrents = {
+          ...result.branchCurrents,
+          ...Object.fromEntries(compiled.nonlinear.map(device => [device.id, device.current(result.nodeVoltages)])),
+        };
+        compiled.commit(result.nodeVoltages, branchCurrents, fixedDt);
+        const terminalVoltages = this.terminalVoltages(compiled.netForTerminal, result.nodeVoltages);
+
+        finalResult = result;
+        finalTerminalVoltages = terminalVoltages;
+        finalBranchCurrents = branchCurrents;
+
+        // Compute terminal currents dictionary for all components
+        const terminalCurrentMap: Record<string, number> = {};
+        for (const comp of this.tabDComponents) {
+          const bI = branchCurrents[comp.id] ?? 0;
+          if (comp.type === 'resistor' || comp.type === 'potentiometer' || comp.type === 'lamp') {
+            terminalCurrentMap[terminalKey(comp.id, 'a')] = bI;
+            terminalCurrentMap[terminalKey(comp.id, 'b')] = -bI;
+          } else if (comp.type === 'transformer' || comp.type === 'transformer-ct') {
+            const priI = branchCurrents[comp.id] ?? 0;
+            const secI = branchCurrents[`${comp.id}:secondary`] ?? branchCurrents[`${comp.id}:top`] ?? 0;
+            terminalCurrentMap[terminalKey(comp.id, 'p1')] = priI;
+            terminalCurrentMap[terminalKey(comp.id, 'p2')] = -priI;
+            terminalCurrentMap[terminalKey(comp.id, 's1')] = secI;
+            terminalCurrentMap[terminalKey(comp.id, 's2')] = -secI;
+          } else if (comp.type === 'voltmeter' || comp.type === 'ammeter' || comp.type === 'dmm') {
+            terminalCurrentMap[terminalKey(comp.id, 'pos')] = bI;
+            terminalCurrentMap[terminalKey(comp.id, 'neg')] = -bI;
+            terminalCurrentMap[terminalKey(comp.id, 'hi')] = bI;
+            terminalCurrentMap[terminalKey(comp.id, 'com')] = -bI;
+          } else if (comp.type === 'ac-voltage' || comp.type === 'dc-voltage') {
+            terminalCurrentMap[terminalKey(comp.id, 'pos')] = bI;
+            terminalCurrentMap[terminalKey(comp.id, 'neg')] = -bI;
+          } else {
+            const def = getDef(comp.type);
+            if (def && def.terminals.length === 2) {
+              terminalCurrentMap[terminalKey(comp.id, def.terminals[0].id)] = bI;
+              terminalCurrentMap[terminalKey(comp.id, def.terminals[1].id)] = -bI;
+            }
+          }
+        }
+
+        // Assign current to each wire from either connected terminal
+        for (const wire of this.tabDWires) {
+          const fromKey = terminalKey(wire.fromComp, wire.fromTerm);
+          const toKey = terminalKey(wire.toComp, wire.toTerm);
+
+          const fromI = terminalCurrentMap[fromKey];
+          const toI = terminalCurrentMap[toKey];
+
+          let wireI = 0;
+          if (fromI !== undefined && Math.abs(fromI) > 1e-12) {
+            wireI = -fromI; // Current leaving 'from' into wire
+          } else if (toI !== undefined && Math.abs(toI) > 1e-12) {
+            wireI = toI;   // Current entering 'to' from wire
+          } else {
+            // Secondary search across components matching either endpoint
+            const cFrom = this.tabDComponents.find(c => c.id === wire.fromComp);
+            const cTo = this.tabDComponents.find(c => c.id === wire.toComp);
+            const i1 = cFrom ? (branchCurrents[cFrom.id] ?? branchCurrents[`${cFrom.id}:secondary`]) : undefined;
+            const i2 = cTo ? (branchCurrents[cTo.id] ?? branchCurrents[`${cTo.id}:secondary`]) : undefined;
+            wireI = i1 !== undefined && Math.abs(i1) > 1e-12 ? i1 : (i2 !== undefined ? i2 : 0);
+          }
+
+          finalWireCurrents[wire.id] = wireI;
+
+          const currentPhase = this.wirePhases.get(wire.id) ?? 0;
+          // Scale rate so that 1 A moves gracefully (~2 cycles per second)
+          const phaseRate = wireI * 15;
+          this.wirePhases.set(wire.id, currentPhase + phaseRate * fixedDt);
+        }
+
+        for (const component of this.tabDComponents) {
+          if (component.type === 'voltmeter' || component.type === 'ammeter' || component.type === 'dmm') {
+            let instVal = 0;
+            if (component.type === 'voltmeter') {
+              instVal = (terminalVoltages[terminalKey(component.id, 'pos')] ?? 0) - (terminalVoltages[terminalKey(component.id, 'neg')] ?? 0);
+            } else if (component.type === 'ammeter') {
+              instVal = branchCurrents[component.id] ?? 0;
+            } else if (component.type === 'dmm') {
+              const compTerminals: { id: string }[] = (component as any).terminals ?? getDef(component.type)?.terminals ?? [];
+              const pTerm = compTerminals.find(t => t.id === 'pos' || t.id === 'hi')?.id ?? 'pos';
+              const nTerm = compTerminals.find(t => t.id === 'neg' || t.id === 'com')?.id ?? 'neg';
+              const mode = String(component.props.mode ?? 'DCV').toUpperCase().trim();
+              if (mode.includes('V') || mode === 'HZ' || mode === 'OHM' || mode === 'CONT') {
+                instVal = (terminalVoltages[terminalKey(component.id, pTerm)] ?? 0) - (terminalVoltages[terminalKey(component.id, nTerm)] ?? 0);
+              } else if (mode.includes('A')) {
+                instVal = branchCurrents[component.id] ?? 0;
+              }
+            }
+
+            let integrator = this.integrators.get(component.id);
+            if (!integrator) {
+              integrator = new SignalIntegrator();
+              this.integrators.set(component.id, integrator);
+            }
+            integrator.push(instVal, fixedDt); // Uniform dt guarantees 0 drift
+          }
+        }
+      }
+
+      if (!stepped) {
+        if (this.documentedSnapshot) {
+          return {
+            ...this.documentedSnapshot,
+            wireCurrents: this.lastWireCurrents,
+            wirePhases: Object.fromEntries(this.wirePhases),
+          };
+        }
+        const fallback = super.step(elapsedSeconds);
+        return {
+          ...fallback,
+          wireCurrents: this.lastWireCurrents,
+          wirePhases: Object.fromEntries(this.wirePhases),
+        };
+      }
+
+      // Ensure wireCurrents is always populated
+      const wireCurrentsOut = Object.keys(finalWireCurrents).length > 0 ? finalWireCurrents : (this.documentedSnapshot?.wireCurrents ?? {});
+      this.lastWireCurrents = { ...wireCurrentsOut };
+
+      const instrumentReadings = this.instrumentReadings(finalTerminalVoltages, finalBranchCurrents, finalWiredTerminals, finalResult.time);
+
       this.documentedSnapshot = {
-        time: result.time,
-        nodeVoltages: result.nodeVoltages,
-        terminalVoltages,
-        branchCurrents,
-        wireCurrents: Object.fromEntries(this.tabDWires.map(wire => [wire.id, 0])),
-        componentPowered: Object.fromEntries(this.tabDComponents.map(component => [component.id, Math.abs(branchCurrents[component.id] ?? 0) > 1e-10])),
+        time: finalResult.time,
+        nodeVoltages: finalResult.nodeVoltages,
+        terminalVoltages: finalTerminalVoltages,
+        branchCurrents: finalBranchCurrents,
+        wireCurrents: wireCurrentsOut,
+        wirePhases: Object.fromEntries(this.wirePhases),
+        componentPowered: Object.fromEntries(this.tabDComponents.map(component => [component.id, Math.abs(finalBranchCurrents[component.id] ?? 0) > 1e-10])),
         componentIntensity: {},
         nodeHistory: {},
         branchHistory: {},
         instrumentReadings,
         warnings: [],
-        converged: result.converged,
+        converged: finalResult.converged,
       };
       return this.documentedSnapshot;
     } catch (error) {
-      const errorMessage = error instanceof TabDMnaError
-        ? error.message
-        : error instanceof Error
-        ? error.message
-        : String(error);
+      const errorMessage = error instanceof TabDMnaError ? error.message : error instanceof Error ? error.message : String(error);
       this.documentedSnapshot = {
         time: this.documentedMna.getTime(),
         nodeVoltages: {}, terminalVoltages: {}, branchCurrents: {}, wireCurrents: {}, componentPowered: {}, componentIntensity: {}, nodeHistory: {}, branchHistory: {}, instrumentReadings: {},
@@ -433,20 +654,22 @@ export class TabDSimulationEngine extends SimulationEngine {
           break;
         }
         case 'transformer': {
-          const ratio = Math.max(1e-6, value(component, 'turnRatio', 19.17));
+          const ratio = Math.max(1e-6, value(component, 'turnRatio', 5));
           primitives.push({ kind: 'vcvs', id: `${component.id}:secondary`, positive: p('s1'), negative: p('s2'), controlPositive: p('p1'), controlNegative: p('p2'), gain: 1 / ratio });
           primitives.push({ kind: 'cccs', id: component.id, positive: p('p1'), negative: p('p2'), controlBranchId: `${component.id}:secondary`, gain: -1 / ratio });
           break;
         }
         case 'transformer-ct': {
-          const ratio = Math.max(1e-6, value(component, 'turnRatio', 9.58));
+          const ratio = Math.max(1e-6, value(component, 'turnRatio', 5));
           primitives.push({ kind: 'vcvs', id: `${component.id}:top`, positive: p('s1'), negative: p('ct'), controlPositive: p('p1'), controlNegative: p('p2'), gain: 0.5 / ratio });
           primitives.push({ kind: 'vcvs', id: `${component.id}:bottom`, positive: p('ct'), negative: p('s2'), controlPositive: p('p1'), controlNegative: p('p2'), gain: 0.5 / ratio });
           primitives.push({ kind: 'cccs', id: component.id, positive: p('p1'), negative: p('p2'), controlBranchId: `${component.id}:top`, gain: -1 / ratio });
           break;
         }
         case 'autotransformer': {
-          primitives.push({ kind: 'vcvs', id: component.id, positive: p('tap'), negative: p('out2'), controlPositive: p('in1'), controlNegative: p('in2'), gain: 1 / Math.max(1e-6, value(component, 'turnRatio', 1.92)) });
+          const ratio = Math.max(1e-6, value(component, 'turnRatio', 2));
+          primitives.push({ kind: 'vcvs', id: component.id, positive: p('tap'), negative: p('out2'), controlPositive: p('in1'), controlNegative: p('in2'), gain: 1 / ratio });
+          primitives.push({ kind: 'cccs', id: `${component.id}:cccs`, positive: p('in1'), negative: p('in2'), controlBranchId: component.id, gain: -1 / ratio });
           primitives.push({ kind: 'resistor', id: `${component.id}:top`, positive: p('in1'), negative: p('out1'), resistance: 1e-6 });
           primitives.push({ kind: 'resistor', id: `${component.id}:bot`, positive: p('in2'), negative: p('out2'), resistance: 1e-6 });
           break;
@@ -484,7 +707,7 @@ export class TabDSimulationEngine extends SimulationEngine {
             if (component.type === 'gate-xor') return a !== b;
             return a === b;
           };
-          const output = p('y'); const observed = inputs.map(input => priorVoltage(input) - priorVoltage(ground) >= threshold); const target = rule(observed) ? high : 0;
+          const output = p('out'); const observed = inputs.map(input => priorVoltage(input) - priorVoltage(ground) >= threshold); const target = rule(observed) ? high : 0;
           primitives.push({ kind: 'voltage', id: component.id, positive: output, negative: ground, voltage: this.tabDDigitalLevels.get(component.id) ?? target });
           digitalModels.push({ id: component.id, inputs, output, ground, threshold, highVoltage: high, delay: Math.max(0, value(component, 'delay', 1e-6)), rule });
           break;
@@ -556,29 +779,61 @@ export class TabDSimulationEngine extends SimulationEngine {
     return terminalVoltages;
   }
 
-  private instrumentReadings(terminalVoltages: Record<string, number>, branchCurrents: Record<string, number>, wiredTerminals: Set<string>) {
-    const readings: Record<string, InstrumentReading> = {};
-    const difference = (component: CircuitComponent, positive: string, negative: string) => (terminalVoltages[terminalKey(component.id, positive)] ?? 0) - (terminalVoltages[terminalKey(component.id, negative)] ?? 0);
-    for (const component of this.tabDComponents) {
-      if (component.type === 'voltmeter') readings[component.id] = { value: difference(component, 'pos', 'neg'), unit: 'V', status: wiredTerminals.has(terminalKey(component.id, 'pos')) && wiredTerminals.has(terminalKey(component.id, 'neg')) ? 'ready' : 'open' };
-      if (component.type === 'ammeter') readings[component.id] = { value: branchCurrents[component.id] ?? 0, unit: 'A', status: wiredTerminals.has(terminalKey(component.id, 'pos')) && wiredTerminals.has(terminalKey(component.id, 'neg')) ? 'ready' : 'open' };
-      if (component.type === 'dmm') {
-        const mode = String(component.props.mode ?? 'DCV');
-        const connected = wiredTerminals.has(terminalKey(component.id, 'hi')) && wiredTerminals.has(terminalKey(component.id, 'com'));
-        const unit = mode.includes('A') ? 'A' : mode === 'OHM' || mode === 'CONT' ? 'Ω' : mode === 'HZ' ? 'Hz' : 'V';
+  private instrumentReadings(terminalVoltages: Record<string, number>, branchCurrents: Record<string, number>, wiredTerminals: Set<string>, currentTime: number) {
+    if (currentTime - this.lastDisplayTime >= 0.5 || this.lastDisplayTime < 0) {
+      const readings: Record<string, InstrumentReading> = {};
+      const difference = (component: CircuitComponent, positive: string, negative: string) => (terminalVoltages[terminalKey(component.id, positive)] ?? 0) - (terminalVoltages[terminalKey(component.id, negative)] ?? 0);
 
-        if (!connected) readings[component.id] = { value: 0, unit, status: 'open' };
-        else if (mode === 'DCV' || mode === 'ACV') readings[component.id] = { value: difference(component, 'hi', 'com'), unit: 'V', status: 'ready' };
-        else if (mode === 'DCA' || mode === 'ACA') readings[component.id] = { value: branchCurrents[component.id] ?? 0, unit: 'A', status: 'ready' };
-        else if (mode === 'HZ') readings[component.id] = { value: 0, unit: 'Hz', status: 'ready' }; // Placeholder for frequency
-        else {
-          const voltage = difference(component, 'hi', 'com');
-          const resistance = Math.abs(voltage) / 0.001; // 1mA test current
-          readings[component.id] = { value: resistance, unit: 'Ω', status: 'ready', continuity: mode === 'CONT' ? resistance < 50 : undefined };
+      for (const component of this.tabDComponents) {
+        const isConnected = (p: string, n: string) => wiredTerminals.has(terminalKey(component.id, p)) && wiredTerminals.has(terminalKey(component.id, n));
+        const integrator = this.integrators.get(component.id);
+        const dcVal = integrator ? integrator.getDC() : 0;
+        const acVal = integrator ? integrator.getAC() : 0;
+
+        if (component.type === 'voltmeter') {
+          const connected = isConnected('pos', 'neg');
+          const mode = String(component.props.mode ?? 'DC').toUpperCase().trim();
+          readings[component.id] = { value: connected ? (mode === 'AC' ? acVal : dcVal) : 0, unit: 'V', status: connected ? 'ready' : 'open' };
+        }
+
+        if (component.type === 'ammeter') {
+          const connected = isConnected('pos', 'neg');
+          const mode = String(component.props.mode ?? 'DC').toUpperCase().trim();
+          readings[component.id] = { value: connected ? (mode === 'AC' ? acVal : dcVal) : 0, unit: 'A', status: connected ? 'ready' : 'open' };
+        }
+
+        if (component.type === 'dmm') {
+          const mode = String(component.props.mode ?? 'DCV').toUpperCase().trim();
+          const compTerminals: { id: string }[] = (component as any).terminals ?? getDef(component.type)?.terminals ?? [];
+          const pTerm = compTerminals.find(t => t.id === 'pos' || t.id === 'hi')?.id ?? 'pos';
+          const nTerm = compTerminals.find(t => t.id === 'neg' || t.id === 'com')?.id ?? 'neg';
+          const connected = isConnected(pTerm, nTerm);
+
+          const unit = mode.includes('A') ? 'A' : mode === 'OHM' || mode === 'CONT' ? 'Ω' : mode === 'HZ' ? 'Hz' : 'V';
+
+          if (!connected) {
+            readings[component.id] = { value: 0, unit, status: 'open' };
+          } else if (mode === 'DCV') {
+            readings[component.id] = { value: dcVal, unit: 'V', status: 'ready' };
+          } else if (mode === 'ACV') {
+            readings[component.id] = { value: acVal, unit: 'V', status: 'ready' };
+          } else if (mode === 'DCA') {
+            readings[component.id] = { value: dcVal, unit: 'A', status: 'ready' };
+          } else if (mode === 'ACA') {
+            readings[component.id] = { value: acVal, unit: 'A', status: 'ready' };
+          } else if (mode === 'HZ') {
+            readings[component.id] = { value: 0, unit: 'Hz', status: 'ready' };
+          } else {
+            const voltage = difference(component, pTerm, nTerm);
+            const resistance = Math.abs(voltage) / 0.001;
+            readings[component.id] = { value: resistance, unit: 'Ω', status: 'ready', continuity: mode === 'CONT' ? resistance < 50 : undefined };
+          }
         }
       }
+      this.displayReadings = readings;
+      this.lastDisplayTime = currentTime;
     }
-    return readings;
+    return this.displayReadings;
   }
 }
 

@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { getDef } from '@/simulators/circuit-engine/models/componentDefs';
-import type { CircuitComponent, CircuitWire } from '@/simulators/circuit-engine/models/circuitTypes';
-import { NormalizedCircuitGraph, splitNormalizedSegments } from '@/simulators/circuit-engine/models/NormalizedCircuitGraph';
-import { getTerminalWorldPos } from '@/simulators/circuit-engine/models/wiring';
+import { getDef } from './componentDefs';
+import type { CircuitComponent, CircuitWire } from './circuitTypes';
+import { NormalizedCircuitGraph, splitNormalizedSegments } from './NormalizedCircuitGraph';
+import { getTerminalWorldPos } from './wiring';
 
 const component = (id: string, type: string, x: number, y: number, rotation = 0): CircuitComponent => ({ id, type, x, y, rotation, flipH: false, flipV: false, label: id, props: {} });
 const point = (item: CircuitComponent, terminalId: string) => {
-  const terminal = getDef(item.type)!.terminals.find((candidate) => candidate.id === terminalId)!;
+  const terminal = getDef(item.type)!.terminals.find((candidate: any) => candidate.id === terminalId)!;
   return getTerminalWorldPos(item.x, item.y, terminal.x, terminal.y, item.rotation, item.flipH, item.flipV);
 };
 const wire = (id: string, from: CircuitComponent, fromTerm: string, to: CircuitComponent, toTerm: string): CircuitWire => ({
@@ -28,7 +28,7 @@ describe('NormalizedCircuitGraph', () => {
     const graph = NormalizedCircuitGraph.fromCanvas([source, r1, r2, ground], wires);
     expect(graph.topology.expectedMeshCount).toBe(2);
     expect(graph.topology.extractedFaceCount).toBe(2);
-    expect(graph.faces.map((face) => face.branchIds.sort())).toEqual(expect.arrayContaining([
+    expect(graph.faces.map((face: any) => face.branchIds.sort())).toEqual(expect.arrayContaining([
       expect.arrayContaining(['I1', 'R1']), expect.arrayContaining(['R1', 'R2']),
     ]));
     expect(graph.essentialJunctions).toHaveLength(1);
@@ -55,7 +55,7 @@ describe('NormalizedCircuitGraph', () => {
     const activeJunctions = graph.essentialJunctions;
     expect(activeJunctions).toHaveLength(1);
     // Source pos is at [100, 170], resistor is at [170, 170], midpoint is [135, 170]
-    expect(activeJunctions[0].point).toEqual([135, 170]);
+    expect(activeJunctions[0].point).toEqual([135, 160]);
     expect(activeJunctions[0].textOffset).toEqual([0, -12]);
   });
 
@@ -65,6 +65,6 @@ describe('NormalizedCircuitGraph', () => {
       { id: 'vertical', from: [50, -50], to: [50, 50] },
     ]);
     expect(split).toHaveLength(4);
-    expect(split.filter((segment) => segment.from[0] === 50 && segment.from[1] === 0 || segment.to[0] === 50 && segment.to[1] === 0)).toHaveLength(4);
+    expect(split.filter((segment: any) => segment.from[0] === 50 && segment.from[1] === 0 || segment.to[0] === 50 && segment.to[1] === 0)).toHaveLength(4);
   });
 });

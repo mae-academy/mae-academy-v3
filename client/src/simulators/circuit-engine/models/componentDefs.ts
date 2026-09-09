@@ -717,7 +717,7 @@ const TRANSFORMERS: Record<string, ComponentDef> = {
       { id: 's1', name: 'SEC+', x: 50, y: -50, type: 'output' },
       { id: 's2', name: 'SEC-', x: 50, y: 50, type: 'output' },
     ],
-    properties: { primaryV: { type: 'number', value: 230, unit: 'V', min: 1, max: 10000, label: 'Primary Voltage' }, secondaryV: { type: 'number', value: 12, unit: 'V', min: 1, max: 1000, label: 'Secondary Voltage' } },
+    properties: { turnRatio: { type: 'number', value: 5, unit: 'n:1', min: 0.001, max: 10000, label: 'Turn Ratio (n)' }, ratedPower: { type: 'number', value: 1000, unit: 'VA', min: 1, max: 1000000, label: 'Rated Apparent Power' } },
     description: 'Standard two-winding transformer',
   },
   'transformer-ct': {
@@ -730,7 +730,7 @@ const TRANSFORMERS: Record<string, ComponentDef> = {
       { id: 'ct', name: 'CT', x: 50, y: 0, type: 'output' },
       { id: 's2', name: 'SEC-', x: 50, y: 50, type: 'output' },
     ],
-    properties: { primaryV: { type: 'number', value: 230, unit: 'V', min: 1, max: 10000, label: 'Primary Voltage' }, secondaryV: { type: 'number', value: 24, unit: 'V', min: 1, max: 1000, label: 'Secondary Voltage' } },
+    properties: { turnRatio: { type: 'number', value: 5, unit: 'n:1', min: 0.001, max: 10000, label: 'Turn Ratio (n)' }, ratedPower: { type: 'number', value: 1000, unit: 'VA', min: 1, max: 1000000, label: 'Rated Apparent Power' } },
     description: 'Center-Tapped Transformer',
   },
   'autotransformer': {
@@ -744,9 +744,8 @@ const TRANSFORMERS: Record<string, ComponentDef> = {
       { id: 'out2', name: 'Out2', x: 50, y: 50, type: 'output' },
     ],
     properties: {
-      inputV: { type: 'number', value: 230, unit: 'V', min: 1, max: 100000, label: 'Input Voltage' },
-      outputV: { type: 'number', value: 120, unit: 'V', min: 1, max: 100000, label: 'Output Voltage' },
-      turnRatio: { type: 'number', value: 1.92, unit: 'n:1', min: 0.001, max: 10000, label: 'Turn Ratio' },
+      turnRatio: { type: 'number', value: 2, unit: 'n:1', min: 0.001, max: 10000, label: 'Turn Ratio (n)' },
+      ratedPower: { type: 'number', value: 1000, unit: 'VA', min: 1, max: 1000000, label: 'Rated Apparent Power' },
     },
     description: 'Single-winding autotransformer with adjustable tap',
   },

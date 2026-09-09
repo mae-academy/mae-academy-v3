@@ -423,11 +423,11 @@ export function DigitalLogicSimulatorHome({ createSimulationEngine = () => new S
       ? ({ a: [-(100 / 3), 0], b: [100 / 3, 0] } as Record<string, Point>)[terminalId]
       : tabDUiRefinement && component.type === 'potentiometer'
         ? ({ a: [-(100 / 3), 0], b: [100 / 3, 0], wiper: [0, -(100 / 3)] } as Record<string, Point>)[terminalId]
-      : tabDUiRefinement && component.type === 'three-phase-source'
-      ? ({ l1: [40, -15], l2: [40, 0], l3: [40, 15], n: [-40, 0] } as Record<string, Point>)[terminalId]
-      : tabDUiRefinement && component.type === 'opamp'
-        ? ({ 'in-': [-(100 / 3), -(100 / 6)], 'in+': [-(100 / 3), 100 / 6], out: [100 / 3, 0], vcc: [0, -(100 / 3)], vee: [0, 100 / 3] } as Record<string, Point>)[terminalId]
-        : undefined;
+        : tabDUiRefinement && component.type === 'three-phase-source'
+          ? ({ l1: [40, -15], l2: [40, 0], l3: [40, 15], n: [-40, 0] } as Record<string, Point>)[terminalId]
+          : tabDUiRefinement && component.type === 'opamp'
+            ? ({ 'in-': [-(100 / 3), -(100 / 6)], 'in+': [-(100 / 3), 100 / 6], out: [100 / 3, 0], vcc: [0, -(100 / 3)], vee: [0, 100 / 3] } as Record<string, Point>)[terminalId]
+            : undefined;
     const [x, y] = documentedTerminal ?? [terminal.x, terminal.y];
     return getTerminalWorldPos(component.x, component.y, x * visualSymbolScale, y * visualSymbolScale, component.rotation, component.flipH, component.flipV);
   }, [getRuntimeTerminals, tabDUiRefinement, visualSymbolScale]);
@@ -726,8 +726,8 @@ export function DigitalLogicSimulatorHome({ createSimulationEngine = () => new S
     const duplicate = wires.some(wire => (
       wire.fromComp === from.componentId && wire.fromTerm === from.terminalId && wire.toComp === target.componentId && wire.toTerm === target.terminalId
     ) || (
-      wire.fromComp === target.componentId && wire.fromTerm === target.terminalId && wire.toComp === from.componentId && wire.toTerm === from.terminalId
-    ));
+        wire.fromComp === target.componentId && wire.fromTerm === target.terminalId && wire.toComp === from.componentId && wire.toTerm === from.terminalId
+      ));
     if (duplicate) {
       toast.message('These terminals are already connected');
       setWiring({});
@@ -1389,16 +1389,16 @@ function ComponentInspector({ colors, component, definition, linkedCoils, readin
       {digitalLogicOnly ? (component.type === 'digital-input'
         ? <><PropertyRow colors={colors} label="Logic state"><select value={String(component.props.state ?? 'LOW')} onChange={event => onPropertyChange('state', event.target.value)} style={inputStyle(colors)}><option value="LOW">0 · LOW</option><option value="HIGH">1 · HIGH</option><option value="Z">Z · High impedance</option><option value="X">X · Unknown</option></select></PropertyRow><PropertyRow colors={colors} label="Toggle key"><input readOnly value={String(component.props.shortcut || defaultInputShortcut)} onFocus={event => event.currentTarget.select()} onKeyDown={event => { event.preventDefault(); if (!['Control', 'Alt', 'Shift', 'Meta'].includes(event.key)) onPropertyChange('shortcut', event.key === 'Backspace' || event.key === 'Delete' ? '' : event.key); }} style={inputStyle(colors)} title="Focus then press a key to assign it" /></PropertyRow></>
         : Object.keys(definition.properties).length > 0 ? Object.entries(definition.properties).map(([key, property]) => {
-            const value = component.props[key] ?? property.value;
-            return <PropertyEditorField key={key} colors={colors} label={property.label ?? key} definition={property} value={value} onChange={nextValue => onPropertyChange(key, nextValue)} />;
-          }) : <div style={{ color: colors.muted, fontSize: 10, lineHeight: 1.45 }}>Discrete-event logic component. No ground, voltage, threshold, or electrical parameter is required.</div>) : Object.entries(definition.properties).map(([key, property]) => {
-        if (key === 'linkedTo') return <PropertyRow key={key} colors={colors} label={property.label ?? key}><select value={String(component.props[key] ?? '')} onChange={event => onPropertyChange(key, event.target.value)} style={inputStyle(colors)}><option value="">Select coil reference</option>{linkedCoils.filter(coil => coil.id !== component.id).map(coil => <option key={coil.id} value={coil.label}>{coil.label} · {getDef(coil.type)?.name}</option>)}</select></PropertyRow>;
-        const value = component.props[key] ?? property.value;
-        const prefixable = tabDUiRefinement && property.type === 'number' && PREFIXABLE_UNITS.has(property.unit ?? '');
-        return prefixable
-          ? <PrefixedPropertyEditorField key={key} colors={colors} propertyKey={key} label={property.label ?? key} definition={property} value={value} prefix={String(component.props[prefixStateKey(key)] ?? engineeringPrefixFor(numeric(value, numeric(property.value))))} onChange={nextValue => onPropertyChange(key, nextValue)} onPrefixChange={nextPrefix => onPropertyChange(prefixStateKey(key), nextPrefix)} />
-          : <PropertyEditorField key={key} colors={colors} label={property.label ?? key} definition={property} value={value} onChange={nextValue => onPropertyChange(key, nextValue)} />;
-      })}
+          const value = component.props[key] ?? property.value;
+          return <PropertyEditorField key={key} colors={colors} label={property.label ?? key} definition={property} value={value} onChange={nextValue => onPropertyChange(key, nextValue)} />;
+        }) : <div style={{ color: colors.muted, fontSize: 10, lineHeight: 1.45 }}>Discrete-event logic component. No ground, voltage, threshold, or electrical parameter is required.</div>) : Object.entries(definition.properties).map(([key, property]) => {
+          if (key === 'linkedTo') return <PropertyRow key={key} colors={colors} label={property.label ?? key}><select value={String(component.props[key] ?? '')} onChange={event => onPropertyChange(key, event.target.value)} style={inputStyle(colors)}><option value="">Select coil reference</option>{linkedCoils.filter(coil => coil.id !== component.id).map(coil => <option key={coil.id} value={coil.label}>{coil.label} · {getDef(coil.type)?.name}</option>)}</select></PropertyRow>;
+          const value = component.props[key] ?? property.value;
+          const prefixable = tabDUiRefinement && property.type === 'number' && PREFIXABLE_UNITS.has(property.unit ?? '');
+          return prefixable
+            ? <PrefixedPropertyEditorField key={key} colors={colors} propertyKey={key} label={property.label ?? key} definition={property} value={value} prefix={String(component.props[prefixStateKey(key)] ?? engineeringPrefixFor(numeric(value, numeric(property.value))))} onChange={nextValue => onPropertyChange(key, nextValue)} onPrefixChange={nextPrefix => onPropertyChange(prefixStateKey(key), nextPrefix)} />
+            : <PropertyEditorField key={key} colors={colors} label={property.label ?? key} definition={property} value={value} onChange={nextValue => onPropertyChange(key, nextValue)} />;
+        })}
     </InspectorSection>
     {component.type === 'dmm' && <DmmReadingInspector colors={colors} reading={reading} />}
     {component.type === 'oscilloscope' && <ScopeReadingInspector colors={colors} component={component} readings={snapshot.instrumentReadings} />}

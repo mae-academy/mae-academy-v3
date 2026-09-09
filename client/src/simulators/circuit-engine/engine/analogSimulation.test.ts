@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { CircuitComponent, CircuitWire } from '@/simulators/circuit-engine/models/circuitTypes';
-import { COMPONENT_DEFS } from '@/simulators/circuit-engine/models/componentDefs';
-import { TabDSimulationEngine } from '@/simulators/circuit-engine/engine/analogSimulation';
+import type { CircuitComponent, CircuitWire } from '../models/circuitTypes';
+import { COMPONENT_DEFS } from '../models/componentDefs';
+import { TabDSimulationEngine } from './analogSimulation';
 
 const component = (id: string, type: string, props: Record<string, unknown> = {}): CircuitComponent => ({ id, type, x: 0, y: 0, rotation: 0, flipH: false, flipV: false, label: id, props });
 const wire = (id: string, fromComp: string, fromTerm: string, toComp: string, toTerm: string): CircuitWire => ({ id, fromComp, fromTerm, toComp, toTerm, routing: 'orthogonal', path: [[0, 0], [20, 0]] });
@@ -28,7 +28,7 @@ describe('Tab D documented runtime binding', () => {
 
     expect(snapshot.converged).toBe(true);
     expect(snapshot.instrumentReadings.DMM1).toMatchObject({ value: 10, unit: 'V', status: 'ready' });
-    expect(Object.values(observable.Yn).some(node => Math.abs(node.iS - 10) < 1e-10)).toBe(true);
+    expect(Object.values(observable.Yn).some((node: any) => Math.abs(node.iS - 10) < 1e-10)).toBe(true);
     expect(observable.Di.R1.iR).toBeCloseTo(0.01, 10);
   });
 
@@ -53,14 +53,14 @@ describe('Tab D documented runtime binding', () => {
     ];
     const wires = [
       wire('a0', 'A', 'gnd', 'GND', 'gnd'), wire('b0', 'B', 'gnd', 'GND', 'gnd'), wire('g0', 'G1', 'gnd', 'GND', 'gnd'), wire('o0', 'OUT', 'gnd', 'GND', 'gnd'),
-      wire('a1', 'A', 'out', 'G1', 'a'), wire('b1', 'B', 'out', 'G1', 'b'), wire('y', 'G1', 'y', 'OUT', 'in'),
+      wire('a1', 'A', 'out', 'G1', 'a'), wire('b1', 'B', 'out', 'G1', 'b'), wire('y', 'G1', 'out', 'OUT', 'in'),
     ];
     const engine = new TabDSimulationEngine();
     engine.setCircuit(components, wires);
     engine.step(1e-3);
     const settled = engine.step(1e-3);
     expect(settled.converged).toBe(true);
-    expect(settled.terminalVoltages['G1:y']).toBeCloseTo(5, 8);
+    expect(settled.terminalVoltages['G1:out']).toBeCloseTo(5, 8);
   });
 
   it('measures a resistance through the DMM 1 mA educational test-source model', () => {
@@ -161,5 +161,84 @@ describe('Tab D documented runtime binding', () => {
     const snapshot = engine.step(1e-3);
     expect(snapshot.converged).toBe(false);
     expect(snapshot.warnings).toEqual([expect.objectContaining({ code: 'TAB_D_MNA', message: expect.stringMatching(/did not converge|Newton-Raphson/i) })]);
+  });
+
+  it('computes stable RMS values for AC voltmeter, ammeter, and DMM ACV/ACA modes', () => {
+    // 10 V peak AC source at 50 Hz across 100 Ohm resistor -> 100 mA peak
+    const components = [
+      component('VAC', 'ac-voltage', { amplitude: 10, frequency: 50 }),
+      component('R1', 'resistor', { resistance: 100 }),
+      component('GND', 'ground'),
+      component('VM1', 'voltmeter', { mode: 'AC' }),
+      component('AM1', 'ammeter', { mode: 'AC' }),
+      component('DMM1', 'dmm', { mode: 'ACV' }),
+    ];
+    const wires = [
+      wire('w1', 'VAC', 'pos', 'AM1', 'pos'),
+      wire('w2', 'AM1', 'neg', 'R1', 'a'),
+      wire('w3', 'R1', 'b', 'VAC', 'neg'),
+      wire('w4', 'VAC', 'neg', 'GND', 'gnd'),
+      wire('w5', 'VM1', 'pos', 'R1', 'a'),
+      wire('w6', 'VM1', 'neg', 'R1', 'b'),
+      wire('w7', 'DMM1', 'hi', 'R1', 'a'),
+      wire('w8', 'DMM1', 'com', 'R1', 'b'),
+    ];
+    const engine = new TabDSimulationEngine();
+    engine.setCircuit(components, wires);
+
+    // Step through 600 ms to allow the True RMS integrator and 0.5s Display Hold to lock
+    let lastSnapshot = engine.step(1e-3);
+    for (let i = 0; i < 600; i++) {
+      lastSnapshot = engine.step(1e-3);
+    }
+
+    expect(lastSnapshot.converged).toBe(true);
+    // 10 V peak sine true RMS is ~7.07 V
+    expect(lastSnapshot.instrumentReadings.VM1.value).toBeGreaterThan(6.0);
+    expect(lastSnapshot.instrumentReadings.VM1.value).toBeLessThan(7.5);
+    expect(lastSnapshot.instrumentReadings.DMM1.value).toBeCloseTo(lastSnapshot.instrumentReadings.VM1.value, 2);
+    // 0.1 A peak sine true RMS is ~0.0707 A
+    expect(lastSnapshot.instrumentReadings.AM1.value).toBeGreaterThan(0.06);
+    expect(lastSnapshot.instrumentReadings.AM1.value).toBeLessThan(0.075);
+
+    // Verify reading stability: subsequent step does not fluctuate wildly
+    const nextSnapshot = engine.step(1e-3);
+    expect(Math.abs(nextSnapshot.instrumentReadings.VM1.value - lastSnapshot.instrumentReadings.VM1.value)).toBeLessThan(0.1);
+  });
+
+  it('averages pure AC sinusoidal signals to 0 when measured with DC modes (DCV, DCA, DC voltmeter/ammeter)', () => {
+    // 10 V peak AC source at 50 Hz across 100 Ohm resistor -> 100 mA peak
+    const components = [
+      component('VAC', 'ac-voltage', { amplitude: 10, frequency: 50 }),
+      component('R1', 'resistor', { resistance: 100 }),
+      component('GND', 'ground'),
+      component('VM_DC', 'voltmeter', { mode: 'DC' }),
+      component('AM_DC', 'ammeter', { mode: 'DC' }),
+      component('DMM_DCV', 'dmm', { mode: 'DCV' }),
+    ];
+    const wires = [
+      wire('w1', 'VAC', 'pos', 'AM_DC', 'pos'),
+      wire('w2', 'AM_DC', 'neg', 'R1', 'a'),
+      wire('w3', 'R1', 'b', 'VAC', 'neg'),
+      wire('w4', 'VAC', 'neg', 'GND', 'gnd'),
+      wire('w5', 'VM_DC', 'pos', 'R1', 'a'),
+      wire('w6', 'VM_DC', 'neg', 'R1', 'b'),
+      wire('w7', 'DMM_DCV', 'hi', 'R1', 'a'),
+      wire('w8', 'DMM_DCV', 'com', 'R1', 'b'),
+    ];
+    const engine = new TabDSimulationEngine();
+    engine.setCircuit(components, wires);
+
+    // Step through 600 ms so the 100ms sliding window reaches steady state and the 0.5s display hold triggers
+    let lastSnapshot = engine.step(1e-3);
+    for (let i = 0; i < 600; i++) {
+      lastSnapshot = engine.step(1e-3);
+    }
+
+    expect(lastSnapshot.converged).toBe(true);
+    // Over a 100ms window (exactly 5 full cycles of 50 Hz) with fractional weighting, integral of sine wave averages to 0
+    expect(Math.abs(lastSnapshot.instrumentReadings.VM_DC.value)).toBeLessThan(0.01);
+    expect(Math.abs(lastSnapshot.instrumentReadings.DMM_DCV.value)).toBeLessThan(0.01);
+    expect(Math.abs(lastSnapshot.instrumentReadings.AM_DC.value)).toBeLessThan(0.001);
   });
 });

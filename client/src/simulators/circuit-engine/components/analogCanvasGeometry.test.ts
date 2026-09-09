@@ -132,13 +132,13 @@ describe('Component Label Anchors (analogCanvasGeometry.ts)', () => {
     expect(relayV.reference).toEqual([41, -6]); // 35 + 6 = 41
     expect(relayV.value).toEqual([41, 10]);
 
-    // Contactor (bodyHalfW = 35, bodyHalfH = 73, padding = 4, yShift = 12.5)
-    // Horizontal rotation: offsetY = 73 + 4 = 77
-    // Top: -77 + 12.5 = -64.5
-    // Bottom: 77 + 12.5 = 89.5
+    // Contactor (bodyHalfW = 35, bodyHalfH = 75, padding = 4, yShift = 12.5)
+    // Horizontal rotation: offsetY = 75 + 4 = 79
+    // Top: -79 + 12.5 = -66.5
+    // Bottom: 79 + 12.5 = 91.5
     const contactorH = tabDComponentLabelAnchors('contactor', true, 50, 80);
-    expect(contactorH.reference).toEqual([0, -64.5]);
-    expect(contactorH.value).toEqual([0, 89.5]);
+    expect(contactorH.reference).toEqual([0, -66.5]);
+    expect(contactorH.value).toEqual([0, 91.5]);
 
     // 3-Phase Fuse (bodyHalfW = 20, bodyHalfH = 25, padding = 4)
     const fuse3pV = tabDComponentLabelAnchors('fuse-3phase', false, 50, 50);
@@ -148,8 +148,8 @@ describe('Component Label Anchors (analogCanvasGeometry.ts)', () => {
 
   it('forces ground labels safely below the symbol to avoid terminal wire at top', () => {
     const groundAnchors = tabDComponentLabelAnchors('ground', false, 15, 15);
-    expect(groundAnchors.reference).toEqual([0, 16]);
-    expect(groundAnchors.value).toEqual([0, 28]);
+    expect(groundAnchors.reference).toEqual([0, 30]);
+    expect(groundAnchors.value).toEqual([0, 42]);
     expect(groundAnchors.refTextAnchor).toBe('middle');
     expect(groundAnchors.valTextAnchor).toBe('middle');
   });

@@ -837,7 +837,7 @@ export class SimulationEngine {
         }
         case 'transformer':
         case 'transformer-ct': {
-          const ratio = propNumber(props, 'secondaryV', type === 'transformer-ct' ? 24 : 12) / Math.max(0.1, propNumber(props, 'primaryV', 230));
+          const ratio = 1 / Math.max(1e-6, propNumber(props, 'turnRatio', 5));
           const inputA = 'p1';
           const inputB = 'p2';
           const outputA = 's1';
@@ -856,7 +856,7 @@ export class SimulationEngine {
           break;
         }
         case 'autotransformer': {
-          const ratio = propNumber(props, 'outputV', 120) / Math.max(0.1, propNumber(props, 'inputV', 230));
+          const ratio = 1 / Math.max(1e-6, propNumber(props, 'turnRatio', 2));
           const target = ratio * (this.terminalVoltage(component, 'in1', guess) - this.terminalVoltage(component, 'in2', guess));
           current = stampSource(component, 'tap', 'out2', target, 0.5);
           stampResistance(component, 'in1', 'in2', 100000);

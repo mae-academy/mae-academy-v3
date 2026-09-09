@@ -12,10 +12,13 @@ import {
   Clipboard,
   Copy,
   Download,
+  FileCode,
+  FileImage,
   FlipHorizontal,
   FlipVertical,
   Grid3X3,
   Info,
+  Maximize2,
   Minus,
   Move,
   Pause,
@@ -36,6 +39,7 @@ import { nanoid } from 'nanoid';
 import { toast } from 'sonner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { V3Math } from '@/components/ui/V3Math';
+import { KATEX_EMBEDDED_FONT_CSS } from '@/simulators/circuit-engine/models/katexSvgFonts';
 import { AnalysisBox } from '@/simulators/circuit-engine/components/ui-components/AnalysisBox';
 import type { AnalysisTrace, MeshCycle, NodalNodeLabel } from '@/simulators/circuit-engine/models/analysisTypes';
 import {
@@ -381,11 +385,17 @@ function componentValueAnchor(definition: ComponentDef, component: CircuitCompon
 }
 
 function componentDisplayValue(definition: ComponentDef, component: CircuitComponent): string | null {
+  if (['transformer', 'transformer-ct', 'autotransformer'].includes(component.type)) {
+    const n = numeric(component.props.turnRatio, definition.properties.turnRatio?.value ?? (component.type === 'autotransformer' ? 2 : 5));
+    if (n >= 1) return `${Number(n.toPrecision(4))}:1`;
+    return `1:${Number((1 / n).toPrecision(4))}`;
+  }
+
   if (component.type === 'impedance' || component.type === 'ac-voltage' || component.type === 'ac-current') {
     const isImpedance = component.type === 'impedance';
     const format = String(component.props.format ?? (isImpedance ? 'rectangular' : 'polar'));
     const unit = component.type === 'ac-voltage' ? 'V' : component.type === 'ac-current' ? 'A' : 'Ω';
-    
+
     if (format === 'polar') {
       const magKey = isImpedance ? 'mag' : 'amplitude';
       const angKey = isImpedance ? 'ang' : 'phase';
@@ -396,7 +406,7 @@ function componentDisplayValue(definition: ComponentDef, component: CircuitCompo
       const isRad = String(component.props.angleUnit) === 'radian';
       return `${mag} ∠ ${ang}${isRad ? ' rad' : '°'} ${unit}`;
     }
-    
+
     const rKey = isImpedance ? 'r' : 'real';
     const xKey = isImpedance ? 'x' : 'imag';
     const defaultR = component.type === 'ac-voltage' ? 10 : component.type === 'ac-current' ? 1 : 3;
@@ -415,8 +425,126 @@ function componentDisplayValue(definition: ComponentDef, component: CircuitCompo
   const visibleValue = Number((value / factor).toPrecision(12));
   const rawUnit = property.unit ?? '';
   const cleanUnit = rawUnit === 'Ohm' ? 'Ω' : rawUnit;
-  const unit = `${prefix}${cleanUnit}`;
+  const unit = `${prefix}${cleanUnit}`.replace(/\u00B5/g, '\u03BC');
   return `${visibleValue} ${unit}`;
+}
+
+/** Renders component value strings with KaTeX math styling, formatting Greek mu (μ) in KaTeX_Math italic. */
+function renderFormattedValueTspans(value: string) {
+  const normalized = value.replace(/\u00B5/g, '\u03BC');
+  const parts = normalized.split(/(\u03BC)/g);
+  return parts.map((part, index) => {
+    if (part === '\u03BC') {
+      return (
+        <tspan
+          key={index}
+          fontFamily="'KaTeX_Math', 'KaTeX_Main', serif"
+          fontStyle="italic"
+          style={{ fontFamily: "'KaTeX_Math', 'KaTeX_Main', serif", fontStyle: 'italic' }}
+        >
+          {part}
+        </tspan>
+      );
+    }
+    return (
+      <tspan
+        key={index}
+        fontFamily="'KaTeX_Main', 'KaTeX_Math', serif"
+        fontStyle="normal"
+        style={{ fontFamily: "'KaTeX_Main', 'KaTeX_Math', serif", fontStyle: 'normal' }}
+      >
+        {part}
+      </tspan>
+    );
+  });
+}
+
+/** Populates SVG text elements with KaTeX tspans for self-contained vector SVG export. */
+function populateMathTspans(svgTextEl: SVGTextElement, rawText: string, baseFontSize: number) {
+  if (!rawText) return;
+
+  const symbolMap: Record<string, string> = {
+    '\\Omega': 'Ω',
+    '\\mu': '\u03BC',
+    '\\pi': 'π',
+    '\\theta': 'θ',
+    '\\phi': 'ϕ',
+    '\\alpha': 'α',
+    '\\beta': 'β',
+    '\\gamma': 'γ',
+    '\\delta': 'δ',
+    '\\Delta': 'Δ',
+    '\\omega': 'ω',
+    '\\lambda': 'λ',
+    '\\sigma': 'σ',
+    '\\approx': '≈',
+    '\\neq': '≠',
+    '\\pm': '±',
+    '\\cdot': '⋅',
+    '\\times': '×',
+    '\\circ': '°',
+    '\\angle': '∠',
+    '\\infty': '∞',
+    '\\leq': '≤',
+    '\\geq': '≥',
+  };
+
+  let text = rawText
+    .replaceAll('\\quad', ' ')
+    .replaceAll('\\qquad', ' ')
+    .replaceAll('\\,', ' ')
+    .replaceAll('\\;', ' ')
+    .replaceAll('\\!', '')
+    .replaceAll('\\ ', ' ');
+
+  for (const [cmd, sym] of Object.entries(symbolMap)) {
+    text = text.replaceAll(cmd, sym);
+  }
+
+  text = text.replace(/\\(mathrm|mathit|mathbf|text)\{([^}]*)\}/g, '$2');
+  text = text.replace(/\\sqrt\{([^}]*)\}/g, '√($1)');
+
+  const tokenRegex = /(_\{[^}]+\}|_[A-Za-z0-9]|\^\{[^}]+\}|\^[A-Za-z0-9]|[^_^]+)/g;
+  const matches = text.match(tokenRegex) || [text];
+
+  let currentDy = 0;
+
+  for (const token of matches) {
+    const tspan = document.createElementNS('http://www.w3.org/2000/svg', 'tspan');
+    if (token.startsWith('_')) {
+      const subContent = token.startsWith('_{') ? token.slice(2, -1) : token.slice(1);
+      const dy = Math.round(baseFontSize * 0.35);
+      tspan.setAttribute('dy', String(dy - currentDy));
+      tspan.setAttribute('font-size', `${Math.round(baseFontSize * 0.75)}px`);
+      tspan.setAttribute('font-family', "'KaTeX_Main', serif");
+      tspan.setAttribute('font-style', 'normal');
+      tspan.style.fontFamily = "'KaTeX_Main', serif";
+      tspan.style.fontStyle = 'normal';
+      tspan.textContent = subContent.replace(/\u00B5/g, '\u03BC');
+      currentDy = dy;
+    } else if (token.startsWith('^')) {
+      const supContent = token.startsWith('^{') ? token.slice(2, -1) : token.slice(1);
+      const dy = -Math.round(baseFontSize * 0.4);
+      tspan.setAttribute('dy', String(dy - currentDy));
+      tspan.setAttribute('font-size', `${Math.round(baseFontSize * 0.75)}px`);
+      tspan.setAttribute('font-family', "'KaTeX_Main', serif");
+      tspan.setAttribute('font-style', 'normal');
+      tspan.style.fontFamily = "'KaTeX_Main', serif";
+      tspan.style.fontStyle = 'normal';
+      tspan.textContent = supContent.replace(/\u00B5/g, '\u03BC');
+      currentDy = dy;
+    } else {
+      if (currentDy !== 0) {
+        tspan.setAttribute('dy', String(-currentDy));
+        currentDy = 0;
+      }
+      tspan.setAttribute('font-size', `${baseFontSize}px`);
+      tspan.setAttribute('font-family', "'KaTeX_Main', 'KaTeX_Math', serif");
+      tspan.style.fontFamily = "'KaTeX_Main', 'KaTeX_Math', serif";
+      tspan.textContent = token.replace(/\u00B5/g, '\u03BC');
+    }
+    svgTextEl.appendChild(tspan);
+  }
 }
 
 function NodalNodeOverlay({ node, colors }: { node: NodalNodeLabel; colors: Palette }) {
@@ -482,6 +610,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
   const [snapshot, setSnapshot] = useState<SimulationSnapshot>(EMPTY_SNAPSHOT);
   const [animationTime, setAnimationTime] = useState(0);
   const [darkPreview, setDarkPreview] = useState(() => typeof document !== 'undefined' && document.documentElement.classList.contains('dark'));
+  const [hoveredComponentId, setHoveredComponentId] = useState<string | null>(null);
   const gridSize = tabDUiRefinement ? TAB_D_GRID_SIZE : GRID_SIZE;
   const visualSymbolScale = tabDUiRefinement ? TAB_D_SYMBOL_SCALE : 1;
   const normalizedGraph = useMemo(() => NormalizedCircuitGraph.fromCanvas(components, wires), [components, wires]);
@@ -902,6 +1031,404 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
       toast.success(`NAD circuit imported (${importedComponents.length} components)${excludedCount ? `; ${excludedCount} unavailable component${excludedCount === 1 ? '' : 's'} omitted` : ''}`);
     } catch (error) { toast.error(error instanceof Error ? error.message : 'Unable to import NAD file.'); }
   }, [tabDUiRefinement]);
+
+  const getCircuitBoundingBox = useCallback(() => {
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+
+    const expand = (x: number, y: number) => {
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+    };
+
+    components.forEach((component) => {
+      expand(component.x - 35, component.y - 35);
+      expand(component.x + 35, component.y + 35);
+      const definition = getDef(component.type);
+      if (definition?.terminals) {
+        definition.terminals.forEach((terminal) => {
+          const pos = getCanvasTerminalPosition(component, terminal.id);
+          if (pos) expand(pos[0], pos[1]);
+        });
+      }
+      if (definition) {
+        const anchors = componentLabelAnchors(definition, component, visualSymbolScale);
+        expand(component.x + anchors.reference[0], component.y + anchors.reference[1]);
+        expand(component.x + anchors.value[0], component.y + anchors.value[1]);
+      }
+    });
+
+    wires.forEach((wire) => {
+      if (Array.isArray(wire.path)) {
+        wire.path.forEach((point) => {
+          if (point && point.length >= 2 && Number.isFinite(point[0]) && Number.isFinite(point[1])) {
+            expand(point[0], point[1]);
+          }
+        });
+      }
+    });
+
+    texts.forEach((text) => {
+      expand(text.x, text.y);
+      expand(text.x + 80, text.y + 24);
+    });
+
+    if (!Number.isFinite(minX) || !Number.isFinite(maxX) || !Number.isFinite(minY) || !Number.isFinite(maxY)) {
+      return null;
+    }
+
+    const circuitWidth = Math.max(20, maxX - minX);
+    const circuitHeight = Math.max(20, maxY - minY);
+
+    return {
+      minX,
+      maxX,
+      minY,
+      maxY,
+      circuitWidth,
+      circuitHeight,
+      centerX: (minX + maxX) / 2,
+      centerY: (minY + maxY) / 2,
+    };
+  }, [components, getCanvasTerminalPosition, texts, visualSymbolScale, wires]);
+
+  const zoomToFit = useCallback(() => {
+    if (components.length === 0 && texts.length === 0) {
+      setZoom(1);
+      setPan([0, 0]);
+      return;
+    }
+
+    const bounds = getCircuitBoundingBox();
+    if (!bounds) {
+      setZoom(1);
+      setPan([0, 0]);
+      return;
+    }
+
+    const rect = svgRef.current?.getBoundingClientRect();
+    const width = rect?.width || 800;
+    const height = rect?.height || 600;
+    const pad = 60;
+
+    const availWidth = Math.max(20, width - pad * 2);
+    const availHeight = Math.max(20, height - pad * 2);
+    const newZoom = Math.max(0.2, Math.min(2.5, Math.min(availWidth / bounds.circuitWidth, availHeight / bounds.circuitHeight)));
+
+    const newPan: Point = [
+      width / 2 - bounds.centerX * newZoom,
+      height / 2 - bounds.centerY * newZoom,
+    ];
+
+    setZoom(newZoom);
+    setPan(newPan);
+    toast.success('Centered circuit to fit viewport');
+  }, [components.length, getCircuitBoundingBox, texts.length]);
+
+  const exportSvg = useCallback(() => {
+    if (components.length === 0 && texts.length === 0 && wires.length === 0) {
+      toast.error('No circuit elements to export');
+      return;
+    }
+
+    const bounds = getCircuitBoundingBox();
+    if (!bounds || !svgRef.current) {
+      toast.error('Unable to compute circuit boundaries');
+      return;
+    }
+
+    const cropX = Math.round(bounds.minX - 30);
+    const cropY = Math.round(bounds.minY - 30);
+    const cropWidth = Math.round(bounds.circuitWidth + 60);
+    const cropHeight = Math.round(bounds.circuitHeight + 60);
+
+    const clonedSvg = svgRef.current.cloneNode(true) as SVGSVGElement;
+    clonedSvg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+    clonedSvg.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
+    clonedSvg.setAttribute('viewBox', `${cropX} ${cropY} ${cropWidth} ${cropHeight}`);
+    clonedSvg.setAttribute('width', String(cropWidth));
+    clonedSvg.setAttribute('height', String(cropHeight));
+    clonedSvg.style.width = `${cropWidth}px`;
+    clonedSvg.style.height = `${cropHeight}px`;
+
+    const strokeColor = darkPreview ? '#f8fafc' : '#1e293b';
+    clonedSvg.style.color = strokeColor;
+    clonedSvg.setAttribute('color', strokeColor);
+
+    const worldGroup = Array.from(clonedSvg.querySelectorAll('g')).find(g => g.getAttribute('transform')?.includes('scale'));
+    if (worldGroup) {
+      worldGroup.removeAttribute('transform');
+    }
+
+    // Clean up interactive, selection, and invisible elements
+    clonedSvg.querySelectorAll('circle[style*="cursor: move"], circle[style*="cursor:move"]').forEach(el => el.remove());
+    clonedSvg.querySelectorAll('circle[r="13"]').forEach(el => el.remove());
+    clonedSvg.querySelectorAll('circle[fill="transparent"]').forEach(el => el.remove());
+    clonedSvg.querySelectorAll('circle[fill="none"][stroke="none"]').forEach(el => el.remove());
+    clonedSvg.querySelectorAll('path[stroke="transparent"]').forEach(el => el.remove());
+    clonedSvg.querySelectorAll('rect[stroke-dasharray="5 4"]').forEach(el => el.remove());
+    clonedSvg.querySelectorAll('path[stroke-dasharray="6 4"]').forEach(el => el.remove());
+    clonedSvg.querySelectorAll('g[opacity="0"], g[style*="opacity: 0"], circle[opacity="0"], circle[style*="opacity: 0"]').forEach(el => el.remove());
+    clonedSvg.querySelectorAll('rect[key*="grid-surface"], rect[fill*="workspace-grid"]').forEach(el => el.remove());
+
+    // Replace free-text foreignObjects with standard SVG text and KaTeX tspans
+    texts.forEach(text => {
+      const g = clonedSvg.querySelector(`g[data-text-id="${text.id}"]`);
+      if (g) {
+        const fo = g.querySelector('foreignObject');
+        if (fo) {
+          const textEl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          textEl.setAttribute('x', '0');
+          textEl.setAttribute('y', '0');
+          textEl.setAttribute('dominant-baseline', 'hanging');
+          textEl.setAttribute('fill', text.color);
+          textEl.setAttribute('font-size', `${text.fontSize || 14}px`);
+          textEl.setAttribute('font-family', "'KaTeX_Main', 'KaTeX_Math', serif");
+          textEl.style.fontFamily = "'KaTeX_Main', 'KaTeX_Math', serif";
+          textEl.style.fontSize = `${text.fontSize || 14}px`;
+          populateMathTspans(textEl, text.text, text.fontSize || 14);
+          fo.replaceWith(textEl);
+        }
+      }
+    });
+
+    clonedSvg.querySelectorAll('g[color]').forEach(el => {
+      el.setAttribute('color', strokeColor);
+    });
+
+    let defs = clonedSvg.querySelector('defs');
+    if (!defs) {
+      defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+      clonedSvg.insertBefore(defs, clonedSvg.firstChild);
+    }
+
+    const bgRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    bgRect.setAttribute('x', String(cropX));
+    bgRect.setAttribute('y', String(cropY));
+    bgRect.setAttribute('width', String(cropWidth));
+    bgRect.setAttribute('height', String(cropHeight));
+    bgRect.setAttribute('fill', colors.canvas);
+
+    if (worldGroup) {
+      worldGroup.insertBefore(bgRect, worldGroup.firstChild);
+    } else {
+      clonedSvg.insertBefore(bgRect, clonedSvg.firstChild);
+    }
+
+    if (gridVisible && (!tabDUiRefinement || tabDGridMode !== 'hidden')) {
+      const gridRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      gridRect.setAttribute('x', String(cropX));
+      gridRect.setAttribute('y', String(cropY));
+      gridRect.setAttribute('width', String(cropWidth));
+      gridRect.setAttribute('height', String(cropHeight));
+      gridRect.setAttribute('fill', `url(#workspace-grid-${tabDUiRefinement ? tabDGridMode : 'base'})`);
+      if (worldGroup) {
+        worldGroup.insertBefore(gridRect, bgRect.nextSibling);
+      } else {
+        clonedSvg.insertBefore(gridRect, bgRect.nextSibling);
+      }
+    }
+
+    const styleEl = document.createElementNS('http://www.w3.org/2000/svg', 'style');
+    styleEl.textContent = `
+      ${KATEX_EMBEDDED_FONT_CSS}
+      :root, svg {
+        color: ${strokeColor};
+        background-color: ${colors.canvas};
+      }
+      text, tspan {
+        font-family: 'KaTeX_Main', 'KaTeX_Math', 'KaTeX_AMS', serif;
+      }
+      .katex {
+        font-family: 'KaTeX_Main', 'KaTeX_Math', 'KaTeX_AMS', serif;
+      }
+    `;
+    defs.appendChild(styleEl);
+
+    const serializer = new XMLSerializer();
+    let svgString = serializer.serializeToString(clonedSvg);
+    if (!svgString.startsWith('<?xml')) {
+      svgString = '<?xml version="1.0" encoding="UTF-8"?>\n' + svgString;
+    }
+
+    const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'circuit-schematic.svg';
+    link.click();
+    URL.revokeObjectURL(url);
+    toast.success('Schematic exported as SVG');
+  }, [colors.canvas, components.length, darkPreview, getCircuitBoundingBox, gridVisible, tabDGridMode, tabDUiRefinement, texts, wires.length]);
+
+  const exportPng = useCallback(() => {
+    if (components.length === 0 && texts.length === 0 && wires.length === 0) {
+      toast.error('No circuit elements to export');
+      return;
+    }
+
+    const bounds = getCircuitBoundingBox();
+    if (!bounds || !svgRef.current) {
+      toast.error('Unable to compute circuit boundaries');
+      return;
+    }
+
+    const cropX = Math.round(bounds.minX - 30);
+    const cropY = Math.round(bounds.minY - 30);
+    const cropWidth = Math.round(bounds.circuitWidth + 60);
+    const cropHeight = Math.round(bounds.circuitHeight + 60);
+
+    const scale = 2;
+    const canvas = document.createElement('canvas');
+    canvas.width = cropWidth * scale;
+    canvas.height = cropHeight * scale;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      toast.error('Failed to initialize canvas for PNG export');
+      return;
+    }
+
+    ctx.fillStyle = colors.canvas;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    if (gridVisible && (!tabDUiRefinement || tabDGridMode !== 'hidden')) {
+      if (tabDUiRefinement && tabDGridMode === 'dots') {
+        const dotColor = darkPreview ? 'rgba(109, 145, 196, 0.9)' : 'rgba(122, 147, 177, 0.9)';
+        ctx.fillStyle = dotColor;
+        const startX = Math.floor(cropX / gridSize) * gridSize;
+        const startY = Math.floor(cropY / gridSize) * gridSize;
+        for (let x = startX; x <= cropX + cropWidth; x += gridSize) {
+          for (let y = startY; y <= cropY + cropHeight; y += gridSize) {
+            const px = (x - cropX) * scale;
+            const py = (y - cropY) * scale;
+            ctx.beginPath();
+            ctx.arc(px, py, 1.65 * scale, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+      } else {
+        const lineColor = tabDUiRefinement
+          ? (darkPreview ? 'rgba(61, 95, 140, 0.85)' : 'rgba(168, 184, 204, 0.85)')
+          : colors.grid;
+        ctx.strokeStyle = lineColor;
+        ctx.lineWidth = (tabDUiRefinement ? 1.15 : 1) * scale;
+        ctx.beginPath();
+        const startX = Math.floor(cropX / gridSize) * gridSize;
+        const startY = Math.floor(cropY / gridSize) * gridSize;
+        for (let x = startX; x <= cropX + cropWidth; x += gridSize) {
+          const px = (x - cropX) * scale;
+          ctx.moveTo(px, 0);
+          ctx.lineTo(px, canvas.height);
+        }
+        for (let y = startY; y <= cropY + cropHeight; y += gridSize) {
+          const py = (y - cropY) * scale;
+          ctx.moveTo(0, py);
+          ctx.lineTo(canvas.width, py);
+        }
+        ctx.stroke();
+      }
+    }
+
+    const clonedSvg = svgRef.current.cloneNode(true) as SVGSVGElement;
+    clonedSvg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+    clonedSvg.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
+    clonedSvg.setAttribute('viewBox', `${cropX} ${cropY} ${cropWidth} ${cropHeight}`);
+    clonedSvg.setAttribute('width', String(cropWidth));
+    clonedSvg.setAttribute('height', String(cropHeight));
+
+    const strokeColor = darkPreview ? '#f8fafc' : '#1e293b';
+    clonedSvg.style.color = strokeColor;
+    clonedSvg.setAttribute('color', strokeColor);
+
+    const worldGroup = Array.from(clonedSvg.querySelectorAll('g')).find(g => g.getAttribute('transform')?.includes('scale'));
+    if (worldGroup) {
+      worldGroup.removeAttribute('transform');
+    }
+
+    clonedSvg.querySelectorAll('rect[key*="grid-surface"], rect[fill*="workspace-grid"]').forEach(el => el.remove());
+    clonedSvg.querySelectorAll('circle[style*="cursor: move"], circle[style*="cursor:move"]').forEach(el => el.remove());
+    clonedSvg.querySelectorAll('circle[r="13"]').forEach(el => el.remove());
+    clonedSvg.querySelectorAll('circle[fill="transparent"]').forEach(el => el.remove());
+    clonedSvg.querySelectorAll('circle[fill="none"][stroke="none"]').forEach(el => el.remove());
+    clonedSvg.querySelectorAll('path[stroke="transparent"]').forEach(el => el.remove());
+    clonedSvg.querySelectorAll('rect[stroke-dasharray="5 4"]').forEach(el => el.remove());
+    clonedSvg.querySelectorAll('path[stroke-dasharray="6 4"]').forEach(el => el.remove());
+    clonedSvg.querySelectorAll('g[opacity="0"], g[style*="opacity: 0"], circle[opacity="0"], circle[style*="opacity: 0"]').forEach(el => el.remove());
+
+    texts.forEach(text => {
+      const g = clonedSvg.querySelector(`g[data-text-id="${text.id}"]`);
+      if (g) {
+        const fo = g.querySelector('foreignObject');
+        if (fo) {
+          const textEl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          textEl.setAttribute('x', '0');
+          textEl.setAttribute('y', '0');
+          textEl.setAttribute('dominant-baseline', 'hanging');
+          textEl.setAttribute('fill', text.color);
+          textEl.setAttribute('font-size', `${text.fontSize || 14}px`);
+          textEl.setAttribute('font-family', "'KaTeX_Main', 'KaTeX_Math', serif");
+          textEl.style.fontFamily = "'KaTeX_Main', 'KaTeX_Math', serif";
+          textEl.style.fontSize = `${text.fontSize || 14}px`;
+          populateMathTspans(textEl, text.text, text.fontSize || 14);
+          fo.replaceWith(textEl);
+        }
+      }
+    });
+
+    clonedSvg.querySelectorAll('g[color]').forEach(el => {
+      el.setAttribute('color', strokeColor);
+    });
+
+    let defs = clonedSvg.querySelector('defs');
+    if (!defs) {
+      defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+      clonedSvg.insertBefore(defs, clonedSvg.firstChild);
+    }
+    const styleEl = document.createElementNS('http://www.w3.org/2000/svg', 'style');
+    styleEl.textContent = `
+      ${KATEX_EMBEDDED_FONT_CSS}
+      :root, svg {
+        color: ${strokeColor};
+      }
+      text, tspan {
+        font-family: 'KaTeX_Main', 'KaTeX_Math', 'KaTeX_AMS', serif;
+      }
+      .katex {
+        font-family: 'KaTeX_Main', 'KaTeX_Math', 'KaTeX_AMS', serif;
+      }
+    `;
+    defs.appendChild(styleEl);
+
+    const serializer = new XMLSerializer();
+    const svgString = serializer.serializeToString(clonedSvg);
+    const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(svgBlob);
+
+    const img = new Image();
+    img.onload = () => {
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      try {
+        const pngUrl = canvas.toDataURL('image/png');
+        const link = document.createElement('a');
+        link.href = pngUrl;
+        link.download = 'circuit-schematic.png';
+        link.click();
+        toast.success('Schematic exported as PNG');
+      } catch (err) {
+        toast.error('Failed to export PNG image');
+      }
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      toast.error('Failed to render schematic to PNG');
+    };
+    img.src = url;
+  }, [colors.canvas, colors.grid, components.length, darkPreview, getCircuitBoundingBox, gridSize, gridVisible, tabDGridMode, tabDUiRefinement, texts, wires.length]);
 
   const moveSelected = useCallback((dx: number, dy: number) => {
     if (selectedComponent) {
@@ -1538,11 +2065,14 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
           </div>
           <div className="flex flex-nowrap items-center gap-1.5 border-t px-2 py-2" style={{ borderColor: colors.line, minHeight: 36 }}>
             <ToolbarButton colors={colors} icon={<Download size={14} />} label="Export" title="Export circuit as NAD netlist" onClick={exportNad} />
+            <ToolbarButton colors={colors} icon={<FileImage size={14} />} label="PNG" title="Export as PNG image" onClick={exportPng} />
+            <ToolbarButton colors={colors} icon={<FileCode size={14} />} label="SVG" title="Export as vector SVG" onClick={exportSvg} />
             <ToolbarButton colors={colors} icon={<Upload size={14} />} label="Import" title="Import circuit from NAD netlist" onClick={() => nadInputRef.current?.click()} />
             <input ref={nadInputRef} type="file" accept=".nad,application/x-mae-nad+json,application/json" onChange={importNad} style={{ display: 'none' }} />
             <ToolbarDivider colors={colors} />
             <ToolbarButton colors={colors} icon={<Undo2 size={14} />} title="Undo (Ctrl/Cmd+Z)" onClick={() => toast('History stack not initialized')} />
             <ToolbarButton colors={colors} icon={<Redo2 size={14} />} title="Redo (Ctrl/Cmd+Shift+Z)" onClick={() => toast('History stack not initialized')} />
+            <ToolbarButton colors={colors} icon={<Maximize2 size={14} />} title="Auto-scale / Center circuit" onClick={zoomToFit} />
             <ToolbarButton colors={colors} icon={<Scissors size={14} />} title="Cut (Ctrl/Cmd+X)" onClick={cutSelection} disabled={!selectedComponent && marqueeIds.length === 0} />
             <ToolbarButton colors={colors} icon={<Copy size={14} />} title="Copy (Ctrl/Cmd+C)" onClick={copySelection} disabled={!selectedComponent && marqueeIds.length === 0} />
             <ToolbarButton colors={colors} icon={<Clipboard size={14} />} title="Paste (Ctrl/Cmd+V)" onClick={pasteClipboard} disabled={!clipboard || (clipboard.components.length === 0 && clipboard.wires.length === 0 && clipboard.texts.length === 0)} />
@@ -1643,19 +2173,21 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
               {wires.map(wire => {
                 const selected = selection?.kind === 'wire' && selection.id === wire.id;
                 const current = snapshot.wireCurrents[wire.id] ?? 0;
-                const active = Math.abs(current) > 1e-9;
+                const phase = snapshot.wirePhases?.[wire.id] ?? 0;
+                const active = Math.abs(current) > 1e-7;
                 const path = wire.path;
                 const renderPath = pointsToPath(path);
-                const conventionalPath = current >= 0 ? path : reversedPath(path);
-                const dots = simulationRunning && active ? getDotsOnPath(conventionalPath, Math.max(2, Math.min(7, Math.round(pathLength(path) / 85))), animationTime * (0.6 + Math.min(2.2, Math.abs(current) * 50))) : [];
+                const normalizedOffset = ((phase % 1) + 1) % 1;
+                const dots = simulationRunning && active
+                  ? getDotsOnPath(path, Math.max(2, Math.min(8, Math.round(pathLength(path) / 50))), normalizedOffset)
+                  : [];
                 const isSensingWire = false;
                 const isSensingParentSelected = false;
                 return (
                   <g key={wire.id}>
                     <path d={renderPath} fill="none" stroke="transparent" strokeWidth={17} strokeLinecap="round" strokeLinejoin="round" onMouseDown={event => handleWireMouseDown(event, wire)} onDoubleClick={event => handleWireDoubleClick(event, wire)} style={{ cursor: 'pointer' }} />
-                    <path d={renderPath} fill="none" stroke={selected ? colors.selection : active ? colors.powered : colors.wire} strokeOpacity={isSensingWire && !isSensingParentSelected ? 0 : selected ? .25 : active ? .16 : .12} strokeWidth={selected ? 7 : active ? 6 : 5} strokeLinecap="round" strokeLinejoin="round" pointerEvents="none" />
-                    <path d={renderPath} fill="none" stroke={selected ? colors.selection : active ? colors.powered : colors.wire} strokeWidth={isSensingWire ? 1 : selected ? 2.6 : 1.8} strokeDasharray={isSensingWire ? "3 3" : undefined} strokeOpacity={isSensingWire && !isSensingParentSelected ? 0.15 : 1} strokeLinecap="round" strokeLinejoin="round" pointerEvents="none" />
-                    {dots.map((dot, index) => <circle key={index} cx={dot[0]} cy={dot[1]} r={2.8} fill={colors.powered} opacity={.9} pointerEvents="none" />)}
+                    <path d={renderPath} fill="none" stroke={colors.text} strokeWidth={1.5} strokeDasharray={isSensingWire ? "3 3" : undefined} strokeLinecap="round" strokeLinejoin="round" pointerEvents="none" />
+                    {dots.map((dot, index) => <circle key={index} cx={dot[0]} cy={dot[1]} r={3} fill={colors.powered} opacity={.9} pointerEvents="none" />)}
                     {wire.toComp.startsWith('junc_') && <circle cx={path[path.length - 1][0]} cy={path[path.length - 1][1]} r={3.5} fill={colors.primary} stroke="#ffffff" strokeWidth={1.5} pointerEvents="none" />}
                     {selected && wire.path.length > 2 && wire.path.slice(1, -1).map((corner, index) => {
                       const cornerIndex = index + 1;
@@ -1665,7 +2197,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                 );
               })}
 
-              {wiring.from && <path d={pointsToPath(tabDOrthogonalDraftPath(wiring.from.position, wireSnapProjection ? wireSnapProjection.point : cursor, wiring.lockedCorners, wiring.from.axis))} fill="none" stroke={colors.accent} strokeDasharray="6 4" strokeWidth={1.6} opacity={.75} pointerEvents="none" />}
+              {wiring.from && <path d={pointsToPath(tabDOrthogonalDraftPath(wiring.from.position, wireSnapProjection ? wireSnapProjection.point : cursor, wiring.lockedCorners, wiring.from.axis))} fill="none" stroke={colors.accent} strokeDasharray="6 4" strokeWidth={1.6} opacity={.75} strokeLinecap="round" strokeLinejoin="round" pointerEvents="none" />}
               {wireSnapProjection && <circle cx={wireSnapProjection.point[0]} cy={wireSnapProjection.point[1]} r={6} fill="none" stroke={colors.accent} strokeWidth={2} pointerEvents="none" />}
               {wiring.lockedCorners?.map((corner, index) => (
                 <circle key={`corner-${index}`} cx={corner[0]} cy={corner[1]} r={3} fill={colors.panel} stroke={colors.accent} strokeWidth={1.2} pointerEvents="none" />
@@ -1681,7 +2213,12 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                 const transform = `translate(${component.x},${component.y})`;
                 const symbolTransform = `rotate(${component.rotation}) scale(${component.flipH ? -1 : 1},${component.flipV ? -1 : 1}) scale(${isExactCadComponent(component.type) ? 1 : visualSymbolScale})`;
                 return (
-                  <g key={component.id} transform={transform}>
+                  <g
+                    key={component.id}
+                    transform={transform}
+                    onPointerEnter={() => setHoveredComponentId(component.id)}
+                    onPointerLeave={() => setHoveredComponentId(null)}
+                  >
                     <g transform={symbolTransform} color={isSelected ? colors.selection : undefined}>
                       {renderSymbol(definition.symbol, powered, { ...component.props, _intensity: intensity, _documentedStyle: tabDUiRefinement }, animationTime)}
                       {component.type === 'oscilloscope' && <ScopeTrace reading={snapshot.instrumentReadings[`${component.id}:ch1`]} color="#38bdf8" />}
@@ -1692,15 +2229,16 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                       if (!snappedWorld || !rawWorld) return null;
                       const terminalX = snappedWorld[0] - component.x;
                       const terminalY = snappedWorld[1] - component.y;
-                      const rawX = rawWorld[0] - component.x;
-                      const rawY = rawWorld[1] - component.y;
                       const starting = wiring.from?.componentId === component.id && wiring.from.terminalId === terminal.id;
                       const terminalVoltage = snapshot.terminalVoltages[terminalKey(component.id, terminal.id)] ?? 0;
                       const energized = Math.abs(terminalVoltage) > .05;
+                      const showTerminals = isSelected || hoveredComponentId === component.id || Boolean(wiring.from);
                       return <g key={terminal.id}>
                         <circle cx={terminalX} cy={terminalY} r={TERMINAL_HIT_RADIUS} fill="transparent" />
-                        <circle cx={terminalX} cy={terminalY} r={TERMINAL_RADIUS} fill={starting ? colors.accent : energized ? colors.powered : colors.panel} stroke={wiring.from ? colors.primary : colors.muted} strokeWidth={1.4} pointerEvents="none" />
-                        {(wiring.from || isSelected) && <text x={terminalX} y={terminalY - 8} textAnchor="middle" fontSize={7} fontWeight={400} fill={colors.muted} pointerEvents="none">{terminal.name}</text>}
+                        <g style={{ opacity: showTerminals ? 1 : 0, transition: 'opacity 0.2s ease-in-out' }} pointerEvents="none">
+                          <circle cx={terminalX} cy={terminalY} r={TERMINAL_RADIUS} fill={starting ? colors.accent : energized ? colors.powered : colors.panel} stroke={wiring.from ? colors.primary : colors.muted} strokeWidth={1.4} />
+                          {terminal.name && <text x={terminalX} y={terminalY - 8} textAnchor="middle" fontSize={7} fontWeight={400} fill={colors.muted}>{terminal.name}</text>}
+                        </g>
                       </g>;
                     })}
                     {isSelected && (component.type === 'cccs' || component.type === 'ccvs' || component.type === 'vcvs' || component.type === 'vccs') && typeof component.props.controlSourceId === 'string' && component.props.controlSourceId && (() => {
@@ -1751,8 +2289,9 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                           y={refY}
                           textAnchor={refTextAnchor}
                           dominantBaseline="central"
+                          fontFamily="'KaTeX_Main', 'KaTeX_Math', serif"
                           style={{
-                            fontFamily: "'KaTeX_Main', 'KaTeX_Math', system-ui, sans-serif",
+                            fontFamily: "'KaTeX_Main', 'KaTeX_Math', serif",
                             fontSize: 13,
                             fontWeight: 400,
                             fill: refFill,
@@ -1765,27 +2304,44 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                         >
                           {labelMatch ? (
                             <>
-                              <tspan style={{ fontStyle: 'italic', fontFamily: "'KaTeX_Math', 'KaTeX_Main', system-ui, sans-serif" }}>
+                              <tspan
+                                fontFamily="'KaTeX_Math', serif"
+                                fontStyle="italic"
+                                style={{ fontStyle: 'italic', fontFamily: "'KaTeX_Math', serif" }}
+                              >
                                 {labelMatch[1]}
                               </tspan>
                               <tspan
                                 dy="2.5"
+                                fontFamily="'KaTeX_Main', serif"
+                                fontSize="9.5px"
+                                fontStyle="normal"
                                 style={{
                                   fontSize: '9.5px',
                                   fontWeight: 400,
                                   fontStyle: 'normal',
-                                  fontFamily: "'KaTeX_Main', system-ui, sans-serif",
+                                  fontFamily: "'KaTeX_Main', serif",
                                 }}
                               >
                                 {labelMatch[2]}
                               </tspan>
                             </>
                           ) : isGround ? (
-                            <tspan style={{ fontStyle: 'normal', fontFamily: "'KaTeX_Main', sans-serif" }}>
+                            <tspan
+                              fontFamily="'KaTeX_Main', serif"
+                              fontStyle="normal"
+                              style={{ fontStyle: 'normal', fontFamily: "'KaTeX_Main', serif" }}
+                            >
                               GND
                             </tspan>
                           ) : (
-                            component.label
+                            <tspan
+                              fontFamily="'KaTeX_Math', 'KaTeX_Main', serif"
+                              fontStyle="italic"
+                              style={{ fontStyle: 'italic', fontFamily: "'KaTeX_Math', 'KaTeX_Main', serif" }}
+                            >
+                              {component.label}
+                            </tspan>
                           )}
                         </text>
                       )}
@@ -1797,8 +2353,9 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                           y={valY}
                           textAnchor={valTextAnchor}
                           dominantBaseline="central"
+                          fontFamily="'KaTeX_Main', 'KaTeX_Math', serif"
                           style={{
-                            fontFamily: "'KaTeX_Main', 'KaTeX_Math', system-ui, sans-serif",
+                            fontFamily: "'KaTeX_Main', 'KaTeX_Math', serif",
                             fontSize: 11,
                             fontWeight: 400,
                             fill: valFill,
@@ -1809,7 +2366,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                             strokeLinecap: 'round',
                           }}
                         >
-                          {value}
+                          {renderFormattedValueTspans(value)}
                         </text>
                       )}
                     </g>
@@ -1820,6 +2377,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
               {texts.map(text => (
                 <g
                   key={text.id}
+                  data-text-id={text.id}
                   transform={`translate(${text.x},${text.y}) rotate(${text.rotation})`}
                   onPointerDown={event => {
                     event.currentTarget.setPointerCapture(event.pointerId);
@@ -1951,10 +2509,10 @@ function ComponentInspector({ colors, component, definition, allComponents, link
         if (component.type === 'impedance' || component.type === 'ac-voltage' || component.type === 'ac-current') {
           const isImpedance = component.type === 'impedance';
           const format = String(component.props.format ?? (isImpedance ? 'rectangular' : 'polar'));
-          
+
           if (format === 'rectangular' && ['mag', 'ang', 'amplitude', 'phase', 'angleUnit'].includes(key)) return null;
           if (format === 'polar' && ['r', 'x', 'real', 'imag', 'angleUnit'].includes(key)) return null;
-          
+
           if (format === 'polar' && (key === 'ang' || key === 'phase')) {
             const defaultAng = isImpedance ? 53.13 : 0;
             return (
@@ -2122,3 +2680,4 @@ function EngineeringMath({ value, unit }: { value: number; unit?: string }) {
 }
 
 function inputStyle(colors: Palette): React.CSSProperties { return { width: '100%', minWidth: 0, boxSizing: 'border-box', background: colors.input, color: colors.text, border: `1px solid ${colors.line}`, borderRadius: 5, padding: '6px 7px', fontSize: 10, outline: 'none' }; }
+

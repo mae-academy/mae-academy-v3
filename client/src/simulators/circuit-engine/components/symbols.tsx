@@ -119,7 +119,7 @@ const AcCurrent: SymbolFC = () => {
 const DcRail: SymbolFC = () => {
   return <g data-documented-dc-rail="positive-reference">
     <line x1={-24} y1={-10} x2={24} y2={-10} stroke="currentColor" strokeWidth={1.5} strokeLinecap="square" />
-    <line x1={0} y1={-10} x2={0} y2={0} stroke="currentColor" strokeWidth={1.5} strokeLinecap="square" />
+    <line x1={0} y1={-10} x2={0} y2={0} stroke="currentColor" strokeWidth={1} strokeLinecap="square" />
   </g>;
 };
 
@@ -149,7 +149,7 @@ const Ground: SymbolFC = ({ props }) => {
   const sw = nonExactStroke(props);
   return (
     <g>
-      <line x1={0} y1={-15} x2={0} y2={0} stroke="currentColor" strokeWidth={sw} />
+      <line x1={0} y1={-17} x2={0} y2={0} stroke="currentColor" strokeWidth={sw} />
       <line x1={-12} y1={0} x2={12} y2={0} stroke="currentColor" strokeWidth={sw} />
       <line x1={-8} y1={5} x2={8} y2={5} stroke="currentColor" strokeWidth={sw} />
       <line x1={-4} y1={10} x2={4} y2={10} stroke="currentColor" strokeWidth={sw} />
@@ -161,26 +161,24 @@ const Ground: SymbolFC = ({ props }) => {
 
 const Resistor: SymbolFC = ({ props }) => {
   const sw = nonExactStroke(props);
-  if (props?._documentedStyle !== true) return <g>
-    <line x1={-30} y1={0} x2={-15} y2={0} stroke="currentColor" strokeWidth={sw} />
-    <rect x={-15} y={-8} width={30} height={16} fill="none" stroke="currentColor" strokeWidth={sw} rx={2} />
-    <line x1={15} y1={0} x2={30} y2={0} stroke="currentColor" strokeWidth={sw} />
-  </g>;
-  return <g>
-    <line x1={-30} y1={0} x2={-20} y2={0} stroke="currentColor" strokeWidth={sw} />
-    <rect x={-20} y={-7} width={40} height={14} rx={2} fill="none" stroke="currentColor" strokeWidth={sw} />
-    <line x1={20} y1={0} x2={30} y2={0} stroke="currentColor" strokeWidth={sw} />
-  </g>;
+  // Boundary ends at exactly ±33.333 so that 33.333 * 1.5 = 50px (Strict 25px Grid Lock)
+  return (
+    <g data-rectangular-resistor="potentiometer-style">
+      <line x1={-33.333} y1={0} x2={-20} y2={0} stroke="currentColor" strokeWidth={sw} strokeLinecap="square" />
+      <rect x={-20} y={-7} width={40} height={14} rx={2} fill="none" stroke="currentColor" strokeWidth={sw} />
+      <line x1={20} y1={0} x2={33.333} y2={0} stroke="currentColor" strokeWidth={sw} strokeLinecap="square" />
+    </g>
+  );
 };
 
 const Capacitor: SymbolFC = ({ props }) => {
   const sw = nonExactStroke(props);
   return (
     <g>
-      <line x1={-30} y1={0} x2={-5} y2={0} stroke="currentColor" strokeWidth={sw} />
-      <line x1={-5} y1={-14} x2={-5} y2={14} stroke="currentColor" strokeWidth={sw} />
-      <line x1={5} y1={-14} x2={5} y2={14} stroke="currentColor" strokeWidth={sw} />
-      <line x1={5} y1={0} x2={30} y2={0} stroke="currentColor" strokeWidth={sw} />
+      <line x1={-33.333} y1={0} x2={-5} y2={0} stroke="currentColor" strokeWidth={sw} strokeLinecap="square" />
+      <line x1={-5} y1={-14} x2={-5} y2={14} stroke="currentColor" strokeWidth={sw} strokeLinecap="square" />
+      <line x1={5} y1={-14} x2={5} y2={14} stroke="currentColor" strokeWidth={sw} strokeLinecap="square" />
+      <line x1={5} y1={0} x2={33.333} y2={0} stroke="currentColor" strokeWidth={sw} strokeLinecap="square" />
     </g>
   );
 };
@@ -189,9 +187,9 @@ const Inductor: SymbolFC = ({ props }) => {
   const sw = nonExactStroke(props);
   return (
     <g>
-      <line x1={-30} y1={0} x2={-20} y2={0} stroke="currentColor" strokeWidth={sw} />
+      <line x1={-33.333} y1={0} x2={-20} y2={0} stroke="currentColor" strokeWidth={sw} strokeLinecap="square" />
       <path d="M -20,0 A 5,5 0 0,1 -10,0 A 5,5 0 0,1 0,0 A 5,5 0 0,1 10,0 A 5,5 0 0,1 20,0" fill="none" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" />
-      <line x1={20} y1={0} x2={30} y2={0} stroke="currentColor" strokeWidth={sw} />
+      <line x1={20} y1={0} x2={33.333} y2={0} stroke="currentColor" strokeWidth={sw} strokeLinecap="square" />
     </g>
   );
 };
@@ -202,10 +200,10 @@ export const Potentiometer: SymbolFC = ({ props }) => {
   const wiperX = props?._documentedStyle === true ? 0 : -20 + position * 40;
   return (
     <g data-rigid-body="potentiometer">
-      <line x1={-30} y1={0} x2={-20} y2={0} stroke="currentColor" strokeWidth={sw} />
+      <line x1={-33.333} y1={0} x2={-20} y2={0} stroke="currentColor" strokeWidth={sw} strokeLinecap="square" />
       <rect x={-20} y={-7} width={40} height={14} rx={2} fill="none" stroke="currentColor" strokeWidth={sw} />
-      <line x1={20} y1={0} x2={30} y2={0} stroke="currentColor" strokeWidth={sw} />
-      <line x1={0} y1={-30} x2={wiperX} y2={-11} stroke="currentColor" strokeWidth={sw} strokeLinecap="round" />
+      <line x1={20} y1={0} x2={33.333} y2={0} stroke="currentColor" strokeWidth={sw} strokeLinecap="square" />
+      <line x1={0} y1={-33.333} x2={wiperX} y2={-11} stroke="currentColor" strokeWidth={sw} strokeLinecap="round" />
       <polygon points={`${wiperX},${-7} ${wiperX - 4},${-12} ${wiperX + 4},${-12}`} fill="currentColor" />
     </g>
   );
@@ -214,25 +212,27 @@ export const Potentiometer: SymbolFC = ({ props }) => {
 const DependentDiamond: SymbolFC = ({ props }) => {
   const sw = nonExactStroke(props);
   const currentControlled = String(props?._type) === 'vccs' || String(props?._type) === 'cccs';
-  return <g>
-    <polygon points="0,-18 18,0 0,18 -18,0" fill="none" stroke="currentColor" strokeWidth={sw} />
-    {currentControlled ? (
-      <>
-        <line x1={0} y1={10} x2={0} y2={-10} stroke="currentColor" strokeWidth={sw} />
-        <polyline points="-4,-4 0,-10 4,-4" fill="none" stroke="currentColor" strokeWidth={sw} />
-      </>
-    ) : (
-      <>
-        {/* Top Plus */}
-        <line x1={0} y1={-13} x2={0} y2={-7} stroke="currentColor" strokeWidth={1} strokeLinecap="round" />
-        <line x1={-3} y1={-10} x2={3} y2={-10} stroke="currentColor" strokeWidth={1} strokeLinecap="round" />
-        {/* Bottom Minus */}
-        <line x1={-3} y1={10} x2={3} y2={10} stroke="currentColor" strokeWidth={1} strokeLinecap="round" />
-      </>
-    )}
-    <line x1={0} y1={-18} x2={0} y2={-30} stroke="currentColor" strokeWidth={sw} />
-    <line x1={0} y1={18} x2={0} y2={30} stroke="currentColor" strokeWidth={sw} />
-  </g>;
+  return (
+    <g>
+      <polygon points="0,-18 18,0 0,18 -18,0" fill="none" stroke="currentColor" strokeWidth={sw} />
+      {currentControlled ? (
+        <>
+          <line x1={0} y1={10} x2={0} y2={-10} stroke="currentColor" strokeWidth={sw} strokeLinecap="round" />
+          <polyline points="-4,-4 0,-10 4,-4" fill="none" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" />
+        </>
+      ) : (
+        <>
+          {/* Top Plus */}
+          <line x1={0} y1={-13} x2={0} y2={-7} stroke="currentColor" strokeWidth={sw} strokeLinecap="round" />
+          <line x1={-3} y1={-10} x2={3} y2={-10} stroke="currentColor" strokeWidth={sw} strokeLinecap="round" />
+          {/* Bottom Minus */}
+          <line x1={-3} y1={10} x2={3} y2={10} stroke="currentColor" strokeWidth={sw} strokeLinecap="round" />
+        </>
+      )}
+      <line x1={0} y1={-18} x2={0} y2={-33.333} stroke="currentColor" strokeWidth={sw} strokeLinecap="square" />
+      <line x1={0} y1={18} x2={0} y2={33.333} stroke="currentColor" strokeWidth={sw} strokeLinecap="square" />
+    </g>
+  );
 };
 
 export const StarResistorPack: SymbolFC = ({ props }) => {

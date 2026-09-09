@@ -75,6 +75,7 @@ export interface SimulationSnapshot {
   terminalVoltages: Record<string, number>;
   branchCurrents: Record<string, number>;
   wireCurrents: Record<string, number>;
+  wirePhases?: Record<string, number>;
   componentPowered: Record<string, boolean>;
   componentIntensity: Record<string, number>;
   nodeHistory: Record<string, SamplePoint[]>;

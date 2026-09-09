@@ -403,7 +403,7 @@ export function tabDComponentLabelAnchors(
   const CONTROLLED_SOURCES = new Set(['vccs', 'vcvs', 'cccs', 'ccvs']);
 
   if (componentType === 'ground') {
-    return { reference: [0, 16], value: [0, 28], refTextAnchor: 'middle', valTextAnchor: 'middle' };
+    return { reference: [0, 30], value: [0, 42], refTextAnchor: 'middle', valTextAnchor: 'middle' };
   }
 
   if (componentType === 'three-phase-rail') {

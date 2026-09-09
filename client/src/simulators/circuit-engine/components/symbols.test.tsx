@@ -20,11 +20,11 @@ describe('Tab D SVG symbol language', () => {
 
   it('renders the 3-Phase Source with neutral and phases A, B, C leads', () => {
     const source = markup('three-phase-source');
-    expect(source).toContain('r="22"');
-    expect(source).toContain('x1="-36" y1="0" x2="-21" y2="0"');
-    expect(source).toContain('x1="22" y1="0" x2="30" y2="0"');
-    expect(source).toContain('x1="16" y1="-15" x2="31" y2="-25"');
-    expect(source).toContain('x1="16" y1="15" x2="31" y2="25"');
+    expect(source).toContain('r="33"');
+    expect(source).toContain('x1="-50" y1="-25" x2="-21.5" y2="-25"');
+    expect(source).toContain('x1="-50" y1="0" x2="-33" y2="0"');
+    expect(source).toContain('x1="-50" y1="25" x2="-21.5" y2="25"');
+    expect(source).toContain('x1="50" y1="0" x2="33" y2="0"');
   });
 
   it('uses red, yellow, blue, and neutral rails for the three-phase power rail', () => {
@@ -32,25 +32,25 @@ describe('Tab D SVG symbol language', () => {
     expect(rail).toContain('#d14343');
     expect(rail).toContain('#d6a720');
     expect(rail).toContain('#2d73b7');
-    expect(rail).toContain(`x1="${-100 / 3}" y1="${-100 / 3}" x2="50" y2="${-100 / 3}"`);
-    expect(rail).toContain(`x1="${-100 / 3}" y1="${-50 / 3}" x2="50" y2="${-50 / 3}"`);
-    expect(rail).toContain(`x1="${-100 / 3}" y1="${0 / 3}" x2="50" y2="${0 / 3}"`);
-    expect(rail).toContain(`x1="${-100 / 3}" y1="${50 / 3}" x2="50" y2="${50 / 3}"`);
+    expect(rail).toContain(`x1="-50" y1="${-100 / 3}" x2="50" y2="${-100 / 3}"`);
+    expect(rail).toContain(`x1="-50" y1="${-50 / 3}" x2="50" y2="${-50 / 3}"`);
+    expect(rail).toContain(`x1="-50" y1="${0 / 3}" x2="50" y2="${0 / 3}"`);
+    expect(rail).toContain(`x1="-50" y1="${50 / 3}" x2="50" y2="${50 / 3}"`);
   });
 
   it('centers the documented IAC sine wave inside its source circle without changing the legacy branch', () => {
     const documented = markup('ac-current', { _documentedStyle: true });
     const legacy = markup('ac-current');
-    expect(documented).toContain('x1="0" y1="-2" x2="0" y2="-13"');
-    expect(documented).toContain('M -11,0 C -7,-7 -3,-7 0,0 C 3,7 7,7 11,0');
-    expect(legacy).toContain('M -10,-4 Q -5,-14 0,-4 Q 5,6 10,-4');
+    expect(documented).toContain('x1="0" y1="-3" x2="0" y2="-18"');
+    expect(documented).toContain('M -15,5 C -10,-5 -5,-5 0,5 C 5,15 10,15 15,5');
+    expect(legacy).toContain('M -15,5 C -10,-5 -5,-5 0,5 C 5,15 10,15 15,5');
   });
 
   it('uses a centered IEEE variable-resistor body and a centered vertical wiper terminal', () => {
     const minimum = markup('potentiometer', { _documentedStyle: true, wiper: 0 });
     expect(minimum).toContain('data-rigid-body="potentiometer"');
     expect(minimum).toContain('x="-20" y="-7" width="40" height="14"');
-    expect(minimum).toContain('x1="0" y1="-30" x2="0" y2="-11"');
+    expect(minimum).toContain('x1="0" y1="-33.333" x2="0" y2="-11"');
     expect(minimum).toContain('points="0,-7 -4,-12 4,-12"');
   });
 
@@ -60,7 +60,7 @@ describe('Tab D SVG symbol language', () => {
     const delta = markup('delta-resistor-pack', { _documentedStyle: true });
     expect(resistor).toContain('data-rectangular-resistor="potentiometer-style"');
     expect(resistor).toContain('x="-20" y="-7" width="40" height="14"');
-    expect(resistor).toContain('x1="-30" y1="0" x2="-20" y2="0"');
+    expect(resistor).toContain('x1="-33.333" y1="0" x2="-20" y2="0"');
     expect(star).toContain('data-resistor-network="star"');
     expect((star.match(/data-rectangular-resistor="potentiometer-style"/g) ?? [])).toHaveLength(3);
     expect((star.match(/width="13" height="4\.5"/g) ?? [])).toHaveLength(3);
@@ -78,10 +78,10 @@ describe('Tab D SVG symbol language', () => {
 
   it('renders the 3-terminal op-amp with hidden power rails and +/- input polarity indicators', () => {
     const opamp = markup('opamp');
-    expect(opamp).toContain('points="-20,-25 30,0 -20,25"');
-    expect(opamp).toContain('x1="-35" y1="-20" x2="-35" y2="-9"');
-    expect(opamp).toContain('x1="-35" y1="9" x2="-35" y2="20"');
-    expect(opamp).toContain('x1="30" y1="0" x2="35" y2="0"');
+    expect(opamp).toContain('points="-20,-25 -20,25 30,0"');
+    expect(opamp).toContain('x1="-40" y1="-15" x2="-20" y2="-15"');
+    expect(opamp).toContain('x1="-40" y1="15" x2="-20" y2="15"');
+    expect(opamp).toContain('x1="30" y1="0" x2="40" y2="0"');
   });
 
   it('uses orthogonal collector/emitter routing and distinct regular arrowheads for NPN and PNP symbols', () => {
@@ -127,8 +127,8 @@ describe('Tab D SVG symbol language', () => {
   it('uses an explicit manual relay state to display a latched contact position', () => {
     const open = markup('relay-spst', { _documentedStyle: true, manualState: 'open' });
     const closed = markup('relay-spst', { _documentedStyle: true, manualState: 'closed' });
-    expect(open).toContain('x1="-8" y1="35" x2="8" y2="25"');
-    expect(closed).toContain('x1="-8" y1="35" x2="8" y2="35"');
+    expect(open).toContain('x1="-10" y1="25" x2="8" y2="15"');
+    expect(closed).toContain('x1="-10" y1="25" x2="8" y2="25"');
   });
 
   it('standardizes schematic symbols to stroke="currentColor" and fill="none" without hardcoded dark strokes or solid white fills', () => {
