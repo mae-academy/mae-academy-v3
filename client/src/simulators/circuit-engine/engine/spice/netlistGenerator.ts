@@ -131,10 +131,8 @@ interface SpiceModel {
 }
 
 /**
- * Emission coefficient for Academic mode's idealized diode/LED junction. Low enough to keep the
- * textbook ~0.7 V knee sharp; not the previous 0.001, whose near-vertical I-V curve is a
- * non-differentiable step that strands Newton-Raphson (a "Did Not Converge" error) the moment an
- * open switch's ROFF leakage puts the junction anywhere near it.
+ * Emission coefficient for Academic mode's idealized diode/LED junction: N·Vt ≈ 1.3 mV, so the
+ * junction is near-ideal — it drops ≈37 mV at 20 mA (ngspice-measured), not a 0.7 V textbook drop.
  */
 const ACADEMIC_IDEAL_JUNCTION_N = 0.05;
 
@@ -170,9 +168,7 @@ function modelFor(
     case "diode":
       switch (element.variant) {
         case "standard":
-          // Academic: a near switch-like junction — N low enough to keep the ~0.7 V textbook knee
-          // sharp, but not so low (was 0.001) that the I-V curve is a true step: that non-
-          // differentiable corner is exactly what stalls Newton-Raphson on an open-switch branch.
+          // Academic: a near-ideal, switch-like junction (see ACADEMIC_IDEAL_JUNCTION_N).
           return academic
             ? {
                 name: "D_STD",
@@ -1030,9 +1026,30 @@ export function generateNetlist(
     ...modelCards,
     ...macroBlocks,
     ...lines,
+    ...nodeShunts(nodes, used),
     CONVERGENCE_OPTIONS,
     ...analysis,
     ".end",
     "",
   ].join("\n");
+}
+
+/**
+ * G_MIN from every node to ground, as a resistance (1 / 1e-12 S). ngspice's RSHUNT option would do
+ * this, but it is an XSPICE feature this wasm build silently ignores — a capacitor-isolated node
+ * still reports "singular matrix" with it set — so the shunts are emitted as explicit elements.
+ */
+const NODE_SHUNT_RESISTANCE = "1e12";
+
+/**
+ * One NODE_SHUNT_RESISTANCE resistor from each node to ground, so a net an open switch or a series
+ * capacitor cuts off from every DC path keeps a defined solution instead of a singular MNA row.
+ */
+function nodeShunts(nodes: SpiceNodeMap, used: Set<string>): string[] {
+  return nodes.entries.map(({ name }) => {
+    let element = `RGMIN_${name}`;
+    for (let suffix = 2; used.has(element.toUpperCase()); suffix += 1) element = `RGMIN_${name}_${suffix}`;
+    used.add(element.toUpperCase());
+    return `${element} ${name} 0 ${NODE_SHUNT_RESISTANCE}`;
+  });
 }

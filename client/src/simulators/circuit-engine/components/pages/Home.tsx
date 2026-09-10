@@ -111,6 +111,8 @@ import {
   cloneSnapshot,
   type CanvasSnapshot,
 } from '@/simulators/circuit-engine/components/hooks/useHistory';
+import { EngineeringMath, Multimeter, type SimulationEngineReadout } from '@/simulators/circuit-engine/components/ui-components/Multimeter';
+import { runPreflightDrc, type DrcViolation } from '@/simulators/circuit-engine/engine/spice/preflightDrc';
 
 const GRID_SIZE = 20;
 const TAB_D_GRID_SIZE = 25;
@@ -130,7 +132,9 @@ type SpiceBridgeStatus =
   | { kind: 'idle' }
   | { kind: 'running' }
   | { kind: 'ready' }
-  | { kind: 'unsupported'; reason: string };
+  | { kind: 'unsupported'; reason: string }
+  /** A failed pre-flight design-rule check: the solver was never invoked. */
+  | { kind: 'blocked'; reason: string };
 const EMPTY_SNAPSHOT: SimulationSnapshot = {
   time: 0,
   nodeVoltages: {},
@@ -698,7 +702,26 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
   const dcMna = useMemo(() => createStaticMna ? createStaticMna(components, wires, normalizedGraph) : tabBMna, [components, createStaticMna, normalizedGraph, tabBMna, wires]);
   const meshGeometry = useMemo(() => compileMeshGeometry(components, wires, normalizedGraph), [components, wires, normalizedGraph]);
   const nodalGeometry = useMemo(() => compileNodalGeometry(components, wires, normalizedGraph), [components, wires, normalizedGraph]);
+  // Pre-flight design-rule check on every edit, ahead of either solver: a source loop closed through
+  // near-zero resistance has no finite MNA solution, so it is explained here instead of surfacing as
+  // the legacy engine's Newton–Raphson divergence or a reading set only by parasitics.
+  const drcViolations = useMemo<DrcViolation[]>(() => {
+    try {
+      const labels = new Map(components.map(component => [component.id, component.label]));
+      const spiceComponents = convertToSpiceComponents(components, wires, resolveCircuitNets(components, wires), simulationMode);
+      return runPreflightDrc(spiceComponents, { labelOf: id => labels.get(id) ?? id });
+    } catch {
+      // A part SPICE cannot map yet: the bridge reports that on its own, and there is nothing to check.
+      return [];
+    }
+  }, [components, simulationMode, wires]);
   const workspaceAlert = useMemo(() => {
+    const [violation] = drcViolations;
+    if (violation) {
+      return violation.rule === 'source-short'
+        ? { label: 'DESIGN RULE CHECK', title: 'Short Circuit Across an Ideal Source', message: violation.message }
+        : { label: 'DESIGN RULE CHECK', title: 'Unbounded Current: No Series Resistor', message: violation.message };
+    }
     if (!tabDUiRefinement) return null;
     const warning = snapshot.warnings.find(item => item.code === 'TAB_D_MNA');
     if (!warning) return null;
@@ -709,7 +732,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
       return { label: 'TAB D / SOLVER LIMIT', title: 'Newton–Raphson Did Not Converge', message: 'Newton-Raphson Divergence: The circuit did not converge safely. Review nonlinear devices, source levels, and circuit paths.' };
     }
     return { label: 'TAB D / MNA WARNING', title: 'Documented MNA Could Not Solve', message: warning.message };
-  }, [snapshot.warnings, tabDUiRefinement]);
+  }, [drcViolations, snapshot.warnings, tabDUiRefinement]);
   const [analysisTraces, setAnalysisTraces] = useState<Partial<Record<'mesh' | 'nodal', AnalysisTrace>>>({});
   const [activeAnalysisMethod, setActiveAnalysisMethod] = useState<'mesh' | 'nodal' | null>(null);
   const handleAnalysisTrace = useCallback((trace: AnalysisTrace) => {
@@ -2111,7 +2134,30 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
   // one. Instead `useSpiceEngine` tags every request with a monotonic id and only ever applies the
   // response carrying the latest one, so an old run's late result is silently discarded rather than
   // overwriting the new one — logical cancellation without paying for a worker restart.
+  // Read at call time, so a debounced or button-triggered run always gates on the latest check.
+  const drcViolationsRef = useRef(drcViolations);
+  drcViolationsRef.current = drcViolations;
+
   const runSpiceSimulation = useCallback(() => {
+    // Pre-flight: a failed design-rule check means no finite solution exists (singular, or I → ∞), so
+    // the solver is never invoked and every instrument is withheld rather than left showing a
+    // divergence artifact or a legacy reading set only by parasitics.
+    const [violation] = drcViolationsRef.current;
+    if (violation) {
+      const withheld: Record<string, InstrumentReading> = {};
+      for (const component of components) {
+        if (component.type === 'oscilloscope') {
+          for (const channel of ['ch1', 'ch2', 'ch3', 'ch4']) withheld[`${component.id}:${channel}`] = { value: 0, unit: '', status: 'unsupported' };
+        } else if (component.type === 'voltmeter' || component.type === 'ammeter' || component.type === 'dmm') {
+          withheld[component.id] = { value: 0, unit: '', status: 'unsupported' };
+        }
+      }
+      spiceRunContextRef.current = null;
+      spiceReadingsRef.current = withheld;
+      setSpiceReadingsVersion(version => version + 1);
+      setSpiceStatus({ kind: 'blocked', reason: violation.message });
+      return;
+    }
     // Both the adapter (unsupported parts) and the generator (an incomplete circuit — no ground yet,
     // or nothing placed at all) can throw; either must fall back to the legacy engine's readings
     // rather than crash the debounce timer or the Run button's click handler.
@@ -2219,6 +2265,16 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     // spiceReadingsVersion (not spiceReadingsRef.current, a ref) is what actually triggers this recompute.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [snapshot, spiceReadingsVersion]);
+
+  // Read port the live meters sample on their own frame loop. Its identity never changes — it reads
+  // through refs refreshed every render — so a meter re-subscribes only when its own props change.
+  const effectiveSnapshotRef = useRef(effectiveSnapshot);
+  effectiveSnapshotRef.current = effectiveSnapshot;
+  const simulationReadout = useMemo<SimulationEngineReadout>(() => ({
+    readInstrument: id => effectiveSnapshotRef.current.instrumentReadings[id],
+    blockedReason: () => drcViolationsRef.current[0]?.message ?? null,
+  }), []);
+  const dmmComponents = useMemo(() => components.filter(component => component.type === 'dmm'), [components]);
 
   // --- Switch & Push-Button Keyboard Controls ---
   useEffect(() => {
@@ -2799,6 +2855,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
             {spiceStatus.kind === 'running' && <span style={{ color: colors.muted, fontWeight: 750 }}>SPICE ACCURACY PASS…</span>}
             {spiceStatus.kind === 'ready' && <span style={{ color: colors.accent, fontWeight: 750 }}>SPICE-VERIFIED</span>}
             {spiceStatus.kind === 'unsupported' && <span title={spiceStatus.reason} style={{ color: colors.muted, fontWeight: 750 }}>SPICE UNAVAILABLE · LIVE ENGINE</span>}
+            {spiceStatus.kind === 'blocked' && <span title={spiceStatus.reason} style={{ color: colors.danger, fontWeight: 750 }}>DESIGN-RULE CHECK FAILED · SOLVE WITHHELD</span>}
             {!snapshot.converged && <span style={{ marginLeft: 'auto', color: colors.danger, fontWeight: 750 }}>CHECK CIRCUIT WARNINGS</span>}
           </div>
         </main>
@@ -2818,7 +2875,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
               {snapshot.warnings.slice(0, 3).map((warning, index) => <div key={`${warning.code}-${index}`} style={{ marginTop: 5, fontSize: 10, color: colors.muted, lineHeight: 1.35 }}>{warning.message}</div>)}
             </div>
           )}
-          <PersistentDmmPanel colors={colors} dmms={components.filter(c => c.type === 'dmm')} snapshot={effectiveSnapshot} />
+          <PersistentDmmPanel colors={colors} dmms={dmmComponents} readout={simulationReadout} />
         </aside>
       </div>
       <section className="mt-3 overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-950" style={{ background: colors.panel, borderColor: colors.line }}>
@@ -2957,64 +3014,14 @@ function TextInspector({ colors, text, onUpdate, onMove, onDelete }: { colors: P
   return <div style={{ overflowY: 'auto' }}><InspectorHeader colors={colors} title="Workspace text" subtitle="Editable annotation that can be placed anywhere in the schematic." /><InspectorSection colors={colors} label="Text properties"><PropertyRow colors={colors} label="Content"><input value={text.text} onChange={event => onUpdate({ text: event.target.value })} style={inputStyle(colors)} /></PropertyRow><PropertyRow colors={colors} label="Size"><input type="number" min={8} max={72} value={text.fontSize} onChange={event => onUpdate({ fontSize: numeric(event.target.value, 16) })} style={inputStyle(colors)} /></PropertyRow><PropertyRow colors={colors} label="Color"><input type="color" value={text.color} onChange={event => onUpdate({ color: event.target.value })} style={{ width: '100%', height: 30, border: `1px solid ${colors.line}`, borderRadius: 5, background: colors.input }} /></PropertyRow><PropertyRow colors={colors} label="X"><input type="number" value={text.x} onChange={event => onUpdate({ x: numeric(event.target.value, text.x) })} style={inputStyle(colors)} /></PropertyRow><PropertyRow colors={colors} label="Y"><input type="number" value={text.y} onChange={event => onUpdate({ y: numeric(event.target.value, text.y) })} style={inputStyle(colors)} /></PropertyRow></InspectorSection><InspectorSection colors={colors} label="Move"><div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 5 }}><InspectorButton colors={colors} onClick={() => onMove(0, -20)}><ArrowUp size={13} /></InspectorButton><InspectorButton colors={colors} onClick={() => onMove(-20, 0)}><ArrowLeft size={13} /></InspectorButton><InspectorButton colors={colors} onClick={() => onMove(20, 0)}><ArrowRight size={13} /></InspectorButton><InspectorButton colors={colors} onClick={() => onMove(0, 20)}><ArrowDown size={13} /></InspectorButton></div></InspectorSection></div>;
 }
 
-function PersistentDmmPanel({ colors, dmms, snapshot }: { colors: Palette; dmms: CircuitComponent[]; snapshot: SimulationSnapshot }) {
-  const audioRef = useRef<{ ctx: AudioContext, osc: OscillatorNode, gain: GainNode } | null>(null);
-
-  useEffect(() => {
-    const anyShorted = dmms.some(dmm => snapshot.instrumentReadings[dmm.id]?.continuity === true);
-    if (anyShorted && !audioRef.current) {
-      try {
-        const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.value = 2700; // Realistic multimeter beep frequency
-        gain.gain.value = 0.1; // Moderate volume
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start();
-        audioRef.current = { ctx, osc, gain };
-      } catch (e) {
-        // Suppress audio context strict auto-play policy warnings
-      }
-    } else if (!anyShorted && audioRef.current) {
-      try {
-        audioRef.current.osc.stop();
-        audioRef.current.ctx.close();
-      } catch (e) { }
-      audioRef.current = null;
-    }
-  }, [dmms, snapshot.instrumentReadings]);
-
-  useEffect(() => {
-    return () => {
-      if (audioRef.current) {
-        try {
-          audioRef.current.osc.stop();
-          audioRef.current.ctx.close();
-        } catch (e) { }
-      }
-    };
-  }, []);
-
+/** Each meter samples `readout` on its own frame loop, so this panel does not re-render per simulation frame. */
+function PersistentDmmPanel({ colors, dmms, readout }: { colors: Palette; dmms: CircuitComponent[]; readout: SimulationEngineReadout }) {
   if (dmms.length === 0) return null;
   return (
     <div style={{ marginTop: 'auto', borderTop: `1px solid ${colors.line}`, background: `${colors.line}22` }}>
       <div className="border-b px-3 py-2" style={{ borderColor: colors.line }}><div className={CONTROL_SYSTEMS_HEADING}>Live Multimeters</div></div>
       <div style={{ display: 'flex', flexDirection: 'column', padding: 10, gap: 10 }}>
-        {dmms.map(dmm => {
-          const reading = snapshot.instrumentReadings[dmm.id];
-          const isShorted = reading?.continuity === true;
-          return (
-            <div key={dmm.id} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: colors.subtle, textTransform: 'uppercase', letterSpacing: '.05em' }}>{dmm.label}</div>
-              <div style={{ padding: 10, background: '#e0f2fe', border: '1px solid #7dd3fc', borderRadius: 7, textAlign: 'right', color: '#0284c7', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>
-                <div style={{ fontSize: 22, fontWeight: 800 }}>{reading?.status === 'open' ? 'OL' : isShorted ? 'SHORTED' : reading ? <EngineeringMath value={reading.value} unit={reading.unit} /> : '—'}</div>
-                <div style={{ marginTop: 4, fontSize: 10, color: '#0369a1' }}>{reading?.status === 'ready' ? (isShorted ? 'Continuity detected' : 'Probe-linked measurement') : reading?.status === 'open' ? 'Open / not fully connected' : 'Connect HI and COM probes'}</div>
-              </div>
-            </div>
-          );
-        })}
+        {dmms.map(dmm => <Multimeter key={dmm.id} dmm={dmm} readout={readout} labelColor={colors.subtle} />)}
       </div>
     </div>
   );
@@ -3051,15 +3058,6 @@ function componentLabelToLatex(label: string): string {
     return `${prefix}_{${match[2]}}`;
   }
   return `\\mathrm{${safe(normalized || 'component')}}`;
-}
-
-function EngineeringMath({ value, unit }: { value: number; unit?: string }) {
-  const formatted = formatEngineering(value, unit ?? '');
-  const match = formatted.match(/^([-+]?\d+(?:\.\d+)?)(?:\s*)(.*)$/);
-  if (!match) return <>{formatted}</>;
-  const suffix = match[2].trim();
-  const suffixMath: Record<string, string> = { 'Ω': '\\Omega', 'kΩ': '\\mathrm{k}\\Omega', 'MΩ': '\\mathrm{M}\\Omega', 'V': '\\mathrm{V}', 'mV': '\\mathrm{mV}', 'A': '\\mathrm{A}', 'mA': '\\mathrm{mA}', 'Hz': '\\mathrm{Hz}', 'kHz': '\\mathrm{kHz}', 'H': '\\mathrm{H}', 'mH': '\\mathrm{mH}', 'F': '\\mathrm{F}', 'µF': '\\mu\\mathrm{F}' };
-  return <V3Math math={`${match[1]}\\,${suffixMath[suffix] ?? `\\mathrm{${suffix}}`}`} />;
 }
 
 function inputStyle(colors: Palette): React.CSSProperties { return { width: '100%', minWidth: 0, boxSizing: 'border-box', background: colors.input, color: colors.text, border: `1px solid ${colors.line}`, borderRadius: 5, padding: '6px 7px', fontSize: 10, outline: 'none' }; }
