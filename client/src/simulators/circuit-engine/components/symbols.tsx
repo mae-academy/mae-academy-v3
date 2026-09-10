@@ -19,6 +19,8 @@ type SymbolFC = FC<SymbolProps>;
 function relayContactClosed(powered: boolean | undefined, props?: Record<string, any>): boolean {
   if (props?.manualState === 'closed') return true;
   if (props?.manualState === 'open') return false;
+  if (props?.isEnergized !== undefined) return Boolean(props.isEnergized);
+  if (props?.state === 'closed') return true;
   return Boolean(powered);
 }
 
@@ -328,7 +330,7 @@ const DiodeBase: SymbolFC = ({ powered, props }) => {
   };
   const glowColor = ledColor ? ledColors[ledColor] || '#ff2020' : null;
   const intensity = Math.max(0, Math.min(1, Number(props?._intensity ?? (powered ? 1 : 0))));
-  const emissionOpacity = 0.25 + intensity * 0.75;
+  const emissionOpacity = 0.75 + intensity * 1;
 
   return (
     <g>
@@ -561,25 +563,31 @@ const PbNc: SymbolFC = ({ props }) => {
   );
 };
 
-const AuxContactNo: SymbolFC = () => (
-  <g>
-    <line x1={-25} y1={0} x2={-10} y2={0} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
-    <line x1={-10} y1={0} x2={8} y2={-10} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
-    <line x1={10} y1={0} x2={25} y2={0} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
-    <circle cx={-10} cy={0} r={2.5} fill="currentColor" />
-    <circle cx={10} cy={0} r={2.5} fill="currentColor" />
-  </g>
-);
+const AuxContactNo: SymbolFC = ({ powered, props }) => {
+  const isClosed = Boolean(powered || props?.isEnergized || props?.state === 'closed');
+  return (
+    <g>
+      <line x1={-25} y1={0} x2={-10} y2={0} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+      <line x1={-10} y1={0} x2={8} y2={isClosed ? 0 : -10} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+      <line x1={10} y1={0} x2={25} y2={0} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+      <circle cx={-10} cy={0} r={2.5} fill="currentColor" />
+      <circle cx={10} cy={0} r={2.5} fill="currentColor" />
+    </g>
+  );
+};
 
-const AuxContactNc: SymbolFC = () => (
-  <g>
-    <line x1={-25} y1={0} x2={-10} y2={0} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
-    <line x1={-10} y1={0} x2={10} y2={0} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
-    <line x1={10} y1={0} x2={25} y2={0} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
-    <circle cx={-10} cy={0} r={2.5} fill="currentColor" />
-    <circle cx={10} cy={0} r={2.5} fill="currentColor" />
-  </g>
-);
+const AuxContactNc: SymbolFC = ({ powered, props }) => {
+  const isClosed = !Boolean(powered || props?.isEnergized || props?.state === 'open');
+  return (
+    <g>
+      <line x1={-25} y1={0} x2={-10} y2={0} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+      <line x1={-10} y1={0} x2={8} y2={isClosed ? 0 : -10} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+      <line x1={10} y1={0} x2={25} y2={0} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+      <circle cx={-10} cy={0} r={2.5} fill="currentColor" />
+      <circle cx={10} cy={0} r={2.5} fill="currentColor" />
+    </g>
+  );
+};
 
 // ─── PROTECTION ───────────────────────────────────────────────────────────────
 
@@ -640,24 +648,34 @@ const CircuitBreaker3Phase: SymbolFC = ({ props }) => {
   );
 };
 
-const RelaySpst: SymbolFC = ({ powered, props }) => (
-  <g>
-    <rect x={-35} y={-35} width={70} height={70} fill="none" stroke="currentColor" strokeWidth={1.5} strokeDasharray="4,3" rx={4} />
-    <path d="M -20,-25 A 5,5 0 0,0 -10,-25 A 5,5 0 0,0 0,-25 A 5,5 0 0,0 10,-25 A 5,5 0 0,0 20,-25" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
-    <line x1={-50} y1={-25} x2={-20} y2={-25} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
-    <line x1={20} y1={-25} x2={50} y2={-25} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+const RelaySpst: SymbolFC = ({ powered, props }) => {
+  const isEnergized = relayContactClosed(powered, props);
+  const isNC = String(props?.contactType ?? 'NO').toUpperCase() === 'NC';
+  const isClosed = isNC ? !isEnergized : isEnergized;
+  return (
+    <g>
+      <rect x={-35} y={-35} width={70} height={70} fill="none" stroke="currentColor" strokeWidth={1.5} strokeDasharray="4,3" rx={4} />
+      <path d="M -20,-25 A 5,5 0 0,0 -10,-25 A 5,5 0 0,0 0,-25 A 5,5 0 0,0 10,-25 A 5,5 0 0,0 20,-25" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+      <line x1={-50} y1={-25} x2={-20} y2={-25} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+      <line x1={20} y1={-25} x2={50} y2={-25} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
 
-    <line x1={-50} y1={25} x2={-10} y2={25} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
-    <line x1={-10} y1={25} x2={8} y2={relayContactClosed(powered, props) ? 25 : 15} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
-    <line x1={10} y1={25} x2={50} y2={25} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
-    <circle cx={-10} cy={25} r={2.5} fill="currentColor" />
-    <circle cx={10} cy={25} r={2.5} fill="currentColor" />
-    <line x1={0} y1={-15} x2={0} y2={15} stroke="currentColor" strokeWidth={1.5} strokeDasharray="4,3" />
-  </g>
-);
+      {/* Switch Contact (Bottom) */}
+      <line x1={-50} y1={25} x2={-10} y2={25} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+      <circle cx={-10} cy={25} r={2.5} fill="currentColor" />
+      <line x1={50} y1={25} x2={10} y2={25} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+      <circle cx={10} cy={25} r={2.5} fill="currentColor" />
+
+      {/* Moving Arm: 25 when closed, 15 when open */}
+      <line x1={-10} y1={25} x2={8} y2={isClosed ? 25 : 15} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+
+      {/* Mechanical Linkage */}
+      <line x1={0} y1={-20} x2={0} y2={isClosed ? 25 : 20} stroke="currentColor" strokeWidth={1.5} strokeDasharray="3,3" />
+    </g>
+  );
+};
 
 const Contactor: SymbolFC = ({ powered, props }) => {
-  const closed = relayContactClosed(powered, props);
+  const isEnergized = relayContactClosed(powered, props);
   return (
     <g>
       <rect x={-35} y={-60} width={70} height={145} fill="none" stroke="currentColor" strokeWidth={1.5} strokeDasharray="4,3" rx={4} />
@@ -665,23 +683,28 @@ const Contactor: SymbolFC = ({ powered, props }) => {
       <line x1={-50} y1={-50} x2={-20} y2={-50} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
       <line x1={20} y1={-50} x2={50} y2={-50} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
 
+      {/* Main 3 Poles (L1-T1, L2-T2, L3-T3) + Auxiliary NO (13-14) */}
       {[-25, 0, 25, 50].map(y => (
         <g key={y}>
           <line x1={-50} y1={y} x2={-10} y2={y} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
-          <line x1={-10} y1={y} x2={8} y2={closed ? y : y - 10} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+          <line x1={-10} y1={y} x2={8} y2={isEnergized ? y : y - 10} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
           <line x1={10} y1={y} x2={50} y2={y} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
           <circle cx={-10} cy={y} r={2.5} fill="currentColor" />
           <circle cx={10} cy={y} r={2.5} fill="currentColor" />
         </g>
       ))}
+
+      {/* Auxiliary NC (21-22) */}
       <g>
         <line x1={-50} y1={75} x2={-10} y2={75} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
-        <line x1={-10} y1={75} x2={8} y2={closed ? 65 : 75} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+        <line x1={-10} y1={75} x2={8} y2={isEnergized ? 65 : 75} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
         <line x1={10} y1={75} x2={50} y2={75} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
         <circle cx={-10} cy={75} r={2.5} fill="currentColor" />
         <circle cx={10} cy={75} r={2.5} fill="currentColor" />
       </g>
-      <line x1={0} y1={-40} x2={0} y2={65} stroke="currentColor" strokeWidth={1.5} strokeDasharray="4,3" />
+
+      {/* Mechanical Linkage */}
+      <line x1={0} y1={-40} x2={0} y2={isEnergized ? 75 : 69} stroke="currentColor" strokeWidth={1.5} strokeDasharray="4,3" />
     </g>
   );
 };
@@ -879,8 +902,8 @@ const Ammeter: SymbolFC = () => (
 
 // ─── RELAY VARIANTS ─────────────────────────────────────────────────────────
 
-const RelaySpdt: SymbolFC = ({ props }) => {
-  const closed = props?.state === 'closed' || props?.manualState === 'closed';
+const RelaySpdt: SymbolFC = ({ powered, props }) => {
+  const isEnergized = relayContactClosed(powered, props) || props?.state === 'closed';
   return (
     <g>
       {/* Bounding Box: FULL OPACITY, DASHED */}
@@ -891,29 +914,29 @@ const RelaySpdt: SymbolFC = ({ props }) => {
       <path d="M -20,-25 A 5,5 0 0,0 -10,-25 A 5,5 0 0,0 0,-25 A 5,5 0 0,0 10,-25 A 5,5 0 0,0 20,-25" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
       <line x1={20} y1={-25} x2={50} y2={-25} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
 
-      {/* COM Terminal */}
-      <line x1={-50} y1={0} x2={-20} y2={0} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
-      <circle cx={-20} cy={0} r={2.5} fill="currentColor" />
+      {/* COM Terminal (Left Feed & Pivot Circle) */}
+      <line x1={-50} y1={0} x2={-10} y2={0} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+      <circle cx={-10} cy={0} r={2.5} fill="currentColor" />
 
-      {/* NC Terminal */}
-      <line x1={50} y1={0} x2={20} y2={0} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
-      <circle cx={20} cy={0} r={2.5} fill="currentColor" />
+      {/* NC Terminal (Right Feed & Contact Circle) */}
+      <line x1={50} y1={0} x2={10} y2={0} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+      <circle cx={10} cy={0} r={2.5} fill="currentColor" />
 
-      {/* NO Terminal */}
-      <line x1={50} y1={25} x2={20} y2={25} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
-      <circle cx={20} cy={25} r={2.5} fill="currentColor" />
+      {/* NO Terminal (Right Feed & Contact Circle) */}
+      <line x1={50} y1={25} x2={10} y2={25} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+      <circle cx={10} cy={25} r={2.5} fill="currentColor" />
 
       {/* Switch Arm */}
-      <line x1={-20} y1={0} x2={18} y2={closed ? 23 : 0} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+      <line x1={-10} y1={0} x2={8} y2={isEnergized ? 25 : 0} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
 
       {/* Mechanical Linkage */}
-      <line x1={0} y1={-20} x2={0} y2={closed ? 12 : 0} stroke="currentColor" strokeWidth={1.5} strokeDasharray="3,3" />
+      <line x1={0} y1={-20} x2={0} y2={isEnergized ? 14 : 0} stroke="currentColor" strokeWidth={1.5} strokeDasharray="3,3" />
     </g>
   );
 };
 
-const RelayDpst: SymbolFC = ({ props }) => {
-  const closed = props?.state === 'closed' || props?.manualState === 'closed';
+const RelayDpst: SymbolFC = ({ powered, props }) => {
+  const isEnergized = relayContactClosed(powered, props) || props?.state === 'closed';
   return (
     <g>
       <rect x={-35} y={-35} width={70} height={70} rx={4} fill="none" stroke="currentColor" strokeWidth={1.5} strokeDasharray="4,3" />
@@ -923,26 +946,22 @@ const RelayDpst: SymbolFC = ({ props }) => {
       <path d="M -20,-25 A 5,5 0 0,0 -10,-25 A 5,5 0 0,0 0,-25 A 5,5 0 0,0 10,-25 A 5,5 0 0,0 20,-25" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
       <line x1={20} y1={-25} x2={50} y2={-25} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
 
-      {/* Switch 1 (Middle) */}
-      <line x1={-50} y1={0} x2={-20} y2={0} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
-      <circle cx={-20} cy={0} r={2.5} fill="currentColor" />
+      {/* Pole 1 (Middle) */}
+      <line x1={-50} y1={0} x2={-10} y2={0} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+      <circle cx={-10} cy={0} r={2.5} fill="currentColor" />
+      <line x1={50} y1={0} x2={10} y2={0} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+      <circle cx={10} cy={0} r={2.5} fill="currentColor" />
+      <line x1={-10} y1={0} x2={8} y2={isEnergized ? 0 : -10} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
 
-      <line x1={50} y1={0} x2={20} y2={0} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
-      <circle cx={20} cy={0} r={2.5} fill="currentColor" />
+      {/* Pole 2 (Bottom) */}
+      <line x1={-50} y1={25} x2={-10} y2={25} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+      <circle cx={-10} cy={25} r={2.5} fill="currentColor" />
+      <line x1={50} y1={25} x2={10} y2={25} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+      <circle cx={10} cy={25} r={2.5} fill="currentColor" />
+      <line x1={-10} y1={25} x2={8} y2={isEnergized ? 25 : 15} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
 
-      <line x1={-20} y1={0} x2={18} y2={closed ? 0 : -10} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
-
-      {/* Switch 2 (Bottom) */}
-      <line x1={-50} y1={25} x2={-20} y2={25} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
-      <circle cx={-20} cy={25} r={2.5} fill="currentColor" />
-
-      <line x1={50} y1={25} x2={20} y2={25} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
-      <circle cx={20} cy={25} r={2.5} fill="currentColor" />
-
-      <line x1={-20} y1={25} x2={18} y2={closed ? 25 : 15} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
-
-      {/* Linkage */}
-      <line x1={0} y1={closed ? 0 : -5} x2={0} y2={closed ? 25 : 20} stroke="currentColor" strokeWidth={1.5} strokeDasharray="3,3" />
+      {/* Mechanical Linkage */}
+      <line x1={0} y1={-20} x2={0} y2={isEnergized ? 25 : 20} stroke="currentColor" strokeWidth={1.5} strokeDasharray="3,3" />
     </g>
   );
 };

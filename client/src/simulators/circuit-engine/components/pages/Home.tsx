@@ -307,11 +307,26 @@ function ComponentPaletteIcon({ definition, colors, documented }: { definition: 
   const padding = 20; // Safe optical padding
   const w = definition.width + padding;
   const h = definition.height + padding;
+
+  let offsetY = 0;
+  if (definition.id === 'pb-no') {
+    offsetY = -10;
+  } else if (['pb-nc', 'sw-spst-no', 'sw-spst-nc', 'aux-contact-no', 'aux-contact-nc'].includes(definition.id)) {
+    offsetY = -5;
+  } else if (definition.terminals && definition.terminals.length > 0) {
+    const yCoords = definition.terminals.map(t => t.y);
+    const minY = Math.min(...yCoords);
+    const maxY = Math.max(...yCoords);
+    if (minY !== -maxY) {
+      offsetY = (minY + maxY) / 2;
+    }
+  }
+
   return (
     <svg
       width="100%"
       height="100%"
-      viewBox={`${-w / 2} ${-h / 2} ${w} ${h}`}
+      viewBox={`${-w / 2} ${offsetY - h / 2} ${w} ${h}`}
       aria-hidden="true"
       style={{ overflow: 'visible', color: colors.text, pointerEvents: 'none' }}
     >
@@ -936,10 +951,16 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
 
       if (component.type === 'sw-spdt') {
         actualHalfW = 25; actualHalfH = 12.5; offsetY = 12.5;
+      } else if (component.type === 'sw-dpst') {
+        actualHalfW = 25; actualHalfH = 12.5; offsetY = -12.5;
       } else if (component.type === 'sw-dpdt') {
         actualHalfW = 25; actualHalfH = 37.5; offsetY = 12.5;
+      } else if (component.type === 'pb-no') {
+        actualHalfW = 25; actualHalfH = 12.5; offsetY = -10;
+      } else if (['pb-nc', 'sw-spst-no', 'sw-spst-nc', 'aux-contact-no', 'aux-contact-nc'].includes(component.type)) {
+        actualHalfW = 25; actualHalfH = 12.5; offsetY = -5;
       } else if (component.type === 'contactor') {
-        actualHalfW = 35; actualHalfH = 75; offsetY = 0;
+        actualHalfW = 35; actualHalfH = 72.5; offsetY = 12.5;
       } else if (['relay-spst', 'relay-spdt', 'relay-dpst'].includes(component.type)) {
         actualHalfW = 35; actualHalfH = 35; offsetY = 0;
       } else if (['transformer', 'transformer-ct', 'autotransformer'].includes(component.type)) {
@@ -2493,7 +2514,47 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                 const definition = getDef(component.type);
                 if (!definition) return null;
                 const isSelected = (selection?.kind === 'component' && selection.id === component.id) || marqueeIds.includes(component.id);
-                const powered = Boolean(snapshot.componentPowered[component.id]);
+                let powered = Boolean(snapshot.componentPowered[component.id]);
+                if (['relay-spst', 'relay-spdt', 'relay-dpst', 'contactor'].includes(component.type)) {
+                  const manual = component.props?.manualState;
+                  if (manual === 'closed') {
+                    powered = true;
+                  } else if (manual === 'open') {
+                    powered = false;
+                  } else {
+                    const vPos = snapshot.terminalVoltages[`${component.id}:coil+`];
+                    const vNeg = snapshot.terminalVoltages[`${component.id}:coil-`];
+                    if (vPos !== undefined && vNeg !== undefined) {
+                      const vCoil = Math.abs(vPos - vNeg);
+                      const rated = Math.max(0.1, Number(component.props?.coilVoltage ?? (component.type === 'contactor' ? 24 : 12)));
+                      if (vCoil >= rated * 0.7) {
+                        powered = true;
+                      }
+                    }
+                  }
+                } else if (['aux-contact-no', 'aux-contact-nc'].includes(component.type) && component.props?.linkedTo) {
+                  const linkedCoil = components.find(c => ['contactor', 'relay-spst', 'relay-spdt', 'relay-dpst'].includes(c.type) && c.label === component.props.linkedTo);
+                  if (linkedCoil) {
+                    const manual = linkedCoil.props?.manualState;
+                    if (manual === 'closed') {
+                      powered = true;
+                    } else if (manual === 'open') {
+                      powered = false;
+                    } else {
+                      let coilEnergized = Boolean(snapshot.componentPowered[linkedCoil.id]);
+                      const vPos = snapshot.terminalVoltages[`${linkedCoil.id}:coil+`];
+                      const vNeg = snapshot.terminalVoltages[`${linkedCoil.id}:coil-`];
+                      if (vPos !== undefined && vNeg !== undefined) {
+                        const vCoil = Math.abs(vPos - vNeg);
+                        const rated = Math.max(0.1, Number(linkedCoil.props?.coilVoltage ?? (linkedCoil.type === 'contactor' ? 24 : 12)));
+                        if (vCoil >= rated * 0.7) {
+                          coilEnergized = true;
+                        }
+                      }
+                      powered = coilEnergized;
+                    }
+                  }
+                }
                 const intensity = snapshot.componentIntensity[component.id] ?? 0;
                 const reading = effectiveSnapshot.instrumentReadings[component.id];
                 const transform = `translate(${component.x},${component.y})`;
@@ -2506,7 +2567,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                     onPointerLeave={() => setHoveredComponentId(null)}
                   >
                     <g transform={symbolTransform} color={isSelected ? colors.selection : undefined}>
-                      {renderSymbol(definition.symbol, powered, { ...component.props, _intensity: intensity, _documentedStyle: tabDUiRefinement }, animationTime)}
+                      {renderSymbol(definition.symbol, powered, { ...component.props, isEnergized: powered, _intensity: intensity, _documentedStyle: tabDUiRefinement }, animationTime)}
                       {component.type === 'oscilloscope' && <ScopeTrace reading={effectiveSnapshot.instrumentReadings[`${component.id}:ch1`]} color="#38bdf8" />}
                     </g>
                     {definition.terminals.map(terminal => {

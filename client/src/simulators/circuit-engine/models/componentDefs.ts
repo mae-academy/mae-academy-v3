@@ -485,7 +485,7 @@ const TRANSISTORS: Record<string, ComponentDef> = {
 const SWITCHES: Record<string, ComponentDef> = {
   'sw-spst-no': {
     id: 'sw-spst-no', name: 'Switch SPST-NO', category: 'Switches',
-    width: 50, height: 50, symbol: 'sw-spst-no',
+    width: 50, height: 25, symbol: 'sw-spst-no',
     terminals: [
       { id: 'a', name: 'A', x: -25, y: 0, type: 'bidirectional' },
       { id: 'b', name: 'B', x: 25, y: 0, type: 'bidirectional' },
@@ -495,7 +495,7 @@ const SWITCHES: Record<string, ComponentDef> = {
   },
   'sw-spst-nc': {
     id: 'sw-spst-nc', name: 'Switch SPST-NC', category: 'Switches',
-    width: 50, height: 50, symbol: 'sw-spst-nc',
+    width: 50, height: 25, symbol: 'sw-spst-nc',
     terminals: [
       { id: 'a', name: 'A', x: -25, y: 0, type: 'bidirectional' },
       { id: 'b', name: 'B', x: 25, y: 0, type: 'bidirectional' },
@@ -505,7 +505,7 @@ const SWITCHES: Record<string, ComponentDef> = {
   },
   'pb-no': {
     id: 'pb-no', name: 'Push Button NO', category: 'Switches',
-    width: 50, height: 50, symbol: 'pb-no',
+    width: 50, height: 25, symbol: 'pb-no',
     terminals: [
       { id: 'a', name: 'A', x: -25, y: 0, type: 'bidirectional' },
       { id: 'b', name: 'B', x: 25, y: 0, type: 'bidirectional' },
@@ -515,7 +515,7 @@ const SWITCHES: Record<string, ComponentDef> = {
   },
   'pb-nc': {
     id: 'pb-nc', name: 'Push Button NC', category: 'Switches',
-    width: 50, height: 50, symbol: 'pb-nc',
+    width: 50, height: 25, symbol: 'pb-nc',
     terminals: [
       { id: 'a', name: 'A', x: -25, y: 0, type: 'bidirectional' },
       { id: 'b', name: 'B', x: 25, y: 0, type: 'bidirectional' },
@@ -536,7 +536,7 @@ const SWITCHES: Record<string, ComponentDef> = {
   },
   'sw-dpst': {
     id: 'sw-dpst', name: 'Switch DPST', category: 'Switches',
-    width: 50, height: 50, symbol: 'sw-dpst',
+    width: 50, height: 25, symbol: 'sw-dpst',
     terminals: [
       { id: 'a1', name: 'A1', x: -25, y: -25, type: 'bidirectional' },
       { id: 'b1', name: 'B1', x: 25, y: -25, type: 'bidirectional' },
@@ -562,7 +562,7 @@ const SWITCHES: Record<string, ComponentDef> = {
   },
   'aux-contact-no': {
     id: 'aux-contact-no', name: 'Auxiliary Contact NO', category: 'Switches',
-    width: 50, height: 30, symbol: 'aux-contact-no',
+    width: 50, height: 25, symbol: 'aux-contact-no',
     terminals: [
       { id: 'a', name: '13', x: -25, y: 0, type: 'bidirectional' },
       { id: 'b', name: '14', x: 25, y: 0, type: 'bidirectional' },
@@ -572,7 +572,7 @@ const SWITCHES: Record<string, ComponentDef> = {
   },
   'aux-contact-nc': {
     id: 'aux-contact-nc', name: 'Auxiliary Contact NC', category: 'Switches',
-    width: 50, height: 30, symbol: 'aux-contact-nc',
+    width: 50, height: 25, symbol: 'aux-contact-nc',
     terminals: [
       { id: 'a', name: '21', x: -25, y: 0, type: 'bidirectional' },
       { id: 'b', name: '22', x: 25, y: 0, type: 'bidirectional' },
@@ -586,7 +586,7 @@ const SWITCHES: Record<string, ComponentDef> = {
 const PROTECTION: Record<string, ComponentDef> = {
   'relay-spst': {
     id: 'relay-spst', name: 'Relay SPST', category: 'Protection',
-    width: 100, height: 80, symbol: 'relay-spst',
+    width: 100, height: 70, symbol: 'relay-spst',
     terminals: [
       { id: 'coil+', name: 'A1', x: -50, y: -25, type: 'input' },
       { id: 'coil-', name: 'A2', x: 50, y: -25, type: 'input' },
@@ -602,7 +602,7 @@ const PROTECTION: Record<string, ComponentDef> = {
   },
   'relay-spdt': {
     id: 'relay-spdt', name: 'Relay SPDT', category: 'Protection',
-    width: 100, height: 100, symbol: 'relay-spdt',
+    width: 100, height: 70, symbol: 'relay-spdt',
     terminals: [
       { id: 'coil+', name: 'A1', x: -50, y: -25, type: 'input' },
       { id: 'coil-', name: 'A2', x: 50, y: -25, type: 'input' },
@@ -615,7 +615,7 @@ const PROTECTION: Record<string, ComponentDef> = {
   },
   'relay-dpst': {
     id: 'relay-dpst', name: 'Relay DPST', category: 'Protection',
-    width: 100, height: 100, symbol: 'relay-dpst',
+    width: 100, height: 70, symbol: 'relay-dpst',
     terminals: [
       { id: 'coil+', name: 'A1', x: -50, y: -25, type: 'input' },
       { id: 'coil-', name: 'A2', x: 50, y: -25, type: 'input' },
@@ -629,7 +629,7 @@ const PROTECTION: Record<string, ComponentDef> = {
   },
   'contactor': {
     id: 'contactor', name: 'Contactor', category: 'Protection',
-    width: 100, height: 160, symbol: 'contactor',
+    width: 100, height: 145, symbol: 'contactor',
     terminals: [
       { id: 'coil+', name: 'A1', x: -50, y: -50, type: 'input' },
       { id: 'coil-', name: 'A2', x: 50, y: -50, type: 'input' },
@@ -830,7 +830,7 @@ const OTHER_COMPONENTS: Record<string, ComponentDef> = {
       { id: 'in+', name: 'IN+', x: -40, y: 15, type: 'input' },
       { id: 'out', name: 'OUT', x: 40, y: 0, type: 'output' }
     ],
-    properties: { gain: { type: 'number', value: 100000, unit: 'V/V', min: 1, max: 1e7, label: 'Open-loop Gain' }, vcc: { type: 'number', value: 15, unit: 'V', min: 1, max: 100, label: 'Supply (±)' } },
+    properties: { gain: { type: 'number', value: 10, unit: 'V/V', min: 1, max: 1e7, label: 'Open-loop Gain' }, vcc: { type: 'number', value: 15, unit: 'V', min: 1, max: 100, label: 'Supply (±)' } },
     description: 'Operational Amplifier (Ideal)',
   },
 };

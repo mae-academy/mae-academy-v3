@@ -172,4 +172,61 @@ describe('Tab D SVG symbol language', () => {
     expect(rendered).not.toContain('x1="10" y1="10" x2="16" y2="16"');
     expect(rendered).not.toContain('x1="-20" y1="15" x2="0" y2="15"');
   });
+
+  it('synchronizes relay-spdt and relay-dpst internal contacts with sw-spdt and sw-dpst vector geometry and dynamic states', () => {
+    // Relay SPDT de-energized: arm rests on NC (y=0)
+    const spdtIdle = renderToStaticMarkup(<svg>{renderSymbol('relay-spdt', false, {}, 0)}</svg>);
+    expect(spdtIdle).toContain('cx="-10" cy="0" r="2.5"'); // COM pivot
+    expect(spdtIdle).toContain('cx="10" cy="0" r="2.5"');  // NC contact
+    expect(spdtIdle).toContain('cx="10" cy="25" r="2.5"'); // NO contact
+    expect(spdtIdle).toContain('x1="-10" y1="0" x2="8" y2="0"'); // Arm resting on NC
+    expect(spdtIdle).toContain('x1="0" y1="-20" x2="0" y2="0"'); // Linkage to arm
+
+    // Relay SPDT energized: arm swings cleanly to NO (y=25)
+    const spdtActive = renderToStaticMarkup(<svg>{renderSymbol('relay-spdt', true, {}, 0)}</svg>);
+    expect(spdtActive).toContain('x1="-10" y1="0" x2="8" y2="25"'); // Arm connected to NO
+    expect(spdtActive).toContain('x1="0" y1="-20" x2="0" y2="14"'); // Linkage follows arm down
+
+    // Relay DPST de-energized: both poles in open position (-10 and 15) matching sw-dpst
+    const dpstIdle = renderToStaticMarkup(<svg>{renderSymbol('relay-dpst', false, {}, 0)}</svg>);
+    expect(dpstIdle).toContain('x1="-10" y1="0" x2="8" y2="-10"'); // Pole 1 open
+    expect(dpstIdle).toContain('x1="-10" y1="25" x2="8" y2="15"'); // Pole 2 open
+    expect(dpstIdle).toContain('x1="0" y1="-20" x2="0" y2="20"');  // Linkage crossing arms
+
+    // Relay DPST energized: both poles swing down closed (0 and 25)
+    const dpstActive = renderToStaticMarkup(<svg>{renderSymbol('relay-dpst', true, {}, 0)}</svg>);
+    expect(dpstActive).toContain('x1="-10" y1="0" x2="8" y2="0"');  // Pole 1 closed
+    expect(dpstActive).toContain('x1="-10" y1="25" x2="8" y2="25"'); // Pole 2 closed
+    expect(dpstActive).toContain('x1="0" y1="-20" x2="0" y2="25"'); // Linkage down to closed arm
+
+    // Relay SPST NO de-energized: arm open (y2=15)
+    const spstNoIdle = renderToStaticMarkup(<svg>{renderSymbol('relay-spst', false, { contactType: 'NO' }, 0)}</svg>);
+    expect(spstNoIdle).toContain('x1="-10" y1="25" x2="8" y2="15"');
+    expect(spstNoIdle).toContain('x1="0" y1="-20" x2="0" y2="20"');
+
+    // Relay SPST NO energized: arm closed (y2=25)
+    const spstNoActive = renderToStaticMarkup(<svg>{renderSymbol('relay-spst', true, { contactType: 'NO' }, 0)}</svg>);
+    expect(spstNoActive).toContain('x1="-10" y1="25" x2="8" y2="25"');
+    expect(spstNoActive).toContain('x1="0" y1="-20" x2="0" y2="25"');
+
+    // Relay SPST NC de-energized: arm closed (y2=25)
+    const spstNcIdle = renderToStaticMarkup(<svg>{renderSymbol('relay-spst', false, { contactType: 'NC' }, 0)}</svg>);
+    expect(spstNcIdle).toContain('x1="-10" y1="25" x2="8" y2="25"');
+    expect(spstNcIdle).toContain('x1="0" y1="-20" x2="0" y2="25"');
+
+    // Relay SPST NC energized: arm open (y2=15)
+    const spstNcActive = renderToStaticMarkup(<svg>{renderSymbol('relay-spst', true, { contactType: 'NC' }, 0)}</svg>);
+    expect(spstNcActive).toContain('x1="-10" y1="25" x2="8" y2="15"');
+    expect(spstNcActive).toContain('x1="0" y1="-20" x2="0" y2="20"');
+
+    // Contactor de-energized: aux NC closed at 75, linkage at 69
+    const contactorIdle = renderToStaticMarkup(<svg>{renderSymbol('contactor', false, {}, 0)}</svg>);
+    expect(contactorIdle).toContain('x1="-10" y1="75" x2="8" y2="75"');
+    expect(contactorIdle).toContain('x1="0" y1="-40" x2="0" y2="69"');
+
+    // Contactor energized: aux NC open at 65, linkage pulls down to 75
+    const contactorActive = renderToStaticMarkup(<svg>{renderSymbol('contactor', true, {}, 0)}</svg>);
+    expect(contactorActive).toContain('x1="-10" y1="75" x2="8" y2="65"');
+    expect(contactorActive).toContain('x1="0" y1="-40" x2="0" y2="75"');
+  });
 });

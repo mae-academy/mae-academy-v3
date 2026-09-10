@@ -304,7 +304,12 @@ export class TabDSimulationEngine extends SimulationEngine {
         branchCurrents: finalBranchCurrents,
         wireCurrents: wireCurrentsOut,
         wirePhases: Object.fromEntries(this.wirePhases),
-        componentPowered: Object.fromEntries(this.tabDComponents.map(component => [component.id, Math.abs(finalBranchCurrents[component.id] ?? 0) > 1e-10])),
+        componentPowered: Object.fromEntries(this.tabDComponents.map(component => {
+          if (['relay-spst', 'relay-spdt', 'relay-dpst', 'contactor'].includes(component.type)) {
+            return [component.id, Boolean(this.tabDRelayStates.get(component.id))];
+          }
+          return [component.id, Math.abs(finalBranchCurrents[component.id] ?? 0) > 1e-10];
+        })),
         componentIntensity: {},
         nodeHistory: {},
         branchHistory: {},
