@@ -35,6 +35,16 @@ export interface SpiceNodeMap {
   readonly entries: ReadonlyArray<{ net: SpiceNet; name: string }>;
 }
 
+/**
+ * Convergence aids for a stiff switch/diode network: a switch's ROFF leakage feeding straight into
+ * a diode's exponential knee is exactly the kind of near-singular Jacobian that strands
+ * Newton-Raphson at the default tolerances. GMIN adds a minimum conductance to every PN junction so
+ * an open branch never looks perfectly singular; the loosened ABSTOL/RELTOL and raised DC/transient
+ * iteration caps (ITL1/ITL4) give the solver room to actually reach them.
+ */
+const CONVERGENCE_OPTIONS =
+  ".OPTIONS GMIN=1e-12 ABSTOL=1e-12 RELTOL=0.005 ITL1=100 ITL4=100";
+
 export interface GenerateNetlistOptions {
   /** SPICE discards the first line of a deck, so a title is always emitted. */
   title?: string;
@@ -120,6 +130,14 @@ interface SpiceModel {
   card: string;
 }
 
+/**
+ * Emission coefficient for Academic mode's idealized diode/LED junction. Low enough to keep the
+ * textbook ~0.7 V knee sharp; not the previous 0.001, whose near-vertical I-V curve is a
+ * non-differentiable step that strands Newton-Raphson (a "Did Not Converge" error) the moment an
+ * open switch's ROFF leakage puts the junction anywhere near it.
+ */
+const ACADEMIC_IDEAL_JUNCTION_N = 0.05;
+
 /** Thermal voltage at the 27 °C ngspice defaults to, used to fit an LED's saturation current. */
 const THERMAL_VOLTAGE = 0.025852;
 /** The current an LED's quoted forward voltage is specified at. */
@@ -152,10 +170,14 @@ function modelFor(
     case "diode":
       switch (element.variant) {
         case "standard":
-          // Academic: an ideal switch-like junction — N so far below 1 that the I-V curve is
-          // effectively a step at 0 V, rather than silicon's ~0.6-0.7 V knee.
+          // Academic: a near switch-like junction — N low enough to keep the ~0.7 V textbook knee
+          // sharp, but not so low (was 0.001) that the I-V curve is a true step: that non-
+          // differentiable corner is exactly what stalls Newton-Raphson on an open-switch branch.
           return academic
-            ? { name: "D_STD", card: ".MODEL D_STD D (IS=1e-14 RS=0 N=0.001)" }
+            ? {
+                name: "D_STD",
+                card: `.MODEL D_STD D (IS=1e-14 RS=0 N=${ACADEMIC_IDEAL_JUNCTION_N})`,
+              }
             : { name: "D_STD", card: ".MODEL D_STD D (IS=1e-14 RS=0 N=1)" };
         case "photodiode":
           // Reduced to its junction: IS stands in for dark current. Photocurrent needs an
@@ -188,11 +210,11 @@ function modelFor(
           }
           const name = `D_LED_${modelToken(element.forwardVoltage)}`;
           if (academic) {
-            // Ideal switch-like junction, same as the standard diode; the fitted forward-voltage
-            // knee is a Practical-mode concern.
+            // Near switch-like junction, same rationale (and N) as the standard diode; the fitted
+            // forward-voltage knee is a Practical-mode concern.
             return {
               name,
-              card: `.MODEL ${name} D (IS=1e-14 N=0.001 RS=0)`,
+              card: `.MODEL ${name} D (IS=1e-14 N=${ACADEMIC_IDEAL_JUNCTION_N} RS=0)`,
             };
           }
           // Fitted so the junction drops the quoted forward voltage at LED_TEST_CURRENT:
@@ -263,7 +285,10 @@ function modelFor(
  * PSPICE's `VSWITCH` with VON/VOFF: this ngspice build fails to parse a `VSWITCH` model card, and
  * feeding VON/VOFF to `SW` aborts the process outright.
  *
- * Academic mode drives RON down to a near-zero ideal contact; ROFF is untouched by either mode.
+ * Academic mode drives RON down to a near-zero ideal contact; ROFF is untouched by either mode — a
+ * strict 1e9 Ω (1 GΩ) open-contact resistance for every switch and relay, so an "open" contact still
+ * leaves a (negligible) conductive path rather than a fully disconnected sub-circuit and a singular
+ * matrix.
  */
 function switchResistances(mode: SimulationMode): string {
   return mode === "academic" ? "RON=1e-6 ROFF=1e9" : "RON=0.001 ROFF=1e9";
@@ -1005,6 +1030,7 @@ export function generateNetlist(
     ...modelCards,
     ...macroBlocks,
     ...lines,
+    CONVERGENCE_OPTIONS,
     ...analysis,
     ".end",
     "",

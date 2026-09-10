@@ -109,6 +109,7 @@ describe("convertToSpiceComponents", () => {
       "V1 n1 0 DC 10",
       "R1 n1 n2 1000",
       "R2 n2 0 1000",
+      ".OPTIONS GMIN=1e-12 ABSTOL=1e-12 RELTOL=0.005 ITL1=100 ITL4=100",
       ".op",
       ".end",
       "",

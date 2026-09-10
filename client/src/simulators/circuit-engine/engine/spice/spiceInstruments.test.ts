@@ -75,6 +75,37 @@ function timeAxis(count: number): number[] {
   return Array.from({ length: count + 1 }, (_, i) => i / count);
 }
 
+/** V1(5V) -> SW1 -> R1(1k) -> D1(LED) -> ground, with a DMM across the LED — the exact reported
+ * "opens a switch, DMM reads ~1.276 V instead of 0 V" topology. */
+function openSwitchLedCircuit(switchState: "open" | "closed") {
+  const components = [
+    part("g", "ground"),
+    part("v", "dc-voltage", { voltage: 5, internalR: 0 }, "V1"),
+    part("sw", "sw-spst-no", { state: switchState }, "SW1"),
+    part("r1", "resistor", { resistance: 220 }, "R1"),
+    part("d1", "led", { forwardVoltage: 2 }, "D1"),
+    part("dmm1", "dmm", { mode: "DCV" }, "DMM1"),
+    part("dmm2", "dmm", { mode: "DCV" }, "DMM2"),
+  ];
+  const wires = [
+    wire("w1", "v", "pos", "sw", "a"),
+    wire("w2", "sw", "b", "r1", "a"),
+    wire("w3", "r1", "b", "d1", "anode"),
+    wire("w4", "d1", "cathode", "g", "gnd"),
+    wire("w5", "v", "neg", "g", "gnd"),
+    // DMM1: across the LED — floats to a leakage potential when the switch is open.
+    wire("w6", "dmm1", "hi", "d1", "anode"),
+    wire("w7", "dmm1", "com", "g", "gnd"),
+    // DMM2: directly across the source — must read 5 V regardless of the switch elsewhere.
+    wire("w8", "dmm2", "hi", "v", "pos"),
+    wire("w9", "dmm2", "com", "g", "gnd"),
+  ];
+  const nets = resolveCircuitNets(components, wires);
+  const spiceComponents = convertToSpiceComponents(components, wires, nets);
+  const nodeMap = buildSpiceNodeMap(spiceComponents);
+  return { components, nets, nodeMap };
+}
+
 describe("buildSpiceInstrumentReadings", () => {
   it("DCV reads the settled tail mean, not a ringing/artifact last sample", () => {
     const { components, nets, nodeMap } = dmmAcrossResistor({ mode: "DCV" });
@@ -151,5 +182,57 @@ describe("buildSpiceInstrumentReadings", () => {
       results
     );
     expect(contReadings.dmm1).toBeUndefined();
+  });
+
+  describe("floating-node clamp", () => {
+    it("clamps a DMM across a load fed only through an open switch's ROFF leakage to exactly 0 V", () => {
+      const { components, nets, nodeMap } = openSwitchLedCircuit("open");
+      const anodeNode = nodeMap.nameFor(nets.netFor("d1", "anode"));
+
+      const time = timeAxis(50);
+      // The reported artifact: the LED settles at a deceptively large ~1.276 V on a leakage current
+      // of a few nA through the switch's mandatory (netlistGenerator's ROFF) open-contact resistance.
+      const voltage = time.map(() => 1.276);
+      const results = parseSpiceResults({ time, [`v(${anodeNode})`]: voltage }, time);
+
+      const readings = buildSpiceInstrumentReadings(components, nets, nodeMap, results);
+
+      expect(readings.dmm1.status).toBe("ready");
+      expect(readings.dmm1.value).toBe(0);
+    });
+
+    it("does not clamp a DMM directly across the source, even while another branch is open", () => {
+      const { components, nets, nodeMap } = openSwitchLedCircuit("open");
+      const anodeNode = nodeMap.nameFor(nets.netFor("d1", "anode"));
+      const sourceNode = nodeMap.nameFor(nets.netFor("v", "pos"));
+
+      const time = timeAxis(50);
+      const results = parseSpiceResults(
+        {
+          time,
+          [`v(${anodeNode})`]: time.map(() => 1.276),
+          [`v(${sourceNode})`]: time.map(() => 5),
+        },
+        time
+      );
+
+      const readings = buildSpiceInstrumentReadings(components, nets, nodeMap, results);
+
+      expect(readings.dmm1.value).toBe(0); // across the LED: floating, clamped
+      expect(readings.dmm2.value).toBeCloseTo(5, 9); // across the source: authoritative, untouched
+    });
+
+    it("does not clamp the same LED reading once the switch is closed and current genuinely flows", () => {
+      const { components, nets, nodeMap } = openSwitchLedCircuit("closed");
+      const anodeNode = nodeMap.nameFor(nets.netFor("d1", "anode"));
+
+      const time = timeAxis(50);
+      // A real forward-conduction drop, reachable from the source through the now-closed switch.
+      const results = parseSpiceResults({ time, [`v(${anodeNode})`]: time.map(() => 2.0) }, time);
+
+      const readings = buildSpiceInstrumentReadings(components, nets, nodeMap, results);
+
+      expect(readings.dmm1.value).toBeCloseTo(2.0, 9);
+    });
   });
 });
