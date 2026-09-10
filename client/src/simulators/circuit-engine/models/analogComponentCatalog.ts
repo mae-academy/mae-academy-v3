@@ -1,8 +1,11 @@
 import type { CircuitComponent } from '@/simulators/circuit-engine/models/circuitTypes';
 
+/** Power Semiconductors catalog category definition */
+export const POWER_SEMICONDUCTORS_CATEGORY = 'Power Semiconductors';
+export const POWER_SEMICONDUCTOR_COMPONENT_IDS = ['scr', 'op-amp', 'diac', 'triac'] as const;
+
 /** Components intentionally excluded from the documented Tab D learner catalog only. */
 export const TAB_D_EXCLUDED_COMPONENT_IDS = new Set([
-  'diac', 'triac',
   'digital-input', 'digital-output', 'gate-and', 'gate-or', 'gate-not',
   'gate-nand', 'gate-nor', 'gate-xor', 'gate-xnor',
   'sw-dpdt',

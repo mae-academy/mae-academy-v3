@@ -78,10 +78,12 @@ describe('Tab D SVG symbol language', () => {
 
   it('renders the 3-terminal op-amp with hidden power rails and +/- input polarity indicators', () => {
     const opamp = markup('opamp');
-    expect(opamp).toContain('points="-20,-25 -20,25 30,0"');
-    expect(opamp).toContain('x1="-40" y1="-15" x2="-20" y2="-15"');
-    expect(opamp).toContain('x1="-40" y1="15" x2="-20" y2="15"');
-    expect(opamp).toContain('x1="30" y1="0" x2="40" y2="0"');
+    expect(opamp).toContain('points="-20,-32 -20,32 25,0"');
+    expect(opamp).toContain('x1="-50" y1="-25" x2="-20" y2="-25"');
+    expect(opamp).toContain('x1="-50" y1="25" x2="-20" y2="25"');
+    expect(opamp).toContain('x1="25" y1="0" x2="50" y2="0"');
+    expect(opamp).toContain('x="-10" y="-18"');
+    expect(opamp).toContain('x="-10" y="18"');
   });
 
   it('uses orthogonal collector/emitter routing and distinct regular arrowheads for NPN and PNP symbols', () => {
@@ -168,7 +170,10 @@ describe('Tab D SVG symbol language', () => {
 
   it('renders SCR symbol with a 45-degree to horizontal gate path and no redundant line', () => {
     const rendered = markup('scr', { _documentedStyle: true });
-    expect(rendered).toContain('d="M 0,10 L -5,16.69 L -16.5,16.69"');
+    expect(rendered).toContain('d="M 0,10 L -15,25 L -25,25"');
+    expect(rendered).toContain('stroke-width="1.5"');
+    expect(rendered).toContain('x1="0" y1="-25" x2="0" y2="-10"');
+    expect(rendered).toContain('x1="0" y1="10" x2="0" y2="25"');
     expect(rendered).not.toContain('x1="10" y1="10" x2="16" y2="16"');
     expect(rendered).not.toContain('x1="-20" y1="15" x2="0" y2="15"');
   });
@@ -228,5 +233,61 @@ describe('Tab D SVG symbol language', () => {
     const contactorActive = renderToStaticMarkup(<svg>{renderSymbol('contactor', true, {}, 0)}</svg>);
     expect(contactorActive).toContain('x1="-10" y1="75" x2="8" y2="65"');
     expect(contactorActive).toContain('x1="0" y1="-40" x2="0" y2="75"');
+  });
+
+  it('renders DIAC and TRIAC matching SCR styling and 25px Cartesian grid alignment', () => {
+    const diac = markup('diac');
+    const triac = markup('triac');
+    // DIAC: stroke-width 1.5, separated triangles with visible gap, outer vertical lines, terminals at [0, -25] and [0, 25]
+    expect(diac).toContain('stroke-width="1.5"');
+    expect(diac).toContain('x1="0" y1="-25" x2="0" y2="-10"');
+    expect(diac).toContain('x1="0" y1="10" x2="0" y2="25"');
+    expect(diac).toContain('x1="-10" y1="-10" x2="-10" y2="10"');
+    expect(diac).toContain('x1="10" y1="-10" x2="10" y2="10"');
+    expect(diac).toContain('points="-10,-7 -10,7 -2,0"');
+    expect(diac).toContain('points="10,-7 10,7 2,0"');
+
+    // TRIAC: stroke-width 1.5, terminals at [0, -25], [0, 25], and gate at [-25, 25]
+    expect(triac).toContain('stroke-width="1.5"');
+    expect(triac).toContain('points="-10,-7 -10,7 -2,0"');
+    expect(triac).toContain('points="10,-7 10,7 2,0"');
+    expect(triac).toContain('d="M -10,10 L -18,25 L -25,25"');
+  });
+
+  it('renders DMM with top-center KaTeX title header and white halo stroke', () => {
+    const dmm = markup('dmm');
+    expect(dmm).toContain('>DMM<');
+    expect(dmm).toContain('KaTeX_Math');
+    expect(dmm).toContain('font-style="italic"');
+    expect(dmm).toContain('stroke="white"');
+    expect(dmm).toContain('stroke-width="3"');
+    expect(dmm).toContain('paint-order="stroke fill"');
+    expect(dmm).toContain('y="-58"');
+  });
+
+  it('renders Voltmeter and Ammeter with dynamic displayValue or fallback', () => {
+    const vDefault = markup('voltmeter');
+    const vDynamic = markup('voltmeter', { displayValue: '12.0 V' });
+    expect(vDefault).toContain('>V<');
+    expect(vDynamic).toContain('>12.0 V<');
+
+    const aDefault = markup('ammeter');
+    const aDynamic = markup('ammeter', { displayValue: '250 mA' });
+    expect(aDefault).toContain('>A<');
+    expect(aDynamic).toContain('>250 mA<');
+  });
+
+  it('renders oscilloscope with a clean dark screen, no sine wave, and clean channel labels', () => {
+    const scope = markup('oscilloscope');
+    // Decorative sine wave removed
+    expect(scope).not.toContain('C -45,-55 -35,15 -20,-20');
+    // Clean screen with grid intact
+    expect(scope).toContain('fill="#000000"');
+    // External labels outside screen and body
+    expect(scope).toContain('>CH1<');
+    expect(scope).toContain('>CH2<');
+    expect(scope).toContain('>CH3<');
+    expect(scope).toContain('>CH4<');
+    expect(scope).toContain('>GND<');
   });
 });

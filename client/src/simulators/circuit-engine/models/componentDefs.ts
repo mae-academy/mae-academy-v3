@@ -755,11 +755,11 @@ const TRANSFORMERS: Record<string, ComponentDef> = {
 const POWER_SEMI: Record<string, ComponentDef> = {
   'scr': {
     id: 'scr', name: 'SCR (Thyristor)', category: 'Power Semiconductors',
-    width: 40, height: 60, symbol: 'scr',
+    width: 50, height: 50, symbol: 'scr',
     terminals: [
-      { id: 'anode', name: 'A', x: 0, y: -30, type: 'input' },
-      { id: 'cathode', name: 'K', x: 0, y: 30, type: 'output' },
-      { id: 'gate', name: 'G', x: -20, y: 15, type: 'input' },
+      { id: 'anode', name: 'A', x: 0, y: -25, type: 'input' },
+      { id: 'cathode', name: 'K', x: 0, y: 25, type: 'output' },
+      { id: 'gate', name: 'G', x: -25, y: 25, type: 'input' },
     ],
     properties: {
       vdrm: { type: 'number', value: 1200, unit: 'V', min: 50, max: 10000, label: 'VDRM' },
@@ -771,10 +771,10 @@ const POWER_SEMI: Record<string, ComponentDef> = {
   },
   'diac': {
     id: 'diac', name: 'Diac', category: 'Power Semiconductors',
-    width: 40, height: 20, symbol: 'diac',
+    width: 50, height: 50, symbol: 'diac',
     terminals: [
-      { id: 'a1', name: 'A1', x: -20, y: 0, type: 'bidirectional' },
-      { id: 'a2', name: 'A2', x: 20, y: 0, type: 'bidirectional' },
+      { id: 'a1', name: 'A1', x: 0, y: -25, type: 'bidirectional' },
+      { id: 'a2', name: 'A2', x: 0, y: 25, type: 'bidirectional' },
     ],
     properties: {
       vbo: { type: 'number', value: 30, unit: 'V', min: 10, max: 200, label: 'Breakover Voltage (Vbo)' },
@@ -784,11 +784,11 @@ const POWER_SEMI: Record<string, ComponentDef> = {
   },
   'triac': {
     id: 'triac', name: 'Triac', category: 'Power Semiconductors',
-    width: 40, height: 60, symbol: 'triac',
+    width: 50, height: 50, symbol: 'triac',
     terminals: [
-      { id: 't1', name: 'T1', x: 0, y: -30, type: 'bidirectional' },
-      { id: 't2', name: 'T2', x: 0, y: 30, type: 'bidirectional' },
-      { id: 'gate', name: 'G', x: -20, y: 15, type: 'input' },
+      { id: 't1', name: 'T1', x: 0, y: -25, type: 'bidirectional' },
+      { id: 't2', name: 'T2', x: 0, y: 25, type: 'bidirectional' },
+      { id: 'gate', name: 'G', x: -25, y: 25, type: 'input' },
     ],
     properties: {
       vdrm: { type: 'number', value: 800, unit: 'V', min: 50, max: 10000, label: 'VDRM' },
@@ -796,6 +796,17 @@ const POWER_SEMI: Record<string, ComponentDef> = {
       vgt: { type: 'number', value: 1.5, unit: 'V', min: 0.5, max: 5, label: 'Gate Trigger Voltage' },
     },
     description: 'Triac – bidirectional thyristor',
+  },
+  'opamp': {
+    id: 'opamp', name: 'Op-Amp', category: 'Power Semiconductors',
+    width: 100, height: 75, symbol: 'opamp',
+    terminals: [
+      { id: 'in-', name: 'IN-', x: -50, y: -25, type: 'input' },
+      { id: 'in+', name: 'IN+', x: -50, y: 25, type: 'input' },
+      { id: 'out', name: 'OUT', x: 50, y: 0, type: 'output' },
+    ],
+    properties: { gain: { type: 'number', value: 10, unit: 'V/V', min: 1, max: 1e7, label: 'Open-loop Gain' }, vcc: { type: 'number', value: 15, unit: 'V', min: 1, max: 100, label: 'Supply (±)' } },
+    description: 'Operational Amplifier (Ideal)',
   },
 };
 
@@ -821,17 +832,6 @@ const OTHER_COMPONENTS: Record<string, ComponentDef> = {
     terminals: [{ id: 'a', name: 'A', x: -25, y: 0, type: 'bidirectional' }, { id: 'b', name: 'B', x: 25, y: 0, type: 'bidirectional' }],
     properties: { ratedV: { type: 'number', value: 12, unit: 'V', min: 1, max: 1000, label: 'Rated V' }, ratedPower: { type: 'number', value: 5, unit: 'W', min: 0.1, max: 1000, label: 'Rated Power' } },
     description: 'Incandescent Lamp',
-  },
-  'opamp': {
-    id: 'opamp', name: 'Op-Amp', category: 'Other Components',
-    width: 80, height: 80, symbol: 'opamp',
-    terminals: [
-      { id: 'in-', name: 'IN-', x: -40, y: -15, type: 'input' },
-      { id: 'in+', name: 'IN+', x: -40, y: 15, type: 'input' },
-      { id: 'out', name: 'OUT', x: 40, y: 0, type: 'output' }
-    ],
-    properties: { gain: { type: 'number', value: 10, unit: 'V/V', min: 1, max: 1e7, label: 'Open-loop Gain' }, vcc: { type: 'number', value: 15, unit: 'V', min: 1, max: 100, label: 'Supply (±)' } },
-    description: 'Operational Amplifier (Ideal)',
   },
 };
 
@@ -939,6 +939,7 @@ export const CATEGORIES = [
   'Passive',
   'Diodes',
   'Transistors',
+  'Power Semiconductors',
   'Switches',
   'Protection',
   'Transformers',
@@ -954,7 +955,7 @@ export function getComponentsByCategory(cat: string): ComponentDef[] {
 }
 
 export function getDef(id: string): ComponentDef | undefined {
-  return COMPONENT_DEFS[id];
+  return COMPONENT_DEFS[id] ?? (id === 'op-amp' ? COMPONENT_DEFS['opamp'] : undefined);
 }
 
 /** LED forward voltage by color */

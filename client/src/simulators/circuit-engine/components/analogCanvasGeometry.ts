@@ -481,7 +481,11 @@ export function tabDComponentLabelAnchors(
  * Guarantees zero offset with visual port extremities.
  */
 export const EXACT_ANALOG_TERMINAL_OFFSETS: Record<string, Record<string, Point>> = {
-  'opamp': { 'in-': [-40, -15], 'in+': [-40, 15], 'out': [40, 0] },
+  'opamp': { 'in-': [-50, -25], 'in+': [-50, 25], 'out': [50, 0] },
+  'op-amp': { 'in-': [-50, -25], 'in+': [-50, 25], 'out': [50, 0] },
+  'scr': { 'anode': [0, -25], 'cathode': [0, 25], 'gate': [-25, 25] },
+  'diac': { 'a1': [0, -25], 'a2': [0, 25] },
+  'triac': { 't1': [0, -25], 't2': [0, 25], 'gate': [-25, 25] },
   'bjt-npn': { 'base': [-25, 0], 'collector': [25, -25], 'emitter': [25, 25] },
   'bjt-pnp': { 'base': [-25, 0], 'collector': [25, -25], 'emitter': [25, 25] },
   'mosfet-n': { 'gate': [-25, 0], 'drain': [25, -25], 'source': [25, 25] },
@@ -533,7 +537,7 @@ export const EXACT_ANALOG_TERMINAL_OFFSETS: Record<string, Record<string, Point>
 };
 
 export const EXACT_CAD_COMPONENTS = new Set<string>([
-  'dmm', 'opamp', 'bjt-npn', 'bjt-pnp', 'mosfet-n', 'mosfet-p', 'jfet-n', 'jfet-p',
+  'dmm', 'opamp', 'op-amp', 'diac', 'triac', 'scr', 'bjt-npn', 'bjt-pnp', 'mosfet-n', 'mosfet-p', 'jfet-n', 'jfet-p',
   'dc-voltage', 'ac-voltage', 'dc-current', 'ac-current',
   'voltmeter', 'ammeter', 'lamp', 'motor-dc', 'motor-3phase', 'three-phase-source',
   'sw-spst-no', 'sw-spst-nc', 'pb-no', 'pb-nc', 'sw-spdt', 'sw-dpst', 'sw-dpdt',

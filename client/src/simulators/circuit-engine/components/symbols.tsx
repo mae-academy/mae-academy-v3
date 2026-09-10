@@ -783,42 +783,63 @@ const Autotransformer: SymbolFC = () => (
 
 // ─── POWER SEMICONDUCTORS ─────────────────────────────────────────────────────
 
-const Scr: SymbolFC = ({ props }) => {
-  const sw = nonExactStroke(props);
-  return (
-    <g>
-      {/* Anode-cathode vertical */}
-      <line x1={0} y1={-33.1} x2={0} y2={-10} stroke="currentColor" strokeWidth={1} />
-      <polygon points="-10,-10 10,-10 0,10" fill="none" stroke="currentColor" strokeWidth={1} />
-      <line x1={-12} y1={10} x2={12} y2={10} stroke="currentColor" strokeWidth={1} />
-      <line x1={0} y1={10} x2={0} y2={33.1} stroke="currentColor" strokeWidth={1} />
-      {/* Gate: originates from cathode at (0, 10), 45-deg angle to (-5, 15), then horizontal to (-20, 15) */}
-      <path d="M 0,10 L -5,16.69 L -16.5,16.69" fill="none" stroke="currentColor" strokeWidth={1} strokeLinejoin="miter" />
-    </g>
-  );
-};
-
+const Scr: SymbolFC = () => (
+  <g>
+    {/* Anode lead from top 25px grid snap point (0, -25) to diode base at (0, -10) */}
+    <line x1={0} y1={-25} x2={0} y2={-10} stroke="currentColor" strokeWidth={1.5} />
+    {/* Diode triangle: base at y=-10, apex at y=10 */}
+    <polygon points="-10,-10 10,-10 0,10" fill="currentColor" stroke="currentColor" strokeWidth={1.5} strokeLinejoin="round" />
+    {/* Cathode barrier bar at y=10 */}
+    <line x1={-10} y1={10} x2={10} y2={10} stroke="currentColor" strokeWidth={1.5} />
+    {/* Cathode lead from (0, 10) to bottom 25px grid snap point (0, 25) */}
+    <line x1={0} y1={10} x2={0} y2={25} stroke="currentColor" strokeWidth={1.5} />
+    {/* Gate terminal: angled from cathode at (0, 10) to (-15, 25), then horizontal to (-25, 25) */}
+    <path d="M 0,10 L -15,25 L -25,25" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinejoin="miter" />
+  </g>
+);
 const Diac: SymbolFC = () => (
   <g>
-    <line x1={-20} y1={0} x2={-8} y2={0} stroke="currentColor" strokeWidth={1.5} />
-    {/* Two back-to-back triangles */}
-    <polygon points="-8,-10 -8,10 8,0" fill="none" stroke="currentColor" strokeWidth={1.5} />
-    <polygon points="8,-10 8,10 -8,0" fill="none" stroke="currentColor" strokeWidth={1.5} />
-    <line x1={-8} y1={-12} x2={-8} y2={12} stroke="currentColor" strokeWidth={1.5} />
-    <line x1={8} y1={-12} x2={8} y2={12} stroke="currentColor" strokeWidth={1.5} />
-    <line x1={8} y1={0} x2={20} y2={0} stroke="currentColor" strokeWidth={1.5} />
+    {/* Main terminal wires */}
+    <line x1={0} y1={-25} x2={0} y2={-10} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+    <line x1={0} y1={10} x2={0} y2={25} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+
+    {/* Top and bottom horizontal bars */}
+    <line x1={-15} y1={-10} x2={15} y2={-10} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+    <line x1={-15} y1={10} x2={15} y2={10} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+
+    {/* Left triangle pointing UP (base at bottom, apex at top) */}
+    <polygon points="-13,10 1,10 -6.5,-10" fill="currentColor" />
+
+    {/* Right triangle pointing DOWN (base at top, apex at bottom) */}
+    <polygon points="-1,-10 13,-10 6.5,10" fill="currentColor" />
   </g>
 );
 
 const Triac: SymbolFC = () => (
   <g>
-    <line x1={0} y1={-30} x2={0} y2={-10} stroke="currentColor" strokeWidth={1.5} />
-    <polygon points="-10,-10 10,-10 0,10" fill="none" stroke="currentColor" strokeWidth={1.5} />
-    <polygon points="-10,10 10,10 0,-10" fill="none" stroke="currentColor" strokeWidth={1.5} />
-    <line x1={-12} y1={-10} x2={12} y2={-10} stroke="currentColor" strokeWidth={1.5} />
-    <line x1={-12} y1={10} x2={12} y2={10} stroke="currentColor" strokeWidth={1.5} />
-    <line x1={0} y1={10} x2={0} y2={30} stroke="currentColor" strokeWidth={1.5} />
-    <line x1={-20} y1={15} x2={0} y2={15} stroke="currentColor" strokeWidth={1.5} />
+    {/* Main terminal wires */}
+    <line x1={0} y1={-25} x2={0} y2={-10} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+    <line x1={0} y1={10} x2={0} y2={25} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+
+    {/* Top and bottom horizontal bars */}
+    <line x1={-15} y1={-10} x2={15} y2={-10} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+    <line x1={-15} y1={10} x2={15} y2={10} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+
+    {/* Left triangle pointing UP (base at bottom, apex at top) */}
+    <polygon points="-13,10 1,10 -6.5,-10" fill="currentColor" />
+
+    {/* Right triangle pointing DOWN (base at top, apex at bottom) */}
+    <polygon points="-1,-10 13,-10 6.5,10" fill="currentColor" />
+
+    {/* Gate terminal connecting smoothly to the bottom bar */}
+    <path
+      d="M -0,10 L -18,25 L -25,25"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.5}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
   </g>
 );
 
@@ -871,34 +892,47 @@ const Lamp: SymbolFC = ({ powered }) => (
 
 const Opamp: SymbolFC = () => (
   <g>
-    <polygon points="-20,-25 -20,25 30,0" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinejoin="round" />
-    <line x1={-40} y1={-15} x2={-20} y2={-15} stroke="currentColor" strokeWidth={1.5} />
-    <line x1={-40} y1={15} x2={-20} y2={15} stroke="currentColor" strokeWidth={1.5} />
-    <line x1={30} y1={0} x2={40} y2={0} stroke="currentColor" strokeWidth={1.5} />
-    <text x={-12} y={-14} fontSize={10} fill="currentColor" dominantBaseline="central" textAnchor="middle">-</text>
-    <text x={-12} y={16} fontSize={10} fill="currentColor" dominantBaseline="central" textAnchor="middle">+</text>
+    {/* Well-proportioned isosceles/equilateral op-amp triangle: apex at (25, 0), flat back wall at x=-20, vertices (-20, -32) and (-20, 32) */}
+    <polygon points="-20,-32 -20,32 25,0" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinejoin="round" />
+    {/* Inverting input lead to terminal IN- at (-50, -25) */}
+    <line x1={-50} y1={-25} x2={-20} y2={-25} stroke="currentColor" strokeWidth={1.5} />
+    {/* Non-inverting input lead to terminal IN+ at (-50, 25) */}
+    <line x1={-50} y1={25} x2={-20} y2={25} stroke="currentColor" strokeWidth={1.5} />
+    {/* Output lead to terminal OUT at (50, 0) */}
+    <line x1={25} y1={0} x2={50} y2={0} stroke="currentColor" strokeWidth={1.5} />
+    {/* Polarity indicators pushed inward toward the center of the triangle */}
+    <text x={-10} y={-18} fontSize={12} fill="currentColor" dominantBaseline="central" textAnchor="middle">-</text>
+    <text x={-10} y={18} fontSize={12} fill="currentColor" dominantBaseline="central" textAnchor="middle">+</text>
   </g>
 );
 
 // ─── MEASUREMENT ──────────────────────────────────────────────────────────────
 
-const Voltmeter: SymbolFC = () => (
-  <g>
-    <circle cx={0} cy={0} r={33} fill="none" stroke="currentColor" strokeWidth={1.5} />
-    <text x={0} y={6} textAnchor="middle" fontSize={20} fontWeight="bold" fill="currentColor">V</text>
-    <line x1={-50} y1={0} x2={-33} y2={0} stroke="currentColor" strokeWidth={1.5} />
-    <line x1={33} y1={0} x2={50} y2={0} stroke="currentColor" strokeWidth={1.5} />
-  </g>
-);
+const Voltmeter: SymbolFC = ({ props }) => {
+  const display = props?.displayValue != null && String(props.displayValue).trim() !== '' ? String(props.displayValue) : 'V';
+  const fontSize = display.length > 3 ? 12 : display.length > 1 ? 14 : 20;
+  return (
+    <g>
+      <circle cx={0} cy={0} r={33} fill="none" stroke="currentColor" strokeWidth={1.5} />
+      <text x={0} y={6} textAnchor="middle" fontSize={fontSize} fontWeight="bold" fill="currentColor">{display}</text>
+      <line x1={-50} y1={0} x2={-33} y2={0} stroke="currentColor" strokeWidth={1.5} />
+      <line x1={33} y1={0} x2={50} y2={0} stroke="currentColor" strokeWidth={1.5} />
+    </g>
+  );
+};
 
-const Ammeter: SymbolFC = () => (
-  <g>
-    <circle cx={0} cy={0} r={33} fill="none" stroke="currentColor" strokeWidth={1.5} />
-    <text x={0} y={6} textAnchor="middle" fontSize={20} fontWeight="bold" fill="currentColor">A</text>
-    <line x1={-50} y1={0} x2={-33} y2={0} stroke="currentColor" strokeWidth={1.5} />
-    <line x1={33} y1={0} x2={50} y2={0} stroke="currentColor" strokeWidth={1.5} />
-  </g>
-);
+const Ammeter: SymbolFC = ({ props }) => {
+  const display = props?.displayValue != null && String(props.displayValue).trim() !== '' ? String(props.displayValue) : 'A';
+  const fontSize = display.length > 3 ? 12 : display.length > 1 ? 14 : 20;
+  return (
+    <g>
+      <circle cx={0} cy={0} r={33} fill="none" stroke="currentColor" strokeWidth={1.5} />
+      <text x={0} y={6} textAnchor="middle" fontSize={fontSize} fontWeight="bold" fill="currentColor">{display}</text>
+      <line x1={-50} y1={0} x2={-33} y2={0} stroke="currentColor" strokeWidth={1.5} />
+      <line x1={33} y1={0} x2={50} y2={0} stroke="currentColor" strokeWidth={1.5} />
+    </g>
+  );
+};
 
 // ─── RELAY VARIANTS ─────────────────────────────────────────────────────────
 
@@ -970,8 +1004,25 @@ const DmmSymbol: SymbolFC = ({ props }) => (
   <g>
     {/* Main Body - Height stretched to exactly hit y=50 */}
     <rect x={-35} y={-50} width={70} height={100} rx={6} fill="#1e293b" stroke="#0f172a" strokeWidth={1.5} />
+    {/* Top Header Label - Positioned cleanly ABOVE the main SVG body with KaTeX style & halo effect */}
+    <text
+      x={0}
+      y={-58}
+      textAnchor="middle"
+      dominantBaseline="central"
+      fontSize={12}
+      fontStyle="italic"
+      fontFamily="KaTeX_Math, Times New Roman, serif"
+      fill="#0f172a"
+      stroke="white"
+      strokeWidth={3}
+      strokeLinejoin="round"
+      paintOrder="stroke fill"
+    >
+      DMM
+    </text>
     {/* LCD Screen */}
-    <rect x={-25} y={-40} width={50} height={24} rx={3} fill="#e0f2fe" stroke="#0284c7" strokeWidth={1} />
+    <rect x={-25} y={-38} width={50} height={22} rx={3} fill="#e0f2fe" stroke="#0284c7" strokeWidth={1} />
     {/* Dial */}
     <circle cx={0} cy={16} r={14} fill="#334155" stroke="#475569" strokeWidth={1.5} />
     <circle cx={0} cy={6} r={2} fill="#94a3b8" />
@@ -982,7 +1033,7 @@ const DmmSymbol: SymbolFC = ({ props }) => (
     <circle cx={-25} cy={50} r={4} fill="#ef4444" stroke="#7f1d1d" strokeWidth={1.5} />
     <circle cx={25} cy={50} r={4} fill="#0f172a" stroke="#000000" strokeWidth={1.5} />
     {/* LCD Text */}
-    <text x={0} y={-23} textAnchor="middle" fontSize={11} fontWeight={700} fontFamily="ui-monospace, monospace" fill="#0284c7">{String(props?.mode ?? 'DCV')}</text>
+    <text x={0} y={-27} textAnchor="middle" fontSize={11} fontWeight={700} fontFamily="ui-monospace, monospace" fill="#0284c7">{String(props?.mode ?? 'DCV')}</text>
   </g>
 );
 
@@ -991,16 +1042,13 @@ const OscilloscopeSymbol: SymbolFC = () => (
     {/* Main Widescreen Body: 140x100 (leaves 5px for terminals to reach ±75) */}
     <rect x={-70} y={-60} width={140} height={100} rx={6} fill="#1e293b" stroke="#0f172a" strokeWidth={1.5} />
 
-    {/* Dark Screen */}
+    {/* Dark Screen: clean blank screen */}
     <rect x={-60} y={-50} width={80} height={60} rx={3} fill="#000000" stroke="#334155" strokeWidth={1.5} />
 
-    {/* Screen Grid for Realism */}
+    {/* Screen Grid */}
     <line x1={-20} y1={-50} x2={-20} y2={10} stroke="#1e293b" strokeWidth={1} />
     <line x1={20} y1={-50} x2={20} y2={10} stroke="#1e293b" strokeWidth={1} />
     <line x1={-60} y1={-20} x2={20} y2={-20} stroke="#1e293b" strokeWidth={1} />
-
-    {/* Beautiful Sine Waveform */}
-    <path d="M -60,-20 C -45,-55 -35,15 -20,-20 S 5,-55 20,-20" fill="none" stroke="#0ea5e9" strokeWidth={1.5} strokeLinecap="round" />
 
     {/* Control Panel Dials */}
     <circle cx={45} cy={-35} r={9} fill="#334155" stroke="#475569" strokeWidth={1.5} />
@@ -1025,6 +1073,13 @@ const OscilloscopeSymbol: SymbolFC = () => (
     <line x1={-75} y1={25} x2={-70} y2={25} stroke="currentColor" strokeWidth={1.5} />
 
     <line x1={70} y1={25} x2={75} y2={25} stroke="currentColor" strokeWidth={1.5} />
+
+    {/* Channel & Ground Port Labels outside screen and body */}
+    <text x={-78} y={-50} textAnchor="end" dominantBaseline="central" fontSize={7} fontWeight="normal" fill="#94a3b8">CH1</text>
+    <text x={-78} y={-25} textAnchor="end" dominantBaseline="central" fontSize={7} fontWeight="normal" fill="#94a3b8">CH2</text>
+    <text x={-78} y={0} textAnchor="end" dominantBaseline="central" fontSize={7} fontWeight="normal" fill="#94a3b8">CH3</text>
+    <text x={-78} y={25} textAnchor="end" dominantBaseline="central" fontSize={7} fontWeight="normal" fill="#94a3b8">CH4</text>
+    <text x={78} y={25} textAnchor="start" dominantBaseline="central" fontSize={7} fontWeight="normal" fill="#94a3b8">GND</text>
   </g>
 );
 
@@ -1119,6 +1174,7 @@ export const SYMBOL_MAP: Record<string, SymbolFC> = {
   'motor-3phase': Motor3Phase,
   'lamp': Lamp,
   'opamp': Opamp,
+  'op-amp': Opamp,
   'digital-input': DigitalInputSymbol,
   'digital-output': DigitalOutputSymbol,
   'gate-and': (p) => <LogicGate {...p} props={{ ...p.props, _kind: 'AND' }} />,

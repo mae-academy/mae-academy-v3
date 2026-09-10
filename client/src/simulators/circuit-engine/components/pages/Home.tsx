@@ -2584,7 +2584,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                         <circle cx={terminalX} cy={terminalY} r={TERMINAL_HIT_RADIUS} fill="transparent" />
                         <g style={{ opacity: showTerminals ? 1 : 0, transition: 'opacity 0.2s ease-in-out' }} pointerEvents="none">
                           <circle cx={terminalX} cy={terminalY} r={TERMINAL_RADIUS} fill={starting ? colors.accent : energized ? colors.powered : colors.panel} stroke={wiring.from ? colors.primary : colors.muted} strokeWidth={1.4} />
-                          {terminal.name && <text x={terminalX} y={terminalY - 8} textAnchor="middle" fontSize={7} fontWeight={400} fill={colors.muted}>{terminal.name}</text>}
+                          {terminal.name && component.type !== 'oscilloscope' && <text x={terminalX} y={terminalY - 8} textAnchor="middle" fontSize={7} fontWeight={400} fill={colors.muted}>{terminal.name}</text>}
                         </g>
                       </g>;
                     })}

@@ -5,15 +5,14 @@ import { filterTabDCatalog, filterTabDImportedComponents, isTabDComponentAvailab
 const component = (type: string): CircuitComponent => ({ id: type, type, x: 0, y: 0, rotation: 0, flipH: false, flipV: false, label: type, props: {} });
 
 describe('Tab D catalog policy', () => {
-  it('excludes DIAC and TRIAC from the documented learner catalog while SCR is temporarily available', () => {
-    expect(['diac', 'triac'].every((id) => !isTabDComponentAvailable(id))).toBe(true);
-    expect(isTabDComponentAvailable('scr')).toBe(true);
+  it('includes SCR, op-amp, DIAC, and TRIAC in Power Semiconductors category and catalog', () => {
+    expect(['scr', 'op-amp', 'diac', 'triac'].every((id) => isTabDComponentAvailable(id))).toBe(true);
     expect(isTabDComponentAvailable('opamp')).toBe(true);
-    expect(filterTabDCatalog([{ id: 'diac' }, { id: 'diode' }, { id: 'triac' }]).map((item: { id: string }) => item.id)).toEqual(['diode']);
+    expect(filterTabDCatalog([{ id: 'diac' }, { id: 'diode' }, { id: 'triac' }]).map((item: { id: string }) => item.id)).toEqual(['diac', 'diode', 'triac']);
   });
 
-  it('removes excluded power semiconductors from a Tab D NAD import while retaining valid components', () => {
-    expect(filterTabDImportedComponents([component('diac'), component('resistor'), component('triac'), component('opamp')]).map((item: CircuitComponent) => item.type)).toEqual(['resistor', 'opamp']);
+  it('retains power semiconductors in a Tab D NAD import', () => {
+    expect(filterTabDImportedComponents([component('diac'), component('resistor'), component('triac'), component('opamp')]).map((item: CircuitComponent) => item.type)).toEqual(['diac', 'resistor', 'triac', 'opamp']);
   });
 
   it('excludes digital inputs, outputs, and all requested logic-gate families', () => {
