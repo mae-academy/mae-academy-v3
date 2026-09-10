@@ -23,6 +23,12 @@ import {
 
 const OSCILLOSCOPE_CHANNELS = ["ch1", "ch2", "ch3", "ch4"] as const;
 
+/** Fraction of the transient's duration averaged for a DC/DCA reading — long enough to reject an
+ * incomplete switch transition or start-up ringing, short enough to stay clear of an early bias. */
+const STEADY_STATE_TAIL_FRACTION = 0.1;
+/** Below this, a branch current is SPICE numerical noise, not real leakage — round it to exactly 0. */
+const CURRENT_NOISE_FLOOR_A = 1e-12;
+
 function stringProp(
   component: CircuitComponent,
   key: string,
@@ -41,9 +47,57 @@ function reading(
   return { value: Number.isFinite(value) ? value : Infinity, unit, status, ...extra };
 }
 
-/** Last sample for DC, or true RMS over whole periods for AC — matches the legacy engine's split. */
+function interpolateAt(vector: number[], time: number[], at: number): number {
+  for (let i = 1; i < time.length; i += 1) {
+    if (time[i] >= at) {
+      const span = time[i] - time[i - 1];
+      if (!(span > 0)) return vector[i];
+      return vector[i - 1] + ((at - time[i - 1]) / span) * (vector[i] - vector[i - 1]);
+    }
+  }
+  return vector[vector.length - 1];
+}
+
+/**
+ * True DC steady-state value: the time-weighted mean over the settled tail of the waveform, not a
+ * single last sample. A `.tran` deck re-solved after a switch/property edit can still be ringing or
+ * mid-transition at its very last point — indexing that point directly reads the artifact, not the
+ * settled value the meter should display.
+ */
+function getSteadyStateMean(vector: number[], time: number[]): number {
+  if (vector.length === 0) return 0;
+  if (vector.length !== time.length || vector.length < 2) return vector.at(-1) ?? 0;
+  const start = time[0];
+  const end = time[time.length - 1];
+  const span = end - start;
+  if (!(span > 0)) return vector.at(-1) ?? 0;
+
+  const tailStart = end - span * STEADY_STATE_TAIL_FRACTION;
+  const t: number[] = [tailStart];
+  const v: number[] = [interpolateAt(vector, time, tailStart)];
+  for (let i = 0; i < time.length; i += 1) {
+    if (time[i] > tailStart) {
+      t.push(time[i]);
+      v.push(vector[i]);
+    }
+  }
+  if (t.length < 2) return vector.at(-1) ?? 0;
+
+  let area = 0;
+  for (let i = 1; i < t.length; i += 1) {
+    area += ((t[i] - t[i - 1]) * (v[i] + v[i - 1])) / 2;
+  }
+  return area / (t[t.length - 1] - t[0]);
+}
+
+/** Settled-tail mean for DC, or true RMS over whole periods for AC — matches the legacy engine's split. */
 function meterValue(vector: number[], time: number[], mode: "DC" | "AC"): number {
-  return mode === "AC" ? getVrms(vector, time) : (vector.at(-1) ?? 0);
+  return mode === "AC" ? getVrms(vector, time) : getSteadyStateMean(vector, time);
+}
+
+/** Numerical noise below the SPICE solver's floor renders as exactly 0, never fractional leakage. */
+function roundBelowNoiseFloor(value: number): number {
+  return Math.abs(value) < CURRENT_NOISE_FLOOR_A ? 0 : value;
 }
 
 function voltageReading(
@@ -65,7 +119,7 @@ function currentReading(
 ): InstrumentReading {
   const branch = results.branchCurrents[branchKey];
   if (!branch) return reading(0, "A", "open");
-  return reading(meterValue(branch, results.time, mode), "A");
+  return reading(roundBelowNoiseFloor(meterValue(branch, results.time, mode)), "A");
 }
 
 /**
@@ -74,8 +128,10 @@ function currentReading(
  * produced `results`, so node names line up with what ngspice actually reported.
  *
  * DMM OHM and CONT modes are intentionally omitted: they need an isolated test-source resistance
- * measurement the batch `.tran`/`.op` deck does not provide. The caller should leave those keys
- * untouched so the legacy engine's topological measurement keeps serving them.
+ * measurement the batch `.tran`/`.op` deck does not provide. The caller (Home.tsx) must leave those
+ * keys untouched in its merge so the legacy engine's topological measurement — which does inject a
+ * behavioral test current — keeps serving them, staying reactive and non-blocking through the same
+ * edit pipeline that drives every other instrument.
  */
 export function buildSpiceInstrumentReadings(
   components: CircuitComponent[],

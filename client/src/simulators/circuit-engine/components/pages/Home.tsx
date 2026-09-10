@@ -165,6 +165,15 @@ function numeric(value: unknown, fallback = 0): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+/** Neutral DMM reading shown while the simulation is not running: 0.000 for every voltage/current/
+ * frequency mode, "OL" (via `status: 'open'`) for OHM/CONT — never a frozen pre-pause/pre-reset value. */
+function dmmIdleReading(component: CircuitComponent): InstrumentReading {
+  const mode = String(component.props.mode ?? 'DCV').toUpperCase().trim();
+  if (mode === 'OHM' || mode === 'CONT') return { value: Infinity, unit: 'Ω', status: 'open' };
+  const unit = mode.includes('A') ? 'A' : mode === 'HZ' ? 'Hz' : 'V';
+  return { value: 0, unit, status: 'ready' };
+}
+
 const ENGINEERING_PREFIXES = [
   { key: 'p', symbol: 'p', factor: 1e-12 }, { key: 'n', symbol: 'n', factor: 1e-9 },
   { key: 'µ', symbol: 'µ', factor: 1e-6 }, { key: 'm', symbol: 'm', factor: 1e-3 },
@@ -1635,9 +1644,13 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     });
     setComponents(nextComponents);
     commitSnapshot({ components: nextComponents });
+    // A contact/position change (switch, push-button, relay latch) must reach the DMM/ammeter
+    // immediately rather than waiting out the edit debounce.
+    if (key === 'state' || key === 'manualState') spiceImmediateRef.current = true;
   }, [commitSnapshot, components, selectedComponent]);
 
   const updateComponentPropsById = useCallback((id: string, updates: Record<string, unknown>) => {
+    if ('state' in updates || 'manualState' in updates) spiceImmediateRef.current = true;
     setComponents(previous => previous.map(component => component.id === id
       ? { ...component, props: { ...component.props, ...updates } }
       : component));
@@ -2028,13 +2041,6 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     commitSnapshot({ wires: nextWires });
   }, [commitSnapshot, selectedWire, wires]);
 
-  const resetSimulation = useCallback(() => {
-    simulation.current.reset();
-    simulation.current.setCircuit(components, wires);
-    setSnapshot(simulation.current.getSnapshot());
-    setAnimationTime(0);
-  }, [components, wires]);
-
   useEffect(() => {
     simulation.current.setCircuit(components, wires);
     setSnapshot(simulation.current.getSnapshot());
@@ -2069,6 +2075,9 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
   const spiceUnsupportedToastRef = useRef<string | null>(null);
   const [spiceStatus, setSpiceStatus] = useState<SpiceBridgeStatus>({ kind: 'idle' });
   const [spiceReadingsVersion, setSpiceReadingsVersion] = useState(0);
+  // Set by a switch/push-button/relay-latch toggle so the debounce effect below resolves the next
+  // pass instantly instead of waiting out SPICE_DEBOUNCE_MS.
+  const spiceImmediateRef = useRef(false);
 
   const clearSpiceReadings = useCallback((status: SpiceBridgeStatus) => {
     spiceReadingsRef.current = {};
@@ -2115,11 +2124,34 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     void spiceEngine.runSimulation(netlist);
   }, [clearSpiceReadings, components, simulationMode, spiceEngine, wires]);
 
-  // Trigger on every circuit edit, debounced so a drag or a burst of keystrokes fires one run.
+  const resetSimulation = useCallback(() => {
+    simulation.current.reset();
+    simulation.current.setCircuit(components, wires);
+    setSnapshot(simulation.current.getSnapshot());
+    setAnimationTime(0);
+    // Reset must never leave a pre-reset SPICE reading on an instrument: purge it immediately and
+    // re-solve the (unchanged-topology) circuit from its fresh state.
+    clearSpiceReadings({ kind: 'idle' });
+    runSpiceSimulation();
+  }, [components, wires, clearSpiceReadings, runSpiceSimulation]);
+
+  // Keeps the scheduling effect below independent of runSpiceSimulation's own identity, which is
+  // unstable — useSpiceEngine returns a fresh object every render — and would otherwise re-arm on
+  // unrelated renders (e.g. a cursor move) instead of only on an actual circuit edit.
+  const runSpiceSimulationRef = useRef(runSpiceSimulation);
+  runSpiceSimulationRef.current = runSpiceSimulation;
+
+  // Trigger on every circuit edit. The stale pre-edit reading is invalidated the instant the edit
+  // lands, so it can never linger on an instrument; the fresh pass is then scheduled instantly for
+  // a switch/push-button/relay toggle, or debounced (SPICE_DEBOUNCE_MS) for a drag or a keystroke burst.
   useEffect(() => {
-    const timer = window.setTimeout(runSpiceSimulation, SPICE_DEBOUNCE_MS);
+    spiceReadingsRef.current = {};
+    setSpiceReadingsVersion(version => version + 1);
+    const immediate = spiceImmediateRef.current;
+    spiceImmediateRef.current = false;
+    const timer = window.setTimeout(() => runSpiceSimulationRef.current(), immediate ? 0 : SPICE_DEBOUNCE_MS);
     return () => window.clearTimeout(timer);
-  }, [runSpiceSimulation]);
+  }, [components, wires, simulationMode]);
 
   // The worker resolves asynchronously; react to the hook's own state (not the promise above) so a
   // superseded run's late arrival can never be mistaken for the latest one's result.
@@ -2141,11 +2173,20 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
   // are overridden, and only for the components SPICE could actually map.
   const effectiveSnapshot = useMemo<SimulationSnapshot>(() => {
     const spiceReadings = spiceReadingsRef.current;
-    if (Object.keys(spiceReadings).length === 0) return snapshot;
-    return { ...snapshot, instrumentReadings: { ...snapshot.instrumentReadings, ...spiceReadings } };
+    const merged = Object.keys(spiceReadings).length === 0
+      ? snapshot
+      : { ...snapshot, instrumentReadings: { ...snapshot.instrumentReadings, ...spiceReadings } };
+    // Paused/reset: a DMM has nothing live to report, so it must read 0.000/OL rather than whatever
+    // transient or leakage potential either engine last happened to settle on.
+    if (simulationRunning) return merged;
+    const idleReadings: Record<string, InstrumentReading> = {};
+    for (const component of components) {
+      if (component.type === 'dmm') idleReadings[component.id] = dmmIdleReading(component);
+    }
+    return { ...merged, instrumentReadings: { ...merged.instrumentReadings, ...idleReadings } };
     // spiceReadingsVersion (not spiceReadingsRef.current, a ref) is what actually triggers this recompute.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [snapshot, spiceReadingsVersion]);
+  }, [snapshot, spiceReadingsVersion, simulationRunning, components]);
 
   // --- Switch & Push-Button Keyboard Controls ---
   useEffect(() => {
@@ -2166,6 +2207,9 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
             if (!match || match[0] !== event.key) return comp;
 
             changed = true;
+            // A live contact change must reach the DMM/ammeter without waiting out the edit
+            // debounce, or the display freezes at the pre-toggle reading until it expires.
+            spiceImmediateRef.current = true;
             if (comp.type.startsWith('sw-')) {
               // Toggle Latching Switch
               const isSpdt = comp.type === 'sw-spdt' || comp.type === 'sw-dpdt';
@@ -2199,6 +2243,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
             if (!match || match[0] !== event.key) return comp;
 
             changed = true;
+            spiceImmediateRef.current = true;
             return { ...comp, props: { ...comp.props, state: 'released' } };
           });
           return changed ? next : prev;
@@ -2360,7 +2405,14 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
             <ToolbarButton colors={colors} icon={<Clipboard size={14} />} title="Paste (Ctrl/Cmd+V)" onClick={pasteClipboard} disabled={!clipboard || (clipboard.components.length === 0 && clipboard.wires.length === 0 && clipboard.texts.length === 0)} />
             <ToolbarButton colors={colors} icon={<Trash2 size={14} />} title="Delete (Del/Backspace)" onClick={removeSelection} disabled={!selectedComponent && !selectedWire && !selectedText && marqueeIds.length === 0} />
             <ToolbarDivider colors={colors} />
-            <button onClick={() => { hasStartedSimulation.current = true; setSimulationRunning(value => !value); runSpiceSimulation(); }} title={simulationRunning ? 'Pause simulation' : 'Run simulation'} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: (!simulationRunning && hasStartedSimulation.current) ? TAB_GRADIENT_REV : TAB_GRADIENT, color: '#ffffff', fontWeight: 500, padding: '6px 14px', minHeight: 30, borderRadius: 8, fontSize: 12, boxShadow: TAB_ACTIVE_SHADOW, border: '1px solid transparent', cursor: 'pointer', whiteSpace: 'nowrap', transition: 'background .3s ease' }}>
+            <button onClick={() => {
+              hasStartedSimulation.current = true;
+              const next = !simulationRunning;
+              setSimulationRunning(next);
+              // Pausing purges the SPICE overlay immediately — effectiveSnapshot's idle override
+              // (above) then takes DMMs to 0.000/OL rather than a frozen last-live reading.
+              if (next) runSpiceSimulation(); else clearSpiceReadings({ kind: 'idle' });
+            }} title={simulationRunning ? 'Pause simulation' : 'Run simulation'} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: (!simulationRunning && hasStartedSimulation.current) ? TAB_GRADIENT_REV : TAB_GRADIENT, color: '#ffffff', fontWeight: 500, padding: '6px 14px', minHeight: 30, borderRadius: 8, fontSize: 12, boxShadow: TAB_ACTIVE_SHADOW, border: '1px solid transparent', cursor: 'pointer', whiteSpace: 'nowrap', transition: 'background .3s ease' }}>
               {simulationRunning ? <Pause size={14} /> : <Play size={14} />}{simulationRunning ? 'Pause' : 'Run'}
             </button>
             <ToolbarButton colors={colors} label={simulationMode === 'academic' ? 'Academic' : 'Practical'} title="Academic / Practical — toggle SPICE simulation mode" onClick={() => setSimulationMode(mode => mode === 'academic' ? 'practical' : 'academic')} active={simulationMode === 'academic'} />
