@@ -68,21 +68,43 @@ describe('Component Label Anchors (analogCanvasGeometry.ts)', () => {
     expect(capAnchors.reference[1]).toBe(-21);
     expect(capAnchors.value[1]).toBe(21);
 
-    // Diode: halfWidth = 20, halfHeight = 10 -> bodyHalfH = 10, offsetY = 10 + 6 = 16
-    const diodeAnchors = tabDComponentLabelAnchors('diode', true, 20, 10);
-    expect(diodeAnchors.reference[0]).toBe(0);
-    expect(diodeAnchors.value[0]).toBe(0);
-    expect(diodeAnchors.reference[1]).toBe(-16);
-    expect(diodeAnchors.value[1]).toBe(16);
+    // Diode: halfWidth = 30, halfHeight = 10 -> bodyHalfH = 9, offsetY = 9 + 5 = 14
+    for (const dType of ['diode', 'zener', 'led', 'photodiode']) {
+      const diodeAnchors = tabDComponentLabelAnchors(dType, true, 30, 10);
+      expect(diodeAnchors.reference[0]).toBe(0);
+      expect(diodeAnchors.value[0]).toBe(0);
+      expect(diodeAnchors.reference[1]).toBe(-14);
+      expect(diodeAnchors.value[1]).toBe(14);
+    }
   });
 
-  it('positions vertical components safely to the right with 6px padding', () => {
-    // Resistor: halfWidth = 30, halfHeight = 10 -> bodyHalfW = 30, offsetX = 30 + 6 = 36
+  it('positions vertical passive and diode components snugly to the right based on visual body width', () => {
+    // Diode family: bodyHalfW = 12, padding = 5 -> offsetX = 17
+    for (const dType of ['diode', 'zener', 'led', 'photodiode']) {
+      const diodeAnchors = tabDComponentLabelAnchors(dType, false, 30, 10);
+      expect(diodeAnchors.reference[0]).toBe(17);
+      expect(diodeAnchors.value[0]).toBe(17);
+      expect(diodeAnchors.reference[1]).toBe(-6);
+      expect(diodeAnchors.value[1]).toBe(10);
+    }
+
+    // Resistor / Inductor / Impedance: bodyHalfW = 11, padding = 5 -> offsetX = 16
     const resistorAnchors = tabDComponentLabelAnchors('resistor', false, 30, 10);
-    expect(resistorAnchors.reference[0]).toBe(36);
-    expect(resistorAnchors.value[0]).toBe(36);
+    expect(resistorAnchors.reference[0]).toBe(16);
+    expect(resistorAnchors.value[0]).toBe(16);
     expect(resistorAnchors.reference[1]).toBe(-6);
     expect(resistorAnchors.value[1]).toBe(10);
+
+    const inductorAnchors = tabDComponentLabelAnchors('inductor', false, 30, 10);
+    expect(inductorAnchors.reference[0]).toBe(16);
+
+    const impedanceAnchors = tabDComponentLabelAnchors('impedance', false, 30, 10);
+    expect(impedanceAnchors.reference[0]).toBe(16);
+
+    // Capacitor: bodyHalfW = 15, padding = 5 -> offsetX = 20
+    const capAnchors = tabDComponentLabelAnchors('capacitor', false, 30, 15);
+    expect(capAnchors.reference[0]).toBe(20);
+    expect(capAnchors.value[0]).toBe(20);
   });
 
   it('handles controlled sources with tighter Left/Right and Top/Bottom placement', () => {
@@ -194,5 +216,15 @@ describe('Component Label Anchors (analogCanvasGeometry.ts)', () => {
     const spdtV = tabDComponentLabelAnchors('sw-spdt', false, 25, 12.5);
     expect(spdtV.reference).toEqual([31, 6.5]);
     expect(spdtV.value).toEqual([31, 22.5]);
+  });
+
+  it('positions SCR labels safely to the right side of the diode body in upright orientation', () => {
+    // SCR vertical: bodyHalfW = 16, padding = 6 -> offsetX = 22
+    // reference: [22, -6], value: [22, 10]
+    const scrV = tabDComponentLabelAnchors('scr', false, 20, 30);
+    expect(scrV.reference).toEqual([22, -6]);
+    expect(scrV.value).toEqual([22, 10]);
+    expect(scrV.refTextAnchor).toBe('start');
+    expect(scrV.valTextAnchor).toBe('start');
   });
 });

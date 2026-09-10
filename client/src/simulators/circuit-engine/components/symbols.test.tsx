@@ -165,4 +165,11 @@ describe('Tab D SVG symbol language', () => {
     const rendered = markup('test-shape');
     expect(rendered).toContain('>?<');
   });
+
+  it('renders SCR symbol with a 45-degree to horizontal gate path and no redundant line', () => {
+    const rendered = markup('scr', { _documentedStyle: true });
+    expect(rendered).toContain('d="M 0,10 L -5,16.69 L -16.5,16.69"');
+    expect(rendered).not.toContain('x1="10" y1="10" x2="16" y2="16"');
+    expect(rendered).not.toContain('x1="-20" y1="15" x2="0" y2="15"');
+  });
 });

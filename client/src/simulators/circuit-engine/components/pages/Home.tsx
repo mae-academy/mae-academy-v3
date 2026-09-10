@@ -68,6 +68,18 @@ import type { MNAElement } from '@/simulators/circuit-engine/engine/mnaSolver';
 import { compileMeshGeometry } from '@/simulators/circuit-engine/components/meshGeometry';
 import { NormalizedCircuitGraph } from '@/simulators/circuit-engine/models/NormalizedCircuitGraph';
 import { createNadDocument, parseNad, serializeNad } from '@/simulators/circuit-engine/models/nadFormat';
+import { useSpiceEngine } from '@/simulators/circuit-engine/components/hooks/useSpiceEngine';
+import {
+  convertToSpiceComponents,
+  detectSystemFrequency,
+  resolveCircuitNets,
+  SpiceAdapterError,
+  type SimulationMode,
+  type SpiceCircuitNets,
+} from '@/simulators/circuit-engine/engine/spice/spiceAdapter';
+import { buildSpiceNodeMap, generateNetlist, NetlistError, type SpiceNodeMap } from '@/simulators/circuit-engine/engine/spice/netlistGenerator';
+import { parseSpiceResults } from '@/simulators/circuit-engine/engine/spice/spiceParser';
+import { buildSpiceInstrumentReadings } from '@/simulators/circuit-engine/engine/spice/spiceInstruments';
 import { filterTabDCatalog, filterTabDImportedComponents, isTabDComponentAvailable } from '@/simulators/circuit-engine/models/analogComponentCatalog';
 import { alignTabDTerminalToGrid, calculateTabDPlanarCavity, dynamicRubberBandPath, getExactTerminalOffset, isExactCadComponent, lockTabDWireCorner, MESH_LOOP_COLORS, moveTabDOrthogonalLane, tabDComponentLabelAnchors, tabDGentleWheelZoomFactor, tabDOrthogonalDraftPath, tabDTerminalOrthogonalPath, type ObstacleBox, type TabDTerminalAxis } from '@/simulators/circuit-engine/components/analogCanvasGeometry';
 import { renderSymbol } from '@/simulators/circuit-engine/components/symbols';
@@ -93,6 +105,12 @@ import {
   type Obstacle,
   type Point,
 } from '@/simulators/circuit-engine/models/wiring';
+import {
+  useHistory,
+  areSnapshotsEqual,
+  cloneSnapshot,
+  type CanvasSnapshot,
+} from '@/simulators/circuit-engine/components/hooks/useHistory';
 
 const GRID_SIZE = 20;
 const TAB_D_GRID_SIZE = 25;
@@ -104,6 +122,15 @@ const CONTROL_SYSTEMS_HEADING = 'text-sm font-bold uppercase tracking-wider text
 const TAB_GRADIENT = 'linear-gradient(90deg, #2563eb 0%, #7c3aed 50%, #f43f5e 100%)';
 const TAB_GRADIENT_REV = 'linear-gradient(90deg, #f43f5e 0%, #7c3aed 50%, #2563eb 100%)';
 const TAB_ACTIVE_SHADOW = '0 1px 3px rgba(2, 6, 23, 0.18)';
+/** Debounce before an edited circuit re-runs through the SPICE accuracy bridge. */
+const SPICE_DEBOUNCE_MS = 400;
+/** How many periods of the detected system frequency a `.tran` accuracy pass covers. */
+const SPICE_TRAN_PERIODS = 5;
+type SpiceBridgeStatus =
+  | { kind: 'idle' }
+  | { kind: 'running' }
+  | { kind: 'ready' }
+  | { kind: 'unsupported'; reason: string };
 const EMPTY_SNAPSHOT: SimulationSnapshot = {
   time: 0,
   nodeVoltages: {},
@@ -308,10 +335,11 @@ function labelClearance(definition: ComponentDef, scale = 1): number {
 /** Labels are outside the rotated symbol group, so their baseline stays horizontal at every angle. */
 function horizontalLabelOffset(definition: ComponentDef, rotation: number, scale = 1): Point {
   const normalized = ((rotation % 360) + 360) % 360;
+  const isDiode = ['diode', 'diode-ideal', 'diode-silicon', 'diode-germanium', 'diode-gaas', 'zener', 'led', 'photodiode'].includes(definition.id);
   if (normalized === 90 || normalized === 270) {
-    return [definition.width * scale / 2 + 12, -6]; // تم التقليل من 26
+    return [isDiode ? 17 : (definition.width * scale / 2 + 12), -6]; // تم التقليل من 26
   }
-  return [0, -(definition.height * scale / 2 + 8)]; // تم التقليل من 18
+  return [0, -(isDiode ? 14 : (definition.height * scale / 2 + 8))]; // تم التقليل من 18
 }
 
 function componentLabelAnchors(definition: ComponentDef, component: CircuitComponent, scale = 1): {
@@ -345,12 +373,26 @@ function componentLabelAnchors(definition: ComponentDef, component: CircuitCompo
   }
 
   if (component.type === 'potentiometer') {
+    const rot = ((component.rotation % 360) + 360) % 360;
+    const isVertical = rot === 90 || rot === 270;
+    if (isVertical) {
+      return { reference: [16, -6], value: [16, 10], isHorizontal: false, refTextAnchor: 'start', valTextAnchor: 'start' };
+    }
     return { reference: [12, -18], value: [0, 14], isHorizontal: true, refTextAnchor: 'middle', valTextAnchor: 'middle' };
   }
 
   const TRANSISTOR_TYPES = new Set(['bjt-npn', 'bjt-pnp', 'mosfet-n', 'mosfet-p', 'jfet-n', 'jfet-p']);
   if (TRANSISTOR_TYPES.has(component.type)) {
     return { reference: [0, -24], value: [0, 26], isHorizontal: true, refTextAnchor: 'middle', valTextAnchor: 'middle' };
+  }
+
+  if (component.type === 'scr') {
+    const rot = ((component.rotation % 360) + 360) % 360;
+    const isVertical = rot === 0 || rot === 180;
+    if (isVertical) {
+      return { reference: [22, -6], value: [22, 10], isHorizontal: false, refTextAnchor: 'start', valTextAnchor: 'start' };
+    }
+    return { reference: [0, -26], value: [0, 26], isHorizontal: true, refTextAnchor: 'middle', valTextAnchor: 'middle' };
   }
 
   let terminalsAreHorizontal = component.rotation % 180 === 0;
@@ -605,6 +647,16 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
   const [search, setSearch] = useState('');
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
   const [simulationRunning, setSimulationRunning] = useState(false);
+  // Academic mode swaps in idealized textbook models (ideal switches, no Early effect, RMS AC
+  // sources, …); Practical is the default so readings match real-world non-linear behavior.
+  const [simulationMode, setSimulationMode] = useState<SimulationMode>('practical');
+  const [showElectrons, setShowElectrons] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('mae-show-electrons');
+      return stored === null ? true : stored === 'true';
+    }
+    return true;
+  });
   const [simulationSpeed, setSimulationSpeed] = useState(1);
   const hasStartedSimulation = useRef(false);
   const [snapshot, setSnapshot] = useState<SimulationSnapshot>(EMPTY_SNAPSHOT);
@@ -662,6 +714,49 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
   wiresRef.current = wires;
   textsRef.current = texts;
   tabDUiRefinementRef.current = tabDUiRefinement;
+
+  const history = useHistory<CanvasSnapshot>(
+    () => ({
+      components: [],
+      wires: [],
+      texts: [],
+    }),
+    { areEqual: areSnapshotsEqual },
+  );
+  const dragStartSnapshotRef = useRef<CanvasSnapshot | null>(null);
+
+  const commitSnapshot = useCallback((patch?: Partial<CanvasSnapshot>) => {
+    const currentSnapshot: CanvasSnapshot = {
+      components: patch?.components ?? componentRef.current,
+      wires: patch?.wires ?? wiresRef.current,
+      texts: patch?.texts ?? textsRef.current,
+    };
+    history.set(cloneSnapshot(currentSnapshot));
+  }, [history]);
+
+  const handleUndo = useCallback(() => {
+    if (!history.canUndo) return;
+    const previous = history.undo();
+    if (!previous) return;
+    setComponents(previous.components);
+    setWires(previous.wires);
+    setTexts(previous.texts);
+    setSelection(null);
+    setMarqueeIds([]);
+    setWiring({});
+  }, [history]);
+
+  const handleRedo = useCallback(() => {
+    if (!history.canRedo) return;
+    const next = history.redo();
+    if (!next) return;
+    setComponents(next.components);
+    setWires(next.wires);
+    setTexts(next.texts);
+    setSelection(null);
+    setMarqueeIds([]);
+    setWiring({});
+  }, [history]);
 
   useEffect(() => {
     const canvas = svgRef.current;
@@ -885,10 +980,12 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
       label: nextComponentLabel(type, components),
       props: defaultProps(definition),
     };
-    setComponents(previous => [...previous, component]);
+    const nextComponents = [...components, component];
+    setComponents(nextComponents);
+    commitSnapshot({ components: nextComponents });
     setSelection({ kind: 'component', id: component.id });
     toast.success(`${component.label} added`);
-  }, [components, gridSize, pan, snapEnabled, tabDUiRefinement, zoom]);
+  }, [commitSnapshot, components, gridSize, pan, snapEnabled, tabDUiRefinement, zoom]);
 
   const addText = useCallback(() => {
     const origin = sourcePointFromElement(svgRef.current, pan, zoom);
@@ -901,28 +998,45 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
       color: darkPreview ? '#e2e8f0' : '#172033',
       rotation: 0,
     };
-    setTexts(previous => [...previous, text]);
+    const nextTexts = [...texts, text];
+    setTexts(nextTexts);
+    commitSnapshot({ texts: nextTexts });
     setSelection({ kind: 'text', id: text.id });
-  }, [darkPreview, gridSize, pan, snapEnabled, zoom]);
+  }, [commitSnapshot, darkPreview, gridSize, pan, snapEnabled, texts, zoom]);
 
   const removeSelection = useCallback(() => {
     if (marqueeIds.length > 0) {
-      setComponents(previous => previous.filter(c => !marqueeIds.includes(c.id)));
-      setWires(previous => previous.filter(w => !marqueeIds.includes(w.id) && !marqueeIds.includes(w.fromComp) && !marqueeIds.includes(w.toComp)));
-      setTexts(previous => previous.filter(t => !marqueeIds.includes(t.id)));
+      const nextC = components.filter(c => !marqueeIds.includes(c.id));
+      const nextW = wires.filter(w => !marqueeIds.includes(w.id) && !marqueeIds.includes(w.fromComp) && !marqueeIds.includes(w.toComp));
+      const nextT = texts.filter(t => !marqueeIds.includes(t.id));
+      setComponents(nextC);
+      setWires(nextW);
+      setTexts(nextT);
+      commitSnapshot({ components: nextC, wires: nextW, texts: nextT });
       setSelection(null);
       setMarqueeIds([]);
       return;
     }
     if (!selection) return;
+    let nextC = components;
+    let nextW = wires;
+    let nextT = texts;
     if (selection.kind === 'component') {
-      setComponents(previous => previous.filter(component => component.id !== selection.id));
-      setWires(previous => previous.filter(wire => wire.fromComp !== selection.id && wire.toComp !== selection.id));
+      nextC = components.filter(component => component.id !== selection.id);
+      nextW = wires.filter(wire => wire.fromComp !== selection.id && wire.toComp !== selection.id);
     }
-    if (selection.kind === 'wire') setWires(previous => previous.filter(wire => wire.id !== selection.id && wire.junctionWireId !== selection.id));
-    if (selection.kind === 'text') setTexts(previous => previous.filter(text => text.id !== selection.id));
+    if (selection.kind === 'wire') {
+      nextW = wires.filter(wire => wire.id !== selection.id && wire.junctionWireId !== selection.id);
+    }
+    if (selection.kind === 'text') {
+      nextT = texts.filter(text => text.id !== selection.id);
+    }
+    setComponents(nextC);
+    setWires(nextW);
+    setTexts(nextT);
+    commitSnapshot({ components: nextC, wires: nextW, texts: nextT });
     setSelection(null);
-  }, [selection, marqueeIds]);
+  }, [commitSnapshot, components, marqueeIds, selection, texts, wires]);
 
   const copySelection = useCallback(() => {
     if (marqueeIds.length > 0) {
@@ -988,9 +1102,14 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
       path: w.path.map(p => [p[0] + dx, p[1] + dy] as Point)
     }));
 
-    setComponents(previous => [...previous, ...pastedComponents]);
-    setTexts(previous => [...previous, ...pastedTexts]);
-    setWires(previous => [...previous, ...pastedWires]);
+    const nextPastedComponents = [...components, ...pastedComponents];
+    const nextPastedTexts = [...texts, ...pastedTexts];
+    const nextPastedWires = [...wires, ...pastedWires];
+
+    setComponents(nextPastedComponents);
+    setTexts(nextPastedTexts);
+    setWires(nextPastedWires);
+    commitSnapshot({ components: nextPastedComponents, wires: nextPastedWires, texts: nextPastedTexts });
 
     const newIds = [...pastedComponents.map(c => c.id), ...pastedTexts.map(t => t.id), ...pastedWires.map(w => w.id)];
     if (newIds.length === 1 && pastedComponents.length === 1) {
@@ -1001,7 +1120,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
       setMarqueeIds(newIds);
     }
     toast.success(`${newIds.length} items pasted`);
-  }, [clipboard, components, gridSize, pan, snapEnabled, tabDUiRefinement, zoom]);
+  }, [clipboard, commitSnapshot, components, gridSize, pan, snapEnabled, tabDUiRefinement, texts, wires, zoom]);
 
   const exportNad = useCallback(() => {
     const document = createNadDocument({ components, wires, texts, viewport: { pan, zoom }, workspace: { gridVisible, snapEnabled } });
@@ -1021,16 +1140,22 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
       const importedComponents = tabDUiRefinement ? filterTabDImportedComponents(document.components) : document.components;
       const importedIds = new Set(importedComponents.map((component) => component.id));
       const importedWires = document.wires.filter((wire) => importedIds.has(wire.fromComp) && importedIds.has(wire.toComp));
+      const refreshedWires = refreshWireEndpoints(importedWires, importedComponents);
       setComponents(importedComponents);
-      setWires(refreshWireEndpoints(importedWires, importedComponents));
+      setWires(refreshedWires);
       setTexts(document.texts);
+      history.reset(cloneSnapshot({
+        components: importedComponents,
+        wires: refreshedWires,
+        texts: document.texts,
+      }));
       setPan(document.viewport.pan); setZoom(document.viewport.zoom);
       setGridVisible(document.workspace.gridVisible); setSnapEnabled(document.workspace.snapEnabled);
       setSelection(null); setMarqueeIds([]); setWiring({}); setDragState(null);
       const excludedCount = document.components.length - importedComponents.length;
       toast.success(`NAD circuit imported (${importedComponents.length} components)${excludedCount ? `; ${excludedCount} unavailable component${excludedCount === 1 ? '' : 's'} omitted` : ''}`);
     } catch (error) { toast.error(error instanceof Error ? error.message : 'Unable to import NAD file.'); }
-  }, [tabDUiRefinement]);
+  }, [history, tabDUiRefinement]);
 
   const getCircuitBoundingBox = useCallback(() => {
     let minX = Infinity;
@@ -1282,15 +1407,21 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     const cropWidth = Math.round(bounds.circuitWidth + 60);
     const cropHeight = Math.round(bounds.circuitHeight + 60);
 
-    const scale = 2;
+    // Ultra high-definition PNG export: target 4K (3840px) resolution with minimum 4x scale
+    const targetLongEdge = 3840;
+    const maxDim = Math.max(cropWidth, cropHeight);
+    const scale = Math.min(8, Math.max(4, Math.round((targetLongEdge / maxDim) * 100) / 100));
+
     const canvas = document.createElement('canvas');
-    canvas.width = cropWidth * scale;
-    canvas.height = cropHeight * scale;
+    canvas.width = Math.round(cropWidth * scale);
+    canvas.height = Math.round(cropHeight * scale);
     const ctx = canvas.getContext('2d');
     if (!ctx) {
       toast.error('Failed to initialize canvas for PNG export');
       return;
     }
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
 
     ctx.fillStyle = colors.canvas;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -1337,8 +1468,8 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     clonedSvg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
     clonedSvg.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
     clonedSvg.setAttribute('viewBox', `${cropX} ${cropY} ${cropWidth} ${cropHeight}`);
-    clonedSvg.setAttribute('width', String(cropWidth));
-    clonedSvg.setAttribute('height', String(cropHeight));
+    clonedSvg.setAttribute('width', String(canvas.width));
+    clonedSvg.setAttribute('height', String(canvas.height));
 
     const strokeColor = darkPreview ? '#f8fafc' : '#1e293b';
     clonedSvg.style.color = strokeColor;
@@ -1439,42 +1570,53 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
           : [component.x + dx, component.y + dy];
         return { ...component, x: next[0], y: next[1] };
       });
+      const nextWires = refreshCanvasWireEndpoints(wires, nextComponents, selectedComponent.id);
       setComponents(nextComponents);
-      setWires(previous => refreshCanvasWireEndpoints(previous, nextComponents, selectedComponent.id));
+      setWires(nextWires);
+      commitSnapshot({ components: nextComponents, wires: nextWires });
       return;
     }
     if (selectedText) {
-      setTexts(previous => previous.map(text => text.id === selectedText.id
+      const nextTexts = texts.map(text => text.id === selectedText.id
         ? { ...text, x: text.x + dx, y: text.y + dy }
-        : text));
+        : text);
+      setTexts(nextTexts);
+      commitSnapshot({ texts: nextTexts });
     }
-  }, [components, gridSize, refreshCanvasWireEndpoints, selectedComponent, selectedText, snapEnabled]);
+  }, [commitSnapshot, components, gridSize, refreshCanvasWireEndpoints, selectedComponent, selectedText, snapEnabled, texts, wires]);
 
   const rotateSelected = useCallback((degrees: number) => {
     if (!selectedComponent) return;
     const nextComponents = components.map(component => component.id === selectedComponent.id
       ? { ...component, rotation: (component.rotation + degrees + 360) % 360 }
       : component);
+    const nextWires = refreshCanvasWireEndpoints(wires, nextComponents, selectedComponent.id);
     setComponents(nextComponents);
-    setWires(previous => refreshCanvasWireEndpoints(previous, nextComponents, selectedComponent.id));
-  }, [components, refreshCanvasWireEndpoints, selectedComponent]);
+    setWires(nextWires);
+    commitSnapshot({ components: nextComponents, wires: nextWires });
+  }, [commitSnapshot, components, refreshCanvasWireEndpoints, selectedComponent, wires]);
 
   const flipSelected = useCallback((axis: 'h' | 'v') => {
     if (!selectedComponent) return;
     const nextComponents = components.map(component => component.id === selectedComponent.id
       ? { ...component, flipH: axis === 'h' ? !component.flipH : component.flipH, flipV: axis === 'v' ? !component.flipV : component.flipV }
       : component);
+    const nextWires = refreshCanvasWireEndpoints(wires, nextComponents, selectedComponent.id);
     setComponents(nextComponents);
-    setWires(previous => refreshCanvasWireEndpoints(previous, nextComponents, selectedComponent.id));
-  }, [components, refreshCanvasWireEndpoints, selectedComponent]);
+    setWires(nextWires);
+    commitSnapshot({ components: nextComponents, wires: nextWires });
+  }, [commitSnapshot, components, refreshCanvasWireEndpoints, selectedComponent, wires]);
 
   const updateComponent = useCallback((id: string, update: Partial<CircuitComponent>) => {
     const nextComponents = components.map(component => component.id === id ? { ...component, ...update } : component);
     setComponents(nextComponents);
+    let nextWires = wires;
     if ('rotation' in update || 'flipH' in update || 'flipV' in update || 'x' in update || 'y' in update) {
-      setWires(previous => refreshCanvasWireEndpoints(previous, nextComponents, id));
+      nextWires = refreshCanvasWireEndpoints(wires, nextComponents, id);
+      setWires(nextWires);
     }
-  }, [components, refreshCanvasWireEndpoints]);
+    commitSnapshot({ components: nextComponents, wires: nextWires });
+  }, [commitSnapshot, components, refreshCanvasWireEndpoints, wires]);
 
   const updateComponentProperty = useCallback((key: string, value: unknown) => {
     if (!selectedComponent) return;
@@ -1484,14 +1626,16 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
       germanium: { forwardVoltage: 0.3, Is: 1e-6 },
       gaas: { forwardVoltage: 1.2, Is: 1e-18 },
     };
-    setComponents(previous => previous.map(component => {
+    const nextComponents = components.map(component => {
       if (component.id !== selectedComponent.id) return component;
       const diodeMaterial = component.type === 'diode' && key === 'material'
         ? materialDefaults[String(value).toLowerCase()] ?? materialDefaults.silicon
         : undefined;
       return { ...component, props: { ...component.props, [key]: value, ...(diodeMaterial ?? {}) } };
-    }));
-  }, [selectedComponent]);
+    });
+    setComponents(nextComponents);
+    commitSnapshot({ components: nextComponents });
+  }, [commitSnapshot, components, selectedComponent]);
 
   const updateComponentPropsById = useCallback((id: string, updates: Record<string, unknown>) => {
     setComponents(previous => previous.map(component => component.id === id
@@ -1517,8 +1661,10 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
 
   const updateText = useCallback((update: Partial<WorkspaceText>) => {
     if (!selectedText) return;
-    setTexts(previous => previous.map(text => text.id === selectedText.id ? { ...text, ...update } : text));
-  }, [selectedText]);
+    const nextTexts = texts.map(text => text.id === selectedText.id ? { ...text, ...update } : text);
+    setTexts(nextTexts);
+    commitSnapshot({ texts: nextTexts });
+  }, [commitSnapshot, selectedText, texts]);
 
   const addWireBetween = useCallback((from: WiringState['from'], target: { componentId: string; terminalId: string; position: Point; axis: TabDTerminalAxis }, lockedCorners: Point[] = []) => {
     if (!from) return;
@@ -1563,11 +1709,13 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
       path,
       waypoints,
     };
-    setWires(previous => [...previous, wire]);
+    const nextWires = [...wires, wire];
+    setWires(nextWires);
+    commitSnapshot({ wires: nextWires });
     setSelection({ kind: 'wire', id: wire.id });
     setWiring({});
     toast.success('Wire connected');
-  }, [components, gridSize, visualSymbolScale, wires]);
+  }, [commitSnapshot, components, gridSize, visualSymbolScale, wires]);
 
   const findWireNearPoint = useCallback((point: Point, threshold = 14): { wire: CircuitWire; projection: NonNullable<ReturnType<typeof projectPointOntoWire>> } | null => {
     let bestMatch: { wire: CircuitWire; projection: NonNullable<ReturnType<typeof projectPointOntoWire>> } | null = null;
@@ -1638,16 +1786,18 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
       waypoints: splitPath2.length > 2 ? splitPath2.slice(1, -1) : undefined,
     };
 
-    setWires(previous => [
-      ...previous.map(w => w.id === targetWire.id ? wire1 : w),
+    const nextWires = [
+      ...wires.map(w => w.id === targetWire.id ? wire1 : w),
       wire2,
       incomingWire,
-    ]);
+    ];
+    setWires(nextWires);
+    commitSnapshot({ wires: nextWires });
 
     setSelection({ kind: 'wire', id: incomingWire.id });
     setWiring({});
     toast.success('Wire connected and split at junction');
-  }, [gridSize]);
+  }, [commitSnapshot, gridSize, wires]);
 
   const handleCanvasMouseDown = useCallback((event: React.MouseEvent<SVGSVGElement>) => {
     const point = clientToWorld(event.clientX, event.clientY);
@@ -1701,6 +1851,11 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
         updateComponentPropsById(component.id, momentaryControlProps(true));
         return;
       }
+      dragStartSnapshotRef.current = cloneSnapshot({
+        components: componentRef.current,
+        wires: wiresRef.current,
+        texts: textsRef.current,
+      });
       setDragState({ kind: 'component', id: component.id, offset: [point[0] - component.x, point[1] - component.y] });
       return;
     }
@@ -1761,6 +1916,17 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
 
   const handleCanvasMouseUp = useCallback(() => {
     releaseMomentaryControl();
+    if (dragStartSnapshotRef.current) {
+      const currentSnapshot: CanvasSnapshot = {
+        components: componentRef.current,
+        wires: wiresRef.current,
+        texts: textsRef.current,
+      };
+      if (!areSnapshotsEqual(dragStartSnapshotRef.current, currentSnapshot)) {
+        commitSnapshot(currentSnapshot);
+      }
+      dragStartSnapshotRef.current = null;
+    }
     if (dragState?.kind === 'marquee') {
       const [left, right] = [dragState.start[0], dragState.end[0]].sort((a, b) => a - b);
       const [top, bottom] = [dragState.start[1], dragState.end[1]].sort((a, b) => a - b);
@@ -1772,7 +1938,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
       setSelection(ids.length === 1 && compIds.length === 1 ? { kind: 'component', id: compIds[0] } : null);
     }
     setDragState(null);
-  }, [dragState, releaseMomentaryControl]);
+  }, [commitSnapshot, dragState, releaseMomentaryControl]);
 
   const handleWireMouseDown = useCallback((event: React.MouseEvent<SVGPathElement>, wire: CircuitWire) => {
     event.stopPropagation();
@@ -1790,22 +1956,29 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     const proj = projectPointOntoWire(rawPoint, wire.path, gridSize);
     if (!proj) return;
     const newPath = insertPointIntoWirePath(wire.path, proj.point, proj.segmentIndex);
-    setWires(previous => previous.map(current => {
+    const nextWires = wires.map(current => {
       if (current.id !== wire.id) return current;
       return {
         ...current,
-        routing: 'manual',
+        routing: 'manual' as const,
         path: newPath,
         waypoints: newPath.length > 2 ? newPath.slice(1, -1) : undefined,
       };
-    }));
+    });
+    setWires(nextWires);
+    commitSnapshot({ wires: nextWires });
     setSelection({ kind: 'wire', id: wire.id });
-  }, [clientToWorld, gridSize]);
+  }, [clientToWorld, commitSnapshot, gridSize, wires]);
 
   const handleTextMouseDown = useCallback((event: React.MouseEvent<HTMLElement | SVGElement>, text: WorkspaceText) => {
     event.stopPropagation();
     const point = clientToWorld(event.clientX, event.clientY);
     setSelection({ kind: 'text', id: text.id });
+    dragStartSnapshotRef.current = cloneSnapshot({
+      components: componentRef.current,
+      wires: wiresRef.current,
+      texts: textsRef.current,
+    });
     setDragState({ kind: 'text', id: text.id, offset: [point[0] - text.x, point[1] - text.y] });
   }, [clientToWorld]);
 
@@ -1821,33 +1994,39 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     if (!selectedWire) return;
     const endpoints = currentWireEndpoints(selectedWire, components);
     if (!endpoints) return;
-    setWires(previous => previous.map(wire => wire.id === selectedWire.id
+    const nextWires = wires.map(wire => wire.id === selectedWire.id
       ? { ...wire, routing, path: routePath(endpoints.from, endpoints.to, routing) }
-      : wire));
-  }, [components, selectedWire]);
+      : wire);
+    setWires(nextWires);
+    commitSnapshot({ wires: nextWires });
+  }, [commitSnapshot, components, selectedWire, wires]);
 
   const addSelectedWireCorner = useCallback(() => {
     if (!selectedWire) return;
     const midpoint: Point = selectedWire.path.length >= 2
       ? [(selectedWire.path[0][0] + selectedWire.path[selectedWire.path.length - 1][0]) / 2, (selectedWire.path[0][1] + selectedWire.path[selectedWire.path.length - 1][1]) / 2]
       : cursor;
-    setWires(previous => previous.map(wire => wire.id === selectedWire.id
-      ? { ...wire, routing: 'manual', path: addWireCorner(wire.path, snapEnabled ? snapPointToGrid(midpoint, GRID_SIZE) : midpoint) }
-      : wire));
-  }, [cursor, selectedWire, snapEnabled]);
+    const nextWires = wires.map(wire => wire.id === selectedWire.id
+      ? { ...wire, routing: 'manual' as const, path: addWireCorner(wire.path, snapEnabled ? snapPointToGrid(midpoint, GRID_SIZE) : midpoint) }
+      : wire);
+    setWires(nextWires);
+    commitSnapshot({ wires: nextWires });
+  }, [commitSnapshot, cursor, selectedWire, snapEnabled, wires]);
 
   const nudgeSelectedWire = useCallback((amount: number) => {
     if (!selectedWire) return;
-    setWires(previous => previous.map(wire => {
+    const nextWires = wires.map(wire => {
       if (wire.id !== selectedWire.id) return wire;
       const path = wire.path.length > 2 ? wire.path : addWireCorner(wire.path, [
         (wire.path[0][0] + wire.path[wire.path.length - 1][0]) / 2,
         (wire.path[0][1] + wire.path[wire.path.length - 1][1]) / 2,
       ]);
       const corner = Math.floor(path.length / 2);
-      return { ...wire, routing: 'manual', path: moveWireCorner(path, corner, [path[corner][0], path[corner][1] + amount]) };
-    }));
-  }, [selectedWire]);
+      return { ...wire, routing: 'manual' as const, path: moveWireCorner(path, corner, [path[corner][0], path[corner][1] + amount]) };
+    });
+    setWires(nextWires);
+    commitSnapshot({ wires: nextWires });
+  }, [commitSnapshot, selectedWire, wires]);
 
   const resetSimulation = useCallback(() => {
     simulation.current.reset();
@@ -1878,6 +2057,95 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
       animationFrame.current = null;
     };
   }, [simulationRunning, simulationSpeed]);
+
+  // --- SPICE Accuracy Bridge ---
+  // Runs ngspice off the main thread alongside the always-on legacy loop above. On success its
+  // readings take over the Voltmeter/Ammeter/DMM/Oscilloscope entries in `effectiveSnapshot` below;
+  // on an unsupported part it throws SpiceAdapterError and the legacy engine's own readings, already
+  // live from the loop above, simply keep serving the instruments untouched — a silent fallback.
+  const spiceEngine = useSpiceEngine();
+  const spiceReadingsRef = useRef<Record<string, InstrumentReading>>({});
+  const spiceRunContextRef = useRef<{ nets: SpiceCircuitNets; nodeMap: SpiceNodeMap } | null>(null);
+  const spiceUnsupportedToastRef = useRef<string | null>(null);
+  const [spiceStatus, setSpiceStatus] = useState<SpiceBridgeStatus>({ kind: 'idle' });
+  const [spiceReadingsVersion, setSpiceReadingsVersion] = useState(0);
+
+  const clearSpiceReadings = useCallback((status: SpiceBridgeStatus) => {
+    spiceReadingsRef.current = {};
+    spiceRunContextRef.current = null;
+    setSpiceReadingsVersion(version => version + 1);
+    setSpiceStatus(status);
+  }, []);
+
+  const runSpiceSimulation = useCallback(() => {
+    // Both the adapter (unsupported parts) and the generator (an incomplete circuit — no ground yet,
+    // or nothing placed at all) can throw; either must fall back to the legacy engine's readings
+    // rather than crash the debounce timer or the Run button's click handler.
+    let netlist: string;
+    let nets: SpiceCircuitNets;
+    let spiceComponents;
+    try {
+      nets = resolveCircuitNets(components, wires);
+      spiceComponents = convertToSpiceComponents(components, wires, nets, simulationMode);
+      const frequency = Math.max(0.001, detectSystemFrequency(components));
+      const duration = Math.min(0.5, Math.max(0.02, SPICE_TRAN_PERIODS / frequency));
+      netlist = generateNetlist(spiceComponents, { analysis: [`.tran ${duration / 2000} ${duration}`], simulationMode });
+    } catch (error) {
+      // An incomplete circuit (no components yet, or no ground placed) is an expected mid-edit
+      // state, not a genuine incompatibility — stay quiet and idle rather than toasting on it.
+      if (error instanceof NetlistError) {
+        spiceUnsupportedToastRef.current = null;
+        clearSpiceReadings({ kind: 'idle' });
+        return;
+      }
+      const reason = error instanceof SpiceAdapterError
+        ? error.unsupported.map(part => part.label).join(', ')
+        : 'Unable to build a SPICE netlist for this circuit.';
+      clearSpiceReadings({ kind: 'unsupported', reason });
+      if (spiceUnsupportedToastRef.current !== reason) {
+        spiceUnsupportedToastRef.current = reason;
+        toast.error(`SPICE accuracy pass unavailable (${reason}) — using the live engine's readings.`);
+      }
+      return;
+    }
+
+    spiceUnsupportedToastRef.current = null;
+    spiceRunContextRef.current = { nets, nodeMap: buildSpiceNodeMap(spiceComponents) };
+    setSpiceStatus({ kind: 'running' });
+    void spiceEngine.runSimulation(netlist);
+  }, [clearSpiceReadings, components, simulationMode, spiceEngine, wires]);
+
+  // Trigger on every circuit edit, debounced so a drag or a burst of keystrokes fires one run.
+  useEffect(() => {
+    const timer = window.setTimeout(runSpiceSimulation, SPICE_DEBOUNCE_MS);
+    return () => window.clearTimeout(timer);
+  }, [runSpiceSimulation]);
+
+  // The worker resolves asynchronously; react to the hook's own state (not the promise above) so a
+  // superseded run's late arrival can never be mistaken for the latest one's result.
+  useEffect(() => {
+    const context = spiceRunContextRef.current;
+    if (!context) return;
+    if (spiceEngine.error) {
+      setSpiceStatus({ kind: 'unsupported', reason: spiceEngine.error });
+      return;
+    }
+    if (!spiceEngine.results) return;
+    const results = parseSpiceResults(spiceEngine.results, spiceEngine.results.time ?? []);
+    spiceReadingsRef.current = buildSpiceInstrumentReadings(components, context.nets, context.nodeMap, results);
+    setSpiceReadingsVersion(version => version + 1);
+    setSpiceStatus({ kind: 'ready' });
+  }, [components, spiceEngine.error, spiceEngine.results]);
+
+  // Legacy `snapshot` stays the source of truth for animation/power flow; only instrument readings
+  // are overridden, and only for the components SPICE could actually map.
+  const effectiveSnapshot = useMemo<SimulationSnapshot>(() => {
+    const spiceReadings = spiceReadingsRef.current;
+    if (Object.keys(spiceReadings).length === 0) return snapshot;
+    return { ...snapshot, instrumentReadings: { ...snapshot.instrumentReadings, ...spiceReadings } };
+    // spiceReadingsVersion (not spiceReadingsRef.current, a ref) is what actually triggers this recompute.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [snapshot, spiceReadingsVersion]);
 
   // --- Switch & Push-Button Keyboard Controls ---
   useEffect(() => {
@@ -1951,6 +2219,20 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
       const target = event.target as HTMLElement | null;
       if (target && ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) return;
       const modifier = event.ctrlKey || event.metaKey;
+      if (modifier && event.key.toLowerCase() === 'z') {
+        event.preventDefault();
+        if (event.shiftKey) {
+          handleRedo();
+        } else {
+          handleUndo();
+        }
+        return;
+      }
+      if (modifier && event.key.toLowerCase() === 'y') {
+        event.preventDefault();
+        handleRedo();
+        return;
+      }
       if (modifier && event.key.toLowerCase() === 'c') {
         event.preventDefault();
         copySelection();
@@ -2008,7 +2290,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [addText, copySelection, cutSelection, gridSize, moveSelected, pasteClipboard, removeSelection, rotateSelected, selectedComponent, snapEnabled]);
+  }, [addText, copySelection, cutSelection, gridSize, handleRedo, handleUndo, moveSelected, pasteClipboard, removeSelection, rotateSelected, selectedComponent, snapEnabled]);
 
   const filteredCategories = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -2070,17 +2352,19 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
             <ToolbarButton colors={colors} icon={<Upload size={14} />} label="Import" title="Import circuit from NAD netlist" onClick={() => nadInputRef.current?.click()} />
             <input ref={nadInputRef} type="file" accept=".nad,application/x-mae-nad+json,application/json" onChange={importNad} style={{ display: 'none' }} />
             <ToolbarDivider colors={colors} />
-            <ToolbarButton colors={colors} icon={<Undo2 size={14} />} title="Undo (Ctrl/Cmd+Z)" onClick={() => toast('History stack not initialized')} />
-            <ToolbarButton colors={colors} icon={<Redo2 size={14} />} title="Redo (Ctrl/Cmd+Shift+Z)" onClick={() => toast('History stack not initialized')} />
+            <ToolbarButton colors={colors} icon={<Undo2 size={14} />} title="Undo (Ctrl/Cmd+Z)" onClick={handleUndo} disabled={!history.canUndo} />
+            <ToolbarButton colors={colors} icon={<Redo2 size={14} />} title="Redo (Ctrl/Cmd+Shift+Z)" onClick={handleRedo} disabled={!history.canRedo} />
             <ToolbarButton colors={colors} icon={<Maximize2 size={14} />} title="Auto-scale / Center circuit" onClick={zoomToFit} />
             <ToolbarButton colors={colors} icon={<Scissors size={14} />} title="Cut (Ctrl/Cmd+X)" onClick={cutSelection} disabled={!selectedComponent && marqueeIds.length === 0} />
             <ToolbarButton colors={colors} icon={<Copy size={14} />} title="Copy (Ctrl/Cmd+C)" onClick={copySelection} disabled={!selectedComponent && marqueeIds.length === 0} />
             <ToolbarButton colors={colors} icon={<Clipboard size={14} />} title="Paste (Ctrl/Cmd+V)" onClick={pasteClipboard} disabled={!clipboard || (clipboard.components.length === 0 && clipboard.wires.length === 0 && clipboard.texts.length === 0)} />
             <ToolbarButton colors={colors} icon={<Trash2 size={14} />} title="Delete (Del/Backspace)" onClick={removeSelection} disabled={!selectedComponent && !selectedWire && !selectedText && marqueeIds.length === 0} />
             <ToolbarDivider colors={colors} />
-            <button onClick={() => { hasStartedSimulation.current = true; setSimulationRunning(value => !value); }} title={simulationRunning ? 'Pause simulation' : 'Run simulation'} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: (!simulationRunning && hasStartedSimulation.current) ? TAB_GRADIENT_REV : TAB_GRADIENT, color: '#ffffff', fontWeight: 500, padding: '6px 14px', minHeight: 30, borderRadius: 8, fontSize: 12, boxShadow: TAB_ACTIVE_SHADOW, border: '1px solid transparent', cursor: 'pointer', whiteSpace: 'nowrap', transition: 'background .3s ease' }}>
+            <button onClick={() => { hasStartedSimulation.current = true; setSimulationRunning(value => !value); runSpiceSimulation(); }} title={simulationRunning ? 'Pause simulation' : 'Run simulation'} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: (!simulationRunning && hasStartedSimulation.current) ? TAB_GRADIENT_REV : TAB_GRADIENT, color: '#ffffff', fontWeight: 500, padding: '6px 14px', minHeight: 30, borderRadius: 8, fontSize: 12, boxShadow: TAB_ACTIVE_SHADOW, border: '1px solid transparent', cursor: 'pointer', whiteSpace: 'nowrap', transition: 'background .3s ease' }}>
               {simulationRunning ? <Pause size={14} /> : <Play size={14} />}{simulationRunning ? 'Pause' : 'Run'}
             </button>
+            <ToolbarButton colors={colors} label={simulationMode === 'academic' ? 'Academic' : 'Practical'} title="Academic / Practical — toggle SPICE simulation mode" onClick={() => setSimulationMode(mode => mode === 'academic' ? 'practical' : 'academic')} active={simulationMode === 'academic'} />
+            <ToolbarButton colors={colors} icon={<Zap size={14} />} title="Show / Hide electron flow" onClick={() => setShowElectrons(v => { const next = !v; try { localStorage.setItem('mae-show-electrons', String(next)); } catch { } return next; })} active={showElectrons} />
             <ToolbarButton colors={colors} icon={<RotateCcw size={14} />} title="Reset simulation" onClick={resetSimulation} />
             <span style={{ fontSize: 11, minWidth: 55, color: colors.muted, fontVariantNumeric: 'tabular-nums' }}>{snapshot.time.toFixed(3)} s</span>
             <ToolbarDivider colors={colors} />
@@ -2172,26 +2456,28 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
 
               {wires.map(wire => {
                 const selected = selection?.kind === 'wire' && selection.id === wire.id;
-                const current = snapshot.wireCurrents[wire.id] ?? 0;
                 const phase = snapshot.wirePhases?.[wire.id] ?? 0;
-                const active = Math.abs(current) > 1e-7;
                 const path = wire.path;
                 const renderPath = pointsToPath(path);
                 const normalizedOffset = ((phase % 1) + 1) % 1;
-                const dots = simulationRunning && active
-                  ? getDotsOnPath(path, Math.max(2, Math.min(8, Math.round(pathLength(path) / 50))), normalizedOffset)
-                  : [];
+                // Persistent charge particles: uniform spacing based solely on physical length (N = floor(length / spacing))
+                const numDots = Math.max(1, Math.floor(pathLength(path) / 45));
+                const dots = getDotsOnPath(path, numDots, normalizedOffset);
                 const isSensingWire = false;
                 const isSensingParentSelected = false;
                 return (
                   <g key={wire.id}>
                     <path d={renderPath} fill="none" stroke="transparent" strokeWidth={17} strokeLinecap="round" strokeLinejoin="round" onMouseDown={event => handleWireMouseDown(event, wire)} onDoubleClick={event => handleWireDoubleClick(event, wire)} style={{ cursor: 'pointer' }} />
                     <path d={renderPath} fill="none" stroke={colors.text} strokeWidth={1.5} strokeDasharray={isSensingWire ? "3 3" : undefined} strokeLinecap="round" strokeLinejoin="round" pointerEvents="none" />
-                    {dots.map((dot, index) => <circle key={index} cx={dot[0]} cy={dot[1]} r={3} fill={colors.powered} opacity={.9} pointerEvents="none" />)}
+                    {showElectrons && dots.map((dot, index) => <circle key={index} cx={dot[0]} cy={dot[1]} r={3} fill={colors.powered} opacity={1} pointerEvents="none" />)}
                     {wire.toComp.startsWith('junc_') && <circle cx={path[path.length - 1][0]} cy={path[path.length - 1][1]} r={3.5} fill={colors.primary} stroke="#ffffff" strokeWidth={1.5} pointerEvents="none" />}
                     {selected && wire.path.length > 2 && wire.path.slice(1, -1).map((corner, index) => {
                       const cornerIndex = index + 1;
-                      return <circle key={`${wire.id}-${cornerIndex}`} cx={corner[0]} cy={corner[1]} r={6} fill={colors.panel} stroke={colors.selection} strokeWidth={2} onMouseDown={event => { event.stopPropagation(); setDragState({ kind: 'wireCorner', id: wire.id, corner: cornerIndex }); }} style={{ cursor: 'move' }} />;
+                      return <circle key={`${wire.id}-${cornerIndex}`} cx={corner[0]} cy={corner[1]} r={6} fill={colors.panel} stroke={colors.selection} strokeWidth={2} onMouseDown={event => {
+                        event.stopPropagation();
+                        dragStartSnapshotRef.current = cloneSnapshot({ components: componentRef.current, wires: wiresRef.current, texts: textsRef.current });
+                        setDragState({ kind: 'wireCorner', id: wire.id, corner: cornerIndex });
+                      }} style={{ cursor: 'move' }} />;
                     })}
                   </g>
                 );
@@ -2209,7 +2495,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                 const isSelected = (selection?.kind === 'component' && selection.id === component.id) || marqueeIds.includes(component.id);
                 const powered = Boolean(snapshot.componentPowered[component.id]);
                 const intensity = snapshot.componentIntensity[component.id] ?? 0;
-                const reading = snapshot.instrumentReadings[component.id];
+                const reading = effectiveSnapshot.instrumentReadings[component.id];
                 const transform = `translate(${component.x},${component.y})`;
                 const symbolTransform = `rotate(${component.rotation}) scale(${component.flipH ? -1 : 1},${component.flipV ? -1 : 1}) scale(${isExactCadComponent(component.type) ? 1 : visualSymbolScale})`;
                 return (
@@ -2221,7 +2507,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                   >
                     <g transform={symbolTransform} color={isSelected ? colors.selection : undefined}>
                       {renderSymbol(definition.symbol, powered, { ...component.props, _intensity: intensity, _documentedStyle: tabDUiRefinement }, animationTime)}
-                      {component.type === 'oscilloscope' && <ScopeTrace reading={snapshot.instrumentReadings[`${component.id}:ch1`]} color="#38bdf8" />}
+                      {component.type === 'oscilloscope' && <ScopeTrace reading={effectiveSnapshot.instrumentReadings[`${component.id}:ch1`]} color="#38bdf8" />}
                     </g>
                     {definition.terminals.map(terminal => {
                       const snappedWorld = getCanvasTerminalPosition(component, terminal.id);
@@ -2416,6 +2702,9 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
           <div style={{ position: 'absolute', bottom: 10, left: 10, right: 10, display: 'flex', alignItems: 'center', gap: 10, padding: '7px 10px', background: `${colors.panel}e8`, border: `1px solid ${colors.line}`, color: colors.muted, borderRadius: 8, fontSize: 10, boxShadow: 'none', pointerEvents: 'none' }}>
             <span>{components.length} components</span><span>•</span><span>{wires.length} wires</span>
             {simulationRunning && <span style={{ marginLeft: 'auto', color: colors.accent, fontWeight: 750 }}>SIMULATION RUNNING</span>}
+            {spiceStatus.kind === 'running' && <span style={{ color: colors.muted, fontWeight: 750 }}>SPICE ACCURACY PASS…</span>}
+            {spiceStatus.kind === 'ready' && <span style={{ color: colors.accent, fontWeight: 750 }}>SPICE-VERIFIED</span>}
+            {spiceStatus.kind === 'unsupported' && <span title={spiceStatus.reason} style={{ color: colors.muted, fontWeight: 750 }}>SPICE UNAVAILABLE · LIVE ENGINE</span>}
             {!snapshot.converged && <span style={{ marginLeft: 'auto', color: colors.danger, fontWeight: 750 }}>CHECK CIRCUIT WARNINGS</span>}
           </div>
         </main>
@@ -2423,7 +2712,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
         <aside className="min-h-0 overflow-y-auto rounded-xl border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-950" style={{ background: colors.panel, borderColor: colors.line, display: 'flex', flexDirection: 'column' }}>
           <div className="border-b px-3 py-2" style={{ borderColor: colors.line }}><div className={CONTROL_SYSTEMS_HEADING}>Active Element &amp; Properties</div></div>
           {selectedComponent ? (
-            <ComponentInspector colors={colors} component={selectedComponent} definition={getDef(selectedComponent.type)!} allComponents={components} linkedCoils={linkedCoils} reading={snapshot.instrumentReadings[selectedComponent.id]} snapshot={snapshot} tabDUiRefinement={tabDUiRefinement} onLabelChange={label => updateComponent(selectedComponent.id, { label })} onPropertyChange={updateComponentProperty} onDelete={removeSelection} />
+            <ComponentInspector colors={colors} component={selectedComponent} definition={getDef(selectedComponent.type)!} allComponents={components} linkedCoils={linkedCoils} reading={effectiveSnapshot.instrumentReadings[selectedComponent.id]} snapshot={effectiveSnapshot} tabDUiRefinement={tabDUiRefinement} onLabelChange={label => updateComponent(selectedComponent.id, { label })} onPropertyChange={updateComponentProperty} onDelete={removeSelection} />
           ) : selectedWire ? (
             <WireInspector colors={colors} wire={selectedWire} tabDUiRefinement={tabDUiRefinement} onRouting={updateWireRouting} onAddCorner={addSelectedWireCorner} onNudge={nudgeSelectedWire} onDelete={removeSelection} />
           ) : selectedText ? (
@@ -2435,7 +2724,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
               {snapshot.warnings.slice(0, 3).map((warning, index) => <div key={`${warning.code}-${index}`} style={{ marginTop: 5, fontSize: 10, color: colors.muted, lineHeight: 1.35 }}>{warning.message}</div>)}
             </div>
           )}
-          <PersistentDmmPanel colors={colors} dmms={components.filter(c => c.type === 'dmm')} snapshot={snapshot} />
+          <PersistentDmmPanel colors={colors} dmms={components.filter(c => c.type === 'dmm')} snapshot={effectiveSnapshot} />
         </aside>
       </div>
       <section className="mt-3 overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-950" style={{ background: colors.panel, borderColor: colors.line }}>

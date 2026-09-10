@@ -272,10 +272,10 @@ const CONTROLLED_SOURCES: Record<string, ComponentDef> = {
 const DIODES: Record<string, ComponentDef> = {
   'diode': {
     id: 'diode', name: 'Diode', category: 'Diodes',
-    width: 40, height: 20, symbol: 'diode',
+    width: 60, height: 20, symbol: 'diode',
     terminals: [
-      { id: 'anode', name: 'A', x: -20, y: 0, type: 'input' },
-      { id: 'cathode', name: 'K', x: 20, y: 0, type: 'output' },
+      { id: 'anode', name: 'A', x: -30, y: 0, type: 'input' },
+      { id: 'cathode', name: 'K', x: 30, y: 0, type: 'output' },
     ],
     properties: {
       material: { type: 'select', value: 'silicon', options: ['ideal', 'silicon', 'germanium', 'gaas'], label: 'Material / Type' },
@@ -286,10 +286,10 @@ const DIODES: Record<string, ComponentDef> = {
   },
   'diode-ideal': {
     id: 'diode-ideal', name: 'Ideal Diode', category: 'Diodes',
-    width: 40, height: 20, symbol: 'diode',
+    width: 60, height: 20, symbol: 'diode',
     terminals: [
-      { id: 'anode', name: 'A', x: -20, y: 0, type: 'input' },
-      { id: 'cathode', name: 'K', x: 20, y: 0, type: 'output' },
+      { id: 'anode', name: 'A', x: -30, y: 0, type: 'input' },
+      { id: 'cathode', name: 'K', x: 30, y: 0, type: 'output' },
     ],
     properties: {
       forwardVoltage: { type: 'number', value: 0, unit: 'V', min: 0, max: 5, label: 'Forward Voltage' },
@@ -298,10 +298,10 @@ const DIODES: Record<string, ComponentDef> = {
   },
   'diode-silicon': {
     id: 'diode-silicon', name: 'PN Diode (Si)', category: 'Diodes',
-    width: 40, height: 20, symbol: 'diode',
+    width: 60, height: 20, symbol: 'diode',
     terminals: [
-      { id: 'anode', name: 'A', x: -20, y: 0, type: 'input' },
-      { id: 'cathode', name: 'K', x: 20, y: 0, type: 'output' },
+      { id: 'anode', name: 'A', x: -30, y: 0, type: 'input' },
+      { id: 'cathode', name: 'K', x: 30, y: 0, type: 'output' },
     ],
     properties: {
       material: { type: 'select', value: 'silicon', options: ['silicon'], label: 'Material' },
@@ -313,10 +313,10 @@ const DIODES: Record<string, ComponentDef> = {
   },
   'diode-germanium': {
     id: 'diode-germanium', name: 'PN Diode (Ge)', category: 'Diodes',
-    width: 40, height: 20, symbol: 'diode',
+    width: 60, height: 20, symbol: 'diode',
     terminals: [
-      { id: 'anode', name: 'A', x: -20, y: 0, type: 'input' },
-      { id: 'cathode', name: 'K', x: 20, y: 0, type: 'output' },
+      { id: 'anode', name: 'A', x: -30, y: 0, type: 'input' },
+      { id: 'cathode', name: 'K', x: 30, y: 0, type: 'output' },
     ],
     properties: {
       material: { type: 'select', value: 'germanium', options: ['germanium'], label: 'Material' },
@@ -328,10 +328,10 @@ const DIODES: Record<string, ComponentDef> = {
   },
   'diode-gaas': {
     id: 'diode-gaas', name: 'PN Diode (GaAs)', category: 'Diodes',
-    width: 40, height: 20, symbol: 'diode',
+    width: 60, height: 20, symbol: 'diode',
     terminals: [
-      { id: 'anode', name: 'A', x: -20, y: 0, type: 'input' },
-      { id: 'cathode', name: 'K', x: 20, y: 0, type: 'output' },
+      { id: 'anode', name: 'A', x: -30, y: 0, type: 'input' },
+      { id: 'cathode', name: 'K', x: 30, y: 0, type: 'output' },
     ],
     properties: {
       material: { type: 'select', value: 'gaas', options: ['gaas'], label: 'Material' },
@@ -343,10 +343,10 @@ const DIODES: Record<string, ComponentDef> = {
   },
   'zener': {
     id: 'zener', name: 'Zener Diode', category: 'Diodes',
-    width: 40, height: 20, symbol: 'zener',
+    width: 60, height: 20, symbol: 'zener',
     terminals: [
-      { id: 'anode', name: 'A', x: -20, y: 0, type: 'input' },
-      { id: 'cathode', name: 'K', x: 20, y: 0, type: 'output' },
+      { id: 'anode', name: 'A', x: -30, y: 0, type: 'input' },
+      { id: 'cathode', name: 'K', x: 30, y: 0, type: 'output' },
     ],
     properties: {
       breakdownVoltage: { type: 'number', value: 5.1, unit: 'V', min: 1.8, max: 400, label: 'Breakdown Voltage (Vz)' },
@@ -356,10 +356,10 @@ const DIODES: Record<string, ComponentDef> = {
   },
   'led': {
     id: 'led', name: 'LED', category: 'Diodes',
-    width: 40, height: 20, symbol: 'led',
+    width: 60, height: 20, symbol: 'led',
     terminals: [
-      { id: 'anode', name: 'A', x: -20, y: 0, type: 'input' },
-      { id: 'cathode', name: 'K', x: 20, y: 0, type: 'output' },
+      { id: 'anode', name: 'A', x: -30, y: 0, type: 'input' },
+      { id: 'cathode', name: 'K', x: 30, y: 0, type: 'output' },
     ],
     properties: {
       color: { type: 'select', value: 'red', options: ['white', 'red', 'amber', 'orange', 'yellow', 'green', 'blue', 'violet'], label: 'Color' },
@@ -370,10 +370,10 @@ const DIODES: Record<string, ComponentDef> = {
   },
   'photodiode': {
     id: 'photodiode', name: 'Photodiode', category: 'Diodes',
-    width: 40, height: 20, symbol: 'photodiode',
+    width: 60, height: 20, symbol: 'photodiode',
     terminals: [
-      { id: 'anode', name: 'A', x: -20, y: 0, type: 'input' },
-      { id: 'cathode', name: 'K', x: 20, y: 0, type: 'output' },
+      { id: 'anode', name: 'A', x: -30, y: 0, type: 'input' },
+      { id: 'cathode', name: 'K', x: 30, y: 0, type: 'output' },
     ],
     properties: {
       responsivity: { type: 'number', value: 0.6, unit: 'A/W', min: 0.1, max: 1.1, label: 'Responsivity' },

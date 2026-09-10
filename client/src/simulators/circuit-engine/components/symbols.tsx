@@ -332,7 +332,7 @@ const DiodeBase: SymbolFC = ({ powered, props }) => {
 
   return (
     <g>
-      <line x1={-20} y1={0} x2={-8} y2={0} stroke="currentColor" strokeWidth={sw} />
+      <line x1={-33.333} y1={0} x2={-8} y2={0} stroke="currentColor" strokeWidth={sw} strokeLinecap="square" />
       {/* Triangle body: fill="none" by default, or glowColor when powered LED */}
       <polygon points="-8,-10 -8,10 10,0" fill={powered && isLed ? glowColor! : 'none'} fillOpacity={powered && isLed ? emissionOpacity : 1} stroke="currentColor" strokeWidth={sw} />
       {/* Cathode bar */}
@@ -341,7 +341,7 @@ const DiodeBase: SymbolFC = ({ powered, props }) => {
       ) : (
         <line x1={10} y1={-12} x2={10} y2={12} stroke="currentColor" strokeWidth={sw} />
       )}
-      <line x1={10} y1={0} x2={20} y2={0} stroke="currentColor" strokeWidth={sw} />
+      <line x1={10} y1={0} x2={33.333} y2={0} stroke="currentColor" strokeWidth={sw} strokeLinecap="square" />
       {isLed && (
         <>
           <line x1={14} y1={-14} x2={22} y2={-22} stroke={powered ? glowColor! : 'currentColor'} strokeOpacity={powered ? emissionOpacity : 1} strokeWidth={sw} markerEnd="url(#arrow)" />
@@ -696,18 +696,18 @@ const Transformer: SymbolFC = () => (
 
     {/* Primary Coil (Left) & Wires stretched to corners */}
     <path d="M -20,-20 A 5,5 0 0,0 -20,-10 A 5,5 0 0,0 -20,0 A 5,5 0 0,0 -20,10 A 5,5 0 0,0 -20,20" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" transform="rotate(180 -20 0)" />
-    <line x1={-20} y1={-20} x2={-20} y2={-50} stroke="currentColor" strokeWidth={1.5} />
+    <line x1={-20} y1={-20} x2={-20} y2={-50.7} stroke="currentColor" strokeWidth={1.5} />
     <line x1={-20} y1={-50} x2={-50} y2={-50} stroke="currentColor" strokeWidth={1.5} />
 
-    <line x1={-20} y1={20} x2={-20} y2={50} stroke="currentColor" strokeWidth={1.5} />
+    <line x1={-20} y1={20} x2={-20} y2={50.7} stroke="currentColor" strokeWidth={1.5} />
     <line x1={-20} y1={50} x2={-50} y2={50} stroke="currentColor" strokeWidth={1.5} />
 
     {/* Secondary Coil (Right) & Wires stretched to corners */}
     <path d="M 20,-20 A 5,5 0 0,1 20,-10 A 5,5 0 0,1 20,0 A 5,5 0 0,1 20,10 A 5,5 0 0,1 20,20" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" transform="rotate(180 20 0)" />
-    <line x1={20} y1={-20} x2={20} y2={-50} stroke="currentColor" strokeWidth={1.5} />
+    <line x1={20} y1={-20} x2={20} y2={-50.7} stroke="currentColor" strokeWidth={1.5} />
     <line x1={20} y1={-50} x2={50} y2={-50} stroke="currentColor" strokeWidth={1.5} />
 
-    <line x1={20} y1={20} x2={20} y2={50} stroke="currentColor" strokeWidth={1.5} />
+    <line x1={20} y1={20} x2={20} y2={50.7} stroke="currentColor" strokeWidth={1.5} />
     <line x1={20} y1={50} x2={50} y2={50} stroke="currentColor" strokeWidth={1.5} />
   </g>
 );
@@ -760,19 +760,20 @@ const Autotransformer: SymbolFC = () => (
 
 // ─── POWER SEMICONDUCTORS ─────────────────────────────────────────────────────
 
-const Scr: SymbolFC = () => (
-  <g>
-    {/* Anode-cathode vertical */}
-    <line x1={0} y1={-30} x2={0} y2={-10} stroke="currentColor" strokeWidth={1.5} />
-    <polygon points="-10,-10 10,-10 0,10" fill="none" stroke="currentColor" strokeWidth={1.5} />
-    <line x1={-12} y1={10} x2={12} y2={10} stroke="currentColor" strokeWidth={1.5} />
-    <line x1={0} y1={10} x2={0} y2={30} stroke="currentColor" strokeWidth={1.5} />
-    {/* Gate */}
-    <line x1={-20} y1={15} x2={0} y2={15} stroke="currentColor" strokeWidth={1.5} />
-    {/* Cathode bar extensions (SCR marker) */}
-    <line x1={10} y1={10} x2={16} y2={16} stroke="currentColor" strokeWidth={1.5} />
-  </g>
-);
+const Scr: SymbolFC = ({ props }) => {
+  const sw = nonExactStroke(props);
+  return (
+    <g>
+      {/* Anode-cathode vertical */}
+      <line x1={0} y1={-33.1} x2={0} y2={-10} stroke="currentColor" strokeWidth={1} />
+      <polygon points="-10,-10 10,-10 0,10" fill="none" stroke="currentColor" strokeWidth={1} />
+      <line x1={-12} y1={10} x2={12} y2={10} stroke="currentColor" strokeWidth={1} />
+      <line x1={0} y1={10} x2={0} y2={33.1} stroke="currentColor" strokeWidth={1} />
+      {/* Gate: originates from cathode at (0, 10), 45-deg angle to (-5, 15), then horizontal to (-20, 15) */}
+      <path d="M 0,10 L -5,16.69 L -16.5,16.69" fill="none" stroke="currentColor" strokeWidth={1} strokeLinejoin="miter" />
+    </g>
+  );
+};
 
 const Diac: SymbolFC = () => (
   <g>

@@ -857,3 +857,4 @@ export function evaluateTabDStaticMna(components: CircuitComponent[], wires: Cir
     elements,
   };
 }
+

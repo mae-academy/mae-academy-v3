@@ -402,6 +402,9 @@ export function tabDComponentLabelAnchors(
   const CIRCULAR_SOURCES = new Set(['dc-voltage', 'ac-voltage', 'dc-current', 'ac-current', 'voltmeter', 'ammeter', 'lamp', 'motor-dc', 'motor-3phase', 'three-phase-source']);
   const CONTROLLED_SOURCES = new Set(['vccs', 'vcvs', 'cccs', 'ccvs']);
 
+  const PASSIVE_SLIM = new Set(['resistor', 'potentiometer', 'inductor', 'impedance']);
+  const DIODE_FAMILY = new Set(['diode', 'diode-ideal', 'diode-silicon', 'diode-germanium', 'diode-gaas', 'zener', 'led', 'photodiode']);
+
   if (componentType === 'ground') {
     return { reference: [0, 30], value: [0, 42], refTextAnchor: 'middle', valTextAnchor: 'middle' };
   }
@@ -420,6 +423,18 @@ export function tabDComponentLabelAnchors(
     bodyHalfW = 33; bodyHalfH = 33; padding = 4;
   } else if (CONTROLLED_SOURCES.has(componentType)) {
     bodyHalfW = 18; bodyHalfH = 18; padding = 4;
+  } else if (PASSIVE_SLIM.has(componentType)) {
+    bodyHalfW = terminalsAreHorizontal ? Math.max(10, halfWidth) : 11;
+    bodyHalfH = 10;
+    padding = terminalsAreHorizontal ? 6 : 5;
+  } else if (componentType === 'capacitor') {
+    bodyHalfW = terminalsAreHorizontal ? Math.max(10, halfWidth) : 15;
+    bodyHalfH = 15;
+    padding = terminalsAreHorizontal ? 6 : 5;
+  } else if (DIODE_FAMILY.has(componentType)) {
+    bodyHalfW = terminalsAreHorizontal ? Math.max(10, halfWidth) : 12;
+    bodyHalfH = 9;
+    padding = 5;
   } else if (componentType.startsWith('transformer') || componentType === 'autotransformer') {
     bodyHalfW = 20; bodyHalfH = 50; padding = 6; // Connectors reach ±50, labels sit cleanly outside
   } else if (['relay-spst', 'relay-spdt', 'relay-dpst'].includes(componentType)) {
@@ -438,6 +453,8 @@ export function tabDComponentLabelAnchors(
     yShift = 12.5; // Offset to match the shifted asymmetrical center
   } else if (componentType === 'opamp') {
     bodyHalfW = 25; bodyHalfH = 25;
+  } else if (componentType === 'scr') {
+    bodyHalfW = 16; bodyHalfH = 20; padding = 6;
   }
 
   if (CIRCULAR_SOURCES.has(componentType) || CONTROLLED_SOURCES.has(componentType)) {

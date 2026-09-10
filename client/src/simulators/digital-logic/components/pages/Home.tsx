@@ -241,10 +241,11 @@ function ComponentPaletteIcon({ definition, colors, documented }: { definition: 
 /** Labels are outside the rotated symbol group, so their baseline stays horizontal at every angle. */
 function horizontalLabelOffset(definition: ComponentDef, rotation: number, scale = 1): Point {
   const normalized = ((rotation % 360) + 360) % 360;
-  if (normalized === 90) return [definition.height * scale / 2 + 30, -8];
-  if (normalized === 270) return [-(definition.height * scale / 2 + 30), -8];
+  const isDiode = ['diode', 'diode-ideal', 'diode-silicon', 'diode-germanium', 'diode-gaas', 'zener', 'led', 'photodiode'].includes(definition.id);
+  if (normalized === 90) return [isDiode ? 17 : (definition.height * scale / 2 + 12), -8];
+  if (normalized === 270) return [isDiode ? -17 : -(definition.height * scale / 2 + 12), -8];
   const direction = normalized === 180 ? -1 : 1;
-  return [0, direction * (definition.height * scale / 2 + 18)];
+  return [0, direction * (isDiode ? 14 : (definition.height * scale / 2 + 8))];
 }
 
 /** Two-terminal labels sit perpendicular to the actual terminal axis, regardless of rotation or reflection. */
@@ -257,9 +258,13 @@ function componentLabelOffset(definition: ComponentDef, component: CircuitCompon
   const actualX = localX * Math.cos(radians) - localY * Math.sin(radians);
   const actualY = localX * Math.sin(radians) + localY * Math.cos(radians);
   const terminalsAreHorizontal = Math.abs(actualX) >= Math.abs(actualY);
+  const isDiode = ['diode', 'diode-ideal', 'diode-silicon', 'diode-germanium', 'diode-gaas', 'zener', 'led', 'photodiode'].includes(component.type);
+  if (isDiode) {
+    return terminalsAreHorizontal ? [0, -14] : [17, -8];
+  }
   return terminalsAreHorizontal
-    ? [0, -(definition.height * scale / 2 + 22)]
-    : [definition.width * scale / 2 + 30, -8];
+    ? [0, -(definition.height * scale / 2 + 8)]
+    : [definition.width * scale / 2 + 12, -8];
 }
 
 function componentDisplayValue(definition: ComponentDef, component: CircuitComponent): string | null {

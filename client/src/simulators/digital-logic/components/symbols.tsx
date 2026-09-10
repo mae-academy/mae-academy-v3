@@ -251,7 +251,7 @@ const DiodeBase: SymbolFC = ({ powered, props }) => {
 
   return (
     <g>
-      <line x1={-20} y1={0} x2={-8} y2={0} stroke="#1a2744" strokeWidth={2} />
+      <line x1={-33.333} y1={0} x2={-8} y2={0} stroke="#1a2744" strokeWidth={2} strokeLinecap="square" />
       {/* Triangle body */}
       <polygon points="-8,-10 -8,10 10,0" fill={powered && isLed ? glowColor! : 'white'} fillOpacity={powered && isLed ? emissionOpacity : 1} stroke="#1a2744" strokeWidth={2} />
       {/* Cathode bar */}
@@ -260,7 +260,7 @@ const DiodeBase: SymbolFC = ({ powered, props }) => {
       ) : (
         <line x1={10} y1={-12} x2={10} y2={12} stroke="#1a2744" strokeWidth={2} />
       )}
-      <line x1={10} y1={0} x2={20} y2={0} stroke="#1a2744" strokeWidth={2} />
+      <line x1={10} y1={0} x2={33.333} y2={0} stroke="#1a2744" strokeWidth={2} strokeLinecap="square" />
       {/* LED emission arrows */}
       {isLed && (
         <>

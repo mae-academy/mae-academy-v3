@@ -2,7 +2,7 @@ import type { CircuitComponent } from '@/simulators/circuit-engine/models/circui
 
 /** Components intentionally excluded from the documented Tab D learner catalog only. */
 export const TAB_D_EXCLUDED_COMPONENT_IDS = new Set([
-  'scr', 'diac', 'triac',
+  'diac', 'triac',
   'digital-input', 'digital-output', 'gate-and', 'gate-or', 'gate-not',
   'gate-nand', 'gate-nor', 'gate-xor', 'gate-xnor',
   'sw-dpdt',
