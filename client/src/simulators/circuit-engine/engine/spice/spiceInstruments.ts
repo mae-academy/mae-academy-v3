@@ -32,7 +32,7 @@ const STEADY_STATE_TAIL_FRACTION = 0.1;
  * — or the residue of an open switch's mandatory (see netlistGenerator's ROFF) but electrically
  * meaningless leakage path — not a real reading, and rounds to exactly 0 either way.
  */
-const OPEN_BRANCH_CURRENT_THRESHOLD_A = 1e-6;
+const OPEN_BRANCH_CURRENT_THRESHOLD_A = 1e-9;
 const OPEN_BRANCH_VOLTAGE_THRESHOLD_V = 1e-4;
 
 function stringProp(

@@ -165,13 +165,32 @@ function numeric(value: unknown, fallback = 0): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-/** Neutral DMM reading shown while the simulation is not running: 0.000 for every voltage/current/
+/** Neutral DMM reading for a just-paused or just-reset instrument: 0.000 for every voltage/current/
  * frequency mode, "OL" (via `status: 'open'`) for OHM/CONT — never a frozen pre-pause/pre-reset value. */
 function dmmIdleReading(component: CircuitComponent): InstrumentReading {
   const mode = String(component.props.mode ?? 'DCV').toUpperCase().trim();
   if (mode === 'OHM' || mode === 'CONT') return { value: Infinity, unit: 'Ω', status: 'open' };
   const unit = mode.includes('A') ? 'A' : mode === 'HZ' ? 'Hz' : 'V';
   return { value: 0, unit, status: 'ready' };
+}
+
+/**
+ * Applies `dmmIdleReading` to every DMM in `readings`, leaving every other instrument untouched.
+ * Called explicitly at the moment Pause or Reset happens, rather than as a `simulationRunning`
+ * branch inside `effectiveSnapshot` — so Play and Pause always derive an instrument's live reading
+ * through the exact same merge, and the only thing that ever forces a DMM to 0.000/OL is one of
+ * these two actions actually firing, not a per-render conditional two code paths could quietly drift
+ * out of sync on.
+ */
+function neutralizeDmmReadings(
+  components: CircuitComponent[],
+  readings: Record<string, InstrumentReading>
+): Record<string, InstrumentReading> {
+  const dmms = components.filter(component => component.type === 'dmm');
+  if (dmms.length === 0) return readings;
+  const next = { ...readings };
+  for (const dmm of dmms) next[dmm.id] = dmmIdleReading(dmm);
+  return next;
 }
 
 const ENGINEERING_PREFIXES = [
@@ -2086,6 +2105,12 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     setSpiceStatus(status);
   }, []);
 
+  // Calling this again while a previous run is still in flight does not terminate that run — ngspice
+  // executes synchronously inside the worker's one thread, and killing + reinstantiating a ~7 MB wasm
+  // module on every keystroke/toggle would trade a harmless few-millisecond wait for a multi-second
+  // one. Instead `useSpiceEngine` tags every request with a monotonic id and only ever applies the
+  // response carrying the latest one, so an old run's late result is silently discarded rather than
+  // overwriting the new one — logical cancellation without paying for a worker restart.
   const runSpiceSimulation = useCallback(() => {
     // Both the adapter (unsupported parts) and the generator (an incomplete circuit — no ground yet,
     // or nothing placed at all) can throw; either must fall back to the legacy engine's readings
@@ -2127,10 +2152,15 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
   const resetSimulation = useCallback(() => {
     simulation.current.reset();
     simulation.current.setCircuit(components, wires);
-    setSnapshot(simulation.current.getSnapshot());
+    const freshSnapshot = simulation.current.getSnapshot();
+    // Reset must never leave a pre-reset reading on a DMM, from either engine: force every DMM to
+    // 0.000/OL directly in the snapshot Reset itself produces, regardless of whether Run is still
+    // toggled on — unconditional, not something that depends on effectiveSnapshot noticing the state
+    // changed later.
+    setSnapshot({ ...freshSnapshot, instrumentReadings: neutralizeDmmReadings(components, freshSnapshot.instrumentReadings) });
     setAnimationTime(0);
-    // Reset must never leave a pre-reset SPICE reading on an instrument: purge it immediately and
-    // re-solve the (unchanged-topology) circuit from its fresh state.
+    // And purge the SPICE overlay immediately, then re-solve the (unchanged-topology) circuit from
+    // its fresh state.
     clearSpiceReadings({ kind: 'idle' });
     runSpiceSimulation();
   }, [components, wires, clearSpiceReadings, runSpiceSimulation]);
@@ -2153,8 +2183,15 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     return () => window.clearTimeout(timer);
   }, [components, wires, simulationMode]);
 
-  // The worker resolves asynchronously; react to the hook's own state (not the promise above) so a
-  // superseded run's late arrival can never be mistaken for the latest one's result.
+  // The worker resolves asynchronously; react only to the hook's own state (not the promise above,
+  // and NOT `components`) so a superseded run's late arrival can never be mistaken for the latest
+  // one's result. `components` must stay out of this dependency list: an edit already runs through
+  // the invalidate-then-resolve effect above, which is the ONLY thing allowed to clear
+  // `spiceReadingsRef` — if this effect also depended on `components`, it would re-fire on that same
+  // edit and immediately repopulate the reading it just invalidated from the still-stale
+  // `spiceEngine.results` (the fresh solve for the edit has not landed yet), which is exactly the
+  // "toggle a switch while running and the DMM won't move" bug: the read-back keeps winning the race
+  // against the invalidation on every edit until the new SPICE pass finally lands moments later.
   useEffect(() => {
     const context = spiceRunContextRef.current;
     if (!context) return;
@@ -2164,29 +2201,24 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     }
     if (!spiceEngine.results) return;
     const results = parseSpiceResults(spiceEngine.results, spiceEngine.results.time ?? []);
-    spiceReadingsRef.current = buildSpiceInstrumentReadings(components, context.nets, context.nodeMap, results);
+    spiceReadingsRef.current = buildSpiceInstrumentReadings(componentRef.current, context.nets, context.nodeMap, results);
     setSpiceReadingsVersion(version => version + 1);
     setSpiceStatus({ kind: 'ready' });
-  }, [components, spiceEngine.error, spiceEngine.results]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [spiceEngine.error, spiceEngine.results]);
 
-  // Legacy `snapshot` stays the source of truth for animation/power flow; only instrument readings
-  // are overridden, and only for the components SPICE could actually map.
+  // Legacy `snapshot` stays the single source of truth for every instrument, in both Run and Pause —
+  // this merge never branches on `simulationRunning`. Toggling Pause or clicking Reset instead calls
+  // `neutralizeDmmReadings` directly (see the Run/Pause button and `resetSimulation`), forcing a DMM
+  // to 0.000/OL as an explicit action at the moment it happens, not as a per-render condition Play
+  // and Pause could read differently through.
   const effectiveSnapshot = useMemo<SimulationSnapshot>(() => {
     const spiceReadings = spiceReadingsRef.current;
-    const merged = Object.keys(spiceReadings).length === 0
-      ? snapshot
-      : { ...snapshot, instrumentReadings: { ...snapshot.instrumentReadings, ...spiceReadings } };
-    // Paused/reset: a DMM has nothing live to report, so it must read 0.000/OL rather than whatever
-    // transient or leakage potential either engine last happened to settle on.
-    if (simulationRunning) return merged;
-    const idleReadings: Record<string, InstrumentReading> = {};
-    for (const component of components) {
-      if (component.type === 'dmm') idleReadings[component.id] = dmmIdleReading(component);
-    }
-    return { ...merged, instrumentReadings: { ...merged.instrumentReadings, ...idleReadings } };
+    if (Object.keys(spiceReadings).length === 0) return snapshot;
+    return { ...snapshot, instrumentReadings: { ...snapshot.instrumentReadings, ...spiceReadings } };
     // spiceReadingsVersion (not spiceReadingsRef.current, a ref) is what actually triggers this recompute.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [snapshot, spiceReadingsVersion, simulationRunning, components]);
+  }, [snapshot, spiceReadingsVersion]);
 
   // --- Switch & Push-Button Keyboard Controls ---
   useEffect(() => {
@@ -2409,9 +2441,19 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
               hasStartedSimulation.current = true;
               const next = !simulationRunning;
               setSimulationRunning(next);
-              // Pausing purges the SPICE overlay immediately — effectiveSnapshot's idle override
-              // (above) then takes DMMs to 0.000/OL rather than a frozen last-live reading.
-              if (next) runSpiceSimulation(); else clearSpiceReadings({ kind: 'idle' });
+              if (next) {
+                runSpiceSimulation();
+              } else {
+                // Pausing purges the SPICE overlay and forces every DMM to 0.000/OL directly in
+                // `snapshot`, rather than a `simulationRunning` branch inside effectiveSnapshot — so
+                // Play and Pause always read that one merge identically; only this explicit action
+                // (or Reset) ever neutralizes a DMM.
+                clearSpiceReadings({ kind: 'idle' });
+                setSnapshot(previous => ({
+                  ...previous,
+                  instrumentReadings: neutralizeDmmReadings(components, previous.instrumentReadings),
+                }));
+              }
             }} title={simulationRunning ? 'Pause simulation' : 'Run simulation'} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: (!simulationRunning && hasStartedSimulation.current) ? TAB_GRADIENT_REV : TAB_GRADIENT, color: '#ffffff', fontWeight: 500, padding: '6px 14px', minHeight: 30, borderRadius: 8, fontSize: 12, boxShadow: TAB_ACTIVE_SHADOW, border: '1px solid transparent', cursor: 'pointer', whiteSpace: 'nowrap', transition: 'background .3s ease' }}>
               {simulationRunning ? <Pause size={14} /> : <Play size={14} />}{simulationRunning ? 'Pause' : 'Run'}
             </button>
