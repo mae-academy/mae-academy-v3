@@ -55,11 +55,7 @@ const RAWFILE_PATH = "/out.raw";
 const SPINIT = "* ngspice initialization\n";
 const SPICE_LIB_DIR = "/usr/local/share/ngspice";
 
-/** stdout + stderr of the current run; ngspice reports parse and convergence errors here. */
-let runLog: string[] = [];
-
-let modulePromise: Promise<NgspiceModule> | null = null;
-/** Serializes requests so two runs can never interleave inside one wasm instance. */
+/** Serializes requests so two runs can never build competing module instances concurrently. */
 let queue: Promise<unknown> = Promise.resolve();
 
 function mkdirSafe(fs: EmscriptenFS, path: string): void {
@@ -70,7 +66,25 @@ function mkdirSafe(fs: EmscriptenFS, path: string): void {
   }
 }
 
-async function createModule(): Promise<NgspiceModule> {
+function describe(cause: unknown): string {
+  if (cause instanceof Error) return cause.message;
+  return typeof cause === "string" ? cause : JSON.stringify(cause);
+}
+
+/**
+ * The vendored ngspice.js glue: an Emscripten MODULARIZE build, fetched and parsed exactly once and
+ * cached — its exported factory can be called any number of times afterward to produce independent
+ * module instances, which is exactly what every simulation needs (see `createModule`).
+ */
+interface NgspiceGlue {
+  factory: NgspiceFactory;
+  /** Kept only long enough for `ensureWasmModule` to pull the embedded binary out of it. */
+  sourceText: string;
+}
+
+let gluePromise: Promise<NgspiceGlue> | null = null;
+
+async function loadGlue(): Promise<NgspiceGlue> {
   // ngspice.js is a 7 MB vendored asset in `public/`, deliberately outside the bundle graph. It is
   // fetched and imported through a blob URL rather than `import(url)`: Vite's dev server rejects a
   // module request for anything under `public/` ("can only be referenced via HTML tags"), and this
@@ -82,9 +96,10 @@ async function createModule(): Promise<NgspiceModule> {
       `Could not fetch ${url}: ${response.status} ${response.statusText}`
     );
   }
+  const sourceText = await response.text();
 
   const blobUrl = URL.createObjectURL(
-    new Blob([await response.text()], { type: "text/javascript" })
+    new Blob([sourceText], { type: "text/javascript" })
   );
   let mod: { default?: NgspiceFactory; createNgspiceModule?: NgspiceFactory };
   try {
@@ -99,12 +114,81 @@ async function createModule(): Promise<NgspiceModule> {
       `ngspice module at ${url} did not export a factory function.`
     );
   }
+  return { factory, sourceText };
+}
+
+function ensureGlue(): Promise<NgspiceGlue> {
+  gluePromise ??= loadGlue().catch(cause => {
+    gluePromise = null;
+    throw new Error(`Failed to load ngspice: ${describe(cause)}`);
+  });
+  return gluePromise;
+}
+
+/**
+ * ngspice's `main()` cannot safely run twice on one module instance: even a run that completed
+ * cleanly leaves a second `_main` call on the same instance aborting with ngspice's own "jump to
+ * zero" internal error — verified directly against this binary, not only after a failed run as one
+ * might assume. So every simulation below gets a brand-new instance (`createModule`).
+ *
+ * Naively, that means re-paying the cost of decoding and compiling this build's ~5.3 MB wasm binary
+ * on every single circuit edit — the dominant cost of building an instance by an order of magnitude
+ * (verified: ~100ms decode + compile vs ~10ms to instantiate from an already-compiled
+ * `WebAssembly.Module`). `ngspice.js` inlines that binary as a base64 literal (an Emscripten
+ * `SINGLE_FILE` build) rather than serving a separate `.wasm` file, so this extracts and compiles it
+ * exactly once and reuses the compiled `WebAssembly.Module` for every later instance via
+ * Emscripten's `instantiateWasm` hook — the documented, supported way for an embedder to take over
+ * instantiation. Compiling a `WebAssembly.Module` produces immutable, shareable bytecode only; each
+ * `WebAssembly.instantiate` call off it still gets its own fresh linear memory and globals, so this
+ * changes nothing about every run getting a fully isolated instance.
+ *
+ * This depends on ngspice.js's current internal layout, which is not part of its public contract —
+ * a future rebuild of the vendored asset could change it. Failure here is caught and treated as
+ * merely "unavailable", in which case `createModule` falls back to the glue's own default (slower,
+ * always-correct) instantiation path rather than breaking simulation outright.
+ */
+// Exported so ngspiceWasmCaching.test.ts can verify this extracts a real, working compiled module
+// straight from the vendored asset, without needing spiceWorker.ts's blob-URL loading (untestable
+// under Node/vitest: dynamic `import()` of a `blob:` URL has no Node ESM loader support).
+export async function extractWasmModule(
+  sourceText: string
+): Promise<WebAssembly.Module | null> {
+  const match =
+    /findWasmBinary\(\)\{return base64Decode\("([A-Za-z0-9+/=]+)"\)\}/.exec(
+      sourceText
+    );
+  if (!match) return null;
+  const binary = atob(match[1]);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  return WebAssembly.compile(bytes);
+}
+
+// Never rejects: a failed extraction/compile memoizes to `null` (permanently falling back to the
+// default path) rather than being retried, and failing, on every single future simulation.
+let wasmModulePromise: Promise<WebAssembly.Module | null> | null = null;
+
+function ensureWasmModule(sourceText: string): Promise<WebAssembly.Module | null> {
+  wasmModulePromise ??= extractWasmModule(sourceText).catch(() => null);
+  return wasmModulePromise;
+}
+
+/** A fresh ngspice instance plus the stdout/stderr log its print hooks fill during its one run. */
+interface ModuleSession {
+  module: NgspiceModule;
+  log: string[];
+}
+
+async function createModule(): Promise<ModuleSession> {
+  const { factory, sourceText } = await ensureGlue();
+  const wasmModule = await ensureWasmModule(sourceText);
+  const log: string[] = [];
 
   const options: Record<string, unknown> = {
     noInitialRun: true,
     stdin: () => null,
-    print: (text: string) => runLog.push(text),
-    printErr: (text: string) => runLog.push(text),
+    print: (text: string) => log.push(text),
+    printErr: (text: string) => log.push(text),
     // Emscripten invokes preRun with the Module itself, before initRuntime.
     preRun: (module: NgspiceModule) => {
       // ngspice aborts at startup without HOME, a spinit file and readable /proc entries.
@@ -137,20 +221,24 @@ async function createModule(): Promise<NgspiceModule> {
     },
   };
 
-  return factory(options);
-}
+  if (wasmModule) {
+    options.instantiateWasm = (
+      imports: WebAssembly.Imports,
+      successCallback: (
+        instance: WebAssembly.Instance,
+        module: WebAssembly.Module
+      ) => void
+    ) => {
+      WebAssembly.instantiate(wasmModule, imports).then(instance =>
+        successCallback(instance, wasmModule)
+      );
+      // Signals "asynchronous — call successCallback later" per Emscripten's instantiateWasm
+      // contract, rather than an already-resolved exports object.
+      return {};
+    };
+  }
 
-function ensureModule(): Promise<NgspiceModule> {
-  modulePromise ??= createModule().catch(cause => {
-    modulePromise = null;
-    throw new Error(`Failed to initialize ngspice: ${describe(cause)}`);
-  });
-  return modulePromise;
-}
-
-function describe(cause: unknown): string {
-  if (cause instanceof Error) return cause.message;
-  return typeof cause === "string" ? cause : JSON.stringify(cause);
+  return { module: await factory(options), log };
 }
 
 /** Marshals argv onto the wasm stack and calls `main`. There is no `_malloc` in this build. */
@@ -185,23 +273,22 @@ function callMain(module: NgspiceModule, args: string[]): void {
 class RawfileError extends Error {}
 
 function runNetlist(
-  module: NgspiceModule,
+  session: ModuleSession,
   netlist: string
 ): Record<string, number[]> {
-  runLog = [];
+  const { module, log } = session;
 
-  // Never let a previous run's rawfile be mistaken for this run's output.
-  if (module.FS.analyzePath(RAWFILE_PATH).exists)
-    module.FS.unlink(RAWFILE_PATH);
+  // A fresh instance's FS starts empty, so unlike a reused one there is never a stale rawfile to
+  // clear first — see the "jump to zero" note above for why every session is fresh.
   module.FS.writeFile(NETLIST_PATH, netlist);
 
   // -n skips the user's .spiceinit, which we never provide.
   callMain(module, ["ngspice", "-b", "-n", "-r", RAWFILE_PATH, NETLIST_PATH]);
 
   if (!module.FS.analyzePath(RAWFILE_PATH).exists) {
-    const log = runLog.join("\n").trim();
+    const text = log.join("\n").trim();
     throw new Error(
-      log.length > 0 ? log : "ngspice produced no output for this netlist."
+      text.length > 0 ? text : "ngspice produced no output for this netlist."
     );
   }
 
@@ -215,34 +302,41 @@ function runNetlist(
 
 async function simulate(netlist: string): Promise<Record<string, number[]>> {
   try {
-    return runNetlist(await ensureModule(), netlist);
+    return runNetlist(await createModule(), netlist);
   } catch (cause) {
     if (cause instanceof RawfileError) throw cause;
-    // ngspice's main() is a one-shot CLI entry point, so a failed run may have left its C globals
-    // in an unusable state. Rebuild the instance and give the netlist exactly one more chance.
-    modulePromise = null;
-    return runNetlist(await ensureModule(), netlist);
+    // A brand-new instance failing on its first (and only) run points at the caches above, not at
+    // ngspice's one-shot main() — clear them and give the netlist exactly one more chance against a
+    // fully clean load.
+    gluePromise = null;
+    wasmModulePromise = null;
+    return runNetlist(await createModule(), netlist);
   }
 }
 
-ctx.addEventListener("message", (event: MessageEvent<SpiceRequest>) => {
-  const request = event.data;
-  if (request?.type !== "RUN_SIMULATION") return;
+// Guarded so this module can be imported for its exports (e.g. by spiceWorkerWasmCache.test.ts)
+// outside an actual Worker, where `addEventListener` does not exist on `globalThis`; real Workers
+// always have it, so this changes nothing about production behavior.
+if (typeof ctx.addEventListener === "function") {
+  ctx.addEventListener("message", (event: MessageEvent<SpiceRequest>) => {
+    const request = event.data;
+    if (request?.type !== "RUN_SIMULATION") return;
 
-  queue = queue.then(async () => {
-    try {
-      const vectors = await simulate(request.payload.netlist);
-      ctx.postMessage({
-        type: "SUCCESS",
-        payload: { vectors },
-        id: request.id,
-      });
-    } catch (cause) {
-      ctx.postMessage({
-        type: "ERROR",
-        payload: { error: describe(cause) },
-        id: request.id,
-      });
-    }
+    queue = queue.then(async () => {
+      try {
+        const vectors = await simulate(request.payload.netlist);
+        ctx.postMessage({
+          type: "SUCCESS",
+          payload: { vectors },
+          id: request.id,
+        });
+      } catch (cause) {
+        ctx.postMessage({
+          type: "ERROR",
+          payload: { error: describe(cause) },
+          id: request.id,
+        });
+      }
+    });
   });
-});
+}
