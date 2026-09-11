@@ -793,7 +793,7 @@ describe("generateNetlist", () => {
     expect(deck).toContain("RA P NA 4");
   });
 
-  it("drives a closed manual switch from a 1V dummy source", () => {
+  it("drives a closed manual switch as a plain low-value resistor", () => {
     const deck = generateNetlist([
       ground,
       {
@@ -806,15 +806,13 @@ describe("generateNetlist", () => {
       },
     ]);
 
-    // SW with VT/VH, not PSPICE's VSWITCH with VON/VOFF: ngspice cannot parse the latter.
-    expect(deck).toContain(
-      ".MODEL SW_MANUAL SW (VT=0.5 VH=0 RON=0.001 ROFF=1e9)"
-    );
-    expect(deck).toContain("VS1CTL S1CTL 0 DC 1");
-    expect(deck).toContain("S1 n1 0 S1CTL 0 SW_MANUAL");
+    // A manual contact never changes state mid-solve — the whole deck is rebuilt on every canvas
+    // edit — so it needs no dummy control source or switch model, just its resistance directly.
+    expect(deck).toContain("RS1 n1 0 0.001");
+    expect(deck).not.toContain("SW_MANUAL");
   });
 
-  it("drives an open manual switch from a 0V dummy source", () => {
+  it("drives an open manual switch as a 1e12 ohm resistor, not a leaky ROFF", () => {
     const deck = generateNetlist([
       ground,
       {
@@ -827,8 +825,9 @@ describe("generateNetlist", () => {
       },
     ]);
 
-    expect(deck).toContain("VS1CTL S1CTL 0 DC 0");
-    expect(deck).toContain("S1 n1 0 S1CTL 0 SW_MANUAL");
+    // 1e12 Ω, not a switch's 1e9 Ω ROFF: loaded only by a downstream diode-like junction, 1e9 Ω of
+    // leakage is still enough to bias that junction onto its exponential knee instead of ~0 V.
+    expect(deck).toContain("RS1 n1 0 1000000000000");
   });
 
   it("emits both SPDT throws so the netlist keeps its shape in every position", () => {
@@ -847,20 +846,18 @@ describe("generateNetlist", () => {
         },
       ]);
 
-    expect(forPosition("a")).toContain("VS1CTLA S1CTLA 0 DC 1");
-    expect(forPosition("a")).toContain("VS1CTLB S1CTLB 0 DC 0");
-    expect(forPosition("b")).toContain("VS1CTLA S1CTLA 0 DC 0");
-    expect(forPosition("b")).toContain("VS1CTLB S1CTLB 0 DC 1");
+    expect(forPosition("a")).toContain("RS1A n1 n2 0.001");
+    expect(forPosition("a")).toContain("RS1B n1 n3 1000000000000");
+    expect(forPosition("b")).toContain("RS1A n1 n2 1000000000000");
+    expect(forPosition("b")).toContain("RS1B n1 n3 0.001");
 
-    // Break-before-make: neither throw is driven, but both switches are still emitted.
+    // Break-before-make: neither throw is live, but both resistors are still emitted, both open.
     const open = forPosition("open");
-    expect(open).toContain("VS1CTLA S1CTLA 0 DC 0");
-    expect(open).toContain("VS1CTLB S1CTLB 0 DC 0");
-    expect(open).toContain("S1A n1 n2 S1CTLA 0 SW_MANUAL");
-    expect(open).toContain("S1B n1 n3 S1CTLB 0 SW_MANUAL");
+    expect(open).toContain("RS1A n1 n2 1000000000000");
+    expect(open).toContain("RS1B n1 n3 1000000000000");
   });
 
-  it("shares one manual switch model across every manual contact", () => {
+  it("needs no shared switch model for manual contacts", () => {
     const deck = generateNetlist([
       ground,
       {
@@ -881,7 +878,8 @@ describe("generateNetlist", () => {
       },
     ]);
 
-    expect(deck.match(/\.MODEL SW_MANUAL/g)).toHaveLength(1);
+    expect(deck).not.toContain(".MODEL SW_MANUAL");
+    expect(deck).not.toMatch(/^V/m);
   });
 
   it("emits a relay as a series R-L coil driving its contacts", () => {

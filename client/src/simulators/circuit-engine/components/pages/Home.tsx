@@ -2086,7 +2086,14 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
   // live from the loop above, simply keep serving the instruments untouched — a silent fallback.
   const spiceEngine = useSpiceEngine();
   const spiceReadingsRef = useRef<Record<string, InstrumentReading>>({});
-  const spiceRunContextRef = useRef<{ nets: SpiceCircuitNets; nodeMap: SpiceNodeMap } | null>(null);
+  // Snapshots the exact component list a run's netlist was built from, alongside its nets/nodeMap.
+  // Reading results back through this instead of the live `components` state means a circuit edit
+  // that lands while a run is still in flight can never be paired with a mismatched node map.
+  const spiceRunContextRef = useRef<{
+    components: CircuitComponent[];
+    nets: SpiceCircuitNets;
+    nodeMap: SpiceNodeMap;
+  } | null>(null);
   const spiceUnsupportedToastRef = useRef<string | null>(null);
   const [spiceStatus, setSpiceStatus] = useState<SpiceBridgeStatus>({ kind: 'idle' });
   const [spiceReadingsVersion, setSpiceReadingsVersion] = useState(0);
@@ -2131,10 +2138,15 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     }
 
     spiceUnsupportedToastRef.current = null;
-    spiceRunContextRef.current = { nets, nodeMap: buildSpiceNodeMap(spiceComponents) };
+    spiceRunContextRef.current = { components, nets, nodeMap: buildSpiceNodeMap(spiceComponents) };
     setSpiceStatus({ kind: 'running' });
     void spiceEngine.runSimulation(netlist);
-  }, [clearSpiceReadings, components, simulationMode, spiceEngine, wires]);
+    // Only the netlist inputs and the hook's own (stable, useCallback-wrapped) `runSimulation`
+    // should give this a new identity. Depending on the whole `spiceEngine` object instead — as
+    // this used to — broke the debounce below: `useSpiceEngine` returns a new object every render,
+    // so during Run (a 60fps state update loop) the debounce timer was reset before it could ever
+    // elapse, and SPICE silently stopped re-solving on switch toggles until Pause forced one retry.
+  }, [clearSpiceReadings, components, simulationMode, spiceEngine.runSimulation, wires]);
 
   // Trigger on every circuit edit, debounced so a drag or a burst of keystrokes fires one run.
   useEffect(() => {
@@ -2143,20 +2155,25 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
   }, [runSpiceSimulation]);
 
   // The worker resolves asynchronously; react to the hook's own state (not the promise above) so a
-  // superseded run's late arrival can never be mistaken for the latest one's result.
+  // superseded run's late arrival can never be mistaken for the latest one's result. Reads back
+  // through `context.components` (captured at request time), not the live `components` state, so
+  // an edit that lands before this effect fires cannot be paired with a stale node map.
   useEffect(() => {
     const context = spiceRunContextRef.current;
     if (!context) return;
     if (spiceEngine.error) {
-      setSpiceStatus({ kind: 'unsupported', reason: spiceEngine.error });
+      // A failed run's readings must not keep masking the legacy engine's own values underneath —
+      // previously only the status changed here, so a stale "SPICE-VERIFIED" reading could sit
+      // behind an "unsupported" chip indefinitely.
+      clearSpiceReadings({ kind: 'unsupported', reason: spiceEngine.error });
       return;
     }
     if (!spiceEngine.results) return;
     const results = parseSpiceResults(spiceEngine.results, spiceEngine.results.time ?? []);
-    spiceReadingsRef.current = buildSpiceInstrumentReadings(components, context.nets, context.nodeMap, results);
+    spiceReadingsRef.current = buildSpiceInstrumentReadings(context.components, context.nets, context.nodeMap, results);
     setSpiceReadingsVersion(version => version + 1);
     setSpiceStatus({ kind: 'ready' });
-  }, [components, spiceEngine.error, spiceEngine.results]);
+  }, [clearSpiceReadings, spiceEngine.error, spiceEngine.results]);
 
   // Legacy `snapshot` stays the source of truth for animation/power flow; only instrument readings
   // are overridden, and only for the components SPICE could actually map.
@@ -2381,7 +2398,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
             <ToolbarButton colors={colors} icon={<Clipboard size={14} />} title="Paste (Ctrl/Cmd+V)" onClick={pasteClipboard} disabled={!clipboard || (clipboard.components.length === 0 && clipboard.wires.length === 0 && clipboard.texts.length === 0)} />
             <ToolbarButton colors={colors} icon={<Trash2 size={14} />} title="Delete (Del/Backspace)" onClick={removeSelection} disabled={!selectedComponent && !selectedWire && !selectedText && marqueeIds.length === 0} />
             <ToolbarDivider colors={colors} />
-            <button onClick={() => { hasStartedSimulation.current = true; setSimulationRunning(value => !value); runSpiceSimulation(); }} title={simulationRunning ? 'Pause simulation' : 'Run simulation'} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: (!simulationRunning && hasStartedSimulation.current) ? TAB_GRADIENT_REV : TAB_GRADIENT, color: '#ffffff', fontWeight: 500, padding: '6px 14px', minHeight: 30, borderRadius: 8, fontSize: 12, boxShadow: TAB_ACTIVE_SHADOW, border: '1px solid transparent', cursor: 'pointer', whiteSpace: 'nowrap', transition: 'background .3s ease' }}>
+            <button onClick={() => { hasStartedSimulation.current = true; setSimulationRunning(value => !value); }} title={simulationRunning ? 'Pause simulation' : 'Run simulation'} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: (!simulationRunning && hasStartedSimulation.current) ? TAB_GRADIENT_REV : TAB_GRADIENT, color: '#ffffff', fontWeight: 500, padding: '6px 14px', minHeight: 30, borderRadius: 8, fontSize: 12, boxShadow: TAB_ACTIVE_SHADOW, border: '1px solid transparent', cursor: 'pointer', whiteSpace: 'nowrap', transition: 'background .3s ease' }}>
               {simulationRunning ? <Pause size={14} /> : <Play size={14} />}{simulationRunning ? 'Pause' : 'Run'}
             </button>
             <ToolbarButton colors={colors} label={simulationMode === 'academic' ? 'Academic' : 'Practical'} title="Academic / Practical — toggle SPICE simulation mode" onClick={() => setSimulationMode(mode => mode === 'academic' ? 'practical' : 'academic')} active={simulationMode === 'academic'} />

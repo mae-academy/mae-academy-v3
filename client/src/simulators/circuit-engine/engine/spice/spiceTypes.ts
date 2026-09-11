@@ -347,9 +347,12 @@ export const SPICE_PREFIXES: Record<
   transformer: "T",
   "transformer-ct": "T",
   autotransformer: "T",
-  // Voltage-controlled switches, plus the dummy control sources and coil R/L derived from them.
-  "switch-spst": "S",
-  "switch-spdt": "S",
+  // Manual contacts emit a plain resistor (see netlistGenerator's `manualContactResistance`), so
+  // they must be named `R…` — ngspice dispatches an element's type from its name's first letter,
+  // and an `S…`-named resistor line would be misparsed as an incomplete switch element.
+  "switch-spst": "R",
+  "switch-spdt": "R",
+  // Coil-driven contacts stay voltage-controlled switches, plus their coil's R/L.
   relay: "S",
   contactor: "S",
 };

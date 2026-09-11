@@ -422,25 +422,78 @@ describe("convertToSpiceComponents", () => {
     expect(probeBranchKey("am-1")).toBe("vprobe_am_1");
   });
 
-  it("inserts a DMM only in current modes", () => {
-    expect(
-      convertToSpiceComponents([part("d", "dmm", { mode: "DCV" })], [])
-    ).toHaveLength(0);
+  it("inserts a DMM's current-mode probe in both simulation modes", () => {
     expect(
       find(
-        convertToSpiceComponents([part("d", "dmm", { mode: "ACA" })], []),
+        convertToSpiceComponents(
+          [part("d", "dmm", { mode: "ACA" })],
+          [],
+          undefined,
+          "practical"
+        ),
+        "d",
+        "dc-voltage"
+      ).voltage
+    ).toBe(0);
+    expect(
+      find(
+        convertToSpiceComponents(
+          [part("d", "dmm", { mode: "ACA" })],
+          [],
+          undefined,
+          "academic"
+        ),
         "d",
         "dc-voltage"
       ).voltage
     ).toBe(0);
   });
 
-  it("emits nothing for ideal voltage-reading instruments", () => {
+  it("leaves OHM/CONT unmapped so the legacy engine keeps serving them", () => {
+    expect(
+      convertToSpiceComponents([part("d", "dmm", { mode: "OHM" })], [])
+    ).toHaveLength(0);
+    expect(
+      convertToSpiceComponents([part("d", "dmm", { mode: "CONT" })], [])
+    ).toHaveLength(0);
+  });
+
+  it("loads DCV/ACV/HZ DMM and voltmeter inputs at 10 MΩ in Practical mode", () => {
+    const spice = convertToSpiceComponents(
+      [part("d", "dmm", { mode: "DCV" }), part("vm", "voltmeter")],
+      [],
+      undefined,
+      "practical"
+    );
+    expect(find(spice, "d", "resistor").resistance).toBe(10e6);
+    expect(find(spice, "vm", "resistor").resistance).toBe(10e6);
+  });
+
+  it("keeps DCV/ACV/HZ DMM and voltmeter inputs ideal in Academic mode", () => {
     expect(
       convertToSpiceComponents(
-        [part("vm", "voltmeter"), part("o", "oscilloscope")],
-        []
+        [part("d", "dmm", { mode: "DCV" })],
+        [],
+        undefined,
+        "academic"
       )
+    ).toHaveLength(0);
+    expect(
+      convertToSpiceComponents(
+        [part("vm", "voltmeter")],
+        [],
+        undefined,
+        "academic"
+      )
+    ).toHaveLength(0);
+  });
+
+  it("leaves the oscilloscope ideal in either mode", () => {
+    expect(
+      convertToSpiceComponents([part("o", "oscilloscope")], [], undefined, "practical")
+    ).toHaveLength(0);
+    expect(
+      convertToSpiceComponents([part("o", "oscilloscope")], [], undefined, "academic")
     ).toHaveLength(0);
   });
 

@@ -153,9 +153,12 @@ function modelFor(
       switch (element.variant) {
         case "standard":
           // Academic: an ideal switch-like junction — N so far below 1 that the I-V curve is
-          // effectively a step at 0 V, rather than silicon's ~0.6-0.7 V knee.
+          // effectively a step at 0 V, rather than silicon's ~0.6-0.7 V knee. RS=1e-3 (rather than
+          // 0) is load-bearing: verified against ngspice.wasm, a bare junction this steep with no
+          // series resistance has nothing bounding di/dv, and gmin/source stepping all fail to find
+          // an operating point the moment it sits directly across a source with no other resistance.
           return academic
-            ? { name: "D_STD", card: ".MODEL D_STD D (IS=1e-14 RS=0 N=0.001)" }
+            ? { name: "D_STD", card: ".MODEL D_STD D (IS=1e-14 RS=1e-3 N=0.001)" }
             : { name: "D_STD", card: ".MODEL D_STD D (IS=1e-14 RS=0 N=1)" };
         case "photodiode":
           // Reduced to its junction: IS stands in for dark current. Photocurrent needs an
@@ -188,11 +191,11 @@ function modelFor(
           }
           const name = `D_LED_${modelToken(element.forwardVoltage)}`;
           if (academic) {
-            // Ideal switch-like junction, same as the standard diode; the fitted forward-voltage
-            // knee is a Practical-mode concern.
+            // Ideal switch-like junction, same as the standard diode (RS=1e-3 for the same
+            // convergence reason); the fitted forward-voltage knee is a Practical-mode concern.
             return {
               name,
-              card: `.MODEL ${name} D (IS=1e-14 N=0.001 RS=0)`,
+              card: `.MODEL ${name} D (IS=1e-14 N=0.001 RS=1e-3)`,
             };
           }
           // Fitted so the junction drops the quoted forward voltage at LED_TEST_CURRENT:
@@ -259,24 +262,37 @@ function modelFor(
 /* --------------------------------------------------------------- Voltage-controlled switches --- */
 
 /**
- * Contact resistances shared by every switch model. Note the model type is `SW` with VT/VH, not
- * PSPICE's `VSWITCH` with VON/VOFF: this ngspice build fails to parse a `VSWITCH` model card, and
- * feeding VON/VOFF to `SW` aborts the process outright.
+ * Contact resistances for a coil-driven contact model (`SW` with VT/VH — not PSPICE's `VSWITCH`
+ * with VON/VOFF: this ngspice build fails to parse a `VSWITCH` model card, and feeding VON/VOFF to
+ * `SW` aborts the process outright). Manual contacts (switches, breakers, pushbuttons, …) never
+ * need this dynamic model — see `manualContactResistance` — because a canvas edit always rebuilds
+ * the whole deck, so nothing needs to change contact state mid-solve.
  *
- * Academic mode drives RON down to a near-zero ideal contact; ROFF is untouched by either mode.
+ * Academic mode drives RON down to a near-zero ideal contact, but not all the way to the value
+ * `manualContactResistance` uses: ROFF stays 1e9 in both modes, and an RON/ROFF ratio much beyond
+ * 1e12 leaves ngspice's transient solver chattering at its minimum timestep on the instant the
+ * contact closes.
  */
 function switchResistances(mode: SimulationMode): string {
-  return mode === "academic" ? "RON=1e-6 ROFF=1e9" : "RON=0.001 ROFF=1e9";
+  return mode === "academic" ? "RON=1e-3 ROFF=1e9" : "RON=0.001 ROFF=1e9";
 }
 
-/** Model for a manually operated contact, driven by a 1 V / 0 V dummy source. */
-const MANUAL_SWITCH_MODEL = "SW_MANUAL";
-function manualSwitchCard(mode: SimulationMode): string {
-  return `.MODEL ${MANUAL_SWITCH_MODEL} SW (VT=0.5 VH=0 ${switchResistances(mode)})`;
+/**
+ * Resistance for a manually operated contact (switch, breaker, pushbutton, aux contact, forced
+ * relay override) in either state. Modeled as a plain resistor rather than a voltage-controlled
+ * switch: unlike a coil contact, a manual contact's state never changes within one SPICE solve, so
+ * there is nothing to switch and no need for the dummy control source a `SW` element requires.
+ *
+ * The open resistance is far higher than a coil contact's ROFF (1e12 vs 1e9): loaded only by a
+ * downstream diode-like junction, 1e9 Ω of leakage current is still enough to bias that junction
+ * onto its exponential knee (a few hundred mV to over a volt) rather than leaving it at 0 V, and no
+ * ROFF value alone fixes that — see spiceAdapter's Practical-mode DMM/voltmeter input resistor for
+ * the other half of this fix.
+ */
+function manualContactResistance(mode: SimulationMode, closed: boolean): number {
+  if (!closed) return 1e12;
+  return mode === "academic" ? 1e-6 : 0.001;
 }
-
-/** Control level a closed manual contact is driven to; open contacts get 0 V. */
-const MANUAL_SWITCH_CLOSED = 1;
 
 type SpiceCoilElement = Extract<SpiceElement, { kind: "relay" | "contactor" }>;
 
@@ -335,9 +351,10 @@ function switchModelsFor(
   mode: SimulationMode
 ): SpiceModel[] {
   switch (element.kind) {
+    // Manual contacts are plain resistors (see `manualContactResistance`) and need no model card.
     case "switch-spst":
     case "switch-spdt":
-      return [{ name: MANUAL_SWITCH_MODEL, card: manualSwitchCard(mode) }];
+      return [];
 
     case "relay":
     case "contactor": {
@@ -412,13 +429,6 @@ const THYRISTOR_GATE_SHUNT = 1000;
 const THYRISTOR_ANODE_SHUNT = 10000;
 
 /**
- * Ideal gate-controlled switch the Academic-mode thyristor macros share: RON/ROFF give a near-zero
- * on-resistance and, per the zero-leakage requirement, a near-infinite off-resistance. VH=0 drops
- * the real device's latching hysteresis in favor of a single, textbook trigger threshold.
- */
-const THYRISTOR_ACADEMIC_SWITCH_MODEL = "SW (VT=0.5 VH=0 RON=1e-6 ROFF=1e12)";
-
-/**
  * The `.SUBCKT` an element expands into, or `undefined` when it maps to native SPICE elements.
  * `name` is the already-uniqued element name, which per-device macros key off so two motors with
  * different parameters cannot collide on one card.
@@ -431,21 +441,13 @@ function macroFor(
   const academic = mode === "academic";
   switch (element.kind) {
     case "scr":
-      // Academic: the 2-BJT regenerative latch collapses to a single ideal gate-controlled switch —
-      // no holding current, no leakage, closes the moment V(gate, cathode) crosses the threshold.
-      if (academic) {
-        return {
-          name: "SCR_STD_ACADEMIC",
-          lines: [
-            ".SUBCKT SCR_STD_ACADEMIC A G K",
-            "S1 A K G K SW_SCR_ACADEMIC",
-            `.MODEL SW_SCR_ACADEMIC ${THYRISTOR_ACADEMIC_SWITCH_MODEL}`,
-            ".ENDS SCR_STD_ACADEMIC",
-          ],
-        };
-      }
-      // Two-transistor latch: the PNP collector drives the NPN base and vice versa, so gate
-      // injection regenerates until the anode current holds it on.
+      // Two-transistor latch in both modes: the PNP collector drives the NPN base and vice versa,
+      // so gate injection regenerates until the anode current holds it on. An ideal gate-controlled
+      // switch was tried for Academic mode (no holding current, no leakage, closes the instant
+      // V(gate, cathode) crosses a threshold) but its own control voltage collapses to 0 V the
+      // instant it closes, which ngspice's transient solver cannot step through — verified against
+      // ngspice.wasm directly: it drives the timestep to the simulator's floor and aborts the run.
+      // The latch also regenerates correctly under `.tran`, so nothing textbook is lost.
       return {
         name: "SCR_STD",
         lines: [
@@ -460,22 +462,9 @@ function macroFor(
       };
 
     case "triac":
-      // Academic: two anti-parallel ideal switches sharing the gate, each firing off the gate
-      // voltage measured against whichever main terminal it currently blocks from — the same
-      // either-direction coverage as the two anti-parallel SCR latches, without the latch.
-      if (academic) {
-        return {
-          name: "TRIAC_STD_ACADEMIC",
-          lines: [
-            ".SUBCKT TRIAC_STD_ACADEMIC MT1 G MT2",
-            "SA MT1 MT2 G MT1 SW_TRIAC_ACADEMIC",
-            "SB MT2 MT1 G MT2 SW_TRIAC_ACADEMIC",
-            `.MODEL SW_TRIAC_ACADEMIC ${THYRISTOR_ACADEMIC_SWITCH_MODEL}`,
-            ".ENDS TRIAC_STD_ACADEMIC",
-          ],
-        };
-      }
-      // Two anti-parallel SCR latches sharing one gate, so it conducts in either direction.
+      // Two anti-parallel SCR latches sharing one gate, so it conducts in either direction, in
+      // both modes — an ideal anti-parallel switch pair was tried for Academic mode but hits the
+      // same control-voltage collapse as the SCR's ideal switch above.
       return {
         name: "TRIAC_STD",
         lines: [
@@ -815,31 +804,26 @@ function elementLines(
       ];
     }
 
-    // A manual contact is a dummy source at 1 V or 0 V driving a voltage-controlled switch, so the
-    // canvas can flip it without the netlist changing shape.
+    // A manual contact is a plain resistor at its open or closed value: the canvas rebuilds the
+    // whole deck on every edit, so nothing needs a live control source mid-solve.
     case "switch-spst": {
-      const control = `${name}CTL`;
-      const level = component.isClosed ? MANUAL_SWITCH_CLOSED : 0;
+      const resistance = manualContactResistance(mode, component.isClosed);
       return [
-        `V${control} ${control} 0 DC ${level}`,
-        `${name} ${nodes.nameFor(component.a)} ${nodes.nameFor(component.b)} ${control} 0 ${MANUAL_SWITCH_MODEL}`,
+        `${name} ${nodes.nameFor(component.a)} ${nodes.nameFor(component.b)} ${resistance}`,
       ];
     }
 
     case "switch-spdt": {
       const common = nodes.nameFor(component.common);
-      // Break-before-make: `open` drives both throws low rather than emitting neither switch, so
-      // the element keeps the same shape in every position.
+      // Break-before-make: `open` resistances both throws rather than emitting neither, so the
+      // element keeps the same shape in every position.
       const throws = [
         { suffix: "A", net: component.a, live: component.position === "a" },
         { suffix: "B", net: component.b, live: component.position === "b" },
       ];
-      return throws.flatMap(({ suffix, net, live }) => {
-        const control = `${name}CTL${suffix}`;
-        return [
-          `V${control} ${control} 0 DC ${live ? MANUAL_SWITCH_CLOSED : 0}`,
-          `${name}${suffix} ${common} ${nodes.nameFor(net)} ${control} 0 ${MANUAL_SWITCH_MODEL}`,
-        ];
+      return throws.map(({ suffix, net, live }) => {
+        const resistance = manualContactResistance(mode, live);
+        return `${name}${suffix} ${common} ${nodes.nameFor(net)} ${resistance}`;
       });
     }
 
