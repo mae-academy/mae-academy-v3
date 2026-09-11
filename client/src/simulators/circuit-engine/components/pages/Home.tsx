@@ -83,7 +83,7 @@ import { buildSpiceInstrumentReadings } from '@/simulators/circuit-engine/engine
 import { filterTabDCatalog, filterTabDImportedComponents, isTabDComponentAvailable } from '@/simulators/circuit-engine/models/analogComponentCatalog';
 import { alignTabDTerminalToGrid, calculateTabDPlanarCavity, dynamicRubberBandPath, getExactTerminalOffset, isExactCadComponent, lockTabDWireCorner, MESH_LOOP_COLORS, moveTabDOrthogonalLane, tabDComponentLabelAnchors, tabDGentleWheelZoomFactor, tabDOrthogonalDraftPath, tabDTerminalOrthogonalPath, type ObstacleBox, type TabDTerminalAxis } from '@/simulators/circuit-engine/components/analogCanvasGeometry';
 import { renderSymbol } from '@/simulators/circuit-engine/components/symbols';
-import { directControlKind, momentaryControlProps, nextLatchingControlProps } from '@/simulators/circuit-engine/models/componentInteraction';
+import { applySwitchHotkey, directControlKind, hotkeyDigit, isTextEntryTarget, momentaryControlProps, nextLatchingControlProps, releaseHeldPushbuttons } from '@/simulators/circuit-engine/models/componentInteraction';
 import {
   addWireCorner,
   getDotsOnPath,
@@ -2205,71 +2205,47 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
   }, [snapshot, spiceReadingsVersion]);
 
   // --- Switch & Push-Button Keyboard Controls ---
+  // A number key addresses the switch/pushbutton whose label ends in it (S1 -> "1"); see
+  // applySwitchHotkey. Every change marks the next SPICE solve eager, so the DMM follows the key
+  // immediately, Run or not.
   useEffect(() => {
+    const applyToCanvas = (update: (previous: CircuitComponent[]) => CircuitComponent[] | null) => {
+      setComponents(previous => {
+        const next = update(previous);
+        if (!next) return previous;
+        requestEagerSpiceRun();
+        return next;
+      });
+    };
+
     const handleSwitchKeyDown = (event: KeyboardEvent) => {
-      const target = event.target as HTMLElement | null;
-      if (target && ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) return;
+      if (isTextEntryTarget(event.target)) return;
+      // Auto-repeat must not re-flip a held latching switch; a held pushbutton is already pressed.
+      // Shift is allowed: AZERTY layouts type the number row's digits only with Shift held.
       if (event.ctrlKey || event.metaKey || event.altKey || event.repeat) return;
-
-      if (/^[0-9]$/.test(event.key)) {
-        setComponents(prev => {
-          let changed = false;
-          const next = prev.map(comp => {
-            // Only affect switches and push-buttons
-            if (!comp.type.startsWith('sw-') && !comp.type.startsWith('pb-')) return comp;
-
-            // Extract the number at the end of the label (e.g., "S1" -> "1")
-            const match = comp.label.match(/\d+$/);
-            if (!match || match[0] !== event.key) return comp;
-
-            changed = true;
-            if (comp.type.startsWith('sw-')) {
-              // Toggle Latching Switch
-              const isSpdt = comp.type === 'sw-spdt' || comp.type === 'sw-dpdt';
-              const nextState = isSpdt
-                ? (comp.props.state === 'b' ? 'a' : 'b')
-                : (comp.props.state === 'closed' ? 'open' : 'closed');
-              return { ...comp, props: { ...comp.props, state: nextState } };
-            } else if (comp.type.startsWith('pb-')) {
-              // Press Momentary Button
-              return { ...comp, props: { ...comp.props, state: 'pressed' } };
-            }
-            return comp;
-          });
-          if (changed) requestEagerSpiceRun();
-          return changed ? next : prev;
-        });
-      }
+      const digit = hotkeyDigit(event);
+      if (digit === null) return;
+      applyToCanvas(previous => applySwitchHotkey(previous, digit, 'down'));
     };
 
+    // Deliberately not filtered by focus or modifiers: a release must always land, or a pushbutton
+    // pressed on the canvas could stay held after focus moves into a text field mid-press.
     const handleSwitchKeyUp = (event: KeyboardEvent) => {
-      const target = event.target as HTMLElement | null;
-      if (target && ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) return;
-
-      if (/^[0-9]$/.test(event.key)) {
-        setComponents(prev => {
-          let changed = false;
-          const next = prev.map(comp => {
-            // Only momentary push buttons react to keyup
-            if (!comp.type.startsWith('pb-')) return comp;
-
-            const match = comp.label.match(/\d+$/);
-            if (!match || match[0] !== event.key) return comp;
-
-            changed = true;
-            return { ...comp, props: { ...comp.props, state: 'released' } };
-          });
-          if (changed) requestEagerSpiceRun();
-          return changed ? next : prev;
-        });
-      }
+      const digit = hotkeyDigit(event);
+      if (digit === null) return;
+      applyToCanvas(previous => applySwitchHotkey(previous, digit, 'up'));
     };
+
+    // Losing window focus mid-press sends the key-up elsewhere; release rather than stick.
+    const handleWindowBlur = () => applyToCanvas(releaseHeldPushbuttons);
 
     window.addEventListener('keydown', handleSwitchKeyDown);
     window.addEventListener('keyup', handleSwitchKeyUp);
+    window.addEventListener('blur', handleWindowBlur);
     return () => {
       window.removeEventListener('keydown', handleSwitchKeyDown);
       window.removeEventListener('keyup', handleSwitchKeyUp);
+      window.removeEventListener('blur', handleWindowBlur);
     };
   }, [requestEagerSpiceRun]);
 

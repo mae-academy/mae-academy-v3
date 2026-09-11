@@ -100,11 +100,9 @@ const MOTOR_RATED_SPEED = 100 * Math.PI;
 const MOTOR_ARMATURE_DROP = 0.1;
 const MOTOR_ELECTRICAL_TIME_CONSTANT = 1e-3;
 const MOTOR_MECHANICAL_TIME_CONSTANT = 0.1;
-// A real benchtop DMM/voltmeter's input impedance in Practical mode, so a high-impedance or
-// floating node reads through it rather than sitting on an ideal probe's open circuit; Academic
-// mode keeps the ideal (infinite-impedance) instrument. Paired with netlistGenerator's 1e12 Ω open
-// manual contact: verified against ngspice.wasm, either alone still leaves a downstream diode-like
-// junction biased onto its exponential knee (hundreds of mV or more) instead of reading ~0 V.
+// A real benchtop DMM/voltmeter's input impedance in Practical mode, so the meter loads what it
+// measures (reading ~9% low across a 1 MΩ divider leg, as real bench equipment does); Academic
+// mode keeps the ideal (infinite-impedance) instrument.
 const DMM_INPUT_IMPEDANCE = 10e6;
 
 /* -------------------------------------------------------------------------------- Helpers --- */

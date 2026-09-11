@@ -3,8 +3,9 @@
  * actual solver spiceWorker.ts ships in production. Each case runs the full production pipeline
  * (convertToSpiceComponents -> generateNetlist -> ngspice -> parseSpiceResults ->
  * buildSpiceInstrumentReadings) so a regression in any one stage is caught, not just a netlist-text
- * diff. Guards the two defects this pass fixed: the 1.265 V open-circuit ghost reading, and Academic
- * mode's non-convergence on the direct diode and the thyristor macros.
+ * diff. Guards the open-circuit ghost reading (an open switch must read exactly like a removed one,
+ * in both modes and on unloaded probes), isolated-subnet handling, and Academic mode's
+ * non-convergence on the direct diode and the thyristor macros.
  */
 
 import { beforeAll, describe, expect, it } from "vitest";
@@ -24,10 +25,13 @@ import {
 } from "@/simulators/circuit-engine/engine/spice/netlistGenerator";
 import { parseSpiceResults } from "@/simulators/circuit-engine/engine/spice/spiceParser";
 import { buildSpiceInstrumentReadings } from "@/simulators/circuit-engine/engine/spice/spiceInstruments";
-import { runNgspice } from "@/simulators/circuit-engine/engine/spice/ngspiceTestHarness";
+import {
+  runNgspice,
+  runNgspiceWithLog,
+} from "@/simulators/circuit-engine/engine/spice/ngspiceTestHarness";
 
-// ngspice.wasm's first boot compiles/instantiates the module; later calls reuse it (exactly as
-// spiceWorker.ts's cached `modulePromise` does in production), so only this first run needs slack.
+// Every run boots a fresh ngspice instance (see ngspiceTestHarness); the first also has to load and
+// parse the 7 MB JS glue, so only that warm-up needs the extra slack.
 const WASM_BOOT_TIMEOUT = 30_000;
 const RUN_TIMEOUT = 15_000;
 // Short enough to run fast, long enough that these DC/latch circuits (no reactive elements besides
@@ -86,7 +90,7 @@ async function simulate(
     analysis: SETTLE_ANALYSIS,
     simulationMode: mode,
   });
-  const vectors = await runNgspice(netlist);
+  const { vectors, log } = await runNgspiceWithLog(netlist);
   const results = parseSpiceResults(vectors, vectors.time ?? []);
   return {
     readings: buildSpiceInstrumentReadings(components, nets, nodeMap, results),
@@ -94,30 +98,62 @@ async function simulate(
       const node = nodeMap.nameFor(nets.netFor(componentId, terminal));
       return results.nodeVoltages[node.toLowerCase()]?.at(-1) ?? 0;
     },
+    log,
   };
 }
 
-/** 5 V -> switch -> 220 Ω -> LED -> ground, with a DCV DMM across the LED — the reported defect. */
-function openLedCircuit(switchClosed: boolean): {
+/**
+ * 5 V -> switch -> 220 Ω -> LED -> ground — the reported defect — with a DCV DMM (loaded at 10 MΩ in
+ * Practical mode) and an oscilloscope (an unloaded probe in both modes) across the LED. `removed`
+ * deletes the switch and its two wires outright: the baseline an open switch must match exactly.
+ */
+function ledCircuit(switchState: "open" | "closed" | "removed"): {
   components: CircuitComponent[];
   wires: CircuitWire[];
 } {
   const components = [
     part("g", "ground"),
     part("v1", "dc-voltage", { voltage: 5 }),
-    part("s1", "sw-spst-no", { state: switchClosed ? "closed" : "open" }),
+    ...(switchState === "removed" ? [] : [part("s1", "sw-spst-no", { state: switchState })]),
     part("r1", "resistor", { resistance: 220 }),
     part("d1", "led", { forwardVoltage: 2 }),
     part("dmm1", "dmm", { mode: "DCV" }),
+    part("osc1", "oscilloscope"),
   ];
   const wires = [
-    wire("w1", "v1", "pos", "s1", "a"),
-    wire("w2", "s1", "b", "r1", "a"),
+    ...(switchState === "removed"
+      ? []
+      : [wire("w1", "v1", "pos", "s1", "a"), wire("w2", "s1", "b", "r1", "a")]),
     wire("w3", "r1", "b", "d1", "anode"),
     wire("w4", "d1", "cathode", "g", "gnd"),
     wire("w5", "v1", "neg", "g", "gnd"),
     wire("w6", "dmm1", "hi", "d1", "anode"),
     wire("w7", "dmm1", "com", "g", "gnd"),
+    wire("w8", "osc1", "ch1", "d1", "anode"),
+    wire("w9", "osc1", "gnd", "g", "gnd"),
+  ];
+  return { components, wires };
+}
+
+/** 5 V -> open switch -> capacitor -> ground, DMM across the capacitor: a subnet with no DC path. */
+function isolatedCapacitorCircuit(): {
+  components: CircuitComponent[];
+  wires: CircuitWire[];
+} {
+  const components = [
+    part("g", "ground"),
+    part("v1", "dc-voltage", { voltage: 5 }),
+    part("s1", "sw-spst-no", { state: "open" }),
+    part("c1", "capacitor", { capacitance: 1e-6 }),
+    part("dmm1", "dmm", { mode: "DCV" }),
+  ];
+  const wires = [
+    wire("w1", "v1", "pos", "s1", "a"),
+    wire("w2", "s1", "b", "c1", "a"),
+    wire("w3", "c1", "b", "g", "gnd"),
+    wire("w4", "v1", "neg", "g", "gnd"),
+    wire("w5", "dmm1", "hi", "c1", "a"),
+    wire("w6", "dmm1", "com", "g", "gnd"),
   ];
   return { components, wires };
 }
@@ -129,12 +165,19 @@ describe("ngspice regression (real ngspice.wasm)", () => {
 
   describe("open-circuit ghost reading (defect 1)", () => {
     it.each(["practical", "academic"] as const)(
-      "reads the LED at under 1 mV with the switch open, in %s mode",
+      "reads an open switch exactly like a removed one — 0 V on the DMM and the scope, in %s mode",
       async mode => {
-        const { components, wires } = openLedCircuit(false);
-        const { readings } = await simulate(components, wires, mode);
-        expect(readings.dmm1.status).toBe("ready");
-        expect(Math.abs(readings.dmm1.value)).toBeLessThan(0.001);
+        const openCircuit = ledCircuit("open");
+        const removedCircuit = ledCircuit("removed");
+        const open = await simulate(openCircuit.components, openCircuit.wires, mode);
+        const removed = await simulate(removedCircuit.components, removedCircuit.wires, mode);
+
+        expect(removed.readings.dmm1).toMatchObject({ status: "ready", value: 0 });
+        expect(open.readings.dmm1).toMatchObject({ status: "ready", value: 0 });
+        // The unloaded probe is where any leftover DC path across the contact shows up: a 1e12 Ω
+        // "open" contact still put ~0.93 V on it through the LED's log law in Practical mode.
+        expect(removed.readings["osc1:ch1"].value).toBe(0);
+        expect(open.readings["osc1:ch1"].value).toBe(0);
       },
       RUN_TIMEOUT
     );
@@ -142,12 +185,23 @@ describe("ngspice regression (real ngspice.wasm)", () => {
     it(
       "still forward-biases the LED normally with the switch closed (no regression)",
       async () => {
-        const { components, wires } = openLedCircuit(true);
+        const { components, wires } = ledCircuit("closed");
         const { readings } = await simulate(components, wires, "practical");
         expect(readings.dmm1.status).toBe("ready");
         // A red LED's forward drop sits well below the 5 V rail and well above a floating reading.
         expect(readings.dmm1.value).toBeGreaterThan(0.5);
         expect(readings.dmm1.value).toBeLessThan(3);
+      },
+      RUN_TIMEOUT
+    );
+
+    it.each(["practical", "academic"] as const)(
+      "ties a subnet the open switch isolated to 0 V cleanly, with no singular matrix, in %s mode",
+      async mode => {
+        const { components, wires } = isolatedCapacitorCircuit();
+        const { readings, log } = await simulate(components, wires, mode);
+        expect(readings.dmm1).toMatchObject({ status: "ready", value: 0 });
+        expect(log).not.toMatch(/singular matrix/i);
       },
       RUN_TIMEOUT
     );

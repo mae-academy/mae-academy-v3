@@ -32,13 +32,47 @@ function stringProp(
   return typeof value === "string" ? value : fallback;
 }
 
+/**
+ * ngspice's default absolute tolerances: it stops iterating a nonlinear solve once every node
+ * voltage moves by less than VNTOL (1 µV) and every branch current by less than ABSTOL (1 pA), so
+ * magnitudes below these are solver residue, not converged signal. Without the clamp a node an open
+ * switch has isolated reads exactly 0 in Practical mode (the 10 MΩ meter load pins it) but not in
+ * Academic mode, where only a junction references it: verified against ngspice.wasm, that node
+ * lands at -1.5e-21 V and an ideal scope's RMS over the run at 2.5e-11 V — shown as "-0.000 nV" and
+ * "0.025 nV". Clamping to the solver's own resolution makes it read 0 identically in both modes.
+ */
+export const VOLTAGE_NOISE_FLOOR = 1e-6;
+export const CURRENT_NOISE_FLOOR = 1e-12;
+
+const NOISE_FLOOR_BY_UNIT: Record<string, number> = {
+  V: VOLTAGE_NOISE_FLOOR,
+  A: CURRENT_NOISE_FLOOR,
+};
+
 function reading(
   value: number,
   unit: string,
   status: InstrumentReading["status"] = "ready",
   extra: Partial<InstrumentReading> = {}
 ): InstrumentReading {
-  return { value: Number.isFinite(value) ? value : Infinity, unit, status, ...extra };
+  const floor = NOISE_FLOOR_BY_UNIT[unit] ?? 0;
+  const clamped = !Number.isFinite(value)
+    ? Infinity
+    : Math.abs(value) < floor
+      ? 0
+      : value;
+  // `+ 0` turns a -0 left by a sub-floor negative or by the solver itself into +0.
+  return { value: clamped + 0, unit, status, ...extra };
+}
+
+/**
+ * Frequency of a voltage trace, or 0 when the trace never rises above the voltage noise floor —
+ * `getFrequency` would otherwise count crossings in pure solver residue and report a bogus rate for
+ * a probe on an isolated node.
+ */
+function voltageFrequency(trace: number[], time: number[]): number {
+  const peak = trace.reduce((max, value) => Math.max(max, Math.abs(value)), 0);
+  return peak < VOLTAGE_NOISE_FLOOR ? 0 : getFrequency(trace, time);
 }
 
 /** Last sample for DC, or true RMS over whole periods for AC — matches the legacy engine's split. */
@@ -129,7 +163,7 @@ export function buildSpiceInstrumentReadings(
           readings[component.id] = reading(0, "Hz", "open");
         } else {
           const differential = getDifferential(results, nodeOf("hi"), nodeOf("com"));
-          readings[component.id] = reading(getFrequency(differential, results.time), "Hz");
+          readings[component.id] = reading(voltageFrequency(differential, results.time), "Hz");
         }
       }
       // OHM / CONT: left unset on purpose — see the function doc comment.
@@ -151,7 +185,7 @@ export function buildSpiceInstrumentReadings(
         }));
         readings[key] = reading(getVrms(differential, results.time), "V", "ready", {
           samples,
-          frequency: getFrequency(differential, results.time),
+          frequency: voltageFrequency(differential, results.time),
         });
       }
     }

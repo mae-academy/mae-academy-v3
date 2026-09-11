@@ -144,6 +144,16 @@ function callMain(module: NgspiceModule, args: string[]): void {
 export async function runNgspice(
   netlist: string
 ): Promise<Record<string, number[]>> {
+  return (await runNgspiceWithLog(netlist)).vectors;
+}
+
+/**
+ * `runNgspice`, plus ngspice's stdout/stderr for a run that succeeded — so a test can assert a deck
+ * solved cleanly (no "singular matrix" warnings rescued by gmin stepping), not merely eventually.
+ */
+export async function runNgspiceWithLog(
+  netlist: string
+): Promise<{ vectors: Record<string, number[]>; log: string }> {
   const log: string[] = [];
   const module = await createModule(log).catch(cause => {
     throw new Error(`Failed to initialize ngspice: ${describe(cause)}`);
@@ -152,13 +162,13 @@ export async function runNgspice(
   module.FS.writeFile(NETLIST_PATH, netlist);
   callMain(module, ["ngspice", "-b", "-n", "-r", RAWFILE_PATH, NETLIST_PATH]);
 
+  const text = log.join("\n").trim();
   if (!module.FS.analyzePath(RAWFILE_PATH).exists) {
-    const text = log.join("\n").trim();
     throw new Error(
       text.length > 0 ? text : "ngspice produced no output for this netlist."
     );
   }
 
   const bytes = module.FS.readFile(RAWFILE_PATH);
-  return parseSpiceRawFile(bytes);
+  return { vectors: parseSpiceRawFile(bytes), log: text };
 }

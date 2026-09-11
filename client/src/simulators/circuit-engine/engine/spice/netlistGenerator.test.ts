@@ -812,29 +812,34 @@ describe("generateNetlist", () => {
     expect(deck).not.toContain("SW_MANUAL");
   });
 
-  it("drives an open manual switch as a 1e12 ohm resistor, not a leaky ROFF", () => {
-    const deck = generateNetlist([
-      ground,
-      {
-        kind: "switch-spst",
-        id: "s-1",
-        label: "S1",
-        a: TOP,
-        b: GND,
-        isClosed: false,
-      },
-    ]);
+  it("omits an open manual switch entirely rather than emitting a resistance across it", () => {
+    const withSwitch = (isClosed: boolean) =>
+      generateNetlist([
+        ...divider,
+        { kind: "switch-spst", id: "s-1", label: "S1", a: TOP, b: MID, isClosed },
+      ]);
 
-    // 1e12 Ω, not a switch's 1e9 Ω ROFF: loaded only by a downstream diode-like junction, 1e9 Ω of
-    // leakage is still enough to bias that junction onto its exponential knee instead of ~0 V.
-    expect(deck).toContain("RS1 n1 0 1000000000000");
+    // Any finite resistance, even 1e12 Ω, is still a DC path a downstream diode's log law turns into
+    // a visible ghost voltage; an open contact must be the same deck as deleting the part.
+    expect(withSwitch(false)).not.toMatch(/^RS1\b/m);
+    expect(withSwitch(false)).toBe(generateNetlist(divider));
+    expect(withSwitch(true)).toContain("RS1 n1 n2 0.001");
   });
 
-  it("emits both SPDT throws so the netlist keeps its shape in every position", () => {
+  it("refuses a circuit in which every contact is open, since nothing would conduct", () => {
+    expect(() =>
+      generateNetlist([
+        ground,
+        { kind: "switch-spst", id: "s-1", label: "S1", a: TOP, b: GND, isClosed: false },
+      ])
+    ).toThrow(NetlistError);
+  });
+
+  it("emits only the live SPDT throw, and neither throw in the open position", () => {
     const THROW = "n:9999aaaa-bbbb-cccc-dddd-eeeeffff0000:b";
     const forPosition = (position: "a" | "b" | "open") =>
       generateNetlist([
-        ground,
+        ...divider,
         {
           kind: "switch-spdt",
           id: "s-1",
@@ -847,14 +852,63 @@ describe("generateNetlist", () => {
       ]);
 
     expect(forPosition("a")).toContain("RS1A n1 n2 0.001");
-    expect(forPosition("a")).toContain("RS1B n1 n3 1000000000000");
-    expect(forPosition("b")).toContain("RS1A n1 n2 1000000000000");
+    expect(forPosition("a")).not.toMatch(/^RS1B\b/m);
     expect(forPosition("b")).toContain("RS1B n1 n3 0.001");
+    expect(forPosition("b")).not.toMatch(/^RS1A\b/m);
 
-    // Break-before-make: neither throw is live, but both resistors are still emitted, both open.
+    // Break-before-make: neither throw is live, so neither conducts.
     const open = forPosition("open");
-    expect(open).toContain("RS1A n1 n2 1000000000000");
-    expect(open).toContain("RS1B n1 n3 1000000000000");
+    expect(open).not.toMatch(/^RS1[AB]\b/m);
+  });
+
+  it("ties a subnet an open switch cut off from every source to ground", () => {
+    const CAP = "n:7a7a7a7a-bbbb-cccc-dddd-eeeeffff0001:cap";
+    // Only a capacitor (open at DC) joins CAP to the rest, so behind the open switch it floats.
+    const deck = generateNetlist([
+      ...divider,
+      { kind: "switch-spst", id: "s-1", label: "S1", a: TOP, b: CAP, isClosed: false },
+      { kind: "capacitor", id: "c-1", label: "C1", positive: CAP, negative: GND, capacitance: 1e-6 },
+    ]);
+
+    expect(deck).toContain("RFLOAT1 n3 0 1000000000000");
+    expect(deck.match(/^RFLOAT/gm)).toHaveLength(1);
+  });
+
+  it("does not tie a cut-off subnet that still reaches ground through a junction", () => {
+    const ANODE = "n:7a7a7a7a-bbbb-cccc-dddd-eeeeffff0002:anode";
+    // Open switch -> resistor -> LED -> ground: the diode's GMIN already references it, and its
+    // voltage is 0 with or without a tie since no source can reach it.
+    const deck = generateNetlist([
+      ...divider,
+      { kind: "switch-spst", id: "s-1", label: "S1", a: TOP, b: MID, isClosed: false },
+      {
+        kind: "diode",
+        id: "d-1",
+        label: "D1",
+        variant: "led",
+        anode: ANODE,
+        cathode: GND,
+        forwardVoltage: 2,
+      },
+      resistor("r-3", "R3", MID, ANODE, 220),
+    ]);
+
+    expect(deck).not.toMatch(/^RFLOAT/m);
+  });
+
+  it("ties an insulated MOSFET gate driven only through a capacitor", () => {
+    const GATE = "n:7a7a7a7a-bbbb-cccc-dddd-eeeeffff0003:gate";
+    const deck = generateNetlist([
+      ...divider,
+      { kind: "capacitor", id: "c-1", label: "C1", positive: TOP, negative: GATE, capacitance: 1e-9 },
+      { kind: "mosfet", id: "m-1", label: "M1", channel: "n", drain: MID, gate: GATE, source: GND },
+    ]);
+
+    expect(deck).toMatch(/^RFLOAT1 n3 0 1000000000000$/m);
+  });
+
+  it("emits no ground ties for an ordinary, fully referenced circuit", () => {
+    expect(generateNetlist(divider)).not.toMatch(/^RFLOAT/m);
   });
 
   it("needs no shared switch model for manual contacts", () => {

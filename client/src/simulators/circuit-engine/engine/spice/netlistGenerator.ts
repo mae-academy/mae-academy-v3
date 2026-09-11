@@ -265,11 +265,11 @@ function modelFor(
  * Contact resistances for a coil-driven contact model (`SW` with VT/VH — not PSPICE's `VSWITCH`
  * with VON/VOFF: this ngspice build fails to parse a `VSWITCH` model card, and feeding VON/VOFF to
  * `SW` aborts the process outright). Manual contacts (switches, breakers, pushbuttons, …) never
- * need this dynamic model — see `manualContactResistance` — because a canvas edit always rebuilds
+ * need this dynamic model — see `manualContactOnResistance` — because a canvas edit always rebuilds
  * the whole deck, so nothing needs to change contact state mid-solve.
  *
  * Academic mode drives RON down to a near-zero ideal contact, but not all the way to the value
- * `manualContactResistance` uses: ROFF stays 1e9 in both modes, and an RON/ROFF ratio much beyond
+ * `manualContactOnResistance` uses: ROFF stays 1e9 in both modes, and an RON/ROFF ratio much beyond
  * 1e12 leaves ngspice's transient solver chattering at its minimum timestep on the instant the
  * contact closes.
  */
@@ -278,19 +278,13 @@ function switchResistances(mode: SimulationMode): string {
 }
 
 /**
- * Resistance for a manually operated contact (switch, breaker, pushbutton, aux contact, forced
- * relay override) in either state. Modeled as a plain resistor rather than a voltage-controlled
- * switch: unlike a coil contact, a manual contact's state never changes within one SPICE solve, so
- * there is nothing to switch and no need for the dummy control source a `SW` element requires.
+ * Resistance of a closed manually operated contact (switch, breaker, pushbutton, aux contact,
+ * forced relay override), emitted as a plain resistor rather than a voltage-controlled switch: a
+ * manual contact's state never changes within one SPICE solve, so there is nothing to switch.
  *
- * The open resistance is far higher than a coil contact's ROFF (1e12 vs 1e9): loaded only by a
- * downstream diode-like junction, 1e9 Ω of leakage current is still enough to bias that junction
- * onto its exponential knee (a few hundred mV to over a volt) rather than leaving it at 0 V, and no
- * ROFF value alone fixes that — see spiceAdapter's Practical-mode DMM/voltmeter input resistor for
- * the other half of this fix.
+ * An open manual contact emits nothing at all — see `elementLines`.
  */
-function manualContactResistance(mode: SimulationMode, closed: boolean): number {
-  if (!closed) return 1e12;
+function manualContactOnResistance(mode: SimulationMode): number {
   return mode === "academic" ? 1e-6 : 0.001;
 }
 
@@ -804,27 +798,30 @@ function elementLines(
       ];
     }
 
-    // A manual contact is a plain resistor at its open or closed value: the canvas rebuilds the
-    // whole deck on every edit, so nothing needs a live control source mid-solve.
+    // A closed manual contact is a plain resistor (the canvas rebuilds the whole deck on every edit,
+    // so nothing needs a live control source mid-solve). An open one is an air gap and emits nothing:
+    // any finite resistance, even 1e12 Ω, is still a DC path, and a downstream diode's log law turns
+    // its picoamps into hundreds of millivolts on an unloaded probe. Omitting the branch makes an open
+    // contact identical to deleting the part; `floatingGroundTies` references whatever it isolates.
     case "switch-spst": {
-      const resistance = manualContactResistance(mode, component.isClosed);
+      if (!component.isClosed) return [];
       return [
-        `${name} ${nodes.nameFor(component.a)} ${nodes.nameFor(component.b)} ${resistance}`,
+        `${name} ${nodes.nameFor(component.a)} ${nodes.nameFor(component.b)} ${manualContactOnResistance(mode)}`,
       ];
     }
 
     case "switch-spdt": {
-      const common = nodes.nameFor(component.common);
-      // Break-before-make: `open` resistances both throws rather than emitting neither, so the
-      // element keeps the same shape in every position.
-      const throws = [
-        { suffix: "A", net: component.a, live: component.position === "a" },
-        { suffix: "B", net: component.b, live: component.position === "b" },
+      // Only the live throw conducts; `open` (break-before-make) emits neither.
+      const live =
+        component.position === "a"
+          ? { suffix: "A", net: component.a }
+          : component.position === "b"
+            ? { suffix: "B", net: component.b }
+            : undefined;
+      if (!live) return [];
+      return [
+        `${name}${live.suffix} ${nodes.nameFor(component.common)} ${nodes.nameFor(live.net)} ${manualContactOnResistance(mode)}`,
       ];
-      return throws.map(({ suffix, net, live }) => {
-        const resistance = manualContactResistance(mode, live);
-        return `${name}${suffix} ${common} ${nodes.nameFor(net)} ${resistance}`;
-      });
     }
 
     case "relay":
@@ -981,6 +978,14 @@ export function generateNetlist(
     return emitted;
   });
 
+  // Only open manual contacts emit nothing, so this is a circuit made entirely of open switches.
+  if (lines.length === 0) {
+    throw new NetlistError(
+      "Cannot build a netlist: nothing conducts — every contact in the circuit is open."
+    );
+  }
+
+  const groundTies = floatingGroundTies(elements, nodes, used);
   const analysis = options.analysis?.length ? options.analysis : [".op"];
 
   // The first line of a SPICE deck is the title and is always discarded by the parser.
@@ -989,8 +994,187 @@ export function generateNetlist(
     ...modelCards,
     ...macroBlocks,
     ...lines,
+    ...groundTies,
     ...analysis,
     ".end",
     "",
   ].join("\n");
+}
+
+/* ------------------------------------------------------------------------ Floating subnets --- */
+
+/**
+ * The resistor tying a DC-floating subnet to ground. Such a subnet has, by construction, no DC path
+ * to any source, so no current flows through it and its value only has to make the matrix
+ * non-singular; 1e12 Ω also keeps an AC-coupled floating node's corner far below any frequency the
+ * canvas simulates.
+ */
+const FLOATING_GROUND_TIE = 1e12;
+
+/** The nets an element's emitted lines actually reference. Open manual contacts reference none. */
+function emittedNets(element: SpiceElement): SpiceNet[] {
+  switch (element.kind) {
+    case "switch-spst":
+      return element.isClosed ? [element.a, element.b] : [];
+    case "switch-spdt":
+      return element.position === "a"
+        ? [element.common, element.a]
+        : element.position === "b"
+          ? [element.common, element.b]
+          : [];
+    default:
+      return elementNets(element);
+  }
+}
+
+/**
+ * The net pairs an element joins at DC. Every junction counts, because ngspice places GMIN across
+ * it; a capacitor and a MOSFET's insulated gate join nothing. Over-reporting a link is safe here —
+ * it can only skip a ground tie ngspice would otherwise have needed — so each case follows the
+ * element's actual lines (see `elementLines` / `macroFor`) rather than guessing.
+ */
+function dcLinks(element: SpiceElement): Array<[SpiceNet, SpiceNet]> {
+  switch (element.kind) {
+    case "resistor":
+    case "inductor":
+    case "dc-voltage":
+    case "ac-voltage":
+    case "dc-motor":
+      return [[element.positive, element.negative]];
+    case "capacitor":
+      return [];
+    case "diode":
+      return [[element.anode, element.cathode]];
+    case "bjt":
+      return [
+        [element.collector, element.base],
+        [element.base, element.emitter],
+      ];
+    case "mosfet": {
+      // Drain and source reach the body through its junction diodes; the gate is insulated.
+      const bulk = element.bulk ?? element.source;
+      return [
+        [element.drain, bulk],
+        [element.source, bulk],
+      ];
+    }
+    case "jfet":
+      return [
+        [element.gate, element.drain],
+        [element.gate, element.source],
+      ];
+    case "scr":
+      return [
+        [element.anode, element.gate],
+        [element.gate, element.cathode],
+      ];
+    case "diac":
+      return [[element.a1, element.a2]];
+    case "triac":
+      return [
+        [element.mt1, element.gate],
+        [element.gate, element.mt2],
+      ];
+    case "transformer":
+      return [
+        [element.primaryPositive, element.primaryNegative],
+        [element.secondaryPositive, element.secondaryNegative],
+      ];
+    case "transformer-ct":
+      return [
+        [element.primaryPositive, element.primaryNegative],
+        [element.secondaryPositive, element.centerTap],
+        [element.centerTap, element.secondaryNegative],
+      ];
+    case "autotransformer":
+      return [
+        [element.input, element.tap],
+        [element.tap, element.common],
+      ];
+    case "switch-spst":
+    case "switch-spdt": {
+      const [first, second] = emittedNets(element);
+      return first !== undefined && second !== undefined ? [[first, second]] : [];
+    }
+    // A coil is a series R-L; every coil-driven contact is a SW element, which always has a finite
+    // RON or ROFF between its terminals.
+    case "relay": {
+      const links: Array<[SpiceNet, SpiceNet]> = [
+        [element.coilPositive, element.coilNegative],
+      ];
+      for (const contact of [element.normallyOpen, element.normallyClosed]) {
+        if (contact !== undefined) links.push([element.common, contact]);
+      }
+      return links;
+    }
+    case "contactor": {
+      const links: Array<[SpiceNet, SpiceNet]> = [
+        [element.coilPositive, element.coilNegative],
+      ];
+      for (const pole of element.poles) links.push([pole.line, pole.load]);
+      for (const aux of [element.auxNormallyOpen, element.auxNormallyClosed]) {
+        if (aux) links.push([aux.line, aux.load]);
+      }
+      return links;
+    }
+  }
+}
+
+/**
+ * Resistor lines tying each DC-floating subnet to ground. An open manual contact (see
+ * `elementLines`) can cut a subnet off from every source and from ground — the node between an open
+ * switch and a capacitor, say, or a resistor left dangling behind one. ngspice's operating point is
+ * singular there (verified: "singular matrix: check node …"); it usually recovers through gmin
+ * stepping, but only after the warnings and only by luck of its heuristics. A subnet with no path
+ * to any source sits at 0 V, so tying one node of it to ground states that outright.
+ */
+function floatingGroundTies(
+  elements: SpiceElement[],
+  nodes: SpiceNodeMap,
+  used: Set<string>
+): string[] {
+  const parent = new Map<string, string>();
+  // First-encounter order keeps the emitted tie lines deterministic for a given deck.
+  const order: string[] = [];
+  const find = (node: string): string => {
+    let root = node;
+    while (parent.get(root) !== root) root = parent.get(root) ?? root;
+    parent.set(node, root);
+    return root;
+  };
+  const touch = (node: string) => {
+    if (parent.has(node)) return;
+    parent.set(node, node);
+    order.push(node);
+  };
+
+  touch(SPICE_GROUND);
+  for (const element of elements) {
+    for (const net of emittedNets(element)) touch(nodes.nameFor(net));
+    for (const [a, b] of dcLinks(element)) {
+      const first = nodes.nameFor(a);
+      const second = nodes.nameFor(b);
+      touch(first);
+      touch(second);
+      const rootA = find(first);
+      const rootB = find(second);
+      if (rootA !== rootB) parent.set(rootA, rootB);
+    }
+  }
+
+  const groundRoot = find(SPICE_GROUND);
+  const tiedRoots = new Set<string>();
+  const ties: string[] = [];
+  for (const node of order) {
+    const root = find(node);
+    if (root === groundRoot || tiedRoots.has(root)) continue;
+    tiedRoots.add(root);
+    let name = `RFLOAT${ties.length + 1}`;
+    for (let suffix = 2; used.has(name.toUpperCase()); suffix += 1) {
+      name = `RFLOAT${ties.length + 1}_${suffix}`;
+    }
+    used.add(name.toUpperCase());
+    ties.push(`${name} ${node} ${SPICE_GROUND} ${FLOATING_GROUND_TIE}`);
+  }
+  return ties;
 }
