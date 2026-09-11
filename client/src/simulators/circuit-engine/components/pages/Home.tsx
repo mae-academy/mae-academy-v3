@@ -725,6 +725,14 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
   const textsRef = useRef(texts);
   const tabDUiRefinementRef = useRef(tabDUiRefinement);
   const activeMomentaryControlRef = useRef<string | null>(null);
+  // Set by every switch/pushbutton/relay-force toggle (see updateComponentProperty and
+  // updateComponentPropsById below) so the SPICE debounce effect, further down, fires immediately
+  // for that edit instead of waiting out the drag-coalescing delay — declared this early so those
+  // toggle handlers, defined before the SPICE bridge section itself, can already depend on it.
+  const spiceEagerRef = useRef(false);
+  const requestEagerSpiceRun = useCallback(() => {
+    spiceEagerRef.current = true;
+  }, []);
   componentRef.current = components;
   wiresRef.current = wires;
   textsRef.current = texts;
@@ -1654,15 +1662,22 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
         : undefined;
       return { ...component, props: { ...component.props, [key]: value, ...(diodeMaterial ?? {}) } };
     });
+    // `state` (switches, breakers, pushbuttons) and `manualState` (forced relay/contactor contacts)
+    // are electrical toggles, not cosmetic edits — SPICE should react to them immediately rather
+    // than through the drag-coalescing debounce every other property edit goes through.
+    if (key === 'state' || key === 'manualState') requestEagerSpiceRun();
     setComponents(nextComponents);
     commitSnapshot({ components: nextComponents });
-  }, [commitSnapshot, components, selectedComponent]);
+  }, [commitSnapshot, components, requestEagerSpiceRun, selectedComponent]);
 
+  // Its only callers are the momentary pushbutton press/release handlers below — an electrical
+  // state change SPICE should react to immediately, not after the drag-coalescing debounce.
   const updateComponentPropsById = useCallback((id: string, updates: Record<string, unknown>) => {
+    requestEagerSpiceRun();
     setComponents(previous => previous.map(component => component.id === id
       ? { ...component, props: { ...component.props, ...updates } }
       : component));
-  }, []);
+  }, [requestEagerSpiceRun]);
 
   const releaseMomentaryControl = useCallback(() => {
     const componentId = activeMomentaryControlRef.current;
@@ -2148,9 +2163,13 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     // elapse, and SPICE silently stopped re-solving on switch toggles until Pause forced one retry.
   }, [clearSpiceReadings, components, simulationMode, spiceEngine.runSimulation, wires]);
 
-  // Trigger on every circuit edit, debounced so a drag or a burst of keystrokes fires one run.
+  // Trigger on every circuit edit, debounced so a drag or a burst of keystrokes fires one run — but
+  // not a switch/relay toggle: those set `spiceEagerRef` first, so this fires with no delay for
+  // exactly the edit the DMM needs to react to right away, live, without waiting for Pause/Reset.
   useEffect(() => {
-    const timer = window.setTimeout(runSpiceSimulation, SPICE_DEBOUNCE_MS);
+    const eager = spiceEagerRef.current;
+    spiceEagerRef.current = false;
+    const timer = window.setTimeout(runSpiceSimulation, eager ? 0 : SPICE_DEBOUNCE_MS);
     return () => window.clearTimeout(timer);
   }, [runSpiceSimulation]);
 
@@ -2217,6 +2236,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
             }
             return comp;
           });
+          if (changed) requestEagerSpiceRun();
           return changed ? next : prev;
         });
       }
@@ -2239,6 +2259,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
             changed = true;
             return { ...comp, props: { ...comp.props, state: 'released' } };
           });
+          if (changed) requestEagerSpiceRun();
           return changed ? next : prev;
         });
       }
@@ -2250,7 +2271,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
       window.removeEventListener('keydown', handleSwitchKeyDown);
       window.removeEventListener('keyup', handleSwitchKeyUp);
     };
-  }, []);
+  }, [requestEagerSpiceRun]);
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
