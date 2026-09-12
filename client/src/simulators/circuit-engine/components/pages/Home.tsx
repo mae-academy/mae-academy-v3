@@ -229,6 +229,14 @@ function refreshWireEndpoints(wires: CircuitWire[], components: CircuitComponent
     if (!endpoints) return wire;
     const isConnectedToDragged = Boolean(draggedComponentId && (wire.fromComp === draggedComponentId || wire.toComp === draggedComponentId));
     if (isConnectedToDragged) {
+      if (wire.routing === 'manual' || (wire.waypoints && wire.waypoints.length > 0) || wire.path.length > 2) {
+        const updatedPath = reconnectPathEndpoints(wire.path, endpoints.from, endpoints.to, wire.routing, [], wire.waypoints, undefined, endpoints.fromAxis);
+        return {
+          ...wire,
+          path: updatedPath,
+          waypoints: updatedPath.length > 2 ? updatedPath.slice(1, -1) : wire.waypoints,
+        };
+      }
       const movingEnd = wire.toComp === draggedComponentId ? 'to' : wire.fromComp === draggedComponentId ? 'from' : 'none';
       const newPath = dynamicRubberBandPath(endpoints.from, endpoints.to, endpoints.fromAxis, endpoints.toAxis, movingEnd);
       return {
@@ -913,6 +921,14 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
       const isConnectedToDragged = Boolean(activeDraggedId && (wire.fromComp === activeDraggedId || wire.toComp === activeDraggedId));
 
       if (isConnectedToDragged) {
+        if (wire.routing === 'manual' || (wire.waypoints && wire.waypoints.length > 0) || wire.path.length > 2) {
+          const updatedPath = reconnectPathEndpoints(wire.path, endpoints.from, endpoints.to, wire.routing, [], wire.waypoints, gridSize, endpoints.fromAxis);
+          return {
+            ...wire,
+            path: updatedPath,
+            waypoints: updatedPath.length > 2 ? updatedPath.slice(1, -1) : wire.waypoints,
+          };
+        }
         const movingEnd = wire.toComp === activeDraggedId ? 'to' : wire.fromComp === activeDraggedId ? 'from' : 'none';
         const newPath = dynamicRubberBandPath(endpoints.from, endpoints.to, endpoints.fromAxis, endpoints.toAxis, movingEnd);
         return {
@@ -2539,7 +2555,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                     <path d={renderPath} fill="none" stroke="transparent" strokeWidth={17} strokeLinecap="round" strokeLinejoin="round" onMouseDown={event => handleWireMouseDown(event, wire)} onDoubleClick={event => handleWireDoubleClick(event, wire)} style={{ cursor: 'pointer' }} />
                     <path d={renderPath} fill="none" stroke={colors.text} strokeWidth={1.5} strokeDasharray={isSensingWire ? "3 3" : undefined} strokeLinecap="round" strokeLinejoin="round" pointerEvents="none" />
                     {showElectrons && dots.map((dot, index) => <circle key={index} cx={dot[0]} cy={dot[1]} r={3} fill={colors.powered} opacity={1} pointerEvents="none" />)}
-                    {wire.toComp.startsWith('junc_') && <circle cx={path[path.length - 1][0]} cy={path[path.length - 1][1]} r={3.5} fill={colors.primary} stroke="#ffffff" strokeWidth={1.5} pointerEvents="none" />}
+                    {wire.toComp.startsWith('junc_') && <circle cx={path[path.length - 1][0]} cy={path[path.length - 1][1]} r={3.5} fill={colors.text} stroke={colors.canvas} strokeWidth={1.5} pointerEvents="none" />}
                     {selected && wire.path.length > 2 && wire.path.slice(1, -1).map((corner, index) => {
                       const cornerIndex = index + 1;
                       return <circle key={`${wire.id}-${cornerIndex}`} cx={corner[0]} cy={corner[1]} r={6} fill={colors.panel} stroke={colors.selection} strokeWidth={2} onMouseDown={event => {
@@ -2774,10 +2790,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                   key={text.id}
                   data-text-id={text.id}
                   transform={`translate(${text.x},${text.y}) rotate(${text.rotation})`}
-                  onPointerDown={event => {
-                    event.currentTarget.setPointerCapture(event.pointerId);
-                    handleTextMouseDown(event, text);
-                  }}
+                  onMouseDown={event => handleTextMouseDown(event, text)}
                   style={{ cursor: 'move' }}
                 >
                   <foreignObject x={0} y={0} width={1} height={1} style={{ overflow: 'visible', pointerEvents: 'auto' }}>
@@ -2859,7 +2872,7 @@ function ToolbarButton({ colors, icon, label, title, onClick, active, disabled }
 function ToolbarDivider({ colors }: { colors: Palette }) { return <span style={{ width: 1, height: 20, background: colors.line, margin: '0 1px', flexShrink: 0 }} />; }
 
 function InspectorHeader({ colors, title, subtitle }: { colors: Palette; title: React.ReactNode; subtitle: string }) {
-  return <div style={{ padding: '15px 15px 12px', borderBottom: `1px solid ${colors.line}` }}><div><div className={CONTROL_SYSTEMS_HEADING}>{title}</div><div style={{ marginTop: 2, color: colors.muted, fontSize: 10, lineHeight: 1.3 }}>{subtitle}</div></div></div>;
+  return <div style={{ padding: '15px 15px 12px', borderBottom: `1px solid ${colors.line}` }}><div><div className="text-sm font-bold uppercase tracking-wider text-black">{title}</div><div className="text-black" style={{ marginTop: 2, fontSize: 10, lineHeight: 1.3 }}>{subtitle}</div></div></div>;
 }
 
 function InspectorButton({ colors, children, onClick, danger, active, disabled }: { colors: Palette; children: React.ReactNode; onClick: () => void; danger?: boolean; active?: boolean; disabled?: boolean }) {
@@ -2867,16 +2880,16 @@ function InspectorButton({ colors, children, onClick, danger, active, disabled }
   return <button onClick={onClick} disabled={disabled} style={{ flex: 1, minHeight: 30, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4, border: `1px solid ${tone}55`, borderRadius: 6, background: active || danger ? `${tone}0d` : colors.panelAlt, color: tone, cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? .5 : 1, fontSize: 10, fontWeight: 700 }}>{children}</button>;
 }
 
-function InspectorSection({ colors, label, children }: { colors: Palette; label: string; children: React.ReactNode }) { return <section style={{ padding: '12px 15px', borderBottom: `1px solid ${colors.line}` }}><div style={{ color: colors.subtle, fontSize: 9, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 8 }}>{label}</div>{children}</section>; }
+function InspectorSection({ colors, label, children }: { colors: Palette; label: string; children: React.ReactNode }) { return <section style={{ padding: '12px 15px', borderBottom: `1px solid ${colors.line}` }}><div className="text-[12px] font-bold text-black uppercase tracking-wider" style={{ marginBottom: 8 }}>{label}</div>{children}</section>; }
 
-function PropertyRow({ colors, label, unit, children }: { colors: Palette; label: string; unit?: string; children: React.ReactNode }) { return <label style={{ display: 'grid', gridTemplateColumns: '1fr 132px', gap: 8, alignItems: 'center', marginBottom: 8 }}><span style={{ fontSize: 10, color: colors.muted, lineHeight: 1.25 }}><ElectricalLabel label={label} unit={unit} /></span>{children}</label>; }
+function PropertyRow({ colors, label, unit, children }: { colors: Palette; label: string; unit?: string; children: React.ReactNode }) { return <label style={{ display: 'grid', gridTemplateColumns: '1fr 132px', gap: 8, alignItems: 'center', marginBottom: 8 }}><span className="text-[13px] font-medium text-black" style={{ lineHeight: 1.25 }}><ElectricalLabel label={label} unit={unit} /></span>{children}</label>; }
 
 function ComponentInspector({ colors, component, definition, allComponents, linkedCoils, reading, snapshot, tabDUiRefinement, onLabelChange, onPropertyChange, onDelete }: { colors: Palette; component: CircuitComponent; definition: ComponentDef; allComponents: CircuitComponent[]; linkedCoils: CircuitComponent[]; reading?: InstrumentReading; snapshot: SimulationSnapshot; tabDUiRefinement: boolean; onLabelChange: (value: string) => void; onPropertyChange: (key: string, value: unknown) => void; onDelete: () => void }) {
   // Check if the component actually has a numeric value to display
   const hasValue = Object.values(definition.properties).some(p => p.type === 'number' && p.unit);
 
   return <div style={{ overflowY: 'auto', minHeight: 0 }}>
-    <InspectorHeader colors={colors} title={<span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 5 }}><V3Math math={componentLabelToLatex(component.type === 'ground' ? 'GND' : component.label)} /><span style={{ color: colors.muted, fontSize: 10, letterSpacing: 0, textTransform: 'none' }}><ElectricalLabel label={definition.name} /></span></span>} subtitle={definition.description} />
+    <InspectorHeader colors={colors} title={<span className="text-black" style={{ display: 'inline-flex', alignItems: 'baseline', gap: 5 }}><V3Math math={componentLabelToLatex(component.type === 'ground' ? 'GND' : component.label)} /><span className="text-black" style={{ fontSize: 10, letterSpacing: 0, textTransform: 'none' }}><ElectricalLabel label={definition.name} /></span></span>} subtitle={definition.description} />
     <InspectorSection colors={colors} label="Instance label">
       <PropertyRow colors={colors} label="Reference">
         <input value={component.type === 'ground' ? 'GND' : component.label} disabled={component.type === 'ground'} onChange={event => onLabelChange(component.type === 'ground' ? 'GND' : event.target.value)} style={inputStyle(colors)} />
