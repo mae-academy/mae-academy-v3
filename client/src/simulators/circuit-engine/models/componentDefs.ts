@@ -32,8 +32,43 @@ export interface PropertyDef {
   max?: number;
   step?: number;
   options?: string[];
+  /** Display text per option value, where the stored value is not what a student should read. */
+  optionLabels?: Record<string, string>;
+  /** Still stored in props and simulated, but derived from another property, so never offered as an
+   * editable inspector field — see the LED's forwardVoltage, which its colour dictates. */
+  hidden?: boolean;
   label?: string;
 }
+
+/**
+ * Nominal LED forward voltage by colour, at the 20 mA test current the SPICE model is fitted to.
+ *
+ * Colour is the single source of truth for Vf: the inspector offers only these presets and writes
+ * the matching `forwardVoltage` alongside the colour, because a real LED's forward drop is set by
+ * its die chemistry rather than dialled in independently. `forwardVoltage` stays in props because
+ * the SPICE model fit (netlistGenerator) and both legacy engines read it from there.
+ */
+export const LED_FORWARD_VOLTAGES: Record<string, number> = {
+  violet: 1.2,
+  red: 1.8,
+  amber: 2.0,
+  orange: 2.0,
+  yellow: 2.2,
+  green: 3.5,
+  blue: 3.8,
+  white: 4.0,
+};
+
+/** The colour presets the dropdown offers, ordered by ascending forward voltage. */
+export const LED_COLOR_OPTIONS = Object.keys(LED_FORWARD_VOLTAGES);
+
+/** Dropdown text, so the choice reads "Red (1.8 V)" rather than a bare colour name. */
+export const LED_COLOR_LABELS: Record<string, string> = Object.fromEntries(
+  Object.entries(LED_FORWARD_VOLTAGES).map(([color, volts]) => [
+    color,
+    `${color.charAt(0).toUpperCase()}${color.slice(1)} (${volts.toFixed(1)} V)`,
+  ]),
+);
 
 // ─── SOURCES ─────────────────────────────────────────────────────────────────
 const SOURCES: Record<string, ComponentDef> = {
@@ -362,8 +397,10 @@ const DIODES: Record<string, ComponentDef> = {
       { id: 'cathode', name: 'K', x: 30, y: 0, type: 'output' },
     ],
     properties: {
-      color: { type: 'select', value: 'red', options: ['white', 'red', 'amber', 'orange', 'yellow', 'green', 'blue', 'violet'], label: 'Color' },
-      forwardVoltage: { type: 'number', value: 2.0, unit: 'V', min: 1.5, max: 4.0, label: 'Forward Voltage' },
+      color: { type: 'select', value: 'red', options: LED_COLOR_OPTIONS, optionLabels: LED_COLOR_LABELS, label: 'Color' },
+      // Dictated by `color`, never typed in: hidden from the inspector but kept in props, since the
+      // SPICE model fit and both legacy engines read the forward voltage from there.
+      forwardVoltage: { type: 'number', value: LED_FORWARD_VOLTAGES.red, unit: 'V', min: 1.0, max: 4.5, hidden: true, label: 'Forward Voltage' },
       maxCurrent: { type: 'number', value: 0.02, unit: 'A', min: 0.001, max: 1, label: 'Max Current' },
     },
     description: 'Light-emitting diode',
@@ -957,12 +994,6 @@ export function getComponentsByCategory(cat: string): ComponentDef[] {
 export function getDef(id: string): ComponentDef | undefined {
   return COMPONENT_DEFS[id] ?? (id === 'op-amp' ? COMPONENT_DEFS['opamp'] : undefined);
 }
-
-/** LED forward voltage by color */
-export const LED_FORWARD_VOLTAGES: Record<string, number> = {
-  white: 3.2, red: 2.0, amber: 2.1, orange: 2.1,
-  yellow: 2.2, green: 2.2, blue: 3.3, violet: 3.5,
-};
 
 /** LED colors as CSS */
 export const LED_COLORS: Record<string, string> = {

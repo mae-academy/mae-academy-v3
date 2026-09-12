@@ -46,6 +46,7 @@ import {
   CATEGORIES,
   getComponentsByCategory,
   getDef,
+  LED_FORWARD_VOLTAGES,
   type ComponentDef,
   type PropertyDef,
 } from '@/simulators/circuit-engine/models/componentDefs';
@@ -1670,12 +1671,19 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
       const diodeMaterial = component.type === 'diode' && key === 'material'
         ? materialDefaults[String(value).toLowerCase()] ?? materialDefaults.silicon
         : undefined;
-      return { ...component, props: { ...component.props, [key]: value, ...(diodeMaterial ?? {}) } };
+      // An LED's colour dictates its forward voltage, so a preset writes both at once and the SPICE
+      // model, the canvas glow and the label the student picked can never disagree.
+      const ledPreset = component.type === 'led' && key === 'color'
+        ? { forwardVoltage: LED_FORWARD_VOLTAGES[String(value)] ?? component.props.forwardVoltage }
+        : undefined;
+      return { ...component, props: { ...component.props, [key]: value, ...(diodeMaterial ?? {}), ...(ledPreset ?? {}) } };
     });
-    // `state` (switches, breakers, pushbuttons) and `manualState` (forced relay/contactor contacts)
-    // are electrical toggles, not cosmetic edits — SPICE should react to them immediately rather
-    // than through the drag-coalescing debounce every other property edit goes through.
-    if (key === 'state' || key === 'manualState') requestEagerSpiceRun();
+    // `state` (switches, breakers, pushbuttons), `manualState` (forced relay/contactor contacts) and
+    // an LED's colour all change the circuit electrically rather than cosmetically — SPICE should
+    // react to them immediately rather than through the drag-coalescing debounce other edits use.
+    const changesCircuit = key === 'state' || key === 'manualState'
+      || (selectedComponent.type === 'led' && key === 'color');
+    if (changesCircuit) requestEagerSpiceRun();
     setComponents(nextComponents);
     commitSnapshot({ components: nextComponents });
   }, [commitSnapshot, components, requestEagerSpiceRun, selectedComponent]);
@@ -2896,6 +2904,8 @@ function ComponentInspector({ colors, component, definition, allComponents, link
     </InspectorSection>
     <InspectorSection colors={colors} label="Electrical properties">
       {Object.entries(definition.properties).map(([key, property]) => {
+        // Derived properties (an LED's forwardVoltage, set by its colour) are simulated but not editable.
+        if (property.hidden) return null;
         if (component.type === 'impedance' || component.type === 'ac-voltage' || component.type === 'ac-current') {
           const isImpedance = component.type === 'impedance';
           const format = String(component.props.format ?? (isImpedance ? 'rectangular' : 'polar'));
@@ -2934,7 +2944,7 @@ function ComponentInspector({ colors, component, definition, allComponents, link
 
 function PropertyEditorField({ colors, label, definition, value, onChange }: { colors: Palette; label: string; definition: PropertyDef; value: unknown; onChange: (value: unknown) => void }) {
   if (definition.type === 'boolean') return <PropertyRow colors={colors} label={label}><input type="checkbox" checked={Boolean(value)} onChange={event => onChange(event.target.checked)} style={{ justifySelf: 'start', accentColor: colors.primary }} /></PropertyRow>;
-  if (definition.type === 'select') return <PropertyRow colors={colors} label={label} unit={definition.unit}><select value={String(value)} onChange={event => onChange(event.target.value)} style={inputStyle(colors)}>{definition.options?.map(option => <option key={option} value={option}>{option}</option>)}</select></PropertyRow>;
+  if (definition.type === 'select') return <PropertyRow colors={colors} label={label} unit={definition.unit}><select value={String(value)} onChange={event => onChange(event.target.value)} style={inputStyle(colors)}>{definition.options?.map(option => <option key={option} value={option}>{definition.optionLabels?.[option] ?? option}</option>)}</select></PropertyRow>;
   if (definition.type === 'color') return <PropertyRow colors={colors} label={label}><input type="color" value={String(value)} onChange={event => onChange(event.target.value)} style={{ width: '100%', height: 30, border: `1px solid ${colors.line}`, borderRadius: 5, background: colors.input }} /></PropertyRow>;
   if (definition.type === 'text') return <PropertyRow colors={colors} label={label}><input value={String(value)} onChange={event => onChange(event.target.value)} style={inputStyle(colors)} /></PropertyRow>;
   return <PropertyRow colors={colors} label={label} unit={definition.unit}><input type="number" min={definition.min} max={definition.max} step={definition.step ?? 'any'} value={numeric(value)} onChange={event => onChange(numeric(event.target.value, numeric(definition.value)))} style={inputStyle(colors)} /></PropertyRow>;

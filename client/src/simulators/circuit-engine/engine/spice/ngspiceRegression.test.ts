@@ -23,6 +23,7 @@ import {
   buildSpiceNodeMap,
   generateNetlist,
 } from "@/simulators/circuit-engine/engine/spice/netlistGenerator";
+import { LED_FORWARD_VOLTAGES } from "@/simulators/circuit-engine/models/componentDefs";
 import { parseSpiceResults } from "@/simulators/circuit-engine/engine/spice/spiceParser";
 import { buildSpiceInstrumentReadings } from "@/simulators/circuit-engine/engine/spice/spiceInstruments";
 import {
@@ -204,6 +205,59 @@ describe("ngspice regression (real ngspice.wasm)", () => {
         expect(log).not.toMatch(/singular matrix/i);
       },
       RUN_TIMEOUT
+    );
+  });
+
+  describe("LED colour presets", () => {
+    // 12 V through 470 Ω biases every preset near the 20 mA the model is fitted at, so each colour
+    // should measure within ~0.1 V of its specified forward voltage.
+    const ledCircuitFor = (color: string) => ({
+      components: [
+        part("g", "ground"),
+        part("v1", "dc-voltage", { voltage: 12 }),
+        part("r1", "resistor", { resistance: 470 }),
+        // Exactly what the inspector writes when a student picks the preset: colour plus its voltage.
+        part("d1", "led", { color, forwardVoltage: LED_FORWARD_VOLTAGES[color] }),
+        part("dmm1", "dmm", { mode: "DCV" }),
+      ],
+      wires: [
+        wire("w1", "v1", "pos", "r1", "a"),
+        wire("w2", "r1", "b", "d1", "anode"),
+        wire("w3", "d1", "cathode", "g", "gnd"),
+        wire("w4", "v1", "neg", "g", "gnd"),
+        wire("w5", "dmm1", "hi", "d1", "anode"),
+        wire("w6", "dmm1", "com", "g", "gnd"),
+      ],
+    });
+
+    const ledDrop = async (color: string) => {
+      const { components, wires } = ledCircuitFor(color);
+      const { readings } = await simulate(components, wires, "practical");
+      expect(readings.dmm1.status).toBe("ready");
+      return readings.dmm1.value;
+    };
+
+    it.each(["violet", "red", "yellow", "blue", "white"])(
+      "drops the %s preset's nominal forward voltage",
+      async color => {
+        const nominal = LED_FORWARD_VOLTAGES[color];
+        const measured = await ledDrop(color);
+        expect(
+          Math.abs(measured - nominal),
+          `${color}: measured ${measured} V against a nominal ${nominal} V`
+        ).toBeLessThan(0.1);
+      },
+      RUN_TIMEOUT
+    );
+
+    it(
+      "separates the colours, instead of every LED simulating alike",
+      async () => {
+        const [violet, red, white] = [await ledDrop("violet"), await ledDrop("red"), await ledDrop("white")];
+        expect(red - violet).toBeGreaterThan(0.4);
+        expect(white - red).toBeGreaterThan(1.5);
+      },
+      RUN_TIMEOUT * 2
     );
   });
 
