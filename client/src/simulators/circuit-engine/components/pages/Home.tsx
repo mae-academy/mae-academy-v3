@@ -83,6 +83,7 @@ import { buildSpiceInstrumentReadings } from '@/simulators/circuit-engine/engine
 import { filterTabDCatalog, filterTabDImportedComponents, isTabDComponentAvailable } from '@/simulators/circuit-engine/models/analogComponentCatalog';
 import { alignTabDTerminalToGrid, calculateTabDPlanarCavity, dynamicRubberBandPath, getExactTerminalOffset, isExactCadComponent, lockTabDWireCorner, MESH_LOOP_COLORS, moveTabDOrthogonalLane, tabDComponentLabelAnchors, tabDGentleWheelZoomFactor, tabDOrthogonalDraftPath, tabDTerminalOrthogonalPath, type ObstacleBox, type TabDTerminalAxis } from '@/simulators/circuit-engine/components/analogCanvasGeometry';
 import { renderSymbol } from '@/simulators/circuit-engine/components/symbols';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { applySwitchHotkey, directControlKind, hotkeyDigit, isTextEntryTarget, momentaryControlProps, nextLatchingControlProps, releaseHeldPushbuttons } from '@/simulators/circuit-engine/models/componentInteraction';
 import {
   addWireCorner,
@@ -2879,19 +2880,13 @@ function ComponentInspector({ colors, component, definition, allComponents, link
 
       {/* NEW: Label Visibility Toggle */}
       <PropertyRow colors={colors} label="Show Label">
-        <select value={component.props._hideLabel ? 'hide' : 'show'} onChange={event => onPropertyChange('_hideLabel', event.target.value === 'hide')} style={inputStyle(colors)}>
-          <option value="show">Show</option>
-          <option value="hide">Hide</option>
-        </select>
+        <ThemedSelect colors={colors} value={component.props._hideLabel ? 'hide' : 'show'} onValueChange={next => onPropertyChange('_hideLabel', next === 'hide')} options={[{ value: 'show', label: 'Show' }, { value: 'hide', label: 'Hide' }]} />
       </PropertyRow>
 
       {/* NEW: Value Visibility Toggle (only if applicable) */}
       {hasValue && (
         <PropertyRow colors={colors} label="Show Value">
-          <select value={component.props._hideValue ? 'hide' : 'show'} onChange={event => onPropertyChange('_hideValue', event.target.value === 'hide')} style={inputStyle(colors)}>
-            <option value="show">Show</option>
-            <option value="hide">Hide</option>
-          </select>
+          <ThemedSelect colors={colors} value={component.props._hideValue ? 'hide' : 'show'} onValueChange={next => onPropertyChange('_hideValue', next === 'hide')} options={[{ value: 'show', label: 'Show' }, { value: 'hide', label: 'Hide' }]} />
         </PropertyRow>
       )}
 
@@ -2914,17 +2909,14 @@ function ComponentInspector({ colors, component, definition, allComponents, link
               <PropertyRow key={key} colors={colors} label={property.label ?? key}>
                 <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 60px', gap: 5 }}>
                   <input type="number" step="any" value={numeric(component.props[key], defaultAng)} onChange={event => onPropertyChange(key, numeric(event.target.value, defaultAng))} style={inputStyle(colors)} />
-                  <select value={String(component.props.angleUnit ?? 'degree')} onChange={event => onPropertyChange('angleUnit', event.target.value)} style={{ ...inputStyle(colors), paddingInline: 5 }}>
-                    <option value="degree">deg</option>
-                    <option value="radian">rad</option>
-                  </select>
+                  <ThemedSelect colors={colors} value={String(component.props.angleUnit ?? 'degree')} onValueChange={next => onPropertyChange('angleUnit', next)} options={[{ value: 'degree', label: 'deg' }, { value: 'radian', label: 'rad' }]} triggerStyle={{ paddingInline: 5 }} />
                 </div>
               </PropertyRow>
             );
           }
         }
-        if (key === 'linkedTo') return <PropertyRow key={key} colors={colors} label={property.label ?? key}><select value={String(component.props[key] ?? '')} onChange={event => onPropertyChange(key, event.target.value)} style={inputStyle(colors)}><option value="">Select coil reference</option>{linkedCoils.filter(coil => coil.id !== component.id).map(coil => <option key={coil.id} value={coil.label}>{coil.label} · {getDef(coil.type)?.name}</option>)}</select></PropertyRow>;
-        if (key === 'controlSourceId') return <PropertyRow key={key} colors={colors} label={property.label ?? key}><select value={String(component.props[key] ?? '')} onChange={event => onPropertyChange(key, event.target.value)} style={inputStyle(colors)}><option value="">Select target branch/node</option>{allComponents.filter(c => c.id !== component.id && c.type !== 'ground').map(c => <option key={c.id} value={c.label}>{c.label} · {getDef(c.type)?.name}</option>)}</select></PropertyRow>;
+        if (key === 'linkedTo') return <PropertyRow key={key} colors={colors} label={property.label ?? key}><ThemedSelect colors={colors} value={String(component.props[key] ?? '')} onValueChange={next => onPropertyChange(key, next)} options={[{ value: '', label: 'Select coil reference' }, ...linkedCoils.filter(coil => coil.id !== component.id).map(coil => ({ value: coil.label, label: `${coil.label} · ${getDef(coil.type)?.name}` }))]} /></PropertyRow>;
+        if (key === 'controlSourceId') return <PropertyRow key={key} colors={colors} label={property.label ?? key}><ThemedSelect colors={colors} value={String(component.props[key] ?? '')} onValueChange={next => onPropertyChange(key, next)} options={[{ value: '', label: 'Select target branch/node' }, ...allComponents.filter(c => c.id !== component.id && c.type !== 'ground').map(c => ({ value: c.label, label: `${c.label} · ${getDef(c.type)?.name}` }))]} /></PropertyRow>;
         const value = component.props[key] ?? property.value;
         const prefixable = tabDUiRefinement && property.type === 'number' && PREFIXABLE_UNITS.has(property.unit ?? '');
         return prefixable
@@ -2939,7 +2931,7 @@ function ComponentInspector({ colors, component, definition, allComponents, link
 
 function PropertyEditorField({ colors, label, definition, value, onChange }: { colors: Palette; label: string; definition: PropertyDef; value: unknown; onChange: (value: unknown) => void }) {
   if (definition.type === 'boolean') return <PropertyRow colors={colors} label={label}><input type="checkbox" checked={Boolean(value)} onChange={event => onChange(event.target.checked)} style={{ justifySelf: 'start', accentColor: colors.primary }} /></PropertyRow>;
-  if (definition.type === 'select') return <PropertyRow colors={colors} label={label} unit={definition.unit}><select value={String(value)} onChange={event => onChange(event.target.value)} style={inputStyle(colors)}>{definition.options?.map(option => <option key={option} value={option}>{definition.optionLabels?.[option] ?? option}</option>)}</select></PropertyRow>;
+  if (definition.type === 'select') return <PropertyRow colors={colors} label={label} unit={definition.unit}><ThemedSelect colors={colors} value={String(value)} onValueChange={next => onChange(next)} options={(definition.options ?? []).map(option => ({ value: option, label: definition.optionLabels?.[option] ?? option }))} /></PropertyRow>;
   if (definition.type === 'color') return <PropertyRow colors={colors} label={label}><input type="color" value={String(value)} onChange={event => onChange(event.target.value)} style={{ width: '100%', height: 30, border: `1px solid ${colors.line}`, borderRadius: 5, background: colors.input }} /></PropertyRow>;
   if (definition.type === 'text') return <PropertyRow colors={colors} label={label}><input value={String(value)} onChange={event => onChange(event.target.value)} style={inputStyle(colors)} /></PropertyRow>;
   return <PropertyRow colors={colors} label={label} unit={definition.unit}><input type="number" min={definition.min} max={definition.max} step={definition.step ?? 'any'} value={numeric(value)} onChange={event => onChange(numeric(event.target.value, numeric(definition.value)))} style={inputStyle(colors)} /></PropertyRow>;
@@ -2954,12 +2946,12 @@ function PrefixedPropertyEditorField({ colors, propertyKey, label, definition, v
     onPrefixChange(nextPrefix);
     onChange(visibleValue * engineeringFactor(nextPrefix));
   };
-  return <PropertyRow colors={colors} label={label} unit={definition.unit}><div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 54px', gap: 5 }}><input aria-label={`${propertyKey} numeric value`} type="number" step="any" value={displayValue} onChange={event => onChange(numeric(event.target.value, displayValue) * factor)} style={inputStyle(colors)} /><select aria-label={`${propertyKey} engineering prefix`} value={prefix} onChange={event => selectPrefix(event.target.value)} style={{ ...inputStyle(colors), paddingInline: 5 }} title={`Engineering prefix for ${definition.unit ?? ''}`}>{ENGINEERING_PREFIXES.map(item => <option key={item.key || 'base'} value={item.key}>{item.symbol || '—'}{definition.unit}</option>)}</select></div></PropertyRow>;
+  return <PropertyRow colors={colors} label={label} unit={definition.unit}><div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 54px', gap: 5 }}><input aria-label={`${propertyKey} numeric value`} type="number" step="any" value={displayValue} onChange={event => onChange(numeric(event.target.value, displayValue) * factor)} style={inputStyle(colors)} /><ThemedSelect colors={colors} ariaLabel={`${propertyKey} engineering prefix`} title={`Engineering prefix for ${definition.unit ?? ''}`} value={prefix} onValueChange={selectPrefix} options={ENGINEERING_PREFIXES.map(item => ({ value: item.key, label: `${item.symbol || '—'}${definition.unit}` }))} triggerStyle={{ paddingInline: 5 }} /></div></PropertyRow>;
 }
 
 function WireInspector({ colors, wire, tabDUiRefinement, onRouting, onAddCorner, onNudge, onDelete }: { colors: Palette; wire: CircuitWire; tabDUiRefinement: boolean; onRouting: (routing: CircuitWire['routing']) => void; onAddCorner: () => void; onNudge: (amount: number) => void; onDelete: () => void }) {
   return <div style={{ overflowY: 'auto' }}><InspectorHeader colors={colors} title="Wire path" subtitle={tabDUiRefinement ? 'Tab D uses a one-bend Manhattan route between terminals.' : 'Click to select. Double-click the line or add a corner, then drag the handles.'} /><InspectorSection colors={colors} label="Route">
-    <PropertyRow colors={colors} label="Routing"><select value={tabDUiRefinement ? 'orthogonal' : wire.routing} onChange={event => onRouting(event.target.value as CircuitWire['routing'])} disabled={tabDUiRefinement} style={inputStyle(colors)}><option value="orthogonal">Orthogonal</option>{!tabDUiRefinement && <><option value="straight">Straight</option><option value="manual">Manual</option></>}</select></PropertyRow>
+    <PropertyRow colors={colors} label="Routing"><ThemedSelect colors={colors} value={tabDUiRefinement ? 'orthogonal' : wire.routing} onValueChange={next => onRouting(next as CircuitWire['routing'])} disabled={tabDUiRefinement} options={[{ value: 'orthogonal', label: 'Orthogonal' }, ...(!tabDUiRefinement ? [{ value: 'straight', label: 'Straight' }, { value: 'manual', label: 'Manual' }] : [])]} /></PropertyRow>
     <div style={{ fontSize: 11, color: colors.text, marginBottom: 7 }}>Geometric length: <strong>{pathLength(wire.path).toFixed(1)} px</strong></div>
     {!tabDUiRefinement && <div style={{ display: 'flex', gap: 5 }}><InspectorButton colors={colors} onClick={onAddCorner}><Plus size={13} />Corner</InspectorButton><InspectorButton colors={colors} onClick={() => onNudge(-20)}><Minus size={13} />Bend</InspectorButton><InspectorButton colors={colors} onClick={() => onNudge(20)}><Plus size={13} />Bend</InspectorButton></div>}
   </InspectorSection><InspectorSection colors={colors} label="Electrical meaning"><p style={{ color: colors.muted, fontSize: 10, lineHeight: 1.45, margin: 0 }}>Wire geometry is editable for documentation and layout. The ideal wire remains a zero-ohm connection in the solver; electron markers only appear when solved branch current exists.</p></InspectorSection></div>;
@@ -3075,4 +3067,45 @@ function EngineeringMath({ value, unit }: { value: number; unit?: string }) {
 }
 
 function inputStyle(colors: Palette): React.CSSProperties { return { width: '100%', minWidth: 0, boxSizing: 'border-box', background: colors.input, color: colors.text, border: `1px solid ${colors.line}`, borderRadius: 5, padding: '6px 7px', fontSize: 10, outline: 'none' }; }
+
+// Radix Select forbids an empty-string item value (it's reserved to mean "clear the selection"),
+// but this panel has real options that store as '' (no linked coil yet, the base engineering
+// prefix). This sentinel round-trips through onValueChange so callers never see it.
+const THEMED_SELECT_EMPTY_VALUE = '__mae-empty__';
+
+/**
+ * Wraps the project's Radix-based Select (@/components/ui/select) so every dropdown in this panel
+ * renders a themed popover instead of Safari/WebKit's native aqua listbox, while keeping the same
+ * inline-styled look (`inputStyle`) the rest of the panel's inputs use.
+ */
+function ThemedSelect({ colors, value, onValueChange, options, disabled, ariaLabel, title, triggerStyle }: {
+  colors: Palette;
+  value: string;
+  onValueChange: (value: string) => void;
+  options: Array<{ value: string; label: React.ReactNode; disabled?: boolean }>;
+  disabled?: boolean;
+  ariaLabel?: string;
+  title?: string;
+  triggerStyle?: React.CSSProperties;
+}) {
+  const toItemValue = (raw: string) => (raw === '' ? THEMED_SELECT_EMPTY_VALUE : raw);
+  return (
+    <Select
+      value={toItemValue(value)}
+      onValueChange={next => onValueChange(next === THEMED_SELECT_EMPTY_VALUE ? '' : next)}
+      disabled={disabled}
+    >
+      <SelectTrigger aria-label={ariaLabel} title={title} style={{ ...inputStyle(colors), height: 26, ...triggerStyle }} className="w-full justify-between">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent style={{ background: colors.input, color: colors.text, border: `1px solid ${colors.line}`, borderRadius: 5 }}>
+        {options.map(option => (
+          <SelectItem key={toItemValue(option.value)} value={toItemValue(option.value)} disabled={option.disabled} style={{ fontSize: 10 }}>
+            {option.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
 
