@@ -165,10 +165,29 @@ const Resistor: SymbolFC = ({ props }) => {
   const sw = nonExactStroke(props);
   // Boundary ends at exactly ±33.333 so that 33.333 * 1.5 = 50px (Strict 25px Grid Lock)
   return (
-    <g data-rectangular-resistor="potentiometer-style">
-      <line x1={-33.333} y1={0} x2={-20} y2={0} stroke="currentColor" strokeWidth={sw} strokeLinecap="square" />
-      <rect x={-20} y={-7} width={40} height={14} rx={2} fill="none" stroke="currentColor" strokeWidth={sw} />
-      <line x1={20} y1={0} x2={33.333} y2={0} stroke="currentColor" strokeWidth={sw} strokeLinecap="square" />
+    <g data-zigzag-resistor="ansi-style">
+      {/* طرف التوصيل الأيسر */}
+      <line x1={-33.333} y1={0} x2={-20.5} y2={0} stroke="currentColor" strokeWidth={sw} strokeLinecap="square" />
+
+      {/* مسار الزجزاج (6 قمم وقيعان متناظرة) */}
+      <path
+        d="M 20 0 
+           L 16.667 6 
+           L 10 -6 
+           L 3.333 6 
+           L -3.333 -6 
+           L -10 6 
+           L -16.667 -6 
+           L -20 0"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={sw}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+
+      {/* طرف التوصيل الأيمن */}
+      <line x1={20.5} y1={0} x2={33.333} y2={0} stroke="currentColor" strokeWidth={sw} strokeLinecap="square" />
     </g>
   );
 };
