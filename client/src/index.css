@@ -98,22 +98,26 @@
     padding-right: 10px !important;
   }
 
-  /* Inspector-panel typography tokens: shared across Component Library, Active Element & Properties, and Analysis Workspace. */
+  /* Inspector-panel typography tokens: shared across Component Library, Active Element & Properties, and Analysis Workspace.
+     Unified to solid black at the user's explicit request (previous slate-500/400 pass was rejected as too faint). */
   .mae-panel-section-header {
-    font-size: 0.6875rem;
-    font-weight: 600;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    color: #64748b;
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    color: #000000 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.05em !important;
   }
+
   .mae-panel-field-label {
-    font-size: 0.75rem;
-    font-weight: 500;
-    color: #475569;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    color: #000000 !important; /* Solid Black */
   }
+
   .mae-panel-meta {
-    font-size: 0.6875rem;
-    color: #94a3b8;
+    font-size: 12px !important;
+    font-weight: 400 !important;
+    color: #334155 !important; /* Dark enough to be readable, used strictly for minor helper text */
   }
 }
 
