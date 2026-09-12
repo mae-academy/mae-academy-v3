@@ -118,7 +118,8 @@ const TAB_D_GRID_SIZE = 25;
 const TAB_D_SYMBOL_SCALE = 1.5;
 const TERMINAL_HIT_RADIUS = 13;
 const TERMINAL_RADIUS = 4;
-const CONTROL_SYSTEMS_HEADING = 'text-sm font-bold uppercase tracking-wider text-slate-800 dark:text-white';
+/* Shared with .mae-panel-section-header (index.css): every structural panel header renders identically muted. */
+const CONTROL_SYSTEMS_HEADING = 'mae-panel-section-header';
 /* Unified signature gradient pills (blue-600 -> pink-500). */
 const TAB_GRADIENT = 'linear-gradient(90deg, #2563eb 0%, #7c3aed 50%, #f43f5e 100%)';
 const TAB_GRADIENT_REV = 'linear-gradient(90deg, #f43f5e 0%, #7c3aed 50%, #2563eb 100%)';
@@ -2397,7 +2398,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
   }, [cursor, dragState?.kind, findWireNearPoint, wiring.from]);
 
   return (
-    <div className="v3-mae-layout font-sans text-slate-900 dark:text-slate-100" style={{ minHeight: 760, color: colors.text }}>
+    <div className="v3-mae-layout font-sans text-slate-600 dark:text-slate-300" style={{ minHeight: 760 }}>
       <section className="mb-4 overflow-x-auto rounded-xl border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-950" style={{ borderColor: colors.line, background: colors.panel }}>
         <header className="min-w-max" style={{ background: colors.panel, zIndex: 5 }}>
           <div className="flex flex-nowrap items-center gap-1.5 px-2 pt-2" style={{ minHeight: 36 }}>
