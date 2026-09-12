@@ -531,6 +531,113 @@ function renderFormattedValueTspans(value: string) {
   });
 }
 
+/**
+ * Universal KaTeX label renderer for all canvas component instance labels.
+ * Ensures letters are math-italic (KaTeX_Math) and digits/subscripts are upright math Roman (KaTeX_Main).
+ * Handles:
+ *  - Ground references: upright 'GND' in KaTeX_Main
+ *  - Alphanumeric references (e.g. C12, R1, V_1, V_{12}, L_load): prefix italic, subscript lowered upright
+ *  - Pure numbers (e.g. 12): upright in KaTeX_Main
+ *  - Mixed general strings: parsed into italic letters, upright digits, and upright symbols
+ */
+function renderComponentCanvasLabel(rawLabel: string, isGround: boolean) {
+  const label = rawLabel.trim();
+
+  // 1. Ground component
+  if (isGround || /^GND\d*$/i.test(label)) {
+    return (
+      <tspan
+        fontFamily="'KaTeX_Main', serif"
+        fontStyle="normal"
+        style={{ fontStyle: 'normal', fontFamily: "'KaTeX_Main', serif" }}
+      >
+        GND
+      </tspan>
+    );
+  }
+
+  // 2. Pure numbers (e.g. "12")
+  if (/^\d+$/.test(label)) {
+    return (
+      <tspan
+        fontFamily="'KaTeX_Main', serif"
+        fontStyle="normal"
+        style={{ fontStyle: 'normal', fontFamily: "'KaTeX_Main', serif" }}
+      >
+        {label}
+      </tspan>
+    );
+  }
+
+  // 3. LaTeX underscore or standard reference with subscript:
+  // Examples: V_{12}, V_1, C12, R1, L_load, V_in
+  const subMatch =
+    label.match(/^([A-Za-z]+)_\{([^}]+)\}$/) ??
+    label.match(/^([A-Za-z]+)_([A-Za-z0-9]+)$/) ??
+    label.match(/^([A-Za-z]+)(\d+)$/);
+
+  if (subMatch) {
+    const [, base, sub] = subMatch;
+    return (
+      <>
+        <tspan
+          fontFamily="'KaTeX_Math', serif"
+          fontStyle="italic"
+          style={{ fontStyle: 'italic', fontFamily: "'KaTeX_Math', serif" }}
+        >
+          {base}
+        </tspan>
+        <tspan
+          dy="2.5"
+          fontFamily="'KaTeX_Main', serif"
+          fontSize="9.5px"
+          fontStyle="normal"
+          style={{
+            fontSize: '9.5px',
+            fontWeight: 400,
+            fontStyle: 'normal',
+            fontFamily: "'KaTeX_Main', serif",
+          }}
+        >
+          {sub}
+        </tspan>
+      </>
+    );
+  }
+
+  // 4. Tokenized fallback for any other string to guarantee 100% KaTeX font coverage:
+  // Tokenize by letters, numbers, and symbols so no character falls back to sans-serif
+  const tokens = label.match(/([A-Za-z]+|\d+|[^A-Za-z0-9\s]+|\s+)/g) || [label];
+  return (
+    <>
+      {tokens.map((token, index) => {
+        if (/^[A-Za-z]+$/.test(token)) {
+          return (
+            <tspan
+              key={index}
+              fontFamily="'KaTeX_Math', serif"
+              fontStyle="italic"
+              style={{ fontStyle: 'italic', fontFamily: "'KaTeX_Math', serif" }}
+            >
+              {token}
+            </tspan>
+          );
+        }
+        return (
+          <tspan
+            key={index}
+            fontFamily="'KaTeX_Main', serif"
+            fontStyle="normal"
+            style={{ fontStyle: 'normal', fontFamily: "'KaTeX_Main', serif" }}
+          >
+            {token}
+          </tspan>
+        );
+      })}
+    </>
+  );
+}
+
 /** Populates SVG text elements with KaTeX tspans for self-contained vector SVG export. */
 function populateMathTspans(svgTextEl: SVGTextElement, rawText: string, baseFontSize: number) {
   if (!rawText) return;
@@ -2505,14 +2612,14 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                           </div>
                           {/* Bottom Section: Fixed height banner with overflow-visible to prevent KaTeX clipping */}
                           <div className="flex h-7 w-full shrink-0 items-center justify-center border-t overflow-visible px-2" style={{ borderColor: colors.line, background: `${colors.line}15` }}>
-                            <span className="flex items-center justify-center text-[10px] font-bold tracking-wider overflow-visible" style={{ color: colors.muted, lineHeight: 1 }}>
+                            <span className="flex items-center justify-center text-[12px] font-normal text-black tracking-normal overflow-visible" style={{ lineHeight: 1 }}>
                               <ElectricalLabel label={item.name} />
                             </span>
                           </div>
                         </>
                       ) : (
                         <>
-                          <span style={{ color: 'inherit', fontWeight: 650 }}><ElectricalLabel label={item.name} /></span>
+                          <span className="text-[12px] font-normal text-black"><ElectricalLabel label={item.name} /></span>
                           <span style={{ color: colors.subtle, fontSize: 9, lineHeight: 1.25 }}>{item.description}</span>
                         </>
                       )}
@@ -2684,10 +2791,6 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                   const valY = component.y + anchors.value[1];
                   const value = componentDisplayValue(definition, component);
                   const isGround = component.type === 'ground' || /^GND\d*$/i.test(component.label);
-                  const labelMatch = isGround
-                    ? null
-                    : (component.label.match(/^([A-Z])_?([a-z0-9]+)$/) ??
-                      component.label.match(/^([A-Za-z]+)_?(\d+)$/));
                   const refFill = darkPreview ? '#f1f5f9' : '#1e293b';
                   const valFill = darkPreview ? '#94a3b8' : '#64748b';
 
@@ -2713,47 +2816,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                             strokeLinecap: 'round',
                           }}
                         >
-                          {labelMatch ? (
-                            <>
-                              <tspan
-                                fontFamily="'KaTeX_Math', serif"
-                                fontStyle="italic"
-                                style={{ fontStyle: 'italic', fontFamily: "'KaTeX_Math', serif" }}
-                              >
-                                {labelMatch[1]}
-                              </tspan>
-                              <tspan
-                                dy="2.5"
-                                fontFamily="'KaTeX_Main', serif"
-                                fontSize="9.5px"
-                                fontStyle="normal"
-                                style={{
-                                  fontSize: '9.5px',
-                                  fontWeight: 400,
-                                  fontStyle: 'normal',
-                                  fontFamily: "'KaTeX_Main', serif",
-                                }}
-                              >
-                                {labelMatch[2]}
-                              </tspan>
-                            </>
-                          ) : isGround ? (
-                            <tspan
-                              fontFamily="'KaTeX_Main', serif"
-                              fontStyle="normal"
-                              style={{ fontStyle: 'normal', fontFamily: "'KaTeX_Main', serif" }}
-                            >
-                              GND
-                            </tspan>
-                          ) : (
-                            <tspan
-                              fontFamily="'KaTeX_Math', 'KaTeX_Main', serif"
-                              fontStyle="italic"
-                              style={{ fontStyle: 'italic', fontFamily: "'KaTeX_Math', 'KaTeX_Main', serif" }}
-                            >
-                              {component.label}
-                            </tspan>
-                          )}
+                          {renderComponentCanvasLabel(component.label, isGround)}
                         </text>
                       )}
 
@@ -2872,7 +2935,7 @@ function ToolbarButton({ colors, icon, label, title, onClick, active, disabled }
 function ToolbarDivider({ colors }: { colors: Palette }) { return <span style={{ width: 1, height: 20, background: colors.line, margin: '0 1px', flexShrink: 0 }} />; }
 
 function InspectorHeader({ colors, title, subtitle }: { colors: Palette; title: React.ReactNode; subtitle: string }) {
-  return <div style={{ padding: '15px 15px 12px', borderBottom: `1px solid ${colors.line}` }}><div><div className="text-sm font-bold uppercase tracking-wider text-black">{title}</div><div className="text-black" style={{ marginTop: 2, fontSize: 10, lineHeight: 1.3 }}>{subtitle}</div></div></div>;
+  return <div style={{ padding: '15px 15px 12px', borderBottom: `1px solid ${colors.line}` }}><div><div className="text-sm font-bold uppercase tracking-wider text-black">{title}</div><div className="text-black" style={{ marginTop: 2, fontSize: 10, lineHeight: 1.0 }}>{subtitle}</div></div></div>;
 }
 
 function InspectorButton({ colors, children, onClick, danger, active, disabled }: { colors: Palette; children: React.ReactNode; onClick: () => void; danger?: boolean; active?: boolean; disabled?: boolean }) {
@@ -2882,7 +2945,7 @@ function InspectorButton({ colors, children, onClick, danger, active, disabled }
 
 function InspectorSection({ colors, label, children }: { colors: Palette; label: string; children: React.ReactNode }) { return <section style={{ padding: '12px 15px', borderBottom: `1px solid ${colors.line}` }}><div className="text-[12px] font-bold text-black uppercase tracking-wider" style={{ marginBottom: 8 }}>{label}</div>{children}</section>; }
 
-function PropertyRow({ colors, label, unit, children }: { colors: Palette; label: string; unit?: string; children: React.ReactNode }) { return <label style={{ display: 'grid', gridTemplateColumns: '1fr 132px', gap: 8, alignItems: 'center', marginBottom: 8 }}><span className="text-[13px] font-medium text-black" style={{ lineHeight: 1.25 }}><ElectricalLabel label={label} unit={unit} /></span>{children}</label>; }
+function PropertyRow({ colors, label, unit, children }: { colors: Palette; label: string; unit?: string; children: React.ReactNode }) { return <label style={{ display: 'grid', gridTemplateColumns: '1fr 132px', gap: 8, alignItems: 'center', marginBottom: 8 }}><span className="font-sans text-[12.5px] font-medium text-slate-700" style={{ lineHeight: 1.25 }}><ElectricalLabel label={label} unit={unit} /></span>{children}</label>; }
 
 function ComponentInspector({ colors, component, definition, allComponents, linkedCoils, reading, snapshot, tabDUiRefinement, onLabelChange, onPropertyChange, onDelete }: { colors: Palette; component: CircuitComponent; definition: ComponentDef; allComponents: CircuitComponent[]; linkedCoils: CircuitComponent[]; reading?: InstrumentReading; snapshot: SimulationSnapshot; tabDUiRefinement: boolean; onLabelChange: (value: string) => void; onPropertyChange: (key: string, value: unknown) => void; onDelete: () => void }) {
   // Check if the component actually has a numeric value to display
@@ -3092,5 +3155,21 @@ function EngineeringMath({ value, unit }: { value: number; unit?: string }) {
   return <V3Math math={`${match[1]}\\,${suffixMath[suffix] ?? `\\mathrm{${suffix}}`}`} />;
 }
 
-function inputStyle(colors: Palette): React.CSSProperties { return { width: '100%', minWidth: 0, boxSizing: 'border-box', background: colors.input, color: colors.text, border: `1px solid ${colors.line}`, borderRadius: 5, padding: '6px 7px', fontSize: 10, outline: 'none' }; }
+function inputStyle(colors: Palette): React.CSSProperties {
+  return {
+    width: '100%',
+    minWidth: 0,
+    boxSizing: 'border-box',
+    height: 32,
+    background: '#ffffff',
+    color: '#1e293b',
+    border: '1px solid #e2e8f0',
+    borderRadius: 12,
+    padding: '4px 12px',
+    fontSize: 13,
+    fontFamily: 'inherit',
+    fontWeight: 500,
+    outline: 'none',
+  };
+}
 

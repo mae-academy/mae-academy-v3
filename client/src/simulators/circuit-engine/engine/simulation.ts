@@ -470,12 +470,12 @@ export class SimulationEngine {
     }
     let currentResult: SolveResult | null = null;
     let converged = false;
-    for (let nonlinearIteration = 0; nonlinearIteration < 20; nonlinearIteration += 1) {
+    for (let nonlinearIteration = 0; nonlinearIteration < 35; nonlinearIteration += 1) {
       currentResult = this.stampAndSolve(dt, controls, guess, baseWarnings);
       if (!currentResult.converged) return currentResult;
       const difference = currentResult.voltages.reduce((maximum, value, index) => Math.max(maximum, Math.abs(value - (guess[index] ?? 0))), 0);
       guess = currentResult.voltages.map((value, index) => 0.55 * value + 0.45 * (guess[index] ?? 0));
-      if (difference < 1e-6) {
+      if (difference < 1e-4) {
         converged = true;
         break;
       }
@@ -613,6 +613,7 @@ export class SimulationEngine {
           isPowered = Math.abs(current) > 1e-10;
           break;
         }
+        case 'diode':
         case 'diode-ideal':
         case 'diode-silicon':
         case 'diode-germanium':
@@ -871,8 +872,9 @@ export class SimulationEngine {
           const mainA = type === 'triac' ? 't1' : type === 'diac' ? 'a1' : 'anode';
           const mainB = type === 'triac' ? 't2' : type === 'diac' ? 'a2' : 'cathode';
           const voltage = this.terminalVoltage(component, mainA, guess) - this.terminalVoltage(component, mainB, guess);
-          const gateVoltage = type === 'diac' ? 0 : this.terminalVoltage(component, 'gate', guess) - this.terminalVoltage(component, mainB, guess);
-          const trigger = type === 'diac' ? Math.abs(voltage) >= propNumber(props, 'vbo', 30) : Math.abs(gateVoltage) >= propNumber(props, 'vgt', 1.5);
+          const gateWired = type !== 'diac' && this.network.wiredTerminals.has(terminalKey(component.id, 'gate'));
+          const gateVoltage = gateWired ? this.terminalVoltage(component, 'gate', guess) - this.terminalVoltage(component, mainB, guess) : 0;
+          const trigger = type === 'diac' ? Math.abs(voltage) >= propNumber(props, 'vbo', 30) : (gateWired && gateVoltage >= propNumber(props, 'vgt', 1.5) && voltage > 0);
           const latched = this.scrLatched.has(component.id) || trigger;
           current = stampResistance(component, mainA, mainB, latched ? 0.5 : OPEN_RESISTANCE);
           isPowered = latched;
