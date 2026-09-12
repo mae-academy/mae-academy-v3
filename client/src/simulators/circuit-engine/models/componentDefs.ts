@@ -223,8 +223,8 @@ const PASSIVE: Record<string, ComponentDef> = {
     ],
     properties: {
       resistance: { type: 'number', value: 10000, unit: 'Ω', min: 1, max: 1e9, label: 'End-to-End Resistance' },
-      wiper: { type: 'number', value: 0.5, unit: '', min: 0, max: 1, step: 0.01, label: 'Wiper Position' },
       taper: { type: 'select', value: 'linear', options: ['linear', 'logarithmic'], label: 'Taper' },
+      wiper: { type: 'number', value: 0.5, unit: '', min: 0, max: 1, step: 0.01, label: 'Wiper' },
     },
     description: 'Three-terminal variable resistor / potentiometer',
   },

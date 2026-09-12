@@ -1394,9 +1394,63 @@ function ComponentInspector({ colors, component, definition, linkedCoils, readin
       {digitalLogicOnly ? (component.type === 'digital-input'
         ? <><PropertyRow colors={colors} label="Logic state"><select value={String(component.props.state ?? 'LOW')} onChange={event => onPropertyChange('state', event.target.value)} style={inputStyle(colors)}><option value="LOW">0 · LOW</option><option value="HIGH">1 · HIGH</option><option value="Z">Z · High impedance</option><option value="X">X · Unknown</option></select></PropertyRow><PropertyRow colors={colors} label="Toggle key"><input readOnly value={String(component.props.shortcut || defaultInputShortcut)} onFocus={event => event.currentTarget.select()} onKeyDown={event => { event.preventDefault(); if (!['Control', 'Alt', 'Shift', 'Meta'].includes(event.key)) onPropertyChange('shortcut', event.key === 'Backspace' || event.key === 'Delete' ? '' : event.key); }} style={inputStyle(colors)} title="Focus then press a key to assign it" /></PropertyRow></>
         : Object.keys(definition.properties).length > 0 ? Object.entries(definition.properties).map(([key, property]) => {
+          if (key === 'wiper') {
+            const rawVal = numeric(component.props[key], 0.5);
+            const normalized = Math.max(0, Math.min(1, rawVal > 1 ? rawVal / 100 : rawVal));
+            const percentVal = Math.round(normalized * 100);
+            return (
+              <PropertyRow key={key} colors={colors} label={property.label ?? 'Wiper'}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
+                  <input
+                    aria-label="Wiper position percentage"
+                    type="range"
+                    min={0}
+                    max={100}
+                    step={1}
+                    value={percentVal}
+                    onChange={event => onPropertyChange('wiper', Number(event.target.value) / 100)}
+                    className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-brand-gradient [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-0 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:ring-2 [&::-webkit-slider-thumb]:ring-blue-500 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:shadow"
+                  />
+                  <span
+                    className="text-sm font-medium text-slate-700 dark:text-slate-300"
+                    style={{ minWidth: 42, display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end' }}
+                  >
+                    <V3Math math={`${percentVal}\\%`} />
+                  </span>
+                </div>
+              </PropertyRow>
+            );
+          }
           const value = component.props[key] ?? property.value;
           return <PropertyEditorField key={key} colors={colors} label={property.label ?? key} definition={property} value={value} onChange={nextValue => onPropertyChange(key, nextValue)} />;
         }) : <div style={{ color: colors.muted, fontSize: 10, lineHeight: 1.45 }}>Discrete-event logic component. No ground, voltage, threshold, or electrical parameter is required.</div>) : Object.entries(definition.properties).map(([key, property]) => {
+          if (key === 'wiper') {
+            const rawVal = numeric(component.props[key], 0.5);
+            const normalized = Math.max(0, Math.min(1, rawVal > 1 ? rawVal / 100 : rawVal));
+            const percentVal = Math.round(normalized * 100);
+            return (
+              <PropertyRow key={key} colors={colors} label={property.label ?? 'Wiper'}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
+                  <input
+                    aria-label="Wiper position percentage"
+                    type="range"
+                    min={0}
+                    max={100}
+                    step={1}
+                    value={percentVal}
+                    onChange={event => onPropertyChange('wiper', Number(event.target.value) / 100)}
+                    className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-brand-gradient [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-0 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:ring-2 [&::-webkit-slider-thumb]:ring-blue-500 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:shadow"
+                  />
+                  <span
+                    className="text-sm font-medium text-slate-700 dark:text-slate-300"
+                    style={{ minWidth: 42, display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end' }}
+                  >
+                    <V3Math math={`${percentVal}\\%`} />
+                  </span>
+                </div>
+              </PropertyRow>
+            );
+          }
           if (key === 'linkedTo') return <PropertyRow key={key} colors={colors} label={property.label ?? key}><select value={String(component.props[key] ?? '')} onChange={event => onPropertyChange(key, event.target.value)} style={inputStyle(colors)}><option value="">Select coil reference</option>{linkedCoils.filter(coil => coil.id !== component.id).map(coil => <option key={coil.id} value={coil.label}>{coil.label} · {getDef(coil.type)?.name}</option>)}</select></PropertyRow>;
           const value = component.props[key] ?? property.value;
           const prefixable = tabDUiRefinement && property.type === 'number' && PREFIXABLE_UNITS.has(property.unit ?? '');

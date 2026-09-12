@@ -3055,12 +3055,12 @@ function ComponentInspector({ colors, component, definition, allComponents, link
             );
           }
         }
-        if (component.type === 'potentiometer' && key === 'wiper') {
+        if (key === 'wiper') {
           const rawVal = numeric(component.props[key], 0.5);
           const normalized = Math.max(0, Math.min(1, rawVal > 1 ? rawVal / 100 : rawVal));
           const percentVal = Math.round(normalized * 100);
           return (
-            <PropertyRow key={key} colors={colors} label={property.label ?? 'Wiper Position'}>
+            <PropertyRow key={key} colors={colors} label={property.label ?? 'Wiper'}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
                 <input
                   aria-label="Wiper position percentage"
