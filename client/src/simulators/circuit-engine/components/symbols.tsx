@@ -220,10 +220,31 @@ export const Potentiometer: SymbolFC = ({ props }) => {
   const position = Math.max(0, Math.min(1, Number(props?.wiper ?? 0.5)));
   const wiperX = props?._documentedStyle === true ? 0 : -20 + position * 40;
   return (
-    <g data-rigid-body="potentiometer">
-      <line x1={-33.333} y1={0} x2={-20} y2={0} stroke="currentColor" strokeWidth={sw} strokeLinecap="square" />
-      <rect x={-20} y={-7} width={40} height={14} rx={2} fill="none" stroke="currentColor" strokeWidth={sw} />
-      <line x1={20} y1={0} x2={33.333} y2={0} stroke="currentColor" strokeWidth={sw} strokeLinecap="square" />
+    <g data-zigzag-potentiometer="ansi-style">
+      {/* طرف التوصيل الأيسر */}
+      <line x1={-33.333} y1={0} x2={-20.5} y2={0} stroke="currentColor" strokeWidth={sw} strokeLinecap="square" />
+
+      {/* مسار الزجزاج (مطابق للمقاومة) */}
+      <path
+        d="M 20 0 
+           L 16.667 6 
+           L 10 -6 
+           L 3.333 6 
+           L -3.333 -6 
+           L -10 6 
+           L -16.667 -6 
+           L -20 0"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={sw}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+
+      {/* طرف التوصيل الأيمن */}
+      <line x1={20.5} y1={0} x2={33.333} y2={0} stroke="currentColor" strokeWidth={sw} strokeLinecap="square" />
+
+      {/* سهم الزالق (Wiper) */}
       <line x1={0} y1={-33.333} x2={wiperX} y2={-11} stroke="currentColor" strokeWidth={sw} strokeLinecap="round" />
       <polygon points={`${wiperX},${-7} ${wiperX - 4},${-12} ${wiperX + 4},${-12}`} fill="currentColor" />
     </g>
