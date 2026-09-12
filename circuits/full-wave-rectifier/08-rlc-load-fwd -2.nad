@@ -1,0 +1,558 @@
+{
+  "format": "MAE-NAD",
+  "version": 1,
+  "components": [
+    {
+      "id": "zOfIJYCdGj",
+      "type": "transformer",
+      "x": 400,
+      "y": 475,
+      "rotation": 0,
+      "flipH": false,
+      "flipV": false,
+      "label": "T1",
+      "props": {
+        "turnRatio": 5,
+        "ratedPower": 1000,
+        "_hideLabel": true,
+        "_hideValue": true
+      }
+    },
+    {
+      "id": "6Z7n86Jhpd",
+      "type": "ac-voltage",
+      "x": 300,
+      "y": 475,
+      "rotation": 0,
+      "flipH": false,
+      "flipV": false,
+      "label": "Vin",
+      "props": {
+        "format": "polar",
+        "real": 10,
+        "imag": 0,
+        "amplitude": 10,
+        "phase": 0,
+        "angleUnit": "degree",
+        "frequency": 60,
+        "offset": 0,
+        "waveform": "sine",
+        "phases": "single",
+        "_hideValue": true
+      }
+    },
+    {
+      "id": "iKyK4RCxcB",
+      "type": "scr",
+      "x": 525,
+      "y": 425,
+      "rotation": 0,
+      "flipH": true,
+      "flipV": false,
+      "label": "SCR1",
+      "props": {
+        "vdrm": 1200,
+        "itav": 100,
+        "vgt": 1.5,
+        "igt": 0.05,
+        "_hideValue": true
+      }
+    },
+    {
+      "id": "j_b-xvDMMo",
+      "type": "scr",
+      "x": 600,
+      "y": 525,
+      "rotation": 0,
+      "flipH": true,
+      "flipV": false,
+      "label": "SCR2",
+      "props": {
+        "vdrm": 1200,
+        "itav": 100,
+        "vgt": 1.5,
+        "igt": 0.05,
+        "_hideValue": true
+      }
+    },
+    {
+      "id": "vjEwhgMIvQ",
+      "type": "scr",
+      "x": 600,
+      "y": 425,
+      "rotation": 0,
+      "flipH": true,
+      "flipV": false,
+      "label": "SCR3",
+      "props": {
+        "vdrm": 1200,
+        "itav": 100,
+        "vgt": 1.5,
+        "igt": 0.05,
+        "_hideValue": true
+      }
+    },
+    {
+      "id": "ZOHj5eHkau",
+      "type": "scr",
+      "x": 525,
+      "y": 525,
+      "rotation": 0,
+      "flipH": true,
+      "flipV": false,
+      "label": "SCR4",
+      "props": {
+        "vdrm": 1200,
+        "itav": 100,
+        "vgt": 1.5,
+        "igt": 0.05,
+        "_hideValue": true
+      }
+    },
+    {
+      "id": "xc15UiliUG",
+      "type": "inductor",
+      "x": 725,
+      "y": 425,
+      "rotation": 0,
+      "flipH": false,
+      "flipV": false,
+      "label": "L",
+      "props": {
+        "inductance": 0.001,
+        "dcr": 0.1,
+        "_hideValue": true
+      }
+    },
+    {
+      "id": "86rvDzwwvd",
+      "type": "capacitor",
+      "x": 850,
+      "y": 475,
+      "rotation": 90,
+      "flipH": false,
+      "flipV": false,
+      "label": "C",
+      "props": {
+        "capacitance": 0.000001,
+        "voltage": 50,
+        "type": "ceramic",
+        "_hideValue": true
+      }
+    },
+    {
+      "id": "JFULzIfO60",
+      "type": "diode",
+      "x": 775,
+      "y": 475,
+      "rotation": 270,
+      "flipH": false,
+      "flipV": false,
+      "label": "FWD",
+      "props": {
+        "material": "silicon",
+        "forwardVoltage": 0.7,
+        "Is": 1e-12,
+        "_hideValue": true
+      }
+    },
+    {
+      "id": "XqSVptXg3V",
+      "type": "resistor",
+      "x": 925,
+      "y": 475,
+      "rotation": 90,
+      "flipH": false,
+      "flipV": false,
+      "label": "Rload",
+      "props": {
+        "resistance": 1000,
+        "tolerance": "5%",
+        "power": 0.25,
+        "_hideValue": true
+      }
+    }
+  ],
+  "wires": [
+    {
+      "id": "_fv45zzVoe",
+      "fromComp": "6Z7n86Jhpd",
+      "fromTerm": "pos",
+      "toComp": "zOfIJYCdGj",
+      "toTerm": "p1",
+      "routing": "orthogonal",
+      "path": [
+        [
+          300,
+          425
+        ],
+        [
+          350,
+          425
+        ]
+      ]
+    },
+    {
+      "id": "7TPqKbhEzf",
+      "fromComp": "6Z7n86Jhpd",
+      "fromTerm": "neg",
+      "toComp": "zOfIJYCdGj",
+      "toTerm": "p2",
+      "routing": "orthogonal",
+      "path": [
+        [
+          300,
+          525
+        ],
+        [
+          350,
+          525
+        ]
+      ]
+    },
+    {
+      "id": "twTdBhfr8f",
+      "fromComp": "vjEwhgMIvQ",
+      "fromTerm": "cathode",
+      "toComp": "j_b-xvDMMo",
+      "toTerm": "anode",
+      "routing": "orthogonal",
+      "path": [
+        [
+          600,
+          450
+        ],
+        [
+          600,
+          500
+        ]
+      ]
+    },
+    {
+      "id": "UsWLTUzftH",
+      "fromComp": "JFULzIfO60",
+      "fromTerm": "cathode",
+      "toComp": "XqSVptXg3V",
+      "toTerm": "a",
+      "routing": "orthogonal",
+      "path": [
+        [
+          775,
+          425
+        ],
+        [
+          925,
+          425
+        ]
+      ]
+    },
+    {
+      "id": "aqkA_6Bppm",
+      "fromComp": "XqSVptXg3V",
+      "fromTerm": "b",
+      "toComp": "JFULzIfO60",
+      "toTerm": "anode",
+      "routing": "orthogonal",
+      "path": [
+        [
+          925,
+          525
+        ],
+        [
+          775,
+          525
+        ]
+      ]
+    },
+    {
+      "id": "amyUYpxS0K",
+      "fromComp": "iKyK4RCxcB",
+      "fromTerm": "cathode",
+      "toComp": "junc_cHkMMxwKh7",
+      "toTerm": "p",
+      "routing": "orthogonal",
+      "path": [
+        [
+          525,
+          450
+        ],
+        [
+          525,
+          475
+        ]
+      ]
+    },
+    {
+      "id": "6aTMV10omo",
+      "fromComp": "zOfIJYCdGj",
+      "fromTerm": "s1",
+      "toComp": "iKyK4RCxcB",
+      "toTerm": "anode",
+      "routing": "manual",
+      "path": [
+        [
+          450,
+          425
+        ],
+        [
+          475,
+          425
+        ],
+        [
+          475,
+          375
+        ],
+        [
+          525,
+          375
+        ],
+        [
+          525,
+          400
+        ]
+      ],
+      "waypoints": [
+        [
+          475,
+          425
+        ],
+        [
+          475,
+          375
+        ],
+        [
+          525,
+          375
+        ]
+      ]
+    },
+    {
+      "id": "usDIoFLC-T",
+      "fromComp": "vjEwhgMIvQ",
+      "fromTerm": "anode",
+      "toComp": "iKyK4RCxcB",
+      "toTerm": "anode",
+      "routing": "manual",
+      "path": [
+        [
+          600,
+          400
+        ],
+        [
+          600,
+          375
+        ],
+        [
+          525,
+          375
+        ],
+        [
+          525,
+          400
+        ]
+      ],
+      "waypoints": [
+        [
+          600,
+          375
+        ],
+        [
+          525,
+          375
+        ]
+      ]
+    },
+    {
+      "id": "3JqsV2MXS4",
+      "fromComp": "zOfIJYCdGj",
+      "fromTerm": "s2",
+      "toComp": "ZOHj5eHkau",
+      "toTerm": "cathode",
+      "routing": "manual",
+      "path": [
+        [
+          450,
+          525
+        ],
+        [
+          475,
+          525
+        ],
+        [
+          475,
+          575
+        ],
+        [
+          525,
+          575
+        ],
+        [
+          525,
+          550
+        ]
+      ],
+      "waypoints": [
+        [
+          475,
+          525
+        ],
+        [
+          475,
+          575
+        ],
+        [
+          525,
+          575
+        ]
+      ]
+    },
+    {
+      "id": "GM4mXBCqT7",
+      "fromComp": "j_b-xvDMMo",
+      "fromTerm": "cathode",
+      "toComp": "ZOHj5eHkau",
+      "toTerm": "cathode",
+      "routing": "manual",
+      "path": [
+        [
+          600,
+          550
+        ],
+        [
+          600,
+          575
+        ],
+        [
+          550,
+          575
+        ],
+        [
+          525,
+          575
+        ],
+        [
+          525,
+          550
+        ]
+      ],
+      "waypoints": [
+        [
+          600,
+          575
+        ],
+        [
+          550,
+          575
+        ],
+        [
+          525,
+          575
+        ]
+      ]
+    },
+    {
+      "id": "AM4zgTy9xl",
+      "fromComp": "junc_cHkMMxwKh7",
+      "fromTerm": "p",
+      "toComp": "ZOHj5eHkau",
+      "toTerm": "anode",
+      "routing": "orthogonal",
+      "path": [
+        [
+          525,
+          475
+        ],
+        [
+          525,
+          500
+        ]
+      ]
+    },
+    {
+      "id": "eqGojrQ9cp",
+      "fromComp": "xc15UiliUG",
+      "fromTerm": "a",
+      "toComp": "junc_cHkMMxwKh7",
+      "toTerm": "p",
+      "routing": "manual",
+      "path": [
+        [
+          675,
+          425
+        ],
+        [
+          675,
+          475
+        ],
+        [
+          525,
+          475
+        ]
+      ],
+      "waypoints": [
+        [
+          675,
+          475
+        ]
+      ]
+    },
+    {
+      "id": "-v91hRrUd4",
+      "fromComp": "JFULzIfO60",
+      "fromTerm": "anode",
+      "toComp": "j_b-xvDMMo",
+      "toTerm": "anode",
+      "routing": "manual",
+      "path": [
+        [
+          775,
+          525
+        ],
+        [
+          675,
+          525
+        ],
+        [
+          675,
+          500
+        ],
+        [
+          600,
+          500
+        ]
+      ],
+      "waypoints": [
+        [
+          675,
+          525
+        ],
+        [
+          675,
+          500
+        ]
+      ]
+    }
+  ],
+  "texts": [
+    {
+      "id": "hkFqM9Wc6t",
+      "x": 925,
+      "y": 400,
+      "text": "V_{out}",
+      "fontSize": 10,
+      "color": "#172033",
+      "rotation": 0
+    }
+  ],
+  "viewport": {
+    "pan": [
+      -314.3388390910691,
+      -186.94434037846736
+    ],
+    "zoom": 1.120217089840851
+  },
+  "workspace": {
+    "gridVisible": true,
+    "snapEnabled": true
+  }
+}
