@@ -37,7 +37,6 @@ import {
 } from 'lucide-react';
 import { nanoid } from 'nanoid';
 import { toast } from 'sonner';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { V3Math } from '@/components/ui/V3Math';
 import { KATEX_EMBEDDED_FONT_CSS } from '@/simulators/circuit-engine/models/katexSvgFonts';
 import { AnalysisBox } from '@/simulators/circuit-engine/components/ui-components/AnalysisBox';
@@ -806,18 +805,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
   const dcMna = useMemo(() => createStaticMna ? createStaticMna(components, wires, normalizedGraph) : tabBMna, [components, createStaticMna, normalizedGraph, tabBMna, wires]);
   const meshGeometry = useMemo(() => compileMeshGeometry(components, wires, normalizedGraph), [components, wires, normalizedGraph]);
   const nodalGeometry = useMemo(() => compileNodalGeometry(components, wires, normalizedGraph), [components, wires, normalizedGraph]);
-  const workspaceAlert = useMemo(() => {
-    if (!tabDUiRefinement) return null;
-    const warning = snapshot.warnings.find(item => item.code === 'TAB_D_MNA');
-    if (!warning) return null;
-    if (/ground reference/i.test(warning.message)) {
-      return { label: 'TAB D / REFERENCE CHECK', title: 'Missing Ground Reference', message: 'Missing Ground Reference: The circuit cannot be solved. Please add a ground terminal.' };
-    }
-    if (/newton|converg/i.test(warning.message)) {
-      return { label: 'TAB D / SOLVER LIMIT', title: 'Newton–Raphson Did Not Converge', message: 'Newton-Raphson Divergence: The circuit did not converge safely. Review nonlinear devices, source levels, and circuit paths.' };
-    }
-    return { label: 'TAB D / MNA WARNING', title: 'Documented MNA Could Not Solve', message: warning.message };
-  }, [snapshot.warnings, tabDUiRefinement]);
+
   const [analysisTraces, setAnalysisTraces] = useState<Partial<Record<'mesh' | 'nodal', AnalysisTrace>>>({});
   const [activeAnalysisMethod, setActiveAnalysisMethod] = useState<'mesh' | 'nodal' | null>(null);
   const handleAnalysisTrace = useCallback((trace: AnalysisTrace) => {
@@ -2651,7 +2639,6 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
 
         <main className="relative min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-950" style={{ background: colors.canvas, borderColor: colors.line }}>
           <div className="flex items-start justify-between border-b px-4 py-2" style={{ borderColor: colors.line }}><div><div className={CONTROL_SYSTEMS_HEADING}>Interactive Electrical Canvas</div></div><div className="flex items-center gap-2 font-mono text-[10px]" style={{ color: colors.muted }}>{components.length} CMP · {wires.length} NET</div></div>
-          {workspaceAlert && <div className="border-b px-3 py-3" style={{ borderColor: `${colors.danger}55`, background: `${colors.danger}09` }}><Alert variant="destructive" style={{ borderColor: `${colors.danger}66`, background: `${colors.panel}e8`, color: colors.text }}><Info /><AlertTitle className="flex items-center justify-between gap-3" style={{ color: colors.danger, fontSize: 12, fontWeight: 800 }}><span>{workspaceAlert.title}</span><span className="font-mono text-[9px] font-bold tracking-[.12em]" style={{ color: colors.muted }}>{workspaceAlert.label}</span></AlertTitle><AlertDescription style={{ color: colors.muted, fontSize: 11, lineHeight: 1.45 }}>{workspaceAlert.message}</AlertDescription></Alert></div>}
           <svg ref={svgRef} onMouseDown={handleCanvasMouseDown} onMouseMove={handleCanvasMouseMove} onMouseUp={handleCanvasMouseUp} onMouseLeave={handleCanvasMouseUp} onContextMenu={event => event.preventDefault()} onDragOver={event => event.preventDefault()} onDrop={handleDrop} style={{ width: '100%', height: '100%', display: 'block', cursor: dragState?.kind === 'pan' ? 'grabbing' : wiring.from ? 'crosshair' : 'default', touchAction: 'none' }}>
             <defs>
               <marker id="arrow" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M 0,0 L 6,3 L 0,6 Z" fill="#64748b" /></marker>
@@ -2954,12 +2941,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
           ) : selectedText ? (
             <TextInspector colors={colors} text={selectedText} onUpdate={updateText} onMove={moveSelected} onDelete={removeSelection} />
           ) : null}
-          {snapshot.warnings.length > 0 && (
-            <div style={{ margin: '10px', border: `1px solid ${colors.danger}55`, background: `${colors.danger}0d`, borderRadius: 8, padding: 9 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 5, color: colors.danger, fontSize: 10, fontWeight: 780 }}><Info size={13} /> Circuit status</div>
-              {snapshot.warnings.slice(0, 3).map((warning, index) => <div key={`${warning.code}-${index}`} style={{ marginTop: 5, fontSize: 10, color: colors.muted, lineHeight: 1.35 }}>{warning.message}</div>)}
-            </div>
-          )}
+
           <PersistentDmmPanel colors={colors} dmms={components.filter(c => c.type === 'dmm')} snapshot={effectiveSnapshot} />
         </aside>
       </div>

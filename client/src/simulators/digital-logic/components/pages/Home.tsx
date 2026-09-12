@@ -1332,12 +1332,6 @@ export function DigitalLogicSimulatorHome({ createSimulationEngine = () => new S
           ) : (
             digitalLogicOnly ? null : <WelcomeInspector colors={colors} onAddDmm={() => addComponent('dmm')} onAddScope={() => addComponent('oscilloscope')} />
           )}
-          {snapshot.warnings.length > 0 && (
-            <div style={{ margin: 'auto 10px 10px', border: `1px solid ${colors.danger}55`, background: `${colors.danger}0d`, borderRadius: 8, padding: 9 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 5, color: colors.danger, fontSize: 10, fontWeight: 780 }}><Info size={13} /> Circuit status</div>
-              {snapshot.warnings.slice(0, 3).map((warning, index) => <div key={`${warning.code}-${index}`} style={{ marginTop: 5, fontSize: 10, color: colors.muted, lineHeight: 1.35 }}>{warning.message}</div>)}
-            </div>
-          )}
         </aside>
       </div>
       <section className="mt-3 overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-950" style={{ background: colors.panel, borderColor: colors.line }}>
