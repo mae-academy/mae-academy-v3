@@ -342,4 +342,100 @@ describe("ngspice regression (real ngspice.wasm)", () => {
       RUN_TIMEOUT
     );
   });
+
+  describe("ideal circular Voltmeter and Ammeter", () => {
+    it(
+      "reads the full open-circuit potential across an open switch without drawing current",
+      async () => {
+        const components = [
+          part("g", "ground"),
+          part("v1", "dc-voltage", { voltage: 12 }),
+          part("r1", "resistor", { resistance: 1000 }),
+          part("s1", "sw-spst-no", { state: "open" }),
+          part("r2", "resistor", { resistance: 1000 }),
+          part("vm1", "voltmeter"),
+        ];
+        const wires = [
+          wire("w1", "v1", "pos", "r1", "a"),
+          wire("w2", "r1", "b", "s1", "a"),
+          wire("w3", "s1", "b", "r2", "a"),
+          wire("w4", "r2", "b", "g", "gnd"),
+          wire("w5", "v1", "neg", "g", "gnd"),
+          wire("w6", "vm1", "pos", "s1", "a"),
+          wire("w7", "vm1", "neg", "s1", "b"),
+        ];
+        const { readings } = await simulate(components, wires, "practical");
+        // No current flows anywhere with the switch open, so R1 drops nothing: the ideal voltmeter
+        // reads the full 12 V rail across the open contact, not a loaded-down fraction of it.
+        expect(readings.vm1.status).toBe("ready");
+        expect(readings.vm1.value).toBeCloseTo(12, 2);
+      },
+      RUN_TIMEOUT
+    );
+
+    it(
+      "reads a high-impedance divider node without disturbing it, unlike the 10 MΩ-loaded DMM in the same spot",
+      async () => {
+        // Two otherwise-identical 1 MΩ/1 MΩ dividers, differing only in which meter reads the
+        // midpoint — a shared circuit would have the DMM's own real loading shift what the
+        // voltmeter reads too, so isolating each meter is what actually tests "no load of its own".
+        const divider = (meter: CircuitComponent) => ({
+          components: [
+            part("g", "ground"),
+            part("v1", "dc-voltage", { voltage: 10 }),
+            part("r1", "resistor", { resistance: 1_000_000 }),
+            part("r2", "resistor", { resistance: 1_000_000 }),
+            meter,
+          ],
+          wires: [
+            wire("w1", "v1", "pos", "r1", "a"),
+            wire("w2", "r1", "b", "r2", "a"),
+            wire("w3", "r2", "b", "g", "gnd"),
+            wire("w4", "v1", "neg", "g", "gnd"),
+            wire("w5", meter.id, meter.type === "dmm" ? "hi" : "pos", "r1", "b"),
+            wire("w6", meter.id, meter.type === "dmm" ? "com" : "neg", "g", "gnd"),
+          ],
+        });
+        const withVoltmeter = divider(part("vm1", "voltmeter"));
+        const withDmm = divider(part("dmm1", "dmm", { mode: "DCV" }));
+        const [voltmeterRun, dmmRun] = await Promise.all([
+          simulate(withVoltmeter.components, withVoltmeter.wires, "practical"),
+          simulate(withDmm.components, withDmm.wires, "practical"),
+        ]);
+        // Ideal: within a few mV of the exact, unloaded 5 V midpoint — the node's own impedance is
+        // undisturbed by the voltmeter's presence.
+        expect(voltmeterRun.readings.vm1.value).toBeCloseTo(5, 2);
+        // The DMM's documented 10 MΩ load pulls the very same node meaningfully low when it is the
+        // one doing the reading — the contrast that proves the voltmeter carries no load of its own.
+        expect(dmmRun.readings.dmm1.value).toBeLessThan(4.8);
+      },
+      RUN_TIMEOUT
+    );
+
+    it(
+      "carries the exact theoretical branch current in series with a resistor, with zero burden voltage",
+      async () => {
+        const components = [
+          part("g", "ground"),
+          part("v1", "dc-voltage", { voltage: 12 }),
+          part("am1", "ammeter"),
+          part("r1", "resistor", { resistance: 1000 }),
+        ];
+        const wires = [
+          wire("w1", "v1", "pos", "am1", "pos"),
+          wire("w2", "am1", "neg", "r1", "a"),
+          wire("w3", "r1", "b", "g", "gnd"),
+          wire("w4", "v1", "neg", "g", "gnd"),
+        ];
+        const { readings, nodeVoltage } = await simulate(components, wires, "practical");
+        // I = V / R = 12 V / 1 kΩ = 12 mA, conventional current entering the ammeter's "pos" terminal.
+        expect(readings.am1.status).toBe("ready");
+        // Positive: conventional current genuinely enters "pos" here, not just matches in magnitude.
+        expect(readings.am1.value).toBeCloseTo(0.012, 5);
+        // Zero burden voltage: the ammeter's own two terminals sit at the same potential.
+        expect(nodeVoltage("am1", "pos") - nodeVoltage("am1", "neg")).toBeCloseTo(0, 6);
+      },
+      RUN_TIMEOUT
+    );
+  });
 });

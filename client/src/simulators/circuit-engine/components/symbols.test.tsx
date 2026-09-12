@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { renderSymbol } from '@/simulators/circuit-engine/components/symbols';
+import { formatMeterReading, renderSymbol } from '@/simulators/circuit-engine/components/symbols';
 
 function markup(symbolId: string, props: Record<string, unknown> = {}) {
   return renderToStaticMarkup(<svg>{renderSymbol(symbolId, false, props, 0)}</svg>);
@@ -270,7 +270,7 @@ describe('Tab D SVG symbol language', () => {
     expect(dmm).toContain('y="-58"');
   });
 
-  it('renders Voltmeter and Ammeter with dynamic displayValue or fallback', () => {
+  it('renders Voltmeter and Ammeter with dynamic displayValue or fallback, in upright KaTeX_Main typography', () => {
     const vDefault = markup('voltmeter');
     const vDynamic = markup('voltmeter', { displayValue: '12.0 V' });
     expect(vDefault).toContain('>V<');
@@ -280,6 +280,28 @@ describe('Tab D SVG symbol language', () => {
     const aDynamic = markup('ammeter', { displayValue: '250 mA' });
     expect(aDefault).toContain('>A<');
     expect(aDynamic).toContain('>250 mA<');
+
+    // Digits and unit letters render upright (never italic), in the same KaTeX_Main face used
+    // elsewhere for math Roman text — not KaTeX_Math, which is reserved for italic variable letters.
+    for (const markup_ of [vDefault, vDynamic, aDefault, aDynamic]) {
+      expect(markup_).toContain('font-family="KaTeX_Main, Times New Roman, serif"');
+      expect(markup_).toContain('font-style="normal"');
+    }
+  });
+
+  it('formats live meter readings as auto-scaled, 4-significant-digit upright KaTeX strings', () => {
+    // Base-unit range: 3 decimals.
+    expect(formatMeterReading(1.5, 'A')).toBe('1.500 A');
+    // Auto-scales down to milli once the base-unit magnitude drops below 1.
+    expect(formatMeterReading(0.02, 'A')).toBe('20.00 mA');
+    expect(formatMeterReading(0.7502, 'V')).toBe('750.2 mV');
+    expect(formatMeterReading(12, 'V')).toBe('12.00 V');
+    // Sub-tolerance solver noise (below ngspice's own VNTOL/ABSTOL resolution) clamps to an exact
+    // zero in the instrument's base unit, never a scaled-down "-0.000 µV" or "0.000 pA".
+    expect(formatMeterReading(4e-8, 'V')).toBe('0.000 V');
+    expect(formatMeterReading(-1e-19, 'A')).toBe('0.000 A');
+    // Polarity survives scaling.
+    expect(formatMeterReading(-0.005, 'A')).toBe('-5.000 mA');
   });
 
   it('renders oscilloscope with a clean dark screen, no sine wave, and clean channel labels', () => {

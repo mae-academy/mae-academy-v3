@@ -82,7 +82,7 @@ import { parseSpiceResults } from '@/simulators/circuit-engine/engine/spice/spic
 import { buildSpiceInstrumentReadings } from '@/simulators/circuit-engine/engine/spice/spiceInstruments';
 import { filterTabDCatalog, filterTabDImportedComponents, isTabDComponentAvailable } from '@/simulators/circuit-engine/models/analogComponentCatalog';
 import { alignTabDTerminalToGrid, calculateTabDPlanarCavity, dynamicRubberBandPath, getExactTerminalOffset, isExactCadComponent, lockTabDWireCorner, MESH_LOOP_COLORS, moveTabDOrthogonalLane, tabDComponentLabelAnchors, tabDGentleWheelZoomFactor, tabDOrthogonalDraftPath, tabDTerminalOrthogonalPath, type ObstacleBox, type TabDTerminalAxis } from '@/simulators/circuit-engine/components/analogCanvasGeometry';
-import { renderSymbol } from '@/simulators/circuit-engine/components/symbols';
+import { formatMeterReading, renderSymbol } from '@/simulators/circuit-engine/components/symbols';
 import { applySwitchHotkey, directControlKind, hotkeyDigit, isTextEntryTarget, momentaryControlProps, nextLatchingControlProps, releaseHeldPushbuttons } from '@/simulators/circuit-engine/models/componentInteraction';
 import {
   addWireCorner,
@@ -2767,6 +2767,13 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                 }
                 const intensity = snapshot.componentIntensity[component.id] ?? 0;
                 const reading = effectiveSnapshot.instrumentReadings[component.id];
+                // Live KaTeX-styled reading inside the circular Voltmeter/Ammeter face, synced with
+                // effectiveSnapshot (SPICE-verified when available, the legacy engine otherwise) so it
+                // follows Run mode with no extra lag beyond the snapshot itself. A component with no
+                // reading yet (never simulated) or an unwired meter falls back to the plain "V"/"A"
+                // glyph inside the symbol, unchanged.
+                const meterUnit = component.type === 'voltmeter' ? 'V' : component.type === 'ammeter' ? 'A' : null;
+                const meterDisplayValue = meterUnit && reading?.status === 'ready' ? formatMeterReading(reading.value, meterUnit) : undefined;
                 const transform = `translate(${component.x},${component.y})`;
                 const symbolTransform = `rotate(${component.rotation}) scale(${component.flipH ? -1 : 1},${component.flipV ? -1 : 1}) scale(${isExactCadComponent(component.type) ? 1 : visualSymbolScale})`;
                 return (
@@ -2777,7 +2784,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                     onPointerLeave={() => setHoveredComponentId(null)}
                   >
                     <g transform={symbolTransform} color={isSelected ? colors.selection : undefined}>
-                      {renderSymbol(definition.symbol, powered, { ...component.props, isEnergized: powered, _intensity: intensity, _documentedStyle: tabDUiRefinement }, animationTime)}
+                      {renderSymbol(definition.symbol, powered, { ...component.props, isEnergized: powered, _intensity: intensity, _documentedStyle: tabDUiRefinement, ...(meterDisplayValue !== undefined ? { displayValue: meterDisplayValue } : {}) }, animationTime)}
                       {component.type === 'oscilloscope' && <ScopeTrace reading={effectiveSnapshot.instrumentReadings[`${component.id}:ch1`]} color="#38bdf8" />}
                     </g>
                     {definition.terminals.map(terminal => {

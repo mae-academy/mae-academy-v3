@@ -973,13 +973,53 @@ const Opamp: SymbolFC = () => (
 
 // ─── MEASUREMENT ──────────────────────────────────────────────────────────────
 
+// Sub-tolerance solver noise floor, matching VOLTAGE_NOISE_FLOOR/CURRENT_NOISE_FLOOR in
+// spiceInstruments.ts (ngspice's own VNTOL/ABSTOL resolution) — a defensive re-clamp so a stray
+// ~1e-19 residual from either engine never survives onto the meter face as "-0.000 V".
+const METER_NOISE_FLOOR: Record<'V' | 'A', number> = { V: 1e-6, A: 1e-12 };
+// Auto-ranging engineering prefixes, largest first, exactly the set the spec calls for: V/mV/µV
+// and A/mA/µA — never kV or nA, which this educational simulator's circuits never reach.
+const METER_PREFIXES: Record<'V' | 'A', Array<{ scale: number; symbol: string }>> = {
+  V: [{ scale: 1, symbol: 'V' }, { scale: 1e-3, symbol: 'mV' }, { scale: 1e-6, symbol: 'µV' }],
+  A: [{ scale: 1, symbol: 'A' }, { scale: 1e-3, symbol: 'mA' }, { scale: 1e-6, symbol: 'µA' }],
+};
+
+/**
+ * Formats a live Voltmeter/Ammeter reading for the circular meter face: engineering-unit
+ * auto-scaling with a 4-significant-digit auto-ranging decimal count (the same convention a
+ * benchtop DMM uses — "1.500 A", "20.00 mA", "750.2 mV"), and sub-tolerance solver noise clamped to
+ * an exact "0.000 <unit>" in the instrument's own base unit.
+ */
+export function formatMeterReading(value: number, unit: 'V' | 'A'): string {
+  const magnitude = Number.isFinite(value) ? value : 0;
+  if (Math.abs(magnitude) < METER_NOISE_FLOOR[unit]) return `0.000 ${unit}`;
+  const tier = METER_PREFIXES[unit].find(prefix => Math.abs(magnitude) >= prefix.scale)
+    ?? METER_PREFIXES[unit][METER_PREFIXES[unit].length - 1];
+  const scaled = magnitude / tier.scale;
+  const integerDigits = Math.max(1, Math.floor(Math.log10(Math.abs(scaled))) + 1);
+  const decimals = Math.max(0, Math.min(3, 4 - integerDigits));
+  return `${scaled.toFixed(decimals)} ${tier.symbol}`;
+}
+
+// Sized to stay clear of the 33px-radius circular face's perimeter: a formatted reading
+// ("750.2 mV") is far longer than the static "V"/"A" fallback glyph, so both the font size and an
+// explicit SVG textLength shrink together as the string grows, guaranteeing it never clips.
+const METER_FACE_TEXT_WIDTH = 56;
+function meterTextMetrics(display: string): { fontSize: number; textLength?: number } {
+  if (display.length <= 1) return { fontSize: 20 };
+  const fontSize = display.length > 7 ? 10 : display.length > 5 ? 12 : 14;
+  const estimatedWidth = display.length * fontSize * 0.62;
+  return estimatedWidth > METER_FACE_TEXT_WIDTH ? { fontSize, textLength: METER_FACE_TEXT_WIDTH } : { fontSize };
+}
+
 const Voltmeter: SymbolFC = ({ props }) => {
   const display = props?.displayValue != null && String(props.displayValue).trim() !== '' ? String(props.displayValue) : 'V';
-  const fontSize = display.length > 3 ? 12 : display.length > 1 ? 14 : 20;
+  const { fontSize, textLength } = meterTextMetrics(display);
   return (
     <g>
       <circle cx={0} cy={0} r={33} fill="none" stroke="currentColor" strokeWidth={1.5} />
-      <text x={0} y={6} textAnchor="middle" fontSize={fontSize} fontWeight="bold" fill="currentColor">{display}</text>
+      {/* Upright KaTeX_Main typography — never italic, matching \mathrm{…} for digits and unit letters. */}
+      <text x={0} y={6} textAnchor="middle" fontSize={fontSize} fontWeight="bold" fontStyle="normal" fontFamily="KaTeX_Main, Times New Roman, serif" {...(textLength ? { textLength, lengthAdjust: 'spacingAndGlyphs' as const } : {})} fill="currentColor">{display}</text>
       <line x1={-50} y1={0} x2={-33} y2={0} stroke="currentColor" strokeWidth={1.5} />
       <line x1={33} y1={0} x2={50} y2={0} stroke="currentColor" strokeWidth={1.5} />
     </g>
@@ -988,11 +1028,12 @@ const Voltmeter: SymbolFC = ({ props }) => {
 
 const Ammeter: SymbolFC = ({ props }) => {
   const display = props?.displayValue != null && String(props.displayValue).trim() !== '' ? String(props.displayValue) : 'A';
-  const fontSize = display.length > 3 ? 12 : display.length > 1 ? 14 : 20;
+  const { fontSize, textLength } = meterTextMetrics(display);
   return (
     <g>
       <circle cx={0} cy={0} r={33} fill="none" stroke="currentColor" strokeWidth={1.5} />
-      <text x={0} y={6} textAnchor="middle" fontSize={fontSize} fontWeight="bold" fill="currentColor">{display}</text>
+      {/* Upright KaTeX_Main typography — never italic, matching \mathrm{…} for digits and unit letters. */}
+      <text x={0} y={6} textAnchor="middle" fontSize={fontSize} fontWeight="bold" fontStyle="normal" fontFamily="KaTeX_Main, Times New Roman, serif" {...(textLength ? { textLength, lengthAdjust: 'spacingAndGlyphs' as const } : {})} fill="currentColor">{display}</text>
       <line x1={-50} y1={0} x2={-33} y2={0} stroke="currentColor" strokeWidth={1.5} />
       <line x1={33} y1={0} x2={50} y2={0} stroke="currentColor" strokeWidth={1.5} />
     </g>
