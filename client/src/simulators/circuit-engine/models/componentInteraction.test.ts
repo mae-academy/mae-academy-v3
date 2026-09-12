@@ -6,12 +6,15 @@ const component = (type: string, props: Record<string, unknown> = {}): CircuitCo
 const labeled = (id: string, type: string, label: string, props: Record<string, unknown>): CircuitComponent => ({ ...component(type, props), id, label });
 
 describe('direct canvas control contract', () => {
-  it('classifies standard switches and relays as latching while pushbuttons remain momentary', () => {
+  it('classifies standard switches as latching and pushbuttons as momentary, but never a relay or contactor body', () => {
     expect(directControlKind('sw-spst-no')).toBe('latching');
-    expect(directControlKind('relay-spdt')).toBe('latching');
-    expect(directControlKind('contactor')).toBe('latching');
     expect(directControlKind('pb-no')).toBe('momentary');
     expect(directControlKind('resistor')).toBeNull();
+    // Relay/contactor contacts and coils stay strictly coil-driven: a canvas click must never latch them.
+    expect(directControlKind('relay-spst')).toBeNull();
+    expect(directControlKind('relay-spdt')).toBeNull();
+    expect(directControlKind('relay-dpst')).toBeNull();
+    expect(directControlKind('contactor')).toBeNull();
   });
 
   it('cycles standard switches between their valid electrical contact states', () => {
@@ -21,14 +24,13 @@ describe('direct canvas control contract', () => {
     expect(nextLatchingControlProps(component('sw-dpdt', { state: 'b' }))).toEqual({ state: 'a' });
   });
 
-  it('latches relay contacts with a manual override and restores momentary pushbuttons on release', () => {
-    expect(nextLatchingControlProps(component('relay-spst', {}))).toEqual({ manualState: 'closed' });
-    expect(nextLatchingControlProps(component('relay-spst', { manualState: 'closed' }))).toEqual({ manualState: 'open' });
+  it('restores momentary pushbuttons on release, while Force State (never a canvas click) still overrides coil sensing', () => {
+    expect(momentaryControlProps(true)).toEqual({ state: 'pressed' });
+    expect(momentaryControlProps(false)).toEqual({ state: 'released' });
+    // manualRelayClosed backs the Force State properties-panel control, not the canvas click path.
     expect(manualRelayClosed({ manualState: 'closed' }, false)).toBe(true);
     expect(manualRelayClosed({ manualState: 'open' }, true)).toBe(false);
     expect(manualRelayClosed({}, true)).toBe(true);
-    expect(momentaryControlProps(true)).toEqual({ state: 'pressed' });
-    expect(momentaryControlProps(false)).toEqual({ state: 'released' });
   });
 });
 

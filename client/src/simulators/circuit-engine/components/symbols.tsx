@@ -15,7 +15,7 @@ interface SymbolProps {
 
 type SymbolFC = FC<SymbolProps>;
 
-/** Manual contact position overrides coil sensing only after direct canvas interaction. */
+/** The Force State property (never a canvas click, which never applies to relay/contactor bodies) overrides coil sensing. */
 function relayContactClosed(powered: boolean | undefined, props?: Record<string, any>): boolean {
   if (props?.manualState === 'closed') return true;
   if (props?.manualState === 'open') return false;

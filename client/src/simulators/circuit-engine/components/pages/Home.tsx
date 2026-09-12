@@ -856,7 +856,8 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     { areEqual: areSnapshotsEqual },
   );
   const dragStartSnapshotRef = useRef<CanvasSnapshot | null>(null);
-  // Armed when a latching control (switch, breaker, relay override) is pressed on the canvas, and
+  // Armed when a latching control (a standard switch) is pressed on the canvas — never a relay or
+  // contactor body, whose contacts stay strictly coil-driven — and
   // cleared as soon as the pointer moves far enough to be a drag — so the mouse-up below toggles a
   // click but never a drag.
   const latchingClickRef = useRef<{ id: string; origin: Point } | null>(null);
