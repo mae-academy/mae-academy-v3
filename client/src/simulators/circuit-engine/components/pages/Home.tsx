@@ -3028,7 +3028,7 @@ function ComponentInspector({ colors, component, definition, allComponents, link
               <PropertyRow key={key} colors={colors} label={property.label ?? key}>
                 <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 68px', gap: 5 }}>
                   <input type="number" step="any" value={numeric(component.props[key], defaultAng)} onChange={event => onPropertyChange(key, numeric(event.target.value, defaultAng))} style={mathNumericInputStyle(colors)} />
-                  <select value={String(component.props.angleUnit ?? 'degree')} onChange={event => onPropertyChange('angleUnit', event.target.value)} style={{ ...inputStyle(colors), paddingInlineStart: 6, paddingInlineEnd: 16 }}>
+                  <select value={String(component.props.angleUnit ?? 'degree')} onChange={event => onPropertyChange('angleUnit', event.target.value)} style={mathSelectStyle(colors)}>
                     <option value="degree">deg</option>
                     <option value="radian">rad</option>
                   </select>
@@ -3095,7 +3095,7 @@ function PrefixedPropertyEditorField({ colors, propertyKey, label, definition, v
     onPrefixChange(nextPrefix);
     onChange(visibleValue * engineeringFactor(nextPrefix));
   };
-  return <PropertyRow colors={colors} label={label} unit={definition.unit}><div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 68px', gap: 5 }}><input aria-label={`${propertyKey} numeric value`} type="number" step="any" value={displayValue} onChange={event => onChange(numeric(event.target.value, displayValue) * factor)} style={mathNumericInputStyle(colors)} /><select aria-label={`${propertyKey} engineering prefix`} value={prefix} onChange={event => selectPrefix(event.target.value)} style={{ ...inputStyle(colors), paddingInlineStart: 6, paddingInlineEnd: 16 }} title={`Engineering prefix for ${definition.unit ?? ''}`}>{ENGINEERING_PREFIXES.map(item => <option key={item.key || 'base'} value={item.key}>{item.symbol || '—'}{definition.unit}</option>)}</select></div></PropertyRow>;
+  return <PropertyRow colors={colors} label={label} unit={definition.unit}><div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 68px', gap: 5 }}><input aria-label={`${propertyKey} numeric value`} type="number" step="any" value={displayValue} onChange={event => onChange(numeric(event.target.value, displayValue) * factor)} style={mathNumericInputStyle(colors)} /><select aria-label={`${propertyKey} engineering prefix`} value={prefix} onChange={event => selectPrefix(event.target.value)} style={mathSelectStyle(colors)} title={`Engineering prefix for ${definition.unit ?? ''}`}>{ENGINEERING_PREFIXES.map(item => <option key={item.key || 'base'} value={item.key}>{item.symbol || '—'}{definition.unit}</option>)}</select></div></PropertyRow>;
 }
 
 function WireInspector({ colors, wire, tabDUiRefinement, onRouting, onAddCorner, onNudge, onDelete }: { colors: Palette; wire: CircuitWire; tabDUiRefinement: boolean; onRouting: (routing: CircuitWire['routing']) => void; onAddCorner: () => void; onNudge: (amount: number) => void; onDelete: () => void }) {
@@ -3244,10 +3244,21 @@ function mathReferenceInputStyle(colors: Palette): React.CSSProperties {
 function mathNumericInputStyle(colors: Palette): React.CSSProperties {
   return {
     ...inputStyle(colors),
-    fontFamily: "'KaTeX_Main', 'KaTeX_Math', serif",
+    fontFamily: "'KaTeX_Main', 'KaTeX_Math', 'Times New Roman', serif",
     fontSize: 14,
     fontStyle: 'normal',
     fontVariantNumeric: 'tabular-nums',
+  };
+}
+
+function mathSelectStyle(colors: Palette): React.CSSProperties {
+  return {
+    ...inputStyle(colors),
+    fontFamily: "'KaTeX_Main', 'KaTeX_Math', 'Times New Roman', serif",
+    fontSize: 14,
+    fontStyle: 'normal',
+    paddingInlineStart: 6,
+    paddingInlineEnd: 16,
   };
 }
 
