@@ -118,11 +118,11 @@ const TAB_D_GRID_SIZE = 25;
 const TAB_D_SYMBOL_SCALE = 1.5;
 const TERMINAL_HIT_RADIUS = 13;
 const TERMINAL_RADIUS = 4;
-/* Shared with .mae-panel-section-header (index.css): every structural panel header renders identically muted. */
-const CONTROL_SYSTEMS_HEADING = 'mae-panel-section-header';
-/* Explicit Tailwind lock for every property-row <select>/<input>: identical 32px height and 12px slate-700 text,
-   redundant with the global index.css rule but keeps the inspector controls pixel-identical even if that rule changes. */
-const THEMED_CONTROL_CLASS = 'h-8 min-h-[32px] max-h-[32px] w-full rounded-xl border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 shadow-none outline-none focus:border-primary focus:ring-1 focus:ring-primary';
+/* Hardcoded directly on JSX (not .mae-panel-*) so utility-class specificity can't be shadowed by a Radix/library default. */
+const CONTROL_SYSTEMS_HEADING = 'text-[12px] font-bold text-black uppercase tracking-wider';
+const FIELD_LABEL_CLASS = 'text-[13px] font-medium text-black';
+/* Explicit Tailwind lock for every property-row <select>/<input>: identical 32px height and 13px solid-black text. */
+const THEMED_CONTROL_CLASS = 'h-8 min-h-[32px] max-h-[32px] w-full rounded-xl border border-slate-200 bg-white px-2.5 text-[13px] font-medium text-black shadow-none outline-none focus:border-primary focus:ring-1 focus:ring-primary';
 /* Unified signature gradient pills (blue-600 -> pink-500). */
 const TAB_GRADIENT = 'linear-gradient(90deg, #2563eb 0%, #7c3aed 50%, #f43f5e 100%)';
 const TAB_GRADIENT_REV = 'linear-gradient(90deg, #f43f5e 0%, #7c3aed 50%, #2563eb 100%)';
@@ -2467,7 +2467,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                     const next = new Set(previous);
                     if (next.has(category)) next.delete(category); else next.add(category);
                     return next;
-                  })} className="mae-panel-section-header" style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: 'none', background: 'transparent', cursor: 'pointer', padding: '8px 5px' }}>
+                  })} className={CONTROL_SYSTEMS_HEADING} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: 'none', background: 'transparent', cursor: 'pointer', padding: '8px 5px' }}>
                     <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>{collapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}{category}</span>
                     <span className="mae-panel-meta">{items.length}</span>
                   </button>
@@ -2500,7 +2500,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                         </>
                       ) : (
                         <>
-                          <span className="mae-panel-field-label" style={{ color: 'inherit' }}><ElectricalLabel label={item.name} /></span>
+                          <span className={FIELD_LABEL_CLASS}><ElectricalLabel label={item.name} /></span>
                           <span className="mae-panel-meta" style={{ lineHeight: 1.25 }}>{item.description}</span>
                         </>
                       )}
@@ -2863,7 +2863,7 @@ function ToolbarButton({ colors, icon, label, title, onClick, active, disabled }
 function ToolbarDivider({ colors }: { colors: Palette }) { return <span style={{ width: 1, height: 20, background: colors.line, margin: '0 1px', flexShrink: 0 }} />; }
 
 function InspectorHeader({ colors, title, subtitle }: { colors: Palette; title: React.ReactNode; subtitle: string }) {
-  return <div style={{ padding: '15px 15px 12px', borderBottom: `1px solid ${colors.line}` }}><div><div className={CONTROL_SYSTEMS_HEADING}>{title}</div><div className="mae-panel-meta" style={{ marginTop: 2, lineHeight: 1.3 }}>{subtitle}</div></div></div>;
+  return <div style={{ padding: '15px 15px 12px', borderBottom: `1px solid ${colors.line}` }}><div><div className={CONTROL_SYSTEMS_HEADING}>{title}</div><div className={FIELD_LABEL_CLASS} style={{ marginTop: 2, lineHeight: 1.3 }}>{subtitle}</div></div></div>;
 }
 
 function InspectorButton({ colors, children, onClick, danger, active, disabled }: { colors: Palette; children: React.ReactNode; onClick: () => void; danger?: boolean; active?: boolean; disabled?: boolean }) {
@@ -2871,9 +2871,9 @@ function InspectorButton({ colors, children, onClick, danger, active, disabled }
   return <button onClick={onClick} disabled={disabled} style={{ flex: 1, minHeight: 30, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4, border: `1px solid ${tone}55`, borderRadius: 6, background: active || danger ? `${tone}0d` : colors.panelAlt, color: tone, cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? .5 : 1, fontSize: 10, fontWeight: 700 }}>{children}</button>;
 }
 
-function InspectorSection({ colors, label, children }: { colors: Palette; label: string; children: React.ReactNode }) { return <section style={{ padding: '12px 15px', borderBottom: `1px solid ${colors.line}` }}><div className="mae-panel-section-header" style={{ marginBottom: 8 }}>{label}</div>{children}</section>; }
+function InspectorSection({ colors, label, children }: { colors: Palette; label: string; children: React.ReactNode }) { return <section style={{ padding: '12px 15px', borderBottom: `1px solid ${colors.line}` }}><div className={CONTROL_SYSTEMS_HEADING} style={{ marginBottom: 8 }}>{label}</div>{children}</section>; }
 
-function PropertyRow({ colors, label, unit, children }: { colors: Palette; label: string; unit?: string; children: React.ReactNode }) { return <label style={{ display: 'grid', gridTemplateColumns: '1fr 132px', gap: 8, alignItems: 'center', marginBottom: 8 }}><span className="mae-panel-field-label" style={{ lineHeight: 1.25 }}><ElectricalLabel label={label} unit={unit} /></span>{children}</label>; }
+function PropertyRow({ colors, label, unit, children }: { colors: Palette; label: string; unit?: string; children: React.ReactNode }) { return <label style={{ display: 'grid', gridTemplateColumns: '1fr 132px', gap: 8, alignItems: 'center', marginBottom: 8 }}><span className={FIELD_LABEL_CLASS} style={{ lineHeight: 1.25 }}><ElectricalLabel label={label} unit={unit} /></span>{children}</label>; }
 
 function ComponentInspector({ colors, component, definition, allComponents, linkedCoils, reading, snapshot, tabDUiRefinement, onLabelChange, onPropertyChange, onDelete }: { colors: Palette; component: CircuitComponent; definition: ComponentDef; allComponents: CircuitComponent[]; linkedCoils: CircuitComponent[]; reading?: InstrumentReading; snapshot: SimulationSnapshot; tabDUiRefinement: boolean; onLabelChange: (value: string) => void; onPropertyChange: (key: string, value: unknown) => void; onDelete: () => void }) {
   // Check if the component actually has a numeric value to display
