@@ -3061,41 +3061,23 @@ function ComponentInspector({ colors, component, definition, allComponents, link
           const percentVal = Math.round(normalized * 100);
           return (
             <PropertyRow key={key} colors={colors} label={property.label ?? 'Wiper Position'}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
                 <input
+                  aria-label="Wiper position percentage"
                   type="range"
                   min={0}
                   max={100}
                   step={1}
                   value={percentVal}
                   onChange={event => onPropertyChange('wiper', Number(event.target.value) / 100)}
-                  className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-slate-200 dark:bg-slate-700 accent-blue-600 focus:outline-none"
-                  style={{ flex: 1, minWidth: 0 }}
-                  title={`${percentVal}%`}
+                  className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-brand-gradient [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-0 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:ring-2 [&::-webkit-slider-thumb]:ring-blue-500 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:shadow"
                 />
-                <div style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
-                  <input
-                    type="number"
-                    min={0}
-                    max={100}
-                    step={1}
-                    value={percentVal}
-                    onChange={event => {
-                      const num = Number(event.target.value);
-                      const clamped = Math.max(0, Math.min(100, isNaN(num) ? 0 : num));
-                      onPropertyChange('wiper', clamped / 100);
-                    }}
-                    style={{
-                      ...mathNumericInputStyle(colors),
-                      width: 38,
-                      padding: '2px 2px',
-                      height: 24,
-                      fontSize: 11,
-                      textAlign: 'center',
-                    }}
-                  />
-                  <span style={{ fontSize: 11, color: colors.muted, fontWeight: 600 }}>%</span>
-                </div>
+                <span
+                  className="text-sm font-medium text-slate-700 dark:text-slate-300"
+                  style={{ minWidth: 42, display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end' }}
+                >
+                  <V3Math math={`${percentVal}\\%`} />
+                </span>
               </div>
             </PropertyRow>
           );
