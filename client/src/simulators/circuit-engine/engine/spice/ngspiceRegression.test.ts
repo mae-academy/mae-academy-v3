@@ -209,26 +209,33 @@ describe("ngspice regression (real ngspice.wasm)", () => {
   });
 
   describe("LED colour presets", () => {
-    // 12 V through 470 Ω biases every preset near the 20 mA the model is fitted at, so each colour
-    // should measure within ~0.1 V of its specified forward voltage.
-    const ledCircuitFor = (color: string) => ({
-      components: [
-        part("g", "ground"),
-        part("v1", "dc-voltage", { voltage: 12 }),
-        part("r1", "resistor", { resistance: 470 }),
-        // Exactly what the inspector writes when a student picks the preset: colour plus its voltage.
-        part("d1", "led", { color, forwardVoltage: LED_FORWARD_VOLTAGES[color] }),
-        part("dmm1", "dmm", { mode: "DCV" }),
-      ],
-      wires: [
-        wire("w1", "v1", "pos", "r1", "a"),
-        wire("w2", "r1", "b", "d1", "anode"),
-        wire("w3", "d1", "cathode", "g", "gnd"),
-        wire("w4", "v1", "neg", "g", "gnd"),
-        wire("w5", "dmm1", "hi", "d1", "anode"),
-        wire("w6", "dmm1", "com", "g", "gnd"),
-      ],
-    });
+    // The exact scenario from a report of massive overshoot on this fit ("5V source, ~20mA load"):
+    // R is sized per colour so the nominal Vf implies ~20mA, the same current the model is fitted
+    // at, from a 5V rail. Not reproduced against this code: every colour below actually measures
+    // within ~25mV of nominal (RS=1 Ω contributes the last ~20mV of that at 20mA, deliberately).
+    const ledCircuitFor = (color: string) => {
+      const forwardVoltage = LED_FORWARD_VOLTAGES[color];
+      const resistance = Math.max(1, (5 - forwardVoltage) / 0.02);
+      return {
+        forwardVoltage,
+        components: [
+          part("g", "ground"),
+          part("v1", "dc-voltage", { voltage: 5 }),
+          part("r1", "resistor", { resistance }),
+          // Exactly what the inspector writes when a student picks the preset: colour plus its voltage.
+          part("d1", "led", { color, forwardVoltage }),
+          part("dmm1", "dmm", { mode: "DCV" }),
+        ],
+        wires: [
+          wire("w1", "v1", "pos", "r1", "a"),
+          wire("w2", "r1", "b", "d1", "anode"),
+          wire("w3", "d1", "cathode", "g", "gnd"),
+          wire("w4", "v1", "neg", "g", "gnd"),
+          wire("w5", "dmm1", "hi", "d1", "anode"),
+          wire("w6", "dmm1", "com", "g", "gnd"),
+        ],
+      };
+    };
 
     const ledDrop = async (color: string) => {
       const { components, wires } = ledCircuitFor(color);
@@ -237,15 +244,15 @@ describe("ngspice regression (real ngspice.wasm)", () => {
       return readings.dmm1.value;
     };
 
-    it.each(["violet", "red", "yellow", "blue", "white"])(
-      "drops the %s preset's nominal forward voltage",
+    it.each(Object.keys(LED_FORWARD_VOLTAGES))(
+      "drops within 50 mV of the %s preset's nominal Vf at its own ~20 mA bias",
       async color => {
         const nominal = LED_FORWARD_VOLTAGES[color];
         const measured = await ledDrop(color);
         expect(
           Math.abs(measured - nominal),
-          `${color}: measured ${measured} V against a nominal ${nominal} V`
-        ).toBeLessThan(0.1);
+          `${color}: measured ${measured} V against a nominal ${nominal} V (not the reported ~1.6-2.0 V overshoot)`
+        ).toBeLessThan(0.05);
       },
       RUN_TIMEOUT
     );
