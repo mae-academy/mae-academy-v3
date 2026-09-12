@@ -81,7 +81,7 @@ const SOURCES: Record<string, ComponentDef> = {
     description: 'AC voltage source with configurable waveform',
   },
   'three-phase-source': {
-    id: 'three-phase-source', name: '3-Phase Source', category: 'Sources',
+    id: 'three-phase-source', name: '3-Phase Voltage Source', category: 'Sources',
     width: 80, height: 90, symbol: 'three-phase-source',
     terminals: [
       { id: 'l1', name: 'L1', x: 40, y: -15, type: 'output' },
@@ -180,7 +180,6 @@ const PASSIVE: Record<string, ComponentDef> = {
     ],
     properties: {
       resistance: { type: 'number', value: 10000, unit: 'Ω', min: 1, max: 1e9, label: 'End-to-End Resistance' },
-      taper: { type: 'select', value: 'linear', options: ['linear', 'logarithmic'], label: 'Taper' },
       wiper: { type: 'number', value: 0.5, unit: '', min: 0, max: 1, step: 0.01, label: 'Wiper' },
     },
     description: 'Three-terminal variable resistor / potentiometer',

@@ -1509,8 +1509,6 @@ function ScopeTrace({ reading, color }: { reading?: InstrumentReading; color: st
 
 function ElectricalLabel({ label, unit }: { label: string; unit?: string }) {
   const symbol: Record<string, string> = {
-    'DC Voltage Source': 'V_{\\mathrm{DC}}', 'AC Voltage Source': 'V_{\\mathrm{AC}}', 'DC Current Source': 'I_{\\mathrm{DC}}', 'AC Current Source': 'I_{\\mathrm{AC}}',
-    '3-Phase Source': 'V_{abc}', 'Resistor': 'R', 'Variable Resistor': 'R_{\\mathrm{var}}', 'Capacitor': 'C', 'Inductor': 'L',
     'Voltage': 'V', 'Current': 'I', 'Resistance': 'R', 'Capacitance': 'C', 'Inductance': 'L', 'Frequency': 'f', 'Phase': '\\phi',
   };
   const unitMath: Record<string, string> = { 'Ohm': '\\Omega', 'Ω': '\\Omega', 'kΩ': '\\mathrm{k}\\Omega', 'MΩ': '\\mathrm{M}\\Omega', 'mH': '\\mathrm{mH}', 'H': '\\mathrm{H}', 'µH': '\\mu\\mathrm{H}', 'uH': '\\mu\\mathrm{H}', 'µF': '\\mu\\mathrm{F}', 'uF': '\\mu\\mathrm{F}', 'nF': '\\mathrm{nF}', 'pF': '\\mathrm{pF}', 'V': '\\mathrm{V}', 'A': '\\mathrm{A}', 'Hz': '\\mathrm{Hz}', 's': '\\mathrm{s}' };

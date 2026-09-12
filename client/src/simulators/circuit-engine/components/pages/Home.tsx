@@ -2628,9 +2628,9 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                           <div className="flex flex-1 min-h-0 w-full items-center justify-center p-2">
                             <ComponentPaletteIcon definition={item} colors={colors} documented={tabDUiRefinement} />
                           </div>
-                          {/* Bottom Section: Fixed height banner with overflow-visible to prevent KaTeX clipping */}
-                          <div className="flex h-7 w-full shrink-0 items-center justify-center border-t overflow-visible px-2" style={{ borderColor: colors.line, background: `${colors.line}15` }}>
-                            <span className="flex items-center justify-center text-[12px] font-normal text-black tracking-normal overflow-visible" style={{ lineHeight: 1 }}>
+                          {/* Bottom Section: Fixed height banner with clear readable component names */}
+                          <div className="flex h-7 w-full shrink-0 items-center justify-center border-t px-1.5" style={{ borderColor: colors.line, background: `${colors.line}15` }}>
+                            <span className="flex items-center justify-center text-[11px] font-medium text-black tracking-tight text-center leading-tight truncate w-full" title={item.name}>
                               <ElectricalLabel label={item.name} />
                             </span>
                           </div>
@@ -3199,8 +3199,6 @@ function ScopeTrace({ reading, color }: { reading?: InstrumentReading; color: st
 
 function ElectricalLabel({ label, unit }: { label: string; unit?: string }) {
   const symbol: Record<string, string> = {
-    'DC Voltage Source': 'V_{\\mathrm{DC}}', 'AC Voltage Source': 'V_{\\mathrm{AC}}', 'DC Current Source': 'I_{\\mathrm{DC}}', 'AC Current Source': 'I_{\\mathrm{AC}}',
-    '3-Phase Source': 'V_{abc}', 'Resistor': 'R', 'Variable Resistor': 'R_{\\mathrm{var}}', 'Capacitor': 'C', 'Inductor': 'L',
     'Voltage': 'V', 'Current': 'I', 'Resistance': 'R', 'Capacitance': 'C', 'Inductance': 'L', 'Frequency': 'f', 'Phase': '\\phi',
   };
   const unitMath: Record<string, string> = { 'Ohm': '\\Omega', 'Ω': '\\Omega', 'kΩ': '\\mathrm{k}\\Omega', 'MΩ': '\\mathrm{M}\\Omega', 'mH': '\\mathrm{mH}', 'H': '\\mathrm{H}', 'µH': '\\mu\\mathrm{H}', 'uH': '\\mu\\mathrm{H}', 'µF': '\\mu\\mathrm{F}', 'uF': '\\mu\\mathrm{F}', 'nF': '\\mathrm{nF}', 'pF': '\\mathrm{pF}', 'V': '\\mathrm{V}', 'A': '\\mathrm{A}', 'Hz': '\\mathrm{Hz}', 's': '\\mathrm{s}' };
