@@ -46,21 +46,26 @@ describe('Tab D SVG symbol language', () => {
     expect(legacy).toContain('M -15,5 C -10,-5 -5,-5 0,5 C 5,15 10,15 15,5');
   });
 
-  it('uses a centered IEEE variable-resistor body and a centered vertical wiper terminal', () => {
-    const minimum = markup('potentiometer', { _documentedStyle: true, wiper: 0 });
-    expect(minimum).toContain('data-rigid-body="potentiometer"');
-    expect(minimum).toContain('x="-20" y="-7" width="40" height="14"');
-    expect(minimum).toContain('x1="0" y1="-33.333" x2="0" y2="-11"');
-    expect(minimum).toContain('points="0,-7 -4,-12 4,-12"');
+  it('uses an ANSI zigzag potentiometer body and a dynamically movable wiper arrow', () => {
+    const zero = markup('potentiometer', { wiper: 0 });
+    expect(zero).toContain('data-zigzag-potentiometer="ansi-style"');
+    expect(zero).toContain('x1="0" y1="-33.333" x2="-20" y2="-11"');
+    expect(zero).toContain('points="-20,-6.5 -23.5,-12 -16.5,-12"');
+
+    const mid = markup('potentiometer', { wiper: 0.5 });
+    expect(mid).toContain('x1="0" y1="-33.333" x2="0" y2="-11"');
+    expect(mid).toContain('points="0,-6.5 -3.5,-12 3.5,-12"');
+
+    const max = markup('potentiometer', { wiper: 1 });
+    expect(max).toContain('x1="0" y1="-33.333" x2="20" y2="-11"');
+    expect(max).toContain('points="20,-6.5 16.5,-12 23.5,-12"');
   });
 
   it('composes documented Star and Delta packs from equal compact resistor arms without overlap or extra Star return paths', () => {
     const resistor = markup('resistor', { _documentedStyle: true });
     const star = markup('star-resistor-pack', { _documentedStyle: true });
     const delta = markup('delta-resistor-pack', { _documentedStyle: true });
-    expect(resistor).toContain('data-rectangular-resistor="potentiometer-style"');
-    expect(resistor).toContain('x="-20" y="-7" width="40" height="14"');
-    expect(resistor).toContain('x1="-33.333" y1="0" x2="-20" y2="0"');
+    expect(resistor).toContain('data-zigzag-resistor="ansi-style"');
     expect(star).toContain('data-resistor-network="star"');
     expect((star.match(/data-rectangular-resistor="potentiometer-style"/g) ?? [])).toHaveLength(3);
     expect((star.match(/width="13" height="4\.5"/g) ?? [])).toHaveLength(3);
@@ -238,20 +243,20 @@ describe('Tab D SVG symbol language', () => {
   it('renders DIAC and TRIAC matching SCR styling and 25px Cartesian grid alignment', () => {
     const diac = markup('diac');
     const triac = markup('triac');
-    // DIAC: stroke-width 1.5, separated triangles with visible gap, outer vertical lines, terminals at [0, -25] and [0, 25]
+    // DIAC: stroke-width 1.5, separated antiparallel triangles with horizontal bars, terminals at [0, -25] and [0, 25]
     expect(diac).toContain('stroke-width="1.5"');
     expect(diac).toContain('x1="0" y1="-25" x2="0" y2="-10"');
     expect(diac).toContain('x1="0" y1="10" x2="0" y2="25"');
-    expect(diac).toContain('x1="-10" y1="-10" x2="-10" y2="10"');
-    expect(diac).toContain('x1="10" y1="-10" x2="10" y2="10"');
-    expect(diac).toContain('points="-10,-7 -10,7 -2,0"');
-    expect(diac).toContain('points="10,-7 10,7 2,0"');
+    expect(diac).toContain('x1="-15" y1="-10" x2="15" y2="-10"');
+    expect(diac).toContain('x1="-15" y1="10" x2="15" y2="10"');
+    expect(diac).toContain('points="-13,10 1,10 -6.5,-10"');
+    expect(diac).toContain('points="-1,-10 13,-10 6.5,10"');
 
     // TRIAC: stroke-width 1.5, terminals at [0, -25], [0, 25], and gate at [-25, 25]
     expect(triac).toContain('stroke-width="1.5"');
-    expect(triac).toContain('points="-10,-7 -10,7 -2,0"');
-    expect(triac).toContain('points="10,-7 10,7 2,0"');
-    expect(triac).toContain('d="M -10,10 L -18,25 L -25,25"');
+    expect(triac).toContain('points="-13,10 1,10 -6.5,-10"');
+    expect(triac).toContain('points="-1,-10 13,-10 6.5,10"');
+    expect(triac).toContain('d="M -0,10 L -18,25 L -25,25"');
   });
 
   it('renders DMM with top-center KaTeX title header and white halo stroke', () => {

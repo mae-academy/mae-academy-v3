@@ -426,7 +426,8 @@ export class TabDSimulationEngine extends SimulationEngine {
           const a = p('t1') ?? p('a');
           const b = p('t2') ?? p('b');
           const total = Math.max(1e-9, value(component, 'resistance', 10000));
-          const wiper = Math.max(0, Math.min(1, value(component, 'wiper', 0.5)));
+          const rawWiper = value(component, 'wiper', 0.5);
+          const wiper = Math.max(0, Math.min(1, rawWiper > 1 ? rawWiper / 100 : rawWiper));
           primitives.push({ kind: 'resistor', id: `${component.id}:a`, positive: a, negative: p('wiper'), resistance: Math.max(1e-9, total * wiper) });
           primitives.push({ kind: 'resistor', id: `${component.id}:b`, positive: p('wiper'), negative: b, resistance: Math.max(1e-9, total * (1 - wiper)) });
           break;

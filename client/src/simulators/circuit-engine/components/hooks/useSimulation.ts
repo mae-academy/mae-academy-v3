@@ -94,7 +94,8 @@ export function compileDcTopology(components: CircuitComponent[], wires: Circuit
       const b = nodeFor(component, 't2') ?? nodeFor(component, 'b');
       const w = nodeFor(component, 'wiper');
       const total = Math.max(1e-9, number(component, 'resistance', 10000));
-      const wiper = Math.max(0, Math.min(1, number(component, 'wiper', 0.5)));
+      const rawWiper = number(component, 'wiper', 0.5);
+      const wiper = Math.max(0, Math.min(1, rawWiper > 1 ? rawWiper / 100 : rawWiper));
       elements.push({ type: 'resistor', id: `${component.id}:ra`, positive: a, negative: w, resistance: Math.max(1e-9, total * wiper) });
       elements.push({ type: 'resistor', id: `${component.id}:rb`, positive: w, negative: b, resistance: Math.max(1e-9, total * (1 - wiper)) });
     }

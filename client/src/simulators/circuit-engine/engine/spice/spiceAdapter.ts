@@ -467,7 +467,8 @@ function mapPart(ctx: PartContext): Mapping {
 
     case "potentiometer": {
       const total = Math.max(1e-9, num("resistance", 10000));
-      const wiper = Math.max(0, Math.min(1, num("wiper", 0.5)));
+      const rawWiper = num("wiper", 0.5);
+      const wiper = Math.max(0, Math.min(1, rawWiper > 1 ? rawWiper / 100 : rawWiper));
       return [
         resistor(
           derived(ctx, "A"),

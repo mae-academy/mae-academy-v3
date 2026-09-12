@@ -217,8 +217,9 @@ const Inductor: SymbolFC = ({ props }) => {
 
 export const Potentiometer: SymbolFC = ({ props }) => {
   const sw = nonExactStroke(props);
-  const position = Math.max(0, Math.min(1, Number(props?.wiper ?? 0.5)));
-  const wiperX = props?._documentedStyle === true ? 0 : -20 + position * 40;
+  const rawWiper = props?.wiper !== undefined ? Number(props.wiper) : 0.5;
+  const position = Math.max(0, Math.min(1, rawWiper > 1 ? rawWiper / 100 : rawWiper));
+  const wiperX = -20 + position * 40;
   return (
     <g data-zigzag-potentiometer="ansi-style">
       {/* طرف التوصيل الأيسر */}
@@ -244,9 +245,9 @@ export const Potentiometer: SymbolFC = ({ props }) => {
       {/* طرف التوصيل الأيمن */}
       <line x1={20.5} y1={0} x2={33.333} y2={0} stroke="currentColor" strokeWidth={sw} strokeLinecap="square" />
 
-      {/* سهم الزالق (Wiper) */}
+      {/* سهم الزالق (Wiper) المتحرك ديناميكياً وبشكل مستمر */}
       <line x1={0} y1={-33.333} x2={wiperX} y2={-11} stroke="currentColor" strokeWidth={sw} strokeLinecap="round" />
-      <polygon points={`${wiperX},${-7} ${wiperX - 4},${-12} ${wiperX + 4},${-12}`} fill="currentColor" />
+      <polygon points={`${wiperX},${-6.5} ${wiperX - 3.5},${-12} ${wiperX + 3.5},${-12}`} fill="currentColor" />
     </g>
   );
 };
@@ -355,6 +356,30 @@ export const DeltaResistorPack: SymbolFC = ({ props }) => {
     </g>
   );
 };
+
+const Impedance: SymbolFC = ({ props }) => {
+
+  const sw = nonExactStroke(props);
+
+  // Boundary ends at exactly ±33.333 so that 33.333 * 1.5 = 50px (Strict 25px Grid Lock)
+
+  return (
+
+    <g data-rectangular-resistor="potentiometer-style">
+
+      <line x1={-33.333} y1={0} x2={-20} y2={0} stroke="currentColor" strokeWidth={sw} strokeLinecap="square" />
+
+      <rect x={-20} y={-7} width={40} height={14} rx={2} fill="none" stroke="currentColor" strokeWidth={sw} />
+
+      <line x1={20} y1={0} x2={33.333} y2={0} stroke="currentColor" strokeWidth={sw} strokeLinecap="square" />
+
+    </g>
+
+  );
+
+};
+
+
 
 // ─── DIODES ───────────────────────────────────────────────────────────────────
 
@@ -1166,7 +1191,7 @@ export const SYMBOL_MAP: Record<string, SymbolFC> = {
   'potentiometer': Potentiometer,
   'capacitor': Capacitor,
   'inductor': Inductor,
-  'impedance': Resistor,
+  'impedance': Impedance,
   'vccs': (p) => <DependentDiamond {...p} props={{ ...p.props, _type: 'vccs' }} />,
   'vcvs': (p) => <DependentDiamond {...p} props={{ ...p.props, _type: 'vcvs' }} />,
   'cccs': (p) => <DependentDiamond {...p} props={{ ...p.props, _type: 'cccs' }} />,

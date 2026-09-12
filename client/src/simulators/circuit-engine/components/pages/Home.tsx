@@ -3055,6 +3055,51 @@ function ComponentInspector({ colors, component, definition, allComponents, link
             );
           }
         }
+        if (component.type === 'potentiometer' && key === 'wiper') {
+          const rawVal = numeric(component.props[key], 0.5);
+          const normalized = Math.max(0, Math.min(1, rawVal > 1 ? rawVal / 100 : rawVal));
+          const percentVal = Math.round(normalized * 100);
+          return (
+            <PropertyRow key={key} colors={colors} label={property.label ?? 'Wiper Position'}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%' }}>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  step={1}
+                  value={percentVal}
+                  onChange={event => onPropertyChange('wiper', Number(event.target.value) / 100)}
+                  className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-slate-200 dark:bg-slate-700 accent-blue-600 focus:outline-none"
+                  style={{ flex: 1, minWidth: 0 }}
+                  title={`${percentVal}%`}
+                />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    step={1}
+                    value={percentVal}
+                    onChange={event => {
+                      const num = Number(event.target.value);
+                      const clamped = Math.max(0, Math.min(100, isNaN(num) ? 0 : num));
+                      onPropertyChange('wiper', clamped / 100);
+                    }}
+                    style={{
+                      ...mathNumericInputStyle(colors),
+                      width: 38,
+                      padding: '2px 2px',
+                      height: 24,
+                      fontSize: 11,
+                      textAlign: 'center',
+                    }}
+                  />
+                  <span style={{ fontSize: 11, color: colors.muted, fontWeight: 600 }}>%</span>
+                </div>
+              </div>
+            </PropertyRow>
+          );
+        }
         if (key === 'linkedTo') return <PropertyRow key={key} colors={colors} label={property.label ?? key}><select value={String(component.props[key] ?? '')} onChange={event => onPropertyChange(key, event.target.value)} style={inputStyle(colors)}><option value="">Select coil reference</option>{linkedCoils.filter(coil => coil.id !== component.id).map(coil => <option key={coil.id} value={coil.label}>{coil.label} · {getDef(coil.type)?.name}</option>)}</select></PropertyRow>;
         if (key === 'controlSourceId') return <PropertyRow key={key} colors={colors} label={property.label ?? key}><select value={String(component.props[key] ?? '')} onChange={event => onPropertyChange(key, event.target.value)} style={inputStyle(colors)}><option value="">Select target branch/node</option>{allComponents.filter(c => c.id !== component.id && c.type !== 'ground').map(c => <option key={c.id} value={c.label}>{c.label} · {getDef(c.type)?.name}</option>)}</select></PropertyRow>;
         const value = component.props[key] ?? property.value;

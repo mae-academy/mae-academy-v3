@@ -571,7 +571,8 @@ export class SimulationEngine {
           isPowered = Math.abs(current) > 1e-10;
           break;
         case 'potentiometer': {
-          const positionRaw = clamp(propNumber(props, 'wiper', 0.5), 0, 1);
+          const rawWiper = propNumber(props, 'wiper', 0.5);
+          const positionRaw = clamp(rawWiper > 1 ? rawWiper / 100 : rawWiper, 0, 1);
           const position = propString(props, 'taper', 'linear') === 'logarithmic'
             ? (Math.pow(10, positionRaw) - 1) / 9
             : positionRaw;
