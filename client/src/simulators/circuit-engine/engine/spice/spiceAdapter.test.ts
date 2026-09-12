@@ -458,18 +458,17 @@ describe("convertToSpiceComponents", () => {
     ).toHaveLength(0);
   });
 
-  it("loads DCV/ACV/HZ DMM and voltmeter inputs at 10 MΩ in Practical mode", () => {
+  it("loads DCV/ACV/HZ DMM inputs at 10 MΩ in Practical mode", () => {
     const spice = convertToSpiceComponents(
-      [part("d", "dmm", { mode: "DCV" }), part("vm", "voltmeter")],
+      [part("d", "dmm", { mode: "DCV" })],
       [],
       undefined,
       "practical"
     );
     expect(find(spice, "d", "resistor").resistance).toBe(10e6);
-    expect(find(spice, "vm", "resistor").resistance).toBe(10e6);
   });
 
-  it("keeps DCV/ACV/HZ DMM and voltmeter inputs ideal in Academic mode", () => {
+  it("keeps DCV/ACV/HZ DMM inputs ideal in Academic mode", () => {
     expect(
       convertToSpiceComponents(
         [part("d", "dmm", { mode: "DCV" })],
@@ -478,13 +477,14 @@ describe("convertToSpiceComponents", () => {
         "academic"
       )
     ).toHaveLength(0);
+  });
+
+  it("keeps the circular Voltmeter ideal (no element emitted) in both simulation modes, unlike the DMM", () => {
     expect(
-      convertToSpiceComponents(
-        [part("vm", "voltmeter")],
-        [],
-        undefined,
-        "academic"
-      )
+      convertToSpiceComponents([part("vm", "voltmeter")], [], undefined, "practical")
+    ).toHaveLength(0);
+    expect(
+      convertToSpiceComponents([part("vm", "voltmeter")], [], undefined, "academic")
     ).toHaveLength(0);
   });
 

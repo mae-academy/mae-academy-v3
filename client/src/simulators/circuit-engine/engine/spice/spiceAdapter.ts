@@ -100,9 +100,10 @@ const MOTOR_RATED_SPEED = 100 * Math.PI;
 const MOTOR_ARMATURE_DROP = 0.1;
 const MOTOR_ELECTRICAL_TIME_CONSTANT = 1e-3;
 const MOTOR_MECHANICAL_TIME_CONSTANT = 0.1;
-// A real benchtop DMM/voltmeter's input impedance in Practical mode, so the meter loads what it
-// measures (reading ~9% low across a 1 MΩ divider leg, as real bench equipment does); Academic
-// mode keeps the ideal (infinite-impedance) instrument.
+// A real benchtop DMM's input impedance in Practical mode, so the meter loads what it measures
+// (reading ~9% low across a 1 MΩ divider leg, as real bench equipment does); Academic mode keeps the
+// ideal (infinite-impedance) instrument. The circular Voltmeter is a separate, always-ideal
+// instrument (see the "voltmeter" case below) and never uses this constant.
 const DMM_INPUT_IMPEDANCE = 10e6;
 
 /* -------------------------------------------------------------------------------- Helpers --- */
@@ -968,19 +969,23 @@ function mapPart(ctx: PartContext): Mapping {
       return auxContact(ctx);
 
     /* --------------------------------------------------------------------------- Instruments --- */
-    // Academic: ideal, infinite input impedance — readings come straight off the node voltages.
-    // Practical: loaded by DMM_INPUT_IMPEDANCE, like the real instrument this mode models, so a
-    // high-impedance or floating node reads through it instead of on an ideal probe's open circuit.
+    // The circular Voltmeter is a pure ideal instrument in both modes — infinite input impedance,
+    // zero loading distortion, unlike the benchtop DMM (below) which Practical mode deliberately
+    // loads at DMM_INPUT_IMPEDANCE to model a real instrument's finite input resistance. Emitting no
+    // element at all leaves the node exactly as the rest of the circuit drives it; a probe-only net
+    // this never touches stays correctly unmapped (see SpiceNodeMap.isMapped) rather than reading a
+    // phantom voltage.
     case "voltmeter":
-      return simulationMode === "academic"
-        ? []
-        : [resistor(self(ctx), net("pos"), net("neg"), DMM_INPUT_IMPEDANCE)];
+      return [];
 
     // Ideal in both modes: modeling the oscilloscope's own input impedance is out of scope here.
     case "oscilloscope":
       return [];
 
-    // Series 0 V sense source; its branch current is the reading.
+    // Ideal ammeter: a 0 V independent voltage sense source in series, R_shunt = 0 Ω. SPICE gives an
+    // independent source zero internal series resistance by construction, so this branch introduces
+    // no burden voltage; its solved branch current (found by id via probeBranchKey) is the reading,
+    // signed positive when conventional current enters the "pos" terminal.
     case "ammeter":
       return [
         {
