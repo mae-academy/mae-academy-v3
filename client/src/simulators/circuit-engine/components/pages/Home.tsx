@@ -2528,12 +2528,6 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
             <span style={{ color: colors.muted, fontSize: 11, minWidth: 42, textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>{Math.round(zoom * 100)}%</span>
             <ToolbarButton colors={colors} label="+" title="Zoom in" onClick={() => setZoom(value => Math.min(3, value * 1.15))} />
             <ToolbarDivider colors={colors} />
-            <ToolbarButton colors={colors} icon={<Grid3X3 size={14} />} title="Grid" onClick={() => setGridVisible(value => !value)} active={gridVisible} />
-            {tabDUiRefinement && <><ToolbarButton colors={colors} label="Dot" title="Dot grid · 25 px" onClick={() => { setTabDGridMode('dots'); setGridVisible(true); }} active={tabDGridMode === 'dots' && gridVisible} /><ToolbarButton colors={colors} label="Cartesian" title="Cartesian grid · 25 px" onClick={() => { setTabDGridMode('cartesian'); setGridVisible(true); }} active={tabDGridMode === 'cartesian' && gridVisible} /><ToolbarButton colors={colors} label="Hidden" title="Hide grid" onClick={() => setTabDGridMode('hidden')} active={tabDGridMode === 'hidden'} /></>}
-            <ToolbarDivider colors={colors} />
-            <ToolbarButton colors={colors} icon={<Move size={14} />} title="Snap to grid" onClick={() => setSnapEnabled(value => !value)} active={snapEnabled} />
-            <ToolbarButton colors={colors} icon={<Cable size={14} />} label="Wire" title="Click one terminal, then another" onClick={() => { setWiring({}); toast.message('Click a terminal to start wiring'); }} active={Boolean(wiring.from)} />
-            <ToolbarDivider colors={colors} />
             <ToolbarButton colors={colors} icon={<Type size={14} />} label="Text" title="Add editable workspace text (T)" onClick={addText} />
             {tabDUiRefinement && <><ToolbarDivider colors={colors} /><ToolbarButton colors={colors} icon={<RotateCw size={14} />} label="90°" title="Rotate selected component 90°" onClick={() => rotateSelected(90)} disabled={!selectedComponent} /><ToolbarButton colors={colors} icon={<RotateCw size={14} />} label="45°" title="Rotate selected component 45°" onClick={() => rotateSelected(45)} disabled={!selectedComponent} /><ToolbarButton colors={colors} icon={<FlipHorizontal size={14} />} label="Flip X" title="Reflect selected component horizontally" onClick={() => flipSelected('h')} disabled={!selectedComponent} /><ToolbarButton colors={colors} icon={<FlipVertical size={14} />} label="Flip Y" title="Reflect selected component vertically" onClick={() => flipSelected('v')} disabled={!selectedComponent} /></>}
           </div>
@@ -2558,11 +2552,15 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
             <ToolbarButton colors={colors} label={simulationMode === 'academic' ? 'Academic' : 'Practical'} title="Academic / Practical — toggle SPICE simulation mode" onClick={() => setSimulationMode(mode => mode === 'academic' ? 'practical' : 'academic')} active={simulationMode === 'academic'} />
             <ToolbarButton colors={colors} icon={<Zap size={14} />} title="Show / Hide electron flow" onClick={() => setShowElectrons(v => { const next = !v; try { localStorage.setItem('mae-show-electrons', String(next)); } catch { } return next; })} active={showElectrons} />
             <ToolbarButton colors={colors} icon={<RotateCcw size={14} />} title="Reset simulation" onClick={resetSimulation} />
-            <span style={{ fontSize: 11, minWidth: 55, color: colors.muted, fontVariantNumeric: 'tabular-nums' }}>{snapshot.time.toFixed(3)} s</span>
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-300" style={{ minWidth: 65, textAlign: 'center', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+              <V3Math math={`${snapshot.time.toFixed(3)}\\,\\mathrm{s}`} />
+            </span>
             <ToolbarDivider colors={colors} />
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <input aria-label="Simulation speed" type="range" min={.25} max={4} step={.25} value={simulationSpeed} onChange={event => setSimulationSpeed(numeric(event.target.value, 1))} className="h-1.5 w-24 cursor-pointer appearance-none rounded-full bg-brand-gradient [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-0 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:ring-2 [&::-webkit-slider-thumb]:ring-blue-500 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:shadow" />
-              <span style={{ color: colors.muted, fontSize: 10 }}>{simulationSpeed.toFixed(2)}×</span>
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-300" style={{ minWidth: 42, display: 'inline-flex', alignItems: 'center' }}>
+                <V3Math math={`${simulationSpeed.toFixed(2)}\\times`} />
+              </span>
             </div>
           </div>
         </header>
@@ -2952,10 +2950,10 @@ function ComponentInspector({ colors, component, definition, allComponents, link
   const hasValue = Object.values(definition.properties).some(p => p.type === 'number' && p.unit);
 
   return <div style={{ overflowY: 'auto', minHeight: 0 }}>
-    <InspectorHeader colors={colors} title={<span className="text-black" style={{ display: 'inline-flex', alignItems: 'baseline', gap: 5 }}><V3Math math={componentLabelToLatex(component.type === 'ground' ? 'GND' : component.label)} /><span className="text-black" style={{ fontSize: 10, letterSpacing: 0, textTransform: 'none' }}><ElectricalLabel label={definition.name} /></span></span>} subtitle={definition.description} />
+    <InspectorHeader colors={colors} title={<span className="text-black" style={{ display: 'inline-flex', alignItems: 'baseline', gap: 6 }}><span style={{ fontFamily: "'KaTeX_Math', 'KaTeX_Main', serif", fontSize: 15 }}><V3Math math={componentLabelToLatex(component.type === 'ground' ? 'GND' : component.label)} /></span><span className="text-slate-600 dark:text-slate-300" style={{ fontSize: 11, letterSpacing: 0, textTransform: 'none', fontFamily: "'KaTeX_Main', 'KaTeX_Math', serif" }}><ElectricalLabel label={definition.name} /></span></span>} subtitle={definition.description} />
     <InspectorSection colors={colors} label="Instance label">
       <PropertyRow colors={colors} label="Reference">
-        <input value={component.type === 'ground' ? 'GND' : component.label} disabled={component.type === 'ground'} onChange={event => onLabelChange(component.type === 'ground' ? 'GND' : event.target.value)} style={inputStyle(colors)} />
+        <input value={component.type === 'ground' ? 'GND' : component.label} disabled={component.type === 'ground'} onChange={event => onLabelChange(component.type === 'ground' ? 'GND' : event.target.value)} style={mathReferenceInputStyle(colors)} />
       </PropertyRow>
 
       {/* NEW: Label Visibility Toggle */}
@@ -2994,7 +2992,7 @@ function ComponentInspector({ colors, component, definition, allComponents, link
             return (
               <PropertyRow key={key} colors={colors} label={property.label ?? key}>
                 <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 60px', gap: 5 }}>
-                  <input type="number" step="any" value={numeric(component.props[key], defaultAng)} onChange={event => onPropertyChange(key, numeric(event.target.value, defaultAng))} style={inputStyle(colors)} />
+                  <input type="number" step="any" value={numeric(component.props[key], defaultAng)} onChange={event => onPropertyChange(key, numeric(event.target.value, defaultAng))} style={mathNumericInputStyle(colors)} />
                   <select value={String(component.props.angleUnit ?? 'degree')} onChange={event => onPropertyChange('angleUnit', event.target.value)} style={{ ...inputStyle(colors), paddingInline: 5 }}>
                     <option value="degree">deg</option>
                     <option value="radian">rad</option>
@@ -3023,7 +3021,7 @@ function PropertyEditorField({ colors, label, definition, value, onChange }: { c
   if (definition.type === 'select') return <PropertyRow colors={colors} label={label} unit={definition.unit}><select value={String(value)} onChange={event => onChange(event.target.value)} style={inputStyle(colors)}>{definition.options?.map(option => <option key={option} value={option}>{definition.optionLabels?.[option] ?? option}</option>)}</select></PropertyRow>;
   if (definition.type === 'color') return <PropertyRow colors={colors} label={label}><input type="color" value={String(value)} onChange={event => onChange(event.target.value)} style={{ width: '100%', height: 30, border: `1px solid ${colors.line}`, borderRadius: 5, background: colors.input }} /></PropertyRow>;
   if (definition.type === 'text') return <PropertyRow colors={colors} label={label}><input value={String(value)} onChange={event => onChange(event.target.value)} style={inputStyle(colors)} /></PropertyRow>;
-  return <PropertyRow colors={colors} label={label} unit={definition.unit}><input type="number" min={definition.min} max={definition.max} step={definition.step ?? 'any'} value={numeric(value)} onChange={event => onChange(numeric(event.target.value, numeric(definition.value)))} style={inputStyle(colors)} /></PropertyRow>;
+  return <PropertyRow colors={colors} label={label} unit={definition.unit}><input type="number" min={definition.min} max={definition.max} step={definition.step ?? 'any'} value={numeric(value)} onChange={event => onChange(numeric(event.target.value, numeric(definition.value)))} style={mathNumericInputStyle(colors)} /></PropertyRow>;
 }
 
 function PrefixedPropertyEditorField({ colors, propertyKey, label, definition, value, prefix, onChange, onPrefixChange }: { colors: Palette; propertyKey: string; label: string; definition: PropertyDef; value: unknown; prefix: string; onChange: (value: number) => void; onPrefixChange: (prefix: string) => void }) {
@@ -3035,7 +3033,7 @@ function PrefixedPropertyEditorField({ colors, propertyKey, label, definition, v
     onPrefixChange(nextPrefix);
     onChange(visibleValue * engineeringFactor(nextPrefix));
   };
-  return <PropertyRow colors={colors} label={label} unit={definition.unit}><div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 54px', gap: 5 }}><input aria-label={`${propertyKey} numeric value`} type="number" step="any" value={displayValue} onChange={event => onChange(numeric(event.target.value, displayValue) * factor)} style={inputStyle(colors)} /><select aria-label={`${propertyKey} engineering prefix`} value={prefix} onChange={event => selectPrefix(event.target.value)} style={{ ...inputStyle(colors), paddingInline: 5 }} title={`Engineering prefix for ${definition.unit ?? ''}`}>{ENGINEERING_PREFIXES.map(item => <option key={item.key || 'base'} value={item.key}>{item.symbol || '—'}{definition.unit}</option>)}</select></div></PropertyRow>;
+  return <PropertyRow colors={colors} label={label} unit={definition.unit}><div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 54px', gap: 5 }}><input aria-label={`${propertyKey} numeric value`} type="number" step="any" value={displayValue} onChange={event => onChange(numeric(event.target.value, displayValue) * factor)} style={mathNumericInputStyle(colors)} /><select aria-label={`${propertyKey} engineering prefix`} value={prefix} onChange={event => selectPrefix(event.target.value)} style={{ ...inputStyle(colors), paddingInline: 5 }} title={`Engineering prefix for ${definition.unit ?? ''}`}>{ENGINEERING_PREFIXES.map(item => <option key={item.key || 'base'} value={item.key}>{item.symbol || '—'}{definition.unit}</option>)}</select></div></PropertyRow>;
 }
 
 function WireInspector({ colors, wire, tabDUiRefinement, onRouting, onAddCorner, onNudge, onDelete }: { colors: Palette; wire: CircuitWire; tabDUiRefinement: boolean; onRouting: (routing: CircuitWire['routing']) => void; onAddCorner: () => void; onNudge: (amount: number) => void; onDelete: () => void }) {
@@ -3170,6 +3168,26 @@ function inputStyle(colors: Palette): React.CSSProperties {
     fontFamily: 'inherit',
     fontWeight: 500,
     outline: 'none',
+  };
+}
+
+function mathReferenceInputStyle(colors: Palette): React.CSSProperties {
+  return {
+    ...inputStyle(colors),
+    fontFamily: "'KaTeX_Math', 'KaTeX_Main', serif",
+    fontSize: 14,
+    fontStyle: 'italic',
+    letterSpacing: '0.02em',
+  };
+}
+
+function mathNumericInputStyle(colors: Palette): React.CSSProperties {
+  return {
+    ...inputStyle(colors),
+    fontFamily: "'KaTeX_Main', 'KaTeX_Math', serif",
+    fontSize: 14,
+    fontStyle: 'normal',
+    fontVariantNumeric: 'tabular-nums',
   };
 }
 
