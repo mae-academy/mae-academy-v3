@@ -797,43 +797,59 @@ const Scr: SymbolFC = () => (
     <path d="M 0,10 L -15,25 L -25,25" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinejoin="miter" />
   </g>
 );
+/**
+ * Bidirectional trigger diode: two anti-parallel junctions drawn between the two main-terminal bars.
+ * Each triangle sits on its own bar and points at the opposite one, so the pair conducts in both
+ * directions between the same two nodes. A1 enters at the top grid point and joins the left bar; A2
+ * leaves the right bar for the bottom grid point, which gives the symbol its 180° rotational
+ * symmetry and keeps both leads on the 25px snap grid.
+ */
 const Diac: SymbolFC = () => (
   <g>
-    {/* Main terminal wires */}
+    {/* A1 lead from the top 25px grid snap point, then across to the left bar */}
     <line x1={0} y1={-25} x2={0} y2={-10} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+    <line x1={0} y1={-10} x2={-10} y2={-10} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+
+    {/* Main terminal bars, one per anode */}
+    <line x1={-10} y1={-10} x2={-10} y2={10} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+    <line x1={10} y1={-10} x2={10} y2={10} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+
+    {/* Anti-parallel junctions, separated by a visible gap at the centre */}
+    <polygon points="-10,-7 -10,7 -2,0" fill="currentColor" stroke="currentColor" strokeWidth={1.5} strokeLinejoin="round" />
+    <polygon points="10,-7 10,7 2,0" fill="currentColor" stroke="currentColor" strokeWidth={1.5} strokeLinejoin="round" />
+
+    {/* A2 lead from the right bar down to the bottom 25px grid snap point */}
+    <line x1={10} y1={10} x2={0} y2={10} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
     <line x1={0} y1={10} x2={0} y2={25} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
-
-    {/* Top and bottom horizontal bars */}
-    <line x1={-15} y1={-10} x2={15} y2={-10} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
-    <line x1={-15} y1={10} x2={15} y2={10} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
-
-    {/* Left triangle pointing UP (base at bottom, apex at top) */}
-    <polygon points="-13,10 1,10 -6.5,-10" fill="currentColor" />
-
-    {/* Right triangle pointing DOWN (base at top, apex at bottom) */}
-    <polygon points="-1,-10 13,-10 6.5,10" fill="currentColor" />
   </g>
 );
 
+/**
+ * The DIAC body with a gate: a TRIAC is two anti-parallel thyristors, so it carries the same pair of
+ * opposed junctions between the T1 and T2 bars. The gate leaves the T1-side bar and lands on the
+ * 25px grid at (-25, 25), matching the terminal componentDefs places there.
+ */
 const Triac: SymbolFC = () => (
   <g>
-    {/* Main terminal wires */}
+    {/* T1 lead from the top 25px grid snap point, then across to the left bar */}
     <line x1={0} y1={-25} x2={0} y2={-10} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+    <line x1={0} y1={-10} x2={-10} y2={-10} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+
+    {/* Main terminal bars, one per main terminal */}
+    <line x1={-10} y1={-10} x2={-10} y2={10} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+    <line x1={10} y1={-10} x2={10} y2={10} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+
+    {/* Anti-parallel junctions, separated by a visible gap at the centre */}
+    <polygon points="-10,-7 -10,7 -2,0" fill="currentColor" stroke="currentColor" strokeWidth={1.5} strokeLinejoin="round" />
+    <polygon points="10,-7 10,7 2,0" fill="currentColor" stroke="currentColor" strokeWidth={1.5} strokeLinejoin="round" />
+
+    {/* T2 lead from the right bar down to the bottom 25px grid snap point */}
+    <line x1={10} y1={10} x2={0} y2={10} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
     <line x1={0} y1={10} x2={0} y2={25} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
 
-    {/* Top and bottom horizontal bars */}
-    <line x1={-15} y1={-10} x2={15} y2={-10} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
-    <line x1={-15} y1={10} x2={15} y2={10} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
-
-    {/* Left triangle pointing UP (base at bottom, apex at top) */}
-    <polygon points="-13,10 1,10 -6.5,-10" fill="currentColor" />
-
-    {/* Right triangle pointing DOWN (base at top, apex at bottom) */}
-    <polygon points="-1,-10 13,-10 6.5,10" fill="currentColor" />
-
-    {/* Gate terminal connecting smoothly to the bottom bar */}
+    {/* Gate: angled off the T1 bar, then horizontal to the grid point at (-25, 25) */}
     <path
-      d="M -0,10 L -18,25 L -25,25"
+      d="M -10,10 L -18,25 L -25,25"
       fill="none"
       stroke="currentColor"
       strokeWidth={1.5}

@@ -126,6 +126,12 @@ const TAB_ACTIVE_SHADOW = '0 1px 3px rgba(2, 6, 23, 0.18)';
 const SPICE_DEBOUNCE_MS = 400;
 /** How many periods of the detected system frequency a `.tran` accuracy pass covers. */
 const SPICE_TRAN_PERIODS = 5;
+/**
+ * How far the pointer may travel, in world units, before a press on a latching control counts as a
+ * drag rather than a click. A switch has to stay draggable, so the toggle only fires if the pointer
+ * effectively stayed put between press and release.
+ */
+const CLICK_DRAG_TOLERANCE = 3;
 type SpiceBridgeStatus =
   | { kind: 'idle' }
   | { kind: 'running' }
@@ -747,6 +753,10 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     { areEqual: areSnapshotsEqual },
   );
   const dragStartSnapshotRef = useRef<CanvasSnapshot | null>(null);
+  // Armed when a latching control (switch, breaker, relay override) is pressed on the canvas, and
+  // cleared as soon as the pointer moves far enough to be a drag — so the mouse-up below toggles a
+  // click but never a drag.
+  const latchingClickRef = useRef<{ id: string; origin: Point } | null>(null);
 
   const commitSnapshot = useCallback((patch?: Partial<CanvasSnapshot>) => {
     const currentSnapshot: CanvasSnapshot = {
@@ -1887,6 +1897,10 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
         updateComponentPropsById(component.id, momentaryControlProps(true));
         return;
       }
+      // A latching control still sets up the drag below; the mouse-up decides between the two.
+      if (control === 'latching') {
+        latchingClickRef.current = { id: component.id, origin: point };
+      }
       dragStartSnapshotRef.current = cloneSnapshot({
         components: componentRef.current,
         wires: wiresRef.current,
@@ -1905,6 +1919,10 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     const point = clientToWorld(event.clientX, event.clientY);
     setCursor(point);
     if (!dragState) return;
+    const pendingClick = latchingClickRef.current;
+    if (pendingClick && Math.hypot(point[0] - pendingClick.origin[0], point[1] - pendingClick.origin[1]) > CLICK_DRAG_TOLERANCE) {
+      latchingClickRef.current = null;
+    }
     if (dragState.kind === 'pan') {
       const dx = event.clientX - dragState.client[0];
       const dy = event.clientY - dragState.client[1];
@@ -1952,6 +1970,14 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
 
   const handleCanvasMouseUp = useCallback(() => {
     releaseMomentaryControl();
+    // A press that never became a drag toggles the contact. updateComponentPropsById marks the next
+    // SPICE solve eager, so the DMM follows the click with no debounce, running or not.
+    const pendingClick = latchingClickRef.current;
+    latchingClickRef.current = null;
+    if (pendingClick) {
+      const clicked = componentRef.current.find(component => component.id === pendingClick.id);
+      if (clicked) updateComponentPropsById(clicked.id, nextLatchingControlProps(clicked));
+    }
     if (dragStartSnapshotRef.current) {
       const currentSnapshot: CanvasSnapshot = {
         components: componentRef.current,
