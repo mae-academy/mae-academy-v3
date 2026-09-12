@@ -40,13 +40,6 @@ export interface SpiceCircuitNets {
   netFor(componentId: string, terminalId: string): SpiceNet;
 }
 
-/**
- * `academic`: idealized textbook models (ideal switches, no Early effect, RMS-scaled AC sources, …).
- * `practical`: real-world non-linear models. Threaded through to `generateNetlist`, which is where
- * the two modes actually diverge; the adapter itself produces the same `SpiceComponent[]` either way.
- */
-export type SimulationMode = "academic" | "practical";
-
 /** Reuses the canvas's own union-find, so SPICE sees exactly the nets the schematic draws. */
 export function resolveCircuitNets(
   components: CircuitComponent[],
@@ -100,9 +93,9 @@ const MOTOR_RATED_SPEED = 100 * Math.PI;
 const MOTOR_ARMATURE_DROP = 0.1;
 const MOTOR_ELECTRICAL_TIME_CONSTANT = 1e-3;
 const MOTOR_MECHANICAL_TIME_CONSTANT = 0.1;
-// A real benchtop DMM/voltmeter's input impedance in Practical mode, so the meter loads what it
-// measures (reading ~9% low across a 1 MΩ divider leg, as real bench equipment does); Academic
-// mode keeps the ideal (infinite-impedance) instrument.
+// A real benchtop DMM/voltmeter's input impedance, so the meter loads what it measures (reading
+// ~9% low across a 1 MΩ divider leg, as real bench equipment does) rather than behaving as an ideal
+// (infinite-impedance) probe.
 const DMM_INPUT_IMPEDANCE = 10e6;
 
 /* -------------------------------------------------------------------------------- Helpers --- */
@@ -133,7 +126,6 @@ interface PartContext {
   nets: SpiceCircuitNets;
   byLabel: Map<string, CircuitComponent>;
   systemFrequency: number;
-  simulationMode: SimulationMode;
 }
 
 const netOf = (ctx: PartContext, terminalId: string): SpiceNet =>
@@ -444,7 +436,7 @@ function auxContact(ctx: PartContext): SpiceComponent[] {
 /* ------------------------------------------------------------------------------ Part mapping --- */
 
 function mapPart(ctx: PartContext): Mapping {
-  const { component, simulationMode } = ctx;
+  const { component } = ctx;
   const net = (terminal: string) => netOf(ctx, terminal);
   const num = (key: string, fallback: number) =>
     numberProp(component, key, fallback);
@@ -967,15 +959,12 @@ function mapPart(ctx: PartContext): Mapping {
       return auxContact(ctx);
 
     /* --------------------------------------------------------------------------- Instruments --- */
-    // Academic: ideal, infinite input impedance — readings come straight off the node voltages.
-    // Practical: loaded by DMM_INPUT_IMPEDANCE, like the real instrument this mode models, so a
-    // high-impedance or floating node reads through it instead of on an ideal probe's open circuit.
+    // Loaded by DMM_INPUT_IMPEDANCE, like the real instrument this models, so a high-impedance or
+    // floating node reads through it instead of on an ideal probe's open circuit.
     case "voltmeter":
-      return simulationMode === "academic"
-        ? []
-        : [resistor(self(ctx), net("pos"), net("neg"), DMM_INPUT_IMPEDANCE)];
+      return [resistor(self(ctx), net("pos"), net("neg"), DMM_INPUT_IMPEDANCE)];
 
-    // Ideal in both modes: modeling the oscilloscope's own input impedance is out of scope here.
+    // Ideal: modeling the oscilloscope's own input impedance is out of scope here.
     case "oscilloscope":
       return [];
 
@@ -1009,10 +998,8 @@ function mapPart(ctx: PartContext): Mapping {
       // OHM / CONT need an isolated test-source resistance measurement the batch deck does not
       // provide (see spiceInstruments); they stay unmapped so the legacy engine keeps serving them.
       if (mode === "OHM" || mode === "CONT") return [];
-      // DCV / ACV / HZ: same input-impedance split as the voltmeter above.
-      return simulationMode === "academic"
-        ? []
-        : [resistor(self(ctx), net("hi"), net("com"), DMM_INPUT_IMPEDANCE)];
+      // DCV / ACV / HZ: same input-impedance load as the voltmeter above.
+      return [resistor(self(ctx), net("hi"), net("com"), DMM_INPUT_IMPEDANCE)];
     }
 
     /* --------------------------------------------------------------------------- Unsupported --- */
@@ -1060,10 +1047,7 @@ export function detectSystemFrequency(components: CircuitComponent[]): number {
 export function convertToSpiceComponents(
   components: CircuitComponent[],
   wires: CircuitWire[],
-  nets: SpiceCircuitNets = resolveCircuitNets(components, wires),
-  // Most mode-specific model swaps live in generateNetlist; this is used directly only for the
-  // Practical-mode DMM/voltmeter input-impedance resistor (see DMM_INPUT_IMPEDANCE above).
-  simulationMode: SimulationMode = "practical"
+  nets: SpiceCircuitNets = resolveCircuitNets(components, wires)
 ): SpiceComponent[] {
   const byLabel = new Map<string, CircuitComponent>(
     components.map(component => [component.label, component])
@@ -1080,7 +1064,6 @@ export function convertToSpiceComponents(
       nets,
       byLabel,
       systemFrequency,
-      simulationMode,
     });
     if (Array.isArray(mapping)) {
       spice.push(...mapping);

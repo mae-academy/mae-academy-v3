@@ -75,7 +75,6 @@ import {
   detectSystemFrequency,
   resolveCircuitNets,
   SpiceAdapterError,
-  type SimulationMode,
   type SpiceCircuitNets,
 } from '@/simulators/circuit-engine/engine/spice/spiceAdapter';
 import { buildSpiceNodeMap, generateNetlist, NetlistError, type SpiceNodeMap } from '@/simulators/circuit-engine/engine/spice/netlistGenerator';
@@ -669,9 +668,6 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
   const [search, setSearch] = useState('');
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
   const [simulationRunning, setSimulationRunning] = useState(false);
-  // Academic mode swaps in idealized textbook models (ideal switches, no Early effect, RMS AC
-  // sources, …); Practical is the default so readings match real-world non-linear behavior.
-  const [simulationMode, setSimulationMode] = useState<SimulationMode>('practical');
   const [showElectrons, setShowElectrons] = useState(() => {
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem('mae-show-electrons');
@@ -2163,10 +2159,10 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     let spiceComponents;
     try {
       nets = resolveCircuitNets(components, wires);
-      spiceComponents = convertToSpiceComponents(components, wires, nets, simulationMode);
+      spiceComponents = convertToSpiceComponents(components, wires, nets);
       const frequency = Math.max(0.001, detectSystemFrequency(components));
       const duration = Math.min(0.5, Math.max(0.02, SPICE_TRAN_PERIODS / frequency));
-      netlist = generateNetlist(spiceComponents, { analysis: [`.tran ${duration / 2000} ${duration}`], simulationMode });
+      netlist = generateNetlist(spiceComponents, { analysis: [`.tran ${duration / 2000} ${duration}`] });
     } catch (error) {
       // An incomplete circuit (no components yet, or no ground placed) is an expected mid-edit
       // state, not a genuine incompatibility — stay quiet and idle rather than toasting on it.
@@ -2195,7 +2191,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     // this used to — broke the debounce below: `useSpiceEngine` returns a new object every render,
     // so during Run (a 60fps state update loop) the debounce timer was reset before it could ever
     // elapse, and SPICE silently stopped re-solving on switch toggles until Pause forced one retry.
-  }, [clearSpiceReadings, components, simulationMode, spiceEngine.runSimulation, wires]);
+  }, [clearSpiceReadings, components, spiceEngine.runSimulation, wires]);
 
   // Trigger on every circuit edit, debounced so a drag or a burst of keystrokes fires one run — but
   // not a switch/relay toggle: those set `spiceEagerRef` first, so this fires with no delay for
@@ -2432,7 +2428,6 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
             <button onClick={() => { hasStartedSimulation.current = true; setSimulationRunning(value => !value); }} title={simulationRunning ? 'Pause simulation' : 'Run simulation'} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: (!simulationRunning && hasStartedSimulation.current) ? TAB_GRADIENT_REV : TAB_GRADIENT, color: '#ffffff', fontWeight: 500, padding: '6px 14px', minHeight: 30, borderRadius: 8, fontSize: 12, boxShadow: TAB_ACTIVE_SHADOW, border: '1px solid transparent', cursor: 'pointer', whiteSpace: 'nowrap', transition: 'background .3s ease' }}>
               {simulationRunning ? <Pause size={14} /> : <Play size={14} />}{simulationRunning ? 'Pause' : 'Run'}
             </button>
-            <ToolbarButton colors={colors} label={simulationMode === 'academic' ? 'Academic' : 'Practical'} title="Academic / Practical — toggle SPICE simulation mode" onClick={() => setSimulationMode(mode => mode === 'academic' ? 'practical' : 'academic')} active={simulationMode === 'academic'} />
             <ToolbarButton colors={colors} icon={<Zap size={14} />} title="Show / Hide electron flow" onClick={() => setShowElectrons(v => { const next = !v; try { localStorage.setItem('mae-show-electrons', String(next)); } catch { } return next; })} active={showElectrons} />
             <ToolbarButton colors={colors} icon={<RotateCcw size={14} />} title="Reset simulation" onClick={resetSimulation} />
             <span style={{ fontSize: 11, minWidth: 55, color: colors.muted, fontVariantNumeric: 'tabular-nums' }}>{snapshot.time.toFixed(3)} s</span>

@@ -35,11 +35,11 @@ function stringProp(
 /**
  * ngspice's default absolute tolerances: it stops iterating a nonlinear solve once every node
  * voltage moves by less than VNTOL (1 µV) and every branch current by less than ABSTOL (1 pA), so
- * magnitudes below these are solver residue, not converged signal. Without the clamp a node an open
- * switch has isolated reads exactly 0 in Practical mode (the 10 MΩ meter load pins it) but not in
- * Academic mode, where only a junction references it: verified against ngspice.wasm, that node
- * lands at -1.5e-21 V and an ideal scope's RMS over the run at 2.5e-11 V — shown as "-0.000 nV" and
- * "0.025 nV". Clamping to the solver's own resolution makes it read 0 identically in both modes.
+ * magnitudes below these are solver residue, not converged signal. The DMM/voltmeter's 10 MΩ input
+ * load pins an isolated node's own reading at exactly 0, but an unloaded probe (the oscilloscope,
+ * which stays ideal) referenced only by a junction does not get that: verified against ngspice.wasm,
+ * such a node lands at -1.5e-21 V and an ideal scope's RMS over the run at 2.5e-11 V — shown as
+ * "-0.000 nV" and "0.025 nV". Clamping to the solver's own resolution makes it read a plain 0.
  */
 export const VOLTAGE_NOISE_FLOOR = 1e-6;
 export const CURRENT_NOISE_FLOOR = 1e-12;

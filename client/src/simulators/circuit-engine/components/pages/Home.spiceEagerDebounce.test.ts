@@ -96,8 +96,8 @@ describe("Home.tsx's SPICE eager/debounce mechanism", () => {
 
   it("is never reset or re-armed by a re-render that leaves the callback's identity unchanged", () => {
     // Models the RAF loop: `snapshot`/`animationTime` update every frame, but `runSpiceSimulation`
-    // itself only ever gets a new identity from `components`/`wires`/`simulationMode` changing — so
-    // a stable callback across many re-renders is exactly what the real component guarantees today.
+    // itself only ever gets a new identity from `components`/`wires` changing — so a stable
+    // callback across many re-renders is exactly what the real component guarantees today.
     const run = vi.fn();
     const stableCallback = () => run();
     const { rerender } = renderHook(() => useSpiceDebounceHarness(stableCallback));

@@ -4,8 +4,7 @@
  * (convertToSpiceComponents -> generateNetlist -> ngspice -> parseSpiceResults ->
  * buildSpiceInstrumentReadings) so a regression in any one stage is caught, not just a netlist-text
  * diff. Guards the open-circuit ghost reading (an open switch must read exactly like a removed one,
- * in both modes and on unloaded probes), isolated-subnet handling, and Academic mode's
- * non-convergence on the direct diode and the thyristor macros.
+ * including on unloaded probes) and isolated-subnet handling.
  */
 
 import { beforeAll, describe, expect, it } from "vitest";
@@ -17,7 +16,6 @@ import type {
 import {
   convertToSpiceComponents,
   resolveCircuitNets,
-  type SimulationMode,
 } from "@/simulators/circuit-engine/engine/spice/spiceAdapter";
 import {
   buildSpiceNodeMap,
@@ -79,18 +77,11 @@ function wire(
 }
 
 /** Runs one circuit through the full production pipeline and returns its instrument readings. */
-async function simulate(
-  components: CircuitComponent[],
-  wires: CircuitWire[],
-  mode: SimulationMode
-) {
+async function simulate(components: CircuitComponent[], wires: CircuitWire[]) {
   const nets = resolveCircuitNets(components, wires);
-  const spiceComponents = convertToSpiceComponents(components, wires, nets, mode);
+  const spiceComponents = convertToSpiceComponents(components, wires, nets);
   const nodeMap = buildSpiceNodeMap(spiceComponents);
-  const netlist = generateNetlist(spiceComponents, {
-    analysis: SETTLE_ANALYSIS,
-    simulationMode: mode,
-  });
+  const netlist = generateNetlist(spiceComponents, { analysis: SETTLE_ANALYSIS });
   const { vectors, log } = await runNgspiceWithLog(netlist);
   const results = parseSpiceResults(vectors, vectors.time ?? []);
   return {
@@ -165,18 +156,18 @@ describe("ngspice regression (real ngspice.wasm)", () => {
   }, WASM_BOOT_TIMEOUT);
 
   describe("open-circuit ghost reading (defect 1)", () => {
-    it.each(["practical", "academic"] as const)(
-      "reads an open switch exactly like a removed one — 0 V on the DMM and the scope, in %s mode",
-      async mode => {
+    it(
+      "reads an open switch exactly like a removed one — 0 V on the DMM and the scope",
+      async () => {
         const openCircuit = ledCircuit("open");
         const removedCircuit = ledCircuit("removed");
-        const open = await simulate(openCircuit.components, openCircuit.wires, mode);
-        const removed = await simulate(removedCircuit.components, removedCircuit.wires, mode);
+        const open = await simulate(openCircuit.components, openCircuit.wires);
+        const removed = await simulate(removedCircuit.components, removedCircuit.wires);
 
         expect(removed.readings.dmm1).toMatchObject({ status: "ready", value: 0 });
         expect(open.readings.dmm1).toMatchObject({ status: "ready", value: 0 });
         // The unloaded probe is where any leftover DC path across the contact shows up: a 1e12 Ω
-        // "open" contact still put ~0.93 V on it through the LED's log law in Practical mode.
+        // "open" contact still put ~0.93 V on it through the LED's log law.
         expect(removed.readings["osc1:ch1"].value).toBe(0);
         expect(open.readings["osc1:ch1"].value).toBe(0);
       },
@@ -187,7 +178,7 @@ describe("ngspice regression (real ngspice.wasm)", () => {
       "still forward-biases the LED normally with the switch closed (no regression)",
       async () => {
         const { components, wires } = ledCircuit("closed");
-        const { readings } = await simulate(components, wires, "practical");
+        const { readings } = await simulate(components, wires);
         expect(readings.dmm1.status).toBe("ready");
         // A red LED's forward drop sits well below the 5 V rail and well above a floating reading.
         expect(readings.dmm1.value).toBeGreaterThan(0.5);
@@ -196,11 +187,11 @@ describe("ngspice regression (real ngspice.wasm)", () => {
       RUN_TIMEOUT
     );
 
-    it.each(["practical", "academic"] as const)(
-      "ties a subnet the open switch isolated to 0 V cleanly, with no singular matrix, in %s mode",
-      async mode => {
+    it(
+      "ties a subnet the open switch isolated to 0 V cleanly, with no singular matrix",
+      async () => {
         const { components, wires } = isolatedCapacitorCircuit();
-        const { readings, log } = await simulate(components, wires, mode);
+        const { readings, log } = await simulate(components, wires);
         expect(readings.dmm1).toMatchObject({ status: "ready", value: 0 });
         expect(log).not.toMatch(/singular matrix/i);
       },
@@ -239,7 +230,7 @@ describe("ngspice regression (real ngspice.wasm)", () => {
 
     const ledDrop = async (color: string) => {
       const { components, wires } = ledCircuitFor(color);
-      const { readings } = await simulate(components, wires, "practical");
+      const { readings } = await simulate(components, wires);
       expect(readings.dmm1.status).toBe("ready");
       return readings.dmm1.value;
     };
@@ -268,25 +259,13 @@ describe("ngspice regression (real ngspice.wasm)", () => {
     );
   });
 
-  describe("Academic-mode convergence (defect 3)", () => {
-    it(
-      "solves an ideal diode directly across a source with no series resistance",
-      async () => {
-        const components = [
-          part("g", "ground"),
-          part("v1", "dc-voltage", { voltage: 5 }),
-          part("d1", "diode-ideal"),
-        ];
-        const wires = [
-          wire("w1", "v1", "pos", "d1", "anode"),
-          wire("w2", "d1", "cathode", "g", "gnd"),
-          wire("w3", "v1", "neg", "g", "gnd"),
-        ];
-        await expect(simulate(components, wires, "academic")).resolves.toBeDefined();
-      },
-      RUN_TIMEOUT
-    );
-
+  // Academic mode (idealized textbook models, including an ideal-switch thyristor macro that
+  // chattered ngspice's transient solver) has been removed entirely. The 2-transistor SCR/TRIAC
+  // latch below was already the only implementation in either mode before that removal, so these
+  // two cases are unchanged; the academic-only ideal diode model (N=0.001 across a bare source,
+  // needing RS=1e-3 to converge) no longer exists in the codebase and had no test of its own left
+  // to carry once that model was deleted.
+  describe("thyristor latching", () => {
     it(
       "latches an SCR on gate current and holds the anode down",
       async () => {
@@ -309,7 +288,7 @@ describe("ngspice regression (real ngspice.wasm)", () => {
           wire("w6", "rg", "b", "scr1", "gate"),
           wire("w7", "vg", "neg", "g", "gnd"),
         ];
-        const { nodeVoltage } = await simulate(components, wires, "academic");
+        const { nodeVoltage } = await simulate(components, wires);
         // Latched: the anode collapses to near the cathode, not the 12 V rail.
         expect(nodeVoltage("scr1", "anode")).toBeLessThan(2);
       },
@@ -336,7 +315,7 @@ describe("ngspice regression (real ngspice.wasm)", () => {
           wire("w6", "rg", "b", "tr1", "gate"),
           wire("w7", "vg", "neg", "g", "gnd"),
         ];
-        const { nodeVoltage } = await simulate(components, wires, "academic");
+        const { nodeVoltage } = await simulate(components, wires);
         expect(nodeVoltage("tr1", "t1")).toBeLessThan(2);
       },
       RUN_TIMEOUT

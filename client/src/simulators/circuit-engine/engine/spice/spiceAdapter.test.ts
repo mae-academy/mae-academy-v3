@@ -422,27 +422,10 @@ describe("convertToSpiceComponents", () => {
     expect(probeBranchKey("am-1")).toBe("vprobe_am_1");
   });
 
-  it("inserts a DMM's current-mode probe in both simulation modes", () => {
+  it("inserts a DMM's current-mode probe", () => {
     expect(
       find(
-        convertToSpiceComponents(
-          [part("d", "dmm", { mode: "ACA" })],
-          [],
-          undefined,
-          "practical"
-        ),
-        "d",
-        "dc-voltage"
-      ).voltage
-    ).toBe(0);
-    expect(
-      find(
-        convertToSpiceComponents(
-          [part("d", "dmm", { mode: "ACA" })],
-          [],
-          undefined,
-          "academic"
-        ),
+        convertToSpiceComponents([part("d", "dmm", { mode: "ACA" })], []),
         "d",
         "dc-voltage"
       ).voltage
@@ -458,42 +441,18 @@ describe("convertToSpiceComponents", () => {
     ).toHaveLength(0);
   });
 
-  it("loads DCV/ACV/HZ DMM and voltmeter inputs at 10 MΩ in Practical mode", () => {
+  it("loads DCV/ACV/HZ DMM and voltmeter inputs at 10 MΩ", () => {
     const spice = convertToSpiceComponents(
       [part("d", "dmm", { mode: "DCV" }), part("vm", "voltmeter")],
-      [],
-      undefined,
-      "practical"
+      []
     );
     expect(find(spice, "d", "resistor").resistance).toBe(10e6);
     expect(find(spice, "vm", "resistor").resistance).toBe(10e6);
   });
 
-  it("keeps DCV/ACV/HZ DMM and voltmeter inputs ideal in Academic mode", () => {
+  it("leaves the oscilloscope ideal", () => {
     expect(
-      convertToSpiceComponents(
-        [part("d", "dmm", { mode: "DCV" })],
-        [],
-        undefined,
-        "academic"
-      )
-    ).toHaveLength(0);
-    expect(
-      convertToSpiceComponents(
-        [part("vm", "voltmeter")],
-        [],
-        undefined,
-        "academic"
-      )
-    ).toHaveLength(0);
-  });
-
-  it("leaves the oscilloscope ideal in either mode", () => {
-    expect(
-      convertToSpiceComponents([part("o", "oscilloscope")], [], undefined, "practical")
-    ).toHaveLength(0);
-    expect(
-      convertToSpiceComponents([part("o", "oscilloscope")], [], undefined, "academic")
+      convertToSpiceComponents([part("o", "oscilloscope")], [])
     ).toHaveLength(0);
   });
 

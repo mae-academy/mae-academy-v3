@@ -8,7 +8,6 @@ import {
   type SpiceComponent,
   type SpiceNet,
 } from "@/simulators/circuit-engine/engine/spice/spiceTypes";
-import type { SimulationMode } from "@/simulators/circuit-engine/engine/spice/spiceAdapter";
 
 /** Everything except ground: the components that produce an actual element line. */
 type SpiceElement = Exclude<SpiceComponent, { kind: "ground" }>;
@@ -40,11 +39,6 @@ export interface GenerateNetlistOptions {
   title?: string;
   /** Analysis directives placed before `.end`. Defaults to a single `.op`. */
   analysis?: string[];
-  /**
-   * `academic` swaps in idealized textbook models (ideal switches, no Early effect, RMS-scaled AC
-   * sources, …); `practical` (the default) keeps the real-world non-linear models.
-   */
-  simulationMode?: SimulationMode;
 }
 
 /**
@@ -143,27 +137,15 @@ function modelToken(value: number): string {
  * generic card; a zener's breakdown voltage and an LED's forward voltage are model parameters
  * rather than element parameters, so those get one card per distinct value.
  */
-function modelFor(
-  element: SpiceElement,
-  mode: SimulationMode
-): SpiceModel | undefined {
-  const academic = mode === "academic";
+function modelFor(element: SpiceElement): SpiceModel | undefined {
   switch (element.kind) {
     case "diode":
       switch (element.variant) {
         case "standard":
-          // Academic: an ideal switch-like junction — N so far below 1 that the I-V curve is
-          // effectively a step at 0 V, rather than silicon's ~0.6-0.7 V knee. RS=1e-3 (rather than
-          // 0) is load-bearing: verified against ngspice.wasm, a bare junction this steep with no
-          // series resistance has nothing bounding di/dv, and gmin/source stepping all fail to find
-          // an operating point the moment it sits directly across a source with no other resistance.
-          return academic
-            ? { name: "D_STD", card: ".MODEL D_STD D (IS=1e-14 RS=1e-3 N=0.001)" }
-            : { name: "D_STD", card: ".MODEL D_STD D (IS=1e-14 RS=0 N=1)" };
+          return { name: "D_STD", card: ".MODEL D_STD D (IS=1e-14 RS=0 N=1)" };
         case "photodiode":
           // Reduced to its junction: IS stands in for dark current. Photocurrent needs an
-          // illumination-driven source, which the canvas does not yet model. Not swapped for an
-          // ideal switch in Academic mode — its dark-current behavior is the point of the part.
+          // illumination-driven source, which the canvas does not yet model.
           return {
             name: "D_PHOTO",
             card: ".MODEL D_PHOTO D (IS=1e-9 RS=0 N=1)",
@@ -175,11 +157,9 @@ function modelFor(
             "breakdownVoltage"
           );
           const name = `D_ZENER_${modelToken(element.breakdownVoltage)}`;
-          // Academic: ideal switch-like below/above BV, same rationale as the standard diode.
-          const emission = academic ? 0.001 : 1;
           return {
             name,
-            card: `.MODEL ${name} D (IS=1e-14 N=${emission} BV=${breakdown} IBV=0.001)`,
+            card: `.MODEL ${name} D (IS=1e-14 N=1 BV=${breakdown} IBV=0.001)`,
           };
         }
         case "led": {
@@ -190,14 +170,6 @@ function modelFor(
             );
           }
           const name = `D_LED_${modelToken(element.forwardVoltage)}`;
-          if (academic) {
-            // Ideal switch-like junction, same as the standard diode (RS=1e-3 for the same
-            // convergence reason); the fitted forward-voltage knee is a Practical-mode concern.
-            return {
-              name,
-              card: `.MODEL ${name} D (IS=1e-14 N=0.001 RS=1e-3)`,
-            };
-          }
           // Fitted so the junction drops the quoted forward voltage at LED_TEST_CURRENT:
           // Vf = N * Vt * ln(I / IS)  =>  N = Vf / (Vt * ln(I / IS)).
           const emission =
@@ -213,20 +185,14 @@ function modelFor(
       break;
 
     case "bjt":
-      // Academic: no Early effect (VAF=0), no junction capacitance, flat BF — the textbook
-      // constant-beta transistor.
       return element.polarity === "npn"
         ? {
             name: "NPN_STD",
-            card: academic
-              ? ".MODEL NPN_STD NPN (IS=1e-14 BF=100 VAF=0 CJE=0 CJC=0 RB=10 RC=1 RE=0.1)"
-              : ".MODEL NPN_STD NPN (IS=1e-14 BF=100 VAF=100 RB=10 RC=1 RE=0.1)",
+            card: ".MODEL NPN_STD NPN (IS=1e-14 BF=100 VAF=100 RB=10 RC=1 RE=0.1)",
           }
         : {
             name: "PNP_STD",
-            card: academic
-              ? ".MODEL PNP_STD PNP (IS=1e-14 BF=100 VAF=0 CJE=0 CJC=0 RB=10 RC=1 RE=0.1)"
-              : ".MODEL PNP_STD PNP (IS=1e-14 BF=100 VAF=100 RB=10 RC=1 RE=0.1)",
+            card: ".MODEL PNP_STD PNP (IS=1e-14 BF=100 VAF=100 RB=10 RC=1 RE=0.1)",
           };
 
     case "mosfet":
@@ -265,17 +231,10 @@ function modelFor(
  * Contact resistances for a coil-driven contact model (`SW` with VT/VH — not PSPICE's `VSWITCH`
  * with VON/VOFF: this ngspice build fails to parse a `VSWITCH` model card, and feeding VON/VOFF to
  * `SW` aborts the process outright). Manual contacts (switches, breakers, pushbuttons, …) never
- * need this dynamic model — see `manualContactOnResistance` — because a canvas edit always rebuilds
- * the whole deck, so nothing needs to change contact state mid-solve.
- *
- * Academic mode drives RON down to a near-zero ideal contact, but not all the way to the value
- * `manualContactOnResistance` uses: ROFF stays 1e9 in both modes, and an RON/ROFF ratio much beyond
- * 1e12 leaves ngspice's transient solver chattering at its minimum timestep on the instant the
- * contact closes.
+ * need this dynamic model — see `MANUAL_CONTACT_ON_RESISTANCE` — because a canvas edit always
+ * rebuilds the whole deck, so nothing needs to change contact state mid-solve.
  */
-function switchResistances(mode: SimulationMode): string {
-  return mode === "academic" ? "RON=1e-3 ROFF=1e9" : "RON=0.001 ROFF=1e9";
-}
+const COIL_CONTACT_RESISTANCES = "RON=0.001 ROFF=1e9";
 
 /**
  * Resistance of a closed manually operated contact (switch, breaker, pushbutton, aux contact,
@@ -284,9 +243,7 @@ function switchResistances(mode: SimulationMode): string {
  *
  * An open manual contact emits nothing at all — see `elementLines`.
  */
-function manualContactOnResistance(mode: SimulationMode): number {
-  return mode === "academic" ? 1e-6 : 0.001;
-}
+const MANUAL_CONTACT_ON_RESISTANCE = 0.001;
 
 type SpiceCoilElement = Extract<SpiceElement, { kind: "relay" | "contactor" }>;
 
@@ -320,19 +277,12 @@ function coilThreshold(element: SpiceCoilElement): {
  * Model names for a coil's contacts. The normally-closed variant is the same switch with a negated
  * threshold, driven from the coil's terminals in reverse — SW has no inversion of its own, and
  * this avoids spending a behavioural source on it.
- *
- * Academic mode zeroes the hysteresis (an ideal contact snaps at one threshold), which the token
- * folds in so the model name always matches the VH it is about to be given.
  */
-function coilModelNames(
-  element: SpiceCoilElement,
-  mode: SimulationMode
-): {
+function coilModelNames(element: SpiceCoilElement): {
   normallyOpen: string;
   normallyClosed: string;
 } {
-  const { threshold, hysteresis: realHysteresis } = coilThreshold(element);
-  const hysteresis = mode === "academic" ? 0 : realHysteresis;
+  const { threshold, hysteresis } = coilThreshold(element);
   const token = `${modelToken(threshold)}_${modelToken(hysteresis)}`;
   return {
     normallyOpen: `SW_COIL_${token}`,
@@ -340,32 +290,27 @@ function coilModelNames(
   };
 }
 
-function switchModelsFor(
-  element: SpiceElement,
-  mode: SimulationMode
-): SpiceModel[] {
+function switchModelsFor(element: SpiceElement): SpiceModel[] {
   switch (element.kind) {
-    // Manual contacts are plain resistors (see `manualContactResistance`) and need no model card.
+    // Manual contacts are plain resistors (see `MANUAL_CONTACT_ON_RESISTANCE`) and need no model card.
     case "switch-spst":
     case "switch-spdt":
       return [];
 
     case "relay":
     case "contactor": {
-      const { threshold, hysteresis: realHysteresis } = coilThreshold(element);
-      const hysteresis = mode === "academic" ? 0 : realHysteresis;
-      const names = coilModelNames(element, mode);
+      const { threshold, hysteresis } = coilThreshold(element);
+      const names = coilModelNames(element);
       const vt = formatValue(threshold, element, "pullInVoltage");
       const vh = formatValue(hysteresis, element, "dropOutVoltage");
-      const resistances = switchResistances(mode);
       return [
         {
           name: names.normallyOpen,
-          card: `.MODEL ${names.normallyOpen} SW (VT=${vt} VH=${vh} ${resistances})`,
+          card: `.MODEL ${names.normallyOpen} SW (VT=${vt} VH=${vh} ${COIL_CONTACT_RESISTANCES})`,
         },
         {
           name: names.normallyClosed,
-          card: `.MODEL ${names.normallyClosed} SW (VT=-${vt} VH=${vh} ${resistances})`,
+          card: `.MODEL ${names.normallyClosed} SW (VT=-${vt} VH=${vh} ${COIL_CONTACT_RESISTANCES})`,
         },
       ];
     }
@@ -376,9 +321,9 @@ function switchModelsFor(
 }
 
 /** Every `.MODEL` card an element needs, semiconductor or switch. */
-function modelsFor(element: SpiceElement, mode: SimulationMode): SpiceModel[] {
-  const semiconductor = modelFor(element, mode);
-  return semiconductor ? [semiconductor] : switchModelsFor(element, mode);
+function modelsFor(element: SpiceElement): SpiceModel[] {
+  const semiconductor = modelFor(element);
+  return semiconductor ? [semiconductor] : switchModelsFor(element);
 }
 
 /** A generated `.SUBCKT` block, for parts ngspice has no native model for. */
@@ -427,21 +372,15 @@ const THYRISTOR_ANODE_SHUNT = 10000;
  * `name` is the already-uniqued element name, which per-device macros key off so two motors with
  * different parameters cannot collide on one card.
  */
-function macroFor(
-  element: SpiceElement,
-  name: string,
-  mode: SimulationMode
-): SpiceMacro | undefined {
-  const academic = mode === "academic";
+function macroFor(element: SpiceElement, name: string): SpiceMacro | undefined {
   switch (element.kind) {
     case "scr":
-      // Two-transistor latch in both modes: the PNP collector drives the NPN base and vice versa,
-      // so gate injection regenerates until the anode current holds it on. An ideal gate-controlled
-      // switch was tried for Academic mode (no holding current, no leakage, closes the instant
+      // Two-transistor latch: the PNP collector drives the NPN base and vice versa, so gate
+      // injection regenerates until the anode current holds it on. An ideal gate-controlled switch
+      // was tried as a simpler alternative (no holding current, no leakage, closes the instant
       // V(gate, cathode) crosses a threshold) but its own control voltage collapses to 0 V the
       // instant it closes, which ngspice's transient solver cannot step through — verified against
       // ngspice.wasm directly: it drives the timestep to the simulator's floor and aborts the run.
-      // The latch also regenerates correctly under `.tran`, so nothing textbook is lost.
       return {
         name: "SCR_STD",
         lines: [
@@ -456,9 +395,9 @@ function macroFor(
       };
 
     case "triac":
-      // Two anti-parallel SCR latches sharing one gate, so it conducts in either direction, in
-      // both modes — an ideal anti-parallel switch pair was tried for Academic mode but hits the
-      // same control-voltage collapse as the SCR's ideal switch above.
+      // Two anti-parallel SCR latches sharing one gate, so it conducts in either direction — an
+      // ideal anti-parallel switch pair was tried but hits the same control-voltage collapse as
+      // the SCR's ideal switch above.
       return {
         name: "TRIAC_STD",
         lines: [
@@ -497,17 +436,12 @@ function macroFor(
     }
 
     case "dc-motor": {
-      // Academic: armature inductance and rotor inertia collapse to near-zero, so the electrical
-      // and mechanical time constants vanish and `.op`/`.tran` land straight on the steady-state
-      // point instead of settling through a startup transient.
-      const armatureInductance = academic ? 1e-9 : element.armatureInductance;
-      const inertia = academic ? 1e-12 : element.inertia;
       for (const [field, value] of [
         ["armatureResistance", element.armatureResistance],
-        ["armatureInductance", armatureInductance],
+        ["armatureInductance", element.armatureInductance],
         ["backEmfConstant", element.backEmfConstant],
         ["torqueConstant", element.torqueConstant],
-        ["inertia", inertia],
+        ["inertia", element.inertia],
         ["viscousFriction", element.viscousFriction],
       ] as const) {
         formatValue(value, element, field);
@@ -524,11 +458,11 @@ function macroFor(
         lines: [
           `.SUBCKT ${macroName} P N`,
           `RA P NA ${formatValue(element.armatureResistance, element, "armatureResistance")}`,
-          `LA NA NB ${formatValue(armatureInductance, element, "armatureInductance")}`,
+          `LA NA NB ${formatValue(element.armatureInductance, element, "armatureInductance")}`,
           "VSENSE NB NC DC 0",
           `BEMF NC N V={${formatValue(element.backEmfConstant, element, "backEmfConstant")}*V(SPD)}`,
           `BTRQ 0 SPD I={${formatValue(element.torqueConstant, element, "torqueConstant")}*I(VSENSE)-${load}}`,
-          `CJ SPD 0 ${formatValue(inertia, element, "inertia")}`,
+          `CJ SPD 0 ${formatValue(element.inertia, element, "inertia")}`,
           `RB SPD 0 ${formatValue(damping, element, "viscousFriction")}`,
           `.ENDS ${macroName}`,
         ],
@@ -547,24 +481,13 @@ function scaleInductance(primary: number, ratio: number): number {
 
 /** Perfect coupling makes the inductance matrix singular, so k defaults just below 1. */
 const DEFAULT_COUPLING = 0.999;
-/**
- * Coupling coefficient and magnetizing-inductance baseline forced in Academic mode: tight enough
- * coupling and large enough inductance that the magnetizing branch draws no appreciable current,
- * leaving an ideal transformer.
- */
-const ACADEMIC_COUPLING = 0.999999;
-const ACADEMIC_MAGNETIZING_INDUCTANCE = 1e6;
 
 function formatCoupling(
   component: Extract<
     SpiceMultiLine,
     { kind: "transformer" | "transformer-ct" | "autotransformer" }
-  >,
-  mode: SimulationMode
+  >
 ): string {
-  if (mode === "academic") {
-    return formatValue(ACADEMIC_COUPLING, component, "couplingCoefficient");
-  }
   const coupling = component.couplingCoefficient ?? DEFAULT_COUPLING;
   if (!(coupling > 0) || coupling >= 1) {
     throw new NetlistError(
@@ -572,19 +495,6 @@ function formatCoupling(
     );
   }
   return formatValue(coupling, component, "couplingCoefficient");
-}
-
-/** The primary (magnetizing) inductance actually emitted, overridden in Academic mode. */
-function magnetizingInductance(
-  component: Extract<
-    SpiceMultiLine,
-    { kind: "transformer" | "transformer-ct" | "autotransformer" }
-  >,
-  mode: SimulationMode
-): number {
-  return mode === "academic"
-    ? ACADEMIC_MAGNETIZING_INDUCTANCE
-    : component.primaryInductance;
 }
 
 /** Kinds that expand into more than one SPICE line. */
@@ -607,8 +517,7 @@ function singleElementLine(
   name: string,
   nodeNames: string[],
   model: SpiceModel | undefined,
-  macro: SpiceMacro | undefined,
-  mode: SimulationMode
+  macro: SpiceMacro | undefined
 ): string {
   const head = `${name} ${nodeNames.join(" ")}`;
 
@@ -635,19 +544,14 @@ function singleElementLine(
 
     case "ac-voltage": {
       // Emitted so one deck stays valid across .op, .ac and .tran: the DC value is the operating
-      // point, AC <mag> <phase> feeds .ac, and SIN() feeds .tran.
+      // point, AC <mag> <phase> feeds .ac, and SIN() feeds .tran. The quoted amplitude is read as
+      // already-peak (not RMS) for both.
       const offset = formatValue(
         component.dcOffset ?? 0,
         component,
         "dcOffset"
       );
-      // Academic mode treats the quoted amplitude as an RMS value: AC/SIN() both want peak, so
-      // scale up by sqrt(2) rather than reading it as already-peak, as Practical mode does.
-      const rawAmplitude =
-        mode === "academic"
-          ? component.amplitude * Math.SQRT2
-          : component.amplitude;
-      const amplitude = formatValue(rawAmplitude, component, "amplitude");
+      const amplitude = formatValue(component.amplitude, component, "amplitude");
       const phase = formatValue(
         component.phaseDegrees ?? 0,
         component,
@@ -704,8 +608,7 @@ function elementLines(
   name: string,
   nodes: SpiceNodeMap,
   model: SpiceModel | undefined,
-  macro: SpiceMacro | undefined,
-  mode: SimulationMode
+  macro: SpiceMacro | undefined
 ): string[] {
   const nodeNames = elementNets(component).map(net => nodes.nameFor(net));
 
@@ -717,18 +620,17 @@ function elementLines(
         secondaryPositive,
         secondaryNegative,
       ] = nodeNames;
-      const primaryInductance = magnetizingInductance(component, mode);
       const primary = formatValue(
-        primaryInductance,
+        component.primaryInductance,
         component,
         "primaryInductance"
       );
       const secondary = formatValue(
-        scaleInductance(primaryInductance, component.turnsRatio),
+        scaleInductance(component.primaryInductance, component.turnsRatio),
         component,
         "turnsRatio"
       );
-      const coupling = formatCoupling(component, mode);
+      const coupling = formatCoupling(component);
       return [
         `L${name}P ${primaryPositive} ${primaryNegative} ${primary}`,
         `L${name}S ${secondaryPositive} ${secondaryNegative} ${secondary}`,
@@ -744,19 +646,18 @@ function elementLines(
         centerTap,
         secondaryNegative,
       ] = nodeNames;
-      const primaryInductance = magnetizingInductance(component, mode);
       const primary = formatValue(
-        primaryInductance,
+        component.primaryInductance,
         component,
         "primaryInductance"
       );
       // Each half carries half the secondary turns, so it sees twice the effective ratio.
       const half = formatValue(
-        scaleInductance(primaryInductance, component.turnsRatio * 2),
+        scaleInductance(component.primaryInductance, component.turnsRatio * 2),
         component,
         "turnsRatio"
       );
-      const coupling = formatCoupling(component, mode);
+      const coupling = formatCoupling(component);
       // ngspice's K directive couples exactly two inductors, so three windings need three lines.
       return [
         `L${name}P ${primaryPositive} ${primaryNegative} ${primary}`,
@@ -779,18 +680,17 @@ function elementLines(
           `Autotransformer "${component.label}" needs a turns ratio above 1, got ${component.turnsRatio}.`
         );
       }
-      const primaryInductance = magnetizingInductance(component, mode);
       const series = formatValue(
-        primaryInductance * seriesTurns * seriesTurns,
+        component.primaryInductance * seriesTurns * seriesTurns,
         component,
         "primaryInductance"
       );
       const output = formatValue(
-        primaryInductance * outputTurns * outputTurns,
+        component.primaryInductance * outputTurns * outputTurns,
         component,
         "primaryInductance"
       );
-      const coupling = formatCoupling(component, mode);
+      const coupling = formatCoupling(component);
       return [
         `L${name}A ${input} ${tap} ${series}`,
         `L${name}B ${tap} ${common} ${output}`,
@@ -806,7 +706,7 @@ function elementLines(
     case "switch-spst": {
       if (!component.isClosed) return [];
       return [
-        `${name} ${nodes.nameFor(component.a)} ${nodes.nameFor(component.b)} ${manualContactOnResistance(mode)}`,
+        `${name} ${nodes.nameFor(component.a)} ${nodes.nameFor(component.b)} ${MANUAL_CONTACT_ON_RESISTANCE}`,
       ];
     }
 
@@ -820,7 +720,7 @@ function elementLines(
             : undefined;
       if (!live) return [];
       return [
-        `${name}${live.suffix} ${nodes.nameFor(component.common)} ${nodes.nameFor(live.net)} ${manualContactOnResistance(mode)}`,
+        `${name}${live.suffix} ${nodes.nameFor(component.common)} ${nodes.nameFor(live.net)} ${MANUAL_CONTACT_ON_RESISTANCE}`,
       ];
     }
 
@@ -829,15 +729,12 @@ function elementLines(
       const coilPositive = nodes.nameFor(component.coilPositive);
       const coilNegative = nodes.nameFor(component.coilNegative);
       const midpoint = `${name}COIL`;
-      const models = coilModelNames(component, mode);
-      // Academic: zero coil inductance, so the armature snaps instantly at the threshold voltage
-      // instead of ramping through a real coil's L/R pull-in delay.
-      const coilInductance = mode === "academic" ? 0 : component.coilInductance;
+      const models = coilModelNames(component);
       // R and L in series across the coil terminals; the contacts sense the whole coil voltage, so
       // the inductance also gives them their pull-in and release delay.
       const lines = [
         `R${midpoint} ${coilPositive} ${midpoint} ${formatValue(component.coilResistance, component, "coilResistance")}`,
-        `L${midpoint} ${midpoint} ${coilNegative} ${formatValue(coilInductance, component, "coilInductance")}`,
+        `L${midpoint} ${midpoint} ${coilNegative} ${formatValue(component.coilInductance, component, "coilInductance")}`,
       ];
 
       // A normally-closed contact is the same model with a negated threshold, driven from the coil
@@ -903,9 +800,7 @@ function elementLines(
     }
 
     default:
-      return [
-        singleElementLine(component, name, nodeNames, model, macro, mode),
-      ];
+      return [singleElementLine(component, name, nodeNames, model, macro)];
   }
 }
 
@@ -923,8 +818,6 @@ export function generateNetlist(
       "Cannot build a netlist: the circuit has no components."
     );
   }
-
-  const mode: SimulationMode = options.simulationMode ?? "practical";
 
   const nodes = buildSpiceNodeMap(components);
   const hasGround =
@@ -958,20 +851,20 @@ export function generateNetlist(
     }
     used.add(name.toUpperCase());
 
-    const model = modelFor(element, mode);
-    for (const card of modelsFor(element, mode)) {
+    const model = modelFor(element);
+    for (const card of modelsFor(element)) {
       if (models.has(card.name)) continue;
       models.set(card.name, card.card);
       modelCards.push(card.card);
     }
 
-    const macro = macroFor(element, name, mode);
+    const macro = macroFor(element, name);
     if (macro && !macros.has(macro.name)) {
       macros.add(macro.name);
       macroBlocks.push(...macro.lines);
     }
 
-    const emitted = elementLines(element, name, nodes, model, macro, mode);
+    const emitted = elementLines(element, name, nodes, model, macro);
     // Transformers derive L and K names from their root; reserve those too so a later element
     // cannot sanitize into the same identifier.
     for (const line of emitted) used.add(line.split(" ")[0].toUpperCase());
