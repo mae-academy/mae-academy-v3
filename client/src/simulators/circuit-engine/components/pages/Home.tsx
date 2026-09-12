@@ -784,9 +784,8 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
   const [search, setSearch] = useState('');
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
   const [simulationRunning, setSimulationRunning] = useState(false);
-  // Academic mode swaps in idealized textbook models (ideal switches, no Early effect, RMS AC
-  // sources, …); Practical is the default so readings match real-world non-linear behavior.
-  const [simulationMode, setSimulationMode] = useState<SimulationMode>('practical');
+  // Academic mode removed: Practical mode is permanently active for accurate SPICE simulation.
+  const [simulationMode] = useState<SimulationMode>('practical');
   const [showElectrons, setShowElectrons] = useState(() => {
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem('mae-show-electrons');
@@ -2528,6 +2527,36 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
             <span style={{ color: colors.muted, fontSize: 11, minWidth: 42, textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>{Math.round(zoom * 100)}%</span>
             <ToolbarButton colors={colors} label="+" title="Zoom in" onClick={() => setZoom(value => Math.min(3, value * 1.15))} />
             <ToolbarDivider colors={colors} />
+            <ToolbarButton colors={colors} icon={<Undo2 size={14} />} title="Undo (Ctrl/Cmd+Z)" onClick={handleUndo} disabled={!history.canUndo} />
+            <ToolbarButton colors={colors} icon={<Redo2 size={14} />} title="Redo (Ctrl/Cmd+Shift+Z)" onClick={handleRedo} disabled={!history.canRedo} />
+            <ToolbarButton colors={colors} icon={<Maximize2 size={14} />} title="Auto-scale / Center circuit" onClick={zoomToFit} />
+            <ToolbarButton colors={colors} icon={<Scissors size={14} />} title="Cut (Ctrl/Cmd+X)" onClick={cutSelection} disabled={!selectedComponent && marqueeIds.length === 0} />
+            <ToolbarButton colors={colors} icon={<Copy size={14} />} title="Copy (Ctrl/Cmd+C)" onClick={copySelection} disabled={!selectedComponent && marqueeIds.length === 0} />
+            <ToolbarButton colors={colors} icon={<Clipboard size={14} />} title="Paste (Ctrl/Cmd+V)" onClick={pasteClipboard} disabled={!clipboard || (clipboard.components.length === 0 && clipboard.wires.length === 0 && clipboard.texts.length === 0)} />
+            <ToolbarButton colors={colors} icon={<Trash2 size={14} />} title="Delete (Del/Backspace)" onClick={removeSelection} disabled={!selectedComponent && !selectedWire && !selectedText && marqueeIds.length === 0} />
+            <ToolbarDivider colors={colors} />
+            <ToolbarButton
+              colors={colors}
+              label="Dotted"
+              title="Dotted grid background"
+              onClick={() => { setTabDGridMode('dots'); setGridVisible(true); }}
+              active={tabDGridMode === 'dots' && gridVisible}
+            />
+            <ToolbarButton
+              colors={colors}
+              label="Cartesian"
+              title="Cartesian grid background"
+              onClick={() => { setTabDGridMode('cartesian'); setGridVisible(true); }}
+              active={tabDGridMode === 'cartesian' && gridVisible}
+            />
+            <ToolbarButton
+              colors={colors}
+              label="Hidden"
+              title="Hide grid"
+              onClick={() => { setTabDGridMode('hidden'); setGridVisible(false); }}
+              active={tabDGridMode === 'hidden' || !gridVisible}
+            />
+            <ToolbarDivider colors={colors} />
             <ToolbarButton colors={colors} icon={<Type size={14} />} label="Text" title="Add editable workspace text (T)" onClick={addText} />
             {tabDUiRefinement && <><ToolbarDivider colors={colors} /><ToolbarButton colors={colors} icon={<RotateCw size={14} />} label="90°" title="Rotate selected component 90°" onClick={() => rotateSelected(90)} disabled={!selectedComponent} /><ToolbarButton colors={colors} icon={<RotateCw size={14} />} label="45°" title="Rotate selected component 45°" onClick={() => rotateSelected(45)} disabled={!selectedComponent} /><ToolbarButton colors={colors} icon={<FlipHorizontal size={14} />} label="Flip X" title="Reflect selected component horizontally" onClick={() => flipSelected('h')} disabled={!selectedComponent} /><ToolbarButton colors={colors} icon={<FlipVertical size={14} />} label="Flip Y" title="Reflect selected component vertically" onClick={() => flipSelected('v')} disabled={!selectedComponent} /></>}
           </div>
@@ -2538,18 +2567,9 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
             <ToolbarButton colors={colors} icon={<Upload size={14} />} label="Import" title="Import circuit from NAD netlist" onClick={() => nadInputRef.current?.click()} />
             <input ref={nadInputRef} type="file" accept=".nad,application/x-mae-nad+json,application/json" onChange={importNad} style={{ display: 'none' }} />
             <ToolbarDivider colors={colors} />
-            <ToolbarButton colors={colors} icon={<Undo2 size={14} />} title="Undo (Ctrl/Cmd+Z)" onClick={handleUndo} disabled={!history.canUndo} />
-            <ToolbarButton colors={colors} icon={<Redo2 size={14} />} title="Redo (Ctrl/Cmd+Shift+Z)" onClick={handleRedo} disabled={!history.canRedo} />
-            <ToolbarButton colors={colors} icon={<Maximize2 size={14} />} title="Auto-scale / Center circuit" onClick={zoomToFit} />
-            <ToolbarButton colors={colors} icon={<Scissors size={14} />} title="Cut (Ctrl/Cmd+X)" onClick={cutSelection} disabled={!selectedComponent && marqueeIds.length === 0} />
-            <ToolbarButton colors={colors} icon={<Copy size={14} />} title="Copy (Ctrl/Cmd+C)" onClick={copySelection} disabled={!selectedComponent && marqueeIds.length === 0} />
-            <ToolbarButton colors={colors} icon={<Clipboard size={14} />} title="Paste (Ctrl/Cmd+V)" onClick={pasteClipboard} disabled={!clipboard || (clipboard.components.length === 0 && clipboard.wires.length === 0 && clipboard.texts.length === 0)} />
-            <ToolbarButton colors={colors} icon={<Trash2 size={14} />} title="Delete (Del/Backspace)" onClick={removeSelection} disabled={!selectedComponent && !selectedWire && !selectedText && marqueeIds.length === 0} />
-            <ToolbarDivider colors={colors} />
             <button onClick={() => { hasStartedSimulation.current = true; setSimulationRunning(value => !value); }} title={simulationRunning ? 'Pause simulation' : 'Run simulation'} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: (!simulationRunning && hasStartedSimulation.current) ? TAB_GRADIENT_REV : TAB_GRADIENT, color: '#ffffff', fontWeight: 500, padding: '6px 14px', minHeight: 30, borderRadius: 8, fontSize: 12, boxShadow: TAB_ACTIVE_SHADOW, border: '1px solid transparent', cursor: 'pointer', whiteSpace: 'nowrap', transition: 'background .3s ease' }}>
               {simulationRunning ? <Pause size={14} /> : <Play size={14} />}{simulationRunning ? 'Pause' : 'Run'}
             </button>
-            <ToolbarButton colors={colors} label={simulationMode === 'academic' ? 'Academic' : 'Practical'} title="Academic / Practical — toggle SPICE simulation mode" onClick={() => setSimulationMode(mode => mode === 'academic' ? 'practical' : 'academic')} active={simulationMode === 'academic'} />
             <ToolbarButton colors={colors} icon={<Zap size={14} />} title="Show / Hide electron flow" onClick={() => setShowElectrons(v => { const next = !v; try { localStorage.setItem('mae-show-electrons', String(next)); } catch { } return next; })} active={showElectrons} />
             <ToolbarButton colors={colors} icon={<RotateCcw size={14} />} title="Reset simulation" onClick={resetSimulation} />
             <span className="text-sm font-medium text-slate-700 dark:text-slate-300" style={{ minWidth: 65, textAlign: 'center', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -2636,7 +2656,40 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
             <defs>
               <marker id="arrow" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M 0,0 L 6,3 L 0,6 Z" fill="#64748b" /></marker>
               {activeMeshTrace?.meshCycles?.map((cycle) => <marker key={cycle.index} id={`mesh-arrow-${cycle.index}`} markerWidth="7" markerHeight="7" refX="5.5" refY="3.5" orient="auto"><path d="M 0,1 L 6,3.5 L 0,6 Z" fill={MESH_LOOP_COLORS[cycle.index % MESH_LOOP_COLORS.length]} /></marker>)}
-              <pattern key={`grid-pattern-${tabDUiRefinement ? tabDGridMode : 'base'}`} id={`workspace-grid-${tabDUiRefinement ? tabDGridMode : 'base'}`} width={gridSize} height={gridSize} patternUnits="userSpaceOnUse">{tabDUiRefinement && tabDGridMode === 'dots' ? <circle cx="0" cy="0" r={1.65} fill={darkPreview ? '#6d91c4' : '#7a93b1'} fillOpacity={.9} /> : <path d={`M ${gridSize} 0 L 0 0 0 ${gridSize}`} fill="none" stroke={tabDUiRefinement ? (darkPreview ? '#3d5f8c' : '#a8b8cc') : colors.grid} strokeWidth={tabDUiRefinement ? 1.15 : 1} strokeOpacity={tabDUiRefinement ? .85 : 1} />}</pattern>
+              {tabDUiRefinement && tabDGridMode === 'dots' ? (
+                <pattern
+                  key="grid-pattern-dots"
+                  id="workspace-grid-dots"
+                  width={gridSize}
+                  height={gridSize}
+                  patternUnits="userSpaceOnUse"
+                  patternTransform={`translate(${-gridSize / 2}, ${-gridSize / 2})`}
+                >
+                  <circle
+                    cx={gridSize / 2}
+                    cy={gridSize / 2}
+                    r={1.65}
+                    fill={darkPreview ? '#6d91c4' : '#7a93b1'}
+                    fillOpacity={0.9}
+                  />
+                </pattern>
+              ) : (
+                <pattern
+                  key={`grid-pattern-${tabDUiRefinement ? tabDGridMode : 'base'}`}
+                  id={`workspace-grid-${tabDUiRefinement ? tabDGridMode : 'base'}`}
+                  width={gridSize}
+                  height={gridSize}
+                  patternUnits="userSpaceOnUse"
+                >
+                  <path
+                    d={`M ${gridSize} 0 L 0 0 0 ${gridSize}`}
+                    fill="none"
+                    stroke={tabDUiRefinement ? (darkPreview ? '#3d5f8c' : '#a8b8cc') : colors.grid}
+                    strokeWidth={tabDUiRefinement ? 1.15 : 1}
+                    strokeOpacity={tabDUiRefinement ? 0.85 : 1}
+                  />
+                </pattern>
+              )}
             </defs>
             <g transform={`translate(${pan[0]},${pan[1]}) scale(${zoom})`}>
               {gridVisible && (!tabDUiRefinement || tabDGridMode !== 'hidden') && <rect key={`grid-surface-${tabDUiRefinement ? tabDGridMode : 'base'}`} x={-5000} y={-5000} width={10000} height={10000} fill={`url(#workspace-grid-${tabDUiRefinement ? tabDGridMode : 'base'})`} />}
