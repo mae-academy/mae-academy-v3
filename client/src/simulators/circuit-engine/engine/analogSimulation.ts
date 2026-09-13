@@ -82,6 +82,10 @@ export class TabDSimulationEngine extends SimulationEngine {
   private readonly tabDPowerLatchStates = new Map<string, boolean>();
   private readonly tabDFuseBlown = new Set<string>();
   private readonly tabDDigitalLevels = new Map<string, number>();
+  /** Tracks instantaneous coil branch current (A) across sim steps for RL transient. */
+  private readonly tabDCoilCurrents = new Map<string, number>();
+  /** True when a coil is currently energized (pulled-in). */
+  private readonly tabDCoilEnergized = new Map<string, boolean>();
   private integrators = new Map<string, SignalIntegrator>();
   private displayReadings: Record<string, InstrumentReading> = {};
   private lastDisplayTime = -1;
@@ -99,6 +103,8 @@ export class TabDSimulationEngine extends SimulationEngine {
     this.tabDPowerLatchStates.clear();
     this.tabDFuseBlown.clear();
     this.tabDDigitalLevels.clear();
+    this.tabDCoilCurrents.clear();
+    this.tabDCoilEnergized.clear();
     this.integrators.clear();
     this.displayReadings = {};
     this.lastDisplayTime = -1;
@@ -115,6 +121,8 @@ export class TabDSimulationEngine extends SimulationEngine {
     this.tabDPowerLatchStates.clear();
     this.tabDFuseBlown.clear();
     this.tabDDigitalLevels.clear();
+    this.tabDCoilCurrents.clear();
+    this.tabDCoilEnergized.clear();
     this.integrators.clear();
     this.displayReadings = {};
     this.lastDisplayTime = -1;
@@ -167,7 +175,7 @@ export class TabDSimulationEngine extends SimulationEngine {
         this.timeAccumulator -= fixedDt;
         stepped = true;
 
-        const compiled = this.compileDocumentedPrimitives();
+        const compiled = this.compileDocumentedPrimitives(fixedDt);
         if (!compiled) return super.step(elapsedSeconds);
         finalWiredTerminals = compiled.wiredTerminals;
 
@@ -308,6 +316,10 @@ export class TabDSimulationEngine extends SimulationEngine {
           if (['relay-spst', 'relay-spdt', 'relay-dpst', 'contactor'].includes(component.type)) {
             return [component.id, Boolean(this.tabDRelayStates.get(component.id))];
           }
+          if (component.type === 'coil') {
+            // Expose energization state so CoilSymbol receives powered=true when pulled-in
+            return [component.id, Boolean(this.tabDCoilEnergized.get(component.id))];
+          }
           return [component.id, Math.abs(finalBranchCurrents[component.id] ?? 0) > 1e-10];
         })),
         componentIntensity: {},
@@ -330,7 +342,9 @@ export class TabDSimulationEngine extends SimulationEngine {
     }
   }
 
-  private compileDocumentedPrimitives(): { primitives: TabDPrimitive[]; nonlinear: TabDNonlinearDevice[]; netForTerminal: (componentId: string, terminalId: string) => string; wiredTerminals: Set<string>; commit: (nodeVoltages: Record<string, number>, branchCurrents: Record<string, number>, elapsedSeconds: number) => void } | null {
+  private lastFixedDt = 0.0005;
+
+  private compileDocumentedPrimitives(dt = this.lastFixedDt): { primitives: TabDPrimitive[]; nonlinear: TabDNonlinearDevice[]; netForTerminal: (componentId: string, terminalId: string) => string; wiredTerminals: Set<string>; commit: (nodeVoltages: Record<string, number>, branchCurrents: Record<string, number>, elapsedSeconds: number) => void } | null {
     const parent = new Map<string, string>();
     const find = (value: string): string => {
       const existing = parent.get(value);
@@ -399,9 +413,56 @@ export class TabDSimulationEngine extends SimulationEngine {
     const powerLatchModels: Array<{ id: string; gate: string; cathode: string; triggerVoltage: number; holdCurrent: number }> = [];
     const fuseModels: Array<{ id: string; ratedCurrent: number }> = [];
     const digitalModels: Array<{ id: string; inputs: string[]; output: string; ground: string; threshold: number; highVoltage: number; delay: number; rule: (levels: boolean[]) => boolean }> = [];
+    /**
+     * Coil models collected during component compilation.
+     * Commit phase runs solveCoilBranch() for each and updates energized state.
+     */
+    const coilModels: Array<{
+      id: string;
+      positive: string;
+      negative: string;
+      resistance: number;
+      inductance: number;
+      pullInCurrent: number;
+      holdCurrent: number;
+    }> = [];
     const priorVoltage = (node: string) => priorNodeVoltages[node] ?? 0;
     const relayClosed = (component: CircuitComponent) => manualRelayClosed(component.props, this.tabDRelayStates.get(component.id) ?? false);
     const powerLatched = (id: string) => this.tabDPowerLatchStates.get(id) ?? false;
+
+    /**
+     * Pre-compute coil energization from the PREVIOUS step's node voltages.
+     *
+     * The aux-contact primitives are assembled in the same pass as the coil
+     * primitive, so tabDCoilEnergized (updated in commit) would always be one
+     * step stale.  By evaluating the RL transient against priorNodeVoltages
+     * here we give the contacts the most up-to-date available coil state
+     * without changing the two-phase (build → commit) architecture.
+     */
+    for (const c of this.tabDComponents) {
+      if (c.type !== 'coil') continue;
+      const nodePos = `${c.id}:pos`;
+      const nodeNeg = `${c.id}:neg`;
+      const V_pos = priorVoltage(nodePos);
+      const V_neg = priorVoltage(nodeNeg);
+      const V_applied = V_pos - V_neg;
+      const R      = Math.max(1, Number(c.props?.resistance  ?? 100));
+      const L      = Math.max(1e-6, Number(c.props?.inductance  ?? 1.0));
+      const pullIn = Math.max(1e-6, Number(c.props?.pullInCurrent ?? 0.05));
+      const hold   = Math.max(1e-6, Number(c.props?.holdCurrent   ?? 0.03));
+      // `dt` is the function parameter (fixedDt from the step() loop)
+      const tau    = L / R;
+      const alpha  = dt / (tau + dt);
+      const I_prev = this.tabDCoilCurrents.get(c.id) ?? 0;
+      const I_ss   = V_applied / R;
+      const I_new  = alpha * I_ss + (1 - alpha) * I_prev;
+      const was    = this.tabDCoilEnergized.get(c.id) ?? false;
+      let now      = was;
+      if      (I_new >= pullIn) now = true;
+      else if (I_new <  hold)   now = false;
+      this.tabDCoilEnergized.set(c.id, now);
+    }
+
     for (const component of this.tabDComponents) {
       const p = (terminal: string) => netForTerminal(component.id, terminal);
       switch (component.type) {
@@ -514,8 +575,25 @@ export class TabDSimulationEngine extends SimulationEngine {
           break;
         }
         case 'aux-contact-no': case 'aux-contact-nc': {
-          const linked = this.tabDComponents.find(item => item.label === String(component.props.linkedTo ?? ''));
-          const energized = linked ? relayClosed(linked) : false;
+          /**
+           * Aux-contact resolution order:
+           *   1. Look up a standalone coil component by label matching linkedTo.
+           *   2. Fall back to any relay/contactor body with a matching label.
+           *   3. Default to de-energized if nothing found.
+           */
+          const linkedLabel = String(component.props.linkedTo ?? '');
+          const linkedCoil = this.tabDComponents.find(
+            item => item.type === 'coil' && item.label === linkedLabel,
+          );
+          const linkedRelay = !linkedCoil
+            ? this.tabDComponents.find(item => item.label === linkedLabel)
+            : null;
+          let energized = false;
+          if (linkedCoil) {
+            energized = this.tabDCoilEnergized.get(linkedCoil.id) ?? false;
+          } else if (linkedRelay) {
+            energized = relayClosed(linkedRelay);
+          }
           primitives.push({ kind: 'resistive-switch', id: component.id, positive: p('a'), negative: p('b'), closed: component.type === 'aux-contact-no' ? energized : !energized });
           break;
         }
@@ -693,6 +771,28 @@ export class TabDSimulationEngine extends SimulationEngine {
           break;
         }
         case 'lamp': primitives.push({ kind: 'resistor', id: component.id, positive: p('a'), negative: p('b'), resistance: Math.max(1e-3, value(component, 'ratedV', 230) ** 2 / Math.max(1e-3, value(component, 'ratedPower', 60))) }); break;
+        case 'coil': {
+          /**
+           * Electromagnetic Coil — Series RL model.
+           *
+           * The coil is modelled as a resistor for the MNA step (backward Euler
+           * replaces the inductor with a Norton equivalent on each iteration).
+           * The true current is solved in the commit phase via solveCoilBranch().
+           *
+           * Terminals: pos (A1) = voltage input, neg (A2) = return path.
+           */
+          const R = Math.max(1, value(component, 'resistance', 100));
+          const L = Math.max(1e-6, value(component, 'inductance', 1.0));
+          const pullIn = Math.max(1e-6, value(component, 'pullInCurrent', 0.05));
+          const hold   = Math.max(1e-6, value(component, 'holdCurrent', 0.03));
+          const positive = p('pos');
+          const negative = p('neg');
+          // Norton equivalent: G = dt/(L + R*dt), I_hist = I_prev * L/(L + R*dt)
+          // For first pass use pure resistor; commit refines the current.
+          primitives.push({ kind: 'resistor', id: component.id, positive, negative, resistance: R });
+          coilModels.push({ id: component.id, positive, negative, resistance: R, inductance: L, pullInCurrent: pullIn, holdCurrent: hold });
+          break;
+        }
         case 'motor-dc': primitives.push({ kind: 'resistor', id: component.id, positive: p('pos'), negative: p('neg'), resistance: Math.max(1e-3, value(component, 'nominalV', 12) ** 2 / Math.max(1e-3, value(component, 'nominalPower', 100))) }); break;
         case 'motor-3phase': {
           const phaseResistance = Math.max(1e-3, value(component, 'nominalV', 400) ** 2 / Math.max(1e-3, value(component, 'nominalPower', 5000) * 3));
@@ -772,6 +872,47 @@ export class TabDSimulationEngine extends SimulationEngine {
           const prior = this.tabDDigitalLevels.get(gate.id) ?? target;
           const alpha = gate.delay <= 0 ? 1 : 1 - Math.exp(-elapsedSeconds / gate.delay);
           this.tabDDigitalLevels.set(gate.id, prior + (target - prior) * alpha);
+        }
+
+        /**
+         * Coil commit — RL transient solver (backward Euler)
+         * ─────────────────────────────────────────────────
+         * V(t) = R·I(t) + L·dI/dt
+         *
+         * Backward Euler discretisation:
+         *   I_new = (dt·V_applied + L·I_prev) / (L + R·dt)
+         *         = α·I_ss + (1 - α)·I_prev          where α = dt/(τ + dt), τ = L/R
+         *
+         * Energization hysteresis:
+         *   Pull-in : I_new ≥ pullInCurrent  → energized = true
+         *   Drop-out: I_new <  holdCurrent   → energized = false
+         *   Between : state unchanged (hysteresis band)
+         */
+        for (const coil of coilModels) {
+          const V_pos = nodeVoltages[coil.positive]  ?? 0;
+          const V_neg = nodeVoltages[coil.negative]  ?? 0;
+          const V_applied = V_pos - V_neg;
+
+          const I_prev = this.tabDCoilCurrents.get(coil.id) ?? 0;
+          const tau    = coil.inductance / coil.resistance;       // τ = L/R
+          const alpha  = elapsedSeconds / (tau + elapsedSeconds); // backward Euler blending
+          const I_ss   = V_applied / coil.resistance;             // steady-state current
+          const I_new  = alpha * I_ss + (1 - alpha) * I_prev;    // transient current
+
+          this.tabDCoilCurrents.set(coil.id, I_new);
+
+          // Hysteresis energization logic
+          const wasEnergized = this.tabDCoilEnergized.get(coil.id) ?? false;
+          let nowEnergized = wasEnergized;
+          if (I_new >= coil.pullInCurrent) {
+            nowEnergized = true;
+          } else if (I_new < coil.holdCurrent) {
+            nowEnergized = false;
+          }
+          this.tabDCoilEnergized.set(coil.id, nowEnergized);
+
+          // Write calculated current back to branchCurrents for wire animation
+          branchCurrents[coil.id] = I_new;
         }
       },
     };
@@ -864,3 +1005,57 @@ export function evaluateTabDStaticMna(components: CircuitComponent[], wires: Cir
   };
 }
 
+// ─── COIL CONFLICT DETECTION ──────────────────────────────────────────────────
+
+export interface CoilConflictEntry {
+  /** Shared coil label (e.g. "K1") */
+  name: string;
+  /** Number of coil components sharing that label */
+  count: number;
+  /** ID of the first definition — the one that is treated as the source of truth */
+  primaryId: string;
+  /** Human-readable resolution message */
+  resolution: string;
+}
+
+export interface CoilConflictReport {
+  hasConflicts: boolean;
+  conflicts: CoilConflictEntry[];
+}
+
+/**
+ * Pre-execution coil conflict validator.
+ *
+ * Groups all `coil` components by their label.  Any label shared by more than
+ * one component is a conflict.  The first component found (circuit order) is
+ * designated the primary / source-of-truth, and all duplicates are flagged.
+ *
+ * Resolution rule: first definition has priority; aux-contacts always resolve
+ * to the primary instance.  Duplicate coils can exist without a hard error —
+ * the UI surfaces the `isConflicted` prop so the symbol renders a warning.
+ */
+export function detectCoilConflicts(components: CircuitComponent[]): CoilConflictReport {
+  const coilsByLabel = new Map<string, CircuitComponent[]>();
+
+  for (const c of components) {
+    if (c.type !== 'coil') continue;
+    const label = c.label || c.id;
+    if (!coilsByLabel.has(label)) coilsByLabel.set(label, []);
+    coilsByLabel.get(label)!.push(c);
+  }
+
+  const conflicts: CoilConflictEntry[] = [];
+
+  coilsByLabel.forEach((coils, name) => {
+    if (coils.length < 2) return;
+    conflicts.push({
+      name,
+      count: coils.length,
+      primaryId: coils[0].id,
+      resolution: `First definition (id: "${coils[0].id}") is the source of truth. ` +
+                  `${coils.length - 1} duplicate(s) detected — rename or remove them.`,
+    });
+  });
+
+  return { hasConflicts: conflicts.length > 0, conflicts };
+}

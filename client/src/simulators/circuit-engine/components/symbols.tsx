@@ -1217,6 +1217,89 @@ const DigitalOutputSymbol: SymbolFC = () => <g>
   <line x1={-30} y1={0} x2={-17} y2={0} stroke="currentColor" strokeWidth={1.5} /><line x1={30} y1={15} x2={12} y2={10} stroke="currentColor" strokeWidth={1.5} strokeDasharray="3,2" />
 </g>;
 
+// ─── CLASSIC CONTROL SYMBOLS ─────────────────────────────────────────────────────
+
+
+const CoilSymbol: SymbolFC = ({ powered, props }) => {
+  const energized = Boolean(powered);
+  const isConflicted = Boolean(props?.isConflicted);
+
+  const borderStroke = isConflicted ? '#EF4444' : 'currentColor';
+  const borderDash = isConflicted ? '4,3' : 'none';
+  const borderWidth = isConflicted ? 1.5 : 1.5;
+  const diagStroke = energized ? '#F59E0B' : 'currentColor';
+
+  return (
+    <g>
+      {/* طرف التوصيل الأيسر - على خط المنتصف y=0 تماماً من -40 إلى -20 */}
+      <line
+        x1={-40}
+        y1={0}
+        x2={-20}
+        y2={0}
+        stroke="currentColor"
+        strokeWidth={1.5}
+        strokeLinecap="round"
+      />
+
+      {/* طرف التوصيل الأيمن - على خط المنتصف y=0 تماماً من 20 إلى 40 */}
+      <line
+        x1={20}
+        y1={0}
+        x2={40}
+        y2={0}
+        stroke="currentColor"
+        strokeWidth={1.5}
+        strokeLinecap="round"
+      />
+
+      {/* جسم الملف القياسي: 40x30 ممركز بدقة عند (0, 0) */}
+      <rect
+        x={-20}
+        y={-15}
+        width={40}
+        height={30}
+        fill="transparent"
+        stroke={borderStroke}
+        strokeWidth={borderWidth}
+        strokeDasharray={borderDash}
+        rx={0}
+        ry={0}
+      />
+
+      {/* مؤشر التغذية (Energized State) بإطار داخلي متناسق */}
+      {energized && (
+        <rect
+          x={-18.5}
+          y={-13.5}
+          width={37}
+          height={27}
+          fill="none"
+          stroke="#F59E0B"
+          strokeWidth={1.5}
+          strokeOpacity={0.6}
+        />
+      )}
+
+      {/* خط IEC المائل للملف - محصور بدقة داخل زوايا المستطيل الداخلية دون أي بروز */}
+      <line
+        x1={-20}
+        y1={15}
+        x2={20}
+        y2={-15}
+        stroke={diagStroke}
+        strokeWidth={1.5}
+        strokeLinecap="round"
+      />
+
+      {/* نقطة تعارض الإشارة (Conflict Warning) عند الزاوية العلوية */}
+      {isConflicted && (
+        <circle cx={15} cy={-10} r={3.5} fill="#EF4444" />
+      )}
+    </g>
+  );
+};
+
 // ─── SYMBOL MAP ───────────────────────────────────────────────────────────────
 
 export const SYMBOL_MAP: Record<string, SymbolFC> = {
@@ -1294,6 +1377,8 @@ export const SYMBOL_MAP: Record<string, SymbolFC> = {
   'ammeter': Ammeter,
   'dmm': DmmSymbol,
   'oscilloscope': OscilloscopeSymbol,
+  // Classic Control
+  'coil': CoilSymbol,
 };
 
 export function renderSymbol(
