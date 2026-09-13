@@ -38,6 +38,7 @@ import {
   convertToSpiceComponents,
   resolveCircuitNets,
 } from "@/simulators/circuit-engine/engine/spice/spiceAdapter";
+import { buildSpiceNodeMap, generateNetlist } from "@/simulators/circuit-engine/engine/spice/netlistGenerator";
 
 const FREQUENCY = 50;
 const PERIOD = 1 / FREQUENCY;
@@ -444,5 +445,57 @@ describe("three-phase source (ngspice.wasm coverage)", () => {
       },
       RUN_TIMEOUT * 2
     );
+  });
+
+  /**
+   * Standalone diagnostic, not a functional regression (all the properties it prints are already
+   * asserted above) — dumps the exact netlist text and raw ngspice readings for both connections
+   * side by side, for a human to eyeball when someone asks "does the fix actually reach ngspice?"
+   * without re-deriving it from the other tests' assertions.
+   */
+  describe("3-Phase Y vs Δ Netlist Dump (diagnostic)", () => {
+    it("prints both netlists and their measured line-to-line/line-to-neutral voltages", async () => {
+      for (const connection of ["Y", "Δ"] as const) {
+        const { components, wires } = sourceOnly("ABC", connection);
+        const nets = resolveCircuitNets(components, wires);
+        const spiceComponents = convertToSpiceComponents(components, wires, nets, "practical");
+        const netlist = generateNetlist(spiceComponents, {
+          analysis: SOURCE_ANALYSIS,
+          simulationMode: "practical",
+        });
+        console.log(`\n--- ${connection}-connection netlist ---\n${netlist}`);
+
+        const withMeters = {
+          components: [
+            ...components,
+            part("vmLL", "voltmeter", { mode: "AC" }),
+            part("vmLN", "voltmeter", { mode: "AC" }),
+          ],
+          wires: [
+            ...wires,
+            wire("m1", "vmLL", "pos", "v1", "l1"),
+            wire("m2", "vmLL", "neg", "v1", "l2"),
+            wire("m3", "vmLN", "pos", "v1", "l1"),
+            wire("m4", "vmLN", "neg", "g", "gnd"), // meaningful only for Y — see the Δ describe above.
+          ],
+        };
+        const { readings } = await simulate(
+          withMeters.components,
+          withMeters.wires,
+          "practical",
+          SOURCE_ANALYSIS
+        );
+        console.log(
+          `${connection}: L1-L2 = ${readings.vmLL.value.toFixed(2)} V, L1-N = ${readings.vmLN.value.toFixed(2)} V` +
+            ` (theoretical: Y phase=${PHASE_VOLTAGE.toFixed(2)} V, line=${LINE_VOLTAGE.toFixed(2)} V; Δ line=${LINE_VOLTAGE.toFixed(2)} V)`
+        );
+        if (connection === "Y") {
+          expect(verifyRelationship(readings.vmLL.value, LINE_VOLTAGE, LINE_VOLTAGE * 0.02)).toBe(true);
+          expect(verifyRelationship(readings.vmLN.value, PHASE_VOLTAGE, PHASE_VOLTAGE * 0.02)).toBe(true);
+        } else {
+          expect(verifyRelationship(readings.vmLL.value, LINE_VOLTAGE, LINE_VOLTAGE * 0.02)).toBe(true);
+        }
+      }
+    }, RUN_TIMEOUT * 2);
   });
 });
