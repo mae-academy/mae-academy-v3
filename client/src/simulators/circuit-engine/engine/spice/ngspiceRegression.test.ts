@@ -14,94 +14,15 @@ import type {
   CircuitComponent,
   CircuitWire,
 } from "@/simulators/circuit-engine/models/circuitTypes";
-import {
-  convertToSpiceComponents,
-  resolveCircuitNets,
-  type SimulationMode,
-} from "@/simulators/circuit-engine/engine/spice/spiceAdapter";
-import {
-  buildSpiceNodeMap,
-  generateNetlist,
-} from "@/simulators/circuit-engine/engine/spice/netlistGenerator";
 import { LED_FORWARD_VOLTAGES } from "@/simulators/circuit-engine/models/componentDefs";
-import { parseSpiceResults } from "@/simulators/circuit-engine/engine/spice/spiceParser";
-import { buildSpiceInstrumentReadings } from "@/simulators/circuit-engine/engine/spice/spiceInstruments";
 import {
-  runNgspice,
-  runNgspiceWithLog,
-} from "@/simulators/circuit-engine/engine/spice/ngspiceTestHarness";
-
-// Every run boots a fresh ngspice instance (see ngspiceTestHarness); the first also has to load and
-// parse the 7 MB JS glue, so only that warm-up needs the extra slack.
-const WASM_BOOT_TIMEOUT = 30_000;
-const RUN_TIMEOUT = 15_000;
-// Short enough to run fast, long enough that these DC/latch circuits (no reactive elements besides
-// the thyristor macros' picofarad junction capacitances) are fully settled by the last sample.
-const SETTLE_ANALYSIS = [".tran 0.00005 0.002"];
-
-function part(
-  id: string,
-  type: string,
-  props: Record<string, unknown> = {}
-): CircuitComponent {
-  return {
-    id,
-    type,
-    x: 0,
-    y: 0,
-    rotation: 0,
-    flipH: false,
-    flipV: false,
-    label: id.toUpperCase(),
-    props,
-  };
-}
-
-function wire(
-  id: string,
-  fromComp: string,
-  fromTerm: string,
-  toComp: string,
-  toTerm: string
-): CircuitWire {
-  return {
-    id,
-    fromComp,
-    fromTerm,
-    toComp,
-    toTerm,
-    path: [
-      [0, 0],
-      [20, 0],
-    ],
-    routing: "orthogonal",
-  };
-}
-
-/** Runs one circuit through the full production pipeline and returns its instrument readings. */
-async function simulate(
-  components: CircuitComponent[],
-  wires: CircuitWire[],
-  mode: SimulationMode
-) {
-  const nets = resolveCircuitNets(components, wires);
-  const spiceComponents = convertToSpiceComponents(components, wires, nets, mode);
-  const nodeMap = buildSpiceNodeMap(spiceComponents);
-  const netlist = generateNetlist(spiceComponents, {
-    analysis: SETTLE_ANALYSIS,
-    simulationMode: mode,
-  });
-  const { vectors, log } = await runNgspiceWithLog(netlist);
-  const results = parseSpiceResults(vectors, vectors.time ?? []);
-  return {
-    readings: buildSpiceInstrumentReadings(components, nets, nodeMap, results),
-    nodeVoltage: (componentId: string, terminal: string) => {
-      const node = nodeMap.nameFor(nets.netFor(componentId, terminal));
-      return results.nodeVoltages[node.toLowerCase()]?.at(-1) ?? 0;
-    },
-    log,
-  };
-}
+  RUN_TIMEOUT,
+  WASM_BOOT_TIMEOUT,
+  part,
+  simulate,
+  warmupNgspice,
+  wire,
+} from "@/simulators/circuit-engine/engine/spice/ngspiceRegressionHelpers";
 
 /**
  * 5 V -> switch -> 220 Ω -> LED -> ground — the reported defect — with a DCV DMM (loaded at 10 MΩ in
@@ -160,9 +81,7 @@ function isolatedCapacitorCircuit(): {
 }
 
 describe("ngspice regression (real ngspice.wasm)", () => {
-  beforeAll(async () => {
-    await runNgspice("warmup\nV1 n1 0 DC 1\n.op\n.end\n");
-  }, WASM_BOOT_TIMEOUT);
+  beforeAll(warmupNgspice, WASM_BOOT_TIMEOUT);
 
   describe("open-circuit ghost reading (defect 1)", () => {
     it.each(["practical", "academic"] as const)(
