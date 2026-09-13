@@ -25,21 +25,14 @@ export type LocaleContent = {
   languageNames: Record<Locale, string>;
   footer: { description: string; research: string; courses: string; simulations: string };
   home: {
-    badge: string;
-    titleBefore: string;
-    titleAccent: string;
-    titleAfter: string;
+    headlinePrimary: string;
+    headlineSecondary: string;
     description: string;
-    exploreField: string;
-    viewResearch: string;
+    ctaPrimary: string;
+    ctaSecondary: string;
     stats: Array<{ value: string; label: string }>;
-    systemStatus: string;
-    systemStatusValue: string;
-    coordinate: string;
-    fieldEyebrow: string;
     fieldTitle: string;
-    fieldDescription: string;
-    gateways: Array<{ eyebrow: string; title: string; description: string; action: string }>;
+    gateways: Array<{ title: string; description: string; action: string }>;
     methodEyebrow: string;
     methodTitle: string;
     methodDescription: string;
@@ -89,13 +82,13 @@ const en: LocaleContent = {
   languageNames: { en: "English", ar: "Arabic", es: "Spanish" },
   footer: { description: "Model. Analyze. Engineering. A global platform for rigorous engineering learning and applied systems thinking.", research: "Research", courses: "Courses", simulations: "Simulations" },
   home: {
-    badge: "GLOBAL ENGINEERING LEARNING", titleBefore: "Engineer the ", titleAccent: "next frame", titleAfter: " of thought.", description: "MAE Academy creates an active learning field for modeling systems, analyzing evidence, and engineering meaningful possibilities.", exploreField: "Explore the field", viewResearch: "View research field",
-    stats: [{ value: "03", label: "LEARNING MODES" }, { value: "06", label: "ACTIVE STUDIOS" }, { value: "01", label: "SHARED METHOD" }], systemStatus: "SYSTEM STATUS", systemStatusValue: "Model loop engaged", coordinate: "COORDINATE",
-    fieldEyebrow: "PLATFORM / 03 ACTIVE FIELDS", fieldTitle: "Choose a station. Follow the signal.", fieldDescription: "Every entry point keeps the same MAE method, then shifts its lens: evidence, learning pathways, or applied tests.",
+    headlinePrimary: "Welcome to MAE Academy", headlineSecondary: "Engineering, simulated in real time.", description: "Interactive labs for control systems, power electronics, and signal analysis — build intuition by running the model, not just reading about it.", ctaPrimary: "Launch a Simulation", ctaSecondary: "Browse Courses",
+    stats: [{ value: "12+", label: "Interactive Simulations" }, { value: "40+", label: "Course Modules" }, { value: "100%", label: "Client-Side Engine" }],
+    fieldTitle: "Choose a station. Follow the signal.",
     gateways: [
-      { eyebrow: "Evidence field", title: "Academic Research", description: "Trace a question through evidence maps, systems logic, and emerging engineering directions.", action: "Enter research field" },
-      { eyebrow: "Learning paths", title: "Academic Courses", description: "Build the conceptual and analytical habits that make technical decisions more confident.", action: "Open course paths" },
-      { eyebrow: "Applied test rigs", title: "Practical Simulations", description: "Test variables, read system responses, and practice choices inside practical engineering scenarios.", action: "Run a simulation" },
+      { title: "Academic Research", description: "Trace a question through evidence maps, systems logic, and emerging engineering directions.", action: "Enter Research Field" },
+      { title: "Academic Courses", description: "Structured, rigorous curricula in control systems, electronics, and embedded systems.", action: "Open Course Paths" },
+      { title: "Practical Simulations", description: "Tune a PID loop, probe a circuit, or drive a pneumatic system — and read the response live.", action: "Launch Simulation" },
     ],
     methodEyebrow: "MAE / WORKING METHOD", methodTitle: "A disciplined path from question to action.", methodDescription: "The MAE structure is deliberately transferable. Whether a future page holds a study, a simulation, or a course module, it enters the system through the same calibrated logic.",
     methodSteps: [{ number: "01", title: "Observe the system", description: "Locate the forces, gaps, patterns, and questions that deserve a more exact frame." }, { number: "02", title: "Make the model", description: "Translate complexity into a working representation that can be tested, challenged, and refined." }, { number: "03", title: "Test the response", description: "Move from insight to applied choices with evidence, iteration, and practical attention." }],
@@ -123,13 +116,13 @@ const ar: LocaleContent = {
   languageNames: { en: "الإنجليزية", ar: "العربية", es: "الإسبانية" },
   footer: { description: "نمذجة. تحليل. هندسة. منصة عالمية لتعلّم الهندسة بعمق والتفكير في الأنظمة التطبيقية.", research: "البحث", courses: "الدورات", simulations: "المحاكاة" },
   home: {
-    badge: "تعلّم هندسي عالمي", titleBefore: "هندس ", titleAccent: "الإطار التالي", titleAfter: " للفكر.", description: "تؤسس أكاديمية MAE مساحة تعلم حية لنمذجة الأنظمة وتحليل الأدلة وهندسة إمكانات ذات معنى.", exploreField: "استكشف المنصة", viewResearch: "استعرض مجال البحث",
-    stats: [{ value: "03", label: "مسارات تعلّم" }, { value: "06", label: "استوديوهات نشطة" }, { value: "01", label: "منهج مشترك" }], systemStatus: "حالة النظام", systemStatusValue: "حلقة النمذجة مفعّلة", coordinate: "الإحداثية",
-    fieldEyebrow: "المنصة / 03 مجالات نشطة", fieldTitle: "اختر محطة. واتبع الإشارة.", fieldDescription: "تحافظ كل نقطة دخول على منهج MAE نفسه، ثم تغيّر عدستها نحو الأدلة أو مسارات التعلّم أو الاختبارات التطبيقية.",
+    headlinePrimary: "أهلاً بك في أكاديمية MAE", headlineSecondary: "هندسة تُحاكى في الزمن الحقيقي.", description: "معامل تفاعلية لأنظمة التحكم، الإلكترونيات القدرية، وتحليل الإشارات — ابنِ فهمك بتشغيل النموذج، لا بقراءته فقط.", ctaPrimary: "ابدأ محاكاة", ctaSecondary: "تصفح المقررات",
+    stats: [{ value: "12+", label: "محاكاة تفاعلية" }, { value: "40+", label: "وحدة دراسية" }, { value: "100%", label: "محرك يعمل بالكامل على المتصفح" }],
+    fieldTitle: "اختر محطتك. اتبع الإشارة.",
     gateways: [
-      { eyebrow: "مجال الأدلة", title: "البحث الأكاديمي", description: "تتبّع سؤالًا عبر خرائط الأدلة ومنطق الأنظمة والاتجاهات الهندسية الناشئة.", action: "ادخل مجال البحث" },
-      { eyebrow: "مسارات التعلّم", title: "الدورات الأكاديمية", description: "ابنِ العادات المفاهيمية والتحليلية التي تجعل القرارات التقنية أكثر ثقة.", action: "افتح مسارات الدورات" },
-      { eyebrow: "منصات اختبار تطبيقية", title: "المحاكاة العملية", description: "اختبر المتغيرات واقرأ استجابات النظام وتدرّب على القرارات داخل سيناريوهات هندسية عملية.", action: "شغّل محاكاة" },
+      { title: "البحث الأكاديمي", description: "تتبّع سؤالاً عبر خرائط الأدلة، والمنطق الهندسي للأنظمة، والاتجاهات الهندسية الناشئة.", action: "ادخل مجال البحث" },
+      { title: "المقررات الأكاديمية", description: "مناهج هندسية منظمة ودقيقة في أنظمة التحكم والإلكترونيات والأنظمة المدمجة.", action: "افتح المسارات الدراسية" },
+      { title: "المحاكاة التطبيقية", description: "اضبط حلقة PID، افحص دارة كهربائية، أو شغّل نظاماً هوائياً — واقرأ الاستجابة لحظياً.", action: "ابدأ المحاكاة" },
     ],
     methodEyebrow: "MAE / منهج العمل", methodTitle: "مسار منضبط من السؤال إلى الفعل.", methodDescription: "بنية MAE قابلة للنقل عمدًا. سواء احتوت الصفحة المستقبلية على دراسة أو محاكاة أو وحدة دراسية، فإنها تدخل النظام من خلال المنطق المنضبط نفسه.",
     methodSteps: [{ number: "01", title: "راقب النظام", description: "حدّد القوى والفجوات والأنماط والأسئلة التي تستحق إطارًا أكثر دقة." }, { number: "02", title: "ابنِ النموذج", description: "حوّل التعقيد إلى تمثيل عملي قابل للاختبار والتحدي والتحسين." }, { number: "03", title: "اختبر الاستجابة", description: "انتقل من الرؤية إلى الخيارات التطبيقية عبر الأدلة والتكرار والاهتمام العملي." }],
@@ -157,13 +150,13 @@ const es: LocaleContent = {
   languageNames: { en: "Inglés", ar: "Árabe", es: "Español" },
   footer: { description: "Modelar. Analizar. Ingeniería. Una plataforma global para el aprendizaje riguroso de ingeniería y el pensamiento aplicado de sistemas.", research: "Investigación", courses: "Cursos", simulations: "Simulaciones" },
   home: {
-    badge: "APRENDIZAJE GLOBAL DE INGENIERÍA", titleBefore: "Construye el ", titleAccent: "próximo marco", titleAfter: " del pensamiento.", description: "MAE Academy crea un campo de aprendizaje activo para modelar sistemas, analizar evidencia e impulsar posibilidades de ingeniería con sentido.", exploreField: "Explorar el campo", viewResearch: "Ver campo de investigación",
-    stats: [{ value: "03", label: "MODOS DE APRENDIZAJE" }, { value: "06", label: "ESTUDIOS ACTIVOS" }, { value: "01", label: "MÉTODO COMPARTIDO" }], systemStatus: "ESTADO DEL SISTEMA", systemStatusValue: "Bucle de modelo activado", coordinate: "COORDENADA",
-    fieldEyebrow: "PLATAFORMA / 03 CAMPOS ACTIVOS", fieldTitle: "Elige una estación. Sigue la señal.", fieldDescription: "Cada punto de entrada conserva el método MAE y cambia su enfoque: evidencia, rutas de aprendizaje o pruebas aplicadas.",
+    headlinePrimary: "Bienvenido a MAE Academy", headlineSecondary: "Ingeniería, simulada en tiempo real.", description: "Laboratorios interactivos de sistemas de control, electrónica de potencia y análisis de señales — construye intuición ejecutando el modelo, no solo leyendo sobre él.", ctaPrimary: "Iniciar una Simulación", ctaSecondary: "Explorar Cursos",
+    stats: [{ value: "12+", label: "Simulaciones Interactivas" }, { value: "40+", label: "Módulos de Curso" }, { value: "100%", label: "Motor 100% en el Cliente" }],
+    fieldTitle: "Elige una estación. Sigue la señal.",
     gateways: [
-      { eyebrow: "Campo de evidencia", title: "Investigación académica", description: "Sigue una pregunta a través de mapas de evidencia, lógica de sistemas y direcciones emergentes de ingeniería.", action: "Entrar al campo de investigación" },
-      { eyebrow: "Rutas de aprendizaje", title: "Cursos académicos", description: "Desarrolla hábitos conceptuales y analíticos que hacen más seguras las decisiones técnicas.", action: "Abrir rutas de cursos" },
-      { eyebrow: "Bancos de prueba aplicados", title: "Simulaciones prácticas", description: "Prueba variables, lee respuestas de sistemas y practica decisiones en escenarios reales de ingeniería.", action: "Ejecutar una simulación" },
+      { title: "Investigación Académica", description: "Recorre una pregunta a través de mapas de evidencia, lógica de sistemas y direcciones de ingeniería emergentes.", action: "Entrar a Investigación" },
+      { title: "Cursos Académicos", description: "Currículos rigurosos y estructurados en sistemas de control, electrónica y sistemas embebidos.", action: "Ver Rutas de Curso" },
+      { title: "Simulaciones Prácticas", description: "Ajusta un lazo PID, analiza un circuito o controla un sistema neumático — y observa la respuesta en vivo.", action: "Lanzar Simulación" },
     ],
     methodEyebrow: "MAE / MÉTODO DE TRABAJO", methodTitle: "Un camino disciplinado de la pregunta a la acción.", methodDescription: "La estructura de MAE es deliberadamente transferible. Ya sea que una página futura contenga un estudio, una simulación o un módulo de curso, entra al sistema con la misma lógica calibrada.",
     methodSteps: [{ number: "01", title: "Observa el sistema", description: "Ubica las fuerzas, brechas, patrones y preguntas que merecen un marco más preciso." }, { number: "02", title: "Construye el modelo", description: "Traduce la complejidad a una representación operativa que pueda probarse, cuestionarse y refinarse." }, { number: "03", title: "Prueba la respuesta", description: "Pasa de la idea a decisiones aplicadas con evidencia, iteración y atención práctica." }],

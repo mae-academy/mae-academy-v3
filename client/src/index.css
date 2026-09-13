@@ -92,6 +92,11 @@
   html[dir="rtl"] .mae-card-title { font-family: var(--font-arabic); letter-spacing: 0; }
   .mae-signal-word { background: linear-gradient(90deg, #2563EB 0%, #8B5CF6 52%, #F43F5E 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
   .mae-signal-rule { width: 4rem; height: 1px; background: linear-gradient(90deg, #2563EB, #8B5CF6, #FB7185); }
+  .mae-signal-draw .mae-signal-primary { stroke-dasharray: 1; stroke-dashoffset: 1; transition: stroke-dashoffset 600ms ease-out; }
+  .group:hover .mae-signal-draw .mae-signal-primary { stroke-dashoffset: 0; }
+  .mae-wave-grid { position: relative; }
+  .mae-wave-grid::before { content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none; background-image: radial-gradient(rgb(148 163 184 / .35) 1px, transparent 1px); background-size: 26px 26px; mask-image: radial-gradient(circle at center, black 55%, transparent 90%); }
+  .dark .mae-wave-grid::before { background-image: radial-gradient(rgb(255 255 255 / .12) 1px, transparent 1px); }
   .bg-brand-gradient { background: linear-gradient(90deg, #2563eb 0%, #7c3aed 50%, #f43f5e 100%) !important; }
   .brand-slider {
     -webkit-appearance: none;
