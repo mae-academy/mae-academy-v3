@@ -2289,6 +2289,9 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
       const reason = error instanceof SpiceAdapterError
         ? error.unsupported.map(part => part.label).join(', ')
         : 'Unable to build a SPICE netlist for this circuit.';
+      // Persists past the toast's auto-dismiss, and survives it going unnoticed — the one place
+      // that can name exactly which part broke the whole netlist build, not just that it happened.
+      console.error('[SPICE accuracy bridge] netlist build failed, falling back to the live engine:', reason, error);
       clearSpiceReadings({ kind: 'unsupported', reason });
       if (spiceUnsupportedToastRef.current !== reason) {
         spiceUnsupportedToastRef.current = reason;
@@ -2329,6 +2332,16 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
       // A failed run's readings must not keep masking the legacy engine's own values underneath —
       // previously only the status changed here, so a stale "SPICE-VERIFIED" reading could sit
       // behind an "unsupported" chip indefinitely.
+      //
+      // Unlike a netlist-build failure above (which at least toasts), a run that ngspice itself
+      // rejected at solve time — a genuinely valid netlist the engine still couldn't converge on —
+      // previously had no toast and no log at all: the exact same silent fallback to the legacy
+      // engine's readings, with nothing anywhere to say why.
+      console.error('[SPICE accuracy bridge] ngspice run failed, falling back to the live engine:', spiceEngine.error);
+      if (spiceUnsupportedToastRef.current !== spiceEngine.error) {
+        spiceUnsupportedToastRef.current = spiceEngine.error;
+        toast.error(`SPICE accuracy pass failed (${spiceEngine.error}) — using the live engine's readings.`);
+      }
       clearSpiceReadings({ kind: 'unsupported', reason: spiceEngine.error });
       return;
     }
