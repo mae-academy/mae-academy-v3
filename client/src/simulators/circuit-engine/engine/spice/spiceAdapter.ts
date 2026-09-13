@@ -661,6 +661,31 @@ function mapPart(ctx: PartContext): Mapping {
       ];
     }
 
+    // Balanced Y source: three independent sine sources, L1/L2/L3 to N, 120° apart — mirrors the
+    // legacy engine's three-phase-source/rail handling exactly (same lineVoltage->phase-amplitude
+    // conversion, same ABC/ACB phase order), so canvas circuits solve the same way on either engine.
+    // `connection` (Y/Δ) and `internalR` aren't modelled yet, same gap as the legacy engine.
+    case "three-phase-source":
+    case "three-phase-rail": {
+      const lineVoltage = num("lineVoltage", 400);
+      const frequency = num("frequency", 50);
+      // Line-to-neutral peak from line-to-line RMS: V_LN(pk) = V_LL(RMS) * sqrt(2) / sqrt(3).
+      const amplitude = (lineVoltage * Math.SQRT2) / Math.sqrt(3);
+      const sequence = stringProp(component, "phaseSequence", "ABC");
+      const order = sequence === "ACB" ? [0, 1, -1] : [0, -1, 1];
+      const neutral = net("n");
+      return (["l1", "l2", "l3"] as const).map((phase, index) => ({
+        kind: "ac-voltage",
+        ...derived(ctx, phase.toUpperCase()),
+        positive: net(phase),
+        negative: neutral,
+        amplitude,
+        phaseDegrees: order[index] * 120,
+        frequency,
+        dcOffset: 0,
+      }));
+    }
+
     /* ---------------------------------------------------------------------- Semiconductors --- */
     case "diode":
     case "diode-ideal":
@@ -1036,11 +1061,6 @@ function mapPart(ctx: PartContext): Mapping {
       };
     case "opamp":
       return { unsupported: "no op-amp macromodel" };
-    case "three-phase-source":
-    case "three-phase-rail":
-      return {
-        unsupported: "three-phase sources are not in the SPICE component set",
-      };
     default:
       return { unsupported: "no SPICE mapping" };
   }
