@@ -131,3 +131,85 @@ export async function simulate(
     log,
   };
 }
+
+/* ------------------------------------------------------------------------- Phasor math (test-only, pure) --- */
+
+export interface Phasor {
+  /** Peak amplitude. */
+  magnitude: number;
+  angleDegrees: number;
+}
+
+/** RMS from a sinusoid's peak amplitude. */
+export function calculateRMSVoltage(peakVoltage: number): number {
+  return peakVoltage / Math.SQRT2;
+}
+
+/** Signed angular difference (v2 - v1), wrapped to (-180°, 180°]. */
+export function calculatePhaseAngleDifference(
+  v1PhaseDegrees: number,
+  v2PhaseDegrees: number
+): number {
+  let diff = (v2PhaseDegrees - v1PhaseDegrees) % 360;
+  if (diff > 180) diff -= 360;
+  if (diff <= -180) diff += 360;
+  return diff;
+}
+
+/** Complex (phasor) sum of three sinusoids of possibly different magnitude and angle. */
+export function calculatePhasorSum(v1: Phasor, v2: Phasor, v3: Phasor): Phasor {
+  const toRectangular = (p: Phasor) => {
+    const radians = (p.angleDegrees * Math.PI) / 180;
+    return { re: p.magnitude * Math.cos(radians), im: p.magnitude * Math.sin(radians) };
+  };
+  const sum = [v1, v2, v3]
+    .map(toRectangular)
+    .reduce((a, b) => ({ re: a.re + b.re, im: a.im + b.im }));
+  return {
+    magnitude: Math.hypot(sum.re, sum.im),
+    angleDegrees: (Math.atan2(sum.im, sum.re) * 180) / Math.PI,
+  };
+}
+
+/** Absolute-tolerance check: |measured - expected| <= tolerance. Tolerance is always absolute —
+ * convert a "±2%" spec into `Math.abs(expected) * 0.02` at the call site. */
+export function verifyRelationship(
+  measured: number,
+  expected: number,
+  tolerance: number
+): boolean {
+  return Math.abs(measured - expected) <= tolerance;
+}
+
+/**
+ * Extracts a sinusoid's peak magnitude and phase (degrees, `v(t) = magnitude * sin(2π·frequency·t +
+ * angleDegrees)`, matching ngspice's own SIN() convention) from a sampled waveform, via a
+ * single-frequency Fourier projection — a matched filter against sin/cos at `frequency`, robust to
+ * where exactly `time`/`values` happen to sample the wave. Accurate when `time` spans a whole number
+ * of periods at `frequency` (the projection's cross-terms cancel only over full cycles).
+ */
+export function extractPhasor(
+  time: number[],
+  values: number[],
+  frequency: number
+): Phasor {
+  const omega = 2 * Math.PI * frequency;
+  let projectedOnCos = 0;
+  let projectedOnSin = 0;
+  for (let i = 1; i < time.length; i += 1) {
+    const dt = time[i] - time[i - 1];
+    const midTime = (time[i] + time[i - 1]) / 2;
+    const midValue = (values[i] + values[i - 1]) / 2;
+    projectedOnCos += midValue * Math.cos(omega * midTime) * dt;
+    projectedOnSin += midValue * Math.sin(omega * midTime) * dt;
+  }
+  const duration = time[time.length - 1] - time[0];
+  // v(t) = A sin(ωt + φ) = A sinφ·cos(ωt) + A cosφ·sin(ωt), so projecting onto cos/sin and
+  // normalizing by (2/duration) recovers A sinφ and A cosφ directly.
+  const magnitudeSinPhi = (2 / duration) * projectedOnCos;
+  const magnitudeCosPhi = (2 / duration) * projectedOnSin;
+  return {
+    magnitude: Math.hypot(magnitudeSinPhi, magnitudeCosPhi),
+    angleDegrees: (Math.atan2(magnitudeSinPhi, magnitudeCosPhi) * 180) / Math.PI,
+  };
+}

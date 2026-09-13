@@ -180,6 +180,22 @@ const toDegrees = (component: CircuitComponent, raw: number): number =>
     ? (raw * 180) / Math.PI
     : raw;
 
+export interface ThreePhaseVoltages {
+  /** RMS, between any two lines. */
+  lineVoltage: number;
+  /** RMS, between a line and neutral: V_LL / √3 for a balanced Y source. */
+  phaseVoltage: number;
+  /** Peak line-to-neutral, what each phase's SIN()/AC source amplitude is set to: V_ph(RMS) × √2. */
+  peakVoltage: number;
+}
+
+/** The standard Y-connection identities relating a three-phase source's line and phase voltages. */
+export function computeThreePhaseVoltages(lineVoltage: number): ThreePhaseVoltages {
+  const phaseVoltage = lineVoltage / Math.sqrt(3);
+  const peakVoltage = phaseVoltage * Math.SQRT2;
+  return { lineVoltage, phaseVoltage, peakVoltage };
+}
+
 /** Series internal resistance also stops parallel sources forming a voltage loop, which SPICE rejects. */
 function dcSource(
   ctx: PartContext,
@@ -669,9 +685,10 @@ function mapPart(ctx: PartContext): Mapping {
     case "three-phase-rail": {
       const lineVoltage = num("lineVoltage", 400);
       const frequency = num("frequency", 50);
-      // Line-to-neutral peak from line-to-line RMS: V_LN(pk) = V_LL(RMS) * sqrt(2) / sqrt(3).
-      const amplitude = (lineVoltage * Math.SQRT2) / Math.sqrt(3);
+      const { peakVoltage } = computeThreePhaseVoltages(lineVoltage);
       const sequence = stringProp(component, "phaseSequence", "ABC");
+      // 0°, -120°, +120° for ABC (equivalently 0°, -120°, -240° — sin is 360°-periodic, so leading
+      // by 120° and lagging by 240° describe the same waveform).
       const order = sequence === "ACB" ? [0, 1, -1] : [0, -1, 1];
       const neutral = net("n");
       return (["l1", "l2", "l3"] as const).map((phase, index) => ({
@@ -679,7 +696,7 @@ function mapPart(ctx: PartContext): Mapping {
         ...derived(ctx, phase.toUpperCase()),
         positive: net(phase),
         negative: neutral,
-        amplitude,
+        amplitude: peakVoltage,
         phaseDegrees: order[index] * 120,
         frequency,
         dcOffset: 0,
