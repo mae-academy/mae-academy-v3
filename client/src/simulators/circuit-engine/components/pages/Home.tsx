@@ -3087,11 +3087,18 @@ function ComponentInspector({ colors, component, definition, allComponents, link
         }
         if (key === 'linkedTo') return <PropertyRow key={key} colors={colors} label={property.label ?? key}><select value={String(component.props[key] ?? '')} onChange={event => onPropertyChange(key, event.target.value)} style={inputStyle(colors)}><option value="">Select coil reference</option>{linkedCoils.filter(coil => coil.id !== component.id).map(coil => <option key={coil.id} value={coil.label}>{coil.label} · {getDef(coil.type)?.name}</option>)}</select></PropertyRow>;
         if (key === 'controlSourceId') return <PropertyRow key={key} colors={colors} label={property.label ?? key}><select value={String(component.props[key] ?? '')} onChange={event => onPropertyChange(key, event.target.value)} style={inputStyle(colors)}><option value="">Select target branch/node</option>{allComponents.filter(c => c.id !== component.id && c.type !== 'ground').map(c => <option key={c.id} value={c.label}>{c.label} · {getDef(c.type)?.name}</option>)}</select></PropertyRow>;
+        // three-phase-source/rail's lineVoltage means whichever quantity voltageReference names
+        // (see computeThreePhaseVoltages) — the label follows the sibling property's live value so
+        // the entered number is never mislabelled as line voltage while it's actually phase voltage.
+        const isThreePhase = component.type === 'three-phase-source' || component.type === 'three-phase-rail';
+        const label = key === 'lineVoltage' && isThreePhase && component.props.voltageReference === 'Phase (L-N)'
+          ? 'Phase Voltage (L-N) VRMS'
+          : property.label ?? key;
         const value = component.props[key] ?? property.value;
         const prefixable = tabDUiRefinement && property.type === 'number' && PREFIXABLE_UNITS.has(property.unit ?? '');
         return prefixable
-          ? <PrefixedPropertyEditorField key={key} colors={colors} propertyKey={key} label={property.label ?? key} definition={property} value={value} prefix={String(component.props[prefixStateKey(key)] ?? engineeringPrefixFor(numeric(value, numeric(property.value))))} onChange={nextValue => onPropertyChange(key, nextValue)} onPrefixChange={nextPrefix => onPropertyChange(prefixStateKey(key), nextPrefix)} />
-          : <PropertyEditorField key={key} colors={colors} label={property.label ?? key} definition={property} value={value} onChange={nextValue => onPropertyChange(key, nextValue)} />;
+          ? <PrefixedPropertyEditorField key={key} colors={colors} propertyKey={key} label={label} definition={property} value={value} prefix={String(component.props[prefixStateKey(key)] ?? engineeringPrefixFor(numeric(value, numeric(property.value))))} onChange={nextValue => onPropertyChange(key, nextValue)} onPrefixChange={nextPrefix => onPropertyChange(prefixStateKey(key), nextPrefix)} />
+          : <PropertyEditorField key={key} colors={colors} label={label} definition={property} value={value} onChange={nextValue => onPropertyChange(key, nextValue)} />;
       })}
     </InspectorSection>
     {component.type === 'oscilloscope' && <ScopeReadingInspector colors={colors} component={component} readings={snapshot.instrumentReadings} />}

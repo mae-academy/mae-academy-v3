@@ -578,4 +578,81 @@ describe("three-phase source (ngspice.wasm coverage)", () => {
       expect(Math.abs(lineToLine - lineToNeutral)).toBeGreaterThan(100);
     }, RUN_TIMEOUT);
   });
+
+  /**
+   * `voltageReference` says which quantity the entered `lineVoltage` number actually is: "L-L"
+   * (default — the historical behavior) treats 400 as line-to-line RMS and derives phase voltage;
+   * "L-N" treats 400 as phase RMS and derives line-to-line (400×√3 ≈ 692.82 V) instead. Both
+   * connections, both references — 4 combinations, matching computeThreePhaseVoltages directly.
+   */
+  describe("voltageReference: which quantity the entered number is", () => {
+    async function measure(connection: "Y" | "Δ", voltageReference: "Line-to-Line (L-L)" | "Phase (L-N)") {
+      const components = [
+        part("g", "ground"),
+        part("v1", "three-phase-source", {
+          lineVoltage: LINE_VOLTAGE, // 400 — meaning depends entirely on voltageReference.
+          frequency: FREQUENCY,
+          connection,
+          voltageReference,
+        }),
+        part("vmLL", "voltmeter", { mode: "AC" }),
+        part("vmLN", "voltmeter", { mode: "AC" }),
+      ];
+      const wires = [
+        wire("w0", "v1", "n", "g", "gnd"), // real neutral for Y; harmless no-op for Δ.
+        wire("m1", "vmLL", "pos", "v1", "l1"),
+        wire("m2", "vmLL", "neg", "v1", "l2"),
+        wire("m3", "vmLN", "pos", "v1", "l1"),
+        wire("m4", "vmLN", "neg", "g", "gnd"),
+      ];
+      const { readings } = await simulate(components, wires, "practical", SOURCE_ANALYSIS);
+      return { lineToLine: readings.vmLL.value, lineToNeutral: readings.vmLN.value };
+    }
+
+    const PHASE_AS_LINE_VOLTAGE = computeThreePhaseVoltages(LINE_VOLTAGE, "L-N").lineVoltage; // ≈692.82 V
+
+    it.each([
+      ["Y", "Line-to-Line (L-L)", LINE_VOLTAGE, PHASE_VOLTAGE],
+      ["Δ", "Line-to-Line (L-L)", LINE_VOLTAGE, PHASE_VOLTAGE],
+      ["Y", "Phase (L-N)", PHASE_AS_LINE_VOLTAGE, LINE_VOLTAGE],
+      ["Δ", "Phase (L-N)", PHASE_AS_LINE_VOLTAGE, LINE_VOLTAGE],
+    ] as const)(
+      "%s source, reference=%s: L1-L2 ≈ %s V, L1-N ≈ %s V",
+      async (connection, voltageReference, expectedLL, expectedLN) => {
+        const { lineToLine, lineToNeutral } = await measure(connection, voltageReference);
+        expect(verifyRelationship(lineToLine, expectedLL, expectedLL * 0.02)).toBe(true);
+        expect(verifyRelationship(lineToNeutral, expectedLN, expectedLN * 0.02)).toBe(true);
+      },
+      RUN_TIMEOUT
+    );
+  });
+
+  /**
+   * Found while investigating a report of a wrong Δ reading, unrelated to Δ itself: netlistGenerator's
+   * "ac-voltage" case treats `amplitude` as already-peak in Practical mode but as RMS (scaling it up
+   * by √2 itself) in Academic mode — a blanket rule for every ac-voltage kind. Feeding it the peak
+   * value unconditionally left Academic mode's actual SPICE amplitude √2 too high for both
+   * connections (230.94 V phase read back as 326.6 V). Confirmed fixed via a DMM in ACV mode
+   * specifically, since DMM (unlike the ideal voltmeter) also exercises the Academic/Practical input-
+   * impedance branch — the same reading pipeline a UI Voltmeter, Ammeter, or DMM component all share.
+   */
+  it.each(["Y", "Δ"] as const)(
+    "Academic mode reads the correct phase voltage (%s), not √2× too high",
+    async connection => {
+      const components = [
+        part("g", "ground"),
+        part("v1", "three-phase-source", { lineVoltage: LINE_VOLTAGE, frequency: FREQUENCY, connection }),
+        part("dmm1", "dmm", { mode: "ACV" }),
+      ];
+      const wires = [
+        wire("w0", "v1", "n", "g", "gnd"), // real neutral for Y; harmless no-op for Δ.
+        wire("w1", "dmm1", "hi", "v1", "l1"),
+        wire("w2", "dmm1", "com", "g", "gnd"),
+      ];
+      const { readings } = await simulate(components, wires, "academic", SOURCE_ANALYSIS);
+      expect(readings.dmm1.status).toBe("ready");
+      expect(verifyRelationship(readings.dmm1.value, PHASE_VOLTAGE, PHASE_VOLTAGE * 0.02)).toBe(true);
+    },
+    RUN_TIMEOUT
+  );
 });

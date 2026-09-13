@@ -137,6 +137,10 @@ const SOURCES: Record<string, ComponentDef> = {
       { id: 'n', name: 'N', x: 50, y: 0, type: 'output' },
     ],
     properties: {
+      voltageReference: { type: 'select', value: 'Line-to-Line (L-L)', options: ['Line-to-Line (L-L)', 'Phase (L-N)'], label: 'Voltage Reference' },
+      // Label is static here; Home.tsx's inspector swaps it for "Phase Voltage (L-N) VRMS" when
+      // voltageReference is 'Phase (L-N)' (see threePhaseVoltageLabel) — the value entered is
+      // always whichever quantity voltageReference names, per computeThreePhaseVoltages.
       lineVoltage: { type: 'number', value: 400, unit: 'V RMS', min: 1, max: 100000, label: 'Line Voltage (L-L)' },
       frequency: { type: 'number', value: 50, unit: 'Hz', min: 0.001, max: 100000, label: 'Frequency' },
       phaseSequence: { type: 'select', value: 'ABC', options: ['ABC', 'ACB'], label: 'Phase Sequence' },
@@ -155,6 +159,7 @@ const SOURCES: Record<string, ComponentDef> = {
       { id: 'n', name: 'N', x: -50, y: 50 / 3, type: 'output' },
     ],
     properties: {
+      voltageReference: { type: 'select', value: 'Line-to-Line (L-L)', options: ['Line-to-Line (L-L)', 'Phase (L-N)'], label: 'Voltage Reference' },
       lineVoltage: { type: 'number', value: 400, unit: 'V RMS', min: 1, max: 100000, label: 'Rail Voltage (L-L)' },
       frequency: { type: 'number', value: 50, unit: 'Hz', min: 0.001, max: 100000, label: 'Frequency' },
       phaseSequence: { type: 'select', value: 'ABC', options: ['ABC', 'ACB'], label: 'Phase Sequence' },

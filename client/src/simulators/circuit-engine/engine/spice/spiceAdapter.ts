@@ -189,11 +189,23 @@ export interface ThreePhaseVoltages {
   peakVoltage: number;
 }
 
-/** The standard Y-connection identities relating a three-phase source's line and phase voltages. */
-export function computeThreePhaseVoltages(lineVoltage: number): ThreePhaseVoltages {
-  const phaseVoltage = lineVoltage / Math.sqrt(3);
-  const peakVoltage = phaseVoltage * Math.SQRT2;
-  return { lineVoltage, phaseVoltage, peakVoltage };
+export type VoltageReference = "L-L" | "L-N";
+
+/**
+ * The standard Y-connection identities relating a three-phase source's line and phase voltages.
+ * `reference` says which of the two `voltage` itself already is — "L-L" (default, the historical
+ * behavior) treats it as the line-to-line RMS and derives phase voltage; "L-N" treats it as the
+ * phase RMS and derives line voltage instead. `peakVoltage` is always the peak line-to-neutral
+ * value regardless of `reference` — the relationship peakVoltage = phaseVoltage × √2 doesn't change,
+ * only which of lineVoltage/phaseVoltage was the input versus the derived one.
+ */
+export function computeThreePhaseVoltages(
+  voltage: number,
+  reference: VoltageReference = "L-L"
+): ThreePhaseVoltages {
+  const [lineVoltage, phaseVoltage] =
+    reference === "L-N" ? [voltage * Math.sqrt(3), voltage] : [voltage, voltage / Math.sqrt(3)];
+  return { lineVoltage, phaseVoltage, peakVoltage: phaseVoltage * Math.SQRT2 };
 }
 
 /** Series internal resistance also stops parallel sources forming a voltage loop, which SPICE rejects. */
@@ -715,13 +727,22 @@ function mapPart(ctx: PartContext): Mapping {
 
     // Three independent sine windings, 120° apart, in either connection (mirrors the legacy
     // engine's Y handling for lineVoltage->phase-amplitude conversion and ABC/ACB phase order — the
-    // legacy engine doesn't model Δ or internalR at all, so this is SPICE-only for Δ so far):
-    // Y wires each winding line-to-neutral at V_LN(pk) = V_LL(RMS)·√2/√3; Δ wires each winding
-    // directly line-to-line at V_LL(pk) = V_LL(RMS)·√2 (a winding's own EMF *is* the line voltage),
-    // closing L1->L2->L3->L1 with no neutral net at all.
+    // legacy engine doesn't model Δ, internalR, or voltageReference at all, so this is SPICE-only):
+    // Y wires each winding line-to-neutral at V_LN(pk) = V_ph(RMS)·√2; Δ wires each winding directly
+    // line-to-line at V_LL(pk) = V_LL(RMS)·√2 (a winding's own EMF *is* the line voltage), closing
+    // L1->L2->L3->L1 with no neutral net at all. `voltageReference` says which of V_LL/V_ph the
+    // entered `lineVoltage` number actually is — computeThreePhaseVoltages derives the other one.
     case "three-phase-source":
     case "three-phase-rail": {
-      const lineVoltage = num("lineVoltage", 400);
+      const enteredVoltage = num("lineVoltage", 400);
+      const reference: VoltageReference =
+        stringProp(component, "voltageReference", "Line-to-Line (L-L)") === "Phase (L-N)"
+          ? "L-N"
+          : "L-L";
+      const { lineVoltage, peakVoltage: phaseNeutralPeak } = computeThreePhaseVoltages(
+        enteredVoltage,
+        reference
+      );
       const frequency = num("frequency", 50);
       // internalR's own min (componentDefs.ts: 0.001) already keeps it off zero in the UI; this
       // floor only guards a directly-constructed component bypassing that, since a zero here is a
@@ -732,9 +753,18 @@ function mapPart(ctx: PartContext): Mapping {
       // by 120° and lagging by 240° describe the same waveform).
       const order = sequence === "ACB" ? [0, 1, -1] : [0, -1, 1];
       const isDelta = stringProp(component, "connection", "Y") !== "Y";
+      // netlistGenerator's "ac-voltage" case treats `amplitude` as already-peak in Practical mode
+      // but as RMS (scaling it up by √2 itself) in Academic mode — a blanket rule applied to every
+      // ac-voltage kind, not something this mapping can opt out of. Feeding it the peak value
+      // unconditionally, as earlier versions of this case did, was correct for Practical but left
+      // Academic mode's actual SPICE amplitude √2 too high (confirmed: DMM ACV read 326.6 V under
+      // Academic mode for the same 230.94 V phase). Pre-dividing here cancels that mode's own
+      // multiplication instead of stacking with it.
+      const modeAmplitude = (peak: number) =>
+        ctx.simulationMode === "academic" ? peak / Math.SQRT2 : peak;
 
       if (isDelta) {
-        const peakVoltage = lineVoltage * Math.SQRT2;
+        const peakVoltage = modeAmplitude(lineVoltage * Math.SQRT2);
         const windings = [
           ["l1", "l2"],
           ["l2", "l3"],
@@ -755,12 +785,22 @@ function mapPart(ctx: PartContext): Mapping {
           ),
           // No neutral net means no inherent ground reference either — a closed loop floating with
           // no path to node 0 at all is a separate SPICE hazard from the loop-current one internalR
-          // already covers. Same fix the transformer mappings below use for the same reason.
+          // already covers. Same fix the transformer mappings below use for the same reason. An
+          // ideal probe against this bleed-established "virtual neutral" correctly reconstructs the
+          // theoretical phase voltage (verified: an ideal AC voltmeter reads it as ~230.94 V for a
+          // 400 V line). A resistive DMM probing the SAME line the bleed is attached to is a
+          // different matter — its own finite input impedance competes directly with that line's
+          // own (deliberately weak) bleed for influence over the very reference it's trying to read,
+          // and no bleed value fixes that: raising it toward "more ideal" only makes the DMM's fixed
+          // impedance relatively *more* dominant there, not less (confirmed empirically — 1 GΩ, 10
+          // MΩ and 1 TΩ all tried, none converges toward the theoretical value). Making that
+          // reading robust under real loading would need an active (dependent-source-averaged)
+          // virtual neutral, not a passive bleed network — a materially larger change than this.
           ...windingBleeds(ctx, [net("l1"), net("l2"), net("l3")]),
         ];
       }
 
-      const { peakVoltage } = computeThreePhaseVoltages(lineVoltage);
+      const peakVoltage = modeAmplitude(phaseNeutralPeak);
       const neutral = net("n");
       return (["l1", "l2", "l3"] as const).flatMap((phase, index) =>
         acWinding(
