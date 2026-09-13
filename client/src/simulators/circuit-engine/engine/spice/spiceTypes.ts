@@ -237,6 +237,24 @@ export interface SpiceDcMotor extends SpiceElementBase {
   loadTorque?: number;
 }
 
+/**
+ * Behavioral macromodel op-amp: differential input resistor, a gain stage through a single
+ * dominant pole (sets the -3dB open-loop rolloff), then diode-clamped output saturation at
+ * ±`supplyVoltage`. No native SPICE primitive, so it emits as an `X` subcircuit instance, keyed
+ * (like the zener/LED diode models) off its own `openLoopGain`/`supplyVoltage` so distinct part
+ * configurations don't share a macro.
+ */
+export interface SpiceOpamp extends SpiceElementBase {
+  kind: "opamp";
+  nonInverting: SpiceNet;
+  inverting: SpiceNet;
+  output: SpiceNet;
+  /** Dimensionless V/V. */
+  openLoopGain: number;
+  /** Volts. Output saturates at ± this value (a symmetric dual-rail supply is assumed). */
+  supplyVoltage: number;
+}
+
 /* ------------------------------------------------------------ Switches & electromechanical --- */
 
 /** Manual single-pole single-throw contact. `isClosed` is the live UI state. */
@@ -312,6 +330,7 @@ export type SpiceComponent =
   | SpiceScr
   | SpiceDiac
   | SpiceTriac
+  | SpiceOpamp
   | SpiceTransformer
   | SpiceCenterTappedTransformer
   | SpiceAutotransformer
@@ -341,6 +360,7 @@ export const SPICE_PREFIXES: Record<
   scr: "X",
   diac: "X",
   triac: "X",
+  opamp: "X",
   "dc-motor": "X",
   // Transformers emit no element line of their own; `T` is only the root the generated L and K
   // names are derived from, so it never collides with SPICE's `T` transmission line.
@@ -399,6 +419,8 @@ export function elementNets(
       return [element.a1, element.a2];
     case "triac":
       return [element.mt1, element.gate, element.mt2];
+    case "opamp":
+      return [element.nonInverting, element.inverting, element.output];
     case "transformer":
       return [
         element.primaryPositive,

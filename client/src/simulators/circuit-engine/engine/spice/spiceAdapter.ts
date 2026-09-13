@@ -907,6 +907,19 @@ function mapPart(ctx: PartContext): Mapping {
         },
       ];
 
+    case "opamp":
+      return [
+        {
+          kind: "opamp",
+          ...self(ctx),
+          nonInverting: net("in+"),
+          inverting: net("in-"),
+          output: net("out"),
+          openLoopGain: Math.max(1, num("gain", 1e5)),
+          supplyVoltage: Math.max(0.1, num("vcc", 15)),
+        },
+      ];
+
     /* ------------------------------------------------------------------ Thyristors & machines --- */
     case "scr":
       return [
@@ -1189,8 +1202,6 @@ function mapPart(ctx: PartContext): Mapping {
       return {
         unsupported: "dependent sources are not in the SPICE component set",
       };
-    case "opamp":
-      return { unsupported: "no op-amp macromodel" };
     default:
       return { unsupported: "no SPICE mapping" };
   }

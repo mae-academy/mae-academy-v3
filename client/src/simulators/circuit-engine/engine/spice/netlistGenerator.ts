@@ -414,6 +414,11 @@ const LATCH_MODELS = (suffix: string) => [
   `.MODEL PNP_${suffix} PNP (${LATCH_PARAMS})`,
 ];
 
+/** Op-amp macromodel constants (see the "opamp" case in `macroFor`). */
+const OPAMP_INPUT_RESISTANCE = 1e7; // 10 MΩ differential input impedance.
+const OPAMP_OUTPUT_RESISTANCE = 75; // Ω, a typical commodity op-amp's open-loop output impedance.
+const OPAMP_GBW = 1e6; // Hz, unity-gain bandwidth (LM741-class); sets the dominant-pole frequency.
+
 /** Gate-to-cathode shunt. Sets the holding current and gives dv/dt immunity. */
 const THYRISTOR_GATE_SHUNT = 1000;
 /**
@@ -491,6 +496,40 @@ function macroFor(
           `D1 NM A1 DMOD_${token}`,
           `D2 NM A2 DMOD_${token}`,
           `.MODEL DMOD_${token} D (IS=1e-14 N=1 BV=${breakdown} IBV=0.001)`,
+          `.ENDS ${macroName}`,
+        ],
+      };
+    }
+
+    case "opamp": {
+      formatValue(element.openLoopGain, element, "openLoopGain");
+      formatValue(element.supplyVoltage, element, "supplyVoltage");
+      const gain = element.openLoopGain;
+      const vcc = element.supplyVoltage;
+      // One dominant pole, sized so the macro's unity-gain bandwidth lands at OPAMP_GBW regardless
+      // of the configured open-loop gain — a commodity op-amp's actual behavior (LM741-class: Aol
+      // ~2e5, GBW ~1 MHz, dominant pole ~5-10 Hz), not an unbounded-bandwidth ideal amplifier. Rp is
+      // fixed at 1 Ω so Cp alone sets the pole frequency fp = GBW/Aol: Cp = Aol / (2*pi*Rp*GBW).
+      const poleCapacitance = gain / (2 * Math.PI * OPAMP_GBW);
+      const macroName = `OPAMP_${modelToken(gain)}_${modelToken(vcc)}`;
+      const clampModel = `${macroName}_DCLAMP`;
+      return {
+        name: macroName,
+        lines: [
+          `.SUBCKT ${macroName} 1 2 3`,
+          `RIN 1 2 ${OPAMP_INPUT_RESISTANCE}`,
+          `EGAIN 4 0 1 2 ${gain}`,
+          "RP 4 5 1",
+          `CP 5 0 ${poleCapacitance}`,
+          `VCLHI 6 0 DC ${vcc}`,
+          `VCLLO 7 0 DC ${-vcc}`,
+          // Same ideal-switch-like junction (N=0.001, RS=1e-3) the diode mapping uses for its
+          // Academic-mode standard diode: steep enough that node 5 clamps within a few mV of ±vcc,
+          // with RS=1e-3 keeping it convergent across a bare source with no other series resistance.
+          `DHI 5 6 ${clampModel}`,
+          `DLO 7 5 ${clampModel}`,
+          `.MODEL ${clampModel} D (IS=1e-14 RS=1e-3 N=0.001)`,
+          `ROUT 5 3 ${OPAMP_OUTPUT_RESISTANCE}`,
           `.ENDS ${macroName}`,
         ],
       };
@@ -683,6 +722,7 @@ function singleElementLine(
     case "scr":
     case "diac":
     case "triac":
+    case "opamp":
     case "dc-motor": {
       if (!macro) {
         throw new NetlistError(
@@ -1074,6 +1114,15 @@ function dcLinks(element: SpiceElement): Array<[SpiceNet, SpiceNet]> {
       return [
         [element.mt1, element.gate],
         [element.gate, element.mt2],
+      ];
+    case "opamp":
+      // The differential pair is genuinely floating relative to ground (real op-amp inputs are
+      // high-impedance) except to each other through RIN; the output, though, always has a DC path
+      // to ground inside the macro — through ROUT and whichever clamp diode is conducting — so it
+      // is never the floating end of an isolated subnet.
+      return [
+        [element.nonInverting, element.inverting],
+        [element.output, SPICE_GROUND],
       ];
     case "transformer":
       return [

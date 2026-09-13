@@ -128,6 +128,12 @@ export async function simulate(
         results.nodeVoltages[nodeName(componentId, terminal)] ?? [],
         atTime
       ),
+    // The full sampled trace, for scans a single (time or interpolated) reading can't do — e.g.
+    // locating where a hysteretic output actually switches within a slow sweep.
+    nodeVoltageSeries: (componentId: string, terminal: string) => ({
+      time: results.time,
+      values: results.nodeVoltages[nodeName(componentId, terminal)] ?? [],
+    }),
     log,
   };
 }

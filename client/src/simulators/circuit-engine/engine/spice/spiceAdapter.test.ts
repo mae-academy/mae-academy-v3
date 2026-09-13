@@ -502,7 +502,7 @@ describe("convertToSpiceComponents", () => {
       convertToSpiceComponents(
         [
           part("i", "dc-current", {}, "I1"),
-          part("u", "opamp", {}, "U1"),
+          part("u", "vccs", {}, "U1"),
           part("v", "ac-voltage", { waveform: "square" }, "V1"),
           part("r", "resistor"),
         ],
@@ -518,6 +518,17 @@ describe("convertToSpiceComponents", () => {
         expect(error.unsupported.map(item => item.id)).toEqual(["i", "u", "v"]);
       }
     }
+  });
+
+  // Op-amp macromodel: was unsupported (see the test above's history), now a mapped `X` subcircuit
+  // instance — see ngspiceRegression.opamps.test.ts for full ngspice.wasm behavioral coverage.
+  it("maps an opamp to an X subcircuit instance instead of reporting it unsupported", () => {
+    const spice = convertToSpiceComponents(
+      [part("o", "opamp", { gain: 1000, vcc: 10 }, "U1")],
+      []
+    );
+    expect(spice).toHaveLength(1);
+    expect(spice[0]).toMatchObject({ kind: "opamp", openLoopGain: 1000, supplyVoltage: 10 });
   });
 
   it("skips parts with no component definition", () => {
