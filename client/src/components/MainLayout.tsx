@@ -49,19 +49,24 @@ export default function MainLayout({ children }: MainLayoutProps) {
     ];
   };
 
-  return <LocaleProvider locale={locale}><div className={`min-h-screen overflow-x-hidden bg-[#f7f8fc] text-slate-950 transition-colors dark:bg-[#07111f] dark:text-slate-50 ${locale === "ar" ? "font-arabic" : "font-sans"}`}>
-    <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden" aria-hidden="true"><div className="absolute -left-56 top-24 h-[32rem] w-[32rem] rounded-full bg-blue-600/10 blur-3xl dark:bg-blue-500/15" /><div className="absolute -right-60 top-[28rem] h-[34rem] w-[34rem] rounded-full bg-rose-500/10 blur-3xl dark:bg-rose-500/10" /><div className="mae-noise absolute inset-0 opacity-[0.035] dark:opacity-[0.055]" /></div>
+  return <LocaleProvider locale={locale}><div className={`min-h-screen overflow-x-hidden bg-[#ffffff] text-slate-950 transition-colors dark:bg-[#000000] dark:text-zinc-100 ${locale === "ar" ? "font-arabic" : "font-sans"}`}>
+    <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden" aria-hidden="true">
+      <div className="absolute -left-56 top-24 h-[32rem] w-[32rem] rounded-full bg-blue-600/10 blur-3xl dark:bg-blue-600/8" />
+      <div className="absolute left-[30%] top-[40rem] h-[28rem] w-[28rem] rounded-full bg-violet-600/8 blur-3xl dark:bg-violet-600/6" />
+      <div className="absolute -right-60 top-[22rem] h-[34rem] w-[34rem] rounded-full bg-rose-500/7 blur-3xl dark:bg-rose-500/5" />
+      <div className="mae-noise absolute inset-0 opacity-[0.03] dark:opacity-[0.03]" />
+    </div>
     <Header locale={locale} onLocaleChange={handleLocaleChange} isLocaleTransitioning={Boolean(languageTarget)} isDark={isDark} onThemeToggle={() => setIsDark((value) => !value)} />
     <main className="min-h-[calc(100svh-var(--mae-header-height))]">{children}</main>
-    <footer className="border-t border-slate-200/80 bg-white/40 backdrop-blur-xs dark:border-white/10 dark:bg-slate-950/40">
-      <div className="container py-12">
+    <footer className="border-t border-slate-200/80 bg-white/40 backdrop-blur-xs dark:border-white/[0.08] dark:bg-[#08080A]/80">
+      <div className="max-w-[1380px] mx-auto px-6 sm:px-8 lg:px-12 py-14 lg:py-16 w-full">
         <div className="grid gap-10 lg:grid-cols-[1.3fr_0.9fr_1fr] lg:gap-12">
           {/* Column 1: Brand & Mission */}
           <div className="flex flex-col justify-between">
             <div>
               <Link href="/" className="group inline-flex items-center gap-2.5 text-slate-950 dark:text-white">
                 <span className="text-xl font-black tracking-tight">
-                  MAE <span className="text-violet-600 dark:text-violet-400">Academy</span>
+                  MAE <span className="mae-gradient-text font-black">Academy</span>
                 </span>
               </Link>
               <p className="mt-3 max-w-sm text-sm leading-relaxed text-slate-600 dark:text-slate-400">
@@ -142,9 +147,9 @@ export default function MainLayout({ children }: MainLayoutProps) {
                   href={SUPPORT_URL}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 rounded-lg border border-slate-200/90 bg-white/70 px-3.5 py-1.5 text-xs font-medium text-slate-600 shadow-2xs backdrop-blur-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-violet-300 hover:bg-white hover:text-violet-700 dark:border-white/15 dark:bg-white/5 dark:text-slate-300 dark:hover:border-violet-400 dark:hover:bg-white/10 dark:hover:text-violet-300"
+                  className="inline-flex items-center gap-2 rounded-lg border border-slate-200/90 bg-white/70 px-3.5 py-1.5 text-xs font-medium text-slate-600 shadow-2xs backdrop-blur-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-rose-300 hover:bg-white hover:text-rose-600 dark:border-white/15 dark:bg-white/5 dark:text-slate-300 dark:hover:border-rose-400 dark:hover:bg-white/10 dark:hover:text-rose-300"
                 >
-                  <Heart className="h-3.5 w-3.5 text-rose-500" />
+                  <Heart className="h-3.5 w-3.5 text-rose-500 dark:text-rose-400" />
                   <span>Support Our Mission</span>
                 </a>
               </div>

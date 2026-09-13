@@ -45,8 +45,9 @@ export default function SimulationDetail() {
   const [location, setLocation] = useLocation();
   const lastNestedRoute = useRef(location);
   if (location.startsWith("/simulations/")) lastNestedRoute.current = location;
-  const activeRoute = location.startsWith("/simulations/") ? location : lastNestedRoute.current;
-  const [, , slug, tool] = activeRoute.split("/");
+  const activeRoute = lastNestedRoute.current;
+  const [, , rawSlug, tool] = activeRoute.split("/");
+  const slug = rawSlug === "circuits" ? "circuit-lab" : rawSlug === "assembly" ? "assembler" : rawSlug;
   const meta = simulationRouteMeta.find((entry) => entry.slug === slug);
   const { copy, isRtl, locale } = useLocale();
   if (!meta) return <NotFound />;

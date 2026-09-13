@@ -33,6 +33,29 @@ export type LocaleContent = {
     stats: Array<{ value: string; label: string }>;
     fieldTitle: string;
     gateways: Array<{ title: string; description: string; action: string }>;
+    platformsTitle: string;
+    platformsSubtitle: string;
+    platformSimulations: {
+      badge: string;
+      title: string;
+      description: string;
+      cta: string;
+      modules: Array<{ title: string; desc: string }>;
+    };
+    platformCourses: {
+      badge: string;
+      title: string;
+      description: string;
+      cta: string;
+      topics: string[];
+    };
+    platformResearch: {
+      badge: string;
+      title: string;
+      description: string;
+      cta: string;
+      pillars: Array<{ title: string; desc: string }>;
+    };
     methodEyebrow: string;
     methodTitle: string;
     methodDescription: string;
@@ -80,9 +103,9 @@ const en: LocaleContent = {
   navigation: { "00": "Home", "01": "Academic Research", "02": "Academic Courses", "03": "Practical Simulations", "04": "About" },
   controls: { home: "MAE Academy home", language: "Language", languageOptions: "Language options", themeToLight: "Switch to light theme", themeToDark: "Switch to dark theme", platformNavigation: "Platform navigation", navigationItem: "Navigation item", previousSlide: "Previous navigation item", nextSlide: "Next navigation item", explore: "Explore", station: "Station" },
   languageNames: { en: "English", ar: "Arabic", es: "Spanish" },
-  footer: { description: "Model. Analyze. Engineering. A global platform for rigorous engineering learning and applied systems thinking.", research: "Research", courses: "Courses", simulations: "Simulations" },
+  footer: { description: "A global platform for rigorous engineering learning and applied systems thinking.", research: "Research", courses: "Courses", simulations: "Simulations" },
   home: {
-    headlinePrimary: "Welcome to MAE Academy", headlineSecondary: "Engineering, simulated in real time.", description: "Interactive labs for control systems, power electronics, and signal analysis — build intuition by running the model, not just reading about it.", ctaPrimary: "Launch a Simulation", ctaSecondary: "Browse Courses",
+    headlinePrimary: "Welcome to MAE Academy", headlineSecondary: "Model-Analyze-Engineering", description: "Interactive labs for control systems, power electronics, and signal analysis — build intuition by running the model, not just reading about it.", ctaPrimary: "Launch a Simulation", ctaSecondary: "Browse Courses",
     stats: [{ value: "12+", label: "Interactive Simulations" }, { value: "40+", label: "Course Modules" }, { value: "100%", label: "Client-Side Engine" }],
     fieldTitle: "Choose a station. Follow the signal.",
     gateways: [
@@ -90,20 +113,63 @@ const en: LocaleContent = {
       { title: "Academic Courses", description: "Structured, rigorous curricula in control systems, electronics, and embedded systems.", action: "Open Course Paths" },
       { title: "Practical Simulations", description: "Tune a PID loop, probe a circuit, or drive a pneumatic system — and read the response live.", action: "Launch Simulation" },
     ],
+    platformsTitle: "Core Engineering Platforms",
+    platformsSubtitle: "Three interconnected learning layers bridging rigorous mathematical theory with interactive, real-time hardware intuition.",
+    platformSimulations: {
+      badge: "Interactive Workbench",
+      title: "Practical Simulations & Virtual Lab Benches",
+      description: "Run real-time dynamic models right in the browser with instantaneous response feedback. Designed to eliminate the barrier between abstract mathematical proofs and applied hardware behavior.",
+      cta: "Launch Interactive Lab",
+      modules: [
+        { title: "Control Systems", desc: "PID tuning, Root Locus, state-space step response." },
+        { title: "Power Electronics", desc: "DC-DC Buck/Boost converters, PWM modulation, inverter stages." },
+        { title: "Signals & Systems", desc: "Fourier synthesis, Nyquist sampling, Bode frequency response." },
+        { title: "Pneumatics & PLCs", desc: "Electro-pneumatic sequencing and ladder logic emulation." },
+      ],
+    },
+    platformCourses: {
+      badge: "Structured Curriculum",
+      title: "Rigorous Engineering Courses",
+      description: "Concept-first lecture series and structured study tracks covering foundational and advanced engineering topics with mathematical rigor and intuitive visual breakdowns.",
+      cta: "Browse Course Catalog",
+      topics: [
+        "Classical Control Theory",
+        "Modern State-Space Analysis",
+        "Microcontroller Architectures",
+        "Signal Processing",
+      ],
+    },
+    platformResearch: {
+      badge: "Deep Modeling",
+      title: "Mathematical Research & System Identification",
+      description: "Open-source research documentation, formal derivations, transfer function formulations, and algorithmic proofs behind our simulations.",
+      cta: "Explore Research Notes",
+      pillars: [
+        { title: "System Identification", desc: "Non-linear state estimation and grey-box parameter extraction." },
+        { title: "Numerical Solvers", desc: "Runge-Kutta 4th-order (RK4) integration for real-time physics." },
+        { title: "Algorithmic Derivations", desc: "Open-source proofs, LaTeX writeups, and reproducible benchmarks." },
+      ],
+    },
     methodEyebrow: "MAE / WORKING METHOD", methodTitle: "A disciplined path from question to action.", methodDescription: "The MAE structure is deliberately transferable. Whether a future page holds a study, a simulation, or a course module, it enters the system through the same calibrated logic.",
     methodSteps: [{ number: "01", title: "Observe the system", description: "Locate the forces, gaps, patterns, and questions that deserve a more exact frame." }, { number: "02", title: "Make the model", description: "Translate complexity into a working representation that can be tested, challenged, and refined." }, { number: "03", title: "Test the response", description: "Move from insight to applied choices with evidence, iteration, and practical attention." }],
-    founderEyebrow: "FOUNDER / FIELD NOTE 001", founderTitle: "Engineering education becomes powerful when it remains close to the real system.", founderDescription: "Meet the founder and the MAE premise behind the platform: Model. Analyze. Engineering.", founderAction: "Enter the founder archive",
+    founderEyebrow: "Founder Note", founderTitle: "Engineering education becomes powerful when it remains close to the real system.", founderDescription: "Meet the founder and the MAE premise behind the platform: Model. Analyze. Engineering.", founderAction: "Enter the founder archive",
   },
   collections: {
-    research: { eyebrow: "01 / Academic Research", title: "Turn evidence into engineering direction.", description: "Six research cells designed to make emerging questions legible, structured, and ready for deeper investigation.", cards: [
-      { title: "Systems as Evidence", description: "Frame complex engineering questions into traceable, testable research paths.", code: "R.01" }, { title: "Applied Mechanics", description: "Explore the relationship between materials, force, and real-world constraints.", code: "R.02" }, { title: "Smart Infrastructure", description: "Research the sensing, feedback, and resilience patterns shaping civic systems.", code: "R.03" }, { title: "Energy Transitions", description: "Map emerging technical choices across clean generation and distribution.", code: "R.04" }, { title: "Computational Design", description: "Study procedural models that turn constraints into new possibilities.", code: "R.05" }, { title: "Engineering Ethics", description: "Test the social, environmental, and human assumptions inside every system.", code: "R.06" },
-    ] },
-    courses: { eyebrow: "02 / Academic Courses", title: "Progress through the logic of making.", description: "A modular course field that connects theory, analytical rigor, and the decision-making habits of practicing engineers.", cards: [
-      { title: "Model Thinking", description: "Build a disciplined mental model before moving to calculation or code.", code: "C.01" }, { title: "Analysis Studio", description: "Learn practical tools for interpreting technical systems and their behavior.", code: "C.02" }, { title: "Engineering Foundations", description: "Strengthen the quantitative and conceptual base behind confident design choices.", code: "C.03" }, { title: "Data for Engineers", description: "Translate measurements into insight, decisions, and transparent arguments.", code: "C.04" }, { title: "Design Under Constraints", description: "Work through material, spatial, financial, and operational trade-offs.", code: "C.05" }, { title: "Leadership in Systems", description: "Develop a clear point of view for guiding teams through complex technical work.", code: "C.06" },
-    ] },
-    simulations: { eyebrow: "03 / Practical Simulations", title: "Test the variable. Read the response.", description: "Practical simulation spaces turn abstract relationships into visual, repeatable experiments designed for applied learning.", cards: [
-      { title: "Bridge Load Lab", description: "Evaluate force paths and structural response across changing conditions.", code: "S.01" }, { title: "Grid Balance", description: "Test energy demand, generation capacity, and resilient system behavior.", code: "S.02" }, { title: "City Flow", description: "Model movement, density, and interventions across a connected urban network.", code: "S.03" }, { title: "Material Stress", description: "Examine how materials react when load, heat, and time interact.", code: "S.04" }, { title: "Water Logic", description: "Trace a water system from collection through treatment, use, and recovery.", code: "S.05" }, { title: "Control Room", description: "Practice decisions in a live-feeling multi-variable engineering scenario.", code: "S.06" },
-    ] },
+    research: {
+      eyebrow: "01 / Academic Research", title: "Turn evidence into engineering direction.", description: "Six research cells designed to make emerging questions legible, structured, and ready for deeper investigation.", cards: [
+        { title: "Systems as Evidence", description: "Frame complex engineering questions into traceable, testable research paths.", code: "R.01" }, { title: "Applied Mechanics", description: "Explore the relationship between materials, force, and real-world constraints.", code: "R.02" }, { title: "Smart Infrastructure", description: "Research the sensing, feedback, and resilience patterns shaping civic systems.", code: "R.03" }, { title: "Energy Transitions", description: "Map emerging technical choices across clean generation and distribution.", code: "R.04" }, { title: "Computational Design", description: "Study procedural models that turn constraints into new possibilities.", code: "R.05" }, { title: "Engineering Ethics", description: "Test the social, environmental, and human assumptions inside every system.", code: "R.06" },
+      ]
+    },
+    courses: {
+      eyebrow: "02 / Academic Courses", title: "Progress through the logic of making.", description: "A modular course field that connects theory, analytical rigor, and the decision-making habits of practicing engineers.", cards: [
+        { title: "Model Thinking", description: "Build a disciplined mental model before moving to calculation or code.", code: "C.01" }, { title: "Analysis Studio", description: "Learn practical tools for interpreting technical systems and their behavior.", code: "C.02" }, { title: "Engineering Foundations", description: "Strengthen the quantitative and conceptual base behind confident design choices.", code: "C.03" }, { title: "Data for Engineers", description: "Translate measurements into insight, decisions, and transparent arguments.", code: "C.04" }, { title: "Design Under Constraints", description: "Work through material, spatial, financial, and operational trade-offs.", code: "C.05" }, { title: "Leadership in Systems", description: "Develop a clear point of view for guiding teams through complex technical work.", code: "C.06" },
+      ]
+    },
+    simulations: {
+      eyebrow: "03 / Practical Simulations", title: "Test the variable. Read the response.", description: "Practical simulation spaces turn abstract relationships into visual, repeatable experiments designed for applied learning.", cards: [
+        { title: "Bridge Load Lab", description: "Evaluate force paths and structural response across changing conditions.", code: "S.01" }, { title: "Grid Balance", description: "Test energy demand, generation capacity, and resilient system behavior.", code: "S.02" }, { title: "City Flow", description: "Model movement, density, and interventions across a connected urban network.", code: "S.03" }, { title: "Material Stress", description: "Examine how materials react when load, heat, and time interact.", code: "S.04" }, { title: "Water Logic", description: "Trace a water system from collection through treatment, use, and recovery.", code: "S.05" }, { title: "Control Room", description: "Practice decisions in a live-feeling multi-variable engineering scenario.", code: "S.06" },
+      ]
+    },
   },
   about: { eyebrow: "04 / About MAE", title: "Model. Analyze. Engineering.", intro: "MAE Academy is a global academic platform that turns engineering curiosity into structured models, analytical clarity, and applied practice.", founderEyebrow: "FOUNDER / 001", founderName: "Mohammad AbuElyan", founderFullName: "Mohammed Jihad Jamal Abu Elyan", paragraphOne: "MAE also carries the founder’s initials. It is an invitation to treat engineering education as a living discipline: one where learners build a model, interrogate its assumptions, and test it against conditions that matter.", paragraphTwo: "As founder and engineering educator, Mohammad AbuElyan shapes MAE Academy around rigorous inquiry, practical experimentation, and an internationally accessible learning culture.", principles: [{ label: "MODEL", value: "Structure" }, { label: "ANALYZE", value: "Insight" }, { label: "ENGINEER", value: "Action" }] },
   blueprints: { visual: { hero: { label: blueprintPaths.visual.en[0][0], sublabel: blueprintPaths.visual.en[0][1] }, research: { label: blueprintPaths.visual.en[1][0], sublabel: blueprintPaths.visual.en[1][1] }, courses: { label: blueprintPaths.visual.en[2][0], sublabel: blueprintPaths.visual.en[2][1] }, simulations: { label: blueprintPaths.visual.en[3][0], sublabel: blueprintPaths.visual.en[3][1] }, orbital: { label: blueprintPaths.visual.en[4][0], sublabel: blueprintPaths.visual.en[4][1] } }, stations: { research: [{ label: "EVIDENCE MAP", sublabel: "Systems as evidence" }, { label: "FORCE TRACE", sublabel: "Applied mechanics" }, { label: "CIVIC NETWORK", sublabel: "Smart infrastructure" }, { label: "ENERGY VECTOR", sublabel: "Energy transitions" }, { label: "PROCEDURAL FIELD", sublabel: "Computational design" }, { label: "ETHICS MATRIX", sublabel: "Engineering ethics" }], courses: [{ label: "MODEL LADDER", sublabel: "Model thinking" }, { label: "ANALYSIS PATH", sublabel: "Analysis studio" }, { label: "FOUNDATION SET", sublabel: "Engineering foundations" }, { label: "DATA SIGNAL", sublabel: "Data for engineers" }, { label: "CONSTRAINT LOOP", sublabel: "Design under constraints" }, { label: "LEADERSHIP AXIS", sublabel: "Leadership in systems" }], simulations: [{ label: "LOAD TEST", sublabel: "Bridge load lab" }, { label: "GRID BALANCE", sublabel: "Energy balance" }, { label: "FLOW NETWORK", sublabel: "City flow" }, { label: "STRESS FIELD", sublabel: "Material stress" }, { label: "WATER LOGIC", sublabel: "Water system" }, { label: "CONTROL LOOP", sublabel: "Control room" }] }, avatar: { aria: "Illustrated placeholder for Leo wearing a hard hat and glasses", archive: "LEO / FIELD ARCHIVE", reference: "REF. 001" } },
@@ -124,20 +190,63 @@ const ar: LocaleContent = {
       { title: "المقررات الأكاديمية", description: "مناهج هندسية منظمة ودقيقة في أنظمة التحكم والإلكترونيات والأنظمة المدمجة.", action: "افتح المسارات الدراسية" },
       { title: "المحاكاة التطبيقية", description: "اضبط حلقة PID، افحص دارة كهربائية، أو شغّل نظاماً هوائياً — واقرأ الاستجابة لحظياً.", action: "ابدأ المحاكاة" },
     ],
+    platformsTitle: "منصات الهندسة الأساسية",
+    platformsSubtitle: "ثلاث طبقات تعليمية متكاملة تربط النظرية الرياضية الصارمة مع الحس الهندسي التفاعلي في الزمن الحقيقي.",
+    platformSimulations: {
+      badge: "منصة عمل تفاعلية",
+      title: "المحاكاة التطبيقية ومنصات المختبر الافتراضية",
+      description: "شغّل نماذج ديناميكية في الزمن الحقيقي مباشرة في المتصفح مع استجابة فورية. صُممت لإزالة الفجوة بين البراهين الرياضية المجردة وسلوك العتاد التطبيقي.",
+      cta: "افتح المختبر التفاعلي",
+      modules: [
+        { title: "أنظمة التحكم", desc: "ضبط PID، المحل الهندسي للجذور، واستجابة فضاء الحالة للخطوة." },
+        { title: "إلكترونيات القدرة", desc: "محولات Buck/Boost المستمرة، تضمين PWM، ومراحل العواكس." },
+        { title: "الإشارات والأنظمة", desc: "تركيب فورييه، أخذ العينات لنايكويست، واستجابة تردد بود." },
+        { title: "النيوماتيك وPLC", desc: "التسلسل الكهرو-هوائي ومحاكاة منطق السلم." },
+      ],
+    },
+    platformCourses: {
+      badge: "منهج منظم",
+      title: "مقررات هندسية دقيقة",
+      description: "سلسلة محاضرات تركز على المفاهيم ومسارات دراسية منظمة تغطي موضوعات هندسية تأسيسية ومتقدمة بصرامة رياضية وتوضيحات بصرية بديهية.",
+      cta: "تصفح دليل المقررات",
+      topics: [
+        "نظرية التحكم الكلاسيكية",
+        "تحليل فضاء الحالة الحديث",
+        "معماريات المتحكمات الدقيقة",
+        "معالجة الإشارات",
+      ],
+    },
+    platformResearch: {
+      badge: "نمذجة عميقة",
+      title: "البحث الرياضي وتحديد الأنظمة",
+      description: "توثيق بحثي مفتوح المصدر واشتقاقات رسمية وصياغات دوال الانتقال وبراهين خوارزمية خلف محاكياتنا.",
+      cta: "استكشف مذكرات البحث",
+      pillars: [
+        { title: "تحديد الأنظمة", desc: "تقدير الحالة اللاخطية واستخراج المعاملات بنماذج الصندوق الرمادي." },
+        { title: "المحللات العددية", desc: "تكامل رنج-كوتا من الرتبة الرابعة (RK4) لمحاكاة فيزيائية بالزمن الحقيقي." },
+        { title: "الاشتقاقات الخوارزمية", desc: "براهين مفتوحة المصدر وصياغات LaTeX ومقارنات معيارية قابلة للتكرار." },
+      ],
+    },
     methodEyebrow: "MAE / منهج العمل", methodTitle: "مسار منضبط من السؤال إلى الفعل.", methodDescription: "بنية MAE قابلة للنقل عمدًا. سواء احتوت الصفحة المستقبلية على دراسة أو محاكاة أو وحدة دراسية، فإنها تدخل النظام من خلال المنطق المنضبط نفسه.",
     methodSteps: [{ number: "01", title: "راقب النظام", description: "حدّد القوى والفجوات والأنماط والأسئلة التي تستحق إطارًا أكثر دقة." }, { number: "02", title: "ابنِ النموذج", description: "حوّل التعقيد إلى تمثيل عملي قابل للاختبار والتحدي والتحسين." }, { number: "03", title: "اختبر الاستجابة", description: "انتقل من الرؤية إلى الخيارات التطبيقية عبر الأدلة والتكرار والاهتمام العملي." }],
-    founderEyebrow: "المؤسس / ملاحظة ميدانية 001", founderTitle: "يصبح التعليم الهندسي قويًا عندما يبقى قريبًا من النظام الحقيقي.", founderDescription: "تعرّف إلى المؤسس وفكرة MAE التي تقود المنصة: نمذجة. تحليل. هندسة.", founderAction: "ادخل أرشيف المؤسس",
+    founderEyebrow: "ملاحظة المؤسس", founderTitle: "يصبح التعليم الهندسي قويًا عندما يبقى قريبًا من النظام الحقيقي.", founderDescription: "تعرّف إلى المؤسس وفكرة MAE التي تقود المنصة: نمذجة. تحليل. هندسة.", founderAction: "ادخل أرشيف المؤسس",
   },
   collections: {
-    research: { eyebrow: "01 / البحث الأكاديمي", title: "حوّل الأدلة إلى اتجاه هندسي.", description: "ست خلايا بحثية تجعل الأسئلة الناشئة واضحة ومنظمة وجاهزة للاستقصاء المتعمق.", cards: [
-      { title: "الأنظمة بوصفها أدلة", description: "صُغ الأسئلة الهندسية المعقدة في مسارات بحث قابلة للتتبع والاختبار.", code: "R.01" }, { title: "الميكانيكا التطبيقية", description: "استكشف العلاقة بين المواد والقوة والقيود الواقعية.", code: "R.02" }, { title: "البنية التحتية الذكية", description: "ابحث في أنماط الاستشعار والتغذية الراجعة والمرونة التي تشكل الأنظمة المدنية.", code: "R.03" }, { title: "تحولات الطاقة", description: "ارسم خريطة الخيارات التقنية الناشئة عبر التوليد النظيف والتوزيع.", code: "R.04" }, { title: "التصميم الحاسوبي", description: "ادرس النماذج الإجرائية التي تحوّل القيود إلى إمكانات جديدة.", code: "R.05" }, { title: "أخلاقيات الهندسة", description: "اختبر الافتراضات الاجتماعية والبيئية والإنسانية داخل كل نظام.", code: "R.06" },
-    ] },
-    courses: { eyebrow: "02 / الدورات الأكاديمية", title: "تقدّم عبر منطق الصنع.", description: "مجال دورات مرن يربط النظرية والصرامة التحليلية وعادات اتخاذ القرار لدى المهندسين الممارسين.", cards: [
-      { title: "التفكير بالنماذج", description: "ابنِ نموذجًا ذهنيًا منضبطًا قبل الانتقال إلى الحساب أو الشيفرة.", code: "C.01" }, { title: "استوديو التحليل", description: "تعلّم أدوات عملية لتفسير الأنظمة التقنية وسلوكها.", code: "C.02" }, { title: "أسس الهندسة", description: "عزّز القاعدة الكمية والمفاهيمية خلف خيارات التصميم الواثقة.", code: "C.03" }, { title: "البيانات للمهندسين", description: "حوّل القياسات إلى رؤية وقرارات وحجج شفافة.", code: "C.04" }, { title: "التصميم تحت القيود", description: "اعمل عبر المفاضلات المادية والمكانية والمالية والتشغيلية.", code: "C.05" }, { title: "القيادة في الأنظمة", description: "طوّر منظورًا واضحًا لقيادة الفرق عبر العمل التقني المعقد.", code: "C.06" },
-    ] },
-    simulations: { eyebrow: "03 / المحاكاة العملية", title: "اختبر المتغير. واقرأ الاستجابة.", description: "تحوّل مساحات المحاكاة العملية العلاقات المجردة إلى تجارب بصرية قابلة للتكرار ومصممة للتعلم التطبيقي.", cards: [
-      { title: "مختبر أحمال الجسور", description: "قيّم مسارات القوة والاستجابة الإنشائية عبر ظروف متغيرة.", code: "S.01" }, { title: "توازن الشبكة", description: "اختبر الطلب على الطاقة وقدرة التوليد وسلوك النظام المرن.", code: "S.02" }, { title: "تدفق المدينة", description: "نمذج الحركة والكثافة والتدخلات عبر شبكة حضرية مترابطة.", code: "S.03" }, { title: "إجهاد المادة", description: "افحص كيفية تفاعل المواد عندما تجتمع الأحمال والحرارة والزمن.", code: "S.04" }, { title: "منطق المياه", description: "تتبّع نظام مياه من التجميع عبر المعالجة والاستخدام والاسترداد.", code: "S.05" }, { title: "غرفة التحكم", description: "تدرّب على القرارات في سيناريو هندسي متعدد المتغيرات ينبض بالحياة.", code: "S.06" },
-    ] },
+    research: {
+      eyebrow: "01 / البحث الأكاديمي", title: "حوّل الأدلة إلى اتجاه هندسي.", description: "ست خلايا بحثية تجعل الأسئلة الناشئة واضحة ومنظمة وجاهزة للاستقصاء المتعمق.", cards: [
+        { title: "الأنظمة بوصفها أدلة", description: "صُغ الأسئلة الهندسية المعقدة في مسارات بحث قابلة للتتبع والاختبار.", code: "R.01" }, { title: "الميكانيكا التطبيقية", description: "استكشف العلاقة بين المواد والقوة والقيود الواقعية.", code: "R.02" }, { title: "البنية التحتية الذكية", description: "ابحث في أنماط الاستشعار والتغذية الراجعة والمرونة التي تشكل الأنظمة المدنية.", code: "R.03" }, { title: "تحولات الطاقة", description: "ارسم خريطة الخيارات التقنية الناشئة عبر التوليد النظيف والتوزيع.", code: "R.04" }, { title: "التصميم الحاسوبي", description: "ادرس النماذج الإجرائية التي تحوّل القيود إلى إمكانات جديدة.", code: "R.05" }, { title: "أخلاقيات الهندسة", description: "اختبر الافتراضات الاجتماعية والبيئية والإنسانية داخل كل نظام.", code: "R.06" },
+      ]
+    },
+    courses: {
+      eyebrow: "02 / الدورات الأكاديمية", title: "تقدّم عبر منطق الصنع.", description: "مجال دورات مرن يربط النظرية والصرامة التحليلية وعادات اتخاذ القرار لدى المهندسين الممارسين.", cards: [
+        { title: "التفكير بالنماذج", description: "ابنِ نموذجًا ذهنيًا منضبطًا قبل الانتقال إلى الحساب أو الشيفرة.", code: "C.01" }, { title: "استوديو التحليل", description: "تعلّم أدوات عملية لتفسير الأنظمة التقنية وسلوكها.", code: "C.02" }, { title: "أسس الهندسة", description: "عزّز القاعدة الكمية والمفاهيمية خلف خيارات التصميم الواثقة.", code: "C.03" }, { title: "البيانات للمهندسين", description: "حوّل القياسات إلى رؤية وقرارات وحجج شفافة.", code: "C.04" }, { title: "التصميم تحت القيود", description: "اعمل عبر المفاضلات المادية والمكانية والمالية والتشغيلية.", code: "C.05" }, { title: "القيادة في الأنظمة", description: "طوّر منظورًا واضحًا لقيادة الفرق عبر العمل التقني المعقد.", code: "C.06" },
+      ]
+    },
+    simulations: {
+      eyebrow: "03 / المحاكاة العملية", title: "اختبر المتغير. واقرأ الاستجابة.", description: "تحوّل مساحات المحاكاة العملية العلاقات المجردة إلى تجارب بصرية قابلة للتكرار ومصممة للتعلم التطبيقي.", cards: [
+        { title: "مختبر أحمال الجسور", description: "قيّم مسارات القوة والاستجابة الإنشائية عبر ظروف متغيرة.", code: "S.01" }, { title: "توازن الشبكة", description: "اختبر الطلب على الطاقة وقدرة التوليد وسلوك النظام المرن.", code: "S.02" }, { title: "تدفق المدينة", description: "نمذج الحركة والكثافة والتدخلات عبر شبكة حضرية مترابطة.", code: "S.03" }, { title: "إجهاد المادة", description: "افحص كيفية تفاعل المواد عندما تجتمع الأحمال والحرارة والزمن.", code: "S.04" }, { title: "منطق المياه", description: "تتبّع نظام مياه من التجميع عبر المعالجة والاستخدام والاسترداد.", code: "S.05" }, { title: "غرفة التحكم", description: "تدرّب على القرارات في سيناريو هندسي متعدد المتغيرات ينبض بالحياة.", code: "S.06" },
+      ]
+    },
   },
   about: { eyebrow: "04 / عن MAE", title: "نمذجة. تحليل. هندسة.", intro: "أكاديمية MAE منصة أكاديمية عالمية تحوّل الفضول الهندسي إلى نماذج منظمة ووضوح تحليلي وممارسة تطبيقية.", founderEyebrow: "المؤسس / 001", founderName: "محمد أبو عليان", founderFullName: "محمد جهاد جمال أبو عليان", paragraphOne: "تحمل MAE أيضًا الأحرف الأولى لاسم المؤسس. وهي دعوة للتعامل مع التعليم الهندسي بوصفه تخصصًا حيًا؛ يبني فيه المتعلمون نموذجًا ويفحصون افتراضاته ويختبرونه أمام ظروف ذات معنى.", paragraphTwo: "بصفته المؤسس والمعلّم الهندسي، يصوغ محمد أبو عليان أكاديمية MAE حول الاستقصاء الصارم والتجريب العملي وثقافة تعلم متاحة دوليًا.", principles: [{ label: "نمذجة", value: "البنية" }, { label: "تحليل", value: "الرؤية" }, { label: "هندسة", value: "الفعل" }] },
   blueprints: { visual: { hero: { label: blueprintPaths.visual.ar[0][0], sublabel: blueprintPaths.visual.ar[0][1] }, research: { label: blueprintPaths.visual.ar[1][0], sublabel: blueprintPaths.visual.ar[1][1] }, courses: { label: blueprintPaths.visual.ar[2][0], sublabel: blueprintPaths.visual.ar[2][1] }, simulations: { label: blueprintPaths.visual.ar[3][0], sublabel: blueprintPaths.visual.ar[3][1] }, orbital: { label: blueprintPaths.visual.ar[4][0], sublabel: blueprintPaths.visual.ar[4][1] } }, stations: { research: [{ label: "خريطة الأدلة", sublabel: "الأنظمة بوصفها أدلة" }, { label: "مسار القوى", sublabel: "الميكانيكا التطبيقية" }, { label: "شبكة مدنية", sublabel: "بنية تحتية ذكية" }, { label: "متجه الطاقة", sublabel: "تحولات الطاقة" }, { label: "مجال إجرائي", sublabel: "تصميم حاسوبي" }, { label: "مصفوفة الأخلاقيات", sublabel: "أخلاقيات الهندسة" }], courses: [{ label: "سلم النماذج", sublabel: "التفكير بالنماذج" }, { label: "مسار التحليل", sublabel: "استوديو التحليل" }, { label: "مجموعة الأسس", sublabel: "أسس الهندسة" }, { label: "إشارة البيانات", sublabel: "البيانات للمهندسين" }, { label: "حلقة القيود", sublabel: "التصميم تحت القيود" }, { label: "محور القيادة", sublabel: "القيادة في الأنظمة" }], simulations: [{ label: "اختبار الأحمال", sublabel: "مختبر أحمال الجسور" }, { label: "توازن الشبكة", sublabel: "توازن الطاقة" }, { label: "شبكة التدفق", sublabel: "تدفق المدينة" }, { label: "مجال الإجهاد", sublabel: "إجهاد المادة" }, { label: "منطق المياه", sublabel: "نظام المياه" }, { label: "حلقة التحكم", sublabel: "غرفة التحكم" }] }, avatar: { aria: "رسم موضعي لشخصية ليو يرتدي خوذة ونظارات", archive: "ليو / أرشيف ميداني", reference: "مرجع 001" } },
@@ -158,20 +267,63 @@ const es: LocaleContent = {
       { title: "Cursos Académicos", description: "Currículos rigurosos y estructurados en sistemas de control, electrónica y sistemas embebidos.", action: "Ver Rutas de Curso" },
       { title: "Simulaciones Prácticas", description: "Ajusta un lazo PID, analiza un circuito o controla un sistema neumático — y observa la respuesta en vivo.", action: "Lanzar Simulación" },
     ],
+    platformsTitle: "Plataformas Principales de Ingeniería",
+    platformsSubtitle: "Tres capas interconectadas de aprendizaje que unen la teoría matemática rigurosa con la intuición práctica en tiempo real.",
+    platformSimulations: {
+      badge: "Banco de Trabajo Interactivo",
+      title: "Simulaciones Prácticas y Bancos de Laboratorio Virtuales",
+      description: "Ejecuta modelos dinámicos en tiempo real en el navegador con retroalimentación instantánea. Diseñado para eliminar la barrera entre demostraciones matemáticas abstractas y el comportamiento del hardware.",
+      cta: "Lanzar Laboratorio Interactivo",
+      modules: [
+        { title: "Sistemas de Control", desc: "Ajuste de PID, Lugar Geométrico de Raíces, respuesta al escalón en espacio de estados." },
+        { title: "Electrónica de Potencia", desc: "Convertidores Buck/Boost CC-CC, modulación PWM, etapas de inversores." },
+        { title: "Señales y Sistemas", desc: "Síntesis de Fourier, muestreo de Nyquist, respuesta en frecuencia de Bode." },
+        { title: "Neumática y PLCs", desc: "Secuenciación electroneumática y emulación de lógica de escalera." },
+      ],
+    },
+    platformCourses: {
+      badge: "Currículo Estructurado",
+      title: "Cursos Rigurosos de Ingeniería",
+      description: "Series de conferencias conceptuales y rutas de estudio estructuradas que cubren temas fundamentales y avanzados con rigor matemático y explicaciones visuales intuitivas.",
+      cta: "Explorar Catálogo de Cursos",
+      topics: [
+        "Teoría de Control Clásico",
+        "Análisis Moderno en Espacio de Estados",
+        "Arquitecturas de Microcontroladores",
+        "Procesamiento de Señales",
+      ],
+    },
+    platformResearch: {
+      badge: "Modelado Profundo",
+      title: "Investigación Matemática e Identificación de Sistemas",
+      description: "Documentación de investigación de código abierto, derivaciones formales, funciones de transferencia y pruebas algorítmicas detrás de nuestras simulaciones.",
+      cta: "Explorar Notas de Investigación",
+      pillars: [
+        { title: "Identificación de Sistemas", desc: "Estimación de estados no lineales y extracción de parámetros de caja gris." },
+        { title: "Solucionadores Numéricos", desc: "Integración Runge-Kutta de 4to orden (RK4) para física en tiempo real." },
+        { title: "Derivaciones Algorítmicas", desc: "Pruebas de código abierto, redacciones en LaTeX y bancos de pruebas reproducibles." },
+      ],
+    },
     methodEyebrow: "MAE / MÉTODO DE TRABAJO", methodTitle: "Un camino disciplinado de la pregunta a la acción.", methodDescription: "La estructura de MAE es deliberadamente transferible. Ya sea que una página futura contenga un estudio, una simulación o un módulo de curso, entra al sistema con la misma lógica calibrada.",
     methodSteps: [{ number: "01", title: "Observa el sistema", description: "Ubica las fuerzas, brechas, patrones y preguntas que merecen un marco más preciso." }, { number: "02", title: "Construye el modelo", description: "Traduce la complejidad a una representación operativa que pueda probarse, cuestionarse y refinarse." }, { number: "03", title: "Prueba la respuesta", description: "Pasa de la idea a decisiones aplicadas con evidencia, iteración y atención práctica." }],
-    founderEyebrow: "FUNDADOR / NOTA DE CAMPO 001", founderTitle: "La educación en ingeniería se vuelve potente cuando permanece cerca del sistema real.", founderDescription: "Conoce al fundador y la premisa de MAE detrás de la plataforma: Modelar. Analizar. Ingeniería.", founderAction: "Entrar al archivo del fundador",
+    founderEyebrow: "Nota del Fundador", founderTitle: "La educación en ingeniería se vuelve potente cuando permanece cerca del sistema real.", founderDescription: "Conoce al fundador y la premisa de MAE detrás de la plataforma: Modelar. Analizar. Ingeniería.", founderAction: "Entrar al archivo del fundador",
   },
   collections: {
-    research: { eyebrow: "01 / Investigación académica", title: "Convierte la evidencia en dirección de ingeniería.", description: "Seis células de investigación diseñadas para hacer legibles, estructuradas y listas para profundizar las preguntas emergentes.", cards: [
-      { title: "Sistemas como evidencia", description: "Convierte preguntas complejas de ingeniería en rutas de investigación trazables y comprobables.", code: "R.01" }, { title: "Mecánica aplicada", description: "Explora la relación entre materiales, fuerza y restricciones reales.", code: "R.02" }, { title: "Infraestructura inteligente", description: "Investiga los patrones de detección, retroalimentación y resiliencia que dan forma a los sistemas cívicos.", code: "R.03" }, { title: "Transiciones energéticas", description: "Traza opciones técnicas emergentes en generación limpia y distribución.", code: "R.04" }, { title: "Diseño computacional", description: "Estudia modelos procedimentales que convierten restricciones en nuevas posibilidades.", code: "R.05" }, { title: "Ética de la ingeniería", description: "Prueba las suposiciones sociales, ambientales y humanas dentro de cada sistema.", code: "R.06" },
-    ] },
-    courses: { eyebrow: "02 / Cursos académicos", title: "Avanza a través de la lógica de crear.", description: "Un campo modular de cursos que conecta teoría, rigor analítico y hábitos de decisión de ingenieros en práctica.", cards: [
-      { title: "Pensamiento de modelos", description: "Construye un modelo mental disciplinado antes de pasar al cálculo o al código.", code: "C.01" }, { title: "Estudio de análisis", description: "Aprende herramientas prácticas para interpretar sistemas técnicos y su comportamiento.", code: "C.02" }, { title: "Fundamentos de ingeniería", description: "Refuerza la base cuantitativa y conceptual detrás de decisiones de diseño seguras.", code: "C.03" }, { title: "Datos para ingenieros", description: "Convierte mediciones en perspectivas, decisiones y argumentos transparentes.", code: "C.04" }, { title: "Diseño bajo restricciones", description: "Trabaja con compensaciones materiales, espaciales, financieras y operativas.", code: "C.05" }, { title: "Liderazgo en sistemas", description: "Desarrolla una perspectiva clara para guiar equipos a través de trabajo técnico complejo.", code: "C.06" },
-    ] },
-    simulations: { eyebrow: "03 / Simulaciones prácticas", title: "Prueba la variable. Lee la respuesta.", description: "Los espacios de simulación convierten relaciones abstractas en experimentos visuales y repetibles diseñados para el aprendizaje aplicado.", cards: [
-      { title: "Laboratorio de carga de puentes", description: "Evalúa rutas de fuerza y respuesta estructural en condiciones cambiantes.", code: "S.01" }, { title: "Equilibrio de red", description: "Prueba la demanda energética, la capacidad de generación y el comportamiento resiliente del sistema.", code: "S.02" }, { title: "Flujo urbano", description: "Modela movimiento, densidad e intervenciones en una red urbana conectada.", code: "S.03" }, { title: "Esfuerzo de materiales", description: "Examina cómo reaccionan los materiales cuando interactúan carga, calor y tiempo.", code: "S.04" }, { title: "Lógica del agua", description: "Sigue un sistema de agua desde la captación hasta el tratamiento, uso y recuperación.", code: "S.05" }, { title: "Sala de control", description: "Practica decisiones en un escenario de ingeniería vivo y multivariable.", code: "S.06" },
-    ] },
+    research: {
+      eyebrow: "01 / Investigación académica", title: "Convierte la evidencia en dirección de ingeniería.", description: "Seis células de investigación diseñadas para hacer legibles, estructuradas y listas para profundizar las preguntas emergentes.", cards: [
+        { title: "Sistemas como evidencia", description: "Convierte preguntas complejas de ingeniería en rutas de investigación trazables y comprobables.", code: "R.01" }, { title: "Mecánica aplicada", description: "Explora la relación entre materiales, fuerza y restricciones reales.", code: "R.02" }, { title: "Infraestructura inteligente", description: "Investiga los patrones de detección, retroalimentación y resiliencia que dan forma a los sistemas cívicos.", code: "R.03" }, { title: "Transiciones energéticas", description: "Traza opciones técnicas emergentes en generación limpia y distribución.", code: "R.04" }, { title: "Diseño computacional", description: "Estudia modelos procedimentales que convierten restricciones en nuevas posibilidades.", code: "R.05" }, { title: "Ética de la ingeniería", description: "Prueba las suposiciones sociales, ambientales y humanas dentro de cada sistema.", code: "R.06" },
+      ]
+    },
+    courses: {
+      eyebrow: "02 / Cursos académicos", title: "Avanza a través de la lógica de crear.", description: "Un campo modular de cursos que conecta teoría, rigor analítico y hábitos de decisión de ingenieros en práctica.", cards: [
+        { title: "Pensamiento de modelos", description: "Construye un modelo mental disciplinado antes de pasar al cálculo o al código.", code: "C.01" }, { title: "Estudio de análisis", description: "Aprende herramientas prácticas para interpretar sistemas técnicos y su comportamiento.", code: "C.02" }, { title: "Fundamentos de ingeniería", description: "Refuerza la base cuantitativa y conceptual detrás de decisiones de diseño seguras.", code: "C.03" }, { title: "Datos para ingenieros", description: "Convierte mediciones en perspectivas, decisiones y argumentos transparentes.", code: "C.04" }, { title: "Diseño bajo restricciones", description: "Trabaja con compensaciones materiales, espaciales, financieras y operativas.", code: "C.05" }, { title: "Liderazgo en sistemas", description: "Desarrolla una perspectiva clara para guiar equipos a través de trabajo técnico complejo.", code: "C.06" },
+      ]
+    },
+    simulations: {
+      eyebrow: "03 / Simulaciones prácticas", title: "Prueba la variable. Lee la respuesta.", description: "Los espacios de simulación convierten relaciones abstractas en experimentos visuales y repetibles diseñados para el aprendizaje aplicado.", cards: [
+        { title: "Laboratorio de carga de puentes", description: "Evalúa rutas de fuerza y respuesta estructural en condiciones cambiantes.", code: "S.01" }, { title: "Equilibrio de red", description: "Prueba la demanda energética, la capacidad de generación y el comportamiento resiliente del sistema.", code: "S.02" }, { title: "Flujo urbano", description: "Modela movimiento, densidad e intervenciones en una red urbana conectada.", code: "S.03" }, { title: "Esfuerzo de materiales", description: "Examina cómo reaccionan los materiales cuando interactúan carga, calor y tiempo.", code: "S.04" }, { title: "Lógica del agua", description: "Sigue un sistema de agua desde la captación hasta el tratamiento, uso y recuperación.", code: "S.05" }, { title: "Sala de control", description: "Practica decisiones en un escenario de ingeniería vivo y multivariable.", code: "S.06" },
+      ]
+    },
   },
   about: { eyebrow: "04 / Acerca de MAE", title: "Modelar. Analizar. Ingeniería.", intro: "MAE Academy es una plataforma académica global que transforma la curiosidad de ingeniería en modelos estructurados, claridad analítica y práctica aplicada.", founderEyebrow: "FUNDADOR / 001", founderName: "Mohammad AbuElyan", founderFullName: "Mohammed Jihad Jamal Abu Elyan", paragraphOne: "MAE también refleja las iniciales del fundador. Es una invitación a tratar la educación en ingeniería como una disciplina viva: una en la que los estudiantes construyen un modelo, examinan sus supuestos y lo prueban frente a condiciones significativas.", paragraphTwo: "Como fundador y educador de ingeniería, Mohammad AbuElyan da forma a MAE Academy a partir de investigación rigurosa, experimentación práctica y una cultura de aprendizaje accesible internacionalmente.", principles: [{ label: "MODELAR", value: "Estructura" }, { label: "ANALIZAR", value: "Perspectiva" }, { label: "INGENIERÍA", value: "Acción" }] },
   blueprints: { visual: { hero: { label: blueprintPaths.visual.es[0][0], sublabel: blueprintPaths.visual.es[0][1] }, research: { label: blueprintPaths.visual.es[1][0], sublabel: blueprintPaths.visual.es[1][1] }, courses: { label: blueprintPaths.visual.es[2][0], sublabel: blueprintPaths.visual.es[2][1] }, simulations: { label: blueprintPaths.visual.es[3][0], sublabel: blueprintPaths.visual.es[3][1] }, orbital: { label: blueprintPaths.visual.es[4][0], sublabel: blueprintPaths.visual.es[4][1] } }, stations: { research: [{ label: "MAPA DE EVIDENCIA", sublabel: "Sistemas como evidencia" }, { label: "TRAZA DE FUERZA", sublabel: "Mecánica aplicada" }, { label: "RED CÍVICA", sublabel: "Infraestructura inteligente" }, { label: "VECTOR ENERGÉTICO", sublabel: "Transiciones energéticas" }, { label: "CAMPO PROCEDIMENTAL", sublabel: "Diseño computacional" }, { label: "MATRIZ ÉTICA", sublabel: "Ética de la ingeniería" }], courses: [{ label: "ESCALERA DE MODELOS", sublabel: "Pensamiento de modelos" }, { label: "RUTA DE ANÁLISIS", sublabel: "Estudio de análisis" }, { label: "CONJUNTO BASE", sublabel: "Fundamentos de ingeniería" }, { label: "SEÑAL DE DATOS", sublabel: "Datos para ingenieros" }, { label: "BUCLE DE RESTRICCIONES", sublabel: "Diseño bajo restricciones" }, { label: "EJE DE LIDERAZGO", sublabel: "Liderazgo en sistemas" }], simulations: [{ label: "PRUEBA DE CARGA", sublabel: "Laboratorio de puentes" }, { label: "EQUILIBRIO DE RED", sublabel: "Equilibrio energético" }, { label: "RED DE FLUJO", sublabel: "Flujo urbano" }, { label: "CAMPO DE ESFUERZO", sublabel: "Esfuerzo de materiales" }, { label: "LÓGICA DEL AGUA", sublabel: "Sistema de agua" }, { label: "BUCLE DE CONTROL", sublabel: "Sala de control" }] }, avatar: { aria: "Ilustración de Leo con casco y gafas", archive: "LEO / ARCHIVO DE CAMPO", reference: "REF. 001" } },

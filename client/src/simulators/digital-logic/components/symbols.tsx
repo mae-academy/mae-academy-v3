@@ -969,13 +969,13 @@ const LogicGate: SymbolFC = ({ props }) => {
 
 const DigitalInputSymbol: SymbolFC = ({ props }) => <g>
   <rect x={-25} y={-12} width={42} height={24} rx={4} fill="white" stroke="#1a2744" strokeWidth={2} />
-  <text x={-4} y={4} textAnchor="middle" fontSize={9} fontWeight={800} fill="#1a2744">{props?.state === 'HIGH' ? '1' : '0'}</text>
+  <text x={-4} y={4} textAnchor="middle" fontSize={10} fontFamily="'KaTeX_Main', serif" fontWeight={700} fill="#1a2744">{props?.state === 'HIGH' ? '1' : '0'}</text>
   <line x1={17} y1={0} x2={30} y2={0} stroke="#1a2744" strokeWidth={2} />
 </g>;
 
 const DigitalOutputSymbol: SymbolFC = ({ powered }) => <g>
   <rect x={-17} y={-12} width={42} height={24} rx={4} fill="white" stroke="#1a2744" strokeWidth={2} />
-  <text x={4} y={4} textAnchor="middle" fontSize={9} fontWeight={800} fill="#1a2744">{powered ? '1' : '0'}</text>
+  <text x={4} y={4} textAnchor="middle" fontSize={10} fontFamily="'KaTeX_Main', serif" fontWeight={700} fill="#1a2744">{powered ? '1' : '0'}</text>
   <line x1={-30} y1={0} x2={-17} y2={0} stroke="#1a2744" strokeWidth={2} />
 </g>;
 
@@ -1006,10 +1006,10 @@ const StandardLogicBlockSymbol: SymbolFC = ({ powered, props }) => {
     {body}
     {isMemory && <g opacity={0.05} stroke="#1a2744" strokeWidth={0.55}>{Array.from({ length: 7 }, (_, index) => <line key={`vm-${index}`} x1={-w + (index + 1) * (2 * w / 8)} y1={-h + 8} x2={-w + (index + 1) * (2 * w / 8)} y2={h - 8} />)}{Array.from({ length: 5 }, (_, index) => <line key={`hm-${index}`} x1={-w + 8} y1={-h + (index + 1) * (2 * h / 6)} x2={w - 8} y2={-h + (index + 1) * (2 * h / 6)} />)}</g>}
     {layout.pins.map(pin => leadForPin(type, pin, layout))}
-    {isAlu && <><text x={-w + 10} y={-h * .38} fontSize={7} fontWeight={800} fill="#1a2744">A</text><text x={-w + 10} y={h * .45} fontSize={7} fontWeight={800} fill="#1a2744">B</text></>}
-    {isAdder && <text x={0} y={4} textAnchor="middle" fontSize={18} fontWeight={700} fill="#1a2744">Σ</text>}
+    {isAlu && <><text x={-w + 10} y={-h * .38} fontSize={7} fontFamily="'KaTeX_Main', serif" fontWeight={700} fill="#1a2744">A</text><text x={-w + 10} y={h * .45} fontSize={7} fontFamily="'KaTeX_Main', serif" fontWeight={700} fill="#1a2744">B</text></>}
+    {isAdder && <text x={0} y={4} textAnchor="middle" fontSize={18} fontFamily="'KaTeX_Main', serif" fontWeight={700} fill="#1a2744">Σ</text>}
     {isFlipFlop && clockPin && <path d={`M ${-w + 7},${clockPin.y - 5} L ${-w + 15},${clockPin.y} L ${-w + 7},${clockPin.y + 5} Z`} fill="none" stroke="#1a2744" strokeWidth={1.5} />}
-    <text x={0} y={isAdder ? 22 : -3} textAnchor="middle" fontSize={8} fontWeight={800} fill="#1a2744">{title}</text>
+    <text x={0} y={isAdder ? 22 : -3} textAnchor="middle" fontSize={8} fontFamily="'KaTeX_Main', serif" fontWeight={700} fill="#1a2744">{title}</text>
   </g>;
 };
 
@@ -1025,7 +1025,7 @@ const LogicBlockSymbol: SymbolFC = ({ powered, props }) => {
   const { bodyHalfWidth: w, bodyHalfHeight: h } = layout;
   return <g>
     <rect x={-w} y={-h} width={w * 2} height={h * 2} rx={4} fill={powered ? '#eef6ff' : 'white'} stroke="#1a2744" strokeWidth={2} />
-    <text x={0} y={-3} textAnchor="middle" fontSize={8} fontWeight={800} fill="#1a2744">{String(props?._blockLabel ?? 'LOGIC')}</text>
+    <text x={0} y={-3} textAnchor="middle" fontSize={8} fontFamily="'KaTeX_Main', serif" fontWeight={700} fill="#1a2744">{String(props?._blockLabel ?? 'LOGIC')}</text>
     {layout.pins.map(pin => leadForPin(type || 'logic-block', pin, layout))}
   </g>;
 };

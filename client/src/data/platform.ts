@@ -23,9 +23,9 @@ export type HomeGatewayMeta = {
 };
 
 export const homeGatewayMeta: HomeGatewayMeta[] = [
-  { href: "/research", index: "01", type: "research", visualVariant: 0, accent: "from-blue-600 via-violet-500 to-rose-500" },
-  { href: "/courses", index: "02", type: "courses", visualVariant: 4, accent: "from-violet-500 via-fuchsia-500 to-rose-500" },
-  { href: "/simulations", index: "03", type: "simulations", visualVariant: 5, accent: "from-blue-500 via-cyan-500 to-violet-500" },
+  { href: "/research", index: "01", type: "research", visualVariant: 0, accent: "from-indigo-600 via-purple-600 to-violet-600" },
+  { href: "/courses", index: "02", type: "courses", visualVariant: 4, accent: "from-indigo-600 via-violet-600 to-purple-600" },
+  { href: "/simulations", index: "03", type: "simulations", visualVariant: 5, accent: "from-indigo-600 via-cyan-500 to-violet-600" },
 ];
 
 export const simulationRouteMeta = [

@@ -22,10 +22,39 @@
   --color-ring: var(--ring);
 }
 
-:root { --background: #f7f8fc; --foreground: #0f172a; --primary: #7c3aed; --primary-foreground: #ffffff; --muted: #f1f5f9; --muted-foreground: #64748b; --border: #dbe3ef; --ring: #7c3aed; --mae-header-height: 120px; }
-.dark { --background: #07111f; --foreground: #f8fafc; --primary: #a78bfa; --primary-foreground: #0f172a; --muted: #1e293b; --muted-foreground: #94a3b8; --border: rgb(255 255 255 / .1); --ring: #a78bfa; }
+:root {
+  --mae-gradient-start: #2563EB;
+  --mae-gradient-mid:   #7C3AED;
+  --mae-gradient-end:   #E11D48;
+  --background: #ffffff;
+  --foreground: #0f172a;
+  --primary: #7c3aed;
+  --primary-foreground: #ffffff;
+  --muted: #f8fafc;
+  --muted-foreground: #64748b;
+  --border: #e2e8f0;
+  --ring: #7c3aed;
+  --mae-header-height: 120px;
+}
+.dark {
+  --mae-gradient-start: #3B82F6;
+  --mae-gradient-mid:   #8B5CF6;
+  --mae-gradient-end:   #F43F5E;
+  --background: #000000;
+  --foreground: #ffffff;
+  --primary: #8b5cf6;
+  --primary-foreground: #000000;
+  --muted: #08080a;
+  --muted-foreground: #a1a1aa;
+  --border: rgb(255 255 255 / .08);
+  --ring: #8b5cf6;
+}
 
 @layer base {
+  html.dark, .dark {
+    color-scheme: dark;
+    background-color: #000000;
+  }
   * { @apply border-border outline-ring/50; }
   html { min-width: 320px; scroll-behavior: smooth; }
   body { @apply m-0 bg-background text-foreground; font-family: var(--font-sans); }
@@ -84,26 +113,56 @@
 }
 
 @layer components {
-  .container { width: 100%; margin-inline: auto; padding-inline: 1.25rem; }
-  .border-gradient-signal { border-image: linear-gradient(to bottom, #2563eb, #8b5cf6, #f43f5e) 1; }
+  .container { width: 100%; margin-inline: auto; padding-inline: 1.5rem; }
+  @media (min-width: 640px) { .container { padding-inline: 2rem; } }
+  @media (min-width: 1024px) { .container { max-width: 1380px; padding-inline: 3rem; } }
+
+  /* Canonical Brand Gradient Utilities */
+  .mae-gradient-text {
+    background: linear-gradient(135deg, var(--mae-gradient-start, #2563EB) 0%, var(--mae-gradient-mid, #7C3AED) 50%, var(--mae-gradient-end, #E11D48) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .mae-gradient-border {
+    border-image: linear-gradient(135deg, var(--mae-gradient-start, #2563EB), var(--mae-gradient-mid, #7C3AED), var(--mae-gradient-end, #E11D48)) 1;
+  }
+
+  .mae-gradient-glow {
+    background: linear-gradient(135deg, rgba(37, 99, 235, 0.15), rgba(124, 58, 237, 0.15), rgba(225, 29, 72, 0.15));
+  }
+
+  .border-gradient-signal { border-image: linear-gradient(to right, #2563EB, #7C3AED, #E11D48) 1; }
   .mae-display { font-family: var(--font-display); font-weight: 800; letter-spacing: -0.066em; }
   .mae-card-title { font-family: var(--font-display); font-weight: 700; letter-spacing: -0.04em; }
   html[dir="rtl"] .mae-display,
   html[dir="rtl"] .mae-card-title { font-family: var(--font-arabic); letter-spacing: 0; }
-  .mae-signal-word { background: linear-gradient(90deg, #2563EB 0%, #8B5CF6 52%, #F43F5E 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
-  .mae-signal-rule { width: 4rem; height: 1px; background: linear-gradient(90deg, #2563EB, #8B5CF6, #FB7185); }
+  .mae-signal-word {
+    background: linear-gradient(135deg, #2563EB 0%, #7C3AED 50%, #E11D48 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+  }
+  .mae-signal-rule {
+    width: 4rem;
+    height: 2px;
+    background: linear-gradient(90deg, #2563EB, #7C3AED, #E11D48);
+  }
   .mae-signal-draw .mae-signal-primary { stroke-dasharray: 1; stroke-dashoffset: 1; transition: stroke-dashoffset 600ms ease-out; }
   .group:hover .mae-signal-draw .mae-signal-primary { stroke-dashoffset: 0; }
   .mae-wave-grid { position: relative; }
   .mae-wave-grid::before { content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none; background-image: radial-gradient(rgb(148 163 184 / .35) 1px, transparent 1px); background-size: 26px 26px; mask-image: radial-gradient(circle at center, black 55%, transparent 90%); }
   .dark .mae-wave-grid::before { background-image: radial-gradient(rgb(255 255 255 / .12) 1px, transparent 1px); }
-  .bg-brand-gradient { background: linear-gradient(90deg, #2563eb 0%, #7c3aed 50%, #f43f5e 100%) !important; }
+  .bg-brand-gradient { background: linear-gradient(135deg, #2563EB 0%, #7C3AED 50%, #E11D48 100%) !important; }
   .brand-slider {
     -webkit-appearance: none;
     appearance: none;
     height: 0.375rem;
     border-radius: 9999px;
-    background: linear-gradient(90deg, #2563eb 0%, #7c3aed 50%, #f43f5e 100%);
+    background: linear-gradient(90deg, #2563EB 0%, #7C3AED 50%, #E11D48 100%);
     cursor: pointer;
   }
   .brand-slider::-webkit-slider-thumb {
@@ -152,8 +211,8 @@
     box-shadow: 0 0 0 2px #3b82f6;
   }
   .dark .brand-select {
-    background-color: #020617;
-    border-color: #1e293b;
+    background-color: #08080a;
+    border-color: rgba(255, 255, 255, 0.08);
     color: #e2e8f0;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   }
@@ -170,22 +229,22 @@
   }
   .brand-radio:checked {
     border-color: transparent;
-    background-image: radial-gradient(circle, #ffffff 35%, transparent 40%), linear-gradient(90deg, #2563eb 0%, #7c3aed 50%, #f43f5e 100%);
+    background-image: radial-gradient(circle, #ffffff 35%, transparent 40%), linear-gradient(90deg, #2563EB 0%, #7C3AED 50%, #E11D48 100%);
   }
   .dark .brand-radio {
-    border-color: #475569;
-    background-color: #0f172a;
+    border-color: rgba(255, 255, 255, 0.15);
+    background-color: #08080a;
   }
   .dark .brand-radio:checked {
     border-color: transparent;
-    background-image: radial-gradient(circle, #ffffff 35%, transparent 40%), linear-gradient(90deg, #2563eb 0%, #7c3aed 50%, #f43f5e 100%);
+    background-image: radial-gradient(circle, #ffffff 35%, transparent 40%), linear-gradient(90deg, #2563EB 0%, #7C3AED 50%, #E11D48 100%);
   }
   .mae-station-section { position: relative; }
   .mae-station-section::before { content: ""; position: absolute; inset-inline-start: max(1.25rem, calc((100vw - 1360px) / 2 + 2.5rem)); top: 0; bottom: 0; width: 1px; background: linear-gradient(to bottom, transparent, rgb(139 92 246 / .35), transparent); pointer-events: none; }
   .simulation-title-block { box-shadow: inset 3px 0 0 rgb(124 58 237 / .65); }
   .simulation-station::after { content: ""; position: absolute; inset-inline-start: .75rem; bottom: .75rem; width: .65rem; height: .65rem; border-inline-start: 1px solid rgb(139 92 246 / .55); border-bottom: 1px solid rgb(139 92 246 / .55); opacity: .8; }
   .simulation-tool-rail { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); overflow: hidden; border: 1px solid rgb(148 163 184 / .35); border-radius: .9rem; background: rgb(255 255 255 / .45); }
-  .dark .simulation-tool-rail { border-color: rgb(255 255 255 / .12); background: rgb(255 255 255 / .025); }
+  .dark .simulation-tool-rail { border-color: rgba(255, 255, 255, 0.08); background: rgba(255, 255, 255, 0.02); }
   .mae-noise { background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.95'/%3E%3C/svg%3E"); }
   /* Assembler Studio: Tajawal labels, strict monospaced machine values, and sharp technical-paper frames. */
   .assembler-studio { font-family: var(--font-arabic); }
@@ -216,7 +275,7 @@
   .circuit-studio h2, .circuit-studio button, .circuit-studio label { font-family: var(--font-arabic); }
   .circuit-studio input, .circuit-studio .font-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
   .circuit-studio { --circuit-canvas: #fff; }
-  .dark .circuit-studio { --circuit-canvas: #020617; }
+  .dark .circuit-studio { --circuit-canvas: #000000; }
   .circuit-studio .aspect-\[16\/9\] { background-color: var(--circuit-canvas); }
   /* Circuit Lab is an anchored MAE instrument rail rather than a centered landing hero. */
   .circuit-lab-station-header { position: relative; padding: 1rem 1.25rem 1.15rem; border-top: 1px solid rgb(148 163 184 / .28); border-bottom: 1px solid rgb(148 163 184 / .18); background: linear-gradient(90deg, rgb(37 99 235 / .05), transparent 26%, transparent 74%, rgb(244 63 94 / .05)); }
@@ -225,7 +284,7 @@
   .circuit-lab-station-header::after { inset: auto -.12rem -.12rem auto; border-right: 1px solid; border-bottom: 1px solid; }
   html[dir="rtl"] .circuit-lab-station-header { text-align: right; }
   /* Tab C is deliberately an archival embedded instrument, surrounded by MAE drafting cues. */
-  .legacy-archive-frame { position: relative; isolation: isolate; background: #0b1525; }
+  .legacy-archive-frame { position: relative; isolation: isolate; background: #000000; }
   .legacy-archive-frame::before { content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none; background-image: linear-gradient(rgb(148 163 184 / .055) 1px, transparent 1px), linear-gradient(90deg, rgb(148 163 184 / .055) 1px, transparent 1px); background-size: 24px 24px; mask-image: linear-gradient(to bottom, black, transparent 72%); }
   .legacy-archive-frame header { background: linear-gradient(90deg, rgb(15 30 54 / .96), rgb(11 21 37 / .96)); }
   .legacy-archive-sheet { border-top: 1px solid rgb(244 63 94 / .38); background: linear-gradient(135deg, rgb(37 99 235 / .14), transparent 33%, rgb(244 63 94 / .11)); }
@@ -239,8 +298,8 @@
      global stylesheet is intentionally excluded; this scope is the future
      visual-theme boundary and prevents accidental inheritance into Tab A. */
   .v3-simulator-root { isolation: isolate; }
-  @media (min-width: 640px) { .container { padding-inline: 2rem; } }
-  @media (min-width: 1280px) { .container { max-width: 1360px; padding-inline: 2.5rem; } }
+  @media (min-width: 640px) { .container { padding-inline: 1.5rem; } }
+  @media (min-width: 1024px) { .container { max-width: 80rem; padding-inline: 2rem; } }
 }
 
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: .01ms !important; } }

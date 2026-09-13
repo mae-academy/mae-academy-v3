@@ -21,8 +21,11 @@ export interface CircuitWire {
   toComp: string;
   toTerm: string;
   path: Point[];
+  waypoints?: Point[];
   routing: WireRouting;
   color?: string;
+  junctionPoint?: Point;
+  junctionWireId?: string;
 }
 
 export interface WorkspaceText {

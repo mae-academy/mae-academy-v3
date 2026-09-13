@@ -56,7 +56,7 @@ export default function SimulationPageHeader({
   return (
     <>
       {showBack && backLabel ? (
-        <Link href={backRoute} className="flex w-fit items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700">
+        <Link href={backRoute} className="flex w-fit items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:border-white/[0.08] dark:bg-[#08080A] dark:text-zinc-200 dark:hover:bg-white/[0.04]">
           <ArrowLeft className={`h-4 w-4 stroke-[1.5] ${isRtl ? "rotate-180" : ""}`} />
           {backLabel}
         </Link>
@@ -70,7 +70,7 @@ export default function SimulationPageHeader({
 
       {showToolNavigation && tools.length > 0 ? (
         <nav aria-label={`${title ?? "Simulation"} tools`} className={`${compact ? "mb-4" : "mb-8"} overflow-x-auto pb-1`}>
-          <div className="mx-auto flex w-full min-w-max max-w-5xl overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
+          <div className="mx-auto flex w-full min-w-max max-w-5xl overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-[#08080A]">
             {tools.map((tool, index) => {
               const active = tool.id === activeTool;
               return (
@@ -80,7 +80,7 @@ export default function SimulationPageHeader({
                   role="tab"
                   aria-selected={active}
                   onClick={() => onSelectTool(tool.id)}
-                  className={`flex min-h-14 flex-1 items-center justify-center px-6 py-4 text-center text-sm font-semibold transition-all focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-blue-600 ${active ? (compact ? "bg-violet-700 text-white" : "bg-brand-gradient text-white") : `bg-white text-slate-500 hover:bg-gray-50 hover:text-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-slate-100 ${index === 0 ? "" : "border-s border-gray-200 dark:border-slate-700"}`}`}
+                  className={`flex min-h-14 flex-1 items-center justify-center px-6 py-4 text-center text-sm font-semibold transition-all focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-blue-600 ${active ? (compact ? "bg-violet-700 text-white" : "bg-brand-gradient text-white") : `bg-white text-slate-500 hover:bg-gray-50 hover:text-slate-700 dark:bg-[#08080A] dark:text-zinc-400 dark:hover:bg-white/[0.04] dark:hover:text-white ${index === 0 ? "" : "border-s border-gray-200 dark:border-white/[0.08]"}`}`}
                 >
                   {tool.label}
                 </button>
