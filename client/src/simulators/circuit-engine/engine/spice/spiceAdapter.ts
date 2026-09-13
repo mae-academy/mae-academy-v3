@@ -220,6 +220,42 @@ function dcSource(
   ];
 }
 
+/**
+ * One sinusoidal winding, `label`-suffixed (a three-phase source needs three of these from one
+ * component). Same internal-resistance rationale as `dcSource` — critical here, not just cosmetic:
+ * a Δ-connected source's three windings form a closed loop, and a closed loop of zero-impedance
+ * ideal sources is singular in SPICE (confirmed: ngspice reports "singular matrix" and returns
+ * arbitrary node voltages for one with no series resistance at all).
+ */
+function acWinding(
+  ctx: PartContext,
+  label: string,
+  positive: SpiceNet,
+  negative: SpiceNet,
+  amplitude: number,
+  phaseDegrees: number,
+  frequency: number,
+  internalResistance: number
+): SpiceComponent[] {
+  const identity = derived(ctx, label);
+  const source = (pos: SpiceNet): SpiceComponent => ({
+    kind: "ac-voltage",
+    ...identity,
+    positive: pos,
+    negative,
+    amplitude,
+    phaseDegrees,
+    frequency,
+    dcOffset: 0,
+  });
+  if (!(internalResistance > 0)) return [source(positive)];
+  const terminal = internalNet(ctx, `${label}rint`);
+  return [
+    source(terminal),
+    resistor(derived(ctx, `${label}_RINT`), positive, terminal, internalResistance),
+  ];
+}
+
 /** Bleeds every distinct non-ground winding terminal to ground. */
 function windingBleeds(ctx: PartContext, nets: SpiceNet[]): SpiceComponent[] {
   return Array.from(new Set(nets))
@@ -677,30 +713,67 @@ function mapPart(ctx: PartContext): Mapping {
       ];
     }
 
-    // Balanced Y source: three independent sine sources, L1/L2/L3 to N, 120° apart — mirrors the
-    // legacy engine's three-phase-source/rail handling exactly (same lineVoltage->phase-amplitude
-    // conversion, same ABC/ACB phase order), so canvas circuits solve the same way on either engine.
-    // `connection` (Y/Δ) and `internalR` aren't modelled yet, same gap as the legacy engine.
+    // Three independent sine windings, 120° apart, in either connection (mirrors the legacy
+    // engine's Y handling for lineVoltage->phase-amplitude conversion and ABC/ACB phase order — the
+    // legacy engine doesn't model Δ or internalR at all, so this is SPICE-only for Δ so far):
+    // Y wires each winding line-to-neutral at V_LN(pk) = V_LL(RMS)·√2/√3; Δ wires each winding
+    // directly line-to-line at V_LL(pk) = V_LL(RMS)·√2 (a winding's own EMF *is* the line voltage),
+    // closing L1->L2->L3->L1 with no neutral net at all.
     case "three-phase-source":
     case "three-phase-rail": {
       const lineVoltage = num("lineVoltage", 400);
       const frequency = num("frequency", 50);
-      const { peakVoltage } = computeThreePhaseVoltages(lineVoltage);
+      // internalR's own min (componentDefs.ts: 0.001) already keeps it off zero in the UI; this
+      // floor only guards a directly-constructed component bypassing that, since a zero here is a
+      // guaranteed singular matrix for the Δ case (see acWinding's doc comment).
+      const internalR = Math.max(1e-6, num("internalR", 0.05));
       const sequence = stringProp(component, "phaseSequence", "ABC");
       // 0°, -120°, +120° for ABC (equivalently 0°, -120°, -240° — sin is 360°-periodic, so leading
       // by 120° and lagging by 240° describe the same waveform).
       const order = sequence === "ACB" ? [0, 1, -1] : [0, -1, 1];
+      const isDelta = stringProp(component, "connection", "Y") !== "Y";
+
+      if (isDelta) {
+        const peakVoltage = lineVoltage * Math.SQRT2;
+        const windings = [
+          ["l1", "l2"],
+          ["l2", "l3"],
+          ["l3", "l1"],
+        ] as const;
+        return [
+          ...windings.flatMap(([from, to], index) =>
+            acWinding(
+              ctx,
+              `${from.toUpperCase()}${to.toUpperCase()}`,
+              net(from),
+              net(to),
+              peakVoltage,
+              order[index] * 120,
+              frequency,
+              internalR
+            )
+          ),
+          // No neutral net means no inherent ground reference either — a closed loop floating with
+          // no path to node 0 at all is a separate SPICE hazard from the loop-current one internalR
+          // already covers. Same fix the transformer mappings below use for the same reason.
+          ...windingBleeds(ctx, [net("l1"), net("l2"), net("l3")]),
+        ];
+      }
+
+      const { peakVoltage } = computeThreePhaseVoltages(lineVoltage);
       const neutral = net("n");
-      return (["l1", "l2", "l3"] as const).map((phase, index) => ({
-        kind: "ac-voltage",
-        ...derived(ctx, phase.toUpperCase()),
-        positive: net(phase),
-        negative: neutral,
-        amplitude: peakVoltage,
-        phaseDegrees: order[index] * 120,
-        frequency,
-        dcOffset: 0,
-      }));
+      return (["l1", "l2", "l3"] as const).flatMap((phase, index) =>
+        acWinding(
+          ctx,
+          phase.toUpperCase(),
+          net(phase),
+          neutral,
+          peakVoltage,
+          order[index] * 120,
+          frequency,
+          internalR
+        )
+      );
     }
 
     /* ---------------------------------------------------------------------- Semiconductors --- */

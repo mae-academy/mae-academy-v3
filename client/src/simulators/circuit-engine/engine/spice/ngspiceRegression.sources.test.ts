@@ -1,10 +1,15 @@
 /**
  * ngspice.wasm coverage for the three-phase source (validation spec Section I) — the real ngspice
  * binary, same full production pipeline as ngspiceRegression.test.ts (see ngspiceRegressionHelpers).
- * spiceAdapter.ts's `three-phase-source`/`three-phase-rail` mapping emits three independent AC
- * sources (L1/L2/L3 to N, 120° apart), mirroring the legacy engine's own three-phase math so canvas
- * circuits solve the same way on either engine. `connection` (Y/Δ) and `internalR` aren't modelled
- * yet — same gap as the legacy engine.
+ * spiceAdapter.ts's `three-phase-source`/`three-phase-rail` mapping supports both connections:
+ *   - Y (default): three windings, line-to-neutral, at V_LN(pk) = V_LL(RMS)·√2/√3.
+ *   - Δ: three windings, directly line-to-line (a winding's own EMF *is* the line voltage), at
+ *     V_LL(pk) = V_LL(RMS)·√2, closing L1->L2->L3->L1 with no neutral net at all.
+ * Both use `internalR` (default 0.05 Ω/winding) in series — not just for realism: a Δ loop of
+ * zero-impedance ideal sources is a singular matrix in real SPICE (confirmed against ngspice's own
+ * output before this was added), so Δ genuinely cannot be modelled without it. The legacy engine
+ * (analogSimulation.ts) still only implements Y and ignores `connection`/`internalR` entirely — this
+ * file is ngspice.wasm-only, as the header on each describe block below notes.
  *
  * Phase/magnitude extraction goes through `extractPhasor` (a single-frequency Fourier projection)
  * rather than raw point-by-point waveform comparison — it reads a genuine angle in degrees off the
@@ -28,7 +33,11 @@ import {
   wire,
   type Phasor,
 } from "@/simulators/circuit-engine/engine/spice/ngspiceRegressionHelpers";
-import { computeThreePhaseVoltages } from "@/simulators/circuit-engine/engine/spice/spiceAdapter";
+import {
+  computeThreePhaseVoltages,
+  convertToSpiceComponents,
+  resolveCircuitNets,
+} from "@/simulators/circuit-engine/engine/spice/spiceAdapter";
 
 const FREQUENCY = 50;
 const PERIOD = 1 / FREQUENCY;
@@ -40,15 +49,18 @@ const { phaseVoltage: PHASE_VOLTAGE, peakVoltage: PEAK_VOLTAGE } =
 const SAMPLES_PER_PERIOD = 400;
 const SOURCE_ANALYSIS = [`.tran ${PERIOD / SAMPLES_PER_PERIOD} ${2 * PERIOD}`];
 
-function sourceOnly(phaseSequence: "ABC" | "ACB" = "ABC") {
+function sourceOnly(phaseSequence: "ABC" | "ACB" = "ABC", connection: "Y" | "Δ" = "Y") {
   const components = [
     part("g", "ground"),
     part("v1", "three-phase-source", {
       lineVoltage: LINE_VOLTAGE,
       frequency: FREQUENCY,
       phaseSequence,
+      connection,
     }),
   ];
+  // Δ has no neutral net to tie down — g/w1 exist here only as a reference the voltmeters below
+  // can share; nothing in the Δ mapping ever drives "v1:n", so this wire simply goes unused for Δ.
   const wires = [wire("w1", "v1", "n", "g", "gnd")];
   return { components, wires };
 }
@@ -277,4 +289,160 @@ describe("three-phase source (ngspice.wasm coverage)", () => {
     },
     RUN_TIMEOUT
   );
+
+  describe("3-Phase Δ-Connection", () => {
+    it(
+      "measures 400 V ±2% line-to-line on every phase pair — NOT 230.94 V (the critical-bug regression)",
+      async () => {
+        const { components, wires } = sourceOnly("ABC", "Δ");
+        const withMeters = {
+          components: [
+            ...components,
+            part("vm12", "voltmeter", { mode: "AC" }),
+            part("vm23", "voltmeter", { mode: "AC" }),
+            part("vm31", "voltmeter", { mode: "AC" }),
+          ],
+          wires: [
+            ...wires,
+            wire("w2", "vm12", "pos", "v1", "l1"),
+            wire("w3", "vm12", "neg", "v1", "l2"),
+            wire("w4", "vm23", "pos", "v1", "l2"),
+            wire("w5", "vm23", "neg", "v1", "l3"),
+            wire("w6", "vm31", "pos", "v1", "l3"),
+            wire("w7", "vm31", "neg", "v1", "l1"),
+          ],
+        };
+        const { readings } = await simulate(
+          withMeters.components,
+          withMeters.wires,
+          "practical",
+          SOURCE_ANALYSIS
+        );
+        const tolerance = LINE_VOLTAGE * 0.02;
+        for (const meter of ["vm12", "vm23", "vm31"]) {
+          expect(readings[meter].status).toBe("ready");
+          expect(verifyRelationship(readings[meter].value, LINE_VOLTAGE, tolerance)).toBe(true);
+          // The old bug: Δ reading back at Y's phase voltage instead of the line voltage.
+          expect(verifyRelationship(readings[meter].value, PHASE_VOLTAGE, tolerance)).toBe(false);
+        }
+      },
+      RUN_TIMEOUT
+    );
+
+    it("each winding's own peak is 400·√2 ≈ 565.7 V, not the Y case's 326.6 V", async () => {
+      const { components, wires } = sourceOnly("ABC", "Δ");
+      const { nodeVoltageAt } = await simulate(components, wires, "practical", SOURCE_ANALYSIS);
+      // A winding's own voltage is line-to-line (L1-L2 here), not a single line's voltage against
+      // ground — with no neutral, an individual line's own node has no meaningful absolute
+      // reference (it floats, held near 0 only by windingBleeds' deliberately-negligible 1 GΩ tie).
+      let peak = 0;
+      for (let i = 0; i <= SAMPLES_PER_PERIOD; i += 1) {
+        const t = (i / SAMPLES_PER_PERIOD) * PERIOD;
+        const vLL = nodeVoltageAt("v1", "l1", t) - nodeVoltageAt("v1", "l2", t);
+        peak = Math.max(peak, Math.abs(vLL));
+      }
+      expect(verifyRelationship(peak, LINE_VOLTAGE * Math.SQRT2, LINE_VOLTAGE * Math.SQRT2 * 0.02)).toBe(
+        true
+      );
+    }, RUN_TIMEOUT);
+
+    it("120° phase separation still holds between the three line-to-line windings", async () => {
+      const { components, wires } = sourceOnly("ABC", "Δ");
+      const { nodeVoltageAt } = await simulate(components, wires, "practical", SOURCE_ANALYSIS);
+      const sample = (terminalFrom: string, terminalTo: string) => {
+        const time: number[] = [];
+        const values: number[] = [];
+        for (let i = 0; i <= 2 * SAMPLES_PER_PERIOD; i += 1) {
+          const t = (i / SAMPLES_PER_PERIOD) * PERIOD;
+          time.push(t);
+          values.push(nodeVoltageAt("v1", terminalFrom, t) - nodeVoltageAt("v1", terminalTo, t));
+        }
+        return extractPhasor(time, values, FREQUENCY);
+      };
+      const l12 = sample("l1", "l2");
+      const l23 = sample("l2", "l3");
+      const l31 = sample("l3", "l1");
+      expect(
+        verifyRelationship(calculatePhaseAngleDifference(l12.angleDegrees, l23.angleDegrees), -120, 3)
+      ).toBe(true);
+      expect(
+        verifyRelationship(calculatePhaseAngleDifference(l12.angleDegrees, l31.angleDegrees), 120, 3)
+      ).toBe(true);
+    }, RUN_TIMEOUT);
+
+    it("drives no neutral net — nothing the mapping emits touches v1's 'n' terminal", () => {
+      // No ground/wires at all here, deliberately: sourceOnly()'s own w1 ties v1:n to ground for
+      // the simulation-based tests above, which would make "n"'s net just BE ground's net — and
+      // since windingBleeds ties l1/l2/l3 to ground too, that would trivially "match" on every
+      // component. Leaving v1:n fully unwired instead gives it a genuinely distinct, unique net to
+      // check against.
+      const components = [
+        part("v1", "three-phase-source", {
+          lineVoltage: LINE_VOLTAGE,
+          frequency: FREQUENCY,
+          connection: "Δ",
+        }),
+      ];
+      const nets = resolveCircuitNets(components, []);
+      const spiceComponents = convertToSpiceComponents(components, [], nets, "practical");
+      const neutralNet = nets.netFor("v1", "n");
+      // A structural, not electrical, check — deliberately serialization-based so it holds
+      // regardless of which SpiceComponent variant (with whatever field names) might reference it.
+      const anyComponentTouchesNeutral = spiceComponents.some(c => JSON.stringify(c).includes(neutralNet));
+      expect(anyComponentTouchesNeutral).toBe(false);
+    });
+  });
+
+  describe("Y vs Δ: same 400 V line voltage, same total power delivered to an equivalent load", () => {
+    it(
+      "Y load at 1 kΩ/phase and Δ load at 3 kΩ/phase (R_Δ = 3·R_Y) both draw ≈160 W total",
+      async () => {
+        // Y: P = 3 × V_phase² / R = 3 × 230.94² / 1000 = 160 W.
+        const yLoad = withWyeLoad(1000, 1000, 1000);
+        const yRun = await simulate(yLoad.components, yLoad.wires, "practical", SOURCE_ANALYSIS);
+        const yPower = ["ama", "amb", "amc"].reduce(
+          (sum, meter) => sum + yRun.readings[meter].value * PHASE_VOLTAGE,
+          0
+        );
+
+        // Δ: each branch sees the full 400 V line voltage directly. P = 3 × V_line² / R = 3 × 400² / 3000 = 160 W.
+        const deltaComponents = [
+          part("g", "ground"),
+          part("v1", "three-phase-source", {
+            lineVoltage: LINE_VOLTAGE,
+            frequency: FREQUENCY,
+            connection: "Δ",
+          }),
+          part("r12", "resistor", { resistance: 3000 }),
+          part("r23", "resistor", { resistance: 3000 }),
+          part("r31", "resistor", { resistance: 3000 }),
+          part("am12", "ammeter", { mode: "AC" }),
+          part("am23", "ammeter", { mode: "AC" }),
+          part("am31", "ammeter", { mode: "AC" }),
+        ];
+        const deltaWires = [
+          wire("d1", "v1", "l1", "am12", "pos"),
+          wire("d2", "am12", "neg", "r12", "a"),
+          wire("d3", "r12", "b", "v1", "l2"),
+          wire("d4", "v1", "l2", "am23", "pos"),
+          wire("d5", "am23", "neg", "r23", "a"),
+          wire("d6", "r23", "b", "v1", "l3"),
+          wire("d7", "v1", "l3", "am31", "pos"),
+          wire("d8", "am31", "neg", "r31", "a"),
+          wire("d9", "r31", "b", "v1", "l1"),
+        ];
+        const deltaRun = await simulate(deltaComponents, deltaWires, "practical", SOURCE_ANALYSIS);
+        const deltaPower = ["am12", "am23", "am31"].reduce(
+          (sum, meter) => sum + deltaRun.readings[meter].value * LINE_VOLTAGE,
+          0
+        );
+
+        const tolerance = 160 * 0.03;
+        expect(verifyRelationship(yPower, 160, tolerance)).toBe(true);
+        expect(verifyRelationship(deltaPower, 160, tolerance)).toBe(true);
+        expect(verifyRelationship(yPower, deltaPower, tolerance)).toBe(true);
+      },
+      RUN_TIMEOUT * 2
+    );
+  });
 });
