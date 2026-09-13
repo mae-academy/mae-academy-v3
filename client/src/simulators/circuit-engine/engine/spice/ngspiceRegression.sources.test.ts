@@ -498,4 +498,84 @@ describe("three-phase source (ngspice.wasm coverage)", () => {
       }
     }, RUN_TIMEOUT * 2);
   });
+
+  /**
+   * All four source×load connection combinations, each read with two voltmeters (line-to-line and
+   * line-to-"neutral") in the SAME run — the direct test of "is the voltmeter reading two genuinely
+   * different nodes, or the same one twice / a hardcoded value": L1-L2 and L1-N must both hit their
+   * target AND differ substantially from each other, in every combination.
+   *
+   * The "neutral" reference is the load's own star point for a Y load (a separate node from the
+   * source's own "n" — see withWyeLoad's doc comment above for why that separation matters) or the
+   * source's own "n" for a Δ load (real for a Y source, the virtual-center reconstruction via
+   * windingBleeds for a Δ source — same identity as the Δ-Connection describe block above).
+   */
+  describe("all four source × load connection combinations", () => {
+    async function measure(sourceConnection: "Y" | "Δ", loadConnection: "Y" | "Δ") {
+      const components = [part("g", "ground"), part("v1", "three-phase-source", {
+        lineVoltage: LINE_VOLTAGE,
+        frequency: FREQUENCY,
+        connection: sourceConnection,
+      })];
+      const wires = [wire("w0", "v1", "n", "g", "gnd")]; // harmless no-op when the source is Δ.
+      let loadNeutral: { comp: string; term: string };
+
+      if (loadConnection === "Y") {
+        components.push(
+          part("ra", "resistor", { resistance: 1000 }),
+          part("rb", "resistor", { resistance: 1000 }),
+          part("rc", "resistor", { resistance: 1000 }),
+          part("amn", "ammeter", { mode: "AC" }) // doubles as the load star point junction
+        );
+        wires.push(
+          wire("la1", "v1", "l1", "ra", "a"),
+          wire("la2", "ra", "b", "amn", "pos"),
+          wire("lb1", "v1", "l2", "rb", "a"),
+          wire("lb2", "rb", "b", "amn", "pos"),
+          wire("lc1", "v1", "l3", "rc", "a"),
+          wire("lc2", "rc", "b", "amn", "pos")
+        );
+        loadNeutral = { comp: "amn", term: "pos" };
+      } else {
+        components.push(
+          part("r12", "resistor", { resistance: 3000 }),
+          part("r23", "resistor", { resistance: 3000 }),
+          part("r31", "resistor", { resistance: 3000 })
+        );
+        wires.push(
+          wire("d1", "v1", "l1", "r12", "a"),
+          wire("d2", "r12", "b", "v1", "l2"),
+          wire("d3", "v1", "l2", "r23", "a"),
+          wire("d4", "r23", "b", "v1", "l3"),
+          wire("d5", "v1", "l3", "r31", "a"),
+          wire("d6", "r31", "b", "v1", "l1")
+        );
+        loadNeutral = { comp: "v1", term: "n" };
+      }
+
+      components.push(part("vmLL", "voltmeter", { mode: "AC" }), part("vmLN", "voltmeter", { mode: "AC" }));
+      wires.push(
+        wire("mLL1", "vmLL", "pos", "v1", "l1"),
+        wire("mLL2", "vmLL", "neg", "v1", "l2"),
+        wire("mLN1", "vmLN", "pos", "v1", "l1"),
+        wire("mLN2", "vmLN", "neg", loadNeutral.comp, loadNeutral.term)
+      );
+
+      const { readings } = await simulate(components, wires, "practical", SOURCE_ANALYSIS);
+      return { lineToLine: readings.vmLL.value, lineToNeutral: readings.vmLN.value };
+    }
+
+    it.each([
+      ["Y", "Y"],
+      ["Y", "Δ"],
+      ["Δ", "Y"],
+      ["Δ", "Δ"],
+    ] as const)("Source %s, Load %s: L1-L2 ≈ 400 V and L1-N ≈ 230.94 V, and they differ", async (sourceConnection, loadConnection) => {
+      const { lineToLine, lineToNeutral } = await measure(sourceConnection, loadConnection);
+      expect(verifyRelationship(lineToLine, LINE_VOLTAGE, LINE_VOLTAGE * 0.02)).toBe(true);
+      expect(verifyRelationship(lineToNeutral, PHASE_VOLTAGE, PHASE_VOLTAGE * 0.02)).toBe(true);
+      // Proves the two probes read genuinely distinct nodes, not the same one twice.
+      expect(Math.abs(lineToLine - lineToNeutral)).toBeGreaterThan(100);
+    }, RUN_TIMEOUT);
+  });
 });
