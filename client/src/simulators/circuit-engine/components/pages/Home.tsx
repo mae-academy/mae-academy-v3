@@ -3045,6 +3045,11 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
         </main>
 
         <aside className="min-h-0 overflow-y-auto rounded-xl border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-950" style={{ background: colors.panel, borderColor: colors.line, display: 'flex', flexDirection: 'column' }}>
+          {/* Top Section: Live Oscilloscope (OSC) and Digital Multimeter (DMM) display screens */}
+          <OscilloscopeTracePanel colors={colors} scopes={components.filter(c => c.type === 'oscilloscope')} instrumentReadings={effectiveSnapshot.instrumentReadings} displaySettings={oscilloscopeDisplaySettings} />
+          <PersistentDmmPanel colors={colors} dmms={components.filter(c => c.type === 'dmm')} snapshot={effectiveSnapshot} />
+
+          {/* Below Instruments: ACTIVE ELEMENT & PROPERTIES inspector */}
           <div className="border-b px-3 py-2" style={{ borderColor: colors.line }}><div className={CONTROL_SYSTEMS_HEADING}>Active Element &amp; Properties</div></div>
           {selectedComponent ? (
             <ComponentInspector colors={colors} component={selectedComponent} definition={getDef(selectedComponent.type)!} allComponents={components} linkedCoils={linkedCoils} reading={effectiveSnapshot.instrumentReadings[selectedComponent.id]} snapshot={effectiveSnapshot} tabDUiRefinement={tabDUiRefinement} oscilloscopeDisplaySettings={oscilloscopeDisplaySettings} onOscilloscopeDisplaySettingsChange={setOscilloscopeDisplaySettings} onLabelChange={label => updateComponent(selectedComponent.id, { label })} onPropertyChange={updateComponentProperty} onPropertiesChange={updateComponentProperties} onDelete={removeSelection} />
@@ -3053,9 +3058,6 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
           ) : selectedText ? (
             <TextInspector colors={colors} text={selectedText} onUpdate={updateText} onMove={moveSelected} onDelete={removeSelection} />
           ) : null}
-
-          <PersistentDmmPanel colors={colors} dmms={components.filter(c => c.type === 'dmm')} snapshot={effectiveSnapshot} />
-          <OscilloscopeTracePanel colors={colors} scopes={components.filter(c => c.type === 'oscilloscope')} instrumentReadings={effectiveSnapshot.instrumentReadings} displaySettings={oscilloscopeDisplaySettings} />
         </aside>
       </div>
       <section className="mt-3 overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-950" style={{ background: colors.panel, borderColor: colors.line }}>
@@ -3272,7 +3274,7 @@ function PersistentDmmPanel({ colors, dmms, snapshot }: { colors: Palette; dmms:
 
   if (dmms.length === 0) return null;
   return (
-    <div style={{ marginTop: 'auto', borderTop: `1px solid ${colors.line}`, background: `${colors.line}22` }}>
+    <div style={{ borderBottom: `1px solid ${colors.line}`, background: `${colors.line}22` }}>
       <div className="border-b px-3 py-2" style={{ borderColor: colors.line }}><div className={CONTROL_SYSTEMS_HEADING}>Live Multimeters</div></div>
       <div style={{ display: 'flex', flexDirection: 'column', padding: 10, gap: 10 }}>
         {dmms.map(dmm => {

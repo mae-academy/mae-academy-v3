@@ -11,6 +11,7 @@ import type { InstrumentReading, SamplePoint } from '@/simulators/circuit-engine
 import { MeasurementTable } from '@/simulators/circuit-engine/components/ui-components/MeasurementTable';
 import { calculateVdc, calculateVpp } from '@/simulators/circuit-engine/components/ui-components/oscilloscopeMeasurements';
 import type { OscilloscopeDisplaySettings } from '@/simulators/circuit-engine/components/ui-components/oscilloscopeDisplaySettings';
+import { V3Math } from '@/components/ui/V3Math';
 
 type ScopePanelColors = { line: string; subtle: string; muted: string };
 
@@ -30,11 +31,97 @@ function numeric(value: unknown, fallback: number): number {
 export function OscilloscopeTracePanel({ colors, scopes, instrumentReadings, displaySettings }: { colors: ScopePanelColors; scopes: CircuitComponent[]; instrumentReadings: Record<string, InstrumentReading>; displaySettings: OscilloscopeDisplaySettings }) {
   if (scopes.length === 0) return null;
   return (
-    <div style={{ marginTop: 'auto', borderTop: `1px solid ${colors.line}`, background: `${colors.line}22` }}>
+    <div style={{ borderBottom: `1px solid ${colors.line}`, background: `${colors.line}22` }}>
       <div className="border-b px-3 py-2" style={{ borderColor: colors.line }}><div className="text-sm font-bold uppercase tracking-wider text-slate-800 dark:text-white">Live Oscilloscopes</div></div>
       <div style={{ display: 'flex', flexDirection: 'column', padding: 10, gap: 14 }}>
         {scopes.map(scope => <ScopeUnit key={scope.id} colors={colors} scope={scope} instrumentReadings={instrumentReadings} displaySettings={displaySettings} />)}
       </div>
+    </div>
+  );
+}
+
+function formatVoltageDivLatex(v: number): string {
+  if (Math.abs(v) < 1e-9) return '0\\ \\text{V}';
+  const sign = v < 0 ? '-' : '+';
+  const abs = Math.abs(v);
+  if (abs < 1) {
+    const val = Number((abs * 1e3).toPrecision(3));
+    return `${sign}${val}\\ \\text{mV}`;
+  }
+  const val = Number(abs.toPrecision(3));
+  return `${sign}${val}\\ \\text{V}`;
+}
+
+function formatTimeDivLatex(sec: number): string {
+  if (Math.abs(sec) < 1e-9) return '0\\ \\text{s}';
+  const abs = Math.abs(sec);
+  if (abs < 1e-3) {
+    const val = Number((abs * 1e6).toPrecision(3));
+    return `${val}\\ \\mu\\text{s}`;
+  }
+  if (abs < 1) {
+    const val = Number((abs * 1e3).toPrecision(3));
+    return `${val}\\ \\text{ms}`;
+  }
+  const val = Number(abs.toPrecision(3));
+  return `${val}\\ \\text{s}`;
+}
+
+function OscilloscopeAxisOverlay({
+  timeDiv,
+  voltDiv,
+  offset,
+  isDarkMode,
+}: {
+  timeDiv: number;
+  voltDiv: number;
+  offset: number;
+  isDarkMode: boolean;
+}) {
+  const labelClass = isDarkMode
+    ? 'bg-black/60 text-slate-200 border border-white/10 shadow-xs'
+    : 'bg-white/80 text-slate-800 border border-slate-200 shadow-xs';
+
+  const vertDivs = [
+    { d: 4, style: { top: '2px', left: '3px' } },
+    { d: 2, style: { top: '25%', left: '3px', transform: 'translateY(-50%)' } },
+    { d: 0, style: { top: '50%', left: '3px', transform: 'translateY(-50%)' } },
+    { d: -2, style: { top: '75%', left: '3px', transform: 'translateY(-50%)' } },
+    { d: -4, style: { bottom: '15px', left: '3px' } },
+  ];
+
+  const horizDivs = [
+    { k: 0, style: { bottom: '2px', left: '3px' } },
+    { k: 2, style: { bottom: '2px', left: '20%', transform: 'translateX(-50%)' } },
+    { k: 4, style: { bottom: '2px', left: '40%', transform: 'translateX(-50%)' } },
+    { k: 6, style: { bottom: '2px', left: '60%', transform: 'translateX(-50%)' } },
+    { k: 8, style: { bottom: '2px', left: '80%', transform: 'translateX(-50%)' } },
+    { k: 10, style: { bottom: '2px', right: '3px' } },
+  ];
+
+  return (
+    <div className="absolute inset-0 pointer-events-none select-none z-10">
+      {/* Vertical Voltage Scale Divisions */}
+      {vertDivs.map(({ d, style }) => (
+        <span
+          key={`v-${d}`}
+          style={style}
+          className={`absolute text-[8px] px-0.5 py-[0.5px] rounded leading-none font-mono flex items-center justify-center ${labelClass}`}
+        >
+          <V3Math math={formatVoltageDivLatex(offset + d * voltDiv)} />
+        </span>
+      ))}
+
+      {/* Horizontal Timebase Scale Divisions */}
+      {horizDivs.map(({ k, style }) => (
+        <span
+          key={`t-${k}`}
+          style={style}
+          className={`absolute text-[8px] px-0.5 py-[0.5px] rounded leading-none font-mono flex items-center justify-center ${labelClass}`}
+        >
+          <V3Math math={formatTimeDivLatex(k * timeDiv)} />
+        </span>
+      ))}
     </div>
   );
 }
@@ -49,6 +136,9 @@ function ScopeUnit({ colors, scope, instrumentReadings, displaySettings }: { col
     timeShift: numeric(scope.props[`timeShift_${channel}`], 0),
   }));
   const canvasBackground = displaySettings.isDarkMode ? '#0a0a0a' : '#ffffff';
+
+  const readyIndex = readings.findIndex(r => r?.status === 'ready');
+  const primaryConfig = channelConfigs[readyIndex >= 0 ? readyIndex : 0];
 
   // Redraws whenever the live samples advance, a slider edits offset/time-div/volt-div/time-shift,
   // or the theme/channel colors change — none needing more than a plain re-render to stay under 16ms.
@@ -73,7 +163,17 @@ function ScopeUnit({ colors, scope, instrumentReadings, displaySettings }: { col
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
       <div style={{ fontSize: 10, fontWeight: 700, color: colors.subtle, textTransform: 'uppercase', letterSpacing: '.05em' }}>{scope.label}</div>
-      <canvas ref={canvasRef} width={CANVAS_WIDTH} height={CANVAS_HEIGHT} style={{ width: '100%', height: CANVAS_HEIGHT, background: canvasBackground, border: '1px solid #444', borderRadius: 4, display: 'block' }} />
+      <div className="relative w-full overflow-hidden" style={{ height: CANVAS_HEIGHT, borderRadius: 4 }}>
+        <canvas ref={canvasRef} width={CANVAS_WIDTH} height={CANVAS_HEIGHT} style={{ width: '100%', height: CANVAS_HEIGHT, background: canvasBackground, border: '1px solid #444', borderRadius: 4, display: 'block' }} />
+        {displaySettings.showValues && (
+          <OscilloscopeAxisOverlay
+            timeDiv={primaryConfig.timeDiv}
+            voltDiv={primaryConfig.voltDiv}
+            offset={primaryConfig.offset}
+            isDarkMode={displaySettings.isDarkMode}
+          />
+        )}
+      </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         {CHANNELS.map((channel, index) => {
           const reading = readings[index];
@@ -85,8 +185,6 @@ function ScopeUnit({ colors, scope, instrumentReadings, displaySettings }: { col
               channel={channel}
               color={displaySettings.channelColors[index]}
               isConnected={isReady}
-              isDarkMode={displaySettings.isDarkMode}
-              showValues={displaySettings.showValues}
               measurements={isReady ? { frequency: reading.frequency ?? 0, vpp: calculateVpp(samples), vrms: reading.value, vdc: calculateVdc(samples) } : undefined}
             />
           );

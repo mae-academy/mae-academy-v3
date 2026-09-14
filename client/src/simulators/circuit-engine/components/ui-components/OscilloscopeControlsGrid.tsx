@@ -31,9 +31,9 @@ export function OscilloscopeControlsGrid({
   return (
     <div className="mt-3 pt-2.5 border-t w-full max-w-full box-border" style={{ borderColor: colors.line }}>
       <div
-        className="text-[11px] font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider text-center mb-2"
+        className="text-left text-[11px] font-semibold tracking-wider text-slate-500 uppercase mb-2"
       >
-        Display & Channels
+        Display
       </div>
 
       {/* 2-row x 3-column unified control grid with container fit & width constraints */}
