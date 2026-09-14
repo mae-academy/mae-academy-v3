@@ -1,6 +1,7 @@
 import { simplifyOrthogonalPath, snapPointToGrid, type Point } from '@/simulators/circuit-engine/models/wiring';
 import type { CircuitComponent, CircuitWire } from '@/simulators/circuit-engine/models/circuitTypes';
 import { getDef } from '@/simulators/circuit-engine/models/componentDefs';
+import { calculateOrthogonalPath } from '@/simulators/circuit-engine/models/wireRouter';
 
 export type TabDTerminalAxis = 'horizontal' | 'vertical';
 
@@ -150,24 +151,39 @@ export function dynamicRubberBandPath(
 }
 
 /**
- * Strict Single-Bend Orthogonal Path:
- * - When connecting two points (x1, y1) and (x2, y2) where Δx ≠ 0 and Δy ≠ 0:
- *   * Default strictly to an L-shape with exactly one 90° corner:
- *     - Route Option H (Horizontal first): [x1, y1] → [x2, y1] → [x2, y2]
- *     - Route Option V (Vertical first): [x1, y1] → [x1, y2] → [x2, y2]
- *   * Choose between Route Option H and Route Option V based strictly on terminal exit orientation
- *     or pull direction. Zero diagonal segments.
+ * Obstacle-avoiding orthogonal path between two terminals.
+ *
+ * When `lockedCorners` is empty (automatic routing):
+ *   - Delegates to the A* router in wireRouter.ts which builds a cost grid
+ *     from component bounding boxes and finds the shortest turn-penalised path.
+ *   - Falls back to a single-elbow L-shape if A* finds no route.
+ *
+ * When `lockedCorners` is non-empty (user-driven manual routing):
+ *   - The draft path is preserved exactly as the user placed it.
+ *
+ * The `components` + `gridSize` parameters are optional for backward
+ * compatibility with call-sites that only supply from/to/axes.
  */
 export function tabDTerminalOrthogonalPath(
   from: Point,
   to: Point,
   fromAxis?: TabDTerminalAxis,
   toAxis?: TabDTerminalAxis,
-  _gridSize?: number,
+  gridSize?: number,
   lockedCorners: Point[] = [],
   _obstacles: ObstacleBox[] = [],
+  components: CircuitComponent[] = [],
+  excludeIds: Set<string> = new Set(),
 ): Point[] {
+  // Manual routing: user-placed corners are preserved as-is.
   if (lockedCorners.length) return tabDOrthogonalDraftPath(from, to, lockedCorners, fromAxis);
+
+  // Automatic routing: use A* when we have component data and a grid size.
+  if (components.length > 0 && gridSize) {
+    return calculateOrthogonalPath(from, to, components, gridSize, excludeIds);
+  }
+
+  // Lightweight fallback (no component context, e.g. during rubber-band drag).
   return dynamicRubberBandPath(from, to, fromAxis, toAxis, 'none');
 }
 

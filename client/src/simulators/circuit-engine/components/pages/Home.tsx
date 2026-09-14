@@ -1899,6 +1899,13 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
       return;
     }
     const routing = lockedCorners.length ? 'manual' : 'orthogonal';
+
+    // Build the set of component IDs to exclude from the obstacle grid so the
+    // router can enter / exit the source and target component bodies freely.
+    const excludeIds = new Set([from.componentId, target.componentId]);
+
+    // Legacy ObstacleBox list kept for any remaining call-sites that still use
+    // the old obstacle-aware path helpers (e.g. rubber-band drag).
     const obstacles: ObstacleBox[] = components
       .filter(c => c.id !== from.componentId && c.id !== target.componentId)
       .map(c => {
@@ -1914,9 +1921,27 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
         };
       });
 
-    const path = tabDTerminalOrthogonalPath(from.position, target.position, from.axis, target.axis, gridSize, lockedCorners, obstacles);
+    // Route via A* (automatic) or via locked-corner draft (manual).
+    // Pass the full components array and gridSize so the A* router can build
+    // its obstacle grid; pass excludeIds so source/target stay freely accessible.
+    const path = tabDTerminalOrthogonalPath(
+      from.position,
+      target.position,
+      from.axis,
+      target.axis,
+      gridSize,
+      lockedCorners,
+      obstacles,
+      components,
+      excludeIds,
+    );
 
-    const waypoints = lockedCorners.length > 0 ? path.slice(1, -1) : undefined;
+    // Persist interior corners as waypoints.
+    // For A*-routed wires (routing === 'orthogonal') we also save the interior
+    // waypoints so that reconnectPathEndpoints can replay them when a component
+    // is later dragged.  For manual wires the locked corners are already the
+    // canonical waypoints.
+    const waypoints = path.length > 2 ? path.slice(1, -1) : undefined;
 
     const wire: CircuitWire = {
       id: nanoid(10),
