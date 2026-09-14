@@ -635,6 +635,21 @@ function macroFor(
       };
     }
 
+    case "opamp": {
+      const macroName = `OPAMP_${name}`;
+      const gain = formatValue(element.gain, element, "gain");
+      return {
+        name: macroName,
+        lines: [
+          `.SUBCKT ${macroName} INP INM OUT`,
+          "RIN INP INM 1E12",
+          `EGAIN INT 0 INP INM ${gain}`,
+          "ROUT INT OUT 50",
+          `.ENDS ${macroName}`,
+        ],
+      };
+    }
+
     default:
       return undefined;
   }
@@ -783,6 +798,56 @@ function singleElementLine(
       return `${line} PULSE(${v1} ${v2} ${td} ${tr} ${tf} ${pw} ${per})`;
     }
 
+    case "dc-current":
+      return `${head} DC ${formatValue(component.current, component, "current")}`;
+
+    case "ac-current": {
+      // Same DC/AC/transient triple-duty as ac-voltage above, on SPICE's `I` element instead of `V`
+      // — same reasoning throughout, just amps instead of volts.
+      const offset = formatValue(
+        component.dcOffset ?? 0,
+        component,
+        "dcOffset"
+      );
+      const rawAmplitude =
+        mode === "academic"
+          ? component.amplitude * Math.SQRT2
+          : component.amplitude;
+      const amplitude = formatValue(rawAmplitude, component, "amplitude");
+      const phase = formatValue(
+        component.phaseDegrees ?? 0,
+        component,
+        "phaseDegrees"
+      );
+      const line = `${head} DC ${offset} AC ${amplitude} ${phase}`;
+      if (!(component.frequency > 0)) return line;
+      const frequency = formatValue(
+        component.frequency,
+        component,
+        "frequency"
+      );
+      const waveform = component.waveform ?? "sine";
+      if (waveform === "sine") {
+        const sinePhase = component.phaseDegrees ? ` 0 0 ${phase}` : "";
+        return `${line} SIN(${offset} ${amplitude} ${frequency}${sinePhase})`;
+      }
+      const pulse = pulseParameters(
+        waveform,
+        rawAmplitude,
+        component.dcOffset ?? 0,
+        component.frequency,
+        component.phaseDegrees ?? 0
+      );
+      const v1 = formatValue(pulse.v1, component, "waveform");
+      const v2 = formatValue(pulse.v2, component, "waveform");
+      const td = formatValue(pulse.td, component, "waveform");
+      const tr = formatValue(pulse.tr, component, "waveform");
+      const tf = formatValue(pulse.tf, component, "waveform");
+      const pw = formatValue(pulse.pw, component, "waveform");
+      const per = formatValue(pulse.per, component, "waveform");
+      return `${line} PULSE(${v1} ${v2} ${td} ${tr} ${tf} ${pw} ${per})`;
+    }
+
     // Semiconductors are a name, their nodes, then the generated model they reference. The node
     // order — D anode/cathode, Q C/B/E, M D/G/S/B, J D/G/S — comes from `elementNets`.
     case "diode":
@@ -801,7 +866,8 @@ function singleElementLine(
     case "scr":
     case "diac":
     case "triac":
-    case "dc-motor": {
+    case "dc-motor":
+    case "opamp": {
       if (!macro) {
         throw new NetlistError(
           `${component.kind} "${component.label}" has no SPICE subcircuit.`
@@ -1157,6 +1223,8 @@ function dcLinks(element: SpiceElement): Array<[SpiceNet, SpiceNet]> {
     case "inductor":
     case "dc-voltage":
     case "ac-voltage":
+    case "dc-current":
+    case "ac-current":
     case "dc-motor":
       return [[element.positive, element.negative]];
     case "capacitor":
@@ -1193,6 +1261,8 @@ function dcLinks(element: SpiceElement): Array<[SpiceNet, SpiceNet]> {
         [element.mt1, element.gate],
         [element.gate, element.mt2],
       ];
+    case "opamp":
+      return [[element.inNonInverting, element.inInverting]];
     case "transformer":
       return [
         [element.primaryPositive, element.primaryNegative],

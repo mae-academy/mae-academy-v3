@@ -95,19 +95,20 @@ export function OscilloscopeComponentPanel({ colors, component, readings, displa
     : Infinity; // No run yet for this channel — don't restrict a control nothing has measured.
   const maxTimeDivIndex = maxFeasibleTimeDivIndex(OSCILLOSCOPE_TIME_DIV_PRESETS, dataSpanSeconds);
 
-  // Offset travel and step both scale with Volt/Div: ±4 divisions of range, 1/10 division per click —
-  // fine control on a 5mV trace, coarse control on a 100V one, instead of one fixed ±500V/5V control.
+  // Dynamic Offset Sliders: bounds derived dynamically from current Scale divisions:
+  // Voltage Offset Bounds = [-5 * current_V_div, +5 * current_V_div]
   const offsetStep = voltDiv / 10;
-  const maxOffset = voltDiv * 4;
+  const maxOffset = voltDiv * 5;
+  const minOffset = -5 * voltDiv;
   const rawOffset = numeric(component.props[offsetKey], 0);
-  const offset = Math.max(-maxOffset, Math.min(maxOffset, rawOffset));
+  const offset = Math.max(minOffset, Math.min(maxOffset, rawOffset));
 
-  // How far the visible window can scroll within what was actually captured — the same "don't show
-  // more than we have" window OscilloscopeTracePanel's own draw uses.
-  const windowSeconds = Math.min(timeDiv * GRID_DIVS_X, Number.isFinite(dataSpanSeconds) ? dataSpanSeconds : timeDiv * GRID_DIVS_X);
-  const maxTimeShift = Number.isFinite(dataSpanSeconds) ? Math.max(0, dataSpanSeconds - windowSeconds) : 0;
+  // Time Shift Bounds = [0, +10 * current_T_div]
+  const minTimeShift = 0;
+  const maxTimeShift = 10 * timeDiv;
+  const timeShiftStep = (10 * timeDiv) / 100;
   const rawTimeShift = numeric(component.props[timeShiftKey], 0);
-  const timeShift = Math.max(-maxTimeShift, Math.min(maxTimeShift, rawTimeShift));
+  const timeShift = Math.max(minTimeShift, Math.min(maxTimeShift, rawTimeShift));
 
   const handleAutoscale = () => {
     if (!channelSamples || channelSamples.length < 2) return;
@@ -140,7 +141,7 @@ export function OscilloscopeComponentPanel({ colors, component, readings, displa
       <StepArrowRow
         colors={colors}
         mathLabel={`V_{\\text{offset}} = ${offset.toFixed(2)}\\ \\text{V}`}
-        min={-maxOffset}
+        min={minOffset}
         max={maxOffset}
         step={offsetStep}
         value={offset}
@@ -170,9 +171,9 @@ export function OscilloscopeComponentPanel({ colors, component, readings, displa
       <StepArrowRow
         colors={colors}
         mathLabel={`t_{\\text{shift}} = ${formatTimeLatex(timeShift)}`}
-        min={-maxTimeShift}
+        min={minTimeShift}
         max={maxTimeShift}
-        step={maxTimeShift > 0 ? maxTimeShift / 100 : 1}
+        step={timeShiftStep}
         value={timeShift}
         onChange={next => onPropertyChange(timeShiftKey, next)}
         onReset={timeShift !== 0 ? () => onPropertyChange(timeShiftKey, 0) : undefined}

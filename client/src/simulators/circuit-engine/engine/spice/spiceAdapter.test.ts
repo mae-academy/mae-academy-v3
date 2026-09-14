@@ -522,8 +522,8 @@ describe("convertToSpiceComponents", () => {
     const attempt = () =>
       convertToSpiceComponents(
         [
-          part("i", "dc-current", {}, "I1"),
-          part("u", "opamp", {}, "U1"),
+          part("i", "vccs", {}, "I1"),
+          part("u", "vcvs", {}, "U1"),
           part("v", "ac-voltage", { waveform: "noise" }, "V1"),
           part("r", "resistor"),
         ],

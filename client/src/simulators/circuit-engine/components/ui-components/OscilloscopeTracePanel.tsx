@@ -160,19 +160,19 @@ function ScopeUnit({ colors, scope, instrumentReadings, displaySettings }: { col
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sampleKey, configKey, themeKey]);
 
+  const modeText = displaySettings.acquisitionMode === 'step' ? 'STEP' : 'ROLL';
+  const timeDivStr = formatTimeDivLatex(primaryConfig.timeDiv);
+  const voltDivStr = formatVoltageDivLatex(primaryConfig.voltDiv).replace(/^[+-]/, '');
+  const headerLatex = displaySettings.showValues
+    ? `${timeDivStr}\\text{ /div} \\cdot ${voltDivStr}\\text{ /div} \\quad \\textbf{${modeText}}`
+    : `\\textbf{${modeText}}`;
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
       <div className="flex items-center justify-between">
         <div style={{ fontSize: 10, fontWeight: 700, color: colors.subtle, textTransform: 'uppercase', letterSpacing: '.05em' }}>{scope.label}</div>
         <div className="flex items-center gap-2">
-          {displaySettings.showValues && (
-            <span className="text-[9px] font-mono text-slate-400">
-              {primaryConfig.timeDiv >= 1e-3 ? `${(primaryConfig.timeDiv * 1e3).toFixed(0)} ms/div` : `${(primaryConfig.timeDiv * 1e6).toFixed(0)} μs/div`} · {primaryConfig.voltDiv} V/div
-            </span>
-          )}
-          <span className="text-[9px] font-mono font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-            {displaySettings.acquisitionMode === 'step' ? 'Step' : 'Roll'}
-          </span>
+          <V3Math math={headerLatex} className="text-[10px] text-slate-400 font-mono" />
         </div>
       </div>
       <div className="relative overflow-hidden rounded" style={{ width: '100%', height: CANVAS_HEIGHT, border: `1px solid ${colors.line}` }}>

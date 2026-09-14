@@ -72,5 +72,7 @@ export function calculateAutoscale(samples: SamplePoint[], frequencyHz: number):
   const candidates = feasible.length > 0 ? feasible : [OSCILLOSCOPE_TIME_DIV_PRESETS[0]];
   const timeDiv = candidates.find(preset => preset >= requiredTimeDiv) ?? candidates[candidates.length - 1];
 
-  return { offset, voltDiv, timeDiv, timeShift: 0 };
+  // Calculate required Volt/Div and Time/Div, and strictly reset offset and timeShift to 0
+  // placing physical sliders dead-center.
+  return { offset: 0, voltDiv, timeDiv, timeShift: 0 };
 }

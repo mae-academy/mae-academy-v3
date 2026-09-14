@@ -159,7 +159,14 @@ export async function runNgspiceWithLog(
     throw new Error(`Failed to initialize ngspice: ${describe(cause)}`);
   });
 
-  module.FS.writeFile(NETLIST_PATH, netlist);
+  // ngspice always reads line 1 as the deck's title (a comment, whatever it says) — but a netlist
+  // string built from a template literal like `\n  Title\n  V1 ...` has an actual *blank* line 1,
+  // which this build doesn't tolerate: it loses its place by one line, and everything after is
+  // misread (confirmed directly — the exact same deck parses fine with the blank line stripped and
+  // fails without, regardless of the title's own wording or word count, which repeatedly looked like
+  // the cause but wasn't). Every caller in this file's test family is one such template literal, so
+  // this is stripped centrally rather than leaving each test to remember not to lead with a newline.
+  module.FS.writeFile(NETLIST_PATH, netlist.replace(/^(?:[ \t]*\n)+/, ""));
   callMain(module, ["ngspice", "-b", "-n", "-r", RAWFILE_PATH, NETLIST_PATH]);
 
   const text = log.join("\n").trim();

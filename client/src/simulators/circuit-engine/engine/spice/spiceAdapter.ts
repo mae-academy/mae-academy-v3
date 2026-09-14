@@ -1222,12 +1222,58 @@ function mapPart(ctx: PartContext): Mapping {
         : [resistor(self(ctx), net("hi"), net("com"), DMM_INPUT_IMPEDANCE)];
     }
 
-    /* --------------------------------------------------------------------------- Unsupported --- */
     case "dc-current":
-    case "ac-current":
-      return {
-        unsupported: "current sources are not in the SPICE component set",
-      };
+      return [
+        {
+          kind: "dc-current",
+          ...self(ctx),
+          positive: net("pos"),
+          negative: net("neg"),
+          current: num("current", 1),
+        },
+      ];
+
+    case "ac-current": {
+      if (stringProp(component, "phases", "single") !== "single") {
+        return { unsupported: "three-phase configuration" };
+      }
+      const waveform = stringProp(component, "waveform", "sine");
+      if (
+        waveform !== "sine" &&
+        waveform !== "square" &&
+        waveform !== "triangle" &&
+        waveform !== "sawtooth"
+      ) {
+        return { unsupported: `${waveform} waveform is not modelled` };
+      }
+      // Phasor handling mirrors ac-voltage's own — see its case above.
+      let amplitude: number;
+      let phaseDegrees: number;
+      if (stringProp(component, "format", "polar") === "rectangular") {
+        const real = num("real", 1);
+        const imag = num("imag", 0);
+        amplitude = Math.hypot(real, imag);
+        phaseDegrees = (Math.atan2(imag, real) * 180) / Math.PI;
+      } else {
+        amplitude = num("amplitude", 1);
+        phaseDegrees = toDegrees(component, num("phase", 0));
+      }
+      return [
+        {
+          kind: "ac-current",
+          ...self(ctx),
+          positive: net("pos"),
+          negative: net("neg"),
+          amplitude,
+          phaseDegrees,
+          frequency: num("frequency", 60),
+          dcOffset: num("offset", 0),
+          waveform: waveform as "sine" | "square" | "triangle" | "sawtooth",
+        },
+      ];
+    }
+
+    /* --------------------------------------------------------------------------- Unsupported --- */
     case "vccs":
     case "vcvs":
     case "cccs":
@@ -1235,8 +1281,21 @@ function mapPart(ctx: PartContext): Mapping {
       return {
         unsupported: "dependent sources are not in the SPICE component set",
       };
-    case "opamp":
-      return { unsupported: "no op-amp macromodel" };
+    case "opamp": {
+      const gain = Math.max(1, num("gain", 100000));
+      const vcc = num("vcc", 15);
+      return [
+        {
+          kind: "opamp",
+          ...self(ctx),
+          inNonInverting: net("in+"),
+          inInverting: net("in-"),
+          out: net("out"),
+          gain,
+          vcc,
+        },
+      ];
+    }
     default:
       return { unsupported: "no SPICE mapping" };
   }

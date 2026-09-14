@@ -98,10 +98,10 @@ describe("calculateVdc — time-weighted, so it should diverge from a naive mean
 });
 
 describe("calculateAutoscale — fits the real signal, not a guess", () => {
-  it("centers the offset on the signal's actual midpoint and picks Volt/Div to fit ~6 divisions", () => {
+  it("resets offset to 0 and picks Volt/Div to fit ~6 divisions", () => {
     const samples = evenSine(3, 100, 4, 1); // swings from -3 to 5, midpoint 1, peak-to-peak 8
     const result = calculateAutoscale(samples, 60);
-    expect(result.offset).toBeCloseTo(1, 1);
+    expect(result.offset).toBe(0);
     // 8V peak-to-peak / 6 divisions ≈ 1.33 required V/div — smallest preset ≥ that.
     const requiredVoltDiv = 8 / 6;
     const expectedVoltDiv = OSCILLOSCOPE_VOLT_DIV_PRESETS.find(preset => preset >= requiredVoltDiv);

@@ -61,6 +61,26 @@ export interface SpiceDcVoltageSource extends SpiceTwoTerminal {
   voltage: number;
 }
 
+export interface SpiceDcCurrentSource extends SpiceTwoTerminal {
+  kind: "dc-current";
+  /** Amps, flowing from `positive` to `negative` inside the source (SPICE's own `I` convention). */
+  current: number;
+}
+
+export interface SpiceAcCurrentSource extends SpiceTwoTerminal {
+  kind: "ac-current";
+  /** Peak amplitude in amps, used both as the AC magnitude and the SIN()/PULSE() amplitude. */
+  amplitude: number;
+  /** Hertz. Drives the emitted transient spec. */
+  frequency: number;
+  /** Degrees. SPICE's `AC <mag> <phase>` phase is always in degrees. */
+  phaseDegrees?: number;
+  /** Amps. Becomes the source's DC operating-point value and the SIN()/PULSE() offset. */
+  dcOffset?: number;
+  /** Same waveform menu as SpiceAcVoltageSource — see its own doc comment. */
+  waveform?: "sine" | "square" | "triangle" | "sawtooth";
+}
+
 export interface SpiceAcVoltageSource extends SpiceTwoTerminal {
   kind: "ac-voltage";
   /** Peak amplitude in volts, used both as the AC magnitude and the SIN()/PULSE() amplitude. */
@@ -242,6 +262,18 @@ export interface SpiceDcMotor extends SpiceElementBase {
   loadTorque?: number;
 }
 
+/**
+  * Operational Amplifier macromodel. Open-loop gain with differential input resistance and output resistance.
+  */
+export interface SpiceOpAmp extends SpiceElementBase {
+  kind: "opamp";
+  inNonInverting: SpiceNet;
+  inInverting: SpiceNet;
+  out: SpiceNet;
+  gain: number;
+  vcc?: number;
+}
+
 /* ------------------------------------------------------------ Switches & electromechanical --- */
 
 /** Manual single-pole single-throw contact. `isClosed` is the live UI state. */
@@ -310,6 +342,8 @@ export type SpiceComponent =
   | SpiceInductor
   | SpiceDcVoltageSource
   | SpiceAcVoltageSource
+  | SpiceDcCurrentSource
+  | SpiceAcCurrentSource
   | SpiceDiode
   | SpiceBjt
   | SpiceMosfet
@@ -324,7 +358,8 @@ export type SpiceComponent =
   | SpiceSwitchSPST
   | SpiceSwitchSPDT
   | SpiceRelay
-  | SpiceContactor;
+  | SpiceContactor
+  | SpiceOpAmp;
 
 export type SpiceComponentKind = SpiceComponent["kind"];
 
@@ -338,6 +373,8 @@ export const SPICE_PREFIXES: Record<
   inductor: "L",
   "dc-voltage": "V",
   "ac-voltage": "V",
+  "dc-current": "I",
+  "ac-current": "I",
   diode: "D",
   bjt: "Q",
   mosfet: "M",
@@ -347,6 +384,7 @@ export const SPICE_PREFIXES: Record<
   diac: "X",
   triac: "X",
   "dc-motor": "X",
+  opamp: "X",
   // Transformers emit no element line of their own; `T` is only the root the generated L and K
   // names are derived from, so it never collides with SPICE's `T` transmission line.
   transformer: "T",
@@ -385,6 +423,15 @@ export function elementNets(
     case "dc-voltage":
     case "ac-voltage":
       return [element.positive, element.negative];
+    // SPICE's `I n1 n2 <value>` pushes current from n2 out into the external circuit and back into
+    // n1 (current flows n1->n2 *inside* the source, like a battery's internal current flows -to+) —
+    // opposite of a voltage source, whose n1 (`positive`) really is the schematic's `+` terminal at
+    // the higher potential. Swapped here (not by negating the value) so `positive` keeps meaning
+    // "the schematic's + terminal" everywhere else this type is read, confirmed against real
+    // ngspice.wasm output in ngspiceRegression.currentSources.test.ts.
+    case "dc-current":
+    case "ac-current":
+      return [element.negative, element.positive];
     case "diode":
       return [element.anode, element.cathode];
     case "bjt":
@@ -404,6 +451,8 @@ export function elementNets(
       return [element.a1, element.a2];
     case "triac":
       return [element.mt1, element.gate, element.mt2];
+    case "opamp":
+      return [element.inNonInverting, element.inInverting, element.out];
     case "transformer":
       return [
         element.primaryPositive,
