@@ -1219,7 +1219,18 @@ const DigitalOutputSymbol: SymbolFC = () => <g>
 
 // ─── CLASSIC CONTROL SYMBOLS ─────────────────────────────────────────────────────
 
-
+/**
+ * IEC 60617 Electromagnetic Coil Symbol (EM Coil / Relay Coil / Contactor Coil)
+ *
+ * Geometry (centered at 0,0):
+ *   Terminal stubs : lines from +-30 to +-20 on X axis (touch rect edge exactly)
+ *   Body rectangle : 40 x 30 px, sharp corners (rx=0), transparent fill
+ *   Diagonal line  : single crisp stroke from bottom-left (-18,13) to top-right (18,-13)
+ *
+ * Theme contract:
+ *   All strokes use currentColor so Light/Dark modes work automatically.
+ *   Only the energized amber accent and conflict red border override color.
+ */
 const CoilSymbol: SymbolFC = ({ powered, props }) => {
   const energized = Boolean(powered);
   const isConflicted = Boolean(props?.isConflicted);
@@ -1228,73 +1239,49 @@ const CoilSymbol: SymbolFC = ({ powered, props }) => {
   const borderDash = isConflicted ? '4,3' : 'none';
   const borderWidth = isConflicted ? 1.5 : 1.5;
   const diagStroke = energized ? '#F59E0B' : 'currentColor';
+  const diagWidth = energized ? 2 : 1.5;
 
   return (
     <g>
-      {/* طرف التوصيل الأيسر - على خط المنتصف y=0 تماماً من -40 إلى -20 */}
-      <line
-        x1={-40}
-        y1={0}
-        x2={-20}
-        y2={0}
-        stroke="currentColor"
-        strokeWidth={1.5}
-        strokeLinecap="round"
-      />
+      {/* Left terminal stub — touches rect left edge at x=-20 */}
+      <line x1={-30} y1={0} x2={-20} y2={0} stroke="currentColor" strokeWidth={1} strokeLinecap="square" />
+      {/* Right terminal stub — touches rect right edge at x=+20 */}
+      <line x1={20} y1={0} x2={30} y2={0} stroke="currentColor" strokeWidth={1} strokeLinecap="square" />
 
-      {/* طرف التوصيل الأيمن - على خط المنتصف y=0 تماماً من 20 إلى 40 */}
-      <line
-        x1={20}
-        y1={0}
-        x2={40}
-        y2={0}
-        stroke="currentColor"
-        strokeWidth={1.5}
-        strokeLinecap="round"
-      />
-
-      {/* جسم الملف القياسي: 40x30 ممركز بدقة عند (0, 0) */}
+      {/* Coil body: 40x30 px, sharp corners, transparent so theme shows through */}
       <rect
-        x={-20}
-        y={-15}
-        width={40}
-        height={30}
+        x={-20} y={-15} width={40} height={30}
         fill="transparent"
         stroke={borderStroke}
         strokeWidth={borderWidth}
         strokeDasharray={borderDash}
-        rx={0}
-        ry={0}
+        rx={0} ry={0}
       />
 
-      {/* مؤشر التغذية (Energized State) بإطار داخلي متناسق */}
+      {/* Energized accent ring — amber, fill=none, inset 1px */}
       {energized && (
         <rect
-          x={-18.5}
-          y={-13.5}
-          width={37}
-          height={27}
+          x={-19} y={-14} width={38} height={28}
           fill="none"
-          stroke="#F59E0B"
-          strokeWidth={1.5}
-          strokeOpacity={0.6}
+          stroke="#0b3ef5ff"
+          strokeWidth={2}
+          strokeOpacity={0.45}
+          rx={0} ry={0}
         />
       )}
 
-      {/* خط IEC المائل للملف - محصور بدقة داخل زوايا المستطيل الداخلية دون أي بروز */}
+      {/* IEC winding indicator: single diagonal from bottom-left to top-right inner corner */}
       <line
-        x1={-20}
-        y1={15}
-        x2={20}
-        y2={-15}
+        x1={-18} y1={13}
+        x2={18} y2={-13}
         stroke={diagStroke}
-        strokeWidth={1.5}
+        strokeWidth={diagWidth}
         strokeLinecap="round"
       />
 
-      {/* نقطة تعارض الإشارة (Conflict Warning) عند الزاوية العلوية */}
+      {/* Conflict warning dot at top-right corner */}
       {isConflicted && (
-        <circle cx={15} cy={-10} r={3.5} fill="#EF4444" />
+        <circle cx={18} cy={-13} r={4} fill="#EF4444" />
       )}
     </g>
   );
