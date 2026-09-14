@@ -201,5 +201,12 @@ describe('Coil Component and Conflict Detection', () => {
     // NC contact closes -> R_NC conducts ~12V / 100Ω = 0.12A
     expect(Math.abs(snapshot.branchCurrents['R_NC'])).toBeCloseTo(0.12, 2);
   });
+
+  it('defaults aux contact label to K? and supports label synchronization to linked coil', async () => {
+    const { nextComponentLabel } = await import('@/simulators/circuit-engine/models/circuitTypes');
+    expect(nextComponentLabel('aux-contact-no', [])).toBe('K?');
+    expect(nextComponentLabel('aux-contact-nc', [])).toBe('K?');
+    expect(nextComponentLabel('coil', [])).toBe('K1');
+  });
 });
 

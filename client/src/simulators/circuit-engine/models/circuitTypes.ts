@@ -157,6 +157,7 @@ export function componentPrefix(type: string): string {
 
 export function nextComponentLabel(type: string, components: CircuitComponent[]): string {
   if (type === 'ground') return 'GND';
+  if (type === 'aux-contact-no' || type === 'aux-contact-nc') return 'K?';
   const prefix = componentPrefix(type);
   const expression = new RegExp(`^${prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\d+)$`, 'i');
   const next = components.reduce((max, component) => {

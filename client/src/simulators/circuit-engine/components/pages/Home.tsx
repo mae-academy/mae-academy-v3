@@ -1790,7 +1790,15 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
       const ledPreset = component.type === 'led' && key === 'color'
         ? { forwardVoltage: LED_FORWARD_VOLTAGES[String(value)] ?? component.props.forwardVoltage }
         : undefined;
-      return { ...component, props: { ...component.props, [key]: value, ...(diodeMaterial ?? {}), ...(ledPreset ?? {}) } };
+      const isAuxContact = component.type === 'aux-contact-no' || component.type === 'aux-contact-nc';
+      const nextLabel = (isAuxContact && key === 'linkedTo')
+        ? (value && String(value).trim() ? String(value).trim() : 'K?')
+        : component.label;
+      return {
+        ...component,
+        label: nextLabel,
+        props: { ...component.props, [key]: value, ...(diodeMaterial ?? {}), ...(ledPreset ?? {}) },
+      };
     });
     // `state` (switches, breakers, pushbuttons), `manualState` (forced relay/contactor contacts) and
     // an LED's colour all change the circuit electrically rather than cosmetically — SPICE should
@@ -3119,7 +3127,7 @@ function ComponentInspector({ colors, component, definition, allComponents, link
           : <PropertyEditorField key={key} colors={colors} label={label} definition={property} value={value} onChange={nextValue => onPropertyChange(key, nextValue)} />;
       })}
     </InspectorSection>}
-    {component.type === 'oscilloscope' && <OscilloscopeComponentPanel colors={colors} component={component} readings={snapshot.instrumentReadings} onPropertyChange={onPropertyChange} />}
+    {component.type === 'oscilloscope' && <OscilloscopeComponentPanel colors={colors} component={component} onPropertyChange={onPropertyChange} />}
 
   </div>;
 }
