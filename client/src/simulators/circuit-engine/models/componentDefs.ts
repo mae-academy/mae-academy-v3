@@ -1011,6 +1011,12 @@ const MEASUREMENT: Record<string, ComponentDef> = {
       voltDiv_ch2: { type: 'number', value: 5, unit: 'V', label: 'CH2 Volt/Div', hidden: true },
       voltDiv_ch3: { type: 'number', value: 5, unit: 'V', label: 'CH3 Volt/Div', hidden: true },
       voltDiv_ch4: { type: 'number', value: 5, unit: 'V', label: 'CH4 Volt/Div', hidden: true },
+      // Horizontal scroll within the captured transient window — a viewing aid, not a real trigger
+      // delay, so it's clamped to the available data span at render time rather than here.
+      timeShift_ch1: { type: 'number', value: 0, unit: 's', label: 'CH1 Time Shift', hidden: true },
+      timeShift_ch2: { type: 'number', value: 0, unit: 's', label: 'CH2 Time Shift', hidden: true },
+      timeShift_ch3: { type: 'number', value: 0, unit: 's', label: 'CH3 Time Shift', hidden: true },
+      timeShift_ch4: { type: 'number', value: 0, unit: 's', label: 'CH4 Time Shift', hidden: true },
     },
     description: 'Four-channel scope; every channel is referenced to its connected ground probe',
   },

@@ -63,14 +63,19 @@ export interface SpiceDcVoltageSource extends SpiceTwoTerminal {
 
 export interface SpiceAcVoltageSource extends SpiceTwoTerminal {
   kind: "ac-voltage";
-  /** Peak amplitude in volts, used both as the AC magnitude and the SIN() amplitude. */
+  /** Peak amplitude in volts, used both as the AC magnitude and the SIN()/PULSE() amplitude. */
   amplitude: number;
-  /** Hertz. Drives the emitted SIN() transient spec. */
+  /** Hertz. Drives the emitted transient spec. */
   frequency: number;
   /** Degrees. SPICE's `AC <mag> <phase>` phase is always in degrees. */
   phaseDegrees?: number;
-  /** Volts. Becomes the source's DC operating-point value and the SIN() offset. */
+  /** Volts. Becomes the source's DC operating-point value and the SIN()/PULSE() offset. */
   dcOffset?: number;
+  /**
+   * Transient shape. `.AC` always sees a sinusoid (SPICE has no small-signal model for the others) —
+   * this only changes what the `.tran` line emits. Defaults to "sine".
+   */
+  waveform?: "sine" | "square" | "triangle" | "sawtooth";
 }
 
 /* -------------------------------------------------------------------------- Semiconductors --- */

@@ -717,8 +717,13 @@ function mapPart(ctx: PartContext): Mapping {
 
     case "ac-voltage": {
       const waveform = stringProp(component, "waveform", "sine");
-      if (waveform !== "sine") {
-        return { unsupported: `${waveform} waveform has no SIN() equivalent` };
+      if (
+        waveform !== "sine" &&
+        waveform !== "square" &&
+        waveform !== "triangle" &&
+        waveform !== "sawtooth"
+      ) {
+        return { unsupported: `${waveform} waveform is not modelled` };
       }
       if (stringProp(component, "phases", "single") !== "single") {
         return { unsupported: "three-phase configuration" };
@@ -745,6 +750,7 @@ function mapPart(ctx: PartContext): Mapping {
           phaseDegrees,
           frequency: num("frequency", 60),
           dcOffset: num("offset", 0),
+          waveform: waveform as "sine" | "square" | "triangle" | "sawtooth",
         },
       ];
     }

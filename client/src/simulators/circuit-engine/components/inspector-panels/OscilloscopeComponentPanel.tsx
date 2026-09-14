@@ -5,7 +5,10 @@ import { useState } from 'react';
 import type { CircuitComponent, InstrumentReading } from '@/simulators/circuit-engine/models/circuitTypes';
 import { formatEngineering } from '@/simulators/circuit-engine/models/circuitTypes';
 import { OSCILLOSCOPE_TIME_DIV_PRESETS, OSCILLOSCOPE_VOLT_DIV_PRESETS } from '@/simulators/circuit-engine/models/componentDefs';
-import { CHANNEL_COLORS, GRID_DIVS_X } from '@/simulators/circuit-engine/components/ui-components/OscilloscopeTracePanel';
+import { GRID_DIVS_X } from '@/simulators/circuit-engine/components/ui-components/OscilloscopeTracePanel';
+import { calculateAutoscale } from '@/simulators/circuit-engine/components/ui-components/oscilloscopeMeasurements';
+import { EducationalToolsPanel } from '@/simulators/circuit-engine/components/ui-components/EducationalToolsPanel';
+import { DARK_CHANNEL_COLORS, LIGHT_CHANNEL_COLORS, type OscilloscopeDisplaySettings } from '@/simulators/circuit-engine/components/ui-components/oscilloscopeDisplaySettings';
 import { V3Math } from '@/components/ui/V3Math';
 
 type PanelColors = { line: string; subtle: string; muted: string };
@@ -59,18 +62,28 @@ function maxFeasibleTimeDivIndex(presets: number[], dataSpanSeconds: number): nu
   return max;
 }
 
-export function OscilloscopeComponentPanel({ colors, component, readings, onPropertyChange }: { colors: PanelColors; component: CircuitComponent; readings: Record<string, InstrumentReading>; onPropertyChange: (key: string, value: unknown) => void }) {
+export function OscilloscopeComponentPanel({ colors, component, readings, displaySettings, onDisplaySettingsChange, onPropertyChange, onPropertiesChange }: {
+  colors: PanelColors;
+  component: CircuitComponent;
+  readings: Record<string, InstrumentReading>;
+  displaySettings: OscilloscopeDisplaySettings;
+  onDisplaySettingsChange: (next: Partial<OscilloscopeDisplaySettings>) => void;
+  onPropertyChange: (key: string, value: unknown) => void;
+  onPropertiesChange: (updates: Record<string, unknown>) => void;
+}) {
   const [selectedChannel, setSelectedChannel] = useState<Channel>('ch1');
   const channelIndex = CHANNELS.indexOf(selectedChannel);
-  const channelColor = CHANNEL_COLORS[channelIndex];
+  const channelColor = displaySettings.channelColors[channelIndex];
 
   const offsetKey = `offset_${selectedChannel}`;
   const timeDivKey = `timeDiv_${selectedChannel}`;
   const voltDivKey = `voltDiv_${selectedChannel}`;
+  const timeShiftKey = `timeShift_${selectedChannel}`;
   const timeDiv = numeric(component.props[timeDivKey], 0.01);
   const voltDiv = numeric(component.props[voltDivKey], 5);
 
-  const channelSamples = readings[`${component.id}:${selectedChannel}`]?.samples;
+  const reading = readings[`${component.id}:${selectedChannel}`];
+  const channelSamples = reading?.samples;
   const dataSpanSeconds = channelSamples && channelSamples.length > 1
     ? channelSamples[channelSamples.length - 1].time - channelSamples[0].time
     : Infinity; // No run yet for this channel — don't restrict a control nothing has measured.
@@ -83,6 +96,24 @@ export function OscilloscopeComponentPanel({ colors, component, readings, onProp
   const rawOffset = numeric(component.props[offsetKey], 0);
   const offset = Math.max(-maxOffset, Math.min(maxOffset, rawOffset));
 
+  // How far the visible window can scroll within what was actually captured — the same "don't show
+  // more than we have" window OscilloscopeTracePanel's own draw uses.
+  const windowSeconds = Math.min(timeDiv * GRID_DIVS_X, Number.isFinite(dataSpanSeconds) ? dataSpanSeconds : timeDiv * GRID_DIVS_X);
+  const maxTimeShift = Number.isFinite(dataSpanSeconds) ? Math.max(0, dataSpanSeconds - windowSeconds) : 0;
+  const rawTimeShift = numeric(component.props[timeShiftKey], 0);
+  const timeShift = Math.max(-maxTimeShift, Math.min(maxTimeShift, rawTimeShift));
+
+  const handleAutoscale = () => {
+    if (!channelSamples || channelSamples.length < 2) return;
+    const result = calculateAutoscale(channelSamples, reading?.frequency ?? 0);
+    onPropertiesChange({
+      [offsetKey]: result.offset,
+      [timeDivKey]: result.timeDiv,
+      [voltDivKey]: result.voltDiv,
+      [timeShiftKey]: result.timeShift,
+    });
+  };
+
   return (
     <section style={{ padding: '12px 15px', borderBottom: `1px solid ${colors.line}` }}>
       <div className="text-[12px] font-bold text-black uppercase tracking-wider" style={{ marginBottom: 8 }}>Oscilloscope settings</div>
@@ -94,7 +125,7 @@ export function OscilloscopeComponentPanel({ colors, component, readings, onProp
           onChange={event => setSelectedChannel(event.target.value as Channel)}
           style={{ height: 32, borderRadius: 8, border: `1px solid ${colors.line}`, padding: '4px 10px', fontSize: 13, fontWeight: 700, color: channelColor, background: '#fff' }}
         >
-          {CHANNELS.map((channel, index) => <option key={channel} value={channel} style={{ color: CHANNEL_COLORS[index] }}>{channel.toUpperCase()}</option>)}
+          {CHANNELS.map((channel, index) => <option key={channel} value={channel} style={{ color: displaySettings.channelColors[index] }}>{channel.toUpperCase()}</option>)}
         </select>
       </label>
 
@@ -127,15 +158,113 @@ export function OscilloscopeComponentPanel({ colors, component, readings, onProp
         value={voltDiv}
         onChange={next => onPropertyChange(voltDivKey, next)}
       />
+
+      <StepArrowRow
+        colors={colors}
+        label="Time shift (s)"
+        displayMath={timeShiftMath(timeShift)}
+        min={-maxTimeShift}
+        max={maxTimeShift}
+        step={maxTimeShift > 0 ? maxTimeShift / 100 : 1}
+        value={timeShift}
+        onChange={next => onPropertyChange(timeShiftKey, next)}
+        onReset={timeShift !== 0 ? () => onPropertyChange(timeShiftKey, 0) : undefined}
+      />
+
+      <button
+        type="button"
+        onClick={handleAutoscale}
+        disabled={!channelSamples || channelSamples.length < 2}
+        style={{
+          width: '100%', marginTop: 6, padding: '9px 12px', borderRadius: 8, border: 'none',
+          background: !channelSamples || channelSamples.length < 2 ? '#cbd5e1' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          color: '#fff', fontWeight: 700, fontSize: 12, letterSpacing: '.04em', textTransform: 'uppercase',
+          cursor: !channelSamples || channelSamples.length < 2 ? 'default' : 'pointer',
+        }}
+        title="Fit Offset / Time-Div / Volt-Div to this channel's captured signal"
+      >
+        ⬜ Autoscale
+      </button>
+
+      <EducationalToolsPanel colors={colors} samples={channelSamples ?? []} frequencyHz={reading?.frequency ?? 0} />
+
+      <DisplaySettingsSection colors={colors} settings={displaySettings} onChange={onDisplaySettingsChange} />
     </section>
+  );
+}
+
+function timeShiftMath(seconds: number): string {
+  if (seconds === 0) return '\\text{Shift} = 0\\ \\text{s}';
+  const sign = seconds > 0 ? '+' : '';
+  const abs = Math.abs(seconds);
+  if (abs < 1e-6) return `\\text{Shift} = ${sign}${(seconds * 1e9).toFixed(1)}\\ \\text{ns}`;
+  if (abs < 1e-3) return `\\text{Shift} = ${sign}${(seconds * 1e6).toFixed(1)}\\ \\mu\\text{s}`;
+  if (abs < 1) return `\\text{Shift} = ${sign}${(seconds * 1e3).toFixed(2)}\\ \\text{ms}`;
+  return `\\text{Shift} = ${sign}${seconds.toFixed(3)}\\ \\text{s}`;
+}
+
+/** Viewer preference (theme + channel colors) — see oscilloscopeDisplaySettings.ts for why this is
+ * localStorage-backed rather than a component.props field like every other control on this panel. */
+function DisplaySettingsSection({ colors, settings, onChange }: { colors: PanelColors; settings: OscilloscopeDisplaySettings; onChange: (next: Partial<OscilloscopeDisplaySettings>) => void }) {
+  const defaults = settings.isDarkMode ? DARK_CHANNEL_COLORS : LIGHT_CHANNEL_COLORS;
+  const setChannelColor = (index: number, color: string) => {
+    const next = [...settings.channelColors] as [string, string, string, string];
+    next[index] = color;
+    onChange({ channelColors: next });
+  };
+  return (
+    <div style={{ marginTop: 12, paddingTop: 10, borderTop: `1px solid ${colors.line}` }}>
+      <div style={{ fontSize: 10, fontWeight: 700, color: colors.subtle, textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 8 }}>Display settings</div>
+
+      <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+        <ThemeButton label="☀️ Light" active={!settings.isDarkMode} onClick={() => onChange({ isDarkMode: false, channelColors: LIGHT_CHANNEL_COLORS })} />
+        <ThemeButton label="🌙 Dark" active={settings.isDarkMode} onClick={() => onChange({ isDarkMode: true, channelColors: DARK_CHANNEL_COLORS })} />
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+        {CHANNELS.map((channel, index) => (
+          <div key={channel} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ width: 30, fontSize: 11, fontWeight: 700, color: settings.channelColors[index] }}>{channel.toUpperCase()}</span>
+            <input
+              type="color"
+              aria-label={`${channel.toUpperCase()} trace color`}
+              value={settings.channelColors[index]}
+              onChange={event => setChannelColor(index, event.target.value)}
+              style={{ width: 32, height: 28, border: `1px solid ${colors.line}`, borderRadius: 4, padding: 0, cursor: 'pointer' }}
+            />
+            <span style={{ flex: 1, fontSize: 10, fontFamily: 'ui-monospace, monospace', color: colors.muted, textTransform: 'uppercase' }}>{settings.channelColors[index]}</span>
+            <button
+              type="button"
+              aria-label={`Reset ${channel.toUpperCase()} color`}
+              onClick={() => setChannelColor(index, defaults[index])}
+              style={{ width: 22, height: 22, borderRadius: 6, border: `1px solid ${colors.line}`, background: '#fff', fontSize: 12, cursor: 'pointer' }}
+            >
+              ⟳
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ThemeButton({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{ flex: 1, padding: '7px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: `1px solid ${active ? '#2563eb' : '#d0d0d0'}`, background: active ? '#2563eb' : '#fff', color: active ? '#fff' : '#334155' }}
+    >
+      {label}
+    </button>
   );
 }
 
 const RANGE_INPUT_CLASS = "h-1.5 w-full cursor-pointer appearance-none rounded-full bg-brand-gradient [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-0 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:ring-2 [&::-webkit-slider-thumb]:ring-blue-500 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:shadow";
 
-/** Offset control: continuous within [min,max] at a Volt/Div-derived step, with prev/next buttons
- * that snap an out-of-range stored value (left over from a since-changed Volt/Div) back in bounds. */
-function StepArrowRow({ colors, label, displayMath, min, max, step, value, onChange }: { colors: PanelColors; label: string; displayMath: string; min: number; max: number; step: number; value: number; onChange: (value: number) => void }) {
+/** Offset/time-shift control: continuous within [min,max] at a fixed step, with prev/next buttons
+ * that snap an out-of-range stored value back in bounds, plus an optional reset-to-0 button. */
+function StepArrowRow({ colors, label, displayMath, min, max, step, value, onChange, onReset }: { colors: PanelColors; label: string; displayMath: string; min: number; max: number; step: number; value: number; onChange: (value: number) => void; onReset?: () => void }) {
   return (
     <div style={{ marginBottom: 10 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 10, fontWeight: 700, color: colors.subtle, textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 4 }}>
@@ -145,6 +274,7 @@ function StepArrowRow({ colors, label, displayMath, min, max, step, value, onCha
         <StepButton disabled={value <= min} onClick={() => onChange(Math.max(min, value - step))} label={`Decrease ${label}`}>‹</StepButton>
         <input aria-label={label} type="range" min={min} max={max} step={step} value={value} onChange={event => onChange(Number(event.target.value))} className={RANGE_INPUT_CLASS} />
         <StepButton disabled={value >= max} onClick={() => onChange(Math.min(max, value + step))} label={`Increase ${label}`}>›</StepButton>
+        {onReset && <StepButton disabled={false} onClick={onReset} label={`Reset ${label}`}>⟳</StepButton>}
       </div>
     </div>
   );

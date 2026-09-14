@@ -930,36 +930,56 @@ const Triac: SymbolFC = () => (
 
 // ─── MOTORS & LAMPS ───────────────────────────────────────────────────────────
 
-const MotorDc: SymbolFC = ({ powered, animTime = 0 }) => {
-  const angle = powered ? animTime * 360 : 0;
+const MOTOR_ACTIVE_BLUE = '#2563eb';
+const MOTOR_RING_BLUE = '#3b82f6';
+
+const MotorDc: SymbolFC = ({ powered, props, animTime = 0 }) => {
+  const nominalV = Math.max(1, Number(props?.nominalV ?? 24));
+  const k = Number(props?.k ?? nominalV);
+  const vEff = props?._vEff !== undefined
+    ? Number(props._vEff)
+    : (powered ? nominalV : 0);
+  const isRunning = Boolean(powered) && vEff >= 0.5;
+  const duration = isRunning
+    ? Math.min(3.0, Math.max(0.15, k / Math.max(0.001, vEff)))
+    : 1.0;
+  const speedFactor = isRunning ? (1 / duration) : 0;
+  const angle = isRunning ? (animTime * speedFactor * 360) % 360 : 0;
+
   return (
     <g>
-      <circle cx={0} cy={0} r={33} fill="none" stroke={powered ? "#08b58d" : "currentColor"} strokeWidth={1.5} />
+      <circle cx={0} cy={0} r={33} fill="none" stroke={isRunning ? MOTOR_ACTIVE_BLUE : "currentColor"} strokeWidth={1.5} />
       <text x={0} y={5} textAnchor="middle" fontSize={16} fontWeight="normal" fill="currentColor">M</text>
-      {powered && (
-        <>
+      {isRunning && (
+        <g
+          transform={`rotate(${angle.toFixed(1)}, 0, 0)`}
+          style={{
+            '--motor-spin-duration': `${duration.toFixed(3)}s`,
+            transform: `rotate(${angle.toFixed(1)}deg)`,
+            transformOrigin: '0px 0px',
+          } as React.CSSProperties}
+        >
           <circle
             cx={0}
             cy={0}
             r={28}
             fill="none"
-            stroke="#08b58d"
+            stroke={MOTOR_RING_BLUE}
             strokeWidth={1.5}
             strokeDasharray="14 8"
             strokeLinecap="round"
-            transform={`rotate(${angle}, 0, 0)`}
             opacity={0.85}
           />
           <line
             x1={0}
             y1={0}
-            x2={26 * Math.cos(((angle - 90) * Math.PI) / 180)}
-            y2={26 * Math.sin(((angle - 90) * Math.PI) / 180)}
-            stroke="#08b58d"
+            x2={0}
+            y2={-26}
+            stroke={MOTOR_ACTIVE_BLUE}
             strokeWidth={2}
             strokeLinecap="round"
           />
-        </>
+        </g>
       )}
       <line x1={-50} y1={0} x2={-33} y2={0} stroke="currentColor" strokeWidth={1.5} />
       <line x1={33} y1={0} x2={50} y2={0} stroke="currentColor" strokeWidth={1.5} />
@@ -967,37 +987,54 @@ const MotorDc: SymbolFC = ({ powered, animTime = 0 }) => {
   );
 };
 
-const Motor3Phase: SymbolFC = ({ powered, animTime = 0 }) => {
-  const angle = powered ? animTime * 360 : 0;
+const Motor3Phase: SymbolFC = ({ powered, props, animTime = 0 }) => {
+  const nominalV = Math.max(1, Number(props?.nominalV ?? 400));
+  const k = Number(props?.k ?? nominalV);
+  const vEff = props?._vEff !== undefined
+    ? Number(props._vEff)
+    : (powered ? nominalV : 0);
+  const isRunning = Boolean(powered) && vEff >= 0.5;
+  const duration = isRunning
+    ? Math.min(3.0, Math.max(0.15, k / Math.max(0.001, vEff)))
+    : 1.0;
+  const speedFactor = isRunning ? (1 / duration) : 0;
+  const angle = isRunning ? (animTime * speedFactor * 360) % 360 : 0;
+
   return (
     <g>
-      <circle cx={0} cy={0} r={33} fill="none" stroke={powered ? "#08b58d" : "currentColor"} strokeWidth={1.5} />
-      {powered && (
-        <>
+      <circle cx={0} cy={0} r={33} fill="none" stroke={isRunning ? MOTOR_ACTIVE_BLUE : "currentColor"} strokeWidth={1.5} />
+      {isRunning && (
+        <g
+          transform={`rotate(${angle.toFixed(1)}, 0, 0)`}
+          style={{
+            '--motor-spin-duration': `${duration.toFixed(3)}s`,
+            transform: `rotate(${angle.toFixed(1)}deg)`,
+            transformOrigin: '0px 0px',
+          } as React.CSSProperties}
+        >
           <circle
             cx={0}
             cy={0}
             r={28}
             fill="none"
-            stroke="#08b58d"
+            stroke={MOTOR_RING_BLUE}
             strokeWidth={1.5}
             strokeDasharray="14 8"
             strokeLinecap="round"
-            transform={`rotate(${angle}, 0, 0)`}
             opacity={0.85}
           />
           <line
             x1={0}
             y1={0}
-            x2={22 * Math.cos(((angle - 90) * Math.PI) / 180)}
-            y2={22 * Math.sin(((angle - 90) * Math.PI) / 180)}
-            stroke="#08b58d"
+            x2={0}
+            y2={-22}
+            stroke={MOTOR_ACTIVE_BLUE}
             strokeWidth={2}
             strokeLinecap="round"
           />
-        </>
+        </g>
       )}
-      <text x={0} y={-4} textAnchor="middle" fontSize={11} fontWeight="bold" fill={powered ? "#08b58d" : "currentColor"} opacity={0.85}>3 ~</text>
+      <text x={0} y={-4} textAnchor="middle" fontSize={11} fontWeight="bold" fill={isRunning ? MOTOR_ACTIVE_BLUE : "currentColor"} opacity={0.85}>3 ~</text>
       <text x={0} y={12} textAnchor="middle" fontSize={14} fontWeight="normal" fill="currentColor">M</text>
       <line x1={-50} y1={-25} x2={-21.5} y2={-25} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
       <line x1={-50} y1={0} x2={-33} y2={0} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />

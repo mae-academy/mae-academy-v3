@@ -349,7 +349,7 @@ describe('Tab D SVG symbol language', () => {
     expect(contact3P_NC).toContain('x1="-3" y1="18" x2="5" y2="32"');
   });
 
-  it('renders 3-Phase Motor with static IEC symbols when unpowered and active rotor animation when powered', () => {
+  it('renders 3-Phase Motor with static IEC symbols when unpowered and unified blue active rotor animation when powered', () => {
     const unpowered = markup('motor-3phase');
     expect(unpowered).toContain('>3 ~<');
     expect(unpowered).toContain('>M<');
@@ -358,10 +358,53 @@ describe('Tab D SVG symbol language', () => {
     const powered = markup('motor-3phase', {}, true, 0.25);
     expect(powered).toContain('>3 ~<');
     expect(powered).toContain('>M<');
-    // Active rotation ring
+    // Unified blue active rotation ring and indicator
     expect(powered).toContain('stroke-dasharray="14 8"');
-    // Spinning rotor indicator line
-    expect(powered).toContain('stroke="#08b58d"');
+    expect(powered).toContain('stroke="#2563eb"');
+    expect(powered).toContain('stroke="#3b82f6"');
+    expect(powered).toContain('--motor-spin-duration:1.000s');
     expect(ThreePhaseMotorSymbol).toBeDefined();
+
+    // Voltage-dependent rotation duration scaling
+    const slow = markup('motor-3phase', { _vEff: 100, nominalV: 400 }, true, 0.5);
+    expect(slow).toContain('--motor-spin-duration:3.000s');
+
+    const nominal = markup('motor-3phase', { _vEff: 400, nominalV: 400 }, true, 0.5);
+    expect(nominal).toContain('--motor-spin-duration:1.000s');
+
+    const fast = markup('motor-3phase', { _vEff: 480, nominalV: 400 }, true, 0.5);
+    expect(fast).toContain('--motor-spin-duration:0.833s');
+
+    // Stationary below threshold (< 0.5V)
+    const belowThreshold = markup('motor-3phase', { _vEff: 0.3, nominalV: 400 }, true, 0.5);
+    expect(belowThreshold).not.toContain('stroke-dasharray="14 8"');
+  });
+
+  it('renders DC Motor with static IEC symbol when unpowered and unified blue rotor animation with voltage scaling', () => {
+    const unpowered = markup('motor-dc');
+    expect(unpowered).toContain('>M<');
+    expect(unpowered).not.toContain('stroke-dasharray="14 8"');
+
+    const powered = markup('motor-dc', { nominalV: 24 }, true, 0.25);
+    expect(powered).toContain('>M<');
+    // Unified blue active rotation ring and indicator
+    expect(powered).toContain('stroke-dasharray="14 8"');
+    expect(powered).toContain('stroke="#2563eb"');
+    expect(powered).toContain('stroke="#3b82f6"');
+    expect(powered).toContain('--motor-spin-duration:1.000s');
+
+    // Voltage-dependent rotation duration scaling
+    const crawl = markup('motor-dc', { _vEff: 6, nominalV: 24 }, true, 0.5);
+    expect(crawl).toContain('--motor-spin-duration:3.000s');
+
+    const nominal = markup('motor-dc', { _vEff: 24, nominalV: 24 }, true, 0.5);
+    expect(nominal).toContain('--motor-spin-duration:1.000s');
+
+    const accelerated = markup('motor-dc', { _vEff: 48, nominalV: 24 }, true, 0.5);
+    expect(accelerated).toContain('--motor-spin-duration:0.500s');
+
+    // Stationary below threshold (< 0.5V)
+    const belowThreshold = markup('motor-dc', { _vEff: 0.2, nominalV: 24 }, true, 0.5);
+    expect(belowThreshold).not.toContain('stroke-dasharray="14 8"');
   });
 });

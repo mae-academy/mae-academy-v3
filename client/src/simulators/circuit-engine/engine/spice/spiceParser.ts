@@ -156,7 +156,9 @@ export function getFrequency(vector: number[], time: number[]): number {
   );
 }
 
-function risingCrossings(vector: number[], time: number[]): number[] {
+/** Exported so an educational display can show the exact crossings `getFrequency` counted, rather
+ * than a simplified re-derivation that could disagree with the number the app actually reports. */
+export function risingCrossings(vector: number[], time: number[]): number[] {
   if (vector.length < 2 || time.length !== vector.length) return [];
 
   let min = Infinity;

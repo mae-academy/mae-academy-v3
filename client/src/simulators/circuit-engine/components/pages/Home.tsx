@@ -42,6 +42,7 @@ import { KATEX_EMBEDDED_FONT_CSS } from '@/simulators/circuit-engine/models/kate
 import { AnalysisBox } from '@/simulators/circuit-engine/components/ui-components/AnalysisBox';
 import { OscilloscopeTracePanel } from '@/simulators/circuit-engine/components/ui-components/OscilloscopeTracePanel';
 import { OscilloscopeComponentPanel } from '@/simulators/circuit-engine/components/inspector-panels/OscilloscopeComponentPanel';
+import { useOscilloscopeDisplaySettings, type OscilloscopeDisplaySettings } from '@/simulators/circuit-engine/components/ui-components/oscilloscopeDisplaySettings';
 import type { AnalysisTrace, MeshCycle, NodalNodeLabel } from '@/simulators/circuit-engine/models/analysisTypes';
 import {
   CATEGORIES,
@@ -933,6 +934,11 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
       background: '#eaf0f8', canvas: '#f8fbff', panel: '#ffffff', panelAlt: '#f1f5fb', line: '#d7e2ef', text: '#172033', muted: '#64748b', subtle: '#94a3b8', primary: '#2563eb', accent: '#7c3aed', danger: '#be123c', selection: '#2563eb', grid: '#dbe7f3', wire: '#2563eb', powered: '#8b5cf6', input: '#ffffff', shadow: '0 12px 28px rgba(15,23,42,0.10)',
     };
 
+  // Oscilloscope theme/channel-color preference — lifted here (rather than a hook call in each
+  // panel) so the persistent aside widget and the inspector's settings section share one live
+  // value: a toggle in one is reflected in the other on the same render, not just after a reload.
+  const [oscilloscopeDisplaySettings, setOscilloscopeDisplaySettings] = useOscilloscopeDisplaySettings();
+
   const selectedComponent = selection?.kind === 'component'
     ? components.find(component => component.id === selection.id)
     : undefined;
@@ -1811,6 +1817,19 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     setComponents(nextComponents);
     commitSnapshot({ components: nextComponents });
   }, [commitSnapshot, components, requestEagerSpiceRun, selectedComponent]);
+
+  // Applies several property keys to the selected component in one commit — the oscilloscope's
+  // Autoscale button needs this: calling updateComponentProperty three times in a row would each
+  // read `components` from this same render's closure, so the last call would silently overwrite
+  // the earlier two rather than compose with them.
+  const updateComponentProperties = useCallback((updates: Record<string, unknown>) => {
+    if (!selectedComponent) return;
+    const nextComponents = components.map(component => component.id === selectedComponent.id
+      ? { ...component, props: { ...component.props, ...updates } }
+      : component);
+    setComponents(nextComponents);
+    commitSnapshot({ components: nextComponents });
+  }, [commitSnapshot, components, selectedComponent]);
 
   // Its only callers are the momentary pushbutton press/release handlers below — an electrical
   // state change SPICE should react to immediately, not after the drag-coalescing debounce.
@@ -2826,21 +2845,27 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                       }
                     }
                   }
+                }
+                let motorVEff: number | undefined;
+                if (component.type === 'motor-dc') {
+                  const vPos = snapshot.terminalVoltages[terminalKey(component.id, 'pos')];
+                  const vNeg = snapshot.terminalVoltages[terminalKey(component.id, 'neg')];
+                  if (vPos !== undefined && vNeg !== undefined) {
+                    const vEff = Math.abs(vPos - vNeg);
+                    motorVEff = vEff;
+                    powered = vEff >= 0.5;
+                  }
                 } else if (component.type === 'motor-3phase') {
-                  if (!powered) {
-                    const vu = snapshot.terminalVoltages[`${component.id}:u`];
-                    const vv = snapshot.terminalVoltages[`${component.id}:v`];
-                    const vw = snapshot.terminalVoltages[`${component.id}:w`];
-                    if (vu !== undefined && vv !== undefined && vw !== undefined) {
-                      const vuv = Math.abs(vu - vv);
-                      const vvw = Math.abs(vv - vw);
-                      const vwu = Math.abs(vw - vu);
-                      const nominalV = Number(component.props?.nominalV ?? 400);
-                      const rmsEstimate = Math.sqrt((vuv ** 2 + vvw ** 2 + vwu ** 2) / 3);
-                      if (rmsEstimate > nominalV * 0.05 || (vuv > 1 && vvw > 1 && vwu > 1)) {
-                        powered = true;
-                      }
-                    }
+                  const vu = snapshot.terminalVoltages[terminalKey(component.id, 'u')];
+                  const vv = snapshot.terminalVoltages[terminalKey(component.id, 'v')];
+                  const vw = snapshot.terminalVoltages[terminalKey(component.id, 'w')];
+                  if (vu !== undefined && vv !== undefined && vw !== undefined) {
+                    const vuv = Math.abs(vu - vv);
+                    const vvw = Math.abs(vv - vw);
+                    const vwu = Math.abs(vw - vu);
+                    const vEff = Math.sqrt((vuv ** 2 + vvw ** 2 + vwu ** 2) / 3);
+                    motorVEff = vEff;
+                    powered = vEff >= 0.5;
                   }
                 }
                 const intensity = snapshot.componentIntensity[component.id] ?? 0;
@@ -2862,7 +2887,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                     onPointerLeave={() => setHoveredComponentId(null)}
                   >
                     <g transform={symbolTransform} color={isSelected ? colors.selection : undefined}>
-                      {renderSymbol(definition.symbol, powered, { ...component.props, isEnergized: powered, isConflicted: conflictedCoilIds.has(component.id), _intensity: intensity, _documentedStyle: tabDUiRefinement, ...(meterDisplayValue !== undefined ? { displayValue: meterDisplayValue } : {}) }, animationTime)}
+                      {renderSymbol(definition.symbol, powered, { ...component.props, isEnergized: powered, isConflicted: conflictedCoilIds.has(component.id), _intensity: intensity, ...(motorVEff !== undefined ? { _vEff: motorVEff } : {}), _documentedStyle: tabDUiRefinement, ...(meterDisplayValue !== undefined ? { displayValue: meterDisplayValue } : {}) }, animationTime)}
                     </g>
                     {definition.terminals.map(terminal => {
                       const snappedWorld = getCanvasTerminalPosition(component, terminal.id);
@@ -3020,7 +3045,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
         <aside className="min-h-0 overflow-y-auto rounded-xl border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-950" style={{ background: colors.panel, borderColor: colors.line, display: 'flex', flexDirection: 'column' }}>
           <div className="border-b px-3 py-2" style={{ borderColor: colors.line }}><div className={CONTROL_SYSTEMS_HEADING}>Active Element &amp; Properties</div></div>
           {selectedComponent ? (
-            <ComponentInspector colors={colors} component={selectedComponent} definition={getDef(selectedComponent.type)!} allComponents={components} linkedCoils={linkedCoils} reading={effectiveSnapshot.instrumentReadings[selectedComponent.id]} snapshot={effectiveSnapshot} tabDUiRefinement={tabDUiRefinement} onLabelChange={label => updateComponent(selectedComponent.id, { label })} onPropertyChange={updateComponentProperty} onDelete={removeSelection} />
+            <ComponentInspector colors={colors} component={selectedComponent} definition={getDef(selectedComponent.type)!} allComponents={components} linkedCoils={linkedCoils} reading={effectiveSnapshot.instrumentReadings[selectedComponent.id]} snapshot={effectiveSnapshot} tabDUiRefinement={tabDUiRefinement} oscilloscopeDisplaySettings={oscilloscopeDisplaySettings} onOscilloscopeDisplaySettingsChange={setOscilloscopeDisplaySettings} onLabelChange={label => updateComponent(selectedComponent.id, { label })} onPropertyChange={updateComponentProperty} onPropertiesChange={updateComponentProperties} onDelete={removeSelection} />
           ) : selectedWire ? (
             <WireInspector colors={colors} wire={selectedWire} tabDUiRefinement={tabDUiRefinement} onRouting={updateWireRouting} onAddCorner={addSelectedWireCorner} onNudge={nudgeSelectedWire} onDelete={removeSelection} />
           ) : selectedText ? (
@@ -3028,7 +3053,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
           ) : null}
 
           <PersistentDmmPanel colors={colors} dmms={components.filter(c => c.type === 'dmm')} snapshot={effectiveSnapshot} />
-          <OscilloscopeTracePanel colors={colors} scopes={components.filter(c => c.type === 'oscilloscope')} instrumentReadings={effectiveSnapshot.instrumentReadings} />
+          <OscilloscopeTracePanel colors={colors} scopes={components.filter(c => c.type === 'oscilloscope')} instrumentReadings={effectiveSnapshot.instrumentReadings} displaySettings={oscilloscopeDisplaySettings} />
         </aside>
       </div>
       <section className="mt-3 overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-950" style={{ background: colors.panel, borderColor: colors.line }}>
@@ -3066,7 +3091,7 @@ function InspectorSection({ colors, label, children }: { colors: Palette; label:
 
 function PropertyRow({ colors, label, unit, children }: { colors: Palette; label: string; unit?: string; children: React.ReactNode }) { return <label style={{ display: 'grid', gridTemplateColumns: '1fr 156px', gap: 8, alignItems: 'center', marginBottom: 8 }}><span className="font-sans text-[12.5px] font-medium text-slate-700" style={{ lineHeight: 1.25 }}><ElectricalLabel label={label} unit={unit} /></span>{children}</label>; }
 
-function ComponentInspector({ colors, component, definition, allComponents, linkedCoils, reading, snapshot, tabDUiRefinement, onLabelChange, onPropertyChange, onDelete }: { colors: Palette; component: CircuitComponent; definition: ComponentDef; allComponents: CircuitComponent[]; linkedCoils: CircuitComponent[]; reading?: InstrumentReading; snapshot: SimulationSnapshot; tabDUiRefinement: boolean; onLabelChange: (value: string) => void; onPropertyChange: (key: string, value: unknown) => void; onDelete: () => void }) {
+function ComponentInspector({ colors, component, definition, allComponents, linkedCoils, reading, snapshot, tabDUiRefinement, oscilloscopeDisplaySettings, onOscilloscopeDisplaySettingsChange, onLabelChange, onPropertyChange, onPropertiesChange, onDelete }: { colors: Palette; component: CircuitComponent; definition: ComponentDef; allComponents: CircuitComponent[]; linkedCoils: CircuitComponent[]; reading?: InstrumentReading; snapshot: SimulationSnapshot; tabDUiRefinement: boolean; oscilloscopeDisplaySettings: OscilloscopeDisplaySettings; onOscilloscopeDisplaySettingsChange: (next: Partial<OscilloscopeDisplaySettings>) => void; onLabelChange: (value: string) => void; onPropertyChange: (key: string, value: unknown) => void; onPropertiesChange: (updates: Record<string, unknown>) => void; onDelete: () => void }) {
   // Check if the component actually has a numeric value to display
   const hasValue = Object.values(definition.properties).some(p => p.type === 'number' && p.unit);
 
@@ -3166,7 +3191,7 @@ function ComponentInspector({ colors, component, definition, allComponents, link
           : <PropertyEditorField key={key} colors={colors} label={label} definition={property} value={value} onChange={nextValue => onPropertyChange(key, nextValue)} />;
       })}
     </InspectorSection>}
-    {component.type === 'oscilloscope' && <OscilloscopeComponentPanel colors={colors} component={component} readings={snapshot.instrumentReadings} onPropertyChange={onPropertyChange} />}
+    {component.type === 'oscilloscope' && <OscilloscopeComponentPanel colors={colors} component={component} readings={snapshot.instrumentReadings} displaySettings={oscilloscopeDisplaySettings} onDisplaySettingsChange={onOscilloscopeDisplaySettingsChange} onPropertyChange={onPropertyChange} onPropertiesChange={onPropertiesChange} />}
 
   </div>;
 }

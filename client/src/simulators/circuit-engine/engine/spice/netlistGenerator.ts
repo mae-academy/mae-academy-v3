@@ -114,6 +114,106 @@ function formatValue(
   return String(value);
 }
 
+/** Wraps `value` into `[0, period)`. */
+function wrapToPeriod(value: number, period: number): number {
+  const remainder = value % period;
+  return remainder < 0 ? remainder + period : remainder;
+}
+
+/**
+ * PULSE() parameters approximating square/triangle/sawtooth. Phase reference at phaseDegrees=0:
+ * - square matches SIN()'s own convention — `sign(sin(angle))` is +1 at angle=0 — so it starts at
+ *   its positive peak, same as sine starts at its zero-crossing.
+ * - triangle and sawtooth instead use their reset edge (trough at t=0): see the comment above their
+ *   shared branch below for why a zero-crossing reference (which would need PULSE's TD to land
+ *   mid-ramp) doesn't work for them the way it does for square.
+ * A positive phaseDegrees advances the waveform (moves its reference point earlier in time), same
+ * direction SIN()'s phase argument does.
+ *
+ * PULSE's TD is a one-time initial hold at V1 before the (ramp/hold/ramp/hold) cycle of length PER
+ * starts repeating — not a per-cycle phase applied every period. Square's periodic block holds at V1
+ * for half of PER, exactly matching the pre-hold TD needs for any phase, so it stays exact for a
+ * full period range; triangle/sawtooth's periodic block holds at V1 for only a sliver of PER, so
+ * their pre-hold is only guaranteed exact at phase 0 (see below). Checked against real ngspice.wasm
+ * output in ngspiceRegression.waveforms.test.ts, not merely reasoned through — the zero-crossing
+ * convention this file started with was tried, failed that test, and is why this comment exists.
+ */
+function pulseParameters(
+  waveform: "square" | "triangle" | "sawtooth",
+  amplitude: number,
+  offset: number,
+  frequency: number,
+  phaseDegrees: number
+): {
+  v1: number;
+  v2: number;
+  td: number;
+  tr: number;
+  tf: number;
+  pw: number;
+  per: number;
+} {
+  const period = 1 / frequency;
+  const edge = period * 1e-6; // Near-instant but nonzero — ngspice requires TR/TF > 0.
+  const phaseTime = (phaseDegrees / 360) * period;
+
+  if (waveform === "square") {
+    const tr = edge;
+    const tf = edge;
+    const pw = period / 2 - tr - tf;
+    const td = wrapToPeriod(period / 2 - phaseTime, period);
+    return {
+      v1: amplitude + offset,
+      v2: -amplitude + offset,
+      td,
+      tr,
+      tf,
+      pw,
+      per: period,
+    };
+  }
+
+  // Triangle and sawtooth both use the reset-edge reference (trough at t=0, phase 0) rather than
+  // sine's zero-crossing: their periodic block's trailing V1 hold is (near-)zero, so a TD chosen to
+  // land mid-ramp — as a zero-crossing reference would need — has nothing of matching duration to
+  // seamlessly continue from, and produces a wrong first partial cycle instead (confirmed against
+  // real ngspice.wasm output: exactly this was tried and failed ngspiceRegression.waveforms.test.ts
+  // before landing on this convention). TD=0 at phase 0 sidesteps the issue entirely — the ramp
+  // starts right at t=0, no pre-hold to get wrong. A nonzero phase still reintroduces a pre-hold
+  // (TD>0) that can briefly mismatch true periodicity for less than one cycle before the second
+  // period onward is exact — acceptable here since every reading downstream (getVrms/getFrequency)
+  // already windows to whole periods and skips exactly that leading fraction.
+  if (waveform === "triangle") {
+    const tr = period / 2 - edge;
+    const tf = period / 2 - edge;
+    const pw = edge;
+    const td = wrapToPeriod(-phaseTime, period);
+    return {
+      v1: -amplitude + offset,
+      v2: amplitude + offset,
+      td,
+      tr,
+      tf,
+      pw,
+      per: period,
+    };
+  }
+
+  const tr = period - 2 * edge;
+  const tf = edge;
+  const pw = edge;
+  const td = wrapToPeriod(-phaseTime, period);
+  return {
+    v1: -amplitude + offset,
+    v2: amplitude + offset,
+    td,
+    tr,
+    tf,
+    pw,
+    per: period,
+  };
+}
+
 /** A generated `.MODEL` card. Cards are de-duplicated by name before being emitted. */
 interface SpiceModel {
   name: string;
@@ -660,9 +760,27 @@ function singleElementLine(
         component,
         "frequency"
       );
-      // SIN()'s sixth argument is phase in degrees; without it .tran silently drops the source's phase.
-      const sinePhase = component.phaseDegrees ? ` 0 0 ${phase}` : "";
-      return `${line} SIN(${offset} ${amplitude} ${frequency}${sinePhase})`;
+      const waveform = component.waveform ?? "sine";
+      if (waveform === "sine") {
+        // SIN()'s sixth argument is phase in degrees; without it .tran silently drops the source's phase.
+        const sinePhase = component.phaseDegrees ? ` 0 0 ${phase}` : "";
+        return `${line} SIN(${offset} ${amplitude} ${frequency}${sinePhase})`;
+      }
+      const pulse = pulseParameters(
+        waveform,
+        rawAmplitude,
+        component.dcOffset ?? 0,
+        component.frequency,
+        component.phaseDegrees ?? 0
+      );
+      const v1 = formatValue(pulse.v1, component, "waveform");
+      const v2 = formatValue(pulse.v2, component, "waveform");
+      const td = formatValue(pulse.td, component, "waveform");
+      const tr = formatValue(pulse.tr, component, "waveform");
+      const tf = formatValue(pulse.tf, component, "waveform");
+      const pw = formatValue(pulse.pw, component, "waveform");
+      const per = formatValue(pulse.per, component, "waveform");
+      return `${line} PULSE(${v1} ${v2} ${td} ${tr} ${tf} ${pw} ${per})`;
     }
 
     // Semiconductors are a name, their nodes, then the generated model they reference. The node
