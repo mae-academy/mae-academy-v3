@@ -129,7 +129,7 @@ export function OscilloscopeComponentPanel({ colors, component, readings, displa
         <select
           value={selectedChannel}
           onChange={event => setSelectedChannel(event.target.value as Channel)}
-          className="h-8 rounded-xl border border-slate-200 dark:border-slate-800 px-2.5 text-[13px] font-bold bg-white dark:bg-slate-900"
+          className="h-8 rounded-xl border border-slate-200 dark:border-[#282d38] px-2.5 text-[13px] font-bold bg-white dark:bg-[#13161c]"
           style={{ color: channelColor }}
         >
           {CHANNELS.map((channel, index) => <option key={channel} value={channel} style={{ color: displaySettings.channelColors[index] }}>{channel.toUpperCase()}</option>)}
@@ -237,7 +237,7 @@ function StepButton({ disabled, onClick, label, children }: { disabled: boolean;
       aria-label={label}
       disabled={disabled}
       onClick={onClick}
-      className="w-[22px] h-[22px] shrink-0 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs leading-none flex items-center justify-center cursor-pointer disabled:cursor-default disabled:opacity-40 disabled:bg-slate-100 dark:disabled:bg-slate-900"
+      className="w-[22px] h-[22px] shrink-0 rounded-md border border-slate-200 dark:border-[#282d38] bg-white dark:bg-[#13161c] text-slate-700 dark:text-[#f8fafc] text-xs leading-none flex items-center justify-center cursor-pointer disabled:cursor-default disabled:opacity-40 disabled:bg-slate-100 dark:disabled:bg-[#090a0d]"
     >
       {children}
     </button>

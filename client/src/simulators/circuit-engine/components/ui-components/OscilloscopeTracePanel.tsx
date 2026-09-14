@@ -79,7 +79,7 @@ function OscilloscopeAxisOverlay({
   isDarkMode: boolean;
 }) {
   const labelClass = isDarkMode
-    ? 'bg-black/60 text-slate-200 border border-white/10 shadow-xs'
+    ? 'bg-[#090a0d]/90 text-[#f8fafc] border border-[#1a1d24] shadow-xs'
     : 'bg-white/80 text-slate-800 border border-slate-200 shadow-xs';
 
   const vertDivs = [
@@ -135,7 +135,7 @@ function ScopeUnit({ colors, scope, instrumentReadings, displaySettings }: { col
     voltDiv: numeric(scope.props[`voltDiv_${channel}`], 5),
     timeShift: numeric(scope.props[`timeShift_${channel}`], 0),
   }));
-  const canvasBackground = displaySettings.isDarkMode ? '#0a0a0a' : '#ffffff';
+  const canvasBackground = displaySettings.isDarkMode ? '#090a0d' : '#ffffff';
 
   const readyIndex = readings.findIndex(r => r?.status === 'ready');
   const primaryConfig = channelConfigs[readyIndex >= 0 ? readyIndex : 0];
@@ -164,12 +164,19 @@ function ScopeUnit({ colors, scope, instrumentReadings, displaySettings }: { col
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
       <div className="flex items-center justify-between">
         <div style={{ fontSize: 10, fontWeight: 700, color: colors.subtle, textTransform: 'uppercase', letterSpacing: '.05em' }}>{scope.label}</div>
-        <span className="text-[9px] font-mono font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-          {displaySettings.acquisitionMode === 'step' ? 'Step Response' : 'Live Roll'}
-        </span>
+        <div className="flex items-center gap-2">
+          {displaySettings.showValues && (
+            <span className="text-[9px] font-mono text-slate-400">
+              {primaryConfig.timeDiv >= 1e-3 ? `${(primaryConfig.timeDiv * 1e3).toFixed(0)} ms/div` : `${(primaryConfig.timeDiv * 1e6).toFixed(0)} μs/div`} · {primaryConfig.voltDiv} V/div
+            </span>
+          )}
+          <span className="text-[9px] font-mono font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+            {displaySettings.acquisitionMode === 'step' ? 'Step' : 'Roll'}
+          </span>
+        </div>
       </div>
-      <div className="relative w-full overflow-hidden" style={{ height: CANVAS_HEIGHT, borderRadius: 4 }}>
-        <canvas ref={canvasRef} width={CANVAS_WIDTH} height={CANVAS_HEIGHT} style={{ width: '100%', height: CANVAS_HEIGHT, background: canvasBackground, border: '1px solid #444', borderRadius: 4, display: 'block' }} />
+      <div className="relative overflow-hidden rounded" style={{ width: '100%', height: CANVAS_HEIGHT, border: `1px solid ${colors.line}` }}>
+        <canvas ref={canvasRef} width={CANVAS_WIDTH} height={CANVAS_HEIGHT} style={{ width: '100%', height: CANVAS_HEIGHT, background: canvasBackground, display: 'block' }} />
         {displaySettings.showValues && (
           <OscilloscopeAxisOverlay
             timeDiv={primaryConfig.timeDiv}
@@ -202,11 +209,11 @@ function ScopeUnit({ colors, scope, instrumentReadings, displaySettings }: { col
 function drawGraticule(ctx: CanvasRenderingContext2D, displaySettings: OscilloscopeDisplaySettings): void {
   const { width, height } = ctx.canvas;
   const isDark = displaySettings.isDarkMode;
-  ctx.fillStyle = isDark ? '#0a0a0a' : '#ffffff';
+  ctx.fillStyle = isDark ? '#090a0d' : '#ffffff';
   ctx.fillRect(0, 0, width, height);
   const stepX = width / GRID_DIVS_X;
   const stepY = height / GRID_DIVS_Y;
-  ctx.strokeStyle = isDark ? '#222' : '#e2e8f0';
+  ctx.strokeStyle = isDark ? '#1a1d24' : '#e2e8f0';
   ctx.lineWidth = 1;
   for (let i = 1; i < GRID_DIVS_X; i++) {
     ctx.beginPath();
@@ -220,7 +227,7 @@ function drawGraticule(ctx: CanvasRenderingContext2D, displaySettings: Oscillosc
     ctx.lineTo(width, i * stepY);
     ctx.stroke();
   }
-  ctx.strokeStyle = isDark ? '#444' : '#94a3b8';
+  ctx.strokeStyle = isDark ? '#222630' : '#94a3b8';
   ctx.beginPath();
   ctx.moveTo(width / 2, 0);
   ctx.lineTo(width / 2, height);

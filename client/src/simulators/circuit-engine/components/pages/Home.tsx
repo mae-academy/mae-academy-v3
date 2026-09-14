@@ -930,7 +930,23 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
 
   const colors = darkPreview
     ? {
-      background: '#07111f', canvas: '#0c1728', panel: '#101d31', panelAlt: '#16243a', line: '#30415c', text: '#e2e8f0', muted: '#9aaac1', subtle: '#52647d', primary: '#60a5fa', accent: '#8b5cf6', danger: '#fb7185', selection: '#60a5fa', grid: '#233652', wire: '#60a5fa', powered: '#a78bfa', input: '#0b1525', shadow: '0 12px 28px rgba(0,0,0,0.28)',
+      background: '#000000',
+      canvas: '#07080a',
+      panel: '#0d0f12',
+      panelAlt: '#090a0d',
+      line: '#1a1d24',
+      text: '#f8fafc',
+      muted: '#94a3b8',
+      subtle: '#64748b',
+      primary: '#8b5cf6',
+      accent: '#a855f7',
+      danger: '#f43f5e',
+      selection: '#a855f7',
+      grid: '#181b22',
+      wire: '#a855f7',
+      powered: '#c084fc',
+      input: '#13161c',
+      shadow: '0 12px 28px rgba(0,0,0,0.45)',
     }
     : {
       background: '#eaf0f8', canvas: '#f8fbff', panel: '#ffffff', panelAlt: '#f1f5fb', line: '#d7e2ef', text: '#172033', muted: '#64748b', subtle: '#94a3b8', primary: '#2563eb', accent: '#7c3aed', danger: '#be123c', selection: '#2563eb', grid: '#dbe7f3', wire: '#2563eb', powered: '#8b5cf6', input: '#ffffff', shadow: '0 12px 28px rgba(15,23,42,0.10)',
@@ -2580,7 +2596,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
 
   return (
     <div className="v3-mae-layout font-sans text-slate-900 dark:text-slate-100" style={{ minHeight: 760, color: colors.text }}>
-      <section className="mb-4 overflow-x-auto rounded-xl border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-950" style={{ borderColor: colors.line, background: colors.panel }}>
+      <section className="mb-4 overflow-x-auto rounded-xl border border-slate-200 bg-white dark:border-[#1a1d24] dark:bg-[#0d0f12]" style={{ borderColor: colors.line, background: colors.panel }}>
         <header className="min-w-max" style={{ background: colors.panel, zIndex: 5 }}>
           <div className="flex flex-nowrap items-center gap-1.5 px-2 pt-2" style={{ minHeight: 36 }}>
             <ToolbarButton colors={colors} label="−" title="Zoom out" onClick={() => setZoom(value => Math.max(.2, value / 1.15))} />
@@ -2646,8 +2662,12 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
         </header>
       </section>
 
-      <div className="grid min-h-[680px] gap-4 xl:grid-cols-[236px_minmax(0,1fr)_286px]">
-        <aside className="min-h-0 overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-950" style={{ background: colors.panel, borderColor: colors.line, display: 'flex', flexDirection: 'column', height: '700px' }}>
+      <div className="flex flex-col xl:flex-row gap-4 items-start w-full">
+        {/* Left Column (flex-1 min-w-0 flex flex-col gap-4) */}
+        <div className="flex-1 min-w-0 flex flex-col gap-4 w-full">
+          {/* Top Row (flex gap-4 items-start) */}
+          <div className="flex flex-col md:flex-row gap-4 items-start w-full">
+            <aside className="w-full md:w-56 shrink-0 min-h-0 overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-[#1a1d24] dark:bg-[#0d0f12]" style={{ background: colors.panel, borderColor: colors.line, display: 'flex', flexDirection: 'column', height: '700px' }}>
           <div className="border-b px-3 py-2" style={{ borderColor: colors.line }}><div className={CONTROL_SYSTEMS_HEADING}>Component Library</div></div>
           <div style={{ padding: 10, borderBottom: `1px solid ${colors.line}` }}>
             <div style={{ position: 'relative' }}>
@@ -2709,7 +2729,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
           </div>
         </aside>
 
-        <main className="relative min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-950" style={{ background: colors.canvas, borderColor: colors.line }}>
+        <main className="relative flex-1 min-w-0 h-[700px] overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-[#1a1d24] dark:bg-[#07080a]" style={{ background: colors.canvas, borderColor: colors.line }}>
           <div className="flex items-start justify-between border-b px-4 py-2" style={{ borderColor: colors.line }}><div><div className={CONTROL_SYSTEMS_HEADING}>Interactive Electrical Canvas</div></div><div className="flex items-center gap-2 font-mono text-[10px]" style={{ color: colors.muted }}>{components.length} CMP · {wires.length} NET</div></div>
           <svg ref={svgRef} onMouseDown={handleCanvasMouseDown} onMouseMove={handleCanvasMouseMove} onMouseUp={handleCanvasMouseUp} onMouseLeave={handleCanvasMouseUp} onContextMenu={event => event.preventDefault()} onDragOver={event => event.preventDefault()} onDrop={handleDrop} style={{ width: '100%', height: '100%', display: 'block', cursor: dragState?.kind === 'pan' ? 'grabbing' : wiring.from ? 'crosshair' : 'default', touchAction: 'none' }}>
             <defs>
@@ -2728,7 +2748,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                     cx={gridSize / 2}
                     cy={gridSize / 2}
                     r={1.65}
-                    fill={darkPreview ? '#6d91c4' : '#7a93b1'}
+                    fill={darkPreview ? '#222630' : '#7a93b1'}
                     fillOpacity={0.9}
                   />
                 </pattern>
@@ -2743,7 +2763,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                   <path
                     d={`M ${gridSize} 0 L 0 0 0 ${gridSize}`}
                     fill="none"
-                    stroke={tabDUiRefinement ? (darkPreview ? '#3d5f8c' : '#a8b8cc') : colors.grid}
+                    stroke={tabDUiRefinement ? (darkPreview ? '#1a1d24' : '#a8b8cc') : colors.grid}
                     strokeWidth={tabDUiRefinement ? 1.15 : 1}
                     strokeOpacity={tabDUiRefinement ? 0.85 : 1}
                   />
@@ -3035,7 +3055,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
           {components.length === 0 && (
             <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', pointerEvents: 'none' }}>
               <div className="flex flex-col items-center justify-center pointer-events-none select-none">
-                <div className="px-6 py-2.5 bg-white border border-slate-100 rounded-2xl shadow-sm mb-3 dark:bg-slate-900 dark:border-slate-800">
+                <div className="px-6 py-2.5 bg-white border border-slate-100 rounded-2xl shadow-sm mb-3 dark:bg-[#0d0f12] dark:border-[#1a1d24]">
                   <span className="text-base font-semibold text-slate-900 tracking-tight dark:text-white">
                     Canvas Ready
                   </span>
@@ -3056,27 +3076,34 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
             {!snapshot.converged && <span style={{ marginLeft: 'auto', color: colors.danger, fontWeight: 750 }}>CHECK CIRCUIT WARNINGS</span>}
           </div>
         </main>
+          </div>
 
-        <aside className="min-h-0 overflow-y-auto rounded-xl border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-950" style={{ background: colors.panel, borderColor: colors.line, display: 'flex', flexDirection: 'column' }}>
-          {/* Top Section: Live Oscilloscope (OSC) and Digital Multimeter (DMM) display screens */}
-          <OscilloscopeTracePanel colors={colors} scopes={components.filter(c => c.type === 'oscilloscope')} instrumentReadings={effectiveSnapshot.instrumentReadings} displaySettings={oscilloscopeDisplaySettings} />
-          <PersistentDmmPanel colors={colors} dmms={components.filter(c => c.type === 'dmm')} snapshot={effectiveSnapshot} />
+          {/* Bottom Row: Academic Analysis Workspace spanning strictly across the bottom of the Left Column */}
+          <section className="w-full overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-[#1a1d24] dark:bg-[#0d0f12]" style={{ background: colors.panel, borderColor: colors.line }}>
+            <div className="border-b px-5 py-3" style={{ borderColor: colors.line }}><div className={CONTROL_SYSTEMS_HEADING}>Academic Analysis Workspace</div></div>
+            <AnalysisBox elements={dcMna.elements} geometry={meshGeometry} nodalNodes={nodalGeometry} colors={colors} standalone onTraceChange={handleAnalysisTrace} />
+          </section>
+        </div>
 
-          {/* Below Instruments: ACTIVE ELEMENT & PROPERTIES inspector */}
-          <div className="border-b px-3 py-2" style={{ borderColor: colors.line }}><div className={CONTROL_SYSTEMS_HEADING}>Active Element &amp; Properties</div></div>
-          {selectedComponent ? (
-            <ComponentInspector colors={colors} component={selectedComponent} definition={getDef(selectedComponent.type)!} allComponents={components} linkedCoils={linkedCoils} reading={effectiveSnapshot.instrumentReadings[selectedComponent.id]} snapshot={effectiveSnapshot} tabDUiRefinement={tabDUiRefinement} oscilloscopeDisplaySettings={oscilloscopeDisplaySettings} onOscilloscopeDisplaySettingsChange={setOscilloscopeDisplaySettings} onLabelChange={label => updateComponent(selectedComponent.id, { label })} onPropertyChange={updateComponentProperty} onPropertiesChange={updateComponentProperties} onDelete={removeSelection} />
-          ) : selectedWire ? (
-            <WireInspector colors={colors} wire={selectedWire} tabDUiRefinement={tabDUiRefinement} onRouting={updateWireRouting} onAddCorner={addSelectedWireCorner} onNudge={nudgeSelectedWire} onDelete={removeSelection} />
-          ) : selectedText ? (
-            <TextInspector colors={colors} text={selectedText} onUpdate={updateText} onMove={moveSelected} onDelete={removeSelection} />
-          ) : null}
-        </aside>
+        {/* Right Column (w-80 flex-shrink-0 flex flex-col gap-4): anchors Live Oscilloscopes / DMM at top, and Active Element & Properties below. The lower space remains an unobstructed vertical void extending down to the footer. */}
+        <div className="w-full xl:w-80 shrink-0 flex flex-col gap-4">
+          <aside className="w-full min-h-0 overflow-y-auto rounded-xl border border-slate-200 bg-white dark:border-[#1a1d24] dark:bg-[#0d0f12]" style={{ background: colors.panel, borderColor: colors.line, display: 'flex', flexDirection: 'column' }}>
+            {/* Top Section: Live Oscilloscope (OSC) and Digital Multimeter (DMM) display screens */}
+            <OscilloscopeTracePanel colors={colors} scopes={components.filter(c => c.type === 'oscilloscope')} instrumentReadings={effectiveSnapshot.instrumentReadings} displaySettings={oscilloscopeDisplaySettings} />
+            <PersistentDmmPanel colors={colors} dmms={components.filter(c => c.type === 'dmm')} snapshot={effectiveSnapshot} />
+
+            {/* Below Instruments: ACTIVE ELEMENT & PROPERTIES inspector */}
+            <div className="border-b px-3 py-2" style={{ borderColor: colors.line }}><div className={CONTROL_SYSTEMS_HEADING}>Active Element &amp; Properties</div></div>
+            {selectedComponent ? (
+              <ComponentInspector colors={colors} component={selectedComponent} definition={getDef(selectedComponent.type)!} allComponents={components} linkedCoils={linkedCoils} reading={effectiveSnapshot.instrumentReadings[selectedComponent.id]} snapshot={effectiveSnapshot} tabDUiRefinement={tabDUiRefinement} oscilloscopeDisplaySettings={oscilloscopeDisplaySettings} onOscilloscopeDisplaySettingsChange={setOscilloscopeDisplaySettings} onLabelChange={label => updateComponent(selectedComponent.id, { label })} onPropertyChange={updateComponentProperty} onPropertiesChange={updateComponentProperties} onDelete={removeSelection} />
+            ) : selectedWire ? (
+              <WireInspector colors={colors} wire={selectedWire} tabDUiRefinement={tabDUiRefinement} onRouting={updateWireRouting} onAddCorner={addSelectedWireCorner} onNudge={nudgeSelectedWire} onDelete={removeSelection} />
+            ) : selectedText ? (
+              <TextInspector colors={colors} text={selectedText} onUpdate={updateText} onMove={moveSelected} onDelete={removeSelection} />
+            ) : null}
+          </aside>
+        </div>
       </div>
-      <section className="mt-3 overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-950" style={{ background: colors.panel, borderColor: colors.line }}>
-        <div className="border-b px-5 py-3" style={{ borderColor: colors.line }}><div className={CONTROL_SYSTEMS_HEADING}>Academic Analysis Workspace</div></div>
-        <AnalysisBox elements={dcMna.elements} geometry={meshGeometry} nodalNodes={nodalGeometry} colors={colors} standalone onTraceChange={handleAnalysisTrace} />
-      </section>
     </div>
   );
 }

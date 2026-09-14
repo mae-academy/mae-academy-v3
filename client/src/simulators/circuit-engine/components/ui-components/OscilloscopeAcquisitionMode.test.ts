@@ -98,4 +98,36 @@ describe("Oscilloscope Acquisition Modes: Step Response & Live Roll", () => {
     expect(liveFiltered[0].time).toBeCloseTo(0.01, 4);
     expect(liveFiltered[liveFiltered.length - 1].time).toBeCloseTo(0.02, 4);
   });
+
+  it(
+    "Test 3: AC sine wave with zero phase offset starts at 0 V and crosses upwards into positive territory at t = 0+",
+    async () => {
+      const components = [
+        part("g", "ground"),
+        part("v1", "ac-voltage", { amplitude: 10, frequency: 50, phase: 0, offset: 0 }),
+        part("r1", "resistor", { resistance: 1000 }),
+        part("osc1", "oscilloscope", { timeDiv_ch1: 0.002, voltDiv_ch1: 5 }),
+      ];
+      const wires = [
+        wire("w1", "v1", "pos", "r1", "a"),
+        wire("w2", "r1", "b", "g", "gnd"),
+        wire("w3", "v1", "neg", "g", "gnd"),
+        wire("w4", "osc1", "ch1", "r1", "a"),
+        wire("w5", "osc1", "gnd", "g", "gnd"),
+      ];
+      const { readings } = await simulate(components, wires, "practical", [
+        ".tran 0.0001 0.02",
+      ]);
+      const reading = readings["osc1:ch1"];
+      expect(reading).toBeDefined();
+      const samples = reading.samples!;
+      const positiveSamples = samples.filter((s) => s.time > 0 && s.time < 0.005);
+      expect(positiveSamples.length).toBeGreaterThan(0);
+      for (const s of positiveSamples) {
+        expect(s.value).toBeGreaterThanOrEqual(0);
+      }
+    },
+    RUN_TIMEOUT
+  );
 });
+
