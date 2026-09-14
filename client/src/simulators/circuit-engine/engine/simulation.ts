@@ -384,15 +384,14 @@ export class SimulationEngine {
       case 'pb-nc': return state !== 'pressed';
       case 'circuit-breaker':
       case 'circuit-breaker-3phase': return state === 'closed';
-      case 'aux-contact-no': {
+      case 'aux-contact-no':
+      case 'aux-contact-nc':
+      case 'aux-contact-3phase': {
         const linked = propString(component.props, 'linkedTo');
         const controller = this.components.find(item => item.label === linked);
-        return Boolean(controller && controls.get(controller.id));
-      }
-      case 'aux-contact-nc': {
-        const linked = propString(component.props, 'linkedTo');
-        const controller = this.components.find(item => item.label === linked);
-        return !controller || !controls.get(controller.id);
+        const energized = Boolean(controller && controls.get(controller.id));
+        const isNC = String(component.props?.contactType ?? (component.type === 'aux-contact-nc' ? 'NC' : 'NO')).toUpperCase() === 'NC';
+        return isNC ? !energized : energized;
       }
       default: return false;
     }
@@ -678,7 +677,8 @@ export class SimulationEngine {
           isPowered = closed;
           break;
         }
-        case 'circuit-breaker-3phase': {
+        case 'circuit-breaker-3phase':
+        case 'aux-contact-3phase': {
           const closed = this.contactClosed(component, controls);
           const l1 = stampResistance(component, 'l1', 't1', closed ? CLOSED_RESISTANCE : OPEN_RESISTANCE);
           const l2 = stampResistance(component, 'l2', 't2', closed ? CLOSED_RESISTANCE : OPEN_RESISTANCE);

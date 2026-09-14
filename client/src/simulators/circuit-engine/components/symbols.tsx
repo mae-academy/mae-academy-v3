@@ -629,7 +629,9 @@ const PbNc: SymbolFC = ({ props }) => {
 };
 
 const AuxContactNo: SymbolFC = ({ powered, props }) => {
-  const isClosed = Boolean(powered || props?.isEnergized || props?.state === 'closed');
+  const isEnergized = relayContactClosed(powered, props);
+  const isNC = String(props?.contactType ?? 'NO').toUpperCase() === 'NC';
+  const isClosed = isNC ? !isEnergized : isEnergized;
   return (
     <g>
       <line x1={-25} y1={0} x2={-10} y2={0} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
@@ -637,19 +639,37 @@ const AuxContactNo: SymbolFC = ({ powered, props }) => {
       <line x1={10} y1={0} x2={25} y2={0} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
       <circle cx={-10} cy={0} r={2.5} fill="currentColor" />
       <circle cx={10} cy={0} r={2.5} fill="currentColor" />
+      {isNC && (
+        <line x1={-3} y1={-7} x2={5} y2={7} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+      )}
     </g>
   );
 };
 
-const AuxContactNc: SymbolFC = ({ powered, props }) => {
-  const isClosed = !Boolean(powered || props?.isEnergized || props?.state === 'open');
+const AuxContactNc: SymbolFC = (props) => (
+  <AuxContactNo {...props} props={{ contactType: 'NC', ...props.props }} />
+);
+
+const AuxContact3Phase: SymbolFC = ({ powered, props }) => {
+  const isEnergized = relayContactClosed(powered, props);
+  const isNC = String(props?.contactType ?? 'NO').toUpperCase() === 'NC';
+  const isClosed = isNC ? !isEnergized : isEnergized;
   return (
     <g>
-      <line x1={-25} y1={0} x2={-10} y2={0} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
-      <line x1={-10} y1={0} x2={8} y2={isClosed ? 0 : -10} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
-      <line x1={10} y1={0} x2={25} y2={0} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
-      <circle cx={-10} cy={0} r={2.5} fill="currentColor" />
-      <circle cx={10} cy={0} r={2.5} fill="currentColor" />
+      {[-25, 0, 25].map(y => (
+        <g key={y}>
+          <line x1={-50} y1={y} x2={-10} y2={y} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+          <line x1={-10} y1={y} x2={8} y2={isClosed ? y : y - 10} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+          <line x1={10} y1={y} x2={50} y2={y} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+          <circle cx={-10} cy={y} r={2.5} fill="currentColor" />
+          <circle cx={10} cy={y} r={2.5} fill="currentColor" />
+          {isNC && (
+            <line x1={-3} y1={y - 7} x2={5} y2={y + 7} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+          )}
+        </g>
+      ))}
+      {/* Mechanical linkage between the 3 contact poles */}
+      <line x1={0} y1={-25} x2={0} y2={25} stroke="currentColor" strokeWidth={1.5} strokeDasharray="4,3" />
     </g>
   );
 };
@@ -1332,6 +1352,7 @@ export const SYMBOL_MAP: Record<string, SymbolFC> = {
   'pb-nc': PbNc,
   'aux-contact-no': AuxContactNo,
   'aux-contact-nc': AuxContactNc,
+  'aux-contact-3phase': AuxContact3Phase,
   'relay-spst': RelaySpst,
   'relay-spdt': RelaySpdt,
   'relay-dpst': RelayDpst,

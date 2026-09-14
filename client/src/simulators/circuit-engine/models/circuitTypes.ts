@@ -127,6 +127,7 @@ const PREFIXES: Record<string, string> = {
   coil: 'K',
   'aux-contact-no': 'K',
   'aux-contact-nc': 'K',
+  'aux-contact-3phase': 'K',
   'relay-spst': 'K',
   'relay-spdt': 'K',
   'relay-dpst': 'K',
@@ -157,7 +158,7 @@ export function componentPrefix(type: string): string {
 
 export function nextComponentLabel(type: string, components: CircuitComponent[]): string {
   if (type === 'ground') return 'GND';
-  if (type === 'aux-contact-no' || type === 'aux-contact-nc') return 'K?';
+  if (type === 'aux-contact-no' || type === 'aux-contact-nc' || type === 'aux-contact-3phase') return 'K?';
   const prefix = componentPrefix(type);
   const expression = new RegExp(`^${prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\d+)$`, 'i');
   const next = components.reduce((max, component) => {

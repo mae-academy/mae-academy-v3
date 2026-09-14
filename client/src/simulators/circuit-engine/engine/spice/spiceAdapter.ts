@@ -284,15 +284,16 @@ function windingBleeds(ctx: PartContext, nets: SpiceNet[]): SpiceComponent[] {
 
 /* ------------------------------------------------------------------------ Coil-driven parts --- */
 
-const COIL_TYPES = new Set([
+const RELAY_TYPES = new Set([
   "relay-spst",
   "relay-spdt",
   "relay-dpst",
   "contactor",
 ]);
-type CoilType = "relay-spst" | "relay-spdt" | "relay-dpst" | "contactor";
+type RelayType = "relay-spst" | "relay-spdt" | "relay-dpst" | "contactor";
 
-const isCoilType = (type: string): type is CoilType => COIL_TYPES.has(type);
+const isCoilType = (type: string): boolean =>
+  RELAY_TYPES.has(type) || type === "coil";
 
 interface Contact {
   suffix: string;
@@ -308,6 +309,17 @@ function forcedState(component: CircuitComponent): boolean | undefined {
 }
 
 function coilParameters(component: CircuitComponent) {
+  if (component.type === "coil") {
+    const coilResistance = Math.max(1e-3, numberProp(component, "resistance", 100));
+    const coilInductance = Math.max(1e-6, numberProp(component, "inductance", 1.0));
+    const threshold = Math.max(0.1, numberProp(component, "activationThreshold", 5));
+    return {
+      coilResistance,
+      coilInductance,
+      pullInVoltage: threshold,
+      dropOutVoltage: threshold * DROP_OUT_FRACTION,
+    };
+  }
   const contactor = component.type === "contactor";
   const rated = Math.max(
     0.1,
@@ -327,7 +339,7 @@ function coilParameters(component: CircuitComponent) {
 
 function coilLayout(
   ctx: PartContext,
-  type: CoilType
+  type: RelayType
 ): { native: SpiceComponent; contacts: Contact[] } {
   const net = (terminal: string) => netOf(ctx, terminal);
   const coil = {
@@ -439,7 +451,7 @@ function coilLayout(
   }
 }
 
-function coilPart(ctx: PartContext, type: CoilType): SpiceComponent[] {
+function coilPart(ctx: PartContext, type: RelayType): SpiceComponent[] {
   const { native, contacts } = coilLayout(ctx, type);
   const forced = forcedState(ctx.component);
   if (forced === undefined) return [native];
@@ -474,36 +486,47 @@ function coilPart(ctx: PartContext, type: CoilType): SpiceComponent[] {
 
 function auxContact(ctx: PartContext): SpiceComponent[] {
   const { component } = ctx;
-  const normallyOpen = component.type === "aux-contact-no";
-  const a = netOf(ctx, "a");
-  const b = netOf(ctx, "b");
+  const normallyOpen = String(component.props?.contactType ?? (component.type === "aux-contact-nc" ? "NC" : "NO")).toUpperCase() !== "NC";
+  const is3Phase = component.type === "aux-contact-3phase";
+  const poles: Array<{ suffix?: string; from: SpiceNet; to: SpiceNet }> = is3Phase
+    ? [
+        { suffix: "1", from: netOf(ctx, "l1"), to: netOf(ctx, "t1") },
+        { suffix: "2", from: netOf(ctx, "l2"), to: netOf(ctx, "t2") },
+        { suffix: "3", from: netOf(ctx, "l3"), to: netOf(ctx, "t3") },
+      ]
+    : [{ from: netOf(ctx, "a"), to: netOf(ctx, "b") }];
+
   const linked = ctx.byLabel.get(stringProp(component, "linkedTo", ""));
 
   // Unlinked contacts see a released coil, as in the legacy engine.
   if (!linked || !isCoilType(linked.type)) {
-    return [manualSwitch(self(ctx), a, b, !normallyOpen)];
+    return poles.map(p =>
+      manualSwitch(p.suffix ? derived(ctx, p.suffix) : self(ctx), p.from, p.to, !normallyOpen)
+    );
   }
   const forced = forcedState(linked);
   if (forced !== undefined) {
-    return [manualSwitch(self(ctx), a, b, normallyOpen === forced)];
+    return poles.map(p =>
+      manualSwitch(p.suffix ? derived(ctx, p.suffix) : self(ctx), p.from, p.to, normallyOpen === forced)
+    );
   }
 
   // A second, non-loading coil across the linked one: its contact tracks the same voltage and thresholds.
   const { pullInVoltage, dropOutVoltage } = coilParameters(linked);
-  return [
-    {
-      kind: "relay",
-      ...self(ctx),
-      coilPositive: ctx.nets.netFor(linked.id, "coil+"),
-      coilNegative: ctx.nets.netFor(linked.id, "coil-"),
-      coilResistance: SENSE_COIL_RESISTANCE,
-      coilInductance: SENSE_COIL_INDUCTANCE,
-      pullInVoltage,
-      dropOutVoltage,
-      common: a,
-      ...(normallyOpen ? { normallyOpen: b } : { normallyClosed: b }),
-    },
-  ];
+  const coilPos = ctx.nets.netFor(linked.id, linked.type === "coil" ? "pos" : "coil+");
+  const coilNeg = ctx.nets.netFor(linked.id, linked.type === "coil" ? "neg" : "coil-");
+  return poles.map(p => ({
+    kind: "relay",
+    ...(p.suffix ? derived(ctx, p.suffix) : self(ctx)),
+    coilPositive: coilPos,
+    coilNegative: coilNeg,
+    coilResistance: SENSE_COIL_RESISTANCE,
+    coilInductance: SENSE_COIL_INDUCTANCE,
+    pullInVoltage,
+    dropOutVoltage,
+    common: p.from,
+    ...(normallyOpen ? { normallyOpen: p.to } : { normallyClosed: p.to }),
+  }));
 }
 
 /* ------------------------------------------------------------------------------ Part mapping --- */
@@ -1119,8 +1142,24 @@ function mapPart(ctx: PartContext): Mapping {
     case "contactor":
       return coilPart(ctx, component.type);
 
+    case "coil": {
+      const { coilResistance, coilInductance } = coilParameters(component);
+      const midpoint = internalNet(ctx, "mid");
+      return [
+        resistor(derived(ctx, "R"), net("pos"), midpoint, coilResistance),
+        {
+          kind: "inductor",
+          ...derived(ctx, "L"),
+          positive: midpoint,
+          negative: net("neg"),
+          inductance: coilInductance,
+        },
+      ];
+    }
+
     case "aux-contact-no":
     case "aux-contact-nc":
+    case "aux-contact-3phase":
       return auxContact(ctx);
 
     /* --------------------------------------------------------------------------- Instruments --- */

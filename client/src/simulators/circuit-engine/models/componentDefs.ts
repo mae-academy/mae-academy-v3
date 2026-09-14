@@ -605,6 +605,51 @@ const SWITCHES: Record<string, ComponentDef> = {
 
 // ─── CLASSIC CONTROL ─────────────────────────────────────────────────────────
 const CLASSIC_CONTROL: Record<string, ComponentDef> = {
+
+  'aux-contact-no': {
+    id: 'aux-contact-no', name: 'Auxiliary Contact (1-Phase)', category: 'Classic Control',
+    width: 50, height: 25, symbol: 'aux-contact-no',
+    terminals: [
+      { id: 'a', name: '13', x: -25, y: 0, type: 'bidirectional' },
+      { id: 'b', name: '14', x: 25, y: 0, type: 'bidirectional' },
+    ],
+    properties: {
+      contactType: {
+        type: 'select',
+        value: 'NO',
+        options: ['NO', 'NC'],
+        optionLabels: { NO: 'NO (Normally Open)', NC: 'NC (Normally Closed)' },
+        label: 'Contact Type',
+      },
+      linkedTo: { type: 'text', value: '', label: 'Linked Coil Reference' },
+    },
+    description: '1-Phase auxiliary contact linked to a coil or contactor label (NO or NC)',
+  },
+
+  'aux-contact-3phase': {
+    id: 'aux-contact-3phase', name: '3-Phase Auxiliary Contact', category: 'Classic Control',
+    width: 100, height: 50, symbol: 'aux-contact-3phase',
+    terminals: [
+      { id: 'l1', name: 'L1', x: -50, y: -25, type: 'bidirectional' },
+      { id: 't1', name: 'T1', x: 50, y: -25, type: 'bidirectional' },
+      { id: 'l2', name: 'L2', x: -50, y: 0, type: 'bidirectional' },
+      { id: 't2', name: 'T2', x: 50, y: 0, type: 'bidirectional' },
+      { id: 'l3', name: 'L3', x: -50, y: 25, type: 'bidirectional' },
+      { id: 't3', name: 'T3', x: 50, y: 25, type: 'bidirectional' },
+    ],
+    properties: {
+      contactType: {
+        type: 'select',
+        value: 'NO',
+        options: ['NO', 'NC'],
+        optionLabels: { NO: 'NO (Normally Open)', NC: 'NC (Normally Closed)' },
+        label: 'Contact Type',
+      },
+      linkedTo: { type: 'text', value: '', label: 'Linked Coil Reference' },
+    },
+    description: '3-Pole contactor / auxiliary contact linked to a coil or contactor label (NO or NC)',
+  },
+
   'coil': {
     id: 'coil', name: 'Electromagnetic Coil', category: 'Classic Control',
     width: 100, height: 40, symbol: 'coil',
@@ -620,26 +665,6 @@ const CLASSIC_CONTROL: Record<string, ComponentDef> = {
       activationThreshold: { type: 'number', value: 5, unit: 'V', min: 0.1, max: 480, label: 'Threshold Voltage' },
     },
     description: 'Electromagnetic Relay / Contactor Coil (IEC 60617)',
-  },
-  'aux-contact-no': {
-    id: 'aux-contact-no', name: 'Auxiliary Contact NO', category: 'Classic Control',
-    width: 50, height: 25, symbol: 'aux-contact-no',
-    terminals: [
-      { id: 'a', name: '13', x: -25, y: 0, type: 'bidirectional' },
-      { id: 'b', name: '14', x: 25, y: 0, type: 'bidirectional' },
-    ],
-    properties: { linkedTo: { type: 'text', value: '', label: 'Linked Coil Reference' } },
-    description: 'Normally-open auxiliary contact linked to a coil or contactor label',
-  },
-  'aux-contact-nc': {
-    id: 'aux-contact-nc', name: 'Auxiliary Contact NC', category: 'Classic Control',
-    width: 50, height: 25, symbol: 'aux-contact-nc',
-    terminals: [
-      { id: 'a', name: '21', x: -25, y: 0, type: 'bidirectional' },
-      { id: 'b', name: '22', x: 25, y: 0, type: 'bidirectional' },
-    ],
-    properties: { linkedTo: { type: 'text', value: '', label: 'Linked Coil Reference' } },
-    description: 'Normally-closed auxiliary contact linked to a coil or contactor label',
   },
 };
 
@@ -1035,7 +1060,9 @@ export function getComponentsByCategory(cat: string): ComponentDef[] {
 }
 
 export function getDef(id: string): ComponentDef | undefined {
-  return COMPONENT_DEFS[id] ?? (id === 'op-amp' ? COMPONENT_DEFS['opamp'] : undefined);
+  if (id === 'op-amp') return COMPONENT_DEFS['opamp'];
+  if (id === 'aux-contact-nc') return COMPONENT_DEFS['aux-contact-no'];
+  return COMPONENT_DEFS[id];
 }
 
 /** LED colors as CSS */

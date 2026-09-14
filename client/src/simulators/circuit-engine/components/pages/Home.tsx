@@ -1092,6 +1092,8 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
         actualHalfW = 25; actualHalfH = 12.5; offsetY = -10;
       } else if (['pb-nc', 'sw-spst-no', 'sw-spst-nc', 'aux-contact-no', 'aux-contact-nc'].includes(component.type)) {
         actualHalfW = 25; actualHalfH = 12.5; offsetY = -5;
+      } else if (['fuse-3phase', 'circuit-breaker-3phase', 'aux-contact-3phase'].includes(component.type)) {
+        actualHalfW = 20; actualHalfH = 35; offsetY = 0;
       } else if (component.type === 'contactor') {
         actualHalfW = 35; actualHalfH = 72.5; offsetY = 12.5;
       } else if (['relay-spst', 'relay-spdt', 'relay-dpst'].includes(component.type)) {
@@ -1790,7 +1792,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
       const ledPreset = component.type === 'led' && key === 'color'
         ? { forwardVoltage: LED_FORWARD_VOLTAGES[String(value)] ?? component.props.forwardVoltage }
         : undefined;
-      const isAuxContact = component.type === 'aux-contact-no' || component.type === 'aux-contact-nc';
+      const isAuxContact = component.type === 'aux-contact-no' || component.type === 'aux-contact-nc' || component.type === 'aux-contact-3phase';
       const nextLabel = (isAuxContact && key === 'linkedTo')
         ? (value && String(value).trim() ? String(value).trim() : 'K?')
         : component.label;
@@ -1800,10 +1802,10 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
         props: { ...component.props, [key]: value, ...(diodeMaterial ?? {}), ...(ledPreset ?? {}) },
       };
     });
-    // `state` (switches, breakers, pushbuttons), `manualState` (forced relay/contactor contacts) and
-    // an LED's colour all change the circuit electrically rather than cosmetically — SPICE should
-    // react to them immediately rather than through the drag-coalescing debounce other edits use.
-    const changesCircuit = key === 'state' || key === 'manualState'
+    // `state` (switches, breakers, pushbuttons), `manualState` (forced relay/contactor contacts),
+    // `contactType` (NO vs NC) and an LED's colour all change the circuit electrically rather than
+    // cosmetically — SPICE should react to them immediately rather than through the drag-coalescing debounce.
+    const changesCircuit = key === 'state' || key === 'manualState' || key === 'contactType'
       || (selectedComponent.type === 'led' && key === 'color');
     if (changesCircuit) requestEagerSpiceRun();
     setComponents(nextComponents);
@@ -2777,7 +2779,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                       }
                     }
                   }
-                } else if (['aux-contact-no', 'aux-contact-nc'].includes(component.type) && component.props?.linkedTo) {
+                } else if (['aux-contact-no', 'aux-contact-nc', 'aux-contact-3phase'].includes(component.type) && component.props?.linkedTo) {
                   const linkedCoil = components.find(c => ['coil', 'contactor', 'relay-spst', 'relay-spdt', 'relay-dpst'].includes(c.type) && c.label === component.props.linkedTo);
                   if (linkedCoil) {
                     if (linkedCoil.type === 'coil') {
@@ -3127,7 +3129,7 @@ function ComponentInspector({ colors, component, definition, allComponents, link
           : <PropertyEditorField key={key} colors={colors} label={label} definition={property} value={value} onChange={nextValue => onPropertyChange(key, nextValue)} />;
       })}
     </InspectorSection>}
-    {component.type === 'oscilloscope' && <OscilloscopeComponentPanel colors={colors} component={component} onPropertyChange={onPropertyChange} />}
+    {component.type === 'oscilloscope' && <OscilloscopeComponentPanel colors={colors} component={component} readings={snapshot.instrumentReadings} onPropertyChange={onPropertyChange} />}
 
   </div>;
 }

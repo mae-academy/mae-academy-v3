@@ -355,6 +355,27 @@ describe("convertToSpiceComponents", () => {
     expect(find(nc, "a", "switch-spst").isClosed).toBe(true);
   });
 
+  it("converts 3-phase auxiliary contact into 3 isolated switches or sense relays", () => {
+    // Unlinked: 3 switches
+    const unlinked = convertToSpiceComponents(
+      [part("km", "aux-contact-3phase", { contactType: "NO", linkedTo: "missing" })],
+      []
+    );
+    expect(unlinked.filter(c => c.kind === "switch-spst")).toHaveLength(3);
+
+    // Linked to standalone coil: 3 sense relays across coil
+    const linked = convertToSpiceComponents(
+      [
+        part("k1", "coil", { activationThreshold: 24, resistance: 120 }, "K1"),
+        part("km1", "aux-contact-3phase", { contactType: "NO", linkedTo: "K1" }),
+      ],
+      []
+    );
+    const relays = linked.filter(c => c.kind === "relay" && c.id.startsWith("km1"));
+    expect(relays).toHaveLength(3);
+    expect(relays[0].pullInVoltage).toBe(24);
+  });
+
   it("bleeds only a floating transformer winding to ground", () => {
     const components = [
       part("g", "ground"),

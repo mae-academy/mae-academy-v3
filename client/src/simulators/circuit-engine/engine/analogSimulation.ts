@@ -574,7 +574,7 @@ export class TabDSimulationEngine extends SimulationEngine {
           primitives.push({ kind: 'resistive-switch', id: `${component.id}:2b`, positive: p('c2'), negative: p('b2'), closed: !aSelected });
           break;
         }
-        case 'aux-contact-no': case 'aux-contact-nc': {
+        case 'aux-contact-no': case 'aux-contact-nc': case 'aux-contact-3phase': {
           /**
            * Aux-contact resolution order:
            *   1. Look up a standalone coil component by label matching linkedTo.
@@ -594,7 +594,27 @@ export class TabDSimulationEngine extends SimulationEngine {
           } else if (linkedRelay) {
             energized = relayClosed(linkedRelay);
           }
-          primitives.push({ kind: 'resistive-switch', id: component.id, positive: p('a'), negative: p('b'), closed: component.type === 'aux-contact-no' ? energized : !energized });
+          const isNC = String(component.props.contactType ?? (component.type === 'aux-contact-nc' ? 'NC' : 'NO')).toUpperCase() === 'NC';
+          const closed = isNC ? !energized : energized;
+          if (component.type === 'aux-contact-3phase') {
+            for (const phase of ['1', '2', '3']) {
+              primitives.push({
+                kind: 'resistive-switch',
+                id: `${component.id}:${phase}`,
+                positive: p(`l${phase}`),
+                negative: p(`t${phase}`),
+                closed,
+              });
+            }
+          } else {
+            primitives.push({
+              kind: 'resistive-switch',
+              id: component.id,
+              positive: p('a'),
+              negative: p('b'),
+              closed,
+            });
+          }
           break;
         }
         case 'relay-spst': {

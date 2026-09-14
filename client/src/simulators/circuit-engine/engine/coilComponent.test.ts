@@ -202,10 +202,131 @@ describe('Coil Component and Conflict Detection', () => {
     expect(Math.abs(snapshot.branchCurrents['R_NC'])).toBeCloseTo(0.12, 2);
   });
 
+  it('supports contactType NO and NC on consolidated 1-phase aux contact', () => {
+    const vCoil = makeComponent('V_COIL', 'dc-voltage', { voltage: 10 });
+    const coil = makeComponent('K1', 'coil', { resistance: 100, inductance: 1.0, pullInCurrent: 0.05, holdCurrent: 0.03 }, 'K1');
+    const contactNo = makeComponent('AUX_1P_NO', 'aux-contact-no', { contactType: 'NO', linkedTo: 'K1' });
+    const contactNc = makeComponent('AUX_1P_NC', 'aux-contact-no', { contactType: 'NC', linkedTo: 'K1' });
+    const vSig = makeComponent('V_SIG', 'dc-voltage', { voltage: 12 });
+    const rNo = makeComponent('R_NO', 'resistor', { resistance: 100 });
+    const rNc = makeComponent('R_NC', 'resistor', { resistance: 100 });
+    const gnd = makeComponent('GND', 'ground');
+
+    const components = [vCoil, coil, contactNo, contactNc, vSig, rNo, rNc, gnd];
+    const wires = [
+      makeWire('w1', 'V_COIL', 'pos', 'K1', 'pos'),
+      makeWire('w2', 'K1', 'neg', 'V_COIL', 'neg'),
+      makeWire('w3', 'V_COIL', 'neg', 'GND', 'gnd'),
+      makeWire('w4', 'V_SIG', 'neg', 'GND', 'gnd'),
+      // NO
+      makeWire('w5', 'V_SIG', 'pos', 'AUX_1P_NO', 'a'),
+      makeWire('w6', 'AUX_1P_NO', 'b', 'R_NO', 'a'),
+      makeWire('w7', 'R_NO', 'b', 'GND', 'gnd'),
+      // NC
+      makeWire('w8', 'V_SIG', 'pos', 'AUX_1P_NC', 'a'),
+      makeWire('w9', 'AUX_1P_NC', 'b', 'R_NC', 'a'),
+      makeWire('w10', 'R_NC', 'b', 'GND', 'gnd'),
+    ];
+
+    const engine = new TabDSimulationEngine();
+    engine.setCircuit(components, wires);
+
+    // Coil energized
+    let snapshot = engine.step(0.05);
+    expect(snapshot.converged).toBe(true);
+    expect(Math.abs(snapshot.branchCurrents['R_NO'])).toBeCloseTo(0.12, 2);
+    expect(Math.abs(snapshot.branchCurrents['R_NC'])).toBeLessThan(1e-4);
+
+    // De-energize coil
+    const internalVCoil = (engine as any).tabDComponents.find((c: any) => c.id === 'V_COIL');
+    if (internalVCoil) internalVCoil.props.voltage = 0;
+    for (let i = 0; i < 50; i++) {
+      snapshot = engine.step(0.001);
+    }
+    expect(Math.abs(snapshot.branchCurrents['R_NO'])).toBeLessThan(1e-4);
+    expect(Math.abs(snapshot.branchCurrents['R_NC'])).toBeCloseTo(0.12, 2);
+  });
+
+  it('synchronously switches all 3 poles of 3-Phase Auxiliary Contact while maintaining phase isolation', () => {
+    const vCoil = makeComponent('V_COIL', 'dc-voltage', { voltage: 10 });
+    const coil = makeComponent('K1', 'coil', { resistance: 100, inductance: 1.0, pullInCurrent: 0.05, holdCurrent: 0.03 }, 'K1');
+    const contact3P = makeComponent('KM1', 'aux-contact-3phase', { contactType: 'NO', linkedTo: 'K1' });
+
+    // 3 separate DC sources on 3 lines: 10V, 20V, 30V
+    const v1 = makeComponent('V1', 'dc-voltage', { voltage: 10 });
+    const v2 = makeComponent('V2', 'dc-voltage', { voltage: 20 });
+    const v3 = makeComponent('V3', 'dc-voltage', { voltage: 30 });
+
+    const r1 = makeComponent('R1', 'resistor', { resistance: 100 });
+    const r2 = makeComponent('R2', 'resistor', { resistance: 100 });
+    const r3 = makeComponent('R3', 'resistor', { resistance: 100 });
+    const gnd = makeComponent('GND', 'ground');
+
+    const components = [vCoil, coil, contact3P, v1, v2, v3, r1, r2, r3, gnd];
+    const wires = [
+      // Coil
+      makeWire('wc1', 'V_COIL', 'pos', 'K1', 'pos'),
+      makeWire('wc2', 'K1', 'neg', 'V_COIL', 'neg'),
+      makeWire('wc3', 'V_COIL', 'neg', 'GND', 'gnd'),
+
+      // Sources negative to ground
+      makeWire('wg1', 'V1', 'neg', 'GND', 'gnd'),
+      makeWire('wg2', 'V2', 'neg', 'GND', 'gnd'),
+      makeWire('wg3', 'V3', 'neg', 'GND', 'gnd'),
+
+      // Loads to ground
+      makeWire('wr1', 'R1', 'b', 'GND', 'gnd'),
+      makeWire('wr2', 'R2', 'b', 'GND', 'gnd'),
+      makeWire('wr3', 'R3', 'b', 'GND', 'gnd'),
+
+      // Phase 1 through L1 -> T1
+      makeWire('wp1_in', 'V1', 'pos', 'KM1', 'l1'),
+      makeWire('wp1_out', 'KM1', 't1', 'R1', 'a'),
+
+      // Phase 2 through L2 -> T2
+      makeWire('wp2_in', 'V2', 'pos', 'KM1', 'l2'),
+      makeWire('wp2_out', 'KM1', 't2', 'R2', 'a'),
+
+      // Phase 3 through L3 -> T3
+      makeWire('wp3_in', 'V3', 'pos', 'KM1', 'l3'),
+      makeWire('wp3_out', 'KM1', 't3', 'R3', 'a'),
+    ];
+
+    const engine = new TabDSimulationEngine();
+    engine.setCircuit(components, wires);
+
+    // Initial step: coil energized
+    let snapshot = engine.step(0.05);
+    expect(snapshot.converged).toBe(true);
+    expect(snapshot.componentPowered['K1']).toBe(true);
+
+    // All 3 poles conduct independently with their respective voltages:
+    // I1 = 10V / 100Ω = 0.10A
+    // I2 = 20V / 100Ω = 0.20A
+    // I3 = 30V / 100Ω = 0.30A
+    expect(Math.abs(snapshot.branchCurrents['R1'])).toBeCloseTo(0.10, 2);
+    expect(Math.abs(snapshot.branchCurrents['R2'])).toBeCloseTo(0.20, 2);
+    expect(Math.abs(snapshot.branchCurrents['R3'])).toBeCloseTo(0.30, 2);
+
+    // De-energize coil: set V_COIL to 0
+    const internalVCoil = (engine as any).tabDComponents.find((c: any) => c.id === 'V_COIL');
+    if (internalVCoil) internalVCoil.props.voltage = 0;
+    for (let i = 0; i < 50; i++) {
+      snapshot = engine.step(0.001);
+    }
+    expect(snapshot.componentPowered['K1']).toBe(false);
+
+    // All 3 poles open simultaneously:
+    expect(Math.abs(snapshot.branchCurrents['R1'])).toBeLessThan(1e-4);
+    expect(Math.abs(snapshot.branchCurrents['R2'])).toBeLessThan(1e-4);
+    expect(Math.abs(snapshot.branchCurrents['R3'])).toBeLessThan(1e-4);
+  });
+
   it('defaults aux contact label to K? and supports label synchronization to linked coil', async () => {
     const { nextComponentLabel } = await import('@/simulators/circuit-engine/models/circuitTypes');
     expect(nextComponentLabel('aux-contact-no', [])).toBe('K?');
     expect(nextComponentLabel('aux-contact-nc', [])).toBe('K?');
+    expect(nextComponentLabel('aux-contact-3phase', [])).toBe('K?');
     expect(nextComponentLabel('coil', [])).toBe('K1');
   });
 });

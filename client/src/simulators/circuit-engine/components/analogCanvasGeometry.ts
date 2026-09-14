@@ -442,7 +442,7 @@ export function tabDComponentLabelAnchors(
   } else if (componentType === 'contactor') {
     bodyHalfW = 35; bodyHalfH = 75; padding = 4;
     yShift = 12.5; // Centers around rect [-35, -60, 70, 145] which spans y from -60 to +85 (center = +12.5)
-  } else if (['fuse-3phase', 'circuit-breaker-3phase'].includes(componentType)) {
+  } else if (['fuse-3phase', 'circuit-breaker-3phase', 'aux-contact-3phase'].includes(componentType)) {
     bodyHalfW = 20; bodyHalfH = 35; padding = 4; // Tight to 3-phase lines
   } else if (componentType === 'sw-dpst') {
     bodyHalfW = 25; bodyHalfH = 25; padding = 12; // Retain user-approved spacing
@@ -513,6 +513,7 @@ export const EXACT_ANALOG_TERMINAL_OFFSETS: Record<string, Record<string, Point>
   'sw-spst-nc': { 'a': [-25, 0], 'b': [25, 0] },
   'aux-contact-no': { 'a': [-25, 0], 'b': [25, 0] },
   'aux-contact-nc': { 'a': [-25, 0], 'b': [25, 0] },
+  'aux-contact-3phase': { 'l1': [-50, -25], 't1': [50, -25], 'l2': [-50, 0], 't2': [50, 0], 'l3': [-50, 25], 't3': [50, 25] },
   'pb-no': { 'a': [-25, 0], 'b': [25, 0] },
   'pb-nc': { 'a': [-25, 0], 'b': [25, 0] },
   'sw-spdt': { 'common': [-25, 0], 'a': [25, 0], 'b': [25, 25] },
@@ -542,7 +543,7 @@ export const EXACT_CAD_COMPONENTS = new Set<string>([
   'dc-voltage', 'ac-voltage', 'dc-current', 'ac-current',
   'voltmeter', 'ammeter', 'lamp', 'motor-dc', 'motor-3phase', 'three-phase-source',
   'sw-spst-no', 'sw-spst-nc', 'pb-no', 'pb-nc', 'sw-spdt', 'sw-dpst', 'sw-dpdt',
-  'coil', 'aux-contact-no', 'aux-contact-nc',
+  'coil', 'aux-contact-no', 'aux-contact-nc', 'aux-contact-3phase',
   'fuse', 'fuse-3phase', 'circuit-breaker', 'circuit-breaker-3phase',
   'relay-spst', 'relay-spdt', 'relay-dpst', 'contactor',
   'transformer', 'transformer-ct', 'autotransformer', 'oscilloscope'

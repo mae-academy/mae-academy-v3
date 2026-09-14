@@ -317,4 +317,35 @@ describe('Tab D SVG symbol language', () => {
     expect(scope).toContain('>CH4<');
     expect(scope).toContain('>GND<');
   });
+
+  it('renders 1-Phase Aux Contact dynamically with open blade for NO and closed with IEC diagonal slash for NC', () => {
+    const noOpen = markup('aux-contact-no', { contactType: 'NO' });
+    expect(noOpen).toContain('x1="-10" y1="0" x2="8" y2="-10"');
+    expect(noOpen).not.toContain('x1="-3" y1="-7" x2="5" y2="7"');
+
+    const ncClosed = markup('aux-contact-no', { contactType: 'NC' });
+    expect(ncClosed).toContain('x1="-10" y1="0" x2="8" y2="0"');
+    expect(ncClosed).toContain('x1="-3" y1="-7" x2="5" y2="7"');
+
+    const ncEnergized = markup('aux-contact-no', { contactType: 'NC', isEnergized: true });
+    expect(ncEnergized).toContain('x1="-10" y1="0" x2="8" y2="-10"');
+    expect(ncEnergized).toContain('x1="-3" y1="-7" x2="5" y2="7"');
+  });
+
+  it('renders 3-Phase Auxiliary Contact with 3 poles and mechanical dashed linkage', () => {
+    const contact3P = markup('aux-contact-3phase', { contactType: 'NO' });
+    // 3 parallel poles at y = -25, 0, 25
+    expect(contact3P).toContain('x1="-50" y1="-25" x2="-10" y2="-25"');
+    expect(contact3P).toContain('x1="-50" y1="0" x2="-10" y2="0"');
+    expect(contact3P).toContain('x1="-50" y1="25" x2="-10" y2="25"');
+    // Dashed mechanical linkage
+    expect(contact3P).toContain('stroke-dasharray="4,3"');
+    expect(contact3P).toContain('x1="0" y1="-25" x2="0" y2="25"');
+
+    const contact3P_NC = markup('aux-contact-3phase', { contactType: 'NC' });
+    // All 3 poles have diagonal NC slash
+    expect(contact3P_NC).toContain('x1="-3" y1="-32" x2="5" y2="-18"');
+    expect(contact3P_NC).toContain('x1="-3" y1="-7" x2="5" y2="7"');
+    expect(contact3P_NC).toContain('x1="-3" y1="18" x2="5" y2="32"');
+  });
 });
