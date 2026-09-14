@@ -110,6 +110,7 @@ import {
   type Point,
 } from '@/simulators/circuit-engine/models/wiring';
 import { buildJumpArcPath, calculateWireIntersections, junctionDotPositions } from '@/simulators/circuit-engine/models/wireIntersections';
+import { calculateOrthogonalPath } from '@/simulators/circuit-engine/models/wireRouter';
 import {
   useHistory,
   areSnapshotsEqual,
@@ -1064,13 +1065,25 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
             waypoints: updatedPath.length > 2 ? updatedPath.slice(1, -1) : wire.waypoints,
           };
         }
-        const movingEnd = wire.toComp === activeDraggedId ? 'to' : wire.fromComp === activeDraggedId ? 'from' : 'none';
-        const newPath = dynamicRubberBandPath(endpoints.from, endpoints.to, endpoints.fromAxis, endpoints.toAxis, movingEnd);
+        // Phase 3: auto-routed wires reroute via A* during drag so they stay
+        // orthogonal and avoid the updated component positions.  The dragged
+        // component itself (and its connection partner) are excluded from the
+        // obstacle grid so the router can reach their terminals freely.
+        // calculateOrthogonalPath already falls back to a single-elbow L-shape
+        // when no clear path exists, so this is always safe.
+        const excludeIds = new Set([wire.fromComp, wire.toComp]);
+        const newPath = calculateOrthogonalPath(
+          endpoints.from,
+          endpoints.to,
+          documentComponents,
+          gridSize,
+          excludeIds,
+        );
         return {
           ...wire,
           routing: 'orthogonal' as const,
           path: newPath,
-          waypoints: undefined,
+          waypoints: newPath.length > 2 ? newPath.slice(1, -1) : undefined,
         };
       }
 
@@ -2632,6 +2645,32 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     return null;
   }, [cursor, dragState?.kind, findWireNearPoint, wiring.from]);
 
+  // Phase 3: orthogonal rubber-band preview path.
+  // When the user is drawing a new wire and has NOT yet locked any corners,
+  // we route from the start pin to the cursor via A* so the preview shows
+  // exactly how the finished wire will avoid component bodies.
+  // Once the user has locked corners (manual mode), we switch back to the
+  // classic draft path that honours those corners.
+  const previewTarget = wireSnapProjection?.point ?? cursor;
+  const wireDraftPreviewPath = useMemo(() => {
+    if (!wiring.from) return null;
+    if (wiring.lockedCorners && wiring.lockedCorners.length > 0) {
+      // Manual draft: honour the user-placed corners.
+      return tabDOrthogonalDraftPath(wiring.from.position, previewTarget, wiring.lockedCorners, wiring.from.axis);
+    }
+    // Automatic A* preview: exclude the source component so the router can
+    // leave its terminal body freely.  The target is the live cursor so
+    // no target component is known yet — we leave the grid fully open there.
+    const excludeIds = new Set([wiring.from.componentId]);
+    return calculateOrthogonalPath(
+      wiring.from.position,
+      previewTarget,
+      components,
+      gridSize,
+      excludeIds,
+    );
+  }, [wiring.from, wiring.lockedCorners, previewTarget, components, gridSize]);
+
   return (
     <div className="v3-mae-layout font-sans text-slate-900 dark:text-slate-100" style={{ minHeight: 760, color: colors.text }}>
       <section className="mb-4 overflow-x-auto rounded-xl border border-slate-200 bg-white dark:border-[#1a1d24] dark:bg-[#0d0f12]" style={{ borderColor: colors.line, background: colors.panel }}>
@@ -2853,7 +2892,8 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                 <circle key={`jdot-${jx}-${jy}`} cx={jx} cy={jy} r={3.5} fill={colors.text} stroke={colors.canvas} strokeWidth={1} pointerEvents="none" />
               ))}
 
-              {wiring.from && <path d={pointsToPath(tabDOrthogonalDraftPath(wiring.from.position, wireSnapProjection ? wireSnapProjection.point : cursor, wiring.lockedCorners, wiring.from.axis))} fill="none" stroke={colors.accent} strokeDasharray="6 4" strokeWidth={1.6} opacity={.75} strokeLinecap="round" strokeLinejoin="round" pointerEvents="none" />}
+              {/* Phase 3: orthogonal rubber-band wire preview */}
+              {wiring.from && wireDraftPreviewPath && <path d={pointsToPath(wireDraftPreviewPath)} fill="none" stroke={colors.accent} strokeDasharray="6 4" strokeWidth={1.6} opacity={.75} strokeLinecap="round" strokeLinejoin="round" pointerEvents="none" />}
               {wireSnapProjection && <circle cx={wireSnapProjection.point[0]} cy={wireSnapProjection.point[1]} r={6} fill="none" stroke={colors.accent} strokeWidth={2} pointerEvents="none" />}
               {wiring.lockedCorners?.map((corner, index) => (
                 <circle key={`corner-${index}`} cx={corner[0]} cy={corner[1]} r={3} fill={colors.panel} stroke={colors.accent} strokeWidth={1.2} pointerEvents="none" />
