@@ -109,6 +109,7 @@ import {
   type Obstacle,
   type Point,
 } from '@/simulators/circuit-engine/models/wiring';
+import { buildJumpArcPath, calculateWireIntersections, junctionDotPositions } from '@/simulators/circuit-engine/models/wireIntersections';
 import {
   useHistory,
   areSnapshotsEqual,
@@ -815,6 +816,14 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
   const dcMna = useMemo(() => createStaticMna ? createStaticMna(components, wires, normalizedGraph) : tabBMna, [components, createStaticMna, normalizedGraph, tabBMna, wires]);
   const meshGeometry = useMemo(() => compileMeshGeometry(components, wires, normalizedGraph), [components, wires, normalizedGraph]);
   const nodalGeometry = useMemo(() => compileNodalGeometry(components, wires, normalizedGraph), [components, wires, normalizedGraph]);
+
+  // Phase 2: compute all H×V wire-crossing intersections once per render.
+  // Used to inject jump-arc SVG paths (cross-net) and junction dots (same-net).
+  const wireIntersectionList = useMemo(
+    () => calculateWireIntersections(wires, w => normalizedGraph.netForTerminal(w.fromComp, w.fromTerm)),
+    [wires, normalizedGraph],
+  );
+  const junctionDots = useMemo(() => junctionDotPositions(wireIntersectionList), [wireIntersectionList]);
 
   const [analysisTraces, setAnalysisTraces] = useState<Partial<Record<'mesh' | 'nodal', AnalysisTrace>>>({});
   const [activeAnalysisMethod, setActiveAnalysisMethod] = useState<'mesh' | 'nodal' | null>(null);
@@ -2809,7 +2818,10 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                 const selected = selection?.kind === 'wire' && selection.id === wire.id;
                 const phase = snapshot.wirePhases?.[wire.id] ?? 0;
                 const path = wire.path;
-                const renderPath = pointsToPath(path);
+                // Phase 2: use jump-arc path for the visible stroke; hitbox uses the
+                // plain polyline so clicks always register even near arc breaks.
+                const hitPath = pointsToPath(path);
+                const renderPath = buildJumpArcPath(path, wireIntersectionList, wire.id, 5);
                 const normalizedOffset = ((phase % 1) + 1) % 1;
                 // Persistent charge particles: uniform spacing based solely on physical length (N = floor(length / spacing))
                 const numDots = Math.max(1, Math.floor(pathLength(path) / 45));
@@ -2818,7 +2830,9 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                 const isSensingParentSelected = false;
                 return (
                   <g key={wire.id}>
-                    <path d={renderPath} fill="none" stroke="transparent" strokeWidth={17} strokeLinecap="round" strokeLinejoin="round" onMouseDown={event => handleWireMouseDown(event, wire)} onDoubleClick={event => handleWireDoubleClick(event, wire)} style={{ cursor: 'pointer' }} />
+                    {/* Wide transparent hitbox — uses plain polyline for reliable click detection */}
+                    <path d={hitPath} fill="none" stroke="transparent" strokeWidth={17} strokeLinecap="round" strokeLinejoin="round" onMouseDown={event => handleWireMouseDown(event, wire)} onDoubleClick={event => handleWireDoubleClick(event, wire)} style={{ cursor: 'pointer' }} />
+                    {/* Visible stroke with jump-arc splices at cross-net crossings */}
                     <path d={renderPath} fill="none" stroke={colors.text} strokeWidth={1.5} strokeDasharray={isSensingWire ? "3 3" : undefined} strokeLinecap="round" strokeLinejoin="round" pointerEvents="none" />
                     {showElectrons && dots.map((dot, index) => <circle key={index} cx={dot[0]} cy={dot[1]} r={3} fill={colors.powered} opacity={1} pointerEvents="none" />)}
                     {wire.toComp.startsWith('junc_') && <circle cx={path[path.length - 1][0]} cy={path[path.length - 1][1]} r={3.5} fill={colors.text} stroke={colors.canvas} strokeWidth={1.5} pointerEvents="none" />}
@@ -2833,6 +2847,11 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                   </g>
                 );
               })}
+
+              {/* Phase 2: same-net junction dots for interior crossing points */}
+              {junctionDots.map(([jx, jy]) => (
+                <circle key={`jdot-${jx}-${jy}`} cx={jx} cy={jy} r={3.5} fill={colors.text} stroke={colors.canvas} strokeWidth={1} pointerEvents="none" />
+              ))}
 
               {wiring.from && <path d={pointsToPath(tabDOrthogonalDraftPath(wiring.from.position, wireSnapProjection ? wireSnapProjection.point : cursor, wiring.lockedCorners, wiring.from.axis))} fill="none" stroke={colors.accent} strokeDasharray="6 4" strokeWidth={1.6} opacity={.75} strokeLinecap="round" strokeLinejoin="round" pointerEvents="none" />}
               {wireSnapProjection && <circle cx={wireSnapProjection.point[0]} cy={wireSnapProjection.point[1]} r={6} fill="none" stroke={colors.accent} strokeWidth={2} pointerEvents="none" />}
