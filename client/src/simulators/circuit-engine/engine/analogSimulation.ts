@@ -581,12 +581,12 @@ export class TabDSimulationEngine extends SimulationEngine {
            *   2. Fall back to any relay/contactor body with a matching label.
            *   3. Default to de-energized if nothing found.
            */
-          const linkedLabel = String(component.props.linkedTo ?? '');
+          const linkedRef = String(component.props.linkedTo ?? component.props.controlSourceId ?? '');
           const linkedCoil = this.tabDComponents.find(
-            item => item.type === 'coil' && item.label === linkedLabel,
+            item => item.type === 'coil' && (item.label === linkedRef || item.id === linkedRef),
           );
           const linkedRelay = !linkedCoil
-            ? this.tabDComponents.find(item => item.label === linkedLabel)
+            ? this.tabDComponents.find(item => item.label === linkedRef || item.id === linkedRef)
             : null;
           let energized = false;
           if (linkedCoil) {

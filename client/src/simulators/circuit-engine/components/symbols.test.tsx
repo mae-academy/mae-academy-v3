@@ -1,10 +1,10 @@
 import * as React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { formatMeterReading, renderSymbol } from '@/simulators/circuit-engine/components/symbols';
+import { formatMeterReading, renderSymbol, ThreePhaseMotorSymbol } from '@/simulators/circuit-engine/components/symbols';
 
-function markup(symbolId: string, props: Record<string, unknown> = {}) {
-  return renderToStaticMarkup(<svg>{renderSymbol(symbolId, false, props, 0)}</svg>);
+function markup(symbolId: string, props: Record<string, unknown> = {}, powered = false, animTime = 0) {
+  return renderToStaticMarkup(<svg>{renderSymbol(symbolId, powered, props, animTime)}</svg>);
 }
 
 describe('Tab D SVG symbol language', () => {
@@ -347,5 +347,21 @@ describe('Tab D SVG symbol language', () => {
     expect(contact3P_NC).toContain('x1="-3" y1="-32" x2="5" y2="-18"');
     expect(contact3P_NC).toContain('x1="-3" y1="-7" x2="5" y2="7"');
     expect(contact3P_NC).toContain('x1="-3" y1="18" x2="5" y2="32"');
+  });
+
+  it('renders 3-Phase Motor with static IEC symbols when unpowered and active rotor animation when powered', () => {
+    const unpowered = markup('motor-3phase');
+    expect(unpowered).toContain('>3 ~<');
+    expect(unpowered).toContain('>M<');
+    expect(unpowered).not.toContain('stroke-dasharray="14 8"');
+
+    const powered = markup('motor-3phase', {}, true, 0.25);
+    expect(powered).toContain('>3 ~<');
+    expect(powered).toContain('>M<');
+    // Active rotation ring
+    expect(powered).toContain('stroke-dasharray="14 8"');
+    // Spinning rotor indicator line
+    expect(powered).toContain('stroke="#08b58d"');
+    expect(ThreePhaseMotorSymbol).toBeDefined();
   });
 });

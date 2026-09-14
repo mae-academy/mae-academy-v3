@@ -387,8 +387,8 @@ export class SimulationEngine {
       case 'aux-contact-no':
       case 'aux-contact-nc':
       case 'aux-contact-3phase': {
-        const linked = propString(component.props, 'linkedTo');
-        const controller = this.components.find(item => item.label === linked);
+        const linked = propString(component.props, 'linkedTo') || propString(component.props, 'controlSourceId');
+        const controller = this.components.find(item => item.label === linked || item.id === linked);
         const energized = Boolean(controller && controls.get(controller.id));
         const isNC = String(component.props?.contactType ?? (component.type === 'aux-contact-nc' ? 'NC' : 'NO')).toUpperCase() === 'NC';
         return isNC ? !energized : energized;
@@ -400,17 +400,22 @@ export class SimulationEngine {
   private calculateControls(solution: number[]): Map<string, boolean> {
     const next = new Map<string, boolean>();
     for (const component of this.components) {
-      if (!['relay-spst', 'relay-spdt', 'relay-dpst', 'contactor'].includes(component.type)) continue;
+      if (!['relay-spst', 'relay-spdt', 'relay-dpst', 'contactor', 'coil'].includes(component.type)) continue;
       const manualState = propString(component.props, 'manualState');
       if (manualState === 'open' || manualState === 'closed') {
         next.set(component.id, manualState === 'closed');
         continue;
       }
-      const coilVoltage = Math.abs(this.terminalVoltage(component, 'coil+', solution) - this.terminalVoltage(component, 'coil-', solution));
-      const rated = Math.max(0.1, propNumber(component.props, 'coilVoltage', component.type === 'contactor' ? 24 : 12));
+      const isCoil = component.type === 'coil';
+      const posTerm = isCoil ? 'pos' : 'coil+';
+      const negTerm = isCoil ? 'neg' : 'coil-';
+      const coilVoltage = Math.abs(this.terminalVoltage(component, posTerm, solution) - this.terminalVoltage(component, negTerm, solution));
+      const rated = isCoil
+        ? Math.max(0.1, propNumber(component.props, 'activationThreshold', propNumber(component.props, 'coilVoltage', 5)))
+        : Math.max(0.1, propNumber(component.props, 'coilVoltage', component.type === 'contactor' ? 24 : 12));
       const previous = this.relayStates.get(component.id) ?? false;
-      const pullIn = rated * 0.75;
-      const dropOut = rated * 0.45;
+      const pullIn = isCoil ? rated : rated * 0.75;
+      const dropOut = isCoil ? rated * 0.6 : rated * 0.45;
       next.set(component.id, previous ? coilVoltage >= dropOut : coilVoltage >= pullIn);
     }
     return next;
@@ -560,7 +565,9 @@ export class SimulationEngine {
           const reverse = propString(props, 'phaseSequence', 'ABC') === 'ACB';
           const phaseAngles = reverse ? [0, 120, -120] : [0, -120, 120];
           const internalR = Math.max(0.01, propNumber(props, 'internalR', 0.05));
-          const currents = ['l1', 'l2', 'l3'].map((terminal, index) => stampSource(component, terminal, 'n', waveform('sine', phaseVoltagePeak, frequency, phaseAngles[index], 0, this.time), internalR));
+          const nWired = this.network.wiredTerminals.has(terminalKey(component.id, 'n'));
+          const nTerm = nWired ? 'n' : null;
+          const currents = ['l1', 'l2', 'l3'].map((terminal, index) => stampSource(component, terminal, nTerm, waveform('sine', phaseVoltagePeak, frequency, phaseAngles[index], 0, this.time), internalR));
           current = currents[0] ?? 0;
           isPowered = true;
           break;
@@ -680,9 +687,12 @@ export class SimulationEngine {
         case 'circuit-breaker-3phase':
         case 'aux-contact-3phase': {
           const closed = this.contactClosed(component, controls);
-          const l1 = stampResistance(component, 'l1', 't1', closed ? CLOSED_RESISTANCE : OPEN_RESISTANCE);
-          const l2 = stampResistance(component, 'l2', 't2', closed ? CLOSED_RESISTANCE : OPEN_RESISTANCE);
-          const l3 = stampResistance(component, 'l3', 't3', closed ? CLOSED_RESISTANCE : OPEN_RESISTANCE);
+          const rOn = 1e-4;
+          const rOff = OPEN_RESISTANCE;
+          const resistance = closed ? rOn : rOff;
+          const l1 = stampResistance(component, 'l1', 't1', resistance);
+          const l2 = stampResistance(component, 'l2', 't2', resistance);
+          const l3 = stampResistance(component, 'l3', 't3', resistance);
           current = Math.max(Math.abs(l1), Math.abs(l2), Math.abs(l3));
           isPowered = closed;
           break;
@@ -744,6 +754,28 @@ export class SimulationEngine {
           componentIntensity = energized ? 1 : 0;
           break;
         }
+        case 'coil': {
+          const coilR = Math.max(1, propNumber(props, 'resistance', 100));
+          const coilL = Math.max(1e-6, propNumber(props, 'inductance', 1.0));
+          const denominator = coilL + dt * coilR;
+          const conductance = dt / denominator;
+          const previousCurrent = this.inductorCurrent.get(component.id) ?? 0;
+          const historyCurrent = (coilL / denominator) * previousCurrent;
+          const a = this.node(component, 'pos');
+          const b = this.node(component, 'neg');
+          system.conductance(a, b, conductance);
+          system.current(a, b, historyCurrent);
+          current = conductance * (this.voltage(guess, a) - this.voltage(guess, b)) + historyCurrent;
+          this.addTerminalCurrent(terminalCurrents, component, 'pos', current);
+          this.addTerminalCurrent(terminalCurrents, component, 'neg', -current);
+          const coilVoltage = Math.abs(this.voltage(guess, a) - this.voltage(guess, b));
+          const rated = Math.max(0.1, propNumber(props, 'activationThreshold', 5));
+          const energized = coilVoltage >= rated * 0.6 || Boolean(controls.get(component.id));
+          branchCurrents[component.id] = current;
+          isPowered = energized;
+          componentIntensity = energized ? 1 : 0;
+          break;
+        }
         case 'fuse': {
           const blown = this.fuseBlown.has(component.id);
           current = stampResistance(component, 'a', 'b', blown ? OPEN_RESISTANCE : 0.01);
@@ -775,12 +807,15 @@ export class SimulationEngine {
           const uv = stampResistance(component, 'u', 'v', phaseResistance);
           const vw = stampResistance(component, 'v', 'w', phaseResistance);
           const wu = stampResistance(component, 'w', 'u', phaseResistance);
-          const vuv = this.terminalVoltage(component, 'u', guess) - this.terminalVoltage(component, 'v', guess);
-          const vvw = this.terminalVoltage(component, 'v', guess) - this.terminalVoltage(component, 'w', guess);
-          const vwu = this.terminalVoltage(component, 'w', guess) - this.terminalVoltage(component, 'u', guess);
+          const vu = this.terminalVoltage(component, 'u', guess);
+          const vv = this.terminalVoltage(component, 'v', guess);
+          const vw_term = this.terminalVoltage(component, 'w', guess);
+          const vuv = Math.abs(vu - vv);
+          const vvw = Math.abs(vv - vw_term);
+          const vwu = Math.abs(vw_term - vu);
           const lineVoltage = Math.sqrt((vuv ** 2 + vvw ** 2 + vwu ** 2) / 3);
           current = Math.max(Math.abs(uv), Math.abs(vw), Math.abs(wu));
-          isPowered = lineVoltage > nominalVoltage * 0.2;
+          isPowered = (lineVoltage > nominalVoltage * 0.1) || (vuv > 1 && vvw > 1 && vwu > 1);
           componentIntensity = clamp(lineVoltage / nominalVoltage, 0, 1);
           break;
         }
@@ -947,7 +982,7 @@ export class SimulationEngine {
         const voltage = (result.terminalVoltages[terminalKey(component.id, 'a')] ?? 0) - (result.terminalVoltages[terminalKey(component.id, 'b')] ?? 0);
         this.capacitorVoltage.set(component.id, voltage);
       }
-      if (component.type === 'inductor') this.inductorCurrent.set(component.id, result.branchCurrents[component.id] ?? 0);
+      if (component.type === 'inductor' || component.type === 'coil') this.inductorCurrent.set(component.id, result.branchCurrents[component.id] ?? 0);
       if (component.type === 'scr' || component.type === 'triac' || component.type === 'diac') {
         const mainA = component.type === 'triac' ? 't1' : component.type === 'diac' ? 'a1' : 'anode';
         const mainB = component.type === 'triac' ? 't2' : component.type === 'diac' ? 'a2' : 'cathode';

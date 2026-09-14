@@ -934,10 +934,32 @@ const MotorDc: SymbolFC = ({ powered, animTime = 0 }) => {
   const angle = powered ? animTime * 360 : 0;
   return (
     <g>
-      <circle cx={0} cy={0} r={33} fill="none" stroke="currentColor" strokeWidth={1.5} />
+      <circle cx={0} cy={0} r={33} fill="none" stroke={powered ? "#08b58d" : "currentColor"} strokeWidth={1.5} />
       <text x={0} y={5} textAnchor="middle" fontSize={16} fontWeight="normal" fill="currentColor">M</text>
       {powered && (
-        <line x1={0} y1={0} x2={26 * Math.cos((angle - 90) * Math.PI / 180)} y2={26 * Math.sin((angle - 90) * Math.PI / 180)} stroke="#08b58d" strokeWidth={1.5} />
+        <>
+          <circle
+            cx={0}
+            cy={0}
+            r={28}
+            fill="none"
+            stroke="#08b58d"
+            strokeWidth={1.5}
+            strokeDasharray="14 8"
+            strokeLinecap="round"
+            transform={`rotate(${angle}, 0, 0)`}
+            opacity={0.85}
+          />
+          <line
+            x1={0}
+            y1={0}
+            x2={26 * Math.cos(((angle - 90) * Math.PI) / 180)}
+            y2={26 * Math.sin(((angle - 90) * Math.PI) / 180)}
+            stroke="#08b58d"
+            strokeWidth={2}
+            strokeLinecap="round"
+          />
+        </>
       )}
       <line x1={-50} y1={0} x2={-33} y2={0} stroke="currentColor" strokeWidth={1.5} />
       <line x1={33} y1={0} x2={50} y2={0} stroke="currentColor" strokeWidth={1.5} />
@@ -949,11 +971,34 @@ const Motor3Phase: SymbolFC = ({ powered, animTime = 0 }) => {
   const angle = powered ? animTime * 360 : 0;
   return (
     <g>
-      <circle cx={0} cy={0} r={33} fill="none" stroke="currentColor" strokeWidth={1.5} />
-      <text x={0} y={5} textAnchor="middle" fontSize={16} fontWeight="normal" fill="currentColor">M</text>
+      <circle cx={0} cy={0} r={33} fill="none" stroke={powered ? "#08b58d" : "currentColor"} strokeWidth={1.5} />
       {powered && (
-        <line x1={0} y1={0} x2={22 * Math.cos((angle - 90) * Math.PI / 180)} y2={22 * Math.sin((angle - 90) * Math.PI / 180)} stroke="#08b58d" strokeWidth={1.5} strokeLinecap="round" />
+        <>
+          <circle
+            cx={0}
+            cy={0}
+            r={28}
+            fill="none"
+            stroke="#08b58d"
+            strokeWidth={1.5}
+            strokeDasharray="14 8"
+            strokeLinecap="round"
+            transform={`rotate(${angle}, 0, 0)`}
+            opacity={0.85}
+          />
+          <line
+            x1={0}
+            y1={0}
+            x2={22 * Math.cos(((angle - 90) * Math.PI) / 180)}
+            y2={22 * Math.sin(((angle - 90) * Math.PI) / 180)}
+            stroke="#08b58d"
+            strokeWidth={2}
+            strokeLinecap="round"
+          />
+        </>
       )}
+      <text x={0} y={-4} textAnchor="middle" fontSize={11} fontWeight="bold" fill={powered ? "#08b58d" : "currentColor"} opacity={0.85}>3 ~</text>
+      <text x={0} y={12} textAnchor="middle" fontSize={14} fontWeight="normal" fill="currentColor">M</text>
       <line x1={-50} y1={-25} x2={-21.5} y2={-25} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
       <line x1={-50} y1={0} x2={-33} y2={0} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
       <line x1={-50} y1={25} x2={-21.5} y2={25} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
@@ -961,6 +1006,8 @@ const Motor3Phase: SymbolFC = ({ powered, animTime = 0 }) => {
     </g>
   );
 };
+
+export const ThreePhaseMotorSymbol = Motor3Phase;
 
 const Lamp: SymbolFC = ({ powered }) => (
   <g>

@@ -496,7 +496,8 @@ function auxContact(ctx: PartContext): SpiceComponent[] {
       ]
     : [{ from: netOf(ctx, "a"), to: netOf(ctx, "b") }];
 
-  const linked = ctx.byLabel.get(stringProp(component, "linkedTo", ""));
+  const linkedRef = stringProp(component, "linkedTo", "") || stringProp(component, "controlSourceId", "");
+  const linked = ctx.byLabel.get(linkedRef) || Array.from(ctx.byLabel.values()).find(c => c.id === linkedRef);
 
   // Unlinked contacts see a released coil, as in the legacy engine.
   if (!linked || !isCoilType(linked.type)) {

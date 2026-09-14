@@ -631,10 +631,10 @@ const CLASSIC_CONTROL: Record<string, ComponentDef> = {
     width: 100, height: 50, symbol: 'aux-contact-3phase',
     terminals: [
       { id: 'l1', name: 'L1', x: -50, y: -25, type: 'bidirectional' },
-      { id: 't1', name: 'T1', x: 50, y: -25, type: 'bidirectional' },
       { id: 'l2', name: 'L2', x: -50, y: 0, type: 'bidirectional' },
-      { id: 't2', name: 'T2', x: 50, y: 0, type: 'bidirectional' },
       { id: 'l3', name: 'L3', x: -50, y: 25, type: 'bidirectional' },
+      { id: 't1', name: 'T1', x: 50, y: -25, type: 'bidirectional' },
+      { id: 't2', name: 'T2', x: 50, y: 0, type: 'bidirectional' },
       { id: 't3', name: 'T3', x: 50, y: 25, type: 'bidirectional' },
     ],
     properties: {

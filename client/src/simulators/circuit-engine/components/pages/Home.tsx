@@ -2762,7 +2762,17 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                 if (!definition) return null;
                 const isSelected = (selection?.kind === 'component' && selection.id === component.id) || marqueeIds.includes(component.id);
                 let powered = Boolean(snapshot.componentPowered[component.id]);
-                if (['relay-spst', 'relay-spdt', 'relay-dpst', 'contactor'].includes(component.type)) {
+                if (component.type === 'coil') {
+                  const vPos = snapshot.terminalVoltages[`${component.id}:pos`];
+                  const vNeg = snapshot.terminalVoltages[`${component.id}:neg`];
+                  if (vPos !== undefined && vNeg !== undefined) {
+                    const vCoil = Math.abs(vPos - vNeg);
+                    const threshold = Math.max(0.1, Number(component.props?.activationThreshold ?? 5));
+                    if (vCoil >= threshold * 0.6) {
+                      powered = true;
+                    }
+                  }
+                } else if (['relay-spst', 'relay-spdt', 'relay-dpst', 'contactor'].includes(component.type)) {
                   const manual = component.props?.manualState;
                   if (manual === 'closed') {
                     powered = true;
@@ -2779,11 +2789,22 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                       }
                     }
                   }
-                } else if (['aux-contact-no', 'aux-contact-nc', 'aux-contact-3phase'].includes(component.type) && component.props?.linkedTo) {
-                  const linkedCoil = components.find(c => ['coil', 'contactor', 'relay-spst', 'relay-spdt', 'relay-dpst'].includes(c.type) && c.label === component.props.linkedTo);
+                } else if (['aux-contact-no', 'aux-contact-nc', 'aux-contact-3phase'].includes(component.type) && (component.props?.linkedTo || component.props?.controlSourceId)) {
+                  const linkedRef = String(component.props?.linkedTo || component.props?.controlSourceId || '');
+                  const linkedCoil = components.find(c => ['coil', 'contactor', 'relay-spst', 'relay-spdt', 'relay-dpst'].includes(c.type) && (c.label === linkedRef || c.id === linkedRef));
                   if (linkedCoil) {
                     if (linkedCoil.type === 'coil') {
-                      powered = Boolean(snapshot.componentPowered[linkedCoil.id]);
+                      let coilEnergized = Boolean(snapshot.componentPowered[linkedCoil.id]);
+                      const vPos = snapshot.terminalVoltages[`${linkedCoil.id}:pos`];
+                      const vNeg = snapshot.terminalVoltages[`${linkedCoil.id}:neg`];
+                      if (vPos !== undefined && vNeg !== undefined) {
+                        const vCoil = Math.abs(vPos - vNeg);
+                        const threshold = Math.max(0.1, Number(linkedCoil.props?.activationThreshold ?? 5));
+                        if (vCoil >= threshold * 0.6) {
+                          coilEnergized = true;
+                        }
+                      }
+                      powered = coilEnergized;
                     } else {
                       const manual = linkedCoil.props?.manualState;
                       if (manual === 'closed') {
@@ -2802,6 +2823,22 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                           }
                         }
                         powered = coilEnergized;
+                      }
+                    }
+                  }
+                } else if (component.type === 'motor-3phase') {
+                  if (!powered) {
+                    const vu = snapshot.terminalVoltages[`${component.id}:u`];
+                    const vv = snapshot.terminalVoltages[`${component.id}:v`];
+                    const vw = snapshot.terminalVoltages[`${component.id}:w`];
+                    if (vu !== undefined && vv !== undefined && vw !== undefined) {
+                      const vuv = Math.abs(vu - vv);
+                      const vvw = Math.abs(vv - vw);
+                      const vwu = Math.abs(vw - vu);
+                      const nominalV = Number(component.props?.nominalV ?? 400);
+                      const rmsEstimate = Math.sqrt((vuv ** 2 + vvw ** 2 + vwu ** 2) / 3);
+                      if (rmsEstimate > nominalV * 0.05 || (vuv > 1 && vvw > 1 && vwu > 1)) {
+                        powered = true;
                       }
                     }
                   }
