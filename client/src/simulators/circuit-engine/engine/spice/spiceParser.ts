@@ -188,9 +188,33 @@ export function risingCrossings(vector: number[], time: number[]): number[] {
   return crossings;
 }
 
+/** A genuine 2-crossing "one period" window only makes sense if that period is a substantial slice
+ * of what was actually captured — see the doc comment on measurementWindow for why. */
+const MIN_WINDOW_FRACTION_OF_RECORD = 0.15;
+
 /**
  * Samples clipped to whole periods (first to last rising crossing, endpoints interpolated), or the
- * full record when fewer than two crossings exist. `undefined` when there is no usable time axis.
+ * full record when fewer than two crossings exist, or when the crossing-derived window covers only
+ * a sliver of what was actually captured. `undefined` when there is no usable time axis.
+ *
+ * That sliver check matters because a series inductor lets a step/pulse excitation legitimately
+ * produce exactly two rising mid-level crossings without the signal being periodic at all —
+ * confirmed against real ngspice output on a step into R–L–C (R=1kΩ, L=1mH, C=1µF, heavily
+ * overdamped, no true ringing): the inductor briefly holds current at 0, so the R–L junction tracks
+ * the source almost instantly up near its final value (crossing #1), dips as inductor current builds
+ * over the fast L/R time constant, then climbs back through the same level on the slow RLC settle
+ * (crossing #2) — a single transient excursion, not a period. Naively clipping to it as "one period"
+ * cut the averaging window down to the first 7% of a 10ms record and read the DC level as ~7.5V
+ * instead of the true ~24V. Simply requiring more crossings breaks a real, deliberately-tested case
+ * instead (spiceParser.test.ts's "2.1 cycles" fixture: a clean periodic sine only ever produces
+ * `floor(cycles)` *interior* crossings — 2 of them here — no matter how many full periods it runs,
+ * since t=0 itself is a boundary, not a detected transition). What actually differs between the two:
+ * a signal deliberately captured for multiple periods (every AC source in this app's own `.tran`
+ * runs, see SPICE_TRAN_PERIODS in Home.tsx) has its "one period" occupy a large share of the total
+ * capture (in that fixture, 1 of 2.1 cycles ≈ 48%); the step-response artifact's spurious "period"
+ * was 6.9% of a capture sized to show the full settle, not to sample a period. Requiring the window
+ * span at least 15% of the record keeps the legitimate case (comfortable 3× margin) and rejects the
+ * transient one (2× margin the other way).
  */
 function measurementWindow(
   vector: number[],
@@ -201,7 +225,11 @@ function measurementWindow(
   if (!(time[time.length - 1] > time[0])) return undefined;
 
   const crossings = risingCrossings(vector, time);
-  if (crossings.length < 2) return { t: time, v: vector };
+  const recordSpan = time[time.length - 1] - time[0];
+  const windowSpan = crossings.length >= 2 ? crossings[crossings.length - 1] - crossings[0] : 0;
+  if (crossings.length < 2 || windowSpan < MIN_WINDOW_FRACTION_OF_RECORD * recordSpan) {
+    return { t: time, v: vector };
+  }
 
   const start = crossings[0];
   const end = crossings[crossings.length - 1];

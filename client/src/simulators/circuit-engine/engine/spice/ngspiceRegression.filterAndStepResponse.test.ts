@@ -20,7 +20,7 @@
 import { describe, expect, it } from "vitest";
 
 import { runNgspiceWithLog } from "@/simulators/circuit-engine/engine/spice/ngspiceTestHarness";
-import { getFrequency, getVrms, parseSpiceResults } from "@/simulators/circuit-engine/engine/spice/spiceParser";
+import { getFrequency, getVmean, getVrms, parseSpiceResults } from "@/simulators/circuit-engine/engine/spice/spiceParser";
 import { calculateVpp } from "@/simulators/circuit-engine/components/ui-components/oscilloscopeMeasurements";
 import type { SamplePoint } from "@/simulators/circuit-engine/models/circuitTypes";
 
@@ -266,6 +266,33 @@ describe("1st/2nd-order circuit responses (ngspice.wasm)", () => {
       // ringing decays, so this should still be a healthy swing this soon after the pulse.
       const vpp = calculateVpp(toSamples(ringVc, ringTime));
       expect(vpp).toBeGreaterThan(3);
+    },
+    RUN_TIMEOUT
+  );
+
+  it(
+    "heavily overdamped R-L-C step (R=1kΩ, L=1mH, C=1µF, ζ≈15.8) doesn't fool measurementWindow's whole-period clip into reading a spurious ~7.5V instead of the true ~22V",
+    async () => {
+      // Regression for a real bug: the R–L junction of this circuit briefly tracks the 24V source
+      // almost instantly (inductor current starts at 0, so R carries none, so no drop across it),
+      // then dips as inductor current builds over the fast L/R time constant, then climbs back
+      // through the same mid-level on the slow RLC settle — two rising crossings from one transient
+      // excursion, not a period. Before the fix, measurementWindow clipped to that "period" (under
+      // 7% of the actual 10ms capture) and read the DC level as ~7.5V; it should read close to the
+      // true settled value instead. Uses the exact component values that first surfaced this in the
+      // running app, not a synthetic reproduction.
+      const { results } = await runAndParse(`
+        RLC overdamped
+        V1 1 0 PULSE(0 24 0 1n 1n 1 2)
+        R1 1 2 1k
+        L1 2 3 1m
+        C1 3 0 1u
+        .tran 0.5u 0.01
+        .end
+      `);
+      const junction = results.nodeVoltages["2"];
+      expect(getVrms(junction, results.time)).toBeGreaterThan(18);
+      expect(getVmean(junction, results.time)).toBeGreaterThan(18);
     },
     RUN_TIMEOUT
   );
