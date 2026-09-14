@@ -1237,20 +1237,20 @@ const CoilSymbol: SymbolFC = ({ powered, props }) => {
 
   const borderStroke = isConflicted ? '#EF4444' : 'currentColor';
   const borderDash = isConflicted ? '4,3' : 'none';
-  const borderWidth = isConflicted ? 1.5 : 1.5;
-  const diagStroke = energized ? '#F59E0B' : 'currentColor';
+  const borderWidth = 1.5;
+  const diagStroke = energized ? '#EF4444' : 'currentColor';
   const diagWidth = energized ? 2 : 1.5;
 
   return (
     <g>
-      {/* Left terminal stub — touches rect left edge at x=-20 */}
-      <line x1={-30} y1={0} x2={-20} y2={0} stroke="currentColor" strokeWidth={1} strokeLinecap="square" />
-      {/* Right terminal stub — touches rect right edge at x=+20 */}
-      <line x1={20} y1={0} x2={30} y2={0} stroke="currentColor" strokeWidth={1} strokeLinecap="square" />
+      {/* Left terminal lead — runs along y=0 from grid pin x=-50 to body edge x=-15 */}
+      <line x1={-50} y1={0} x2={-15} y2={0} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+      {/* Right terminal lead — runs along y=0 from body edge x=+15 to grid pin x=+50 */}
+      <line x1={15} y1={0} x2={50} y2={0} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
 
-      {/* Coil body: 40x30 px, sharp corners, transparent so theme shows through */}
+      {/* Sleek compact IEC Coil body: 30x18 px, sharp corners, transparent */}
       <rect
-        x={-20} y={-15} width={40} height={30}
+        x={-15} y={-9} width={30} height={18}
         fill="transparent"
         stroke={borderStroke}
         strokeWidth={borderWidth}
@@ -1258,22 +1258,22 @@ const CoilSymbol: SymbolFC = ({ powered, props }) => {
         rx={0} ry={0}
       />
 
-      {/* Energized accent ring — amber, fill=none, inset 1px */}
+      {/* Energized accent ring — fill=none, inset 1px inside the 30x18 body */}
       {energized && (
         <rect
-          x={-19} y={-14} width={38} height={28}
+          x={-14} y={-8} width={28} height={16}
           fill="none"
-          stroke="#0b3ef5ff"
-          strokeWidth={2}
+          stroke="#EF4444"
+          strokeWidth={1.5}
           strokeOpacity={0.45}
           rx={0} ry={0}
         />
       )}
 
-      {/* IEC winding indicator: single diagonal from bottom-left to top-right inner corner */}
+      {/* IEC winding indicator: single crisp diagonal strictly corner-to-corner */}
       <line
-        x1={-18} y1={13}
-        x2={18} y2={-13}
+        x1={-15} y1={9}
+        x2={15} y2={-9}
         stroke={diagStroke}
         strokeWidth={diagWidth}
         strokeLinecap="round"
@@ -1281,7 +1281,7 @@ const CoilSymbol: SymbolFC = ({ powered, props }) => {
 
       {/* Conflict warning dot at top-right corner */}
       {isConflicted && (
-        <circle cx={18} cy={-13} r={4} fill="#EF4444" />
+        <circle cx={15} cy={-9} r={3.5} fill="#EF4444" />
       )}
     </g>
   );

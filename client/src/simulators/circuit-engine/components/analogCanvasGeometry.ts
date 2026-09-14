@@ -518,7 +518,8 @@ export const EXACT_ANALOG_TERMINAL_OFFSETS: Record<string, Record<string, Point>
   'sw-spdt': { 'common': [-25, 0], 'a': [25, 0], 'b': [25, 25] },
   'sw-dpst': { 'a1': [-25, -25], 'b1': [25, -25], 'a2': [-25, 0], 'b2': [25, 0] },
   'sw-dpdt': { 'c1': [-25, -25], 'a1': [25, -25], 'b1': [25, 0], 'c2': [-25, 25], 'a2': [25, 25], 'b2': [25, 50] },
-  // Universal Protection
+  // Universal Protection & Classic Control
+  'coil': { 'pos': [-50, 0], 'neg': [50, 0] },
   'fuse': { 'a': [-50, 0], 'b': [50, 0] },
   'fuse-3phase': { 'l1': [-50, -25], 't1': [50, -25], 'l2': [-50, 0], 't2': [50, 0], 'l3': [-50, 25], 't3': [50, 25] },
   'circuit-breaker': { 'a': [-50, 0], 'b': [50, 0] },
@@ -541,7 +542,7 @@ export const EXACT_CAD_COMPONENTS = new Set<string>([
   'dc-voltage', 'ac-voltage', 'dc-current', 'ac-current',
   'voltmeter', 'ammeter', 'lamp', 'motor-dc', 'motor-3phase', 'three-phase-source',
   'sw-spst-no', 'sw-spst-nc', 'pb-no', 'pb-nc', 'sw-spdt', 'sw-dpst', 'sw-dpdt',
-  'aux-contact-no', 'aux-contact-nc',
+  'coil', 'aux-contact-no', 'aux-contact-nc',
   'fuse', 'fuse-3phase', 'circuit-breaker', 'circuit-breaker-3phase',
   'relay-spst', 'relay-spdt', 'relay-dpst', 'contactor',
   'transformer', 'transformer-ct', 'autotransformer', 'oscilloscope'

@@ -601,25 +601,45 @@ const SWITCHES: Record<string, ComponentDef> = {
     properties: { state: { type: 'select', value: 'a', options: ['a', 'b'], label: 'Position' } },
     description: 'Double Pole Double Throw',
   },
+};
+
+// ─── CLASSIC CONTROL ─────────────────────────────────────────────────────────
+const CLASSIC_CONTROL: Record<string, ComponentDef> = {
+  'coil': {
+    id: 'coil', name: 'Electromagnetic Coil', category: 'Classic Control',
+    width: 100, height: 40, symbol: 'coil',
+    terminals: [
+      { id: 'pos', name: 'A1', x: -50, y: 0, type: 'input' },
+      { id: 'neg', name: 'A2', x: 50, y: 0, type: 'input' },
+    ],
+    properties: {
+      resistance: { type: 'number', value: 100, unit: 'Ω', min: 1, max: 10000, label: 'Coil Resistance' },
+      inductance: { type: 'number', value: 1.0, unit: 'H', min: 0.001, max: 100, label: 'Coil Inductance' },
+      pullInCurrent: { type: 'number', value: 0.05, unit: 'A', min: 0.001, max: 10, label: 'Pull-in Current' },
+      holdCurrent: { type: 'number', value: 0.03, unit: 'A', min: 0.001, max: 10, label: 'Hold Current' },
+      activationThreshold: { type: 'number', value: 5, unit: 'V', min: 0.1, max: 480, label: 'Threshold Voltage' },
+    },
+    description: 'Electromagnetic Relay / Contactor Coil (IEC 60617)',
+  },
   'aux-contact-no': {
-    id: 'aux-contact-no', name: 'Auxiliary Contact NO', category: 'Switches',
+    id: 'aux-contact-no', name: 'Auxiliary Contact NO', category: 'Classic Control',
     width: 50, height: 25, symbol: 'aux-contact-no',
     terminals: [
       { id: 'a', name: '13', x: -25, y: 0, type: 'bidirectional' },
       { id: 'b', name: '14', x: 25, y: 0, type: 'bidirectional' },
     ],
-    properties: { linkedTo: { type: 'text', value: '', label: 'Linked Coil Label' } },
-    description: 'Normally-open auxiliary contact linked to a relay or contactor label',
+    properties: { linkedTo: { type: 'text', value: '', label: 'Linked Coil Reference' } },
+    description: 'Normally-open auxiliary contact linked to a coil or contactor label',
   },
   'aux-contact-nc': {
-    id: 'aux-contact-nc', name: 'Auxiliary Contact NC', category: 'Switches',
+    id: 'aux-contact-nc', name: 'Auxiliary Contact NC', category: 'Classic Control',
     width: 50, height: 25, symbol: 'aux-contact-nc',
     terminals: [
       { id: 'a', name: '21', x: -25, y: 0, type: 'bidirectional' },
       { id: 'b', name: '22', x: 25, y: 0, type: 'bidirectional' },
     ],
-    properties: { linkedTo: { type: 'text', value: '', label: 'Linked Coil Label' } },
-    description: 'Normally-closed auxiliary contact linked to a relay or contactor label',
+    properties: { linkedTo: { type: 'text', value: '', label: 'Linked Coil Reference' } },
+    description: 'Normally-closed auxiliary contact linked to a coil or contactor label',
   },
 };
 
@@ -951,12 +971,29 @@ const MEASUREMENT: Record<string, ComponentDef> = {
       { id: 'gnd', name: 'GND', x: 75, y: 25, type: 'input' },
     ],
     properties: {
-      timebase: { type: 'number', value: 0.02, unit: 's', min: 0.000001, max: 10, label: 'Time Base' },
-      samples: { type: 'number', value: 500, unit: '', min: 50, max: 2000, label: 'Samples' },
+      // Per-channel display settings (offset/time-div/volt-div): view-only, hidden from the generic
+      // inspector list — OscilloscopeComponentPanel is their dedicated editor. Values still live in
+      // component.props like every other property, so they save/undo with the circuit as normal.
+      offset_ch1: { type: 'number', value: 0, unit: 'V', min: -500, max: 500, step: 0.1, label: 'CH1 Offset', hidden: true },
+      offset_ch2: { type: 'number', value: 0, unit: 'V', min: -500, max: 500, step: 0.1, label: 'CH2 Offset', hidden: true },
+      offset_ch3: { type: 'number', value: 0, unit: 'V', min: -500, max: 500, step: 0.1, label: 'CH3 Offset', hidden: true },
+      offset_ch4: { type: 'number', value: 0, unit: 'V', min: -500, max: 500, step: 0.1, label: 'CH4 Offset', hidden: true },
+      timeDiv_ch1: { type: 'number', value: 0.01, unit: 's', label: 'CH1 Time/Div', hidden: true },
+      timeDiv_ch2: { type: 'number', value: 0.01, unit: 's', label: 'CH2 Time/Div', hidden: true },
+      timeDiv_ch3: { type: 'number', value: 0.01, unit: 's', label: 'CH3 Time/Div', hidden: true },
+      timeDiv_ch4: { type: 'number', value: 0.01, unit: 's', label: 'CH4 Time/Div', hidden: true },
+      voltDiv_ch1: { type: 'number', value: 5, unit: 'V', label: 'CH1 Volt/Div', hidden: true },
+      voltDiv_ch2: { type: 'number', value: 5, unit: 'V', label: 'CH2 Volt/Div', hidden: true },
+      voltDiv_ch3: { type: 'number', value: 5, unit: 'V', label: 'CH3 Volt/Div', hidden: true },
+      voltDiv_ch4: { type: 'number', value: 5, unit: 'V', label: 'CH4 Volt/Div', hidden: true },
     },
     description: 'Four-channel scope; every channel is referenced to its connected ground probe',
   },
 };
+
+// Discrete Time/Div and Volt/Div rungs the oscilloscope's logarithmic sliders snap to.
+export const OSCILLOSCOPE_TIME_DIV_PRESETS = [1e-5, 5e-5, 1e-4, 5e-4, 1e-3, 5e-3, 1e-2, 5e-2, 1e-1, 5e-1, 1, 2, 5, 10];
+export const OSCILLOSCOPE_VOLT_DIV_PRESETS = [1e-3, 5e-3, 1e-2, 5e-2, 1e-1, 5e-1, 1, 2, 5, 10, 20, 50, 100];
 
 // ─── MASTER EXPORT ────────────────────────────────────────────────────────────
 export const COMPONENT_DEFS: Record<string, ComponentDef> = {
@@ -969,6 +1006,7 @@ export const COMPONENT_DEFS: Record<string, ComponentDef> = {
   ...PROTECTION,
   ...TRANSFORMERS,
   ...POWER_SEMI,
+  ...CLASSIC_CONTROL,
   ...OTHER_COMPONENTS,
   ...DIGITAL_LOGIC,
   ...MEASUREMENT,
@@ -982,6 +1020,7 @@ export const CATEGORIES = [
   'Transistors',
   'Power Semiconductors',
   'Switches',
+  'Classic Control',
   'Protection',
   'Transformers',
   'Other Components',

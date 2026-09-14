@@ -441,10 +441,10 @@ export class TabDSimulationEngine extends SimulationEngine {
      */
     for (const c of this.tabDComponents) {
       if (c.type !== 'coil') continue;
-      const nodePos = `${c.id}:pos`;
-      const nodeNeg = `${c.id}:neg`;
-      const V_pos = priorVoltage(nodePos);
-      const V_neg = priorVoltage(nodeNeg);
+      const posNet = netForTerminal(c.id, 'pos');
+      const negNet = netForTerminal(c.id, 'neg');
+      const V_pos = priorVoltage(posNet);
+      const V_neg = priorVoltage(negNet);
       const V_applied = V_pos - V_neg;
       const R      = Math.max(1, Number(c.props?.resistance  ?? 100));
       const L      = Math.max(1e-6, Number(c.props?.inductance  ?? 1.0));

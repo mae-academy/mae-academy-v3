@@ -40,6 +40,8 @@ import { toast } from 'sonner';
 import { V3Math } from '@/components/ui/V3Math';
 import { KATEX_EMBEDDED_FONT_CSS } from '@/simulators/circuit-engine/models/katexSvgFonts';
 import { AnalysisBox } from '@/simulators/circuit-engine/components/ui-components/AnalysisBox';
+import { OscilloscopeTracePanel } from '@/simulators/circuit-engine/components/ui-components/OscilloscopeTracePanel';
+import { OscilloscopeComponentPanel } from '@/simulators/circuit-engine/components/inspector-panels/OscilloscopeComponentPanel';
 import type { AnalysisTrace, MeshCycle, NodalNodeLabel } from '@/simulators/circuit-engine/models/analysisTypes';
 import {
   CATEGORIES,
@@ -63,6 +65,7 @@ import {
   type WorkspaceText,
 } from '@/simulators/circuit-engine/models/circuitTypes';
 import { SimulationEngine } from '@/simulators/circuit-engine/engine/simulation';
+import { detectCoilConflicts } from '@/simulators/circuit-engine/engine/analogSimulation';
 import { compileNodalGeometry, useSimulation, type TabBMnaState } from '@/simulators/circuit-engine/components/hooks/useSimulation';
 import type { MNAElement } from '@/simulators/circuit-engine/engine/mnaSolver';
 import { compileMeshGeometry } from '@/simulators/circuit-engine/components/meshGeometry';
@@ -2510,7 +2513,18 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     }, {});
   }, [search, tabDUiRefinement]);
 
-  const linkedCoils = components.filter(component => ['contactor', 'relay-spst', 'relay-spdt', 'relay-dpst'].includes(component.type));
+  const linkedCoils = components.filter(component => ['coil', 'contactor', 'relay-spst', 'relay-spdt', 'relay-dpst'].includes(component.type));
+
+  const conflictedCoilIds = useMemo(() => {
+    const report = detectCoilConflicts(components);
+    const set = new Set<string>();
+    if (!report.hasConflicts) return set;
+    for (const conflict of report.conflicts) {
+      const duplicates = components.filter(c => c.type === 'coil' && (c.label || c.id) === conflict.name && c.id !== conflict.primaryId);
+      duplicates.forEach(d => set.add(d.id));
+    }
+    return set;
+  }, [components]);
 
   const wireSnapProjection = useMemo(() => {
     if (wiring.from && dragState?.kind !== 'pan') {
@@ -2756,25 +2770,29 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                     }
                   }
                 } else if (['aux-contact-no', 'aux-contact-nc'].includes(component.type) && component.props?.linkedTo) {
-                  const linkedCoil = components.find(c => ['contactor', 'relay-spst', 'relay-spdt', 'relay-dpst'].includes(c.type) && c.label === component.props.linkedTo);
+                  const linkedCoil = components.find(c => ['coil', 'contactor', 'relay-spst', 'relay-spdt', 'relay-dpst'].includes(c.type) && c.label === component.props.linkedTo);
                   if (linkedCoil) {
-                    const manual = linkedCoil.props?.manualState;
-                    if (manual === 'closed') {
-                      powered = true;
-                    } else if (manual === 'open') {
-                      powered = false;
+                    if (linkedCoil.type === 'coil') {
+                      powered = Boolean(snapshot.componentPowered[linkedCoil.id]);
                     } else {
-                      let coilEnergized = Boolean(snapshot.componentPowered[linkedCoil.id]);
-                      const vPos = snapshot.terminalVoltages[`${linkedCoil.id}:coil+`];
-                      const vNeg = snapshot.terminalVoltages[`${linkedCoil.id}:coil-`];
-                      if (vPos !== undefined && vNeg !== undefined) {
-                        const vCoil = Math.abs(vPos - vNeg);
-                        const rated = Math.max(0.1, Number(linkedCoil.props?.coilVoltage ?? (linkedCoil.type === 'contactor' ? 24 : 12)));
-                        if (vCoil >= rated * 0.7) {
-                          coilEnergized = true;
+                      const manual = linkedCoil.props?.manualState;
+                      if (manual === 'closed') {
+                        powered = true;
+                      } else if (manual === 'open') {
+                        powered = false;
+                      } else {
+                        let coilEnergized = Boolean(snapshot.componentPowered[linkedCoil.id]);
+                        const vPos = snapshot.terminalVoltages[`${linkedCoil.id}:coil+`];
+                        const vNeg = snapshot.terminalVoltages[`${linkedCoil.id}:coil-`];
+                        if (vPos !== undefined && vNeg !== undefined) {
+                          const vCoil = Math.abs(vPos - vNeg);
+                          const rated = Math.max(0.1, Number(linkedCoil.props?.coilVoltage ?? (linkedCoil.type === 'contactor' ? 24 : 12)));
+                          if (vCoil >= rated * 0.7) {
+                            coilEnergized = true;
+                          }
                         }
+                        powered = coilEnergized;
                       }
-                      powered = coilEnergized;
                     }
                   }
                 }
@@ -2797,8 +2815,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                     onPointerLeave={() => setHoveredComponentId(null)}
                   >
                     <g transform={symbolTransform} color={isSelected ? colors.selection : undefined}>
-                      {renderSymbol(definition.symbol, powered, { ...component.props, isEnergized: powered, _intensity: intensity, _documentedStyle: tabDUiRefinement, ...(meterDisplayValue !== undefined ? { displayValue: meterDisplayValue } : {}) }, animationTime)}
-                      {component.type === 'oscilloscope' && <ScopeTrace reading={effectiveSnapshot.instrumentReadings[`${component.id}:ch1`]} color="#38bdf8" />}
+                      {renderSymbol(definition.symbol, powered, { ...component.props, isEnergized: powered, isConflicted: conflictedCoilIds.has(component.id), _intensity: intensity, _documentedStyle: tabDUiRefinement, ...(meterDisplayValue !== undefined ? { displayValue: meterDisplayValue } : {}) }, animationTime)}
                     </g>
                     {definition.terminals.map(terminal => {
                       const snappedWorld = getCanvasTerminalPosition(component, terminal.id);
@@ -2964,6 +2981,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
           ) : null}
 
           <PersistentDmmPanel colors={colors} dmms={components.filter(c => c.type === 'dmm')} snapshot={effectiveSnapshot} />
+          <OscilloscopeTracePanel colors={colors} scopes={components.filter(c => c.type === 'oscilloscope')} instrumentReadings={effectiveSnapshot.instrumentReadings} />
         </aside>
       </div>
       <section className="mt-3 overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-950" style={{ background: colors.panel, borderColor: colors.line }}>
@@ -3032,7 +3050,7 @@ function ComponentInspector({ colors, component, definition, allComponents, link
 
       <div style={{ color: colors.subtle, fontSize: 9, marginTop: 8 }}>Auto reference prefix: {componentPrefix(component.type)}. Auxiliary contacts link to this reference.</div>
     </InspectorSection>
-    <InspectorSection colors={colors} label="Electrical properties">
+    {component.type !== 'oscilloscope' && <InspectorSection colors={colors} label="Electrical properties">
       {Object.entries(definition.properties).map(([key, property]) => {
         // Derived properties (an LED's forwardVoltage, set by its colour) are simulated but not editable.
         if (property.hidden) return null;
@@ -3100,8 +3118,8 @@ function ComponentInspector({ colors, component, definition, allComponents, link
           ? <PrefixedPropertyEditorField key={key} colors={colors} propertyKey={key} label={label} definition={property} value={value} prefix={String(component.props[prefixStateKey(key)] ?? engineeringPrefixFor(numeric(value, numeric(property.value))))} onChange={nextValue => onPropertyChange(key, nextValue)} onPrefixChange={nextPrefix => onPropertyChange(prefixStateKey(key), nextPrefix)} />
           : <PropertyEditorField key={key} colors={colors} label={label} definition={property} value={value} onChange={nextValue => onPropertyChange(key, nextValue)} />;
       })}
-    </InspectorSection>
-    {component.type === 'oscilloscope' && <ScopeReadingInspector colors={colors} component={component} readings={snapshot.instrumentReadings} />}
+    </InspectorSection>}
+    {component.type === 'oscilloscope' && <OscilloscopeComponentPanel colors={colors} component={component} readings={snapshot.instrumentReadings} onPropertyChange={onPropertyChange} />}
 
   </div>;
 }
@@ -3201,11 +3219,9 @@ function PersistentDmmPanel({ colors, dmms, snapshot }: { colors: Palette; dmms:
   );
 }
 
-function ScopeReadingInspector({ colors, component, readings }: { colors: Palette; component: CircuitComponent; readings: Record<string, InstrumentReading> }) { const channels = ['ch1', 'ch2', 'ch3', 'ch4']; return <InspectorSection colors={colors} label="Live scope acquisition"><div style={{ padding: 8, background: '#0f172a', borderRadius: 7 }}>{channels.map((channel, index) => { const reading = readings[`${component.id}:${channel}`]; return <div key={channel} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 2px', color: ['#38bdf8', '#f472b6', '#facc15', '#a78bfa'][index], fontSize: 10, fontFamily: 'ui-monospace, monospace' }}><span>{channel.toUpperCase()}</span><span>{reading?.status === 'ready' ? <><EngineeringMath value={reading.value} unit={reading.unit} /> <V3Math math="\mathrm{RMS}" /></> : 'not connected'}</span></div>; })}</div><p style={{ color: colors.muted, fontSize: 10, lineHeight: 1.45, margin: '8px 0 0' }}>Each channel is measured against the scope <V3Math math="\mathrm{GND}" /> terminal. The display trace uses sampled solved node voltage history.</p></InspectorSection>; }
 
 function InstrumentText({ reading, x, y, color }: { reading?: InstrumentReading; x: number; y: number; color: string }) { const label = reading?.status === 'open' ? 'OL' : reading?.status === 'ready' ? formatEngineering(reading.value, reading.unit, 2) : '—'; return <text x={x} y={y} textAnchor="middle" fontFamily="monospace" fontSize={9} fontWeight={400} fill={color} pointerEvents="none">{label}</text>; }
 
-function ScopeTrace({ reading, color }: { reading?: InstrumentReading; color: string }) { const samples = reading?.samples?.slice(-80) ?? []; if (samples.length < 2) return null; const values = samples.map(sample => sample.value); const amplitude = Math.max(1e-6, ...values.map(value => Math.abs(value))); const path = values.map((value, index) => `${index === 0 ? 'M' : 'L'} ${-25 + index * (48 / (values.length - 1))},${-10 - (value / amplitude) * 12}`).join(' '); return <path d={path} fill="none" stroke={color} strokeWidth={1.2} pointerEvents="none" />; }
 
 function ElectricalLabel({ label, unit }: { label: string; unit?: string }) {
   const symbol: Record<string, string> = {

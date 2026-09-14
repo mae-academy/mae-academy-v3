@@ -124,6 +124,7 @@ const PREFIXES: Record<string, string> = {
   'sw-dpdt': 'S',
   'pb-no': 'S',
   'pb-nc': 'S',
+  coil: 'K',
   'aux-contact-no': 'K',
   'aux-contact-nc': 'K',
   'relay-spst': 'K',
