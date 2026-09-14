@@ -4,10 +4,13 @@
    one is reflected in the other immediately rather than only after a reload. */
 import { useState } from 'react';
 
+export type AcquisitionMode = 'live' | 'step';
+
 export interface OscilloscopeDisplaySettings {
   isDarkMode: boolean;
   showValues: boolean;
   channelColors: [string, string, string, string];
+  acquisitionMode?: AcquisitionMode;
 }
 
 const STORAGE_KEY = 'mae-oscilloscope-display-settings';
@@ -21,6 +24,7 @@ export const DEFAULT_DISPLAY_SETTINGS: OscilloscopeDisplaySettings = {
   isDarkMode: true,
   showValues: true,
   channelColors: DARK_CHANNEL_COLORS,
+  acquisitionMode: 'live',
 };
 
 function readSettings(): OscilloscopeDisplaySettings {
@@ -35,6 +39,7 @@ function readSettings(): OscilloscopeDisplaySettings {
       isDarkMode: Boolean(parsed.isDarkMode ?? true),
       showValues: Boolean(parsed.showValues ?? true),
       channelColors,
+      acquisitionMode: parsed.acquisitionMode === 'step' ? 'step' : 'live',
     };
   } catch {
     return DEFAULT_DISPLAY_SETTINGS;

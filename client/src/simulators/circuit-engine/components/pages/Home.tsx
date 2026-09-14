@@ -2309,9 +2309,17 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     try {
       nets = resolveCircuitNets(components, wires);
       spiceComponents = convertToSpiceComponents(components, wires, nets, simulationMode);
+      const isStepMode = oscilloscopeDisplaySettings.acquisitionMode === 'step';
+      const maxScopeWindow = components
+        .filter(c => c.type === 'oscilloscope')
+        .reduce((max, scope) => {
+          const chTimes = ['ch1', 'ch2', 'ch3', 'ch4'].map(ch => Number(scope.props[`timeDiv_${ch}`]) || 0.01);
+          return Math.max(max, ...chTimes.map(t => t * 10));
+        }, 0);
       const frequency = Math.max(0.001, detectSystemFrequency(components));
-      const duration = Math.min(0.5, Math.max(0.02, SPICE_TRAN_PERIODS / frequency));
-      netlist = generateNetlist(spiceComponents, { analysis: [`.tran ${duration / 2000} ${duration}`], simulationMode });
+      const duration = Math.min(2.0, Math.max(0.02, SPICE_TRAN_PERIODS / frequency, maxScopeWindow));
+      const analysis = [`.tran ${duration / 2000} ${duration}${isStepMode ? ' uic' : ''}`];
+      netlist = generateNetlist(spiceComponents, { analysis, simulationMode });
     } catch (error) {
       // An incomplete circuit (no components yet, or no ground placed) is an expected mid-edit
       // state, not a genuine incompatibility — stay quiet and idle rather than toasting on it.
@@ -2343,7 +2351,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     // this used to — broke the debounce below: `useSpiceEngine` returns a new object every render,
     // so during Run (a 60fps state update loop) the debounce timer was reset before it could ever
     // elapse, and SPICE silently stopped re-solving on switch toggles until Pause forced one retry.
-  }, [clearSpiceReadings, components, simulationMode, spiceEngine.runSimulation, wires]);
+  }, [clearSpiceReadings, components, oscilloscopeDisplaySettings.acquisitionMode, simulationMode, spiceEngine.runSimulation, wires]);
 
   // Trigger on every circuit edit, debounced so a drag or a burst of keystrokes fires one run — but
   // not a switch/relay toggle: those set `spiceEagerRef` first, so this fires with no delay for
@@ -2354,6 +2362,11 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     const timer = window.setTimeout(runSpiceSimulation, eager ? 0 : SPICE_DEBOUNCE_MS);
     return () => window.clearTimeout(timer);
   }, [runSpiceSimulation]);
+
+  // Eagerly re-run SPICE whenever switching between Live Roll and Step Response mode
+  useEffect(() => {
+    runSpiceSimulation();
+  }, [oscilloscopeDisplaySettings.acquisitionMode, runSpiceSimulation]);
 
   // The worker resolves asynchronously; react to the hook's own state (not the promise above) so a
   // superseded run's late arrival can never be mistaken for the latest one's result. Reads back

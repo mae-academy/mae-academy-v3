@@ -17,10 +17,14 @@ export function OscilloscopeControlsGrid({
   colors,
   settings,
   onChange,
+  onAutoscale,
+  isAutoscaleDisabled,
 }: {
   colors: PanelColors;
   settings: OscilloscopeDisplaySettings;
   onChange: (next: Partial<OscilloscopeDisplaySettings>) => void;
+  onAutoscale?: () => void;
+  isAutoscaleDisabled?: boolean;
 }) {
   const setChannelColor = (index: number, color: string) => {
     const next = [...settings.channelColors] as [string, string, string, string];
@@ -30,6 +34,34 @@ export function OscilloscopeControlsGrid({
 
   return (
     <div className="mt-3 pt-2.5 border-t w-full max-w-full box-border" style={{ borderColor: colors.line }}>
+      {/* Aligned 2-column header action row: [Autoscale] alongside acquisition mode toggle [Step Response / Live Roll] */}
+      <div className="grid grid-cols-2 gap-2 w-full mb-3">
+        {/* 1. [Autoscale] Button */}
+        <button
+          type="button"
+          onClick={onAutoscale}
+          disabled={isAutoscaleDisabled}
+          className="bg-gradient-to-r from-blue-600 via-purple-600 to-rose-500 text-white font-medium shadow-sm hover:opacity-95 h-8 rounded-xl text-xs transition-opacity cursor-pointer disabled:cursor-not-allowed disabled:bg-slate-300 dark:disabled:bg-slate-800 disabled:text-slate-500"
+          title="Fit Offset / Time-Div / Volt-Div to this channel's captured signal"
+        >
+          Autoscale
+        </button>
+
+        {/* 2. Acquisition Mode Toggle Button */}
+        <button
+          type="button"
+          onClick={() => onChange({ acquisitionMode: settings.acquisitionMode === 'step' ? 'live' : 'step' })}
+          className={`h-8 rounded-xl text-xs font-medium transition-all cursor-pointer flex items-center justify-center px-1 truncate ${
+            settings.acquisitionMode === 'step'
+              ? 'bg-gradient-to-r from-blue-600 via-purple-600 to-rose-500 text-white border-transparent shadow-sm'
+              : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800'
+          }`}
+          title={settings.acquisitionMode === 'step' ? 'Switch to Live Rolling mode' : 'Switch to Step Response (Transient Capture) mode'}
+        >
+          {settings.acquisitionMode === 'step' ? 'Step Response' : 'Live Roll'}
+        </button>
+      </div>
+
       <div
         className="text-left text-[11px] font-semibold tracking-wider text-slate-500 uppercase mb-2"
       >

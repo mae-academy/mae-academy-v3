@@ -144,7 +144,7 @@ function ScopeUnit({ colors, scope, instrumentReadings, displaySettings }: { col
   // or the theme/channel colors change — none needing more than a plain re-render to stay under 16ms.
   const sampleKey = readings.map(reading => reading?.samples?.at(-1)?.value).join(',');
   const configKey = channelConfigs.map(config => `${config.offset}|${config.timeDiv}|${config.voltDiv}|${config.timeShift}`).join(';');
-  const themeKey = `${displaySettings.isDarkMode}|${displaySettings.channelColors.join(',')}`;
+  const themeKey = `${displaySettings.isDarkMode}|${displaySettings.channelColors.join(',')}|${displaySettings.acquisitionMode ?? 'live'}`;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -154,7 +154,7 @@ function ScopeUnit({ colors, scope, instrumentReadings, displaySettings }: { col
     readings.forEach((reading, index) => {
       if (reading?.status === 'ready' && reading.samples) {
         const { offset, timeDiv, voltDiv, timeShift } = channelConfigs[index];
-        drawChannelTrace(ctx, reading.samples, displaySettings.channelColors[index], offset, voltDiv, timeDiv, timeShift);
+        drawChannelTrace(ctx, reading.samples, displaySettings.channelColors[index], offset, voltDiv, timeDiv, timeShift, displaySettings.acquisitionMode);
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -162,7 +162,12 @@ function ScopeUnit({ colors, scope, instrumentReadings, displaySettings }: { col
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-      <div style={{ fontSize: 10, fontWeight: 700, color: colors.subtle, textTransform: 'uppercase', letterSpacing: '.05em' }}>{scope.label}</div>
+      <div className="flex items-center justify-between">
+        <div style={{ fontSize: 10, fontWeight: 700, color: colors.subtle, textTransform: 'uppercase', letterSpacing: '.05em' }}>{scope.label}</div>
+        <span className="text-[9px] font-mono font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+          {displaySettings.acquisitionMode === 'step' ? 'Step Response' : 'Live Roll'}
+        </span>
+      </div>
       <div className="relative w-full overflow-hidden" style={{ height: CANVAS_HEIGHT, borderRadius: 4 }}>
         <canvas ref={canvasRef} width={CANVAS_WIDTH} height={CANVAS_HEIGHT} style={{ width: '100%', height: CANVAS_HEIGHT, background: canvasBackground, border: '1px solid #444', borderRadius: 4, display: 'block' }} />
         {displaySettings.showValues && (
@@ -238,9 +243,48 @@ function drawGraticule(ctx: CanvasRenderingContext2D, displaySettings: Oscillosc
  * same real data span — OscilloscopeComponentPanel already clamps it so the window can never be
  * pushed past the captured samples, so no clamping happens here beyond the window-fit above.
  */
-function drawChannelTrace(ctx: CanvasRenderingContext2D, samples: SamplePoint[], color: string, offset: number, voltDiv: number, timeDiv: number, timeShift: number): void {
+function drawChannelTrace(
+  ctx: CanvasRenderingContext2D,
+  samples: SamplePoint[],
+  color: string,
+  offset: number,
+  voltDiv: number,
+  timeDiv: number,
+  timeShift: number,
+  acquisitionMode: 'live' | 'step' = 'live'
+): void {
   if (samples.length < 2) return;
   const { width, height } = ctx.canvas;
+  const pixelsPerDivY = height / GRID_DIVS_Y;
+  const centerY = height / 2;
+  const safeVoltDiv = Math.max(1e-9, voltDiv);
+
+  if (acquisitionMode === 'step') {
+    // Step Response Behavior (t >= 0 Frozen / Transient Capture):
+    // 1. Time Horizon: Anchors the horizontal axis strictly from t = 0 to t = +T_span
+    const tSpan = Math.max(1e-9, timeDiv * GRID_DIVS_X);
+    // 2. Fixed Capture (No Left-Shifting): Data points prior to step excitation (t < 0) are blanked
+    const stepSamples = samples.filter(s => s.time >= 0);
+    if (stepSamples.length < 2) return;
+    // 3. Waveform plots left-to-right starting rigidly at the left vertical axis (t = 0)
+    // Once transient reaches T_span, trace remains static/pinned on screen (no leftward drift or buffer truncation)
+    const visible = stepSamples.filter(s => s.time <= tSpan + tSpan * 1e-6);
+    if (visible.length < 2) return;
+
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    visible.forEach((sample, index) => {
+      const x = Math.min(width, (sample.time / tSpan) * width);
+      const y = Math.max(0, Math.min(height, centerY - ((sample.value - offset) / safeVoltDiv) * pixelsPerDivY));
+      if (index === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+    return;
+  }
+
+  // Continuous / Live Roll Behavior:
+  // Rolling window buffer showing dynamic real-time data moving across [t - T_window, t]
   const requestedWindow = Math.max(1e-9, timeDiv * GRID_DIVS_X);
   const dataStart = samples[0].time;
   const dataEnd = samples[samples.length - 1].time;
@@ -254,9 +298,6 @@ function drawChannelTrace(ctx: CanvasRenderingContext2D, samples: SamplePoint[],
   const epsilon = windowSeconds * 1e-6;
   const visible = samples.filter(sample => sample.time >= windowStart - epsilon && sample.time <= windowEnd + epsilon);
   if (visible.length < 2) return;
-  const pixelsPerDivY = height / GRID_DIVS_Y;
-  const centerY = height / 2;
-  const safeVoltDiv = Math.max(1e-9, voltDiv);
   ctx.strokeStyle = color;
   ctx.lineWidth = 1.4;
   ctx.beginPath();

@@ -178,17 +178,13 @@ export function OscilloscopeComponentPanel({ colors, component, readings, displa
         onReset={timeShift !== 0 ? () => onPropertyChange(timeShiftKey, 0) : undefined}
       />
 
-      <button
-        type="button"
-        onClick={handleAutoscale}
-        disabled={!channelSamples || channelSamples.length < 2}
-        className="w-full mt-1.5 h-8 px-3 rounded-xl border-none font-medium text-[12px] text-white transition-opacity cursor-pointer disabled:cursor-not-allowed disabled:bg-slate-300 dark:disabled:bg-slate-800 disabled:text-slate-500 bg-gradient-to-r from-blue-600 via-purple-600 to-rose-500 shadow-sm hover:opacity-95"
-        title="Fit Offset / Time-Div / Volt-Div to this channel's captured signal"
-      >
-        Autoscale
-      </button>
-
-      <OscilloscopeControlsGrid colors={colors} settings={displaySettings} onChange={onDisplaySettingsChange} />
+      <OscilloscopeControlsGrid
+        colors={colors}
+        settings={displaySettings}
+        onChange={onDisplaySettingsChange}
+        onAutoscale={handleAutoscale}
+        isAutoscaleDisabled={!channelSamples || channelSamples.length < 2}
+      />
     </section>
   );
 }

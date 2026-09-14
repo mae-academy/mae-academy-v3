@@ -1103,7 +1103,7 @@ export class SimulationEngine {
           const samples = this.differentialHistory(terminalKey(component.id, channel), ground);
           const timebase = Math.max(1e-6, propNumber(component.props, 'timebase', 0.02));
           const visible = samples.filter(sample => sample.time >= this.time - timebase);
-          readings[key] = this.reading(rms(visible.map(sample => sample.value), true), 'V', 'ready', { samples: visible, frequency: estimateFrequency(visible) });
+          readings[key] = this.reading(rms(visible.map(sample => sample.value), true), 'V', 'ready', { samples, frequency: estimateFrequency(visible) });
         }
       }
     }
