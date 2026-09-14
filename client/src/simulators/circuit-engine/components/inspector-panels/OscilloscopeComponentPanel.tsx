@@ -1,14 +1,14 @@
-/* Dedicated oscilloscope inspector: per-channel offset/time-div/volt-div step controls.
-   Replaces the old generic "Electrical properties" number inputs and the "Live scope acquisition"
-   list. Measurements live next to each channel in OscilloscopeTracePanel, not here. */
+/* Dedicated oscilloscope inspector: per-channel offset/time-div/volt-div/time-shift step controls
+   plus Autoscale and the viewer-preference controls grid. Replaces the old generic "Electrical
+   properties" number inputs and the "Live scope acquisition" list.
+   All on-screen readout values (voltage, period, divisions, time) strictly render in KaTeX math format. */
 import { useState } from 'react';
 import type { CircuitComponent, InstrumentReading } from '@/simulators/circuit-engine/models/circuitTypes';
-import { formatEngineering } from '@/simulators/circuit-engine/models/circuitTypes';
 import { OSCILLOSCOPE_TIME_DIV_PRESETS, OSCILLOSCOPE_VOLT_DIV_PRESETS } from '@/simulators/circuit-engine/models/componentDefs';
 import { GRID_DIVS_X } from '@/simulators/circuit-engine/components/ui-components/OscilloscopeTracePanel';
 import { calculateAutoscale } from '@/simulators/circuit-engine/components/ui-components/oscilloscopeMeasurements';
-import { EducationalToolsPanel } from '@/simulators/circuit-engine/components/ui-components/EducationalToolsPanel';
-import { DARK_CHANNEL_COLORS, LIGHT_CHANNEL_COLORS, type OscilloscopeDisplaySettings } from '@/simulators/circuit-engine/components/ui-components/oscilloscopeDisplaySettings';
+import { OscilloscopeControlsGrid } from '@/simulators/circuit-engine/components/ui-components/OscilloscopeControlsGrid';
+import type { OscilloscopeDisplaySettings } from '@/simulators/circuit-engine/components/ui-components/oscilloscopeDisplaySettings';
 import { V3Math } from '@/components/ui/V3Math';
 
 type PanelColors = { line: string; subtle: string; muted: string };
@@ -21,6 +21,30 @@ function numeric(value: unknown, fallback: number): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+/** Format seconds for KaTeX math rendering (e.g. 10\,\mu\text{s}, 1\,\text{ms}, 2\,\text{s}). */
+function formatTimeLatex(sec: number): string {
+  if (sec < 1e-3) {
+    const val = Number((sec * 1e6).toPrecision(3));
+    return `${val}\\ \\mu\\text{s}`;
+  }
+  if (sec < 1) {
+    const val = Number((sec * 1e3).toPrecision(3));
+    return `${val}\\ \\text{ms}`;
+  }
+  const val = Number(sec.toPrecision(3));
+  return `${val}\\ \\text{s}`;
+}
+
+/** Format volts for KaTeX math rendering (e.g. 10\,\text{mV}, 5\,\text{V}). */
+function formatVoltLatex(v: number): string {
+  if (v < 1) {
+    const val = Number((v * 1e3).toPrecision(3));
+    return `${val}\\ \\text{mV}`;
+  }
+  const val = Number(v.toPrecision(3));
+  return `${val}\\ \\text{V}`;
+}
+
 /** Nearest preset index on a log scale — lets the stepper land on a rung even for a value that
  * predates this control (an older saved circuit, or a value entered before snapping applied). */
 function nearestPresetIndex(presets: number[], value: number): number {
@@ -31,24 +55,6 @@ function nearestPresetIndex(presets: number[], value: number): number {
     if (diff < bestDiff) { bestDiff = diff; best = index; }
   });
   return best;
-}
-
-/** Offset is displayed in whatever unit its own Volt/Div scale reads in — µV for a mV/div trace,
- * kV for a very coarse one — so a small offset on a fine scale doesn't round away to "0.00 V". */
-function offsetMath(value: number, voltDiv: number): string {
-  const sign = value > 0 ? '+' : '';
-  if (voltDiv < 0.001) return `\\text{Offset} = ${sign}${(value * 1e6).toFixed(1)}\\ \\mu\\text{V}`;
-  if (voltDiv < 1) return `\\text{Offset} = ${sign}${(value * 1e3).toFixed(2)}\\ \\text{mV}`;
-  if (voltDiv < 1000) return `\\text{Offset} = ${sign}${value.toFixed(2)}\\ \\text{V}`;
-  return `\\text{Offset} = ${sign}${(value / 1000).toFixed(2)}\\ \\text{kV}`;
-}
-
-function perDivMath(value: number, unit: string): string {
-  const formatted = formatEngineering(value, unit, 0); // presets are round decade values — no decimals needed
-  const match = formatted.match(/^([-+]?\d+)\s*(.*)$/);
-  if (!match) return `\\text{${formatted}/div}`;
-  const [, num, suffix] = match;
-  return `${num}\\ \\text{${suffix}/div}`;
 }
 
 /** Highest preset whose 10-division window still fits inside the channel's actual simulated span.
@@ -116,23 +122,24 @@ export function OscilloscopeComponentPanel({ colors, component, readings, displa
 
   return (
     <section style={{ padding: '12px 15px', borderBottom: `1px solid ${colors.line}` }}>
-      <div className="text-[12px] font-bold text-black uppercase tracking-wider" style={{ marginBottom: 8 }}>Oscilloscope settings</div>
+      <div className="text-[12px] font-bold text-slate-800 dark:text-slate-400 uppercase tracking-wider" style={{ marginBottom: 8 }}>Oscilloscope settings</div>
 
       <label style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 10 }}>
-        <span style={{ fontSize: 10, fontWeight: 700, color: colors.subtle, textTransform: 'uppercase', letterSpacing: '.05em' }}>Channel</span>
+        <span className="text-[10px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Channel</span>
         <select
           value={selectedChannel}
           onChange={event => setSelectedChannel(event.target.value as Channel)}
-          style={{ height: 32, borderRadius: 8, border: `1px solid ${colors.line}`, padding: '4px 10px', fontSize: 13, fontWeight: 700, color: channelColor, background: '#fff' }}
+          className="h-8 rounded-xl border border-slate-200 dark:border-slate-800 px-2.5 text-[13px] font-bold bg-white dark:bg-slate-900"
+          style={{ color: channelColor }}
         >
           {CHANNELS.map((channel, index) => <option key={channel} value={channel} style={{ color: displaySettings.channelColors[index] }}>{channel.toUpperCase()}</option>)}
         </select>
       </label>
 
+      {/* Offset readout in KaTeX */}
       <StepArrowRow
         colors={colors}
-        label="Offset (V)"
-        displayMath={offsetMath(offset, voltDiv)}
+        mathLabel={`V_{\\text{offset}} = ${offset.toFixed(2)}\\ \\text{V}`}
         min={-maxOffset}
         max={maxOffset}
         step={offsetStep}
@@ -140,29 +147,29 @@ export function OscilloscopeComponentPanel({ colors, component, readings, displa
         onChange={next => onPropertyChange(offsetKey, next)}
       />
 
+      {/* Time/Div readout in KaTeX */}
       <PresetStepperRow
         colors={colors}
-        label="Time/Div (s)"
-        unit="s"
+        mathLabel={`t_{\\text{div}} = ${formatTimeLatex(timeDiv)}`}
         presets={OSCILLOSCOPE_TIME_DIV_PRESETS}
         value={timeDiv}
         maxIndex={maxTimeDivIndex}
         onChange={next => onPropertyChange(timeDivKey, next)}
       />
 
+      {/* Volt/Div readout in KaTeX */}
       <PresetStepperRow
         colors={colors}
-        label="Volt/Div (V)"
-        unit="V"
+        mathLabel={`V_{\\text{div}} = ${formatVoltLatex(voltDiv)}`}
         presets={OSCILLOSCOPE_VOLT_DIV_PRESETS}
         value={voltDiv}
         onChange={next => onPropertyChange(voltDivKey, next)}
       />
 
+      {/* Time shift readout in KaTeX */}
       <StepArrowRow
         colors={colors}
-        label="Time shift (s)"
-        displayMath={timeShiftMath(timeShift)}
+        mathLabel={`t_{\\text{shift}} = ${formatTimeLatex(timeShift)}`}
         min={-maxTimeShift}
         max={maxTimeShift}
         step={maxTimeShift > 0 ? maxTimeShift / 100 : 1}
@@ -175,126 +182,53 @@ export function OscilloscopeComponentPanel({ colors, component, readings, displa
         type="button"
         onClick={handleAutoscale}
         disabled={!channelSamples || channelSamples.length < 2}
-        style={{
-          width: '100%', marginTop: 6, padding: '9px 12px', borderRadius: 8, border: 'none',
-          background: !channelSamples || channelSamples.length < 2 ? '#cbd5e1' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-          color: '#fff', fontWeight: 700, fontSize: 12, letterSpacing: '.04em', textTransform: 'uppercase',
-          cursor: !channelSamples || channelSamples.length < 2 ? 'default' : 'pointer',
-        }}
+        className="w-full mt-1.5 py-2 px-3 rounded-xl border-none font-bold text-xs uppercase tracking-wider text-white transition-all cursor-pointer disabled:cursor-not-allowed disabled:bg-slate-300 dark:disabled:bg-slate-800 disabled:text-slate-500 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 shadow-xs"
         title="Fit Offset / Time-Div / Volt-Div to this channel's captured signal"
       >
-        ⬜ Autoscale
+        Autoscale
       </button>
 
-      <EducationalToolsPanel colors={colors} samples={channelSamples ?? []} frequencyHz={reading?.frequency ?? 0} />
-
-      <DisplaySettingsSection colors={colors} settings={displaySettings} onChange={onDisplaySettingsChange} />
+      <OscilloscopeControlsGrid colors={colors} settings={displaySettings} onChange={onDisplaySettingsChange} />
     </section>
-  );
-}
-
-function timeShiftMath(seconds: number): string {
-  if (seconds === 0) return '\\text{Shift} = 0\\ \\text{s}';
-  const sign = seconds > 0 ? '+' : '';
-  const abs = Math.abs(seconds);
-  if (abs < 1e-6) return `\\text{Shift} = ${sign}${(seconds * 1e9).toFixed(1)}\\ \\text{ns}`;
-  if (abs < 1e-3) return `\\text{Shift} = ${sign}${(seconds * 1e6).toFixed(1)}\\ \\mu\\text{s}`;
-  if (abs < 1) return `\\text{Shift} = ${sign}${(seconds * 1e3).toFixed(2)}\\ \\text{ms}`;
-  return `\\text{Shift} = ${sign}${seconds.toFixed(3)}\\ \\text{s}`;
-}
-
-/** Viewer preference (theme + channel colors) — see oscilloscopeDisplaySettings.ts for why this is
- * localStorage-backed rather than a component.props field like every other control on this panel. */
-function DisplaySettingsSection({ colors, settings, onChange }: { colors: PanelColors; settings: OscilloscopeDisplaySettings; onChange: (next: Partial<OscilloscopeDisplaySettings>) => void }) {
-  const defaults = settings.isDarkMode ? DARK_CHANNEL_COLORS : LIGHT_CHANNEL_COLORS;
-  const setChannelColor = (index: number, color: string) => {
-    const next = [...settings.channelColors] as [string, string, string, string];
-    next[index] = color;
-    onChange({ channelColors: next });
-  };
-  return (
-    <div style={{ marginTop: 12, paddingTop: 10, borderTop: `1px solid ${colors.line}` }}>
-      <div style={{ fontSize: 10, fontWeight: 700, color: colors.subtle, textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 8 }}>Display settings</div>
-
-      <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
-        <ThemeButton label="☀️ Light" active={!settings.isDarkMode} onClick={() => onChange({ isDarkMode: false, channelColors: LIGHT_CHANNEL_COLORS })} />
-        <ThemeButton label="🌙 Dark" active={settings.isDarkMode} onClick={() => onChange({ isDarkMode: true, channelColors: DARK_CHANNEL_COLORS })} />
-      </div>
-
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-        {CHANNELS.map((channel, index) => (
-          <div key={channel} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ width: 30, fontSize: 11, fontWeight: 700, color: settings.channelColors[index] }}>{channel.toUpperCase()}</span>
-            <input
-              type="color"
-              aria-label={`${channel.toUpperCase()} trace color`}
-              value={settings.channelColors[index]}
-              onChange={event => setChannelColor(index, event.target.value)}
-              style={{ width: 32, height: 28, border: `1px solid ${colors.line}`, borderRadius: 4, padding: 0, cursor: 'pointer' }}
-            />
-            <span style={{ flex: 1, fontSize: 10, fontFamily: 'ui-monospace, monospace', color: colors.muted, textTransform: 'uppercase' }}>{settings.channelColors[index]}</span>
-            <button
-              type="button"
-              aria-label={`Reset ${channel.toUpperCase()} color`}
-              onClick={() => setChannelColor(index, defaults[index])}
-              style={{ width: 22, height: 22, borderRadius: 6, border: `1px solid ${colors.line}`, background: '#fff', fontSize: 12, cursor: 'pointer' }}
-            >
-              ⟳
-            </button>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function ThemeButton({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      style={{ flex: 1, padding: '7px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: `1px solid ${active ? '#2563eb' : '#d0d0d0'}`, background: active ? '#2563eb' : '#fff', color: active ? '#fff' : '#334155' }}
-    >
-      {label}
-    </button>
   );
 }
 
 const RANGE_INPUT_CLASS = "h-1.5 w-full cursor-pointer appearance-none rounded-full bg-brand-gradient [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-0 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:ring-2 [&::-webkit-slider-thumb]:ring-blue-500 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:shadow";
 
 /** Offset/time-shift control: continuous within [min,max] at a fixed step, with prev/next buttons
- * that snap an out-of-range stored value back in bounds, plus an optional reset-to-0 button. */
-function StepArrowRow({ colors, label, displayMath, min, max, step, value, onChange, onReset }: { colors: PanelColors; label: string; displayMath: string; min: number; max: number; step: number; value: number; onChange: (value: number) => void; onReset?: () => void }) {
+ * that snap an out-of-range stored value back in bounds, plus an optional reset-to-0 button.
+ * Label strictly renders in KaTeX math format. */
+function StepArrowRow({ colors, mathLabel, min, max, step, value, onChange, onReset }: { colors: PanelColors; mathLabel: string; min: number; max: number; step: number; value: number; onChange: (value: number) => void; onReset?: () => void }) {
   return (
     <div style={{ marginBottom: 10 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 10, fontWeight: 700, color: colors.subtle, textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 4 }}>
-        <span>{label}</span><span style={{ color: colors.muted, textTransform: 'none', fontWeight: 600 }}><V3Math math={displayMath} /></span>
+      <div className="text-[11px] font-medium text-slate-700 dark:text-slate-200 tracking-tight" style={{ marginBottom: 4 }}>
+        <V3Math math={mathLabel} />
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <StepButton disabled={value <= min} onClick={() => onChange(Math.max(min, value - step))} label={`Decrease ${label}`}>‹</StepButton>
-        <input aria-label={label} type="range" min={min} max={max} step={step} value={value} onChange={event => onChange(Number(event.target.value))} className={RANGE_INPUT_CLASS} />
-        <StepButton disabled={value >= max} onClick={() => onChange(Math.min(max, value + step))} label={`Increase ${label}`}>›</StepButton>
-        {onReset && <StepButton disabled={false} onClick={onReset} label={`Reset ${label}`}>⟳</StepButton>}
+        <StepButton disabled={value <= min} onClick={() => onChange(Math.max(min, value - step))} label="Decrease">‹</StepButton>
+        <input aria-label={mathLabel} type="range" min={min} max={max} step={step} value={value} onChange={event => onChange(Number(event.target.value))} className={RANGE_INPUT_CLASS} />
+        <StepButton disabled={value >= max} onClick={() => onChange(Math.min(max, value + step))} label="Increase">›</StepButton>
+        {onReset && <StepButton disabled={false} onClick={onReset} label="Reset">↶</StepButton>}
       </div>
     </div>
   );
 }
 
 /** Time/Div & Volt/Div control: thumb travels over preset indices only, plus prev/next buttons —
- * a segmented "oscilloscope knob" rather than a continuous drag. `maxIndex` (Time/Div only, see
- * maxFeasibleTimeDivIndex) caps how far it can travel when there isn't more real data past that rung. */
-function PresetStepperRow({ colors, label, unit, presets, value, maxIndex = presets.length - 1, onChange }: { colors: PanelColors; label: string; unit: string; presets: number[]; value: number; maxIndex?: number; onChange: (value: number) => void }) {
+ * a segmented "oscilloscope knob" rather than a continuous drag.
+ * Label strictly renders in KaTeX math format. */
+function PresetStepperRow({ colors, mathLabel, presets, value, maxIndex = presets.length - 1, onChange }: { colors: PanelColors; mathLabel: string; presets: number[]; value: number; maxIndex?: number; onChange: (value: number) => void }) {
   const index = Math.min(maxIndex, nearestPresetIndex(presets, value));
   const step = (delta: number) => onChange(presets[Math.max(0, Math.min(maxIndex, index + delta))]);
   return (
     <div style={{ marginBottom: 10 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 10, fontWeight: 700, color: colors.subtle, textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 4 }}>
-        <span>{label}</span><span style={{ color: colors.muted, textTransform: 'none', fontWeight: 600 }}><V3Math math={perDivMath(presets[index], unit)} /></span>
+      <div className="text-[11px] font-medium text-slate-700 dark:text-slate-200 tracking-tight" style={{ marginBottom: 4 }}>
+        <V3Math math={mathLabel} />
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <StepButton disabled={index === 0} onClick={() => step(-1)} label={`Previous ${label}`}>‹</StepButton>
-        <input aria-label={label} type="range" min={0} max={maxIndex} step={1} value={index} onChange={event => onChange(presets[Number(event.target.value)])} className={RANGE_INPUT_CLASS} title={maxIndex < presets.length - 1 ? 'Limited by the simulated transient window — see the circuit\'s SPICE run length' : undefined} />
-        <StepButton disabled={index === maxIndex} onClick={() => step(1)} label={`Next ${label}`}>›</StepButton>
+        <StepButton disabled={index === 0} onClick={() => step(-1)} label="Previous">‹</StepButton>
+        <input aria-label={mathLabel} type="range" min={0} max={maxIndex} step={1} value={index} onChange={event => onChange(presets[Number(event.target.value)])} className={RANGE_INPUT_CLASS} title={maxIndex < presets.length - 1 ? 'Limited by the simulated transient window — see the circuit\'s SPICE run length' : undefined} />
+        <StepButton disabled={index === maxIndex} onClick={() => step(1)} label="Next">›</StepButton>
       </div>
     </div>
   );
@@ -307,7 +241,7 @@ function StepButton({ disabled, onClick, label, children }: { disabled: boolean;
       aria-label={label}
       disabled={disabled}
       onClick={onClick}
-      style={{ width: 22, height: 22, flexShrink: 0, borderRadius: 6, border: '1px solid #cbd5e1', background: disabled ? '#f1f5f9' : '#fff', color: disabled ? '#cbd5e1' : '#334155', fontSize: 13, lineHeight: 1, cursor: disabled ? 'default' : 'pointer' }}
+      className="w-[22px] h-[22px] shrink-0 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs leading-none flex items-center justify-center cursor-pointer disabled:cursor-default disabled:opacity-40 disabled:bg-slate-100 dark:disabled:bg-slate-900"
     >
       {children}
     </button>

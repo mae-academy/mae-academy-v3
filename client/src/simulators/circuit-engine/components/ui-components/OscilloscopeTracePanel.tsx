@@ -61,6 +61,7 @@ function ScopeUnit({ colors, scope, instrumentReadings, displaySettings }: { col
     const ctx = canvas?.getContext('2d');
     if (!ctx) return;
     drawGraticule(ctx, displaySettings);
+    drawScopeLabel(ctx, scope.label, displaySettings.isDarkMode);
     readings.forEach((reading, index) => {
       if (reading?.status === 'ready' && reading.samples) {
         const { offset, timeDiv, voltDiv, timeShift } = channelConfigs[index];
@@ -86,6 +87,7 @@ function ScopeUnit({ colors, scope, instrumentReadings, displaySettings }: { col
               color={displaySettings.channelColors[index]}
               isConnected={isReady}
               isDarkMode={displaySettings.isDarkMode}
+              showValues={displaySettings.showValues}
               measurements={isReady ? { frequency: reading.frequency ?? 0, vpp: calculateVpp(samples), vrms: reading.value, vdc: calculateVdc(samples) } : undefined}
             />
           );
@@ -123,6 +125,16 @@ function drawGraticule(ctx: CanvasRenderingContext2D, displaySettings: Oscillosc
   ctx.moveTo(0, height / 2);
   ctx.lineTo(width, height / 2);
   ctx.stroke();
+}
+
+/** The only text drawn on the screen itself — the scope's own reference designator (its real label,
+ * so a second scope reads "OSC2" rather than a hardcoded "OSC1"), not a value or a time/volt marker. */
+function drawScopeLabel(ctx: CanvasRenderingContext2D, label: string, isDarkMode: boolean): void {
+  ctx.fillStyle = isDarkMode ? '#666666' : '#94a3b8';
+  ctx.font = 'bold 11px monospace';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.fillText(label, 4, 4);
 }
 
 /** Real scope behaviour: a trailing `10 * timeDiv` second sweep window, vertical position driven by

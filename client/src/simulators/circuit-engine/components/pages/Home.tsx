@@ -460,6 +460,8 @@ function componentValueAnchor(definition: ComponentDef, component: CircuitCompon
 }
 
 function componentDisplayValue(definition: ComponentDef, component: CircuitComponent): string | null {
+  if (component.type === 'oscilloscope') return null;
+
   if (['transformer', 'transformer-ct', 'autotransformer'].includes(component.type)) {
     const n = numeric(component.props.turnRatio, definition.properties.turnRatio?.value ?? (component.type === 'autotransformer' ? 2 : 5));
     if (n >= 1) return `${Number(n.toPrecision(4))}:1`;
@@ -2675,14 +2677,14 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                           </div>
                           {/* Bottom Section: Fixed height banner with clear readable component names */}
                           <div className="flex h-7 w-full shrink-0 items-center justify-center border-t px-1.5" style={{ borderColor: colors.line, background: `${colors.line}15` }}>
-                            <span className="flex items-center justify-center text-[11px] font-medium text-black tracking-tight text-center leading-tight truncate w-full" title={item.name}>
+                            <span className="flex items-center justify-center text-[11px] font-medium text-slate-800 dark:text-slate-200 tracking-tight text-center leading-tight truncate w-full" title={item.name}>
                               <ElectricalLabel label={item.name} />
                             </span>
                           </div>
                         </>
                       ) : (
                         <>
-                          <span className="text-[12px] font-normal text-black"><ElectricalLabel label={item.name} /></span>
+                          <span className="text-[12px] font-normal text-slate-800 dark:text-slate-200"><ElectricalLabel label={item.name} /></span>
                           <span style={{ color: colors.subtle, fontSize: 9, lineHeight: 1.25 }}>{item.description}</span>
                         </>
                       )}
@@ -3079,7 +3081,7 @@ function ToolbarButton({ colors, icon, label, title, onClick, active, disabled }
 function ToolbarDivider({ colors }: { colors: Palette }) { return <span style={{ width: 1, height: 20, background: colors.line, margin: '0 1px', flexShrink: 0 }} />; }
 
 function InspectorHeader({ colors, title, subtitle }: { colors: Palette; title: React.ReactNode; subtitle: string }) {
-  return <div style={{ padding: '15px 15px 12px', borderBottom: `1px solid ${colors.line}` }}><div><div className="text-sm font-bold uppercase tracking-wider text-black">{title}</div><div className="text-black" style={{ marginTop: 2, fontSize: 10, lineHeight: 1.0 }}>{subtitle}</div></div></div>;
+  return <div style={{ padding: '15px 15px 12px', borderBottom: `1px solid ${colors.line}` }}><div><div className="text-sm font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">{title}</div><div className="text-slate-600 dark:text-slate-400" style={{ marginTop: 2, fontSize: 10, lineHeight: 1.0 }}>{subtitle}</div></div></div>;
 }
 
 function InspectorButton({ colors, children, onClick, danger, active, disabled }: { colors: Palette; children: React.ReactNode; onClick: () => void; danger?: boolean; active?: boolean; disabled?: boolean }) {
@@ -3087,16 +3089,16 @@ function InspectorButton({ colors, children, onClick, danger, active, disabled }
   return <button onClick={onClick} disabled={disabled} style={{ flex: 1, minHeight: 30, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4, border: `1px solid ${tone}55`, borderRadius: 6, background: active || danger ? `${tone}0d` : colors.panelAlt, color: tone, cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? .5 : 1, fontSize: 10, fontWeight: 700 }}>{children}</button>;
 }
 
-function InspectorSection({ colors, label, children }: { colors: Palette; label: string; children: React.ReactNode }) { return <section style={{ padding: '12px 15px', borderBottom: `1px solid ${colors.line}` }}><div className="text-[12px] font-bold text-black uppercase tracking-wider" style={{ marginBottom: 8 }}>{label}</div>{children}</section>; }
+function InspectorSection({ colors, label, children }: { colors: Palette; label: string; children: React.ReactNode }) { return <section style={{ padding: '12px 15px', borderBottom: `1px solid ${colors.line}` }}><div className="mae-panel-section-header" style={{ marginBottom: 8 }}>{label}</div>{children}</section>; }
 
-function PropertyRow({ colors, label, unit, children }: { colors: Palette; label: string; unit?: string; children: React.ReactNode }) { return <label style={{ display: 'grid', gridTemplateColumns: '1fr 156px', gap: 8, alignItems: 'center', marginBottom: 8 }}><span className="font-sans text-[12.5px] font-medium text-slate-700" style={{ lineHeight: 1.25 }}><ElectricalLabel label={label} unit={unit} /></span>{children}</label>; }
+function PropertyRow({ colors, label, unit, children }: { colors: Palette; label: string; unit?: string; children: React.ReactNode }) { return <label style={{ display: 'grid', gridTemplateColumns: '1fr 156px', gap: 8, alignItems: 'center', marginBottom: 8 }}><span className="mae-panel-field-label" style={{ lineHeight: 1.25 }}><ElectricalLabel label={label} unit={unit} /></span>{children}</label>; }
 
 function ComponentInspector({ colors, component, definition, allComponents, linkedCoils, reading, snapshot, tabDUiRefinement, oscilloscopeDisplaySettings, onOscilloscopeDisplaySettingsChange, onLabelChange, onPropertyChange, onPropertiesChange, onDelete }: { colors: Palette; component: CircuitComponent; definition: ComponentDef; allComponents: CircuitComponent[]; linkedCoils: CircuitComponent[]; reading?: InstrumentReading; snapshot: SimulationSnapshot; tabDUiRefinement: boolean; oscilloscopeDisplaySettings: OscilloscopeDisplaySettings; onOscilloscopeDisplaySettingsChange: (next: Partial<OscilloscopeDisplaySettings>) => void; onLabelChange: (value: string) => void; onPropertyChange: (key: string, value: unknown) => void; onPropertiesChange: (updates: Record<string, unknown>) => void; onDelete: () => void }) {
-  // Check if the component actually has a numeric value to display
-  const hasValue = Object.values(definition.properties).some(p => p.type === 'number' && p.unit);
+  // Check if the component actually has a numeric value to display (oscilloscope has its own dedicated panel and no floating/inspector value)
+  const hasValue = component.type !== 'oscilloscope' && Object.values(definition.properties).some(p => p.type === 'number' && p.unit);
 
   return <div style={{ overflowY: 'auto', minHeight: 0 }}>
-    <InspectorHeader colors={colors} title={<span className="text-black" style={{ display: 'inline-flex', alignItems: 'baseline', gap: 6 }}><span style={{ fontFamily: "'KaTeX_Math', 'KaTeX_Main', serif", fontSize: 15 }}><V3Math math={componentLabelToLatex(component.type === 'ground' ? 'GND' : component.label)} /></span><span className="text-slate-600 dark:text-slate-300" style={{ fontSize: 11, letterSpacing: 0, textTransform: 'none', fontFamily: "'KaTeX_Main', 'KaTeX_Math', serif" }}><ElectricalLabel label={definition.name} /></span></span>} subtitle={definition.description} />
+    <InspectorHeader colors={colors} title={<span className="text-slate-800 dark:text-slate-200" style={{ display: 'inline-flex', alignItems: 'baseline', gap: 6 }}><span style={{ fontFamily: "'KaTeX_Math', 'KaTeX_Main', serif", fontSize: 15 }}><V3Math math={componentLabelToLatex(component.type === 'ground' ? 'GND' : component.label)} /></span><span className="text-slate-600 dark:text-slate-300" style={{ fontSize: 11, letterSpacing: 0, textTransform: 'none', fontFamily: "'KaTeX_Main', 'KaTeX_Math', serif" }}><ElectricalLabel label={definition.name} /></span></span>} subtitle={definition.description} />
     <InspectorSection colors={colors} label="Instance label">
       <PropertyRow colors={colors} label="Reference">
         <input value={component.type === 'ground' ? 'GND' : component.label} disabled={component.type === 'ground'} onChange={event => onLabelChange(component.type === 'ground' ? 'GND' : event.target.value)} style={mathReferenceInputStyle(colors)} />
@@ -3120,7 +3122,7 @@ function ComponentInspector({ colors, component, definition, allComponents, link
         </PropertyRow>
       )}
 
-      <div style={{ color: colors.subtle, fontSize: 9, marginTop: 8 }}>Auto reference prefix: {componentPrefix(component.type)}. Auxiliary contacts link to this reference.</div>
+      <div className="mae-panel-meta" style={{ marginTop: 8 }}>Auto reference prefix: {componentPrefix(component.type)}. Auxiliary contacts link to this reference.</div>
     </InspectorSection>
     {component.type !== 'oscilloscope' && <InspectorSection colors={colors} label="Electrical properties">
       {Object.entries(definition.properties).map(([key, property]) => {
@@ -3335,9 +3337,9 @@ function inputStyle(colors: Palette): React.CSSProperties {
     minWidth: 0,
     boxSizing: 'border-box',
     height: 32,
-    background: '#ffffff',
-    color: '#1e293b',
-    border: '1px solid #e2e8f0',
+    background: colors.input,
+    color: colors.text,
+    border: `1px solid ${colors.line}`,
     borderRadius: 12,
     padding: '4px 12px',
     fontSize: 13,

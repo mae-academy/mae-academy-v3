@@ -1,21 +1,25 @@
-/* Oscilloscope theme/channel-color preference: a viewer setting, like the app's own light/dark
-   toggle — shared by every scope on the canvas, not saved into the circuit file. Lifted into a
+/* Oscilloscope theme/channel-color/values preference: a viewer setting, like the app's own light/
+   dark toggle — shared by every scope on the canvas, not saved into the circuit file. Lifted into a
    single hook call in Home.tsx and threaded to both oscilloscope panels as props, so a change in
    one is reflected in the other immediately rather than only after a reload. */
 import { useState } from 'react';
 
 export interface OscilloscopeDisplaySettings {
   isDarkMode: boolean;
+  showValues: boolean;
   channelColors: [string, string, string, string];
 }
 
 const STORAGE_KEY = 'mae-oscilloscope-display-settings';
 
-export const DARK_CHANNEL_COLORS: [string, string, string, string] = ['#38bdf8', '#f472b6', '#facc15', '#a78bfa'];
-export const LIGHT_CHANNEL_COLORS: [string, string, string, string] = ['#0369a1', '#be185d', '#a16207', '#6d28d9'];
+// CH1/CH2/CH3 mirror the R/Y/B convention a 3-phase line uses elsewhere in the industry; CH4 takes
+// the app's own accent purple.
+export const DARK_CHANNEL_COLORS: [string, string, string, string] = ['#EF4444', '#EAB308', '#3B82F6', '#A855F7'];
+export const LIGHT_CHANNEL_COLORS: [string, string, string, string] = ['#EF4444', '#EAB308', '#3B82F6', '#A855F7'];
 
 export const DEFAULT_DISPLAY_SETTINGS: OscilloscopeDisplaySettings = {
   isDarkMode: true,
+  showValues: true,
   channelColors: DARK_CHANNEL_COLORS,
 };
 
@@ -27,7 +31,11 @@ function readSettings(): OscilloscopeDisplaySettings {
     const channelColors = Array.isArray(parsed.channelColors) && parsed.channelColors.length === 4
       ? (parsed.channelColors as [string, string, string, string])
       : DEFAULT_DISPLAY_SETTINGS.channelColors;
-    return { isDarkMode: Boolean(parsed.isDarkMode ?? true), channelColors };
+    return {
+      isDarkMode: Boolean(parsed.isDarkMode ?? true),
+      showValues: Boolean(parsed.showValues ?? true),
+      channelColors,
+    };
   } catch {
     return DEFAULT_DISPLAY_SETTINGS;
   }
