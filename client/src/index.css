@@ -14,12 +14,33 @@
   --font-arabic: "Tajawal", ui-sans-serif, system-ui, sans-serif;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
   --color-border: var(--border);
+  --color-border-hover: var(--border-hover);
+  --color-input: var(--input);
   --color-ring: var(--ring);
+
+  /* Semantic dark scales */
+  --color-dark-background: #000000;
+  --color-dark-surface: #090a0d;
+  --color-dark-card: #0d0f12;
+  --color-dark-muted: #13161c;
+  --color-dark-border: #1b2028;
+  --color-dark-border-hover: #262c36;
+
+  /* Remap slate tokens so any dark:bg-slate-900 / dark:bg-slate-950 / dark:border-slate-800 use neutral charcoal */
+  --color-slate-950: var(--slate-950, #020617);
+  --color-slate-900: var(--slate-900, #0f172a);
+  --color-slate-800: var(--slate-800, #1e293b);
+  --color-slate-700: var(--slate-700, #334155);
 }
 
 :root {
@@ -27,27 +48,51 @@
   --mae-gradient-mid:   #7C3AED;
   --mae-gradient-end:   #E11D48;
   --background: #ffffff;
+  --surface: #ffffff;
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  --popover: #ffffff;
+  --popover-foreground: #0f172a;
   --foreground: #0f172a;
   --primary: #7c3aed;
   --primary-foreground: #ffffff;
   --muted: #f8fafc;
   --muted-foreground: #64748b;
   --border: #e2e8f0;
+  --border-hover: #cbd5e1;
+  --input: #ffffff;
   --ring: #7c3aed;
   --mae-header-height: 120px;
+  --slate-950: #020617;
+  --slate-900: #0f172a;
+  --slate-800: #1e293b;
+  --slate-700: #334155;
 }
 .dark {
   --mae-gradient-start: #3B82F6;
   --mae-gradient-mid:   #8B5CF6;
   --mae-gradient-end:   #F43F5E;
   --background: #000000;
+  --surface: #090a0d;
+  --card: #0d0f12;
+  --card-foreground: #f8fafc;
+  --popover: #0d0f12;
+  --popover-foreground: #f8fafc;
   --foreground: #ffffff;
   --primary: #8b5cf6;
   --primary-foreground: #000000;
-  --muted: #08080a;
+  --muted: #13161c;
   --muted-foreground: #a1a1aa;
-  --border: rgb(255 255 255 / .08);
-  --ring: #8b5cf6;
+  --border: #1b2028;
+  --border-hover: #262c36;
+  --input: #13161c;
+  --ring: #262c36;
+
+  /* Remap slate tokens in dark mode strictly to neutral zinc/charcoal */
+  --slate-950: #090a0d;
+  --slate-900: #0d0f12;
+  --slate-800: #1b2028;
+  --slate-700: #262c36;
 }
 
 @layer base {
@@ -293,7 +338,7 @@
   .dark .mae-card,
   html.dark .mae-card {
     background-color: #0d0f12 !important;
-    border-color: #1a1d24 !important;
+    border-color: #1b2028 !important;
   }
   .mae-station-section { position: relative; }
   .mae-station-section::before { content: ""; position: absolute; inset-inline-start: max(1.25rem, calc((100vw - 1360px) / 2 + 2.5rem)); top: 0; bottom: 0; width: 1px; background: linear-gradient(to bottom, transparent, rgb(139 92 246 / .35), transparent); pointer-events: none; }
@@ -342,7 +387,7 @@
   /* Tab C is deliberately an archival embedded instrument, surrounded by MAE drafting cues. */
   .legacy-archive-frame { position: relative; isolation: isolate; background: #000000; }
   .legacy-archive-frame::before { content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none; background-image: linear-gradient(rgb(148 163 184 / .055) 1px, transparent 1px), linear-gradient(90deg, rgb(148 163 184 / .055) 1px, transparent 1px); background-size: 24px 24px; mask-image: linear-gradient(to bottom, black, transparent 72%); }
-  .legacy-archive-frame header { background: linear-gradient(90deg, rgb(15 30 54 / .96), rgb(11 21 37 / .96)); }
+  .legacy-archive-frame header { background: linear-gradient(90deg, rgb(13 15 18 / .96), rgb(9 10 13 / .96)); }
   .legacy-archive-sheet { border-top: 1px solid rgb(244 63 94 / .38); background: linear-gradient(135deg, rgb(37 99 235 / .14), transparent 33%, rgb(244 63 94 / .11)); }
   .legacy-archive-sheet::before, .legacy-archive-sheet::after { content: ""; position: absolute; z-index: 2; width: 1.1rem; height: 1.1rem; pointer-events: none; border-color: rgb(139 92 246 / .72); }
   .legacy-archive-sheet::before { inset: .65rem auto auto .65rem; border-top: 1px solid; border-left: 1px solid; }

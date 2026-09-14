@@ -46,7 +46,7 @@ function PhasePlane({ matrix, initialState, duration }: { matrix: Matrix; initia
       canvas.width = Math.max(1, Math.floor(rect.width * scale)); canvas.height = Math.max(1, Math.floor(rect.height * scale));
       context.setTransform(scale, 0, 0, scale, 0, 0);
       const dark = document.documentElement.classList.contains("dark");
-      const background = dark ? "#0f172a" : "#ffffff";
+      const background = dark ? "#090a0d" : "#ffffff";
       const ink = dark ? "#60a5fa" : "#2563eb";
       const grid = dark ? "rgba(148,163,184,0.22)" : "rgba(100,116,139,0.18)";
       const secondary = dark ? "rgba(196,181,253,0.72)" : "rgba(124,58,237,0.58)";
@@ -76,7 +76,7 @@ function PhasePlane({ matrix, initialState, duration }: { matrix: Matrix; initia
     render(); const observer = new ResizeObserver(render); observer.observe(canvas); return () => observer.disconnect();
   }, [matrix, trajectory]);
 
-  return <section className={CARD}><div className="flex flex-wrap items-center justify-between gap-2"><h3 className={HEADING}>{labels.plane}</h3><div className="flex items-center gap-3 text-[10px] font-bold text-slate-500 dark:text-slate-400"><span className="inline-flex items-center gap-1"><i className="h-px w-4 bg-blue-500" />{labels.trajectory}</span><span className="inline-flex items-center gap-1"><i className="h-px w-4 border-t border-dashed border-violet-500" />{labels.field}</span></div></div><div className="relative mt-4 min-h-72 overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-[#0f172a]" style={{ aspectRatio: "4 / 3" }}><canvas ref={canvasRef} className="absolute inset-0 h-full w-full" /></div></section>;
+  return <section className={CARD}><div className="flex flex-wrap items-center justify-between gap-2"><h3 className={HEADING}>{labels.plane}</h3><div className="flex items-center gap-3 text-[10px] font-bold text-slate-500 dark:text-slate-400"><span className="inline-flex items-center gap-1"><i className="h-px w-4 bg-blue-500" />{labels.trajectory}</span><span className="inline-flex items-center gap-1"><i className="h-px w-4 border-t border-dashed border-violet-500" />{labels.field}</span></div></div><div className="relative mt-4 min-h-72 overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-[#090a0d]" style={{ aspectRatio: "4 / 3" }}><canvas ref={canvasRef} className="absolute inset-0 h-full w-full" /></div></section>;
 }
 
 function StateSpace3D({ matrix, initialState, duration }: { matrix: Matrix; initialState: Vector; duration: number }) {
@@ -91,7 +91,7 @@ function StateSpace3D({ matrix, initialState, duration }: { matrix: Matrix; init
     const canvas = canvasRef.current; if (!canvas) return; const context = canvas.getContext("2d"); if (!context) return;
     const render = () => {
       const rect = canvas.getBoundingClientRect(); const scale = window.devicePixelRatio || 1; canvas.width = Math.max(1, Math.floor(rect.width * scale)); canvas.height = Math.max(1, Math.floor(rect.height * scale)); context.setTransform(scale, 0, 0, scale, 0, 0);
-      const dark = document.documentElement.classList.contains("dark"); const background = dark ? "#0f172a" : "#ffffff"; const ink = dark ? "#60a5fa" : "#2563eb"; const grid = dark ? "rgba(148,163,184,0.26)" : "rgba(100,116,139,0.2)";
+      const dark = document.documentElement.classList.contains("dark"); const background = dark ? "#090a0d" : "#ffffff"; const ink = dark ? "#60a5fa" : "#2563eb"; const grid = dark ? "rgba(148,163,184,0.26)" : "rgba(100,116,139,0.2)";
       const width = rect.width; const height = rect.height; context.fillStyle = background; context.fillRect(0, 0, width, height);
       const maxMagnitude = Math.max(1, ...trajectory.states.flatMap((state) => state.map((value) => Math.abs(value))));
       const range = Math.min(25, maxMagnitude * 1.25 + 0.5);
@@ -108,7 +108,7 @@ function StateSpace3D({ matrix, initialState, duration }: { matrix: Matrix; init
   const pointerMove = (event: React.PointerEvent<HTMLCanvasElement>) => { const pointer = pointerRef.current; if (!pointer || pointer.id !== event.pointerId) return; const dx = event.clientX - pointer.x; const dy = event.clientY - pointer.y; pointerRef.current = { ...pointer, x: event.clientX, y: event.clientY }; setRotation((current) => ({ yaw: current.yaw + dx * 0.012, pitch: Math.max(-1.35, Math.min(1.35, current.pitch + dy * 0.012)) })); };
   const pointerUp = () => { pointerRef.current = null; };
 
-  return <section className={CARD}><div className="flex flex-wrap items-center justify-between gap-2"><h3 className={HEADING}>{labels.space}</h3><span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-500 dark:text-slate-400"><Orbit className="h-3.5 w-3.5" />{labels.rotate}</span></div><div className="relative mt-4 min-h-72 overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-[#0f172a]" style={{ aspectRatio: "4 / 3" }}><canvas ref={canvasRef} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerCancel={pointerUp} className="absolute inset-0 h-full w-full touch-none cursor-grab active:cursor-grabbing" /></div><p className="mt-3 inline-flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400"><MousePointer2 className="h-3.5 w-3.5" />{labels.drag}</p></section>;
+  return <section className={CARD}><div className="flex flex-wrap items-center justify-between gap-2"><h3 className={HEADING}>{labels.space}</h3><span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-500 dark:text-slate-400"><Orbit className="h-3.5 w-3.5" />{labels.rotate}</span></div><div className="relative mt-4 min-h-72 overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-[#090a0d]" style={{ aspectRatio: "4 / 3" }}><canvas ref={canvasRef} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerCancel={pointerUp} className="absolute inset-0 h-full w-full touch-none cursor-grab active:cursor-grabbing" /></div><p className="mt-3 inline-flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400"><MousePointer2 className="h-3.5 w-3.5" />{labels.drag}</p></section>;
 }
 
 export function StateSpacePortraits({ matrix, closedLoopMatrix, order }: Props) {

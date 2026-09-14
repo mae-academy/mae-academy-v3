@@ -64,7 +64,7 @@ export function RootLocusStudio() {
     const h = rect.height;
     const isDark = theme === "dark";
 
-    ctx.fillStyle = isDark ? "#0f172a" : "#f8fafc";
+    ctx.fillStyle = isDark ? "#090a0d" : "#f8fafc";
     ctx.fillRect(0, 0, w, h);
 
     const { xMin, xMax, yMin, yMax } = plotLimits;
@@ -819,7 +819,7 @@ const charPoly = dAligned.map((d_val, idx) => d_val + K * nAligned[idx]);
     const h = rect.height;
     const isDark = theme === "dark";
     ctx.clearRect(0, 0, w, h);
-    ctx.fillStyle = isDark ? "#0f172a" : "#f8fafc";
+    ctx.fillStyle = isDark ? "#090a0d" : "#f8fafc";
     ctx.fillRect(0, 0, w, h);
 
     const padding = 40;
@@ -965,7 +965,7 @@ const charPoly = dAligned.map((d_val, idx) => d_val + K * nAligned[idx]);
               </div>
             </div>
             <div
-              className={`relative w-full aspect-square md:aspect-[4/3] rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a] shadow-inner select-none ${isPanningRef.current ? 'cursor-grabbing' : 'cursor-grab'}`}
+              className={`relative w-full aspect-square md:aspect-[4/3] rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#090a0d] shadow-inner select-none ${isPanningRef.current ? 'cursor-grabbing' : 'cursor-grab'}`}
               onMouseDown={(e) => {
                 isPanningRef.current = true;
                 lastPanPosRef.current = { x: e.clientX, y: e.clientY };
@@ -1074,7 +1074,7 @@ const charPoly = dAligned.map((d_val, idx) => d_val + K * nAligned[idx]);
                 />
               </div>
             </div>
-            <div className="relative w-full aspect-[4/2] rounded-2xl overflow-hidden border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-[#0f172a]">
+            <div className="relative w-full aspect-[4/2] rounded-2xl overflow-hidden border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-[#090a0d]">
               <canvas ref={stepCanvasRef} className="absolute inset-0 w-full h-full" />
               <div className="pointer-events-none absolute bottom-4 left-5 flex items-center gap-3 text-[10px] font-bold"><span className="flex items-center gap-1 text-violet-400"><i className="h-px w-3 bg-violet-400"/>r(t)</span><span className="flex items-center gap-1 text-blue-400"><i className="h-px w-3 bg-blue-400"/>y(t)</span></div>
             </div>

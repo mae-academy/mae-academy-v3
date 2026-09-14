@@ -608,7 +608,7 @@ export default function HiddenSymbolDesigner() {
   const sel = elements.find(e => e.id === selectedId);
 
   return (
-    <div className={`fixed inset-0 z-[9999] flex flex-col overflow-hidden select-none font-mono transition-colors duration-200 ${theme === 'dark' ? 'bg-[#0f172a] text-slate-100' : 'bg-[#f8fafc] text-slate-800'
+    <div className={`fixed inset-0 z-[9999] flex flex-col overflow-hidden select-none font-mono transition-colors duration-200 ${theme === 'dark' ? 'bg-[#000000] text-slate-100' : 'bg-[#f8fafc] text-slate-800'
       }`}>
 
       {/* Top Bar */}
@@ -666,7 +666,7 @@ export default function HiddenSymbolDesigner() {
       {/* Middle Workspace */}
       <div className="flex-1 min-h-0 flex overflow-hidden">
         {/* Canvas Area */}
-        <div className={`flex-1 relative overflow-hidden transition-colors ${theme === 'dark' ? 'bg-[#0b0f19]' : 'bg-[#ffffff]'
+        <div className={`flex-1 relative overflow-hidden transition-colors ${theme === 'dark' ? 'bg-[#000000]' : 'bg-[#ffffff]'
           }`}>
 
           <svg
@@ -920,7 +920,7 @@ export default function HiddenSymbolDesigner() {
       </div>
 
       {/* Bottom Dock */}
-      <div className={`h-40 border-t flex shrink-0 p-2 gap-2 transition-colors ${theme === 'dark' ? 'border-slate-800 bg-[#090d16]' : 'border-slate-200 bg-slate-100'
+      <div className={`h-40 border-t flex shrink-0 p-2 gap-2 transition-colors ${theme === 'dark' ? 'border-slate-800 bg-[#090a0d]' : 'border-slate-200 bg-slate-100'
         }`}>
         {/* Export ReadOnly Area */}
         <div className={`flex-1 flex flex-col rounded-md border overflow-hidden transition-colors ${theme === 'dark' ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'

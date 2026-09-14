@@ -1213,7 +1213,7 @@ const RelayDpst: SymbolFC = ({ powered, props }) => {
 const DmmSymbol: SymbolFC = ({ props }) => (
   <g>
     {/* Main Body - Height stretched to exactly hit y=50 */}
-    <rect x={-35} y={-50} width={70} height={100} rx={6} fill="#1e293b" stroke="#0f172a" strokeWidth={1.5} />
+    <rect x={-35} y={-50} width={70} height={100} rx={6} fill="#0d0f12" stroke="#1b2028" strokeWidth={1.5} />
     {/* Top Header Label - Positioned cleanly ABOVE the main SVG body with KaTeX style & halo effect */}
     <text
       x={0}
@@ -1234,14 +1234,14 @@ const DmmSymbol: SymbolFC = ({ props }) => (
     {/* LCD Screen */}
     <rect x={-25} y={-38} width={50} height={22} rx={3} fill="#e0f2fe" stroke="#0284c7" strokeWidth={1} />
     {/* Dial */}
-    <circle cx={0} cy={16} r={14} fill="#334155" stroke="#475569" strokeWidth={1.5} />
+    <circle cx={0} cy={16} r={14} fill="#1b2028" stroke="#262c36" strokeWidth={1.5} />
     <circle cx={0} cy={6} r={2} fill="#94a3b8" />
     {/* Buttons */}
-    <circle cx={-18} cy={-8} r={3} fill="#475569" />
-    <circle cx={18} cy={-8} r={3} fill="#475569" />
+    <circle cx={-18} cy={-8} r={3} fill="#262c36" />
+    <circle cx={18} cy={-8} r={3} fill="#262c36" />
     {/* Jacks exactly sitting on the y=50 grid bottom edge */}
     <circle cx={-25} cy={50} r={4} fill="#ef4444" stroke="#7f1d1d" strokeWidth={1.5} />
-    <circle cx={25} cy={50} r={4} fill="#0f172a" stroke="#000000" strokeWidth={1.5} />
+    <circle cx={25} cy={50} r={4} fill="#0d0f12" stroke="#000000" strokeWidth={1.5} />
     {/* LCD Text */}
     <text x={0} y={-27} textAnchor="middle" fontSize={11} fontWeight={700} fontFamily="ui-monospace, monospace" fill="#0284c7">{String(props?.mode ?? 'DCV')}</text>
   </g>
@@ -1250,15 +1250,15 @@ const DmmSymbol: SymbolFC = ({ props }) => (
 const OscilloscopeSymbol: SymbolFC = () => (
   <g>
     {/* Main Widescreen Body: 140x100 (leaves 5px for terminals to reach ±75) */}
-    <rect x={-70} y={-60} width={140} height={100} rx={6} fill="#1e293b" stroke="#0f172a" strokeWidth={1.5} />
+    <rect x={-70} y={-60} width={140} height={100} rx={6} fill="#0d0f12" stroke="#1b2028" strokeWidth={1.5} />
 
     {/* Dark Screen: clean blank screen */}
-    <rect x={-60} y={-50} width={80} height={60} rx={3} fill="#000000" stroke="#334155" strokeWidth={1.5} />
+    <rect x={-60} y={-50} width={80} height={60} rx={3} fill="#000000" stroke="#1b2028" strokeWidth={1.5} />
 
     {/* Screen Grid */}
-    <line x1={-20} y1={-50} x2={-20} y2={10} stroke="#1e293b" strokeWidth={1} />
-    <line x1={20} y1={-50} x2={20} y2={10} stroke="#1e293b" strokeWidth={1} />
-    <line x1={-60} y1={-20} x2={20} y2={-20} stroke="#1e293b" strokeWidth={1} />
+    <line x1={-20} y1={-50} x2={-20} y2={10} stroke="#1b2028" strokeWidth={1} />
+    <line x1={20} y1={-50} x2={20} y2={10} stroke="#1b2028" strokeWidth={1} />
+    <line x1={-60} y1={-20} x2={20} y2={-20} stroke="#1b2028" strokeWidth={1} />
 
     {/* Control Panel Dials */}
     <circle cx={45} cy={-35} r={9} fill="#334155" stroke="#475569" strokeWidth={1.5} />
