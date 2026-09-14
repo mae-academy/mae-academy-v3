@@ -552,7 +552,7 @@ export class SimulationEngine {
           break;
         }
         case 'ac-current': {
-          current = waveform(propString(props, 'waveform', 'sine'), propNumber(props, 'amplitude', 1), propNumber(props, 'frequency', 60), propNumber(props, 'phase', 0), 0, this.time);
+          current = waveform(propString(props, 'waveform', 'sine'), propNumber(props, 'amplitude', 1), propNumber(props, 'frequency', 60), propNumber(props, 'phase', 0), propNumber(props, 'offset', 0), this.time);
           stampCurrent(component, 'pos', 'neg', current);
           isPowered = Math.abs(current) > 1e-12;
           break;

@@ -508,6 +508,8 @@ export const EXACT_ANALOG_TERMINAL_OFFSETS: Record<string, Record<string, Point>
   'autotransformer': { 'in1': [-50, -50], 'in2': [-50, 50], 'tap': [50, 0], 'out1': [50, -50], 'out2': [50, 50] },
   'oscilloscope': { 'ch1': [-75, -50], 'ch2': [-75, -25], 'ch3': [-75, 0], 'ch4': [-75, 25], 'gnd': [75, 25] },
   'dmm': { 'hi': [-25, 50], 'com': [25, 50] },
+  'three-phase-source': { 'l1': [50, -25], 'l2': [50, 0], 'l3': [50, 25], 'n': [-50, 0] },
+  'three-phase-rail': { 'l1': [50, -100 / 3], 'l2': [50, -50 / 3], 'l3': [50, 0], 'n': [50, 50 / 3] },
   // Universal Switches & Relays
   'sw-spst-no': { 'a': [-25, 0], 'b': [25, 0] },
   'sw-spst-nc': { 'a': [-25, 0], 'b': [25, 0] },
@@ -541,7 +543,7 @@ export const EXACT_ANALOG_TERMINAL_OFFSETS: Record<string, Record<string, Point>
 export const EXACT_CAD_COMPONENTS = new Set<string>([
   'dmm', 'opamp', 'op-amp', 'diac', 'triac', 'scr', 'bjt-npn', 'bjt-pnp', 'mosfet-n', 'mosfet-p', 'jfet-n', 'jfet-p',
   'dc-voltage', 'ac-voltage', 'dc-current', 'ac-current',
-  'voltmeter', 'ammeter', 'lamp', 'motor-dc', 'motor-3phase', 'three-phase-source',
+  'voltmeter', 'ammeter', 'lamp', 'motor-dc', 'motor-3phase', 'three-phase-source', 'three-phase-rail',
   'sw-spst-no', 'sw-spst-nc', 'pb-no', 'pb-nc', 'sw-spdt', 'sw-dpst', 'sw-dpdt',
   'coil', 'aux-contact-no', 'aux-contact-nc', 'aux-contact-3phase',
   'fuse', 'fuse-3phase', 'circuit-breaker', 'circuit-breaker-3phase',

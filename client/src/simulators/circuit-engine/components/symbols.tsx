@@ -74,21 +74,29 @@ const DcVoltage: SymbolFC = () => (
   </g>
 );
 
+const renderAcWaveform = (wf: string, documented: boolean): React.ReactNode => {
+  switch (wf) {
+    case 'square':
+      return <path d="M -15,8 L -15,-8 L 0,-8 L 0,8 L 15,8 L 15,-8" fill="none" stroke="currentColor" strokeWidth={1.5} />;
+    case 'sawtooth':
+      return <path d="M -15,8 L 0,-8 L 0,8 L 15,-8" fill="none" stroke="currentColor" strokeWidth={1.5} />;
+    case 'triangle':
+      return <path d="M -15,0 L -7.5,-8 L 0,0 L 7.5,8 L 15,0" fill="none" stroke="currentColor" strokeWidth={1.5} />;
+    case 'sine':
+    default:
+      return documented
+        ? <path d="M -15,2 C -10,-10 -5,-10 0,2 C 5,14 10,14 15,2" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+        : <path d="M -15,-8 Q -7.5,-20 0,-8 Q 7.5,4 15,-8" fill="none" stroke="currentColor" strokeWidth={1.5} />;
+  }
+};
+
 const AcVoltage: SymbolFC = ({ props }) => {
   const wf = (props?.waveform as string) || 'sine';
   const documented = props?._documentedStyle === true;
-  const waveSymbols: Record<string, React.ReactNode> = {
-    sine: documented
-      ? <path d="M -15,2 C -10,-10 -5,-10 0,2 C 5,14 10,14 15,2" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
-      : <path d="M -15,-8 Q -7.5,-20 0,-8 Q 7.5,4 15,-8" fill="none" stroke="currentColor" strokeWidth={1.5} />,
-    square: <path d="M -15,-18 L -15,-3 L 0,-3 L 0,-18 L 15,-18 L 15,-3" fill="none" stroke="currentColor" strokeWidth={1.5} />,
-    sawtooth: <path d="M -15,-3 L 0,-18 L 0,-3 L 15,-18" fill="none" stroke="currentColor" strokeWidth={1.5} />,
-    triangle: <path d="M -15,-3 L -7.5,-18 L 0,-3 L 7.5,-18 L 15,-3" fill="none" stroke="currentColor" strokeWidth={1.5} />,
-  };
   return (
     <g>
       <circle cx={0} cy={0} r={33} fill="none" stroke="currentColor" strokeWidth={1.5} />
-      {waveSymbols[wf] || null}
+      {renderAcWaveform(wf, documented)}
       <line x1={0} y1={-33} x2={0} y2={-50} stroke="currentColor" strokeWidth={1.5} />
       <line x1={0} y1={33} x2={0} y2={50} stroke="currentColor" strokeWidth={1.5} />
     </g>
@@ -105,13 +113,13 @@ const DcCurrent: SymbolFC = () => (
   </g>
 );
 
-const AcCurrent: SymbolFC = () => {
+const AcCurrent: SymbolFC = ({ props }) => {
+  const wf = (props?.waveform as string) || 'sine';
+  const documented = props?._documentedStyle === true;
   return (
     <g>
       <circle cx={0} cy={0} r={33} fill="none" stroke="currentColor" strokeWidth={1.5} />
-      <line x1={0} y1={-3} x2={0} y2={-18} stroke="currentColor" strokeWidth={1.5} />
-      <polyline points="-6,-10 0,-18 6,-10" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinejoin="round" />
-      <path d="M -15,5 C -10,-5 -5,-5 0,5 C 5,15 10,15 15,5" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+      {renderAcWaveform(wf, documented)}
       <line x1={0} y1={-33} x2={0} y2={-50} stroke="currentColor" strokeWidth={1.5} />
       <line x1={0} y1={33} x2={0} y2={50} stroke="currentColor" strokeWidth={1.5} />
     </g>
@@ -128,10 +136,10 @@ const DcRail: SymbolFC = () => {
 const ThreePhaseSource: SymbolFC = () => (
   <g>
     <text x={0} y={5} textAnchor="middle" fontSize={16} fontWeight="bold" fill="currentColor">3~</text>
-    <line x1={-50} y1={-25} x2={-21.5} y2={-25} stroke="#d14343" strokeWidth={1.5} strokeLinecap="round" />
-    <line x1={-50} y1={0} x2={-33} y2={0} stroke="#d6a720" strokeWidth={1.5} strokeLinecap="round" />
-    <line x1={-50} y1={25} x2={-21.5} y2={25} stroke="#2d73b7" strokeWidth={1.5} strokeLinecap="round" />
-    <line x1={50} y1={0} x2={33} y2={0} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+    <line x1={50} y1={-25} x2={21.5} y2={-25} stroke="#d14343" strokeWidth={1.5} strokeLinecap="round" />
+    <line x1={50} y1={0} x2={33} y2={0} stroke="#d6a720" strokeWidth={1.5} strokeLinecap="round" />
+    <line x1={50} y1={25} x2={21.5} y2={25} stroke="#2d73b7" strokeWidth={1.5} strokeLinecap="round" />
+    <line x1={-50} y1={0} x2={-33} y2={0} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
     <circle cx={0} cy={0} r={33} fill="none" stroke="currentColor" strokeWidth={1.5} />
   </g>
 );
@@ -1210,42 +1218,53 @@ const RelayDpst: SymbolFC = ({ powered, props }) => {
   );
 };
 
-const DmmSymbol: SymbolFC = ({ props }) => (
-  <g>
-    {/* Main Body - Height stretched to exactly hit y=50 */}
-    <rect x={-35} y={-50} width={70} height={100} rx={6} fill="#0d0f12" stroke="#1b2028" strokeWidth={1.5} />
-    {/* Top Header Label - Positioned cleanly ABOVE the main SVG body with KaTeX style & halo effect */}
-    <text
-      x={0}
-      y={-58}
-      textAnchor="middle"
-      dominantBaseline="central"
-      fontSize={12}
-      fontStyle="italic"
-      fontFamily="KaTeX_Math, Times New Roman, serif"
-      fill="#0f172a"
-      stroke="white"
-      strokeWidth={3}
-      strokeLinejoin="round"
-      paintOrder="stroke fill"
-    >
-      DMM
-    </text>
-    {/* LCD Screen */}
-    <rect x={-25} y={-38} width={50} height={22} rx={3} fill="#e0f2fe" stroke="#0284c7" strokeWidth={1} />
-    {/* Dial */}
-    <circle cx={0} cy={16} r={14} fill="#1b2028" stroke="#262c36" strokeWidth={1.5} />
-    <circle cx={0} cy={6} r={2} fill="#94a3b8" />
-    {/* Buttons */}
-    <circle cx={-18} cy={-8} r={3} fill="#262c36" />
-    <circle cx={18} cy={-8} r={3} fill="#262c36" />
-    {/* Jacks exactly sitting on the y=50 grid bottom edge */}
-    <circle cx={-25} cy={50} r={4} fill="#ef4444" stroke="#7f1d1d" strokeWidth={1.5} />
-    <circle cx={25} cy={50} r={4} fill="#0d0f12" stroke="#000000" strokeWidth={1.5} />
-    {/* LCD Text */}
-    <text x={0} y={-27} textAnchor="middle" fontSize={11} fontWeight={700} fontFamily="ui-monospace, monospace" fill="#0284c7">{String(props?.mode ?? 'DCV')}</text>
-  </g>
-);
+const DmmSymbol: SymbolFC = ({ props }) => {
+  const raw = String(props?.label || 'DMM');
+  const match = raw.match(/^([A-Za-z]+)(\d+)$/);
+  return (
+    <g>
+      {/* Main Body - Height stretched to exactly hit y=50 */}
+      <rect x={-35} y={-50} width={70} height={100} rx={6} fill="#0d0f12" stroke="#1b2028" strokeWidth={1.5} />
+      {/* Top Header Label - Positioned cleanly ABOVE the main SVG body with KaTeX style & halo effect */}
+      <text
+        x={0}
+        y={-58}
+        textAnchor="middle"
+        dominantBaseline="central"
+        fontSize={12}
+        fontStyle="italic"
+        fontFamily="KaTeX_Math, Times New Roman, serif"
+        fill="#0f172a"
+        stroke="white"
+        strokeWidth={3}
+        strokeLinejoin="round"
+        paintOrder="stroke fill"
+      >
+        {match ? (
+          <>
+            {match[1]}
+            <tspan dy="2.5" fontSize="9px" fontStyle="normal" fontFamily="KaTeX_Main, sans-serif">{match[2]}</tspan>
+          </>
+        ) : (
+          raw
+        )}
+      </text>
+      {/* LCD Screen */}
+      <rect x={-25} y={-38} width={50} height={22} rx={3} fill="#e0f2fe" stroke="#0284c7" strokeWidth={1} />
+      {/* Dial */}
+      <circle cx={0} cy={16} r={14} fill="#1b2028" stroke="#262c36" strokeWidth={1.5} />
+      <circle cx={0} cy={6} r={2} fill="#94a3b8" />
+      {/* Buttons */}
+      <circle cx={-18} cy={-8} r={3} fill="#262c36" />
+      <circle cx={18} cy={-8} r={3} fill="#262c36" />
+      {/* Jacks exactly sitting on the y=50 grid bottom edge */}
+      <circle cx={-25} cy={50} r={4} fill="#ef4444" stroke="#7f1d1d" strokeWidth={1.5} />
+      <circle cx={25} cy={50} r={4} fill="#0d0f12" stroke="#000000" strokeWidth={1.5} />
+      {/* LCD Text */}
+      <text x={0} y={-27} textAnchor="middle" fontSize={11} fontWeight={700} fontFamily="ui-monospace, monospace" fill="#0284c7">{String(props?.mode ?? 'DCV')}</text>
+    </g>
+  );
+};
 
 const OscilloscopeSymbol: SymbolFC = () => (
   <g>

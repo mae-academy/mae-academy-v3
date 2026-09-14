@@ -323,11 +323,15 @@ function SvgKaTeXLabel({ x, y, math, color, ariaLabel, width = 64, height = 28 }
 
 function ComponentPaletteIcon({ definition, colors, documented }: { definition: ComponentDef; colors: Palette; documented: boolean }) {
   const padding = 20; // Safe optical padding
-  const w = definition.width + padding;
-  const h = definition.height + padding;
+  let w = definition.width + padding;
+  let h = definition.height + padding;
 
   let offsetY = 0;
-  if (definition.id === 'pb-no') {
+  if (definition.id === 'dmm') {
+    offsetY = -5;
+    w = 100;
+    h = 130;
+  } else if (definition.id === 'pb-no') {
     offsetY = -10;
   } else if (['pb-nc', 'sw-spst-no', 'sw-spst-nc', 'aux-contact-no', 'aux-contact-nc'].includes(definition.id)) {
     offsetY = -5;
@@ -2922,7 +2926,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                     onPointerLeave={() => setHoveredComponentId(null)}
                   >
                     <g transform={symbolTransform} color={isSelected ? colors.selection : undefined}>
-                      {renderSymbol(definition.symbol, powered, { ...component.props, isEnergized: powered, isConflicted: conflictedCoilIds.has(component.id), _intensity: intensity, ...(motorVEff !== undefined ? { _vEff: motorVEff } : {}), _documentedStyle: tabDUiRefinement, ...(meterDisplayValue !== undefined ? { displayValue: meterDisplayValue } : {}) }, animationTime)}
+                      {renderSymbol(definition.symbol, powered, { ...component.props, label: component.label, isEnergized: powered, isConflicted: conflictedCoilIds.has(component.id), _intensity: intensity, ...(motorVEff !== undefined ? { _vEff: motorVEff } : {}), _documentedStyle: tabDUiRefinement, ...(meterDisplayValue !== undefined ? { displayValue: meterDisplayValue } : {}) }, animationTime)}
                     </g>
                     {definition.terminals.map(terminal => {
                       const snappedWorld = getCanvasTerminalPosition(component, terminal.id);

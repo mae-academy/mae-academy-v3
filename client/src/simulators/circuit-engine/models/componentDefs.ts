@@ -123,7 +123,6 @@ const SOURCES: Record<string, ComponentDef> = {
       frequency: { type: 'number', value: 60, unit: 'Hz', min: 0.001, max: 1e6, label: 'Frequency' },
       offset: { type: 'number', value: 0, unit: 'V', min: -10000, max: 10000, label: 'DC Offset' },
       waveform: { type: 'select', value: 'sine', options: ['sine', 'square', 'sawtooth', 'triangle'], label: 'Waveform' },
-      phases: { type: 'select', value: 'single', options: ['single', 'three-phase'], label: 'Phase Config' },
     },
     description: 'AC voltage source with configurable waveform',
   },
@@ -131,10 +130,10 @@ const SOURCES: Record<string, ComponentDef> = {
     id: 'three-phase-source', name: '3-Phase Voltage Source', category: 'Sources',
     width: 100, height: 100, symbol: 'three-phase-source',
     terminals: [
-      { id: 'l1', name: 'L1', x: -50, y: -25, type: 'output' },
-      { id: 'l2', name: 'L2', x: -50, y: 0, type: 'output' },
-      { id: 'l3', name: 'L3', x: -50, y: 25, type: 'output' },
-      { id: 'n', name: 'N', x: 50, y: 0, type: 'output' },
+      { id: 'l1', name: 'L1', x: 50, y: -25, type: 'output' },
+      { id: 'l2', name: 'L2', x: 50, y: 0, type: 'output' },
+      { id: 'l3', name: 'L3', x: 50, y: 25, type: 'output' },
+      { id: 'n', name: 'N', x: -50, y: 0, type: 'output' },
     ],
     properties: {
       voltageReference: { type: 'select', value: 'Line-to-Line (L-L)', options: ['Line-to-Line (L-L)', 'Phase (L-N)'], label: 'Voltage Reference' },
@@ -153,10 +152,10 @@ const SOURCES: Record<string, ComponentDef> = {
     id: 'three-phase-rail', name: '3-Phase Power Rail', category: 'Sources',
     width: 90, height: 60, symbol: 'three-phase-rail',
     terminals: [
-      { id: 'l1', name: 'A', x: -50, y: -100 / 3, type: 'output' },
-      { id: 'l2', name: 'B', x: -50, y: -50 / 3, type: 'output' },
-      { id: 'l3', name: 'C', x: -50, y: 0 / 3, type: 'output' },
-      { id: 'n', name: 'N', x: -50, y: 50 / 3, type: 'output' },
+      { id: 'l1', name: 'A', x: 50, y: -100 / 3, type: 'output' },
+      { id: 'l2', name: 'B', x: 50, y: -50 / 3, type: 'output' },
+      { id: 'l3', name: 'C', x: 50, y: 0 / 3, type: 'output' },
+      { id: 'n', name: 'N', x: 50, y: 50 / 3, type: 'output' },
     ],
     properties: {
       voltageReference: { type: 'select', value: 'Line-to-Line (L-L)', options: ['Line-to-Line (L-L)', 'Phase (L-N)'], label: 'Voltage Reference' },

@@ -47,6 +47,32 @@ function findLocalMaximaTimes(values: number[], time: number[], count: number): 
   return peaks;
 }
 
+/** First interpolated crossing time where `values` reaches `target`, rising from below it. */
+function findTimeAtValue(values: number[], time: number[], target: number): number {
+  for (let i = 1; i < values.length; i++) {
+    if (values[i - 1] < target && values[i] >= target) {
+      const fraction = (target - values[i - 1]) / (values[i] - values[i - 1]);
+      return time[i - 1] + fraction * (time[i] - time[i - 1]);
+    }
+  }
+  return NaN;
+}
+
+/**
+ * Settling time: the first instant after which the signal stays inside [bandLow, bandHigh] for the
+ * rest of the record — not just the first moment it happens to touch the band (a signal can dip in
+ * and back out, e.g. the initial rise crossing 9.8V before its own overshoot), which is what a naive
+ * first-crossing search would wrongly report as "already settled."
+ */
+function findSettlingTime(values: number[], time: number[], bandLow: number, bandHigh: number): number {
+  for (let i = 0; i < values.length; i++) {
+    if (values[i] < bandLow || values[i] > bandHigh) continue;
+    const staysInBand = values.slice(i).every(value => value >= bandLow && value <= bandHigh);
+    if (staysInBand) return time[i];
+  }
+  return NaN;
+}
+
 describe("1st/2nd-order circuit responses (ngspice.wasm)", () => {
   it("boots ngspice once so the first real test below isn't timed against the wasm load", async () => {
     await runNgspiceWithLog("warmup\nV1 n1 0 DC 1\n.op\n.end\n");
@@ -151,6 +177,15 @@ describe("1st/2nd-order circuit responses (ngspice.wasm)", () => {
       const frequency = 1 / period;
       expect(frequency).toBeGreaterThan(120);
       expect(frequency).toBeLessThan(180);
+
+      // Time to first peak: tp = π/ωd ≈ 3.29 ms.
+      expect(firstTwoPeakTimes[0]).toBeGreaterThan(0.0025);
+      expect(firstTwoPeakTimes[0]).toBeLessThan(0.004);
+
+      // Settling time (2% band, 9.8–10.2V): ts = 4/(ζωn) ≈ 13.3 ms.
+      const settlingTime = findSettlingTime(vc, results.time, 9.8, 10.2);
+      expect(settlingTime).toBeGreaterThan(0.011);
+      expect(settlingTime).toBeLessThan(0.016);
     },
     RUN_TIMEOUT
   );
@@ -163,31 +198,45 @@ describe("1st/2nd-order circuit responses (ngspice.wasm)", () => {
       const peak = Math.max(...vc);
       expect(peak).toBeLessThan(10.3); // essentially no overshoot, allowing solver ripple
       expect(peak).toBeGreaterThan(9.5); // still actually reaches the final value
+
+      // Rise time (10%→90%): the commonly-quoted "tr ≈ 2.2/ωn ≈ 2.2ms" estimate is for a 1st-order
+      // system's 10-90% rise (2.2τ); a critically-damped 2nd-order step actually rises a bit slower
+      // than that (real ngspice output here: ~3.36ms) since (1+ωnt)e^-ωnt starts with zero slope,
+      // not linearly — checked against the real curve rather than the borrowed 1st-order estimate.
+      const t10 = findTimeAtValue(vc, results.time, 1);
+      const t90 = findTimeAtValue(vc, results.time, 9);
+      expect(t90 - t10).toBeGreaterThan(0.0025);
+      expect(t90 - t10).toBeLessThan(0.004);
+
+      // Settling time (2% band): ts = 4/(ζωn) = 4/1000 = 4 ms — the fastest of the three regimes,
+      // checked directly rather than only by comparison to the others below.
+      const settlingTime = findSettlingTime(vc, results.time, 9.8, 10.2);
+      expect(settlingTime).toBeGreaterThan(0.003);
+      expect(settlingTime).toBeLessThan(0.006);
     },
     RUN_TIMEOUT
   );
 
   it(
-    "RLC overdamped step (ζ=10, R=200Ω): slower than critical, still no overshoot",
+    "RLC overdamped step (ζ=2, R=40Ω): real poles λ = -ωn(ζ∓√(ζ²-1)), dominant time constant τ≈3.73ms",
     async () => {
-      const [criticallyDamped, overdamped] = await Promise.all([
-        runAndParse(stepNetlist(20)),
-        runAndParse(stepNetlist(200)),
-      ]);
-      const vcCritical = criticallyDamped.results.nodeVoltages["3"];
-      const vcOver = overdamped.results.nodeVoltages["3"];
-      expect(Math.max(...vcOver)).toBeLessThan(10.1); // no overshoot at all
+      const { results } = await runAndParse(stepNetlist(40));
+      const vc = results.nodeVoltages["3"];
+      expect(Math.max(...vc)).toBeLessThan(10.1); // no overshoot at all
 
-      // At the same instant partway to steady state, the overdamped response should trail the
-      // critically-damped one — the textbook "critical damping is the fastest non-overshooting
-      // response" property, verified against real solver output rather than assumed.
-      const sampleAt = (results: typeof criticallyDamped.results, t: number) => {
-        const samples = toSamples(results.nodeVoltages["3"], results.time);
-        let nearest = samples[0];
-        for (const sample of samples) if (Math.abs(sample.time - t) < Math.abs(nearest.time - t)) nearest = sample;
-        return nearest.value;
-      };
-      expect(sampleAt(overdamped.results, 0.003)).toBeLessThan(sampleAt(criticallyDamped.results, 0.003));
+      // λ1 = -ωn(ζ-√(ζ²-1)) = -1000(2-√3) ≈ -267.9 — the slower of the two real poles, which
+      // dominates the response once the faster one (λ2≈-3732, τ≈0.27ms) has already decayed away.
+      // A single-pole system reaches 1-1/e (63.2%) of its final value at t=τ; approximating this
+      // 2-pole response the same way and checking it against the analytic τ is what's verified here.
+      const tau = 1 / (1000 * (2 - Math.sqrt(3)));
+      const t63 = findTimeAtValue(vc, results.time, 6.32);
+      expect(t63).toBeGreaterThan(tau * 0.6);
+      expect(t63).toBeLessThan(tau * 1.6);
+
+      // Settling time is markedly slower than critical damping's 4ms — the "critical damping is the
+      // fastest non-overshooting response" property, verified against real solver output.
+      const settlingTime = findSettlingTime(vc, results.time, 9.8, 10.2);
+      expect(settlingTime).toBeGreaterThan(0.006);
     },
     RUN_TIMEOUT
   );

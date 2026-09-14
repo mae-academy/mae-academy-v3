@@ -18,13 +18,13 @@ describe('Tab D SVG symbol language', () => {
     expect(rail).not.toContain('24V');
   });
 
-  it('renders the 3-Phase Source with neutral and phases A, B, C leads', () => {
+  it('renders the 3-Phase Source with neutral and phases A, B, C leads facing right', () => {
     const source = markup('three-phase-source');
     expect(source).toContain('r="33"');
-    expect(source).toContain('x1="-50" y1="-25" x2="-21.5" y2="-25"');
-    expect(source).toContain('x1="-50" y1="0" x2="-33" y2="0"');
-    expect(source).toContain('x1="-50" y1="25" x2="-21.5" y2="25"');
+    expect(source).toContain('x1="50" y1="-25" x2="21.5" y2="-25"');
     expect(source).toContain('x1="50" y1="0" x2="33" y2="0"');
+    expect(source).toContain('x1="50" y1="25" x2="21.5" y2="25"');
+    expect(source).toContain('x1="-50" y1="0" x2="-33" y2="0"');
   });
 
   it('uses red, yellow, blue, and neutral rails for the three-phase power rail', () => {
@@ -38,12 +38,15 @@ describe('Tab D SVG symbol language', () => {
     expect(rail).toContain(`x1="-50" y1="${50 / 3}" x2="50" y2="${50 / 3}"`);
   });
 
-  it('centers the documented IAC sine wave inside its source circle without changing the legacy branch', () => {
-    const documented = markup('ac-current', { _documentedStyle: true });
-    const legacy = markup('ac-current');
-    expect(documented).toContain('x1="0" y1="-3" x2="0" y2="-18"');
-    expect(documented).toContain('M -15,5 C -10,-5 -5,-5 0,5 C 5,15 10,15 15,5');
-    expect(legacy).toContain('M -15,5 C -10,-5 -5,-5 0,5 C 5,15 10,15 15,5');
+  it('centers the documented IAC waveforms inside its source circle with visual parity to AC voltage source', () => {
+    const sine = markup('ac-current', { waveform: 'sine', _documentedStyle: true });
+    const square = markup('ac-current', { waveform: 'square' });
+    const triangle = markup('ac-current', { waveform: 'triangle' });
+    const sawtooth = markup('ac-current', { waveform: 'sawtooth' });
+    expect(sine).toContain('M -15,2 C -10,-10 -5,-10 0,2 C 5,14 10,14 15,2');
+    expect(square).toContain('M -15,8 L -15,-8 L 0,-8 L 0,8 L 15,8 L 15,-8');
+    expect(triangle).toContain('M -15,0 L -7.5,-8 L 0,0 L 7.5,8 L 15,0');
+    expect(sawtooth).toContain('M -15,8 L 0,-8 L 0,8 L 15,-8');
   });
 
   it('uses an ANSI zigzag potentiometer body and a dynamically movable wiper arrow', () => {
@@ -268,6 +271,11 @@ describe('Tab D SVG symbol language', () => {
     expect(dmm).toContain('stroke-width="3"');
     expect(dmm).toContain('paint-order="stroke fill"');
     expect(dmm).toContain('y="-58"');
+
+    const dmm1 = markup('dmm', { label: 'DMM1' });
+    expect(dmm1).toContain('DMM<tspan');
+    expect(dmm1).toContain('dy="2.5"');
+    expect(dmm1).toContain('>1</tspan>');
   });
 
   it('renders Voltmeter and Ammeter with dynamic displayValue or fallback, in upright KaTeX_Main typography', () => {
