@@ -561,87 +561,184 @@ function renderFormattedValueTspans(value: string) {
 
 
 /**
- * Deep Style Inliner: Walks the live source DOM and the cloned SVG simultaneously,
- * extracting computed CSS values and writing them as hardcoded SVG presentation attributes.
- * This ensures the exported SVG renders correctly in external apps (Word, Illustrator, Figma)
- * that do not have access to the browser's CSS stylesheets or Tailwind/CSS-variables.
+ * Deep Style Inliner — Aggressive SVG Sanitizer for MS Word / Illustrator / Figma
+ *
+ * MS Word's SVG renderer is extremely restricted:
+ *   - Strips ALL <style> tags
+ *   - Ignores CSS classes and var(--…) references
+ *   - Drops <foreignObject> entirely
+ *   - Doesn't resolve currentColor
+ *   - Requires explicit fill/stroke/font-* attributes on every element
+ *
+ * This function walks the live source DOM and the cloned SVG in lockstep,
+ * reading `window.getComputedStyle()` from the source (which is still mounted)
+ * and writing hardcoded SVG presentation attributes onto the clone.
+ *
+ * After this function completes, the cloned SVG is fully self-contained:
+ * no CSS resolution needed, no external stylesheets, no currentColor.
  */
 function inlineComputedStyles(sourceNode: Element, clonedNode: Element): void {
-  // Only process SVG elements that can carry presentation attributes
-  const isSvgEl = sourceNode.namespaceURI === 'http://www.w3.org/2000/svg';
-  if (!isSvgEl) return;
+  // Only process SVG namespace elements
+  if (sourceNode.namespaceURI !== 'http://www.w3.org/2000/svg') return;
 
   try {
     const cs = window.getComputedStyle(sourceNode);
 
-    // SVG presentation attributes we care about
-    const fill = cs.getPropertyValue('fill').trim();
-    const stroke = cs.getPropertyValue('stroke').trim();
+    // Read the resolved `color` property — this is what currentColor maps to
+    const resolvedColor = cs.getPropertyValue('color').trim();
+
+    // Helper: resolve currentColor → actual RGB/hex, and convert transparent to 'none'
+    const resolveColor = (raw: string): string => {
+      let v = raw.trim();
+      if (v === 'currentColor' || v === 'currentcolor') v = resolvedColor;
+      // rgba(0, 0, 0, 0) is how browsers represent fill="none" / invisible
+      if (v === 'rgba(0, 0, 0, 0)' || v === 'transparent') v = 'none';
+      return v;
+    };
+
+    // ── Fill ─────────────────────────────────────────────────────────
+    const rawFill = cs.getPropertyValue('fill').trim();
+    const fill = resolveColor(rawFill);
+    // Always write fill — MS Word needs it explicit. Skip url() (pattern) fills.
+    if (!fill.startsWith('url(')) {
+      clonedNode.setAttribute('fill', fill || 'none');
+    }
+
+    // ── Stroke ───────────────────────────────────────────────────────
+    const rawStroke = cs.getPropertyValue('stroke').trim();
+    const stroke = resolveColor(rawStroke);
+    if (!stroke.startsWith('url(')) {
+      clonedNode.setAttribute('stroke', stroke || 'none');
+    }
+
+    // ── Stroke-width — ALWAYS write (MS Word doesn't have a default) ─
     const strokeWidth = cs.getPropertyValue('stroke-width').trim();
-    const opacity = cs.getPropertyValue('opacity').trim();
-    const color = cs.getPropertyValue('color').trim(); // resolves currentColor
-    const fontFamily = cs.getPropertyValue('font-family').trim();
-    const fontSize = cs.getPropertyValue('font-size').trim();
-    const fontWeight = cs.getPropertyValue('font-weight').trim();
-
-    // Resolve currentColor → actual computed color
-    const resolveCurrentColor = (val: string) =>
-      val === 'currentColor' || val === 'currentcolor' ? color : val;
-
-    // Only set attributes when the value is a real, non-empty, non-inherit value
-    const shouldSet = (v: string) => v && v !== 'none' && v !== '' && v !== 'inherit';
-
-    const resolvedFill = resolveCurrentColor(fill);
-    const resolvedStroke = resolveCurrentColor(stroke);
-
-    if (shouldSet(resolvedFill) && !['url(', 'none'].some(p => resolvedFill.startsWith(p))) {
-      clonedNode.setAttribute('fill', resolvedFill);
-    } else if (fill === 'none') {
-      clonedNode.setAttribute('fill', 'none');
-    }
-
-    if (shouldSet(resolvedStroke) && !resolvedStroke.startsWith('url(')) {
-      clonedNode.setAttribute('stroke', resolvedStroke);
-    } else if (stroke === 'none') {
-      clonedNode.setAttribute('stroke', 'none');
-    }
-
-    if (strokeWidth && strokeWidth !== '0px' && strokeWidth !== '1px') {
+    if (strokeWidth) {
       clonedNode.setAttribute('stroke-width', strokeWidth);
     }
 
-    if (opacity && opacity !== '1' && opacity !== '') {
+    // ── Stroke line styling ──────────────────────────────────────────
+    const strokeLinecap = cs.getPropertyValue('stroke-linecap').trim();
+    if (strokeLinecap && strokeLinecap !== 'butt') {
+      clonedNode.setAttribute('stroke-linecap', strokeLinecap);
+    }
+    const strokeLinejoin = cs.getPropertyValue('stroke-linejoin').trim();
+    if (strokeLinejoin && strokeLinejoin !== 'miter') {
+      clonedNode.setAttribute('stroke-linejoin', strokeLinejoin);
+    }
+    const strokeDasharray = cs.getPropertyValue('stroke-dasharray').trim();
+    if (strokeDasharray && strokeDasharray !== 'none') {
+      clonedNode.setAttribute('stroke-dasharray', strokeDasharray);
+    }
+    const strokeDashoffset = cs.getPropertyValue('stroke-dashoffset').trim();
+    if (strokeDashoffset && strokeDashoffset !== '0px' && strokeDashoffset !== '0') {
+      clonedNode.setAttribute('stroke-dashoffset', strokeDashoffset);
+    }
+    const strokeOpacity = cs.getPropertyValue('stroke-opacity').trim();
+    if (strokeOpacity && strokeOpacity !== '1') {
+      clonedNode.setAttribute('stroke-opacity', strokeOpacity);
+    }
+    const fillOpacity = cs.getPropertyValue('fill-opacity').trim();
+    if (fillOpacity && fillOpacity !== '1') {
+      clonedNode.setAttribute('fill-opacity', fillOpacity);
+    }
+
+    // ── Opacity ──────────────────────────────────────────────────────
+    const opacity = cs.getPropertyValue('opacity').trim();
+    if (opacity && opacity !== '1') {
       clonedNode.setAttribute('opacity', opacity);
     }
 
-    if (fontFamily) {
-      clonedNode.setAttribute('font-family', fontFamily);
-    }
-    if (fontSize) {
-      clonedNode.setAttribute('font-size', fontSize);
-    }
-    if (fontWeight && fontWeight !== '400' && fontWeight !== 'normal') {
-      clonedNode.setAttribute('font-weight', fontWeight);
+    // ── Paint-order (critical for label halo effect) ─────────────────
+    const paintOrder = cs.getPropertyValue('paint-order').trim();
+    if (paintOrder && paintOrder !== 'normal' && paintOrder !== 'fill') {
+      clonedNode.setAttribute('paint-order', paintOrder);
     }
 
-    // Remove className so no external CSS class resolution is attempted
-    if (clonedNode.getAttribute('class')) {
-      clonedNode.removeAttribute('class');
+    // ── Text properties (for <text>, <tspan>) ────────────────────────
+    const tag = sourceNode.tagName.toLowerCase();
+    const isTextEl = tag === 'text' || tag === 'tspan';
+    if (isTextEl) {
+      const fontFamily = cs.getPropertyValue('font-family').trim();
+      if (fontFamily) clonedNode.setAttribute('font-family', fontFamily);
+
+      const fontSize = cs.getPropertyValue('font-size').trim();
+      if (fontSize) clonedNode.setAttribute('font-size', fontSize);
+
+      const fontWeight = cs.getPropertyValue('font-weight').trim();
+      if (fontWeight && fontWeight !== '400' && fontWeight !== 'normal') {
+        clonedNode.setAttribute('font-weight', fontWeight);
+      }
+
+      const fontStyle = cs.getPropertyValue('font-style').trim();
+      if (fontStyle && fontStyle !== 'normal') {
+        clonedNode.setAttribute('font-style', fontStyle);
+      }
+
+      const textAnchor = cs.getPropertyValue('text-anchor').trim();
+      if (textAnchor && textAnchor !== 'start') {
+        clonedNode.setAttribute('text-anchor', textAnchor);
+      }
+
+      const dominantBaseline = cs.getPropertyValue('dominant-baseline').trim();
+      if (dominantBaseline && dominantBaseline !== 'auto') {
+        clonedNode.setAttribute('dominant-baseline', dominantBaseline);
+      }
+
+      const letterSpacing = cs.getPropertyValue('letter-spacing').trim();
+      if (letterSpacing && letterSpacing !== 'normal' && letterSpacing !== '0px') {
+        clonedNode.setAttribute('letter-spacing', letterSpacing);
+      }
+
+      const textDecoration = cs.getPropertyValue('text-decoration-line').trim();
+      if (textDecoration && textDecoration !== 'none') {
+        clonedNode.setAttribute('text-decoration', textDecoration);
+      }
+    } else {
+      // Non-text elements may still have font attributes (e.g., <g> inheriting)
+      const fontFamily = cs.getPropertyValue('font-family').trim();
+      if (fontFamily) clonedNode.setAttribute('font-family', fontFamily);
     }
-    // Remove inline style that references CSS vars or currentColor — they're now hardcoded
-    const clonedStyle = (clonedNode as HTMLElement | SVGElement).style;
-    if (clonedStyle && clonedStyle.cssText) {
-      // Keep only font-family and font-size from the inline style (needed for tspan rendering)
-      const keptStyle: string[] = [];
-      if (clonedStyle.fontFamily) keptStyle.push(`font-family:${clonedStyle.fontFamily}`);
-      if (clonedStyle.fontSize) keptStyle.push(`font-size:${clonedStyle.fontSize}`);
-      clonedStyle.cssText = keptStyle.join(';');
+
+    // ── Visibility / Display ─────────────────────────────────────────
+    const visibility = cs.getPropertyValue('visibility').trim();
+    if (visibility === 'hidden' || visibility === 'collapse') {
+      clonedNode.setAttribute('visibility', visibility);
+    }
+    const display = cs.getPropertyValue('display').trim();
+    if (display === 'none') {
+      clonedNode.setAttribute('display', 'none');
+    }
+
+    // ── Clean the clone: strip className and rewrite inline style ─────
+    clonedNode.removeAttribute('class');
+
+    // Transfer critical style properties that are SVG-only (paint-order)
+    // to attributes, then strip the inline style to avoid var(--…) / CSS leaks.
+    const srcStyle = (sourceNode as SVGElement).style;
+    const clnStyle = (clonedNode as SVGElement).style;
+    if (clnStyle && clnStyle.cssText) {
+      // Preserve paint-order, strokeWidth from inline style → attribute
+      if (srcStyle?.paintOrder) {
+        clonedNode.setAttribute('paint-order', srcStyle.paintOrder);
+      }
+      if (srcStyle?.strokeWidth) {
+        clonedNode.setAttribute('stroke-width', srcStyle.strokeWidth);
+      }
+      if (srcStyle?.strokeLinejoin) {
+        clonedNode.setAttribute('stroke-linejoin', srcStyle.strokeLinejoin);
+      }
+      if (srcStyle?.strokeLinecap) {
+        clonedNode.setAttribute('stroke-linecap', srcStyle.strokeLinecap);
+      }
+      // Clear the inline style — all values now live as presentation attributes
+      clnStyle.cssText = '';
     }
   } catch {
-    // getComputedStyle may fail for detached nodes; skip gracefully
+    // getComputedStyle may fail for detached or non-SVG nodes; skip
   }
 
-  // Recurse into children
+  // Recurse into children (source and clone share the same structure)
   const srcChildren = Array.from(sourceNode.children);
   const clnChildren = Array.from(clonedNode.children);
   const len = Math.min(srcChildren.length, clnChildren.length);
@@ -3080,14 +3177,16 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     // Embedded font CSS + hardcoded fallback class styles (belt-and-suspenders for any
     // class that wasn't removed by inlineComputedStyles due to non-SVG wrappers)
     const styleEl = document.createElementNS('http://www.w3.org/2000/svg', 'style');
+    // Only embed font-face declarations and a root color fallback.
+    // ALL visual properties (fill, stroke, paint-order, etc.) are now hardcoded
+    // as presentation attributes by inlineComputedStyles — no CSS rules needed.
+    // Class-based rules were actively harmful: they overrode inlined attributes
+    // (CSS specificity > presentation attributes) and pointed at classes the
+    // inliner strips.
     styleEl.textContent = `
       ${KATEX_EMBEDDED_FONT_CSS}
       :root, svg { color: ${strokeColor}; background-color: transparent; }
       text, tspan { font-family: 'KaTeX_Main', 'KaTeX_Math', 'KaTeX_AMS', serif; }
-      .mae-component-label { fill: ${darkPreview ? '#f1f5f9' : '#1e293b'}; stroke: none; }
-      .dmm-body { fill: ${darkPreview ? '#1e232d' : '#1e232d'}; stroke: ${darkPreview ? '#cbd5e1' : '#111827'}; }
-      .dmm-screen { fill: #edf2f7; stroke: #94a3b8; }
-      .dmm-screen-text { fill: #0f172a; }
     `;
     defs.appendChild(styleEl);
 
@@ -3295,10 +3394,6 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
       ${KATEX_EMBEDDED_FONT_CSS}
       :root, svg { color: ${strokeColor}; background-color: transparent; }
       text, tspan { font-family: 'KaTeX_Main', 'KaTeX_Math', 'KaTeX_AMS', serif; }
-      .mae-component-label { fill: ${darkPreview ? '#f1f5f9' : '#1e293b'}; stroke: none; }
-      .dmm-body { fill: ${darkPreview ? '#1e232d' : '#1e232d'}; stroke: ${darkPreview ? '#cbd5e1' : '#111827'}; }
-      .dmm-screen { fill: #edf2f7; stroke: #94a3b8; }
-      .dmm-screen-text { fill: #0f172a; }
     `;
     defs.appendChild(styleEl);
 
