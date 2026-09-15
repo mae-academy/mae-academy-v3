@@ -282,6 +282,17 @@ describe('Tab D SVG symbol language', () => {
     expect(dmm1).toContain('>DMM</tspan>');
     expect(dmm1).toContain('dy="2.5"');
     expect(dmm1).toContain('>1</tspan>');
+
+    // Library drawer preview suppresses DMM label
+    const dmmLibrary = markup('dmm', { _isLibraryThumbnail: true });
+    expect(dmmLibrary).not.toContain('mae-component-label');
+    expect(dmmLibrary).not.toContain('y="-58"');
+
+    // LCD screen is always bright (#edf2f7) with dark digits (#0f172a) in both modes
+    expect(dmm).toContain('fill="#edf2f7"');
+    expect(dmm).toContain('fill="#0f172a"');
+    expect(dmmDark).toContain('fill="#edf2f7"');
+    expect(dmmDark).toContain('fill="#0f172a"');
   });
 
   it('renders Voltmeter and Ammeter with dynamic displayValue or fallback, in upright KaTeX_Main typography', () => {

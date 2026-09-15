@@ -361,7 +361,7 @@ function ComponentPaletteIcon({ definition, colors, documented }: { definition: 
       style={{ overflow: 'visible', color: colors.text, pointerEvents: 'none' }}
     >
       <g>
-        {renderSymbol(definition.symbol, false, { ...defaultProps(definition), _documentedStyle: documented }, 0)}
+        {renderSymbol(definition.symbol, false, { ...defaultProps(definition), _documentedStyle: documented, _isLibraryThumbnail: true }, 0)}
       </g>
     </svg>
   );
@@ -2294,7 +2294,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
           if (pts.length >= 2) {
             drawnAnyTrace = true;
             ctx.strokeStyle = channelColors[idx];
-            ctx.lineWidth = 1.5;
+            ctx.lineWidth = 2.5;
             ctx.lineJoin = 'round';
             ctx.lineCap = 'round';
             ctx.beginPath();
@@ -2391,10 +2391,6 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
         });
       }
 
-      ctx.fillStyle = isDark ? '#94a3b8' : '#64748b';
-      ctx.font = 'bold 9px ui-monospace, monospace';
-      ctx.fillText((scope.label || 'OSCILLOSCOPE').toUpperCase(), 6, 12);
-
       ctx.restore();
 
       const pngData = exportCanvas.toDataURL('image/png');
@@ -2449,7 +2445,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
           );
           if (pts.length >= 2) {
             const d = pts.map((pt, i) => `${i === 0 ? 'M' : 'L'} ${pt.x.toFixed(2)} ${pt.y.toFixed(2)}`).join(' ');
-            tracePaths += `<path d="${d}" fill="none" stroke="${channelColors[idx]}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
+            tracePaths += `<path d="${d}" fill="none" stroke="${channelColors[idx]}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>`;
           }
         }
       });
@@ -2506,7 +2502,6 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
   <g class="graticule">${graticuleLines}</g>
   <g class="traces">${tracePaths}</g>
   ${badgesSvg}
-  <text x="6" y="14" fill="${isDark ? '#94a3b8' : '#64748b'}" font-size="9" font-weight="bold" font-family="ui-monospace, monospace">${escapeXml((scope.label || 'OSCILLOSCOPE').toUpperCase())}</text>
 </svg>`;
 
       const blob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
@@ -2597,31 +2592,32 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
       ctx.textAlign = 'left';
 
       // LCD screen bezel
-      ctx.fillStyle = '#041d33';
+      // LCD screen bezel - ALWAYS bright/light screen (#edf2f7) with dark digits
+      ctx.fillStyle = '#edf2f7';
       if (typeof ctx.roundRect === 'function') {
         ctx.roundRect(20, 50, 440, 160, 10);
         ctx.fill();
       } else {
         ctx.fillRect(20, 50, 440, 160);
       }
-      ctx.strokeStyle = isDark ? '#0284c7' : '#38bdf8';
+      ctx.strokeStyle = '#94a3b8';
       ctx.lineWidth = 1.5;
       ctx.stroke();
 
       // Annunciator
-      ctx.fillStyle = '#38bdf8';
+      ctx.fillStyle = '#0284c7';
       ctx.font = 'bold 12px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace';
       ctx.fillText(dmmMode.toUpperCase(), 36, 78);
 
       // Value Display
-      ctx.fillStyle = '#e0f2fe';
+      ctx.fillStyle = '#0f172a';
       ctx.font = 'bold 42px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace';
       ctx.textAlign = 'right';
       ctx.fillText(valueText, 440, 142);
       ctx.textAlign = 'left';
 
       // Subtitle
-      ctx.fillStyle = isDark ? '#0284c7' : '#7dd3fc';
+      ctx.fillStyle = '#475569';
       ctx.font = '12px sans-serif';
       ctx.fillText(statusText, 36, 185);
 
@@ -2656,10 +2652,10 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
   <rect x="0" y="0" width="480" height="240" rx="16" fill="${isDark ? '#f1f5f9' : '#1e232d'}" stroke="${isDark ? '#cbd5e1' : '#111827'}" stroke-width="2"/>
   <text x="24" y="34" fill="${isDark ? '#334155' : '#cbd5e1'}" font-family="ui-monospace, SFMono-Regular, monospace" font-size="13" font-weight="bold">${escapeXml((dmm.label || 'DIGITAL MULTIMETER').toUpperCase())}</text>
   <text x="456" y="34" text-anchor="end" fill="${isDark ? '#64748b' : '#94a3b8'}" font-family="system-ui, -apple-system, sans-serif" font-size="11">MAE ACADEMY PRECISION DMM</text>
-  <rect x="20" y="50" width="440" height="160" rx="10" fill="#041d33" stroke="${isDark ? '#0284c7' : '#38bdf8'}" stroke-width="1.5"/>
-  <text x="36" y="78" fill="#38bdf8" font-family="ui-monospace, SFMono-Regular, monospace" font-size="12" font-weight="bold">${escapeXml(dmmMode.toUpperCase())}</text>
-  <text x="440" y="142" text-anchor="end" fill="#e0f2fe" font-family="ui-monospace, SFMono-Regular, monospace" font-size="42" font-weight="bold">${escapeXml(valueText)}</text>
-  <text x="36" y="185" fill="${isDark ? '#0284c7' : '#7dd3fc'}" font-family="system-ui, -apple-system, sans-serif" font-size="12">${escapeXml(statusText)}</text>
+  <rect x="20" y="50" width="440" height="160" rx="10" fill="#edf2f7" stroke="#94a3b8" stroke-width="1.5"/>
+  <text x="36" y="78" fill="#0284c7" font-family="ui-monospace, SFMono-Regular, monospace" font-size="12" font-weight="bold">${escapeXml(dmmMode.toUpperCase())}</text>
+  <text x="440" y="142" text-anchor="end" fill="#0f172a" font-family="ui-monospace, SFMono-Regular, monospace" font-size="42" font-weight="bold">${escapeXml(valueText)}</text>
+  <text x="36" y="185" fill="#475569" font-family="system-ui, -apple-system, sans-serif" font-size="12">${escapeXml(statusText)}</text>
 </svg>`;
 
       const blob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
@@ -2828,11 +2824,11 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
         stroke: ${darkPreview ? '#cbd5e1' : '#111827'};
       }
       .dmm-screen {
-        fill: #041d33;
-        stroke: ${darkPreview ? '#0284c7' : '#38bdf8'};
+        fill: #edf2f7;
+        stroke: #94a3b8;
       }
       .dmm-screen-text {
-        fill: #38bdf8;
+        fill: #0f172a;
       }
     `;
     defs.appendChild(styleEl);
@@ -3042,15 +3038,15 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
         stroke: ${colors.canvas};
       }
       .dmm-body {
-        fill: ${darkPreview ? '#141820' : '#0d0f12'};
-        stroke: ${darkPreview ? '#3b4556' : '#262c36'};
+        fill: ${darkPreview ? '#f1f5f9' : '#1e232d'};
+        stroke: ${darkPreview ? '#cbd5e1' : '#111827'};
       }
       .dmm-screen {
-        fill: ${darkPreview ? '#041d33' : '#e0f2fe'};
-        stroke: ${darkPreview ? '#38bdf8' : '#0284c7'};
+        fill: #edf2f7;
+        stroke: #94a3b8;
       }
       .dmm-screen-text {
-        fill: ${darkPreview ? '#38bdf8' : '#0284c7'};
+        fill: #0f172a;
       }
     `;
     defs.appendChild(styleEl);

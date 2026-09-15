@@ -279,7 +279,9 @@ function drawChannelTrace(
     if (visible.length < 2) return;
 
     ctx.strokeStyle = color;
-    ctx.lineWidth = 1.4;
+    ctx.lineWidth = 2.5;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
     ctx.beginPath();
     visible.forEach((sample, index) => {
       const x = Math.min(width, (sample.time / tSpan) * width);
@@ -306,7 +308,9 @@ function drawChannelTrace(
   const visible = samples.filter(sample => sample.time >= windowStart - epsilon && sample.time <= windowEnd + epsilon);
   if (visible.length < 2) return;
   ctx.strokeStyle = color;
-  ctx.lineWidth = 1.4;
+  ctx.lineWidth = 2.5;
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
   ctx.beginPath();
   visible.forEach((sample, index) => {
     const x = ((sample.time - windowStart) / windowSeconds) * width;

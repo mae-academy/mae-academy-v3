@@ -135,10 +135,29 @@ export function ExportPreviewModal({
   onAllDownloaded,
 }: ExportPreviewModalProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [customNames, setCustomNames] = useState<Record<string, string>>({});
+
+  const getBaseName = (filename: string, itemFormat: string) => {
+    const ext = `.${itemFormat}`;
+    return filename.endsWith(ext) ? filename.slice(0, -ext.length) : filename;
+  };
+
+  const getEffectiveFilename = (item: ExportItem) => {
+    const ext = `.${item.format}`;
+    const custom = customNames[item.id];
+    if (custom !== undefined) {
+      const trimmed = custom.trim();
+      if (trimmed) {
+        return trimmed.endsWith(ext) ? trimmed : `${trimmed}${ext}`;
+      }
+    }
+    return item.filename;
+  };
 
   useEffect(() => {
     if (!isOpen) {
       setCopiedId(null);
+      setCustomNames({});
       return;
     }
 
@@ -155,6 +174,7 @@ export function ExportPreviewModal({
   if (!isOpen) return null;
 
   const handleCopy = async (item: ExportItem) => {
+    const effectiveFilename = getEffectiveFilename(item);
     try {
       if (item.format === 'png') {
         let blob = item.blob;
@@ -166,50 +186,39 @@ export function ExportPreviewModal({
           new ClipboardItem({ 'image/png': blob }),
         ]);
         setCopiedId(item.id);
-        toast.success(`Copied ${item.filename} to clipboard`);
+        toast.success(`Copied ${effectiveFilename} to clipboard`);
         setTimeout(() => setCopiedId(null), 2000);
       } else {
-        // Rich Clipboard API: Register both high-resolution fallback image/png and standard image/svg+xml
-        const svgString = item.svgString || (await (await fetch(item.dataUrl)).text());
-        const svgBlob = new Blob([svgString], { type: 'image/svg+xml' });
+        // Pure Vector SVG Copying: Write raw XML vector string as standard SVG MIME and plain text
+        const cleanSvgString = item.svgString || (await (await fetch(item.dataUrl)).text());
+        const svgBlob = new Blob([cleanSvgString], { type: 'image/svg+xml' });
         let writeSuccess = false;
 
         try {
-          const baseWidth = item.width || 800;
-          const exportScale = Math.max(4, TARGET_4K_WIDTH / baseWidth);
-          const pngBlob = await svgToPngBlob(svgString, item.width, item.height, exportScale);
+          await navigator.clipboard.write([
+            new ClipboardItem({
+              'image/svg+xml': svgBlob,
+              'text/plain': new Blob([cleanSvgString], { type: 'text/plain' }),
+            }),
+          ]);
+          writeSuccess = true;
+        } catch {
+          // Fallback to text copy if ClipboardItem image/svg+xml is unsupported
           try {
-            await navigator.clipboard.write([
-              new ClipboardItem({
-                'image/png': pngBlob,
-                'image/svg+xml': svgBlob,
-              }),
-            ]);
+            await navigator.clipboard.writeText(cleanSvgString);
             writeSuccess = true;
           } catch {
-            // Some browsers only accept image/png in ClipboardItem
-            try {
-              await navigator.clipboard.write([
-                new ClipboardItem({
-                  'image/png': pngBlob,
-                }),
-              ]);
-              writeSuccess = true;
-            } catch {
-              // Fallback to text copy
-            }
+            // Failed
           }
-        } catch {
-          // Fallback to text copy
         }
 
-        if (!writeSuccess) {
-          await navigator.clipboard.writeText(svgString);
+        if (writeSuccess) {
+          setCopiedId(item.id);
+          toast.success(`Copied ${effectiveFilename} vector to clipboard`);
+          setTimeout(() => setCopiedId(null), 2000);
+        } else {
+          toast.error('Failed to copy vector to clipboard');
         }
-
-        setCopiedId(item.id);
-        toast.success('Copied Image to Clipboard!');
-        setTimeout(() => setCopiedId(null), 2000);
       }
     } catch (err) {
       toast.error('Failed to copy to clipboard');
@@ -217,37 +226,40 @@ export function ExportPreviewModal({
   };
 
   const handleSave = (item: ExportItem) => {
+    const effectiveFilename = getEffectiveFilename(item);
     try {
       const link = document.createElement('a');
       link.href = item.dataUrl;
-      link.download = item.filename;
+      link.download = effectiveFilename;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      toast.success(`Downloaded ${item.filename}`);
-      onItemDownloaded?.(item);
+      toast.success(`Downloaded ${effectiveFilename}`);
+      onItemDownloaded?.({ ...item, filename: effectiveFilename });
     } catch (err) {
-      toast.error(`Failed to download ${item.filename}`);
+      toast.error(`Failed to download ${effectiveFilename}`);
     }
   };
 
   const handleDownloadAll = () => {
     if (items.length === 0) return;
     items.forEach((item, index) => {
+      const effectiveFilename = getEffectiveFilename(item);
       setTimeout(() => {
         const link = document.createElement('a');
         link.href = item.dataUrl;
-        link.download = item.filename;
+        link.download = effectiveFilename;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
       }, index * 250);
     });
     toast.success(`Exporting all ${items.length} files...`);
+    const updatedItems = items.map(it => ({ ...it, filename: getEffectiveFilename(it) }));
     if (onAllDownloaded) {
-      onAllDownloaded(items);
+      onAllDownloaded(updatedItems);
     } else if (onItemDownloaded) {
-      items.forEach(it => onItemDownloaded(it));
+      updatedItems.forEach(it => onItemDownloaded(it));
     }
   };
 
@@ -271,7 +283,7 @@ export function ExportPreviewModal({
                 Export Preview ({format.toUpperCase()})
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Review and download your generated schematic and instrument captures
+                Review, rename, and download your generated schematic and instrument captures
               </p>
             </div>
           </div>
@@ -295,19 +307,31 @@ export function ExportPreviewModal({
             <div className={`grid gap-5 ${items.length === 1 ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2'}`}>
               {items.map((item) => {
                 const isCopied = copiedId === item.id;
+                const baseName = getBaseName(item.filename, item.format);
+                const currentName = customNames[item.id] ?? baseName;
                 return (
                   <div
                     key={item.id}
                     className="flex flex-col bg-slate-50/60 dark:bg-[#13161c] border border-slate-200 dark:border-[#1f2530] rounded-xl p-4 transition-all duration-150 hover:border-slate-300 dark:hover:border-[#2a3240]"
                   >
-                    {/* Item Header & Filename */}
+                    {/* Item Header & Editable Filename */}
                     <div className="flex items-center justify-between mb-3 gap-2">
                       <span className="text-xs font-semibold text-slate-700 dark:text-slate-200 truncate">
                         {item.title}
                       </span>
-                      <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-200/70 dark:bg-[#1b2028] text-slate-600 dark:text-slate-300 border border-slate-300/60 dark:border-[#262c36] select-all shrink-0">
-                        {item.filename}
-                      </span>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <input
+                          type="text"
+                          value={currentName}
+                          onChange={(e) => setCustomNames(prev => ({ ...prev, [item.id]: e.target.value }))}
+                          className="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-200/70 dark:bg-[#1b2028] text-slate-700 dark:text-slate-200 border border-slate-300/60 dark:border-[#262c36] focus:border-blue-500 focus:bg-white dark:focus:bg-[#0d0f12] outline-none transition-colors w-28 sm:w-36"
+                          placeholder={baseName}
+                          title="Click to rename file"
+                        />
+                        <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400 select-none">
+                          .{item.format}
+                        </span>
+                      </div>
                     </div>
 
                     {/* Preview Box */}

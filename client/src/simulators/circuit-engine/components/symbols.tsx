@@ -1358,6 +1358,7 @@ export function renderComponentCanvasLabel(rawLabel: string, isGround = false): 
 
 const DmmSymbol: SymbolFC = ({ props }) => {
   const isDark = Boolean(props?._isDark || props?.isDark);
+  const showLabel = !props?._isLibraryThumbnail;
   const raw = String(props?.label || 'DMM');
   return (
     <g>
@@ -1373,27 +1374,29 @@ const DmmSymbol: SymbolFC = ({ props }) => {
         stroke={isDark ? '#cbd5e1' : '#111827'}
         strokeWidth={1.5}
       />
-      {/* Top Header Label - Positioned cleanly ABOVE the main SVG body with KaTeX style & halo effect */}
-      <text
-        x={0}
-        y={-58}
-        textAnchor="middle"
-        dominantBaseline="central"
-        fontSize={13}
-        className="mae-component-label fill-slate-800 dark:fill-slate-100 stroke-white dark:stroke-[#090b0e]"
-        style={{
-          fontFamily: "'KaTeX_Main', 'KaTeX_Math', serif",
-          paintOrder: 'stroke fill',
-          strokeWidth: 3.5,
-          strokeLinejoin: 'round',
-          strokeLinecap: 'round',
-        }}
-        fill={isDark ? '#f1f5f9' : '#1e293b'}
-        stroke={isDark ? '#090b0e' : '#ffffff'}
-      >
-        {renderComponentCanvasLabel(raw, false)}
-      </text>
-      {/* LCD Screen - standard CRT dark background */}
+      {/* Top Header Label - Only rendered when on active canvas (suppressed in component library sidebar) */}
+      {showLabel && (
+        <text
+          x={0}
+          y={-58}
+          textAnchor="middle"
+          dominantBaseline="central"
+          fontSize={13}
+          className="mae-component-label fill-slate-800 dark:fill-slate-100 stroke-white dark:stroke-[#090b0e]"
+          style={{
+            fontFamily: "'KaTeX_Main', 'KaTeX_Math', serif",
+            paintOrder: 'stroke fill',
+            strokeWidth: 3.5,
+            strokeLinejoin: 'round',
+            strokeLinecap: 'round',
+          }}
+          fill={isDark ? '#f1f5f9' : '#1e293b'}
+          stroke={isDark ? '#090b0e' : '#ffffff'}
+        >
+          {renderComponentCanvasLabel(raw, false)}
+        </text>
+      )}
+      {/* LCD Display Screen - ALWAYS bright/light screen (#EDF2F7) in both Light & Dark Mode */}
       <rect
         x={-25}
         y={-38}
@@ -1401,8 +1404,8 @@ const DmmSymbol: SymbolFC = ({ props }) => {
         height={22}
         rx={3}
         className="dmm-screen"
-        fill="#041d33"
-        stroke={isDark ? '#0284c7' : '#38bdf8'}
+        fill="#edf2f7"
+        stroke="#94a3b8"
         strokeWidth={1}
       />
       {/* Dial - Tinted with contrasting darker grays in dark mode */}
@@ -1428,7 +1431,7 @@ const DmmSymbol: SymbolFC = ({ props }) => {
         stroke={isDark ? '#334155' : '#000000'}
         strokeWidth={1.5}
       />
-      {/* LCD Text - Unified monospace parity */}
+      {/* LCD Text - Dark digits on bright LCD screen */}
       <text
         x={0}
         y={-27}
@@ -1437,7 +1440,7 @@ const DmmSymbol: SymbolFC = ({ props }) => {
         fontWeight={700}
         fontFamily="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
         className="dmm-screen-text"
-        fill="#38bdf8"
+        fill="#0f172a"
       >
         {String(props?.mode ?? 'DCV')}
       </text>
