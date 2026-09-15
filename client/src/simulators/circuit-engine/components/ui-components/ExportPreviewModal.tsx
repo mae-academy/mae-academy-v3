@@ -185,6 +185,14 @@ export function ExportPreviewModal({
       setCopiedId(null);
       setCustomNames({});
       setItemFormats({});
+      // Revoke any object URLs from the previous session to avoid memory leaks
+      // and clear the PNG cache so re-opening always captures fresh circuit state
+      setCachedPngUrls(prev => {
+        Object.values(prev).forEach(url => {
+          try { URL.revokeObjectURL(url); } catch { /* ignore */ }
+        });
+        return {};
+      });
       return;
     }
 

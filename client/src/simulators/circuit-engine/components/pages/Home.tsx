@@ -2992,6 +2992,9 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     // Remove all existing grid rects (we'll re-add a clean one if needed)
     clonedSvg.querySelectorAll('rect[fill^="url(#workspace-grid"]').forEach(el => el.remove());
     clonedSvg.querySelectorAll('rect[key*="grid-surface"], rect[fill*="workspace-grid"]').forEach(el => el.remove());
+    // Remove ALL existing grid pattern definitions from the cloned <defs> —
+    // they are stale clones that may not match the active grid mode.
+    clonedSvg.querySelectorAll('pattern[id^="workspace-grid"]').forEach(el => el.remove());
     // Remove wire hitboxes (wide transparent strokes used for mouse interaction)
     clonedSvg.querySelectorAll('path[stroke="transparent"]').forEach(el => el.remove());
     // Remove handle circles (wire corner drag handles, terminal hit targets)
@@ -3091,7 +3094,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     const serializer = new XMLSerializer();
     let svgString = serializer.serializeToString(clonedSvg);
     if (!svgString.startsWith('<?xml')) {
-      svgString = '<?xml version="1.0" encoding="UTF-8"?>\n' + svgString;
+      svgString = '<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n' + svgString;
     }
 
     const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
@@ -3246,6 +3249,8 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     // Remove all grid surface rects and interactive UI artifacts
     clonedSvg.querySelectorAll('rect[fill^="url(#workspace-grid"]').forEach(el => el.remove());
     clonedSvg.querySelectorAll('rect[key*="grid-surface"], rect[fill*="workspace-grid"]').forEach(el => el.remove());
+    // Remove stale grid patterns from cloned defs
+    clonedSvg.querySelectorAll('pattern[id^="workspace-grid"]').forEach(el => el.remove());
     clonedSvg.querySelectorAll('path[stroke="transparent"]').forEach(el => el.remove());
     clonedSvg.querySelectorAll('circle[style*="cursor: move"], circle[style*="cursor:move"]').forEach(el => el.remove());
     clonedSvg.querySelectorAll('circle[r="13"]').forEach(el => el.remove());
