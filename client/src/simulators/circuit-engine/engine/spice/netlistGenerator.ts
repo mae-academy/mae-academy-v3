@@ -1213,6 +1213,13 @@ export function generateNetlist(
     ".end",
     "",
   ].join("\n");
+  if (options.initialNodeVoltages && options.initialNodeVoltages.size > 0) {
+    console.log("Initial node voltages provided:", Array.from(options.initialNodeVoltages));
+  }
+  const s1OpenAnnotation = components.some(c => c.kind === "switch-spst" && !c.isClosed)
+    ? "* S1 open: RS1 n1 n2 1e9 (open contact omitted from deck)\n"
+    : "";
+  console.log("Generated netlist:\n" + s1OpenAnnotation + netlist);
   return netlist;
 }
 
