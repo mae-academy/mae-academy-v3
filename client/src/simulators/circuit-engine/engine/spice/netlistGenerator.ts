@@ -45,6 +45,28 @@ export interface GenerateNetlistOptions {
    * sources, …); `practical` (the default) keeps the real-world non-linear models.
    */
   simulationMode?: SimulationMode;
+  /**
+   * Canvas nets to seed with a starting voltage via a `.IC V(node)=value` directive, keyed by the
+   * same `SpiceNet` a caller reads back from `SpiceNodeMap`/`SpiceCircuitNets`.
+   *
+   * Every canvas edit (including releasing S1 on a self-holding contactor latch) rebuilds the
+   * whole netlist and reruns `.tran` from t=0 on a brand-new ngspice instance — spiceWorker.ts
+   * cannot reuse one across runs — so a coil held in only by its own contact (aux-NO wired back
+   * onto the coil it drives) needs its previous run's coil voltage fed forward here, or the new
+   * run's Newton iteration starts that control node's guess at 0 V and settles on the de-energized
+   * branch even though the physical armature should still be latched in.
+   *
+   * A bare `IC=` on the coil's own inductor is not a substitute and was tried and rejected: with
+   * the switch's control node left an unseeded 0 V guess, ngspice's first Newton iteration still
+   * evaluates the aux contact open regardless of the imposed inductor current, and forcing a
+   * nonzero current through what it thinks is an open branch produced a several-thousand-volt
+   * numerical spike rather than a stable latched start (verified against ngspice.wasm directly).
+   * Seeding the node voltage itself is what actually converges cleanly.
+   *
+   * Only takes effect when the emitted `.tran` also carries `uic`; a net with no emitted element
+   * (never mapped) is silently skipped, as is one that resolves to ground (`.IC` cannot set node 0).
+   */
+  initialNodeVoltages?: ReadonlyMap<SpiceNet, number>;
 }
 
 /**
@@ -1172,6 +1194,13 @@ export function generateNetlist(
   const groundTies = floatingGroundTies(elements, nodes, used);
   const analysis = options.analysis?.length ? options.analysis : [".op"];
 
+  // See GenerateNetlistOptions.initialNodeVoltages: one `.IC` line seeding every requested net's
+  // starting voltage, skipping nets this deck never actually mapped and ground itself (`.IC` cannot
+  // set node 0, and it is 0 by definition anyway).
+  const initialConditions = Array.from(options.initialNodeVoltages ?? [])
+    .filter(([net]) => nodes.isMapped(net) && nodes.nameFor(net) !== SPICE_GROUND)
+    .map(([net, voltage]) => `V(${nodes.nameFor(net)})=${voltage}`);
+
   // The first line of a SPICE deck is the title and is always discarded by the parser.
   return [
     options.title ?? "MAE Academy circuit",
@@ -1179,6 +1208,7 @@ export function generateNetlist(
     ...macroBlocks,
     ...lines,
     ...groundTies,
+    ...(initialConditions.length ? [`.IC ${initialConditions.join(" ")}`] : []),
     ...analysis,
     ".end",
     "",

@@ -104,7 +104,10 @@ export async function simulate(
   components: CircuitComponent[],
   wires: CircuitWire[],
   mode: SimulationMode,
-  analysis: string[] = DEFAULT_SETTLE_ANALYSIS
+  analysis: string[] = DEFAULT_SETTLE_ANALYSIS,
+  // Canvas nets to seed via `.IC` — mirrors Home.tsx's coilInitialVoltagesRef, for tests that
+  // reproduce the netlist-rebuild-loses-history bug across two separate `simulate()` calls.
+  initialNodeVoltages?: ReadonlyMap<string, number>
 ) {
   const nets = resolveCircuitNets(components, wires);
   const spiceComponents = convertToSpiceComponents(components, wires, nets, mode);
@@ -112,6 +115,7 @@ export async function simulate(
   const netlist = generateNetlist(spiceComponents, {
     analysis,
     simulationMode: mode,
+    initialNodeVoltages,
   });
   const { vectors, log } = await runNgspiceWithLog(netlist);
   const results = parseSpiceResults(vectors, vectors.time ?? []);

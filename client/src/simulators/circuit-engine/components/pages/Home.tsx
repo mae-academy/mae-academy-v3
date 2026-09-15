@@ -81,6 +81,10 @@ import {
   type SimulationMode,
   type SpiceCircuitNets,
 } from '@/simulators/circuit-engine/engine/spice/spiceAdapter';
+import type { SpiceNet } from '@/simulators/circuit-engine/engine/spice/spiceTypes';
+
+/** Coil-driven part types whose armature can stay latched via a contact wired back onto its own coil. */
+const COIL_DRIVEN_TYPES = ['coil', 'contactor', 'relay-spst', 'relay-spdt', 'relay-dpst'];
 import { buildSpiceNodeMap, generateNetlist, NetlistError, type SpiceNodeMap } from '@/simulators/circuit-engine/engine/spice/netlistGenerator';
 import { parseSpiceResults } from '@/simulators/circuit-engine/engine/spice/spiceParser';
 import { buildSpiceInstrumentReadings } from '@/simulators/circuit-engine/engine/spice/spiceInstruments';
@@ -2358,6 +2362,14 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
   const spiceUnsupportedToastRef = useRef<string | null>(null);
   const [spiceStatus, setSpiceStatus] = useState<SpiceBridgeStatus>({ kind: 'idle' });
   const [spiceReadingsVersion, setSpiceReadingsVersion] = useState(0);
+  // Every edit rebuilds the netlist and reruns `.tran` from t=0 on a brand-new ngspice instance
+  // (spiceWorker.ts never reuses one across runs), so a self-holding coil needs its last run's
+  // terminal voltage fed forward as the next run's `.IC` seed, or a fresh solve's Newton iteration
+  // starts that control node's guess at 0 V and settles de-energized — see
+  // GenerateNetlistOptions.initialNodeVoltages. Keyed by canvas net (stable across a state-only
+  // toggle like S1 press/release, since net identity depends only on components/wires); populated
+  // after each successful run below.
+  const coilInitialVoltagesRef = useRef<Map<SpiceNet, number>>(new Map());
 
   const clearSpiceReadings = useCallback((status: SpiceBridgeStatus) => {
     spiceReadingsRef.current = {};
@@ -2377,6 +2389,9 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
       nets = resolveCircuitNets(components, wires);
       spiceComponents = convertToSpiceComponents(components, wires, nets, simulationMode);
       const isStepMode = oscilloscopeDisplaySettings.acquisitionMode === 'step';
+      // A seeded `.IC` is inert without `uic` (ngspice otherwise recomputes its own t=0 bias and
+      // discards it) — see GenerateNetlistOptions.initialNodeVoltages.
+      const hasLatchedCoil = coilInitialVoltagesRef.current.size > 0;
       const maxScopeWindow = components
         .filter(c => c.type === 'oscilloscope')
         .reduce((max, scope) => {
@@ -2385,8 +2400,12 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
         }, 0);
       const frequency = Math.max(0.001, detectSystemFrequency(components));
       const duration = Math.min(2.0, Math.max(0.02, SPICE_TRAN_PERIODS / frequency, maxScopeWindow));
-      const analysis = [`.tran ${duration / 2000} ${duration}${isStepMode ? ' uic' : ''}`];
-      netlist = generateNetlist(spiceComponents, { analysis, simulationMode });
+      const analysis = [`.tran ${duration / 2000} ${duration}${isStepMode || hasLatchedCoil ? ' uic' : ''}`];
+      netlist = generateNetlist(spiceComponents, {
+        analysis,
+        simulationMode,
+        initialNodeVoltages: coilInitialVoltagesRef.current,
+      });
     } catch (error) {
       // An incomplete circuit (no components yet, or no ground placed) is an expected mid-edit
       // state, not a genuine incompatibility — stay quiet and idle rather than toasting on it.
@@ -2464,6 +2483,20 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     spiceReadingsRef.current = buildSpiceInstrumentReadings(context.components, context.nets, context.nodeMap, results);
     setSpiceReadingsVersion(version => version + 1);
     setSpiceStatus({ kind: 'ready' });
+
+    // Carry this run's ending coil terminal voltage into the next netlist rebuild's `.IC` seed —
+    // see coilInitialVoltagesRef's own doc comment. Every coil-driven part's own contacts (aux-NO,
+    // poles) are controlled straight off this net (see spiceAdapter.ts's coilLayout), so seeding it
+    // alone is enough to keep a self-holding latch converging to the same branch it was already on.
+    const nextCoilVoltages = new Map<SpiceNet, number>();
+    for (const component of context.components) {
+      if (!COIL_DRIVEN_TYPES.includes(component.type)) continue;
+      const posTerminal = component.type === 'coil' ? 'pos' : 'coil+';
+      const posNet = context.nets.netFor(component.id, posTerminal);
+      const posVoltages = results.nodeVoltages[context.nodeMap.nameFor(posNet)];
+      if (posVoltages && posVoltages.length > 0) nextCoilVoltages.set(posNet, posVoltages[posVoltages.length - 1]);
+    }
+    coilInitialVoltagesRef.current = nextCoilVoltages;
   }, [clearSpiceReadings, spiceEngine.error, spiceEngine.results]);
 
   // Legacy `snapshot` stays the source of truth for animation/power flow; only instrument readings
