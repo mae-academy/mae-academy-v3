@@ -62,6 +62,7 @@ import {
   type CircuitComponent,
   type CircuitWire,
   type InstrumentReading,
+  type SamplePoint,
   type Selection,
   type SimulationSnapshot,
   type WorkspaceText,
@@ -2123,6 +2124,60 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [snapshot, spiceReadingsVersion]);
 
+  function escapeXml(str: string): string {
+    return str
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&apos;');
+  }
+
+  function computeScopeTracePoints(
+    samples: SamplePoint[],
+    offset: number,
+    voltDiv: number,
+    timeDiv: number,
+    timeShift: number,
+    acquisitionMode: 'live' | 'step',
+    width: number,
+    height: number,
+  ): { x: number; y: number }[] {
+    if (samples.length < 2) return [];
+    const GRID_DIVS_X = 10;
+    const GRID_DIVS_Y = 8;
+    const pixelsPerDivY = height / GRID_DIVS_Y;
+    const centerY = height / 2;
+    const safeVoltDiv = Math.max(1e-9, voltDiv);
+
+    if (acquisitionMode === 'step') {
+      const tSpan = Math.max(1e-9, timeDiv * GRID_DIVS_X);
+      const stepSamples = samples.filter(s => s.time >= 0);
+      if (stepSamples.length < 2) return [];
+      const visible = stepSamples.filter(s => s.time <= tSpan + tSpan * 1e-6);
+      if (visible.length < 2) return [];
+      return visible.map(sample => ({
+        x: Math.min(width, (sample.time / tSpan) * width),
+        y: Math.max(0, Math.min(height, centerY - ((sample.value - offset) / safeVoltDiv) * pixelsPerDivY)),
+      }));
+    }
+
+    const requestedWindow = Math.max(1e-9, timeDiv * GRID_DIVS_X);
+    const dataStart = samples[0].time;
+    const dataEnd = samples[samples.length - 1].time;
+    const windowSeconds = Math.min(requestedWindow, Math.max(1e-9, dataEnd - dataStart));
+    const desiredEnd = dataEnd - timeShift;
+    const windowEnd = Math.max(dataStart + windowSeconds, Math.min(dataEnd, desiredEnd));
+    const windowStart = windowEnd - windowSeconds;
+    const epsilon = windowSeconds * 1e-6;
+    const visible = samples.filter(sample => sample.time >= windowStart - epsilon && sample.time <= windowEnd + epsilon);
+    if (visible.length < 2) return [];
+    return visible.map(sample => ({
+      x: ((sample.time - windowStart) / windowSeconds) * width,
+      y: Math.max(0, Math.min(height, centerY - ((sample.value - offset) / safeVoltDiv) * pixelsPerDivY)),
+    }));
+  }
+
   const captureOscilloscopeItem = useCallback((scope: CircuitComponent, format: 'png' | 'svg', index: number, total: number): Promise<ExportItem | null> => {
     const canvas = document.querySelector(`canvas[data-scope-id="${scope.id}"]`) as HTMLCanvasElement | null;
     const filename = total > 1
@@ -2131,6 +2186,8 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
 
     const isDark = oscilloscopeDisplaySettings.isDarkMode;
     const showValues = oscilloscopeDisplaySettings.showValues;
+    const channelColors = oscilloscopeDisplaySettings.channelColors || ['#38bdf8', '#fbbf24', '#34d399', '#f43f5e'];
+    const acquisitionMode = oscilloscopeDisplaySettings.acquisitionMode || 'live';
 
     const channels = ['ch1', 'ch2', 'ch3', 'ch4'] as const;
     const readings = channels.map(channel => effectiveSnapshot.instrumentReadings[`${scope.id}:${channel}`]);
@@ -2143,54 +2200,126 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     const readyIndex = readings.findIndex(r => r?.status === 'ready');
     const primaryConfig = channelConfigs[readyIndex >= 0 ? readyIndex : 0];
 
-    const width = canvas ? canvas.width : 300;
-    const height = canvas ? canvas.height : 180;
+    const baseWidth = canvas ? canvas.width : 268;
+    const baseHeight = canvas ? canvas.height : 160;
 
-    const exportCanvas = document.createElement('canvas');
-    exportCanvas.width = width;
-    exportCanvas.height = height;
-    const ctx = exportCanvas.getContext('2d');
-    if (ctx) {
+    const formatVoltageText = (v: number): string => {
+      if (Math.abs(v) < 1e-9) return '0 V';
+      const sign = v < 0 ? '-' : '+';
+      const abs = Math.abs(v);
+      if (abs < 1) {
+        const val = Number((abs * 1e3).toPrecision(3));
+        return `${sign}${val} mV`;
+      }
+      const val = Number(abs.toPrecision(3));
+      return `${sign}${val} V`;
+    };
+
+    const formatTimeText = (sec: number): string => {
+      if (Math.abs(sec) < 1e-9) return '0 s';
+      const abs = Math.abs(sec);
+      if (abs < 1e-3) {
+        const val = Number((abs * 1e6).toPrecision(3));
+        return `${val} µs`;
+      }
+      if (abs < 1) {
+        const val = Number((abs * 1e3).toPrecision(3));
+        return `${val} ms`;
+      }
+      const val = Number(abs.toPrecision(3));
+      return `${val} s`;
+    };
+
+    if (format === 'png') {
+      const TARGET_4K_WIDTH = 3840;
+      const exportScale = Math.max(4, Math.ceil(TARGET_4K_WIDTH / baseWidth));
+      const targetWidth = baseWidth * exportScale;
+      const targetHeight = baseHeight * exportScale;
+
+      const exportCanvas = document.createElement('canvas');
+      exportCanvas.width = targetWidth;
+      exportCanvas.height = targetHeight;
+      const ctx = exportCanvas.getContext('2d');
+      if (!ctx) return Promise.resolve(null);
+
+      ctx.save();
+      ctx.scale(exportScale, exportScale);
+
+      // Background
       ctx.fillStyle = isDark ? '#090a0d' : '#ffffff';
-      ctx.fillRect(0, 0, width, height);
+      ctx.fillRect(0, 0, baseWidth, baseHeight);
 
-      if (canvas) {
-        ctx.drawImage(canvas, 0, 0);
-      } else {
-        ctx.fillStyle = isDark ? '#94a3b8' : '#64748b';
-        ctx.font = '12px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(`${scope.label || 'Oscilloscope'} Screen`, width / 2, height / 2);
+      // Graticule grid
+      const gridDivsX = 10;
+      const gridDivsY = 8;
+      const stepX = baseWidth / gridDivsX;
+      const stepY = baseHeight / gridDivsY;
+      ctx.strokeStyle = isDark ? '#1a1d24' : '#e2e8f0';
+      ctx.lineWidth = 1;
+      for (let i = 1; i < gridDivsX; i++) {
+        ctx.beginPath();
+        ctx.moveTo(i * stepX, 0);
+        ctx.lineTo(i * stepX, baseHeight);
+        ctx.stroke();
+      }
+      for (let j = 1; j < gridDivsY; j++) {
+        ctx.beginPath();
+        ctx.moveTo(0, j * stepY);
+        ctx.lineTo(baseWidth, j * stepY);
+        ctx.stroke();
+      }
+      // Center crosshair
+      ctx.strokeStyle = isDark ? '#222630' : '#94a3b8';
+      ctx.beginPath();
+      ctx.moveTo(baseWidth / 2, 0);
+      ctx.lineTo(baseWidth / 2, baseHeight);
+      ctx.moveTo(0, baseHeight / 2);
+      ctx.lineTo(baseWidth, baseHeight / 2);
+      ctx.stroke();
+
+      // High-res waveform traces from live solver samples
+      let drawnAnyTrace = false;
+      readings.forEach((reading, idx) => {
+        if (reading?.status === 'ready' && reading.samples && reading.samples.length >= 2) {
+          const pts = computeScopeTracePoints(
+            reading.samples,
+            channelConfigs[idx].offset,
+            channelConfigs[idx].voltDiv,
+            channelConfigs[idx].timeDiv,
+            channelConfigs[idx].timeShift,
+            acquisitionMode,
+            baseWidth,
+            baseHeight,
+          );
+          if (pts.length >= 2) {
+            drawnAnyTrace = true;
+            ctx.strokeStyle = channelColors[idx];
+            ctx.lineWidth = 1.5;
+            ctx.lineJoin = 'round';
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            pts.forEach((pt, i) => {
+              if (i === 0) ctx.moveTo(pt.x, pt.y);
+              else ctx.lineTo(pt.x, pt.y);
+            });
+            ctx.stroke();
+          }
+        }
+      });
+
+      if (!drawnAnyTrace) {
+        if (canvas) {
+          ctx.drawImage(canvas, 0, 0, baseWidth, baseHeight);
+        } else {
+          ctx.fillStyle = isDark ? '#94a3b8' : '#64748b';
+          ctx.font = '12px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText(`${scope.label || 'Oscilloscope'} Screen`, baseWidth / 2, baseHeight / 2);
+        }
       }
 
+      // Division badges
       if (showValues) {
-        const formatVoltageText = (v: number): string => {
-          if (Math.abs(v) < 1e-9) return '0 V';
-          const sign = v < 0 ? '-' : '+';
-          const abs = Math.abs(v);
-          if (abs < 1) {
-            const val = Number((abs * 1e3).toPrecision(3));
-            return `${sign}${val} mV`;
-          }
-          const val = Number(abs.toPrecision(3));
-          return `${sign}${val} V`;
-        };
-
-        const formatTimeText = (sec: number): string => {
-          if (Math.abs(sec) < 1e-9) return '0 s';
-          const abs = Math.abs(sec);
-          if (abs < 1e-3) {
-            const val = Number((abs * 1e6).toPrecision(3));
-            return `${val} µs`;
-          }
-          if (abs < 1) {
-            const val = Number((abs * 1e3).toPrecision(3));
-            return `${val} ms`;
-          }
-          const val = Number(abs.toPrecision(3));
-          return `${val} s`;
-        };
-
         const badgeBg = isDark ? 'rgba(9, 10, 13, 0.92)' : 'rgba(255, 255, 255, 0.88)';
         const badgeBorder = isDark ? '#1a1d24' : '#cbd5e1';
         const textColor = isDark ? '#f8fafc' : '#1e293b';
@@ -2199,10 +2328,10 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
 
         const vertDivs = [
           { text: formatVoltageText(primaryConfig.offset + 4 * primaryConfig.voltDiv), y: 8 },
-          { text: formatVoltageText(primaryConfig.offset + 2 * primaryConfig.voltDiv), y: height * 0.25 },
-          { text: formatVoltageText(primaryConfig.offset + 0 * primaryConfig.voltDiv), y: height * 0.50 },
-          { text: formatVoltageText(primaryConfig.offset - 2 * primaryConfig.voltDiv), y: height * 0.75 },
-          { text: formatVoltageText(primaryConfig.offset - 4 * primaryConfig.voltDiv), y: height - 18 },
+          { text: formatVoltageText(primaryConfig.offset + 2 * primaryConfig.voltDiv), y: baseHeight * 0.25 },
+          { text: formatVoltageText(primaryConfig.offset + 0 * primaryConfig.voltDiv), y: baseHeight * 0.50 },
+          { text: formatVoltageText(primaryConfig.offset - 2 * primaryConfig.voltDiv), y: baseHeight * 0.75 },
+          { text: formatVoltageText(primaryConfig.offset - 4 * primaryConfig.voltDiv), y: baseHeight - 18 },
         ];
 
         vertDivs.forEach(({ text, y }) => {
@@ -2230,11 +2359,11 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
 
         const horizDivs = [
           { text: formatTimeText(0 * primaryConfig.timeDiv), align: 'left', x: 3 },
-          { text: formatTimeText(2 * primaryConfig.timeDiv), align: 'center', x: width * 0.20 },
-          { text: formatTimeText(4 * primaryConfig.timeDiv), align: 'center', x: width * 0.40 },
-          { text: formatTimeText(6 * primaryConfig.timeDiv), align: 'center', x: width * 0.60 },
-          { text: formatTimeText(8 * primaryConfig.timeDiv), align: 'center', x: width * 0.80 },
-          { text: formatTimeText(10 * primaryConfig.timeDiv), align: 'right', x: width - 3 },
+          { text: formatTimeText(2 * primaryConfig.timeDiv), align: 'center', x: baseWidth * 0.20 },
+          { text: formatTimeText(4 * primaryConfig.timeDiv), align: 'center', x: baseWidth * 0.40 },
+          { text: formatTimeText(6 * primaryConfig.timeDiv), align: 'center', x: baseWidth * 0.60 },
+          { text: formatTimeText(8 * primaryConfig.timeDiv), align: 'center', x: baseWidth * 0.80 },
+          { text: formatTimeText(10 * primaryConfig.timeDiv), align: 'right', x: baseWidth - 3 },
         ];
 
         horizDivs.forEach(({ text, align, x }) => {
@@ -2242,7 +2371,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
           const w = metrics.width + 6;
           const h = 12;
           const boxX = align === 'left' ? x : align === 'right' ? x - w : x - w / 2;
-          const boxY = height - h - 2;
+          const boxY = baseHeight - h - 2;
           ctx.fillStyle = badgeBg;
           ctx.strokeStyle = badgeBorder;
           ctx.lineWidth = 1;
@@ -2261,11 +2390,14 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
           ctx.textAlign = 'left';
         });
       }
-    }
 
-    const pngData = exportCanvas.toDataURL('image/png');
+      ctx.fillStyle = isDark ? '#94a3b8' : '#64748b';
+      ctx.font = 'bold 9px ui-monospace, monospace';
+      ctx.fillText((scope.label || 'OSCILLOSCOPE').toUpperCase(), 6, 12);
 
-    if (format === 'png') {
+      ctx.restore();
+
+      const pngData = exportCanvas.toDataURL('image/png');
       return new Promise<ExportItem | null>(resolve => {
         exportCanvas.toBlob(blob => {
           resolve({
@@ -2276,13 +2408,107 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
             type: 'oscilloscope',
             dataUrl: pngData,
             blob: blob || undefined,
-            width,
-            height,
+            width: targetWidth,
+            height: targetHeight,
           });
         }, 'image/png');
       });
     } else {
-      const svgStr = `<svg xmlns="http://www.w3.org/2000/svg" class="${isDark ? 'dark' : ''}" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><rect width="${width}" height="${height}" fill="none"/><image href="${pngData}" width="${width}" height="${height}"/></svg>`;
+      // Pure native vector SVG export - No raster wrapping!
+      const gridDivsX = 10;
+      const gridDivsY = 8;
+      const stepX = baseWidth / gridDivsX;
+      const stepY = baseHeight / gridDivsY;
+      const gridStroke = isDark ? '#1a1d24' : '#e2e8f0';
+      const centerStroke = isDark ? '#222630' : '#94a3b8';
+
+      let graticuleLines = '';
+      for (let i = 1; i < gridDivsX; i++) {
+        const x = (i * stepX).toFixed(2);
+        graticuleLines += `<line x1="${x}" y1="0" x2="${x}" y2="${baseHeight}" stroke="${gridStroke}" stroke-width="1" vector-effect="non-scaling-stroke"/>`;
+      }
+      for (let j = 1; j < gridDivsY; j++) {
+        const y = (j * stepY).toFixed(2);
+        graticuleLines += `<line x1="0" y1="${y}" x2="${baseWidth}" y2="${y}" stroke="${gridStroke}" stroke-width="1" vector-effect="non-scaling-stroke"/>`;
+      }
+      graticuleLines += `<line x1="${(baseWidth / 2).toFixed(2)}" y1="0" x2="${(baseWidth / 2).toFixed(2)}" y2="${baseHeight}" stroke="${centerStroke}" stroke-width="1" vector-effect="non-scaling-stroke"/>`;
+      graticuleLines += `<line x1="0" y1="${(baseHeight / 2).toFixed(2)}" x2="${baseWidth}" y2="${(baseHeight / 2).toFixed(2)}" stroke="${centerStroke}" stroke-width="1" vector-effect="non-scaling-stroke"/>`;
+
+      let tracePaths = '';
+      readings.forEach((reading, idx) => {
+        if (reading?.status === 'ready' && reading.samples && reading.samples.length >= 2) {
+          const pts = computeScopeTracePoints(
+            reading.samples,
+            channelConfigs[idx].offset,
+            channelConfigs[idx].voltDiv,
+            channelConfigs[idx].timeDiv,
+            channelConfigs[idx].timeShift,
+            acquisitionMode,
+            baseWidth,
+            baseHeight,
+          );
+          if (pts.length >= 2) {
+            const d = pts.map((pt, i) => `${i === 0 ? 'M' : 'L'} ${pt.x.toFixed(2)} ${pt.y.toFixed(2)}`).join(' ');
+            tracePaths += `<path d="${d}" fill="none" stroke="${channelColors[idx]}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
+          }
+        }
+      });
+
+      let badgesSvg = '';
+      if (showValues) {
+        const badgeBg = isDark ? 'rgba(9, 10, 13, 0.92)' : 'rgba(255, 255, 255, 0.88)';
+        const badgeBorder = isDark ? '#1a1d24' : '#cbd5e1';
+        const textColor = isDark ? '#f8fafc' : '#1e293b';
+
+        const vertDivs = [
+          { text: formatVoltageText(primaryConfig.offset + 4 * primaryConfig.voltDiv), y: 8 },
+          { text: formatVoltageText(primaryConfig.offset + 2 * primaryConfig.voltDiv), y: baseHeight * 0.25 },
+          { text: formatVoltageText(primaryConfig.offset + 0 * primaryConfig.voltDiv), y: baseHeight * 0.50 },
+          { text: formatVoltageText(primaryConfig.offset - 2 * primaryConfig.voltDiv), y: baseHeight * 0.75 },
+          { text: formatVoltageText(primaryConfig.offset - 4 * primaryConfig.voltDiv), y: baseHeight - 18 },
+        ];
+
+        vertDivs.forEach(({ text, y }) => {
+          const estimatedW = text.length * 5.5 + 6;
+          const h = 12;
+          const x = 3;
+          const top = (y - h / 2).toFixed(2);
+          badgesSvg += `<g class="v-badge"><rect x="${x}" y="${top}" width="${estimatedW}" height="${h}" rx="2" fill="${badgeBg}" stroke="${badgeBorder}" stroke-width="1" vector-effect="non-scaling-stroke"/><text x="${x + 3}" y="${(y + 3).toFixed(2)}" fill="${textColor}" font-size="8" font-family="'KaTeX_Main', ui-monospace, monospace">${escapeXml(text)}</text></g>`;
+        });
+
+        const horizDivs = [
+          { text: formatTimeText(0 * primaryConfig.timeDiv), align: 'left', x: 3 },
+          { text: formatTimeText(2 * primaryConfig.timeDiv), align: 'center', x: baseWidth * 0.20 },
+          { text: formatTimeText(4 * primaryConfig.timeDiv), align: 'center', x: baseWidth * 0.40 },
+          { text: formatTimeText(6 * primaryConfig.timeDiv), align: 'center', x: baseWidth * 0.60 },
+          { text: formatTimeText(8 * primaryConfig.timeDiv), align: 'center', x: baseWidth * 0.80 },
+          { text: formatTimeText(10 * primaryConfig.timeDiv), align: 'right', x: baseWidth - 3 },
+        ];
+
+        horizDivs.forEach(({ text, align, x }) => {
+          const estimatedW = text.length * 5.5 + 6;
+          const h = 12;
+          const boxX = align === 'left' ? x : align === 'right' ? x - estimatedW : x - estimatedW / 2;
+          const boxY = baseHeight - h - 2;
+          badgesSvg += `<g class="h-badge"><rect x="${boxX.toFixed(2)}" y="${boxY}" width="${estimatedW}" height="${h}" rx="2" fill="${badgeBg}" stroke="${badgeBorder}" stroke-width="1" vector-effect="non-scaling-stroke"/><text x="${(boxX + estimatedW / 2).toFixed(2)}" y="${boxY + 9}" text-anchor="middle" fill="${textColor}" font-size="8" font-family="'KaTeX_Main', ui-monospace, monospace">${escapeXml(text)}</text></g>`;
+        });
+      }
+
+      const svgStr = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${baseWidth} ${baseHeight}" width="100%" height="100%">
+  <defs>
+    <style>
+      ${KATEX_EMBEDDED_FONT_CSS}
+      text { font-family: 'KaTeX_Main', ui-monospace, monospace; }
+    </style>
+  </defs>
+  <rect width="${baseWidth}" height="${baseHeight}" fill="${isDark ? '#090a0d' : '#ffffff'}"/>
+  <g class="graticule">${graticuleLines}</g>
+  <g class="traces">${tracePaths}</g>
+  ${badgesSvg}
+  <text x="6" y="14" fill="${isDark ? '#94a3b8' : '#64748b'}" font-size="9" font-weight="bold" font-family="ui-monospace, monospace">${escapeXml((scope.label || 'OSCILLOSCOPE').toUpperCase())}</text>
+</svg>`;
+
       const blob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
       const dataUrl = URL.createObjectURL(blob);
       return Promise.resolve({
@@ -2294,8 +2520,8 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
         dataUrl,
         blob,
         svgString: svgStr,
-        width,
-        height,
+        width: baseWidth,
+        height: baseHeight,
       });
     }
   }, [effectiveSnapshot.instrumentReadings, oscilloscopeDisplaySettings]);
@@ -2325,70 +2551,82 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
         : 'Connect HI and COM probes';
 
     const isDark = darkPreview;
-    const canvas = document.createElement('canvas');
-    canvas.width = 480;
-    canvas.height = 240;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return Promise.resolve(null);
-
-    // Outer casing - Inverted clean off-white enclosure in Dark Mode, dark charcoal in Light Mode
-    ctx.fillStyle = isDark ? '#f1f5f9' : '#1e232d';
-    if (typeof ctx.roundRect === 'function') {
-      ctx.roundRect(0, 0, 480, 240, 16);
-      ctx.fill();
-    } else {
-      ctx.fillRect(0, 0, 480, 240);
-    }
-    ctx.strokeStyle = isDark ? '#cbd5e1' : '#111827';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    // Header
-    ctx.fillStyle = isDark ? '#334155' : '#cbd5e1';
-    ctx.font = 'bold 13px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace';
-    ctx.fillText((dmm.label || 'DIGITAL MULTIMETER').toUpperCase(), 24, 34);
-
-    ctx.fillStyle = isDark ? '#64748b' : '#94a3b8';
-    ctx.font = '11px sans-serif';
-    ctx.textAlign = 'right';
-    ctx.fillText('MAE ACADEMY PRECISION DMM', 456, 34);
-    ctx.textAlign = 'left';
-
-    // LCD screen bezel
-    ctx.fillStyle = '#041d33';
-    if (typeof ctx.roundRect === 'function') {
-      ctx.roundRect(20, 50, 440, 160, 10);
-      ctx.fill();
-    } else {
-      ctx.fillRect(20, 50, 440, 160);
-    }
-    ctx.strokeStyle = isDark ? '#0284c7' : '#38bdf8';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-
-    // Annunciator
-    ctx.fillStyle = '#38bdf8';
-    ctx.font = 'bold 12px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace';
+    const baseWidth = 480;
+    const baseHeight = 240;
     const dmmMode = (dmm.props?.mode as string) || 'AUTO RANGE';
-    ctx.fillText(dmmMode.toUpperCase(), 36, 78);
-
-    // Value Display
-    ctx.fillStyle = '#e0f2fe';
-    ctx.font = 'bold 42px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace';
-    ctx.textAlign = 'right';
-    ctx.fillText(valueText, 440, 142);
-    ctx.textAlign = 'left';
-
-    // Subtitle
-    ctx.fillStyle = isDark ? '#0284c7' : '#7dd3fc';
-    ctx.font = '12px sans-serif';
-    ctx.fillText(statusText, 36, 185);
-
     const filename = total > 1
       ? `dmm-${exportCounters.current.multimeter}-${index + 1}.${format}`
       : `dmm-${exportCounters.current.multimeter}.${format}`;
 
     if (format === 'png') {
+      const TARGET_4K_WIDTH = 3840;
+      const scale = Math.max(4, Math.round(TARGET_4K_WIDTH / baseWidth));
+      const targetWidth = baseWidth * scale;
+      const targetHeight = baseHeight * scale;
+
+      const canvas = document.createElement('canvas');
+      canvas.width = targetWidth;
+      canvas.height = targetHeight;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return Promise.resolve(null);
+
+      ctx.save();
+      ctx.scale(scale, scale);
+
+      // Outer casing - Inverted clean off-white enclosure in Dark Mode, dark charcoal in Light Mode
+      ctx.fillStyle = isDark ? '#f1f5f9' : '#1e232d';
+      if (typeof ctx.roundRect === 'function') {
+        ctx.roundRect(0, 0, baseWidth, baseHeight, 16);
+        ctx.fill();
+      } else {
+        ctx.fillRect(0, 0, baseWidth, baseHeight);
+      }
+      ctx.strokeStyle = isDark ? '#cbd5e1' : '#111827';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Header
+      ctx.fillStyle = isDark ? '#334155' : '#cbd5e1';
+      ctx.font = 'bold 13px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace';
+      ctx.fillText((dmm.label || 'DIGITAL MULTIMETER').toUpperCase(), 24, 34);
+
+      ctx.fillStyle = isDark ? '#64748b' : '#94a3b8';
+      ctx.font = '11px sans-serif';
+      ctx.textAlign = 'right';
+      ctx.fillText('MAE ACADEMY PRECISION DMM', 456, 34);
+      ctx.textAlign = 'left';
+
+      // LCD screen bezel
+      ctx.fillStyle = '#041d33';
+      if (typeof ctx.roundRect === 'function') {
+        ctx.roundRect(20, 50, 440, 160, 10);
+        ctx.fill();
+      } else {
+        ctx.fillRect(20, 50, 440, 160);
+      }
+      ctx.strokeStyle = isDark ? '#0284c7' : '#38bdf8';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      // Annunciator
+      ctx.fillStyle = '#38bdf8';
+      ctx.font = 'bold 12px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace';
+      ctx.fillText(dmmMode.toUpperCase(), 36, 78);
+
+      // Value Display
+      ctx.fillStyle = '#e0f2fe';
+      ctx.font = 'bold 42px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace';
+      ctx.textAlign = 'right';
+      ctx.fillText(valueText, 440, 142);
+      ctx.textAlign = 'left';
+
+      // Subtitle
+      ctx.fillStyle = isDark ? '#0284c7' : '#7dd3fc';
+      ctx.font = '12px sans-serif';
+      ctx.fillText(statusText, 36, 185);
+
+      ctx.restore();
+
       const dataUrl = canvas.toDataURL('image/png');
       return new Promise<ExportItem | null>(resolve => {
         canvas.toBlob(blob => {
@@ -2400,14 +2638,30 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
             type: 'multimeter',
             dataUrl,
             blob: blob || undefined,
-            width: 480,
-            height: 240,
+            width: targetWidth,
+            height: targetHeight,
           });
         }, 'image/png');
       });
     } else {
-      const pngData = canvas.toDataURL('image/png');
-      const svgStr = `<svg xmlns="http://www.w3.org/2000/svg" class="${isDark ? 'dark' : ''}" width="480" height="240" viewBox="0 0 480 240"><rect width="480" height="240" fill="none"/><image href="${pngData}" width="480" height="240"/></svg>`;
+      // Pure native vector SVG export - No raster wrapping!
+      const svgStr = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 240" width="100%" height="100%">
+  <defs>
+    <style>
+      ${KATEX_EMBEDDED_FONT_CSS}
+      text { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+    </style>
+  </defs>
+  <rect x="0" y="0" width="480" height="240" rx="16" fill="${isDark ? '#f1f5f9' : '#1e232d'}" stroke="${isDark ? '#cbd5e1' : '#111827'}" stroke-width="2"/>
+  <text x="24" y="34" fill="${isDark ? '#334155' : '#cbd5e1'}" font-family="ui-monospace, SFMono-Regular, monospace" font-size="13" font-weight="bold">${escapeXml((dmm.label || 'DIGITAL MULTIMETER').toUpperCase())}</text>
+  <text x="456" y="34" text-anchor="end" fill="${isDark ? '#64748b' : '#94a3b8'}" font-family="system-ui, -apple-system, sans-serif" font-size="11">MAE ACADEMY PRECISION DMM</text>
+  <rect x="20" y="50" width="440" height="160" rx="10" fill="#041d33" stroke="${isDark ? '#0284c7' : '#38bdf8'}" stroke-width="1.5"/>
+  <text x="36" y="78" fill="#38bdf8" font-family="ui-monospace, SFMono-Regular, monospace" font-size="12" font-weight="bold">${escapeXml(dmmMode.toUpperCase())}</text>
+  <text x="440" y="142" text-anchor="end" fill="#e0f2fe" font-family="ui-monospace, SFMono-Regular, monospace" font-size="42" font-weight="bold">${escapeXml(valueText)}</text>
+  <text x="36" y="185" fill="${isDark ? '#0284c7' : '#7dd3fc'}" font-family="system-ui, -apple-system, sans-serif" font-size="12">${escapeXml(statusText)}</text>
+</svg>`;
+
       const blob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
       const dataUrl = URL.createObjectURL(blob);
       return Promise.resolve({
@@ -2437,20 +2691,39 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
       return;
     }
 
-    const cropX = Math.round(bounds.minX - 30);
-    const cropY = Math.round(bounds.minY - 30);
-    const cropWidth = Math.round(bounds.circuitWidth + 60);
-    const cropHeight = Math.round(bounds.circuitHeight + 60);
+    const padding = 40;
+    let cropX = Math.round(bounds.minX - padding);
+    let cropY = Math.round(bounds.minY - padding);
+    let cropWidth = Math.round(bounds.circuitWidth + padding * 2);
+    let cropHeight = Math.round(bounds.circuitHeight + padding * 2);
+
+    if (svgRef.current) {
+      try {
+        const worldGroup = svgRef.current.querySelector('g[data-circuit-world]') || svgRef.current.querySelector('g');
+        const bboxTarget = (worldGroup as SVGGraphicsElement) || svgRef.current;
+        if (typeof bboxTarget.getBBox === 'function') {
+          const liveBbox = bboxTarget.getBBox();
+          if (Number.isFinite(liveBbox.x) && Number.isFinite(liveBbox.y) && liveBbox.width > 0 && liveBbox.height > 0) {
+            cropX = Math.round(liveBbox.x - padding);
+            cropY = Math.round(liveBbox.y - padding);
+            cropWidth = Math.round(liveBbox.width + padding * 2);
+            cropHeight = Math.round(liveBbox.height + padding * 2);
+          }
+        }
+      } catch {
+        // fallback to bounds
+      }
+    }
 
     const clonedSvg = svgRef.current.cloneNode(true) as SVGSVGElement;
     clonedSvg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
     clonedSvg.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
     clonedSvg.setAttribute('class', darkPreview ? 'dark' : '');
     clonedSvg.setAttribute('viewBox', `${cropX} ${cropY} ${cropWidth} ${cropHeight}`);
-    clonedSvg.setAttribute('width', String(cropWidth));
-    clonedSvg.setAttribute('height', String(cropHeight));
-    clonedSvg.style.width = `${cropWidth}px`;
-    clonedSvg.style.height = `${cropHeight}px`;
+    clonedSvg.setAttribute('width', '100%');
+    clonedSvg.setAttribute('height', '100%');
+    clonedSvg.style.width = '100%';
+    clonedSvg.style.height = '100%';
     clonedSvg.style.backgroundColor = 'transparent';
 
     const strokeColor = darkPreview ? '#f8fafc' : '#1e293b';
@@ -2615,15 +2888,34 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
       return;
     }
 
-    const cropX = Math.round(bounds.minX - 30);
-    const cropY = Math.round(bounds.minY - 30);
-    const cropWidth = Math.round(bounds.circuitWidth + 60);
-    const cropHeight = Math.round(bounds.circuitHeight + 60);
+    const padding = 40;
+    let cropX = Math.round(bounds.minX - padding);
+    let cropY = Math.round(bounds.minY - padding);
+    let cropWidth = Math.round(bounds.circuitWidth + padding * 2);
+    let cropHeight = Math.round(bounds.circuitHeight + padding * 2);
 
-    // Ultra high-definition PNG export: target 4K (3840px) resolution with minimum 4x scale
-    const targetLongEdge = 3840;
-    const maxDim = Math.max(cropWidth, cropHeight);
-    const scale = Math.min(8, Math.max(4, Math.round((targetLongEdge / maxDim) * 100) / 100));
+    if (svgRef.current) {
+      try {
+        const worldGroup = svgRef.current.querySelector('g[data-circuit-world]') || svgRef.current.querySelector('g');
+        const bboxTarget = (worldGroup as SVGGraphicsElement) || svgRef.current;
+        if (typeof bboxTarget.getBBox === 'function') {
+          const liveBbox = bboxTarget.getBBox();
+          if (Number.isFinite(liveBbox.x) && Number.isFinite(liveBbox.y) && liveBbox.width > 0 && liveBbox.height > 0) {
+            cropX = Math.round(liveBbox.x - padding);
+            cropY = Math.round(liveBbox.y - padding);
+            cropWidth = Math.round(liveBbox.width + padding * 2);
+            cropHeight = Math.round(liveBbox.height + padding * 2);
+          }
+        }
+      } catch {
+        // fallback
+      }
+    }
+
+    // Ultra high-definition PNG export: target 4K (3840px base width) with minimum 4x scale
+    const TARGET_4K_WIDTH = 3840;
+    const exportScale = Math.max(4, TARGET_4K_WIDTH / cropWidth);
+    const scale = exportScale;
 
     const canvas = document.createElement('canvas');
     canvas.width = Math.round(cropWidth * scale);

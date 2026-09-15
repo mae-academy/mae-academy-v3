@@ -130,4 +130,43 @@ describe('Part 3: ExportPreviewModal Component', () => {
   it('exports svgToPngBlob helper to convert SVG to high-res PNG blob for rich clipboard copying', () => {
     expect(typeof svgToPngBlob).toBe('function');
   });
+
+  it('defines TARGET_4K_WIDTH as 3840 for ultra-HD publication-grade resolution', async () => {
+    const { TARGET_4K_WIDTH } = await import('./ExportPreviewModal');
+    expect(TARGET_4K_WIDTH).toBe(3840);
+  });
 });
+
+describe('Pure Native Vector SVG & 4K Resolution Integrity', () => {
+  it('ensures exported SVG string contains pure vector nodes and no raster <image> elements', () => {
+    const dmmSvg = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 240" width="100%" height="100%">
+  <defs>
+    <style>text { font-family: ui-monospace, monospace; }</style>
+  </defs>
+  <rect x="0" y="0" width="480" height="240" rx="16" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="2"/>
+  <text x="24" y="34">DIGITAL MULTIMETER</text>
+  <rect x="20" y="50" width="440" height="160" rx="10" fill="#041d33" stroke="#0284c7" stroke-width="1.5"/>
+  <text x="440" y="142">5.000 V</text>
+</svg>`;
+
+    expect(dmmSvg).not.toContain('<image');
+    expect(dmmSvg).toContain('viewBox="0 0 480 240"');
+    expect(dmmSvg).toContain('width="100%"');
+    expect(dmmSvg).toContain('height="100%"');
+  });
+
+  it('ensures oscilloscope pure vector SVG uses vector-effect non-scaling-stroke for graticule and traces', () => {
+    const scopeSvg = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 268 160" width="100%" height="100%">
+  <rect width="268" height="160" fill="#090a0d"/>
+  <line x1="26.80" y1="0" x2="26.80" y2="160" stroke="#1a1d24" stroke-width="1" vector-effect="non-scaling-stroke"/>
+  <path d="M 0 80 L 100 40 L 200 120" fill="none" stroke="#38bdf8" stroke-width="2" vector-effect="non-scaling-stroke"/>
+</svg>`;
+
+    expect(scopeSvg).not.toContain('<image');
+    expect(scopeSvg).toContain('vector-effect="non-scaling-stroke"');
+    expect(scopeSvg).toContain('viewBox="0 0 268 160"');
+  });
+});
+

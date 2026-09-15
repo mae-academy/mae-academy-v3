@@ -24,32 +24,77 @@ export interface ExportPreviewModalProps {
   onAllDownloaded?: (items: ExportItem[]) => void;
 }
 
-export async function svgToPngBlob(svgString: string, explicitWidth?: number, explicitHeight?: number, scale = 2): Promise<Blob> {
+export const TARGET_4K_WIDTH = 3840;
+
+export async function svgToPngBlob(
+  svgString: string,
+  explicitWidth?: number,
+  explicitHeight?: number,
+  requestedScale?: number,
+): Promise<Blob> {
   return new Promise((resolve, reject) => {
     try {
       let width = explicitWidth;
       let height = explicitHeight;
-      if (!width || !height) {
-        if (typeof DOMParser !== 'undefined') {
-          const parser = new DOMParser();
-          const doc = parser.parseFromString(svgString, 'image/svg+xml');
-          const svgEl = doc.querySelector('svg');
-          if (svgEl) {
-            const viewBox = svgEl.getAttribute('viewBox');
-            if (viewBox) {
-              const parts = viewBox.trim().split(/[\s,]+/).map(Number);
-              if (parts.length === 4 && parts[2] > 0 && parts[3] > 0) {
-                width = parts[2];
-                height = parts[3];
-              }
+      let rasterSvgString = svgString;
+
+      if (typeof DOMParser !== 'undefined') {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(svgString, 'image/svg+xml');
+        const svgEl = doc.querySelector('svg');
+        if (svgEl) {
+          const viewBox = svgEl.getAttribute('viewBox');
+          if (viewBox) {
+            const parts = viewBox.trim().split(/[\s,]+/).map(Number);
+            if (parts.length === 4 && parts[2] > 0 && parts[3] > 0) {
+              if (!width) width = parts[2];
+              if (!height) height = parts[3];
             }
-            if (!width) width = parseFloat(svgEl.getAttribute('width') || '800') || 800;
-            if (!height) height = parseFloat(svgEl.getAttribute('height') || '600') || 600;
           }
+          if (!width) width = parseFloat(svgEl.getAttribute('width') || '800') || 800;
+          if (!height) height = parseFloat(svgEl.getAttribute('height') || '600') || 600;
+
+          const scale = requestedScale ?? Math.max(4, TARGET_4K_WIDTH / width);
+          const targetWidth = Math.round(width * scale);
+          const targetHeight = Math.round(height * scale);
+
+          svgEl.setAttribute('width', String(targetWidth));
+          svgEl.setAttribute('height', String(targetHeight));
+          rasterSvgString = new XMLSerializer().serializeToString(svgEl);
+
+          const img = new Image();
+          const svgBlob = new Blob([rasterSvgString], { type: 'image/svg+xml;charset=utf-8' });
+          const url = URL.createObjectURL(svgBlob);
+          img.onload = () => {
+            URL.revokeObjectURL(url);
+            const canvas = document.createElement('canvas');
+            canvas.width = targetWidth;
+            canvas.height = targetHeight;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+              reject(new Error('Canvas 2D context not available'));
+              return;
+            }
+            ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+            canvas.toBlob((blob) => {
+              if (blob) resolve(blob);
+              else reject(new Error('Failed to convert canvas to blob'));
+            }, 'image/png');
+          };
+          img.onerror = (e) => {
+            URL.revokeObjectURL(url);
+            reject(e);
+          };
+          img.src = url;
+          return;
         }
-        if (!width) width = 800;
-        if (!height) height = 600;
       }
+
+      const finalWidth = width || 800;
+      const finalHeight = height || 600;
+      const scale = requestedScale ?? Math.max(4, TARGET_4K_WIDTH / finalWidth);
+      const targetWidth = Math.round(finalWidth * scale);
+      const targetHeight = Math.round(finalHeight * scale);
 
       const img = new Image();
       const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
@@ -57,15 +102,14 @@ export async function svgToPngBlob(svgString: string, explicitWidth?: number, ex
       img.onload = () => {
         URL.revokeObjectURL(url);
         const canvas = document.createElement('canvas');
-        canvas.width = Math.round(width! * scale);
-        canvas.height = Math.round(height! * scale);
+        canvas.width = targetWidth;
+        canvas.height = targetHeight;
         const ctx = canvas.getContext('2d');
         if (!ctx) {
           reject(new Error('Canvas 2D context not available'));
           return;
         }
-        ctx.scale(scale, scale);
-        ctx.drawImage(img, 0, 0, width!, height!);
+        ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
         canvas.toBlob((blob) => {
           if (blob) resolve(blob);
           else reject(new Error('Failed to convert canvas to blob'));
@@ -131,7 +175,9 @@ export function ExportPreviewModal({
         let writeSuccess = false;
 
         try {
-          const pngBlob = await svgToPngBlob(svgString, item.width, item.height, 2);
+          const baseWidth = item.width || 800;
+          const exportScale = Math.max(4, TARGET_4K_WIDTH / baseWidth);
+          const pngBlob = await svgToPngBlob(svgString, item.width, item.height, exportScale);
           try {
             await navigator.clipboard.write([
               new ClipboardItem({
