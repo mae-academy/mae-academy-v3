@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { CartesianGrid, Label, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { KatexMath } from "@/components/ui/KatexMath";
 import { PowerSlider } from "./PowerSlider";
+import { PowerWarningAlert } from "./PowerWarningAlert";
 import {
   defaultRectifierParameters,
   simulateControlledRectifier,
@@ -106,7 +107,7 @@ export function RectifierStudio() {
 
   const metricsPanel = <section className={`${card} p-4`}><div><h3 className={heading}>Steady-State Metrics</h3><KatexMath math={tex`\frac{1}{T_{out}}\int_{T_{out}}(\cdot)\,dt`} className="mt-1 block text-xs text-slate-500 dark:text-slate-400" /></div><div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4"><MetricCell label={tex`V_{\mathrm{RMS}}`} value={tex`${NumberValue(metrics.voltageRms)}\,\mathrm{V}`} /><MetricCell label={tex`V_{\mathrm{DC}}`} value={tex`${NumberValue(metrics.voltageDc)}\,\mathrm{V}`} /><MetricCell label={tex`I_{\mathrm{RMS}}`} value={tex`${NumberValue(metrics.currentRms)}\,\mathrm{A}`} /><MetricCell label={tex`I_{\mathrm{DC}}`} value={tex`${NumberValue(metrics.currentDc)}\,\mathrm{A}`} /><MetricCell label={tex`P_{\mathrm{DC}}`} value={tex`${NumberValue(metrics.dcPower)}\,\mathrm{W}`} /><MetricCell label={tex`P_{\mathrm{AC}}`} value={tex`${NumberValue(metrics.acPower)}\,\mathrm{VA}`} /><MetricCell label={tex`f_{out}`} value={tex`${NumberValue(metrics.outputFrequency)}\,\mathrm{Hz}`} /><MetricCell label={tex`V_{\mathrm{ripple}}`} value={tex`${NumberValue(metrics.rippleVoltage)}\,\mathrm{V}`} /><MetricCell label={tex`\mathrm{FF}`} value={tex`${NumberValue(metrics.formFactor, 3)}`} /><MetricCell label={tex`\mathrm{RF}`} value={tex`${NumberValue(metrics.rippleFactor, 3)}`} /><MetricCell label={tex`\mathrm{PF}`} value={tex`${NumberValue(metrics.powerFactor, 3)}`} /><MetricCell label={tex`\eta`} value={tex`${NumberValue(metrics.efficiency)}\%`} /></div></section>;
 
-  return <div className="space-y-6"><div className="grid gap-6 xl:grid-cols-2"><aside className="space-y-6">{topologyPanel}{loadPanel}{metricsPanel}</aside><main className="space-y-6">{outputScope}<CircuitPlate parameters={parameters} /></main></div></div>;
+  return <div className="space-y-6"><PowerWarningAlert warnings={simulation.warnings} /><div className="grid gap-6 xl:grid-cols-2"><aside className="space-y-6">{topologyPanel}{loadPanel}{metricsPanel}</aside><main className="space-y-6">{outputScope}<CircuitPlate parameters={parameters} /></main></div></div>;
 }
 
 export default RectifierStudio;

@@ -3,6 +3,7 @@ export type RectifierType = "half" | "full";
 export type FullWaveSubtype = "bridge" | "center-tapped";
 export type RectifierLoad = "R" | "RL" | "RC" | "RLC" | "RLE";
 export type VoltageFormat = "rms" | "peak";
+export type PulseCount = 6 | 12;
 
 export type RectifierParameters = {
   phase: RectifierPhase;
@@ -18,6 +19,8 @@ export type RectifierParameters = {
   inductanceMilliHenry: number;
   capacitanceMicroFarad: number;
   backEmfVoltage: number;
+  /** Only meaningful for phase === "three" && rectifierType === "full". */
+  pulseCount: PulseCount;
 };
 
 export type RectifierSample = {
@@ -49,12 +52,16 @@ export type RectifierMetrics = {
   extinctionAngleDeg: number | null;
 };
 
+export type RectifierWarningCode = "FWD_INERT_FOR_LOAD";
+export type RectifierWarning = { code: RectifierWarningCode; message: string };
+
 export type RectifierSimulation = {
   samples: RectifierSample[];
   metrics: RectifierMetrics;
   peakVoltage: number;
   angularFrequency: number;
   period: number;
+  warnings: RectifierWarning[];
 };
 
 export const defaultRectifierParameters: RectifierParameters = {
@@ -71,6 +78,7 @@ export const defaultRectifierParameters: RectifierParameters = {
   inductanceMilliHenry: 85,
   capacitanceMicroFarad: 470,
   backEmfVoltage: 24,
+  pulseCount: 6,
 };
 
 const EPSILON = 1e-8;
@@ -122,8 +130,24 @@ function includesCapacitance(load: RectifierLoad) {
 }
 
 function outputFrequencyFor(parameters: RectifierParameters) {
-  if (parameters.phase === "three") return parameters.frequency * (parameters.rectifierType === "full" ? 6 : 3);
+  if (parameters.phase === "three") {
+    if (parameters.rectifierType === "full") return parameters.frequency * (parameters.pulseCount === 12 ? 12 : 6);
+    return parameters.frequency * 3;
+  }
   return parameters.frequency * (parameters.rectifierType === "full" ? 2 : 1);
+}
+
+/**
+ * One 6-pulse bridge, optionally fed from a secondary shifted by `secondaryShiftRad`
+ * (30° for a delta secondary vs. a wye secondary) to build a 12-pulse configuration.
+ */
+function threePhaseBridgeOutput(theta: number, peakVoltage: number, alpha: number, secondaryShiftRad: number) {
+  const shiftedTheta = theta + secondaryShiftRad;
+  const actual = phaseVoltages(shiftedTheta, peakVoltage);
+  const control = phaseVoltages(shiftedTheta - alpha, peakVoltage);
+  const upper = indexOfMaximum(control);
+  const lower = indexOfMinimum(control);
+  return actual[upper] - actual[lower];
 }
 
 /**
@@ -142,6 +166,15 @@ function selectedSourceVoltage(parameters: RectifierParameters, theta: number, p
     }
     const polarity = Math.sin(theta - alpha) >= 0 ? 1 : -1;
     return polarity * va;
+  }
+
+  if (parameters.rectifierType === "full" && parameters.pulseCount === 12) {
+    // Two series-connected 6-pulse bridges (wye + delta secondaries, 30° apart), each
+    // sized to half the peak so the combined DC level matches a single 6-pulse bridge
+    // while ripple frequency doubles. Transformer turns ratio is not modeled separately.
+    const bridgeA = threePhaseBridgeOutput(theta, peakVoltage / 2, alpha, 0);
+    const bridgeB = threePhaseBridgeOutput(theta, peakVoltage / 2, alpha, Math.PI / 6);
+    return bridgeA + bridgeB;
   }
 
   const actual = phaseVoltages(theta, peakVoltage);
@@ -190,6 +223,9 @@ export function simulateControlledRectifier(parameters: RectifierParameters): Re
   const backEmf = parameters.loadType === "RLE" ? Math.max(0, parameters.backEmfVoltage) : 0;
   const hasL = includesInductance(parameters.loadType);
   const hasC = includesCapacitance(parameters.loadType);
+  // Free-wheeling diode is only a distinct device for RL/RLE; for RLC the inductor
+  // and capacitor already govern current continuity, so the flag must be inert there.
+  const fwdEligible = parameters.loadType === "RL" || parameters.loadType === "RLE";
   const inductiveSettlingTime = hasL ? (7 * inductance) / resistance : 0;
   const capacitiveSettlingTime = hasC ? 7 * resistance * capacitance : 0;
   const settleCycles = clamp(Math.ceil(Math.max(inductiveSettlingTime, capacitiveSettlingTime) / period), MINIMUM_SETTLE_CYCLES, MAXIMUM_SETTLE_CYCLES);
@@ -208,10 +244,10 @@ export function simulateControlledRectifier(parameters: RectifierParameters): Re
     const rawSourceVoltage = selectedSourceVoltage(parameters, theta, peakVoltage, alpha);
     const currentCanContinue = inductorCurrent > EPSILON;
     const sourceCanSupply = rawSourceVoltage > EPSILON;
-    const sourceConnected = sourceCanSupply || (hasL && currentCanContinue && !parameters.freeWheelingDiode);
+    const sourceConnected = sourceCanSupply || (fwdEligible && currentCanContinue && !parameters.freeWheelingDiode);
     let appliedVoltage = sourceConnected ? rawSourceVoltage : 0;
 
-    if (hasL && parameters.freeWheelingDiode && rawSourceVoltage <= EPSILON && currentCanContinue) {
+    if (fwdEligible && parameters.freeWheelingDiode && rawSourceVoltage <= EPSILON && currentCanContinue) {
       appliedVoltage = 0;
     }
 
@@ -277,11 +313,17 @@ export function simulateControlledRectifier(parameters: RectifierParameters): Re
     ? minimumCurrent > 1e-4 ? "CCM" : "DCM"
     : "RESISTIVE";
 
+  const warnings: RectifierWarning[] = [];
+  if (parameters.freeWheelingDiode && !fwdEligible && parameters.loadType !== "R") {
+    warnings.push({ code: "FWD_INERT_FOR_LOAD", message: `Free-wheeling diode has no effect for ${parameters.loadType} loads; only RL and RLE route current through it.` });
+  }
+
   return {
     samples,
     peakVoltage,
     angularFrequency: omega,
     period,
+    warnings,
     metrics: {
       voltageRms,
       voltageDc,
@@ -293,8 +335,11 @@ export function simulateControlledRectifier(parameters: RectifierParameters): Re
       rippleVoltage: Math.sqrt(Math.max(0, voltageRms * voltageRms - voltageDc * voltageDc)),
       formFactor,
       rippleFactor,
-      efficiency: realPower > EPSILON ? 100 : 0,
-      powerFactor: apparentPower > EPSILON ? clamp(realPower / apparentPower, -1, 1) : 0,
+      // η = (V_DC/V_RMS)² = 1/FF² and PF = V_DC/V_RMS = 1/FF (spec §1.3.1): both quantify
+      // DC purity, not real/apparent output power (which is ≈1 for any resistive-type
+      // load and would mask ripple loss entirely). Half-wave R ≈ 40.5%/0.637, full-wave ≈ 81%/0.9.
+      efficiency: formFactor > EPSILON ? clamp(100 / (formFactor * formFactor), 0, 100) : 0,
+      powerFactor: formFactor > EPSILON ? clamp(1 / formFactor, 0, 1) : 0,
       conductionMode,
       extinctionAngleDeg: conductionMode === "CCM" ? null : extinctionAngleDeg,
     },

@@ -49,11 +49,15 @@ export interface AcControllerMetrics {
   controlValue: number;
 }
 
+export type AcControllerWarningCode = "POOR_POWER_FACTOR" | "CONDUCTION_FAILURE" | "BIDIRECTIONAL_ASYMMETRY";
+export interface AcControllerWarning { code: AcControllerWarningCode; message: string; }
+
 export interface AcControllerSimulation {
   period: number;
   angularFrequency: number;
   samples: AcControllerSample[];
   metrics: AcControllerMetrics;
+  warnings: AcControllerWarning[];
 }
 
 const TWO_PI = Math.PI * 2;
@@ -155,7 +159,11 @@ export function simulateAcVoltageController(parameters: AcVoltageControllerParam
   const resistance = Math.max(parameters.resistance, 0.05);
   const inductance = Math.max(parameters.inductanceMilliHenry, 0) / 1000;
   const hasInductance = parameters.loadType === "RL" && inductance > 0;
-  const alpha = clamp(parameters.firingAngle, 0, 180) * Math.PI / 180;
+  const rawFiringAngleDeg = clamp(parameters.firingAngle, 0, 180);
+  // Bidirectional (back-to-back thyristor) firing is symmetric about the half-cycle; α beyond
+  // 90° has no additional effect there and is capped rather than silently over-firing.
+  const firingAngleDeg = parameters.topology === "bidirectional" ? Math.min(rawFiringAngleDeg, 90) : rawFiringAngleDeg;
+  const alpha = firingAngleDeg * Math.PI / 180;
   const onCycles = clamp(Math.round(parameters.onCycles), 1, 12);
   const offCycles = clamp(Math.round(parameters.offCycles), 1, 12);
   const totalCycles = parameters.controlMode === "integral-cycle" ? onCycles + offCycles : 2;
@@ -167,6 +175,11 @@ export function simulateAcVoltageController(parameters: AcVoltageControllerParam
   let current = 0;
   let conduction = false;
   let lastExtinctionAngle = hasInductance ? solveExtinctionAngle(alpha, resistance, inductance, omega) : Math.PI;
+  // Threshold-crossing state for firing detection (see below): a fixed-width sample
+  // window around `alpha` can be skipped entirely by floating-point rounding once
+  // `thetaAbsolute` grows across many periods, silently dropping a firing pulse.
+  let previousLocalHalfAngle = 0;
+  let previousGlobalHalfIndex = -1;
 
   for (let step = 0; step <= totalSteps; step += 1) {
     const time = step * dt;
@@ -176,12 +189,16 @@ export function simulateAcVoltageController(parameters: AcVoltageControllerParam
     const phaseAngles = [theta, wrap(theta - TWO_PI / 3, TWO_PI), wrap(theta + TWO_PI / 3, TWO_PI)];
     const sourcePhases = phaseAngles.map((phaseAngle) => inputPeak * Math.sin(phaseAngle));
     const sourceVoltage = sourcePhases[0];
-    const halfCycle = Math.floor(theta / Math.PI);
-    const halfStart = halfCycle * Math.PI;
-    const localHalfAngle = theta - halfStart;
-    const signedHalf = halfCycle % 2 === 0 ? 1 : -1;
+    // Monotonic half-cycle index (unlike floor(theta/π), which wraps every period) so a new
+    // half can be detected unambiguously and the firing check below is a true edge-crossing
+    // test rather than a fragile one-sample bracket around alpha.
+    const globalHalfIndex = Math.floor(thetaAbsolute / Math.PI);
+    const localHalfAngle = thetaAbsolute - globalHalfIndex * Math.PI;
+    const signedHalf = globalHalfIndex % 2 === 0 ? 1 : -1;
+    const isNewHalf = globalHalfIndex !== previousGlobalHalfIndex;
     const enabled = parameters.controlMode === "integral-cycle" ? integralCycleEnabled(cycle, onCycles, offCycles) : true;
-    const firingNow = parameters.controlMode === "phase-angle" && enabled && localHalfAngle >= alpha && localHalfAngle < alpha + omega * dt;
+    const crossedFiringAngle = isNewHalf ? alpha <= 1e-9 : previousLocalHalfAngle < alpha && localHalfAngle >= alpha;
+    const firingNow = parameters.controlMode === "phase-angle" && enabled && crossedFiringAngle;
     const positiveHalfAllowed = signedHalf > 0 || parameters.topology === "bidirectional";
     const gatePulse = firingNow && positiveHalfAllowed ? signedHalf * inputPeak * 0.12 : 0;
     const threePhaseOutputs = phaseAngles.map((phaseAngle, index) => {
@@ -238,6 +255,8 @@ export function simulateAcVoltageController(parameters: AcVoltageControllerParam
     }
 
     if (step >= captureStart) samples.push({ time: (step - captureStart) * dt, sourceVoltage, outputVoltage, phaseAOutput: parameters.phase === "three" ? threePhaseOutputs[0] : outputVoltage, phaseBOutput: parameters.phase === "three" ? threePhaseOutputs[1] : 0, phaseCOutput: parameters.phase === "three" ? threePhaseOutputs[2] : 0, outputCurrent: current, thyristorVoltage: sourceVoltage - outputVoltage, gatePulse, conducting: conduction });
+    previousLocalHalfAngle = localHalfAngle;
+    previousGlobalHalfIndex = globalHalfIndex;
   }
 
   const analysis = samples.slice(-Math.min(samples.length, parameters.controlMode === "integral-cycle" ? totalCycles * SAMPLES_PER_PERIOD : SAMPLES_PER_PERIOD));
@@ -254,6 +273,22 @@ export function simulateAcVoltageController(parameters: AcVoltageControllerParam
   const betaRadians = hasInductance ? lastExtinctionAngle : Math.PI;
   const betaDegrees = clamp(betaRadians * 180 / Math.PI, 0, 360);
   const alphaDegrees = alpha * 180 / Math.PI;
+  const powerFactor = apparentPower > 1e-9 ? clamp(activePower / apparentPower, -1, 1) : 0;
+
+  const warnings: AcControllerWarning[] = [];
+  if (parameters.topology === "bidirectional" && rawFiringAngleDeg > 90) {
+    warnings.push({ code: "BIDIRECTIONAL_ASYMMETRY", message: `Firing angle ${rawFiringAngleDeg.toFixed(0)}° exceeds 90° for bidirectional operation; capped to 90° to preserve half-cycle symmetry.` });
+  }
+  if (parameters.loadType === "RL" && hasInductance) {
+    const phiDeg = Math.atan2(omega * inductance, resistance) * 180 / Math.PI;
+    if (firingAngleDeg + phiDeg > 180) {
+      warnings.push({ code: "CONDUCTION_FAILURE", message: `Firing angle ${firingAngleDeg.toFixed(0)}° plus load phase angle ${phiDeg.toFixed(0)}° exceeds 180°; the thyristor cannot conduct and output collapses toward zero.` });
+    }
+  }
+  if (apparentPower > 1e-6 && Math.abs(powerFactor) < 0.5) {
+    warnings.push({ code: "POOR_POWER_FACTOR", message: `Power factor ${powerFactor.toFixed(2)} is below 0.5; heavy phase-control degrades utility-side power factor at this firing angle.` });
+  }
+
   return {
     period,
     angularFrequency: omega,
@@ -263,7 +298,7 @@ export function simulateAcVoltageController(parameters: AcVoltageControllerParam
       outputCurrentRms,
       activePower,
       apparentPower,
-      powerFactor: apparentPower > 1e-9 ? clamp(activePower / apparentPower, -1, 1) : 0,
+      powerFactor,
       firingAngle: alphaDegrees,
       extinctionAngle: betaDegrees,
       conductionAngle: Math.max(0, betaDegrees - alphaDegrees),
@@ -272,5 +307,6 @@ export function simulateAcVoltageController(parameters: AcVoltageControllerParam
       sourceVoltageRms: sourceRms,
       controlValue: parameters.controlMode === "integral-cycle" ? onCycles / (onCycles + offCycles) : 0,
     },
+    warnings,
   };
 }

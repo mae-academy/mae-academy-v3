@@ -137,6 +137,33 @@ describe('Part 3: ExportPreviewModal Component', () => {
     const { TARGET_4K_WIDTH } = await import('./ExportPreviewModal');
     expect(TARGET_4K_WIDTH).toBe(3840);
   });
+
+  it('renders PNG and SVG format toggle buttons for preview items and global controls', () => {
+    const testItems: ExportItem[] = [
+      {
+        id: 'circuit-main',
+        title: 'Circuit Schematic',
+        filename: 'circuit-1.png',
+        format: 'png',
+        dataUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+        width: 800,
+        height: 600,
+      },
+    ];
+
+    const markup = renderToStaticMarkup(
+      <ExportPreviewModal
+        isOpen={true}
+        onClose={() => {}}
+        items={testItems}
+        format="png"
+      />
+    );
+
+    // Should render toggle buttons for both PNG and SVG
+    expect(markup).toContain('>PNG</button>');
+    expect(markup).toContain('>SVG</button>');
+  });
 });
 
 describe('Pure Native Vector SVG & 4K Resolution Integrity', () => {

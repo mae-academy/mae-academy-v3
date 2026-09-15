@@ -20,6 +20,10 @@ export interface CircuitWire {
   fromTerm: string;
   toComp: string;
   toTerm: string;
+  sourceComponentId?: string;
+  sourcePinId?: string;
+  targetComponentId?: string;
+  targetPinId?: string;
   path: Point[];
   waypoints?: Point[];
   routing: WireRouting;

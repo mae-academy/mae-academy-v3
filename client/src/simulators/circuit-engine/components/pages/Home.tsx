@@ -28,12 +28,14 @@ import {
   RotateCw,
   Scissors,
   Search,
+  Share2,
   Trash2,
   Type,
   Undo2,
   Redo2,
   Upload,
   Zap,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { nanoid } from 'nanoid';
 import { toast } from 'sonner';
@@ -43,7 +45,8 @@ import { AnalysisBox } from '@/simulators/circuit-engine/components/ui-component
 import { OscilloscopeTracePanel } from '@/simulators/circuit-engine/components/ui-components/OscilloscopeTracePanel';
 import { OscilloscopeComponentPanel } from '@/simulators/circuit-engine/components/inspector-panels/OscilloscopeComponentPanel';
 import { useOscilloscopeDisplaySettings, type OscilloscopeDisplaySettings } from '@/simulators/circuit-engine/components/ui-components/oscilloscopeDisplaySettings';
-import { ExportPreviewModal, type ExportItem } from '@/simulators/circuit-engine/components/ui-components/ExportPreviewModal';
+import { ExportPreviewModal, svgToPngBlob, type ExportItem } from '@/simulators/circuit-engine/components/ui-components/ExportPreviewModal';
+import { ShareProjectModal } from '@/simulators/circuit-engine/components/ui-components/ShareProjectModal';
 import type { AnalysisTrace, MeshCycle, NodalNodeLabel } from '@/simulators/circuit-engine/models/analysisTypes';
 import {
   CATEGORIES,
@@ -73,7 +76,15 @@ import { compileNodalGeometry, useSimulation, type TabBMnaState } from '@/simula
 import type { MNAElement } from '@/simulators/circuit-engine/engine/mnaSolver';
 import { compileMeshGeometry } from '@/simulators/circuit-engine/components/meshGeometry';
 import { NormalizedCircuitGraph } from '@/simulators/circuit-engine/models/NormalizedCircuitGraph';
-import { createNadDocument, parseNad, serializeNad } from '@/simulators/circuit-engine/models/nadFormat';
+import {
+  createNadDocument,
+  parseNad,
+  serializeNad,
+  normalizeWire,
+  compressProjectState,
+  decompressProjectState,
+  type NADDocument,
+} from '@/simulators/circuit-engine/models/nadFormat';
 import { useSpiceEngine } from '@/simulators/circuit-engine/components/hooks/useSpiceEngine';
 import {
   convertToSpiceComponents,
@@ -879,6 +890,8 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const [exportItems, setExportItems] = useState<ExportItem[]>([]);
   const [exportFormat, setExportFormat] = useState<'png' | 'svg'>('png');
+  const [shareModalOpen, setShareModalOpen] = useState(false);
+  const [shareUrl, setShareUrl] = useState('');
 
   // Safe Exit / Refresh Warning (BeforeUnload)
   useEffect(() => {
@@ -1021,6 +1034,49 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
       return { ...wire, path: reconnectPathEndpoints(wire.path, endpoints.from, endpoints.to, wire.routing, [], wire.waypoints, gridSize, endpoints.fromAxis) };
     });
   }, [canvasWireEndpoints, tabDUiRefinement, gridSize, dragState]);
+
+  const recalculateAllOrthogonalPaths = useCallback((
+    documentWires: CircuitWire[],
+    documentComponents: CircuitComponent[],
+  ): CircuitWire[] => {
+    return documentWires.map(wire => {
+      const endpoints = canvasWireEndpoints(wire, documentComponents);
+      if (!endpoints) return wire;
+
+      if (wire.routing === 'manual' || (wire.waypoints && wire.waypoints.length > 0)) {
+        const updatedPath = reconnectPathEndpoints(
+          wire.path,
+          endpoints.from,
+          endpoints.to,
+          wire.routing,
+          [],
+          wire.waypoints,
+          gridSize,
+          endpoints.fromAxis,
+        );
+        return {
+          ...wire,
+          path: updatedPath,
+          waypoints: updatedPath.length > 2 ? updatedPath.slice(1, -1) : wire.waypoints,
+        };
+      }
+
+      const excludeIds = new Set([wire.fromComp, wire.toComp]);
+      const newPath = calculateOrthogonalPath(
+        endpoints.from,
+        endpoints.to,
+        documentComponents,
+        gridSize,
+        excludeIds,
+      );
+      return {
+        ...wire,
+        routing: 'orthogonal' as const,
+        path: newPath,
+        waypoints: newPath.length > 2 ? newPath.slice(1, -1) : undefined,
+      };
+    });
+  }, [canvasWireEndpoints, gridSize]);
 
   const findTerminalAt = useCallback((point: Point): { componentId: string; terminalId: string; position: Point; axis: TabDTerminalAxis } | null => {
     for (const component of [...componentRef.current].reverse()) {
@@ -1258,31 +1314,114 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     toast.success('NAD circuit exported');
   }, [components, gridVisible, pan, snapEnabled, texts, wires, zoom]);
 
+  const loadCircuitDocument = useCallback((document: NADDocument) => {
+    const importedComponents = tabDUiRefinement ? filterTabDImportedComponents(document.components) : document.components;
+    const importedIds = new Set(importedComponents.map((component) => component.id));
+    const importedWires = document.wires
+      .map(normalizeWire)
+      .filter((wire) => importedIds.has(wire.fromComp) && importedIds.has(wire.toComp));
+    const refreshedWires = recalculateAllOrthogonalPaths(importedWires, importedComponents);
+
+    setComponents(importedComponents);
+    setWires(refreshedWires);
+    setTexts(document.texts || []);
+    history.reset(cloneSnapshot({
+      components: importedComponents,
+      wires: refreshedWires,
+      texts: document.texts || [],
+    }));
+    setPan(document.viewport.pan);
+    setZoom(document.viewport.zoom);
+    setGridVisible(document.workspace.gridVisible);
+    setSnapEnabled(document.workspace.snapEnabled);
+    setSelection(null);
+    setMarqueeIds([]);
+    setWiring({});
+    setDragState(null);
+
+    // Re-snap all wires to exact live pin locations after layout settles
+    requestAnimationFrame(() => {
+      setWires(prevWires => recalculateAllOrthogonalPaths(prevWires, importedComponents));
+    });
+    setTimeout(() => {
+      setWires(prevWires => recalculateAllOrthogonalPaths(prevWires, importedComponents));
+    }, 60);
+
+    return { importedComponents, importedWires: refreshedWires };
+  }, [history, recalculateAllOrthogonalPaths, tabDUiRefinement]);
+
   const importNad = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = '';
     if (!file) return;
     try {
       const document = parseNad(await file.text());
-      const importedComponents = tabDUiRefinement ? filterTabDImportedComponents(document.components) : document.components;
-      const importedIds = new Set(importedComponents.map((component) => component.id));
-      const importedWires = document.wires.filter((wire) => importedIds.has(wire.fromComp) && importedIds.has(wire.toComp));
-      const refreshedWires = refreshWireEndpoints(importedWires, importedComponents);
-      setComponents(importedComponents);
-      setWires(refreshedWires);
-      setTexts(document.texts);
-      history.reset(cloneSnapshot({
-        components: importedComponents,
-        wires: refreshedWires,
-        texts: document.texts,
-      }));
-      setPan(document.viewport.pan); setZoom(document.viewport.zoom);
-      setGridVisible(document.workspace.gridVisible); setSnapEnabled(document.workspace.snapEnabled);
-      setSelection(null); setMarqueeIds([]); setWiring({}); setDragState(null);
+      const { importedComponents } = loadCircuitDocument(document);
       const excludedCount = document.components.length - importedComponents.length;
       toast.success(`NAD circuit imported (${importedComponents.length} components)${excludedCount ? `; ${excludedCount} unavailable component${excludedCount === 1 ? '' : 's'} omitted` : ''}`);
     } catch (error) { toast.error(error instanceof Error ? error.message : 'Unable to import NAD file.'); }
-  }, [history, tabDUiRefinement]);
+  }, [loadCircuitDocument]);
+
+  // Deep-Link Project Loading on Mount (?project=...)
+  useEffect(() => {
+    try {
+      const searchParams = new URLSearchParams(window.location.search);
+      const projectParam = searchParams.get('project');
+      if (projectParam) {
+        const document = decompressProjectState(projectParam);
+        if (document && document.components) {
+          const { importedComponents } = loadCircuitDocument(document);
+          toast.success(`Loaded shared project (${importedComponents.length} components)`);
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to parse shared project from URL:', err);
+    }
+  }, [loadCircuitDocument]);
+
+  const handleShareProject = useCallback(async () => {
+    if (components.length === 0 && texts.length === 0 && wires.length === 0) {
+      toast.error('No circuit elements to share');
+      return;
+    }
+
+    const document = createNadDocument({
+      components,
+      wires,
+      texts,
+      viewport: { pan, zoom },
+      workspace: { gridVisible, snapEnabled },
+    });
+
+    const compressed = compressProjectState(document);
+    const url = new URL(window.location.href);
+    url.searchParams.set('project', compressed);
+    const finalUrl = url.toString();
+
+    // Update browser URL
+    window.history.replaceState({}, '', finalUrl);
+    setShareUrl(finalUrl);
+
+    // Try native Web Share API
+    if (typeof navigator !== 'undefined' && navigator.share && typeof navigator.share === 'function') {
+      try {
+        await navigator.share({
+          title: 'MAE Academy - Circuit Simulation',
+          text: 'Check out this circuit design!',
+          url: finalUrl,
+        });
+        toast.success('Project link shared!');
+        return;
+      } catch (err) {
+        if ((err as Error).name === 'AbortError') {
+          return;
+        }
+      }
+    }
+
+    // Fallback: open internal ShareProjectModal
+    setShareModalOpen(true);
+  }, [components, gridVisible, pan, snapEnabled, texts, wires, zoom]);
 
   const getCircuitBoundingBox = useCallback(() => {
     let minX = Infinity;
@@ -2498,7 +2637,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
       text { font-family: 'KaTeX_Main', ui-monospace, monospace; }
     </style>
   </defs>
-  <rect width="${baseWidth}" height="${baseHeight}" fill="${isDark ? '#090a0d' : '#ffffff'}"/>
+  <rect width="${baseWidth}" height="${baseHeight}" fill="none"/>
   <g class="graticule">${graticuleLines}</g>
   <g class="traces">${tracePaths}</g>
   ${badgesSvg}
@@ -2871,6 +3010,8 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     setExportFormat('svg');
     setExportModalOpen(true);
   }, [captureDmmItem, captureOscilloscopeItem, colors.canvas, components, darkPreview, effectiveSnapshot.instrumentReadings, getCircuitBoundingBox, gridVisible, tabDGridMode, tabDUiRefinement, texts, wires.length]);
+
+  const handleOpenSaveImage = exportSvg;
 
   const exportPng = useCallback(() => {
     if (components.length === 0 && texts.length === 0 && wires.length === 0) {
@@ -3344,10 +3485,11 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
           </div>
           <div className="flex flex-nowrap items-center gap-1.5 border-t px-2 py-2" style={{ borderColor: colors.line, minHeight: 36 }}>
             <ToolbarButton colors={colors} icon={<Download size={14} />} label="Export" title="Export circuit as NAD netlist" onClick={exportNad} />
-            <ToolbarButton colors={colors} icon={<FileImage size={14} />} label="PNG" title="Export as PNG image" onClick={exportPng} />
-            <ToolbarButton colors={colors} icon={<FileCode size={14} />} label="SVG" title="Export as vector SVG" onClick={exportSvg} />
             <ToolbarButton colors={colors} icon={<Upload size={14} />} label="Import" title="Import circuit from NAD netlist" onClick={() => nadInputRef.current?.click()} />
             <input ref={nadInputRef} type="file" accept=".nad,application/x-mae-nad+json,application/json" onChange={importNad} style={{ display: 'none' }} />
+            <ToolbarDivider colors={colors} />
+            <ToolbarButton colors={colors} icon={<ImageIcon size={14} />} label="Save Image" title="Save circuit as image (PNG or SVG)" onClick={handleOpenSaveImage} />
+            <ToolbarButton colors={colors} icon={<Share2 size={14} />} label="Share Project" title="Share circuit via Web Share API or deep link" onClick={handleShareProject} />
             <ToolbarDivider colors={colors} />
             <button onClick={() => { hasStartedSimulation.current = true; setSimulationRunning(value => !value); }} title={simulationRunning ? 'Pause simulation' : 'Run simulation'} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: (!simulationRunning && hasStartedSimulation.current) ? TAB_GRADIENT_REV : TAB_GRADIENT, color: '#ffffff', fontWeight: 500, padding: '6px 14px', minHeight: 30, borderRadius: 8, fontSize: 12, boxShadow: TAB_ACTIVE_SHADOW, border: '1px solid transparent', cursor: 'pointer', whiteSpace: 'nowrap', transition: 'background .3s ease' }}>
               {simulationRunning ? <Pause size={14} /> : <Play size={14} />}{simulationRunning ? 'Pause' : 'Run'}
@@ -3840,14 +3982,23 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
         };
 
         return (
-          <ExportPreviewModal
-            isOpen={exportModalOpen}
-            onClose={() => setExportModalOpen(false)}
-            items={exportItems}
-            format={exportFormat}
-            onItemDownloaded={handleItemDownloaded}
-            onAllDownloaded={handleAllDownloaded}
-          />
+          <>
+            <ExportPreviewModal
+              isOpen={exportModalOpen}
+              onClose={() => setExportModalOpen(false)}
+              items={exportItems}
+              format={exportFormat}
+              onItemDownloaded={handleItemDownloaded}
+              onAllDownloaded={handleAllDownloaded}
+            />
+            <ShareProjectModal
+              isOpen={shareModalOpen}
+              onClose={() => setShareModalOpen(false)}
+              shareUrl={shareUrl}
+              componentCount={components.length}
+              wireCount={wires.length}
+            />
+          </>
         );
       })()}
     </div>

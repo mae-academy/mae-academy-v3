@@ -19,7 +19,7 @@ export interface ExportPreviewModalProps {
   isOpen: boolean;
   onClose: () => void;
   items: ExportItem[];
-  format: 'png' | 'svg';
+  format?: 'png' | 'svg';
   onItemDownloaded?: (item: ExportItem) => void;
   onAllDownloaded?: (items: ExportItem[]) => void;
 }
@@ -120,8 +120,8 @@ export async function svgToPngBlob(
         reject(e);
       };
       img.src = url;
-    } catch (e) {
-      reject(e);
+    } catch (err) {
+      reject(err);
     }
   });
 }
@@ -130,34 +130,61 @@ export function ExportPreviewModal({
   isOpen,
   onClose,
   items,
-  format,
+  format: initialFormat = 'png',
   onItemDownloaded,
   onAllDownloaded,
 }: ExportPreviewModalProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [customNames, setCustomNames] = useState<Record<string, string>>({});
+  const [itemFormats, setItemFormats] = useState<Record<string, 'png' | 'svg'>>({});
+  const [globalFormat, setGlobalFormat] = useState<'png' | 'svg'>(initialFormat);
+  const [cachedPngUrls, setCachedPngUrls] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    setGlobalFormat(initialFormat);
+  }, [initialFormat]);
+
+  const getItemFormat = (item: ExportItem): 'png' | 'svg' => {
+    return itemFormats[item.id] ?? globalFormat;
+  };
 
   const getBaseName = (filename: string, itemFormat: string) => {
     const ext = `.${itemFormat}`;
+    if (filename.endsWith('.png')) return filename.slice(0, -4);
+    if (filename.endsWith('.svg')) return filename.slice(0, -4);
     return filename.endsWith(ext) ? filename.slice(0, -ext.length) : filename;
   };
 
-  const getEffectiveFilename = (item: ExportItem) => {
-    const ext = `.${item.format}`;
+  const getEffectiveFilename = (item: ExportItem, activeFormat: 'png' | 'svg') => {
+    const base = getBaseName(item.filename, item.format);
     const custom = customNames[item.id];
-    if (custom !== undefined) {
-      const trimmed = custom.trim();
-      if (trimmed) {
-        return trimmed.endsWith(ext) ? trimmed : `${trimmed}${ext}`;
-      }
-    }
-    return item.filename;
+    const rawName = (custom !== undefined && custom.trim().length > 0) ? custom.trim() : base;
+    const cleanBase = rawName.endsWith('.png') ? rawName.slice(0, -4) : rawName.endsWith('.svg') ? rawName.slice(0, -4) : rawName;
+    return `${cleanBase}.${activeFormat}`;
   };
+
+  // Convert SVG to PNG on-demand if user toggles to PNG
+  useEffect(() => {
+    if (!isOpen) return;
+    items.forEach(async (item) => {
+      const activeFormat = getItemFormat(item);
+      if (activeFormat === 'png' && item.format === 'svg' && item.svgString && !cachedPngUrls[item.id]) {
+        try {
+          const blob = await svgToPngBlob(item.svgString, item.width, item.height);
+          const url = URL.createObjectURL(blob);
+          setCachedPngUrls(prev => ({ ...prev, [item.id]: url }));
+        } catch {
+          // ignore
+        }
+      }
+    });
+  }, [isOpen, items, itemFormats, globalFormat, cachedPngUrls]);
 
   useEffect(() => {
     if (!isOpen) {
       setCopiedId(null);
       setCustomNames({});
+      setItemFormats({});
       return;
     }
 
@@ -173,37 +200,72 @@ export function ExportPreviewModal({
 
   if (!isOpen) return null;
 
+  const handleToggleGlobalFormat = (newFormat: 'png' | 'svg') => {
+    setGlobalFormat(newFormat);
+    const updated: Record<string, 'png' | 'svg'> = {};
+    items.forEach(it => {
+      updated[it.id] = newFormat;
+    });
+    setItemFormats(updated);
+  };
+
+  const handleToggleItemFormat = (itemId: string, newFormat: 'png' | 'svg') => {
+    setItemFormats(prev => ({ ...prev, [itemId]: newFormat }));
+  };
+
   const handleCopy = async (item: ExportItem) => {
-    const effectiveFilename = getEffectiveFilename(item);
+    const activeFormat = getItemFormat(item);
+    const effectiveFilename = getEffectiveFilename(item, activeFormat);
     try {
-      if (item.format === 'png') {
+      if (activeFormat === 'png') {
         let blob = item.blob;
-        if (!blob) {
-          const res = await fetch(item.dataUrl);
+        if (item.format === 'svg' && item.svgString) {
+          blob = await svgToPngBlob(item.svgString, item.width, item.height);
+        } else if (!blob && (cachedPngUrls[item.id] || item.dataUrl)) {
+          const res = await fetch(cachedPngUrls[item.id] || item.dataUrl);
           blob = await res.blob();
         }
-        await navigator.clipboard.write([
-          new ClipboardItem({ 'image/png': blob }),
-        ]);
-        setCopiedId(item.id);
-        toast.success(`Copied ${effectiveFilename} to clipboard`);
-        setTimeout(() => setCopiedId(null), 2000);
-      } else {
-        // Pure Vector SVG Copying: Write raw XML vector string as standard SVG MIME and plain text
-        const cleanSvgString = item.svgString || (await (await fetch(item.dataUrl)).text());
-        const svgBlob = new Blob([cleanSvgString], { type: 'image/svg+xml' });
-        let writeSuccess = false;
+        if (blob) {
+          await navigator.clipboard.write([
+            new ClipboardItem({ 'image/png': blob }),
+          ]);
+          setCopiedId(item.id);
+          toast.success(`Copied ${effectiveFilename} image to clipboard`);
+          setTimeout(() => setCopiedId(null), 2000);
+          return;
+        }
+      }
 
+      // Vector SVG Copying with MS Word / PowerPoint text/html compatibility wrapper
+      const cleanSvgString = item.svgString || (await (await fetch(item.dataUrl)).text());
+      const base64Svg = btoa(unescape(encodeURIComponent(cleanSvgString)));
+      const htmlWrapper = `<img src="data:image/svg+xml;base64,${base64Svg}" />`;
+      const svgBlob = new Blob([cleanSvgString], { type: 'image/svg+xml' });
+
+      let writeSuccess = false;
+
+      // Try rich clipboard write: text/html (Word/PowerPoint), image/svg+xml (vector apps), text/plain
+      try {
+        await navigator.clipboard.write([
+          new ClipboardItem({
+            'text/html': new Blob([htmlWrapper], { type: 'text/html' }),
+            'image/svg+xml': svgBlob,
+            'text/plain': new Blob([cleanSvgString], { type: 'text/plain' }),
+          }),
+        ]);
+        writeSuccess = true;
+      } catch {
+        // Fallback without image/svg+xml representation
         try {
           await navigator.clipboard.write([
             new ClipboardItem({
-              'image/svg+xml': svgBlob,
+              'text/html': new Blob([htmlWrapper], { type: 'text/html' }),
               'text/plain': new Blob([cleanSvgString], { type: 'text/plain' }),
             }),
           ]);
           writeSuccess = true;
         } catch {
-          // Fallback to text copy if ClipboardItem image/svg+xml is unsupported
+          // Fallback to plain text copy
           try {
             await navigator.clipboard.writeText(cleanSvgString);
             writeSuccess = true;
@@ -211,31 +273,46 @@ export function ExportPreviewModal({
             // Failed
           }
         }
+      }
 
-        if (writeSuccess) {
-          setCopiedId(item.id);
-          toast.success(`Copied ${effectiveFilename} vector to clipboard`);
-          setTimeout(() => setCopiedId(null), 2000);
-        } else {
-          toast.error('Failed to copy vector to clipboard');
-        }
+      if (writeSuccess) {
+        setCopiedId(item.id);
+        toast.success(`Copied ${effectiveFilename} vector to clipboard`);
+        setTimeout(() => setCopiedId(null), 2000);
+      } else {
+        toast.error('Failed to copy vector to clipboard');
       }
     } catch (err) {
       toast.error('Failed to copy to clipboard');
     }
   };
 
-  const handleSave = (item: ExportItem) => {
-    const effectiveFilename = getEffectiveFilename(item);
+  const handleSave = async (item: ExportItem) => {
+    const activeFormat = getItemFormat(item);
+    const effectiveFilename = getEffectiveFilename(item, activeFormat);
     try {
+      let downloadUrl = item.dataUrl;
+
+      if (activeFormat === 'png' && item.format === 'svg') {
+        if (cachedPngUrls[item.id]) {
+          downloadUrl = cachedPngUrls[item.id];
+        } else if (item.svgString) {
+          const blob = await svgToPngBlob(item.svgString, item.width, item.height);
+          downloadUrl = URL.createObjectURL(blob);
+        }
+      } else if (activeFormat === 'svg' && item.format === 'png' && item.svgString) {
+        const svgBlob = new Blob([item.svgString], { type: 'image/svg+xml;charset=utf-8' });
+        downloadUrl = URL.createObjectURL(svgBlob);
+      }
+
       const link = document.createElement('a');
-      link.href = item.dataUrl;
+      link.href = downloadUrl;
       link.download = effectiveFilename;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       toast.success(`Downloaded ${effectiveFilename}`);
-      onItemDownloaded?.({ ...item, filename: effectiveFilename });
+      onItemDownloaded?.({ ...item, filename: effectiveFilename, format: activeFormat });
     } catch (err) {
       toast.error(`Failed to download ${effectiveFilename}`);
     }
@@ -244,18 +321,17 @@ export function ExportPreviewModal({
   const handleDownloadAll = () => {
     if (items.length === 0) return;
     items.forEach((item, index) => {
-      const effectiveFilename = getEffectiveFilename(item);
+      const activeFormat = getItemFormat(item);
+      const effectiveFilename = getEffectiveFilename(item, activeFormat);
       setTimeout(() => {
-        const link = document.createElement('a');
-        link.href = item.dataUrl;
-        link.download = effectiveFilename;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        handleSave(item);
       }, index * 250);
     });
     toast.success(`Exporting all ${items.length} files...`);
-    const updatedItems = items.map(it => ({ ...it, filename: getEffectiveFilename(it) }));
+    const updatedItems = items.map(it => {
+      const activeFormat = getItemFormat(it);
+      return { ...it, filename: getEffectiveFilename(it, activeFormat), format: activeFormat };
+    });
     if (onAllDownloaded) {
       onAllDownloaded(updatedItems);
     } else if (onItemDownloaded) {
@@ -280,20 +356,49 @@ export function ExportPreviewModal({
             </div>
             <div>
               <h2 className="text-base font-semibold text-slate-900 dark:text-white">
-                Export Preview ({format.toUpperCase()})
+                Export Preview ({globalFormat.toUpperCase()})
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Review, rename, and download your generated schematic and instrument captures
+                Review, choose format, rename, and download your high-fidelity captures
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#1b2028] transition-colors"
-          >
-            <X size={18} />
-          </button>
+
+          <div className="flex items-center gap-3">
+            {/* Global Format Selector */}
+            <div className="flex items-center bg-slate-100 dark:bg-[#161a22] p-1 rounded-xl border border-slate-200 dark:border-[#222834]">
+              <button
+                type="button"
+                onClick={() => handleToggleGlobalFormat('png')}
+                className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all ${
+                  globalFormat === 'png'
+                    ? 'bg-white dark:bg-blue-600 text-slate-900 dark:text-white shadow-xs'
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                }`}
+              >
+                PNG
+              </button>
+              <button
+                type="button"
+                onClick={() => handleToggleGlobalFormat('svg')}
+                className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all ${
+                  globalFormat === 'svg'
+                    ? 'bg-white dark:bg-blue-600 text-slate-900 dark:text-white shadow-xs'
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                }`}
+              >
+                SVG
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#1b2028] transition-colors"
+            >
+              <X size={18} />
+            </button>
+          </div>
         </div>
 
         {/* Content Grid */}
@@ -307,8 +412,11 @@ export function ExportPreviewModal({
             <div className={`grid gap-5 ${items.length === 1 ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2'}`}>
               {items.map((item) => {
                 const isCopied = copiedId === item.id;
+                const activeFormat = getItemFormat(item);
                 const baseName = getBaseName(item.filename, item.format);
                 const currentName = customNames[item.id] ?? baseName;
+                const previewSrc = (activeFormat === 'png' && cachedPngUrls[item.id]) ? cachedPngUrls[item.id] : item.dataUrl;
+
                 return (
                   <div
                     key={item.id}
@@ -319,25 +427,53 @@ export function ExportPreviewModal({
                       <span className="text-xs font-semibold text-slate-700 dark:text-slate-200 truncate">
                         {item.title}
                       </span>
-                      <div className="flex items-center gap-1 shrink-0">
-                        <input
-                          type="text"
-                          value={currentName}
-                          onChange={(e) => setCustomNames(prev => ({ ...prev, [item.id]: e.target.value }))}
-                          className="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-200/70 dark:bg-[#1b2028] text-slate-700 dark:text-slate-200 border border-slate-300/60 dark:border-[#262c36] focus:border-blue-500 focus:bg-white dark:focus:bg-[#0d0f12] outline-none transition-colors w-28 sm:w-36"
-                          placeholder={baseName}
-                          title="Click to rename file"
-                        />
-                        <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400 select-none">
-                          .{item.format}
-                        </span>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {/* Per-Item Format Selector */}
+                        <div className="flex items-center bg-slate-200/80 dark:bg-[#1b2028] p-0.5 rounded-md border border-slate-300/50 dark:border-[#262c36]">
+                          <button
+                            type="button"
+                            onClick={() => handleToggleItemFormat(item.id, 'png')}
+                            className={`px-1.5 py-0.5 text-[10px] font-mono font-semibold rounded transition-colors ${
+                              activeFormat === 'png'
+                                ? 'bg-white dark:bg-blue-600 text-slate-800 dark:text-white shadow-2xs'
+                                : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                            }`}
+                          >
+                            PNG
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleItemFormat(item.id, 'svg')}
+                            className={`px-1.5 py-0.5 text-[10px] font-mono font-semibold rounded transition-colors ${
+                              activeFormat === 'svg'
+                                ? 'bg-white dark:bg-blue-600 text-slate-800 dark:text-white shadow-2xs'
+                                : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                            }`}
+                          >
+                            SVG
+                          </button>
+                        </div>
+
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="text"
+                            value={currentName}
+                            onChange={(e) => setCustomNames(prev => ({ ...prev, [item.id]: e.target.value }))}
+                            className="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-200/70 dark:bg-[#1b2028] text-slate-700 dark:text-slate-200 border border-slate-300/60 dark:border-[#262c36] focus:border-blue-500 focus:bg-white dark:focus:bg-[#0d0f12] outline-none transition-colors w-24 sm:w-32"
+                            placeholder={baseName}
+                            title="Click to rename file"
+                          />
+                          <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400 select-none">
+                            .{activeFormat}
+                          </span>
+                        </div>
                       </div>
                     </div>
 
                     {/* Preview Box */}
                     <div className="flex-1 min-h-[160px] max-h-[260px] flex items-center justify-center p-3 rounded-lg bg-slate-100 dark:bg-[#08090b] border border-slate-200/80 dark:border-[#171a21] overflow-hidden">
                       <img
-                        src={item.dataUrl}
+                        src={previewSrc}
                         alt={item.title}
                         className="max-h-[230px] w-auto max-w-full object-contain rounded shadow-xs"
                       />
@@ -349,17 +485,17 @@ export function ExportPreviewModal({
                         type="button"
                         onClick={() => handleCopy(item)}
                         className="px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors flex items-center gap-1.5 bg-white hover:bg-slate-50 text-slate-700 border-slate-200 dark:bg-[#13161c] dark:hover:bg-[#1b2028] dark:text-slate-200 dark:border-[#262c36]"
-                        title={item.format === 'svg' ? 'Copy raw SVG code to clipboard' : 'Copy image to clipboard'}
+                        title={activeFormat === 'svg' ? 'Copy SVG with HTML vector wrapper for Word/PowerPoint' : 'Copy PNG image to clipboard'}
                       >
                         {isCopied ? (
                           <>
                             <Check size={13} className="text-emerald-500" />
-                            <span>{item.format === 'svg' ? 'Copied Code!' : 'Copied'}</span>
+                            <span>Copied</span>
                           </>
                         ) : (
                           <>
                             <Copy size={13} />
-                            <span>{item.format === 'svg' ? 'Copy' : 'Copy'}</span>
+                            <span>Copy</span>
                           </>
                         )}
                       </button>
@@ -382,7 +518,7 @@ export function ExportPreviewModal({
         {/* Modal Footer / Global Actions */}
         <div className="pt-4 border-t border-slate-200 dark:border-[#1b2028] flex items-center justify-between">
           <div className="text-xs text-slate-500 dark:text-slate-400">
-            {items.length} {items.length === 1 ? 'file' : 'files'} ready for export
+            {items.length} {items.length === 1 ? 'file' : 'files'} ready for export ({globalFormat.toUpperCase()})
           </div>
           <div className="flex items-center gap-3">
             <button

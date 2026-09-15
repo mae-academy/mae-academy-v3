@@ -45,10 +45,13 @@ export interface InverterMetrics {
   apparentPower: number;
   powerFactor: number;
   outputFrequency: number;
+  inputPower: number;
+  outputPower: number;
+  efficiency: number;
 }
 
 export interface InverterWarning {
-  code: "SHOOT_THROUGH";
+  code: "SHOOT_THROUGH" | "OVERMODULATION" | "NYQUIST_VIOLATION" | "BACK_EMF_EXCEEDED";
   message: string;
 }
 
@@ -218,7 +221,7 @@ export function simulateInverter(parameters: InverterParameters): InverterSimula
       period,
       angularFrequency,
       samples,
-      metrics: { voltageRms: 0, voltageFundamentalRms: 0, currentRms: 0, currentFundamentalRms: 0, voltageThd: 0, currentThd: 0, distortionFactor: 0, harmonicFactor: 0, activePower: 0, apparentPower: 0, powerFactor: 0, outputFrequency: frequency },
+      metrics: { voltageRms: 0, voltageFundamentalRms: 0, currentRms: 0, currentFundamentalRms: 0, voltageThd: 0, currentThd: 0, distortionFactor: 0, harmonicFactor: 0, activePower: 0, apparentPower: 0, powerFactor: 0, outputFrequency: frequency, inputPower: 0, outputPower: 0, efficiency: 0 },
       warnings: [{ code: "SHOOT_THROUGH", message }],
       fault: { code: "SHOOT_THROUGH", message, shortCircuitCurrent: null },
     };
@@ -278,6 +281,22 @@ export function simulateInverter(parameters: InverterParameters): InverterSimula
   const currentSpectrum = dftSpectrum(currentValues);
   const activePower = voltageSpectrum.rms * currentSpectrum.rms * Math.cos(voltageSpectrum.phase - currentSpectrum.phase);
   const apparentPower = voltageRms * currentRms;
+  // Ideal switches store no energy internally, so P_in = P_out exactly at every instant;
+  // efficiency is reported at 100% whenever real power actually flows (spec 2.5.5: ideal ⇒ ~100%).
+  const inputPower = activePower;
+  const outputPower = activePower;
+  const efficiency = Math.abs(activePower) > 1e-9 ? 100 : 0;
+
+  const warnings: InverterWarning[] = [];
+  if (parameters.technique === "spwm" && parameters.modulationIndex > 1) {
+    warnings.push({ code: "OVERMODULATION", message: `Modulation index m=${parameters.modulationIndex.toFixed(2)} exceeds the linear range (m ≤ 1); output enters overmodulation with added low-order harmonics.` });
+  }
+  if (parameters.technique === "spwm" && parameters.fundamentalFrequency >= parameters.carrierFrequency / 2) {
+    warnings.push({ code: "NYQUIST_VIOLATION", message: `Fundamental frequency ${parameters.fundamentalFrequency}Hz is not below half the carrier frequency (${(parameters.carrierFrequency / 2).toFixed(0)}Hz); PWM sampling is inadequate and will alias.` });
+  }
+  if (parameters.loadType === "RLE" && parameters.backEmfVoltage >= parameters.dcVoltage) {
+    warnings.push({ code: "BACK_EMF_EXCEEDED", message: `Back-EMF ${parameters.backEmfVoltage}V is at or above the DC bus voltage ${parameters.dcVoltage}V; the inverter cannot deliver forward power into this load.` });
+  }
 
   return {
     period,
@@ -296,8 +315,11 @@ export function simulateInverter(parameters: InverterParameters): InverterSimula
       apparentPower,
       powerFactor: apparentPower > 1e-9 ? clamp(activePower / apparentPower, -1, 1) : 0,
       outputFrequency: frequency,
+      inputPower,
+      outputPower,
+      efficiency,
     },
-    warnings: [],
+    warnings,
     fault: null,
   };
 }
