@@ -43,6 +43,7 @@ import { AnalysisBox } from '@/simulators/circuit-engine/components/ui-component
 import { OscilloscopeTracePanel } from '@/simulators/circuit-engine/components/ui-components/OscilloscopeTracePanel';
 import { OscilloscopeComponentPanel } from '@/simulators/circuit-engine/components/inspector-panels/OscilloscopeComponentPanel';
 import { useOscilloscopeDisplaySettings, type OscilloscopeDisplaySettings } from '@/simulators/circuit-engine/components/ui-components/oscilloscopeDisplaySettings';
+import { ExportPreviewModal, type ExportItem } from '@/simulators/circuit-engine/components/ui-components/ExportPreviewModal';
 import type { AnalysisTrace, MeshCycle, NodalNodeLabel } from '@/simulators/circuit-engine/models/analysisTypes';
 import {
   CATEGORIES,
@@ -978,6 +979,24 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
   // value: a toggle in one is reflected in the other on the same render, not just after a reload.
   const [oscilloscopeDisplaySettings, setOscilloscopeDisplaySettings] = useOscilloscopeDisplaySettings();
 
+  // Session-level counter reference for intelligent exports (circuit, oscilloscope, multimeter)
+  const exportCounters = useRef({ circuit: 1, oscilloscope: 1, multimeter: 1 });
+  const [exportModalOpen, setExportModalOpen] = useState(false);
+  const [exportItems, setExportItems] = useState<ExportItem[]>([]);
+  const [exportFormat, setExportFormat] = useState<'png' | 'svg'>('png');
+
+  // Safe Exit / Refresh Warning (BeforeUnload)
+  useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (components.length > 0 || wires.length > 0) {
+        event.preventDefault();
+        event.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [components.length, wires.length]);
+
   const selectedComponent = selection?.kind === 'component'
     ? components.find(component => component.id === selection.id)
     : undefined;
@@ -1466,313 +1485,6 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     setPan(newPan);
     toast.success('Centered circuit to fit viewport');
   }, [components.length, getCircuitBoundingBox, texts.length]);
-
-  const exportSvg = useCallback(() => {
-    if (components.length === 0 && texts.length === 0 && wires.length === 0) {
-      toast.error('No circuit elements to export');
-      return;
-    }
-
-    const bounds = getCircuitBoundingBox();
-    if (!bounds || !svgRef.current) {
-      toast.error('Unable to compute circuit boundaries');
-      return;
-    }
-
-    const cropX = Math.round(bounds.minX - 30);
-    const cropY = Math.round(bounds.minY - 30);
-    const cropWidth = Math.round(bounds.circuitWidth + 60);
-    const cropHeight = Math.round(bounds.circuitHeight + 60);
-
-    const clonedSvg = svgRef.current.cloneNode(true) as SVGSVGElement;
-    clonedSvg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
-    clonedSvg.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
-    clonedSvg.setAttribute('viewBox', `${cropX} ${cropY} ${cropWidth} ${cropHeight}`);
-    clonedSvg.setAttribute('width', String(cropWidth));
-    clonedSvg.setAttribute('height', String(cropHeight));
-    clonedSvg.style.width = `${cropWidth}px`;
-    clonedSvg.style.height = `${cropHeight}px`;
-
-    const strokeColor = darkPreview ? '#f8fafc' : '#1e293b';
-    clonedSvg.style.color = strokeColor;
-    clonedSvg.setAttribute('color', strokeColor);
-
-    const worldGroup = Array.from(clonedSvg.querySelectorAll('g')).find(g => g.getAttribute('transform')?.includes('scale'));
-    if (worldGroup) {
-      worldGroup.removeAttribute('transform');
-    }
-
-    // Clean up interactive, selection, and invisible elements
-    clonedSvg.querySelectorAll('circle[style*="cursor: move"], circle[style*="cursor:move"]').forEach(el => el.remove());
-    clonedSvg.querySelectorAll('circle[r="13"]').forEach(el => el.remove());
-    clonedSvg.querySelectorAll('circle[fill="transparent"]').forEach(el => el.remove());
-    clonedSvg.querySelectorAll('circle[fill="none"][stroke="none"]').forEach(el => el.remove());
-    clonedSvg.querySelectorAll('path[stroke="transparent"]').forEach(el => el.remove());
-    clonedSvg.querySelectorAll('rect[stroke-dasharray="5 4"]').forEach(el => el.remove());
-    clonedSvg.querySelectorAll('path[stroke-dasharray="6 4"]').forEach(el => el.remove());
-    clonedSvg.querySelectorAll('g[opacity="0"], g[style*="opacity: 0"], circle[opacity="0"], circle[style*="opacity: 0"]').forEach(el => el.remove());
-    clonedSvg.querySelectorAll('rect[key*="grid-surface"], rect[fill*="workspace-grid"]').forEach(el => el.remove());
-
-    // Replace free-text foreignObjects with standard SVG text and KaTeX tspans
-    texts.forEach(text => {
-      const g = clonedSvg.querySelector(`g[data-text-id="${text.id}"]`);
-      if (g) {
-        const fo = g.querySelector('foreignObject');
-        if (fo) {
-          const textEl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-          textEl.setAttribute('x', '0');
-          textEl.setAttribute('y', '0');
-          textEl.setAttribute('dominant-baseline', 'hanging');
-          textEl.setAttribute('fill', text.color);
-          textEl.setAttribute('font-size', `${text.fontSize || 14}px`);
-          textEl.setAttribute('font-family', "'KaTeX_Main', 'KaTeX_Math', serif");
-          textEl.style.fontFamily = "'KaTeX_Main', 'KaTeX_Math', serif";
-          textEl.style.fontSize = `${text.fontSize || 14}px`;
-          populateMathTspans(textEl, text.text, text.fontSize || 14);
-          fo.replaceWith(textEl);
-        }
-      }
-    });
-
-    clonedSvg.querySelectorAll('g[color]').forEach(el => {
-      el.setAttribute('color', strokeColor);
-    });
-
-    let defs = clonedSvg.querySelector('defs');
-    if (!defs) {
-      defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
-      clonedSvg.insertBefore(defs, clonedSvg.firstChild);
-    }
-
-    const bgRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-    bgRect.setAttribute('x', String(cropX));
-    bgRect.setAttribute('y', String(cropY));
-    bgRect.setAttribute('width', String(cropWidth));
-    bgRect.setAttribute('height', String(cropHeight));
-    bgRect.setAttribute('fill', colors.canvas);
-
-    if (worldGroup) {
-      worldGroup.insertBefore(bgRect, worldGroup.firstChild);
-    } else {
-      clonedSvg.insertBefore(bgRect, clonedSvg.firstChild);
-    }
-
-    if (gridVisible && (!tabDUiRefinement || tabDGridMode !== 'hidden')) {
-      const gridRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-      gridRect.setAttribute('x', String(cropX));
-      gridRect.setAttribute('y', String(cropY));
-      gridRect.setAttribute('width', String(cropWidth));
-      gridRect.setAttribute('height', String(cropHeight));
-      gridRect.setAttribute('fill', `url(#workspace-grid-${tabDUiRefinement ? tabDGridMode : 'base'})`);
-      if (worldGroup) {
-        worldGroup.insertBefore(gridRect, bgRect.nextSibling);
-      } else {
-        clonedSvg.insertBefore(gridRect, bgRect.nextSibling);
-      }
-    }
-
-    const styleEl = document.createElementNS('http://www.w3.org/2000/svg', 'style');
-    styleEl.textContent = `
-      ${KATEX_EMBEDDED_FONT_CSS}
-      :root, svg {
-        color: ${strokeColor};
-        background-color: ${colors.canvas};
-      }
-      text, tspan {
-        font-family: 'KaTeX_Main', 'KaTeX_Math', 'KaTeX_AMS', serif;
-      }
-      .katex {
-        font-family: 'KaTeX_Main', 'KaTeX_Math', 'KaTeX_AMS', serif;
-      }
-    `;
-    defs.appendChild(styleEl);
-
-    const serializer = new XMLSerializer();
-    let svgString = serializer.serializeToString(clonedSvg);
-    if (!svgString.startsWith('<?xml')) {
-      svgString = '<?xml version="1.0" encoding="UTF-8"?>\n' + svgString;
-    }
-
-    const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = 'circuit-schematic.svg';
-    link.click();
-    URL.revokeObjectURL(url);
-    toast.success('Schematic exported as SVG');
-  }, [colors.canvas, components.length, darkPreview, getCircuitBoundingBox, gridVisible, tabDGridMode, tabDUiRefinement, texts, wires.length]);
-
-  const exportPng = useCallback(() => {
-    if (components.length === 0 && texts.length === 0 && wires.length === 0) {
-      toast.error('No circuit elements to export');
-      return;
-    }
-
-    const bounds = getCircuitBoundingBox();
-    if (!bounds || !svgRef.current) {
-      toast.error('Unable to compute circuit boundaries');
-      return;
-    }
-
-    const cropX = Math.round(bounds.minX - 30);
-    const cropY = Math.round(bounds.minY - 30);
-    const cropWidth = Math.round(bounds.circuitWidth + 60);
-    const cropHeight = Math.round(bounds.circuitHeight + 60);
-
-    // Ultra high-definition PNG export: target 4K (3840px) resolution with minimum 4x scale
-    const targetLongEdge = 3840;
-    const maxDim = Math.max(cropWidth, cropHeight);
-    const scale = Math.min(8, Math.max(4, Math.round((targetLongEdge / maxDim) * 100) / 100));
-
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.round(cropWidth * scale);
-    canvas.height = Math.round(cropHeight * scale);
-    const ctx = canvas.getContext('2d');
-    if (!ctx) {
-      toast.error('Failed to initialize canvas for PNG export');
-      return;
-    }
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
-
-    ctx.fillStyle = colors.canvas;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    if (gridVisible && (!tabDUiRefinement || tabDGridMode !== 'hidden')) {
-      if (tabDUiRefinement && tabDGridMode === 'dots') {
-        const dotColor = darkPreview ? 'rgba(109, 145, 196, 0.9)' : 'rgba(122, 147, 177, 0.9)';
-        ctx.fillStyle = dotColor;
-        const startX = Math.floor(cropX / gridSize) * gridSize;
-        const startY = Math.floor(cropY / gridSize) * gridSize;
-        for (let x = startX; x <= cropX + cropWidth; x += gridSize) {
-          for (let y = startY; y <= cropY + cropHeight; y += gridSize) {
-            const px = (x - cropX) * scale;
-            const py = (y - cropY) * scale;
-            ctx.beginPath();
-            ctx.arc(px, py, 1.65 * scale, 0, Math.PI * 2);
-            ctx.fill();
-          }
-        }
-      } else {
-        const lineColor = tabDUiRefinement
-          ? (darkPreview ? 'rgba(61, 95, 140, 0.85)' : 'rgba(168, 184, 204, 0.85)')
-          : colors.grid;
-        ctx.strokeStyle = lineColor;
-        ctx.lineWidth = (tabDUiRefinement ? 1.15 : 1) * scale;
-        ctx.beginPath();
-        const startX = Math.floor(cropX / gridSize) * gridSize;
-        const startY = Math.floor(cropY / gridSize) * gridSize;
-        for (let x = startX; x <= cropX + cropWidth; x += gridSize) {
-          const px = (x - cropX) * scale;
-          ctx.moveTo(px, 0);
-          ctx.lineTo(px, canvas.height);
-        }
-        for (let y = startY; y <= cropY + cropHeight; y += gridSize) {
-          const py = (y - cropY) * scale;
-          ctx.moveTo(0, py);
-          ctx.lineTo(canvas.width, py);
-        }
-        ctx.stroke();
-      }
-    }
-
-    const clonedSvg = svgRef.current.cloneNode(true) as SVGSVGElement;
-    clonedSvg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
-    clonedSvg.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
-    clonedSvg.setAttribute('viewBox', `${cropX} ${cropY} ${cropWidth} ${cropHeight}`);
-    clonedSvg.setAttribute('width', String(canvas.width));
-    clonedSvg.setAttribute('height', String(canvas.height));
-
-    const strokeColor = darkPreview ? '#f8fafc' : '#1e293b';
-    clonedSvg.style.color = strokeColor;
-    clonedSvg.setAttribute('color', strokeColor);
-
-    const worldGroup = Array.from(clonedSvg.querySelectorAll('g')).find(g => g.getAttribute('transform')?.includes('scale'));
-    if (worldGroup) {
-      worldGroup.removeAttribute('transform');
-    }
-
-    clonedSvg.querySelectorAll('rect[key*="grid-surface"], rect[fill*="workspace-grid"]').forEach(el => el.remove());
-    clonedSvg.querySelectorAll('circle[style*="cursor: move"], circle[style*="cursor:move"]').forEach(el => el.remove());
-    clonedSvg.querySelectorAll('circle[r="13"]').forEach(el => el.remove());
-    clonedSvg.querySelectorAll('circle[fill="transparent"]').forEach(el => el.remove());
-    clonedSvg.querySelectorAll('circle[fill="none"][stroke="none"]').forEach(el => el.remove());
-    clonedSvg.querySelectorAll('path[stroke="transparent"]').forEach(el => el.remove());
-    clonedSvg.querySelectorAll('rect[stroke-dasharray="5 4"]').forEach(el => el.remove());
-    clonedSvg.querySelectorAll('path[stroke-dasharray="6 4"]').forEach(el => el.remove());
-    clonedSvg.querySelectorAll('g[opacity="0"], g[style*="opacity: 0"], circle[opacity="0"], circle[style*="opacity: 0"]').forEach(el => el.remove());
-
-    texts.forEach(text => {
-      const g = clonedSvg.querySelector(`g[data-text-id="${text.id}"]`);
-      if (g) {
-        const fo = g.querySelector('foreignObject');
-        if (fo) {
-          const textEl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-          textEl.setAttribute('x', '0');
-          textEl.setAttribute('y', '0');
-          textEl.setAttribute('dominant-baseline', 'hanging');
-          textEl.setAttribute('fill', text.color);
-          textEl.setAttribute('font-size', `${text.fontSize || 14}px`);
-          textEl.setAttribute('font-family', "'KaTeX_Main', 'KaTeX_Math', serif");
-          textEl.style.fontFamily = "'KaTeX_Main', 'KaTeX_Math', serif";
-          textEl.style.fontSize = `${text.fontSize || 14}px`;
-          populateMathTspans(textEl, text.text, text.fontSize || 14);
-          fo.replaceWith(textEl);
-        }
-      }
-    });
-
-    clonedSvg.querySelectorAll('g[color]').forEach(el => {
-      el.setAttribute('color', strokeColor);
-    });
-
-    let defs = clonedSvg.querySelector('defs');
-    if (!defs) {
-      defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
-      clonedSvg.insertBefore(defs, clonedSvg.firstChild);
-    }
-    const styleEl = document.createElementNS('http://www.w3.org/2000/svg', 'style');
-    styleEl.textContent = `
-      ${KATEX_EMBEDDED_FONT_CSS}
-      :root, svg {
-        color: ${strokeColor};
-      }
-      text, tspan {
-        font-family: 'KaTeX_Main', 'KaTeX_Math', 'KaTeX_AMS', serif;
-      }
-      .katex {
-        font-family: 'KaTeX_Main', 'KaTeX_Math', 'KaTeX_AMS', serif;
-      }
-    `;
-    defs.appendChild(styleEl);
-
-    const serializer = new XMLSerializer();
-    const svgString = serializer.serializeToString(clonedSvg);
-    const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
-    const url = URL.createObjectURL(svgBlob);
-
-    const img = new Image();
-    img.onload = () => {
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      URL.revokeObjectURL(url);
-      try {
-        const pngUrl = canvas.toDataURL('image/png');
-        const link = document.createElement('a');
-        link.href = pngUrl;
-        link.download = 'circuit-schematic.png';
-        link.click();
-        toast.success('Schematic exported as PNG');
-      } catch (err) {
-        toast.error('Failed to export PNG image');
-      }
-    };
-    img.onerror = () => {
-      URL.revokeObjectURL(url);
-      toast.error('Failed to render schematic to PNG');
-    };
-    img.src = url;
-  }, [colors.canvas, colors.grid, components.length, darkPreview, getCircuitBoundingBox, gridSize, gridVisible, tabDGridMode, tabDUiRefinement, texts, wires.length]);
 
   const moveSelected = useCallback((dx: number, dy: number) => {
     if (selectedComponent) {
@@ -2517,6 +2229,549 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [snapshot, spiceReadingsVersion]);
 
+  const captureOscilloscopeItem = useCallback((scope: CircuitComponent, format: 'png' | 'svg', index: number, total: number): Promise<ExportItem | null> => {
+    const canvas = document.querySelector(`canvas[data-scope-id="${scope.id}"]`) as HTMLCanvasElement | null;
+    const filename = total > 1
+      ? `oscilloscope-${exportCounters.current.oscilloscope}-${index + 1}.${format}`
+      : `oscilloscope-${exportCounters.current.oscilloscope}.${format}`;
+
+    if (!canvas) {
+      const offscreen = document.createElement('canvas');
+      offscreen.width = 300;
+      offscreen.height = 180;
+      const ctx = offscreen.getContext('2d');
+      if (ctx) {
+        ctx.fillStyle = '#090a0d';
+        ctx.fillRect(0, 0, 300, 180);
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '12px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(`${scope.label || 'Oscilloscope'} Screen`, 150, 90);
+      }
+      const dataUrl = offscreen.toDataURL('image/png');
+      return Promise.resolve({
+        id: `scope-${scope.id}`,
+        title: scope.label ? `Live Oscilloscope (${scope.label})` : 'Live Oscilloscope',
+        filename,
+        format,
+        dataUrl,
+        width: 300,
+        height: 180,
+      });
+    }
+
+    if (format === 'png') {
+      const dataUrl = canvas.toDataURL('image/png');
+      return new Promise<ExportItem | null>(resolve => {
+        canvas.toBlob(blob => {
+          resolve({
+            id: `scope-${scope.id}`,
+            title: scope.label ? `Live Oscilloscope (${scope.label})` : 'Live Oscilloscope',
+            filename,
+            format: 'png',
+            dataUrl,
+            blob: blob || undefined,
+            width: canvas.width,
+            height: canvas.height,
+          });
+        }, 'image/png');
+      });
+    } else {
+      const pngData = canvas.toDataURL('image/png');
+      const svgStr = `<svg xmlns="http://www.w3.org/2000/svg" width="${canvas.width}" height="${canvas.height}" viewBox="0 0 ${canvas.width} ${canvas.height}"><rect width="${canvas.width}" height="${canvas.height}" fill="#090a0d"/><image href="${pngData}" width="${canvas.width}" height="${canvas.height}"/></svg>`;
+      const blob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
+      const dataUrl = URL.createObjectURL(blob);
+      return Promise.resolve({
+        id: `scope-${scope.id}`,
+        title: scope.label ? `Live Oscilloscope (${scope.label})` : 'Live Oscilloscope',
+        filename,
+        format: 'svg',
+        dataUrl,
+        blob,
+        width: canvas.width,
+        height: canvas.height,
+      });
+    }
+  }, []);
+
+  const captureDmmItem = useCallback((dmm: CircuitComponent, reading: InstrumentReading | undefined, format: 'png' | 'svg', index: number, total: number): Promise<ExportItem | null> => {
+    let valueText = '—';
+    const isShorted = reading?.continuity === true;
+    if (reading?.status === 'open') {
+      valueText = 'OL';
+    } else if (isShorted) {
+      valueText = 'SHORTED';
+    } else if (reading && typeof reading.value === 'number') {
+      const val = reading.value;
+      const abs = Math.abs(val);
+      const unit = reading.unit || '';
+      if (abs >= 1e6) valueText = `${(val / 1e6).toFixed(3)} M${unit}`;
+      else if (abs >= 1e3) valueText = `${(val / 1e3).toFixed(3)} k${unit}`;
+      else if (abs >= 1) valueText = `${val.toFixed(3)} ${unit}`;
+      else if (abs >= 1e-3) valueText = `${(val * 1e3).toFixed(2)} m${unit}`;
+      else if (abs >= 1e-6) valueText = `${(val * 1e6).toFixed(2)} µ${unit}`;
+      else valueText = `${val.toFixed(3)} ${unit}`;
+    }
+    const statusText = reading?.status === 'ready'
+      ? (isShorted ? 'Continuity detected' : 'Probe-linked measurement')
+      : reading?.status === 'open'
+        ? 'Open / not fully connected'
+        : 'Connect HI and COM probes';
+
+    const canvas = document.createElement('canvas');
+    canvas.width = 480;
+    canvas.height = 240;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return Promise.resolve(null);
+
+    // Outer casing
+    ctx.fillStyle = '#0d0f12';
+    if (typeof ctx.roundRect === 'function') {
+      ctx.roundRect(0, 0, 480, 240, 16);
+      ctx.fill();
+    } else {
+      ctx.fillRect(0, 0, 480, 240);
+    }
+    ctx.strokeStyle = '#262c36';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Header
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = 'bold 13px ui-monospace, SFMono-Regular, Menlo, monospace';
+    ctx.fillText((dmm.label || 'DIGITAL MULTIMETER').toUpperCase(), 24, 34);
+
+    ctx.fillStyle = '#64748b';
+    ctx.font = '11px sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText('MAE ACADEMY PRECISION DMM', 456, 34);
+    ctx.textAlign = 'left';
+
+    // LCD screen bezel
+    ctx.fillStyle = '#031728';
+    if (typeof ctx.roundRect === 'function') {
+      ctx.roundRect(20, 50, 440, 160, 10);
+      ctx.fill();
+    } else {
+      ctx.fillRect(20, 50, 440, 160);
+    }
+    ctx.strokeStyle = '#0284c7';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Annunciator
+    ctx.fillStyle = '#38bdf8';
+    ctx.font = 'bold 12px ui-monospace, SFMono-Regular, Menlo, monospace';
+    const dmmMode = (dmm.props?.mode as string) || 'AUTO RANGE';
+    ctx.fillText(dmmMode.toUpperCase(), 36, 78);
+
+    // Value Display
+    ctx.fillStyle = '#e0f2fe';
+    ctx.font = 'bold 42px ui-monospace, SFMono-Regular, Menlo, monospace';
+    ctx.textAlign = 'right';
+    ctx.fillText(valueText, 440, 142);
+    ctx.textAlign = 'left';
+
+    // Subtitle
+    ctx.fillStyle = '#7dd3fc';
+    ctx.font = '12px sans-serif';
+    ctx.fillText(statusText, 36, 185);
+
+    const filename = total > 1
+      ? `dmm-${exportCounters.current.multimeter}-${index + 1}.${format}`
+      : `dmm-${exportCounters.current.multimeter}.${format}`;
+
+    if (format === 'png') {
+      const dataUrl = canvas.toDataURL('image/png');
+      return new Promise<ExportItem | null>(resolve => {
+        canvas.toBlob(blob => {
+          resolve({
+            id: `dmm-${dmm.id}`,
+            title: dmm.label ? `Digital Multimeter (${dmm.label})` : 'Digital Multimeter',
+            filename,
+            format: 'png',
+            dataUrl,
+            blob: blob || undefined,
+            width: 480,
+            height: 240,
+          });
+        }, 'image/png');
+      });
+    } else {
+      const pngData = canvas.toDataURL('image/png');
+      const svgStr = `<svg xmlns="http://www.w3.org/2000/svg" width="480" height="240" viewBox="0 0 480 240"><image href="${pngData}" width="480" height="240"/></svg>`;
+      const blob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
+      const dataUrl = URL.createObjectURL(blob);
+      return Promise.resolve({
+        id: `dmm-${dmm.id}`,
+        title: dmm.label ? `Digital Multimeter (${dmm.label})` : 'Digital Multimeter',
+        filename,
+        format: 'svg',
+        dataUrl,
+        blob,
+        width: 480,
+        height: 240,
+      });
+    }
+  }, []);
+
+  const exportSvg = useCallback(async () => {
+    if (components.length === 0 && texts.length === 0 && wires.length === 0) {
+      toast.error('No circuit elements to export');
+      return;
+    }
+
+    const bounds = getCircuitBoundingBox();
+    if (!bounds || !svgRef.current) {
+      toast.error('Unable to compute circuit boundaries');
+      return;
+    }
+
+    const cropX = Math.round(bounds.minX - 30);
+    const cropY = Math.round(bounds.minY - 30);
+    const cropWidth = Math.round(bounds.circuitWidth + 60);
+    const cropHeight = Math.round(bounds.circuitHeight + 60);
+
+    const clonedSvg = svgRef.current.cloneNode(true) as SVGSVGElement;
+    clonedSvg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+    clonedSvg.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
+    clonedSvg.setAttribute('viewBox', `${cropX} ${cropY} ${cropWidth} ${cropHeight}`);
+    clonedSvg.setAttribute('width', String(cropWidth));
+    clonedSvg.setAttribute('height', String(cropHeight));
+    clonedSvg.style.width = `${cropWidth}px`;
+    clonedSvg.style.height = `${cropHeight}px`;
+
+    const strokeColor = darkPreview ? '#f8fafc' : '#1e293b';
+    clonedSvg.style.color = strokeColor;
+    clonedSvg.setAttribute('color', strokeColor);
+
+    const worldGroup = Array.from(clonedSvg.querySelectorAll('g')).find(g => g.getAttribute('transform')?.includes('scale'));
+    if (worldGroup) {
+      worldGroup.removeAttribute('transform');
+    }
+
+    clonedSvg.querySelectorAll('rect[key*="grid-surface"], rect[fill*="workspace-grid"]').forEach(el => el.remove());
+    clonedSvg.querySelectorAll('circle[style*="cursor: move"], circle[style*="cursor:move"]').forEach(el => el.remove());
+    clonedSvg.querySelectorAll('circle[r="13"]').forEach(el => el.remove());
+    clonedSvg.querySelectorAll('circle[fill="transparent"]').forEach(el => el.remove());
+    clonedSvg.querySelectorAll('circle[fill="none"][stroke="none"]').forEach(el => el.remove());
+    clonedSvg.querySelectorAll('path[stroke="transparent"]').forEach(el => el.remove());
+    clonedSvg.querySelectorAll('rect[stroke-dasharray="5 4"]').forEach(el => el.remove());
+    clonedSvg.querySelectorAll('path[stroke-dasharray="6 4"]').forEach(el => el.remove());
+    clonedSvg.querySelectorAll('g[opacity="0"], g[style*="opacity: 0"], circle[opacity="0"], circle[style*="opacity: 0"]').forEach(el => el.remove());
+
+    texts.forEach(text => {
+      const g = clonedSvg.querySelector(`g[data-text-id="${text.id}"]`);
+      if (g) {
+        const fo = g.querySelector('foreignObject');
+        if (fo) {
+          const textEl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          textEl.setAttribute('x', '0');
+          textEl.setAttribute('y', '0');
+          textEl.setAttribute('dominant-baseline', 'hanging');
+          textEl.setAttribute('fill', text.color);
+          textEl.setAttribute('font-size', `${text.fontSize || 14}px`);
+          textEl.setAttribute('font-family', "'KaTeX_Main', 'KaTeX_Math', serif");
+          textEl.style.fontFamily = "'KaTeX_Main', 'KaTeX_Math', serif";
+          textEl.style.fontSize = `${text.fontSize || 14}px`;
+          populateMathTspans(textEl, text.text, text.fontSize || 14);
+          fo.replaceWith(textEl);
+        }
+      }
+    });
+
+    clonedSvg.querySelectorAll('g[color]').forEach(el => {
+      el.setAttribute('color', strokeColor);
+    });
+
+    let defs = clonedSvg.querySelector('defs');
+    if (!defs) {
+      defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+      clonedSvg.insertBefore(defs, clonedSvg.firstChild);
+    }
+
+    const bgRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    bgRect.setAttribute('x', String(cropX));
+    bgRect.setAttribute('y', String(cropY));
+    bgRect.setAttribute('width', String(cropWidth));
+    bgRect.setAttribute('height', String(cropHeight));
+    bgRect.setAttribute('fill', colors.canvas);
+
+    if (worldGroup) {
+      worldGroup.insertBefore(bgRect, worldGroup.firstChild);
+    } else {
+      clonedSvg.insertBefore(bgRect, clonedSvg.firstChild);
+    }
+
+    if (gridVisible && (!tabDUiRefinement || tabDGridMode !== 'hidden')) {
+      const gridRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      gridRect.setAttribute('x', String(cropX));
+      gridRect.setAttribute('y', String(cropY));
+      gridRect.setAttribute('width', String(cropWidth));
+      gridRect.setAttribute('height', String(cropHeight));
+      gridRect.setAttribute('fill', `url(#workspace-grid-${tabDUiRefinement ? tabDGridMode : 'base'})`);
+      if (worldGroup) {
+        worldGroup.insertBefore(gridRect, bgRect.nextSibling);
+      } else {
+        clonedSvg.insertBefore(gridRect, bgRect.nextSibling);
+      }
+    }
+
+    const styleEl = document.createElementNS('http://www.w3.org/2000/svg', 'style');
+    styleEl.textContent = `
+      ${KATEX_EMBEDDED_FONT_CSS}
+      :root, svg {
+        color: ${strokeColor};
+        background-color: ${colors.canvas};
+      }
+      text, tspan {
+        font-family: 'KaTeX_Main', 'KaTeX_Math', 'KaTeX_AMS', serif;
+      }
+      .katex {
+        font-family: 'KaTeX_Main', 'KaTeX_Math', 'KaTeX_AMS', serif;
+      }
+    `;
+    defs.appendChild(styleEl);
+
+    const serializer = new XMLSerializer();
+    let svgString = serializer.serializeToString(clonedSvg);
+    if (!svgString.startsWith('<?xml')) {
+      svgString = '<?xml version="1.0" encoding="UTF-8"?>\n' + svgString;
+    }
+
+    const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+
+    const items: ExportItem[] = [{
+      id: 'circuit-main',
+      title: 'Circuit Schematic',
+      filename: `circuit-${exportCounters.current.circuit}.svg`,
+      format: 'svg',
+      dataUrl: url,
+      blob,
+      width: cropWidth,
+      height: cropHeight,
+    }];
+
+    const activeScopes = components.filter(c => c.type === 'oscilloscope');
+    for (let i = 0; i < activeScopes.length; i++) {
+      const scopeItem = await captureOscilloscopeItem(activeScopes[i], 'svg', i, activeScopes.length);
+      if (scopeItem) items.push(scopeItem);
+    }
+
+    const activeDmms = components.filter(c => c.type === 'dmm');
+    for (let i = 0; i < activeDmms.length; i++) {
+      const dmmItem = await captureDmmItem(activeDmms[i], effectiveSnapshot.instrumentReadings[activeDmms[i].id], 'svg', i, activeDmms.length);
+      if (dmmItem) items.push(dmmItem);
+    }
+
+    exportCounters.current.circuit += 1;
+    if (activeScopes.length > 0) exportCounters.current.oscilloscope += 1;
+    if (activeDmms.length > 0) exportCounters.current.multimeter += 1;
+
+    setExportItems(items);
+    setExportFormat('svg');
+    setExportModalOpen(true);
+  }, [captureDmmItem, captureOscilloscopeItem, colors.canvas, components, darkPreview, effectiveSnapshot.instrumentReadings, getCircuitBoundingBox, gridVisible, tabDGridMode, tabDUiRefinement, texts, wires.length]);
+
+  const exportPng = useCallback(() => {
+    if (components.length === 0 && texts.length === 0 && wires.length === 0) {
+      toast.error('No circuit elements to export');
+      return;
+    }
+
+    const bounds = getCircuitBoundingBox();
+    if (!bounds || !svgRef.current) {
+      toast.error('Unable to compute circuit boundaries');
+      return;
+    }
+
+    const cropX = Math.round(bounds.minX - 30);
+    const cropY = Math.round(bounds.minY - 30);
+    const cropWidth = Math.round(bounds.circuitWidth + 60);
+    const cropHeight = Math.round(bounds.circuitHeight + 60);
+
+    // Ultra high-definition PNG export: target 4K (3840px) resolution with minimum 4x scale
+    const targetLongEdge = 3840;
+    const maxDim = Math.max(cropWidth, cropHeight);
+    const scale = Math.min(8, Math.max(4, Math.round((targetLongEdge / maxDim) * 100) / 100));
+
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(cropWidth * scale);
+    canvas.height = Math.round(cropHeight * scale);
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      toast.error('Failed to initialize canvas for PNG export');
+      return;
+    }
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+
+    ctx.fillStyle = colors.canvas;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    if (gridVisible && (!tabDUiRefinement || tabDGridMode !== 'hidden')) {
+      if (tabDUiRefinement && tabDGridMode === 'dots') {
+        const dotColor = darkPreview ? 'rgba(109, 145, 196, 0.9)' : 'rgba(122, 147, 177, 0.9)';
+        ctx.fillStyle = dotColor;
+        const startX = Math.floor(cropX / gridSize) * gridSize;
+        const startY = Math.floor(cropY / gridSize) * gridSize;
+        for (let x = startX; x <= cropX + cropWidth; x += gridSize) {
+          for (let y = startY; y <= cropY + cropHeight; y += gridSize) {
+            const px = (x - cropX) * scale;
+            const py = (y - cropY) * scale;
+            ctx.beginPath();
+            ctx.arc(px, py, 1.65 * scale, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+      } else {
+        const lineColor = tabDUiRefinement
+          ? (darkPreview ? 'rgba(61, 95, 140, 0.85)' : 'rgba(168, 184, 204, 0.85)')
+          : colors.grid;
+        ctx.strokeStyle = lineColor;
+        ctx.lineWidth = (tabDUiRefinement ? 1.15 : 1) * scale;
+        ctx.beginPath();
+        const startX = Math.floor(cropX / gridSize) * gridSize;
+        const startY = Math.floor(cropY / gridSize) * gridSize;
+        for (let x = startX; x <= cropX + cropWidth; x += gridSize) {
+          const px = (x - cropX) * scale;
+          ctx.moveTo(px, 0);
+          ctx.lineTo(px, canvas.height);
+        }
+        for (let y = startY; y <= cropY + cropHeight; y += gridSize) {
+          const py = (y - cropY) * scale;
+          ctx.moveTo(0, py);
+          ctx.lineTo(canvas.width, py);
+        }
+        ctx.stroke();
+      }
+    }
+
+    const clonedSvg = svgRef.current.cloneNode(true) as SVGSVGElement;
+    clonedSvg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+    clonedSvg.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
+    clonedSvg.setAttribute('viewBox', `${cropX} ${cropY} ${cropWidth} ${cropHeight}`);
+    clonedSvg.setAttribute('width', String(canvas.width));
+    clonedSvg.setAttribute('height', String(canvas.height));
+
+    const strokeColor = darkPreview ? '#f8fafc' : '#1e293b';
+    clonedSvg.style.color = strokeColor;
+    clonedSvg.setAttribute('color', strokeColor);
+
+    const worldGroup = Array.from(clonedSvg.querySelectorAll('g')).find(g => g.getAttribute('transform')?.includes('scale'));
+    if (worldGroup) {
+      worldGroup.removeAttribute('transform');
+    }
+
+    clonedSvg.querySelectorAll('rect[key*="grid-surface"], rect[fill*="workspace-grid"]').forEach(el => el.remove());
+    clonedSvg.querySelectorAll('circle[style*="cursor: move"], circle[style*="cursor:move"]').forEach(el => el.remove());
+    clonedSvg.querySelectorAll('circle[r="13"]').forEach(el => el.remove());
+    clonedSvg.querySelectorAll('circle[fill="transparent"]').forEach(el => el.remove());
+    clonedSvg.querySelectorAll('circle[fill="none"][stroke="none"]').forEach(el => el.remove());
+    clonedSvg.querySelectorAll('path[stroke="transparent"]').forEach(el => el.remove());
+    clonedSvg.querySelectorAll('rect[stroke-dasharray="5 4"]').forEach(el => el.remove());
+    clonedSvg.querySelectorAll('path[stroke-dasharray="6 4"]').forEach(el => el.remove());
+    clonedSvg.querySelectorAll('g[opacity="0"], g[style*="opacity: 0"], circle[opacity="0"], circle[style*="opacity: 0"]').forEach(el => el.remove());
+
+    texts.forEach(text => {
+      const g = clonedSvg.querySelector(`g[data-text-id="${text.id}"]`);
+      if (g) {
+        const fo = g.querySelector('foreignObject');
+        if (fo) {
+          const textEl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          textEl.setAttribute('x', '0');
+          textEl.setAttribute('y', '0');
+          textEl.setAttribute('dominant-baseline', 'hanging');
+          textEl.setAttribute('fill', text.color);
+          textEl.setAttribute('font-size', `${text.fontSize || 14}px`);
+          textEl.setAttribute('font-family', "'KaTeX_Main', 'KaTeX_Math', serif");
+          textEl.style.fontFamily = "'KaTeX_Main', 'KaTeX_Math', serif";
+          textEl.style.fontSize = `${text.fontSize || 14}px`;
+          populateMathTspans(textEl, text.text, text.fontSize || 14);
+          fo.replaceWith(textEl);
+        }
+      }
+    });
+
+    clonedSvg.querySelectorAll('g[color]').forEach(el => {
+      el.setAttribute('color', strokeColor);
+    });
+
+    let defs = clonedSvg.querySelector('defs');
+    if (!defs) {
+      defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+      clonedSvg.insertBefore(defs, clonedSvg.firstChild);
+    }
+    const styleEl = document.createElementNS('http://www.w3.org/2000/svg', 'style');
+    styleEl.textContent = `
+      ${KATEX_EMBEDDED_FONT_CSS}
+      :root, svg {
+        color: ${strokeColor};
+      }
+      text, tspan {
+        font-family: 'KaTeX_Main', 'KaTeX_Math', 'KaTeX_AMS', serif;
+      }
+      .katex {
+        font-family: 'KaTeX_Main', 'KaTeX_Math', 'KaTeX_AMS', serif;
+      }
+    `;
+    defs.appendChild(styleEl);
+
+    const serializer = new XMLSerializer();
+    const svgString = serializer.serializeToString(clonedSvg);
+    const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(svgBlob);
+
+    const img = new Image();
+    img.onload = async () => {
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      try {
+        const pngUrl = canvas.toDataURL('image/png');
+        const circuitBlob = await new Promise<Blob | null>(res => canvas.toBlob(res, 'image/png'));
+
+        const items: ExportItem[] = [{
+          id: 'circuit-main',
+          title: 'Circuit Schematic',
+          filename: `circuit-${exportCounters.current.circuit}.png`,
+          format: 'png',
+          dataUrl: pngUrl,
+          blob: circuitBlob || undefined,
+          width: canvas.width,
+          height: canvas.height,
+        }];
+
+        const activeScopes = components.filter(c => c.type === 'oscilloscope');
+        for (let i = 0; i < activeScopes.length; i++) {
+          const scopeItem = await captureOscilloscopeItem(activeScopes[i], 'png', i, activeScopes.length);
+          if (scopeItem) items.push(scopeItem);
+        }
+
+        const activeDmms = components.filter(c => c.type === 'dmm');
+        for (let i = 0; i < activeDmms.length; i++) {
+          const dmmItem = await captureDmmItem(activeDmms[i], effectiveSnapshot.instrumentReadings[activeDmms[i].id], 'png', i, activeDmms.length);
+          if (dmmItem) items.push(dmmItem);
+        }
+
+        exportCounters.current.circuit += 1;
+        if (activeScopes.length > 0) exportCounters.current.oscilloscope += 1;
+        if (activeDmms.length > 0) exportCounters.current.multimeter += 1;
+
+        setExportItems(items);
+        setExportFormat('png');
+        setExportModalOpen(true);
+      } catch (err) {
+        toast.error('Failed to prepare export preview');
+      }
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      toast.error('Failed to render schematic to PNG');
+    };
+    img.src = url;
+  }, [captureDmmItem, captureOscilloscopeItem, colors.canvas, colors.grid, components, darkPreview, effectiveSnapshot.instrumentReadings, getCircuitBoundingBox, gridSize, gridVisible, tabDGridMode, tabDUiRefinement, texts, wires.length]);
+
   // --- Switch & Push-Button Keyboard Controls ---
   // A number key addresses the switch/pushbutton whose label ends in it (S1 -> "1"); see
   // applySwitchHotkey. Every change marks the next SPICE solve eager, so the DMM follows the key
@@ -2643,7 +2898,8 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
   const filteredCategories = useMemo(() => {
     const query = search.trim().toLowerCase();
     return CATEGORIES.reduce<Record<string, ComponentDef[]>>((all, category) => {
-      let categoryItems = getComponentsByCategory(category);
+      if (category === 'Classic Control') return all;
+      let categoryItems = getComponentsByCategory(category).filter(item => !item.hidden);
       if (tabDUiRefinement && category === 'Passive') {
         categoryItems = [...categoryItems, ...['star-resistor-pack', 'delta-resistor-pack'].map(getDef).filter((item): item is ComponentDef => Boolean(item))];
       }
@@ -2657,9 +2913,11 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
       if (!tabDUiRefinement && category === 'Diodes') {
         categoryItems = categoryItems.filter(item => item.id !== 'diode');
       }
-      const items = categoryItems.filter(item => !query
-        || item.name.toLowerCase().includes(query)
-        || item.description.toLowerCase().includes(query));
+      const items = categoryItems
+        .filter(item => !item.hidden)
+        .filter(item => !query
+          || item.name.toLowerCase().includes(query)
+          || item.description.toLowerCase().includes(query));
       if (items.length) all[category] = items;
       return all;
     }, {});
@@ -3234,6 +3492,12 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
           </aside>
         </div>
       </div>
+      <ExportPreviewModal
+        isOpen={exportModalOpen}
+        onClose={() => setExportModalOpen(false)}
+        items={exportItems}
+        format={exportFormat}
+      />
     </div>
   );
 }

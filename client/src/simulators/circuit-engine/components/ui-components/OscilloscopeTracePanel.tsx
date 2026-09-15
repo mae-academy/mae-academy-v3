@@ -176,7 +176,7 @@ function ScopeUnit({ colors, scope, instrumentReadings, displaySettings }: { col
         </div>
       </div>
       <div className="relative overflow-hidden rounded" style={{ width: '100%', height: CANVAS_HEIGHT, border: `1px solid ${colors.line}` }}>
-        <canvas ref={canvasRef} width={CANVAS_WIDTH} height={CANVAS_HEIGHT} style={{ width: '100%', height: CANVAS_HEIGHT, background: canvasBackground, display: 'block' }} />
+        <canvas ref={canvasRef} data-scope-id={scope.id} width={CANVAS_WIDTH} height={CANVAS_HEIGHT} style={{ width: '100%', height: CANVAS_HEIGHT, background: canvasBackground, display: 'block' }} />
         {displaySettings.showValues && (
           <OscilloscopeAxisOverlay
             timeDiv={primaryConfig.timeDiv}

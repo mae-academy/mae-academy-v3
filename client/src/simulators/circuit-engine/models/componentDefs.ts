@@ -22,6 +22,7 @@ export interface ComponentDef {
   properties: Record<string, PropertyDef>;
   description: string;
   symbol: string;
+  hidden?: boolean;
 }
 
 export interface PropertyDef {
@@ -608,6 +609,7 @@ const CLASSIC_CONTROL: Record<string, ComponentDef> = {
   'aux-contact-no': {
     id: 'aux-contact-no', name: 'Auxiliary Contact (1-Phase)', category: 'Classic Control',
     width: 50, height: 25, symbol: 'aux-contact-no',
+    hidden: true,
     terminals: [
       { id: 'a', name: '13', x: -25, y: 0, type: 'bidirectional' },
       { id: 'b', name: '14', x: 25, y: 0, type: 'bidirectional' },
@@ -628,6 +630,7 @@ const CLASSIC_CONTROL: Record<string, ComponentDef> = {
   'aux-contact-3phase': {
     id: 'aux-contact-3phase', name: '3-Phase Auxiliary Contact', category: 'Classic Control',
     width: 100, height: 50, symbol: 'aux-contact-3phase',
+    hidden: true,
     terminals: [
       { id: 'l1', name: 'L1', x: -50, y: -25, type: 'bidirectional' },
       { id: 'l2', name: 'L2', x: -50, y: 0, type: 'bidirectional' },
@@ -652,6 +655,7 @@ const CLASSIC_CONTROL: Record<string, ComponentDef> = {
   'coil': {
     id: 'coil', name: 'Electromagnetic Coil', category: 'Classic Control',
     width: 100, height: 40, symbol: 'coil',
+    hidden: true,
     terminals: [
       { id: 'pos', name: 'A1', x: -50, y: 0, type: 'input' },
       { id: 'neg', name: 'A2', x: 50, y: 0, type: 'input' },
@@ -715,6 +719,7 @@ const PROTECTION: Record<string, ComponentDef> = {
   'contactor': {
     id: 'contactor', name: 'Contactor', category: 'Protection',
     width: 100, height: 145, symbol: 'contactor',
+    hidden: true,
     terminals: [
       { id: 'coil+', name: 'A1', x: -50, y: -50, type: 'input' },
       { id: 'coil-', name: 'A2', x: 50, y: -50, type: 'input' },
@@ -1061,7 +1066,7 @@ export const CATEGORIES = [
 export type Category = typeof CATEGORIES[number];
 
 export function getComponentsByCategory(cat: string): ComponentDef[] {
-  return Object.values(COMPONENT_DEFS).filter(c => c.category === cat);
+  return Object.values(COMPONENT_DEFS).filter(c => c.category === cat && !c.hidden);
 }
 
 export function getDef(id: string): ComponentDef | undefined {
