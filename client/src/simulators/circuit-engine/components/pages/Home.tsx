@@ -2235,50 +2235,160 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
       ? `oscilloscope-${exportCounters.current.oscilloscope}-${index + 1}.${format}`
       : `oscilloscope-${exportCounters.current.oscilloscope}.${format}`;
 
-    if (!canvas) {
-      const offscreen = document.createElement('canvas');
-      offscreen.width = 300;
-      offscreen.height = 180;
-      const ctx = offscreen.getContext('2d');
-      if (ctx) {
-        ctx.fillStyle = '#090a0d';
-        ctx.fillRect(0, 0, 300, 180);
-        ctx.fillStyle = '#94a3b8';
+    const isDark = oscilloscopeDisplaySettings.isDarkMode;
+    const showValues = oscilloscopeDisplaySettings.showValues;
+
+    const channels = ['ch1', 'ch2', 'ch3', 'ch4'] as const;
+    const readings = channels.map(channel => effectiveSnapshot.instrumentReadings[`${scope.id}:${channel}`]);
+    const channelConfigs = channels.map(channel => ({
+      offset: numeric(scope.props[`offset_${channel}`], 0),
+      timeDiv: numeric(scope.props[`timeDiv_${channel}`], 0.01),
+      voltDiv: numeric(scope.props[`voltDiv_${channel}`], 5),
+      timeShift: numeric(scope.props[`timeShift_${channel}`], 0),
+    }));
+    const readyIndex = readings.findIndex(r => r?.status === 'ready');
+    const primaryConfig = channelConfigs[readyIndex >= 0 ? readyIndex : 0];
+
+    const width = canvas ? canvas.width : 300;
+    const height = canvas ? canvas.height : 180;
+
+    const exportCanvas = document.createElement('canvas');
+    exportCanvas.width = width;
+    exportCanvas.height = height;
+    const ctx = exportCanvas.getContext('2d');
+    if (ctx) {
+      ctx.fillStyle = isDark ? '#090a0d' : '#ffffff';
+      ctx.fillRect(0, 0, width, height);
+
+      if (canvas) {
+        ctx.drawImage(canvas, 0, 0);
+      } else {
+        ctx.fillStyle = isDark ? '#94a3b8' : '#64748b';
         ctx.font = '12px sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText(`${scope.label || 'Oscilloscope'} Screen`, 150, 90);
+        ctx.fillText(`${scope.label || 'Oscilloscope'} Screen`, width / 2, height / 2);
       }
-      const dataUrl = offscreen.toDataURL('image/png');
-      return Promise.resolve({
-        id: `scope-${scope.id}`,
-        title: scope.label ? `Live Oscilloscope (${scope.label})` : 'Live Oscilloscope',
-        filename,
-        format,
-        dataUrl,
-        width: 300,
-        height: 180,
-      });
+
+      if (showValues) {
+        const formatVoltageText = (v: number): string => {
+          if (Math.abs(v) < 1e-9) return '0 V';
+          const sign = v < 0 ? '-' : '+';
+          const abs = Math.abs(v);
+          if (abs < 1) {
+            const val = Number((abs * 1e3).toPrecision(3));
+            return `${sign}${val} mV`;
+          }
+          const val = Number(abs.toPrecision(3));
+          return `${sign}${val} V`;
+        };
+
+        const formatTimeText = (sec: number): string => {
+          if (Math.abs(sec) < 1e-9) return '0 s';
+          const abs = Math.abs(sec);
+          if (abs < 1e-3) {
+            const val = Number((abs * 1e6).toPrecision(3));
+            return `${val} µs`;
+          }
+          if (abs < 1) {
+            const val = Number((abs * 1e3).toPrecision(3));
+            return `${val} ms`;
+          }
+          const val = Number(abs.toPrecision(3));
+          return `${val} s`;
+        };
+
+        const badgeBg = isDark ? 'rgba(9, 10, 13, 0.92)' : 'rgba(255, 255, 255, 0.88)';
+        const badgeBorder = isDark ? '#1a1d24' : '#cbd5e1';
+        const textColor = isDark ? '#f8fafc' : '#1e293b';
+        ctx.font = '8px "KaTeX_Main", ui-monospace, SFMono-Regular, monospace';
+        ctx.textBaseline = 'middle';
+
+        const vertDivs = [
+          { text: formatVoltageText(primaryConfig.offset + 4 * primaryConfig.voltDiv), y: 8 },
+          { text: formatVoltageText(primaryConfig.offset + 2 * primaryConfig.voltDiv), y: height * 0.25 },
+          { text: formatVoltageText(primaryConfig.offset + 0 * primaryConfig.voltDiv), y: height * 0.50 },
+          { text: formatVoltageText(primaryConfig.offset - 2 * primaryConfig.voltDiv), y: height * 0.75 },
+          { text: formatVoltageText(primaryConfig.offset - 4 * primaryConfig.voltDiv), y: height - 18 },
+        ];
+
+        vertDivs.forEach(({ text, y }) => {
+          const metrics = ctx.measureText(text);
+          const w = metrics.width + 6;
+          const h = 12;
+          const x = 3;
+          const top = y - h / 2;
+          ctx.fillStyle = badgeBg;
+          ctx.strokeStyle = badgeBorder;
+          ctx.lineWidth = 1;
+          if (typeof ctx.roundRect === 'function') {
+            ctx.beginPath();
+            ctx.roundRect(x, top, w, h, 2);
+            ctx.fill();
+            ctx.stroke();
+          } else {
+            ctx.fillRect(x, top, w, h);
+            ctx.strokeRect(x, top, w, h);
+          }
+          ctx.fillStyle = textColor;
+          ctx.textAlign = 'left';
+          ctx.fillText(text, x + 3, y);
+        });
+
+        const horizDivs = [
+          { text: formatTimeText(0 * primaryConfig.timeDiv), align: 'left', x: 3 },
+          { text: formatTimeText(2 * primaryConfig.timeDiv), align: 'center', x: width * 0.20 },
+          { text: formatTimeText(4 * primaryConfig.timeDiv), align: 'center', x: width * 0.40 },
+          { text: formatTimeText(6 * primaryConfig.timeDiv), align: 'center', x: width * 0.60 },
+          { text: formatTimeText(8 * primaryConfig.timeDiv), align: 'center', x: width * 0.80 },
+          { text: formatTimeText(10 * primaryConfig.timeDiv), align: 'right', x: width - 3 },
+        ];
+
+        horizDivs.forEach(({ text, align, x }) => {
+          const metrics = ctx.measureText(text);
+          const w = metrics.width + 6;
+          const h = 12;
+          const boxX = align === 'left' ? x : align === 'right' ? x - w : x - w / 2;
+          const boxY = height - h - 2;
+          ctx.fillStyle = badgeBg;
+          ctx.strokeStyle = badgeBorder;
+          ctx.lineWidth = 1;
+          if (typeof ctx.roundRect === 'function') {
+            ctx.beginPath();
+            ctx.roundRect(boxX, boxY, w, h, 2);
+            ctx.fill();
+            ctx.stroke();
+          } else {
+            ctx.fillRect(boxX, boxY, w, h);
+            ctx.strokeRect(boxX, boxY, w, h);
+          }
+          ctx.fillStyle = textColor;
+          ctx.textAlign = 'center';
+          ctx.fillText(text, boxX + w / 2, boxY + h / 2);
+          ctx.textAlign = 'left';
+        });
+      }
     }
 
+    const pngData = exportCanvas.toDataURL('image/png');
+
     if (format === 'png') {
-      const dataUrl = canvas.toDataURL('image/png');
       return new Promise<ExportItem | null>(resolve => {
-        canvas.toBlob(blob => {
+        exportCanvas.toBlob(blob => {
           resolve({
             id: `scope-${scope.id}`,
             title: scope.label ? `Live Oscilloscope (${scope.label})` : 'Live Oscilloscope',
             filename,
             format: 'png',
-            dataUrl,
+            type: 'oscilloscope',
+            dataUrl: pngData,
             blob: blob || undefined,
-            width: canvas.width,
-            height: canvas.height,
+            width,
+            height,
           });
         }, 'image/png');
       });
     } else {
-      const pngData = canvas.toDataURL('image/png');
-      const svgStr = `<svg xmlns="http://www.w3.org/2000/svg" width="${canvas.width}" height="${canvas.height}" viewBox="0 0 ${canvas.width} ${canvas.height}"><rect width="${canvas.width}" height="${canvas.height}" fill="#090a0d"/><image href="${pngData}" width="${canvas.width}" height="${canvas.height}"/></svg>`;
+      const svgStr = `<svg xmlns="http://www.w3.org/2000/svg" class="${isDark ? 'dark' : ''}" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><rect width="${width}" height="${height}" fill="${isDark ? '#090a0d' : '#ffffff'}"/><image href="${pngData}" width="${width}" height="${height}"/></svg>`;
       const blob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
       const dataUrl = URL.createObjectURL(blob);
       return Promise.resolve({
@@ -2286,13 +2396,15 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
         title: scope.label ? `Live Oscilloscope (${scope.label})` : 'Live Oscilloscope',
         filename,
         format: 'svg',
+        type: 'oscilloscope',
         dataUrl,
         blob,
-        width: canvas.width,
-        height: canvas.height,
+        svgString: svgStr,
+        width,
+        height,
       });
     }
-  }, []);
+  }, [effectiveSnapshot.instrumentReadings, oscilloscopeDisplaySettings]);
 
   const captureDmmItem = useCallback((dmm: CircuitComponent, reading: InstrumentReading | undefined, format: 'png' | 'svg', index: number, total: number): Promise<ExportItem | null> => {
     let valueText = '—';
@@ -2318,6 +2430,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
         ? 'Open / not fully connected'
         : 'Connect HI and COM probes';
 
+    const isDark = darkPreview;
     const canvas = document.createElement('canvas');
     canvas.width = 480;
     canvas.height = 240;
@@ -2325,30 +2438,30 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     if (!ctx) return Promise.resolve(null);
 
     // Outer casing
-    ctx.fillStyle = '#0d0f12';
+    ctx.fillStyle = isDark ? '#0d0f12' : '#ffffff';
     if (typeof ctx.roundRect === 'function') {
       ctx.roundRect(0, 0, 480, 240, 16);
       ctx.fill();
     } else {
       ctx.fillRect(0, 0, 480, 240);
     }
-    ctx.strokeStyle = '#262c36';
+    ctx.strokeStyle = isDark ? '#262c36' : '#cbd5e1';
     ctx.lineWidth = 2;
     ctx.stroke();
 
     // Header
-    ctx.fillStyle = '#94a3b8';
+    ctx.fillStyle = isDark ? '#94a3b8' : '#475569';
     ctx.font = 'bold 13px ui-monospace, SFMono-Regular, Menlo, monospace';
     ctx.fillText((dmm.label || 'DIGITAL MULTIMETER').toUpperCase(), 24, 34);
 
-    ctx.fillStyle = '#64748b';
+    ctx.fillStyle = isDark ? '#64748b' : '#94a3b8';
     ctx.font = '11px sans-serif';
     ctx.textAlign = 'right';
     ctx.fillText('MAE ACADEMY PRECISION DMM', 456, 34);
     ctx.textAlign = 'left';
 
     // LCD screen bezel
-    ctx.fillStyle = '#031728';
+    ctx.fillStyle = isDark ? '#031728' : '#f0f9ff';
     if (typeof ctx.roundRect === 'function') {
       ctx.roundRect(20, 50, 440, 160, 10);
       ctx.fill();
@@ -2360,20 +2473,20 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     ctx.stroke();
 
     // Annunciator
-    ctx.fillStyle = '#38bdf8';
+    ctx.fillStyle = isDark ? '#38bdf8' : '#0284c7';
     ctx.font = 'bold 12px ui-monospace, SFMono-Regular, Menlo, monospace';
     const dmmMode = (dmm.props?.mode as string) || 'AUTO RANGE';
     ctx.fillText(dmmMode.toUpperCase(), 36, 78);
 
     // Value Display
-    ctx.fillStyle = '#e0f2fe';
+    ctx.fillStyle = isDark ? '#e0f2fe' : '#0369a1';
     ctx.font = 'bold 42px ui-monospace, SFMono-Regular, Menlo, monospace';
     ctx.textAlign = 'right';
     ctx.fillText(valueText, 440, 142);
     ctx.textAlign = 'left';
 
     // Subtitle
-    ctx.fillStyle = '#7dd3fc';
+    ctx.fillStyle = isDark ? '#7dd3fc' : '#0284c7';
     ctx.font = '12px sans-serif';
     ctx.fillText(statusText, 36, 185);
 
@@ -2390,6 +2503,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
             title: dmm.label ? `Digital Multimeter (${dmm.label})` : 'Digital Multimeter',
             filename,
             format: 'png',
+            type: 'multimeter',
             dataUrl,
             blob: blob || undefined,
             width: 480,
@@ -2399,7 +2513,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
       });
     } else {
       const pngData = canvas.toDataURL('image/png');
-      const svgStr = `<svg xmlns="http://www.w3.org/2000/svg" width="480" height="240" viewBox="0 0 480 240"><image href="${pngData}" width="480" height="240"/></svg>`;
+      const svgStr = `<svg xmlns="http://www.w3.org/2000/svg" class="${isDark ? 'dark' : ''}" width="480" height="240" viewBox="0 0 480 240"><rect width="480" height="240" fill="${isDark ? '#090a0d' : '#ffffff'}"/><image href="${pngData}" width="480" height="240"/></svg>`;
       const blob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
       const dataUrl = URL.createObjectURL(blob);
       return Promise.resolve({
@@ -2407,13 +2521,15 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
         title: dmm.label ? `Digital Multimeter (${dmm.label})` : 'Digital Multimeter',
         filename,
         format: 'svg',
+        type: 'multimeter',
         dataUrl,
         blob,
+        svgString: svgStr,
         width: 480,
         height: 240,
       });
     }
-  }, []);
+  }, [darkPreview]);
 
   const exportSvg = useCallback(async () => {
     if (components.length === 0 && texts.length === 0 && wires.length === 0) {
@@ -2435,6 +2551,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     const clonedSvg = svgRef.current.cloneNode(true) as SVGSVGElement;
     clonedSvg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
     clonedSvg.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
+    clonedSvg.setAttribute('class', darkPreview ? 'dark' : '');
     clonedSvg.setAttribute('viewBox', `${cropX} ${cropY} ${cropWidth} ${cropHeight}`);
     clonedSvg.setAttribute('width', String(cropWidth));
     clonedSvg.setAttribute('height', String(cropHeight));
@@ -2530,6 +2647,21 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
       .katex {
         font-family: 'KaTeX_Main', 'KaTeX_Math', 'KaTeX_AMS', serif;
       }
+      .mae-component-label {
+        fill: ${darkPreview ? '#f1f5f9' : '#1e293b'};
+        stroke: ${colors.canvas};
+      }
+      .dmm-body {
+        fill: ${darkPreview ? '#141820' : '#0d0f12'};
+        stroke: ${darkPreview ? '#3b4556' : '#262c36'};
+      }
+      .dmm-screen {
+        fill: ${darkPreview ? '#041d33' : '#e0f2fe'};
+        stroke: ${darkPreview ? '#38bdf8' : '#0284c7'};
+      }
+      .dmm-screen-text {
+        fill: ${darkPreview ? '#38bdf8' : '#0284c7'};
+      }
     `;
     defs.appendChild(styleEl);
 
@@ -2547,8 +2679,10 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
       title: 'Circuit Schematic',
       filename: `circuit-${exportCounters.current.circuit}.svg`,
       format: 'svg',
+      type: 'circuit',
       dataUrl: url,
       blob,
+      svgString,
       width: cropWidth,
       height: cropHeight,
     }];
@@ -2564,10 +2698,6 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
       const dmmItem = await captureDmmItem(activeDmms[i], effectiveSnapshot.instrumentReadings[activeDmms[i].id], 'svg', i, activeDmms.length);
       if (dmmItem) items.push(dmmItem);
     }
-
-    exportCounters.current.circuit += 1;
-    if (activeScopes.length > 0) exportCounters.current.oscilloscope += 1;
-    if (activeDmms.length > 0) exportCounters.current.multimeter += 1;
 
     setExportItems(items);
     setExportFormat('svg');
@@ -2651,6 +2781,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     const clonedSvg = svgRef.current.cloneNode(true) as SVGSVGElement;
     clonedSvg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
     clonedSvg.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
+    clonedSvg.setAttribute('class', darkPreview ? 'dark' : '');
     clonedSvg.setAttribute('viewBox', `${cropX} ${cropY} ${cropWidth} ${cropHeight}`);
     clonedSvg.setAttribute('width', String(canvas.width));
     clonedSvg.setAttribute('height', String(canvas.height));
@@ -2715,6 +2846,21 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
       .katex {
         font-family: 'KaTeX_Main', 'KaTeX_Math', 'KaTeX_AMS', serif;
       }
+      .mae-component-label {
+        fill: ${darkPreview ? '#f1f5f9' : '#1e293b'};
+        stroke: ${colors.canvas};
+      }
+      .dmm-body {
+        fill: ${darkPreview ? '#141820' : '#0d0f12'};
+        stroke: ${darkPreview ? '#3b4556' : '#262c36'};
+      }
+      .dmm-screen {
+        fill: ${darkPreview ? '#041d33' : '#e0f2fe'};
+        stroke: ${darkPreview ? '#38bdf8' : '#0284c7'};
+      }
+      .dmm-screen-text {
+        fill: ${darkPreview ? '#38bdf8' : '#0284c7'};
+      }
     `;
     defs.appendChild(styleEl);
 
@@ -2736,6 +2882,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
           title: 'Circuit Schematic',
           filename: `circuit-${exportCounters.current.circuit}.png`,
           format: 'png',
+          type: 'circuit',
           dataUrl: pngUrl,
           blob: circuitBlob || undefined,
           width: canvas.width,
@@ -2753,10 +2900,6 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
           const dmmItem = await captureDmmItem(activeDmms[i], effectiveSnapshot.instrumentReadings[activeDmms[i].id], 'png', i, activeDmms.length);
           if (dmmItem) items.push(dmmItem);
         }
-
-        exportCounters.current.circuit += 1;
-        if (activeScopes.length > 0) exportCounters.current.oscilloscope += 1;
-        if (activeDmms.length > 0) exportCounters.current.multimeter += 1;
 
         setExportItems(items);
         setExportFormat('png');
@@ -3310,7 +3453,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                     onPointerLeave={() => setHoveredComponentId(null)}
                   >
                     <g transform={symbolTransform} color={isSelected ? colors.selection : undefined}>
-                      {renderSymbol(definition.symbol, powered, { ...component.props, label: component.label, isEnergized: powered, isConflicted: conflictedCoilIds.has(component.id), _intensity: intensity, ...(motorVEff !== undefined ? { _vEff: motorVEff } : {}), _documentedStyle: tabDUiRefinement, ...(meterDisplayValue !== undefined ? { displayValue: meterDisplayValue } : {}) }, animationTime)}
+                      {renderSymbol(definition.symbol, powered, { ...component.props, label: component.label, selected: isSelected, _isSelected: isSelected, isDark: darkPreview, _isDark: darkPreview, isEnergized: powered, isConflicted: conflictedCoilIds.has(component.id), _intensity: intensity, ...(motorVEff !== undefined ? { _vEff: motorVEff } : {}), _documentedStyle: tabDUiRefinement, ...(meterDisplayValue !== undefined ? { displayValue: meterDisplayValue } : {}) }, animationTime)}
                     </g>
                     {definition.terminals.map(terminal => {
                       const snappedWorld = getCanvasTerminalPosition(component, terminal.id);
@@ -3492,12 +3635,34 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
           </aside>
         </div>
       </div>
-      <ExportPreviewModal
-        isOpen={exportModalOpen}
-        onClose={() => setExportModalOpen(false)}
-        items={exportItems}
-        format={exportFormat}
-      />
+      {(() => {
+        const handleItemDownloaded = (item: ExportItem) => {
+          const type = item.type ?? (item.id.startsWith('circuit') ? 'circuit' : item.id.startsWith('scope') ? 'oscilloscope' : 'multimeter');
+          exportCounters.current[type] += 1;
+        };
+
+        const handleAllDownloaded = (downloadedItems: ExportItem[]) => {
+          const seen = new Set<'circuit' | 'oscilloscope' | 'multimeter'>();
+          downloadedItems.forEach(it => {
+            const type = it.type ?? (it.id.startsWith('circuit') ? 'circuit' : it.id.startsWith('scope') ? 'oscilloscope' : 'multimeter');
+            seen.add(type);
+          });
+          seen.forEach(type => {
+            exportCounters.current[type] += 1;
+          });
+        };
+
+        return (
+          <ExportPreviewModal
+            isOpen={exportModalOpen}
+            onClose={() => setExportModalOpen(false)}
+            items={exportItems}
+            format={exportFormat}
+            onItemDownloaded={handleItemDownloaded}
+            onAllDownloaded={handleAllDownloaded}
+          />
+        );
+      })()}
     </div>
   );
 }

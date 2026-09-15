@@ -100,4 +100,30 @@ describe('Part 3: ExportPreviewModal Component', () => {
     expect(markup).toContain('Download All');
     expect(markup).toContain('bg-gradient-to-r from-blue-600 via-purple-600 to-rose-500');
   });
+
+  it('renders Copy button for SVG export items and displays SVG filenames', () => {
+    const svgItems: ExportItem[] = [
+      {
+        id: 'circuit-main',
+        title: 'Circuit Schematic',
+        filename: 'circuit-1.svg',
+        format: 'svg',
+        dataUrl: 'data:image/svg+xml;utf8,<svg></svg>',
+        svgString: '<svg xmlns="http://www.w3.org/2000/svg"></svg>',
+      },
+    ];
+
+    const markup = renderToStaticMarkup(
+      <ExportPreviewModal
+        isOpen={true}
+        onClose={() => {}}
+        items={svgItems}
+        format="svg"
+      />
+    );
+
+    expect(markup).toContain('circuit-1.svg');
+    expect(markup).toContain('Copy');
+    expect(markup).toContain('Save');
+  });
 });

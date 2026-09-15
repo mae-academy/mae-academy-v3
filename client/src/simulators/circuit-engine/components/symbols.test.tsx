@@ -262,15 +262,16 @@ describe('Tab D SVG symbol language', () => {
     expect(triac).toContain('d="M -0,10 L -18,25 L -25,25"');
   });
 
-  it('renders DMM with top-center KaTeX title header and white halo stroke', () => {
+  it('renders DMM with standardized mae-component-label, KaTeX title header, and dark mode support', () => {
     const dmm = markup('dmm');
     expect(dmm).toContain('>DMM<');
+    expect(dmm).toContain('mae-component-label');
     expect(dmm).toContain('KaTeX_Math');
-    expect(dmm).toContain('font-style="italic"');
-    expect(dmm).toContain('stroke="white"');
-    expect(dmm).toContain('stroke-width="3"');
-    expect(dmm).toContain('paint-order="stroke fill"');
     expect(dmm).toContain('y="-58"');
+
+    const dmmDark = markup('dmm', { _isDark: true });
+    expect(dmmDark).toContain('fill="#141820"');
+    expect(dmmDark).toContain('stroke="#3b4556"');
 
     const dmm1 = markup('dmm', { label: 'DMM1' });
     expect(dmm1).toContain('DMM<tspan');
@@ -312,18 +313,26 @@ describe('Tab D SVG symbol language', () => {
     expect(formatMeterReading(-0.005, 'A')).toBe('-5.000 mA');
   });
 
-  it('renders oscilloscope with a clean dark screen, no sine wave, and clean channel labels', () => {
-    const scope = markup('oscilloscope');
+  it('renders oscilloscope with terminal labels visible ONLY when selected', () => {
+    const unselectedScope = markup('oscilloscope');
     // Decorative sine wave removed
-    expect(scope).not.toContain('C -45,-55 -35,15 -20,-20');
+    expect(unselectedScope).not.toContain('C -45,-55 -35,15 -20,-20');
     // Clean screen with grid intact
-    expect(scope).toContain('fill="#000000"');
-    // External labels outside screen and body
-    expect(scope).toContain('>CH1<');
-    expect(scope).toContain('>CH2<');
-    expect(scope).toContain('>CH3<');
-    expect(scope).toContain('>CH4<');
-    expect(scope).toContain('>GND<');
+    expect(unselectedScope).toContain('fill="#000000"');
+    // External labels MUST NOT appear when unselected
+    expect(unselectedScope).not.toContain('>CH1<');
+    expect(unselectedScope).not.toContain('>CH2<');
+    expect(unselectedScope).not.toContain('>CH3<');
+    expect(unselectedScope).not.toContain('>CH4<');
+    expect(unselectedScope).not.toContain('>GND<');
+
+    const selectedScope = markup('oscilloscope', { selected: true });
+    // External labels MUST appear when selected
+    expect(selectedScope).toContain('>CH1<');
+    expect(selectedScope).toContain('>CH2<');
+    expect(selectedScope).toContain('>CH3<');
+    expect(selectedScope).toContain('>CH4<');
+    expect(selectedScope).toContain('>GND<');
   });
 
   it('renders 1-Phase Aux Contact dynamically with open blade for NO and closed with IEC diagonal slash for NC', () => {

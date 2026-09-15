@@ -9,6 +9,8 @@ export interface ExportItem {
   format: 'png' | 'svg';
   dataUrl: string;
   blob?: Blob;
+  svgString?: string;
+  type?: 'circuit' | 'oscilloscope' | 'multimeter';
   width?: number;
   height?: number;
 }
@@ -18,6 +20,8 @@ export interface ExportPreviewModalProps {
   onClose: () => void;
   items: ExportItem[];
   format: 'png' | 'svg';
+  onItemDownloaded?: (item: ExportItem) => void;
+  onAllDownloaded?: (items: ExportItem[]) => void;
 }
 
 export function ExportPreviewModal({
@@ -25,6 +29,8 @@ export function ExportPreviewModal({
   onClose,
   items,
   format,
+  onItemDownloaded,
+  onAllDownloaded,
 }: ExportPreviewModalProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
@@ -61,16 +67,15 @@ export function ExportPreviewModal({
         toast.success(`Copied ${item.filename} to clipboard`);
         setTimeout(() => setCopiedId(null), 2000);
       } else {
-        // SVG text copy
-        const res = await fetch(item.dataUrl);
-        const text = await res.text();
+        // SVG raw text copy
+        const text = item.svgString || (await (await fetch(item.dataUrl)).text());
         await navigator.clipboard.writeText(text);
         setCopiedId(item.id);
-        toast.success(`Copied SVG code to clipboard`);
+        toast.success('Copied Code!');
         setTimeout(() => setCopiedId(null), 2000);
       }
     } catch (err) {
-      toast.error('Failed to copy image to clipboard');
+      toast.error('Failed to copy to clipboard');
     }
   };
 
@@ -83,6 +88,7 @@ export function ExportPreviewModal({
       link.click();
       document.body.removeChild(link);
       toast.success(`Downloaded ${item.filename}`);
+      onItemDownloaded?.(item);
     } catch (err) {
       toast.error(`Failed to download ${item.filename}`);
     }
@@ -101,6 +107,11 @@ export function ExportPreviewModal({
       }, index * 250);
     });
     toast.success(`Exporting all ${items.length} files...`);
+    if (onAllDownloaded) {
+      onAllDownloaded(items);
+    } else if (onItemDownloaded) {
+      items.forEach(it => onItemDownloaded(it));
+    }
   };
 
   return (
@@ -173,25 +184,24 @@ export function ExportPreviewModal({
 
                     {/* Item Action Buttons */}
                     <div className="flex items-center justify-end gap-2 mt-3 pt-2 border-t border-slate-200/60 dark:border-[#1b2028]">
-                      {item.format === 'png' && (
-                        <button
-                          type="button"
-                          onClick={() => handleCopy(item)}
-                          className="px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors flex items-center gap-1.5 bg-white hover:bg-slate-50 text-slate-700 border-slate-200 dark:bg-[#13161c] dark:hover:bg-[#1b2028] dark:text-slate-200 dark:border-[#262c36]"
-                        >
-                          {isCopied ? (
-                            <>
-                              <Check size={13} className="text-emerald-500" />
-                              <span>Copied</span>
-                            </>
-                          ) : (
-                            <>
-                              <Copy size={13} />
-                              <span>Copy</span>
-                            </>
-                          )}
-                        </button>
-                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleCopy(item)}
+                        className="px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors flex items-center gap-1.5 bg-white hover:bg-slate-50 text-slate-700 border-slate-200 dark:bg-[#13161c] dark:hover:bg-[#1b2028] dark:text-slate-200 dark:border-[#262c36]"
+                        title={item.format === 'svg' ? 'Copy raw SVG code to clipboard' : 'Copy image to clipboard'}
+                      >
+                        {isCopied ? (
+                          <>
+                            <Check size={13} className="text-emerald-500" />
+                            <span>{item.format === 'svg' ? 'Copied Code!' : 'Copied'}</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy size={13} />
+                            <span>{item.format === 'svg' ? 'Copy' : 'Copy'}</span>
+                          </>
+                        )}
+                      </button>
                       <button
                         type="button"
                         onClick={() => handleSave(item)}

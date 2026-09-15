@@ -1219,54 +1219,103 @@ const RelayDpst: SymbolFC = ({ powered, props }) => {
 };
 
 const DmmSymbol: SymbolFC = ({ props }) => {
+  const isDark = Boolean(props?._isDark || props?.isDark);
   const raw = String(props?.label || 'DMM');
   const match = raw.match(/^([A-Za-z]+)(\d+)$/);
   return (
     <g>
       {/* Main Body - Height stretched to exactly hit y=50 */}
-      <rect x={-35} y={-50} width={70} height={100} rx={6} fill="#0d0f12" stroke="#1b2028" strokeWidth={1.5} />
+      <rect
+        x={-35}
+        y={-50}
+        width={70}
+        height={100}
+        rx={6}
+        className="dmm-body fill-slate-900 dark:fill-[#141820] stroke-slate-400 dark:stroke-[#3b4556]"
+        fill={isDark ? '#141820' : '#0d0f12'}
+        stroke={isDark ? '#3b4556' : '#1b2028'}
+        strokeWidth={1.5}
+      />
       {/* Top Header Label - Positioned cleanly ABOVE the main SVG body with KaTeX style & halo effect */}
       <text
         x={0}
         y={-58}
         textAnchor="middle"
         dominantBaseline="central"
-        fontSize={12}
-        fontStyle="italic"
-        fontFamily="KaTeX_Math, Times New Roman, serif"
-        fill="#0f172a"
-        stroke="white"
-        strokeWidth={3}
-        strokeLinejoin="round"
-        paintOrder="stroke fill"
+        fontSize={13}
+        className="mae-component-label fill-slate-800 dark:fill-slate-100 stroke-white dark:stroke-[#090b0e]"
+        style={{
+          fontFamily: "'KaTeX_Main', 'KaTeX_Math', serif",
+          paintOrder: 'stroke fill',
+          strokeWidth: 3.5,
+          strokeLinejoin: 'round',
+          strokeLinecap: 'round',
+        }}
+        fill={isDark ? '#f1f5f9' : '#1e293b'}
+        stroke={isDark ? '#090b0e' : '#ffffff'}
       >
         {match ? (
           <>
             {match[1]}
-            <tspan dy="2.5" fontSize="9px" fontStyle="normal" fontFamily="KaTeX_Main, sans-serif">{match[2]}</tspan>
+            <tspan dy="2.5" fontSize="9px" fontStyle="normal" fontFamily="'KaTeX_Main', sans-serif">{match[2]}</tspan>
           </>
         ) : (
           raw
         )}
       </text>
       {/* LCD Screen */}
-      <rect x={-25} y={-38} width={50} height={22} rx={3} fill="#e0f2fe" stroke="#0284c7" strokeWidth={1} />
+      <rect
+        x={-25}
+        y={-38}
+        width={50}
+        height={22}
+        rx={3}
+        className="dmm-screen fill-[#e0f2fe] dark:fill-[#041d33] stroke-[#0284c7] dark:stroke-[#38bdf8]"
+        fill={isDark ? '#041d33' : '#e0f2fe'}
+        stroke={isDark ? '#38bdf8' : '#0284c7'}
+        strokeWidth={1}
+      />
       {/* Dial */}
-      <circle cx={0} cy={16} r={14} fill="#1b2028" stroke="#262c36" strokeWidth={1.5} />
+      <circle
+        cx={0}
+        cy={16}
+        r={14}
+        fill={isDark ? '#1e293b' : '#1b2028'}
+        stroke={isDark ? '#3b4556' : '#262c36'}
+        strokeWidth={1.5}
+      />
       <circle cx={0} cy={6} r={2} fill="#94a3b8" />
       {/* Buttons */}
-      <circle cx={-18} cy={-8} r={3} fill="#262c36" />
-      <circle cx={18} cy={-8} r={3} fill="#262c36" />
+      <circle cx={-18} cy={-8} r={3} fill={isDark ? '#334155' : '#262c36'} />
+      <circle cx={18} cy={-8} r={3} fill={isDark ? '#334155' : '#262c36'} />
       {/* Jacks exactly sitting on the y=50 grid bottom edge */}
       <circle cx={-25} cy={50} r={4} fill="#ef4444" stroke="#7f1d1d" strokeWidth={1.5} />
-      <circle cx={25} cy={50} r={4} fill="#0d0f12" stroke="#000000" strokeWidth={1.5} />
+      <circle
+        cx={25}
+        cy={50}
+        r={4}
+        fill={isDark ? '#1e293b' : '#0d0f12'}
+        stroke={isDark ? '#64748b' : '#000000'}
+        strokeWidth={1.5}
+      />
       {/* LCD Text */}
-      <text x={0} y={-27} textAnchor="middle" fontSize={11} fontWeight={700} fontFamily="ui-monospace, monospace" fill="#0284c7">{String(props?.mode ?? 'DCV')}</text>
+      <text
+        x={0}
+        y={-27}
+        textAnchor="middle"
+        fontSize={11}
+        fontWeight={700}
+        fontFamily="ui-monospace, monospace"
+        className="dmm-screen-text fill-[#0284c7] dark:fill-[#38bdf8]"
+        fill={isDark ? '#38bdf8' : '#0284c7'}
+      >
+        {String(props?.mode ?? 'DCV')}
+      </text>
     </g>
   );
 };
 
-const OscilloscopeSymbol: SymbolFC = () => (
+const OscilloscopeSymbol: SymbolFC = ({ props }) => (
   <g>
     {/* Main Widescreen Body: 140x100 (leaves 5px for terminals to reach ±75) */}
     <rect x={-70} y={-60} width={140} height={100} rx={6} fill="#0d0f12" stroke="#1b2028" strokeWidth={1.5} />
@@ -1303,12 +1352,16 @@ const OscilloscopeSymbol: SymbolFC = () => (
 
     <line x1={70} y1={25} x2={75} y2={25} stroke="currentColor" strokeWidth={1.5} />
 
-    {/* Channel & Ground Port Labels outside screen and body */}
-    <text x={-78} y={-50} textAnchor="end" dominantBaseline="central" fontSize={7} fontWeight="normal" fill="#94a3b8">CH1</text>
-    <text x={-78} y={-25} textAnchor="end" dominantBaseline="central" fontSize={7} fontWeight="normal" fill="#94a3b8">CH2</text>
-    <text x={-78} y={0} textAnchor="end" dominantBaseline="central" fontSize={7} fontWeight="normal" fill="#94a3b8">CH3</text>
-    <text x={-78} y={25} textAnchor="end" dominantBaseline="central" fontSize={7} fontWeight="normal" fill="#94a3b8">CH4</text>
-    <text x={78} y={25} textAnchor="start" dominantBaseline="central" fontSize={7} fontWeight="normal" fill="#94a3b8">GND</text>
+    {/* Channel & Ground Port Labels outside screen and body (rendered only when selected) */}
+    {(props?.selected || props?._isSelected) && (
+      <>
+        <text x={-78} y={-50} textAnchor="end" dominantBaseline="central" fontSize={7} fontWeight="normal" fill="#94a3b8">CH1</text>
+        <text x={-78} y={-25} textAnchor="end" dominantBaseline="central" fontSize={7} fontWeight="normal" fill="#94a3b8">CH2</text>
+        <text x={-78} y={0} textAnchor="end" dominantBaseline="central" fontSize={7} fontWeight="normal" fill="#94a3b8">CH3</text>
+        <text x={-78} y={25} textAnchor="end" dominantBaseline="central" fontSize={7} fontWeight="normal" fill="#94a3b8">CH4</text>
+        <text x={78} y={25} textAnchor="start" dominantBaseline="central" fontSize={7} fontWeight="normal" fill="#94a3b8">GND</text>
+      </>
+    )}
   </g>
 );
 
