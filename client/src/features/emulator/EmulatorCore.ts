@@ -41,14 +41,14 @@ export class EmulatorCore {
     // DOS COM flat model: every real-mode segment shares one PSP-relative base.
     this.setSegment(cpu, SEGMENT.CS, CODE_SEGMENT); this.setSegment(cpu, SEGMENT.DS, CODE_SEGMENT); this.setSegment(cpu, SEGMENT.ES, CODE_SEGMENT); this.setSegment(cpu, SEGMENT.SS, CODE_SEGMENT);
     cpu.reg32[4] = STACK_OFFSET; cpu.instruction_pointer[0] = (CODE_SEGMENT << 4) + program.origin; cpu.previous_ip[0] = cpu.instruction_pointer[0]; cpu.last_virt_eip[0] = -1; cpu.eip_phys[0] = 0; cpu.update_state_flags();
-    this.instance!.write_memory(program.bytes, (CODE_SEGMENT << 4) + program.origin); this.program = program; this.snapshots = []; this.traceStep = 0; this.halted = false; this.initialState = await this.instance!.save_state(); this.emitState(); return true;
+    this.instance!.write_memory(program.bytes, (CODE_SEGMENT << 4) + program.origin); this.program = program; this.snapshots = []; this.traceStep = 0; this.halted = false; this.pendingKeyboard = []; this.initialState = await this.instance!.save_state(); this.emitState(); return true;
   }
 
   async run() { if (!this.program) throw new Error("Assemble a program before running it"); this.running = true; let budget = 0; while (this.running && !this.halted) { const line = this.currentLine(); if ((line === null && budget > 0) || (line !== null && this.breakpoints.has(line) && budget > 0)) break; if (budget >= 2048) { this.events.onError?.("Execution stopped after 2048 instructions outside the mapped source range"); break; } await this.step(); budget++; if (budget % 24 === 0) await wait(0); } this.running = false; }
   stop() { this.running = false; }
-  async step() { if (!this.program || this.halted) return; const before = this.getCpuState(); if (!this.program.executableOffsets.has(before.pointers.ip)) { this.halted = true; this.running = false; this.events.onError?.("Execution entered an unmapped data region"); return; } this.snapshots.push(await this.instance!.save_state()); if (this.snapshots.length > 96) this.snapshots.shift(); const line = this.currentLine(); const stopOffset = this.program.haltOffsets.has(before.pointers.ip); this.cpu().mae_step_instruction(); this.traceStep++; if (stopOffset || this.cpu().in_hlt[0] !== 0) { this.halted = true; this.running = false; } const state = this.getCpuState(); const instruction = line ? this.program.source[line - 1].trim() : "—"; const entry: ExecutionTraceEntry = { step: this.traceStep, line, instruction, value: `AX=${hex(state.registers.ax)}` }; this.events.onTrace?.(entry); this.emitState(); }
+  async step() { if (!this.program || this.halted) return; const before = this.getCpuState(); if (!this.program.executableOffsets.has(before.pointers.ip)) { this.halted = true; this.running = false; this.events.onError?.("Execution entered an unmapped data region"); return; } this.snapshots.push(await this.instance!.save_state()); if (this.snapshots.length > 96) this.snapshots.shift(); const line = this.currentLine(); const stopOffset = this.program.haltOffsets.has(before.pointers.ip); this.cpu().mae_step_instruction(); this.traceStep++; if (stopOffset || this.cpu().in_hlt[0] !== 0) { this.halted = true; this.running = false; } const state = this.getCpuState(); const instruction = line ? this.program.source[line - 1].trim() : "—"; const entry: ExecutionTraceEntry = { step: this.traceStep, line, instruction, value: this.describeChange(before, state) }; this.events.onTrace?.(entry); this.emitState(); }
   async stepBack() { const snapshot = this.snapshots.pop(); if (!snapshot || !this.instance) return; this.running = false; await this.instance.restore_state(snapshot); await wait(0); this.traceStep = Math.max(0, this.traceStep - 1); this.halted = false; this.emitState(); }
-  async reset() { if (!this.initialState || !this.instance) return; this.running = false; await this.instance.restore_state(this.initialState.slice(0)); this.snapshots = []; this.traceStep = 0; this.halted = false; this.emitState(); }
+  async reset() { if (!this.initialState || !this.instance) return; this.running = false; await this.instance.restore_state(this.initialState.slice(0)); this.snapshots = []; this.traceStep = 0; this.halted = false; this.pendingKeyboard = []; this.emitState(); }
   setBreakpoint(lineNumber: number) { this.breakpoints.add(lineNumber); }
   clearBreakpoint(lineNumber: number) { this.breakpoints.delete(lineNumber); }
   sendKey(text: string) { this.pendingKeyboard.push(...Array.from(text).map((character) => character.charCodeAt(0) & 0xff)); }
@@ -60,6 +60,17 @@ export class EmulatorCore {
   private cpu() { if (!this.instance) throw new Error("The emulator core has not initialized"); return this.instance.v86.cpu; }
   private setSegment(cpu: CpuBridge, index: number, value: number) { cpu.sreg[index] = value; cpu.segment_offsets[index] = value << 4; cpu.segment_limits[index] = 0xffff; cpu.segment_is_null[index] = 0; }
   private currentLine() { if (!this.program) return null; return this.program.sourceByOffset.get(this.getCpuState().pointers.ip) ?? null; }
+  /** Reports the registers an instruction actually touched, instead of assuming AX. */
+  private describeChange(before: CpuState, after: CpuState): string {
+    const tracked: Array<[string, number, number]> = [
+      ["AX", before.registers.ax, after.registers.ax], ["BX", before.registers.bx, after.registers.bx],
+      ["CX", before.registers.cx, after.registers.cx], ["DX", before.registers.dx, after.registers.dx],
+      ["SI", before.pointers.si, after.pointers.si], ["DI", before.pointers.di, after.pointers.di],
+      ["BP", before.pointers.bp, after.pointers.bp], ["SP", before.pointers.sp, after.pointers.sp],
+    ];
+    const changed = tracked.filter(([, previous, next]) => previous !== next).map(([name, , next]) => `${name}=${hex(next)}`);
+    return changed.length ? changed.join(" ") : `IP=${hex(after.pointers.ip)}`;
+  }
   private emitState() { this.events.onStateChange?.(this.getCpuState()); }
   private handleInterrupt([interrupt, ah, dx]: [number, number, number]) { const state = this.getCpuState(); const payload: InterruptPayload = { interrupt, ah, dx, al: state.registers.al, state }; this.events.onInterruptTriggered?.(payload); if (interrupt === 0x10 && ah === 0x0e) this.events.onTerminalOutput?.(String.fromCharCode(state.registers.al)); if (interrupt === 0x21 && ah === 0x02) this.events.onTerminalOutput?.(String.fromCharCode(state.registers.dl)); if (interrupt === 0x21 && (ah === 0x01 || ah === 0x08)) { const key = this.pendingKeyboard.shift() ?? 0; const cpu = this.cpu(); cpu.reg32[0] = (cpu.reg32[0] & 0xffffff00) | key; if (ah === 0x01 && key) this.events.onTerminalOutput?.(String.fromCharCode(key)); } if (interrupt === 0x21 && ah === 0x09) { const start = (state.segments.ds << 4) + dx; const characters: string[] = []; for (const byte of Array.from(this.readMemory(start, 512))) { if (byte === 0x24) break; characters.push(String.fromCharCode(byte)); } this.events.onTerminalOutput?.(characters.join("")); } if (interrupt === 0x21 && ah === 0x4c) { this.halted = true; this.running = false; } }
 }

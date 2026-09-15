@@ -1,6 +1,6 @@
 /* MAE Luminous Technical Atelier: Tab D Academic Analysis renders solver-backed derivations only.
    This view selects an engine trace; all circuit mathematics remains inside the dedicated solvers. */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { MNAElement } from '@/simulators/circuit-engine/engine/mnaSolver';
 import { NodalSolver } from '@/simulators/circuit-engine/engine/NodalSolver';
 import { MeshSolver } from '@/simulators/circuit-engine/engine/MeshSolver';
@@ -39,7 +39,19 @@ export function AnalysisBox({ elements, geometry, nodalNodes = [], colors, stand
     if (method === 'transform') return new SourceTransformationSolver(elements).analyze(targetSource, targetResistor);
     return new TheveninSolver(elements).analyze(targetResistor);
   }, [elements, geometry, method, nodalNodes, targetResistor, targetSource]);
-  useEffect(() => { onTraceChange?.(trace); }, [onTraceChange, trace]);
+
+  const onTraceChangeRef = useRef(onTraceChange);
+  useEffect(() => {
+    onTraceChangeRef.current = onTraceChange;
+  });
+
+  const prevTraceKeyRef = useRef<string>('');
+  useEffect(() => {
+    const key = `${trace.method}:${trace.status}:${trace.heading}:${trace.warning || ''}:${trace.steps.length}:${trace.steps.map(s => `${s.title}=${s.math}`).join('|')}`;
+    if (prevTraceKeyRef.current === key) return;
+    prevTraceKeyRef.current = key;
+    onTraceChangeRef.current?.(trace);
+  }, [trace]);
   const displayMath = (math: string) => compactMathNumbers(math, precision);
   const meshStepStyle = (title: string) => { if (method !== 'mesh') return undefined; const match = title.match(/(?:Loop|Mesh)\s*(\d+)/i); if (!match) return undefined; return { borderLeft: `3px solid ${MESH_LOOP_COLORS[(parseInt(match[1], 10) - 1) % MESH_LOOP_COLORS.length]}` }; };
 

@@ -237,31 +237,82 @@ export function ExportPreviewModal({
       }
 
       // Vector SVG Copying with MS Word / PowerPoint text/html compatibility wrapper
-      const cleanSvgString = item.svgString || (await (await fetch(item.dataUrl)).text());
+      let cleanSvgString = item.svgString || (await (await fetch(item.dataUrl)).text());
+
+      // Ensure explicit width, height in pixels and xmlns for MS Word / PowerPoint compatibility
+      let targetWidth = item.width;
+      let targetHeight = item.height;
+      if (typeof DOMParser !== 'undefined') {
+        try {
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(cleanSvgString, 'image/svg+xml');
+          const svgEl = doc.querySelector('svg');
+          if (svgEl) {
+            svgEl.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+            if (targetWidth && targetHeight) {
+              svgEl.setAttribute('width', `${targetWidth}px`);
+              svgEl.setAttribute('height', `${targetHeight}px`);
+            } else {
+              const vb = svgEl.getAttribute('viewBox');
+              if (vb) {
+                const parts = vb.trim().split(/[\s,]+/).map(Number);
+                if (parts.length === 4 && parts[2] > 0 && parts[3] > 0) {
+                  targetWidth = Math.round(parts[2]);
+                  targetHeight = Math.round(parts[3]);
+                  svgEl.setAttribute('width', `${targetWidth}px`);
+                  svgEl.setAttribute('height', `${targetHeight}px`);
+                }
+              }
+            }
+            svgEl.removeAttribute('style');
+            cleanSvgString = new XMLSerializer().serializeToString(svgEl);
+          }
+        } catch {
+          // fallback
+        }
+      }
+
       const base64Svg = btoa(unescape(encodeURIComponent(cleanSvgString)));
-      const htmlWrapper = `<img src="data:image/svg+xml;base64,${base64Svg}" />`;
+      const imgWidthAttr = targetWidth ? ` width="${targetWidth}"` : '';
+      const imgHeightAttr = targetHeight ? ` height="${targetHeight}"` : '';
+      const htmlWrapper = `<img${imgWidthAttr}${imgHeightAttr} src="data:image/svg+xml;base64,${base64Svg}" />`;
       const svgBlob = new Blob([cleanSvgString], { type: 'image/svg+xml' });
+
+      let pngFallbackBlob: Blob | undefined;
+      try {
+        pngFallbackBlob = await svgToPngBlob(cleanSvgString, targetWidth, targetHeight);
+      } catch {
+        // ignore
+      }
 
       let writeSuccess = false;
 
-      // Try rich clipboard write: text/html (Word/PowerPoint), image/svg+xml (vector apps), text/plain
+      // Try rich clipboard write: text/html (Word/PowerPoint), image/svg+xml (vector apps), text/plain, image/png
       try {
+        const clipItems: Record<string, Blob> = {
+          'text/html': new Blob([htmlWrapper], { type: 'text/html' }),
+          'image/svg+xml': svgBlob,
+          'text/plain': new Blob([cleanSvgString], { type: 'text/plain' }),
+        };
+        if (pngFallbackBlob) {
+          clipItems['image/png'] = pngFallbackBlob;
+        }
         await navigator.clipboard.write([
-          new ClipboardItem({
-            'text/html': new Blob([htmlWrapper], { type: 'text/html' }),
-            'image/svg+xml': svgBlob,
-            'text/plain': new Blob([cleanSvgString], { type: 'text/plain' }),
-          }),
+          new ClipboardItem(clipItems),
         ]);
         writeSuccess = true;
       } catch {
         // Fallback without image/svg+xml representation
         try {
+          const clipItems: Record<string, Blob> = {
+            'text/html': new Blob([htmlWrapper], { type: 'text/html' }),
+            'text/plain': new Blob([cleanSvgString], { type: 'text/plain' }),
+          };
+          if (pngFallbackBlob) {
+            clipItems['image/png'] = pngFallbackBlob;
+          }
           await navigator.clipboard.write([
-            new ClipboardItem({
-              'text/html': new Blob([htmlWrapper], { type: 'text/html' }),
-              'text/plain': new Blob([cleanSvgString], { type: 'text/plain' }),
-            }),
+            new ClipboardItem(clipItems),
           ]);
           writeSuccess = true;
         } catch {

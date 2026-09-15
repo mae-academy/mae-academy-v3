@@ -167,9 +167,9 @@ describe('Part 3: ExportPreviewModal Component', () => {
 });
 
 describe('Pure Native Vector SVG & 4K Resolution Integrity', () => {
-  it('ensures exported SVG string contains pure vector nodes and no raster <image> elements', () => {
+  it('ensures exported SVG string contains pure vector nodes and explicit physical px dimensions', () => {
     const dmmSvg = `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 240" width="100%" height="100%">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 240" width="480px" height="240px">
   <defs>
     <style>text { font-family: ui-monospace, monospace; }</style>
   </defs>
@@ -181,14 +181,15 @@ describe('Pure Native Vector SVG & 4K Resolution Integrity', () => {
 
     expect(dmmSvg).not.toContain('<image');
     expect(dmmSvg).toContain('viewBox="0 0 480 240"');
-    expect(dmmSvg).toContain('width="100%"');
-    expect(dmmSvg).toContain('height="100%"');
+    expect(dmmSvg).toContain('width="480px"');
+    expect(dmmSvg).toContain('height="240px"');
+    expect(dmmSvg).toContain('xmlns="http://www.w3.org/2000/svg"');
   });
 
-  it('ensures oscilloscope pure vector SVG uses 2.5 stroke-width for trace and crisp 1px graticule', () => {
+  it('ensures oscilloscope pure vector SVG uses 2.5 stroke-width for trace, explicit px dimensions, and crisp 1px graticule', () => {
     const scopeSvg = `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 268 160" width="100%" height="100%">
-  <rect width="268" height="160" fill="#090a0d"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 268 160" width="268px" height="160px">
+  <rect width="268" height="160" fill="none"/>
   <line x1="26.80" y1="0" x2="26.80" y2="160" stroke="#1a1d24" stroke-width="1" vector-effect="non-scaling-stroke"/>
   <path d="M 0 80 L 100 40 L 200 120" fill="none" stroke="#38bdf8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>`;
@@ -197,6 +198,8 @@ describe('Pure Native Vector SVG & 4K Resolution Integrity', () => {
     expect(scopeSvg).toContain('stroke-width="2.5"');
     expect(scopeSvg).toContain('vector-effect="non-scaling-stroke"');
     expect(scopeSvg).toContain('viewBox="0 0 268 160"');
+    expect(scopeSvg).toContain('width="268px"');
+    expect(scopeSvg).toContain('height="160px"');
   });
 });
 

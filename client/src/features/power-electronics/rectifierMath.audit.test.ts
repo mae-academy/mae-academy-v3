@@ -33,8 +33,12 @@ describe("Rectifier power-engine audit", () => {
 
     expect(halfWaveR.metrics.efficiency).toBeCloseTo(40.5, 0);
     expect(halfWaveR.metrics.powerFactor).toBeCloseTo(0.637, 2);
+    expect(halfWaveR.warnings.some(warning => warning.code === "EFFICIENCY_LOW")).toBe(true);
+    expect(halfWaveR.warnings.some(warning => warning.code === "RIPPLE_EXCESSIVE")).toBe(true);
     expect(fullWaveR.metrics.efficiency).toBeCloseTo(81.2, 0);
     expect(fullWaveR.metrics.powerFactor).toBeCloseTo(0.9, 2);
+    expect(fullWaveR.warnings.some(warning => warning.code === "EFFICIENCY_LOW")).toBe(false);
+    expect(fullWaveR.warnings.some(warning => warning.code === "RIPPLE_EXCESSIVE")).toBe(false);
 
     const rlcFwdOn = simulateControlledRectifier({ ...defaultRectifierParameters, loadType: "RLC", freeWheelingDiode: true, firingAngle: 30 });
     const rlcFwdOff = simulateControlledRectifier({ ...defaultRectifierParameters, loadType: "RLC", freeWheelingDiode: false, firingAngle: 30 });

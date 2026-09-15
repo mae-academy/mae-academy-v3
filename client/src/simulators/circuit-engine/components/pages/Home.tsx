@@ -744,8 +744,21 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
   const [activeAnalysisMethod, setActiveAnalysisMethod] = useState<'mesh' | 'nodal' | null>(null);
   const handleAnalysisTrace = useCallback((trace: AnalysisTrace) => {
     if (trace.method !== 'mesh' && trace.method !== 'nodal') return;
-    setActiveAnalysisMethod(trace.method);
-    setAnalysisTraces((current) => trace.status === 'ready' ? { ...current, [trace.method]: trace } : { ...current, [trace.method]: undefined });
+    const method: 'mesh' | 'nodal' = trace.method;
+    setActiveAnalysisMethod(prev => prev === method ? prev : method);
+    setAnalysisTraces((current) => {
+      const existing = current[method];
+      if (
+        existing &&
+        existing.status === trace.status &&
+        existing.heading === trace.heading &&
+        existing.warning === trace.warning &&
+        existing.steps.length === trace.steps.length
+      ) {
+        return current;
+      }
+      return trace.status === 'ready' ? { ...current, [method]: trace } : { ...current, [method]: undefined };
+    });
   }, []);
   const activeMeshTrace = activeAnalysisMethod === 'mesh' ? analysisTraces.mesh ?? null : null;
   const activeNodalTrace = activeAnalysisMethod === 'nodal' ? analysisTraces.nodal ?? null : null;
@@ -1363,11 +1376,14 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
   }, [loadCircuitDocument]);
 
   // Deep-Link Project Loading on Mount (?project=...)
+  const hasLoadedUrlProjectRef = useRef(false);
   useEffect(() => {
+    if (hasLoadedUrlProjectRef.current) return;
     try {
       const searchParams = new URLSearchParams(window.location.search);
       const projectParam = searchParams.get('project');
       if (projectParam) {
+        hasLoadedUrlProjectRef.current = true;
         const document = decompressProjectState(projectParam);
         if (document && document.components) {
           const { importedComponents } = loadCircuitDocument(document);
@@ -1377,8 +1393,9 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     } catch (err) {
       console.warn('Failed to parse shared project from URL:', err);
     }
-  }, [loadCircuitDocument]);
+  }, []); // Run strictly once on mount
 
+  const hasSharedRef = useRef(false);
   const handleShareProject = useCallback(async () => {
     if (components.length === 0 && texts.length === 0 && wires.length === 0) {
       toast.error('No circuit elements to share');
@@ -1397,6 +1414,10 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     const url = new URL(window.location.href);
     url.searchParams.set('project', compressed);
     const finalUrl = url.toString();
+
+    // Mark as loaded so deep-link effect doesn't re-parse what we just created
+    hasLoadedUrlProjectRef.current = true;
+    hasSharedRef.current = true;
 
     // Update browser URL
     window.history.replaceState({}, '', finalUrl);
@@ -2630,7 +2651,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
       }
 
       const svgStr = `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${baseWidth} ${baseHeight}" width="100%" height="100%">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${baseWidth} ${baseHeight}" width="${baseWidth}px" height="${baseHeight}px">
   <defs>
     <style>
       ${KATEX_EMBEDDED_FONT_CSS}
@@ -2781,7 +2802,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     } else {
       // Pure native vector SVG export - No raster wrapping!
       const svgStr = `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 240" width="100%" height="100%">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 240" width="480px" height="240px">
   <defs>
     <style>
       ${KATEX_EMBEDDED_FONT_CSS}
@@ -2834,10 +2855,9 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
 
     if (svgRef.current) {
       try {
-        const worldGroup = svgRef.current.querySelector('g[data-circuit-world]') || svgRef.current.querySelector('g');
-        const bboxTarget = (worldGroup as SVGGraphicsElement) || svgRef.current;
-        if (typeof bboxTarget.getBBox === 'function') {
-          const liveBbox = bboxTarget.getBBox();
+        const elementsLayer = (svgRef.current.querySelector('#circuit-elements-layer') || svgRef.current.querySelector('g[data-circuit-world]')) as SVGGElement | null;
+        if (elementsLayer && typeof elementsLayer.getBBox === 'function') {
+          const liveBbox = elementsLayer.getBBox();
           if (Number.isFinite(liveBbox.x) && Number.isFinite(liveBbox.y) && liveBbox.width > 0 && liveBbox.height > 0) {
             cropX = Math.round(liveBbox.x - padding);
             cropY = Math.round(liveBbox.y - padding);
@@ -2855,11 +2875,9 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     clonedSvg.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
     clonedSvg.setAttribute('class', darkPreview ? 'dark' : '');
     clonedSvg.setAttribute('viewBox', `${cropX} ${cropY} ${cropWidth} ${cropHeight}`);
-    clonedSvg.setAttribute('width', '100%');
-    clonedSvg.setAttribute('height', '100%');
-    clonedSvg.style.width = '100%';
-    clonedSvg.style.height = '100%';
-    clonedSvg.style.backgroundColor = 'transparent';
+    clonedSvg.setAttribute('width', `${cropWidth}px`);
+    clonedSvg.setAttribute('height', `${cropHeight}px`);
+    clonedSvg.removeAttribute('style');
 
     const strokeColor = darkPreview ? '#f8fafc' : '#1e293b';
     clonedSvg.style.color = strokeColor;
@@ -3033,10 +3051,9 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
 
     if (svgRef.current) {
       try {
-        const worldGroup = svgRef.current.querySelector('g[data-circuit-world]') || svgRef.current.querySelector('g');
-        const bboxTarget = (worldGroup as SVGGraphicsElement) || svgRef.current;
-        if (typeof bboxTarget.getBBox === 'function') {
-          const liveBbox = bboxTarget.getBBox();
+        const elementsLayer = (svgRef.current.querySelector('#circuit-elements-layer') || svgRef.current.querySelector('g[data-circuit-world]')) as SVGGElement | null;
+        if (elementsLayer && typeof elementsLayer.getBBox === 'function') {
+          const liveBbox = elementsLayer.getBBox();
           if (Number.isFinite(liveBbox.x) && Number.isFinite(liveBbox.y) && liveBbox.width > 0 && liveBbox.height > 0) {
             cropX = Math.round(liveBbox.x - padding);
             cropY = Math.round(liveBbox.y - padding);
@@ -3624,7 +3641,9 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
 
               {activeMeshTrace?.meshCycles?.map((cycle) => <MeshLoopOverlay key={`mesh-cycle-${cycle.index}`} cycle={cycle} tabDUiRefinement={tabDUiRefinement} components={components} scale={visualSymbolScale} />)}
 
-              {wires.map(wire => {
+              {/* Dedicated layer containing ONLY components, wires, labels, and texts for tight export bounding box */}
+              <g id="circuit-elements-layer">
+                {wires.map(wire => {
                 const selected = selection?.kind === 'wire' && selection.id === wire.id;
                 const phase = snapshot.wirePhases?.[wire.id] ?? 0;
                 const path = getWirePoints(wire);
@@ -3906,6 +3925,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                   </foreignObject>
                 </g>
               ))}
+              </g>
 
               {/* V_i labels deliberately render last: they remain readable above grid, wires, symbols, and workspace text. */}
               {activeNodalTrace?.nodalNodes?.filter((node) => node.centroid[0] !== 0 || node.centroid[1] !== 0).map((node) => <NodalNodeOverlay key={`nodal-node-${node.node}`} node={node} colors={colors} />)}

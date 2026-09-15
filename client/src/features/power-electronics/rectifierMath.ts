@@ -52,7 +52,7 @@ export type RectifierMetrics = {
   extinctionAngleDeg: number | null;
 };
 
-export type RectifierWarningCode = "FWD_INERT_FOR_LOAD";
+export type RectifierWarningCode = "FWD_INERT_FOR_LOAD" | "EFFICIENCY_LOW" | "RIPPLE_EXCESSIVE";
 export type RectifierWarning = { code: RectifierWarningCode; message: string };
 
 export type RectifierSimulation = {
@@ -313,9 +313,18 @@ export function simulateControlledRectifier(parameters: RectifierParameters): Re
     ? minimumCurrent > 1e-4 ? "CCM" : "DCM"
     : "RESISTIVE";
 
+  const rectificationEfficiency = formFactor > EPSILON ? clamp(100 / (formFactor * formFactor), 0, 100) : 0;
   const warnings: RectifierWarning[] = [];
   if (parameters.freeWheelingDiode && !fwdEligible && parameters.loadType !== "R") {
     warnings.push({ code: "FWD_INERT_FOR_LOAD", message: `Free-wheeling diode has no effect for ${parameters.loadType} loads; only RL and RLE route current through it.` });
+  }
+  // Thresholds are the half-wave R-load textbook values themselves (η≈40.5%, RF≈1.21):
+  // anything at or worse than half-wave rectification is a real design smell, not a guess.
+  if (rectificationEfficiency < 45) {
+    warnings.push({ code: "EFFICIENCY_LOW", message: `Rectification efficiency η = ${rectificationEfficiency.toFixed(1)}% is below the half-wave R-load baseline (≈40.5%); consider a full-wave or three-phase bridge.` });
+  }
+  if (rippleFactor > 1.0) {
+    warnings.push({ code: "RIPPLE_EXCESSIVE", message: `Ripple factor RF = ${rippleFactor.toFixed(2)} exceeds the half-wave R-load baseline (≈1.21 is already poor); add an LC/π filter or a full-wave topology.` });
   }
 
   return {
@@ -338,7 +347,7 @@ export function simulateControlledRectifier(parameters: RectifierParameters): Re
       // η = (V_DC/V_RMS)² = 1/FF² and PF = V_DC/V_RMS = 1/FF (spec §1.3.1): both quantify
       // DC purity, not real/apparent output power (which is ≈1 for any resistive-type
       // load and would mask ripple loss entirely). Half-wave R ≈ 40.5%/0.637, full-wave ≈ 81%/0.9.
-      efficiency: formFactor > EPSILON ? clamp(100 / (formFactor * formFactor), 0, 100) : 0,
+      efficiency: rectificationEfficiency,
       powerFactor: formFactor > EPSILON ? clamp(1 / formFactor, 0, 1) : 0,
       conductionMode,
       extinctionAngleDeg: conductionMode === "CCM" ? null : extinctionAngleDeg,

@@ -15,6 +15,8 @@ const SEVERITY_STYLE: Record<PowerWarningSeverity, SeverityStyle> = {
 // comes from the engine's own `message` (already parameterized with live values).
 const WARNING_SEVERITY: Record<string, PowerWarningSeverity> = {
   FWD_INERT_FOR_LOAD: "info",
+  EFFICIENCY_LOW: "warning",
+  RIPPLE_EXCESSIVE: "warning",
   SHOOT_THROUGH: "error",
   OVERMODULATION: "warning",
   NYQUIST_VIOLATION: "error",
