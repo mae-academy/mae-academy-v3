@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { ExportPreviewModal, type ExportItem } from './ExportPreviewModal';
+import { ExportPreviewModal, svgToPngBlob, type ExportItem } from './ExportPreviewModal';
 import { getComponentsByCategory, getDef, COMPONENT_DEFS } from '@/simulators/circuit-engine/models/componentDefs';
 
 describe('Part 1: Classic Control Components Hidden (UI Only)', () => {
@@ -125,5 +125,9 @@ describe('Part 3: ExportPreviewModal Component', () => {
     expect(markup).toContain('circuit-1.svg');
     expect(markup).toContain('Copy');
     expect(markup).toContain('Save');
+  });
+
+  it('exports svgToPngBlob helper to convert SVG to high-res PNG blob for rich clipboard copying', () => {
+    expect(typeof svgToPngBlob).toBe('function');
   });
 });

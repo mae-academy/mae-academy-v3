@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { formatMeterReading, renderSymbol, ThreePhaseMotorSymbol } from '@/simulators/circuit-engine/components/symbols';
+import { formatMeterReading, renderComponentCanvasLabel, renderSymbol, ThreePhaseMotorSymbol } from '@/simulators/circuit-engine/components/symbols';
 
 function markup(symbolId: string, props: Record<string, unknown> = {}, powered = false, animTime = 0) {
   return renderToStaticMarkup(<svg>{renderSymbol(symbolId, powered, props, animTime)}</svg>);
@@ -262,19 +262,24 @@ describe('Tab D SVG symbol language', () => {
     expect(triac).toContain('d="M -0,10 L -18,25 L -25,25"');
   });
 
-  it('renders DMM with standardized mae-component-label, KaTeX title header, and dark mode support', () => {
+  it('renders DMM with standardized mae-component-label, KaTeX title header, and inverted dark mode casing', () => {
     const dmm = markup('dmm');
     expect(dmm).toContain('>DMM<');
     expect(dmm).toContain('mae-component-label');
-    expect(dmm).toContain('KaTeX_Math');
     expect(dmm).toContain('y="-58"');
+    // Light mode: dark charcoal body
+    expect(dmm).toContain('fill="#1e232d"');
+    expect(dmm).toContain('stroke="#111827"');
 
+    // Dark mode: inverted off-white high-contrast body
     const dmmDark = markup('dmm', { _isDark: true });
-    expect(dmmDark).toContain('fill="#141820"');
-    expect(dmmDark).toContain('stroke="#3b4556"');
+    expect(dmmDark).toContain('fill="#f1f5f9"');
+    expect(dmmDark).toContain('stroke="#cbd5e1"');
 
+    // Multi-letter acronyms (DMM) must render in upright KaTeX_Main, not italic
     const dmm1 = markup('dmm', { label: 'DMM1' });
-    expect(dmm1).toContain('DMM<tspan');
+    expect(dmm1).toContain('font-family="&#x27;KaTeX_Main&#x27;, serif" font-style="normal"');
+    expect(dmm1).toContain('>DMM</tspan>');
     expect(dmm1).toContain('dy="2.5"');
     expect(dmm1).toContain('>1</tspan>');
   });
@@ -313,18 +318,26 @@ describe('Tab D SVG symbol language', () => {
     expect(formatMeterReading(-0.005, 'A')).toBe('-5.000 mA');
   });
 
-  it('renders oscilloscope with terminal labels visible ONLY when selected', () => {
+  it('renders oscilloscope with terminal labels visible ONLY when selected, CRT screen, and inverted dark mode body', () => {
     const unselectedScope = markup('oscilloscope');
     // Decorative sine wave removed
     expect(unselectedScope).not.toContain('C -45,-55 -35,15 -20,-20');
-    // Clean screen with grid intact
-    expect(unselectedScope).toContain('fill="#000000"');
+    // Clean screen with grid intact (standard CRT dark screen)
+    expect(unselectedScope).toContain('fill="#030712"');
+    // Light mode: dark charcoal casing
+    expect(unselectedScope).toContain('fill="#1e232d"');
+    expect(unselectedScope).toContain('stroke="#111827"');
     // External labels MUST NOT appear when unselected
     expect(unselectedScope).not.toContain('>CH1<');
     expect(unselectedScope).not.toContain('>CH2<');
     expect(unselectedScope).not.toContain('>CH3<');
     expect(unselectedScope).not.toContain('>CH4<');
     expect(unselectedScope).not.toContain('>GND<');
+
+    // Dark mode: inverted off-white body
+    const darkScope = markup('oscilloscope', { _isDark: true });
+    expect(darkScope).toContain('fill="#f1f5f9"');
+    expect(darkScope).toContain('stroke="#cbd5e1"');
 
     const selectedScope = markup('oscilloscope', { selected: true });
     // External labels MUST appear when selected
@@ -423,5 +436,40 @@ describe('Tab D SVG symbol language', () => {
     // Stationary below threshold (< 0.5V)
     const belowThreshold = markup('motor-dc', { _vEff: 0.2, nominalV: 24 }, true, 0.5);
     expect(belowThreshold).not.toContain('stroke-dasharray="14 8"');
+  });
+
+  it('standardizes KaTeX typography: single-letter math variables italic, multi-letter acronyms upright', () => {
+    // Single-letter identifiers: R1, C1, L1, V1, I1 -> italic base, upright subscript
+    const r1 = renderToStaticMarkup(<text>{renderComponentCanvasLabel('R1')}</text>);
+    expect(r1).toContain('font-family="&#x27;KaTeX_Math&#x27;, serif"');
+    expect(r1).toContain('font-style="italic"');
+    expect(r1).toContain('>R</tspan>');
+    expect(r1).toContain('font-family="&#x27;KaTeX_Main&#x27;, serif"');
+    expect(r1).toContain('font-style="normal"');
+    expect(r1).toContain('>1</tspan>');
+
+    const v1 = renderToStaticMarkup(<text>{renderComponentCanvasLabel('V1')}</text>);
+    expect(v1).toContain('font-style="italic"');
+    expect(v1).toContain('>V</tspan>');
+
+    // Multi-letter designations / acronyms: GND -> upright \text{GND}
+    const gnd = renderToStaticMarkup(<text>{renderComponentCanvasLabel('GND')}</text>);
+    expect(gnd).toContain('font-family="&#x27;KaTeX_Main&#x27;, serif" font-style="normal"');
+    expect(gnd).toContain('>GND</tspan>');
+    expect(gnd).not.toContain('font-style="italic"');
+
+    // OSC1 -> upright \text{OSC}_1
+    const osc1 = renderToStaticMarkup(<text>{renderComponentCanvasLabel('OSC1')}</text>);
+    expect(osc1).toContain('font-family="&#x27;KaTeX_Main&#x27;, serif" font-style="normal"');
+    expect(osc1).toContain('>OSC</tspan>');
+    expect(osc1).toContain('>1</tspan>');
+    expect(osc1).not.toContain('font-style="italic"');
+
+    // DMM1 -> upright \text{DMM}_1
+    const dmm1 = renderToStaticMarkup(<text>{renderComponentCanvasLabel('DMM1')}</text>);
+    expect(dmm1).toContain('font-family="&#x27;KaTeX_Main&#x27;, serif" font-style="normal"');
+    expect(dmm1).toContain('>DMM</tspan>');
+    expect(dmm1).toContain('>1</tspan>');
+    expect(dmm1).not.toContain('font-style="italic"');
   });
 });

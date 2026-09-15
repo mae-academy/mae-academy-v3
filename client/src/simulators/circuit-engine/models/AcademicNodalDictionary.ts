@@ -10,7 +10,10 @@ function escapedText(value: string) { return value.replace(/[\\{}_$#%&^~]/g, '\\
 function academicLabel(label: string, fallback: string) {
   const normalized = label.replace(/[^A-Za-z0-9]/g, '');
   const indexed = normalized.match(/^([A-Za-z]+)(\d+)$/);
-  if (indexed) return `${indexed[1]}_{${indexed[2]}}`;
+  if (indexed) {
+    const isSingleLetter = indexed[1].length === 1;
+    return isSingleLetter ? `${indexed[1]}_{${indexed[2]}}` : `\\mathrm{${indexed[1]}}_{${indexed[2]}}`;
+  }
   return normalized ? `\\mathrm{${escapedText(normalized)}}` : fallback;
 }
 

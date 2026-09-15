@@ -1218,22 +1218,159 @@ const RelayDpst: SymbolFC = ({ powered, props }) => {
   );
 };
 
+/**
+ * Universal KaTeX label renderer for all canvas component instance labels.
+ * Ensures single-letter math variables (R, C, L, V, I, etc.) are math-italic (KaTeX_Math),
+ * while multi-letter acronyms and instruments (GND, OSC, DMM, etc.) and all digits/subscripts
+ * are upright math Roman (KaTeX_Main).
+ */
+export function renderComponentCanvasLabel(rawLabel: string, isGround = false): React.ReactNode {
+  const label = (rawLabel ?? '').trim();
+
+  // 1. Ground component
+  if (isGround || /^GND\d*$/i.test(label)) {
+    const gndMatch = label.match(/^GND(\d+)$/i);
+    if (gndMatch) {
+      return (
+        <>
+          <tspan
+            fontFamily="'KaTeX_Main', serif"
+            fontStyle="normal"
+            style={{ fontStyle: 'normal', fontFamily: "'KaTeX_Main', serif" }}
+          >
+            GND
+          </tspan>
+          <tspan
+            dy="2.5"
+            fontFamily="'KaTeX_Main', serif"
+            fontSize="9.5px"
+            fontStyle="normal"
+            style={{
+              fontSize: '9.5px',
+              fontWeight: 400,
+              fontStyle: 'normal',
+              fontFamily: "'KaTeX_Main', serif",
+            }}
+          >
+            {gndMatch[1]}
+          </tspan>
+        </>
+      );
+    }
+    return (
+      <tspan
+        fontFamily="'KaTeX_Main', serif"
+        fontStyle="normal"
+        style={{ fontStyle: 'normal', fontFamily: "'KaTeX_Main', serif" }}
+      >
+        GND
+      </tspan>
+    );
+  }
+
+  // 2. Pure numbers (e.g. "12")
+  if (/^\d+$/.test(label)) {
+    return (
+      <tspan
+        fontFamily="'KaTeX_Main', serif"
+        fontStyle="normal"
+        style={{ fontStyle: 'normal', fontFamily: "'KaTeX_Main', serif" }}
+      >
+        {label}
+      </tspan>
+    );
+  }
+
+  // 3. LaTeX underscore or standard reference with subscript:
+  // Examples: V_{12}, V_1, C12, R1, L_load, V_in, OSC1, DMM1
+  const subMatch =
+    label.match(/^([A-Za-z]+)_\{([^}]+)\}$/) ??
+    label.match(/^([A-Za-z]+)_([A-Za-z0-9]+)$/) ??
+    label.match(/^([A-Za-z]+)(\d+)$/);
+
+  if (subMatch) {
+    const [, base, sub] = subMatch;
+    // Single-letter variable -> KaTeX math italic (e.g. R_1, C_1, L_1, V_1, I_1)
+    // Multi-letter acronym/designation -> KaTeX main upright (e.g. OSC_1, DMM_1, GND_1, RL_1)
+    const isSingleLetter = base.length === 1;
+    return (
+      <>
+        <tspan
+          fontFamily={isSingleLetter ? "'KaTeX_Math', serif" : "'KaTeX_Main', serif"}
+          fontStyle={isSingleLetter ? 'italic' : 'normal'}
+          style={{
+            fontStyle: isSingleLetter ? 'italic' : 'normal',
+            fontFamily: isSingleLetter ? "'KaTeX_Math', serif" : "'KaTeX_Main', serif",
+          }}
+        >
+          {base}
+        </tspan>
+        <tspan
+          dy="2.5"
+          fontFamily="'KaTeX_Main', serif"
+          fontSize="9.5px"
+          fontStyle="normal"
+          style={{
+            fontSize: '9.5px',
+            fontWeight: 400,
+            fontStyle: 'normal',
+            fontFamily: "'KaTeX_Main', serif",
+          }}
+        >
+          {sub}
+        </tspan>
+      </>
+    );
+  }
+
+  // 4. Tokenized fallback for any other string to guarantee 100% KaTeX font coverage:
+  // Single-letter tokens get KaTeX_Math italic, multi-letter words (acronyms) get KaTeX_Main upright, digits & symbols get KaTeX_Main upright
+  const tokens = label.match(/([A-Za-z]+|\d+|[^A-Za-z0-9\s]+|\s+)/g) || [label];
+  return (
+    <>
+      {tokens.map((token, index) => {
+        if (/^[A-Za-z]$/.test(token)) {
+          return (
+            <tspan
+              key={index}
+              fontFamily="'KaTeX_Math', serif"
+              fontStyle="italic"
+              style={{ fontStyle: 'italic', fontFamily: "'KaTeX_Math', serif" }}
+            >
+              {token}
+            </tspan>
+          );
+        }
+        return (
+          <tspan
+            key={index}
+            fontFamily="'KaTeX_Main', serif"
+            fontStyle="normal"
+            style={{ fontStyle: 'normal', fontFamily: "'KaTeX_Main', serif" }}
+          >
+            {token}
+          </tspan>
+        );
+      })}
+    </>
+  );
+}
+
 const DmmSymbol: SymbolFC = ({ props }) => {
   const isDark = Boolean(props?._isDark || props?.isDark);
   const raw = String(props?.label || 'DMM');
-  const match = raw.match(/^([A-Za-z]+)(\d+)$/);
   return (
     <g>
-      {/* Main Body - Height stretched to exactly hit y=50 */}
+      {/* Main Body - Inverted clean off-white enclosure in Dark Mode, dark charcoal in Light Mode */}
       <rect
         x={-35}
         y={-50}
         width={70}
         height={100}
         rx={6}
-        className="dmm-body fill-slate-900 dark:fill-[#141820] stroke-slate-400 dark:stroke-[#3b4556]"
-        fill={isDark ? '#141820' : '#0d0f12'}
-        stroke={isDark ? '#3b4556' : '#1b2028'}
+        className="dmm-body"
+        fill={isDark ? '#f1f5f9' : '#1e232d'}
+        stroke={isDark ? '#cbd5e1' : '#111827'}
         strokeWidth={1.5}
       />
       {/* Top Header Label - Positioned cleanly ABOVE the main SVG body with KaTeX style & halo effect */}
@@ -1254,34 +1391,27 @@ const DmmSymbol: SymbolFC = ({ props }) => {
         fill={isDark ? '#f1f5f9' : '#1e293b'}
         stroke={isDark ? '#090b0e' : '#ffffff'}
       >
-        {match ? (
-          <>
-            {match[1]}
-            <tspan dy="2.5" fontSize="9px" fontStyle="normal" fontFamily="'KaTeX_Main', sans-serif">{match[2]}</tspan>
-          </>
-        ) : (
-          raw
-        )}
+        {renderComponentCanvasLabel(raw, false)}
       </text>
-      {/* LCD Screen */}
+      {/* LCD Screen - standard CRT dark background */}
       <rect
         x={-25}
         y={-38}
         width={50}
         height={22}
         rx={3}
-        className="dmm-screen fill-[#e0f2fe] dark:fill-[#041d33] stroke-[#0284c7] dark:stroke-[#38bdf8]"
-        fill={isDark ? '#041d33' : '#e0f2fe'}
-        stroke={isDark ? '#38bdf8' : '#0284c7'}
+        className="dmm-screen"
+        fill="#041d33"
+        stroke={isDark ? '#0284c7' : '#38bdf8'}
         strokeWidth={1}
       />
-      {/* Dial */}
+      {/* Dial - Tinted with contrasting darker grays in dark mode */}
       <circle
         cx={0}
         cy={16}
         r={14}
-        fill={isDark ? '#1e293b' : '#1b2028'}
-        stroke={isDark ? '#3b4556' : '#262c36'}
+        fill={isDark ? '#334155' : '#1b2028'}
+        stroke={isDark ? '#475569' : '#262c36'}
         strokeWidth={1.5}
       />
       <circle cx={0} cy={6} r={2} fill="#94a3b8" />
@@ -1294,20 +1424,20 @@ const DmmSymbol: SymbolFC = ({ props }) => {
         cx={25}
         cy={50}
         r={4}
-        fill={isDark ? '#1e293b' : '#0d0f12'}
-        stroke={isDark ? '#64748b' : '#000000'}
+        fill={isDark ? '#0f172a' : '#0d0f12'}
+        stroke={isDark ? '#334155' : '#000000'}
         strokeWidth={1.5}
       />
-      {/* LCD Text */}
+      {/* LCD Text - Unified monospace parity */}
       <text
         x={0}
         y={-27}
         textAnchor="middle"
         fontSize={11}
         fontWeight={700}
-        fontFamily="ui-monospace, monospace"
-        className="dmm-screen-text fill-[#0284c7] dark:fill-[#38bdf8]"
-        fill={isDark ? '#38bdf8' : '#0284c7'}
+        fontFamily="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
+        className="dmm-screen-text"
+        fill="#38bdf8"
       >
         {String(props?.mode ?? 'DCV')}
       </text>
@@ -1315,55 +1445,76 @@ const DmmSymbol: SymbolFC = ({ props }) => {
   );
 };
 
-const OscilloscopeSymbol: SymbolFC = ({ props }) => (
-  <g>
-    {/* Main Widescreen Body: 140x100 (leaves 5px for terminals to reach ±75) */}
-    <rect x={-70} y={-60} width={140} height={100} rx={6} fill="#0d0f12" stroke="#1b2028" strokeWidth={1.5} />
+const OscilloscopeSymbol: SymbolFC = ({ props }) => {
+  const isDark = Boolean(props?._isDark || props?.isDark);
+  return (
+    <g>
+      {/* Main Widescreen Body: Inverted off-white enclosure in Dark Mode, dark charcoal in Light Mode */}
+      <rect
+        x={-70}
+        y={-60}
+        width={140}
+        height={100}
+        rx={6}
+        fill={isDark ? '#f1f5f9' : '#1e232d'}
+        stroke={isDark ? '#cbd5e1' : '#111827'}
+        strokeWidth={1.5}
+      />
 
-    {/* Dark Screen: clean blank screen */}
-    <rect x={-60} y={-50} width={80} height={60} rx={3} fill="#000000" stroke="#1b2028" strokeWidth={1.5} />
+      {/* Dark Screen: standard CRT dark background */}
+      <rect
+        x={-60}
+        y={-50}
+        width={80}
+        height={60}
+        rx={3}
+        fill="#030712"
+        stroke={isDark ? '#cbd5e1' : '#1b2028'}
+        strokeWidth={1.5}
+      />
 
-    {/* Screen Grid */}
-    <line x1={-20} y1={-50} x2={-20} y2={10} stroke="#1b2028" strokeWidth={1} />
-    <line x1={20} y1={-50} x2={20} y2={10} stroke="#1b2028" strokeWidth={1} />
-    <line x1={-60} y1={-20} x2={20} y2={-20} stroke="#1b2028" strokeWidth={1} />
+      {/* Screen Grid */}
+      <line x1={-20} y1={-50} x2={-20} y2={10} stroke="#1e293b" strokeWidth={1} />
+      <line x1={20} y1={-50} x2={20} y2={10} stroke="#1e293b" strokeWidth={1} />
+      <line x1={-60} y1={-20} x2={20} y2={-20} stroke="#1e293b" strokeWidth={1} />
 
-    {/* Control Panel Dials */}
-    <circle cx={45} cy={-35} r={9} fill="#334155" stroke="#475569" strokeWidth={1.5} />
-    <circle cx={45} cy={-41} r={2} fill="#94a3b8" />
+      {/* Control Panel Dials - Contrasting darker grays in dark mode */}
+      <circle cx={45} cy={-35} r={9} fill={isDark ? '#334155' : '#1b2028'} stroke={isDark ? '#475569' : '#334155'} strokeWidth={1.5} />
+      <circle cx={45} cy={-41} r={2} fill="#94a3b8" />
 
-    <circle cx={45} cy={-10} r={9} fill="#334155" stroke="#475569" strokeWidth={1.5} />
-    <circle cx={45} cy={-16} r={2} fill="#94a3b8" />
+      <circle cx={45} cy={-10} r={9} fill={isDark ? '#334155' : '#1b2028'} stroke={isDark ? '#475569' : '#334155'} strokeWidth={1.5} />
+      <circle cx={45} cy={-16} r={2} fill="#94a3b8" />
 
-    {/* Control Panel Buttons */}
-    <circle cx={35} cy={15} r={3} fill="#475569" />
-    <circle cx={45} cy={15} r={3} fill="#475569" />
-    <circle cx={55} cy={15} r={3} fill="#475569" />
+      {/* Control Panel Buttons */}
+      <circle cx={35} cy={15} r={3} fill={isDark ? '#334155' : '#475569'} />
+      <circle cx={45} cy={15} r={3} fill={isDark ? '#334155' : '#475569'} />
+      <circle cx={55} cy={15} r={3} fill={isDark ? '#334155' : '#475569'} />
 
-    <circle cx={35} cy={27} r={3} fill="#475569" />
-    <circle cx={45} cy={27} r={3} fill="#475569" />
-    <circle cx={55} cy={27} r={3} fill="#ef4444" /> {/* Red trigger/power button */}
+      <circle cx={35} cy={27} r={3} fill={isDark ? '#334155' : '#475569'} />
+      <circle cx={45} cy={27} r={3} fill={isDark ? '#334155' : '#475569'} />
+      <circle cx={55} cy={27} r={3} fill="#ef4444" /> {/* Red trigger/power button */}
 
-    {/* Connection lines to exact terminals (spanning -75 to -70 and 70 to 75) */}
-    <line x1={-75} y1={-50} x2={-70} y2={-50} stroke="currentColor" strokeWidth={1.5} />
-    <line x1={-75} y1={-25} x2={-70} y2={-25} stroke="currentColor" strokeWidth={1.5} />
-    <line x1={-75} y1={0} x2={-70} y2={0} stroke="currentColor" strokeWidth={1.5} />
-    <line x1={-75} y1={25} x2={-70} y2={25} stroke="currentColor" strokeWidth={1.5} />
+      {/* Connection lines to exact terminals (spanning -75 to -70 and 70 to 75) */}
+      <line x1={-75} y1={-50} x2={-70} y2={-50} stroke="currentColor" strokeWidth={1.5} />
+      <line x1={-75} y1={-25} x2={-70} y2={-25} stroke="currentColor" strokeWidth={1.5} />
+      <line x1={-75} y1={0} x2={-70} y2={0} stroke="currentColor" strokeWidth={1.5} />
+      <line x1={-75} y1={25} x2={-70} y2={25} stroke="currentColor" strokeWidth={1.5} />
 
-    <line x1={70} y1={25} x2={75} y2={25} stroke="currentColor" strokeWidth={1.5} />
+      <line x1={70} y1={25} x2={75} y2={25} stroke="currentColor" strokeWidth={1.5} />
 
-    {/* Channel & Ground Port Labels outside screen and body (rendered only when selected) */}
-    {(props?.selected || props?._isSelected) && (
-      <>
-        <text x={-78} y={-50} textAnchor="end" dominantBaseline="central" fontSize={7} fontWeight="normal" fill="#94a3b8">CH1</text>
-        <text x={-78} y={-25} textAnchor="end" dominantBaseline="central" fontSize={7} fontWeight="normal" fill="#94a3b8">CH2</text>
-        <text x={-78} y={0} textAnchor="end" dominantBaseline="central" fontSize={7} fontWeight="normal" fill="#94a3b8">CH3</text>
-        <text x={-78} y={25} textAnchor="end" dominantBaseline="central" fontSize={7} fontWeight="normal" fill="#94a3b8">CH4</text>
-        <text x={78} y={25} textAnchor="start" dominantBaseline="central" fontSize={7} fontWeight="normal" fill="#94a3b8">GND</text>
-      </>
-    )}
-  </g>
-);
+      {/* Channel & Ground Port Labels outside screen and body (rendered only when selected) */}
+      {(props?.selected || props?._isSelected) && (
+        <>
+          <text x={-78} y={-50} textAnchor="end" dominantBaseline="central" fontSize={7} fontWeight="normal" fill="#94a3b8">CH1</text>
+          <text x={-78} y={-25} textAnchor="end" dominantBaseline="central" fontSize={7} fontWeight="normal" fill="#94a3b8">CH2</text>
+          <text x={-78} y={0} textAnchor="end" dominantBaseline="central" fontSize={7} fontWeight="normal" fill="#94a3b8">CH3</text>
+          <text x={-78} y={25} textAnchor="end" dominantBaseline="central" fontSize={7} fontWeight="normal" fill="#94a3b8">CH4</text>
+          <text x={78} y={25} textAnchor="start" dominantBaseline="central" fontSize={7} fontWeight="normal" fill="#94a3b8">GND</text>
+        </>
+      )}
+    </g>
+  );
+};
 
 const LogicGate: SymbolFC = ({ props }) => {
   const kind = String(props?._kind ?? 'AND').toUpperCase();

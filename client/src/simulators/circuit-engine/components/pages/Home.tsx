@@ -91,7 +91,7 @@ import { parseSpiceResults } from '@/simulators/circuit-engine/engine/spice/spic
 import { buildSpiceInstrumentReadings } from '@/simulators/circuit-engine/engine/spice/spiceInstruments';
 import { filterTabDCatalog, filterTabDImportedComponents, isTabDComponentAvailable } from '@/simulators/circuit-engine/models/analogComponentCatalog';
 import { alignTabDTerminalToGrid, calculateTabDPlanarCavity, dynamicRubberBandPath, getExactTerminalOffset, isExactCadComponent, lockTabDWireCorner, MESH_LOOP_COLORS, moveTabDOrthogonalLane, tabDComponentLabelAnchors, tabDGentleWheelZoomFactor, tabDOrthogonalDraftPath, tabDTerminalOrthogonalPath, type ObstacleBox, type TabDTerminalAxis } from '@/simulators/circuit-engine/components/analogCanvasGeometry';
-import { formatMeterReading, renderSymbol } from '@/simulators/circuit-engine/components/symbols';
+import { formatMeterReading, renderComponentCanvasLabel, renderSymbol } from '@/simulators/circuit-engine/components/symbols';
 import { applySwitchHotkey, directControlKind, hotkeyDigit, isTextEntryTarget, momentaryControlProps, nextLatchingControlProps, releaseHeldPushbuttons } from '@/simulators/circuit-engine/models/componentInteraction';
 import {
   addWireCorner,
@@ -547,112 +547,6 @@ function renderFormattedValueTspans(value: string) {
   });
 }
 
-/**
- * Universal KaTeX label renderer for all canvas component instance labels.
- * Ensures letters are math-italic (KaTeX_Math) and digits/subscripts are upright math Roman (KaTeX_Main).
- * Handles:
- *  - Ground references: upright 'GND' in KaTeX_Main
- *  - Alphanumeric references (e.g. C12, R1, V_1, V_{12}, L_load): prefix italic, subscript lowered upright
- *  - Pure numbers (e.g. 12): upright in KaTeX_Main
- *  - Mixed general strings: parsed into italic letters, upright digits, and upright symbols
- */
-function renderComponentCanvasLabel(rawLabel: string, isGround: boolean) {
-  const label = rawLabel.trim();
-
-  // 1. Ground component
-  if (isGround || /^GND\d*$/i.test(label)) {
-    return (
-      <tspan
-        fontFamily="'KaTeX_Main', serif"
-        fontStyle="normal"
-        style={{ fontStyle: 'normal', fontFamily: "'KaTeX_Main', serif" }}
-      >
-        GND
-      </tspan>
-    );
-  }
-
-  // 2. Pure numbers (e.g. "12")
-  if (/^\d+$/.test(label)) {
-    return (
-      <tspan
-        fontFamily="'KaTeX_Main', serif"
-        fontStyle="normal"
-        style={{ fontStyle: 'normal', fontFamily: "'KaTeX_Main', serif" }}
-      >
-        {label}
-      </tspan>
-    );
-  }
-
-  // 3. LaTeX underscore or standard reference with subscript:
-  // Examples: V_{12}, V_1, C12, R1, L_load, V_in
-  const subMatch =
-    label.match(/^([A-Za-z]+)_\{([^}]+)\}$/) ??
-    label.match(/^([A-Za-z]+)_([A-Za-z0-9]+)$/) ??
-    label.match(/^([A-Za-z]+)(\d+)$/);
-
-  if (subMatch) {
-    const [, base, sub] = subMatch;
-    return (
-      <>
-        <tspan
-          fontFamily="'KaTeX_Math', serif"
-          fontStyle="italic"
-          style={{ fontStyle: 'italic', fontFamily: "'KaTeX_Math', serif" }}
-        >
-          {base}
-        </tspan>
-        <tspan
-          dy="2.5"
-          fontFamily="'KaTeX_Main', serif"
-          fontSize="9.5px"
-          fontStyle="normal"
-          style={{
-            fontSize: '9.5px',
-            fontWeight: 400,
-            fontStyle: 'normal',
-            fontFamily: "'KaTeX_Main', serif",
-          }}
-        >
-          {sub}
-        </tspan>
-      </>
-    );
-  }
-
-  // 4. Tokenized fallback for any other string to guarantee 100% KaTeX font coverage:
-  // Tokenize by letters, numbers, and symbols so no character falls back to sans-serif
-  const tokens = label.match(/([A-Za-z]+|\d+|[^A-Za-z0-9\s]+|\s+)/g) || [label];
-  return (
-    <>
-      {tokens.map((token, index) => {
-        if (/^[A-Za-z]+$/.test(token)) {
-          return (
-            <tspan
-              key={index}
-              fontFamily="'KaTeX_Math', serif"
-              fontStyle="italic"
-              style={{ fontStyle: 'italic', fontFamily: "'KaTeX_Math', serif" }}
-            >
-              {token}
-            </tspan>
-          );
-        }
-        return (
-          <tspan
-            key={index}
-            fontFamily="'KaTeX_Main', serif"
-            fontStyle="normal"
-            style={{ fontStyle: 'normal', fontFamily: "'KaTeX_Main', serif" }}
-          >
-            {token}
-          </tspan>
-        );
-      })}
-    </>
-  );
-}
 
 /** Populates SVG text elements with KaTeX tspans for self-contained vector SVG export. */
 function populateMathTspans(svgTextEl: SVGTextElement, rawText: string, baseFontSize: number) {
@@ -2388,7 +2282,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
         }, 'image/png');
       });
     } else {
-      const svgStr = `<svg xmlns="http://www.w3.org/2000/svg" class="${isDark ? 'dark' : ''}" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><rect width="${width}" height="${height}" fill="${isDark ? '#090a0d' : '#ffffff'}"/><image href="${pngData}" width="${width}" height="${height}"/></svg>`;
+      const svgStr = `<svg xmlns="http://www.w3.org/2000/svg" class="${isDark ? 'dark' : ''}" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><rect width="${width}" height="${height}" fill="none"/><image href="${pngData}" width="${width}" height="${height}"/></svg>`;
       const blob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
       const dataUrl = URL.createObjectURL(blob);
       return Promise.resolve({
@@ -2437,21 +2331,21 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     const ctx = canvas.getContext('2d');
     if (!ctx) return Promise.resolve(null);
 
-    // Outer casing
-    ctx.fillStyle = isDark ? '#0d0f12' : '#ffffff';
+    // Outer casing - Inverted clean off-white enclosure in Dark Mode, dark charcoal in Light Mode
+    ctx.fillStyle = isDark ? '#f1f5f9' : '#1e232d';
     if (typeof ctx.roundRect === 'function') {
       ctx.roundRect(0, 0, 480, 240, 16);
       ctx.fill();
     } else {
       ctx.fillRect(0, 0, 480, 240);
     }
-    ctx.strokeStyle = isDark ? '#262c36' : '#cbd5e1';
+    ctx.strokeStyle = isDark ? '#cbd5e1' : '#111827';
     ctx.lineWidth = 2;
     ctx.stroke();
 
     // Header
-    ctx.fillStyle = isDark ? '#94a3b8' : '#475569';
-    ctx.font = 'bold 13px ui-monospace, SFMono-Regular, Menlo, monospace';
+    ctx.fillStyle = isDark ? '#334155' : '#cbd5e1';
+    ctx.font = 'bold 13px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace';
     ctx.fillText((dmm.label || 'DIGITAL MULTIMETER').toUpperCase(), 24, 34);
 
     ctx.fillStyle = isDark ? '#64748b' : '#94a3b8';
@@ -2461,32 +2355,32 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     ctx.textAlign = 'left';
 
     // LCD screen bezel
-    ctx.fillStyle = isDark ? '#031728' : '#f0f9ff';
+    ctx.fillStyle = '#041d33';
     if (typeof ctx.roundRect === 'function') {
       ctx.roundRect(20, 50, 440, 160, 10);
       ctx.fill();
     } else {
       ctx.fillRect(20, 50, 440, 160);
     }
-    ctx.strokeStyle = '#0284c7';
+    ctx.strokeStyle = isDark ? '#0284c7' : '#38bdf8';
     ctx.lineWidth = 1.5;
     ctx.stroke();
 
     // Annunciator
-    ctx.fillStyle = isDark ? '#38bdf8' : '#0284c7';
-    ctx.font = 'bold 12px ui-monospace, SFMono-Regular, Menlo, monospace';
+    ctx.fillStyle = '#38bdf8';
+    ctx.font = 'bold 12px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace';
     const dmmMode = (dmm.props?.mode as string) || 'AUTO RANGE';
     ctx.fillText(dmmMode.toUpperCase(), 36, 78);
 
     // Value Display
-    ctx.fillStyle = isDark ? '#e0f2fe' : '#0369a1';
-    ctx.font = 'bold 42px ui-monospace, SFMono-Regular, Menlo, monospace';
+    ctx.fillStyle = '#e0f2fe';
+    ctx.font = 'bold 42px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace';
     ctx.textAlign = 'right';
     ctx.fillText(valueText, 440, 142);
     ctx.textAlign = 'left';
 
     // Subtitle
-    ctx.fillStyle = isDark ? '#7dd3fc' : '#0284c7';
+    ctx.fillStyle = isDark ? '#0284c7' : '#7dd3fc';
     ctx.font = '12px sans-serif';
     ctx.fillText(statusText, 36, 185);
 
@@ -2513,7 +2407,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
       });
     } else {
       const pngData = canvas.toDataURL('image/png');
-      const svgStr = `<svg xmlns="http://www.w3.org/2000/svg" class="${isDark ? 'dark' : ''}" width="480" height="240" viewBox="0 0 480 240"><rect width="480" height="240" fill="${isDark ? '#090a0d' : '#ffffff'}"/><image href="${pngData}" width="480" height="240"/></svg>`;
+      const svgStr = `<svg xmlns="http://www.w3.org/2000/svg" class="${isDark ? 'dark' : ''}" width="480" height="240" viewBox="0 0 480 240"><rect width="480" height="240" fill="none"/><image href="${pngData}" width="480" height="240"/></svg>`;
       const blob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
       const dataUrl = URL.createObjectURL(blob);
       return Promise.resolve({
@@ -2557,6 +2451,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     clonedSvg.setAttribute('height', String(cropHeight));
     clonedSvg.style.width = `${cropWidth}px`;
     clonedSvg.style.height = `${cropHeight}px`;
+    clonedSvg.style.backgroundColor = 'transparent';
 
     const strokeColor = darkPreview ? '#f8fafc' : '#1e293b';
     clonedSvg.style.color = strokeColor;
@@ -2607,12 +2502,13 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
       clonedSvg.insertBefore(defs, clonedSvg.firstChild);
     }
 
+    // Transparent backdrop - never opaque white or black
     const bgRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
     bgRect.setAttribute('x', String(cropX));
     bgRect.setAttribute('y', String(cropY));
     bgRect.setAttribute('width', String(cropWidth));
     bgRect.setAttribute('height', String(cropHeight));
-    bgRect.setAttribute('fill', colors.canvas);
+    bgRect.setAttribute('fill', 'none');
 
     if (worldGroup) {
       worldGroup.insertBefore(bgRect, worldGroup.firstChild);
@@ -2626,7 +2522,10 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
       gridRect.setAttribute('y', String(cropY));
       gridRect.setAttribute('width', String(cropWidth));
       gridRect.setAttribute('height', String(cropHeight));
-      gridRect.setAttribute('fill', `url(#workspace-grid-${tabDUiRefinement ? tabDGridMode : 'base'})`);
+      const gridPatternId = tabDUiRefinement && tabDGridMode === 'dots'
+        ? 'workspace-grid-dots'
+        : `workspace-grid-${tabDUiRefinement ? tabDGridMode : 'base'}`;
+      gridRect.setAttribute('fill', `url(#${gridPatternId})`);
       if (worldGroup) {
         worldGroup.insertBefore(gridRect, bgRect.nextSibling);
       } else {
@@ -2639,7 +2538,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
       ${KATEX_EMBEDDED_FONT_CSS}
       :root, svg {
         color: ${strokeColor};
-        background-color: ${colors.canvas};
+        background-color: transparent;
       }
       text, tspan {
         font-family: 'KaTeX_Main', 'KaTeX_Math', 'KaTeX_AMS', serif;
@@ -2652,15 +2551,15 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
         stroke: ${colors.canvas};
       }
       .dmm-body {
-        fill: ${darkPreview ? '#141820' : '#0d0f12'};
-        stroke: ${darkPreview ? '#3b4556' : '#262c36'};
+        fill: ${darkPreview ? '#f1f5f9' : '#1e232d'};
+        stroke: ${darkPreview ? '#cbd5e1' : '#111827'};
       }
       .dmm-screen {
-        fill: ${darkPreview ? '#041d33' : '#e0f2fe'};
-        stroke: ${darkPreview ? '#38bdf8' : '#0284c7'};
+        fill: #041d33;
+        stroke: ${darkPreview ? '#0284c7' : '#38bdf8'};
       }
       .dmm-screen-text {
-        fill: ${darkPreview ? '#38bdf8' : '#0284c7'};
+        fill: #38bdf8;
       }
     `;
     defs.appendChild(styleEl);

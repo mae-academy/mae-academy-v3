@@ -24,6 +24,64 @@ export interface ExportPreviewModalProps {
   onAllDownloaded?: (items: ExportItem[]) => void;
 }
 
+export async function svgToPngBlob(svgString: string, explicitWidth?: number, explicitHeight?: number, scale = 2): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    try {
+      let width = explicitWidth;
+      let height = explicitHeight;
+      if (!width || !height) {
+        if (typeof DOMParser !== 'undefined') {
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(svgString, 'image/svg+xml');
+          const svgEl = doc.querySelector('svg');
+          if (svgEl) {
+            const viewBox = svgEl.getAttribute('viewBox');
+            if (viewBox) {
+              const parts = viewBox.trim().split(/[\s,]+/).map(Number);
+              if (parts.length === 4 && parts[2] > 0 && parts[3] > 0) {
+                width = parts[2];
+                height = parts[3];
+              }
+            }
+            if (!width) width = parseFloat(svgEl.getAttribute('width') || '800') || 800;
+            if (!height) height = parseFloat(svgEl.getAttribute('height') || '600') || 600;
+          }
+        }
+        if (!width) width = 800;
+        if (!height) height = 600;
+      }
+
+      const img = new Image();
+      const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+      const url = URL.createObjectURL(svgBlob);
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(width! * scale);
+        canvas.height = Math.round(height! * scale);
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          reject(new Error('Canvas 2D context not available'));
+          return;
+        }
+        ctx.scale(scale, scale);
+        ctx.drawImage(img, 0, 0, width!, height!);
+        canvas.toBlob((blob) => {
+          if (blob) resolve(blob);
+          else reject(new Error('Failed to convert canvas to blob'));
+        }, 'image/png');
+      };
+      img.onerror = (e) => {
+        URL.revokeObjectURL(url);
+        reject(e);
+      };
+      img.src = url;
+    } catch (e) {
+      reject(e);
+    }
+  });
+}
+
 export function ExportPreviewModal({
   isOpen,
   onClose,
@@ -67,11 +125,44 @@ export function ExportPreviewModal({
         toast.success(`Copied ${item.filename} to clipboard`);
         setTimeout(() => setCopiedId(null), 2000);
       } else {
-        // SVG raw text copy
-        const text = item.svgString || (await (await fetch(item.dataUrl)).text());
-        await navigator.clipboard.writeText(text);
+        // Rich Clipboard API: Register both high-resolution fallback image/png and standard image/svg+xml
+        const svgString = item.svgString || (await (await fetch(item.dataUrl)).text());
+        const svgBlob = new Blob([svgString], { type: 'image/svg+xml' });
+        let writeSuccess = false;
+
+        try {
+          const pngBlob = await svgToPngBlob(svgString, item.width, item.height, 2);
+          try {
+            await navigator.clipboard.write([
+              new ClipboardItem({
+                'image/png': pngBlob,
+                'image/svg+xml': svgBlob,
+              }),
+            ]);
+            writeSuccess = true;
+          } catch {
+            // Some browsers only accept image/png in ClipboardItem
+            try {
+              await navigator.clipboard.write([
+                new ClipboardItem({
+                  'image/png': pngBlob,
+                }),
+              ]);
+              writeSuccess = true;
+            } catch {
+              // Fallback to text copy
+            }
+          }
+        } catch {
+          // Fallback to text copy
+        }
+
+        if (!writeSuccess) {
+          await navigator.clipboard.writeText(svgString);
+        }
+
         setCopiedId(item.id);
-        toast.success('Copied Code!');
+        toast.success('Copied Image to Clipboard!');
         setTimeout(() => setCopiedId(null), 2000);
       }
     } catch (err) {
