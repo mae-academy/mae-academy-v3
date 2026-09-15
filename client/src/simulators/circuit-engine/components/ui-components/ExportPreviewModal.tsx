@@ -236,10 +236,11 @@ export function ExportPreviewModal({
         }
       }
 
-      // Vector SVG Copying with MS Word / PowerPoint text/html compatibility wrapper
+      // --- Vector SVG clipboard write ---
+      // Source SVG string: prefer the already-inlined svgString (from Home.tsx exportSvg)
       let cleanSvgString = item.svgString || (await (await fetch(item.dataUrl)).text());
 
-      // Ensure explicit width, height in pixels and xmlns for MS Word / PowerPoint compatibility
+      // Ensure explicit px dimensions and transparent background for Word/Illustrator
       let targetWidth = item.width;
       let targetHeight = item.height;
       if (typeof DOMParser !== 'undefined') {
@@ -248,80 +249,86 @@ export function ExportPreviewModal({
           const doc = parser.parseFromString(cleanSvgString, 'image/svg+xml');
           const svgEl = doc.querySelector('svg');
           if (svgEl) {
+            // Enforce xmlns
             svgEl.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
-            if (targetWidth && targetHeight) {
-              svgEl.setAttribute('width', `${targetWidth}px`);
-              svgEl.setAttribute('height', `${targetHeight}px`);
-            } else {
+            svgEl.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
+
+            // Derive px dimensions from item metadata or existing viewBox
+            if (!targetWidth || !targetHeight) {
               const vb = svgEl.getAttribute('viewBox');
               if (vb) {
                 const parts = vb.trim().split(/[\s,]+/).map(Number);
                 if (parts.length === 4 && parts[2] > 0 && parts[3] > 0) {
                   targetWidth = Math.round(parts[2]);
                   targetHeight = Math.round(parts[3]);
-                  svgEl.setAttribute('width', `${targetWidth}px`);
-                  svgEl.setAttribute('height', `${targetHeight}px`);
                 }
               }
             }
-            svgEl.removeAttribute('style');
+            // MS Word requires explicit pixel dimensions — without them it renders 0×0
+            if (targetWidth && targetHeight) {
+              svgEl.setAttribute('width', `${targetWidth}px`);
+              svgEl.setAttribute('height', `${targetHeight}px`);
+            }
+
+            // Strip any residual CSS class on the root (already inlined by the Deep Style Inliner)
+            svgEl.removeAttribute('class');
+            // Guarantee transparent root background
+            svgEl.style.background = 'transparent';
+            svgEl.style.backgroundColor = 'transparent';
+
             cleanSvgString = new XMLSerializer().serializeToString(svgEl);
           }
         } catch {
-          // fallback
+          // fallback: use raw svgString
         }
       }
 
+      // Build the base64 HTML wrapper for MS Word/PowerPoint paste
       const base64Svg = btoa(unescape(encodeURIComponent(cleanSvgString)));
       const imgWidthAttr = targetWidth ? ` width="${targetWidth}"` : '';
       const imgHeightAttr = targetHeight ? ` height="${targetHeight}"` : '';
-      const htmlWrapper = `<img${imgWidthAttr}${imgHeightAttr} src="data:image/svg+xml;base64,${base64Svg}" />`;
+      // MS Word picks up an <img> with a data-URI SVG source and renders it as a vector EMF internally
+      const htmlWrapper = `<html><body><img${imgWidthAttr}${imgHeightAttr} src="data:image/svg+xml;base64,${base64Svg}" /></body></html>`;
       const svgBlob = new Blob([cleanSvgString], { type: 'image/svg+xml' });
 
+      // Generate a transparent 4K PNG fallback for image editors
       let pngFallbackBlob: Blob | undefined;
       try {
         pngFallbackBlob = await svgToPngBlob(cleanSvgString, targetWidth, targetHeight);
       } catch {
-        // ignore
+        // ignore — PNG fallback is optional
       }
 
       let writeSuccess = false;
 
-      // Try rich clipboard write: text/html (Word/PowerPoint), image/svg+xml (vector apps), text/plain, image/png
+      // Strategy 1: Full rich clipboard — text/html (Word), image/svg+xml (Inkscape/Illustrator),
+      //              image/png (image editors), text/plain (plain text fallback)
       try {
         const clipItems: Record<string, Blob> = {
           'text/html': new Blob([htmlWrapper], { type: 'text/html' }),
           'image/svg+xml': svgBlob,
           'text/plain': new Blob([cleanSvgString], { type: 'text/plain' }),
         };
-        if (pngFallbackBlob) {
-          clipItems['image/png'] = pngFallbackBlob;
-        }
-        await navigator.clipboard.write([
-          new ClipboardItem(clipItems),
-        ]);
+        if (pngFallbackBlob) clipItems['image/png'] = pngFallbackBlob;
+        await navigator.clipboard.write([new ClipboardItem(clipItems)]);
         writeSuccess = true;
       } catch {
-        // Fallback without image/svg+xml representation
+        // Strategy 2: Without image/svg+xml (Chrome's ClipboardItem can be picky about MIME types)
         try {
           const clipItems: Record<string, Blob> = {
             'text/html': new Blob([htmlWrapper], { type: 'text/html' }),
             'text/plain': new Blob([cleanSvgString], { type: 'text/plain' }),
           };
-          if (pngFallbackBlob) {
-            clipItems['image/png'] = pngFallbackBlob;
-          }
-          await navigator.clipboard.write([
-            new ClipboardItem(clipItems),
-          ]);
+          if (pngFallbackBlob) clipItems['image/png'] = pngFallbackBlob;
+          await navigator.clipboard.write([new ClipboardItem(clipItems)]);
           writeSuccess = true;
         } catch {
-          // Fallback to plain text copy
+          // Strategy 3: Plain text fallback (copies raw SVG XML)
           try {
             await navigator.clipboard.writeText(cleanSvgString);
             writeSuccess = true;
           } catch {
-            // Failed
+            // All strategies failed
           }
         }
       }
@@ -333,7 +340,7 @@ export function ExportPreviewModal({
       } else {
         toast.error('Failed to copy vector to clipboard');
       }
-    } catch (err) {
+    } catch {
       toast.error('Failed to copy to clipboard');
     }
   };

@@ -560,6 +560,96 @@ function renderFormattedValueTspans(value: string) {
 }
 
 
+/**
+ * Deep Style Inliner: Walks the live source DOM and the cloned SVG simultaneously,
+ * extracting computed CSS values and writing them as hardcoded SVG presentation attributes.
+ * This ensures the exported SVG renders correctly in external apps (Word, Illustrator, Figma)
+ * that do not have access to the browser's CSS stylesheets or Tailwind/CSS-variables.
+ */
+function inlineComputedStyles(sourceNode: Element, clonedNode: Element): void {
+  // Only process SVG elements that can carry presentation attributes
+  const isSvgEl = sourceNode.namespaceURI === 'http://www.w3.org/2000/svg';
+  if (!isSvgEl) return;
+
+  try {
+    const cs = window.getComputedStyle(sourceNode);
+
+    // SVG presentation attributes we care about
+    const fill = cs.getPropertyValue('fill').trim();
+    const stroke = cs.getPropertyValue('stroke').trim();
+    const strokeWidth = cs.getPropertyValue('stroke-width').trim();
+    const opacity = cs.getPropertyValue('opacity').trim();
+    const color = cs.getPropertyValue('color').trim(); // resolves currentColor
+    const fontFamily = cs.getPropertyValue('font-family').trim();
+    const fontSize = cs.getPropertyValue('font-size').trim();
+    const fontWeight = cs.getPropertyValue('font-weight').trim();
+
+    // Resolve currentColor → actual computed color
+    const resolveCurrentColor = (val: string) =>
+      val === 'currentColor' || val === 'currentcolor' ? color : val;
+
+    // Only set attributes when the value is a real, non-empty, non-inherit value
+    const shouldSet = (v: string) => v && v !== 'none' && v !== '' && v !== 'inherit';
+
+    const resolvedFill = resolveCurrentColor(fill);
+    const resolvedStroke = resolveCurrentColor(stroke);
+
+    if (shouldSet(resolvedFill) && !['url(', 'none'].some(p => resolvedFill.startsWith(p))) {
+      clonedNode.setAttribute('fill', resolvedFill);
+    } else if (fill === 'none') {
+      clonedNode.setAttribute('fill', 'none');
+    }
+
+    if (shouldSet(resolvedStroke) && !resolvedStroke.startsWith('url(')) {
+      clonedNode.setAttribute('stroke', resolvedStroke);
+    } else if (stroke === 'none') {
+      clonedNode.setAttribute('stroke', 'none');
+    }
+
+    if (strokeWidth && strokeWidth !== '0px' && strokeWidth !== '1px') {
+      clonedNode.setAttribute('stroke-width', strokeWidth);
+    }
+
+    if (opacity && opacity !== '1' && opacity !== '') {
+      clonedNode.setAttribute('opacity', opacity);
+    }
+
+    if (fontFamily) {
+      clonedNode.setAttribute('font-family', fontFamily);
+    }
+    if (fontSize) {
+      clonedNode.setAttribute('font-size', fontSize);
+    }
+    if (fontWeight && fontWeight !== '400' && fontWeight !== 'normal') {
+      clonedNode.setAttribute('font-weight', fontWeight);
+    }
+
+    // Remove className so no external CSS class resolution is attempted
+    if (clonedNode.getAttribute('class')) {
+      clonedNode.removeAttribute('class');
+    }
+    // Remove inline style that references CSS vars or currentColor — they're now hardcoded
+    const clonedStyle = (clonedNode as HTMLElement | SVGElement).style;
+    if (clonedStyle && clonedStyle.cssText) {
+      // Keep only font-family and font-size from the inline style (needed for tspan rendering)
+      const keptStyle: string[] = [];
+      if (clonedStyle.fontFamily) keptStyle.push(`font-family:${clonedStyle.fontFamily}`);
+      if (clonedStyle.fontSize) keptStyle.push(`font-size:${clonedStyle.fontSize}`);
+      clonedStyle.cssText = keptStyle.join(';');
+    }
+  } catch {
+    // getComputedStyle may fail for detached nodes; skip gracefully
+  }
+
+  // Recurse into children
+  const srcChildren = Array.from(sourceNode.children);
+  const clnChildren = Array.from(clonedNode.children);
+  const len = Math.min(srcChildren.length, clnChildren.length);
+  for (let i = 0; i < len; i++) {
+    inlineComputedStyles(srcChildren[i], clnChildren[i]);
+  }
+}
+
 /** Populates SVG text elements with KaTeX tspans for self-contained vector SVG export. */
 function populateMathTspans(svgTextEl: SVGTextElement, rawText: string, baseFontSize: number) {
   if (!rawText) return;
@@ -2870,33 +2960,53 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
       }
     }
 
+    // --- Step 1: Inline computed styles from the LIVE DOM into the CLONE ---
+    // This must happen BEFORE cloneNode so we can walk source + clone in sync.
+    // We need to first get the clone, then immediately call inlineComputedStyles.
     const clonedSvg = svgRef.current.cloneNode(true) as SVGSVGElement;
+
+    // Run the deep style inliner while the original SVG is still attached to the DOM
+    inlineComputedStyles(svgRef.current, clonedSvg);
+
     clonedSvg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
     clonedSvg.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
-    clonedSvg.setAttribute('class', darkPreview ? 'dark' : '');
+    clonedSvg.removeAttribute('class'); // No external CSS class resolution
     clonedSvg.setAttribute('viewBox', `${cropX} ${cropY} ${cropWidth} ${cropHeight}`);
     clonedSvg.setAttribute('width', `${cropWidth}px`);
     clonedSvg.setAttribute('height', `${cropHeight}px`);
     clonedSvg.removeAttribute('style');
+    clonedSvg.style.background = 'transparent';
+    clonedSvg.style.backgroundColor = 'transparent';
 
     const strokeColor = darkPreview ? '#f8fafc' : '#1e293b';
-    clonedSvg.style.color = strokeColor;
+    // Set color on root so any remaining currentColor references resolve correctly
     clonedSvg.setAttribute('color', strokeColor);
 
+    // --- Step 2: Remove the pan/zoom world transform (viewBox handles framing) ---
     const worldGroup = Array.from(clonedSvg.querySelectorAll('g')).find(g => g.getAttribute('transform')?.includes('scale'));
     if (worldGroup) {
       worldGroup.removeAttribute('transform');
     }
 
+    // --- Step 3: Strip all interactive artifacts and grid surface rects ---
+    // Remove all existing grid rects (we'll re-add a clean one if needed)
+    clonedSvg.querySelectorAll('rect[fill^="url(#workspace-grid"]').forEach(el => el.remove());
     clonedSvg.querySelectorAll('rect[key*="grid-surface"], rect[fill*="workspace-grid"]').forEach(el => el.remove());
+    // Remove wire hitboxes (wide transparent strokes used for mouse interaction)
+    clonedSvg.querySelectorAll('path[stroke="transparent"]').forEach(el => el.remove());
+    // Remove handle circles (wire corner drag handles, terminal hit targets)
     clonedSvg.querySelectorAll('circle[style*="cursor: move"], circle[style*="cursor:move"]').forEach(el => el.remove());
     clonedSvg.querySelectorAll('circle[r="13"]').forEach(el => el.remove());
     clonedSvg.querySelectorAll('circle[fill="transparent"]').forEach(el => el.remove());
     clonedSvg.querySelectorAll('circle[fill="none"][stroke="none"]').forEach(el => el.remove());
-    clonedSvg.querySelectorAll('path[stroke="transparent"]').forEach(el => el.remove());
+    // Remove marquee selection rect
     clonedSvg.querySelectorAll('rect[stroke-dasharray="5 4"]').forEach(el => el.remove());
+    // Remove wire draft preview path
     clonedSvg.querySelectorAll('path[stroke-dasharray="6 4"]').forEach(el => el.remove());
+    // Remove hidden overlays
     clonedSvg.querySelectorAll('g[opacity="0"], g[style*="opacity: 0"], circle[opacity="0"], circle[style*="opacity: 0"]').forEach(el => el.remove());
+    // Strip any solid background rect that was added by previous export iterations
+    clonedSvg.querySelectorAll('rect[data-export-bg]').forEach(el => el.remove());
 
     texts.forEach(text => {
       const g = clonedSvg.querySelector(`g[data-text-id="${text.id}"]`);
@@ -2918,75 +3028,63 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
       }
     });
 
-    clonedSvg.querySelectorAll('g[color]').forEach(el => {
+    // --- Step 4: Normalize all remaining `color` and `currentColor` references ---
+    // After inlineComputedStyles, most elements are hardcoded. Do a final pass for
+    // any remaining `color` attributes and `currentColor` fill/stroke values.
+    clonedSvg.querySelectorAll('[color]').forEach(el => {
       el.setAttribute('color', strokeColor);
     });
+    clonedSvg.querySelectorAll('[fill="currentColor"], [fill="currentcolor"]').forEach(el => {
+      el.setAttribute('fill', strokeColor);
+    });
+    clonedSvg.querySelectorAll('[stroke="currentColor"], [stroke="currentcolor"]').forEach(el => {
+      el.setAttribute('stroke', strokeColor);
+    });
 
+    // --- Step 5: Build defs block with embedded fonts and grid pattern ---
     let defs = clonedSvg.querySelector('defs');
     if (!defs) {
       defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
       clonedSvg.insertBefore(defs, clonedSvg.firstChild);
     }
 
-    // Transparent backdrop - never opaque white or black
-    const bgRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-    bgRect.setAttribute('x', String(cropX));
-    bgRect.setAttribute('y', String(cropY));
-    bgRect.setAttribute('width', String(cropWidth));
-    bgRect.setAttribute('height', String(cropHeight));
-    bgRect.setAttribute('fill', 'none');
+    // Pure transparent backdrop (fill="none" means no background rectangle at all)
+    // We do NOT insert a background rect for SVG exports — this ensures transparency.
+    // The transparency is established at the SVG root level via style.
 
-    if (worldGroup) {
-      worldGroup.insertBefore(bgRect, worldGroup.firstChild);
-    } else {
-      clonedSvg.insertBefore(bgRect, clonedSvg.firstChild);
-    }
-
+    // Re-inject grid pattern + rect if the grid is active
     if (gridVisible && (!tabDUiRefinement || tabDGridMode !== 'hidden')) {
+      // Clone the live grid pattern definition from the live SVG <defs>
+      const livePatternId = tabDUiRefinement && tabDGridMode === 'dots'
+        ? 'workspace-grid-dots'
+        : `workspace-grid-${tabDUiRefinement ? tabDGridMode : 'base'}`;
+      const livePattern = svgRef.current?.querySelector(`#${livePatternId}`);
+      if (livePattern) {
+        const patternClone = livePattern.cloneNode(true) as Element;
+        defs.appendChild(patternClone);
+      }
       const gridRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
       gridRect.setAttribute('x', String(cropX));
       gridRect.setAttribute('y', String(cropY));
       gridRect.setAttribute('width', String(cropWidth));
       gridRect.setAttribute('height', String(cropHeight));
-      const gridPatternId = tabDUiRefinement && tabDGridMode === 'dots'
-        ? 'workspace-grid-dots'
-        : `workspace-grid-${tabDUiRefinement ? tabDGridMode : 'base'}`;
-      gridRect.setAttribute('fill', `url(#${gridPatternId})`);
-      if (worldGroup) {
-        worldGroup.insertBefore(gridRect, bgRect.nextSibling);
-      } else {
-        clonedSvg.insertBefore(gridRect, bgRect.nextSibling);
-      }
+      gridRect.setAttribute('fill', `url(#${livePatternId})`);
+      gridRect.setAttribute('data-export-bg', 'grid');
+      const insertTarget = worldGroup || clonedSvg;
+      insertTarget.insertBefore(gridRect, insertTarget.firstChild);
     }
 
+    // Embedded font CSS + hardcoded fallback class styles (belt-and-suspenders for any
+    // class that wasn't removed by inlineComputedStyles due to non-SVG wrappers)
     const styleEl = document.createElementNS('http://www.w3.org/2000/svg', 'style');
     styleEl.textContent = `
       ${KATEX_EMBEDDED_FONT_CSS}
-      :root, svg {
-        color: ${strokeColor};
-        background-color: transparent;
-      }
-      text, tspan {
-        font-family: 'KaTeX_Main', 'KaTeX_Math', 'KaTeX_AMS', serif;
-      }
-      .katex {
-        font-family: 'KaTeX_Main', 'KaTeX_Math', 'KaTeX_AMS', serif;
-      }
-      .mae-component-label {
-        fill: ${darkPreview ? '#f1f5f9' : '#1e293b'};
-        stroke: ${colors.canvas};
-      }
-      .dmm-body {
-        fill: ${darkPreview ? '#f1f5f9' : '#1e232d'};
-        stroke: ${darkPreview ? '#cbd5e1' : '#111827'};
-      }
-      .dmm-screen {
-        fill: #edf2f7;
-        stroke: #94a3b8;
-      }
-      .dmm-screen-text {
-        fill: #0f172a;
-      }
+      :root, svg { color: ${strokeColor}; background-color: transparent; }
+      text, tspan { font-family: 'KaTeX_Main', 'KaTeX_Math', 'KaTeX_AMS', serif; }
+      .mae-component-label { fill: ${darkPreview ? '#f1f5f9' : '#1e293b'}; stroke: none; }
+      .dmm-body { fill: ${darkPreview ? '#1e232d' : '#1e232d'}; stroke: ${darkPreview ? '#cbd5e1' : '#111827'}; }
+      .dmm-screen { fill: #edf2f7; stroke: #94a3b8; }
+      .dmm-screen-text { fill: #0f172a; }
     `;
     defs.appendChild(styleEl);
 
@@ -3123,32 +3221,44 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
       }
     }
 
+    // PNG export: clone and inline computed styles for accurate pixel rendering
     const clonedSvg = svgRef.current.cloneNode(true) as SVGSVGElement;
+
+    // Deep style inliner — resolves currentColor, CSS vars, Tailwind classes
+    inlineComputedStyles(svgRef.current, clonedSvg);
+
     clonedSvg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
     clonedSvg.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
-    clonedSvg.setAttribute('class', darkPreview ? 'dark' : '');
+    clonedSvg.removeAttribute('class');
     clonedSvg.setAttribute('viewBox', `${cropX} ${cropY} ${cropWidth} ${cropHeight}`);
     clonedSvg.setAttribute('width', String(canvas.width));
     clonedSvg.setAttribute('height', String(canvas.height));
+    clonedSvg.removeAttribute('style');
 
     const strokeColor = darkPreview ? '#f8fafc' : '#1e293b';
-    clonedSvg.style.color = strokeColor;
     clonedSvg.setAttribute('color', strokeColor);
 
-    const worldGroup = Array.from(clonedSvg.querySelectorAll('g')).find(g => g.getAttribute('transform')?.includes('scale'));
-    if (worldGroup) {
-      worldGroup.removeAttribute('transform');
+    const worldGroupPng = Array.from(clonedSvg.querySelectorAll('g')).find(g => g.getAttribute('transform')?.includes('scale'));
+    if (worldGroupPng) {
+      worldGroupPng.removeAttribute('transform');
     }
 
+    // Remove all grid surface rects and interactive UI artifacts
+    clonedSvg.querySelectorAll('rect[fill^="url(#workspace-grid"]').forEach(el => el.remove());
     clonedSvg.querySelectorAll('rect[key*="grid-surface"], rect[fill*="workspace-grid"]').forEach(el => el.remove());
+    clonedSvg.querySelectorAll('path[stroke="transparent"]').forEach(el => el.remove());
     clonedSvg.querySelectorAll('circle[style*="cursor: move"], circle[style*="cursor:move"]').forEach(el => el.remove());
     clonedSvg.querySelectorAll('circle[r="13"]').forEach(el => el.remove());
     clonedSvg.querySelectorAll('circle[fill="transparent"]').forEach(el => el.remove());
     clonedSvg.querySelectorAll('circle[fill="none"][stroke="none"]').forEach(el => el.remove());
-    clonedSvg.querySelectorAll('path[stroke="transparent"]').forEach(el => el.remove());
     clonedSvg.querySelectorAll('rect[stroke-dasharray="5 4"]').forEach(el => el.remove());
     clonedSvg.querySelectorAll('path[stroke-dasharray="6 4"]').forEach(el => el.remove());
     clonedSvg.querySelectorAll('g[opacity="0"], g[style*="opacity: 0"], circle[opacity="0"], circle[style*="opacity: 0"]').forEach(el => el.remove());
+
+    // Normalize any remaining currentColor references
+    clonedSvg.querySelectorAll('[color]').forEach(el => el.setAttribute('color', strokeColor));
+    clonedSvg.querySelectorAll('[fill="currentColor"], [fill="currentcolor"]').forEach(el => el.setAttribute('fill', strokeColor));
+    clonedSvg.querySelectorAll('[stroke="currentColor"], [stroke="currentcolor"]').forEach(el => el.setAttribute('stroke', strokeColor));
 
     texts.forEach(text => {
       const g = clonedSvg.querySelector(`g[data-text-id="${text.id}"]`);
@@ -3170,10 +3280,6 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
       }
     });
 
-    clonedSvg.querySelectorAll('g[color]').forEach(el => {
-      el.setAttribute('color', strokeColor);
-    });
-
     let defs = clonedSvg.querySelector('defs');
     if (!defs) {
       defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
@@ -3182,30 +3288,12 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     const styleEl = document.createElementNS('http://www.w3.org/2000/svg', 'style');
     styleEl.textContent = `
       ${KATEX_EMBEDDED_FONT_CSS}
-      :root, svg {
-        color: ${strokeColor};
-      }
-      text, tspan {
-        font-family: 'KaTeX_Main', 'KaTeX_Math', 'KaTeX_AMS', serif;
-      }
-      .katex {
-        font-family: 'KaTeX_Main', 'KaTeX_Math', 'KaTeX_AMS', serif;
-      }
-      .mae-component-label {
-        fill: ${darkPreview ? '#f1f5f9' : '#1e293b'};
-        stroke: ${colors.canvas};
-      }
-      .dmm-body {
-        fill: ${darkPreview ? '#f1f5f9' : '#1e232d'};
-        stroke: ${darkPreview ? '#cbd5e1' : '#111827'};
-      }
-      .dmm-screen {
-        fill: #edf2f7;
-        stroke: #94a3b8;
-      }
-      .dmm-screen-text {
-        fill: #0f172a;
-      }
+      :root, svg { color: ${strokeColor}; background-color: transparent; }
+      text, tspan { font-family: 'KaTeX_Main', 'KaTeX_Math', 'KaTeX_AMS', serif; }
+      .mae-component-label { fill: ${darkPreview ? '#f1f5f9' : '#1e293b'}; stroke: none; }
+      .dmm-body { fill: ${darkPreview ? '#1e232d' : '#1e232d'}; stroke: ${darkPreview ? '#cbd5e1' : '#111827'}; }
+      .dmm-screen { fill: #edf2f7; stroke: #94a3b8; }
+      .dmm-screen-text { fill: #0f172a; }
     `;
     defs.appendChild(styleEl);
 
