@@ -113,7 +113,7 @@ import {
   type Obstacle,
   type Point,
 } from '@/simulators/circuit-engine/models/wiring';
-import { buildJumpArcPath, calculateWireIntersections, junctionDotPositions } from '@/simulators/circuit-engine/models/wireIntersections';
+import { buildJumpArcPath, calculateWireIntersections, getWirePoints, junctionDotPositions } from '@/simulators/circuit-engine/models/wireIntersections';
 import { calculateOrthogonalPath } from '@/simulators/circuit-engine/models/wireRouter';
 import {
   useHistory,
@@ -828,7 +828,10 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     () => calculateWireIntersections(wires, w => normalizedGraph.netForTerminal(w.fromComp, w.fromTerm)),
     [wires, normalizedGraph],
   );
-  const junctionDots = useMemo(() => junctionDotPositions(wireIntersectionList), [wireIntersectionList]);
+  const junctionDots = useMemo(
+    () => junctionDotPositions(wireIntersectionList, wires, w => normalizedGraph.netForTerminal(w.fromComp, w.fromTerm)),
+    [wireIntersectionList, wires, normalizedGraph],
+  );
 
   const [analysisTraces, setAnalysisTraces] = useState<Partial<Record<'mesh' | 'nodal', AnalysisTrace>>>({});
   const [activeAnalysisMethod, setActiveAnalysisMethod] = useState<'mesh' | 'nodal' | null>(null);
@@ -2344,6 +2347,10 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     };
   }, [simulationRunning, simulationSpeed]);
 
+  useEffect(() => {
+    // The previous agent added a log here. I will remove it to clean up.
+  }, [animationTime, components]);
+
   // --- SPICE Accuracy Bridge ---
   // Runs ngspice off the main thread alongside the always-on legacy loop above. On success its
   // readings take over the Voltmeter/Ammeter/DMM/Oscilloscope entries in `effectiveSnapshot` below;
@@ -2497,6 +2504,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
       if (posVoltages && posVoltages.length > 0) nextCoilVoltages.set(posNet, posVoltages[posVoltages.length - 1]);
     }
     coilInitialVoltagesRef.current = nextCoilVoltages;
+    spiceRunContextRef.current = null;
   }, [clearSpiceReadings, spiceEngine.error, spiceEngine.results]);
 
   // Legacy `snapshot` stays the source of truth for animation/power flow; only instrument readings
@@ -2889,26 +2897,27 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
               {wires.map(wire => {
                 const selected = selection?.kind === 'wire' && selection.id === wire.id;
                 const phase = snapshot.wirePhases?.[wire.id] ?? 0;
-                const path = wire.path;
+                const path = getWirePoints(wire);
                 // Phase 2: use jump-arc path for the visible stroke; hitbox uses the
                 // plain polyline so clicks always register even near arc breaks.
                 const hitPath = pointsToPath(path);
-                const renderPath = buildJumpArcPath(path, wireIntersectionList, wire.id, 5);
+                const renderPath = buildJumpArcPath(path, wireIntersectionList, wire.id, 4);
                 const normalizedOffset = ((phase % 1) + 1) % 1;
                 // Persistent charge particles: uniform spacing based solely on physical length (N = floor(length / spacing))
                 const numDots = Math.max(1, Math.floor(pathLength(path) / 45));
                 const dots = getDotsOnPath(path, numDots, normalizedOffset);
                 const isSensingWire = false;
-                const isSensingParentSelected = false;
+                const strokeColor = selected ? colors.selection : (wire.color ?? colors.text);
+                const strokeWidth = selected ? 2 : 1.5;
+
                 return (
                   <g key={wire.id}>
                     {/* Wide transparent hitbox — uses plain polyline for reliable click detection */}
                     <path d={hitPath} fill="none" stroke="transparent" strokeWidth={17} strokeLinecap="round" strokeLinejoin="round" onMouseDown={event => handleWireMouseDown(event, wire)} onDoubleClick={event => handleWireDoubleClick(event, wire)} style={{ cursor: 'pointer' }} />
                     {/* Visible stroke with jump-arc splices at cross-net crossings */}
-                    <path d={renderPath} fill="none" stroke={colors.text} strokeWidth={1.5} strokeDasharray={isSensingWire ? "3 3" : undefined} strokeLinecap="round" strokeLinejoin="round" pointerEvents="none" />
+                    <path d={renderPath} fill="none" stroke={strokeColor} strokeWidth={strokeWidth} strokeDasharray={isSensingWire ? "3 3" : undefined} strokeLinecap="round" strokeLinejoin="round" pointerEvents="none" />
                     {showElectrons && dots.map((dot, index) => <circle key={index} cx={dot[0]} cy={dot[1]} r={3} fill={colors.powered} opacity={1} pointerEvents="none" />)}
-                    {wire.toComp.startsWith('junc_') && <circle cx={path[path.length - 1][0]} cy={path[path.length - 1][1]} r={3.5} fill={colors.text} stroke={colors.canvas} strokeWidth={1.5} pointerEvents="none" />}
-                    {selected && wire.path.length > 2 && wire.path.slice(1, -1).map((corner, index) => {
+                    {selected && path.length > 2 && path.slice(1, -1).map((corner, index) => {
                       const cornerIndex = index + 1;
                       return <circle key={`${wire.id}-${cornerIndex}`} cx={corner[0]} cy={corner[1]} r={6} fill={colors.panel} stroke={colors.selection} strokeWidth={2} onMouseDown={event => {
                         event.stopPropagation();
@@ -2920,9 +2929,9 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                 );
               })}
 
-              {/* Phase 2: same-net junction dots for interior crossing points */}
+              {/* Phase 2: same-net junction dots for interior crossing points, T-junctions, and cross-junctions */}
               {junctionDots.map(([jx, jy]) => (
-                <circle key={`jdot-${jx}-${jy}`} cx={jx} cy={jy} r={3.5} fill={colors.text} stroke={colors.canvas} strokeWidth={1} pointerEvents="none" />
+                <circle key={`jdot-${jx}-${jy}`} cx={jx} cy={jy} r={3} fill="currentColor" color={colors.text} pointerEvents="none" />
               ))}
 
               {/* Phase 3: orthogonal rubber-band wire preview */}

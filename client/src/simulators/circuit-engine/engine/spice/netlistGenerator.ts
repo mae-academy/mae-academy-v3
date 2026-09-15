@@ -1202,7 +1202,7 @@ export function generateNetlist(
     .map(([net, voltage]) => `V(${nodes.nameFor(net)})=${voltage}`);
 
   // The first line of a SPICE deck is the title and is always discarded by the parser.
-  return [
+  const netlist = [
     options.title ?? "MAE Academy circuit",
     ...modelCards,
     ...macroBlocks,
@@ -1213,6 +1213,7 @@ export function generateNetlist(
     ".end",
     "",
   ].join("\n");
+  return netlist;
 }
 
 /* ------------------------------------------------------------------------ Floating subnets --- */
