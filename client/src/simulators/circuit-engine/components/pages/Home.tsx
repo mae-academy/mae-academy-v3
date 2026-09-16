@@ -916,12 +916,13 @@ function TheveninTerminalOverlay({
         strokeDasharray="3 2"
         opacity={0.8}
       />
-      {/* Hollow terminal circle */}
+      {/* Genuinely hollow terminal circle (an opaque canvas-colored fill would mask
+          whatever it sits over — the pulse ring, a wire, an export background) */}
       <circle
         cx={x}
         cy={y}
         r={7}
-        fill={darkPreview ? '#0d0f12' : '#ffffff'}
+        fill="transparent"
         stroke={strokeColor}
         strokeWidth={2.5}
       />
@@ -1303,7 +1304,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
       const isConnectedToDragged = Boolean(activeDraggedId && (wire.fromComp === activeDraggedId || wire.toComp === activeDraggedId));
 
       if (isConnectedToDragged) {
-        if (wire.routing === 'manual' || (wire.waypoints && wire.waypoints.length > 0) || wire.path.length > 2) {
+        if (wire.routing === 'manual') {
           const updatedPath = reconnectPathEndpoints(wire.path, endpoints.from, endpoints.to, wire.routing, [], wire.waypoints, gridSize, endpoints.fromAxis);
           return {
             ...wire,
@@ -1311,10 +1312,14 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
             waypoints: updatedPath.length > 2 ? updatedPath.slice(1, -1) : wire.waypoints,
           };
         }
-        // Phase 3: auto-routed wires reroute via A* during drag so they stay
-        // orthogonal and avoid the updated component positions.  The dragged
-        // component itself (and its connection partner) are excluded from the
-        // obstacle grid so the router can reach their terminals freely.
+        // Phase 3: auto-routed wires reroute via A* on every drag frame so they stay
+        // orthogonal and avoid the updated component positions. This must run even
+        // once `wire.waypoints` is already populated from a prior frame's A* result —
+        // gating on "has waypoints" (as this used to) sends every wire that ever needed
+        // an elbow into the waypoint-preserving branch above, freezing its interior
+        // corners in world space while only the endpoint follows the cursor. The dragged
+        // component itself (and its connection partner) are excluded from the obstacle
+        // grid so the router can reach their terminals freely.
         // calculateOrthogonalPath already falls back to a single-elbow L-shape
         // when no clear path exists, so this is always safe.
         const excludeIds = new Set([wire.fromComp, wire.toComp]);
@@ -1355,7 +1360,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
       const endpoints = canvasWireEndpoints(wire, documentComponents);
       if (!endpoints) return wire;
 
-      if (wire.routing === 'manual' || (wire.waypoints && wire.waypoints.length > 0)) {
+      if (wire.routing === 'manual') {
         const updatedPath = reconnectPathEndpoints(
           wire.path,
           endpoints.from,
@@ -1373,6 +1378,8 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
         };
       }
 
+      // Same reasoning as refreshCanvasWireEndpoints: a previously-populated
+      // `waypoints` must not freeze an orthogonal (auto-routed) wire out of A*.
       const excludeIds = new Set([wire.fromComp, wire.toComp]);
       const newPath = calculateOrthogonalPath(
         endpoints.from,
@@ -4068,7 +4075,16 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                       const isIndependentSource = component.type === 'voltage' || component.type === 'current' || component.type === 'dc-voltage' || component.type === 'dc-current';
                       const isSuperpositionDimmedSource = isSuperpositionActive && superpositionActiveSourceId && isIndependentSource && component.id !== superpositionActiveSourceId;
                       const isSuperpositionActiveSource = isSuperpositionActive && superpositionActiveSourceId && component.id === superpositionActiveSourceId;
-                      const componentCanvasOpacity = isTheveninRemovedLoad ? 0.45 : isSuperpositionDimmedSource ? 0.28 : 1;
+                      // Deactivating an independent source for superposition isn't just "dim it" —
+                      // a zeroed voltage source is a short (wire), a zeroed current source is an open
+                      // (gap). Distinguish the two so a deactivated current source never gets a
+                      // short-circuit line drawn across it.
+                      const isSuperpositionDeactivatedVoltage = isSuperpositionDimmedSource && (component.type === 'voltage' || component.type === 'dc-voltage');
+                      const isSuperpositionDeactivatedCurrent = isSuperpositionDimmedSource && (component.type === 'current' || component.type === 'dc-current');
+                      // The deactivated-source branches below draw their own ghosted (opacity 0.25)
+                      // symbol, so the wrapper stays at full opacity — the short/open substitute must
+                      // read as real circuit geometry, not a dimmed component.
+                      const componentCanvasOpacity = isTheveninRemovedLoad ? 0.45 : (isSuperpositionDeactivatedVoltage || isSuperpositionDeactivatedCurrent) ? 1 : isSuperpositionDimmedSource ? 0.28 : 1;
 
                       return (
                         <g
@@ -4092,9 +4108,34 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                               pointerEvents="none"
                             />
                           )}
-                          <g transform={symbolTransform} color={isSelected ? colors.selection : undefined}>
-                            {renderSymbol(definition.symbol, powered, { ...component.props, label: component.label, selected: isSelected, _isSelected: isSelected, isDark: darkPreview, _isDark: darkPreview, isEnergized: powered, isConflicted: conflictedCoilIds.has(component.id), _intensity: intensity, ...(motorVEff !== undefined ? { _vEff: motorVEff } : {}), _documentedStyle: tabDUiRefinement, ...(meterDisplayValue !== undefined ? { displayValue: meterDisplayValue } : {}) }, animationTime)}
-                          </g>
+                          {isSuperpositionDeactivatedVoltage ? (
+                            /* Deactivated Voltage Source (Short Circuit): ghosted source graphic + solid wire line connecting pin1 to pin2 */
+                            (() => {
+                              const t0 = getCanvasTerminalPosition(component, definition.terminals[0]?.id);
+                              const t1 = getCanvasTerminalPosition(component, definition.terminals[1]?.id);
+                              const x1 = t0 ? t0[0] - component.x : 0;
+                              const y1 = t0 ? t0[1] - component.y : -50;
+                              const x2 = t1 ? t1[0] - component.x : 0;
+                              const y2 = t1 ? t1[1] - component.y : 50;
+                              return (
+                                <g>
+                                  <g opacity={0.25} transform={symbolTransform} color={isSelected ? colors.selection : undefined}>
+                                    {renderSymbol(definition.symbol, powered, { ...component.props, label: component.label, selected: isSelected, _isSelected: isSelected, isDark: darkPreview, _isDark: darkPreview, isEnergized: powered, isConflicted: conflictedCoilIds.has(component.id), _intensity: intensity, ...(motorVEff !== undefined ? { _vEff: motorVEff } : {}), _documentedStyle: tabDUiRefinement, ...(meterDisplayValue !== undefined ? { displayValue: meterDisplayValue } : {}) }, animationTime)}
+                                  </g>
+                                  <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={colors.text} strokeWidth={2} strokeLinecap="round" pointerEvents="none" />
+                                </g>
+                              );
+                            })()
+                          ) : isSuperpositionDeactivatedCurrent ? (
+                            /* Deactivated Current Source (Open Circuit): ghosted source graphic, strictly NO shorting wire */
+                            <g opacity={0.25} transform={symbolTransform} color={isSelected ? colors.selection : undefined}>
+                              {renderSymbol(definition.symbol, powered, { ...component.props, label: component.label, selected: isSelected, _isSelected: isSelected, isDark: darkPreview, _isDark: darkPreview, isEnergized: powered, isConflicted: conflictedCoilIds.has(component.id), _intensity: intensity, ...(motorVEff !== undefined ? { _vEff: motorVEff } : {}), _documentedStyle: tabDUiRefinement, ...(meterDisplayValue !== undefined ? { displayValue: meterDisplayValue } : {}) }, animationTime)}
+                            </g>
+                          ) : (
+                            <g transform={symbolTransform} color={isSelected ? colors.selection : undefined}>
+                              {renderSymbol(definition.symbol, powered, { ...component.props, label: component.label, selected: isSelected, _isSelected: isSelected, isDark: darkPreview, _isDark: darkPreview, isEnergized: powered, isConflicted: conflictedCoilIds.has(component.id), _intensity: intensity, ...(motorVEff !== undefined ? { _vEff: motorVEff } : {}), _documentedStyle: tabDUiRefinement, ...(meterDisplayValue !== undefined ? { displayValue: meterDisplayValue } : {}) }, animationTime)}
+                            </g>
+                          )}
                           {definition.terminals.map(terminal => {
                             const snappedWorld = getCanvasTerminalPosition(component, terminal.id);
                             const rawWorld = getRawCanvasTerminalPosition(component, terminal.id);
