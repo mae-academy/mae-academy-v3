@@ -362,4 +362,192 @@ describe('Phase 3 academic analysis benchmarks', () => {
     expect(reducedStep).toBeDefined();
     expect(reducedStep?.prose).toMatch(/The residual certificate is \|\|G·V-z\|\|∞≤/);
   });
+
+  it('Test D (Nodal VCVS Supernode): detects VCVS supernode between non-reference nodes with constraint & symbolic substitution', () => {
+    const circuit: MNAElement[] = [
+      { type: 'voltage', id: 'Vs', positive: 'n1', negative: '0', voltage: 12 },
+      { type: 'resistor', id: 'R1', positive: 'n1', negative: 'n2', resistance: 1000 },
+      { type: 'vcvs', id: 'E1', positive: 'n3', negative: 'n2', controlPositive: 'n1', controlNegative: 'n2', gain: 2 },
+      { type: 'resistor', id: 'R2', positive: 'n2', negative: '0', resistance: 2000 },
+      { type: 'resistor', id: 'R3', positive: 'n3', negative: '0', resistance: 3000 },
+    ];
+
+    const floating = identifyFloatingSupernodes(circuit);
+    expect(floating).toHaveLength(1);
+    expect(floating[0].element.id).toBe('E1');
+    expect(floating[0].positiveNode).toBe('n3');
+    expect(floating[0].negativeNode).toBe('n2');
+
+    const trace = new NodalSolver(circuit).analyze();
+    expect(trace.status).toBe('ready');
+
+    const supernodeStep = trace.steps.find((s) => s.title.includes('Supernode'))?.math ?? '';
+    expect(supernodeStep).toContain('Boundary KCL');
+    expect(supernodeStep).toContain('Constraint');
+    expect(supernodeStep).toContain('V_{R_{1}}');
+    expect(supernodeStep).toContain('\\text{Substitute } V_{R_{1}}');
+
+    const mna = new MNASolver(circuit).solve();
+    expect(trace.result?.nodeVoltages.n2).toBeCloseTo(mna.nodeVoltages.n2, 9);
+    expect(trace.result?.nodeVoltages.n3).toBeCloseTo(mna.nodeVoltages.n3, 9);
+  });
+
+  it('Test E (Nodal CCVS Supernode): detects CCVS supernode with KaTeX constraint and symbolic substitution of target current', () => {
+    const circuit: MNAElement[] = [
+      { type: 'voltage', id: 'Vs', positive: 'n1', negative: '0', voltage: 10 },
+      { type: 'resistor', id: 'R1', positive: 'n1', negative: 'n2', resistance: 100 },
+      { type: 'ccvs', id: 'H1', positive: 'n3', negative: 'n2', targetId: 'R1', gain: 50 },
+      { type: 'resistor', id: 'R2', positive: 'n2', negative: '0', resistance: 200 },
+      { type: 'resistor', id: 'R3', positive: 'n3', negative: '0', resistance: 500 },
+    ];
+
+    const floating = identifyFloatingSupernodes(circuit);
+    expect(floating).toHaveLength(1);
+    expect(floating[0].element.id).toBe('H1');
+
+    const trace = new NodalSolver(circuit).analyze();
+    expect(trace.status).toBe('ready');
+
+    const supernodeStep = trace.steps.find((s) => s.title.includes('Supernode'))?.math ?? '';
+    expect(supernodeStep).toContain('Constraint');
+    expect(supernodeStep).toContain('I_{R_{1}}');
+    expect(supernodeStep).toContain('\\text{Substitute } I_{R_{1}}');
+
+    const mna = new MNASolver(circuit).solve();
+    expect(trace.result?.nodeVoltages.n2).toBeCloseTo(mna.nodeVoltages.n2, 9);
+    expect(trace.result?.nodeVoltages.n3).toBeCloseTo(mna.nodeVoltages.n3, 9);
+  });
+
+  it('Test F (Nodal Standard KCL with CCCS & VCCS): formats raw terms and dynamic substitution in independent node KCL', () => {
+    const circuit: MNAElement[] = [
+      { type: 'voltage', id: 'Vin', positive: 'n1', negative: '0', voltage: 10 },
+      { type: 'resistor', id: 'Rsense', label: 'R_{sense}', positive: 'n1', negative: '0', resistance: 100 },
+      { type: 'cccs', id: 'F1', positive: 'n2', negative: '0', targetId: 'Rsense', gain: 2 },
+      { type: 'resistor', id: 'Rload', positive: 'n2', negative: '0', resistance: 50 },
+    ];
+
+    const trace = new NodalSolver(circuit).analyze();
+    expect(trace.status).toBe('ready');
+
+    const kclStep = trace.steps.find((s) => s.title.includes('Independent-node KCL'))?.math ?? '';
+    expect(kclStep).toContain('I_{R');
+    expect(kclStep).toContain('\\text{Substitute } I_{R');
+    expect(kclStep).toContain('\\frac');
+
+    const mna = new MNASolver(circuit).solve();
+    expect(trace.result?.nodeVoltages.n2).toBeCloseTo(mna.nodeVoltages.n2, 9);
+  });
+
+  it('Test G (Mesh CCCS Supermesh): detects supermesh with CCCS, constraint equation and symbolic substitution', () => {
+    const circuit: MNAElement[] = [
+      { id: 'V1', type: 'voltage', positive: 'n1', negative: '0', voltage: 20 },
+      { id: 'R1', type: 'resistor', positive: 'n1', negative: 'n2', resistance: 5 },
+      { id: 'F1', type: 'cccs', positive: 'n2', negative: '0', targetId: 'R1', gain: 2 },
+      { id: 'R2', type: 'resistor', positive: 'n2', negative: '0', resistance: 10 },
+    ];
+    const geom: MeshGeometry = {
+      branches: [
+        { id: 'V1', path: [[0, 0], [0, 100]] },
+        { id: 'R1', path: [[0, 0], [100, 0]] },
+        { id: 'F1', path: [[100, 0], [100, 100]] },
+        { id: 'R2', path: [[200, 0], [200, 100]] },
+      ],
+      wires: [
+        { id: 'wb1', path: [[0, 100], [100, 100]] },
+        { id: 'wt2', path: [[100, 0], [200, 0]] },
+        { id: 'wb2', path: [[100, 100], [200, 100]] },
+      ],
+    };
+
+    const system = buildMeshSystem(circuit, geom);
+    expect(system.cycles).toHaveLength(2);
+    expect(system.currentConstraints).toHaveLength(1);
+    expect(system.currentConstraints[0].isDependent).toBe(true);
+
+    const trace = new MeshSolver(circuit, geom).analyze();
+    expect(trace.status).toBe('ready');
+
+    const supermeshStep = trace.steps.find((s) => s.title.includes('Supermesh'))?.math ?? '';
+    expect(supermeshStep).toContain('I_{R_{1}}');
+    expect(supermeshStep).toContain('\\text{Substitute } I_{R_{1}}');
+
+    const mna = new MNASolver(circuit).solve();
+    const ir1Mna = ((mna.nodeVoltages.n1 ?? 0) - (mna.nodeVoltages.n2 ?? 0)) / 5;
+    const ir2Mna = (mna.nodeVoltages.n2 ?? 0) / 10;
+    expect(trace.meshCurrents?.I_1).toBeCloseTo(ir1Mna, 9);
+    expect(trace.meshCurrents?.I_2).toBeCloseTo(ir2Mna, 9);
+  });
+
+  it('Test H (Mesh VCCS Supermesh): detects supermesh with VCCS, constraint equation and symbolic substitution of target voltage', () => {
+    const circuit: MNAElement[] = [
+      { id: 'V1', type: 'voltage', positive: 'n1', negative: '0', voltage: 24 },
+      { id: 'R1', type: 'resistor', positive: 'n1', negative: 'n2', resistance: 4 },
+      { id: 'G1', type: 'vccs', positive: 'n2', negative: '0', targetId: 'R1', gain: 0.5 },
+      { id: 'R2', type: 'resistor', positive: 'n2', negative: '0', resistance: 8 },
+    ];
+    const geom: MeshGeometry = {
+      branches: [
+        { id: 'V1', path: [[0, 0], [0, 100]] },
+        { id: 'R1', path: [[0, 0], [100, 0]] },
+        { id: 'G1', path: [[100, 0], [100, 100]] },
+        { id: 'R2', path: [[200, 0], [200, 100]] },
+      ],
+      wires: [
+        { id: 'wb1', path: [[0, 100], [100, 100]] },
+        { id: 'wt2', path: [[100, 0], [200, 0]] },
+        { id: 'wb2', path: [[100, 100], [200, 100]] },
+      ],
+    };
+
+    const system = buildMeshSystem(circuit, geom);
+    expect(system.cycles).toHaveLength(2);
+    expect(system.currentConstraints).toHaveLength(1);
+
+    const trace = new MeshSolver(circuit, geom).analyze();
+    expect(trace.status).toBe('ready');
+
+    const supermeshStep = trace.steps.find((s) => s.title.includes('Supermesh'))?.math ?? '';
+    expect(supermeshStep).toContain('V_{R_{1}}');
+    expect(supermeshStep).toContain('\\text{Substitute } V_{R_{1}}');
+
+    const mna = new MNASolver(circuit).solve();
+    const ir1Mna = ((mna.nodeVoltages.n1 ?? 0) - (mna.nodeVoltages.n2 ?? 0)) / 4;
+    const ir2Mna = (mna.nodeVoltages.n2 ?? 0) / 8;
+    expect(trace.meshCurrents?.I_1).toBeCloseTo(ir1Mna, 9);
+    expect(trace.meshCurrents?.I_2).toBeCloseTo(ir2Mna, 9);
+  });
+
+  it('Test I (Mesh CCVS in Standard KVL): includes symbolic CCVS term and substitution in KVL step', () => {
+    const circuit: MNAElement[] = [
+      { id: 'V1', type: 'voltage', positive: 'n1', negative: '0', voltage: 24 },
+      { id: 'R1', type: 'resistor', positive: 'n1', negative: 'n2', resistance: 4 },
+      { id: 'H1', type: 'ccvs', positive: 'n2', negative: 'n3', targetId: 'R2', gain: 2 },
+      { id: 'R_shared', type: 'resistor', positive: 'n3', negative: '0', resistance: 8 },
+      { id: 'R2', type: 'resistor', positive: 'n3', negative: '0', resistance: 8 },
+    ];
+    const geom: MeshGeometry = {
+      branches: [
+        { id: 'V1', path: [[0, 0], [0, 100]] },
+        { id: 'R1', path: [[0, 0], [100, 0]] },
+        { id: 'H1', path: [[100, 0], [100, 50]] },
+        { id: 'R_shared', path: [[100, 50], [100, 100]] },
+        { id: 'R2', path: [[200, 0], [200, 100]] },
+      ],
+      wires: [
+        { id: 'wb1', path: [[0, 100], [100, 100]] },
+        { id: 'wt2', path: [[100, 50], [200, 0]] },
+        { id: 'wb2', path: [[100, 100], [200, 100]] },
+      ],
+    };
+
+    const trace = new MeshSolver(circuit, geom).analyze();
+    expect(trace.status).toBe('ready');
+
+    const kvlStep = trace.steps.find((s) => s.title.includes('KVL loop equations'))?.math ?? '';
+    expect(kvlStep).toContain('H_{1}');
+    expect(kvlStep).toContain('\\text{Substitute } I_{R_{2}}');
+
+    const mna = new MNASolver(circuit).solve();
+    expect(trace.result?.nodeVoltages.n1).toBeCloseTo(mna.nodeVoltages.n1, 8);
+  });
 });

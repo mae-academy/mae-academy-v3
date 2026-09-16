@@ -8,28 +8,70 @@ import {
   reindexUINodes,
   identifyCompoundSupernodes,
   identifyFloatingSupernodes,
+  resolveTargetResistor,
   type FloatingSupernode,
   type CompoundSupernode,
 } from '@/simulators/circuit-engine/engine/reducedNodalMatrix';
 
 export { identifyFloatingSupernodes, identifyCompoundSupernodes, type FloatingSupernode, type CompoundSupernode };
 
-interface SymbolicKCLContext {
+export interface SymbolicKCLContext {
   elements: MNAElement[];
   dictionary: AcademicNodalDictionary;
   uiIndices: Map<string, number>;
   knownNodes: Map<string, number>;
 }
 
-function algebraicNumber(value: number): string {
+export function algebraicNumber(value: number): string {
   return String(Math.round(value * 1e9) / 1e9);
+}
+
+export interface DependentSourceInfo {
+  element: Extract<MNAElement, { type: 'vccs' | 'cccs' | 'vcvs' | 'ccvs' }>;
+  varName: string;
+  subDef: string;
+  subExpr: string;
+  gain: number;
+}
+
+export function getDependentSourceInfo(
+  element: Extract<MNAElement, { type: 'vccs' | 'cccs' | 'vcvs' | 'ccvs' }>,
+  elements: MNAElement[],
+  dictionary: AcademicNodalDictionary,
+  symbolicVoltage: (node: string) => string
+): DependentSourceInfo {
+  const targetResistor = resolveTargetResistor(elements, element);
+  const resLabel = targetResistor ? (targetResistor.resistor ? dictionary.element(targetResistor.resistor) : targetResistor.label) : 'R_x';
+
+  if (element.type === 'vcvs' || element.type === 'vccs') {
+    const gain = element.gain ?? (element as any).transconductance ?? 1;
+    const cp = element.controlPositive;
+    const cn = element.controlNegative;
+    const varName = targetResistor ? `V_{${resLabel}}` : 'V_x';
+    const num = cn === '0' ? symbolicVoltage(cp) : `${symbolicVoltage(cp)}-${symbolicVoltage(cn)}`;
+    const subDef = cn === '0' ? symbolicVoltage(cp) : `\\left(${num}\\right)`;
+    return { element, varName, subDef, subExpr: num, gain };
+  } else {
+    // cccs or ccvs
+    const gain = element.gain ?? (element as any).transresistance ?? 1;
+    const varName = targetResistor ? `I_{${resLabel}}` : 'I_x';
+    const tp = targetResistor?.positive ?? ('controlPositive' in element ? element.controlPositive ?? '0' : '0');
+    const tn = targetResistor?.negative ?? ('controlNegative' in element ? element.controlNegative ?? '0' : '0');
+    const num = tn === '0' ? symbolicVoltage(tp) : `${symbolicVoltage(tp)}-${symbolicVoltage(tn)}`;
+    const subDef = `\\frac{${num}}{${resLabel}}`;
+    return { element, varName, subDef, subExpr: subDef, gain };
+  }
 }
 
 /**
  * Creates KCL strictly from topology and declared source values. Because it has
  * no MNA solution input, solved floats cannot leak into academic derivations.
  */
-export function generateKCLString(boundary: Set<string>, context: SymbolicKCLContext): string {
+export function generateKCLString(
+  boundary: Set<string>,
+  context: SymbolicKCLContext,
+  options: { substituted?: boolean } = {}
+): string {
   const { elements, dictionary, uiIndices, knownNodes } = context;
   const seriesBranches = detectGroundedSourceResistorBranches(elements);
   const effectiveBoundary = new Set(boundary);
@@ -49,7 +91,8 @@ export function generateKCLString(boundary: Set<string>, context: SymbolicKCLCon
   };
   const terms = elements.flatMap((element) => {
     if (element.type !== 'resistor') return [];
-    const positiveInside = effectiveBoundary.has(element.positive); const negativeInside = effectiveBoundary.has(element.negative);
+    const positiveInside = effectiveBoundary.has(element.positive);
+    const negativeInside = effectiveBoundary.has(element.negative);
     if (positiveInside === negativeInside) return [];
     const inside = positiveInside ? element.positive : element.negative;
     const outside = positiveInside ? element.negative : element.positive;
@@ -58,11 +101,25 @@ export function generateKCLString(boundary: Set<string>, context: SymbolicKCLCon
   });
   const currents = elements.flatMap((element) => {
     if (element.type !== 'current') return [];
-    const fromInside = effectiveBoundary.has(element.from); const toInside = effectiveBoundary.has(element.to);
+    const fromInside = effectiveBoundary.has(element.from);
+    const toInside = effectiveBoundary.has(element.to);
     if (fromInside === toInside) return [];
     return [`${fromInside ? '+' : '-'}${dictionary.element(element)}`];
   });
-  return [...terms, ...currents].join(' + ').replace(/\+ -/g, '- ') || '0';
+  const dependentCurrents = elements.flatMap((element) => {
+    if (element.type !== 'vccs' && element.type !== 'cccs') return [];
+    const fromInside = effectiveBoundary.has(element.positive);
+    const toInside = effectiveBoundary.has(element.negative);
+    if (fromInside === toInside) return [];
+    const sign = fromInside ? '+' : '-';
+    const info = getDependentSourceInfo(element, elements, dictionary, symbolicVoltage);
+    const gainPrefix = Math.abs(info.gain - 1) < 1e-12 ? '' : `${algebraicNumber(info.gain)} \\cdot `;
+    if (options.substituted) {
+      return [`${sign}${gainPrefix}\\left(${info.subExpr}\\right)`];
+    }
+    return [`${sign}${gainPrefix}${info.varName}`];
+  });
+  return [...terms, ...currents, ...dependentCurrents].join(' + ').replace(/\+ -/g, '- ') || '0';
 }
 
 /** Pedagogical KCL front-end: full MNA is retained strictly for numerical solve and verification. */
@@ -89,7 +146,27 @@ export class NodalSolver {
         if (!series) return '\\mathrm{V_{series}}';
         return `\\left(${symbolicVoltage(series.primaryNode)}${series.simpleOffset >= 0 ? '+' : '-'}${algebraicNumber(Math.abs(series.simpleOffset))}\\right)`;
       };
-      const kclLines = reduced.unknownNodes.filter((node) => !supernodeMembers.has(node) && !knownVoltageNodes.has(node)).map((node) => `\\text{KCL at }${dictionary.coloredNodeName(node)} &: ${generateKCLString(new Set([node]), symbolicContext)}=0`);
+      const kclLines = reduced.unknownNodes
+        .filter((node) => !supernodeMembers.has(node) && !knownVoltageNodes.has(node))
+        .flatMap((node) => {
+          const boundary = new Set([node]);
+          const depCrossing = this.elements.filter(
+            (e): e is Extract<MNAElement, { type: 'vccs' | 'cccs' }> =>
+              (e.type === 'vccs' || e.type === 'cccs') &&
+              boundary.has(e.positive) !== boundary.has(e.negative)
+          );
+          if (depCrossing.length === 0) {
+            return [`\\text{KCL at }${dictionary.coloredNodeName(node)} &: ${generateKCLString(boundary, symbolicContext)}=0`];
+          }
+          const rawKcl = generateKCLString(boundary, symbolicContext, { substituted: false });
+          const lines = [`\\text{KCL at }${dictionary.coloredNodeName(node)} &: ${rawKcl}=0`];
+          for (const dep of depCrossing) {
+            const info = getDependentSourceInfo(dep, this.elements, dictionary, symbolicVoltage);
+            const subKcl = generateKCLString(boundary, symbolicContext, { substituted: true });
+            lines.push(`\\text{Substitute } ${info.varName} = ${info.subDef} \\text{ into the equation: } &: ${subKcl}=0`);
+          }
+          return lines;
+        });
       const knownLines = Array.from(reduced.knownNodes.entries()).map(([node, voltage]) => {
         const source = this.elements.find((element): element is Extract<MNAElement, { type: 'voltage' }> => element.type === 'voltage' && ((element.positive === node && element.negative === '0') || (element.negative === node && element.positive === '0')));
         return `\\text{Source condition from }${source ? dictionary.element(source) : 'V_s'}:\\quad V_{\\mathrm{known}}=${algebraicNumber(voltage)}\\,\\mathrm{V}`;
@@ -97,15 +174,39 @@ export class NodalSolver {
       const supernodeLines = compoundSupernodes.flatMap((supernode) => {
         const boundary = new Set(supernode.nodes);
         const nodeNames = supernode.nodes.map((node) => uiIndices.has(node) ? dictionary.coloredNodeName(node) : '\\text{source-connected node}').join(', ');
-        const kclLine = `\\text{Boundary KCL for }${nodeNames} &: ${generateKCLString(boundary, symbolicContext)}=0`;
-        const constraintLines = supernode.sources.map((source) => {
+        const depCrossing = this.elements.filter(
+          (e): e is Extract<MNAElement, { type: 'vccs' | 'cccs' }> =>
+            (e.type === 'vccs' || e.type === 'cccs') &&
+            boundary.has(e.positive) !== boundary.has(e.negative)
+        );
+        const kclLinesForSupernode: string[] = [];
+        if (depCrossing.length === 0) {
+          kclLinesForSupernode.push(`\\text{Boundary KCL for }${nodeNames} &: ${generateKCLString(boundary, symbolicContext)}=0`);
+        } else {
+          const rawKcl = generateKCLString(boundary, symbolicContext, { substituted: false });
+          kclLinesForSupernode.push(`\\text{Boundary KCL for }${nodeNames} &: ${rawKcl}=0`);
+          for (const dep of depCrossing) {
+            const info = getDependentSourceInfo(dep, this.elements, dictionary, symbolicVoltage);
+            const subKcl = generateKCLString(boundary, symbolicContext, { substituted: true });
+            kclLinesForSupernode.push(`\\text{Substitute } ${info.varName} = ${info.subDef} \\text{ into the equation: } &: ${subKcl}=0`);
+          }
+        }
+
+        const constraintLines = supernode.sources.flatMap((source) => {
           const { element, positiveNode, negativeNode } = source;
-          const constraint = element.type === 'voltage'
-            ? `\\left(${symbolicVoltage(positiveNode)}\\right)-\\left(${symbolicVoltage(negativeNode)}\\right)=${element.voltage}\\,\\mathrm{V}`
-            : `\\left(${symbolicVoltage(positiveNode)}\\right)-\\left(${symbolicVoltage(negativeNode)}\\right)=${element.gain}\\left(${symbolicVoltage(element.controlPositive)}-${symbolicVoltage(element.controlNegative)}\\right)`;
-          return `\\text{Constraint} &: ${constraint}`;
+          if (element.type === 'voltage') {
+            return [`\\text{Constraint} &: \\left(${symbolicVoltage(positiveNode)}\\right)-\\left(${symbolicVoltage(negativeNode)}\\right)=${element.voltage}\\,\\mathrm{V}`];
+          }
+          const info = getDependentSourceInfo(element, this.elements, dictionary, symbolicVoltage);
+          const gainStr = Math.abs(info.gain - 1) < 1e-12 ? '' : `${algebraicNumber(info.gain)} \\cdot `;
+          const rawConstraint = `\\left(${symbolicVoltage(positiveNode)}\\right)-\\left(${symbolicVoltage(negativeNode)}\\right)=${gainStr}${info.varName}`;
+          const subConstraint = `\\left(${symbolicVoltage(positiveNode)}\\right)-\\left(${symbolicVoltage(negativeNode)}\\right)=${algebraicNumber(info.gain)}\\left(${info.subExpr}\\right)`;
+          return [
+            `\\text{Constraint} &: ${rawConstraint}`,
+            `\\text{Substitute } ${info.varName} = ${info.subDef} &: ${subConstraint}`,
+          ];
         });
-        return [kclLine, ...constraintLines];
+        return [...kclLinesForSupernode, ...constraintLines];
       });
       const unknownSymbols = reduced.unknownNodes.map((node) => dictionary.coloredVoltage(node));
       const matrixSystem = `${latexMatrix(reduced.conductance)}\\begin{bmatrix}${unknownSymbols.join(' \\\\ ')}\\end{bmatrix}= ${latexMatrix(reduced.rhs.map((value) => [value]))}`;

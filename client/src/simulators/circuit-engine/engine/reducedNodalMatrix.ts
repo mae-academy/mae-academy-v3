@@ -23,7 +23,7 @@ export interface FloatingSupernode {
   sourceId: string;
   positiveNode: string;
   negativeNode: string;
-  element: Extract<MNAElement, { type: 'voltage' | 'vcvs' }>;
+  element: Extract<MNAElement, { type: 'voltage' | 'vcvs' | 'ccvs' }>;
 }
 
 export interface CompoundSupernode {
@@ -32,9 +32,48 @@ export interface CompoundSupernode {
   sources: FloatingSupernode[];
 }
 
+export interface TargetResistorRef {
+  positive: string;
+  negative: string;
+  resistance: number;
+  resistor?: Extract<MNAElement, { type: 'resistor' }>;
+  label: string;
+}
+
+export function resolveTargetResistor(
+  elements: MNAElement[],
+  element: Extract<MNAElement, { type: 'cccs' | 'ccvs' | 'vccs' | 'vcvs' }>
+): TargetResistorRef | null {
+  const targetRef = ('targetId' in element ? element.targetId : undefined) || ('controlSourceId' in element ? element.controlSourceId : undefined) || '';
+  if (targetRef) {
+    const found = elements.find((e) => (e.id === targetRef || e.label === targetRef) && e.type === 'resistor') as Extract<MNAElement, { type: 'resistor' }> | undefined;
+    if (found && Math.abs(found.resistance) > 1e-12) {
+      return { positive: found.positive, negative: found.negative, resistance: found.resistance, resistor: found, label: found.label || found.id };
+    }
+  }
+  if ('controlPositive' in element && 'controlNegative' in element && element.controlPositive && element.controlNegative) {
+    const cp = element.controlPositive;
+    const cn = element.controlNegative;
+    const found = elements.find((e) => e.type === 'resistor' && ((e.positive === cp && e.negative === cn) || (e.positive === cn && e.negative === cp))) as Extract<MNAElement, { type: 'resistor' }> | undefined;
+    if (found && Math.abs(found.resistance) > 1e-12) {
+      return {
+        positive: cp,
+        negative: cn,
+        resistance: found.resistance,
+        resistor: found,
+        label: found.label || found.id,
+      };
+    }
+    if ('targetResistance' in element && element.targetResistance !== undefined && Math.abs(element.targetResistance) > 1e-12) {
+      return { positive: cp, negative: cn, resistance: element.targetResistance, label: 'R_x' };
+    }
+  }
+  return null;
+}
+
 export function identifyFloatingSupernodes(elements: MNAElement[]): FloatingSupernode[] {
   return elements.flatMap((element) => {
-    if ((element.type !== 'voltage' && element.type !== 'vcvs') || element.positive === '0' || element.negative === '0') return [];
+    if ((element.type !== 'voltage' && element.type !== 'vcvs' && element.type !== 'ccvs') || element.positive === '0' || element.negative === '0') return [];
     return [{ sourceId: element.id, positiveNode: element.positive, negativeNode: element.negative, element }];
   });
 }
@@ -149,9 +188,13 @@ export function filterEssentialNodes(elements: MNAElement[], knownNodes: Map<str
   const seriesBranches = detectGroundedSourceResistorBranches(elements);
   const seriesNodes = new Set(seriesBranches.map((b) => b.simpleNode));
 
-  return nonReferenceNodes(elements).filter(
+  const essential = nonReferenceNodes(elements).filter(
     (node) => !knownNodes.has(node) && !seriesNodes.has(node) && (academicBranchDegree(elements, node) >= 3 || supernodeNodes.has(node))
   );
+  if (essential.length === 0) {
+    return nonReferenceNodes(elements).filter((node) => !knownNodes.has(node) && !seriesNodes.has(node));
+  }
+  return essential;
 }
 
 /** Reindexes UI-only N_i/V_i names after filtering; internal graph IDs never affect the sequence. */
@@ -219,6 +262,47 @@ export function generateReducedNodalMatrix(elements: MNAElement[]): ReducedNodal
       // MNA convention: positive source current leaves `from` and enters `to`.
       addToUnknown(element.from, -element.current);
       addToUnknown(element.to, element.current);
+      continue;
+    }
+    if (element.type === 'vccs') {
+      const k = element.gain ?? element.transconductance ?? 0;
+      const cp = element.controlPositive;
+      const cn = element.controlNegative;
+      const stampVCCS = (node: string, sign: number) => {
+        const row = index.get(node);
+        if (row === undefined) return;
+        const cpCol = index.get(cp);
+        const cnCol = index.get(cn);
+        if (cpCol !== undefined) fullConductance[row][cpCol] += sign * k;
+        else if (cp !== '0' && knownNodes.has(cp)) fullRhs[row] -= sign * k * knownNodes.get(cp)!;
+        if (cnCol !== undefined) fullConductance[row][cnCol] -= sign * k;
+        else if (cn !== '0' && knownNodes.has(cn)) fullRhs[row] += sign * k * knownNodes.get(cn)!;
+      };
+      stampVCCS(element.positive, 1);
+      stampVCCS(element.negative, -1);
+      continue;
+    }
+    if (element.type === 'cccs') {
+      const k = element.gain;
+      const targetResistor = resolveTargetResistor(elements, element);
+      if (targetResistor) {
+        const geq = k / targetResistor.resistance;
+        const tp = targetResistor.positive;
+        const tn = targetResistor.negative;
+        const stampCCCS = (node: string, sign: number) => {
+          const row = index.get(node);
+          if (row === undefined) return;
+          const tpCol = index.get(tp);
+          const tnCol = index.get(tn);
+          if (tpCol !== undefined) fullConductance[row][tpCol] += sign * geq;
+          else if (tp !== '0' && knownNodes.has(tp)) fullRhs[row] -= sign * geq * knownNodes.get(tp)!;
+          if (tnCol !== undefined) fullConductance[row][tnCol] -= sign * geq;
+          else if (tn !== '0' && knownNodes.has(tn)) fullRhs[row] += sign * geq * knownNodes.get(tn)!;
+        };
+        stampCCCS(element.positive, 1);
+        stampCCCS(element.negative, -1);
+      }
+      continue;
     }
   }
   for (const branch of sourceResistorBranches) {
@@ -286,6 +370,18 @@ export function generateReducedNodalMatrix(elements: MNAElement[]): ReducedNodal
         else if (knownNodes.has(source.element.controlPositive)) rhs[constraintRow] += gain * knownNodes.get(source.element.controlPositive)!;
         if (cNegIdx >= 0) conductance[constraintRow][cNegIdx] += gain;
         else if (knownNodes.has(source.element.controlNegative)) rhs[constraintRow] -= gain * knownNodes.get(source.element.controlNegative)!;
+      } else if (source.element.type === 'ccvs') {
+        const gain = source.element.gain ?? source.element.transresistance ?? 0;
+        const targetResistor = resolveTargetResistor(elements, source.element);
+        if (targetResistor) {
+          const mueq = gain / targetResistor.resistance;
+          const tpIdx = unknownNodes.indexOf(targetResistor.positive);
+          const tnIdx = unknownNodes.indexOf(targetResistor.negative);
+          if (tpIdx >= 0) conductance[constraintRow][tpIdx] -= mueq;
+          else if (knownNodes.has(targetResistor.positive)) rhs[constraintRow] += mueq * knownNodes.get(targetResistor.positive)!;
+          if (tnIdx >= 0) conductance[constraintRow][tnIdx] += mueq;
+          else if (knownNodes.has(targetResistor.negative)) rhs[constraintRow] -= mueq * knownNodes.get(targetResistor.negative)!;
+        }
       }
     }
   }

@@ -118,8 +118,14 @@ export class MNASolver {
         case 'voltage': stampVoltageBranch(positive, negative, branchIndex.get(element.id)!, element.voltage); break;
         case 'current-sense': stampVoltageBranch(positive, negative, branchIndex.get(element.id)!, 0); break;
         case 'vccs': {
-          const cp = node(element.controlPositive);
-          const cn = node(element.controlNegative);
+          let cpId = element.controlPositive;
+          let cnId = element.controlNegative;
+          if ((!cpId || !cnId) && (element.targetId || (element as any).controlSourceId)) {
+            const tr = resolveTargetResistor(element.targetId || (element as any).controlSourceId);
+            if (tr) { cpId = tr.positive; cnId = tr.negative; }
+          }
+          const cp = node(cpId);
+          const cn = node(cnId);
           const k = finite(element.gain ?? element.transconductance ?? 0, 'VCCS gain');
           add(positive, cp, k);
           add(positive, cn, -k);
@@ -130,9 +136,15 @@ export class MNASolver {
         case 'vcvs': {
           const branch = branchIndex.get(element.id)!;
           stampVoltageBranch(positive, negative, branch, 0);
+          let cpId = element.controlPositive;
+          let cnId = element.controlNegative;
+          if ((!cpId || !cnId) && (element.targetId || (element as any).controlSourceId)) {
+            const tr = resolveTargetResistor(element.targetId || (element as any).controlSourceId);
+            if (tr) { cpId = tr.positive; cnId = tr.negative; }
+          }
           const k = finite(element.gain, 'VCVS gain');
-          add(branch, node(element.controlPositive), -k);
-          add(branch, node(element.controlNegative), k);
+          add(branch, node(cpId), -k);
+          add(branch, node(cnId), k);
           break;
         }
         case 'cccs': {
@@ -231,13 +243,16 @@ export class MNASolver {
 
   private collectNonReferenceNodes(): string[] {
     const nodes = new Set<string>();
-    const add = (id: string) => { if (id !== '0') nodes.add(id); };
+    const add = (id?: string) => { if (id && id !== '0') nodes.add(id); };
     for (const element of this.elements) {
       switch (element.type) {
         case 'current': add(element.from); add(element.to); break;
         case 'vccs':
         case 'vcvs':
-          add(element.positive); add(element.negative); add(element.controlPositive); add(element.controlNegative); break;
+          add(element.positive); add(element.negative);
+          if (element.controlPositive) add(element.controlPositive);
+          if (element.controlNegative) add(element.controlNegative);
+          break;
         case 'cccs':
         case 'ccvs': {
           add(element.positive); add(element.negative);

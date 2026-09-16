@@ -1,18 +1,19 @@
 import { MNASolver, type MNAElement } from '@/simulators/circuit-engine/engine/mnaSolver';
-import { AcademicNodalDictionary } from '@/simulators/circuit-engine/models/AcademicNodalDictionary';
+import { AcademicNodalDictionary, formatAcademicUserLabel } from '@/simulators/circuit-engine/models/AcademicNodalDictionary';
 import { MESH_COLORS, type AnalysisTrace, type MeshCycle } from '@/simulators/circuit-engine/models/analysisTypes';
 import { formatAcademicNumber } from '@/simulators/circuit-engine/models/analysisFormatting';
+import { resolveTargetResistor, type TargetResistorRef } from '@/simulators/circuit-engine/engine/reducedNodalMatrix';
 import type { MeshGeometry } from '@/simulators/circuit-engine/components/meshGeometry';
 import type { NormalizedCircuitGraph } from '@/simulators/circuit-engine/models/NormalizedCircuitGraph';
 import type { Point } from '@/simulators/circuit-engine/models/wiring';
 
-type MeshEdge = { id: string; type: 'resistor' | 'voltage' | 'current'; from: string; to: string; value: number };
+type MeshEdge = { id: string; type: 'resistor' | 'voltage' | 'current'; from: string; to: string; value: number; element: MNAElement };
 type SignedCycle = Map<string, number>;
 type GeometricCycle = { signed: SignedCycle; cycle: MeshCycle };
 
 type Segment = { id: string; from: Point; to: Point; branchId?: string; direction?: 1 | -1 };
 type HalfEdge = { key: string; from: string; to: string; segment: Segment; direction: 1 | -1; angle: number };
-type CurrentConstraint = { sourceId: string; coefficients: number[]; value: number };
+type CurrentConstraint = { sourceId: string; coefficients: number[]; value: number; rawConstraint?: string; subConstraint?: string; isDependent?: boolean };
 export type MeshTopology = { branchCount: number; netCount: number; connectedComponents: number; expectedMeshCount: number; extractedFaceCount: number };
 
 const POINT_EPSILON = 1e-6;
@@ -156,10 +157,65 @@ class DisjointSet {
   union(a: string, b: string): boolean { const ra = this.find(a); const rb = this.find(b); if (ra === rb) return false; this.parent.set(ra, rb); return true; }
 }
 
+function getTargetMeshParticipation(
+  elements: MNAElement[],
+  depElement: Extract<MNAElement, { type: 'vccs' | 'cccs' | 'vcvs' | 'ccvs' }>,
+  cycles: SignedCycle[]
+): { coefficients: number[]; targetResistor?: TargetResistorRef; varName: string; rawSub: string } {
+  const targetResistor = resolveTargetResistor(elements, depElement);
+  const isVoltageControlled = depElement.type === 'vcvs' || depElement.type === 'vccs';
+  const varPrefix = isVoltageControlled ? 'V' : 'I';
+  const rawLabel = targetResistor ? (targetResistor.resistor?.label || targetResistor.label) : 'x';
+  const resName = formatAcademicUserLabel(rawLabel, 'R_x');
+  const varName = `${varPrefix}_{${resName}}`;
+
+  let branchId = '';
+  let branchSign = 1;
+  if (targetResistor?.resistor) {
+    branchId = targetResistor.resistor.id;
+    branchSign = targetResistor.resistor.positive === targetResistor.positive ? 1 : -1;
+  } else if ('targetId' in depElement && depElement.targetId) {
+    branchId = depElement.targetId;
+  } else if ('controlSourceId' in depElement && depElement.controlSourceId) {
+    branchId = depElement.controlSourceId;
+  }
+
+  const branchMeshCoeffs = cycles.map((cycle) => (cycle.get(branchId) ?? 0) * branchSign);
+
+  const nonZeroTerms = branchMeshCoeffs
+    .map((coeff, idx) => ({ coeff, idx }))
+    .filter(({ coeff }) => coeff !== 0);
+
+  let meshCurrentsStr = nonZeroTerms
+    .map(({ coeff, idx }, pos) => {
+      const sign = coeff > 0 ? (pos > 0 ? ' + ' : '') : (pos > 0 ? ' - ' : '-');
+      const absCoeff = Math.abs(coeff);
+      const coeffStr = absCoeff === 1 ? '' : `${absCoeff}`;
+      return `${sign}${coeffStr}I_{${idx + 1}}`;
+    })
+    .join('');
+
+  if (!meshCurrentsStr) meshCurrentsStr = '0';
+
+  const rawSub = isVoltageControlled
+    ? (targetResistor ? `${resName}\\left(${meshCurrentsStr}\\right)` : `\\left(${meshCurrentsStr}\\right)`)
+    : (nonZeroTerms.length > 1 ? `\\left(${meshCurrentsStr}\\right)` : meshCurrentsStr);
+
+  const scale = (isVoltageControlled && targetResistor) ? targetResistor.resistance : 1;
+  const coefficients = branchMeshCoeffs.map((c) => c * scale);
+
+  return { coefficients, targetResistor: targetResistor ?? undefined, varName, rawSub };
+}
+
 const meshEdges = (elements: MNAElement[]): MeshEdge[] => elements.flatMap<MeshEdge>((element) => {
-  if (element.type === 'resistor') return [{ id: element.id, type: 'resistor', from: element.positive, to: element.negative, value: element.resistance }];
-  if (element.type === 'voltage') return [{ id: element.id, type: 'voltage', from: element.positive, to: element.negative, value: element.voltage }];
-  if (element.type === 'current') return [{ id: element.id, type: 'current', from: element.from, to: element.to, value: element.current }];
+  if (element.type === 'resistor') return [{ id: element.id, type: 'resistor', from: element.positive, to: element.negative, value: element.resistance, element }];
+  if (element.type === 'voltage') return [{ id: element.id, type: 'voltage', from: element.positive, to: element.negative, value: element.voltage, element }];
+  if (element.type === 'current') return [{ id: element.id, type: 'current', from: element.from, to: element.to, value: element.current, element }];
+  if (element.type === 'vccs') return [{ id: element.id, type: 'current', from: element.positive, to: element.negative, value: element.gain ?? (element as any).transconductance ?? 0, element }];
+  if (element.type === 'cccs') return [{ id: element.id, type: 'current', from: element.positive, to: element.negative, value: element.gain, element }];
+  if (element.type === 'vcvs') return [{ id: element.id, type: 'voltage', from: element.positive, to: element.negative, value: element.gain, element }];
+  if (element.type === 'ccvs') return [{ id: element.id, type: 'voltage', from: element.positive, to: element.negative, value: element.gain ?? (element as any).transresistance ?? 0, element }];
+  if (element.type === 'current-sense') return [{ id: element.id, type: 'voltage', from: element.positive, to: element.negative, value: 0, element }];
   return [];
 });
 
@@ -308,7 +364,8 @@ const stampCurrentConstraints = (
   impedance: number[][],
   source: number[],
   origImpedance: number[][],
-  origSource: number[]
+  origSource: number[],
+  elements: MNAElement[] = []
 ): CurrentConstraint[] => {
   const currentEdges = edges.filter((item) => item.type === 'current');
   if (!currentEdges.length) return [];
@@ -318,14 +375,49 @@ const stampCurrentConstraints = (
     coefficients: number[];
     value: number;
     participatingMeshes: number[];
+    rawConstraint?: string;
+    subConstraint?: string;
+    isDependent?: boolean;
   }
   const independentConstraints: CandidateConstraint[] = [];
   for (const edge of currentEdges) {
-    const coefficients = cycles.map((cycle) => cycle.get(edge.id) ?? 0);
-    const participatingMeshes = coefficients
+    const baseCoeffs = cycles.map((cycle) => cycle.get(edge.id) ?? 0);
+    const participatingMeshes = baseCoeffs
       .map((coeff, idx) => (coeff !== 0 ? idx : -1))
       .filter((idx) => idx >= 0);
     if (!participatingMeshes.length) continue;
+
+    let coefficients = [...baseCoeffs];
+    let value = edge.value;
+    let isDependent = false;
+    let rawConstraint = '';
+    let subConstraint = '';
+
+    const nonZeroLhs = baseCoeffs
+      .map((coeff, idx) => ({ coeff, idx }))
+      .filter(({ coeff }) => coeff !== 0);
+    const lhsStr = nonZeroLhs
+      .map(({ coeff, idx }, pos) => {
+        const sign = coeff > 0 ? (pos > 0 ? ' + ' : '') : (pos > 0 ? ' - ' : '-');
+        const absCoeff = Math.abs(coeff);
+        const coeffStr = absCoeff === 1 ? '' : `${absCoeff}`;
+        return `${sign}${coeffStr}I_{${idx + 1}}`;
+      })
+      .join('');
+
+    if (edge.element && (edge.element.type === 'vccs' || edge.element.type === 'cccs')) {
+      isDependent = true;
+      const k = edge.element.gain ?? (edge.element as any).transconductance ?? 0;
+      const targetInfo = getTargetMeshParticipation(elements, edge.element, cycles);
+      coefficients = cycles.map((_, m) => baseCoeffs[m] - k * (targetInfo.coefficients[m] ?? 0));
+      value = 0;
+
+      const kStr = Math.abs(k - 1) < 1e-12 ? '' : `${formatAcademicNumber(k)} \\cdot `;
+      rawConstraint = `i_b-i_a = ${lhsStr} = ${kStr}${targetInfo.varName}`;
+      subConstraint = `\\text{Substitute } ${targetInfo.varName} = ${targetInfo.rawSub} \\implies ${lhsStr} = ${kStr}${targetInfo.rawSub}`;
+    } else {
+      rawConstraint = `${lhsStr} = ${formatAcademicNumber(value)}\\,\\mathrm{A}`;
+    }
 
     const isIndependent =
       matrixRank([...independentConstraints.map((c) => c.coefficients), coefficients]) >
@@ -334,8 +426,11 @@ const stampCurrentConstraints = (
       independentConstraints.push({
         sourceId: edge.id,
         coefficients,
-        value: edge.value,
+        value,
         participatingMeshes,
+        rawConstraint,
+        subConstraint,
+        isDependent,
       });
     }
   }
@@ -357,6 +452,9 @@ const stampCurrentConstraints = (
         sourceId: c.sourceId,
         coefficients: c.coefficients,
         value: c.value,
+        rawConstraint: c.rawConstraint,
+        subConstraint: c.subConstraint,
+        isDependent: c.isDependent,
       });
     }
   }
@@ -411,6 +509,9 @@ const stampCurrentConstraints = (
           sourceId: c.sourceId,
           coefficients: c.coefficients,
           value: c.value,
+          rawConstraint: c.rawConstraint,
+          subConstraint: c.subConstraint,
+          isDependent: c.isDependent,
         });
       } else if (availableRows.length === 1 && comp.constraints.length >= meshIndices.length) {
         const row = availableRows.shift()!;
@@ -421,6 +522,9 @@ const stampCurrentConstraints = (
           sourceId: c.sourceId,
           coefficients: c.coefficients,
           value: c.value,
+          rawConstraint: c.rawConstraint,
+          subConstraint: c.subConstraint,
+          isDependent: c.isDependent,
         });
       }
     }
@@ -524,14 +628,14 @@ export const buildMeshSystem = (elements: MNAElement[], geometry?: MeshGeometry)
   const topology = geometry?.graph
     ? { ...geometry.graph.topology, extractedFaceCount: resistorFaces.length }
     : topologyFor(edges, resistorFaces.length);
-  const impedance = assembleMeshImpedance(cycles, edges);
+  const impedance = assembleMeshImpedance(cycles, edges, elements);
   const source = assembleMeshSource(cycles, edges);
   const meshCycles = resistorFaces.length
     ? resistorFaces.map((face) => face.cycle)
     : synthesizeFallbackMeshCycles(cycles, geometry);
   const origImpedance = impedance.map((row) => [...row]);
   const origSource = [...source];
-  const currentConstraints = stampCurrentConstraints(cycles, edges, impedance, source, origImpedance, origSource);
+  const currentConstraints = stampCurrentConstraints(cycles, edges, impedance, source, origImpedance, origSource, elements);
   const rank = matrixRank(impedance);
   return { impedance, source, cycles, edges, meshCycles, currentConstraints, topology, rank, fullRank: rank === cycles.length };
 };
@@ -541,22 +645,44 @@ export const buildMeshSystem = (elements: MNAElement[], geometry?: MeshGeometry)
  * - Z_m[k, k] = sum of evaluated resistances of all resistor components in Loop k: sum_{b in Loop k} R_b
  * - Z_m[k, l] = Z_m[l, k] = -R_s for shared resistor branch R_s between Loop k and Loop l (or 0 if no shared resistor)
  */
-export const assembleMeshImpedance = (cycles: SignedCycle[], edges: MeshEdge[]): number[][] => {
+export const assembleMeshImpedance = (
+  cycles: SignedCycle[],
+  edges: MeshEdge[],
+  elements: MNAElement[] = []
+): number[][] => {
   const resistors = edges.filter((edge) => edge.type === 'resistor');
+  const depVoltages = edges.filter(
+    (edge): edge is MeshEdge & { element: Extract<MNAElement, { type: 'vcvs' | 'ccvs' }> } =>
+      Boolean(edge.element && (edge.element.type === 'vcvs' || edge.element.type === 'ccvs'))
+  );
+
   return cycles.map((row, rowIndex) =>
     cycles.map((column, columnIndex) => {
+      let term = 0;
       if (rowIndex === columnIndex) {
-        return resistors.reduce((sum, edge) => {
+        term += resistors.reduce((sum, edge) => {
           const inLoop = Math.abs(row.get(edge.id) ?? 0) > 0;
           return sum + (inLoop ? edge.value : 0);
         }, 0);
+      } else {
+        term += resistors.reduce((sum, edge) => {
+          const inRow = Math.abs(row.get(edge.id) ?? 0) > 0;
+          const inCol = Math.abs(column.get(edge.id) ?? 0) > 0;
+          if (!inRow || !inCol) return sum;
+          return sum - edge.value;
+        }, 0);
       }
-      return resistors.reduce((sum, edge) => {
-        const inRow = Math.abs(row.get(edge.id) ?? 0) > 0;
-        const inCol = Math.abs(column.get(edge.id) ?? 0) > 0;
-        if (!inRow || !inCol) return sum;
-        return sum - edge.value;
-      }, 0);
+
+      for (const edge of depVoltages) {
+        const traversal = row.get(edge.id) ?? 0;
+        if (traversal === 0) continue;
+        const gain = edge.element.gain ?? (edge.element as any).transresistance ?? 0;
+        const targetInfo = getTargetMeshParticipation(elements, edge.element, cycles);
+        const targetCoeff = targetInfo.coefficients[columnIndex] ?? 0;
+        term += traversal * gain * targetCoeff;
+      }
+
+      return term;
     })
   );
 };
@@ -567,7 +693,7 @@ export const assembleMeshImpedance = (cycles: SignedCycle[], edges: MeshEdge[]):
  * entered at the positive terminal contribute -V (voltage drop).
  */
 export const assembleMeshSource = (cycles: SignedCycle[], edges: MeshEdge[]): number[] => {
-  const voltageSources = edges.filter((edge) => edge.type === 'voltage');
+  const voltageSources = edges.filter((edge) => edge.type === 'voltage' && (!edge.element || edge.element.type === 'voltage'));
   return cycles.map((cycle) =>
     voltageSources.reduce((sum, edge) => {
       const traversal = cycle.get(edge.id) ?? 0;
@@ -629,7 +755,7 @@ export class MeshSolver {
       const dictionary = new AcademicNodalDictionary(this.elements);
       const system = buildMeshSystem(this.elements, this.geometry);
       const currentConstraints = system.currentConstraints;
-      const dependentCurrentSources = this.elements.filter((element) => element.type === 'cccs' || element.type === 'current-sense');
+      const dependentCurrentSources = this.elements.filter((element) => element.type === 'cccs' || element.type === 'vccs' || element.type === 'current-sense');
       const hasSupermesh = currentConstraints.length > 0 || dependentCurrentSources.length > 0;
       const meshCount = Math.max(1, system.cycles.length);
       if (!system.fullRank) throw new Error(`Mesh-current system is rank-deficient after Supermesh constraints (rank ${system.rank} of ${system.cycles.length}).`);
@@ -640,6 +766,29 @@ export class MeshSolver {
       const meshCurrents = Object.fromEntries(solvedMesh.map((value, index) => [`I_${index + 1}`, value]));
       const loopSystem = `${coloredMatrix(z)}${coloredVector(loops)}=${coloredMatrix(rhs.map((value) => [value]))}`;
       const solvedVector = solvedMesh.map((value, index) => `I_{${index + 1}}=${formatAcademicNumber(value)}\\,\\mathrm{A}`).join(',\\qquad ');
+
+      // KVL derivation equations for meshes containing dependent sources
+      const kvlDerivations: string[] = [];
+      const depVoltages = system.edges.filter(
+        (edge): edge is MeshEdge & { element: Extract<MNAElement, { type: 'vcvs' | 'ccvs' }> } =>
+          Boolean(edge.element && (edge.element.type === 'vcvs' || edge.element.type === 'ccvs'))
+      );
+      if (depVoltages.length > 0) {
+        system.cycles.forEach((cycle, k) => {
+          const inLoop = depVoltages.filter((edge) => (cycle.get(edge.id) ?? 0) !== 0);
+          if (inLoop.length > 0) {
+            for (const edge of inLoop) {
+              const trav = cycle.get(edge.id)!;
+              const info = getTargetMeshParticipation(this.elements, edge.element, system.cycles);
+              const signStr = trav > 0 ? '+' : '-';
+              const kVal = edge.element.gain ?? (edge.element as any).transresistance ?? 1;
+              const kStr = Math.abs(kVal - 1) < 1e-12 ? '' : `${formatAcademicNumber(kVal)} \\cdot `;
+              kvlDerivations.push(`\\text{Loop ${k + 1} KVL term from }${dictionary.element(edge.element)}: ${signStr}${kStr}${info.varName}`);
+              kvlDerivations.push(`\\text{Substitute } ${info.varName} = ${info.rawSub}`);
+            }
+          }
+        });
+      }
 
       // Reconstructed branch currents from solved mesh currents
       const branchReconstructions: string[] = [];
@@ -672,10 +821,20 @@ export class MeshSolver {
       }).join(',\\qquad ');
       const topologyMath = `M=B-N+C=${system.topology.branchCount}-${system.topology.netCount}+${system.topology.connectedComponents}=${system.topology.expectedMeshCount}`;
       const rankMath = `\\mathrm{rank}(Z_m)=${system.rank}`;
-      const supermeshMath = currentConstraints.map((constraint) => `${constraint.coefficients.map((coefficient, index) => coefficient === 0 ? '' : `${coefficient < 0 ? '-' : coefficient === 1 ? '' : coefficient}I_{${index + 1}}`).filter(Boolean).join('+')}=${formatAcademicNumber(constraint.value)}\\,\\mathrm{A}`).join(',\\qquad ');
+      const supermeshMath = currentConstraints.map((constraint) => {
+        if (constraint.isDependent) {
+          return `${constraint.rawConstraint}, \\quad ${constraint.subConstraint}`;
+        }
+        return `${constraint.coefficients.map((coefficient, index) => coefficient === 0 ? '' : `${coefficient < 0 ? '-' : coefficient === 1 ? '' : coefficient}I_{${index + 1}}`).filter(Boolean).join('+')}=${formatAcademicNumber(constraint.value)}\\,\\mathrm{A}`;
+      }).join(',\\qquad ');
       const steps = [
         { title: '1. Planar graph and clockwise face-mesh assignment', math: `${topologyMath}\\qquad${rankMath}`, prose: `Merged electrical rails produce ${system.topology.netCount} nets and ${system.topology.branchCount} branches. Euler’s relation predicts ${system.topology.expectedMeshCount} independent bounded meshes; ${system.topology.extractedFaceCount || meshCount} geometric faces were extracted from the workspace. The stamped Supermesh system is rank-certified at ${system.rank} of ${system.cycles.length}.` },
-        { title: '2. KVL loop equations · assembled mesh-current coefficient system', math: `${loopSystem}\\qquad\\left[Z_m\\right]\\left[I_m\\right]=\\left[E_m\\right]`, prose: 'Each diagonal entry is the sum of resistances in its mesh. An off-diagonal entry is the signed negative shared resistance, so this system has exactly one row and one column per mesh.' },
+        {
+          title: '2. KVL loop equations · assembled mesh-current coefficient system',
+          math: (kvlDerivations.length ? `\\begin{aligned}${kvlDerivations.join(' \\\\ ')}\\end{aligned}\\\\ ` : '') +
+            `${loopSystem}\\qquad\\left[Z_m\\right]\\left[I_m\\right]=\\left[E_m\\right]`,
+          prose: 'Each diagonal entry is the sum of resistances in its mesh. An off-diagonal entry is the signed negative shared resistance, so this system has exactly one row and one column per mesh.',
+        },
         ...(hasSupermesh ? [{ title: '3. Supermesh constraints', math: supermeshMath || 'i_b-i_a=I_s', prose: currentConstraints.length ? 'Each ideal current-source branch replaces one KVL row with its signed mesh-current constraint, preventing a singular mesh-current system.' : 'A dependent current-source branch is excluded from the KVL perimeter and restored by its explicit controlled-current constraint.' }] : []),
         { title: hasSupermesh ? '4. Solved mesh-current vector' : '3. Solved mesh-current vector', math: solvedVector, prose: 'The solved I_1 through I_n values come directly from the displayed mesh coefficient system and are the mesh-level current readings.' },
         {
