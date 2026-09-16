@@ -1,5 +1,6 @@
 import { MNASolver, type MNAElement } from '@/simulators/circuit-engine/engine/mnaSolver';
 import { id, n, type AnalysisTrace } from '@/simulators/circuit-engine/models/analysisTypes';
+import { AcademicNodalDictionary } from '@/simulators/circuit-engine/models/AcademicNodalDictionary';
 
 export class TheveninSolver {
   constructor(private readonly elements: MNAElement[]) {}
@@ -24,10 +25,14 @@ export class TheveninSolver {
         rth = new MNASolver(deactivated).equivalentResistance(load.positive, load.negative);
         resistanceTrace = `R_{Th}=R_{eq}=${rth.toFixed(9)}\\,\\Omega`;
       }
+      const dict = new AcademicNodalDictionary(this.elements);
+      const loadLabel = dict.element(load);
+      const posNode = load.positive === '0' ? '0' : `Node_{${dict.nodeIndex(load.positive) || 1}}`;
+      const negNode = load.negative === '0' ? '0' : `Node_{${dict.nodeIndex(load.negative) || 2}}`;
       const inorton = Math.abs(rth) < 1e-12 ? 0 : vth / rth;
       const pmax = Math.abs(rth) < 1e-12 ? 0 : vth * vth / (4 * rth);
-      return { method: 'thevenin', status: 'ready', heading: 'Thévenin / Norton / Maximum Power', result: open, steps: [
-        { title: 'Selected terminal pair', math: `A=n_{${n(load.positive)}},\\quad B=n_{${n(load.negative)}}`, prose: `Load ${id(load.id)} is removed to obtain the open-circuit response.` },
+      return { method: 'thevenin', status: 'ready', heading: 'Thévenin / Norton / Maximum Power', targetId: load.id, result: open, steps: [
+        { title: 'Selected terminal pair', math: `A=${posNode},\\quad B=${negNode}`, prose: `Load ${loadLabel} is removed to obtain the open-circuit response.` },
         { title: 'Open-circuit Thévenin voltage', math: `V_{Th}=V_{oc}=V_A-V_B=${vth.toFixed(9)}\\,\\mathrm{V}` },
         { title: hasDependent ? 'Dependent-source test method' : 'Independent-source deactivation', math: resistanceTrace, prose: hasDependent ? 'Independent sources are deactivated; the dependent source remains active and a virtual 1 V test source is applied.' : 'Independent voltage sources are shorted and independent current sources are opened.' },
         { title: 'Norton equivalent', math: `I_N=\\frac{V_{Th}}{R_{Th}}=${inorton.toFixed(9)}\\,\\mathrm{A}` },

@@ -228,6 +228,44 @@ export function moveTabDOrthogonalLane(path: Point[], cornerIndex: number, reque
   return path;
 }
 
+/** Ray-casting containment test; needed because a bounding-box midpoint can fall in the notch of a concave (e.g. L-shaped/staircase) face. */
+function pointInPolygon(point: Point, polygon: Point[]): boolean {
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i, i += 1) {
+    const [xi, yi] = polygon[i];
+    const [xj, yj] = polygon[j];
+    if (((yi > point[1]) !== (yj > point[1])) && (point[0] < ((xj - xi) * (point[1] - yi)) / (yj - yi) + xi)) inside = !inside;
+  }
+  return inside;
+}
+
+/** Area-weighted polygon centroid, used only as the concave-face fallback anchor. */
+function polygonCentroid(points: Point[]): Point {
+  let doubleArea = 0;
+  let weightedX = 0;
+  let weightedY = 0;
+  points.forEach((point, index) => {
+    const next = points[(index + 1) % points.length];
+    const cross = point[0] * next[1] - next[0] * point[1];
+    doubleArea += cross;
+    weightedX += (point[0] + next[0]) * cross;
+    weightedY += (point[1] + next[1]) * cross;
+  });
+  if (Math.abs(doubleArea) <= 1e-6) {
+    return [points.reduce((sum, [x]) => sum + x, 0) / points.length, points.reduce((sum, [, y]) => sum + y, 0) / points.length];
+  }
+  return [weightedX / (3 * doubleArea), weightedY / (3 * doubleArea)];
+}
+
+function pointToSegmentDistance(point: Point, from: Point, to: Point): number {
+  const dx = to[0] - from[0];
+  const dy = to[1] - from[1];
+  const denominator = dx * dx + dy * dy;
+  if (denominator < 1e-6) return Math.hypot(point[0] - from[0], point[1] - from[1]);
+  const ratio = Math.max(0, Math.min(1, ((point[0] - from[0]) * dx + (point[1] - from[1]) * dy) / denominator));
+  return Math.hypot(point[0] - (from[0] + ratio * dx), point[1] - (from[1] + ratio * dy));
+}
+
 export interface TabDPlanarCavity {
   center: Point;
   radius: number;
@@ -265,9 +303,18 @@ export function calculateTabDPlanarCavity(
     if (y > yMax) yMax = y;
   }
 
-  // True interior geometric center of the bounding window
-  const cx = (xMin + xMax) / 2;
-  const cy = (yMin + yMax) / 2;
+  // True interior geometric center of the bounding window. For a concave
+  // face (e.g. an L-shaped/staircase loop) this midpoint can land in the
+  // outer notch, outside the face's own perimeter — re-anchor to the area
+  // centroid in that case, which is guaranteed inside for a simple polygon.
+  let cx = (xMin + xMax) / 2;
+  let cy = (yMin + yMax) / 2;
+  let concaveFace = false;
+  if (points.length >= 3 && !pointInPolygon([cx, cy], points)) {
+    concaveFace = true;
+    const centroid = polygonCentroid(points);
+    if (pointInPolygon(centroid, points)) [cx, cy] = centroid;
+  }
 
   // Inner bounds: shift inward to clear boundary component bodies and labels
   let innerXMin = xMin;
@@ -307,7 +354,14 @@ export function calculateTabDPlanarCavity(
   const halfW = (xMax - xMin) / 2;
   const halfH = (yMax - yMin) / 2;
   const clearance = Math.min(halfW, halfH) - 14;
-  const radius = Math.max(12, Math.min(24, clearance));
+  let radius = Math.max(12, Math.min(24, clearance));
+  // The bbox-derived radius above only guarantees containment within the
+  // rectangular window, not within a concave perimeter — re-clamp to the
+  // re-anchored center's true distance to the nearest edge of the face.
+  if (concaveFace) {
+    const perimeterClearance = points.reduce((closest, point, index) => Math.min(closest, pointToSegmentDistance([cx, cy], point, points[(index + 1) % points.length])), Number.POSITIVE_INFINITY);
+    radius = Math.max(8, Math.min(radius, perimeterClearance * 0.7));
+  }
 
   return {
     center: [cx, cy],

@@ -87,6 +87,17 @@ export const calculateMeshCentroid = (points: Point[]): Point => {
   return [weightedX / (3 * doubleArea), weightedY / (3 * doubleArea)];
 };
 
+/** Ray-casting containment test; needed because a bounding-box midpoint can fall in the notch of a concave (e.g. L-shaped/staircase) face. */
+const pointInPolygon = (point: Point, polygon: Point[]) => {
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i, i += 1) {
+    const [xi, yi] = polygon[i];
+    const [xj, yj] = polygon[j];
+    if (((yi > point[1]) !== (yj > point[1])) && (point[0] < ((xj - xi) * (point[1] - yi)) / (yj - yi) + xi)) inside = !inside;
+  }
+  return inside;
+};
+
 const pointToSegmentDistance = (point: Point, from: Point, to: Point) => {
   const dx = to[0] - from[0];
   const dy = to[1] - from[1];
@@ -124,9 +135,18 @@ export const calculateMeshCavity = (points: Point[]): { center: Point; radius: n
     if (y < yMin) yMin = y;
     if (y > yMax) yMax = y;
   }
-  const center: Point = [(xMin + xMax) / 2, (yMin + yMax) / 2];
+  let center: Point = [(xMin + xMax) / 2, (yMin + yMax) / 2];
   const minDim = Math.min(xMax - xMin, yMax - yMin);
-  const radius = Math.max(12, Math.min(minDim * 0.25, 30));
+  let radius = Math.max(12, Math.min(minDim * 0.25, 30));
+  // Concave face (e.g. an L-shaped/staircase loop): the bbox midpoint can land
+  // in the outer notch, outside the face's own perimeter. Re-anchor to the
+  // area centroid and re-clamp the radius to its true perimeter clearance.
+  if (points.length >= 3 && !pointInPolygon(center, points)) {
+    const centroid = calculateMeshCentroid(points);
+    if (pointInPolygon(centroid, points)) center = centroid;
+    const clearance = points.reduce((closest, point, index) => Math.min(closest, pointToSegmentDistance(center, point, points[(index + 1) % points.length])), Number.POSITIVE_INFINITY);
+    radius = Math.max(8, Math.min(radius, clearance * 0.7));
+  }
   return { center, radius };
 };
 

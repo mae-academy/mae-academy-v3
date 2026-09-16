@@ -45,6 +45,9 @@ export interface AnalysisTrace {
   meshCycles?: MeshCycle[];
   nodalNodes?: NodalNodeLabel[];
   warning?: string;
+  targetId?: string;
+  activeSourceId?: string;
+  activeStepIndex?: number;
 }
 
 export const nonReferenceNodes = (elements: MNAElement[]) => Array.from(new Set(elements.flatMap((element) => {

@@ -1,6 +1,38 @@
 import { describe, it, expect } from 'vitest';
 import { componentPrefix, nextComponentLabel, type CircuitComponent } from '../models/circuitTypes';
-import { tabDComponentLabelAnchors } from './analogCanvasGeometry';
+import { calculateTabDPlanarCavity, tabDComponentLabelAnchors } from './analogCanvasGeometry';
+import type { Point } from '../models/wiring';
+
+describe('calculateTabDPlanarCavity (rendered mesh-indicator geometry)', () => {
+  const pointInPolygon = (point: Point, polygon: Point[]) => {
+    let inside = false;
+    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i, i += 1) {
+      const [xi, yi] = polygon[i];
+      const [xj, yj] = polygon[j];
+      if (((yi > point[1]) !== (yj > point[1])) && (point[0] < ((xj - xi) * (point[1] - yi)) / (yj - yi) + xi)) inside = !inside;
+    }
+    return inside;
+  };
+
+  it('centers within a plain rectangular face at the bbox midpoint', () => {
+    const rectangle: Point[] = [[0, 0], [200, 0], [200, 100], [0, 100]];
+    const { center, radius } = calculateTabDPlanarCavity(rectangle);
+    expect(center).toEqual([100, 50]);
+    expect(radius).toBeGreaterThan(0);
+  });
+
+  it('re-anchors center and radius inside a concave (L-shaped/staircase) mesh face', () => {
+    // The bbox midpoint of this face falls in its outer notch, outside the polygon.
+    const lShape: Point[] = [[0, 0], [200, 0], [200, 100], [100, 100], [100, 200], [0, 200]];
+    const { center, radius } = calculateTabDPlanarCavity(lShape);
+    expect(pointInPolygon(center, lShape)).toBe(true);
+    for (let angle = 0; angle < 360; angle += 5) {
+      const radians = (angle * Math.PI) / 180;
+      const sample: Point = [center[0] + radius * Math.cos(radians), center[1] + radius * Math.sin(radians)];
+      expect(pointInPolygon(sample, lShape)).toBe(true);
+    }
+  });
+});
 
 describe('Component Prefixes (circuitTypes.ts)', () => {
   it('maps potentiometer to R', () => {

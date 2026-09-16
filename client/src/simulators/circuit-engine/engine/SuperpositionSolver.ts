@@ -1,5 +1,6 @@
 import { MNASolver, type MNAElement } from '@/simulators/circuit-engine/engine/mnaSolver';
-import { id, type AnalysisTrace } from '@/simulators/circuit-engine/models/analysisTypes';
+import { type AnalysisTrace } from '@/simulators/circuit-engine/models/analysisTypes';
+import { AcademicNodalDictionary } from '@/simulators/circuit-engine/models/AcademicNodalDictionary';
 
 export class SuperpositionSolver {
   constructor(private readonly elements: MNAElement[]) {}
@@ -24,9 +25,27 @@ export class SuperpositionSolver {
       const baseline = new MNASolver(this.elements).solve();
       const actual = ((baseline.nodeVoltages[target.positive] ?? 0) - (baseline.nodeVoltages[target.negative] ?? 0)) / target.resistance;
       const sum = contribution.reduce((value, item) => value + item.i, 0);
-      const steps: AnalysisTrace['steps'] = contribution.map(({ source, i }, index) => ({ title: `Sub-circuit ${index + 1}: ${id(source.id)} active`, math: `I_{${id(target.id)}}^{(${index + 1})}=${i.toFixed(9)}\\,\\mathrm{A}`, prose: source.type === 'voltage' ? 'Other independent voltage sources are shorted; independent current sources are opened.' : 'Other independent sources are deactivated; dependent sources remain active.' }));
-      steps.push({ title: 'Algebraic superposition', math: `I_{${id(target.id)}}=\\sum_k I_{${id(target.id)}}^{(k)}=${sum.toFixed(9)}\\,\\mathrm{A}` }, { title: 'Baseline MNA verification', math: `I_{${id(target.id)}}^{\\mathrm{MNA}}=${actual.toFixed(9)}\\,\\mathrm{A}` });
-      return { method: 'superposition', status: Math.abs(sum - actual) < 1e-8 ? 'ready' : 'error', heading: 'Superposition Theorem', steps, result: baseline, warning: Math.abs(sum - actual) < 1e-8 ? undefined : 'Sub-responses did not match the baseline MNA branch current.' };
+      const dict = new AcademicNodalDictionary(this.elements);
+      const targetLabel = dict.element(target);
+      const steps: AnalysisTrace['steps'] = contribution.map(({ source, i }, index) => ({
+        title: `Sub-circuit ${index + 1}: ${dict.element(source)} active`,
+        math: `I_{${targetLabel}}^{(${index + 1})}=${i.toFixed(9)}\\,\\mathrm{A}`,
+        prose: source.type === 'voltage' ? 'Other independent voltage sources are shorted; independent current sources are opened.' : 'Other independent sources are deactivated; dependent sources remain active.'
+      }));
+      steps.push(
+        { title: 'Algebraic superposition', math: `I_{${targetLabel}}=\\sum_k I_{${targetLabel}}^{(k)}=${sum.toFixed(9)}\\,\\mathrm{A}` },
+        { title: 'Baseline MNA verification', math: `I_{${targetLabel}}^{\\mathrm{MNA}}=${actual.toFixed(9)}\\,\\mathrm{A}` }
+      );
+      return {
+        method: 'superposition',
+        status: Math.abs(sum - actual) < 1e-8 ? 'ready' : 'error',
+        heading: 'Superposition Theorem',
+        targetId: target.id,
+        activeSourceId: independent[0]?.id,
+        steps,
+        result: baseline,
+        warning: Math.abs(sum - actual) < 1e-8 ? undefined : 'Sub-responses did not match the baseline MNA branch current.'
+      };
     } catch (error) { return { method: 'superposition', status: 'error', heading: 'Superposition Theorem', steps: [], warning: error instanceof Error ? error.message : 'Superposition analysis failed.' }; }
   }
 }

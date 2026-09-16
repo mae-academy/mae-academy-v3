@@ -47,7 +47,7 @@ import { OscilloscopeComponentPanel } from '@/simulators/circuit-engine/componen
 import { useOscilloscopeDisplaySettings, type OscilloscopeDisplaySettings } from '@/simulators/circuit-engine/components/ui-components/oscilloscopeDisplaySettings';
 import { ExportPreviewModal, svgToPngBlob, type ExportItem } from '@/simulators/circuit-engine/components/ui-components/ExportPreviewModal';
 import { ShareProjectModal } from '@/simulators/circuit-engine/components/ui-components/ShareProjectModal';
-import type { AnalysisTrace, MeshCycle, NodalNodeLabel } from '@/simulators/circuit-engine/models/analysisTypes';
+import type { AnalysisMethod, AnalysisTrace, MeshCycle, NodalNodeLabel } from '@/simulators/circuit-engine/models/analysisTypes';
 import {
   CATEGORIES,
   getComponentsByCategory,
@@ -886,6 +886,77 @@ function NodalNodeOverlay({ node, colors }: { node: NodalNodeLabel; colors: Pale
   );
 }
 
+function TheveninTerminalOverlay({
+  position,
+  label,
+  colors,
+  darkPreview,
+}: {
+  position: [number, number];
+  label: 'A' | 'B';
+  colors: Palette;
+  darkPreview: boolean;
+}) {
+  const [x, y] = position;
+  const isA = label === 'A';
+  const strokeColor = isA ? '#ef4444' : '#3b82f6';
+  const labelOffsetX = isA ? -24 : 8;
+  const labelOffsetY = -24;
+
+  return (
+    <g pointerEvents="none" aria-label={`Thévenin Terminal ${label}`}>
+      {/* Outer open-circuit indicator pulse ring */}
+      <circle
+        cx={x}
+        cy={y}
+        r={14}
+        fill="none"
+        stroke={strokeColor}
+        strokeWidth={1.5}
+        strokeDasharray="3 2"
+        opacity={0.8}
+      />
+      {/* Hollow terminal circle */}
+      <circle
+        cx={x}
+        cy={y}
+        r={7}
+        fill={darkPreview ? '#0d0f12' : '#ffffff'}
+        stroke={strokeColor}
+        strokeWidth={2.5}
+      />
+      {/* Terminal center dot */}
+      <circle cx={x} cy={y} r={2.5} fill={strokeColor} />
+
+      {/* KaTeX label badge */}
+      <rect
+        x={x + labelOffsetX}
+        y={y + labelOffsetY}
+        width={16}
+        height={16}
+        rx={4}
+        fill={strokeColor}
+        stroke={darkPreview ? '#1a1d24' : '#ffffff'}
+        strokeWidth={1.5}
+      />
+      <text
+        x={x + labelOffsetX + 8}
+        y={y + labelOffsetY + 9.5}
+        textAnchor="middle"
+        dominantBaseline="central"
+        fill="#ffffff"
+        style={{
+          fontFamily: "'KaTeX_Main', 'KaTeX_Math', serif",
+          fontSize: '11px',
+          fontWeight: 700,
+        }}
+      >
+        {label}
+      </text>
+    </g>
+  );
+}
+
 export interface V3HomeProps {
   /** Creates an isolated runtime while retaining the exact Tab B presentation contract. */
   createSimulationEngine?: () => SimulationEngine;
@@ -947,28 +1018,33 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     [wireIntersectionList, wires, normalizedGraph],
   );
 
-  const [analysisTraces, setAnalysisTraces] = useState<Partial<Record<'mesh' | 'nodal', AnalysisTrace>>>({});
-  const [activeAnalysisMethod, setActiveAnalysisMethod] = useState<'mesh' | 'nodal' | null>(null);
+  const [analysisTraces, setAnalysisTraces] = useState<Partial<Record<AnalysisMethod, AnalysisTrace>>>({});
+  const [activeAnalysisTrace, setActiveAnalysisTrace] = useState<AnalysisTrace | null>(null);
+  const [activeAnalysisMethod, setActiveAnalysisMethod] = useState<AnalysisMethod | null>('nodal');
   const handleAnalysisTrace = useCallback((trace: AnalysisTrace) => {
-    if (trace.method !== 'mesh' && trace.method !== 'nodal') return;
-    const method: 'mesh' | 'nodal' = trace.method;
-    setActiveAnalysisMethod(prev => prev === method ? prev : method);
+    setActiveAnalysisMethod(trace.method);
+    setActiveAnalysisTrace(trace);
     setAnalysisTraces((current) => {
-      const existing = current[method];
+      const existing = current[trace.method];
       if (
         existing &&
         existing.status === trace.status &&
         existing.heading === trace.heading &&
         existing.warning === trace.warning &&
+        existing.targetId === trace.targetId &&
+        existing.activeSourceId === trace.activeSourceId &&
+        existing.activeStepIndex === trace.activeStepIndex &&
         existing.steps.length === trace.steps.length
       ) {
         return current;
       }
-      return trace.status === 'ready' ? { ...current, [method]: trace } : { ...current, [method]: undefined };
+      return trace.status === 'ready' ? { ...current, [trace.method]: trace } : { ...current, [trace.method]: undefined };
     });
   }, []);
   const activeMeshTrace = activeAnalysisMethod === 'mesh' ? analysisTraces.mesh ?? null : null;
   const activeNodalTrace = activeAnalysisMethod === 'nodal' ? analysisTraces.nodal ?? null : null;
+  const activeTheveninTrace = (activeAnalysisMethod === 'thevenin' || activeAnalysisMethod === 'transform') ? activeAnalysisTrace : null;
+  const activeSuperpositionTrace = activeAnalysisMethod === 'superposition' ? activeAnalysisTrace : null;
 
   useEffect(() => {
     const root = document.documentElement;
@@ -1157,6 +1233,22 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     if (isExactCadComponent(component.type)) return raw; // strict sub-grid bypass
     return raw && tabDUiRefinement ? alignTabDTerminalToGrid(raw, gridSize) : raw;
   }, [getRawCanvasTerminalPosition, gridSize, tabDUiRefinement]);
+
+  const isTheveninActive = activeAnalysisMethod === 'thevenin' || activeAnalysisMethod === 'transform';
+  const theveninTargetId = isTheveninActive ? activeTheveninTrace?.targetId : null;
+  const theveninTargetComp = theveninTargetId ? components.find(c => c.id === theveninTargetId) : null;
+  const isSuperpositionActive = activeAnalysisMethod === 'superposition';
+  const superpositionActiveSourceId = isSuperpositionActive ? activeSuperpositionTrace?.activeSourceId : null;
+
+  const theveninTerminals = useMemo(() => {
+    if (!isTheveninActive || !theveninTargetComp) return null;
+    const def = getDef(theveninTargetComp.type);
+    if (!def || def.terminals.length < 2) return null;
+    const posA = getCanvasTerminalPosition(theveninTargetComp, def.terminals[0].id);
+    const posB = getCanvasTerminalPosition(theveninTargetComp, def.terminals[1].id);
+    if (!posA || !posB) return null;
+    return { posA, posB };
+  }, [isTheveninActive, theveninTargetComp, getCanvasTerminalPosition]);
 
   const canvasWireEndpoints = useCallback((wire: CircuitWire, documentComponents: CircuitComponent[]): { from: Point; to: Point; fromAxis: TabDTerminalAxis; toAxis: TabDTerminalAxis } | null => {
     let from: Point | null = null;
@@ -3972,13 +4064,34 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                       const meterDisplayValue = meterUnit && reading?.status === 'ready' ? formatMeterReading(reading.value, meterUnit) : undefined;
                       const transform = `translate(${component.x},${component.y})`;
                       const symbolTransform = `rotate(${component.rotation}) scale(${component.flipH ? -1 : 1},${component.flipV ? -1 : 1}) scale(${isExactCadComponent(component.type) ? 1 : visualSymbolScale})`;
+                      const isTheveninRemovedLoad = isTheveninActive && theveninTargetId === component.id;
+                      const isIndependentSource = component.type === 'voltage' || component.type === 'current' || component.type === 'dc-voltage' || component.type === 'dc-current';
+                      const isSuperpositionDimmedSource = isSuperpositionActive && superpositionActiveSourceId && isIndependentSource && component.id !== superpositionActiveSourceId;
+                      const isSuperpositionActiveSource = isSuperpositionActive && superpositionActiveSourceId && component.id === superpositionActiveSourceId;
+                      const componentCanvasOpacity = isTheveninRemovedLoad ? 0.45 : isSuperpositionDimmedSource ? 0.28 : 1;
+
                       return (
                         <g
                           key={component.id}
                           transform={transform}
+                          opacity={componentCanvasOpacity}
+                          style={{ transition: 'opacity 0.25s ease' }}
                           onPointerEnter={() => setHoveredComponentId(component.id)}
                           onPointerLeave={() => setHoveredComponentId(null)}
                         >
+                          {isSuperpositionActiveSource && (
+                            <circle
+                              cx={0}
+                              cy={0}
+                              r={24}
+                              fill="none"
+                              stroke="#3b82f6"
+                              strokeWidth={2}
+                              strokeDasharray="4 3"
+                              opacity={0.85}
+                              pointerEvents="none"
+                            />
+                          )}
                           <g transform={symbolTransform} color={isSelected ? colors.selection : undefined}>
                             {renderSymbol(definition.symbol, powered, { ...component.props, label: component.label, selected: isSelected, _isSelected: isSelected, isDark: darkPreview, _isDark: darkPreview, isEnergized: powered, isConflicted: conflictedCoilIds.has(component.id), _intensity: intensity, ...(motorVEff !== undefined ? { _vEff: motorVEff } : {}), _documentedStyle: tabDUiRefinement, ...(meterDisplayValue !== undefined ? { displayValue: meterDisplayValue } : {}) }, animationTime)}
                           </g>
@@ -4035,8 +4148,13 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                         const refFill = darkPreview ? '#f1f5f9' : '#1e293b';
                         const valFill = darkPreview ? '#94a3b8' : '#64748b';
 
+                        const isTheveninRemovedLoad = isTheveninActive && theveninTargetId === component.id;
+                        const isIndependentSource = component.type === 'voltage' || component.type === 'current' || component.type === 'dc-voltage' || component.type === 'dc-current';
+                        const isSuperpositionDimmedSource = isSuperpositionActive && superpositionActiveSourceId && isIndependentSource && component.id !== superpositionActiveSourceId;
+                        const labelOpacity = isTheveninRemovedLoad ? 0.45 : isSuperpositionDimmedSource ? 0.28 : 1;
+
                         return (
-                          <g key={`labels-${component.id}`}>
+                          <g key={`labels-${component.id}`} opacity={labelOpacity} style={{ transition: 'opacity 0.25s ease' }}>
                             {/* Component Reference Label */}
                             {!hideLabel && (
                               <text
@@ -4106,8 +4224,16 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                     ))}
                   </g>
 
-                  {/* V_i labels deliberately render last: they remain readable above grid, wires, symbols, and workspace text. */}
-                  {activeNodalTrace?.nodalNodes?.filter((node) => node.centroid[0] !== 0 || node.centroid[1] !== 0).map((node) => <NodalNodeOverlay key={`nodal-node-${node.node}`} node={node} colors={colors} />)}
+                  {/* V_i labels deliberately render last: they remain readable above grid, wires, symbols, and workspace text. Strictly active in Nodal mode. */}
+                  {activeAnalysisMethod === 'nodal' && activeNodalTrace?.nodalNodes?.filter((node) => node.centroid[0] !== 0 || node.centroid[1] !== 0).map((node) => <NodalNodeOverlay key={`nodal-node-${node.node}`} node={node} colors={colors} />)}
+
+                  {/* Thévenin / Norton / Max Power Terminal Pair A–B Overlays */}
+                  {isTheveninActive && theveninTerminals && (
+                    <g className="v3-thevenin-terminals-layer" pointerEvents="none">
+                      <TheveninTerminalOverlay position={theveninTerminals.posA} label="A" colors={colors} darkPreview={darkPreview} />
+                      <TheveninTerminalOverlay position={theveninTerminals.posB} label="B" colors={colors} darkPreview={darkPreview} />
+                    </g>
+                  )}
                 </g>
               </svg>
 

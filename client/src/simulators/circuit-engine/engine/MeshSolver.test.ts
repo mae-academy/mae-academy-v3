@@ -5,6 +5,7 @@ import {
   assembleMeshSource,
   buildMeshSystem,
   calculateMeshArrowRadius,
+  calculateMeshCavity,
   calculateMeshCentroid,
   MeshSolver,
   reconstructBranchCurrents,
@@ -154,6 +155,27 @@ describe('Mesh-current coefficient system', () => {
     const rectangle: Array<[number, number]> = [[10, 20], [210, 20], [210, 80], [10, 80]];
     expect(calculateMeshCentroid(rectangle)).toEqual([110, 50]);
     expect(calculateMeshArrowRadius(rectangle)).toBe(15);
+  });
+
+  it('re-anchors the cavity center and radius inside a concave (L-shaped/staircase) mesh face', () => {
+    // A bbox-midpoint would fall in the outer notch of this face.
+    const lShape: Array<[number, number]> = [[0, 0], [200, 0], [200, 100], [100, 100], [100, 200], [0, 200]];
+    const pointInPolygon = (point: [number, number], polygon: Array<[number, number]>) => {
+      let inside = false;
+      for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i, i += 1) {
+        const [xi, yi] = polygon[i];
+        const [xj, yj] = polygon[j];
+        if (((yi > point[1]) !== (yj > point[1])) && (point[0] < ((xj - xi) * (point[1] - yi)) / (yj - yi) + xi)) inside = !inside;
+      }
+      return inside;
+    };
+    const { center, radius } = calculateMeshCavity(lShape);
+    expect(pointInPolygon(center, lShape)).toBe(true);
+    for (let angle = 0; angle < 360; angle += 5) {
+      const radians = (angle * Math.PI) / 180;
+      const sample: [number, number] = [center[0] + radius * Math.cos(radians), center[1] + radius * Math.sin(radians)];
+      expect(pointInPolygon(sample, lShape)).toBe(true);
+    }
   });
 
   it('assigns three adjacent faces independent local boxes so top-right and bottom-right mesh labels cannot collide', () => {
