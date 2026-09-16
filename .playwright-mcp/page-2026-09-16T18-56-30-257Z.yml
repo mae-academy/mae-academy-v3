@@ -1,0 +1,354 @@
+- generic [ref=f3e2]:
+  - region "Notifications alt+T"
+  - generic [ref=f3e3]:
+    - banner [ref=f3e4]:
+      - generic [ref=f3e5]:
+        - link "MAE Academy home" [ref=f3e6] [cursor=pointer]:
+          - /url: /
+          - img "MAE Academy tri-axis mark" [ref=f3e7]
+          - generic [ref=f3e11]:
+            - strong [ref=f3e12]: MAE /
+            - generic [ref=f3e13]: ACADEMY
+        - generic [ref=f3e14]:
+          - button "Language" [ref=f3e16] [cursor=pointer]:
+            - generic [ref=f3e17]: EN
+          - button "Switch to light theme" [ref=f3e20] [cursor=pointer]
+      - navigation "Platform navigation" [ref=f3e29]:
+        - region [ref=f3e30]:
+          - button "Previous navigation item" [disabled]
+          - generic [ref=f3e32]:
+            - group [ref=f3e33]:
+              - link "Home" [ref=f3e34] [cursor=pointer]:
+                - /url: /
+            - group [ref=f3e36]:
+              - link "Academic Research" [ref=f3e37] [cursor=pointer]:
+                - /url: /research
+            - group [ref=f3e39]:
+              - link "Academic Courses" [ref=f3e40] [cursor=pointer]:
+                - /url: /courses
+            - group [ref=f3e42]:
+              - link "Practical Simulations" [ref=f3e43] [cursor=pointer]:
+                - /url: /simulations
+            - group [ref=f3e46]:
+              - link "About" [ref=f3e47] [cursor=pointer]:
+                - /url: /about
+          - button "Next navigation item" [disabled]
+    - main [ref=f3e49]:
+      - generic [ref=f3e52]:
+        - link "Simulations" [ref=f3e53] [cursor=pointer]:
+          - /url: /simulations
+        - heading "Electrical Circuits" [level=1] [ref=f3e56]
+        - generic [ref=f3e59]:
+          - generic [ref=f3e61]:
+            - generic [ref=f3e62]:
+              - button "−" [ref=f3e63] [cursor=pointer]
+              - generic [ref=f3e64]: 100%
+              - button "+" [ref=f3e65] [cursor=pointer]
+              - button "Undo (Ctrl/Cmd+Z)" [disabled] [ref=f3e67]
+              - button "Redo (Ctrl/Cmd+Shift+Z)" [disabled] [ref=f3e71]
+              - button "Auto-scale / Center circuit" [ref=f3e75] [cursor=pointer]
+              - button "Cut (Ctrl/Cmd+X)" [disabled] [ref=f3e81]
+              - button "Copy (Ctrl/Cmd+C)" [disabled] [ref=f3e88]
+              - button "Paste (Ctrl/Cmd+V)" [disabled] [ref=f3e92]
+              - button "Delete (Del/Backspace)" [disabled] [ref=f3e96]
+              - button "Dotted" [ref=f3e101] [cursor=pointer]
+              - button "Cartesian" [ref=f3e102] [cursor=pointer]
+              - button "Hidden" [ref=f3e103] [cursor=pointer]
+              - button "Text" [ref=f3e105] [cursor=pointer]
+              - button "90°" [disabled] [ref=f3e109]
+              - button "Flip X" [disabled] [ref=f3e113]
+              - button "Flip Y" [disabled] [ref=f3e117]
+            - generic [ref=f3e121]:
+              - button "Export" [ref=f3e122] [cursor=pointer]
+              - button "Import" [ref=f3e126] [cursor=pointer]
+              - button "Save Image" [ref=f3e131] [cursor=pointer]
+              - button "Share Project" [ref=f3e136] [cursor=pointer]
+              - button "Run" [ref=f3e144] [cursor=pointer]
+              - button "Show / Hide electron flow" [ref=f3e147] [cursor=pointer]
+              - button "Reset simulation" [ref=f3e150] [cursor=pointer]
+              - generic [ref=f3e156]:
+                - math [ref=f3e158]:
+                  - generic [ref=f3e160]:
+                    - generic [ref=f3e161]: "0.000"
+                    - generic [ref=f3e162]: s
+                - generic [ref=f3e164]: 0.000 s
+              - generic [ref=f3e166]:
+                - slider "Simulation speed" [ref=f3e167] [cursor=pointer]: "1"
+                - generic [ref=f3e170]:
+                  - math [ref=f3e172]:
+                    - generic [ref=f3e174]:
+                      - generic [ref=f3e175]: "1.00"
+                      - generic [ref=f3e176]: ×
+                  - generic [ref=f3e178]: 1.00×
+          - generic [ref=f3e179]:
+            - generic [ref=f3e180]:
+              - generic [ref=f3e181]:
+                - complementary [ref=f3e182]:
+                  - generic [ref=f3e183]: Component Library
+                  - textbox "Search components" [ref=f3e190]
+                  - generic [ref=f3e191]:
+                    - generic [ref=f3e192]:
+                      - button "Sources 8" [ref=f3e193] [cursor=pointer]:
+                        - generic [ref=f3e194]: Sources
+                        - generic [ref=f3e197]: "8"
+                      - generic [ref=f3e198]:
+                        - button "Ground" [ref=f3e199]:
+                          - generic "Ground" [ref=f3e202]
+                        - button "DC Power Rail" [ref=f3e203]:
+                          - generic "DC Power Rail" [ref=f3e206]
+                        - button "DC Voltage Source" [ref=f3e207]:
+                          - generic "DC Voltage Source" [ref=f3e210]
+                        - button "AC Voltage Source" [ref=f3e211]:
+                          - generic "AC Voltage Source" [ref=f3e214]
+                        - button "3-Phase Voltage Source" [ref=f3e215]:
+                          - generic [ref=f3e216]:
+                            - img [aria-hidden]:
+                              - generic: 3~
+                          - generic "3-Phase Voltage Source" [ref=f3e218]
+                        - button "3-Phase Power Rail" [ref=f3e219]:
+                          - generic "3-Phase Power Rail" [ref=f3e222]
+                        - button "DC Current Source" [ref=f3e223]:
+                          - generic "DC Current Source" [ref=f3e226]
+                        - button "AC Current Source" [ref=f3e227]:
+                          - generic "AC Current Source" [ref=f3e230]
+                    - generic [ref=f3e231]:
+                      - button "Controlled Sources 4" [ref=f3e232] [cursor=pointer]:
+                        - generic [ref=f3e233]: Controlled Sources
+                        - generic [ref=f3e236]: "4"
+                      - generic [ref=f3e237]:
+                        - button "VCCS" [ref=f3e238]:
+                          - generic "VCCS" [ref=f3e241]
+                        - button "VCVS" [ref=f3e242]:
+                          - generic "VCVS" [ref=f3e245]
+                        - button "CCCS" [ref=f3e246]:
+                          - generic "CCCS" [ref=f3e249]
+                        - button "CCVS" [ref=f3e250]:
+                          - generic "CCVS" [ref=f3e253]
+                    - generic [ref=f3e254]:
+                      - button "Passive 5" [ref=f3e255] [cursor=pointer]:
+                        - generic [ref=f3e256]: Passive
+                        - generic [ref=f3e259]: "5"
+                      - generic [ref=f3e260]:
+                        - button "Resistor" [ref=f3e261]:
+                          - generic "Resistor" [ref=f3e264]
+                        - button "Variable Resistor" [ref=f3e265]:
+                          - generic "Variable Resistor" [ref=f3e268]
+                        - button "Capacitor" [ref=f3e269]:
+                          - generic "Capacitor" [ref=f3e272]
+                        - button "Inductor" [ref=f3e273]:
+                          - generic "Inductor" [ref=f3e276]
+                        - button "Impedance" [ref=f3e277]:
+                          - generic "Impedance" [ref=f3e280]
+                    - generic [ref=f3e281]:
+                      - button "Diodes 4" [ref=f3e282] [cursor=pointer]:
+                        - generic [ref=f3e283]: Diodes
+                        - generic [ref=f3e286]: "4"
+                      - generic [ref=f3e287]:
+                        - button "Diode" [ref=f3e288]:
+                          - generic "Diode" [ref=f3e291]
+                        - button "Zener Diode" [ref=f3e292]:
+                          - generic "Zener Diode" [ref=f3e295]
+                        - button "LED" [ref=f3e296]:
+                          - generic "LED" [ref=f3e299]
+                        - button "Photodiode" [ref=f3e300]:
+                          - generic "Photodiode" [ref=f3e303]
+                    - generic [ref=f3e304]:
+                      - button "Transistors 6" [ref=f3e305] [cursor=pointer]:
+                        - generic [ref=f3e306]: Transistors
+                        - generic [ref=f3e309]: "6"
+                      - generic [ref=f3e310]:
+                        - button "BJT NPN" [ref=f3e311]:
+                          - generic "BJT NPN" [ref=f3e314]
+                        - button "BJT PNP" [ref=f3e315]:
+                          - generic "BJT PNP" [ref=f3e318]
+                        - button "MOSFET N-ch" [ref=f3e319]:
+                          - generic "MOSFET N-ch" [ref=f3e322]
+                        - button "MOSFET P-ch" [ref=f3e323]:
+                          - generic "MOSFET P-ch" [ref=f3e326]
+                        - button "JFET N-ch" [ref=f3e327]:
+                          - generic "JFET N-ch" [ref=f3e330]
+                        - button "JFET P-ch" [ref=f3e331]:
+                          - generic "JFET P-ch" [ref=f3e334]
+                    - generic [ref=f3e335]:
+                      - button "Power Semiconductors 4" [ref=f3e336] [cursor=pointer]:
+                        - generic [ref=f3e337]: Power Semiconductors
+                        - generic [ref=f3e340]: "4"
+                      - generic [ref=f3e341]:
+                        - button "SCR (Thyristor)" [ref=f3e342]:
+                          - generic "SCR (Thyristor)" [ref=f3e345]
+                        - button "Diac" [ref=f3e346]:
+                          - generic "Diac" [ref=f3e349]
+                        - button "Triac" [ref=f3e350]:
+                          - generic "Triac" [ref=f3e353]
+                        - button "Op-Amp" [ref=f3e354]:
+                          - generic [ref=f3e355]:
+                            - img [aria-hidden]:
+                              - generic:
+                                - generic:
+                                  - generic: "-"
+                                  - generic: +
+                          - generic "Op-Amp" [ref=f3e357]
+                    - generic [ref=f3e358]:
+                      - button "Switches 6" [ref=f3e359] [cursor=pointer]:
+                        - generic [ref=f3e360]: Switches
+                        - generic [ref=f3e363]: "6"
+                      - generic [ref=f3e364]:
+                        - button "Switch SPST-NO" [ref=f3e365]:
+                          - generic "Switch SPST-NO" [ref=f3e368]
+                        - button "Switch SPST-NC" [ref=f3e369]:
+                          - generic "Switch SPST-NC" [ref=f3e372]
+                        - button "Push Button NO" [ref=f3e373]:
+                          - generic "Push Button NO" [ref=f3e376]
+                        - button "Push Button NC" [ref=f3e377]:
+                          - generic "Push Button NC" [ref=f3e380]
+                        - button "Switch SPDT" [ref=f3e381]:
+                          - generic "Switch SPDT" [ref=f3e384]
+                        - button "Switch DPST" [ref=f3e385]:
+                          - generic "Switch DPST" [ref=f3e388]
+                    - generic [ref=f3e389]:
+                      - button "Protection 7" [ref=f3e390] [cursor=pointer]:
+                        - generic [ref=f3e391]: Protection
+                        - generic [ref=f3e394]: "7"
+                      - generic [ref=f3e395]:
+                        - button "Relay SPST" [ref=f3e396]:
+                          - generic "Relay SPST" [ref=f3e399]
+                        - button "Relay SPDT" [ref=f3e400]:
+                          - generic "Relay SPDT" [ref=f3e403]
+                        - button "Relay DPST" [ref=f3e404]:
+                          - generic "Relay DPST" [ref=f3e407]
+                        - button "Fuse" [ref=f3e408]:
+                          - generic "Fuse" [ref=f3e411]
+                        - button "3-Phase Fuse" [ref=f3e412]:
+                          - generic "3-Phase Fuse" [ref=f3e415]
+                        - button "Circuit Breaker" [ref=f3e416]:
+                          - generic "Circuit Breaker" [ref=f3e419]
+                        - button "3-Phase Circuit Breaker" [ref=f3e420]:
+                          - generic "3-Phase Circuit Breaker" [ref=f3e423]
+                    - generic [ref=f3e424]:
+                      - button "Transformers 3" [ref=f3e425] [cursor=pointer]:
+                        - generic [ref=f3e426]: Transformers
+                        - generic [ref=f3e429]: "3"
+                      - generic [ref=f3e430]:
+                        - button "Transformer" [ref=f3e431]:
+                          - generic "Transformer" [ref=f3e434]
+                        - button "Transformer (CT)" [ref=f3e435]:
+                          - generic "Transformer (CT)" [ref=f3e438]
+                        - button "Autotransformer" [ref=f3e439]:
+                          - generic "Autotransformer" [ref=f3e442]
+                    - generic [ref=f3e443]:
+                      - button "Other Components 3" [ref=f3e444] [cursor=pointer]:
+                        - generic [ref=f3e445]: Other Components
+                        - generic [ref=f3e448]: "3"
+                      - generic [ref=f3e449]:
+                        - button "DC Motor" [ref=f3e450]:
+                          - generic [ref=f3e451]:
+                            - img [aria-hidden]:
+                              - generic: M
+                          - generic "DC Motor" [ref=f3e453]
+                        - button "3-Phase Motor" [ref=f3e454]:
+                          - generic [ref=f3e455]:
+                            - img [aria-hidden]:
+                              - generic:
+                                - generic:
+                                  - generic: 3 ~
+                                  - generic: M
+                          - generic "3-Phase Motor" [ref=f3e457]
+                        - button "Lamp" [ref=f3e458]:
+                          - generic "Lamp" [ref=f3e461]
+                    - generic [ref=f3e462]:
+                      - button "Measurement 4" [ref=f3e463] [cursor=pointer]:
+                        - generic [ref=f3e464]: Measurement
+                        - generic [ref=f3e467]: "4"
+                      - generic [ref=f3e468]:
+                        - button "Voltmeter" [ref=f3e469]:
+                          - generic [ref=f3e470]:
+                            - img [aria-hidden]:
+                              - generic: V
+                          - generic "Voltmeter" [ref=f3e472]
+                        - button "Ammeter" [ref=f3e473]:
+                          - generic [ref=f3e474]:
+                            - img [aria-hidden]:
+                              - generic: A
+                          - generic "Ammeter" [ref=f3e476]
+                        - button "Digital Multimeter" [ref=f3e477]:
+                          - generic [ref=f3e478]:
+                            - img [aria-hidden]:
+                              - generic: DCV
+                          - generic "Digital Multimeter" [ref=f3e480]
+                        - button "Oscilloscope" [ref=f3e481]:
+                          - generic "Oscilloscope" [ref=f3e484]
+                - main [ref=f3e485]:
+                  - generic [ref=f3e486]:
+                    - generic [ref=f3e487]: Interactive Electrical Canvas
+                    - generic [ref=f3e489]: 0 CMP · 0 NET
+                  - generic:
+                    - generic:
+                      - generic: Canvas Ready
+                      - paragraph: Drag and drop components from the library to begin circuit design.
+                  - generic:
+                    - generic: 0 components
+                    - generic: •
+                    - generic: 0 wires
+              - generic [ref=f3e493]:
+                - generic [ref=f3e494]: Academic Analysis Workspace
+                - generic [ref=f3e496]:
+                  - generic [ref=f3e497]:
+                    - generic [ref=f3e498]: Academic Analysis
+                    - generic [ref=f3e500]:
+                      - generic [ref=f3e501]:
+                        - generic [ref=f3e502]: DECIMAL PLACES
+                        - generic [ref=f3e505]:
+                          - math [ref=f3e507]:
+                            - generic [ref=f3e508]: "4"
+                          - generic [ref=f3e512]: "4"
+                      - combobox "Decimal places" [ref=f3e515] [cursor=pointer]:
+                        - option "0 digits"
+                        - option "1 digits"
+                        - option "2 digits"
+                        - option "3 digits"
+                        - option "4 digits" [selected]
+                        - option "5 digits"
+                        - option "6 digits"
+                  - generic [ref=f3e516]:
+                    - tab "Nodal" [selected] [ref=f3e517] [cursor=pointer]
+                    - tab "Mesh" [ref=f3e518] [cursor=pointer]
+                    - tab "Superposition" [ref=f3e519] [cursor=pointer]
+                    - tab "Thévenin" [ref=f3e520] [cursor=pointer]
+                  - status [ref=f3e521]: Build a grounded DC circuit to generate a derivation.
+            - complementary [ref=f3e523]:
+              - generic [ref=f3e524]: Active Element & Properties
+    - contentinfo [ref=f3e526]:
+      - generic [ref=f3e528]:
+        - generic [ref=f3e530]:
+          - link "MAE Academy" [ref=f3e531] [cursor=pointer]:
+            - /url: /
+          - paragraph [ref=f3e533]: Model. Analyze. Engineering. A global platform for rigorous engineering learning and applied systems thinking.
+          - link "maeacademy2026@gmail.com" [ref=f3e534] [cursor=pointer]:
+            - /url: mailto:maeacademy2026@gmail.com
+        - generic [ref=f3e539]:
+          - paragraph [ref=f3e540]: PLATFORM
+          - navigation [ref=f3e541]:
+            - link "Research" [ref=f3e542] [cursor=pointer]:
+              - /url: /research
+            - link "Courses" [ref=f3e547] [cursor=pointer]:
+              - /url: /courses
+            - link "Simulations" [ref=f3e551] [cursor=pointer]:
+              - /url: /simulations
+        - generic [ref=f3e556]:
+          - generic [ref=f3e557]:
+            - generic [ref=f3e558]:
+              - button "Switch language to English" [ref=f3e559] [cursor=pointer]: EN
+              - button "Switch language to العربية" [ref=f3e560] [cursor=pointer]: AR
+              - button "Switch language to Español" [ref=f3e561] [cursor=pointer]: ES
+            - generic [ref=f3e563]:
+              - link "Instagram" [ref=f3e564] [cursor=pointer]:
+                - /url: https://www.instagram.com/mae.academy/
+              - link "Facebook" [ref=f3e568] [cursor=pointer]:
+                - /url: https://web.facebook.com/search/top?q=mae%20academy
+              - link "YouTube" [ref=f3e571] [cursor=pointer]:
+                - /url: https://www.youtube.com/@MAE.Academy
+              - link "X" [ref=f3e574] [cursor=pointer]:
+                - /url: https://x.com
+            - link "Support Our Mission" [ref=f3e578] [cursor=pointer]:
+              - /url: https://www.paypal.com/ncp/payment/KQC2MQJX795D6
+          - paragraph [ref=f3e582]: © 2026 MAE Academy. All rights reserved.

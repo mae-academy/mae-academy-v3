@@ -1,0 +1,24 @@
+{
+  "format": "MAE-NAD",
+  "version": 1,
+  "texts": [],
+  "viewport": { "pan": [0, 0], "zoom": 1 },
+  "workspace": { "gridVisible": true, "snapEnabled": true },
+  "components": [
+    { "id": "v1", "type": "dc-voltage", "x": 150, "y": 300, "rotation": 0, "flipH": false, "flipV": false, "label": "V1", "props": { "voltage": 10 } },
+    { "id": "r1", "type": "resistor", "x": 300, "y": 150, "rotation": 0, "flipH": false, "flipV": false, "label": "R1", "props": { "resistance": 1000 } },
+    { "id": "rs", "type": "resistor", "x": 450, "y": 300, "rotation": 90, "flipH": false, "flipV": false, "label": "Rs", "props": { "resistance": 1000 } },
+    { "id": "e1", "type": "vcvs", "x": 650, "y": 300, "rotation": 0, "flipH": false, "flipV": false, "label": "E1", "props": { "gain": 3, "targetId": "Rs" } },
+    { "id": "r2", "type": "resistor", "x": 800, "y": 400, "rotation": 90, "flipH": false, "flipV": false, "label": "R2", "props": { "resistance": 2000 } },
+    { "id": "g1", "type": "ground", "x": 450, "y": 560, "rotation": 0, "flipH": false, "flipV": false, "label": "GND", "props": {} }
+  ],
+  "wires": [
+    { "id": "w1", "fromComp": "v1", "fromTerm": "pos", "toComp": "r1", "toTerm": "a", "path": [[150, 250], [150, 150], [270, 150]], "routing": "orthogonal" },
+    { "id": "w2", "fromComp": "r1", "fromTerm": "b", "toComp": "rs", "toTerm": "a", "path": [[330, 150], [450, 150], [450, 270]], "routing": "orthogonal" },
+    { "id": "w3", "fromComp": "rs", "fromTerm": "b", "toComp": "g1", "toTerm": "gnd", "path": [[450, 330], [450, 545]], "routing": "orthogonal" },
+    { "id": "w4", "fromComp": "v1", "fromTerm": "neg", "toComp": "g1", "toTerm": "gnd", "path": [[150, 350], [150, 545], [450, 545]], "routing": "orthogonal" },
+    { "id": "w5", "fromComp": "e1", "fromTerm": "pos", "toComp": "r2", "toTerm": "a", "path": [[650, 265], [800, 265], [800, 370]], "routing": "orthogonal" },
+    { "id": "w6", "fromComp": "r2", "fromTerm": "b", "toComp": "g1", "toTerm": "gnd", "path": [[800, 430], [800, 545], [450, 545]], "routing": "orthogonal" },
+    { "id": "w7", "fromComp": "e1", "fromTerm": "neg", "toComp": "g1", "toTerm": "gnd", "path": [[650, 335], [650, 545], [450, 545]], "routing": "orthogonal" }
+  ]
+}

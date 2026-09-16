@@ -1,0 +1,621 @@
+- generic [ref=f3e2]:
+  - region "Notifications alt+T":
+    - list:
+      - listitem [ref=f3e583]:
+        - generic [ref=f3e587]: SPICE accuracy pass unavailable (E1) — using the live engine's readings.
+      - listitem [ref=f3e589]:
+        - generic [ref=f3e593]: NAD circuit imported (6 components)
+  - generic [ref=f3e3]:
+    - banner [ref=f3e4]:
+      - generic [ref=f3e5]:
+        - link "MAE Academy home" [ref=f3e6] [cursor=pointer]:
+          - /url: /
+          - img "MAE Academy tri-axis mark" [ref=f3e7]
+          - generic [ref=f3e11]:
+            - strong [ref=f3e12]: MAE /
+            - generic [ref=f3e13]: ACADEMY
+        - generic [ref=f3e14]:
+          - button "Language" [ref=f3e16] [cursor=pointer]:
+            - generic [ref=f3e17]: EN
+          - button "Switch to light theme" [ref=f3e20] [cursor=pointer]
+      - navigation "Platform navigation" [ref=f3e29]:
+        - region [ref=f3e30]:
+          - button "Previous navigation item" [disabled]
+          - generic [ref=f3e32]:
+            - group [ref=f3e33]:
+              - link "Home" [ref=f3e34] [cursor=pointer]:
+                - /url: /
+            - group [ref=f3e36]:
+              - link "Academic Research" [ref=f3e37] [cursor=pointer]:
+                - /url: /research
+            - group [ref=f3e39]:
+              - link "Academic Courses" [ref=f3e40] [cursor=pointer]:
+                - /url: /courses
+            - group [ref=f3e42]:
+              - link "Practical Simulations" [ref=f3e43] [cursor=pointer]:
+                - /url: /simulations
+            - group [ref=f3e46]:
+              - link "About" [ref=f3e47] [cursor=pointer]:
+                - /url: /about
+          - button "Next navigation item" [disabled]
+    - main [ref=f3e49]:
+      - generic [ref=f3e52]:
+        - link "Simulations" [ref=f3e53] [cursor=pointer]:
+          - /url: /simulations
+        - heading "Electrical Circuits" [level=1] [ref=f3e56]
+        - generic [ref=f3e59]:
+          - generic [ref=f3e61]:
+            - generic [ref=f3e62]:
+              - button "−" [ref=f3e63] [cursor=pointer]
+              - generic [ref=f3e64]: 100%
+              - button "+" [ref=f3e65] [cursor=pointer]
+              - button "Undo (Ctrl/Cmd+Z)" [disabled] [ref=f3e67]
+              - button "Redo (Ctrl/Cmd+Shift+Z)" [disabled] [ref=f3e71]
+              - button "Auto-scale / Center circuit" [ref=f3e75] [cursor=pointer]
+              - button "Cut (Ctrl/Cmd+X)" [disabled] [ref=f3e81]
+              - button "Copy (Ctrl/Cmd+C)" [disabled] [ref=f3e88]
+              - button "Paste (Ctrl/Cmd+V)" [disabled] [ref=f3e92]
+              - button "Delete (Del/Backspace)" [disabled] [ref=f3e96]
+              - button "Dotted" [ref=f3e101] [cursor=pointer]
+              - button "Cartesian" [ref=f3e102] [cursor=pointer]
+              - button "Hidden" [ref=f3e103] [cursor=pointer]
+              - button "Text" [ref=f3e105] [cursor=pointer]
+              - button "90°" [disabled] [ref=f3e109]
+              - button "Flip X" [disabled] [ref=f3e113]
+              - button "Flip Y" [disabled] [ref=f3e117]
+            - generic [ref=f3e121]:
+              - button "Export" [ref=f3e122] [cursor=pointer]
+              - button "Import" [active] [ref=f3e126] [cursor=pointer]
+              - button "Save Image" [ref=f3e131] [cursor=pointer]
+              - button "Share Project" [ref=f3e136] [cursor=pointer]
+              - button "Run" [ref=f3e144] [cursor=pointer]
+              - button "Show / Hide electron flow" [ref=f3e147] [cursor=pointer]
+              - button "Reset simulation" [ref=f3e150] [cursor=pointer]
+              - generic [ref=f3e595]:
+                - math [ref=f3e597]:
+                  - generic [ref=f3e599]:
+                    - generic [ref=f3e600]: "0.000"
+                    - generic [ref=f3e601]: s
+                - generic [ref=f3e603]: 0.000 s
+              - generic [ref=f3e166]:
+                - slider "Simulation speed" [ref=f3e167] [cursor=pointer]: "1"
+                - generic [ref=f3e604]:
+                  - math [ref=f3e606]:
+                    - generic [ref=f3e608]:
+                      - generic [ref=f3e609]: "1.00"
+                      - generic [ref=f3e610]: ×
+                  - generic [ref=f3e612]: 1.00×
+          - generic [ref=f3e179]:
+            - generic [ref=f3e180]:
+              - generic [ref=f3e181]:
+                - complementary [ref=f3e182]:
+                  - generic [ref=f3e183]: Component Library
+                  - textbox "Search components" [ref=f3e190]
+                  - generic [ref=f3e191]:
+                    - generic [ref=f3e192]:
+                      - button "Sources 8" [ref=f3e193] [cursor=pointer]:
+                        - generic [ref=f3e194]: Sources
+                        - generic [ref=f3e197]: "8"
+                      - generic [ref=f3e198]:
+                        - button "Ground" [ref=f3e199]:
+                          - generic "Ground" [ref=f3e202]
+                        - button "DC Power Rail" [ref=f3e203]:
+                          - generic "DC Power Rail" [ref=f3e206]
+                        - button "DC Voltage Source" [ref=f3e207]:
+                          - generic "DC Voltage Source" [ref=f3e210]
+                        - button "AC Voltage Source" [ref=f3e211]:
+                          - generic "AC Voltage Source" [ref=f3e214]
+                        - button "3-Phase Voltage Source" [ref=f3e215]:
+                          - generic [ref=f3e216]:
+                            - img [aria-hidden]:
+                              - generic: 3~
+                          - generic "3-Phase Voltage Source" [ref=f3e218]
+                        - button "3-Phase Power Rail" [ref=f3e219]:
+                          - generic "3-Phase Power Rail" [ref=f3e222]
+                        - button "DC Current Source" [ref=f3e223]:
+                          - generic "DC Current Source" [ref=f3e226]
+                        - button "AC Current Source" [ref=f3e227]:
+                          - generic "AC Current Source" [ref=f3e230]
+                    - generic [ref=f3e231]:
+                      - button "Controlled Sources 4" [ref=f3e232] [cursor=pointer]:
+                        - generic [ref=f3e233]: Controlled Sources
+                        - generic [ref=f3e236]: "4"
+                      - generic [ref=f3e237]:
+                        - button "VCCS" [ref=f3e238]:
+                          - generic "VCCS" [ref=f3e241]
+                        - button "VCVS" [ref=f3e242]:
+                          - generic "VCVS" [ref=f3e245]
+                        - button "CCCS" [ref=f3e246]:
+                          - generic "CCCS" [ref=f3e249]
+                        - button "CCVS" [ref=f3e250]:
+                          - generic "CCVS" [ref=f3e253]
+                    - generic [ref=f3e254]:
+                      - button "Passive 5" [ref=f3e255] [cursor=pointer]:
+                        - generic [ref=f3e256]: Passive
+                        - generic [ref=f3e259]: "5"
+                      - generic [ref=f3e260]:
+                        - button "Resistor" [ref=f3e261]:
+                          - generic "Resistor" [ref=f3e264]
+                        - button "Variable Resistor" [ref=f3e265]:
+                          - generic "Variable Resistor" [ref=f3e268]
+                        - button "Capacitor" [ref=f3e269]:
+                          - generic "Capacitor" [ref=f3e272]
+                        - button "Inductor" [ref=f3e273]:
+                          - generic "Inductor" [ref=f3e276]
+                        - button "Impedance" [ref=f3e277]:
+                          - generic "Impedance" [ref=f3e280]
+                    - generic [ref=f3e281]:
+                      - button "Diodes 4" [ref=f3e282] [cursor=pointer]:
+                        - generic [ref=f3e283]: Diodes
+                        - generic [ref=f3e286]: "4"
+                      - generic [ref=f3e287]:
+                        - button "Diode" [ref=f3e288]:
+                          - generic "Diode" [ref=f3e291]
+                        - button "Zener Diode" [ref=f3e292]:
+                          - generic "Zener Diode" [ref=f3e295]
+                        - button "LED" [ref=f3e296]:
+                          - generic "LED" [ref=f3e299]
+                        - button "Photodiode" [ref=f3e300]:
+                          - generic "Photodiode" [ref=f3e303]
+                    - generic [ref=f3e304]:
+                      - button "Transistors 6" [ref=f3e305] [cursor=pointer]:
+                        - generic [ref=f3e306]: Transistors
+                        - generic [ref=f3e309]: "6"
+                      - generic [ref=f3e310]:
+                        - button "BJT NPN" [ref=f3e311]:
+                          - generic "BJT NPN" [ref=f3e314]
+                        - button "BJT PNP" [ref=f3e315]:
+                          - generic "BJT PNP" [ref=f3e318]
+                        - button "MOSFET N-ch" [ref=f3e319]:
+                          - generic "MOSFET N-ch" [ref=f3e322]
+                        - button "MOSFET P-ch" [ref=f3e323]:
+                          - generic "MOSFET P-ch" [ref=f3e326]
+                        - button "JFET N-ch" [ref=f3e327]:
+                          - generic "JFET N-ch" [ref=f3e330]
+                        - button "JFET P-ch" [ref=f3e331]:
+                          - generic "JFET P-ch" [ref=f3e334]
+                    - generic [ref=f3e335]:
+                      - button "Power Semiconductors 4" [ref=f3e336] [cursor=pointer]:
+                        - generic [ref=f3e337]: Power Semiconductors
+                        - generic [ref=f3e340]: "4"
+                      - generic [ref=f3e341]:
+                        - button "SCR (Thyristor)" [ref=f3e342]:
+                          - generic "SCR (Thyristor)" [ref=f3e345]
+                        - button "Diac" [ref=f3e346]:
+                          - generic "Diac" [ref=f3e349]
+                        - button "Triac" [ref=f3e350]:
+                          - generic "Triac" [ref=f3e353]
+                        - button "Op-Amp" [ref=f3e354]:
+                          - generic [ref=f3e355]:
+                            - img [aria-hidden]:
+                              - generic:
+                                - generic:
+                                  - generic: "-"
+                                  - generic: +
+                          - generic "Op-Amp" [ref=f3e357]
+                    - generic [ref=f3e358]:
+                      - button "Switches 6" [ref=f3e359] [cursor=pointer]:
+                        - generic [ref=f3e360]: Switches
+                        - generic [ref=f3e363]: "6"
+                      - generic [ref=f3e364]:
+                        - button "Switch SPST-NO" [ref=f3e365]:
+                          - generic "Switch SPST-NO" [ref=f3e368]
+                        - button "Switch SPST-NC" [ref=f3e369]:
+                          - generic "Switch SPST-NC" [ref=f3e372]
+                        - button "Push Button NO" [ref=f3e373]:
+                          - generic "Push Button NO" [ref=f3e376]
+                        - button "Push Button NC" [ref=f3e377]:
+                          - generic "Push Button NC" [ref=f3e380]
+                        - button "Switch SPDT" [ref=f3e381]:
+                          - generic "Switch SPDT" [ref=f3e384]
+                        - button "Switch DPST" [ref=f3e385]:
+                          - generic "Switch DPST" [ref=f3e388]
+                    - generic [ref=f3e389]:
+                      - button "Protection 7" [ref=f3e390] [cursor=pointer]:
+                        - generic [ref=f3e391]: Protection
+                        - generic [ref=f3e394]: "7"
+                      - generic [ref=f3e395]:
+                        - button "Relay SPST" [ref=f3e396]:
+                          - generic "Relay SPST" [ref=f3e399]
+                        - button "Relay SPDT" [ref=f3e400]:
+                          - generic "Relay SPDT" [ref=f3e403]
+                        - button "Relay DPST" [ref=f3e404]:
+                          - generic "Relay DPST" [ref=f3e407]
+                        - button "Fuse" [ref=f3e408]:
+                          - generic "Fuse" [ref=f3e411]
+                        - button "3-Phase Fuse" [ref=f3e412]:
+                          - generic "3-Phase Fuse" [ref=f3e415]
+                        - button "Circuit Breaker" [ref=f3e416]:
+                          - generic "Circuit Breaker" [ref=f3e419]
+                        - button "3-Phase Circuit Breaker" [ref=f3e420]:
+                          - generic "3-Phase Circuit Breaker" [ref=f3e423]
+                    - generic [ref=f3e424]:
+                      - button "Transformers 3" [ref=f3e425] [cursor=pointer]:
+                        - generic [ref=f3e426]: Transformers
+                        - generic [ref=f3e429]: "3"
+                      - generic [ref=f3e430]:
+                        - button "Transformer" [ref=f3e431]:
+                          - generic "Transformer" [ref=f3e434]
+                        - button "Transformer (CT)" [ref=f3e435]:
+                          - generic "Transformer (CT)" [ref=f3e438]
+                        - button "Autotransformer" [ref=f3e439]:
+                          - generic "Autotransformer" [ref=f3e442]
+                    - generic [ref=f3e443]:
+                      - button "Other Components 3" [ref=f3e444] [cursor=pointer]:
+                        - generic [ref=f3e445]: Other Components
+                        - generic [ref=f3e448]: "3"
+                      - generic [ref=f3e449]:
+                        - button "DC Motor" [ref=f3e450]:
+                          - generic [ref=f3e451]:
+                            - img [aria-hidden]:
+                              - generic: M
+                          - generic "DC Motor" [ref=f3e453]
+                        - button "3-Phase Motor" [ref=f3e454]:
+                          - generic [ref=f3e455]:
+                            - img [aria-hidden]:
+                              - generic:
+                                - generic:
+                                  - generic: 3 ~
+                                  - generic: M
+                          - generic "3-Phase Motor" [ref=f3e457]
+                        - button "Lamp" [ref=f3e458]:
+                          - generic "Lamp" [ref=f3e461]
+                    - generic [ref=f3e462]:
+                      - button "Measurement 4" [ref=f3e463] [cursor=pointer]:
+                        - generic [ref=f3e464]: Measurement
+                        - generic [ref=f3e467]: "4"
+                      - generic [ref=f3e468]:
+                        - button "Voltmeter" [ref=f3e469]:
+                          - generic [ref=f3e470]:
+                            - img [aria-hidden]:
+                              - generic: V
+                          - generic "Voltmeter" [ref=f3e472]
+                        - button "Ammeter" [ref=f3e473]:
+                          - generic [ref=f3e474]:
+                            - img [aria-hidden]:
+                              - generic: A
+                          - generic "Ammeter" [ref=f3e476]
+                        - button "Digital Multimeter" [ref=f3e477]:
+                          - generic [ref=f3e478]:
+                            - img [aria-hidden]:
+                              - generic: DCV
+                          - generic "Digital Multimeter" [ref=f3e480]
+                        - button "Oscilloscope" [ref=f3e481]:
+                          - generic "Oscilloscope" [ref=f3e484]
+                - main [ref=f3e485]:
+                  - generic [ref=f3e486]:
+                    - generic [ref=f3e487]: Interactive Electrical Canvas
+                    - generic [ref=f3e489]: 6 CMP · 7 NET
+                  - img [ref=f3e490]:
+                    - generic [ref=f3e491]:
+                      - generic [ref=f3e613]:
+                        - generic [ref=f3e615] [cursor=pointer]
+                        - generic [ref=f3e617] [cursor=pointer]
+                        - generic [ref=f3e620] [cursor=pointer]
+                        - generic [ref=f3e622] [cursor=pointer]
+                        - generic [ref=f3e624] [cursor=pointer]
+                        - generic [ref=f3e626] [cursor=pointer]
+                        - generic [ref=f3e627]:
+                          - generic [ref=f3e631]: +
+                          - generic [ref=f3e633]: −
+                        - generic [ref=f3e635]:
+                          - generic [ref=f3e639]: A
+                          - generic [ref=f3e641]: B
+                        - generic [ref=f3e643]:
+                          - generic [ref=f3e647]: A
+                          - generic [ref=f3e649]: B
+                        - generic [ref=f3e651]:
+                          - generic [ref=f3e655]: +
+                          - generic [ref=f3e657]: −
+                        - generic [ref=f3e659]:
+                          - generic [ref=f3e663]: A
+                          - generic [ref=f3e665]: B
+                        - generic [ref=f3e667]: GND
+                        - generic:
+                          - generic:
+                            - generic: V1
+                            - generic: 10 V
+                          - generic:
+                            - generic: R1
+                            - generic: 1 kΩ
+                          - generic:
+                            - generic: Rs
+                            - generic: 1 kΩ
+                          - generic:
+                            - generic: E1
+                            - generic:
+                              - generic:
+                                - generic:
+                                  - generic:
+                                    - generic:
+                                      - generic:
+                                        - math:
+                                          - generic:
+                                            - generic:
+                                              - generic: "3"
+                                              - generic:
+                                                - generic: V
+                                                - generic:
+                                                  - generic: R
+                                                  - generic: s
+                                      - generic [aria-hidden]:
+                                        - generic:
+                                          - text: "3"
+                                          - generic:
+                                            - text: V
+                                            - generic: Rs
+                          - generic:
+                            - generic: R2
+                            - generic: 2 kΩ
+                          - generic: GND
+                      - generic "Nodal voltage V 1": V1
+                  - generic:
+                    - generic: 6 components
+                    - generic: •
+                    - generic: 7 wires
+                    - generic "E1": SPICE UNAVAILABLE · LIVE ENGINE
+              - generic [ref=f3e493]:
+                - generic [ref=f3e494]: Academic Analysis Workspace
+                - generic [ref=f3e496]:
+                  - generic [ref=f3e497]:
+                    - generic [ref=f3e498]:
+                      - generic [ref=f3e499]: Nodal Analysis · KCL / Supernodes
+                      - generic [ref=f3e672]: Solver-backed derivation
+                    - generic [ref=f3e500]:
+                      - generic [ref=f3e501]:
+                        - generic [ref=f3e502]: DECIMAL PLACES
+                        - generic [ref=f3e673]:
+                          - math [ref=f3e675]:
+                            - generic [ref=f3e676]: "4"
+                          - generic [ref=f3e680]: "4"
+                      - combobox "Decimal places" [ref=f3e515] [cursor=pointer]:
+                        - option "0 digits"
+                        - option "1 digits"
+                        - option "2 digits"
+                        - option "3 digits"
+                        - option "4 digits" [selected]
+                        - option "5 digits"
+                        - option "6 digits"
+                  - generic [ref=f3e516]:
+                    - tab "Nodal" [selected] [ref=f3e517] [cursor=pointer]
+                    - tab "Mesh" [ref=f3e518] [cursor=pointer]
+                    - tab "Superposition" [ref=f3e519] [cursor=pointer]
+                    - tab "Thévenin" [ref=f3e520] [cursor=pointer]
+                  - generic [ref=f3e681]:
+                    - article [ref=f3e682]:
+                      - generic [ref=f3e683]:
+                        - generic [ref=f3e684]: Step 1
+                        - heading "Known source conditions" [level=4] [ref=f3e685]
+                      - generic [ref=f3e690]:
+                        - math [ref=f3e692]:
+                          - generic [ref=f3e698]:
+                            - generic [ref=f3e699]: Source condition from
+                            - generic [ref=f3e700]:
+                              - generic [ref=f3e701]: V
+                              - generic [ref=f3e702]: "1"
+                            - generic [ref=f3e703]: ":"
+                            - generic [ref=f3e704]:
+                              - generic [ref=f3e705]: V
+                              - generic [ref=f3e706]:
+                                - generic [ref=f3e707]: k
+                                - generic [ref=f3e708]: "n"
+                                - generic [ref=f3e709]: o
+                                - generic [ref=f3e710]: w
+                                - generic [ref=f3e711]: "n"
+                            - generic [ref=f3e712]: =
+                            - generic [ref=f3e713]: "10"
+                            - generic [ref=f3e714]: V
+                        - generic [ref=f3e723]:
+                          - generic [ref=f3e724]: Source condition from
+                          - generic [ref=f3e725]:
+                            - text: V
+                            - generic [ref=f3e726]: "1"
+                          - text: ":"
+                          - generic [ref=f3e735]:
+                            - text: V
+                            - generic [ref=f3e736]: known
+                          - text: = 10 V
+                      - generic [ref=f3e749]: Grounded ideal voltage sources set their connected node voltages before KCL equations are assembled.
+                    - article [ref=f3e750]:
+                      - generic [ref=f3e751]:
+                        - generic [ref=f3e752]: Step 2
+                        - heading "Independent-node KCL equations" [level=4] [ref=f3e753]
+                      - generic [ref=f3e758]:
+                        - math [ref=f3e760]:
+                          - generic [ref=f3e762]:
+                            - generic [ref=f3e763]:
+                              - generic [ref=f3e766]:
+                                - generic [ref=f3e767]: Constraint from
+                                - generic [ref=f3e768]:
+                                  - generic [ref=f3e769]: E
+                                  - generic [ref=f3e770]: "1"
+                              - generic [ref=f3e773]:
+                                - generic [ref=f3e774]: ":"
+                                - generic [ref=f3e776]:
+                                  - generic [ref=f3e777]: V
+                                  - generic [ref=f3e778]: "1"
+                                - generic [ref=f3e779]: =
+                                - generic [ref=f3e780]: "3"
+                                - generic [ref=f3e781]:
+                                  - generic [ref=f3e782]: \cdotV
+                                  - generic [ref=f3e784]:
+                                    - generic [ref=f3e785]: R
+                                    - generic [ref=f3e786]: s
+                            - generic [ref=f3e787]:
+                              - generic [ref=f3e790]:
+                                - generic [ref=f3e791]: Substitute
+                                - generic [ref=f3e792]:
+                                  - generic [ref=f3e793]: V
+                                  - generic [ref=f3e794]:
+                                    - generic [ref=f3e795]: R
+                                    - generic [ref=f3e796]: s
+                                - generic [ref=f3e797]: =
+                                - generic [ref=f3e798]:
+                                  - generic [ref=f3e799]: V
+                                  - generic [ref=f3e800]:
+                                    - generic [ref=f3e801]: s
+                                    - generic [ref=f3e802]: e
+                                    - generic [ref=f3e803]: r
+                                    - generic [ref=f3e804]: i
+                                    - generic [ref=f3e805]: e
+                                    - generic [ref=f3e806]: s
+                              - generic [ref=f3e809]:
+                                - generic [ref=f3e810]: ":"
+                                - generic [ref=f3e812]:
+                                  - generic [ref=f3e813]: V
+                                  - generic [ref=f3e814]: "1"
+                                - generic [ref=f3e815]: =
+                                - generic [ref=f3e816]: "3"
+                                - generic [ref=f3e817]:
+                                  - generic [ref=f3e818]: (
+                                  - generic [ref=f3e819]:
+                                    - generic [ref=f3e820]: V
+                                    - generic [ref=f3e821]:
+                                      - generic [ref=f3e822]: s
+                                      - generic [ref=f3e823]: e
+                                      - generic [ref=f3e824]: r
+                                      - generic [ref=f3e825]: i
+                                      - generic [ref=f3e826]: e
+                                      - generic [ref=f3e827]: s
+                                  - generic [ref=f3e828]: )
+                        - generic [ref=f3e832]:
+                          - generic [ref=f3e836]:
+                            - generic [ref=f3e837]:
+                              - generic [ref=f3e838]: Constraint from
+                              - generic [ref=f3e839]:
+                                - text: E
+                                - generic [ref=f3e840]: "1"
+                            - generic [ref=f3e849]:
+                              - generic [ref=f3e850]: Substitute
+                              - generic [ref=f3e851]:
+                                - text: V
+                                - generic [ref=f3e858]:
+                                  - text: R
+                                  - generic [ref=f3e859]: s
+                              - text: =
+                              - generic [ref=f3e871]:
+                                - text: V
+                                - generic [ref=f3e872]: series
+                          - generic [ref=f3e887]:
+                            - generic [ref=f3e888]:
+                              - text: ":"
+                              - generic [ref=f3e889]:
+                                - text: V
+                                - generic [ref=f3e890]: "1"
+                              - text: = 3
+                              - generic [ref=f3e899]:
+                                - generic [ref=f3e900]: \cdotV
+                                - generic [ref=f3e907]:
+                                  - text: R
+                                  - generic [ref=f3e908]: s
+                            - generic [ref=f3e920]:
+                              - text: ":"
+                              - generic [ref=f3e921]:
+                                - text: V
+                                - generic [ref=f3e922]: "1"
+                              - text: = 3
+                              - generic [ref=f3e931]:
+                                - text: (
+                                - generic [ref=f3e932]:
+                                  - text: V
+                                  - generic [ref=f3e933]: series
+                                - text: )
+                      - generic [ref=f3e945]: Each equation remains symbolic, using declared source values rather than post-solve voltages.
+                    - article [ref=f3e946]:
+                      - generic [ref=f3e947]:
+                        - generic [ref=f3e948]: Step 3
+                        - heading "Reduced nodal coefficient system" [level=4] [ref=f3e949]
+                      - generic [ref=f3e954]:
+                        - math [ref=f3e956]:
+                          - generic [ref=f3e958]:
+                            - generic [ref=f3e959]:
+                              - generic [ref=f3e960]: "["
+                              - generic [ref=f3e961]: "1"
+                              - generic [ref=f3e966]: "]"
+                            - generic [ref=f3e967]:
+                              - generic [ref=f3e968]: "["
+                              - generic [ref=f3e974]:
+                                - generic [ref=f3e975]: V
+                                - generic [ref=f3e976]: "1"
+                              - generic [ref=f3e977]: "]"
+                            - generic [ref=f3e978]: =
+                            - generic [ref=f3e979]:
+                              - generic [ref=f3e980]: "["
+                              - generic [ref=f3e981]: "15"
+                              - generic [ref=f3e986]: "]"
+                        - generic [aria-hidden] [ref=f3e987]:
+                          - generic [ref=f3e988]:
+                            - generic [ref=f3e989]:
+                              - generic [ref=f3e990]: "["
+                              - generic [ref=f3e991]: "1"
+                              - generic [ref=f3e1001]: "]"
+                            - generic [ref=f3e1002]:
+                              - generic [ref=f3e1003]: "["
+                              - generic [ref=f3e1011]:
+                                - text: V
+                                - generic [ref=f3e1012]: "1"
+                              - generic [ref=f3e1024]: "]"
+                            - text: =
+                          - generic [ref=f3e1026]:
+                            - generic [ref=f3e1027]: "["
+                            - generic [ref=f3e1028]: "15"
+                            - generic [ref=f3e1038]: "]"
+                      - generic [ref=f3e1039]: Only 1 essential unknown node voltage appear. Simple degree-two nodes are eliminated before the academic matrix is rendered. The residual certificate is ||G·V-z||∞≤0.00e+0.
+                    - article [ref=f3e1040]:
+                      - generic [ref=f3e1041]:
+                        - generic [ref=f3e1042]: Step 4
+                        - heading "Solved node-voltage vector" [level=4] [ref=f3e1043]
+                      - generic [ref=f3e1048]:
+                        - math [ref=f3e1050]:
+                          - generic [ref=f3e1052]:
+                            - generic [ref=f3e1054]:
+                              - generic [ref=f3e1055]: V
+                              - generic [ref=f3e1056]: "1"
+                            - generic [ref=f3e1057]: =
+                            - generic [ref=f3e1058]: "15"
+                            - generic [ref=f3e1059]: V
+                        - generic [aria-hidden] [ref=f3e1060]:
+                          - generic [ref=f3e1061]:
+                            - generic [ref=f3e1062]:
+                              - text: V
+                              - generic [ref=f3e1063]: "1"
+                            - text: =
+                          - generic [ref=f3e1072]: 15 V
+                      - generic [ref=f3e1073]: Only this final step reports numerical MNA solution values.
+            - complementary [ref=f3e523]:
+              - generic [ref=f3e524]: Active Element & Properties
+    - contentinfo [ref=f3e526]:
+      - generic [ref=f3e528]:
+        - generic [ref=f3e530]:
+          - link "MAE Academy" [ref=f3e531] [cursor=pointer]:
+            - /url: /
+          - paragraph [ref=f3e533]: Model. Analyze. Engineering. A global platform for rigorous engineering learning and applied systems thinking.
+          - link "maeacademy2026@gmail.com" [ref=f3e534] [cursor=pointer]:
+            - /url: mailto:maeacademy2026@gmail.com
+        - generic [ref=f3e539]:
+          - paragraph [ref=f3e540]: PLATFORM
+          - navigation [ref=f3e541]:
+            - link "Research" [ref=f3e542] [cursor=pointer]:
+              - /url: /research
+            - link "Courses" [ref=f3e547] [cursor=pointer]:
+              - /url: /courses
+            - link "Simulations" [ref=f3e551] [cursor=pointer]:
+              - /url: /simulations
+        - generic [ref=f3e556]:
+          - generic [ref=f3e557]:
+            - generic [ref=f3e558]:
+              - button "Switch language to English" [ref=f3e559] [cursor=pointer]: EN
+              - button "Switch language to العربية" [ref=f3e560] [cursor=pointer]: AR
+              - button "Switch language to Español" [ref=f3e561] [cursor=pointer]: ES
+            - generic [ref=f3e563]:
+              - link "Instagram" [ref=f3e564] [cursor=pointer]:
+                - /url: https://www.instagram.com/mae.academy/
+              - link "Facebook" [ref=f3e568] [cursor=pointer]:
+                - /url: https://web.facebook.com/search/top?q=mae%20academy
+              - link "YouTube" [ref=f3e571] [cursor=pointer]:
+                - /url: https://www.youtube.com/@MAE.Academy
+              - link "X" [ref=f3e574] [cursor=pointer]:
+                - /url: https://x.com
+            - link "Support Our Mission" [ref=f3e578] [cursor=pointer]:
+              - /url: https://www.paypal.com/ncp/payment/KQC2MQJX795D6
+          - paragraph [ref=f3e582]: © 2026 MAE Academy. All rights reserved.

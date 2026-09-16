@@ -1,0 +1,143 @@
+- generic [ref=e2]:
+  - region "Notifications alt+T"
+  - generic [ref=e3]:
+    - banner [ref=e4]:
+      - generic [ref=e5]:
+        - link "MAE Academy home" [ref=e6] [cursor=pointer]:
+          - /url: /
+          - img "MAE Academy tri-axis mark" [ref=e7]
+          - generic [ref=e11]:
+            - strong [ref=e12]: MAE /
+            - generic [ref=e13]: ACADEMY
+        - generic [ref=e14]:
+          - button "Language" [ref=e16] [cursor=pointer]:
+            - generic [ref=e17]: EN
+          - button "Switch to light theme" [ref=e20] [cursor=pointer]
+      - navigation "Platform navigation" [ref=e29]:
+        - region [ref=e30]:
+          - button "Previous navigation item" [disabled]
+          - generic [ref=e32]:
+            - group [ref=e33]:
+              - link "Home" [ref=e34] [cursor=pointer]:
+                - /url: /
+            - group [ref=e37]:
+              - link "Academic Research" [ref=e38] [cursor=pointer]:
+                - /url: /research
+            - group [ref=e40]:
+              - link "Academic Courses" [ref=e41] [cursor=pointer]:
+                - /url: /courses
+            - group [ref=e43]:
+              - link "Practical Simulations" [ref=e44] [cursor=pointer]:
+                - /url: /simulations
+            - group [ref=e46]:
+              - link "About" [ref=e47] [cursor=pointer]:
+                - /url: /about
+          - button "Next navigation item" [disabled]
+    - main [ref=e49]:
+      - generic [ref=e51]:
+        - generic [ref=e55]:
+          - heading "Welcome to MAE Academy Model-Analyze-Engineering" [level=1] [ref=e56]:
+            - generic [ref=e57]: Welcome to MAE Academy
+            - generic [ref=e58]: Model-Analyze-Engineering
+          - paragraph [ref=e59]: Interactive labs for control systems, power electronics, and signal analysis — build intuition by running the model, not just reading about it.
+          - generic [ref=e60]:
+            - link "Launch a Simulation" [ref=e61] [cursor=pointer]:
+              - /url: /simulations
+            - link "Browse Courses" [ref=e64] [cursor=pointer]:
+              - /url: /courses
+        - generic [ref=e68]:
+          - generic [ref=e69]:
+            - heading "Core Engineering Platforms" [level=2] [ref=e70]
+            - paragraph [ref=e72]: Three interconnected learning layers bridging rigorous mathematical theory with interactive, real-time hardware intuition.
+          - generic [ref=e73]:
+            - generic [ref=e77]:
+              - generic [ref=e78]:
+                - heading "Practical Simulations & Virtual Lab Benches" [level=3] [ref=e79]
+                - paragraph [ref=e80]: Bridge abstract mathematics with interactive, real-time physical simulation. Explore state transitions, transient settling curves, and feedback responses instantly in your browser.
+              - generic [ref=e81]:
+                - link "Control Systems Simulator" [ref=e82] [cursor=pointer]:
+                  - /url: /simulations/control-systems
+                - link "Electrical Circuits Simulator" [ref=e86] [cursor=pointer]:
+                  - /url: /simulations/circuits
+                - link "Power Electronics Simulator" [ref=e90] [cursor=pointer]:
+                  - /url: /simulations/power-electronics
+              - link "Explore All Simulations" [ref=e95] [cursor=pointer]:
+                - /url: /simulations
+            - generic [ref=e99]:
+              - generic [ref=e100]:
+                - heading "Rigorous Engineering Courses" [level=3] [ref=e101]
+                - paragraph [ref=e102]: Concept-first lecture series and structured study tracks covering foundational and advanced engineering topics with mathematical rigor and intuitive visual breakdowns.
+              - generic [ref=e103]:
+                - link "Classical Control Theory" [ref=e104] [cursor=pointer]:
+                  - /url: /courses
+                - link "Modern State Space" [ref=e108] [cursor=pointer]:
+                  - /url: /courses
+                - link "Signal Processing & Filter Design" [ref=e112] [cursor=pointer]:
+                  - /url: /courses
+                - link "Embedded Systems" [ref=e116] [cursor=pointer]:
+                  - /url: /courses
+              - link "Browse Course Catalog" [ref=e121] [cursor=pointer]:
+                - /url: /courses
+            - generic [ref=e129]:
+              - generic [ref=e130]:
+                - heading "Mathematical Research & System Identification" [level=3] [ref=e131]
+                - paragraph [ref=e132]: Open research notes, mathematical formulations, transfer functions, and algorithmic proofs behind our simulations. Grounded in numerical physics and validated against benchmark experiments.
+              - generic [ref=e133]:
+                - link "Nonlinear System Identification" [ref=e134] [cursor=pointer]:
+                  - /url: /research
+                - link "Dynamic Simulation Solvers" [ref=e138] [cursor=pointer]:
+                  - /url: /research
+                - link "Algorithmic Derivations & Proofs" [ref=e142] [cursor=pointer]:
+                  - /url: /research
+              - link "Explore Research Notes" [ref=e147] [cursor=pointer]:
+                - /url: /research
+        - generic [ref=e154]:
+          - generic [ref=e155]:
+            - heading "Engineering education becomes powerful when it remains close to the real system." [level=2] [ref=e156]
+            - paragraph [ref=e157]: Engineering education becomes powerful when it remains close to the real system. MAE Academy turns abstract engineering curiosity into structured models, analytical clarity, and hands-on simulation.
+          - generic [ref=e158]:
+            - generic [ref=e159]:
+              - img "Mohammad AbuElyan" [ref=e162]:
+                - generic [ref=e172]: FOUNDER / 001
+              - generic [ref=e174]:
+                - heading "Mohammad AbuElyan" [level=3] [ref=e175]
+                - paragraph [ref=e176]: Founder & Engineering Educator // MAE
+                - paragraph [ref=e177]: Model·Analyze·Engineering
+            - paragraph [ref=e178]: "Meet the founder and the MAE premise behind the platform: Model. Analyze. Engineering."
+            - link "Meet the Founder & About MAE" [ref=e180] [cursor=pointer]:
+              - /url: /about
+    - contentinfo [ref=e183]:
+      - generic [ref=e185]:
+        - generic [ref=e187]:
+          - link "MAE Academy" [ref=e188] [cursor=pointer]:
+            - /url: /
+          - paragraph [ref=e190]: Model. Analyze. Engineering. A global platform for rigorous engineering learning and applied systems thinking.
+          - link "maeacademy2026@gmail.com" [ref=e191] [cursor=pointer]:
+            - /url: mailto:maeacademy2026@gmail.com
+        - generic [ref=e196]:
+          - paragraph [ref=e197]: PLATFORM
+          - navigation [ref=e198]:
+            - link "Research" [ref=e199] [cursor=pointer]:
+              - /url: /research
+            - link "Courses" [ref=e204] [cursor=pointer]:
+              - /url: /courses
+            - link "Simulations" [ref=e208] [cursor=pointer]:
+              - /url: /simulations
+        - generic [ref=e213]:
+          - generic [ref=e214]:
+            - generic [ref=e215]:
+              - button "Switch language to English" [ref=e216] [cursor=pointer]: EN
+              - button "Switch language to العربية" [ref=e217] [cursor=pointer]: AR
+              - button "Switch language to Español" [ref=e218] [cursor=pointer]: ES
+            - generic [ref=e220]:
+              - link "Instagram" [ref=e221] [cursor=pointer]:
+                - /url: https://www.instagram.com/mae.academy/
+              - link "Facebook" [ref=e225] [cursor=pointer]:
+                - /url: https://web.facebook.com/search/top?q=mae%20academy
+              - link "YouTube" [ref=e228] [cursor=pointer]:
+                - /url: https://www.youtube.com/@MAE.Academy
+              - link "X" [ref=e231] [cursor=pointer]:
+                - /url: https://x.com
+            - link "Support Our Mission" [ref=e235] [cursor=pointer]:
+              - /url: https://www.paypal.com/ncp/payment/KQC2MQJX795D6
+          - paragraph [ref=e239]: © 2026 MAE Academy. All rights reserved.

@@ -1,0 +1,419 @@
+- generic [ref=f1e2]:
+  - region "Notifications alt+T"
+  - generic [ref=f1e3]:
+    - banner [ref=f1e4]:
+      - generic [ref=f1e5]:
+        - link "MAE Academy home" [ref=f1e6] [cursor=pointer]:
+          - /url: /
+          - img "MAE Academy tri-axis mark" [ref=f1e7]
+          - generic [ref=f1e11]:
+            - strong [ref=f1e12]: MAE /
+            - generic [ref=f1e13]: ACADEMY
+        - generic [ref=f1e14]:
+          - button "Language" [ref=f1e16] [cursor=pointer]:
+            - generic [ref=f1e17]: EN
+          - button "Switch to light theme" [ref=f1e20] [cursor=pointer]
+      - navigation "Platform navigation" [ref=f1e29]:
+        - region [ref=f1e30]:
+          - button "Previous navigation item" [disabled]
+          - generic [ref=f1e32]:
+            - group [ref=f1e33]:
+              - link "Home" [ref=f1e34] [cursor=pointer]:
+                - /url: /
+            - group [ref=f1e36]:
+              - link "Academic Research" [ref=f1e37] [cursor=pointer]:
+                - /url: /research
+            - group [ref=f1e39]:
+              - link "Academic Courses" [ref=f1e40] [cursor=pointer]:
+                - /url: /courses
+            - group [ref=f1e42]:
+              - link "Practical Simulations" [ref=f1e43] [cursor=pointer]:
+                - /url: /simulations
+            - group [ref=f1e46]:
+              - link "About" [ref=f1e47] [cursor=pointer]:
+                - /url: /about
+          - button "Next navigation item" [disabled]
+    - main [ref=f1e49]:
+      - generic [ref=f1e469]:
+        - link "Simulations" [ref=f1e470] [cursor=pointer]:
+          - /url: /simulations
+        - heading "Assembler" [level=1] [ref=f1e473]
+        - navigation "Assembler tools" [ref=f1e474]:
+          - generic [ref=f1e475]:
+            - tab "A" [selected] [ref=f1e476] [cursor=pointer]
+            - tab "B" [ref=f1e477] [cursor=pointer]
+            - tab "C" [ref=f1e478] [cursor=pointer]
+            - tab "D" [ref=f1e479] [cursor=pointer]
+            - tab "E" [ref=f1e480] [cursor=pointer]
+        - generic [ref=f1e482]:
+          - generic [ref=f1e483]:
+            - main [ref=f1e484]:
+              - generic [ref=f1e485]:
+                - generic [ref=f1e486]:
+                  - generic [ref=f1e487]:
+                    - heading "Source workspace" [level=3] [ref=f1e488]
+                    - paragraph [ref=f1e489]: .model → .data → .code → trace
+                  - generic [ref=f1e490]: Core error
+                - generic [ref=f1e491]:
+                  - generic [ref=f1e492]:
+                    - generic [ref=f1e493]:
+                      - button "Toggle breakpoint 1" [ref=f1e494] [cursor=pointer]
+                      - generic [ref=f1e496]: "01"
+                    - generic [ref=f1e497]:
+                      - button "Toggle breakpoint 2" [ref=f1e498] [cursor=pointer]
+                      - generic [ref=f1e500]: "02"
+                    - generic [ref=f1e501]:
+                      - button "Toggle breakpoint 3" [ref=f1e502] [cursor=pointer]
+                      - generic [ref=f1e504]: "03"
+                    - generic [ref=f1e505]:
+                      - button "Toggle breakpoint 4" [ref=f1e506] [cursor=pointer]
+                      - generic [ref=f1e508]: "04"
+                    - generic [ref=f1e509]:
+                      - button "Toggle breakpoint 5" [ref=f1e510] [cursor=pointer]
+                      - generic [ref=f1e512]: "05"
+                    - generic [ref=f1e513]:
+                      - button "Toggle breakpoint 6" [ref=f1e514] [cursor=pointer]
+                      - generic [ref=f1e516]: "06"
+                    - generic [ref=f1e517]:
+                      - button "Toggle breakpoint 7" [ref=f1e518] [cursor=pointer]
+                      - generic [ref=f1e520]: "07"
+                    - generic [ref=f1e521]:
+                      - button "Toggle breakpoint 8" [ref=f1e522] [cursor=pointer]
+                      - generic [ref=f1e524]: "08"
+                    - generic [ref=f1e525]:
+                      - button "Toggle breakpoint 9" [ref=f1e526] [cursor=pointer]
+                      - generic [ref=f1e528]: "09"
+                    - generic [ref=f1e529]:
+                      - button "Toggle breakpoint 10" [ref=f1e530] [cursor=pointer]
+                      - generic [ref=f1e532]: "10"
+                    - generic [ref=f1e533]:
+                      - button "Toggle breakpoint 11" [ref=f1e534] [cursor=pointer]
+                      - generic [ref=f1e537]: "11"
+                    - generic [ref=f1e538]:
+                      - button "Toggle breakpoint 12" [ref=f1e539] [cursor=pointer]
+                      - generic [ref=f1e541]: "12"
+                    - generic [ref=f1e542]:
+                      - button "Toggle breakpoint 13" [ref=f1e543] [cursor=pointer]
+                      - generic [ref=f1e545]: "13"
+                    - generic [ref=f1e546]:
+                      - button "Toggle breakpoint 14" [ref=f1e547] [cursor=pointer]
+                      - generic [ref=f1e549]: "14"
+                    - generic [ref=f1e550]:
+                      - button "Toggle breakpoint 15" [ref=f1e551] [cursor=pointer]
+                      - generic [ref=f1e553]: "15"
+                    - generic [ref=f1e554]:
+                      - button "Toggle breakpoint 16" [ref=f1e555] [cursor=pointer]
+                      - generic [ref=f1e557]: "16"
+                    - generic [ref=f1e558]:
+                      - button "Toggle breakpoint 17" [ref=f1e559] [cursor=pointer]
+                      - generic [ref=f1e561]: "17"
+                    - generic [ref=f1e562]:
+                      - button "Toggle breakpoint 18" [ref=f1e563] [cursor=pointer]
+                      - generic [ref=f1e565]: "18"
+                    - generic [ref=f1e566]:
+                      - button "Toggle breakpoint 19" [ref=f1e567] [cursor=pointer]
+                      - generic [ref=f1e569]: "19"
+                    - generic [ref=f1e570]:
+                      - button "Toggle breakpoint 20" [ref=f1e571] [cursor=pointer]
+                      - generic [ref=f1e573]: "20"
+                  - generic [ref=f1e574]:
+                    - generic [aria-hidden]:
+                      - generic: ; Shift & Rotate
+                      - generic: .model small
+                      - generic: .stack 100h
+                      - generic: .data
+                      - generic: message db 'MAE 8086 ready.$', 0
+                      - generic: .code
+                      - generic: main proc
+                      - generic: mov ax, @data
+                      - generic: mov ds, ax
+                      - generic: mov dx, offset message
+                      - generic: mov ah, 09h
+                      - generic: int 21h
+                      - generic: mov ax, 0005h
+                      - generic: mov bx, 0003h
+                      - generic: add ax, bx
+                      - generic: push ax
+                      - generic: pop cx
+                      - generic: mov ax, 4C00h
+                      - generic: int 21h
+                      - generic: main endp
+                    - textbox [ref=f1e575]: ; Shift & Rotate .model small .stack 100h .data message db 'MAE 8086 ready.$', 0 .code main proc mov ax, @data mov ds, ax mov dx, offset message mov ah, 09h int 21h mov ax, 0005h mov bx, 0003h add ax, bx push ax pop cx mov ax, 4C00h int 21h main endp
+              - generic [ref=f1e576]:
+                - generic [ref=f1e577]:
+                  - heading "DOS screen" [level=3] [ref=f1e578]
+                  - paragraph [ref=f1e579]: INT 21h / INT 10h output surface
+                - generic [ref=f1e580]:
+                  - paragraph [ref=f1e581]: "> MAE 8086 console ready."
+                  - paragraph [ref=f1e582]: "> Initializing headless CPU…"
+                  - paragraph [ref=f1e583]: "> core error: Failed to fetch dynamically imported module: http://localhost:3000/manus-storage/mae-v86-headless_edf4ece3.mjs?import"
+                - generic [ref=f1e585]:
+                  - textbox "Keyboard entry" [ref=f1e586]
+                  - button "Queue input" [ref=f1e587] [cursor=pointer]
+            - complementary [ref=f1e588]:
+              - generic [ref=f1e589]:
+                - generic [ref=f1e590]:
+                  - generic [ref=f1e591]:
+                    - heading "Execution controls" [level=3] [ref=f1e592]
+                    - paragraph [ref=f1e593]: Headless v86 core · MASM educational subset · browser execution.
+                  - generic [ref=f1e594]:
+                    - generic [ref=f1e595]: Clock cycles
+                    - generic [ref=f1e596]: "0000"
+                - generic [ref=f1e597]:
+                  - button "Run" [ref=f1e598] [cursor=pointer]
+                  - button "Step" [ref=f1e601] [cursor=pointer]
+                  - button "Step Back" [ref=f1e604] [cursor=pointer]
+                  - button "Reset" [ref=f1e607] [cursor=pointer]
+                - generic [ref=f1e611]:
+                  - generic [ref=f1e614]: Examples library
+                  - combobox "Examples library" [ref=f1e615] [cursor=pointer]:
+                    - option "Examples library" [disabled]
+                    - option "Basic Math & Flags"
+                    - option "Negative Hex & Exchange"
+                    - option "Shift & Rotate" [selected]
+                    - option "Loop & Logic"
+                    - option "Stack (Call & Return)"
+                    - option "PUSH & POP"
+                    - option "LEA & Memory mapping"
+                    - option "Palindrome Checker"
+                    - option "Array Min/Max Search"
+                    - option "BCD/ASCII Arithmetic"
+              - generic [ref=f1e616]:
+                - generic [ref=f1e617]:
+                  - generic [ref=f1e618]:
+                    - heading "CPU registers" [level=3] [ref=f1e619]
+                    - paragraph [ref=f1e620]: 8086 · read-only execution state
+                  - generic [ref=f1e621]: 16 BIT
+                - generic [ref=f1e622]:
+                  - heading "General-purpose registers" [level=4] [ref=f1e623]
+                  - generic [ref=f1e624]:
+                    - article [ref=f1e625]:
+                      - generic [ref=f1e626]:
+                        - generic [ref=f1e627]: AX
+                        - generic [ref=f1e628]: "0000"
+                      - generic [ref=f1e629]:
+                        - generic [ref=f1e630]:
+                          - generic [ref=f1e631]: AH
+                          - text: "00"
+                        - generic [ref=f1e632]:
+                          - generic [ref=f1e633]: AL
+                          - text: "00"
+                    - article [ref=f1e634]:
+                      - generic [ref=f1e635]:
+                        - generic [ref=f1e636]: BX
+                        - generic [ref=f1e637]: "0000"
+                      - generic [ref=f1e638]:
+                        - generic [ref=f1e639]:
+                          - generic [ref=f1e640]: BH
+                          - text: "00"
+                        - generic [ref=f1e641]:
+                          - generic [ref=f1e642]: BL
+                          - text: "00"
+                    - article [ref=f1e643]:
+                      - generic [ref=f1e644]:
+                        - generic [ref=f1e645]: CX
+                        - generic [ref=f1e646]: "0000"
+                      - generic [ref=f1e647]:
+                        - generic [ref=f1e648]:
+                          - generic [ref=f1e649]: CH
+                          - text: "00"
+                        - generic [ref=f1e650]:
+                          - generic [ref=f1e651]: CL
+                          - text: "00"
+                    - article [ref=f1e652]:
+                      - generic [ref=f1e653]:
+                        - generic [ref=f1e654]: DX
+                        - generic [ref=f1e655]: "0000"
+                      - generic [ref=f1e656]:
+                        - generic [ref=f1e657]:
+                          - generic [ref=f1e658]: DH
+                          - text: "00"
+                        - generic [ref=f1e659]:
+                          - generic [ref=f1e660]: DL
+                          - text: "00"
+                - generic [ref=f1e661]:
+                  - heading "Pointers & indexes" [level=4] [ref=f1e662]
+                  - generic [ref=f1e663]:
+                    - generic [ref=f1e664]:
+                      - generic [ref=f1e665]: SI
+                      - text: "0000"
+                    - generic [ref=f1e666]:
+                      - generic [ref=f1e667]: DI
+                      - text: "0000"
+                    - generic [ref=f1e668]:
+                      - generic [ref=f1e669]: BP
+                      - text: "0000"
+                    - generic [ref=f1e670]:
+                      - generic [ref=f1e671]: SP
+                      - text: "0000"
+                    - generic [ref=f1e672]:
+                      - generic [ref=f1e673]: IP
+                      - text: "0000"
+                - generic [ref=f1e674]:
+                  - heading "Segment registers" [level=4] [ref=f1e675]
+                  - generic [ref=f1e676]:
+                    - generic [ref=f1e677]:
+                      - generic [ref=f1e678]:
+                        - generic [ref=f1e679]: CS
+                        - generic [ref=f1e680]: "0000"
+                      - paragraph [ref=f1e681]: "Physical: 00000h"
+                    - generic [ref=f1e682]:
+                      - generic [ref=f1e683]:
+                        - generic [ref=f1e684]: DS
+                        - generic [ref=f1e685]: "0000"
+                      - paragraph [ref=f1e686]: "Physical: 00000h"
+                    - generic [ref=f1e687]:
+                      - generic [ref=f1e688]:
+                        - generic [ref=f1e689]: ES
+                        - generic [ref=f1e690]: "0000"
+                      - paragraph [ref=f1e691]: "Physical: 00000h"
+                    - generic [ref=f1e692]:
+                      - generic [ref=f1e693]:
+                        - generic [ref=f1e694]: SS
+                        - generic [ref=f1e695]: "0000"
+                      - paragraph [ref=f1e696]: "Physical: 00000h"
+                - generic [ref=f1e697]:
+                  - generic [ref=f1e698]:
+                    - heading "Flags register" [level=4] [ref=f1e699]
+                    - generic [ref=f1e700]: FLAGS
+                  - generic [ref=f1e701]:
+                    - 'generic "ZF: 0 / off" [ref=f1e702]': ZF
+                    - 'generic "SF: 0 / off" [ref=f1e705]': SF
+                    - 'generic "CF: 0 / off" [ref=f1e708]': CF
+                    - 'generic "OF: 0 / off" [ref=f1e711]': OF
+                    - 'generic "PF: 0 / off" [ref=f1e714]': PF
+                    - 'generic "AF: 0 / off" [ref=f1e717]': AF
+                    - 'generic "IF: 0 / off" [ref=f1e720]': IF
+                    - 'generic "DF: 0 / off" [ref=f1e723]': DF
+          - generic [ref=f1e726]:
+            - generic [ref=f1e727]:
+              - generic [ref=f1e728]:
+                - heading "Main memory" [level=3] [ref=f1e729]
+                - generic [ref=f1e730]:
+                  - button "Hex" [ref=f1e731] [cursor=pointer]
+                  - button "Decimal" [ref=f1e732] [cursor=pointer]
+                  - button "ASCII" [ref=f1e733] [cursor=pointer]
+              - generic [ref=f1e734]:
+                - generic [ref=f1e735]: Reference address
+                - textbox "Main memory Reference address" [ref=f1e736]: 01E5h
+              - generic [ref=f1e737]:
+                - generic [ref=f1e738]:
+                  - generic [ref=f1e739]: Address
+                  - generic [ref=f1e740]: Value
+                - generic [ref=f1e741]:
+                  - generic [ref=f1e742]: 01E5h
+                  - generic [ref=f1e743]: 00h
+                - generic [ref=f1e744]:
+                  - generic [ref=f1e745]: 01E6h
+                  - generic [ref=f1e746]: 00h
+                - generic [ref=f1e747]:
+                  - generic [ref=f1e748]: 01E7h
+                  - generic [ref=f1e749]: 00h
+                - generic [ref=f1e750]:
+                  - generic [ref=f1e751]: 01E8h
+                  - generic [ref=f1e752]: 00h
+                - generic [ref=f1e753]:
+                  - generic [ref=f1e754]: 01E9h
+                  - generic [ref=f1e755]: 00h
+                - generic [ref=f1e756]:
+                  - generic [ref=f1e757]: 01EAh
+                  - generic [ref=f1e758]: 00h
+                - generic [ref=f1e759]:
+                  - generic [ref=f1e760]: 01EBh
+                  - generic [ref=f1e761]: 00h
+                - generic [ref=f1e762]:
+                  - generic [ref=f1e763]: 01ECh
+                  - generic [ref=f1e764]: 00h
+                - generic [ref=f1e765]:
+                  - generic [ref=f1e766]: 01EDh
+                  - generic [ref=f1e767]: 00h
+                - generic [ref=f1e768]:
+                  - generic [ref=f1e769]: 01EEh
+                  - generic [ref=f1e770]: 00h
+            - generic [ref=f1e771]:
+              - generic [ref=f1e772]:
+                - generic [ref=f1e773]:
+                  - heading "Stack visualizer" [level=3] [ref=f1e774]
+                  - paragraph [ref=f1e775]: Last in · first out
+                - generic [ref=f1e776]: SS:SP
+              - generic [ref=f1e777]:
+                - generic [ref=f1e778]: Reference address
+                - textbox "Stack visualizer Reference address" [ref=f1e779]: 2FFFEh
+              - generic [ref=f1e780]:
+                - generic [ref=f1e781]: SP
+                - generic [ref=f1e784]:
+                  - generic [ref=f1e785]: 2FFFEh
+                  - generic [ref=f1e786]: 00h00h
+                - generic [ref=f1e787]:
+                  - generic [ref=f1e788]: 30000h
+                  - generic [ref=f1e789]: 00h00h
+                - generic [ref=f1e790]:
+                  - generic [ref=f1e791]: 30002h
+                  - generic [ref=f1e792]: 00h00h
+                - generic [ref=f1e793]:
+                  - generic [ref=f1e794]: 30004h
+                  - generic [ref=f1e795]: 00h00h
+                - generic [ref=f1e796]:
+                  - generic [ref=f1e797]: 30006h
+                  - generic [ref=f1e798]: 00h00h
+                - generic [ref=f1e799]:
+                  - generic [ref=f1e800]: 30008h
+                  - generic [ref=f1e801]: 00h00h
+                - generic [ref=f1e802]:
+                  - generic [ref=f1e803]: 3000Ah
+                  - generic [ref=f1e804]: 00h00h
+                - generic [ref=f1e805]:
+                  - generic [ref=f1e806]: 3000Ch
+                  - generic [ref=f1e807]: 00h00h
+                - generic [ref=f1e808]:
+                  - generic [ref=f1e809]: 3000Eh
+                  - generic [ref=f1e810]: 00h00h
+                - generic [ref=f1e811]:
+                  - generic [ref=f1e812]: 30010h
+                  - generic [ref=f1e813]: 00h00h
+                - generic [ref=f1e814]: Available stack memory
+            - generic [ref=f1e815]:
+              - generic [ref=f1e816]:
+                - heading "Execution trace" [level=3] [ref=f1e817]
+                - button "Collapse" [ref=f1e818] [cursor=pointer]
+              - generic [ref=f1e819]:
+                - generic [ref=f1e820]:
+                  - generic [ref=f1e821]: Step
+                  - generic [ref=f1e822]: Instruction
+                  - generic [ref=f1e823]: New value
+                - paragraph [ref=f1e824]: Initializing headless CPU…
+    - contentinfo [ref=f1e410]:
+      - generic [ref=f1e412]:
+        - generic [ref=f1e414]:
+          - link "MAE Academy" [ref=f1e415] [cursor=pointer]:
+            - /url: /
+          - paragraph [ref=f1e417]: Model. Analyze. Engineering. A global platform for rigorous engineering learning and applied systems thinking.
+          - link "maeacademy2026@gmail.com" [ref=f1e418] [cursor=pointer]:
+            - /url: mailto:maeacademy2026@gmail.com
+        - generic [ref=f1e423]:
+          - paragraph [ref=f1e424]: PLATFORM
+          - navigation [ref=f1e425]:
+            - link "Research" [ref=f1e426] [cursor=pointer]:
+              - /url: /research
+            - link "Courses" [ref=f1e431] [cursor=pointer]:
+              - /url: /courses
+            - link "Simulations" [ref=f1e435] [cursor=pointer]:
+              - /url: /simulations
+        - generic [ref=f1e440]:
+          - generic [ref=f1e441]:
+            - generic [ref=f1e442]:
+              - button "Switch language to English" [ref=f1e443] [cursor=pointer]: EN
+              - button "Switch language to العربية" [ref=f1e444] [cursor=pointer]: AR
+              - button "Switch language to Español" [ref=f1e445] [cursor=pointer]: ES
+            - generic [ref=f1e447]:
+              - link "Instagram" [ref=f1e448] [cursor=pointer]:
+                - /url: https://www.instagram.com/mae.academy/
+              - link "Facebook" [ref=f1e452] [cursor=pointer]:
+                - /url: https://web.facebook.com/search/top?q=mae%20academy
+              - link "YouTube" [ref=f1e455] [cursor=pointer]:
+                - /url: https://www.youtube.com/@MAE.Academy
+              - link "X" [ref=f1e458] [cursor=pointer]:
+                - /url: https://x.com
+            - link "Support Our Mission" [ref=f1e462] [cursor=pointer]:
+              - /url: https://www.paypal.com/ncp/payment/KQC2MQJX795D6
+          - paragraph [ref=f1e466]: © 2026 MAE Academy. All rights reserved.
