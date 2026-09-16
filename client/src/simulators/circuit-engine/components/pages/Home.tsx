@@ -1191,6 +1191,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
   const [exportFormat, setExportFormat] = useState<'png' | 'svg'>('png');
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [shareUrl, setShareUrl] = useState('');
+  const [sharePreviewUrl, setSharePreviewUrl] = useState<string | null>(null);
 
   // Safe Exit / Refresh Warning (BeforeUnload)
   useEffect(() => {
@@ -1242,6 +1243,8 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
   const theveninTargetComp = theveninTargetId ? components.find(c => c.id === theveninTargetId) : null;
   const isSuperpositionActive = activeAnalysisMethod === 'superposition';
   const superpositionActiveSourceId = isSuperpositionActive ? activeSuperpositionTrace?.activeSourceId : null;
+  const superpositionTargetId = isSuperpositionActive ? activeSuperpositionTrace?.targetId : null;
+  const superpositionTargetComp = superpositionTargetId ? components.find(c => c.id === superpositionTargetId) : null;
 
   const effectiveCircuitComponents = useMemo(() => {
     if (!isSuperpositionActive || !superpositionActiveSourceId) {
@@ -1294,6 +1297,16 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     if (!posA || !posB) return null;
     return { posA, posB };
   }, [isTheveninActive, theveninTargetComp, getCanvasTerminalPosition]);
+
+  const superpositionTerminals = useMemo(() => {
+    if (!isSuperpositionActive || !superpositionTargetComp) return null;
+    const def = getDef(superpositionTargetComp.type);
+    if (!def || def.terminals.length < 2) return null;
+    const posA = getCanvasTerminalPosition(superpositionTargetComp, def.terminals[0].id);
+    const posB = getCanvasTerminalPosition(superpositionTargetComp, def.terminals[1].id);
+    if (!posA || !posB) return null;
+    return { posA, posB };
+  }, [isSuperpositionActive, superpositionTargetComp, getCanvasTerminalPosition]);
 
   const canvasWireEndpoints = useCallback((wire: CircuitWire, documentComponents: CircuitComponent[]): { from: Point; to: Point; fromAxis: TabDTerminalAxis; toAxis: TabDTerminalAxis } | null => {
     let from: Point | null = null;
@@ -1739,55 +1752,6 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     }
   }, []); // Run strictly once on mount
 
-  const hasSharedRef = useRef(false);
-  const handleShareProject = useCallback(async () => {
-    if (components.length === 0 && texts.length === 0 && wires.length === 0) {
-      toast.error('No circuit elements to share');
-      return;
-    }
-
-    const document = createNadDocument({
-      components,
-      wires,
-      texts,
-      viewport: { pan, zoom },
-      workspace: { gridVisible, snapEnabled },
-    });
-
-    const compressed = compressProjectState(document);
-    const url = new URL(window.location.href);
-    url.searchParams.set('project', compressed);
-    const finalUrl = url.toString();
-
-    // Mark as loaded so deep-link effect doesn't re-parse what we just created
-    hasLoadedUrlProjectRef.current = true;
-    hasSharedRef.current = true;
-
-    // Update browser URL
-    window.history.replaceState({}, '', finalUrl);
-    setShareUrl(finalUrl);
-
-    // Try native Web Share API
-    if (typeof navigator !== 'undefined' && navigator.share && typeof navigator.share === 'function') {
-      try {
-        await navigator.share({
-          title: 'MAE Academy - Circuit Simulation',
-          text: 'Check out this circuit design!',
-          url: finalUrl,
-        });
-        toast.success('Project link shared!');
-        return;
-      } catch (err) {
-        if ((err as Error).name === 'AbortError') {
-          return;
-        }
-      }
-    }
-
-    // Fallback: open internal ShareProjectModal
-    setShareModalOpen(true);
-  }, [components, gridVisible, pan, snapEnabled, texts, wires, zoom]);
-
   const getCircuitBoundingBox = useCallback(() => {
     let minX = Infinity;
     let maxX = -Infinity;
@@ -1851,6 +1815,83 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
       centerY: (minY + maxY) / 2,
     };
   }, [components, getCanvasTerminalPosition, texts, visualSymbolScale, wires]);
+
+  const generateCircuitSnapshot = useCallback((): string | null => {
+    const liveSvg = svgRef.current;
+    if (!liveSvg) return null;
+    try {
+      const bbox = getCircuitBoundingBox();
+      if (!bbox) return null;
+      const PADDING = 40;
+      const cropX = bbox.minX - PADDING;
+      const cropY = bbox.minY - PADDING;
+      const cropWidth = Math.max(100, (bbox.maxX - bbox.minX) + PADDING * 2);
+      const cropHeight = Math.max(100, (bbox.maxY - bbox.minY) + PADDING * 2);
+
+      const clonedSvg = liveSvg.cloneNode(true) as SVGSVGElement;
+      clonedSvg.setAttribute('viewBox', `${cropX} ${cropY} ${cropWidth} ${cropHeight}`);
+      clonedSvg.setAttribute('width', '100%');
+      clonedSvg.setAttribute('height', '100%');
+      clonedSvg.style.backgroundColor = 'transparent';
+
+      const worldGroup = Array.from(clonedSvg.querySelectorAll('g')).find(g => g.getAttribute('transform')?.includes('scale'));
+      if (worldGroup) {
+        worldGroup.removeAttribute('transform');
+      }
+
+      // Strip hitboxes and interactive handles
+      clonedSvg.querySelectorAll('path[stroke="transparent"]').forEach(el => el.remove());
+      clonedSvg.querySelectorAll('circle[style*="cursor: move"], circle[style*="cursor:move"]').forEach(el => el.remove());
+      clonedSvg.querySelectorAll('circle[r="13"]').forEach(el => el.remove());
+      clonedSvg.querySelectorAll('circle[fill="transparent"]').forEach(el => el.remove());
+      clonedSvg.querySelectorAll('circle[fill="none"][stroke="none"]').forEach(el => el.remove());
+      clonedSvg.querySelectorAll('rect[stroke-dasharray="5 4"]').forEach(el => el.remove());
+      clonedSvg.querySelectorAll('path[stroke-dasharray="6 4"]').forEach(el => el.remove());
+      clonedSvg.querySelectorAll('g[opacity="0"], g[style*="opacity: 0"]').forEach(el => el.remove());
+
+      const serializer = new XMLSerializer();
+      const svgStr = serializer.serializeToString(clonedSvg);
+      return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgStr)}`;
+    } catch {
+      return null;
+    }
+  }, [getCircuitBoundingBox]);
+
+  const hasSharedRef = useRef(false);
+  const handleShareProject = useCallback(async () => {
+    if (components.length === 0 && texts.length === 0 && wires.length === 0) {
+      toast.error('No circuit elements to share');
+      return;
+    }
+
+    const document = createNadDocument({
+      components,
+      wires,
+      texts,
+      viewport: { pan, zoom },
+      workspace: { gridVisible, snapEnabled },
+    });
+
+    const compressed = compressProjectState(document);
+    const url = new URL(window.location.href);
+    url.searchParams.set('project', compressed);
+    const finalUrl = url.toString();
+
+    // Mark as loaded so deep-link effect doesn't re-parse what we just created
+    hasLoadedUrlProjectRef.current = true;
+    hasSharedRef.current = true;
+
+    // Update browser URL
+    window.history.replaceState({}, '', finalUrl);
+    setShareUrl(finalUrl);
+
+    // Capture lightweight circuit preview snapshot
+    const preview = generateCircuitSnapshot();
+    setSharePreviewUrl(preview);
+
+    // Open internal ShareProjectModal
+    setShareModalOpen(true);
+  }, [components, generateCircuitSnapshot, gridVisible, pan, snapEnabled, texts, wires, zoom]);
 
   const zoomToFit = useCallback(() => {
     if (components.length === 0 && texts.length === 0) {
@@ -4401,6 +4442,14 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                       <TheveninTerminalOverlay position={theveninTerminals.posB} label="B" colors={colors} darkPreview={darkPreview} />
                     </g>
                   )}
+
+                  {/* Superposition Target Load Terminal Pair A–B Overlays */}
+                  {isSuperpositionActive && superpositionTerminals && (
+                    <g className="v3-superposition-terminals-layer" pointerEvents="none">
+                      <TheveninTerminalOverlay position={superpositionTerminals.posA} label="A" colors={colors} darkPreview={darkPreview} />
+                      <TheveninTerminalOverlay position={superpositionTerminals.posB} label="B" colors={colors} darkPreview={darkPreview} />
+                    </g>
+                  )}
                 </g>
               </svg>
 
@@ -4489,6 +4538,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
               shareUrl={shareUrl}
               componentCount={components.length}
               wireCount={wires.length}
+              previewUrl={sharePreviewUrl}
             />
           </>
         );
