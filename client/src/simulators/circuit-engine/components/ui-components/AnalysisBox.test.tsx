@@ -47,8 +47,22 @@ describe('Tab D Academic Analysis Workspace', () => {
       );
       expect(markup).toContain('font-sans');
       expect(markup).toContain('TARGET LOAD / BRANCH');
+      // Verify Part 4: redundant "Active:" component box is completely removed
+      expect(markup).not.toContain('Active:');
       // Should include resistance and ohm unit
       expect(markup).toContain('1000');
+    });
+
+    it('dynamically reacts and maps updated component labels like R_L', () => {
+      const liveComponents = [
+        { id: 'PT_0LBZklQz', label: 'R_L' },
+      ];
+      const idMap = buildIdToLabelMap(elements, [], liveComponents);
+      expect(idMap.get('PT_0LBZklQz')).toMatch(/^R_\{?L\}?$/);
+
+      const rawCompEquation = 'I_{PT\\_0LBZklQz} = 0.012\\,\\mathrm{A}';
+      const cleanCompEquation = sanitizeMathUuids(rawCompEquation, idMap);
+      expect(cleanCompEquation).toMatch(/R_\{?L\}?/);
     });
   });
 
@@ -61,7 +75,7 @@ describe('Tab D Academic Analysis Workspace', () => {
       const cleanCompEquation = sanitizeMathUuids(rawCompEquation, idMap);
       expect(cleanCompEquation).not.toContain('PT_0LBZklQz');
       expect(cleanCompEquation).not.toContain('PT\\_0LBZklQz');
-      expect(cleanCompEquation).toContain('R_3');
+      expect(cleanCompEquation).toMatch(/R_\{?3\}?/);
 
       // Node UUID substitution
       const rawNodeEquation = 'A = n_{C9KUa},\\quad B = n_{0}';
@@ -74,7 +88,7 @@ describe('Tab D Academic Analysis Workspace', () => {
       const rawProse = 'Load PT_0LBZklQz is removed to obtain the open-circuit response.';
       const cleanProse = sanitizeMathUuids(rawProse, idMap);
       expect(cleanProse).not.toContain('PT_0LBZklQz');
-      expect(cleanProse).toContain('R_3');
+      expect(cleanProse).toMatch(/R_\{?3\}?/);
     });
   });
 

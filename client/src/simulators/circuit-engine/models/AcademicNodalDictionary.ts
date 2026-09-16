@@ -7,14 +7,39 @@ const PREFIX: Record<LabelKind, string> = { resistor: 'R', voltage: 'V', current
 
 function escapedText(value: string) { return value.replace(/[\\{}_$#%&^~]/g, '\\$&'); }
 
-function academicLabel(label: string, fallback: string) {
-  const normalized = label.replace(/[^A-Za-z0-9]/g, '');
-  const indexed = normalized.match(/^([A-Za-z]+)(\d+)$/);
+export function formatAcademicUserLabel(label: string, fallback = 'R_1'): string {
+  if (!label) return fallback;
+  const trimmed = label.trim();
+  if (!trimmed) return fallback;
+
+  // 1. Explicit subscript in user label like R_L, R_{L}, R_load, V_in, R_3
+  const subMatch = trimmed.match(/^([A-Za-z]+)[_]\{?([A-Za-z0-9]+)\}?$/);
+  if (subMatch) {
+    const prefix = subMatch[1].length === 1 ? subMatch[1] : `\\mathrm{${subMatch[1]}}`;
+    const sub = subMatch[2].length === 1 ? subMatch[2] : `\\mathrm{${subMatch[2]}}`;
+    return `${prefix}_{${sub}}`;
+  }
+
+  // 2. Letter followed by number like R1, R2 -> R_{1}, R_{2}
+  const indexed = trimmed.match(/^([A-Za-z]+)(\d+)$/);
   if (indexed) {
     const isSingleLetter = indexed[1].length === 1;
-    return isSingleLetter ? `${indexed[1]}_{${indexed[2]}}` : `\\mathrm{${indexed[1]}}_{${indexed[2]}}`;
+    const prefix = isSingleLetter ? indexed[1] : `\\mathrm{${indexed[1]}}`;
+    return `${prefix}_{${indexed[2]}}`;
   }
-  return normalized ? `\\mathrm{${escapedText(normalized)}}` : fallback;
+
+  // 3. Common two-letter electrical variables like RL, VL, IL -> R_{L}, V_{L}, I_{L}
+  const twoLetter = trimmed.match(/^([RVIrvi])([A-Za-z])$/);
+  if (twoLetter) {
+    return `${twoLetter[1].toUpperCase()}_{${twoLetter[2]}}`;
+  }
+
+  const clean = trimmed.replace(/[\\{}_$#%&^~]/g, '');
+  return clean ? `\\mathrm{${escapedText(clean)}}` : fallback;
+}
+
+function academicLabel(label: string, fallback: string) {
+  return formatAcademicUserLabel(label, fallback);
 }
 
 /** Translates volatile canvas IDs into deterministic textbook symbols, never exposing topology UUIDs in derivations. */

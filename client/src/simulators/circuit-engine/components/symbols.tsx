@@ -63,16 +63,21 @@ function RectangularResistor({ strokeWidth = 1.5, halfLength = 30, bodyWidth = 4
 
 // ─── SOURCES ─────────────────────────────────────────────────────────────────
 
-const DcVoltage: SymbolFC = () => (
-  <g>
-    <circle cx={0} cy={0} r={33} fill="none" stroke="currentColor" strokeWidth={1.5} />
-    <line x1={-6} y1={-12} x2={6} y2={-12} stroke="currentColor" strokeWidth={1.5} />
-    <line x1={0} y1={-18} x2={0} y2={-6} stroke="currentColor" strokeWidth={1.5} />
-    <line x1={-6} y1={12} x2={6} y2={12} stroke="currentColor" strokeWidth={1.5} />
-    <line x1={0} y1={-33} x2={0} y2={-50} stroke="currentColor" strokeWidth={1.5} />
-    <line x1={0} y1={33} x2={0} y2={50} stroke="currentColor" strokeWidth={1.5} />
-  </g>
-);
+const DcVoltage: SymbolFC = ({ props }) => {
+  const isSuperActive = props?._superpositionActive === true;
+  const stroke = isSuperActive ? '#A855F7' : 'currentColor';
+  const circleWidth = isSuperActive ? 3 : 1.5;
+  return (
+    <g>
+      <circle cx={0} cy={0} r={33} fill="none" stroke={stroke} strokeWidth={circleWidth} />
+      <line x1={-6} y1={-12} x2={6} y2={-12} stroke={stroke} strokeWidth={1.5} />
+      <line x1={0} y1={-18} x2={0} y2={-6} stroke={stroke} strokeWidth={1.5} />
+      <line x1={-6} y1={12} x2={6} y2={12} stroke={stroke} strokeWidth={1.5} />
+      <line x1={0} y1={-33} x2={0} y2={-50} stroke={stroke} strokeWidth={1.5} />
+      <line x1={0} y1={33} x2={0} y2={50} stroke={stroke} strokeWidth={1.5} />
+    </g>
+  );
+};
 
 const renderAcWaveform = (wf: string, documented: boolean): React.ReactNode => {
   switch (wf) {
@@ -93,35 +98,46 @@ const renderAcWaveform = (wf: string, documented: boolean): React.ReactNode => {
 const AcVoltage: SymbolFC = ({ props }) => {
   const wf = (props?.waveform as string) || 'sine';
   const documented = props?._documentedStyle === true;
+  const isSuperActive = props?._superpositionActive === true;
+  const stroke = isSuperActive ? '#A855F7' : 'currentColor';
+  const circleWidth = isSuperActive ? 3 : 1.5;
   return (
     <g>
-      <circle cx={0} cy={0} r={33} fill="none" stroke="currentColor" strokeWidth={1.5} />
+      <circle cx={0} cy={0} r={33} fill="none" stroke={stroke} strokeWidth={circleWidth} />
       {renderAcWaveform(wf, documented)}
-      <line x1={0} y1={-33} x2={0} y2={-50} stroke="currentColor" strokeWidth={1.5} />
-      <line x1={0} y1={33} x2={0} y2={50} stroke="currentColor" strokeWidth={1.5} />
+      <line x1={0} y1={-33} x2={0} y2={-50} stroke={stroke} strokeWidth={1.5} />
+      <line x1={0} y1={33} x2={0} y2={50} stroke={stroke} strokeWidth={1.5} />
     </g>
   );
 };
 
-const DcCurrent: SymbolFC = () => (
-  <g>
-    <circle cx={0} cy={0} r={33} fill="none" stroke="currentColor" strokeWidth={1.5} />
-    <line x1={0} y1={18} x2={0} y2={-19} stroke="currentColor" strokeWidth={1.5} />
-    <polyline points="-8,-10 0,-20 8,-10" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinejoin="round" />
-    <line x1={0} y1={-33} x2={0} y2={-50} stroke="currentColor" strokeWidth={1.5} />
-    <line x1={0} y1={33} x2={0} y2={50} stroke="currentColor" strokeWidth={1.5} />
-  </g>
-);
+const DcCurrent: SymbolFC = ({ props }) => {
+  const isSuperActive = props?._superpositionActive === true;
+  const stroke = isSuperActive ? '#A855F7' : 'currentColor';
+  const circleWidth = isSuperActive ? 3 : 1.5;
+  return (
+    <g>
+      <circle cx={0} cy={0} r={33} fill="none" stroke={stroke} strokeWidth={circleWidth} />
+      <line x1={0} y1={18} x2={0} y2={-19} stroke={stroke} strokeWidth={1.5} />
+      <polyline points="-8,-10 0,-20 8,-10" fill="none" stroke={stroke} strokeWidth={1.5} strokeLinejoin="round" />
+      <line x1={0} y1={-33} x2={0} y2={-50} stroke={stroke} strokeWidth={1.5} />
+      <line x1={0} y1={33} x2={0} y2={50} stroke={stroke} strokeWidth={1.5} />
+    </g>
+  );
+};
 
 const AcCurrent: SymbolFC = ({ props }) => {
   const wf = (props?.waveform as string) || 'sine';
   const documented = props?._documentedStyle === true;
+  const isSuperActive = props?._superpositionActive === true;
+  const stroke = isSuperActive ? '#A855F7' : 'currentColor';
+  const circleWidth = isSuperActive ? 3 : 1.5;
   return (
     <g>
-      <circle cx={0} cy={0} r={33} fill="none" stroke="currentColor" strokeWidth={1.5} />
+      <circle cx={0} cy={0} r={33} fill="none" stroke={stroke} strokeWidth={circleWidth} />
       {renderAcWaveform(wf, documented)}
-      <line x1={0} y1={-33} x2={0} y2={-50} stroke="currentColor" strokeWidth={1.5} />
-      <line x1={0} y1={33} x2={0} y2={50} stroke="currentColor" strokeWidth={1.5} />
+      <line x1={0} y1={-33} x2={0} y2={-50} stroke={stroke} strokeWidth={1.5} />
+      <line x1={0} y1={33} x2={0} y2={50} stroke={stroke} strokeWidth={1.5} />
     </g>
   );
 };
@@ -1396,7 +1412,7 @@ const DmmSymbol: SymbolFC = ({ props }) => {
           {renderComponentCanvasLabel(raw, false)}
         </text>
       )}
-      {/* LCD Display Screen - Soft sky-blue/cyan background matching Live Multimeters panel */}
+      {/* LCD Display Screen - Soft neutral LCD background */}
       <rect
         x={-25}
         y={-38}
@@ -1404,8 +1420,8 @@ const DmmSymbol: SymbolFC = ({ props }) => {
         height={22}
         rx={3}
         className="dmm-screen"
-        fill="#e0f2fe"
-        stroke="#7dd3fc"
+        fill="#edf2f7"
+        stroke="#cbd5e1"
         strokeWidth={1}
       />
       {/* Dial - Tinted with contrasting darker grays in dark mode */}
@@ -1431,7 +1447,7 @@ const DmmSymbol: SymbolFC = ({ props }) => {
         stroke={isDark ? '#334155' : '#000000'}
         strokeWidth={1.5}
       />
-      {/* LCD Text - Matching Live Multimeters panel annunciator text color */}
+      {/* LCD Text - High-contrast dark digits */}
       <text
         x={0}
         y={-27}
@@ -1440,7 +1456,7 @@ const DmmSymbol: SymbolFC = ({ props }) => {
         fontWeight={700}
         fontFamily="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
         className="dmm-screen-text"
-        fill="#0284c7"
+        fill="#0f172a"
       >
         {String(props?.mode ?? 'DCV')}
       </text>

@@ -1,6 +1,6 @@
 import type { MNAElement } from '@/simulators/circuit-engine/engine/mnaSolver';
 import { id as formatId, type NodalNodeLabel } from '@/simulators/circuit-engine/models/analysisTypes';
-import { AcademicNodalDictionary } from '@/simulators/circuit-engine/models/AcademicNodalDictionary';
+import { AcademicNodalDictionary, formatAcademicUserLabel } from '@/simulators/circuit-engine/models/AcademicNodalDictionary';
 
 export function formatAcademicNumber(value: number, decimals = 4) {
   if (!Number.isFinite(value)) return '\\mathrm{NaN}';
@@ -28,20 +28,16 @@ export function latexMatrix(rows: number[][], decimals = 4) {
  */
 export function buildIdToLabelMap(
   elements: MNAElement[],
-  nodalNodes: NodalNodeLabel[] = []
+  nodalNodes: NodalNodeLabel[] = [],
+  customComponents?: Array<{ id: string; label?: string }>
 ): Map<string, string> {
   const idToLabelMap = new Map<string, string>();
   const dict = new AcademicNodalDictionary(elements);
 
   // 1. Components / Branches
   elements.forEach((c) => {
-    let academic = dict.element(c);
-    if (c.label) {
-      const match = c.label.replace(/[^A-Za-z0-9]/g, '').match(/^([A-Za-z]+)(\d+)$/);
-      if (match) {
-        academic = `${match[1]}_${match[2]}`;
-      }
-    }
+    const overrideLabel = customComponents?.find(comp => comp.id === c.id)?.label || c.label;
+    const academic = overrideLabel ? formatAcademicUserLabel(overrideLabel, dict.element(c)) : dict.element(c);
     // Set standard ID
     idToLabelMap.set(c.id, academic);
     // Set LaTeX-escaped variant (e.g. PT\_0LBZklQz)

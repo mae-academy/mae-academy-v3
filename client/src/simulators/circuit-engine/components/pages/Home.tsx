@@ -293,10 +293,33 @@ function sourcePointFromElement(element: SVGSVGElement | null, pan: Point, zoom:
   return [(rect.width / 2 - pan[0]) / zoom, (rect.height / 2 - pan[1]) / zoom];
 }
 
-/** Renders an explicit clockwise current reference at the geometrical cavity center of one bounded mesh face. */
-function MeshLoopOverlay({ cycle, components = [], scale = 1 }: { cycle: MeshCycle; tabDUiRefinement?: boolean; components?: CircuitComponent[]; scale?: number }) {
-  const { center, radius } = calculateTabDPlanarCavity(cycle.points, components, scale);
-  const [cx, cy] = center;
+/** Renders an explicit clockwise current reference at the geometrical centroid of one bounded mesh face. */
+function MeshLoopOverlay({ cycle }: { cycle: MeshCycle; tabDUiRefinement?: boolean; components?: CircuitComponent[]; scale?: number }) {
+  const meshNodes = cycle.points;
+  let cx = 0;
+  let cy = 0;
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+
+  meshNodes.forEach(([x, y]) => {
+    cx += x;
+    cy += y;
+    if (x < minX) minX = x;
+    if (x > maxX) maxX = x;
+    if (y < minY) minY = y;
+    if (y > maxY) maxY = y;
+  });
+
+  const n = meshNodes.length || 1;
+  cx /= n;
+  cy /= n;
+
+  const width = maxX - minX;
+  const height = maxY - minY;
+  // Radius dynamically adapts to 25% of smallest dimension, clamped [12, 24]
+  const radius = Math.max(12, Math.min(24, Math.min(width, height) * 0.25));
   const color = MESH_LOOP_COLORS[cycle.index % MESH_LOOP_COLORS.length];
 
   // Clockwise circular arrow arc sweeping from -45° to -90° (12 o'clock, 315° arc)
@@ -320,7 +343,7 @@ function MeshLoopOverlay({ cycle, components = [], scale = 1 }: { cycle: MeshCyc
       />
       <text
         x={cx}
-        y={cy - 1}
+        y={cy}
         textAnchor="middle"
         dominantBaseline="central"
         fill={color}
@@ -890,69 +913,48 @@ function TheveninTerminalOverlay({
   position,
   label,
   colors,
-  darkPreview,
 }: {
   position: [number, number];
   label: 'A' | 'B';
   colors: Palette;
-  darkPreview: boolean;
+  darkPreview?: boolean;
 }) {
   const [x, y] = position;
   const isA = label === 'A';
-  const strokeColor = isA ? '#ef4444' : '#3b82f6';
-  const labelOffsetX = isA ? -24 : 8;
-  const labelOffsetY = -24;
+  // Terminal A (Blue: #3B82F6), Terminal B (Rose/Pink: #F43F5E)
+  const terminalColor = isA ? '#3B82F6' : '#F43F5E';
+  const offsetX = isA ? -13 : 13;
+  const offsetY = -12;
 
   return (
     <g pointerEvents="none" aria-label={`Thévenin Terminal ${label}`}>
-      {/* Outer open-circuit indicator pulse ring */}
+      {/* Exact clone of Nodal analysis dot: single circle r=4, fill="white", strokeWidth=3 */}
       <circle
         cx={x}
         cy={y}
-        r={14}
-        fill="none"
-        stroke={strokeColor}
-        strokeWidth={1.5}
-        strokeDasharray="3 2"
-        opacity={0.8}
+        r={4}
+        fill="#ffffff"
+        stroke={terminalColor}
+        strokeWidth={3}
       />
-      {/* Genuinely hollow terminal circle (an opaque canvas-colored fill would mask
-          whatever it sits over — the pulse ring, a wire, an export background) */}
-      <circle
-        cx={x}
-        cy={y}
-        r={7}
-        fill="transparent"
-        stroke={strokeColor}
-        strokeWidth={2.5}
-      />
-      {/* Terminal center dot */}
-      <circle cx={x} cy={y} r={2.5} fill={strokeColor} />
-
-      {/* KaTeX label badge */}
-      <rect
-        x={x + labelOffsetX}
-        y={y + labelOffsetY}
-        width={16}
-        height={16}
-        rx={4}
-        fill={strokeColor}
-        stroke={darkPreview ? '#1a1d24' : '#ffffff'}
-        strokeWidth={1.5}
-      />
+      {/* Standard KaTeX equivalent label beside the dot */}
       <text
-        x={x + labelOffsetX + 8}
-        y={y + labelOffsetY + 9.5}
+        x={x + offsetX}
+        y={y + offsetY}
         textAnchor="middle"
         dominantBaseline="central"
-        fill="#ffffff"
+        fill={terminalColor}
+        stroke={colors.canvas}
+        strokeWidth={3}
+        paintOrder="stroke fill"
         style={{
-          fontFamily: "'KaTeX_Main', 'KaTeX_Math', serif",
-          fontSize: '11px',
-          fontWeight: 700,
+          fontSize: '13px',
+          fontWeight: 600,
         }}
       >
-        {label}
+        <tspan style={{ fontStyle: 'italic', fontFamily: "'KaTeX_Math', 'KaTeX_Main', serif" }}>
+          {label}
+        </tspan>
       </text>
     </g>
   );
@@ -1304,7 +1306,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
       const isConnectedToDragged = Boolean(activeDraggedId && (wire.fromComp === activeDraggedId || wire.toComp === activeDraggedId));
 
       if (isConnectedToDragged) {
-        if (wire.routing === 'manual') {
+        if (wire.routing === 'manual' || (wire.waypoints && wire.waypoints.length > 0) || wire.path.length > 2) {
           const updatedPath = reconnectPathEndpoints(wire.path, endpoints.from, endpoints.to, wire.routing, [], wire.waypoints, gridSize, endpoints.fromAxis);
           return {
             ...wire,
@@ -1312,14 +1314,10 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
             waypoints: updatedPath.length > 2 ? updatedPath.slice(1, -1) : wire.waypoints,
           };
         }
-        // Phase 3: auto-routed wires reroute via A* on every drag frame so they stay
-        // orthogonal and avoid the updated component positions. This must run even
-        // once `wire.waypoints` is already populated from a prior frame's A* result —
-        // gating on "has waypoints" (as this used to) sends every wire that ever needed
-        // an elbow into the waypoint-preserving branch above, freezing its interior
-        // corners in world space while only the endpoint follows the cursor. The dragged
-        // component itself (and its connection partner) are excluded from the obstacle
-        // grid so the router can reach their terminals freely.
+        // Phase 3: auto-routed wires reroute via A* during drag so they stay
+        // orthogonal and avoid the updated component positions.  The dragged
+        // component itself (and its connection partner) are excluded from the
+        // obstacle grid so the router can reach their terminals freely.
         // calculateOrthogonalPath already falls back to a single-elbow L-shape
         // when no clear path exists, so this is always safe.
         const excludeIds = new Set([wire.fromComp, wire.toComp]);
@@ -1360,7 +1358,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
       const endpoints = canvasWireEndpoints(wire, documentComponents);
       if (!endpoints) return wire;
 
-      if (wire.routing === 'manual') {
+      if (wire.routing === 'manual' || (wire.waypoints && wire.waypoints.length > 0)) {
         const updatedPath = reconnectPathEndpoints(
           wire.path,
           endpoints.from,
@@ -1378,8 +1376,6 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
         };
       }
 
-      // Same reasoning as refreshCanvasWireEndpoints: a previously-populated
-      // `waypoints` must not freeze an orthogonal (auto-routed) wire out of A*.
       const excludeIds = new Set([wire.fromComp, wire.toComp]);
       const newPath = calculateOrthogonalPath(
         endpoints.from,
@@ -3740,7 +3736,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     <div className="v3-mae-layout font-sans text-slate-900 dark:text-slate-100" style={{ minHeight: 760, color: colors.text }}>
       <section className="mb-4 overflow-x-auto rounded-xl border border-slate-200 bg-white dark:border-[#1a1d24] dark:bg-[#0d0f12]" style={{ borderColor: colors.line, background: colors.panel }}>
         <header className="min-w-max" style={{ background: colors.panel, zIndex: 5 }}>
-          <div className="flex flex-nowrap items-center gap-1.5 px-2 pt-2" style={{ minHeight: 36 }}>
+          <div className="flex flex-wrap items-center gap-1.5 p-2" style={{ minHeight: 36 }}>
             <ToolbarButton colors={colors} label="−" title="Zoom out" onClick={() => setZoom(value => Math.max(.2, value / 1.15))} />
             <span style={{ color: colors.muted, fontSize: 11, minWidth: 42, textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>{Math.round(zoom * 100)}%</span>
             <ToolbarButton colors={colors} label="+" title="Zoom in" onClick={() => setZoom(value => Math.min(3, value * 1.15))} />
@@ -3777,8 +3773,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
             <ToolbarDivider colors={colors} />
             <ToolbarButton colors={colors} icon={<Type size={14} />} label="Text" title="Add editable workspace text (T)" onClick={addText} />
             {tabDUiRefinement && <><ToolbarDivider colors={colors} /><ToolbarButton colors={colors} icon={<RotateCw size={14} />} label="90°" title="Rotate selected component 90°" onClick={() => rotateSelected(90)} disabled={!selectedComponent} /><ToolbarButton colors={colors} icon={<FlipHorizontal size={14} />} label="Flip X" title="Reflect selected component horizontally" onClick={() => flipSelected('h')} disabled={!selectedComponent} /><ToolbarButton colors={colors} icon={<FlipVertical size={14} />} label="Flip Y" title="Reflect selected component vertically" onClick={() => flipSelected('v')} disabled={!selectedComponent} /></>}
-          </div>
-          <div className="flex flex-nowrap items-center gap-1.5 border-t px-2 py-2" style={{ borderColor: colors.line, minHeight: 36 }}>
+            <ToolbarDivider colors={colors} />
             <ToolbarButton colors={colors} icon={<Download size={14} />} label="Export" title="Export circuit as NAD netlist" onClick={exportNad} />
             <ToolbarButton colors={colors} icon={<Upload size={14} />} label="Import" title="Import circuit from NAD netlist" onClick={() => nadInputRef.current?.click()} />
             <input ref={nadInputRef} type="file" accept=".nad,application/x-mae-nad+json,application/json" onChange={importNad} style={{ display: 'none' }} />
@@ -4072,18 +4067,12 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                       const transform = `translate(${component.x},${component.y})`;
                       const symbolTransform = `rotate(${component.rotation}) scale(${component.flipH ? -1 : 1},${component.flipV ? -1 : 1}) scale(${isExactCadComponent(component.type) ? 1 : visualSymbolScale})`;
                       const isTheveninRemovedLoad = isTheveninActive && theveninTargetId === component.id;
-                      const isIndependentSource = component.type === 'voltage' || component.type === 'current' || component.type === 'dc-voltage' || component.type === 'dc-current';
+                      const isIndependentSource = component.type === 'voltage' || component.type === 'current' || component.type === 'dc-voltage' || component.type === 'dc-current' || component.type === 'ac-voltage' || component.type === 'ac-current';
                       const isSuperpositionDimmedSource = isSuperpositionActive && superpositionActiveSourceId && isIndependentSource && component.id !== superpositionActiveSourceId;
                       const isSuperpositionActiveSource = isSuperpositionActive && superpositionActiveSourceId && component.id === superpositionActiveSourceId;
-                      // Deactivating an independent source for superposition isn't just "dim it" —
-                      // a zeroed voltage source is a short (wire), a zeroed current source is an open
-                      // (gap). Distinguish the two so a deactivated current source never gets a
-                      // short-circuit line drawn across it.
-                      const isSuperpositionDeactivatedVoltage = isSuperpositionDimmedSource && (component.type === 'voltage' || component.type === 'dc-voltage');
-                      const isSuperpositionDeactivatedCurrent = isSuperpositionDimmedSource && (component.type === 'current' || component.type === 'dc-current');
-                      // The deactivated-source branches below draw their own ghosted (opacity 0.25)
-                      // symbol, so the wrapper stays at full opacity — the short/open substitute must
-                      // read as real circuit geometry, not a dimmed component.
+                      const isSuperpositionDeactivatedVoltage = isSuperpositionDimmedSource && (component.type === 'voltage' || component.type === 'dc-voltage' || component.type === 'ac-voltage');
+                      const isSuperpositionDeactivatedCurrent = isSuperpositionDimmedSource && (component.type === 'current' || component.type === 'dc-current' || component.type === 'ac-current');
+                      // Deactivated sources (wire short / open gap) render with full opacity so the wire looks like real circuit wire
                       const componentCanvasOpacity = isTheveninRemovedLoad ? 0.45 : (isSuperpositionDeactivatedVoltage || isSuperpositionDeactivatedCurrent) ? 1 : isSuperpositionDimmedSource ? 0.28 : 1;
 
                       return (
@@ -4095,21 +4084,8 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                           onPointerEnter={() => setHoveredComponentId(component.id)}
                           onPointerLeave={() => setHoveredComponentId(null)}
                         >
-                          {isSuperpositionActiveSource && (
-                            <circle
-                              cx={0}
-                              cy={0}
-                              r={24}
-                              fill="none"
-                              stroke="#3b82f6"
-                              strokeWidth={2}
-                              strokeDasharray="4 3"
-                              opacity={0.85}
-                              pointerEvents="none"
-                            />
-                          )}
                           {isSuperpositionDeactivatedVoltage ? (
-                            /* Deactivated Voltage Source (Short Circuit): ghosted source graphic + solid wire line connecting pin1 to pin2 */
+                            /* Deactivated Voltage Source (Short Circuit): ghosted original source with solid wire overlay connecting pin1 to pin2 */
                             (() => {
                               const t0 = getCanvasTerminalPosition(component, definition.terminals[0]?.id);
                               const t1 = getCanvasTerminalPosition(component, definition.terminals[1]?.id);
@@ -4119,21 +4095,89 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                               const y2 = t1 ? t1[1] - component.y : 50;
                               return (
                                 <g>
-                                  <g opacity={0.25} transform={symbolTransform} color={isSelected ? colors.selection : undefined}>
-                                    {renderSymbol(definition.symbol, powered, { ...component.props, label: component.label, selected: isSelected, _isSelected: isSelected, isDark: darkPreview, _isDark: darkPreview, isEnergized: powered, isConflicted: conflictedCoilIds.has(component.id), _intensity: intensity, ...(motorVEff !== undefined ? { _vEff: motorVEff } : {}), _documentedStyle: tabDUiRefinement, ...(meterDisplayValue !== undefined ? { displayValue: meterDisplayValue } : {}) }, animationTime)}
+                                  <g transform={symbolTransform} opacity={0.25}>
+                                    {renderSymbol(
+                                      definition.symbol,
+                                      powered,
+                                      {
+                                        ...component.props,
+                                        label: component.label,
+                                        selected: isSelected,
+                                        _isSelected: isSelected,
+                                        isDark: darkPreview,
+                                        _isDark: darkPreview,
+                                        isEnergized: powered,
+                                        isConflicted: conflictedCoilIds.has(component.id),
+                                        _intensity: intensity,
+                                        _superpositionActive: false,
+                                        ...(motorVEff !== undefined ? { _vEff: motorVEff } : {}),
+                                        _documentedStyle: tabDUiRefinement,
+                                        ...(meterDisplayValue !== undefined ? { displayValue: meterDisplayValue } : {}),
+                                      },
+                                      animationTime,
+                                    )}
                                   </g>
-                                  <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={colors.text} strokeWidth={2} strokeLinecap="round" pointerEvents="none" />
+                                  <line
+                                    x1={x1}
+                                    y1={y1}
+                                    x2={x2}
+                                    y2={y2}
+                                    stroke={colors.text}
+                                    strokeWidth={2}
+                                    strokeLinecap="round"
+                                  />
                                 </g>
                               );
                             })()
                           ) : isSuperpositionDeactivatedCurrent ? (
-                            /* Deactivated Current Source (Open Circuit): ghosted source graphic, strictly NO shorting wire */
-                            <g opacity={0.25} transform={symbolTransform} color={isSelected ? colors.selection : undefined}>
-                              {renderSymbol(definition.symbol, powered, { ...component.props, label: component.label, selected: isSelected, _isSelected: isSelected, isDark: darkPreview, _isDark: darkPreview, isEnergized: powered, isConflicted: conflictedCoilIds.has(component.id), _intensity: intensity, ...(motorVEff !== undefined ? { _vEff: motorVEff } : {}), _documentedStyle: tabDUiRefinement, ...(meterDisplayValue !== undefined ? { displayValue: meterDisplayValue } : {}) }, animationTime)}
-                            </g>
+                            /* Deactivated Current Source (Open Circuit): visual gap with tiny terminal connection stubs */
+                            (() => {
+                              const t0 = getCanvasTerminalPosition(component, definition.terminals[0]?.id);
+                              const t1 = getCanvasTerminalPosition(component, definition.terminals[1]?.id);
+                              const x1 = t0 ? t0[0] - component.x : 0;
+                              const y1 = t0 ? t0[1] - component.y : -50;
+                              const x2 = t1 ? t1[0] - component.x : 0;
+                              const y2 = t1 ? t1[1] - component.y : 50;
+                              const stubLen = 14;
+                              const d0 = Math.hypot(x1, y1) || 1;
+                              const s0x = x1 - (x1 / d0) * stubLen;
+                              const s0y = y1 - (y1 / d0) * stubLen;
+                              const d1 = Math.hypot(x2, y2) || 1;
+                              const s1x = x2 - (x2 / d1) * stubLen;
+                              const s1y = y2 - (y2 / d1) * stubLen;
+                              return (
+                                <g>
+                                  <line x1={x1} y1={y1} x2={s0x} y2={s0y} stroke={colors.text} strokeWidth={1.5} strokeLinecap="round" />
+                                  <line x1={x2} y1={y2} x2={s1x} y2={s1y} stroke={colors.text} strokeWidth={1.5} strokeLinecap="round" />
+                                </g>
+                              );
+                            })()
                           ) : (
-                            <g transform={symbolTransform} color={isSelected ? colors.selection : undefined}>
-                              {renderSymbol(definition.symbol, powered, { ...component.props, label: component.label, selected: isSelected, _isSelected: isSelected, isDark: darkPreview, _isDark: darkPreview, isEnergized: powered, isConflicted: conflictedCoilIds.has(component.id), _intensity: intensity, ...(motorVEff !== undefined ? { _vEff: motorVEff } : {}), _documentedStyle: tabDUiRefinement, ...(meterDisplayValue !== undefined ? { displayValue: meterDisplayValue } : {}) }, animationTime)}
+                            /* Active or standard component graphic with solid purple highlight (no glow/drop-shadow) during Superposition */
+                            <g
+                              transform={symbolTransform}
+                              color={isSelected ? colors.selection : isSuperpositionActiveSource ? '#A855F7' : undefined}
+                            >
+                              {renderSymbol(
+                                definition.symbol,
+                                powered,
+                                {
+                                  ...component.props,
+                                  label: component.label,
+                                  selected: isSelected,
+                                  _isSelected: isSelected,
+                                  isDark: darkPreview,
+                                  _isDark: darkPreview,
+                                  isEnergized: powered,
+                                  isConflicted: conflictedCoilIds.has(component.id),
+                                  _intensity: intensity,
+                                  _superpositionActive: isSuperpositionActiveSource,
+                                  ...(motorVEff !== undefined ? { _vEff: motorVEff } : {}),
+                                  _documentedStyle: tabDUiRefinement,
+                                  ...(meterDisplayValue !== undefined ? { displayValue: meterDisplayValue } : {}),
+                                },
+                                animationTime,
+                              )}
                             </g>
                           )}
                           {definition.terminals.map(terminal => {
@@ -4190,9 +4234,11 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                         const valFill = darkPreview ? '#94a3b8' : '#64748b';
 
                         const isTheveninRemovedLoad = isTheveninActive && theveninTargetId === component.id;
-                        const isIndependentSource = component.type === 'voltage' || component.type === 'current' || component.type === 'dc-voltage' || component.type === 'dc-current';
+                        const isIndependentSource = component.type === 'voltage' || component.type === 'current' || component.type === 'dc-voltage' || component.type === 'dc-current' || component.type === 'ac-voltage' || component.type === 'ac-current';
                         const isSuperpositionDimmedSource = isSuperpositionActive && superpositionActiveSourceId && isIndependentSource && component.id !== superpositionActiveSourceId;
-                        const labelOpacity = isTheveninRemovedLoad ? 0.45 : isSuperpositionDimmedSource ? 0.28 : 1;
+                        // During Superposition, deactivated sources (short/open) hide their labels completely
+                        if (isSuperpositionDimmedSource) return null;
+                        const labelOpacity = isTheveninRemovedLoad ? 0.45 : 1;
 
                         return (
                           <g key={`labels-${component.id}`} opacity={labelOpacity} style={{ transition: 'opacity 0.25s ease' }}>
@@ -4307,7 +4353,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
           {/* Bottom Row: Academic Analysis Workspace spanning strictly across the bottom of the Left Column */}
           <section className="w-full overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-[#1a1d24] dark:bg-[#0d0f12]" style={{ background: colors.panel, borderColor: colors.line }}>
             <div className="border-b px-5 py-3" style={{ borderColor: colors.line }}><div className={CONTROL_SYSTEMS_HEADING}>Academic Analysis Workspace</div></div>
-            <AnalysisBox elements={dcMna.elements} geometry={meshGeometry} nodalNodes={nodalGeometry} colors={colors} standalone onTraceChange={handleAnalysisTrace} />
+            <AnalysisBox elements={dcMna.elements} geometry={meshGeometry} nodalNodes={nodalGeometry} colors={colors} standalone onTraceChange={handleAnalysisTrace} components={components} />
           </section>
         </div>
 

@@ -33,14 +33,6 @@ export function TargetLoadSelector({
     <div className="flex flex-col gap-1.5 mb-3 font-sans">
       <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
         <span>TARGET LOAD / BRANCH</span>
-        {activeResistor && (
-          <span className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2 py-0.5 text-xs text-slate-700 shadow-sm dark:border-[#282d38] dark:bg-[#13161c] dark:text-slate-200">
-            <span className="text-[10px] text-slate-400 font-sans">Active:</span>
-            <span className="font-sans text-xs">
-              <V3Math math={targetMath} />
-            </span>
-          </span>
-        )}
       </div>
 
       <div className="relative">

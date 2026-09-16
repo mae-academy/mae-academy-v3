@@ -13,6 +13,7 @@ import type { MeshGeometry } from '@/simulators/circuit-engine/components/meshGe
 import { V3BlockMath, V3Math } from '@/components/ui/V3Math';
 import { MESH_LOOP_COLORS } from '@/simulators/circuit-engine/components/analogCanvasGeometry';
 import { AcademicNodalDictionary } from '@/simulators/circuit-engine/models/AcademicNodalDictionary';
+import type { CircuitComponent } from '@/simulators/circuit-engine/models/circuitTypes';
 import { TargetLoadSelector, DecimalPlacesSelector } from '@/simulators/circuit-engine/components/ui-components/TargetLoadSelector';
 
 const METHODS: Array<{ id: AnalysisMethod; label: string }> = [
@@ -31,6 +32,7 @@ export function AnalysisBox({
   colors,
   standalone = false,
   onTraceChange,
+  components = [],
 }: {
   elements: MNAElement[];
   geometry?: MeshGeometry;
@@ -38,6 +40,7 @@ export function AnalysisBox({
   colors: AnalysisColors;
   standalone?: boolean;
   onTraceChange?: (trace: AnalysisTrace) => void;
+  components?: CircuitComponent[];
 }) {
   const [method, setMethod] = useState<AnalysisMethod>('nodal');
   const [targetResistor, setTargetResistor] = useState('');
@@ -45,9 +48,22 @@ export function AnalysisBox({
   const [precision, setPrecision] = useState(4);
   const [activeStepIndex, setActiveStepIndex] = useState<number>(0);
 
-  const resistors = elements.filter((element): element is Extract<MNAElement, { type: 'resistor' }> => element.type === 'resistor');
-  const voltageSources = elements.filter((element): element is Extract<MNAElement, { type: 'voltage' }> => element.type === 'voltage');
-  const independentSources = elements.filter((element): element is Extract<MNAElement, { type: 'voltage' | 'current' }> => element.type === 'voltage' || element.type === 'current');
+  // Dynamically merge live component labels to ensure instant synchronization when renamed on canvas
+  const liveElements = useMemo(() => {
+    if (!components || components.length === 0) return elements;
+    const labelMap = new Map<string, string>();
+    for (const c of components) {
+      if (c.label) labelMap.set(c.id, c.label);
+    }
+    return elements.map((el) => {
+      const userLabel = labelMap.get(el.id);
+      return userLabel ? { ...el, label: userLabel } : el;
+    });
+  }, [elements, components]);
+
+  const resistors = liveElements.filter((element): element is Extract<MNAElement, { type: 'resistor' }> => element.type === 'resistor');
+  const voltageSources = liveElements.filter((element): element is Extract<MNAElement, { type: 'voltage' }> => element.type === 'voltage');
+  const independentSources = liveElements.filter((element): element is Extract<MNAElement, { type: 'voltage' | 'current' }> => element.type === 'voltage' || element.type === 'current');
 
   // Reset active step when method changes
   useEffect(() => {
@@ -55,16 +71,16 @@ export function AnalysisBox({
   }, [method]);
 
   const rawTrace = useMemo<AnalysisTrace>(() => {
-    if (!elements.length) return { method, status: 'unsupported', heading: 'Academic Analysis', steps: [], warning: 'Build a grounded DC circuit to generate a derivation.' };
-    if (method === 'nodal') return new NodalSolver(elements, nodalNodes).analyze();
-    if (method === 'mesh') return new MeshSolver(elements, geometry).analyze();
-    if (method === 'superposition') return new SuperpositionSolver(elements).analyze(targetResistor);
-    if (method === 'transform') return new SourceTransformationSolver(elements).analyze(targetSource, targetResistor);
-    return new TheveninSolver(elements).analyze(targetResistor);
-  }, [elements, geometry, method, nodalNodes, targetResistor, targetSource]);
+    if (!liveElements.length) return { method, status: 'unsupported', heading: 'Academic Analysis', steps: [], warning: 'Build a grounded DC circuit to generate a derivation.' };
+    if (method === 'nodal') return new NodalSolver(liveElements, nodalNodes).analyze();
+    if (method === 'mesh') return new MeshSolver(liveElements, geometry).analyze();
+    if (method === 'superposition') return new SuperpositionSolver(liveElements).analyze(targetResistor);
+    if (method === 'transform') return new SourceTransformationSolver(liveElements).analyze(targetSource, targetResistor);
+    return new TheveninSolver(liveElements).analyze(targetResistor);
+  }, [liveElements, geometry, method, nodalNodes, targetResistor, targetSource]);
 
-  // ID-to-Label mapping for intercepting UUIDs in derivations and dropdowns
-  const idToLabelMap = useMemo(() => buildIdToLabelMap(elements, nodalNodes), [elements, nodalNodes]);
+  // ID-to-Label mapping for intercepting UUIDs in derivations and dropdowns, strictly synchronized with latest component labels
+  const idToLabelMap = useMemo(() => buildIdToLabelMap(liveElements, nodalNodes, components), [liveElements, nodalNodes, components]);
 
   // Enriched trace carrying targetId and activeSourceId for dynamic canvas reactivity
   const trace = useMemo<AnalysisTrace>(() => {
@@ -101,7 +117,7 @@ export function AnalysisBox({
     return { borderLeft: `3px solid ${MESH_LOOP_COLORS[(parseInt(match[1], 10) - 1) % MESH_LOOP_COLORS.length]}` };
   };
 
-  const dict = useMemo(() => new AcademicNodalDictionary(elements), [elements]);
+  const dict = useMemo(() => new AcademicNodalDictionary(liveElements), [liveElements]);
   const activeTransformSource = voltageSources.find((s) => s.id === targetSource) || voltageSources[0];
   const transformSourceMath = activeTransformSource
     ? `${dict.element(activeTransformSource)} \\cdot ${activeTransformSource.voltage}\\,\\mathrm{V}`
@@ -151,7 +167,7 @@ export function AnalysisBox({
       {(method === 'superposition' || method === 'transform' || method === 'thevenin') && (
         <div className="mb-3">
           <TargetLoadSelector
-            elements={elements}
+            elements={liveElements}
             resistors={resistors}
             targetResistor={targetResistor}
             onSelectTarget={setTargetResistor}
@@ -161,14 +177,6 @@ export function AnalysisBox({
             <div className="flex flex-col gap-1.5 font-sans mt-2">
               <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                 <span>SOURCE / RESISTOR PAIR</span>
-                {activeTransformSource && (
-                  <span className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2 py-0.5 text-xs text-slate-700 shadow-sm dark:border-[#282d38] dark:bg-[#13161c] dark:text-slate-200">
-                    <span className="text-[10px] text-slate-400 font-sans">Active:</span>
-                    <span className="font-sans text-xs">
-                      <V3Math math={transformSourceMath} />
-                    </span>
-                  </span>
-                )}
               </div>
               <div className="relative">
                 <div className="flex min-h-[38px] items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-sans text-slate-700 shadow-sm dark:border-[#282d38] dark:bg-[#13161c] dark:text-slate-200">
@@ -239,7 +247,22 @@ export function AnalysisBox({
                   Step {index + 1}
                 </span>
                 <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-100">
-                  {sanitizeText(step.title.replace(/^\s*\d+[.):]?\s*/, ''))}
+                  {(() => {
+                    const rawClean = sanitizeText(step.title.replace(/^\s*\d+[.):]?\s*/, '')) || '';
+                    const subcircuitMatch = rawClean.match(/^(?:Sub-circuit\s*\d+:\s*)?(.+?)\s+active$/i);
+                    if (subcircuitMatch) {
+                      const prefixMatch = rawClean.match(/^(Sub-circuit\s*\d+:\s*)/i);
+                      const prefix = prefixMatch ? prefixMatch[1] : '';
+                      const sourceMath = subcircuitMatch[1].trim();
+                      return (
+                        <span>
+                          {prefix}
+                          <V3Math math={`${sourceMath} \\text{ active}`} />
+                        </span>
+                      );
+                    }
+                    return rawClean;
+                  })()}
                 </h4>
                 {isSelectedSuperpositionStep && (
                   <span className="ml-auto inline-flex items-center rounded bg-blue-100 px-2 py-0.5 text-[10px] font-semibold text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
