@@ -4089,7 +4089,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                           onPointerLeave={() => setHoveredComponentId(null)}
                         >
                           {isSuperpositionDeactivatedVoltage ? (
-                            /* Deactivated Voltage Source (Short Circuit): ghosted original source with solid wire overlay connecting pin1 to pin2 */
+                            /* Deactivated Voltage Source (Short Circuit): ghosted original source with solid wire overlay connecting pin1 to pin2 matching circuit wire stroke width */
                             (() => {
                               const t0 = getCanvasTerminalPosition(component, definition.terminals[0]?.id);
                               const t1 = getCanvasTerminalPosition(component, definition.terminals[1]?.id);
@@ -4127,14 +4127,14 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                                     x2={x2}
                                     y2={y2}
                                     stroke={colors.text}
-                                    strokeWidth={2}
+                                    strokeWidth={1.5}
                                     strokeLinecap="round"
                                   />
                                 </g>
                               );
                             })()
                           ) : isSuperpositionDeactivatedCurrent ? (
-                            /* Deactivated Current Source (Open Circuit): visual gap with tiny terminal connection stubs */
+                            /* Deactivated Current Source (Open Circuit): ghosted original source (opacity 0.25) with open visual terminal gap */
                             (() => {
                               const t0 = getCanvasTerminalPosition(component, definition.terminals[0]?.id);
                               const t1 = getCanvasTerminalPosition(component, definition.terminals[1]?.id);
@@ -4151,6 +4151,28 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                               const s1y = y2 - (y2 / d1) * stubLen;
                               return (
                                 <g>
+                                  <g transform={symbolTransform} opacity={0.25}>
+                                    {renderSymbol(
+                                      definition.symbol,
+                                      powered,
+                                      {
+                                        ...component.props,
+                                        label: component.label,
+                                        selected: isSelected,
+                                        _isSelected: isSelected,
+                                        isDark: darkPreview,
+                                        _isDark: darkPreview,
+                                        isEnergized: powered,
+                                        isConflicted: conflictedCoilIds.has(component.id),
+                                        _intensity: intensity,
+                                        _superpositionActive: false,
+                                        ...(motorVEff !== undefined ? { _vEff: motorVEff } : {}),
+                                        _documentedStyle: tabDUiRefinement,
+                                        ...(meterDisplayValue !== undefined ? { displayValue: meterDisplayValue } : {}),
+                                      },
+                                      animationTime,
+                                    )}
+                                  </g>
                                   <line x1={x1} y1={y1} x2={s0x} y2={s0y} stroke={colors.text} strokeWidth={1.5} strokeLinecap="round" />
                                   <line x1={x2} y1={y2} x2={s1x} y2={s1y} stroke={colors.text} strokeWidth={1.5} strokeLinecap="round" />
                                 </g>
