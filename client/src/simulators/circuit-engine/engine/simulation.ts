@@ -215,6 +215,7 @@ export class SimulationEngine {
   private terminalHistory = new Map<string, SamplePoint[]>();
   private nodeHistory = new Map<string, SamplePoint[]>();
   private branchHistory = new Map<string, SamplePoint[]>();
+  protected wirePhases = new Map<string, number>();
   private lastSnapshot: SimulationSnapshot = this.emptySnapshot();
 
   reset() {
@@ -227,6 +228,7 @@ export class SimulationEngine {
     this.terminalHistory.clear();
     this.nodeHistory.clear();
     this.branchHistory.clear();
+    this.wirePhases.clear();
     this.lastSnapshot = this.emptySnapshot();
   }
 
@@ -234,6 +236,7 @@ export class SimulationEngine {
     this.components = components.map(component => ({ ...component, props: { ...component.props } }));
     this.wires = wires.map(wire => ({ ...wire, path: wire.path.map(point => [...point] as [number, number]) }));
     this.network = this.buildNetwork();
+    this.wirePhases.clear();
   }
 
   getSnapshot(): SimulationSnapshot {
@@ -265,6 +268,7 @@ export class SimulationEngine {
       terminalVoltages: {},
       branchCurrents: {},
       wireCurrents: {},
+      wirePhases: {},
       componentPowered: {},
       componentIntensity: {},
       nodeHistory: {},
@@ -445,12 +449,34 @@ export class SimulationEngine {
     const wireCurrents = this.computeWireCurrents(result.terminalCurrents);
     const nodeVoltages = this.nodeVoltageMap(result.voltages);
 
+    let maxAbsWireCurrent = 0;
+    for (const wire of this.wires) {
+      const absI = Math.abs(wireCurrents[wire.id] ?? 0);
+      if (absI > maxAbsWireCurrent) maxAbsWireCurrent = absI;
+    }
+
+    const V_BASE = 0.6;
+    const V_TOP = 2.4;
+    for (const wire of this.wires) {
+      const wireI = wireCurrents[wire.id] ?? 0;
+      const currentPhase = this.wirePhases.get(wire.id) ?? 0;
+      if (Math.abs(wireI) < 1e-7 || maxAbsWireCurrent < 1e-7) {
+        this.wirePhases.set(wire.id, currentPhase);
+      } else {
+        const relativeRatio = Math.min(1, Math.max(0, Math.abs(wireI) / maxAbsWireCurrent));
+        const speed = V_BASE + (V_TOP - V_BASE) * Math.pow(relativeRatio, 0.35);
+        const phaseRate = Math.sign(wireI) * speed;
+        this.wirePhases.set(wire.id, currentPhase + phaseRate * dt);
+      }
+    }
+
     this.lastSnapshot = {
       time: this.time,
       nodeVoltages,
       terminalVoltages: result.terminalVoltages,
       branchCurrents: result.branchCurrents,
       wireCurrents,
+      wirePhases: Object.fromEntries(this.wirePhases),
       componentPowered: result.powered,
       componentIntensity: result.intensity,
       nodeHistory: this.historyObject(this.nodeHistory),
@@ -1112,15 +1138,47 @@ export class SimulationEngine {
 
   private computeWireCurrents(terminalCurrents: Record<string, number>): Record<string, number> {
     const currents: Record<string, number> = {};
+
+    const terminalWireCount: Record<string, number> = {};
+    for (const wire of this.wires) {
+      const fromKey = terminalKey(wire.fromComp, wire.fromTerm);
+      const toKey = terminalKey(wire.toComp, wire.toTerm);
+      terminalWireCount[fromKey] = (terminalWireCount[fromKey] ?? 0) + 1;
+      terminalWireCount[toKey] = (terminalWireCount[toKey] ?? 0) + 1;
+    }
+
     for (const wire of this.wires) {
       const from = terminalKey(wire.fromComp, wire.fromTerm);
       const to = terminalKey(wire.toComp, wire.toTerm);
-      // Ideal-wire current is underdetermined at branched nodes.  At a terminal,
-      // the physical terminal current gives a stable, directionally meaningful
-      // value for animation; the opposing terminal is used as a fallback.
-      const leavingFrom = -(terminalCurrents[from] ?? 0);
-      const enteringTo = terminalCurrents[to] ?? 0;
-      currents[wire.id] = Math.abs(leavingFrom) > 1e-12 ? leavingFrom : enteringTo;
+
+      const fromI = terminalCurrents[from];
+      const toI = terminalCurrents[to];
+
+      const wiresAtFrom = terminalWireCount[from] ?? 0;
+      const wiresAtTo = terminalWireCount[to] ?? 0;
+
+      let wireI = 0;
+      if (wiresAtTo === 1 && toI !== undefined && wiresAtFrom !== 1) {
+        wireI = toI;
+      } else if (wiresAtFrom === 1 && fromI !== undefined && wiresAtTo !== 1) {
+        wireI = -fromI;
+      } else if (wiresAtFrom === 1 && wiresAtTo === 1) {
+        if (toI !== undefined && Math.abs(toI) > 1e-12) {
+          wireI = toI;
+        } else if (fromI !== undefined && Math.abs(fromI) > 1e-12) {
+          wireI = -fromI;
+        }
+      } else {
+        const leavingFrom = fromI !== undefined ? -fromI : 0;
+        const enteringTo = toI !== undefined ? toI : 0;
+        wireI = Math.abs(leavingFrom) > 1e-12 ? leavingFrom : enteringTo;
+      }
+
+      if (Math.abs(wireI) < 1e-7) {
+        wireI = 0;
+      }
+
+      currents[wire.id] = wireI;
     }
     return currents;
   }

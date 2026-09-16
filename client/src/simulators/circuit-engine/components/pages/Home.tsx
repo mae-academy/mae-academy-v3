@@ -3923,15 +3923,17 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                     {wires.map(wire => {
                       const selected = selection?.kind === 'wire' && selection.id === wire.id;
                       const phase = snapshot.wirePhases?.[wire.id] ?? 0;
+                      const wireCurrent = Math.abs(snapshot.wireCurrents?.[wire.id] ?? 0);
+                      const isCurrentFlowing = wireCurrent >= 1e-7;
                       const path = getWirePoints(wire);
                       // Phase 2: use jump-arc path for the visible stroke; hitbox uses the
                       // plain polyline so clicks always register even near arc breaks.
                       const hitPath = pointsToPath(path);
                       const renderPath = buildJumpArcPath(path, wireIntersectionList, wire.id, 4);
-                      const normalizedOffset = ((phase % 1) + 1) % 1;
-                      // Persistent charge particles: uniform spacing based solely on physical length (N = floor(length / spacing))
-                      const numDots = Math.max(1, Math.floor(pathLength(path) / 45));
-                      const dots = getDotsOnPath(path, numDots, normalizedOffset);
+                      const len = pathLength(path);
+                      // Persistent charge particles: uniform spacing based solely on physical length (N = round(length / spacing))
+                      const numDots = Math.max(1, Math.round(len / 36));
+                      const dots = getDotsOnPath(path, numDots, phase);
                       const isSensingWire = false;
                       const strokeColor = selected ? colors.selection : (wire.color ?? colors.text);
                       const strokeWidth = selected ? 2 : 1.5;
@@ -3942,7 +3944,17 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                           <path d={hitPath} fill="none" stroke="transparent" strokeWidth={17} strokeLinecap="round" strokeLinejoin="round" onMouseDown={event => handleWireMouseDown(event, wire)} onDoubleClick={event => handleWireDoubleClick(event, wire)} style={{ cursor: 'pointer' }} />
                           {/* Visible stroke with jump-arc splices at cross-net crossings */}
                           <path d={renderPath} fill="none" stroke={strokeColor} strokeWidth={strokeWidth} strokeDasharray={isSensingWire ? "3 3" : undefined} strokeLinecap="round" strokeLinejoin="round" pointerEvents="none" />
-                          {showElectrons && dots.map((dot, index) => <circle key={index} cx={dot[0]} cy={dot[1]} r={3} fill={colors.powered} opacity={1} pointerEvents="none" />)}
+                          {showElectrons && dots.map((dot, index) => (
+                            <circle
+                              key={index}
+                              cx={dot[0]}
+                              cy={dot[1]}
+                              r={3}
+                              fill={colors.powered}
+                              opacity={isCurrentFlowing ? 1 : 0.25}
+                              pointerEvents="none"
+                            />
+                          ))}
                           {selected && path.length > 2 && path.slice(1, -1).map((corner, index) => {
                             const cornerIndex = index + 1;
                             return <circle key={`${wire.id}-${cornerIndex}`} cx={corner[0]} cy={corner[1]} r={6} fill={colors.panel} stroke={colors.selection} strokeWidth={2} onMouseDown={event => {

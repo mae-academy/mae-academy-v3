@@ -90,7 +90,6 @@ export class TabDSimulationEngine extends SimulationEngine {
   private displayReadings: Record<string, InstrumentReading> = {};
   private lastDisplayTime = -1;
   private timeAccumulator = 0;
-  private wirePhases = new Map<string, number>();
   private lastWireCurrents: Record<string, number> = {};
 
   override setCircuit(components: CircuitComponent[], wires: CircuitWire[]) {
@@ -197,7 +196,18 @@ export class TabDSimulationEngine extends SimulationEngine {
         const terminalCurrentMap: Record<string, number> = {};
         for (const comp of this.tabDComponents) {
           const bI = branchCurrents[comp.id] ?? 0;
-          if (comp.type === 'resistor' || comp.type === 'potentiometer' || comp.type === 'lamp') {
+          if (comp.type === 'resistor' || comp.type === 'lamp') {
+            terminalCurrentMap[terminalKey(comp.id, 'a')] = bI;
+            terminalCurrentMap[terminalKey(comp.id, 'b')] = -bI;
+          } else if (comp.type === 'potentiometer') {
+            const iA = branchCurrents[`${comp.id}:a`] ?? 0;
+            const iB = branchCurrents[`${comp.id}:b`] ?? 0;
+            terminalCurrentMap[terminalKey(comp.id, 'a')] = iA;
+            terminalCurrentMap[terminalKey(comp.id, 't1')] = iA;
+            terminalCurrentMap[terminalKey(comp.id, 'b')] = -iB;
+            terminalCurrentMap[terminalKey(comp.id, 't2')] = -iB;
+            terminalCurrentMap[terminalKey(comp.id, 'wiper')] = -iA + iB;
+          } else if (comp.type === 'capacitor' || comp.type === 'inductor' || comp.type === 'impedance') {
             terminalCurrentMap[terminalKey(comp.id, 'a')] = bI;
             terminalCurrentMap[terminalKey(comp.id, 'b')] = -bI;
           } else if (comp.type === 'transformer' || comp.type === 'transformer-ct') {
@@ -215,6 +225,39 @@ export class TabDSimulationEngine extends SimulationEngine {
           } else if (comp.type === 'ac-voltage' || comp.type === 'dc-voltage') {
             terminalCurrentMap[terminalKey(comp.id, 'pos')] = bI;
             terminalCurrentMap[terminalKey(comp.id, 'neg')] = -bI;
+          } else if (comp.type === 'dc-rail') {
+            terminalCurrentMap[terminalKey(comp.id, 'pos')] = bI;
+          } else if (comp.type === 'dc-current' || comp.type === 'ac-current') {
+            terminalCurrentMap[terminalKey(comp.id, 'pos')] = -bI;
+            terminalCurrentMap[terminalKey(comp.id, 'neg')] = bI;
+          } else if (['diode', 'diode-silicon', 'diode-germanium', 'diode-gaas', 'led', 'zener', 'photodiode'].includes(comp.type)) {
+            terminalCurrentMap[terminalKey(comp.id, 'anode')] = bI;
+            terminalCurrentMap[terminalKey(comp.id, 'cathode')] = -bI;
+          } else if (['sw-spst-no', 'sw-spst-nc', 'pb-no', 'pb-nc', 'circuit-breaker', 'fuse'].includes(comp.type)) {
+            terminalCurrentMap[terminalKey(comp.id, 'a')] = bI;
+            terminalCurrentMap[terminalKey(comp.id, 'b')] = -bI;
+          } else if (comp.type === 'coil') {
+            terminalCurrentMap[terminalKey(comp.id, 'pos')] = bI;
+            terminalCurrentMap[terminalKey(comp.id, 'neg')] = -bI;
+          } else if (comp.type === 'motor-dc') {
+            terminalCurrentMap[terminalKey(comp.id, 'pos')] = bI;
+            terminalCurrentMap[terminalKey(comp.id, 'neg')] = -bI;
+          } else if (comp.type === 'relay-spst') {
+            const coilI = branchCurrents[`${comp.id}:coil`] ?? 0;
+            const swI = branchCurrents[comp.id] ?? 0;
+            terminalCurrentMap[terminalKey(comp.id, 'coil+')] = coilI;
+            terminalCurrentMap[terminalKey(comp.id, 'coil-')] = -coilI;
+            terminalCurrentMap[terminalKey(comp.id, 'com')] = swI;
+            terminalCurrentMap[terminalKey(comp.id, 'no')] = -swI;
+          } else if (comp.type === 'relay-spdt') {
+            const coilI = branchCurrents[`${comp.id}:coil`] ?? 0;
+            const noI = branchCurrents[`${comp.id}:no`] ?? 0;
+            const ncI = branchCurrents[`${comp.id}:nc`] ?? 0;
+            terminalCurrentMap[terminalKey(comp.id, 'coil+')] = coilI;
+            terminalCurrentMap[terminalKey(comp.id, 'coil-')] = -coilI;
+            terminalCurrentMap[terminalKey(comp.id, 'com')] = noI + ncI;
+            terminalCurrentMap[terminalKey(comp.id, 'no')] = -noI;
+            terminalCurrentMap[terminalKey(comp.id, 'nc')] = -ncI;
           } else {
             const def = getDef(comp.type);
             if (def && def.terminals.length === 2) {
@@ -224,7 +267,19 @@ export class TabDSimulationEngine extends SimulationEngine {
           }
         }
 
-        // Assign current to each wire from either connected terminal
+        // Map degrees (number of wires connected to each terminal)
+        const terminalWireCount: Record<string, number> = {};
+        for (const wire of this.tabDWires) {
+          const fromKey = terminalKey(wire.fromComp, wire.fromTerm);
+          const toKey = terminalKey(wire.toComp, wire.toTerm);
+          terminalWireCount[fromKey] = (terminalWireCount[fromKey] ?? 0) + 1;
+          terminalWireCount[toKey] = (terminalWireCount[toKey] ?? 0) + 1;
+        }
+
+        // Pass 1: Resolve physical wire currents with strict series continuity and open-circuit isolation
+        const subStepWireCurrents: Record<string, number> = {};
+        let maxAbsWireCurrent = 0;
+
         for (const wire of this.tabDWires) {
           const fromKey = terminalKey(wire.fromComp, wire.fromTerm);
           const toKey = terminalKey(wire.toComp, wire.toTerm);
@@ -232,26 +287,67 @@ export class TabDSimulationEngine extends SimulationEngine {
           const fromI = terminalCurrentMap[fromKey];
           const toI = terminalCurrentMap[toKey];
 
+          const wiresAtFrom = terminalWireCount[fromKey] ?? 0;
+          const wiresAtTo = terminalWireCount[toKey] ?? 0;
+
           let wireI = 0;
-          if (fromI !== undefined && Math.abs(fromI) > 1e-12) {
-            wireI = -fromI; // Current leaving 'from' into wire
-          } else if (toI !== undefined && Math.abs(toI) > 1e-12) {
-            wireI = toI;   // Current entering 'to' from wire
+          if (wiresAtTo === 1 && toI !== undefined && wiresAtFrom !== 1) {
+            wireI = toI;
+          } else if (wiresAtFrom === 1 && fromI !== undefined && wiresAtTo !== 1) {
+            wireI = -fromI;
+          } else if (wiresAtFrom === 1 && wiresAtTo === 1) {
+            if (toI !== undefined && Math.abs(toI) > 1e-12) {
+              wireI = toI;
+            } else if (fromI !== undefined && Math.abs(fromI) > 1e-12) {
+              wireI = -fromI;
+            }
           } else {
-            // Secondary search across components matching either endpoint
-            const cFrom = this.tabDComponents.find(c => c.id === wire.fromComp);
-            const cTo = this.tabDComponents.find(c => c.id === wire.toComp);
-            const i1 = cFrom ? (branchCurrents[cFrom.id] ?? branchCurrents[`${cFrom.id}:secondary`]) : undefined;
-            const i2 = cTo ? (branchCurrents[cTo.id] ?? branchCurrents[`${cTo.id}:secondary`]) : undefined;
-            wireI = i1 !== undefined && Math.abs(i1) > 1e-12 ? i1 : (i2 !== undefined ? i2 : 0);
+            if (toI !== undefined && Math.abs(toI) > 1e-12) {
+              wireI = toI;
+            } else if (fromI !== undefined && Math.abs(fromI) > 1e-12) {
+              wireI = -fromI;
+            } else {
+              const cFrom = this.tabDComponents.find(c => c.id === wire.fromComp);
+              const cTo = this.tabDComponents.find(c => c.id === wire.toComp);
+              const i1 = cFrom ? (branchCurrents[cFrom.id] ?? branchCurrents[`${cFrom.id}:secondary`]) : undefined;
+              const i2 = cTo ? (branchCurrents[cTo.id] ?? branchCurrents[`${cTo.id}:secondary`]) : undefined;
+              wireI = i1 !== undefined && Math.abs(i1) > 1e-12 ? i1 : (i2 !== undefined ? i2 : 0);
+            }
           }
 
+          // Strict cutoff for open-circuit, disconnected, or negligible leakage current (< 100 nA)
+          if (Math.abs(wireI) < 1e-7) {
+            wireI = 0;
+          }
+
+          subStepWireCurrents[wire.id] = wireI;
           finalWireCurrents[wire.id] = wireI;
 
+          const absI = Math.abs(wireI);
+          if (absI > maxAbsWireCurrent) {
+            maxAbsWireCurrent = absI;
+          }
+        }
+
+        // Pass 2: Calculate smooth relative speed and integrate phase
+        // V_BASE: 0.6 cycles/s (~22 px/s) - visible, smooth drift for low currents
+        // V_TOP: 2.4 cycles/s (~86 px/s) - energetic flow for dominant branch, no strobing
+        const V_BASE = 0.6;
+        const V_TOP = 2.4;
+
+        for (const wire of this.tabDWires) {
+          const wireI = subStepWireCurrents[wire.id] ?? 0;
           const currentPhase = this.wirePhases.get(wire.id) ?? 0;
-          // Scale rate so that 1 A moves gracefully (~2 cycles per second)
-          const phaseRate = wireI * 15;
-          this.wirePhases.set(wire.id, currentPhase + phaseRate * fixedDt);
+
+          if (Math.abs(wireI) < 1e-7 || maxAbsWireCurrent < 1e-7) {
+            // Zero current / open circuit: rate is exactly 0, electrons remain completely stationary
+            this.wirePhases.set(wire.id, currentPhase);
+          } else {
+            const relativeRatio = Math.min(1, Math.max(0, Math.abs(wireI) / maxAbsWireCurrent));
+            const speed = V_BASE + (V_TOP - V_BASE) * Math.pow(relativeRatio, 0.35);
+            const phaseRate = Math.sign(wireI) * speed;
+            this.wirePhases.set(wire.id, currentPhase + phaseRate * fixedDt);
+          }
         }
 
         for (const component of this.tabDComponents) {

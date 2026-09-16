@@ -340,8 +340,10 @@ export function getDotsOnPath(pts: Point[], numDots: number, offset: number): Po
 
   const spacing = totalLen / numDots;
   const dots: Point[] = [];
+  // Each unit of offset shifts the dot pattern by exactly one dot interval (spacing),
+  // guaranteeing uniform physical velocity across wires of arbitrary lengths.
   for (let d = 0; d < numDots; d++) {
-    let targetDist = ((d * spacing + offset * totalLen) % totalLen + totalLen) % totalLen;
+    let targetDist = ((d * spacing + offset * spacing) % totalLen + totalLen) % totalLen;
     let accumulated = 0;
     for (let i = 0; i < segments.length; i++) {
       if (accumulated + segments[i] >= targetDist) {
