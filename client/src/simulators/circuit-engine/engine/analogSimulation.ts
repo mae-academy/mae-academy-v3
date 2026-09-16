@@ -330,10 +330,10 @@ export class TabDSimulationEngine extends SimulationEngine {
         }
 
         // Pass 2: Calculate smooth relative speed and integrate phase
-        // V_BASE: 0.6 cycles/s (~22 px/s) - visible, smooth drift for low currents
-        // V_TOP: 2.4 cycles/s (~86 px/s) - energetic flow for dominant branch, no strobing
-        const V_BASE = 0.6;
-        const V_TOP = 2.4;
+        // V_BASE: 2.5 cycles/s (~90 px/s) - clear, lively drift for low currents
+        // V_TOP: 8.0 cycles/s (~288 px/s) - dynamic, active flow for peak currents
+        const V_BASE = 2.5;
+        const V_TOP = 8.0;
 
         for (const wire of this.tabDWires) {
           const wireI = subStepWireCurrents[wire.id] ?? 0;
@@ -628,8 +628,8 @@ export class TabDSimulationEngine extends SimulationEngine {
           for (const [index, phase] of Array.from(['l1', 'l2', 'l3'].entries())) primitives.push({ kind: 'voltage', id: `${component.id}:${phase}`, positive: p(phase), negative: p('n'), voltage: amplitude * Math.sin(angle + order[index] * 2 * Math.PI / 3) });
           break;
         }
-        case 'dc-current': primitives.push({ kind: 'current', id: component.id, positive: p('pos'), negative: p('neg'), current: value(component, 'current', 1) }); break;
-        case 'ac-current': primitives.push({ kind: 'current', id: component.id, positive: p('pos'), negative: p('neg'), current: sourceValue(component, 'amplitude', 1) }); break;
+        case 'dc-current': primitives.push({ kind: 'current', id: component.id, positive: p('neg'), negative: p('pos'), current: value(component, 'current', 1) }); break;
+        case 'ac-current': primitives.push({ kind: 'current', id: component.id, positive: p('neg'), negative: p('pos'), current: sourceValue(component, 'amplitude', 1) }); break;
         case 'vccs': case 'vcvs': {
           const controlSourceId = String(component.props.controlSourceId ?? '');
           const controlComponent = this.tabDComponents.find((c: CircuitComponent) => c.id === controlSourceId || c.label === controlSourceId);

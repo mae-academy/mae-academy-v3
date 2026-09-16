@@ -118,9 +118,95 @@ describe('Electron Flow & Branch Current Physics', () => {
     // Higher current branch MUST advance faster than lower current branch
     expect(diffHeavy).toBeGreaterThan(diffLight);
 
-    // Both must be positive and bounded (smooth, non-strobing)
+    // Both must be positive and bounded (smooth, non-strobing, lively)
     expect(diffLight).toBeGreaterThan(0);
-    expect(diffHeavy).toBeLessThan(0.1); // at 0.016s, 2.4 cycles/s * 0.016s ~ 0.0384 cycles
+    expect(diffHeavy).toBeLessThan(0.2); // at 0.016s, 8.0 cycles/s * 0.016s ~ 0.128 cycles
+  });
+
+  it('guarantees correct directional electron path around a current source: OUT of pos (arrow tip) and INTO neg', () => {
+    const components = [
+      component('I1', 'dc-current', { current: 2 }),
+      component('R1', 'resistor', { resistance: 10 }),
+      component('GND', 'ground'),
+    ];
+    // Wire from I1:pos (arrow tip at top) to R1:a (top of resistor)
+    // Wire from R1:b (bottom of resistor) to I1:neg (bottom of current source)
+    const wires = [
+      wire('w_top', 'I1', 'pos', 'R1', 'a'),
+      wire('w_bottom', 'R1', 'b', 'I1', 'neg'),
+      wire('w_gnd', 'I1', 'neg', 'GND', 'gnd'),
+    ];
+
+    // Test 1: TabDSimulationEngine
+    const tabDEngine = new TabDSimulationEngine();
+    tabDEngine.setCircuit(components, wires);
+    const tabDSnap0 = tabDEngine.step(0.016);
+    const tabDSnap1 = tabDEngine.step(0.016);
+
+    expect(tabDSnap1.wireCurrents['w_top']).toBeCloseTo(2, 3);
+    expect(tabDSnap1.wireCurrents['w_bottom']).toBeCloseTo(2, 3);
+    expect((tabDSnap1.wirePhases?.['w_top'] ?? 0) - (tabDSnap0.wirePhases?.['w_top'] ?? 0)).toBeGreaterThan(0);
+    expect((tabDSnap1.wirePhases?.['w_bottom'] ?? 0) - (tabDSnap0.wirePhases?.['w_bottom'] ?? 0)).toBeGreaterThan(0);
+
+    // Test 2: SimulationEngine (legacy engine used on main workspace canvas)
+    const simEngine = new SimulationEngine();
+    simEngine.setCircuit(components, wires);
+    const simSnap0 = simEngine.step(0.016);
+    const simSnap1 = simEngine.step(0.016);
+
+    // Both wires must be POSITIVE (current flows OUT of I1:pos to R1:a, and OUT of R1:b into I1:neg)
+    expect(simSnap1.wireCurrents['w_top']).toBeCloseTo(2, 3);
+    expect(simSnap1.wireCurrents['w_bottom']).toBeCloseTo(2, 3);
+
+    // Both phases must advance forward in the exact direction of the current source arrow
+    const simDiffTop = (simSnap1.wirePhases?.['w_top'] ?? 0) - (simSnap0.wirePhases?.['w_top'] ?? 0);
+    const simDiffBottom = (simSnap1.wirePhases?.['w_bottom'] ?? 0) - (simSnap0.wirePhases?.['w_bottom'] ?? 0);
+    expect(simDiffTop).toBeGreaterThan(0);
+    expect(simDiffBottom).toBeGreaterThan(0);
+    expect(simDiffTop).toBeCloseTo(simDiffBottom, 4);
+  });
+
+  it('strictly scales electron animation phase with simulation speed slider without altering physical time rate', () => {
+    const components = [
+      component('V1', 'dc-voltage', { voltage: 10 }),
+      component('R1', 'resistor', { resistance: 100 }),
+      component('GND', 'ground'),
+    ];
+    const wires = [
+      wire('w1', 'V1', 'pos', 'R1', 'a'),
+      wire('w2', 'R1', 'b', 'V1', 'neg'),
+      wire('w3', 'V1', 'neg', 'GND', 'gnd'),
+    ];
+
+    // Case 1: 1x speed (dt = 0.016s)
+    const engine1x = new SimulationEngine();
+    engine1x.setCircuit(components, wires);
+    const snap1x_0 = engine1x.step(0.016);
+    const snap1x_1 = engine1x.step(0.016);
+    const rate1x = (snap1x_1.wirePhases?.['w1'] ?? 0) - (snap1x_0.wirePhases?.['w1'] ?? 0);
+
+    // Case 2: 2x speed (dt = 0.032s)
+    const engine2x = new SimulationEngine();
+    engine2x.setCircuit(components, wires);
+    const snap2x_0 = engine2x.step(0.032);
+    const snap2x_1 = engine2x.step(0.032);
+    const rate2x = (snap2x_1.wirePhases?.['w1'] ?? 0) - (snap2x_0.wirePhases?.['w1'] ?? 0);
+
+    // Case 3: 0.25x speed (dt = 0.004s)
+    const engineQuarter = new SimulationEngine();
+    engineQuarter.setCircuit(components, wires);
+    const snapQ_0 = engineQuarter.step(0.004);
+    const snapQ_1 = engineQuarter.step(0.004);
+    const rateQuarter = (snapQ_1.wirePhases?.['w1'] ?? 0) - (snapQ_0.wirePhases?.['w1'] ?? 0);
+
+    // Phase progression scales linearly with dt (simulation slider)
+    expect(rate2x).toBeCloseTo(rate1x * 2, 4);
+    expect(rateQuarter).toBeCloseTo(rate1x * 0.25, 4);
+
+    // Physical time advances strictly by the given dt
+    expect(snap1x_1.time).toBeCloseTo(0.032, 6);
+    expect(snap2x_1.time).toBeCloseTo(0.064, 6);
+    expect(snapQ_1.time).toBeCloseTo(0.008, 6);
   });
 
   it('getDotsOnPath shifts uniformly by dot spacing, ensuring equal velocity regardless of wire length', () => {

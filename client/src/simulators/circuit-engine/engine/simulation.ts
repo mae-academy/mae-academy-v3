@@ -455,8 +455,8 @@ export class SimulationEngine {
       if (absI > maxAbsWireCurrent) maxAbsWireCurrent = absI;
     }
 
-    const V_BASE = 0.6;
-    const V_TOP = 2.4;
+    const V_BASE = 2.5;
+    const V_TOP = 8.0;
     for (const wire of this.wires) {
       const wireI = wireCurrents[wire.id] ?? 0;
       const currentPhase = this.wirePhases.get(wire.id) ?? 0;
@@ -573,13 +573,13 @@ export class SimulationEngine {
         }
         case 'dc-current': {
           current = propNumber(props, 'current', 1);
-          stampCurrent(component, 'pos', 'neg', current);
+          stampCurrent(component, 'neg', 'pos', current);
           isPowered = Math.abs(current) > 1e-12;
           break;
         }
         case 'ac-current': {
           current = waveform(propString(props, 'waveform', 'sine'), propNumber(props, 'amplitude', 1), propNumber(props, 'frequency', 60), propNumber(props, 'phase', 0), propNumber(props, 'offset', 0), this.time);
-          stampCurrent(component, 'pos', 'neg', current);
+          stampCurrent(component, 'neg', 'pos', current);
           isPowered = Math.abs(current) > 1e-12;
           break;
         }
