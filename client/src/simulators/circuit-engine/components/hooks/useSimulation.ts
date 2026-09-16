@@ -77,17 +77,54 @@ export function compileDcTopology(components: CircuitComponent[], wires: Circuit
     if (component.type === 'dc-rail') elements.push({ type: 'voltage', id: component.id, label: component.label, positive: nodeFor(component, 'pos'), negative: '0', voltage: number(component, 'voltage', 24) });
     if (component.type === 'dc-current') elements.push({ type: 'current', id: component.id, label: component.label, from: nodeFor(component, 'pos'), to: nodeFor(component, 'neg'), current: number(component, 'current', 1) });
     if (component.type === 'vccs' || component.type === 'vcvs') {
-      const controlSourceId = String(component.props.controlSourceId ?? '');
-      const controlComponent = components.find(c => c.id === controlSourceId || c.label === controlSourceId);
-      const cp = controlComponent ? nodeFor(controlComponent, 'pos') : '0';
-      const cn = controlComponent ? nodeFor(controlComponent, 'neg') : '0';
-      if (component.type === 'vccs') elements.push({ type: 'vccs', id: component.id, label: component.label, positive: nodeFor(component, 'pos'), negative: nodeFor(component, 'neg'), controlPositive: cp, controlNegative: cn, transconductance: number(component, 'transconductance', 0.001) });
+      const targetRef = String(component.props.targetId ?? component.props.controlSourceId ?? '');
+      const controlComponent = components.find(c => c.id === targetRef || c.label === targetRef);
+      let cp = '0';
+      let cn = '0';
+      if (controlComponent) {
+        const def = getDef(controlComponent.type);
+        const terms = def?.terminals ?? [];
+        if (controlComponent.type === 'dc-rail') {
+          cp = nodeFor(controlComponent, 'pos');
+          cn = '0';
+        } else if (terms.length >= 2) {
+          cp = nodeFor(controlComponent, terms[0].id);
+          cn = nodeFor(controlComponent, terms[1].id);
+        } else if (terms.length === 1) {
+          cp = nodeFor(controlComponent, terms[0].id);
+          cn = '0';
+        }
+      }
+      const gain = number(component, 'gain', number(component, 'transconductance', 0.001));
+      if (component.type === 'vccs') elements.push({ type: 'vccs', id: component.id, label: component.label, positive: nodeFor(component, 'pos'), negative: nodeFor(component, 'neg'), controlPositive: cp, controlNegative: cn, gain, transconductance: gain });
       else elements.push({ type: 'vcvs', id: component.id, label: component.label, positive: nodeFor(component, 'pos'), negative: nodeFor(component, 'neg'), controlPositive: cp, controlNegative: cn, gain: number(component, 'gain', 2) });
     }
     if (component.type === 'cccs' || component.type === 'ccvs') {
-      const controlSourceId = String(component.props.controlSourceId ?? '');
-      if (component.type === 'cccs') elements.push({ type: 'cccs', id: component.id, label: component.label, positive: nodeFor(component, 'pos'), negative: nodeFor(component, 'neg'), controlSourceId, gain: number(component, 'gain', 1) });
-      else elements.push({ type: 'ccvs', id: component.id, label: component.label, positive: nodeFor(component, 'pos'), negative: nodeFor(component, 'neg'), controlSourceId, transresistance: number(component, 'transresistance', 1000) });
+      const targetRef = String(component.props.targetId ?? component.props.controlSourceId ?? '');
+      const controlComponent = components.find(c => c.id === targetRef || c.label === targetRef);
+      let cp = '0';
+      let cn = '0';
+      let targetResistance: number | undefined = undefined;
+      if (controlComponent) {
+        const def = getDef(controlComponent.type);
+        const terms = def?.terminals ?? [];
+        if (controlComponent.type === 'dc-rail') {
+          cp = nodeFor(controlComponent, 'pos');
+          cn = '0';
+        } else if (terms.length >= 2) {
+          cp = nodeFor(controlComponent, terms[0].id);
+          cn = nodeFor(controlComponent, terms[1].id);
+        } else if (terms.length === 1) {
+          cp = nodeFor(controlComponent, terms[0].id);
+          cn = '0';
+        }
+        if (controlComponent.type === 'resistor') {
+          targetResistance = number(controlComponent, 'resistance', 1000);
+        }
+      }
+      const gain = number(component, 'gain', number(component, 'transresistance', 1000));
+      if (component.type === 'cccs') elements.push({ type: 'cccs', id: component.id, label: component.label, positive: nodeFor(component, 'pos'), negative: nodeFor(component, 'neg'), controlSourceId: targetRef, targetId: targetRef, gain: number(component, 'gain', 1), controlPositive: cp, controlNegative: cn, targetResistance });
+      else elements.push({ type: 'ccvs', id: component.id, label: component.label, positive: nodeFor(component, 'pos'), negative: nodeFor(component, 'neg'), controlSourceId: targetRef, targetId: targetRef, gain, transresistance: gain, controlPositive: cp, controlNegative: cn, targetResistance });
     }
     if (component.type === 'potentiometer') {
       const a = nodeFor(component, 't1') ?? nodeFor(component, 'a');

@@ -644,16 +644,57 @@ export class TabDSimulationEngine extends SimulationEngine {
         case 'dc-current': primitives.push({ kind: 'current', id: component.id, positive: p('neg'), negative: p('pos'), current: value(component, 'current', 1) }); break;
         case 'ac-current': primitives.push({ kind: 'current', id: component.id, positive: p('neg'), negative: p('pos'), current: sourceValue(component, 'amplitude', 1) }); break;
         case 'vccs': case 'vcvs': {
-          const controlSourceId = String(component.props.controlSourceId ?? '');
-          const controlComponent = this.tabDComponents.find((c: CircuitComponent) => c.id === controlSourceId || c.label === controlSourceId);
-          const cp = controlComponent ? netForTerminal(controlComponent.id, 'pos') : '0';
-          const cn = controlComponent ? netForTerminal(controlComponent.id, 'neg') : '0';
-          if (component.type === 'vccs') primitives.push({ kind: 'vccs', id: component.id, positive: p('pos'), negative: p('neg'), controlPositive: cp, controlNegative: cn, transconductance: value(component, 'transconductance', 0.001) });
+          const targetRef = String(component.props.targetId ?? component.props.controlSourceId ?? '');
+          const controlComponent = this.tabDComponents.find((c: CircuitComponent) => c.id === targetRef || c.label === targetRef);
+          let cp = '0';
+          let cn = '0';
+          if (controlComponent) {
+            const def = getDef(controlComponent.type);
+            const terms = def?.terminals ?? [];
+            if (controlComponent.type === 'dc-rail') {
+              cp = netForTerminal(controlComponent.id, 'pos');
+              cn = '0';
+            } else if (terms.length >= 2) {
+              cp = netForTerminal(controlComponent.id, terms[0].id);
+              cn = netForTerminal(controlComponent.id, terms[1].id);
+            } else if (terms.length === 1) {
+              cp = netForTerminal(controlComponent.id, terms[0].id);
+              cn = '0';
+            }
+          }
+          const gain = value(component, 'gain', value(component, 'transconductance', 0.001));
+          if (component.type === 'vccs') primitives.push({ kind: 'vccs', id: component.id, positive: p('pos'), negative: p('neg'), controlPositive: cp, controlNegative: cn, gain, transconductance: gain });
           else primitives.push({ kind: 'vcvs', id: component.id, positive: p('pos'), negative: p('neg'), controlPositive: cp, controlNegative: cn, gain: value(component, 'gain', 2) });
           break;
         }
-        case 'cccs': primitives.push({ kind: 'cccs', id: component.id, positive: p('pos'), negative: p('neg'), controlBranchId: String(component.props.controlSourceId ?? ''), gain: value(component, 'gain', 1) }); break;
-        case 'ccvs': primitives.push({ kind: 'ccvs', id: component.id, positive: p('pos'), negative: p('neg'), controlBranchId: String(component.props.controlSourceId ?? ''), transresistance: value(component, 'transresistance', 1000) }); break;
+        case 'cccs': case 'ccvs': {
+          const targetRef = String(component.props.targetId ?? component.props.controlSourceId ?? '');
+          const controlComponent = this.tabDComponents.find((c: CircuitComponent) => c.id === targetRef || c.label === targetRef);
+          let cp = '0';
+          let cn = '0';
+          let targetResistance: number | undefined = undefined;
+          if (controlComponent) {
+            const def = getDef(controlComponent.type);
+            const terms = def?.terminals ?? [];
+            if (controlComponent.type === 'dc-rail') {
+              cp = netForTerminal(controlComponent.id, 'pos');
+              cn = '0';
+            } else if (terms.length >= 2) {
+              cp = netForTerminal(controlComponent.id, terms[0].id);
+              cn = netForTerminal(controlComponent.id, terms[1].id);
+            } else if (terms.length === 1) {
+              cp = netForTerminal(controlComponent.id, terms[0].id);
+              cn = '0';
+            }
+            if (controlComponent.type === 'resistor') {
+              targetResistance = value(controlComponent, 'resistance', 1000);
+            }
+          }
+          const gain = value(component, 'gain', value(component, 'transresistance', 1000));
+          if (component.type === 'cccs') primitives.push({ kind: 'cccs', id: component.id, positive: p('pos'), negative: p('neg'), controlBranchId: targetRef, targetId: targetRef, gain: value(component, 'gain', 1), controlPositive: cp, controlNegative: cn, targetResistance });
+          else primitives.push({ kind: 'ccvs', id: component.id, positive: p('pos'), negative: p('neg'), controlBranchId: targetRef, targetId: targetRef, gain, transresistance: gain, controlPositive: cp, controlNegative: cn, targetResistance });
+          break;
+        }
         case 'sw-spst-no': case 'pb-no': case 'circuit-breaker': primitives.push({ kind: 'resistive-switch', id: component.id, positive: p('a'), negative: p('b'), closed: component.props.state === (component.type === 'pb-no' ? 'pressed' : 'closed') }); break;
         case 'circuit-breaker-3phase': {
           const closed = component.props.state === 'closed';

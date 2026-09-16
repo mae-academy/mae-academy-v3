@@ -7,10 +7,10 @@ export type MNAElement =
   | (MNAIdentity & { type: 'resistor'; positive: string; negative: string; resistance: number })
   | (MNAIdentity & { type: 'current'; from: string; to: string; current: number })
   | (MNAIdentity & { type: 'voltage'; positive: string; negative: string; voltage: number })
-  | (MNAIdentity & { type: 'vccs'; positive: string; negative: string; controlPositive: string; controlNegative: string; transconductance: number })
+  | (MNAIdentity & { type: 'vccs'; positive: string; negative: string; controlPositive: string; controlNegative: string; transconductance?: number; gain?: number })
   | (MNAIdentity & { type: 'vcvs'; positive: string; negative: string; controlPositive: string; controlNegative: string; gain: number })
-  | (MNAIdentity & { type: 'cccs'; positive: string; negative: string; controlSourceId: string; gain: number })
-  | (MNAIdentity & { type: 'ccvs'; positive: string; negative: string; controlSourceId: string; transresistance: number })
+  | (MNAIdentity & { type: 'cccs'; positive: string; negative: string; controlSourceId?: string; targetId?: string; gain: number; controlPositive?: string; controlNegative?: string; targetResistance?: number })
+  | (MNAIdentity & { type: 'ccvs'; positive: string; negative: string; controlSourceId?: string; targetId?: string; transresistance?: number; gain?: number; controlPositive?: string; controlNegative?: string; targetResistance?: number })
   | (MNAIdentity & { type: 'current-sense'; positive: string; negative: string });
 
 export interface MNAResult {
@@ -58,7 +58,11 @@ export class MNASolver {
     const nodeOrder = this.collectNonReferenceNodes();
     const nodeIndex = new Map(nodeOrder.map((node, index) => [node, index]));
     const voltageBranches = this.elements.filter(isVoltageBranch);
-    const branchIndex = new Map(voltageBranches.map((element, index) => [element.id, nodeOrder.length + index]));
+    const branchIndex = new Map<string, number>();
+    voltageBranches.forEach((element, index) => {
+      branchIndex.set(element.id, nodeOrder.length + index);
+      if (element.label) branchIndex.set(element.label, nodeOrder.length + index);
+    });
     const size = nodeOrder.length + voltageBranches.length;
     if (!size) return { nodeVoltages: { '0': 0 }, voltageSourceCurrents: {}, branchCurrents: {}, matrix: [], rhs: [], nodeOrder: [], voltageBranchOrder: [] };
 
@@ -85,10 +89,21 @@ export class MNASolver {
       add(branch, positive, 1); add(branch, negative, -1);
       addRhs(branch, finite(voltage, 'voltage'));
     };
-    const controlBranch = (id: string) => {
-      const found = branchIndex.get(id);
-      if (found === undefined) throw new MNAError('INVALID_CONTROL', `Invalid Circuit: controlling current ${id} requires a voltage source or 0 V current-sense branch`);
-      return found;
+    const resolveTargetResistor = (targetRef?: string, fallbackCp?: string, fallbackCn?: string, fallbackR?: number) => {
+      if (targetRef) {
+        const found = this.elements.find(e => (e.id === targetRef || e.label === targetRef) && e.type === 'resistor') as Extract<MNAElement, { type: 'resistor' }> | undefined;
+        if (found) {
+          const r = finite(found.resistance, 'target resistor resistance');
+          if (Math.abs(r) < VALUE_EPSILON) throw new MNAError('INVALID_CONTROL', `Invalid Circuit: target resistor ${targetRef} has zero resistance`);
+          return { positive: found.positive, negative: found.negative, resistance: r };
+        }
+      }
+      if (fallbackCp && fallbackCn && fallbackR !== undefined) {
+        const r = finite(fallbackR, 'target resistor resistance');
+        if (Math.abs(r) < VALUE_EPSILON) throw new MNAError('INVALID_CONTROL', `Invalid Circuit: target resistor has zero resistance`);
+        return { positive: fallbackCp, negative: fallbackCn, resistance: r };
+      }
+      return null;
     };
 
     for (const element of this.elements) {
@@ -103,26 +118,68 @@ export class MNASolver {
         case 'voltage': stampVoltageBranch(positive, negative, branchIndex.get(element.id)!, element.voltage); break;
         case 'current-sense': stampVoltageBranch(positive, negative, branchIndex.get(element.id)!, 0); break;
         case 'vccs': {
-          const cp = node(element.controlPositive); const cn = node(element.controlNegative); const gain = finite(element.transconductance, 'transconductance');
-          add(positive, cp, gain); add(positive, cn, -gain); add(negative, cp, -gain); add(negative, cn, gain);
+          const cp = node(element.controlPositive);
+          const cn = node(element.controlNegative);
+          const k = finite(element.gain ?? element.transconductance ?? 0, 'VCCS gain');
+          add(positive, cp, k);
+          add(positive, cn, -k);
+          add(negative, cp, -k);
+          add(negative, cn, k);
           break;
         }
         case 'vcvs': {
           const branch = branchIndex.get(element.id)!;
           stampVoltageBranch(positive, negative, branch, 0);
-          const gain = finite(element.gain, 'VCVS gain');
-          add(branch, node(element.controlPositive), -gain); add(branch, node(element.controlNegative), gain);
+          const k = finite(element.gain, 'VCVS gain');
+          add(branch, node(element.controlPositive), -k);
+          add(branch, node(element.controlNegative), k);
           break;
         }
         case 'cccs': {
-          const gain = finite(element.gain, 'CCCS gain'); const control = controlBranch(element.controlSourceId);
-          add(positive, control, gain); add(negative, control, -gain);
+          const k = finite(element.gain, 'CCCS gain');
+          const targetRef = element.targetId || element.controlSourceId || '';
+          const targetBranch = targetRef ? branchIndex.get(targetRef) : undefined;
+          if (targetBranch !== undefined) {
+            // Target is an auxiliary branch current variable
+            add(positive, targetBranch, k);
+            add(negative, targetBranch, -k);
+          } else {
+            // Target is a resistor
+            const targetResistor = resolveTargetResistor(targetRef, element.controlPositive, element.controlNegative, element.targetResistance);
+            if (!targetResistor) {
+              throw new MNAError('INVALID_CONTROL', `Invalid Circuit: CCCS ${element.id} targets invalid component ${targetRef || 'unknown'}`);
+            }
+            const geq = k / targetResistor.resistance;
+            const tp = node(targetResistor.positive);
+            const tn = node(targetResistor.negative);
+            add(positive, tp, geq);
+            add(positive, tn, -geq);
+            add(negative, tp, -geq);
+            add(negative, tn, geq);
+          }
           break;
         }
         case 'ccvs': {
           const branch = branchIndex.get(element.id)!;
           stampVoltageBranch(positive, negative, branch, 0);
-          add(branch, controlBranch(element.controlSourceId), -finite(element.transresistance, 'CCVS transresistance'));
+          const k = finite(element.gain ?? element.transresistance ?? 0, 'CCVS gain');
+          const targetRef = element.targetId || element.controlSourceId || '';
+          const targetBranch = targetRef ? branchIndex.get(targetRef) : undefined;
+          if (targetBranch !== undefined) {
+            // Target is an auxiliary branch current variable
+            add(branch, targetBranch, -k);
+          } else {
+            // Target is a resistor
+            const targetResistor = resolveTargetResistor(targetRef, element.controlPositive, element.controlNegative, element.targetResistance);
+            if (!targetResistor) {
+              throw new MNAError('INVALID_CONTROL', `Invalid Circuit: CCVS ${element.id} targets invalid component ${targetRef || 'unknown'}`);
+            }
+            const mueq = k / targetResistor.resistance;
+            const tp = node(targetResistor.positive);
+            const tn = node(targetResistor.negative);
+            add(branch, tp, -mueq);
+            add(branch, tn, mueq);
+          }
           break;
         }
       }
@@ -142,6 +199,24 @@ export class MNASolver {
         branchCurrents[element.id] = (vp - vn) / element.resistance;
       } else if (element.type === 'current') {
         branchCurrents[element.id] = element.current;
+      } else if (element.type === 'vccs') {
+        const cp = nodeVoltages[element.controlPositive] ?? 0;
+        const cn = nodeVoltages[element.controlNegative] ?? 0;
+        const k = element.gain ?? element.transconductance ?? 0;
+        branchCurrents[element.id] = k * (cp - cn);
+      } else if (element.type === 'cccs') {
+        const targetRef = element.targetId || element.controlSourceId || '';
+        const k = element.gain ?? 1;
+        if (targetRef && branchCurrents[targetRef] !== undefined) {
+          branchCurrents[element.id] = k * branchCurrents[targetRef];
+        } else {
+          const targetResistor = resolveTargetResistor(targetRef, element.controlPositive, element.controlNegative, element.targetResistance);
+          if (targetResistor) {
+            const vp = nodeVoltages[targetResistor.positive] ?? 0;
+            const vn = nodeVoltages[targetResistor.negative] ?? 0;
+            branchCurrents[element.id] = k * (vp - vn) / targetResistor.resistance;
+          }
+        }
       }
     }
     const voltageSourceCurrents = Object.fromEntries(voltageBranches.filter(element => element.type === 'voltage' || element.type === 'vcvs' || element.type === 'ccvs').map(element => [element.id, branchCurrents[element.id]]));
@@ -160,8 +235,24 @@ export class MNASolver {
     for (const element of this.elements) {
       switch (element.type) {
         case 'current': add(element.from); add(element.to); break;
-        case 'vccs': add(element.positive); add(element.negative); add(element.controlPositive); add(element.controlNegative); break;
-        case 'vcvs': add(element.positive); add(element.negative); add(element.controlPositive); add(element.controlNegative); break;
+        case 'vccs':
+        case 'vcvs':
+          add(element.positive); add(element.negative); add(element.controlPositive); add(element.controlNegative); break;
+        case 'cccs':
+        case 'ccvs': {
+          add(element.positive); add(element.negative);
+          if (element.controlPositive) add(element.controlPositive);
+          if (element.controlNegative) add(element.controlNegative);
+          const targetRef = element.targetId || element.controlSourceId;
+          if (targetRef) {
+            const targetResistor = this.elements.find(e => (e.id === targetRef || e.label === targetRef) && e.type === 'resistor') as Extract<MNAElement, { type: 'resistor' }> | undefined;
+            if (targetResistor) {
+              add(targetResistor.positive);
+              add(targetResistor.negative);
+            }
+          }
+          break;
+        }
         default: add(element.positive); add(element.negative); break;
       }
     }

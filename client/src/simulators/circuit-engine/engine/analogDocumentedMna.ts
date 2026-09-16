@@ -12,10 +12,10 @@ export type TabDPrimitive =
   | { kind: 'voltage'; id: string; positive: string; negative: string; voltage: number }
   | { kind: 'capacitor'; id: string; positive: string; negative: string; capacitance: number }
   | { kind: 'inductor'; id: string; positive: string; negative: string; inductance: number; seriesResistance?: number }
-  | { kind: 'vccs'; id: string; positive: string; negative: string; controlPositive: string; controlNegative: string; transconductance: number }
+  | { kind: 'vccs'; id: string; positive: string; negative: string; controlPositive: string; controlNegative: string; transconductance?: number; gain?: number }
   | { kind: 'vcvs'; id: string; positive: string; negative: string; controlPositive: string; controlNegative: string; gain: number }
-  | { kind: 'cccs'; id: string; positive: string; negative: string; controlBranchId: string; gain: number }
-  | { kind: 'ccvs'; id: string; positive: string; negative: string; controlBranchId: string; transresistance: number }
+  | { kind: 'cccs'; id: string; positive: string; negative: string; controlBranchId?: string; targetId?: string; gain: number; controlPositive?: string; controlNegative?: string; targetResistance?: number }
+  | { kind: 'ccvs'; id: string; positive: string; negative: string; controlBranchId?: string; targetId?: string; transresistance?: number; gain?: number; controlPositive?: string; controlNegative?: string; targetResistance?: number }
   | { kind: 'resistive-switch'; id: string; positive: string; negative: string; closed: boolean };
 
 export interface TabDOperatingPoint {
@@ -124,8 +124,10 @@ export class TabDDocumentedMna {
     for (const primitive of primitives) {
       nodeNames.add(primitive.positive);
       nodeNames.add(primitive.negative);
-      if ('controlPositive' in primitive) {
+      if ('controlPositive' in primitive && primitive.controlPositive) {
         nodeNames.add(primitive.controlPositive);
+      }
+      if ('controlNegative' in primitive && primitive.controlNegative) {
         nodeNames.add(primitive.controlNegative);
       }
     }
@@ -161,6 +163,21 @@ export class TabDDocumentedMna {
       if (n >= 0) { matrix[n][column] -= 1; matrix[column][n] -= 1; }
     };
 
+    const resolveTargetResistor = (targetRef?: string, fallbackCp?: string, fallbackCn?: string, fallbackR?: number) => {
+      if (targetRef) {
+        const found = primitives.find(p => p.id === targetRef && p.kind === 'resistor') as Extract<TabDPrimitive, { kind: 'resistor' }> | undefined;
+        if (found) {
+          const r = Math.max(1e-15, Math.abs(found.resistance));
+          return { positive: found.positive, negative: found.negative, resistance: r };
+        }
+      }
+      if (fallbackCp && fallbackCn && fallbackR !== undefined) {
+        const r = Math.max(1e-15, Math.abs(fallbackR));
+        return { positive: fallbackCp, negative: fallbackCn, resistance: r };
+      }
+      return null;
+    };
+
     for (const primitive of primitives) {
       switch (primitive.kind) {
         case 'resistor':
@@ -184,24 +201,11 @@ export class TabDDocumentedMna {
         case 'vccs': {
           const p = node(primitive.positive); const n = node(primitive.negative);
           const cp = node(primitive.controlPositive); const cn = node(primitive.controlNegative);
-          if (p >= 0 && cp >= 0) matrix[p][cp] += primitive.transconductance;
-          if (p >= 0 && cn >= 0) matrix[p][cn] -= primitive.transconductance;
-          if (n >= 0 && cp >= 0) matrix[n][cp] -= primitive.transconductance;
-          if (n >= 0 && cn >= 0) matrix[n][cn] += primitive.transconductance;
-          break;
-        }
-        case 'cccs': {
-          const control = branchIndex.get(primitive.controlBranchId);
-          if (control === undefined) throw new TabDMnaError(`CCCS ${primitive.id} requires an existing current-control branch.`);
-          const p = node(primitive.positive); const n = node(primitive.negative);
-          if (p >= 0) matrix[p][control] += primitive.gain;
-          if (n >= 0) matrix[n][control] -= primitive.gain;
-          break;
-        }
-        case 'voltage': {
-          const column = branchIndex.get(primitive.id)!;
-          stampBranchConnection(primitive.positive, primitive.negative, column);
-          rhs[column] = primitive.voltage;
+          const gain = primitive.gain ?? primitive.transconductance ?? 0;
+          if (p >= 0 && cp >= 0) matrix[p][cp] += gain;
+          if (p >= 0 && cn >= 0) matrix[p][cn] -= gain;
+          if (n >= 0 && cp >= 0) matrix[n][cp] -= gain;
+          if (n >= 0 && cn >= 0) matrix[n][cn] += gain;
           break;
         }
         case 'vcvs': {
@@ -212,12 +216,55 @@ export class TabDDocumentedMna {
           if (cn >= 0) matrix[column][cn] += primitive.gain;
           break;
         }
+        case 'cccs': {
+          const targetRef = primitive.targetId || primitive.controlBranchId || '';
+          const gain = primitive.gain;
+          const control = targetRef ? branchIndex.get(targetRef) : undefined;
+          if (control !== undefined) {
+            const p = node(primitive.positive); const n = node(primitive.negative);
+            if (p >= 0) matrix[p][control] += gain;
+            if (n >= 0) matrix[n][control] -= gain;
+          } else {
+            const targetResistor = resolveTargetResistor(targetRef, primitive.controlPositive, primitive.controlNegative, primitive.targetResistance);
+            if (targetResistor) {
+              const geq = gain / targetResistor.resistance;
+              const p = node(primitive.positive); const n = node(primitive.negative);
+              const tp = node(targetResistor.positive); const tn = node(targetResistor.negative);
+              if (p >= 0 && tp >= 0) matrix[p][tp] += geq;
+              if (p >= 0 && tn >= 0) matrix[p][tn] -= geq;
+              if (n >= 0 && tp >= 0) matrix[n][tp] -= geq;
+              if (n >= 0 && tn >= 0) matrix[n][tn] += geq;
+            } else {
+              throw new TabDMnaError(`CCCS ${primitive.id} requires an existing current-control branch or resistor.`);
+            }
+          }
+          break;
+        }
         case 'ccvs': {
           const column = branchIndex.get(primitive.id)!;
-          const control = branchIndex.get(primitive.controlBranchId);
-          if (control === undefined) throw new TabDMnaError(`CCVS ${primitive.id} requires an existing current-control branch.`);
           stampBranchConnection(primitive.positive, primitive.negative, column);
-          matrix[column][control] -= primitive.transresistance;
+          const targetRef = primitive.targetId || primitive.controlBranchId || '';
+          const gain = primitive.gain ?? primitive.transresistance ?? 0;
+          const control = targetRef ? branchIndex.get(targetRef) : undefined;
+          if (control !== undefined) {
+            matrix[column][control] -= gain;
+          } else {
+            const targetResistor = resolveTargetResistor(targetRef, primitive.controlPositive, primitive.controlNegative, primitive.targetResistance);
+            if (targetResistor) {
+              const mueq = gain / targetResistor.resistance;
+              const tp = node(targetResistor.positive); const tn = node(targetResistor.negative);
+              if (tp >= 0) matrix[column][tp] -= mueq;
+              if (tn >= 0) matrix[column][tn] += mueq;
+            } else {
+              throw new TabDMnaError(`CCVS ${primitive.id} requires an existing current-control branch or resistor.`);
+            }
+          }
+          break;
+        }
+        case 'voltage': {
+          const column = branchIndex.get(primitive.id)!;
+          stampBranchConnection(primitive.positive, primitive.negative, column);
+          rhs[column] = primitive.voltage;
           break;
         }
         case 'inductor': {
@@ -253,8 +300,23 @@ export class TabDDocumentedMna {
         if (commitHistory) this.capacitorVoltage.set(primitive.id, present);
       }
       if (primitive.kind === 'inductor' && commitHistory) this.inductorCurrent.set(primitive.id, branchCurrents[primitive.id] ?? 0);
-      if (primitive.kind === 'vccs') branchCurrents[primitive.id] = primitive.transconductance * (voltage(solution, primitive.controlPositive) - voltage(solution, primitive.controlNegative));
-      if (primitive.kind === 'cccs') branchCurrents[primitive.id] = primitive.gain * (branchCurrents[primitive.controlBranchId] ?? 0);
+      if (primitive.kind === 'vccs') {
+        const gain = primitive.gain ?? primitive.transconductance ?? 0;
+        branchCurrents[primitive.id] = gain * (voltage(solution, primitive.controlPositive) - voltage(solution, primitive.controlNegative));
+      }
+      if (primitive.kind === 'cccs') {
+        const targetRef = primitive.targetId || primitive.controlBranchId || '';
+        const gain = primitive.gain;
+        if (targetRef && branchCurrents[targetRef] !== undefined) {
+          branchCurrents[primitive.id] = gain * (branchCurrents[targetRef] ?? 0);
+        } else {
+          const targetResistor = resolveTargetResistor(targetRef, primitive.controlPositive, primitive.controlNegative, primitive.targetResistance);
+          if (targetResistor) {
+            const iTarget = (voltage(solution, targetResistor.positive) - voltage(solution, targetResistor.negative)) / targetResistor.resistance;
+            branchCurrents[primitive.id] = gain * iTarget;
+          }
+        }
+      }
     }
     if (commitHistory) this.time += dt;
     return { time: this.time, converged: true, nodeVoltages, branchCurrents, terminalVoltages: {} };

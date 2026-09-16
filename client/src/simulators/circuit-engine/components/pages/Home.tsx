@@ -4371,7 +4371,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                               const targetRef = String(component.props.targetId || component.props.controlSourceId || '');
                               const targetComp = components.find(c => c.id === targetRef || c.label === targetRef);
                               const targetLabel = targetComp ? targetComp.label : '';
-                              const gain = component.props.gain ?? 1;
+                              const gain = Number(component.props.gain ?? 1);
                               const mathStr = formatDependentSourceMath(component.type, gain, targetLabel);
                               return (
                                 <g>

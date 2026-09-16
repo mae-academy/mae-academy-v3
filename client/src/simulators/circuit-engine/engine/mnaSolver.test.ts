@@ -48,22 +48,67 @@ describe('Tab B Phase 2 strict MNA solver', () => {
   });
 
   it('stamps VCVS, VCCS, CCCS, and CCVS controlled source matrix terms', () => {
-    const vcvs = new MNASolver([
-      { type: 'voltage', id: 'Vin', positive: 'in', negative: '0', voltage: 2 },
-      { type: 'vcvs', id: 'E1', positive: 'out', negative: '0', controlPositive: 'in', controlNegative: '0', gain: 3 },
+    // 1. VCVS doubling the voltage of a 5V source
+    const vcvsDouble = new MNASolver([
+      { type: 'voltage', id: 'Vin', positive: 'in', negative: '0', voltage: 5 },
+      { type: 'vcvs', id: 'E1', positive: 'out', negative: '0', controlPositive: 'in', controlNegative: '0', gain: 2 },
       { type: 'resistor', id: 'Rout', positive: 'out', negative: '0', resistance: 1000 },
     ]).solve();
-    near(vcvs.nodeVoltages.out, 6);
+    near(vcvsDouble.nodeVoltages.in, 5);
+    near(vcvsDouble.nodeVoltages.out, 10);
+    near(vcvsDouble.branchCurrents.E1, -0.01); // 10V / 1000 ohm leaving positive terminal into negative terminal
 
-    const cccs = new MNASolver([
+    // 2. VCCS controlling current based on voltage
+    const vccs = new MNASolver([
+      { type: 'voltage', id: 'Vin', positive: 'in', negative: '0', voltage: 4 },
+      { type: 'vccs', id: 'G1', positive: 'out', negative: '0', controlPositive: 'in', controlNegative: '0', gain: 0.5 },
+      { type: 'resistor', id: 'Rload', positive: 'out', negative: '0', resistance: 100 },
+    ]).solve();
+    near(vccs.nodeVoltages.in, 4);
+    near(vccs.nodeVoltages.out, -200); // Injects current from out to 0, so out is at -200V across Rload
+    near(vccs.branchCurrents.G1, 2.0); // 0.5 S * 4 V = 2 A
+
+    // 3. CCCS targeting a resistor dynamically (I_target = (Vtp - Vtn) / R)
+    const cccsResistor = new MNASolver([
+      { type: 'voltage', id: 'Vin', positive: 'in', negative: '0', voltage: 10 },
+      { type: 'resistor', id: 'Rsense', positive: 'in', negative: '0', resistance: 100 },
+      { type: 'cccs', id: 'F1', positive: 'out', negative: '0', targetId: 'Rsense', gain: 3 },
+      { type: 'resistor', id: 'Rload', positive: 'out', negative: '0', resistance: 50 },
+    ]).solve();
+    // I_Rsense = 10 / 100 = 0.1 A. CCCS injects 3 * 0.1 = 0.3 A from out to 0.
+    near(cccsResistor.nodeVoltages.out, -15); // -0.3 A * 50 ohm = -15 V
+    near(cccsResistor.branchCurrents.F1, 0.3);
+
+    // 4. CCVS targeting a resistor dynamically (V_out = mu_eq * (Vtp - Vtn))
+    const ccvsResistor = new MNASolver([
+      { type: 'voltage', id: 'Vin', positive: 'in', negative: '0', voltage: 10 },
+      { type: 'resistor', id: 'Rsense', positive: 'in', negative: '0', resistance: 100 },
+      { type: 'ccvs', id: 'H1', positive: 'out', negative: '0', targetId: 'Rsense', gain: 50 },
+      { type: 'resistor', id: 'Rload', positive: 'out', negative: '0', resistance: 10 },
+    ]).solve();
+    // I_Rsense = 0.1 A. CCVS enforces V_out = 50 * 0.1 = 5 V.
+    near(ccvsResistor.nodeVoltages.out, 5);
+    near(ccvsResistor.branchCurrents.H1, -0.5); // 5 V / 10 ohm = 0.5 A leaving pos
+
+    // 5. CCCS & CCVS targeting an auxiliary branch (voltage source / current sense)
+    const cccsAux = new MNASolver([
       { type: 'voltage', id: 'Vin', positive: 'in', negative: '0', voltage: 2 },
       { type: 'resistor', id: 'Rsense', positive: 'in', negative: 'mid', resistance: 1000 },
       { type: 'current-sense', id: 'Vsense', positive: 'mid', negative: '0' },
       { type: 'cccs', id: 'F1', positive: 'out', negative: '0', controlSourceId: 'Vsense', gain: 2 },
       { type: 'resistor', id: 'Rout', positive: 'out', negative: '0', resistance: 1000 },
     ]).solve();
-    near(cccs.branchCurrents.Vsense, 0.002);
-    near(cccs.nodeVoltages.out, -4);
+    near(cccsAux.branchCurrents.Vsense, 0.002);
+    near(cccsAux.nodeVoltages.out, -4);
+    near(cccsAux.branchCurrents.F1, 0.004);
+  });
+
+  it('throws INVALID_CONTROL if a current-controlled source targets an invalid component', () => {
+    expect(() => new MNASolver([
+      { type: 'voltage', id: 'Vin', positive: 'in', negative: '0', voltage: 5 },
+      { type: 'cccs', id: 'F1', positive: 'out', negative: '0', targetId: 'NonExistent', gain: 2 },
+      { type: 'resistor', id: 'Rout', positive: 'out', negative: '0', resistance: 1000 },
+    ]).solve()).toThrow(MNAError);
   });
 
   it('returns a strict MNAError code for an underconstrained singular matrix', () => {
