@@ -482,7 +482,7 @@ describe('Phase 3 academic analysis benchmarks', () => {
     const circuit: MNAElement[] = [
       { id: 'V1', type: 'voltage', positive: 'n1', negative: '0', voltage: 24 },
       { id: 'R1', type: 'resistor', positive: 'n1', negative: 'n2', resistance: 4 },
-      { id: 'G1', type: 'vccs', positive: 'n2', negative: '0', targetId: 'R1', gain: 0.5 },
+      { id: 'G1', type: 'vccs', positive: 'n2', negative: '0', controlPositive: 'n1', controlNegative: 'n2', targetId: 'R1', gain: 0.5 },
       { id: 'R2', type: 'resistor', positive: 'n2', negative: '0', resistance: 8 },
     ];
     const geom: MeshGeometry = {

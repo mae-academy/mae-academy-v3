@@ -12,6 +12,7 @@ import { MeasurementTable } from '@/simulators/circuit-engine/components/ui-comp
 import { calculateVdc, calculateVpp } from '@/simulators/circuit-engine/components/ui-components/oscilloscopeMeasurements';
 import type { OscilloscopeDisplaySettings } from '@/simulators/circuit-engine/components/ui-components/oscilloscopeDisplaySettings';
 import { V3Math } from '@/components/ui/V3Math';
+import { InlineMath } from 'react-katex';
 
 type ScopePanelColors = { line: string; subtle: string; muted: string };
 
@@ -185,7 +186,9 @@ function ScopeUnit({ colors, scope, instrumentReadings, displaySettings }: { col
       <div className="flex items-center justify-between">
         <div style={{ fontSize: 10, fontWeight: 700, color: colors.subtle, textTransform: 'uppercase', letterSpacing: '.05em' }}>{scope.label}</div>
         <div className="flex items-center gap-2">
-          <V3Math math={headerLatex} className="text-[10px] text-slate-400 font-mono" />
+          <span className="text-[10px] text-slate-400 font-mono" data-testid="scope-scale-header">
+            <InlineMath math={headerLatex} />
+          </span>
         </div>
       </div>
       <div className="relative overflow-hidden rounded" style={{ width: '100%', height: CANVAS_HEIGHT, border: `1px solid ${colors.line}` }}>

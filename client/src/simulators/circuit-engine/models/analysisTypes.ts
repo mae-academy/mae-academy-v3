@@ -55,7 +55,7 @@ export const nonReferenceNodes = (elements: MNAElement[]) => Array.from(new Set(
   if (element.type === 'current') return [element.from, element.to];
   if (element.type === 'vccs' || element.type === 'vcvs') return [element.positive, element.negative, element.controlPositive, element.controlNegative];
   return [element.positive, element.negative];
-}).filter((node) => node !== '0'))).sort();
+}).filter((node): node is string => Boolean(node) && node !== '0'))).sort();
 
 export const n = (node: string) => node === '0' ? '0' : node.replace(/^n:/, '').replace(/[^A-Za-z0-9]/g, '').slice(-5) || 'x';
 export const id = (value: string) => value.replace(/[^A-Za-z0-9]/g, '').replace(/([A-Za-z]+)(\d+)/, '$1_{$2}') || '\\mathrm{branch}';

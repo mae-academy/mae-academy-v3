@@ -7,8 +7,8 @@ export type MNAElement =
   | (MNAIdentity & { type: 'resistor'; positive: string; negative: string; resistance: number })
   | (MNAIdentity & { type: 'current'; from: string; to: string; current: number })
   | (MNAIdentity & { type: 'voltage'; positive: string; negative: string; voltage: number })
-  | (MNAIdentity & { type: 'vccs'; positive: string; negative: string; controlPositive: string; controlNegative: string; transconductance?: number; gain?: number })
-  | (MNAIdentity & { type: 'vcvs'; positive: string; negative: string; controlPositive: string; controlNegative: string; gain: number })
+  | (MNAIdentity & { type: 'vccs'; positive: string; negative: string; controlPositive: string; controlNegative: string; transconductance?: number; gain?: number; targetId?: string; controlSourceId?: string })
+  | (MNAIdentity & { type: 'vcvs'; positive: string; negative: string; controlPositive: string; controlNegative: string; gain: number; targetId?: string; controlSourceId?: string })
   | (MNAIdentity & { type: 'cccs'; positive: string; negative: string; controlSourceId?: string; targetId?: string; gain: number; controlPositive?: string; controlNegative?: string; targetResistance?: number })
   | (MNAIdentity & { type: 'ccvs'; positive: string; negative: string; controlSourceId?: string; targetId?: string; transresistance?: number; gain?: number; controlPositive?: string; controlNegative?: string; targetResistance?: number })
   | (MNAIdentity & { type: 'current-sense'; positive: string; negative: string });
