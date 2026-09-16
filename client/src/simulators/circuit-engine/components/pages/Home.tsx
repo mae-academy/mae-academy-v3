@@ -102,7 +102,7 @@ import { buildSpiceNodeMap, generateNetlist, NetlistError, type SpiceNodeMap } f
 import { parseSpiceResults } from '@/simulators/circuit-engine/engine/spice/spiceParser';
 import { buildSpiceInstrumentReadings } from '@/simulators/circuit-engine/engine/spice/spiceInstruments';
 import { filterTabDCatalog, filterTabDImportedComponents, isTabDComponentAvailable } from '@/simulators/circuit-engine/models/analogComponentCatalog';
-import { alignTabDTerminalToGrid, calculateTabDPlanarCavity, dynamicRubberBandPath, getExactTerminalOffset, isExactCadComponent, lockTabDWireCorner, MESH_LOOP_COLORS, moveTabDOrthogonalLane, tabDComponentLabelAnchors, tabDGentleWheelZoomFactor, tabDOrthogonalDraftPath, tabDTerminalOrthogonalPath, type ObstacleBox, type TabDTerminalAxis } from '@/simulators/circuit-engine/components/analogCanvasGeometry';
+import { alignTabDTerminalToGrid, calculateMeshLoopBounds, calculateTabDPlanarCavity, dynamicRubberBandPath, getExactTerminalOffset, isExactCadComponent, lockTabDWireCorner, MESH_LOOP_COLORS, moveTabDOrthogonalLane, tabDComponentLabelAnchors, tabDGentleWheelZoomFactor, tabDOrthogonalDraftPath, tabDTerminalOrthogonalPath, type ObstacleBox, type TabDTerminalAxis } from '@/simulators/circuit-engine/components/analogCanvasGeometry';
 import { formatMeterReading, renderComponentCanvasLabel, renderSymbol } from '@/simulators/circuit-engine/components/symbols';
 import { applySwitchHotkey, directControlKind, hotkeyDigit, isTextEntryTarget, momentaryControlProps, nextLatchingControlProps, releaseHeldPushbuttons } from '@/simulators/circuit-engine/models/componentInteraction';
 import {
@@ -294,33 +294,8 @@ function sourcePointFromElement(element: SVGSVGElement | null, pan: Point, zoom:
 }
 
 /** Renders an explicit clockwise current reference at the geometrical bounding-box midpoint of one bounded mesh face. */
-function MeshLoopOverlay({ cycle }: { cycle: MeshCycle; tabDUiRefinement?: boolean; components?: CircuitComponent[]; scale?: number }) {
-  const rawNodes = cycle.points && cycle.points.length > 0 ? cycle.points : [];
-  const meshNodes = rawNodes.map((n: any) => ({
-    x: Array.isArray(n) ? n[0] : (typeof n?.x === 'number' ? n.x : 0),
-    y: Array.isArray(n) ? n[1] : (typeof n?.y === 'number' ? n.y : 0),
-  }));
-
-  if (meshNodes.length === 0) return null;
-
-  // Find the absolute limits of the specific mesh loop
-  const minX = Math.min(...meshNodes.map(n => n.x));
-  const maxX = Math.max(...meshNodes.map(n => n.x));
-  const minY = Math.min(...meshNodes.map(n => n.y));
-  const maxY = Math.max(...meshNodes.map(n => n.y));
-
-  // The visual center is exactly in the middle of the extremes
-  const cx = (minX + maxX) / 2;
-  const cy = (minY + maxY) / 2;
-
-  // Calculate a Collision-Proof Safe Radius:
-  const width = maxX - minX;
-  const height = maxY - minY;
-
-  // Radius must be proportional to the empty space.
-  // 25% of the shortest side guarantees it will never touch the boundary wires.
-  // Clamp it between a readable minimum (15px) and a clean maximum (35px).
-  const R = Math.max(15, Math.min(35, Math.min(width, height) * 0.25));
+function MeshLoopOverlay({ cycle, tabDUiRefinement, components = [], scale = 1, wires = [] }: { cycle: MeshCycle; tabDUiRefinement?: boolean; components?: CircuitComponent[]; scale?: number; wires?: CircuitWire[] }) {
+  const { cx, cy, R } = calculateMeshLoopBounds(cycle, components, wires, scale);
   const color = MESH_LOOP_COLORS[cycle.index % MESH_LOOP_COLORS.length];
 
   // Clockwise circular arrow arc sweeping from -45° to -90° (12 o'clock, 315° arc)
@@ -4000,7 +3975,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                   {gridVisible && (!tabDUiRefinement || tabDGridMode !== 'hidden') && <rect key={`grid-surface-${tabDUiRefinement ? tabDGridMode : 'base'}`} x={-5000} y={-5000} width={10000} height={10000} fill={`url(#workspace-grid-${tabDUiRefinement ? tabDGridMode : 'base'})`} />}
                   {dragState?.kind === 'marquee' && <rect x={Math.min(dragState.start[0], dragState.end[0])} y={Math.min(dragState.start[1], dragState.end[1])} width={Math.abs(dragState.end[0] - dragState.start[0])} height={Math.abs(dragState.end[1] - dragState.start[1])} fill={`${colors.selection}18`} stroke={colors.selection} strokeWidth={1.2} strokeDasharray="5 4" pointerEvents="none" />}
 
-                  {activeMeshTrace?.meshCycles?.map((cycle) => <MeshLoopOverlay key={`mesh-cycle-${cycle.index}`} cycle={cycle} tabDUiRefinement={tabDUiRefinement} components={components} scale={visualSymbolScale} />)}
+                  {activeMeshTrace?.meshCycles?.map((cycle) => <MeshLoopOverlay key={`mesh-cycle-${cycle.index}`} cycle={cycle} tabDUiRefinement={tabDUiRefinement} components={components} scale={visualSymbolScale} wires={wires} />)}
 
                   {/* Dedicated layer containing ONLY components, wires, labels, and texts for tight export bounding box */}
                   <g id="circuit-elements-layer">

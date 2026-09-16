@@ -42,7 +42,7 @@ describe('calculateMeshLoopBounds (Bounding Box Midpoint & Safe Radius)', () => 
     expect(bounds.cy).toBe(50);
     expect(bounds.width).toBe(200);
     expect(bounds.height).toBe(100);
-    expect(bounds.R).toBe(25); // 25% of 100
+    expect(bounds.R).toBe(22); // Clamped to max 22px
   });
 
   it('prevents center drift towards dense shared branches where vertex averaging fails', () => {
@@ -71,7 +71,7 @@ describe('calculateMeshLoopBounds (Bounding Box Midpoint & Safe Radius)', () => 
     const bounds = calculateMeshLoopBounds(asymmetricNodes);
     expect(bounds.cx).toBe(100); // Perfectly centered in the middle of the loop void!
     expect(bounds.cy).toBe(50);
-    expect(bounds.R).toBe(25);
+    expect(bounds.R).toBe(22);
     // Collision-safe guarantee: Loop circle does NOT touch boundary wires (x=0, x=200, y=0, y=100)
     expect(bounds.cx - bounds.R).toBeGreaterThan(0);
     expect(bounds.cx + bounds.R).toBeLessThan(200);
@@ -79,23 +79,99 @@ describe('calculateMeshLoopBounds (Bounding Box Midpoint & Safe Radius)', () => 
     expect(bounds.cy + bounds.R).toBeLessThan(100);
   });
 
-  it('enforces collision-safe radius clamped between 15px and 35px', () => {
-    // Very small mesh loop (40x40): 25% of 40 = 10, clamped to minimum 15px
+  it('enforces collision-safe radius clamped between 14px and 22px', () => {
+    // Very small mesh loop (40x40): 25% of 40 = 10, clamped to minimum 14px
     const smallLoop: Point[] = [[0, 0], [40, 0], [40, 40], [0, 40]];
     const smallBounds = calculateMeshLoopBounds(smallLoop);
-    expect(smallBounds.R).toBe(15);
+    expect(smallBounds.R).toBe(14);
 
-    // Very large mesh loop (400x300): 25% of 300 = 75, clamped to maximum 35px
+    // Very large mesh loop (400x300): 25% of 300 = 75, hard-clamped to maximum 22px (no bloated hoops)
     const largeLoop: Point[] = [[0, 0], [400, 0], [400, 300], [0, 300]];
     const largeBounds = calculateMeshLoopBounds(largeLoop);
-    expect(largeBounds.R).toBe(35);
+    expect(largeBounds.R).toBe(22);
 
-    // Medium mesh loop (160x80): 25% of 80 = 20, in readable range [15, 35]
+    // Medium mesh loop (160x80): 25% of 80 = 20, within [14, 22] range
     const mediumLoop: Point[] = [[10, 10], [170, 10], [170, 90], [10, 90]];
     const mediumBounds = calculateMeshLoopBounds(mediumLoop);
     expect(mediumBounds.R).toBe(20);
     expect(mediumBounds.cx).toBe(90);
     expect(mediumBounds.cy).toBe(50);
+  });
+
+  it('computes bounds from cycle.wires waypoints matching visual wire segments', () => {
+    const mockCycle = {
+      index: 1,
+      color: '#7c3aed',
+      points: [[50, 380], [600, 380]], // Contaminated points from logical super-node
+      centroid: [325, 220] as [number, number],
+      radius: 35,
+      nodes: [],
+      branchIds: ['R8', 'V2', 'R3', 'I1'],
+      wires: [
+        { waypoints: [{ x: 300, y: 60 }, { x: 450, y: 60 }, { x: 600, y: 60 }] },
+        { waypoints: [{ x: 600, y: 60 }, { x: 600, y: 380 }] },
+        { waypoints: [{ x: 600, y: 380 }, { x: 300, y: 380 }] },
+        { waypoints: [{ x: 300, y: 380 }, { x: 300, y: 60 }] },
+      ],
+    };
+
+    const bounds = calculateMeshLoopBounds(mockCycle);
+    expect(bounds.minX).toBe(300);
+    expect(bounds.maxX).toBe(600);
+    expect(bounds.cx).toBe(450); // Perfectly centered at 450, completely immune to contaminated points at 50!
+    expect(bounds.cy).toBe(220);
+    expect(bounds.R).toBe(22); // Hard clamped to 22px
+  });
+
+  it('resolves visual wire segments and components for Mesh 2 without ground super-node skew', () => {
+    // Exact topology from the user screenshot:
+    // Left: V1(50, 280), R1(200, 60)
+    // Middle branch: R8(300, 140), V2(300, 280)
+    // Right branch: R3(450, 60), I1(600, 180)
+    const components: CircuitComponent[] = [
+      { id: 'V1', type: 'dc-voltage', x: 50, y: 280, rotation: 0, flipH: false, flipV: false, label: 'V_1', value: 12 },
+      { id: 'R1', type: 'resistor', x: 200, y: 60, rotation: 0, flipH: false, flipV: false, label: 'R_1', value: 1000 },
+      { id: 'R8', type: 'resistor', x: 300, y: 140, rotation: 90, flipH: false, flipV: false, label: 'R_8', value: 1000 },
+      { id: 'V2', type: 'dc-voltage', x: 300, y: 280, rotation: 0, flipH: false, flipV: false, label: 'V_2', value: 12 },
+      { id: 'R3', type: 'resistor', x: 450, y: 60, rotation: 0, flipH: false, flipV: false, label: 'R_3', value: 1000 },
+      { id: 'I1', type: 'dc-current', x: 600, y: 180, rotation: 0, flipH: false, flipV: false, label: 'I_1', value: 1 },
+      { id: 'GND', type: 'ground', x: 150, y: 380, rotation: 0, flipH: false, flipV: false },
+    ];
+
+    const wires: any[] = [
+      // Mesh 1 wires
+      { id: 'w1', fromComp: 'V1', fromTerm: 'pos', toComp: 'R1', toTerm: 'a', path: [[50, 240], [50, 60], [170, 60]] },
+      { id: 'w2', fromComp: 'R1', fromTerm: 'b', toComp: 'R8', toTerm: 'a', path: [[230, 60], [300, 60], [300, 110]] },
+      // Shared middle wire
+      { id: 'w3', fromComp: 'R8', fromTerm: 'b', toComp: 'V2', toTerm: 'pos', path: [[300, 170], [300, 240]] },
+      // Mesh 2 top wires
+      { id: 'w4', fromComp: 'R8', fromTerm: 'a', toComp: 'R3', toTerm: 'a', path: [[300, 60], [420, 60]] },
+      { id: 'w5', fromComp: 'R3', fromTerm: 'b', toComp: 'I1', toTerm: 'pos', path: [[480, 60], [600, 60], [600, 140]] },
+      // Mesh 2 right/bottom wire to middle branch
+      { id: 'w6', fromComp: 'I1', fromTerm: 'neg', toComp: 'V2', toTerm: 'neg', path: [[600, 220], [600, 380], [300, 380], [300, 320]] },
+      // Ground rail wire to the far left (Mesh 1 / ground)
+      { id: 'w7', fromComp: 'GND', fromTerm: 'gnd', toComp: 'V1', toTerm: 'neg', path: [[150, 380], [50, 380], [50, 320]] },
+    ];
+
+    const mesh2Cycle = {
+      index: 1,
+      color: '#7c3aed',
+      points: [[50, 380], [600, 380], [600, 60], [300, 60]], // Contaminated logical super-node points
+      centroid: [325, 220] as [number, number],
+      radius: 35,
+      nodes: [],
+      branchIds: ['R8', 'V2', 'R3', 'I1'],
+    };
+
+    const bounds = calculateMeshLoopBounds(mesh2Cycle, components, wires);
+    // Physical boundary of Mesh 2 is strictly x in [300, 600]
+    expect(bounds.minX).toBeGreaterThanOrEqual(280);
+    expect(bounds.maxX).toBeLessThanOrEqual(620);
+    // Center is in the empty right-hand space (~450), NOT crashed into middle branch (300)
+    expect(bounds.cx).toBeGreaterThanOrEqual(430);
+    expect(bounds.cx).toBeLessThanOrEqual(470);
+    // Radius is elegantly clamped to 22px max
+    expect(bounds.R).toBe(22);
   });
 });
 

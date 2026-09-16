@@ -25,6 +25,7 @@ export interface MeshCycle {
   /** Human-readable electrical node sequence is intentionally never exposed as internal UI IDs. */
   nodes: string[];
   branchIds: string[];
+  wires?: Array<{ waypoints: Array<{ x: number; y: number } | [number, number]> | Array<[number, number]>; path?: [number, number][] }>;
 }
 
 export type AnalysisMethod = 'nodal' | 'mesh' | 'superposition' | 'transform' | 'thevenin';

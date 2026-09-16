@@ -1,5 +1,6 @@
-import { simplifyOrthogonalPath, snapPointToGrid, type Point } from '@/simulators/circuit-engine/models/wiring';
+import { getTerminalWorldPos, simplifyOrthogonalPath, snapPointToGrid, type Point } from '@/simulators/circuit-engine/models/wiring';
 import type { CircuitComponent, CircuitWire } from '@/simulators/circuit-engine/models/circuitTypes';
+import type { MeshCycle } from '@/simulators/circuit-engine/models/analysisTypes';
 import { getDef } from '@/simulators/circuit-engine/models/componentDefs';
 import { calculateOrthogonalPath } from '@/simulators/circuit-engine/models/wireRouter';
 
@@ -372,9 +373,16 @@ export function calculateTabDPlanarCavity(
 
 /**
  * Calculates the bounding-box midpoint and collision-proof safe radius for mesh current loops.
- * Avoids vertex averaging which skews heavily towards branches with higher node density.
+ * Abandon logical super-nodes for geometry: calculates bounds using specific visual wire segments
+ * (waypoints) and component pins that form the physical boundary of the mesh cycle.
+ * Radius is hard-clamped [14, 22] for a subtle, elegant indicator.
  */
-export function calculateMeshLoopBounds(meshNodes: Array<{ x: number; y: number } | [number, number]>): {
+export function calculateMeshLoopBounds(
+  cycleOrNodes: MeshCycle | Array<{ x: number; y: number } | [number, number]>,
+  components: CircuitComponent[] = [],
+  wires: CircuitWire[] = [],
+  scale = 1,
+): {
   minX: number;
   maxX: number;
   minY: number;
@@ -385,33 +393,125 @@ export function calculateMeshLoopBounds(meshNodes: Array<{ x: number; y: number 
   height: number;
   R: number;
 } {
-  const normalized = meshNodes.map((n: any) => ({
-    x: Array.isArray(n) ? n[0] : (typeof n?.x === 'number' ? n.x : 0),
-    y: Array.isArray(n) ? n[1] : (typeof n?.y === 'number' ? n.y : 0),
-  }));
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
 
-  if (normalized.length === 0) {
-    return { minX: 0, maxX: 0, minY: 0, maxY: 0, cx: 0, cy: 0, width: 0, height: 0, R: 15 };
+  const updateBounds = (x: number, y: number) => {
+    if (typeof x === 'number' && isFinite(x) && typeof y === 'number' && isFinite(y)) {
+      minX = Math.min(minX, x);
+      maxX = Math.max(maxX, x);
+      minY = Math.min(minY, y);
+      maxY = Math.max(maxY, y);
+    }
+  };
+
+  if (Array.isArray(cycleOrNodes)) {
+    // Direct array of points/waypoints passed
+    cycleOrNodes.forEach((n: any) => {
+      const x = Array.isArray(n) ? n[0] : (typeof n?.x === 'number' ? n.x : 0);
+      const y = Array.isArray(n) ? n[1] : (typeof n?.y === 'number' ? n.y : 0);
+      updateBounds(x, y);
+    });
+  } else {
+    const cycle = cycleOrNodes;
+    const branchIds = new Set(cycle.branchIds ?? []);
+
+    // 1. If cycle explicitly contains wires, iterate over visual wire waypoints
+    if (cycle.wires && cycle.wires.length > 0) {
+      cycle.wires.forEach((wire) => {
+        const waypoints = wire.waypoints ?? (wire as any).path ?? [];
+        waypoints.forEach((pt: any) => {
+          const x = Array.isArray(pt) ? pt[0] : (typeof pt?.x === 'number' ? pt.x : 0);
+          const y = Array.isArray(pt) ? pt[1] : (typeof pt?.y === 'number' ? pt.y : 0);
+          updateBounds(x, y);
+        });
+      });
+    }
+
+    // 2. Include specific visual Component Pins that form the cycle edges
+    const cycleComponents = components.filter((c) => branchIds.has(c.id));
+    cycleComponents.forEach((comp) => {
+      const def = getDef(comp.type);
+      if (def?.terminals && def.terminals.length > 0) {
+        def.terminals.forEach((term) => {
+          const pinPos = getTerminalWorldPos(
+            comp.x,
+            comp.y,
+            term.x,
+            term.y,
+            comp.rotation,
+            comp.flipH,
+            comp.flipV,
+          );
+          updateBounds(pinPos[0], pinPos[1]);
+        });
+      } else {
+        updateBounds(comp.x, comp.y);
+      }
+    });
+
+    // 3. Iterate specific visual Wire Segments (Waypoints) that form the cycle boundary
+    if (wires.length > 0 && cycleComponents.length > 0) {
+      // Physical bounding corridor of the cycle's components
+      const compMinX = Math.min(...cycleComponents.map((c) => c.x)) - 60;
+      const compMaxX = Math.max(...cycleComponents.map((c) => c.x)) + 60;
+      const compMinY = Math.min(...cycleComponents.map((c) => c.y)) - 60;
+      const compMaxY = Math.max(...cycleComponents.map((c) => c.y)) + 60;
+
+      wires.forEach((wire) => {
+        const fromInCycle = branchIds.has(wire.fromComp);
+        const toInCycle = branchIds.has(wire.toComp);
+        const fromExternal = components.some((c) => c.id === wire.fromComp && !branchIds.has(c.id));
+        const toExternal = components.some((c) => c.id === wire.toComp && !branchIds.has(c.id));
+
+        if (fromInCycle && toInCycle) {
+          // Direct intra-cycle connection
+          const pts = wire.waypoints ?? wire.path ?? [];
+          pts.forEach((pt: any) => {
+            const x = Array.isArray(pt) ? pt[0] : (typeof pt?.x === 'number' ? pt.x : 0);
+            const y = Array.isArray(pt) ? pt[1] : (typeof pt?.y === 'number' ? pt.y : 0);
+            updateBounds(x, y);
+          });
+        } else if ((fromInCycle || toInCycle) && !fromExternal && !toExternal) {
+          // Wire segment attached to cycle component and a junction/stub (not an external component)
+          const pts = wire.waypoints ?? wire.path ?? [];
+          pts.forEach((pt: any) => {
+            const x = Array.isArray(pt) ? pt[0] : (typeof pt?.x === 'number' ? pt.x : 0);
+            const y = Array.isArray(pt) ? pt[1] : (typeof pt?.y === 'number' ? pt.y : 0);
+            if (x >= compMinX && x <= compMaxX && y >= compMinY && y <= compMaxY) {
+              updateBounds(x, y);
+            }
+          });
+        }
+      });
+    }
+
+    // 4. Fallback if no specific wires or components were resolved
+    if (!isFinite(minX) || !isFinite(maxX)) {
+      const rawNodes = cycle.points && cycle.points.length > 0 ? cycle.points : [];
+      rawNodes.forEach((pt: any) => {
+        const x = Array.isArray(pt) ? pt[0] : (typeof pt?.x === 'number' ? pt.x : 0);
+        const y = Array.isArray(pt) ? pt[1] : (typeof pt?.y === 'number' ? pt.y : 0);
+        updateBounds(x, y);
+      });
+    }
   }
 
-  // Find the absolute limits of the specific mesh loop
-  const minX = Math.min(...normalized.map(n => n.x));
-  const maxX = Math.max(...normalized.map(n => n.x));
-  const minY = Math.min(...normalized.map(n => n.y));
-  const maxY = Math.max(...normalized.map(n => n.y));
+  if (!isFinite(minX) || !isFinite(maxX) || !isFinite(minY) || !isFinite(maxY)) {
+    return { minX: 0, maxX: 0, minY: 0, maxY: 0, cx: 0, cy: 0, width: 0, height: 0, R: 14 };
+  }
 
-  // The visual center is exactly in the middle of the extremes (Bounding Box Midpoint, NOT Average)
+  // The visual center is exactly in the middle of the extremes (Bounding Box Midpoint)
   const cx = (minX + maxX) / 2;
   const cy = (minY + maxY) / 2;
 
-  // Calculate a Collision-Proof Safe Radius:
   const width = maxX - minX;
   const height = maxY - minY;
 
-  // Radius must be proportional to the empty space.
-  // 25% of the shortest side guarantees it will never touch the boundary wires.
-  // Clamp it between a readable minimum (15px) and a clean maximum (35px).
-  const R = Math.max(15, Math.min(35, Math.min(width, height) * 0.25));
+  // Radius must be proportional to empty space, hard-clamped [14, 22] for a subtle, elegant indicator
+  const R = Math.max(14, Math.min(22, Math.min(width, height) * 0.25));
 
   return { minX, maxX, minY, maxY, cx, cy, width, height, R };
 }
