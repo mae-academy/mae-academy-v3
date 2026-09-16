@@ -41,20 +41,32 @@ export function OscilloscopeTracePanel({ colors, scopes, instrumentReadings, dis
 }
 
 function formatVoltageDivLatex(v: number): string {
-  if (Math.abs(v) < 1e-9) return '0\\ \\text{V}';
+  if (Math.abs(v) < 1e-12) return '0\\ \\text{V}';
   const sign = v < 0 ? '-' : '+';
   const abs = Math.abs(v);
+  if (abs < 1e-3) {
+    const val = Number((abs * 1e6).toPrecision(3));
+    return `${sign}${val}\\ \\mu\\text{V}`;
+  }
   if (abs < 1) {
     const val = Number((abs * 1e3).toPrecision(3));
     return `${sign}${val}\\ \\text{mV}`;
+  }
+  if (abs >= 1e3) {
+    const val = Number((abs / 1e3).toPrecision(3));
+    return `${sign}${val}\\ \\text{kV}`;
   }
   const val = Number(abs.toPrecision(3));
   return `${sign}${val}\\ \\text{V}`;
 }
 
 function formatTimeDivLatex(sec: number): string {
-  if (Math.abs(sec) < 1e-9) return '0\\ \\text{s}';
+  if (Math.abs(sec) < 1e-12) return '0\\ \\text{s}';
   const abs = Math.abs(sec);
+  if (abs < 1e-6) {
+    const val = Number((abs * 1e9).toPrecision(3));
+    return `${val}\\ \\text{ns}`;
+  }
   if (abs < 1e-3) {
     const val = Number((abs * 1e6).toPrecision(3));
     return `${val}\\ \\mu\\text{s}`;

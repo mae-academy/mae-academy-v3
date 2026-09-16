@@ -47,7 +47,9 @@ export interface AutoscaleResult {
  */
 export function calculateAutoscale(samples: SamplePoint[], frequencyHz: number): AutoscaleResult {
   if (samples.length < 2) {
-    return { offset: 0, voltDiv: OSCILLOSCOPE_VOLT_DIV_PRESETS[4], timeDiv: OSCILLOSCOPE_TIME_DIV_PRESETS[6], timeShift: 0 };
+    const defaultVoltDiv = OSCILLOSCOPE_VOLT_DIV_PRESETS.find(p => p >= 1) ?? 1;
+    const defaultTimeDiv = OSCILLOSCOPE_TIME_DIV_PRESETS.find(p => p >= 0.01) ?? 0.01;
+    return { offset: 0, voltDiv: defaultVoltDiv, timeDiv: defaultTimeDiv, timeShift: 0 };
   }
   let min = Infinity;
   let max = -Infinity;

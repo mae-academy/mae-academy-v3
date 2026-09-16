@@ -23,26 +23,44 @@ function numeric(value: unknown, fallback: number): number {
 
 /** Format seconds for KaTeX math rendering (e.g. 10\,\mu\text{s}, 1\,\text{ms}, 2\,\text{s}). */
 function formatTimeLatex(sec: number): string {
-  if (sec < 1e-3) {
-    const val = Number((sec * 1e6).toPrecision(3));
-    return `${val}\\ \\mu\\text{s}`;
+  if (Math.abs(sec) < 1e-12) return '0\\ \\text{s}';
+  const abs = Math.abs(sec);
+  const sign = sec < 0 ? '-' : '';
+  if (abs < 1e-6) {
+    const val = Number((abs * 1e9).toPrecision(3));
+    return `${sign}${val}\\ \\text{ns}`;
   }
-  if (sec < 1) {
-    const val = Number((sec * 1e3).toPrecision(3));
-    return `${val}\\ \\text{ms}`;
+  if (abs < 1e-3) {
+    const val = Number((abs * 1e6).toPrecision(3));
+    return `${sign}${val}\\ \\mu\\text{s}`;
   }
-  const val = Number(sec.toPrecision(3));
-  return `${val}\\ \\text{s}`;
+  if (abs < 1) {
+    const val = Number((abs * 1e3).toPrecision(3));
+    return `${sign}${val}\\ \\text{ms}`;
+  }
+  const val = Number(abs.toPrecision(3));
+  return `${sign}${val}\\ \\text{s}`;
 }
 
-/** Format volts for KaTeX math rendering (e.g. 10\,\text{mV}, 5\,\text{V}). */
+/** Format volts for KaTeX math rendering (e.g. 10\,\mu\text{V}, 10\,\text{mV}, 5\,\text{V}, 1\,\text{kV}). */
 function formatVoltLatex(v: number): string {
-  if (v < 1) {
-    const val = Number((v * 1e3).toPrecision(3));
-    return `${val}\\ \\text{mV}`;
+  if (Math.abs(v) < 1e-12) return '0\\ \\text{V}';
+  const abs = Math.abs(v);
+  const sign = v < 0 ? '-' : '';
+  if (abs < 1e-3) {
+    const val = Number((abs * 1e6).toPrecision(3));
+    return `${sign}${val}\\ \\mu\\text{V}`;
   }
-  const val = Number(v.toPrecision(3));
-  return `${val}\\ \\text{V}`;
+  if (abs < 1) {
+    const val = Number((abs * 1e3).toPrecision(3));
+    return `${sign}${val}\\ \\text{mV}`;
+  }
+  if (abs >= 1e3) {
+    const val = Number((abs / 1e3).toPrecision(3));
+    return `${sign}${val}\\ \\text{kV}`;
+  }
+  const val = Number(abs.toPrecision(3));
+  return `${sign}${val}\\ \\text{V}`;
 }
 
 /** Nearest preset index on a log scale — lets the stepper land on a rung even for a value that
@@ -140,7 +158,7 @@ export function OscilloscopeComponentPanel({ colors, component, readings, displa
       {/* Offset readout in KaTeX */}
       <StepArrowRow
         colors={colors}
-        mathLabel={`V_{\\text{offset}} = ${offset.toFixed(2)}\\ \\text{V}`}
+        mathLabel={`V_{\\text{offset}} = ${formatVoltLatex(offset)}`}
         min={minOffset}
         max={maxOffset}
         step={offsetStep}

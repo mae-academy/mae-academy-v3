@@ -1027,8 +1027,16 @@ const MEASUREMENT: Record<string, ComponentDef> = {
 };
 
 // Discrete Time/Div and Volt/Div rungs the oscilloscope's logarithmic sliders snap to.
-export const OSCILLOSCOPE_TIME_DIV_PRESETS = [1e-5, 5e-5, 1e-4, 5e-4, 1e-3, 5e-3, 1e-2, 5e-2, 1e-1, 5e-1, 1, 2, 5, 10];
-export const OSCILLOSCOPE_VOLT_DIV_PRESETS = [1e-3, 5e-3, 1e-2, 5e-2, 1e-1, 5e-1, 1, 2, 5, 10, 20, 50, 100];
+export const OSCILLOSCOPE_TIME_DIV_PRESETS = [
+  1e-6, 2e-6, 5e-6, 1e-5, 2e-5, 5e-5, 1e-4, 2e-4, 5e-4,
+  1e-3, 2e-3, 5e-3, 1e-2, 2e-2, 5e-2, 1e-1, 2e-1, 5e-1,
+  1, 2, 5, 10
+];
+export const OSCILLOSCOPE_VOLT_DIV_PRESETS = [
+  1e-6, 2e-6, 5e-6, 1e-5, 2e-5, 5e-5, 1e-4, 2e-4, 5e-4,
+  1e-3, 2e-3, 5e-3, 1e-2, 2e-2, 5e-2, 1e-1, 2e-1, 5e-1,
+  1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000
+];
 
 // ─── MASTER EXPORT ────────────────────────────────────────────────────────────
 export const COMPONENT_DEFS: Record<string, ComponentDef> = {

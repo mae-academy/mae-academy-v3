@@ -227,4 +227,41 @@ describe('Electron Flow & Branch Current Physics', () => {
     expect(shortDrift).toBeCloseTo(20, 2);
     expect(longDrift).toBeCloseTo(20, 2);
   });
+
+  it('strictly stops electron animation on branches when sources are deactivated in superposition sub-circuit', () => {
+    // 2-source circuit: V1 and I1 feeding parallel resistors R1 and R2
+    // When I1 is deactivated in superposition (0A, open circuit):
+    const subCircuitComponents = [
+      component('V1', 'dc-voltage', { voltage: 12 }),
+      component('I1', 'dc-current', { current: 0 }), // Deactivated current source in superposition
+      component('R1', 'resistor', { resistance: 100 }),
+      component('R2', 'resistor', { resistance: 200 }),
+      component('GND', 'ground'),
+    ];
+    const wires = [
+      wire('w_v_top', 'V1', 'pos', 'R1', 'a'),
+      wire('w_v_bot', 'R1', 'b', 'V1', 'neg'),
+      wire('w_gnd', 'V1', 'neg', 'GND', 'gnd'),
+      wire('w_i_top', 'I1', 'pos', 'R2', 'a'),
+      wire('w_i_bot', 'R2', 'b', 'I1', 'neg'),
+    ];
+
+    const simEngine = new SimulationEngine();
+    simEngine.setCircuit(subCircuitComponents, wires);
+    const snap0 = simEngine.step(0.016);
+    const snap1 = simEngine.step(0.016);
+
+    // Active V1 branch must have current and advancing electrons
+    expect(Math.abs(snap1.wireCurrents['w_v_top'])).toBeGreaterThan(0.05);
+    const vPhaseDiff = (snap1.wirePhases?.['w_v_top'] ?? 0) - (snap0.wirePhases?.['w_v_top'] ?? 0);
+    expect(vPhaseDiff).toBeGreaterThan(0);
+
+    // Deactivated I1 branch (open circuit, 0A) must have exactly 0 current and stopped electron animation
+    expect(snap1.wireCurrents['w_i_top'] ?? 0).toBe(0);
+    expect(snap1.wireCurrents['w_i_bot'] ?? 0).toBe(0);
+    const iTopPhaseDiff = (snap1.wirePhases?.['w_i_top'] ?? 0) - (snap0.wirePhases?.['w_i_top'] ?? 0);
+    const iBotPhaseDiff = (snap1.wirePhases?.['w_i_bot'] ?? 0) - (snap0.wirePhases?.['w_i_bot'] ?? 0);
+    expect(iTopPhaseDiff).toBe(0);
+    expect(iBotPhaseDiff).toBe(0);
+  });
 });

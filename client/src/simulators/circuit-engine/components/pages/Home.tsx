@@ -1243,6 +1243,48 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
   const isSuperpositionActive = activeAnalysisMethod === 'superposition';
   const superpositionActiveSourceId = isSuperpositionActive ? activeSuperpositionTrace?.activeSourceId : null;
 
+  const effectiveCircuitComponents = useMemo(() => {
+    if (!isSuperpositionActive || !superpositionActiveSourceId) {
+      return components;
+    }
+    return components.map(c => {
+      const isIndepSource = ['dc-voltage', 'ac-voltage', 'dc-rail', 'dc-current', 'ac-current', 'three-phase-rail'].includes(c.type);
+      if (isIndepSource && c.id !== superpositionActiveSourceId) {
+        if (c.type === 'dc-voltage' || c.type === 'ac-voltage' || c.type === 'dc-rail') {
+          return {
+            ...c,
+            props: {
+              ...c.props,
+              voltage: 0,
+              amplitude: 0,
+              internalR: 0.0001,
+            },
+          };
+        }
+        if (c.type === 'dc-current' || c.type === 'ac-current') {
+          return {
+            ...c,
+            props: {
+              ...c.props,
+              current: 0,
+              amplitude: 0,
+            },
+          };
+        }
+        if (c.type === 'three-phase-rail') {
+          return {
+            ...c,
+            props: {
+              ...c.props,
+              lineVoltage: 0,
+            },
+          };
+        }
+      }
+      return c;
+    });
+  }, [components, isSuperpositionActive, superpositionActiveSourceId]);
+
   const theveninTerminals = useMemo(() => {
     if (!isTheveninActive || !theveninTargetComp) return null;
     const def = getDef(theveninTargetComp.type);
@@ -2388,15 +2430,15 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
 
   const resetSimulation = useCallback(() => {
     simulation.current.reset();
-    simulation.current.setCircuit(components, wires);
+    simulation.current.setCircuit(effectiveCircuitComponents, wires);
     setSnapshot(simulation.current.getSnapshot());
     setAnimationTime(0);
-  }, [components, wires]);
+  }, [effectiveCircuitComponents, wires]);
 
   useEffect(() => {
-    simulation.current.setCircuit(components, wires);
+    simulation.current.setCircuit(effectiveCircuitComponents, wires);
     setSnapshot(simulation.current.getSnapshot());
-  }, [components, wires]);
+  }, [effectiveCircuitComponents, wires]);
 
   useEffect(() => {
     if (!simulationRunning) return undefined;
@@ -2418,7 +2460,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
 
   useEffect(() => {
     // The previous agent added a log here. I will remove it to clean up.
-  }, [animationTime, components]);
+  }, [animationTime, effectiveCircuitComponents]);
 
   // --- SPICE Accuracy Bridge ---
   // Runs ngspice off the main thread alongside the always-on legacy loop above. On success its
@@ -2462,19 +2504,19 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     let nets: SpiceCircuitNets;
     let spiceComponents;
     try {
-      nets = resolveCircuitNets(components, wires);
-      spiceComponents = convertToSpiceComponents(components, wires, nets, simulationMode);
+      nets = resolveCircuitNets(effectiveCircuitComponents, wires);
+      spiceComponents = convertToSpiceComponents(effectiveCircuitComponents, wires, nets, simulationMode);
       const isStepMode = oscilloscopeDisplaySettings.acquisitionMode === 'step';
       // A seeded `.IC` is inert without `uic` (ngspice otherwise recomputes its own t=0 bias and
       // discards it) — see GenerateNetlistOptions.initialNodeVoltages.
       const hasLatchedCoil = coilInitialVoltagesRef.current.size > 0;
-      const maxScopeWindow = components
+      const maxScopeWindow = effectiveCircuitComponents
         .filter(c => c.type === 'oscilloscope')
         .reduce((max, scope) => {
           const chTimes = ['ch1', 'ch2', 'ch3', 'ch4'].map(ch => Number(scope.props[`timeDiv_${ch}`]) || 0.01);
           return Math.max(max, ...chTimes.map(t => t * 10));
         }, 0);
-      const frequency = Math.max(0.001, detectSystemFrequency(components));
+      const frequency = Math.max(0.001, detectSystemFrequency(effectiveCircuitComponents));
       const duration = Math.min(2.0, Math.max(0.02, SPICE_TRAN_PERIODS / frequency, maxScopeWindow));
       const analysis = [`.tran ${duration / 2000} ${duration}${isStepMode || hasLatchedCoil ? ' uic' : ''}`];
       netlist = generateNetlist(spiceComponents, {
@@ -2505,7 +2547,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     }
 
     spiceUnsupportedToastRef.current = null;
-    spiceRunContextRef.current = { components, nets, nodeMap: buildSpiceNodeMap(spiceComponents) };
+    spiceRunContextRef.current = { components: effectiveCircuitComponents, nets, nodeMap: buildSpiceNodeMap(spiceComponents) };
     setSpiceStatus({ kind: 'running' });
     void spiceEngine.runSimulation(netlist);
     // Only the netlist inputs and the hook's own (stable, useCallback-wrapped) `runSimulation`
@@ -2513,7 +2555,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     // this used to — broke the debounce below: `useSpiceEngine` returns a new object every render,
     // so during Run (a 60fps state update loop) the debounce timer was reset before it could ever
     // elapse, and SPICE silently stopped re-solving on switch toggles until Pause forced one retry.
-  }, [clearSpiceReadings, components, oscilloscopeDisplaySettings.acquisitionMode, simulationMode, spiceEngine.runSimulation, wires]);
+  }, [clearSpiceReadings, effectiveCircuitComponents, oscilloscopeDisplaySettings.acquisitionMode, simulationMode, spiceEngine.runSimulation, wires]);
 
   // Trigger on every circuit edit, debounced so a drag or a burst of keystrokes fires one run — but
   // not a switch/relay toggle: those set `spiceEagerRef` first, so this fires with no delay for

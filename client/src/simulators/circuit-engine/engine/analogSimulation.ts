@@ -290,8 +290,21 @@ export class TabDSimulationEngine extends SimulationEngine {
           const wiresAtFrom = terminalWireCount[fromKey] ?? 0;
           const wiresAtTo = terminalWireCount[toKey] ?? 0;
 
+          const fromCompObj = this.tabDComponents.find(c => c.id === wire.fromComp);
+          const toCompObj = this.tabDComponents.find(c => c.id === wire.toComp);
+          const fromIsCurrent = fromCompObj && (fromCompObj.type === 'dc-current' || fromCompObj.type === 'ac-current');
+          const toIsCurrent = toCompObj && (toCompObj.type === 'dc-current' || toCompObj.type === 'ac-current');
+
           let wireI = 0;
-          if (wiresAtTo === 1 && toI !== undefined && wiresAtFrom !== 1) {
+          if (fromIsCurrent || toIsCurrent) {
+            if (fromIsCurrent) {
+              const srcI = fromI !== undefined ? -fromI : 0;
+              wireI = wire.fromTerm === 'pos' ? srcI : -srcI;
+            } else if (toIsCurrent) {
+              const srcI = toI !== undefined ? toI : 0;
+              wireI = wire.toTerm === 'pos' ? -srcI : srcI;
+            }
+          } else if (wiresAtTo === 1 && toI !== undefined && wiresAtFrom !== 1) {
             wireI = toI;
           } else if (wiresAtFrom === 1 && fromI !== undefined && wiresAtTo !== 1) {
             wireI = -fromI;
