@@ -431,12 +431,12 @@ export function ExportPreviewModal({
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Global Format Selector: Pill buttons matching Download All gradient styling */}
+            {/* Global Format Selector */}
             <div className="flex items-center gap-1.5">
               <button
                 type="button"
                 onClick={() => handleToggleGlobalFormat('png')}
-                className={`px-3.5 py-1.5 text-xs font-semibold rounded-full transition-all ${globalFormat === 'png'
+                className={`px-4 py-1.5 text-xs font-semibold rounded-xl transition-all ${globalFormat === 'png'
                     ? 'bg-gradient-to-r from-blue-600 via-purple-600 to-rose-500 text-white shadow-md'
                     : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#1b2028]'
                   }`}
@@ -446,7 +446,7 @@ export function ExportPreviewModal({
               <button
                 type="button"
                 onClick={() => handleToggleGlobalFormat('svg')}
-                className={`px-3.5 py-1.5 text-xs font-semibold rounded-full transition-all ${globalFormat === 'svg'
+                className={`px-4 py-1.5 text-xs font-semibold rounded-xl transition-all ${globalFormat === 'svg'
                     ? 'bg-gradient-to-r from-blue-600 via-purple-600 to-rose-500 text-white shadow-md'
                     : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#1b2028]'
                   }`}
@@ -497,7 +497,7 @@ export function ExportPreviewModal({
                           <button
                             type="button"
                             onClick={() => handleToggleItemFormat(item.id, 'png')}
-                            className={`px-2.5 py-0.5 text-[11px] font-semibold rounded-full transition-all ${activeFormat === 'png'
+                            className={`px-2.5 py-0.5 text-[11px] font-semibold rounded-lg transition-all ${activeFormat === 'png'
                                 ? 'bg-gradient-to-r from-blue-600 via-purple-600 to-rose-500 text-white shadow-xs'
                                 : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-[#1b2028]'
                               }`}
@@ -507,7 +507,7 @@ export function ExportPreviewModal({
                           <button
                             type="button"
                             onClick={() => handleToggleItemFormat(item.id, 'svg')}
-                            className={`px-2.5 py-0.5 text-[11px] font-semibold rounded-full transition-all ${activeFormat === 'svg'
+                            className={`px-2.5 py-0.5 text-[11px] font-semibold rounded-lg transition-all ${activeFormat === 'svg'
                                 ? 'bg-gradient-to-r from-blue-600 via-purple-600 to-rose-500 text-white shadow-xs'
                                 : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-[#1b2028]'
                               }`}
