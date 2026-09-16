@@ -293,43 +293,44 @@ function sourcePointFromElement(element: SVGSVGElement | null, pan: Point, zoom:
   return [(rect.width / 2 - pan[0]) / zoom, (rect.height / 2 - pan[1]) / zoom];
 }
 
-/** Renders an explicit clockwise current reference at the geometrical centroid of one bounded mesh face. */
+/** Renders an explicit clockwise current reference at the geometrical bounding-box midpoint of one bounded mesh face. */
 function MeshLoopOverlay({ cycle }: { cycle: MeshCycle; tabDUiRefinement?: boolean; components?: CircuitComponent[]; scale?: number }) {
-  const meshNodes = cycle.points;
-  let cx = 0;
-  let cy = 0;
-  let minX = Infinity;
-  let maxX = -Infinity;
-  let minY = Infinity;
-  let maxY = -Infinity;
+  const rawNodes = cycle.points && cycle.points.length > 0 ? cycle.points : [];
+  const meshNodes = rawNodes.map((n: any) => ({
+    x: Array.isArray(n) ? n[0] : (typeof n?.x === 'number' ? n.x : 0),
+    y: Array.isArray(n) ? n[1] : (typeof n?.y === 'number' ? n.y : 0),
+  }));
 
-  meshNodes.forEach(([x, y]) => {
-    cx += x;
-    cy += y;
-    if (x < minX) minX = x;
-    if (x > maxX) maxX = x;
-    if (y < minY) minY = y;
-    if (y > maxY) maxY = y;
-  });
+  if (meshNodes.length === 0) return null;
 
-  const n = meshNodes.length || 1;
-  cx /= n;
-  cy /= n;
+  // Find the absolute limits of the specific mesh loop
+  const minX = Math.min(...meshNodes.map(n => n.x));
+  const maxX = Math.max(...meshNodes.map(n => n.x));
+  const minY = Math.min(...meshNodes.map(n => n.y));
+  const maxY = Math.max(...meshNodes.map(n => n.y));
 
+  // The visual center is exactly in the middle of the extremes
+  const cx = (minX + maxX) / 2;
+  const cy = (minY + maxY) / 2;
+
+  // Calculate a Collision-Proof Safe Radius:
   const width = maxX - minX;
   const height = maxY - minY;
-  // Radius dynamically adapts to 25% of smallest dimension, clamped [12, 24]
-  const radius = Math.max(12, Math.min(24, Math.min(width, height) * 0.25));
+
+  // Radius must be proportional to the empty space.
+  // 25% of the shortest side guarantees it will never touch the boundary wires.
+  // Clamp it between a readable minimum (15px) and a clean maximum (35px).
+  const R = Math.max(15, Math.min(35, Math.min(width, height) * 0.25));
   const color = MESH_LOOP_COLORS[cycle.index % MESH_LOOP_COLORS.length];
 
   // Clockwise circular arrow arc sweeping from -45° to -90° (12 o'clock, 315° arc)
   // leaving an open 45° gap where the arrow marker cleanly points in the clockwise tangent direction
   const startAngle = -Math.PI / 4;
-  const startX = cx + radius * Math.cos(startAngle);
-  const startY = cy + radius * Math.sin(startAngle);
+  const startX = cx + R * Math.cos(startAngle);
+  const startY = cy + R * Math.sin(startAngle);
   const endX = cx;
-  const endY = cy - radius;
-  const pathData = `M ${startX} ${startY} A ${radius} ${radius} 0 1 1 ${endX} ${endY}`;
+  const endY = cy - R;
+  const pathData = `M ${startX} ${startY} A ${R} ${R} 0 1 1 ${endX} ${endY}`;
 
   return (
     <g pointerEvents="none" aria-label={`Clockwise mesh current I ${cycle.index + 1}`}>

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { componentPrefix, nextComponentLabel, type CircuitComponent } from '../models/circuitTypes';
-import { calculateTabDPlanarCavity, tabDComponentLabelAnchors } from './analogCanvasGeometry';
+import { calculateMeshLoopBounds, calculateTabDPlanarCavity, tabDComponentLabelAnchors } from './analogCanvasGeometry';
 import type { Point } from '../models/wiring';
 
 describe('calculateTabDPlanarCavity (rendered mesh-indicator geometry)', () => {
@@ -31,6 +31,71 @@ describe('calculateTabDPlanarCavity (rendered mesh-indicator geometry)', () => {
       const sample: Point = [center[0] + radius * Math.cos(radians), center[1] + radius * Math.sin(radians)];
       expect(pointInPolygon(sample, lShape)).toBe(true);
     }
+  });
+});
+
+describe('calculateMeshLoopBounds (Bounding Box Midpoint & Safe Radius)', () => {
+  it('calculates the exact bounding box midpoint instead of vertex average', () => {
+    const rectangle: Point[] = [[0, 0], [200, 0], [200, 100], [0, 100]];
+    const bounds = calculateMeshLoopBounds(rectangle);
+    expect(bounds.cx).toBe(100);
+    expect(bounds.cy).toBe(50);
+    expect(bounds.width).toBe(200);
+    expect(bounds.height).toBe(100);
+    expect(bounds.R).toBe(25); // 25% of 100
+  });
+
+  it('prevents center drift towards dense shared branches where vertex averaging fails', () => {
+    // Asymmetric loop: 2 vertices on the left at x=0, but 10 intermediate nodes on the right shared branch at x=200
+    const asymmetricNodes: Point[] = [
+      [0, 0],
+      [0, 100],
+      // 10 nodes on shared branch at x=200
+      [200, 0],
+      [200, 10],
+      [200, 20],
+      [200, 30],
+      [200, 40],
+      [200, 50],
+      [200, 60],
+      [200, 70],
+      [200, 80],
+      [200, 100],
+    ];
+
+    // Vertex averaging center of mass:
+    const vertexAvgX = asymmetricNodes.reduce((sum, [x]) => sum + x, 0) / asymmetricNodes.length;
+    expect(vertexAvgX).toBeGreaterThan(160); // Severely skewed towards the shared branch (x=200)
+
+    // Bounding box midpoint:
+    const bounds = calculateMeshLoopBounds(asymmetricNodes);
+    expect(bounds.cx).toBe(100); // Perfectly centered in the middle of the loop void!
+    expect(bounds.cy).toBe(50);
+    expect(bounds.R).toBe(25);
+    // Collision-safe guarantee: Loop circle does NOT touch boundary wires (x=0, x=200, y=0, y=100)
+    expect(bounds.cx - bounds.R).toBeGreaterThan(0);
+    expect(bounds.cx + bounds.R).toBeLessThan(200);
+    expect(bounds.cy - bounds.R).toBeGreaterThan(0);
+    expect(bounds.cy + bounds.R).toBeLessThan(100);
+  });
+
+  it('enforces collision-safe radius clamped between 15px and 35px', () => {
+    // Very small mesh loop (40x40): 25% of 40 = 10, clamped to minimum 15px
+    const smallLoop: Point[] = [[0, 0], [40, 0], [40, 40], [0, 40]];
+    const smallBounds = calculateMeshLoopBounds(smallLoop);
+    expect(smallBounds.R).toBe(15);
+
+    // Very large mesh loop (400x300): 25% of 300 = 75, clamped to maximum 35px
+    const largeLoop: Point[] = [[0, 0], [400, 0], [400, 300], [0, 300]];
+    const largeBounds = calculateMeshLoopBounds(largeLoop);
+    expect(largeBounds.R).toBe(35);
+
+    // Medium mesh loop (160x80): 25% of 80 = 20, in readable range [15, 35]
+    const mediumLoop: Point[] = [[10, 10], [170, 10], [170, 90], [10, 90]];
+    const mediumBounds = calculateMeshLoopBounds(mediumLoop);
+    expect(mediumBounds.R).toBe(20);
+    expect(mediumBounds.cx).toBe(90);
+    expect(mediumBounds.cy).toBe(50);
   });
 });
 

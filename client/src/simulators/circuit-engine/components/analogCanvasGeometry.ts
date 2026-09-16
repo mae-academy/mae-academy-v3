@@ -370,6 +370,52 @@ export function calculateTabDPlanarCavity(
   };
 }
 
+/**
+ * Calculates the bounding-box midpoint and collision-proof safe radius for mesh current loops.
+ * Avoids vertex averaging which skews heavily towards branches with higher node density.
+ */
+export function calculateMeshLoopBounds(meshNodes: Array<{ x: number; y: number } | [number, number]>): {
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
+  cx: number;
+  cy: number;
+  width: number;
+  height: number;
+  R: number;
+} {
+  const normalized = meshNodes.map((n: any) => ({
+    x: Array.isArray(n) ? n[0] : (typeof n?.x === 'number' ? n.x : 0),
+    y: Array.isArray(n) ? n[1] : (typeof n?.y === 'number' ? n.y : 0),
+  }));
+
+  if (normalized.length === 0) {
+    return { minX: 0, maxX: 0, minY: 0, maxY: 0, cx: 0, cy: 0, width: 0, height: 0, R: 15 };
+  }
+
+  // Find the absolute limits of the specific mesh loop
+  const minX = Math.min(...normalized.map(n => n.x));
+  const maxX = Math.max(...normalized.map(n => n.x));
+  const minY = Math.min(...normalized.map(n => n.y));
+  const maxY = Math.max(...normalized.map(n => n.y));
+
+  // The visual center is exactly in the middle of the extremes (Bounding Box Midpoint, NOT Average)
+  const cx = (minX + maxX) / 2;
+  const cy = (minY + maxY) / 2;
+
+  // Calculate a Collision-Proof Safe Radius:
+  const width = maxX - minX;
+  const height = maxY - minY;
+
+  // Radius must be proportional to the empty space.
+  // 25% of the shortest side guarantees it will never touch the boundary wires.
+  // Clamp it between a readable minimum (15px) and a clean maximum (35px).
+  const R = Math.max(15, Math.min(35, Math.min(width, height) * 0.25));
+
+  return { minX, maxX, minY, maxY, cx, cy, width, height, R };
+}
+
 export interface TabDJunctionResult {
   point: Point;
   degree: number;
