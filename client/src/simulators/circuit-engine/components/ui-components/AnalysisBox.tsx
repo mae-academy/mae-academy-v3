@@ -15,7 +15,6 @@ import { MESH_LOOP_COLORS } from '@/simulators/circuit-engine/components/analogC
 import { AcademicNodalDictionary } from '@/simulators/circuit-engine/models/AcademicNodalDictionary';
 import type { CircuitComponent } from '@/simulators/circuit-engine/models/circuitTypes';
 import { TargetLoadSelector, DecimalPlacesSelector } from '@/simulators/circuit-engine/components/ui-components/TargetLoadSelector';
-import { Sparkles } from 'lucide-react';
 import { isACCircuit } from '@/simulators/circuit-engine/models/isACCircuit';
 
 const METHODS: Array<{ id: AnalysisMethod; label: string }> = [
@@ -182,9 +181,6 @@ export function AnalysisBox({
           data-testid="ac-analysis-coming-soon"
           className="my-3 flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50/70 p-8 text-center dark:border-slate-800 dark:bg-[#0d0f12]/60"
         >
-          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-blue-500/20 bg-gradient-to-br from-blue-500/10 to-purple-500/10 text-blue-600 shadow-sm dark:border-blue-500/30 dark:from-blue-500/20 dark:to-purple-500/20 dark:text-blue-400">
-            <Sparkles className="h-7 w-7" />
-          </div>
           <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100">
             AC Analysis (Phasors) — Coming Soon
           </h3>
