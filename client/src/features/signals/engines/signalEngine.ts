@@ -13,7 +13,7 @@ export type SignalNode =
   | { kind: "binary"; operator: "+" | "-" | "*" | "/" | "^"; left: SignalNode; right: SignalNode }
   | { kind: "function"; name: SignalFunction; argument: SignalNode };
 
-export type SignalFunction = "u" | "r" | "delta" | "rect" | "tri" | "sinc" | "Sa" | "sin" | "cos" | "sgn" | "int" | "derivative";
+export type SignalFunction = "u" | "r" | "delta" | "rect" | "tri" | "sinc" | "Sa" | "sin" | "cos" | "exp" | "sgn" | "int" | "derivative";
 export type PeriodMode = "periodic" | "aperiodic";
 export type Classification = "Energy" | "Power" | "Neither";
 export type SignalWindow = { from: number; to: number };
@@ -45,7 +45,7 @@ type TokenKind = "number" | "identifier" | "operator" | "leftParen" | "rightPare
 type Token = { kind: TokenKind; value: string; index: number };
 type LinearForm = { slope: number; offset: number };
 
-const KNOWN_FUNCTIONS = new Set<SignalFunction>(["u", "r", "delta", "rect", "tri", "sinc", "Sa", "sin", "cos", "sgn", "int", "derivative"]);
+const KNOWN_FUNCTIONS = new Set<SignalFunction>(["u", "r", "delta", "rect", "tri", "sinc", "Sa", "sin", "cos", "exp", "sgn", "int", "derivative"]);
 const EPSILON = 1e-9;
 const DEFAULT_WINDOW: SignalWindow = { from: -6, to: 6 };
 
@@ -102,6 +102,7 @@ function normalizeSource(source: string) {
     .replaceAll("\\cdot", "*")
     .replaceAll("\\div", "/")
     .replaceAll("\\wedge", "^")
+    .replaceAll("\\exp", "exp")
     .replaceAll("\\sin", "sin")
     .replaceAll("\\cos", "cos")
     .replaceAll("\\pi", "(pi)")
@@ -114,6 +115,8 @@ function normalizeSource(source: string) {
     .replaceAll("π", "(pi)")
     .replaceAll("{", "(")
     .replaceAll("}", ")")
+    // MathLive emits the natural exponential as e^{...}; the grammar models it as exp(...).
+    .replace(/(?<![A-Za-z])e\^(?=\()/g, "exp")
     .trim();
 }
 
@@ -210,6 +213,7 @@ export function evaluateSignal(node: SignalNode, time: number): number {
       if (node.name === "Sa") return Math.abs(value) < EPSILON ? 1 : Math.sin(value) / value;
       if (node.name === "sin") return Math.sin(value);
       if (node.name === "cos") return Math.cos(value);
+      if (node.name === "exp") return Math.exp(value);
       if (node.name === "int") return integrateTrapezoidal((tau) => evaluateSignal(node.argument, tau), 0, time, 384);
       if (node.name === "derivative") { const step = Math.max(1e-5, Math.abs(time) * 1e-5); return (evaluateSignal(node.argument, time + step) - evaluateSignal(node.argument, time - step)) / (2 * step); }
       return Math.sign(value);
@@ -241,6 +245,7 @@ export function toLatex(node: SignalNode, timeSymbol = "t"): string {
       if (node.name === "int") return `\\int_{0}^{${timeSymbol}}\\!\\left(${toLatex(node.argument, "\\tau")}\\right)\\,d\\tau`;
       if (node.name === "derivative") return `\\frac{d}{d${timeSymbol}}\\!\\left(${toLatex(node.argument, timeSymbol)}\\right)`;
       const argument = toLatex(node.argument, timeSymbol);
+      if (node.name === "exp") return `e^{${argument}}`;
       const name = node.name === "delta" ? "\\delta" : node.name === "rect" ? "\\operatorname{rect}" : node.name === "tri" ? "\\operatorname{tri}" : node.name === "sinc" ? "\\operatorname{sinc}" : node.name === "sgn" ? "\\operatorname{sgn}" : node.name;
       return `${name}\\!\\left(${argument}\\right)`;
     }

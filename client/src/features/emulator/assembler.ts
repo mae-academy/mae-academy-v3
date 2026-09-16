@@ -23,6 +23,15 @@ const isReg16 = (value?: string) => REG16.includes(key(value ?? "") as typeof RE
 const isReg8 = (value?: string) => REG8.includes(key(value ?? "") as typeof REG8[number]);
 const registerIndex16 = (value?: string) => REG16.indexOf(key(value ?? "") as typeof REG16[number]);
 const registerIndex8 = (value?: string) => REG8.indexOf(key(value ?? "") as typeof REG8[number]);
+/** Short (rel8) Jcc opcodes, including every documented mnemonic alias. */
+const CONDITION_JUMP: Record<string, number> = {
+  jo: 0x70, jno: 0x71, jc: 0x72, jb: 0x72, jnae: 0x72, jnc: 0x73, jae: 0x73, jnb: 0x73,
+  jz: 0x74, je: 0x74, jnz: 0x75, jne: 0x75, jbe: 0x76, jna: 0x76, ja: 0x77, jnbe: 0x77,
+  js: 0x78, jns: 0x79, jp: 0x7a, jpe: 0x7a, jnp: 0x7b, jpo: 0x7b,
+  jl: 0x7c, jnge: 0x7c, jge: 0x7d, jnl: 0x7d, jle: 0x7e, jng: 0x7e, jg: 0x7f, jnle: 0x7f,
+};
+const LOOP_VARIANT: Record<string, number> = { loop: 0xe2, loope: 0xe1, loopz: 0xe1, loopne: 0xe0, loopnz: 0xe0 };
+const GROUP1_ARITH = ["add", "sub", "cmp", "xchg", "and", "or", "xor"] as const;
 
 function stripComment(line: string) {
   let quoted = false;
@@ -63,10 +72,11 @@ function encodeData(operands: string[], width: DataWidth, symbols: Map<string, n
 }
 function instructionSize(mnemonic: string, operands: string[]) {
   const op = key(mnemonic); const destination = operands[0]; const source = operands[1];
-  if (["nop", "hlt", "ret", "push", "pop", "inc", "dec"].includes(op)) return 1;
+  if (["nop", "hlt", "ret", "push", "pop", "inc", "dec", "pushf", "popf"].includes(op)) return 1;
   if (op === "int") return 2;
   if (["jmp", "call"].includes(op)) return 3;
-  if (["jz", "je", "jnz", "jne", "loop"].includes(op)) return 2;
+  if (op in CONDITION_JUMP || op in LOOP_VARIANT) return 2;
+  if (op === "not") return isReg16(destination) || isReg8(destination) ? 2 : null;
   if (op === "mov") {
     const destinationMemory = bracketSymbol(destination ?? "") !== null; const sourceMemory = bracketSymbol(source ?? "") !== null;
     if ((destinationMemory && key(source ?? "") === "ax") || (sourceMemory && key(destination ?? "") === "ax")) return 3;
@@ -75,7 +85,7 @@ function instructionSize(mnemonic: string, operands: string[]) {
     if (isReg8(destination) && !isReg8(source)) return 2;
     return 2;
   }
-  if (["add", "sub", "cmp", "xchg"].includes(op)) {
+  if ((GROUP1_ARITH as readonly string[]).includes(op)) {
     if (isReg16(destination) && !isReg16(source)) return 4;
     if (isReg8(destination) && !isReg8(source)) return 3;
     return 2;
@@ -92,12 +102,19 @@ function encodeInstruction(statement: Statement, symbols: Map<string, number>, d
   if (mnemonic === "push" || mnemonic === "pop") { const index = registerIndex16(destination); return index < 0 ? fail("PUSH/POP requires a 16-bit register") : [(mnemonic === "push" ? 0x50 : 0x58) + index]; }
   if (mnemonic === "inc" || mnemonic === "dec") { const index = registerIndex16(destination); return index < 0 ? fail("INC/DEC requires a 16-bit register") : [(mnemonic === "inc" ? 0x40 : 0x48) + index]; }
   if (mnemonic === "int") { const interrupt = immediate(destination); return interrupt === null ? fail("INT requires a numeric interrupt") : [0xcd, interrupt & 0xff]; }
-  if (["jmp", "call", "jz", "je", "jnz", "jne", "loop"].includes(mnemonic)) {
+  if (mnemonic === "pushf") return [0x9c]; if (mnemonic === "popf") return [0x9d];
+  if (mnemonic === "not") {
+    const d16 = registerIndex16(destination); const d8 = registerIndex8(destination);
+    if (d16 >= 0) return [0xf7, modrm(2, d16)];
+    if (d8 >= 0) return [0xf6, modrm(2, d8)];
+    return fail("NOT requires a register operand");
+  }
+  if (mnemonic === "jmp" || mnemonic === "call" || mnemonic in CONDITION_JUMP || mnemonic in LOOP_VARIANT) {
     const target = immediate(destination); if (target === null) return fail("Branch target must be a resolved label or offset");
     const size = statement.size!; const displacement = target - (offset + size);
     if (mnemonic === "jmp" || mnemonic === "call") return [mnemonic === "jmp" ? 0xe9 : 0xe8, ...wordBytes(displacement)];
     if (displacement < -128 || displacement > 127) return fail("Short branch target is out of range");
-    return [["jz", "je"].includes(mnemonic) ? 0x74 : ["jnz", "jne"].includes(mnemonic) ? 0x75 : 0xe2, displacement & 0xff];
+    return [CONDITION_JUMP[mnemonic] ?? LOOP_VARIANT[mnemonic], displacement & 0xff];
   }
   if (mnemonic === "mov") {
     const d16 = registerIndex16(destination); const s16 = registerIndex16(source); const d8 = registerIndex8(destination); const s8 = registerIndex8(source); const segment = SEGMENT[destination]; const destinationMemory = bracketSymbol(operands[0] ?? ""); const sourceMemory = bracketSymbol(operands[1] ?? "");
@@ -111,12 +128,12 @@ function encodeInstruction(statement: Statement, symbols: Map<string, number>, d
     if (d8 >= 0 && value !== null) return [0xb0 + d8, value & 0xff];
     return fail("MOV supports registers, immediate values, OFFSET, and direct [symbol] memory operands");
   }
-  if (["add", "sub", "cmp", "xchg"].includes(mnemonic)) {
+  if ((GROUP1_ARITH as readonly string[]).includes(mnemonic)) {
     const d16 = registerIndex16(destination); const s16 = registerIndex16(source); const d8 = registerIndex8(destination); const s8 = registerIndex8(source);
-    const opcode = { add: 0x01, sub: 0x29, cmp: 0x39, xchg: 0x87 }[mnemonic]!;
+    const opcode = { add: 0x01, sub: 0x29, cmp: 0x39, xchg: 0x87, and: 0x21, or: 0x09, xor: 0x31 }[mnemonic]!;
     if (d16 >= 0 && s16 >= 0) return [opcode, modrm(s16, d16)];
-    if (mnemonic !== "xchg" && d8 >= 0 && s8 >= 0) return [{ add: 0x00, sub: 0x28, cmp: 0x38 }[mnemonic]!, modrm(s8, d8)];
-    const value = immediate(operands[1] ?? ""); const extension = { add: 0, sub: 5, cmp: 7 }[mnemonic];
+    if (mnemonic !== "xchg" && d8 >= 0 && s8 >= 0) return [{ add: 0x00, sub: 0x28, cmp: 0x38, and: 0x20, or: 0x08, xor: 0x30 }[mnemonic]!, modrm(s8, d8)];
+    const value = immediate(operands[1] ?? ""); const extension = { add: 0, sub: 5, cmp: 7, and: 4, or: 1, xor: 6 }[mnemonic];
     if (mnemonic !== "xchg" && d16 >= 0 && value !== null) return [0x81, modrm(extension ?? 0, d16), ...wordBytes(value)];
     if (mnemonic !== "xchg" && d8 >= 0 && value !== null) return [0x80, modrm(extension ?? 0, d8), value & 0xff];
     return fail(`${mnemonic.toUpperCase()} uses an unsupported operand pair`);

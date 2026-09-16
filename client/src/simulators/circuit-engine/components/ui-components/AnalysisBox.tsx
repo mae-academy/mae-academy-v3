@@ -18,7 +18,6 @@ const METHODS: Array<{ id: AnalysisMethod; label: string }> = [
   { id: 'nodal', label: 'Nodal' },
   { id: 'mesh', label: 'Mesh' },
   { id: 'superposition', label: 'Superposition' },
-  { id: 'transform', label: 'Source Xform' },
   { id: 'thevenin', label: 'Thévenin' },
 ];
 

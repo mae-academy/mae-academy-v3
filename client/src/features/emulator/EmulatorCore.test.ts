@@ -109,6 +109,20 @@ class FakeV86 {
     this.setFlag("ZF", res === 0);
     this.setFlag("PF", parityEven(res));
   }
+  private applyLogicFlags(result: number, width: 8 | 16) {
+    const mask = width === 8 ? 0xff : 0xffff; const signBit = width === 8 ? 0x80 : 0x8000; const res = result & mask;
+    this.setFlag("CF", false); this.setFlag("OF", false); this.setFlag("SF", (res & signBit) !== 0); this.setFlag("ZF", res === 0); this.setFlag("PF", parityEven(res));
+  }
+  private evaluateCondition(opcode: number): boolean {
+    const f = this.flagsArr[0]; const cf = (f & FLAG_BIT.CF) !== 0, zf = (f & FLAG_BIT.ZF) !== 0, sf = (f & FLAG_BIT.SF) !== 0, of = (f & FLAG_BIT.OF) !== 0, pf = (f & FLAG_BIT.PF) !== 0;
+    switch (opcode) {
+      case 0x70: return of; case 0x71: return !of; case 0x72: return cf; case 0x73: return !cf;
+      case 0x74: return zf; case 0x75: return !zf; case 0x76: return cf || zf; case 0x77: return !cf && !zf;
+      case 0x78: return sf; case 0x79: return !sf; case 0x7a: return pf; case 0x7b: return !pf;
+      case 0x7c: return sf !== of; case 0x7d: return sf === of; case 0x7e: return zf || sf !== of; case 0x7f: return !zf && sf === of;
+      default: return false;
+    }
+  }
   private readReg8(index: number) { const base = index % 4; const high = index >= 4; const v = this.reg32[base]; return high ? (v >> 8) & 0xff : v & 0xff; }
   private writeReg8(index: number, value: number) { const base = index % 4; const high = index >= 4; const v = this.reg32[base]; this.reg32[base] = high ? (v & 0x00ff) | ((value & 0xff) << 8) : (v & 0xff00) | (value & 0xff); }
   private readByte(addr: number) { return this.memory[addr] ?? 0; }
@@ -134,13 +148,20 @@ class FakeV86 {
     else if (opcode === 0xcd) { const interrupt = fetchByte(); const ah = (this.reg32[0] >> 8) & 0xff; const dx = word(this.reg32[2]); this.instruction_pointer[0] = ip; this.emit("mae-interrupt", [interrupt, ah, dx]); ip = this.instruction_pointer[0]; }
     else if (opcode === 0xe9) { const rel = fetchWord(); ip = ip + signed16(rel); }
     else if (opcode === 0xe8) { const rel = fetchWord(); const csBase = this.segment_offsets[SEGMENT.CS]; this.pushWord(word(ip - csBase)); ip = ip + signed16(rel); }
-    else if (opcode === 0x74 || opcode === 0x75) { const rel = fetchByte(); const zf = (this.flagsArr[0] & FLAG_BIT.ZF) !== 0; const take = opcode === 0x74 ? zf : !zf; const target = ip + signed8(rel); if (take) ip = target; }
-    else if (opcode === 0xe2) { const rel = fetchByte(); const cx = word(this.reg32[1] - 1); this.reg32[1] = cx; if (cx !== 0) ip = ip + signed8(rel); }
+    else if (opcode >= 0x70 && opcode <= 0x7f) { const rel = fetchByte(); const target = ip + signed8(rel); if (this.evaluateCondition(opcode)) ip = target; }
+    else if (opcode === 0xe2 || opcode === 0xe1 || opcode === 0xe0) { const rel = fetchByte(); const cx = word(this.reg32[1] - 1); this.reg32[1] = cx; const zf = (this.flagsArr[0] & FLAG_BIT.ZF) !== 0; const take = cx !== 0 && (opcode === 0xe2 || (opcode === 0xe1 && zf) || (opcode === 0xe0 && !zf)); if (take) ip = ip + signed8(rel); }
+    else if (opcode === 0x9c) { this.pushWord(this.flagsArr[0] & 0xffff); }
+    else if (opcode === 0x9d) { this.flagsArr[0] = (this.flagsArr[0] & ~0xffff) | this.popWord(); }
+    else if (opcode === 0xf7 || opcode === 0xf6) {
+      const modrm = fetchByte(); const reg = (modrm >> 3) & 7; const rm = modrm & 7;
+      if (reg === 2 && opcode === 0xf7) this.reg32[rm] = word(~this.reg32[rm]);
+      else if (reg === 2 && opcode === 0xf6) this.writeReg8(rm, ~this.readReg8(rm) & 0xff);
+    }
     else if (opcode >= 0xb8 && opcode <= 0xbf) { this.reg32[opcode - 0xb8] = fetchWord(); }
     else if (opcode >= 0xb0 && opcode <= 0xb7) { this.writeReg8(opcode - 0xb0, fetchByte()); }
     else if (opcode === 0xa1) { const addr = fetchWord(); this.reg32[0] = this.readWord(dsBase + addr); }
     else if (opcode === 0xa3) { const addr = fetchWord(); this.writeWord(dsBase + addr, word(this.reg32[0])); }
-    else if (opcode === 0x8b || opcode === 0x89 || opcode === 0x88 || opcode === 0x8e || opcode === 0x01 || opcode === 0x29 || opcode === 0x39 || opcode === 0x87 || opcode === 0x00 || opcode === 0x28 || opcode === 0x38 || opcode === 0x81 || opcode === 0x80) {
+    else if (opcode === 0x8b || opcode === 0x89 || opcode === 0x88 || opcode === 0x8e || opcode === 0x01 || opcode === 0x29 || opcode === 0x39 || opcode === 0x87 || opcode === 0x00 || opcode === 0x28 || opcode === 0x38 || opcode === 0x81 || opcode === 0x80 || opcode === 0x21 || opcode === 0x09 || opcode === 0x31 || opcode === 0x20 || opcode === 0x08 || opcode === 0x30) {
       const modrm = fetchByte(); const mod = (modrm >> 6) & 3; const reg = (modrm >> 3) & 7; const rm = modrm & 7;
       const directMem = mod === 0 && rm === 6; const disp = directMem ? fetchWord() : 0; const memAddr = dsBase + disp;
       if (opcode === 0x8b) { this.reg32[reg] = directMem ? this.readWord(memAddr) : word(this.reg32[rm]); }
@@ -154,16 +175,28 @@ class FakeV86 {
       else if (opcode === 0x00) { const a = this.readReg8(rm); const b = this.readReg8(reg); const res = (a + b) & 0xff; this.applyArithFlags(a, b, res, 8, false); this.writeReg8(rm, res); }
       else if (opcode === 0x28) { const a = this.readReg8(rm); const b = this.readReg8(reg); const res = (a - b) & 0xff; this.applyArithFlags(a, b, res, 8, true); this.writeReg8(rm, res); }
       else if (opcode === 0x38) { const a = this.readReg8(rm); const b = this.readReg8(reg); const res = (a - b) & 0xff; this.applyArithFlags(a, b, res, 8, true); }
+      else if (opcode === 0x21) { const res = word(this.reg32[rm] & this.reg32[reg]); this.applyLogicFlags(res, 16); this.reg32[rm] = res; }
+      else if (opcode === 0x09) { const res = word(this.reg32[rm] | this.reg32[reg]); this.applyLogicFlags(res, 16); this.reg32[rm] = res; }
+      else if (opcode === 0x31) { const res = word(this.reg32[rm] ^ this.reg32[reg]); this.applyLogicFlags(res, 16); this.reg32[rm] = res; }
+      else if (opcode === 0x20) { const res = this.readReg8(rm) & this.readReg8(reg); this.applyLogicFlags(res, 8); this.writeReg8(rm, res); }
+      else if (opcode === 0x08) { const res = this.readReg8(rm) | this.readReg8(reg); this.applyLogicFlags(res, 8); this.writeReg8(rm, res); }
+      else if (opcode === 0x30) { const res = this.readReg8(rm) ^ this.readReg8(reg); this.applyLogicFlags(res, 8); this.writeReg8(rm, res); }
       else if (opcode === 0x81) { const imm = fetchWord(); const a = word(this.reg32[rm]); let res = 0;
         if (reg === 0) { res = word(a + imm); this.applyArithFlags(a, imm, res, 16, false); }
         else if (reg === 5) { res = word(a - imm); this.applyArithFlags(a, imm, res, 16, true); }
         else if (reg === 7) { res = word(a - imm); this.applyArithFlags(a, imm, res, 16, true); res = a; }
+        else if (reg === 4) { res = word(a & imm); this.applyLogicFlags(res, 16); }
+        else if (reg === 1) { res = word(a | imm); this.applyLogicFlags(res, 16); }
+        else if (reg === 6) { res = word(a ^ imm); this.applyLogicFlags(res, 16); }
         this.reg32[rm] = res;
       }
       else if (opcode === 0x80) { const imm = fetchByte(); const a = this.readReg8(rm); let res = 0;
         if (reg === 0) { res = (a + imm) & 0xff; this.applyArithFlags(a, imm, res, 8, false); }
         else if (reg === 5) { res = (a - imm) & 0xff; this.applyArithFlags(a, imm, res, 8, true); }
         else if (reg === 7) { res = (a - imm) & 0xff; this.applyArithFlags(a, imm, res, 8, true); res = a; }
+        else if (reg === 4) { res = a & imm & 0xff; this.applyLogicFlags(res, 8); }
+        else if (reg === 1) { res = (a | imm) & 0xff; this.applyLogicFlags(res, 8); }
+        else if (reg === 6) { res = (a ^ imm) & 0xff; this.applyLogicFlags(res, 8); }
         this.writeReg8(rm, res);
       }
     }
@@ -503,6 +536,89 @@ describe("EmulatorCore — execution trace (Task 7)", () => {
     expect(trace[0].value).toBe("AX=0010h");
     expect(trace[1].value).toBe("BX=0020h");
     expect(trace[2].value).toBe("AX=0030h");
+  });
+});
+
+describe("EmulatorCore — logical instructions (AND/OR/XOR/NOT)", () => {
+  it("AND/OR/XOR/NOT compose correctly (stress batch 5.2)", async () => {
+    const emulator = await loadProgram(`
+      main:
+          mov ax, 0xf0f0
+          and ax, 0x00ff
+          or ax, 0x0f00
+          xor ax, 0x0ff0
+          not ax
+          hlt
+    `);
+    await emulator.step(); // mov
+    await emulator.step(); // and -> 0x00f0
+    expect(emulator.getCpuState().registers.ax).toBe(0x00f0);
+    await emulator.step(); // or -> 0x0ff0
+    expect(emulator.getCpuState().registers.ax).toBe(0x0ff0);
+    await emulator.step(); // xor -> 0x0000
+    expect(emulator.getCpuState().registers.ax).toBe(0x0000);
+    expect(emulator.getCpuState().flags.ZF).toBe(true);
+    await emulator.step(); // not -> 0xffff
+    expect(emulator.getCpuState().registers.ax).toBe(0xffff);
+  });
+});
+
+describe("EmulatorCore — conditional jumps and LOOPE/LOOPNE (stress batches 12/14)", () => {
+  it("JL takes the branch when the comparison is signed-less-than", async () => {
+    const emulator = await loadProgram(`
+      main:
+          mov ax, 5
+          mov bx, 10
+          cmp ax, bx
+          jl less_than
+          mov ax, 0
+      less_than:
+          mov ax, 1
+          hlt
+    `);
+    await emulator.run();
+    expect(emulator.getCpuState().registers.ax).toBe(1);
+  });
+
+  it("LOOPE stops as soon as ZF clears, distinct from plain LOOP", async () => {
+    const emulator = await loadProgram(`
+      main:
+          mov cx, 10
+          mov ax, 0
+          mov bx, 1
+      loop_equal:
+          add ax, bx
+          cmp ax, 3
+          loope loop_equal
+          hlt
+    `);
+    await emulator.run();
+    // ax becomes 1 (cx=9,cmp!=0 zf=0 -> stop immediately after first iteration since 1!=3 sets ZF=0)
+    expect(emulator.getCpuState().registers.ax).toBe(1);
+    expect(emulator.getCpuState().registers.cx).toBe(9);
+  });
+});
+
+describe("EmulatorCore — PUSHF/POPF preserve flag state across mutation (stress batch 15.2)", () => {
+  it("POPF restores flags saved by an earlier PUSHF", async () => {
+    const emulator = await loadProgram(`
+      main:
+          mov ax, 10
+          sub ax, 10
+          pushf
+          mov ax, 0
+          sub ax, 1
+          popf
+          je flags_ok
+          mov ax, 0
+          jmp flags_done
+      flags_ok:
+          mov ax, 1
+      flags_done:
+          hlt
+    `);
+    await emulator.run();
+    expect(emulator.getCpuState().registers.ax).toBe(1);
   });
 });
 

@@ -1396,7 +1396,7 @@ const DmmSymbol: SymbolFC = ({ props }) => {
           {renderComponentCanvasLabel(raw, false)}
         </text>
       )}
-      {/* LCD Display Screen - ALWAYS bright/light screen (#EDF2F7) in both Light & Dark Mode */}
+      {/* LCD Display Screen - Soft sky-blue/cyan background matching Live Multimeters panel */}
       <rect
         x={-25}
         y={-38}
@@ -1404,8 +1404,8 @@ const DmmSymbol: SymbolFC = ({ props }) => {
         height={22}
         rx={3}
         className="dmm-screen"
-        fill="#edf2f7"
-        stroke="#94a3b8"
+        fill="#e0f2fe"
+        stroke="#7dd3fc"
         strokeWidth={1}
       />
       {/* Dial - Tinted with contrasting darker grays in dark mode */}
@@ -1431,7 +1431,7 @@ const DmmSymbol: SymbolFC = ({ props }) => {
         stroke={isDark ? '#334155' : '#000000'}
         strokeWidth={1.5}
       />
-      {/* LCD Text - Dark digits on bright LCD screen */}
+      {/* LCD Text - Matching Live Multimeters panel annunciator text color */}
       <text
         x={0}
         y={-27}
@@ -1440,7 +1440,7 @@ const DmmSymbol: SymbolFC = ({ props }) => {
         fontWeight={700}
         fontFamily="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
         className="dmm-screen-text"
-        fill="#0f172a"
+        fill="#0284c7"
       >
         {String(props?.mode ?? 'DCV')}
       </text>

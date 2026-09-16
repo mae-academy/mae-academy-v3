@@ -407,7 +407,7 @@ export function ExportPreviewModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 backdrop-blur-sm bg-black/50 animate-in fade-in duration-200"
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 backdrop-blur-sm bg-black/60 overflow-y-auto animate-in fade-in duration-200"
       onClick={onClose}
     >
       <div
@@ -417,7 +417,7 @@ export function ExportPreviewModal({
         {/* Modal Header */}
         <div className="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-[#1b2028]">
           <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+            <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400">
               <FileImage size={18} />
             </div>
             <div>
@@ -431,27 +431,25 @@ export function ExportPreviewModal({
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Global Format Selector */}
-            <div className="flex items-center bg-slate-100 dark:bg-[#161a22] p-1 rounded-xl border border-slate-200 dark:border-[#222834]">
+            {/* Global Format Selector: Pill buttons matching Download All gradient styling */}
+            <div className="flex items-center gap-1.5">
               <button
                 type="button"
                 onClick={() => handleToggleGlobalFormat('png')}
-                className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all ${
-                  globalFormat === 'png'
-                    ? 'bg-white dark:bg-blue-600 text-slate-900 dark:text-white shadow-xs'
-                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
-                }`}
+                className={`px-3.5 py-1.5 text-xs font-semibold rounded-full transition-all ${globalFormat === 'png'
+                    ? 'bg-gradient-to-r from-blue-600 via-purple-600 to-rose-500 text-white shadow-md'
+                    : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#1b2028]'
+                  }`}
               >
                 PNG
               </button>
               <button
                 type="button"
                 onClick={() => handleToggleGlobalFormat('svg')}
-                className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all ${
-                  globalFormat === 'svg'
-                    ? 'bg-white dark:bg-blue-600 text-slate-900 dark:text-white shadow-xs'
-                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
-                }`}
+                className={`px-3.5 py-1.5 text-xs font-semibold rounded-full transition-all ${globalFormat === 'svg'
+                    ? 'bg-gradient-to-r from-blue-600 via-purple-600 to-rose-500 text-white shadow-md'
+                    : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#1b2028]'
+                  }`}
               >
                 SVG
               </button>
@@ -495,26 +493,24 @@ export function ExportPreviewModal({
                       </span>
                       <div className="flex items-center gap-1.5 shrink-0">
                         {/* Per-Item Format Selector */}
-                        <div className="flex items-center bg-slate-200/80 dark:bg-[#1b2028] p-0.5 rounded-md border border-slate-300/50 dark:border-[#262c36]">
+                        <div className="flex items-center gap-1">
                           <button
                             type="button"
                             onClick={() => handleToggleItemFormat(item.id, 'png')}
-                            className={`px-1.5 py-0.5 text-[10px] font-mono font-semibold rounded transition-colors ${
-                              activeFormat === 'png'
-                                ? 'bg-white dark:bg-blue-600 text-slate-800 dark:text-white shadow-2xs'
-                                : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
-                            }`}
+                            className={`px-2.5 py-0.5 text-[11px] font-semibold rounded-full transition-all ${activeFormat === 'png'
+                                ? 'bg-gradient-to-r from-blue-600 via-purple-600 to-rose-500 text-white shadow-xs'
+                                : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-[#1b2028]'
+                              }`}
                           >
                             PNG
                           </button>
                           <button
                             type="button"
                             onClick={() => handleToggleItemFormat(item.id, 'svg')}
-                            className={`px-1.5 py-0.5 text-[10px] font-mono font-semibold rounded transition-colors ${
-                              activeFormat === 'svg'
-                                ? 'bg-white dark:bg-blue-600 text-slate-800 dark:text-white shadow-2xs'
-                                : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
-                            }`}
+                            className={`px-2.5 py-0.5 text-[11px] font-semibold rounded-full transition-all ${activeFormat === 'svg'
+                                ? 'bg-gradient-to-r from-blue-600 via-purple-600 to-rose-500 text-white shadow-xs'
+                                : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-[#1b2028]'
+                              }`}
                           >
                             SVG
                           </button>
@@ -525,11 +521,11 @@ export function ExportPreviewModal({
                             type="text"
                             value={currentName}
                             onChange={(e) => setCustomNames(prev => ({ ...prev, [item.id]: e.target.value }))}
-                            className="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-200/70 dark:bg-[#1b2028] text-slate-700 dark:text-slate-200 border border-slate-300/60 dark:border-[#262c36] focus:border-blue-500 focus:bg-white dark:focus:bg-[#0d0f12] outline-none transition-colors w-24 sm:w-32"
+                            className="text-xs font-sans font-medium px-2 py-0.5 rounded bg-slate-200/70 dark:bg-[#1b2028] text-slate-700 dark:text-slate-200 border border-slate-300/60 dark:border-[#262c36] focus:border-blue-500 focus:bg-white dark:focus:bg-[#0d0f12] outline-none transition-colors w-24 sm:w-32"
                             placeholder={baseName}
                             title="Click to rename file"
                           />
-                          <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400 select-none">
+                          <span className="text-xs font-sans text-slate-500 dark:text-slate-400 select-none">
                             .{activeFormat}
                           </span>
                         </div>

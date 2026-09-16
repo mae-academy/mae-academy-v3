@@ -747,6 +747,26 @@ function inlineComputedStyles(sourceNode: Element, clonedNode: Element): void {
   }
 }
 
+/** A flat 3px halo (tuned for the live app, where it just has to beat the grid) overwhelms
+ * small glyphs once transplanted — a GND subscript or scope-axis digit can render at 8-9.5px,
+ * where a 3px stroke swallows the letterform into a solid blob. Scale it to the font instead. */
+function haloStrokeWidth(fontSizePx: number): number {
+  return Math.max(0.6, Math.min(1.8, fontSizePx * 0.12));
+}
+
+/** Export-only pass: re-derives stroke-width on every already-haloed <text> from its own
+ * font-size instead of the live app's fixed 3/3.5px. Colors are untouched — component labels,
+ * per-loop mesh-current colors, and per-node V_k colors all keep their existing fill/stroke,
+ * only the width that was causing the bloat is corrected. Child <tspan>s inherit stroke-width,
+ * so nothing else needs touching. */
+function thinHaloStrokes(clonedSvg: SVGSVGElement): void {
+  clonedSvg.querySelectorAll('text[stroke]:not([stroke="none"])').forEach(node => {
+    const fontSizePx = parseFloat(node.getAttribute('font-size') || '13') || 13;
+    node.setAttribute('stroke-width', String(haloStrokeWidth(fontSizePx)));
+    node.setAttribute('paint-order', 'stroke fill');
+  });
+}
+
 /** Populates SVG text elements with KaTeX tspans for self-contained vector SVG export. */
 function populateMathTspans(svgTextEl: SVGTextElement, rawText: string, baseFontSize: number) {
   if (!rawText) return;
@@ -2665,13 +2685,23 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
         }
       }
 
-      // Division badges
+      // Axis scale labels: pure typography with a stroke halo, no background box (was overlapping grid/traces).
       if (showValues) {
-        const badgeBg = isDark ? 'rgba(9, 10, 13, 0.92)' : 'rgba(255, 255, 255, 0.88)';
-        const badgeBorder = isDark ? '#1a1d24' : '#cbd5e1';
         const textColor = isDark ? '#f8fafc' : '#1e293b';
+        const haloColor = isDark ? '#090a0d' : '#ffffff';
         ctx.font = '8px "KaTeX_Main", ui-monospace, SFMono-Regular, monospace';
         ctx.textBaseline = 'middle';
+        ctx.lineJoin = 'round';
+        ctx.miterLimit = 2;
+
+        const drawHaloText = (text: string, x: number, y: number, align: CanvasTextAlign) => {
+          ctx.textAlign = align;
+          ctx.lineWidth = haloStrokeWidth(8);
+          ctx.strokeStyle = haloColor;
+          ctx.strokeText(text, x, y);
+          ctx.fillStyle = textColor;
+          ctx.fillText(text, x, y);
+        };
 
         const vertDivs = [
           { text: formatVoltageText(primaryConfig.offset + 4 * primaryConfig.voltDiv), y: 8 },
@@ -2680,62 +2710,19 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
           { text: formatVoltageText(primaryConfig.offset - 2 * primaryConfig.voltDiv), y: baseHeight * 0.75 },
           { text: formatVoltageText(primaryConfig.offset - 4 * primaryConfig.voltDiv), y: baseHeight - 18 },
         ];
-
-        vertDivs.forEach(({ text, y }) => {
-          const metrics = ctx.measureText(text);
-          const w = metrics.width + 6;
-          const h = 12;
-          const x = 3;
-          const top = y - h / 2;
-          ctx.fillStyle = badgeBg;
-          ctx.strokeStyle = badgeBorder;
-          ctx.lineWidth = 1;
-          if (typeof ctx.roundRect === 'function') {
-            ctx.beginPath();
-            ctx.roundRect(x, top, w, h, 2);
-            ctx.fill();
-            ctx.stroke();
-          } else {
-            ctx.fillRect(x, top, w, h);
-            ctx.strokeRect(x, top, w, h);
-          }
-          ctx.fillStyle = textColor;
-          ctx.textAlign = 'left';
-          ctx.fillText(text, x + 3, y);
-        });
+        vertDivs.forEach(({ text, y }) => drawHaloText(text, 4, y, 'left'));
 
         const horizDivs = [
-          { text: formatTimeText(0 * primaryConfig.timeDiv), align: 'left', x: 3 },
-          { text: formatTimeText(2 * primaryConfig.timeDiv), align: 'center', x: baseWidth * 0.20 },
-          { text: formatTimeText(4 * primaryConfig.timeDiv), align: 'center', x: baseWidth * 0.40 },
-          { text: formatTimeText(6 * primaryConfig.timeDiv), align: 'center', x: baseWidth * 0.60 },
-          { text: formatTimeText(8 * primaryConfig.timeDiv), align: 'center', x: baseWidth * 0.80 },
-          { text: formatTimeText(10 * primaryConfig.timeDiv), align: 'right', x: baseWidth - 3 },
+          { text: formatTimeText(0 * primaryConfig.timeDiv), align: 'left' as CanvasTextAlign, x: 3 },
+          { text: formatTimeText(2 * primaryConfig.timeDiv), align: 'center' as CanvasTextAlign, x: baseWidth * 0.20 },
+          { text: formatTimeText(4 * primaryConfig.timeDiv), align: 'center' as CanvasTextAlign, x: baseWidth * 0.40 },
+          { text: formatTimeText(6 * primaryConfig.timeDiv), align: 'center' as CanvasTextAlign, x: baseWidth * 0.60 },
+          { text: formatTimeText(8 * primaryConfig.timeDiv), align: 'center' as CanvasTextAlign, x: baseWidth * 0.80 },
+          { text: formatTimeText(10 * primaryConfig.timeDiv), align: 'right' as CanvasTextAlign, x: baseWidth - 3 },
         ];
+        horizDivs.forEach(({ text, align, x }) => drawHaloText(text, x, baseHeight - 6, align));
 
-        horizDivs.forEach(({ text, align, x }) => {
-          const metrics = ctx.measureText(text);
-          const w = metrics.width + 6;
-          const h = 12;
-          const boxX = align === 'left' ? x : align === 'right' ? x - w : x - w / 2;
-          const boxY = baseHeight - h - 2;
-          ctx.fillStyle = badgeBg;
-          ctx.strokeStyle = badgeBorder;
-          ctx.lineWidth = 1;
-          if (typeof ctx.roundRect === 'function') {
-            ctx.beginPath();
-            ctx.roundRect(boxX, boxY, w, h, 2);
-            ctx.fill();
-            ctx.stroke();
-          } else {
-            ctx.fillRect(boxX, boxY, w, h);
-            ctx.strokeRect(boxX, boxY, w, h);
-          }
-          ctx.fillStyle = textColor;
-          ctx.textAlign = 'center';
-          ctx.fillText(text, boxX + w / 2, boxY + h / 2);
-          ctx.textAlign = 'left';
-        });
+        ctx.textAlign = 'left';
       }
 
       ctx.restore();
@@ -2799,9 +2786,9 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
 
       let badgesSvg = '';
       if (showValues) {
-        const badgeBg = isDark ? 'rgba(9, 10, 13, 0.92)' : 'rgba(255, 255, 255, 0.88)';
-        const badgeBorder = isDark ? '#1a1d24' : '#cbd5e1';
         const textColor = isDark ? '#f8fafc' : '#1e293b';
+        const haloColor = isDark ? '#090a0d' : '#ffffff';
+        const haloAttrs = `stroke="${haloColor}" stroke-width="${haloStrokeWidth(8)}" paint-order="stroke fill" stroke-linejoin="round"`;
 
         const vertDivs = [
           { text: formatVoltageText(primaryConfig.offset + 4 * primaryConfig.voltDiv), y: 8 },
@@ -2810,30 +2797,20 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
           { text: formatVoltageText(primaryConfig.offset - 2 * primaryConfig.voltDiv), y: baseHeight * 0.75 },
           { text: formatVoltageText(primaryConfig.offset - 4 * primaryConfig.voltDiv), y: baseHeight - 18 },
         ];
-
         vertDivs.forEach(({ text, y }) => {
-          const estimatedW = text.length * 5.5 + 6;
-          const h = 12;
-          const x = 3;
-          const top = (y - h / 2).toFixed(2);
-          badgesSvg += `<g class="v-badge"><rect x="${x}" y="${top}" width="${estimatedW}" height="${h}" rx="2" fill="${badgeBg}" stroke="${badgeBorder}" stroke-width="1" vector-effect="non-scaling-stroke"/><text x="${x + 3}" y="${(y + 3).toFixed(2)}" fill="${textColor}" font-size="8" font-family="'KaTeX_Main', ui-monospace, monospace">${escapeXml(text)}</text></g>`;
+          badgesSvg += `<text x="4" y="${(y + 3).toFixed(2)}" fill="${textColor}" ${haloAttrs} font-size="8" font-family="'KaTeX_Main', ui-monospace, monospace">${escapeXml(text)}</text>`;
         });
 
         const horizDivs = [
-          { text: formatTimeText(0 * primaryConfig.timeDiv), align: 'left', x: 3 },
-          { text: formatTimeText(2 * primaryConfig.timeDiv), align: 'center', x: baseWidth * 0.20 },
-          { text: formatTimeText(4 * primaryConfig.timeDiv), align: 'center', x: baseWidth * 0.40 },
-          { text: formatTimeText(6 * primaryConfig.timeDiv), align: 'center', x: baseWidth * 0.60 },
-          { text: formatTimeText(8 * primaryConfig.timeDiv), align: 'center', x: baseWidth * 0.80 },
-          { text: formatTimeText(10 * primaryConfig.timeDiv), align: 'right', x: baseWidth - 3 },
+          { text: formatTimeText(0 * primaryConfig.timeDiv), anchor: 'start', x: 3 },
+          { text: formatTimeText(2 * primaryConfig.timeDiv), anchor: 'middle', x: baseWidth * 0.20 },
+          { text: formatTimeText(4 * primaryConfig.timeDiv), anchor: 'middle', x: baseWidth * 0.40 },
+          { text: formatTimeText(6 * primaryConfig.timeDiv), anchor: 'middle', x: baseWidth * 0.60 },
+          { text: formatTimeText(8 * primaryConfig.timeDiv), anchor: 'middle', x: baseWidth * 0.80 },
+          { text: formatTimeText(10 * primaryConfig.timeDiv), anchor: 'end', x: baseWidth - 3 },
         ];
-
-        horizDivs.forEach(({ text, align, x }) => {
-          const estimatedW = text.length * 5.5 + 6;
-          const h = 12;
-          const boxX = align === 'left' ? x : align === 'right' ? x - estimatedW : x - estimatedW / 2;
-          const boxY = baseHeight - h - 2;
-          badgesSvg += `<g class="h-badge"><rect x="${boxX.toFixed(2)}" y="${boxY}" width="${estimatedW}" height="${h}" rx="2" fill="${badgeBg}" stroke="${badgeBorder}" stroke-width="1" vector-effect="non-scaling-stroke"/><text x="${(boxX + estimatedW / 2).toFixed(2)}" y="${boxY + 9}" text-anchor="middle" fill="${textColor}" font-size="8" font-family="'KaTeX_Main', ui-monospace, monospace">${escapeXml(text)}</text></g>`;
+        horizDivs.forEach(({ text, anchor, x }) => {
+          badgesSvg += `<text x="${x.toFixed(2)}" y="${baseHeight - 6}" text-anchor="${anchor}" fill="${textColor}" ${haloAttrs} font-size="8" font-family="'KaTeX_Main', ui-monospace, monospace">${escapeXml(text)}</text>`;
         });
       }
 
@@ -2939,15 +2916,15 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
       ctx.textAlign = 'left';
 
       // LCD screen bezel
-      // LCD screen bezel - ALWAYS bright/light screen (#edf2f7) with dark digits
-      ctx.fillStyle = '#edf2f7';
+      // LCD screen bezel - matching Live Multimeters panel soft cyan
+      ctx.fillStyle = '#e0f2fe';
       if (typeof ctx.roundRect === 'function') {
         ctx.roundRect(20, 50, 440, 160, 10);
         ctx.fill();
       } else {
         ctx.fillRect(20, 50, 440, 160);
       }
-      ctx.strokeStyle = '#94a3b8';
+      ctx.strokeStyle = '#7dd3fc';
       ctx.lineWidth = 1.5;
       ctx.stroke();
 
@@ -2957,14 +2934,14 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
       ctx.fillText(dmmMode.toUpperCase(), 36, 78);
 
       // Value Display
-      ctx.fillStyle = '#0f172a';
+      ctx.fillStyle = '#0284c7';
       ctx.font = 'bold 42px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace';
       ctx.textAlign = 'right';
       ctx.fillText(valueText, 440, 142);
       ctx.textAlign = 'left';
 
       // Subtitle
-      ctx.fillStyle = '#475569';
+      ctx.fillStyle = '#0369a1';
       ctx.font = '12px sans-serif';
       ctx.fillText(statusText, 36, 185);
 
@@ -2999,10 +2976,10 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
   <rect x="0" y="0" width="480" height="240" rx="16" fill="${isDark ? '#f1f5f9' : '#1e232d'}" stroke="${isDark ? '#cbd5e1' : '#111827'}" stroke-width="2"/>
   <text x="24" y="34" fill="${isDark ? '#334155' : '#cbd5e1'}" font-family="ui-monospace, SFMono-Regular, monospace" font-size="13" font-weight="bold">${escapeXml((dmm.label || 'DIGITAL MULTIMETER').toUpperCase())}</text>
   <text x="456" y="34" text-anchor="end" fill="${isDark ? '#64748b' : '#94a3b8'}" font-family="system-ui, -apple-system, sans-serif" font-size="11">MAE ACADEMY PRECISION DMM</text>
-  <rect x="20" y="50" width="440" height="160" rx="10" fill="#edf2f7" stroke="#94a3b8" stroke-width="1.5"/>
+  <rect x="20" y="50" width="440" height="160" rx="10" fill="#e0f2fe" stroke="#7dd3fc" stroke-width="1.5"/>
   <text x="36" y="78" fill="#0284c7" font-family="ui-monospace, SFMono-Regular, monospace" font-size="12" font-weight="bold">${escapeXml(dmmMode.toUpperCase())}</text>
-  <text x="440" y="142" text-anchor="end" fill="#0f172a" font-family="ui-monospace, SFMono-Regular, monospace" font-size="42" font-weight="bold">${escapeXml(valueText)}</text>
-  <text x="36" y="185" fill="#475569" font-family="system-ui, -apple-system, sans-serif" font-size="12">${escapeXml(statusText)}</text>
+  <text x="440" y="142" text-anchor="end" fill="#0284c7" font-family="ui-monospace, SFMono-Regular, monospace" font-size="42" font-weight="bold">${escapeXml(valueText)}</text>
+  <text x="36" y="185" fill="#0369a1" font-family="system-ui, -apple-system, sans-serif" font-size="12">${escapeXml(statusText)}</text>
 </svg>`;
 
       const blob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
@@ -3118,6 +3095,11 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
           textEl.setAttribute('y', '0');
           textEl.setAttribute('dominant-baseline', 'hanging');
           textEl.setAttribute('fill', text.color);
+          // Halo guards against dark-mode-authored near-white fills (see line 1381 default) going invisible on a transparent/white export target.
+          textEl.setAttribute('paint-order', 'stroke fill');
+          textEl.setAttribute('stroke', colors.canvas);
+          textEl.setAttribute('stroke-width', String(haloStrokeWidth(text.fontSize || 14)));
+          textEl.setAttribute('stroke-linejoin', 'round');
           textEl.setAttribute('font-size', `${text.fontSize || 14}px`);
           textEl.setAttribute('font-family', "'KaTeX_Main', 'KaTeX_Math', serif");
           textEl.style.fontFamily = "'KaTeX_Main', 'KaTeX_Math', serif";
@@ -3189,6 +3171,8 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
       text, tspan { font-family: 'KaTeX_Main', 'KaTeX_Math', 'KaTeX_AMS', serif; }
     `;
     defs.appendChild(styleEl);
+
+    thinHaloStrokes(clonedSvg);
 
     const serializer = new XMLSerializer();
     let svgString = serializer.serializeToString(clonedSvg);
@@ -3374,6 +3358,11 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
           textEl.setAttribute('y', '0');
           textEl.setAttribute('dominant-baseline', 'hanging');
           textEl.setAttribute('fill', text.color);
+          // Halo guards against dark-mode-authored near-white fills (see line 1381 default) going invisible on a transparent/white export target.
+          textEl.setAttribute('paint-order', 'stroke fill');
+          textEl.setAttribute('stroke', colors.canvas);
+          textEl.setAttribute('stroke-width', String(haloStrokeWidth(text.fontSize || 14)));
+          textEl.setAttribute('stroke-linejoin', 'round');
           textEl.setAttribute('font-size', `${text.fontSize || 14}px`);
           textEl.setAttribute('font-family', "'KaTeX_Main', 'KaTeX_Math', serif");
           textEl.style.fontFamily = "'KaTeX_Main', 'KaTeX_Math', serif";
@@ -3396,6 +3385,8 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
       text, tspan { font-family: 'KaTeX_Main', 'KaTeX_Math', 'KaTeX_AMS', serif; }
     `;
     defs.appendChild(styleEl);
+
+    thinHaloStrokes(clonedSvg);
 
     const serializer = new XMLSerializer();
     const svgString = serializer.serializeToString(clonedSvg);
@@ -3721,429 +3712,429 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
           {/* Top Row (flex gap-4 items-start) */}
           <div className="flex flex-col md:flex-row gap-4 items-start w-full">
             <aside className="w-full md:w-56 shrink-0 min-h-0 overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-[#1a1d24] dark:bg-[#0d0f12]" style={{ background: colors.panel, borderColor: colors.line, display: 'flex', flexDirection: 'column', height: '700px' }}>
-          <div className="border-b px-3 py-2" style={{ borderColor: colors.line }}><div className={CONTROL_SYSTEMS_HEADING}>Component Library</div></div>
-          <div style={{ padding: 10, borderBottom: `1px solid ${colors.line}` }}>
-            <div style={{ position: 'relative' }}>
-              <Search size={14} style={{ position: 'absolute', left: 9, top: 9, color: colors.subtle }} />
-              <input value={search} onChange={event => setSearch(event.target.value)} placeholder="Search components" style={{ width: '100%', boxSizing: 'border-box', border: `1px solid ${colors.line}`, outline: 'none', background: colors.input, color: colors.text, borderRadius: 7, padding: '8px 9px 8px 29px', fontSize: 11 }} />
-            </div>
-          </div>
-          <div style={{ overflowY: 'auto', padding: '6px 6px 14px' }}>
-            {Object.entries(filteredCategories).map(([category, items]) => {
-              const collapsed = collapsedCategories.has(category);
-              return (
-                <section key={category} style={{ marginBottom: 3 }}>
-                  <button onClick={() => setCollapsedCategories(previous => {
-                    const next = new Set(previous);
-                    if (next.has(category)) next.delete(category); else next.add(category);
-                    return next;
-                  })} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: 'none', background: 'transparent', color: colors.text, cursor: 'pointer', padding: '8px 5px', fontSize: 11, fontWeight: 750 }}>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>{collapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}{category}</span>
-                    <span style={{ color: colors.subtle, fontWeight: 600 }}>{items.length}</span>
-                  </button>
-                  {!collapsed && <div className={tabDUiRefinement ? 'grid grid-cols-2 gap-2 px-1 pb-3' : undefined}>{items.map(item => (
-                    <button
-                      key={item.id}
-                      draggable
-                      onDragStart={event => {
-                        event.dataTransfer.setData('application/electrolab-component', item.id);
-                        event.dataTransfer.effectAllowed = 'copy';
-                      }}
-                      onClick={() => addComponent(item.id)}
-                      className={tabDUiRefinement ? 'flex h-[110px] flex-col overflow-hidden rounded-md border transition-all active:scale-[.97]' : undefined}
-                      style={tabDUiRefinement ? { borderColor: colors.line, background: colors.panel, cursor: 'grab' } : { width: '100%', textAlign: 'left', border: 'none', background: 'transparent', color: colors.muted, cursor: 'grab', borderRadius: 6, padding: '7px 8px', fontSize: 11, display: 'flex', flexDirection: 'column', gap: 2 }}
-                      onMouseEnter={event => { event.currentTarget.style.background = colors.panelAlt; if (!tabDUiRefinement) event.currentTarget.style.color = colors.text; }}
-                      onMouseLeave={event => { event.currentTarget.style.background = tabDUiRefinement ? colors.panel : 'transparent'; if (!tabDUiRefinement) event.currentTarget.style.color = colors.muted; }}
-                    >
-                      {tabDUiRefinement ? (
-                        <>
-                          {/* Top Section: Scaled & Centered Canvas */}
-                          <div className="flex flex-1 min-h-0 w-full items-center justify-center p-2">
-                            <ComponentPaletteIcon definition={item} colors={colors} documented={tabDUiRefinement} />
-                          </div>
-                          {/* Bottom Section: Fixed height banner with clear readable component names */}
-                          <div className="flex h-7 w-full shrink-0 items-center justify-center border-t px-1.5" style={{ borderColor: colors.line, background: `${colors.line}15` }}>
-                            <span className="flex items-center justify-center text-[11px] font-medium text-slate-800 dark:text-slate-200 tracking-tight text-center leading-tight truncate w-full" title={item.name}>
-                              <ElectricalLabel label={item.name} />
-                            </span>
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <span className="text-[12px] font-normal text-slate-800 dark:text-slate-200"><ElectricalLabel label={item.name} /></span>
-                          <span style={{ color: colors.subtle, fontSize: 9, lineHeight: 1.25 }}>{item.description}</span>
-                        </>
-                      )}
-                    </button>
-                  ))}</div>}
-                </section>
-              );
-            })}
-          </div>
-        </aside>
-
-        <main className="relative flex-1 min-w-0 h-[700px] overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-[#1a1d24] dark:bg-[#07080a]" style={{ background: colors.canvas, borderColor: colors.line }}>
-          <div className="flex items-start justify-between border-b px-4 py-2" style={{ borderColor: colors.line }}><div><div className={CONTROL_SYSTEMS_HEADING}>Interactive Electrical Canvas</div></div><div className="flex items-center gap-2 font-mono text-[10px]" style={{ color: colors.muted }}>{components.length} CMP · {wires.length} NET</div></div>
-          <svg ref={svgRef} onMouseDown={handleCanvasMouseDown} onMouseMove={handleCanvasMouseMove} onMouseUp={handleCanvasMouseUp} onMouseLeave={handleCanvasMouseUp} onContextMenu={event => event.preventDefault()} onDragOver={event => event.preventDefault()} onDrop={handleDrop} style={{ width: '100%', height: '100%', display: 'block', cursor: dragState?.kind === 'pan' ? 'grabbing' : wiring.from ? 'crosshair' : 'default', touchAction: 'none' }}>
-            <defs>
-              <marker id="arrow" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M 0,0 L 6,3 L 0,6 Z" fill="#64748b" /></marker>
-              {activeMeshTrace?.meshCycles?.map((cycle) => <marker key={cycle.index} id={`mesh-arrow-${cycle.index}`} markerWidth="7" markerHeight="7" refX="5.5" refY="3.5" orient="auto"><path d="M 0,1 L 6,3.5 L 0,6 Z" fill={MESH_LOOP_COLORS[cycle.index % MESH_LOOP_COLORS.length]} /></marker>)}
-              {tabDUiRefinement && tabDGridMode === 'dots' ? (
-                <pattern
-                  key="grid-pattern-dots"
-                  id="workspace-grid-dots"
-                  width={gridSize}
-                  height={gridSize}
-                  patternUnits="userSpaceOnUse"
-                  patternTransform={`translate(${-gridSize / 2}, ${-gridSize / 2})`}
-                >
-                  <circle
-                    cx={gridSize / 2}
-                    cy={gridSize / 2}
-                    r={1.65}
-                    fill={darkPreview ? '#222630' : '#7a93b1'}
-                    fillOpacity={0.9}
-                  />
-                </pattern>
-              ) : (
-                <pattern
-                  key={`grid-pattern-${tabDUiRefinement ? tabDGridMode : 'base'}`}
-                  id={`workspace-grid-${tabDUiRefinement ? tabDGridMode : 'base'}`}
-                  width={gridSize}
-                  height={gridSize}
-                  patternUnits="userSpaceOnUse"
-                >
-                  <path
-                    d={`M ${gridSize} 0 L 0 0 0 ${gridSize}`}
-                    fill="none"
-                    stroke={tabDUiRefinement ? (darkPreview ? '#1a1d24' : '#a8b8cc') : colors.grid}
-                    strokeWidth={tabDUiRefinement ? 1.15 : 1}
-                    strokeOpacity={tabDUiRefinement ? 0.85 : 1}
-                  />
-                </pattern>
-              )}
-            </defs>
-            <g transform={`translate(${pan[0]},${pan[1]}) scale(${zoom})`}>
-              {gridVisible && (!tabDUiRefinement || tabDGridMode !== 'hidden') && <rect key={`grid-surface-${tabDUiRefinement ? tabDGridMode : 'base'}`} x={-5000} y={-5000} width={10000} height={10000} fill={`url(#workspace-grid-${tabDUiRefinement ? tabDGridMode : 'base'})`} />}
-              {dragState?.kind === 'marquee' && <rect x={Math.min(dragState.start[0], dragState.end[0])} y={Math.min(dragState.start[1], dragState.end[1])} width={Math.abs(dragState.end[0] - dragState.start[0])} height={Math.abs(dragState.end[1] - dragState.start[1])} fill={`${colors.selection}18`} stroke={colors.selection} strokeWidth={1.2} strokeDasharray="5 4" pointerEvents="none" />}
-
-              {activeMeshTrace?.meshCycles?.map((cycle) => <MeshLoopOverlay key={`mesh-cycle-${cycle.index}`} cycle={cycle} tabDUiRefinement={tabDUiRefinement} components={components} scale={visualSymbolScale} />)}
-
-              {/* Dedicated layer containing ONLY components, wires, labels, and texts for tight export bounding box */}
-              <g id="circuit-elements-layer">
-                {wires.map(wire => {
-                const selected = selection?.kind === 'wire' && selection.id === wire.id;
-                const phase = snapshot.wirePhases?.[wire.id] ?? 0;
-                const path = getWirePoints(wire);
-                // Phase 2: use jump-arc path for the visible stroke; hitbox uses the
-                // plain polyline so clicks always register even near arc breaks.
-                const hitPath = pointsToPath(path);
-                const renderPath = buildJumpArcPath(path, wireIntersectionList, wire.id, 4);
-                const normalizedOffset = ((phase % 1) + 1) % 1;
-                // Persistent charge particles: uniform spacing based solely on physical length (N = floor(length / spacing))
-                const numDots = Math.max(1, Math.floor(pathLength(path) / 45));
-                const dots = getDotsOnPath(path, numDots, normalizedOffset);
-                const isSensingWire = false;
-                const strokeColor = selected ? colors.selection : (wire.color ?? colors.text);
-                const strokeWidth = selected ? 2 : 1.5;
-
-                return (
-                  <g key={wire.id}>
-                    {/* Wide transparent hitbox — uses plain polyline for reliable click detection */}
-                    <path d={hitPath} fill="none" stroke="transparent" strokeWidth={17} strokeLinecap="round" strokeLinejoin="round" onMouseDown={event => handleWireMouseDown(event, wire)} onDoubleClick={event => handleWireDoubleClick(event, wire)} style={{ cursor: 'pointer' }} />
-                    {/* Visible stroke with jump-arc splices at cross-net crossings */}
-                    <path d={renderPath} fill="none" stroke={strokeColor} strokeWidth={strokeWidth} strokeDasharray={isSensingWire ? "3 3" : undefined} strokeLinecap="round" strokeLinejoin="round" pointerEvents="none" />
-                    {showElectrons && dots.map((dot, index) => <circle key={index} cx={dot[0]} cy={dot[1]} r={3} fill={colors.powered} opacity={1} pointerEvents="none" />)}
-                    {selected && path.length > 2 && path.slice(1, -1).map((corner, index) => {
-                      const cornerIndex = index + 1;
-                      return <circle key={`${wire.id}-${cornerIndex}`} cx={corner[0]} cy={corner[1]} r={6} fill={colors.panel} stroke={colors.selection} strokeWidth={2} onMouseDown={event => {
-                        event.stopPropagation();
-                        dragStartSnapshotRef.current = cloneSnapshot({ components: componentRef.current, wires: wiresRef.current, texts: textsRef.current });
-                        setDragState({ kind: 'wireCorner', id: wire.id, corner: cornerIndex });
-                      }} style={{ cursor: 'move' }} />;
-                    })}
-                  </g>
-                );
-              })}
-
-              {/* Phase 2: same-net junction dots for interior crossing points, T-junctions, and cross-junctions */}
-              {junctionDots.map(([jx, jy]) => (
-                <circle key={`jdot-${jx}-${jy}`} cx={jx} cy={jy} r={3} fill="currentColor" color={colors.text} pointerEvents="none" />
-              ))}
-
-              {/* Phase 3: orthogonal rubber-band wire preview */}
-              {wiring.from && wireDraftPreviewPath && <path d={pointsToPath(wireDraftPreviewPath)} fill="none" stroke={colors.accent} strokeDasharray="6 4" strokeWidth={1.6} opacity={.75} strokeLinecap="round" strokeLinejoin="round" pointerEvents="none" />}
-              {wireSnapProjection && <circle cx={wireSnapProjection.point[0]} cy={wireSnapProjection.point[1]} r={6} fill="none" stroke={colors.accent} strokeWidth={2} pointerEvents="none" />}
-              {wiring.lockedCorners?.map((corner, index) => (
-                <circle key={`corner-${index}`} cx={corner[0]} cy={corner[1]} r={3} fill={colors.panel} stroke={colors.accent} strokeWidth={1.2} pointerEvents="none" />
-              ))}
-
-              {components.map(component => {
-                const definition = getDef(component.type);
-                if (!definition) return null;
-                const isSelected = (selection?.kind === 'component' && selection.id === component.id) || marqueeIds.includes(component.id);
-                let powered = Boolean(snapshot.componentPowered[component.id]);
-                if (component.type === 'coil') {
-                  const vPos = snapshot.terminalVoltages[`${component.id}:pos`];
-                  const vNeg = snapshot.terminalVoltages[`${component.id}:neg`];
-                  if (vPos !== undefined && vNeg !== undefined) {
-                    const vCoil = Math.abs(vPos - vNeg);
-                    const threshold = Math.max(0.1, Number(component.props?.activationThreshold ?? 5));
-                    if (vCoil >= threshold * 0.6) {
-                      powered = true;
-                    }
-                  }
-                } else if (['relay-spst', 'relay-spdt', 'relay-dpst', 'contactor'].includes(component.type)) {
-                  const manual = component.props?.manualState;
-                  if (manual === 'closed') {
-                    powered = true;
-                  } else if (manual === 'open') {
-                    powered = false;
-                  } else {
-                    const vPos = snapshot.terminalVoltages[`${component.id}:coil+`];
-                    const vNeg = snapshot.terminalVoltages[`${component.id}:coil-`];
-                    if (vPos !== undefined && vNeg !== undefined) {
-                      const vCoil = Math.abs(vPos - vNeg);
-                      const rated = Math.max(0.1, Number(component.props?.coilVoltage ?? (component.type === 'contactor' ? 24 : 12)));
-                      if (vCoil >= rated * 0.7) {
-                        powered = true;
-                      }
-                    }
-                  }
-                } else if (['aux-contact-no', 'aux-contact-nc', 'aux-contact-3phase'].includes(component.type) && (component.props?.linkedTo || component.props?.controlSourceId)) {
-                  const linkedRef = String(component.props?.linkedTo || component.props?.controlSourceId || '');
-                  const linkedCoil = components.find(c => ['coil', 'contactor', 'relay-spst', 'relay-spdt', 'relay-dpst'].includes(c.type) && (c.label === linkedRef || c.id === linkedRef));
-                  if (linkedCoil) {
-                    if (linkedCoil.type === 'coil') {
-                      let coilEnergized = Boolean(snapshot.componentPowered[linkedCoil.id]);
-                      const vPos = snapshot.terminalVoltages[`${linkedCoil.id}:pos`];
-                      const vNeg = snapshot.terminalVoltages[`${linkedCoil.id}:neg`];
-                      if (vPos !== undefined && vNeg !== undefined) {
-                        const vCoil = Math.abs(vPos - vNeg);
-                        const threshold = Math.max(0.1, Number(linkedCoil.props?.activationThreshold ?? 5));
-                        if (vCoil >= threshold * 0.6) {
-                          coilEnergized = true;
-                        }
-                      }
-                      powered = coilEnergized;
-                    } else {
-                      const manual = linkedCoil.props?.manualState;
-                      if (manual === 'closed') {
-                        powered = true;
-                      } else if (manual === 'open') {
-                        powered = false;
-                      } else {
-                        let coilEnergized = Boolean(snapshot.componentPowered[linkedCoil.id]);
-                        const vPos = snapshot.terminalVoltages[`${linkedCoil.id}:coil+`];
-                        const vNeg = snapshot.terminalVoltages[`${linkedCoil.id}:coil-`];
-                        if (vPos !== undefined && vNeg !== undefined) {
-                          const vCoil = Math.abs(vPos - vNeg);
-                          const rated = Math.max(0.1, Number(linkedCoil.props?.coilVoltage ?? (linkedCoil.type === 'contactor' ? 24 : 12)));
-                          if (vCoil >= rated * 0.7) {
-                            coilEnergized = true;
-                          }
-                        }
-                        powered = coilEnergized;
-                      }
-                    }
-                  }
-                }
-                let motorVEff: number | undefined;
-                if (component.type === 'motor-dc') {
-                  const vPos = snapshot.terminalVoltages[terminalKey(component.id, 'pos')];
-                  const vNeg = snapshot.terminalVoltages[terminalKey(component.id, 'neg')];
-                  if (vPos !== undefined && vNeg !== undefined) {
-                    const vEff = Math.abs(vPos - vNeg);
-                    motorVEff = vEff;
-                    powered = vEff >= 0.5;
-                  }
-                } else if (component.type === 'motor-3phase') {
-                  const vu = snapshot.terminalVoltages[terminalKey(component.id, 'u')];
-                  const vv = snapshot.terminalVoltages[terminalKey(component.id, 'v')];
-                  const vw = snapshot.terminalVoltages[terminalKey(component.id, 'w')];
-                  if (vu !== undefined && vv !== undefined && vw !== undefined) {
-                    const vuv = Math.abs(vu - vv);
-                    const vvw = Math.abs(vv - vw);
-                    const vwu = Math.abs(vw - vu);
-                    const vEff = Math.sqrt((vuv ** 2 + vvw ** 2 + vwu ** 2) / 3);
-                    motorVEff = vEff;
-                    powered = vEff >= 0.5;
-                  }
-                }
-                const intensity = snapshot.componentIntensity[component.id] ?? 0;
-                const reading = effectiveSnapshot.instrumentReadings[component.id];
-                // Live KaTeX-styled reading inside the circular Voltmeter/Ammeter face, synced with
-                // effectiveSnapshot (SPICE-verified when available, the legacy engine otherwise) so it
-                // follows Run mode with no extra lag beyond the snapshot itself. A component with no
-                // reading yet (never simulated) or an unwired meter falls back to the plain "V"/"A"
-                // glyph inside the symbol, unchanged.
-                const meterUnit = component.type === 'voltmeter' ? 'V' : component.type === 'ammeter' ? 'A' : null;
-                const meterDisplayValue = meterUnit && reading?.status === 'ready' ? formatMeterReading(reading.value, meterUnit) : undefined;
-                const transform = `translate(${component.x},${component.y})`;
-                const symbolTransform = `rotate(${component.rotation}) scale(${component.flipH ? -1 : 1},${component.flipV ? -1 : 1}) scale(${isExactCadComponent(component.type) ? 1 : visualSymbolScale})`;
-                return (
-                  <g
-                    key={component.id}
-                    transform={transform}
-                    onPointerEnter={() => setHoveredComponentId(component.id)}
-                    onPointerLeave={() => setHoveredComponentId(null)}
-                  >
-                    <g transform={symbolTransform} color={isSelected ? colors.selection : undefined}>
-                      {renderSymbol(definition.symbol, powered, { ...component.props, label: component.label, selected: isSelected, _isSelected: isSelected, isDark: darkPreview, _isDark: darkPreview, isEnergized: powered, isConflicted: conflictedCoilIds.has(component.id), _intensity: intensity, ...(motorVEff !== undefined ? { _vEff: motorVEff } : {}), _documentedStyle: tabDUiRefinement, ...(meterDisplayValue !== undefined ? { displayValue: meterDisplayValue } : {}) }, animationTime)}
-                    </g>
-                    {definition.terminals.map(terminal => {
-                      const snappedWorld = getCanvasTerminalPosition(component, terminal.id);
-                      const rawWorld = getRawCanvasTerminalPosition(component, terminal.id);
-                      if (!snappedWorld || !rawWorld) return null;
-                      const terminalX = snappedWorld[0] - component.x;
-                      const terminalY = snappedWorld[1] - component.y;
-                      const starting = wiring.from?.componentId === component.id && wiring.from.terminalId === terminal.id;
-                      const terminalVoltage = snapshot.terminalVoltages[terminalKey(component.id, terminal.id)] ?? 0;
-                      const energized = Math.abs(terminalVoltage) > .05;
-                      const showTerminals = isSelected || hoveredComponentId === component.id || Boolean(wiring.from);
-                      return <g key={terminal.id}>
-                        <circle cx={terminalX} cy={terminalY} r={TERMINAL_HIT_RADIUS} fill="transparent" />
-                        <g style={{ opacity: showTerminals ? 1 : 0, transition: 'opacity 0.2s ease-in-out' }} pointerEvents="none">
-                          <circle cx={terminalX} cy={terminalY} r={TERMINAL_RADIUS} fill={starting ? colors.accent : energized ? colors.powered : colors.panel} stroke={wiring.from ? colors.primary : colors.muted} strokeWidth={1.4} />
-                          {terminal.name && component.type !== 'oscilloscope' && <text x={terminalX} y={terminalY - 8} textAnchor="middle" fontSize={7} fontWeight={400} fill={colors.muted}>{terminal.name}</text>}
-                        </g>
-                      </g>;
-                    })}
-                    {isSelected && (component.type === 'cccs' || component.type === 'ccvs' || component.type === 'vcvs' || component.type === 'vccs') && typeof component.props.controlSourceId === 'string' && component.props.controlSourceId && (() => {
-                      const sensedComponent = components.find(c => c.label === component.props.controlSourceId || c.id === component.props.controlSourceId);
-                      if (!sensedComponent) return null;
-                      const dx = sensedComponent.x - component.x;
-                      const dy = sensedComponent.y - component.y;
-                      return <line x1={0} y1={0} x2={dx} y2={dy} stroke={colors.selection} strokeWidth={1} strokeDasharray="3 3" opacity={0.45} pointerEvents="none" />;
-                    })()}
-                  </g>
-                );
-              })}
-
-              {/* Dedicated Component Labels World Overlay Layer (0° Upright Orientation, No Upside Down / Rotated Labels) */}
-              <g className="v3-component-labels-layer" pointerEvents="none" style={{ userSelect: 'none' }}>
-                {components.map(component => {
-                  if (component.type === 'dmm') return null; // Completely hide DMM canvas label
-                  const definition = getDef(component.type);
-                  if (!definition) return null;
-
-                  // Read the display visibility flags
-                  const hideLabel = component.props._hideLabel === true;
-                  const hideValue = component.props._hideValue === true;
-
-                  const anchors = componentLabelAnchors(definition, component, visualSymbolScale);
-                  const isHorizontal = anchors.isHorizontal;
-                  const refTextAnchor = anchors.refTextAnchor ?? (isHorizontal ? 'middle' : 'start');
-                  const valTextAnchor = anchors.valTextAnchor ?? (isHorizontal ? 'middle' : 'start');
-                  const refX = component.x + anchors.reference[0];
-                  const refY = component.y + anchors.reference[1];
-                  const valX = component.x + anchors.value[0];
-                  const valY = component.y + anchors.value[1];
-                  const value = componentDisplayValue(definition, component);
-                  const isGround = component.type === 'ground' || /^GND\d*$/i.test(component.label);
-                  const refFill = darkPreview ? '#f1f5f9' : '#1e293b';
-                  const valFill = darkPreview ? '#94a3b8' : '#64748b';
-
+              <div className="border-b px-3 py-2" style={{ borderColor: colors.line }}><div className={CONTROL_SYSTEMS_HEADING}>Component Library</div></div>
+              <div style={{ padding: 10, borderBottom: `1px solid ${colors.line}` }}>
+                <div style={{ position: 'relative' }}>
+                  <Search size={14} style={{ position: 'absolute', left: 9, top: 9, color: colors.subtle }} />
+                  <input value={search} onChange={event => setSearch(event.target.value)} placeholder="Search components" style={{ width: '100%', boxSizing: 'border-box', border: `1px solid ${colors.line}`, outline: 'none', background: colors.input, color: colors.text, borderRadius: 7, padding: '8px 9px 8px 29px', fontSize: 11 }} />
+                </div>
+              </div>
+              <div style={{ overflowY: 'auto', padding: '6px 6px 14px' }}>
+                {Object.entries(filteredCategories).map(([category, items]) => {
+                  const collapsed = collapsedCategories.has(category);
                   return (
-                    <g key={`labels-${component.id}`}>
-                      {/* Component Reference Label */}
-                      {!hideLabel && (
-                        <text
-                          x={refX}
-                          y={refY}
-                          textAnchor={refTextAnchor}
-                          dominantBaseline="central"
-                          fontFamily="'KaTeX_Main', 'KaTeX_Math', serif"
-                          style={{
-                            fontFamily: "'KaTeX_Main', 'KaTeX_Math', serif",
-                            fontSize: 13,
-                            fontWeight: 400,
-                            fill: refFill,
-                            paintOrder: 'stroke fill',
-                            stroke: colors.canvas,
-                            strokeWidth: 3.5,
-                            strokeLinejoin: 'round',
-                            strokeLinecap: 'round',
+                    <section key={category} style={{ marginBottom: 3 }}>
+                      <button onClick={() => setCollapsedCategories(previous => {
+                        const next = new Set(previous);
+                        if (next.has(category)) next.delete(category); else next.add(category);
+                        return next;
+                      })} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: 'none', background: 'transparent', color: colors.text, cursor: 'pointer', padding: '8px 5px', fontSize: 11, fontWeight: 750 }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>{collapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}{category}</span>
+                        <span style={{ color: colors.subtle, fontWeight: 600 }}>{items.length}</span>
+                      </button>
+                      {!collapsed && <div className={tabDUiRefinement ? 'grid grid-cols-2 gap-2 px-1 pb-3' : undefined}>{items.map(item => (
+                        <button
+                          key={item.id}
+                          draggable
+                          onDragStart={event => {
+                            event.dataTransfer.setData('application/electrolab-component', item.id);
+                            event.dataTransfer.effectAllowed = 'copy';
                           }}
+                          onClick={() => addComponent(item.id)}
+                          className={tabDUiRefinement ? 'flex h-[110px] flex-col overflow-hidden rounded-md border transition-all active:scale-[.97]' : undefined}
+                          style={tabDUiRefinement ? { borderColor: colors.line, background: colors.panel, cursor: 'grab' } : { width: '100%', textAlign: 'left', border: 'none', background: 'transparent', color: colors.muted, cursor: 'grab', borderRadius: 6, padding: '7px 8px', fontSize: 11, display: 'flex', flexDirection: 'column', gap: 2 }}
+                          onMouseEnter={event => { event.currentTarget.style.background = colors.panelAlt; if (!tabDUiRefinement) event.currentTarget.style.color = colors.text; }}
+                          onMouseLeave={event => { event.currentTarget.style.background = tabDUiRefinement ? colors.panel : 'transparent'; if (!tabDUiRefinement) event.currentTarget.style.color = colors.muted; }}
                         >
-                          {renderComponentCanvasLabel(component.label, isGround)}
-                        </text>
-                      )}
-
-                      {/* Component Value Label */}
-                      {value && !hideValue && (
-                        <text
-                          x={valX}
-                          y={valY}
-                          textAnchor={valTextAnchor}
-                          dominantBaseline="central"
-                          fontFamily="'KaTeX_Main', 'KaTeX_Math', serif"
-                          style={{
-                            fontFamily: "'KaTeX_Main', 'KaTeX_Math', serif",
-                            fontSize: 11,
-                            fontWeight: 400,
-                            fill: valFill,
-                            paintOrder: 'stroke fill',
-                            stroke: colors.canvas,
-                            strokeWidth: 3,
-                            strokeLinejoin: 'round',
-                            strokeLinecap: 'round',
-                          }}
-                        >
-                          {renderFormattedValueTspans(value)}
-                        </text>
-                      )}
-                    </g>
+                          {tabDUiRefinement ? (
+                            <>
+                              {/* Top Section: Scaled & Centered Canvas */}
+                              <div className="flex flex-1 min-h-0 w-full items-center justify-center p-2">
+                                <ComponentPaletteIcon definition={item} colors={colors} documented={tabDUiRefinement} />
+                              </div>
+                              {/* Bottom Section: Fixed height banner with clear readable component names */}
+                              <div className="flex h-7 w-full shrink-0 items-center justify-center border-t px-1.5" style={{ borderColor: colors.line, background: `${colors.line}15` }}>
+                                <span className="flex items-center justify-center text-[11px] font-medium text-slate-800 dark:text-slate-200 tracking-tight text-center leading-tight truncate w-full" title={item.name}>
+                                  <ElectricalLabel label={item.name} />
+                                </span>
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <span className="text-[12px] font-normal text-slate-800 dark:text-slate-200"><ElectricalLabel label={item.name} /></span>
+                              <span style={{ color: colors.subtle, fontSize: 9, lineHeight: 1.25 }}>{item.description}</span>
+                            </>
+                          )}
+                        </button>
+                      ))}</div>}
+                    </section>
                   );
                 })}
-              </g>
-
-              {texts.map(text => (
-                <g
-                  key={text.id}
-                  data-text-id={text.id}
-                  transform={`translate(${text.x},${text.y}) rotate(${text.rotation})`}
-                  onMouseDown={event => handleTextMouseDown(event, text)}
-                  style={{ cursor: 'move' }}
-                >
-                  <foreignObject x={0} y={0} width={1} height={1} style={{ overflow: 'visible', pointerEvents: 'auto' }}>
-                    <div style={{ width: 'max-content', color: text.color, fontSize: text.fontSize, fontWeight: 400, userSelect: 'none', display: 'flex', border: selection?.kind === 'text' && selection.id === text.id ? `1px dashed ${colors.selection}` : 'none', padding: 4, transform: 'translate(-4px, -4px)' }}>
-                      <V3Math math={text.text} />
-                    </div>
-                  </foreignObject>
-                </g>
-              ))}
-              </g>
-
-              {/* V_i labels deliberately render last: they remain readable above grid, wires, symbols, and workspace text. */}
-              {activeNodalTrace?.nodalNodes?.filter((node) => node.centroid[0] !== 0 || node.centroid[1] !== 0).map((node) => <NodalNodeOverlay key={`nodal-node-${node.node}`} node={node} colors={colors} />)}
-            </g>
-          </svg>
-
-          {components.length === 0 && (
-            <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', pointerEvents: 'none' }}>
-              <div className="flex flex-col items-center justify-center pointer-events-none select-none">
-                <div className="px-6 py-2.5 bg-white border border-slate-100 rounded-2xl shadow-sm mb-3 dark:bg-[#0d0f12] dark:border-[#1a1d24]">
-                  <span className="text-base font-semibold text-slate-900 tracking-tight dark:text-white">
-                    Canvas Ready
-                  </span>
-                </div>
-                <p className="text-xs text-slate-400 font-normal">
-                  Drag and drop components from the library to begin circuit design.
-                </p>
               </div>
-            </div>
-          )}
+            </aside>
 
-          <div style={{ position: 'absolute', bottom: 10, left: 10, right: 10, display: 'flex', alignItems: 'center', gap: 10, padding: '7px 10px', background: `${colors.panel}e8`, border: `1px solid ${colors.line}`, color: colors.muted, borderRadius: 8, fontSize: 10, boxShadow: 'none', pointerEvents: 'none' }}>
-            <span>{components.length} components</span><span>•</span><span>{wires.length} wires</span>
-            {simulationRunning && <span style={{ marginLeft: 'auto', color: colors.accent, fontWeight: 750 }}>SIMULATION RUNNING</span>}
-            {spiceStatus.kind === 'running' && <span style={{ color: colors.muted, fontWeight: 750 }}>SPICE ACCURACY PASS…</span>}
-            {spiceStatus.kind === 'ready' && <span style={{ color: colors.accent, fontWeight: 750 }}>SPICE-VERIFIED</span>}
-            {spiceStatus.kind === 'unsupported' && <span title={spiceStatus.reason} style={{ color: colors.muted, fontWeight: 750 }}>SPICE UNAVAILABLE · LIVE ENGINE</span>}
-            {!snapshot.converged && <span style={{ marginLeft: 'auto', color: colors.danger, fontWeight: 750 }}>CHECK CIRCUIT WARNINGS</span>}
-          </div>
-        </main>
+            <main className="relative flex-1 min-w-0 h-[700px] overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-[#1a1d24] dark:bg-[#07080a]" style={{ background: colors.canvas, borderColor: colors.line }}>
+              <div className="flex items-start justify-between border-b px-4 py-2" style={{ borderColor: colors.line }}><div><div className={CONTROL_SYSTEMS_HEADING}>Interactive Electrical Canvas</div></div><div className="flex items-center gap-2 font-mono text-[10px]" style={{ color: colors.muted }}>{components.length} CMP · {wires.length} NET</div></div>
+              <svg ref={svgRef} onMouseDown={handleCanvasMouseDown} onMouseMove={handleCanvasMouseMove} onMouseUp={handleCanvasMouseUp} onMouseLeave={handleCanvasMouseUp} onContextMenu={event => event.preventDefault()} onDragOver={event => event.preventDefault()} onDrop={handleDrop} style={{ width: '100%', height: '100%', display: 'block', cursor: dragState?.kind === 'pan' ? 'grabbing' : wiring.from ? 'crosshair' : 'default', touchAction: 'none' }}>
+                <defs>
+                  <marker id="arrow" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M 0,0 L 6,3 L 0,6 Z" fill="#64748b" /></marker>
+                  {activeMeshTrace?.meshCycles?.map((cycle) => <marker key={cycle.index} id={`mesh-arrow-${cycle.index}`} markerWidth="7" markerHeight="7" refX="5.5" refY="3.5" orient="auto"><path d="M 0,1 L 6,3.5 L 0,6 Z" fill={MESH_LOOP_COLORS[cycle.index % MESH_LOOP_COLORS.length]} /></marker>)}
+                  {tabDUiRefinement && tabDGridMode === 'dots' ? (
+                    <pattern
+                      key="grid-pattern-dots"
+                      id="workspace-grid-dots"
+                      width={gridSize}
+                      height={gridSize}
+                      patternUnits="userSpaceOnUse"
+                      patternTransform={`translate(${-gridSize / 2}, ${-gridSize / 2})`}
+                    >
+                      <circle
+                        cx={gridSize / 2}
+                        cy={gridSize / 2}
+                        r={1.65}
+                        fill={darkPreview ? '#222630' : '#7a93b1'}
+                        fillOpacity={0.9}
+                      />
+                    </pattern>
+                  ) : (
+                    <pattern
+                      key={`grid-pattern-${tabDUiRefinement ? tabDGridMode : 'base'}`}
+                      id={`workspace-grid-${tabDUiRefinement ? tabDGridMode : 'base'}`}
+                      width={gridSize}
+                      height={gridSize}
+                      patternUnits="userSpaceOnUse"
+                    >
+                      <path
+                        d={`M ${gridSize} 0 L 0 0 0 ${gridSize}`}
+                        fill="none"
+                        stroke={tabDUiRefinement ? (darkPreview ? '#1a1d24' : '#a8b8cc') : colors.grid}
+                        strokeWidth={tabDUiRefinement ? 1.15 : 1}
+                        strokeOpacity={tabDUiRefinement ? 0.85 : 1}
+                      />
+                    </pattern>
+                  )}
+                </defs>
+                <g transform={`translate(${pan[0]},${pan[1]}) scale(${zoom})`}>
+                  {gridVisible && (!tabDUiRefinement || tabDGridMode !== 'hidden') && <rect key={`grid-surface-${tabDUiRefinement ? tabDGridMode : 'base'}`} x={-5000} y={-5000} width={10000} height={10000} fill={`url(#workspace-grid-${tabDUiRefinement ? tabDGridMode : 'base'})`} />}
+                  {dragState?.kind === 'marquee' && <rect x={Math.min(dragState.start[0], dragState.end[0])} y={Math.min(dragState.start[1], dragState.end[1])} width={Math.abs(dragState.end[0] - dragState.start[0])} height={Math.abs(dragState.end[1] - dragState.start[1])} fill={`${colors.selection}18`} stroke={colors.selection} strokeWidth={1.2} strokeDasharray="5 4" pointerEvents="none" />}
+
+                  {activeMeshTrace?.meshCycles?.map((cycle) => <MeshLoopOverlay key={`mesh-cycle-${cycle.index}`} cycle={cycle} tabDUiRefinement={tabDUiRefinement} components={components} scale={visualSymbolScale} />)}
+
+                  {/* Dedicated layer containing ONLY components, wires, labels, and texts for tight export bounding box */}
+                  <g id="circuit-elements-layer">
+                    {wires.map(wire => {
+                      const selected = selection?.kind === 'wire' && selection.id === wire.id;
+                      const phase = snapshot.wirePhases?.[wire.id] ?? 0;
+                      const path = getWirePoints(wire);
+                      // Phase 2: use jump-arc path for the visible stroke; hitbox uses the
+                      // plain polyline so clicks always register even near arc breaks.
+                      const hitPath = pointsToPath(path);
+                      const renderPath = buildJumpArcPath(path, wireIntersectionList, wire.id, 4);
+                      const normalizedOffset = ((phase % 1) + 1) % 1;
+                      // Persistent charge particles: uniform spacing based solely on physical length (N = floor(length / spacing))
+                      const numDots = Math.max(1, Math.floor(pathLength(path) / 45));
+                      const dots = getDotsOnPath(path, numDots, normalizedOffset);
+                      const isSensingWire = false;
+                      const strokeColor = selected ? colors.selection : (wire.color ?? colors.text);
+                      const strokeWidth = selected ? 2 : 1.5;
+
+                      return (
+                        <g key={wire.id}>
+                          {/* Wide transparent hitbox — uses plain polyline for reliable click detection */}
+                          <path d={hitPath} fill="none" stroke="transparent" strokeWidth={17} strokeLinecap="round" strokeLinejoin="round" onMouseDown={event => handleWireMouseDown(event, wire)} onDoubleClick={event => handleWireDoubleClick(event, wire)} style={{ cursor: 'pointer' }} />
+                          {/* Visible stroke with jump-arc splices at cross-net crossings */}
+                          <path d={renderPath} fill="none" stroke={strokeColor} strokeWidth={strokeWidth} strokeDasharray={isSensingWire ? "3 3" : undefined} strokeLinecap="round" strokeLinejoin="round" pointerEvents="none" />
+                          {showElectrons && dots.map((dot, index) => <circle key={index} cx={dot[0]} cy={dot[1]} r={3} fill={colors.powered} opacity={1} pointerEvents="none" />)}
+                          {selected && path.length > 2 && path.slice(1, -1).map((corner, index) => {
+                            const cornerIndex = index + 1;
+                            return <circle key={`${wire.id}-${cornerIndex}`} cx={corner[0]} cy={corner[1]} r={6} fill={colors.panel} stroke={colors.selection} strokeWidth={2} onMouseDown={event => {
+                              event.stopPropagation();
+                              dragStartSnapshotRef.current = cloneSnapshot({ components: componentRef.current, wires: wiresRef.current, texts: textsRef.current });
+                              setDragState({ kind: 'wireCorner', id: wire.id, corner: cornerIndex });
+                            }} style={{ cursor: 'move' }} />;
+                          })}
+                        </g>
+                      );
+                    })}
+
+                    {/* Phase 2: same-net junction dots for interior crossing points, T-junctions, and cross-junctions */}
+                    {junctionDots.map(([jx, jy]) => (
+                      <circle key={`jdot-${jx}-${jy}`} cx={jx} cy={jy} r={3} fill="currentColor" color={colors.text} pointerEvents="none" />
+                    ))}
+
+                    {/* Phase 3: orthogonal rubber-band wire preview */}
+                    {wiring.from && wireDraftPreviewPath && <path d={pointsToPath(wireDraftPreviewPath)} fill="none" stroke={colors.accent} strokeDasharray="6 4" strokeWidth={1.6} opacity={.75} strokeLinecap="round" strokeLinejoin="round" pointerEvents="none" />}
+                    {wireSnapProjection && <circle cx={wireSnapProjection.point[0]} cy={wireSnapProjection.point[1]} r={6} fill="none" stroke={colors.accent} strokeWidth={2} pointerEvents="none" />}
+                    {wiring.lockedCorners?.map((corner, index) => (
+                      <circle key={`corner-${index}`} cx={corner[0]} cy={corner[1]} r={3} fill={colors.panel} stroke={colors.accent} strokeWidth={1.2} pointerEvents="none" />
+                    ))}
+
+                    {components.map(component => {
+                      const definition = getDef(component.type);
+                      if (!definition) return null;
+                      const isSelected = (selection?.kind === 'component' && selection.id === component.id) || marqueeIds.includes(component.id);
+                      let powered = Boolean(snapshot.componentPowered[component.id]);
+                      if (component.type === 'coil') {
+                        const vPos = snapshot.terminalVoltages[`${component.id}:pos`];
+                        const vNeg = snapshot.terminalVoltages[`${component.id}:neg`];
+                        if (vPos !== undefined && vNeg !== undefined) {
+                          const vCoil = Math.abs(vPos - vNeg);
+                          const threshold = Math.max(0.1, Number(component.props?.activationThreshold ?? 5));
+                          if (vCoil >= threshold * 0.6) {
+                            powered = true;
+                          }
+                        }
+                      } else if (['relay-spst', 'relay-spdt', 'relay-dpst', 'contactor'].includes(component.type)) {
+                        const manual = component.props?.manualState;
+                        if (manual === 'closed') {
+                          powered = true;
+                        } else if (manual === 'open') {
+                          powered = false;
+                        } else {
+                          const vPos = snapshot.terminalVoltages[`${component.id}:coil+`];
+                          const vNeg = snapshot.terminalVoltages[`${component.id}:coil-`];
+                          if (vPos !== undefined && vNeg !== undefined) {
+                            const vCoil = Math.abs(vPos - vNeg);
+                            const rated = Math.max(0.1, Number(component.props?.coilVoltage ?? (component.type === 'contactor' ? 24 : 12)));
+                            if (vCoil >= rated * 0.7) {
+                              powered = true;
+                            }
+                          }
+                        }
+                      } else if (['aux-contact-no', 'aux-contact-nc', 'aux-contact-3phase'].includes(component.type) && (component.props?.linkedTo || component.props?.controlSourceId)) {
+                        const linkedRef = String(component.props?.linkedTo || component.props?.controlSourceId || '');
+                        const linkedCoil = components.find(c => ['coil', 'contactor', 'relay-spst', 'relay-spdt', 'relay-dpst'].includes(c.type) && (c.label === linkedRef || c.id === linkedRef));
+                        if (linkedCoil) {
+                          if (linkedCoil.type === 'coil') {
+                            let coilEnergized = Boolean(snapshot.componentPowered[linkedCoil.id]);
+                            const vPos = snapshot.terminalVoltages[`${linkedCoil.id}:pos`];
+                            const vNeg = snapshot.terminalVoltages[`${linkedCoil.id}:neg`];
+                            if (vPos !== undefined && vNeg !== undefined) {
+                              const vCoil = Math.abs(vPos - vNeg);
+                              const threshold = Math.max(0.1, Number(linkedCoil.props?.activationThreshold ?? 5));
+                              if (vCoil >= threshold * 0.6) {
+                                coilEnergized = true;
+                              }
+                            }
+                            powered = coilEnergized;
+                          } else {
+                            const manual = linkedCoil.props?.manualState;
+                            if (manual === 'closed') {
+                              powered = true;
+                            } else if (manual === 'open') {
+                              powered = false;
+                            } else {
+                              let coilEnergized = Boolean(snapshot.componentPowered[linkedCoil.id]);
+                              const vPos = snapshot.terminalVoltages[`${linkedCoil.id}:coil+`];
+                              const vNeg = snapshot.terminalVoltages[`${linkedCoil.id}:coil-`];
+                              if (vPos !== undefined && vNeg !== undefined) {
+                                const vCoil = Math.abs(vPos - vNeg);
+                                const rated = Math.max(0.1, Number(linkedCoil.props?.coilVoltage ?? (linkedCoil.type === 'contactor' ? 24 : 12)));
+                                if (vCoil >= rated * 0.7) {
+                                  coilEnergized = true;
+                                }
+                              }
+                              powered = coilEnergized;
+                            }
+                          }
+                        }
+                      }
+                      let motorVEff: number | undefined;
+                      if (component.type === 'motor-dc') {
+                        const vPos = snapshot.terminalVoltages[terminalKey(component.id, 'pos')];
+                        const vNeg = snapshot.terminalVoltages[terminalKey(component.id, 'neg')];
+                        if (vPos !== undefined && vNeg !== undefined) {
+                          const vEff = Math.abs(vPos - vNeg);
+                          motorVEff = vEff;
+                          powered = vEff >= 0.5;
+                        }
+                      } else if (component.type === 'motor-3phase') {
+                        const vu = snapshot.terminalVoltages[terminalKey(component.id, 'u')];
+                        const vv = snapshot.terminalVoltages[terminalKey(component.id, 'v')];
+                        const vw = snapshot.terminalVoltages[terminalKey(component.id, 'w')];
+                        if (vu !== undefined && vv !== undefined && vw !== undefined) {
+                          const vuv = Math.abs(vu - vv);
+                          const vvw = Math.abs(vv - vw);
+                          const vwu = Math.abs(vw - vu);
+                          const vEff = Math.sqrt((vuv ** 2 + vvw ** 2 + vwu ** 2) / 3);
+                          motorVEff = vEff;
+                          powered = vEff >= 0.5;
+                        }
+                      }
+                      const intensity = snapshot.componentIntensity[component.id] ?? 0;
+                      const reading = effectiveSnapshot.instrumentReadings[component.id];
+                      // Live KaTeX-styled reading inside the circular Voltmeter/Ammeter face, synced with
+                      // effectiveSnapshot (SPICE-verified when available, the legacy engine otherwise) so it
+                      // follows Run mode with no extra lag beyond the snapshot itself. A component with no
+                      // reading yet (never simulated) or an unwired meter falls back to the plain "V"/"A"
+                      // glyph inside the symbol, unchanged.
+                      const meterUnit = component.type === 'voltmeter' ? 'V' : component.type === 'ammeter' ? 'A' : null;
+                      const meterDisplayValue = meterUnit && reading?.status === 'ready' ? formatMeterReading(reading.value, meterUnit) : undefined;
+                      const transform = `translate(${component.x},${component.y})`;
+                      const symbolTransform = `rotate(${component.rotation}) scale(${component.flipH ? -1 : 1},${component.flipV ? -1 : 1}) scale(${isExactCadComponent(component.type) ? 1 : visualSymbolScale})`;
+                      return (
+                        <g
+                          key={component.id}
+                          transform={transform}
+                          onPointerEnter={() => setHoveredComponentId(component.id)}
+                          onPointerLeave={() => setHoveredComponentId(null)}
+                        >
+                          <g transform={symbolTransform} color={isSelected ? colors.selection : undefined}>
+                            {renderSymbol(definition.symbol, powered, { ...component.props, label: component.label, selected: isSelected, _isSelected: isSelected, isDark: darkPreview, _isDark: darkPreview, isEnergized: powered, isConflicted: conflictedCoilIds.has(component.id), _intensity: intensity, ...(motorVEff !== undefined ? { _vEff: motorVEff } : {}), _documentedStyle: tabDUiRefinement, ...(meterDisplayValue !== undefined ? { displayValue: meterDisplayValue } : {}) }, animationTime)}
+                          </g>
+                          {definition.terminals.map(terminal => {
+                            const snappedWorld = getCanvasTerminalPosition(component, terminal.id);
+                            const rawWorld = getRawCanvasTerminalPosition(component, terminal.id);
+                            if (!snappedWorld || !rawWorld) return null;
+                            const terminalX = snappedWorld[0] - component.x;
+                            const terminalY = snappedWorld[1] - component.y;
+                            const starting = wiring.from?.componentId === component.id && wiring.from.terminalId === terminal.id;
+                            const terminalVoltage = snapshot.terminalVoltages[terminalKey(component.id, terminal.id)] ?? 0;
+                            const energized = Math.abs(terminalVoltage) > .05;
+                            const showTerminals = isSelected || hoveredComponentId === component.id || Boolean(wiring.from);
+                            return <g key={terminal.id}>
+                              <circle cx={terminalX} cy={terminalY} r={TERMINAL_HIT_RADIUS} fill="transparent" />
+                              <g style={{ opacity: showTerminals ? 1 : 0, transition: 'opacity 0.2s ease-in-out' }} pointerEvents="none">
+                                <circle cx={terminalX} cy={terminalY} r={TERMINAL_RADIUS} fill={starting ? colors.accent : energized ? colors.powered : colors.panel} stroke={wiring.from ? colors.primary : colors.muted} strokeWidth={1.4} />
+                                {terminal.name && component.type !== 'oscilloscope' && <text x={terminalX} y={terminalY - 8} textAnchor="middle" fontSize={7} fontWeight={400} fill={colors.muted}>{terminal.name}</text>}
+                              </g>
+                            </g>;
+                          })}
+                          {isSelected && (component.type === 'cccs' || component.type === 'ccvs' || component.type === 'vcvs' || component.type === 'vccs') && typeof component.props.controlSourceId === 'string' && component.props.controlSourceId && (() => {
+                            const sensedComponent = components.find(c => c.label === component.props.controlSourceId || c.id === component.props.controlSourceId);
+                            if (!sensedComponent) return null;
+                            const dx = sensedComponent.x - component.x;
+                            const dy = sensedComponent.y - component.y;
+                            return <line x1={0} y1={0} x2={dx} y2={dy} stroke={colors.selection} strokeWidth={1} strokeDasharray="3 3" opacity={0.45} pointerEvents="none" />;
+                          })()}
+                        </g>
+                      );
+                    })}
+
+                    {/* Dedicated Component Labels World Overlay Layer (0° Upright Orientation, No Upside Down / Rotated Labels) */}
+                    <g className="v3-component-labels-layer" pointerEvents="none" style={{ userSelect: 'none' }}>
+                      {components.map(component => {
+                        if (component.type === 'dmm') return null; // Completely hide DMM canvas label
+                        const definition = getDef(component.type);
+                        if (!definition) return null;
+
+                        // Read the display visibility flags
+                        const hideLabel = component.props._hideLabel === true;
+                        const hideValue = component.props._hideValue === true;
+
+                        const anchors = componentLabelAnchors(definition, component, visualSymbolScale);
+                        const isHorizontal = anchors.isHorizontal;
+                        const refTextAnchor = anchors.refTextAnchor ?? (isHorizontal ? 'middle' : 'start');
+                        const valTextAnchor = anchors.valTextAnchor ?? (isHorizontal ? 'middle' : 'start');
+                        const refX = component.x + anchors.reference[0];
+                        const refY = component.y + anchors.reference[1];
+                        const valX = component.x + anchors.value[0];
+                        const valY = component.y + anchors.value[1];
+                        const value = componentDisplayValue(definition, component);
+                        const isGround = component.type === 'ground' || /^GND\d*$/i.test(component.label);
+                        const refFill = darkPreview ? '#f1f5f9' : '#1e293b';
+                        const valFill = darkPreview ? '#94a3b8' : '#64748b';
+
+                        return (
+                          <g key={`labels-${component.id}`}>
+                            {/* Component Reference Label */}
+                            {!hideLabel && (
+                              <text
+                                x={refX}
+                                y={refY}
+                                textAnchor={refTextAnchor}
+                                dominantBaseline="central"
+                                fontFamily="'KaTeX_Main', 'KaTeX_Math', serif"
+                                style={{
+                                  fontFamily: "'KaTeX_Main', 'KaTeX_Math', serif",
+                                  fontSize: 13,
+                                  fontWeight: 400,
+                                  fill: refFill,
+                                  paintOrder: 'stroke fill',
+                                  stroke: colors.canvas,
+                                  strokeWidth: 3.5,
+                                  strokeLinejoin: 'round',
+                                  strokeLinecap: 'round',
+                                }}
+                              >
+                                {renderComponentCanvasLabel(component.label, isGround)}
+                              </text>
+                            )}
+
+                            {/* Component Value Label */}
+                            {value && !hideValue && (
+                              <text
+                                x={valX}
+                                y={valY}
+                                textAnchor={valTextAnchor}
+                                dominantBaseline="central"
+                                fontFamily="'KaTeX_Main', 'KaTeX_Math', serif"
+                                style={{
+                                  fontFamily: "'KaTeX_Main', 'KaTeX_Math', serif",
+                                  fontSize: 11,
+                                  fontWeight: 400,
+                                  fill: valFill,
+                                  paintOrder: 'stroke fill',
+                                  stroke: colors.canvas,
+                                  strokeWidth: 3,
+                                  strokeLinejoin: 'round',
+                                  strokeLinecap: 'round',
+                                }}
+                              >
+                                {renderFormattedValueTspans(value)}
+                              </text>
+                            )}
+                          </g>
+                        );
+                      })}
+                    </g>
+
+                    {texts.map(text => (
+                      <g
+                        key={text.id}
+                        data-text-id={text.id}
+                        transform={`translate(${text.x},${text.y}) rotate(${text.rotation})`}
+                        onMouseDown={event => handleTextMouseDown(event, text)}
+                        style={{ cursor: 'move' }}
+                      >
+                        <foreignObject x={0} y={0} width={1} height={1} style={{ overflow: 'visible', pointerEvents: 'auto' }}>
+                          <div style={{ width: 'max-content', color: text.color, fontSize: text.fontSize, fontWeight: 400, userSelect: 'none', display: 'flex', border: selection?.kind === 'text' && selection.id === text.id ? `1px dashed ${colors.selection}` : 'none', padding: 4, transform: 'translate(-4px, -4px)' }}>
+                            <V3Math math={text.text} />
+                          </div>
+                        </foreignObject>
+                      </g>
+                    ))}
+                  </g>
+
+                  {/* V_i labels deliberately render last: they remain readable above grid, wires, symbols, and workspace text. */}
+                  {activeNodalTrace?.nodalNodes?.filter((node) => node.centroid[0] !== 0 || node.centroid[1] !== 0).map((node) => <NodalNodeOverlay key={`nodal-node-${node.node}`} node={node} colors={colors} />)}
+                </g>
+              </svg>
+
+              {components.length === 0 && (
+                <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', pointerEvents: 'none' }}>
+                  <div className="flex flex-col items-center justify-center pointer-events-none select-none">
+                    <div className="px-6 py-2.5 bg-white border border-slate-100 rounded-2xl shadow-sm mb-3 dark:bg-[#0d0f12] dark:border-[#1a1d24]">
+                      <span className="text-base font-semibold text-slate-900 tracking-tight dark:text-white">
+                        Canvas Ready
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400 font-normal">
+                      Drag and drop components from the library to begin circuit design.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              <div style={{ position: 'absolute', bottom: 10, left: 10, right: 10, display: 'flex', alignItems: 'center', gap: 10, padding: '7px 10px', background: `${colors.panel}e8`, border: `1px solid ${colors.line}`, color: colors.muted, borderRadius: 8, fontSize: 10, boxShadow: 'none', pointerEvents: 'none' }}>
+                <span>{components.length} components</span><span>•</span><span>{wires.length} wires</span>
+                {simulationRunning && <span style={{ marginLeft: 'auto', color: colors.accent, fontWeight: 750 }}>SIMULATION RUNNING</span>}
+                {spiceStatus.kind === 'running' && <span style={{ color: colors.muted, fontWeight: 750 }}>SPICE ACCURACY PASS…</span>}
+                {spiceStatus.kind === 'ready' && <span style={{ color: colors.accent, fontWeight: 750 }}>SPICE-VERIFIED</span>}
+                {spiceStatus.kind === 'unsupported' && <span title={spiceStatus.reason} style={{ color: colors.muted, fontWeight: 750 }}>SPICE UNAVAILABLE · LIVE ENGINE</span>}
+                {!snapshot.converged && <span style={{ marginLeft: 'auto', color: colors.danger, fontWeight: 750 }}>CHECK CIRCUIT WARNINGS</span>}
+              </div>
+            </main>
           </div>
 
           {/* Bottom Row: Academic Analysis Workspace spanning strictly across the bottom of the Left Column */}

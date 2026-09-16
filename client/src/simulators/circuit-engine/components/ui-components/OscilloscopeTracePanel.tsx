@@ -78,9 +78,10 @@ function OscilloscopeAxisOverlay({
   offset: number;
   isDarkMode: boolean;
 }) {
-  const labelClass = isDarkMode
-    ? 'bg-[#090a0d]/90 text-[#f8fafc] border border-[#1a1d24] shadow-xs'
-    : 'bg-white/80 text-slate-800 border border-slate-200 shadow-xs';
+  // No background box: a text-shadow halo keeps labels legible over the grid/traces instead.
+  const textColor = isDarkMode ? '#f8fafc' : '#1e293b';
+  const haloColor = isDarkMode ? '#090a0d' : '#ffffff';
+  const halo = [-1, 1].flatMap(dx => [-1, 1].map(dy => `${dx}px ${dy}px 0 ${haloColor}`)).join(', ');
 
   const vertDivs = [
     { d: 4, style: { top: '2px', left: '3px' } },
@@ -105,8 +106,8 @@ function OscilloscopeAxisOverlay({
       {vertDivs.map(({ d, style }) => (
         <span
           key={`v-${d}`}
-          style={style}
-          className={`absolute text-[8px] px-0.5 py-[0.5px] rounded leading-none font-mono flex items-center justify-center ${labelClass}`}
+          style={{ ...style, color: textColor, textShadow: halo }}
+          className="absolute text-[8px] leading-none font-mono flex items-center justify-center"
         >
           <V3Math math={formatVoltageDivLatex(offset + d * voltDiv)} />
         </span>
@@ -116,8 +117,8 @@ function OscilloscopeAxisOverlay({
       {horizDivs.map(({ k, style }) => (
         <span
           key={`t-${k}`}
-          style={style}
-          className={`absolute text-[8px] px-0.5 py-[0.5px] rounded leading-none font-mono flex items-center justify-center ${labelClass}`}
+          style={{ ...style, color: textColor, textShadow: halo }}
+          className="absolute text-[8px] leading-none font-mono flex items-center justify-center"
         >
           <V3Math math={formatTimeDivLatex(k * timeDiv)} />
         </span>

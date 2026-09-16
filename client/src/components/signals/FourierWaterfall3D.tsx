@@ -5,22 +5,10 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { waterfallHarmonics, type FourierSeriesResult } from "@/features/signals/engines/fourierEngine";
+import { loadPlotlyGl3d, type PlotlyRuntime } from "./plotlyRuntime";
 
 type Props = { series: FourierSeriesResult; harmonics: number };
-type PlotlyRuntime = { react: (root: HTMLDivElement, traces: unknown[], layout: unknown, config: unknown) => Promise<unknown>; purge: (root: HTMLDivElement) => void };
-declare global { interface Window { Plotly?: PlotlyRuntime; } }
 const palette = ["#60a5fa", "#818cf8", "#a78bfa", "#d946ef", "#fb7185", "#fb923c"];
-let plotlyLoader: Promise<PlotlyRuntime> | null = null;
-
-function loadPlotlyGl3d() {
-  if (window.Plotly) return Promise.resolve(window.Plotly);
-  if (plotlyLoader) return plotlyLoader;
-  plotlyLoader = new Promise<PlotlyRuntime>((resolve, reject) => {
-    const script = document.createElement("script"); script.src = "/manus-storage/plotly-gl3d-2.12.1.min_8dae105b.js"; script.async = true;
-    script.onload = () => window.Plotly ? resolve(window.Plotly) : reject(new Error("Plotly GL3D did not register.")); script.onerror = () => reject(new Error("Plotly GL3D could not be loaded.")); document.head.appendChild(script);
-  });
-  return plotlyLoader;
-}
 
 export function FourierWaterfall3D({ series, harmonics }: Props) {
   const host = useRef<HTMLDivElement>(null);

@@ -172,6 +172,50 @@ describe("compileComProgram — instruction encoding", () => {
     expect(program.diagnostics.some((d) => /Unsupported instruction: mul/.test(d.message))).toBe(true);
   });
 
+  it("encodes AND/OR/XOR reg16,reg16 with the standard opcode family", () => {
+    const program = compileComProgram(`and ax, bx\nor cx, dx\nxor ax, ax\nhlt`);
+    expect(Array.from(program.bytes.slice(0, 2))).toEqual([0x21, 0xd8]);
+    expect(Array.from(program.bytes.slice(2, 4))).toEqual([0x09, 0xd1]);
+    expect(Array.from(program.bytes.slice(4, 6))).toEqual([0x31, 0xc0]);
+  });
+
+  it("encodes AND reg16,imm16 via opcode 0x81 with the /4 extension", () => {
+    const program = compileComProgram(`and ax, 0x00ff\nhlt`);
+    expect(Array.from(program.bytes.slice(0, 4))).toEqual([0x81, 0xe0, 0xff, 0x00]);
+  });
+
+  it("encodes NOT reg16/reg8 as group-3 unary opcodes", () => {
+    const program = compileComProgram(`not ax\nnot al\nhlt`);
+    expect(Array.from(program.bytes.slice(0, 2))).toEqual([0xf7, 0xd0]);
+    expect(Array.from(program.bytes.slice(2, 4))).toEqual([0xf6, 0xd0]);
+  });
+
+  it("encodes PUSHF/POPF as single-byte opcodes", () => {
+    const program = compileComProgram(`pushf\npopf\nhlt`);
+    expect(Array.from(program.bytes.slice(0, 2))).toEqual([0x9c, 0x9d]);
+  });
+
+  it("encodes the full conditional-jump mnemonic set to their documented Jcc opcodes", () => {
+    const cases: Array<[string, number]> = [
+      ["jo", 0x70], ["jno", 0x71], ["jc", 0x72], ["jnae", 0x72], ["jnc", 0x73], ["jae", 0x73],
+      ["jz", 0x74], ["je", 0x74], ["jnz", 0x75], ["jne", 0x75], ["jbe", 0x76], ["ja", 0x77],
+      ["js", 0x78], ["jns", 0x79], ["jp", 0x7a], ["jnp", 0x7b],
+      ["jl", 0x7c], ["jge", 0x7d], ["jle", 0x7e], ["jg", 0x7f],
+    ];
+    for (const [mnemonic, opcode] of cases) {
+      const program = compileComProgram(`start:\n ${mnemonic} start\n hlt`);
+      expect(program.diagnostics, mnemonic).toEqual([]);
+      expect(program.bytes[0], mnemonic).toBe(opcode);
+    }
+  });
+
+  it("encodes LOOPE/LOOPZ and LOOPNE/LOOPNZ distinctly from plain LOOP", () => {
+    const program = compileComProgram(`start:\n loope start\n loopne start\n loop start\n hlt`);
+    expect(program.bytes[0]).toBe(0xe1);
+    expect(program.bytes[2]).toBe(0xe0);
+    expect(program.bytes[4]).toBe(0xe2);
+  });
+
   it("encodes direct-memory MOV forms using the COM_SEGMENT-relative offset", () => {
     const program = compileComProgram(`
       main:
