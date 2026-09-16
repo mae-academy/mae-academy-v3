@@ -152,7 +152,11 @@ function terminalPoint(component: CircuitComponent, terminalId: string): Point |
 
 function branchTerminals(component: CircuitComponent): readonly [string, string] | null {
   if (component.type === 'resistor') return ['a', 'b'];
-  if (component.type === 'dc-voltage' || component.type === 'dc-current') return ['pos', 'neg'];
+  // Every branch is oriented the way its MNAElement is, so a face's signed traversal can be read
+  // directly as a mesh coefficient. A current source's MNA flow runs `from`(neg) -> `to`(pos), the
+  // direction its arrow points, so it is oriented neg -> pos and not pos -> neg like a voltage source.
+  if (component.type === 'dc-current') return ['neg', 'pos'];
+  if (component.type === 'dc-voltage') return ['pos', 'neg'];
   if (component.type === 'vccs' || component.type === 'vcvs' || component.type === 'cccs' || component.type === 'ccvs') return ['pos', 'neg'];
   return null;
 }

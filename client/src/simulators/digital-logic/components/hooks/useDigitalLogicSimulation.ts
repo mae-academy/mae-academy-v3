@@ -51,7 +51,10 @@ export function compileDcTopology(components: CircuitComponent[], wires: Circuit
   for (const component of components) {
     if (component.type === 'resistor') elements.push({ type: 'resistor', id: component.id, positive: nodeFor(component, 'a'), negative: nodeFor(component, 'b'), resistance: number(component, 'resistance', 1000) });
     if (component.type === 'dc-voltage' || component.type === 'dc-rail') elements.push({ type: 'voltage', id: component.id, positive: nodeFor(component, 'pos'), negative: nodeFor(component, 'neg'), voltage: number(component, 'voltage', component.type === 'dc-rail' ? 24 : 12) });
-    if (component.type === 'dc-current') elements.push({ type: 'current', id: component.id, from: nodeFor(component, 'pos'), to: nodeFor(component, 'neg'), current: number(component, 'current', 1) });
+    // Arrow-direction convention, same as circuit-engine's compileDcTopology: current EXITS the
+    // `pos` pin into the circuit, and MNAElement flows `from` -> `to` inside the source, so `pos`
+    // maps to `to` (rhs[to] += I). Mapping `pos` -> `from` inverts the RHS constants vector.
+    if (component.type === 'dc-current') elements.push({ type: 'current', id: component.id, from: nodeFor(component, 'neg'), to: nodeFor(component, 'pos'), current: number(component, 'current', 1) });
     if (component.type === 'vccs') elements.push({ type: 'vccs', id: component.id, positive: nodeFor(component, 'pos'), negative: nodeFor(component, 'neg'), controlPositive: nodeFor(component, 'cp'), controlNegative: nodeFor(component, 'cn'), transconductance: number(component, 'transconductance', 0.001) });
     if (component.type === 'vcvs') elements.push({ type: 'vcvs', id: component.id, positive: nodeFor(component, 'pos'), negative: nodeFor(component, 'neg'), controlPositive: nodeFor(component, 'cp'), controlNegative: nodeFor(component, 'cn'), gain: number(component, 'gain', 2) });
     if (component.type === 'cccs' || component.type === 'ccvs') {

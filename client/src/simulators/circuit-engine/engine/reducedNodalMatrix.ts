@@ -259,15 +259,18 @@ export function generateReducedNodalMatrix(elements: MNAElement[]): ReducedNodal
       continue;
     }
     if (element.type === 'current') {
-      // MNA convention: positive source current leaves `from` and enters `to`.
+      // Same known-vector rule as mnaSolver.stampCurrent: the source LEAVES `from` (z -= I) and
+      // ENTERS `to` (z += I). addToUnknown resolves the row through `index`, so a pin that sits on
+      // a collapsed supernode/eliminated node reaches the row that survives the reduction.
       addToUnknown(element.from, -element.current);
       addToUnknown(element.to, element.current);
       continue;
     }
     if (element.type === 'vccs') {
       const k = element.gain ?? element.transconductance ?? 0;
-      const cp = element.controlPositive;
-      const cn = element.controlNegative;
+      const targetResistor = resolveTargetResistor(elements, element);
+      const cp = element.controlPositive ?? targetResistor?.positive ?? '0';
+      const cn = element.controlNegative ?? targetResistor?.negative ?? '0';
       const stampVCCS = (node: string, sign: number) => {
         const row = index.get(node);
         if (row === undefined) return;
@@ -364,12 +367,15 @@ export function generateReducedNodalMatrix(elements: MNAElement[]): ReducedNodal
         rhs[constraintRow] += source.element.voltage;
       } else if (source.element.type === 'vcvs') {
         const gain = source.element.gain;
-        const cPosIdx = unknownNodes.indexOf(source.element.controlPositive);
-        const cNegIdx = unknownNodes.indexOf(source.element.controlNegative);
+        const targetResistor = resolveTargetResistor(elements, source.element);
+        const cp = source.element.controlPositive ?? targetResistor?.positive ?? '0';
+        const cn = source.element.controlNegative ?? targetResistor?.negative ?? '0';
+        const cPosIdx = unknownNodes.indexOf(cp);
+        const cNegIdx = unknownNodes.indexOf(cn);
         if (cPosIdx >= 0) conductance[constraintRow][cPosIdx] -= gain;
-        else if (knownNodes.has(source.element.controlPositive)) rhs[constraintRow] += gain * knownNodes.get(source.element.controlPositive)!;
+        else if (knownNodes.has(cp)) rhs[constraintRow] += gain * knownNodes.get(cp)!;
         if (cNegIdx >= 0) conductance[constraintRow][cNegIdx] += gain;
-        else if (knownNodes.has(source.element.controlNegative)) rhs[constraintRow] -= gain * knownNodes.get(source.element.controlNegative)!;
+        else if (knownNodes.has(cn)) rhs[constraintRow] -= gain * knownNodes.get(cn)!;
       } else if (source.element.type === 'ccvs') {
         const gain = source.element.gain ?? source.element.transresistance ?? 0;
         const targetResistor = resolveTargetResistor(elements, source.element);

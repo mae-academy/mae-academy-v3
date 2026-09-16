@@ -75,7 +75,13 @@ export function compileDcTopology(components: CircuitComponent[], wires: Circuit
     }
     if (component.type === 'dc-voltage') elements.push({ type: 'voltage', id: component.id, label: component.label, positive: nodeFor(component, 'pos'), negative: nodeFor(component, 'neg'), voltage: number(component, 'voltage', 12) });
     if (component.type === 'dc-rail') elements.push({ type: 'voltage', id: component.id, label: component.label, positive: nodeFor(component, 'pos'), negative: '0', voltage: number(component, 'voltage', 24) });
-    if (component.type === 'dc-current') elements.push({ type: 'current', id: component.id, label: component.label, from: nodeFor(component, 'pos'), to: nodeFor(component, 'neg'), current: number(component, 'current', 1) });
+    // MNAElement.current is SPICE-oriented: conventional current flows `from` -> `to` INSIDE the
+    // source, so the RHS is stamped as rhs[from] -= I (leaving) and rhs[to] += I (entering).
+    // The schematic arrow points at the `pos` pin, i.e. `pos` is where current EXITS into the
+    // external circuit, so `pos` must map to `to`. Same swap as spiceTypes.ts (`I <neg> <pos>`),
+    // simulation.ts (stampCurrent 'neg','pos') and analogSimulation.ts; compiling `pos` -> `from`
+    // inverted every RHS constant fed to MNA/Nodal/Mesh.
+    if (component.type === 'dc-current') elements.push({ type: 'current', id: component.id, label: component.label, from: nodeFor(component, 'neg'), to: nodeFor(component, 'pos'), current: number(component, 'current', 1) });
     if (component.type === 'vccs' || component.type === 'vcvs') {
       const targetRef = String(component.props.targetId ?? component.props.controlSourceId ?? '');
       const controlComponent = components.find(c => c.id === targetRef || c.label === targetRef);

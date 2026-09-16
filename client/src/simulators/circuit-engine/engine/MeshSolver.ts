@@ -595,7 +595,10 @@ export const buildMeshSystem = (elements: MNAElement[], geometry?: MeshGeometry)
       for (const segment of treePath(adjacency, chord.to, chord.from)) {
         cycle.set(segment.edge.id, segment.edge.from === segment.from && segment.edge.to === segment.to ? 1 : -1);
       }
-      cycle.set(chord.id, -1);
+      // The tree path already walks chord.to -> chord.from, so the loop closes by traversing the
+      // chord in its own from -> to direction: +1. Stamping -1 made the stored cycle a cut rather
+      // than a circulation, inverting the chord's reconstructed branch current against MNA.
+      cycle.set(chord.id, 1);
       return cycle;
     });
 
@@ -780,10 +783,14 @@ export class MeshSolver {
             for (const edge of inLoop) {
               const trav = cycle.get(edge.id)!;
               const info = getTargetMeshParticipation(this.elements, edge.element, system.cycles);
-              const signStr = trav > 0 ? '+' : '-';
+              // trav = +1: mesh traverses from edge.from (= element.positive) to edge.to (= element.negative)
+              //           = enters + terminal = DROP = positive in \sum V_drop = 0
+              // trav = -1: enters − terminal = RISE = negative
+              const enterPositiveTerminal = trav > 0;
+              const kvlDropSign = enterPositiveTerminal ? '+' : '-';
               const kVal = edge.element.gain ?? (edge.element as any).transresistance ?? 1;
               const kStr = Math.abs(kVal - 1) < 1e-12 ? '' : `${formatAcademicNumber(kVal)} \\cdot `;
-              kvlDerivations.push(`\\text{Loop ${k + 1} KVL term from }${dictionary.element(edge.element)}: ${signStr}${kStr}${info.varName}`);
+              kvlDerivations.push(`\\text{Loop ${k + 1} KVL term from }${dictionary.element(edge.element)}: ${kvlDropSign}${kStr}${info.varName}`);
               kvlDerivations.push(`\\text{Substitute } ${info.varName} = ${info.rawSub}`);
             }
           }

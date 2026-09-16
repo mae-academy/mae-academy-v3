@@ -80,7 +80,10 @@ export class MNASolver {
       add(positive, negative, -conductance); add(negative, positive, -conductance);
     };
     const stampCurrent = (from: number, to: number, current: number) => {
-      // Positive source current enters `to` and leaves `from`.
+      // [G][V]=[I] is written as sum(I_leaving)=0, so the known [I] vector takes the source with a
+      // topological sign: it LEAVES `from` (rhs -= I) and ENTERS `to` (rhs += I). Reference-node
+      // rows are dropped by addRhs. Callers must pass `from`/`to` as the internal flow direction —
+      // the schematic's arrow pin is the `to` end (see compileDcTopology).
       const value = finite(current, 'current');
       addRhs(from, -value); addRhs(to, value);
     };

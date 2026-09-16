@@ -123,4 +123,54 @@ describe('Tab B Phase 2 strict MNA solver', () => {
       expect((error as MNAError).code).toBe('SINGULAR_MATRIX');
     }
   });
+
+  // Numerical [I] vector certificates: [G][V]=[I] with sum(I_leaving)=0, so an independent current
+  // source SUBTRACTS at the node it leaves (`from`) and ADDS at the node it enters (`to`).
+  it('stamps the numerical RHS vector with the exact topological sign of an independent current source', () => {
+    const leaving = new MNASolver([
+      { type: 'current', id: 'I1', from: 'n1', to: '0', current: 2 },
+      { type: 'resistor', id: 'R1', positive: 'n1', negative: '0', resistance: 10 },
+    ]).solve();
+    expect(leaving.nodeOrder).toEqual(['n1']);
+    expect(leaving.rhs).toEqual([-2]);
+    near(leaving.nodeVoltages.n1, -20);
+
+    const entering = new MNASolver([
+      { type: 'current', id: 'I1', from: '0', to: 'n1', current: 2 },
+      { type: 'resistor', id: 'R1', positive: 'n1', negative: '0', resistance: 10 },
+    ]).solve();
+    expect(entering.rhs).toEqual([2]);
+    near(entering.nodeVoltages.n1, 20);
+  });
+
+  it('splits one current source across both node rows of the RHS when neither pin is the reference', () => {
+    const result = new MNASolver([
+      { type: 'voltage', id: 'V1', positive: 'n1', negative: '0', voltage: 12 },
+      { type: 'resistor', id: 'R1', positive: 'n1', negative: 'n2', resistance: 10 },
+      { type: 'resistor', id: 'R2', positive: 'n2', negative: '0', resistance: 20 },
+      { type: 'resistor', id: 'R3', positive: 'n2', negative: 'n3', resistance: 30 },
+      { type: 'resistor', id: 'R4', positive: 'n3', negative: '0', resistance: 40 },
+      { type: 'current', id: 'I1', from: 'n2', to: 'n3', current: 0.5 },
+    ]).solve();
+    const rhsFor = (node: string) => result.rhs![result.nodeOrder.indexOf(node)];
+    expect(rhsFor('n2')).toBeCloseTo(-0.5, 12);
+    expect(rhsFor('n3')).toBeCloseTo(0.5, 12);
+    expect(result.residualInfinity).toBeLessThanOrEqual(1e-9);
+  });
+
+  it('keeps every dependent-source gain on the LHS: their RHS rows, including the auxiliary branch row, stay 0', () => {
+    const result = new MNASolver([
+      { type: 'voltage', id: 'V1', positive: 'in', negative: '0', voltage: 10 },
+      { type: 'resistor', id: 'R1', positive: 'in', negative: 'mid', resistance: 100 },
+      { type: 'resistor', id: 'R2', positive: 'mid', negative: '0', resistance: 200 },
+      { type: 'vccs', id: 'G1', positive: 'out', negative: '0', controlPositive: 'mid', controlNegative: '0', gain: 0.05 },
+      { type: 'vcvs', id: 'E1', positive: 'aux', negative: '0', controlPositive: 'mid', controlNegative: '0', gain: 3 },
+      { type: 'resistor', id: 'R3', positive: 'out', negative: '0', resistance: 50 },
+      { type: 'resistor', id: 'R4', positive: 'aux', negative: '0', resistance: 500 },
+    ]).solve();
+    // Only V1's own branch row may carry a constant; every node row and every dependent branch row is 0.
+    const v1Row = result.voltageBranchOrder.indexOf('V1') + result.nodeOrder.length;
+    result.rhs!.forEach((value, row) => expect(value).toBe(row === v1Row ? 10 : 0));
+    expect(result.residualInfinity).toBeLessThanOrEqual(1e-9);
+  });
 });

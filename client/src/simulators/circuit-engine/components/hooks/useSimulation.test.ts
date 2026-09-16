@@ -48,6 +48,26 @@ describe('Tab B visual topology to MNA compilation', () => {
     expect(vcvs.controlNegative).not.toBe(vcvs.negative);
   });
 
+  // The dc-current symbol's arrow points at its `pos` pin, so conventional current EXITS `pos` into
+  // the external circuit. MNAElement.current is SPICE-oriented (flow runs `from`->`to` INSIDE the
+  // source), so `pos` must compile to `to`; the same 2A-into-10Ω case is pinned against real
+  // ngspice.wasm in spice/ngspiceRegression.currentSources.test.ts.
+  it('compiles a DC current source with its schematic arrow direction, so the MNA RHS is not inverted', () => {
+    const components = [component('g', 'ground'), component('i1', 'dc-current', { current: 2 }), component('r1', 'resistor', { resistance: 10 })];
+    const elements = compileDcTopology(components, [
+      wire('w1', 'i1', 'pos', 'r1', 'a'), wire('w2', 'r1', 'b', 'g', 'gnd'), wire('w3', 'i1', 'neg', 'g', 'gnd'),
+    ]);
+    const source = elements.find((item: any) => item.type === 'current') as Extract<typeof elements[number], { type: 'current' }>;
+    const driven = elements.find((item: any) => item.type === 'resistor') as Extract<typeof elements[number], { type: 'resistor' }>;
+    expect(source.from).toBe('0');
+    expect(source.to).toBe(driven.positive);
+
+    const result = new MNASolver(elements).solve();
+    // Current is INJECTED into the driven node: RHS = +2, node rises to +I·R = +20 V (never -20 V).
+    expect(result.rhs).toEqual([2]);
+    expect(result.nodeVoltages[driven.positive]).toBeCloseTo(20, 9);
+  });
+
   it('derives an independent node label centroid from all connected visual pins and wire points', () => {
     const source = { ...component('v', 'dc-voltage', { voltage: 12 }), x: 100, y: 130 };
     const resistor = { ...component('r', 'resistor', { resistance: 1000 }), x: 160, y: 100 };

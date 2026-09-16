@@ -36,11 +36,15 @@ export function compileMeshGeometry(components: CircuitComponent[], wires: Circu
   const graph = normalizedGraph ?? NormalizedCircuitGraph.fromCanvas(components, wires);
   const groundIds = new Set(components.filter((component) => component.type === 'ground').map((component) => component.id));
   const branches = components.flatMap<MeshBranchGeometry>((component) => {
+    // Orientation must match the component's MNAElement: resistor a->b and voltage source pos->neg
+    // are positive->negative, while a current source's MNA flow is neg->pos (its arrow direction).
     const terminalIds = component.type === 'resistor'
       ? ['a', 'b'] as const
-      : component.type === 'dc-voltage' || component.type === 'dc-current'
+      : component.type === 'dc-voltage'
         ? ['pos', 'neg'] as const
-        : null;
+        : component.type === 'dc-current'
+          ? ['neg', 'pos'] as const
+          : null;
     if (!terminalIds) return [];
     const positive = terminal(component, terminalIds[0]);
     const negative = terminal(component, terminalIds[1]);

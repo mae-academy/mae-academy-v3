@@ -45,8 +45,8 @@ export function getDependentSourceInfo(
 
   if (element.type === 'vcvs' || element.type === 'vccs') {
     const gain = element.gain ?? (element as any).transconductance ?? 1;
-    const cp = element.controlPositive;
-    const cn = element.controlNegative;
+    const cp = element.controlPositive ?? targetResistor?.positive ?? '0';
+    const cn = element.controlNegative ?? targetResistor?.negative ?? '0';
     const varName = targetResistor ? `V_{${resLabel}}` : 'V_x';
     const num = cn === '0' ? symbolicVoltage(cp) : `${symbolicVoltage(cp)}-${symbolicVoltage(cn)}`;
     const subDef = cn === '0' ? symbolicVoltage(cp) : `\\left(${num}\\right)`;
@@ -76,7 +76,30 @@ export function generateKCLString(
   const seriesBranches = detectGroundedSourceResistorBranches(elements);
   const effectiveBoundary = new Set(boundary);
   for (const branch of seriesBranches) {
-    if (boundary.has(branch.primaryNode)) effectiveBoundary.add(branch.simpleNode);
+    if (boundary.has(branch.primaryNode)) {
+      // Guard effectiveBoundary expansion:
+      // Before absorbing simpleNode into effectiveBoundary, verify that no current source
+      // has both from and to (or positive and negative) mapping to the expanded set.
+      // If detected, skip the absorption for that node to preserve the sign-determining cross-boundary property of the current source.
+      const candidateBoundary = new Set(effectiveBoundary);
+      candidateBoundary.add(branch.simpleNode);
+      const trapsCurrentSource = elements.some((element) => {
+        if (element.type === 'current') {
+          const wasCrossing = effectiveBoundary.has(element.from) !== effectiveBoundary.has(element.to);
+          const willBeTrapped = candidateBoundary.has(element.from) && candidateBoundary.has(element.to);
+          return wasCrossing && willBeTrapped;
+        }
+        if (element.type === 'vccs' || element.type === 'cccs') {
+          const wasCrossing = effectiveBoundary.has(element.positive) !== effectiveBoundary.has(element.negative);
+          const willBeTrapped = candidateBoundary.has(element.positive) && candidateBoundary.has(element.negative);
+          return wasCrossing && willBeTrapped;
+        }
+        return false;
+      });
+      if (!trapsCurrentSource) {
+        effectiveBoundary.add(branch.simpleNode);
+      }
+    }
   }
   const symbolicVoltage = (node: string): string => {
     if (node === '0') return '0';
@@ -99,27 +122,43 @@ export function generateKCLString(
     const numerator = outside === '0' ? symbolicVoltage(inside) : `${symbolicVoltage(inside)}-${symbolicVoltage(outside)}`;
     return [`\\frac{${numerator}}{${dictionary.element(element)}}`];
   });
+  // Independent current sources:
+  // Conventional current EXITS `element.from` and ENTERS `element.to`.
+  // Convention: \sum I_leaving = 0.
+  // If exit pin (element.from) is inside the boundary, current leaves the boundary -> +
+  // If entry pin (element.to) is inside the boundary, current enters the boundary -> -
   const currents = elements.flatMap((element) => {
     if (element.type !== 'current') return [];
-    const fromInside = effectiveBoundary.has(element.from);
-    const toInside = effectiveBoundary.has(element.to);
-    if (fromInside === toInside) return [];
-    return [`${fromInside ? '+' : '-'}${dictionary.element(element)}`];
+    const exitPinInBoundary = effectiveBoundary.has(element.from);
+    const entryPinInBoundary = effectiveBoundary.has(element.to);
+    if (exitPinInBoundary === entryPinInBoundary) return [];
+    return [`${exitPinInBoundary ? '+' : '-'}${dictionary.element(element)}`];
   });
+  // Dependent current sources (VCCS and CCCS):
+  // Conventional current EXITS `element.positive` and ENTERS `element.negative`.
+  // Convention: \sum I_leaving = 0.
+  // If exit pin (element.positive) is inside the boundary, current leaves the boundary -> +
+  // If entry pin (element.negative) is inside the boundary, current enters the boundary -> -
   const dependentCurrents = elements.flatMap((element) => {
     if (element.type !== 'vccs' && element.type !== 'cccs') return [];
-    const fromInside = effectiveBoundary.has(element.positive);
-    const toInside = effectiveBoundary.has(element.negative);
-    if (fromInside === toInside) return [];
-    const sign = fromInside ? '+' : '-';
+    const exitPinInBoundary = effectiveBoundary.has(element.positive);
+    const entryPinInBoundary = effectiveBoundary.has(element.negative);
+    if (exitPinInBoundary === entryPinInBoundary) return [];
+    let sign: '+' | '-' = exitPinInBoundary ? '+' : '-';
     const info = getDependentSourceInfo(element, elements, dictionary, symbolicVoltage);
-    const gainPrefix = Math.abs(info.gain - 1) < 1e-12 ? '' : `${algebraicNumber(info.gain)} \\cdot `;
+    let effectiveGain = info.gain;
+    // When gain k < 0, flip the topological sign and use |k|
+    if (effectiveGain < 0) {
+      sign = sign === '+' ? '-' : '+';
+      effectiveGain = Math.abs(effectiveGain);
+    }
+    const gainPrefix = Math.abs(effectiveGain - 1) < 1e-12 ? '' : `${algebraicNumber(effectiveGain)} \\cdot `;
     if (options.substituted) {
       return [`${sign}${gainPrefix}\\left(${info.subExpr}\\right)`];
     }
     return [`${sign}${gainPrefix}${info.varName}`];
   });
-  return [...terms, ...currents, ...dependentCurrents].join(' + ').replace(/\+ -/g, '- ') || '0';
+  return [...terms, ...currents, ...dependentCurrents].join(' + ').replace(/\+ \+/g, '+ ').replace(/\+ -/g, '- ').replace(/^\+\s*/, '') || '0';
 }
 
 /** Pedagogical KCL front-end: full MNA is retained strictly for numerical solve and verification. */
@@ -193,6 +232,8 @@ export class NodalSolver {
         }
 
         const constraintLines = supernode.sources.flatMap((source) => {
+          // Topological polarity: positiveNode = element.positive, negativeNode = element.negative
+          // established by identifyFloatingSupernodes(). The constraint V_positive - V_negative = V_source is invariant.
           const { element, positiveNode, negativeNode } = source;
           if (element.type === 'voltage') {
             return [`\\text{Constraint} &: \\left(${symbolicVoltage(positiveNode)}\\right)-\\left(${symbolicVoltage(negativeNode)}\\right)=${element.voltage}\\,\\mathrm{V}`];

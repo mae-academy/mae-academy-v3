@@ -550,4 +550,174 @@ describe('Phase 3 academic analysis benchmarks', () => {
     const mna = new MNASolver(circuit).solve();
     expect(trace.result?.nodeVoltages.n1).toBeCloseTo(mna.nodeVoltages.n1, 8);
   });
+
+  it('Test J (Topological Sign: Outgoing Current Source in Supernode): renders positive +I_1 in KCL step when current flows out of supernode', () => {
+    const circuit: MNAElement[] = [
+      { type: 'voltage', id: 'V1', positive: 'n1', negative: 'n2', voltage: 5 },
+      { type: 'resistor', id: 'R1', positive: 'n1', negative: '0', resistance: 10 },
+      { type: 'resistor', id: 'R2', positive: 'n2', negative: '0', resistance: 20 },
+      { type: 'resistor', id: 'R3', positive: 'n2', negative: '0', resistance: 20 },
+      { type: 'current', id: 'I1', label: 'I1', from: 'n1', to: '0', current: 2 },
+    ];
+
+    const trace = new NodalSolver(circuit).analyze();
+    expect(trace.status).toBe('ready');
+
+    const supernodeStep = trace.steps.find((s) => s.title.includes('Supernode boundary and constraint'))?.math ?? '';
+    // Current leaves n1 (inside supernode) to 0 (outside) -> positive sign in \sum I_leaving = 0
+    expect(supernodeStep).toMatch(/\+\s*I_\{1\}/);
+    expect(supernodeStep).not.toMatch(/-\s*I_\{1\}/);
+
+    const mna = new MNASolver(circuit).solve();
+    expect(trace.result?.nodeVoltages.n1).toBeCloseTo(mna.nodeVoltages.n1, 8);
+    expect(trace.result?.nodeVoltages.n2).toBeCloseTo(mna.nodeVoltages.n2, 8);
+  });
+
+  it('Test K (Topological Sign: Incoming Current Source in Supernode): renders negative -I_in in KCL step when current flows into supernode', () => {
+    const circuit: MNAElement[] = [
+      { type: 'voltage', id: 'V1', positive: 'n1', negative: 'n2', voltage: 5 },
+      { type: 'resistor', id: 'R1', positive: 'n1', negative: '0', resistance: 10 },
+      { type: 'resistor', id: 'R2', positive: 'n2', negative: '0', resistance: 20 },
+      { type: 'resistor', id: 'R3', positive: 'n2', negative: '0', resistance: 20 },
+      { type: 'current', id: 'Iin', label: 'I_in', from: '0', to: 'n1', current: 2 },
+    ];
+
+    const trace = new NodalSolver(circuit).analyze();
+    expect(trace.status).toBe('ready');
+
+    const supernodeStep = trace.steps.find((s) => s.title.includes('Supernode boundary and constraint'))?.math ?? '';
+    // Current enters n1 (inside supernode) from 0 (outside) -> negative sign in \sum I_leaving = 0
+    expect(supernodeStep).toMatch(/-\s*I_\{?\\mathrm\{in\}\}?/);
+    expect(supernodeStep).not.toMatch(/\+\s*I_\{?\\mathrm\{in\}\}?/);
+
+    const mna = new MNASolver(circuit).solve();
+    expect(trace.result?.nodeVoltages.n1).toBeCloseTo(mna.nodeVoltages.n1, 8);
+    expect(trace.result?.nodeVoltages.n2).toBeCloseTo(mna.nodeVoltages.n2, 8);
+  });
+
+  it('Test L (Topological Sign: VCVS Supernode Constraint Polarity): correctly assigns V_positive - V_negative = gain * V_target', () => {
+    const circuit: MNAElement[] = [
+      { type: 'voltage', id: 'V1', positive: 'n1', negative: '0', voltage: 12 },
+      { type: 'resistor', id: 'R1', label: 'R1', positive: 'n1', negative: '0', resistance: 10 },
+      { type: 'vcvs', id: 'E1', label: 'E1', positive: 'n3', negative: 'n2', targetId: 'R1', gain: 2 },
+      { type: 'resistor', id: 'R2', positive: 'n2', negative: '0', resistance: 10 },
+      { type: 'resistor', id: 'R3', positive: 'n3', negative: '0', resistance: 20 },
+    ];
+
+    const trace = new NodalSolver(circuit).analyze();
+    expect(trace.status).toBe('ready');
+
+    const supernodeStep = trace.steps.find((s) => s.title.includes('Supernode boundary and constraint'))?.math ?? '';
+    // E1 sits between n3 (+) and n2 (-). Constraint must be V_positive - V_negative = 2 \cdot V_{target}
+    expect(supernodeStep).toContain('\\text{Constraint}');
+    expect(supernodeStep).toContain('2 \\cdot V_{R_{1}}');
+    expect(supernodeStep).toContain('\\text{Substitute } V_{R_{1}}');
+
+    const mna = new MNASolver(circuit).solve();
+    expect(trace.result?.nodeVoltages.n2).toBeCloseTo(mna.nodeVoltages.n2, 8);
+    expect(trace.result?.nodeVoltages.n3).toBeCloseTo(mna.nodeVoltages.n3, 8);
+    // Verify physical constraint: V(n3) - V(n2) = 2 * V(R1) = 2 * 12 = 24V
+    const v3 = trace.result?.nodeVoltages.n3 ?? 0;
+    const v2 = trace.result?.nodeVoltages.n2 ?? 0;
+    expect(v3 - v2).toBeCloseTo(24, 8);
+  });
+
+  it('Test M (Topological Sign: Dependent VCCS with Negative Gain): correctly flips sign for negative transconductance in KCL', () => {
+    const circuit: MNAElement[] = [
+      { type: 'voltage', id: 'V1', positive: 'n1', negative: '0', voltage: 10 },
+      { type: 'resistor', id: 'R1', label: 'R1', positive: 'n1', negative: '0', resistance: 100 },
+      { type: 'vccs', id: 'G1', label: 'G1', positive: 'n2', negative: '0', targetId: 'R1', gain: -0.5 },
+      { type: 'resistor', id: 'R2', positive: 'n2', negative: '0', resistance: 50 },
+    ];
+
+    const trace = new NodalSolver(circuit).analyze();
+    expect(trace.status).toBe('ready');
+
+    const kclStep = trace.steps.find((s) => s.title.includes('Independent-node KCL'))?.math ?? '';
+    // Positive pin is at n2 (exit pin -> base sign '+'), but gain is -0.5 -> net sign becomes '-' with |gain| = 0.5
+    expect(kclStep).toMatch(/-\s*0\.5\s*\\cdot\s*V_\{R_\{1\}\}/);
+    expect(kclStep).not.toContain('+ -0.5');
+
+    const mna = new MNASolver(circuit).solve();
+    expect(trace.result?.nodeVoltages.n2).toBeCloseTo(mna.nodeVoltages.n2, 8);
+  });
+
+  // ---- Numerical RHS certificates for the rendered academic systems ----
+  // These assert the constants vector itself, not the LaTeX that describes it.
+
+  it('Test N (Numerical RHS): the reduced nodal [z] vector carries -I where the source leaves and +I where it enters', () => {
+    const circuit: MNAElement[] = [
+      { type: 'voltage', id: 'V1', label: 'V1', positive: 'n1', negative: '0', voltage: 12 },
+      { type: 'resistor', id: 'R1', label: 'R1', positive: 'n1', negative: 'n2', resistance: 10 },
+      { type: 'resistor', id: 'R2', label: 'R2', positive: 'n2', negative: '0', resistance: 20 },
+      { type: 'resistor', id: 'R3', label: 'R3', positive: 'n2', negative: 'n3', resistance: 30 },
+      { type: 'resistor', id: 'R4', label: 'R4', positive: 'n3', negative: '0', resistance: 40 },
+      { type: 'current', id: 'I1', label: 'I1', from: 'n2', to: 'n3', current: 0.5 },
+    ];
+    const reduced = generateReducedNodalMatrix(circuit);
+    const rhsFor = (node: string) => reduced.rhs[reduced.unknownNodes.indexOf(node)];
+    // n2 also receives +V1/R1 = 1.2 from the known grounded source, so the source's own share is -0.5.
+    expect(rhsFor('n2')).toBeCloseTo(1.2 - 0.5, 12);
+    expect(rhsFor('n3')).toBeCloseTo(0.5, 12);
+
+    const flipped = generateReducedNodalMatrix(circuit.map((element) =>
+      element.id === 'I1' ? { ...element, from: 'n3', to: 'n2' } as MNAElement : element));
+    expect(flipped.rhs[flipped.unknownNodes.indexOf('n2')]).toBeCloseTo(1.2 + 0.5, 12);
+    expect(flipped.rhs[flipped.unknownNodes.indexOf('n3')]).toBeCloseTo(-0.5, 12);
+  });
+
+  it('Test O (Numerical RHS): a current source leaving a supernode lands on the collapsed merged row as -I', () => {
+    const circuit: MNAElement[] = [
+      { type: 'voltage', id: 'V1', label: 'V1', positive: 'n1', negative: 'n2', voltage: 5 },
+      { type: 'resistor', id: 'R1', label: 'R1', positive: 'n1', negative: '0', resistance: 10 },
+      { type: 'resistor', id: 'R2', label: 'R2', positive: 'n2', negative: '0', resistance: 20 },
+      { type: 'resistor', id: 'R3', label: 'R3', positive: 'n2', negative: '0', resistance: 20 },
+      { type: 'current', id: 'I1', label: 'I1', from: 'n1', to: '0', current: 2 },
+    ];
+    const reduced = generateReducedNodalMatrix(circuit);
+    const mergedRow = reduced.unknownNodes.indexOf('n1');
+    const constraintRow = reduced.unknownNodes.indexOf('n2');
+    // Merged supernode KCL keeps the source's -I; the constraint row carries only V1 = 5.
+    expect(reduced.rhs[mergedRow]).toBeCloseTo(-2, 12);
+    expect(reduced.rhs[constraintRow]).toBeCloseTo(5, 12);
+    expect(reduced.conductance[constraintRow]).toEqual([1, -1]);
+
+    const mna = new MNASolver(circuit).solve();
+    reduced.unknownNodes.forEach((node, row) => {
+      const lhs = reduced.conductance[row].reduce((sum, g, column) => sum + g * mna.nodeVoltages[reduced.unknownNodes[column]], 0);
+      expect(lhs).toBeCloseTo(reduced.rhs[row], 9);
+    });
+    expect(mna.nodeVoltages.n1).toBeCloseTo(-7.5, 9);
+  });
+
+  it('Test P (Numerical RHS): dependent sources contribute 0 to the reduced [z] vector; only independent sources appear', () => {
+    const circuit: MNAElement[] = [
+      { type: 'resistor', id: 'R1', label: 'R1', positive: 'n1', negative: '0', resistance: 100 },
+      { type: 'resistor', id: 'R2', label: 'R2', positive: 'n1', negative: 'n2', resistance: 200 },
+      { type: 'resistor', id: 'R3', label: 'R3', positive: 'n2', negative: '0', resistance: 50 },
+      { type: 'vccs', id: 'G1', label: 'G1', positive: 'n2', negative: '0', targetId: 'R1', gain: 0.02 },
+    ];
+    // No independent source at all: every RHS constant must be exactly 0 even though G1 has a gain.
+    expect(generateReducedNodalMatrix(circuit).rhs.every((value) => value === 0)).toBe(true);
+
+    const driven = generateReducedNodalMatrix([...circuit, { type: 'current', id: 'I1', label: 'I1', from: '0', to: 'n1', current: 3 }]);
+    const rhsFor = (node: string) => driven.rhs[driven.unknownNodes.indexOf(node)];
+    expect(rhsFor('n1')).toBeCloseTo(3, 12);
+    expect(rhsFor('n2')).toBeCloseTo(0, 12);
+  });
+
+  it('Test Q (Numerical RHS): the mesh [E] vector subtracts a traversed voltage drop and adds a traversed rise', () => {
+    const loop: MNAElement[] = [
+      { type: 'voltage', id: 'V1', label: 'V1', positive: 'n1', negative: '0', voltage: 10 },
+      { type: 'resistor', id: 'R1', label: 'R1', positive: 'n1', negative: 'n2', resistance: 4 },
+      { type: 'resistor', id: 'R2', label: 'R2', positive: 'n2', negative: '0', resistance: 6 },
+    ];
+    const system = buildMeshSystem(loop);
+    expect(system.cycles).toHaveLength(1);
+    const traversal = system.cycles[0].get('V1') ?? 0;
+    // Entering the + terminal is a drop (-V); entering the - terminal is a rise (+V).
+    expect(system.source[0]).toBeCloseTo(-traversal * 10, 12);
+    expect(Math.abs(system.source[0])).toBeCloseTo(10, 12);
+    expect(solveMeshCurrents(system.impedance, system.source)[0]).toBeCloseTo(traversal * -1, 12);
+  });
 });

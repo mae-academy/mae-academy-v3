@@ -508,5 +508,44 @@ describe('Mesh-current coefficient system', () => {
     const traceWithoutGeom = new MeshSolver(mnaElements).analyze();
     console.log('TRACE WITHOUT GEOM SOURCE:', traceWithoutGeom);
   });
+
+  // A face's signed traversal is only a valid mesh coefficient while each branch's geometric
+  // orientation matches its MNAElement's. A current source flows neg -> pos (its arrow direction),
+  // unlike a voltage source, so orienting its geometry pos -> neg silently inverts the supermesh
+  // constraint and every branch current reconstructed from it.
+  it('keeps current-source branch geometry oriented like its MNA element, so the supermesh constraint and reconstruction agree with MNA', () => {
+    const comps: CircuitComponent[] = [
+      { id: 'i1', type: 'dc-current', x: 300, y: 300, rotation: 0, flipH: false, flipV: false, label: 'I1', props: { current: 2 } },
+      { id: 'r1', type: 'resistor', x: 500, y: 250, rotation: 90, flipH: false, flipV: false, label: 'R1', props: { resistance: 10 } },
+      { id: 'g1', type: 'ground', x: 400, y: 450, rotation: 0, flipH: false, flipV: false, label: 'GND', props: {} },
+    ];
+    const wires: CircuitWire[] = [
+      { id: 'w1', fromComp: 'i1', fromTerm: 'pos', toComp: 'r1', toTerm: 'a', path: [[300, 250], [500, 250]], routing: 'orthogonal' },
+      { id: 'w2', fromComp: 'r1', fromTerm: 'b', toComp: 'g1', toTerm: 'gnd', path: [[500, 310], [500, 435], [400, 435]], routing: 'orthogonal' },
+      { id: 'w3', fromComp: 'i1', fromTerm: 'neg', toComp: 'g1', toTerm: 'gnd', path: [[300, 350], [300, 435], [400, 435]], routing: 'orthogonal' },
+    ];
+
+    const graph = NormalizedCircuitGraph.fromCanvas(comps, wires);
+    const elements = compileDcTopology(comps, wires, graph);
+    const meshGeom = compileMeshGeometry(comps, wires, graph);
+    const system = buildMeshSystem(elements, meshGeom);
+    expect(system.cycles).toHaveLength(1);
+
+    // Walking the loop 0 -> n1 through the source and n1 -> 0 through the resistor follows both
+    // elements' own from -> to direction, so both coefficients are +1 (a circulation, not a cut).
+    const cycle = system.cycles[0];
+    expect(cycle.get('i1')).toBe(1);
+    expect(cycle.get('r1')).toBe(1);
+    expect(system.currentConstraints[0]).toMatchObject({ sourceId: 'i1', coefficients: [1], value: 2 });
+
+    const mna = new MNASolver(elements).solve();
+    const meshCurrents = solveMeshCurrents(system.impedance, system.source);
+    const reconstructed = reconstructBranchCurrents(elements, system.cycles, meshCurrents);
+    expect(reconstructed.i1).toBeCloseTo(mna.branchCurrents.i1, 9);
+    expect(reconstructed.r1).toBeCloseTo(mna.branchCurrents.r1, 9);
+    // 2 A pushed into the 10 Ω: the resistor carries +2 A from its own + terminal, never -2 A.
+    expect(mna.branchCurrents.r1).toBeCloseTo(2, 9);
+    expect(new MeshSolver(elements, meshGeom).analyze().status).toBe('ready');
+  });
 });
 
