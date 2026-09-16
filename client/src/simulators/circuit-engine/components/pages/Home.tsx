@@ -928,16 +928,16 @@ function TheveninTerminalOverlay({
 
   return (
     <g pointerEvents="none" aria-label={`Thévenin Terminal ${label}`}>
-      {/* Exact clone of Nodal analysis dot: single circle r=4, fill="white", strokeWidth=3 */}
+      {/* Exact clone of Nodal analysis dot: single circle r=4, fill="white", strokeWidth=2 */}
       <circle
         cx={x}
         cy={y}
         r={4}
         fill="#ffffff"
         stroke={terminalColor}
-        strokeWidth={3}
+        strokeWidth={2}
       />
-      {/* Standard KaTeX equivalent label beside the dot */}
+      {/* Clean normal-weight KaTeX label matching Nodal analysis dots (fontWeight: 400) */}
       <text
         x={x + offsetX}
         y={y + offsetY}
@@ -949,7 +949,7 @@ function TheveninTerminalOverlay({
         paintOrder="stroke fill"
         style={{
           fontSize: '13px',
-          fontWeight: 600,
+          fontWeight: 400,
         }}
       >
         <tspan style={{ fontStyle: 'italic', fontFamily: "'KaTeX_Math', 'KaTeX_Main', serif" }}>
@@ -3736,7 +3736,8 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     <div className="v3-mae-layout font-sans text-slate-900 dark:text-slate-100" style={{ minHeight: 760, color: colors.text }}>
       <section className="mb-4 overflow-x-auto rounded-xl border border-slate-200 bg-white dark:border-[#1a1d24] dark:bg-[#0d0f12]" style={{ borderColor: colors.line, background: colors.panel }}>
         <header className="min-w-max" style={{ background: colors.panel, zIndex: 5 }}>
-          <div className="flex flex-wrap items-center gap-1.5 p-2" style={{ minHeight: 36 }}>
+          {/* Row 1: Workspace navigation, history, clipboard, grids, text, component transformation */}
+          <div className="flex flex-nowrap items-center gap-1.5 px-2 pt-2" style={{ minHeight: 36 }}>
             <ToolbarButton colors={colors} label="−" title="Zoom out" onClick={() => setZoom(value => Math.max(.2, value / 1.15))} />
             <span style={{ color: colors.muted, fontSize: 11, minWidth: 42, textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>{Math.round(zoom * 100)}%</span>
             <ToolbarButton colors={colors} label="+" title="Zoom in" onClick={() => setZoom(value => Math.min(3, value * 1.15))} />
@@ -3773,7 +3774,10 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
             <ToolbarDivider colors={colors} />
             <ToolbarButton colors={colors} icon={<Type size={14} />} label="Text" title="Add editable workspace text (T)" onClick={addText} />
             {tabDUiRefinement && <><ToolbarDivider colors={colors} /><ToolbarButton colors={colors} icon={<RotateCw size={14} />} label="90°" title="Rotate selected component 90°" onClick={() => rotateSelected(90)} disabled={!selectedComponent} /><ToolbarButton colors={colors} icon={<FlipHorizontal size={14} />} label="Flip X" title="Reflect selected component horizontally" onClick={() => flipSelected('h')} disabled={!selectedComponent} /><ToolbarButton colors={colors} icon={<FlipVertical size={14} />} label="Flip Y" title="Reflect selected component vertically" onClick={() => flipSelected('v')} disabled={!selectedComponent} /></>}
-            <ToolbarDivider colors={colors} />
+          </div>
+
+          {/* Row 2: Export, Import, Save Image, Share, Simulation, Speed (Clean row without divider line) */}
+          <div className="flex flex-nowrap items-center gap-1.5 px-2 pb-2 pt-1" style={{ minHeight: 36 }}>
             <ToolbarButton colors={colors} icon={<Download size={14} />} label="Export" title="Export circuit as NAD netlist" onClick={exportNad} />
             <ToolbarButton colors={colors} icon={<Upload size={14} />} label="Import" title="Import circuit from NAD netlist" onClick={() => nadInputRef.current?.click()} />
             <input ref={nadInputRef} type="file" accept=".nad,application/x-mae-nad+json,application/json" onChange={importNad} style={{ display: 'none' }} />
