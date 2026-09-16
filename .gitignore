@@ -117,3 +117,7 @@ client/public/__manus__/version.json
 # on every run because they carry timings.
 client/src/simulators/circuit-engine/engine/mnaValidationSuite.report.md
 client/src/simulators/circuit-engine/engine/spice/mnaValidationSuite.ac.report.md
+
+# Playwright MCP browser-automation cache (page snapshots, console logs) — verification
+# artifacts from interactive testing, not source.
+.playwright-mcp/

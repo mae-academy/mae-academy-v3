@@ -18,6 +18,7 @@ import {
   FlipVertical,
   Grid3X3,
   Info,
+  Library,
   Maximize2,
   Minus,
   Move,
@@ -47,6 +48,8 @@ import { OscilloscopeComponentPanel } from '@/simulators/circuit-engine/componen
 import { useOscilloscopeDisplaySettings, type OscilloscopeDisplaySettings } from '@/simulators/circuit-engine/components/ui-components/oscilloscopeDisplaySettings';
 import { ExportPreviewModal, svgToPngBlob, type ExportItem } from '@/simulators/circuit-engine/components/ui-components/ExportPreviewModal';
 import { ShareProjectModal } from '@/simulators/circuit-engine/components/ui-components/ShareProjectModal';
+import { LoadExampleModal } from '@/simulators/circuit-engine/components/ui-components/LoadExampleModal';
+import type { ExampleDefinition } from '@/simulators/circuit-engine/examples';
 import type { AnalysisMethod, AnalysisTrace, MeshCycle, NodalNodeLabel } from '@/simulators/circuit-engine/models/analysisTypes';
 import {
   CATEGORIES,
@@ -1167,6 +1170,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
   const [exportFormat, setExportFormat] = useState<'png' | 'svg'>('png');
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [shareUrl, setShareUrl] = useState('');
+  const [examplesModalOpen, setExamplesModalOpen] = useState(false);
   const [sharePreviewUrl, setSharePreviewUrl] = useState<string | null>(null);
 
   // Safe Exit / Refresh Warning (BeforeUnload)
@@ -1706,6 +1710,18 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
       const excludedCount = document.components.length - importedComponents.length;
       toast.success(`NAD circuit imported (${importedComponents.length} components)${excludedCount ? `; ${excludedCount} unavailable component${excludedCount === 1 ? '' : 's'} omitted` : ''}`);
     } catch (error) { toast.error(error instanceof Error ? error.message : 'Unable to import NAD file.'); }
+  }, [loadCircuitDocument]);
+
+  // Loads a curated example from the Interactive Examples Library through the exact same path as
+  // a .nad import — createNadDocument normalizes the example's raw components/wires, and
+  // loadCircuitDocument replaces the canvas, resets history, and re-snaps wire paths to the live
+  // pin positions on the next animation frames.
+  const handleLoadExample = useCallback((example: ExampleDefinition) => {
+    try {
+      const document = createNadDocument({ components: example.schematic.components, wires: example.schematic.wires, texts: [] });
+      loadCircuitDocument(document);
+      toast.success(`Loaded example: ${example.name}`);
+    } catch (error) { toast.error(error instanceof Error ? error.message : 'Unable to load example circuit.'); }
   }, [loadCircuitDocument]);
 
   // Deep-Link Project Loading on Mount (?project=...)
@@ -3844,6 +3860,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
             <ToolbarButton colors={colors} icon={<ImageIcon size={14} />} label="Save Image" title="Save circuit as image (PNG or SVG)" onClick={handleOpenSaveImage} />
             <ToolbarButton colors={colors} icon={<Share2 size={14} />} label="Share Project" title="Share circuit via Web Share API or deep link" onClick={handleShareProject} />
             <ToolbarDivider colors={colors} />
+            <ToolbarButton colors={colors} icon={<Library size={14} />} label="Examples" title="Browse the Interactive Examples Library" onClick={() => setExamplesModalOpen(true)} />
             <button onClick={() => { hasStartedSimulation.current = true; setSimulationRunning(value => !value); }} title={simulationRunning ? 'Pause simulation' : 'Run simulation'} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: (!simulationRunning && hasStartedSimulation.current) ? TAB_GRADIENT_REV : TAB_GRADIENT, color: '#ffffff', fontWeight: 500, padding: '6px 14px', minHeight: 30, borderRadius: 8, fontSize: 12, boxShadow: TAB_ACTIVE_SHADOW, border: '1px solid transparent', cursor: 'pointer', whiteSpace: 'nowrap', transition: 'background .3s ease' }}>
               {simulationRunning ? <Pause size={14} /> : <Play size={14} />}{simulationRunning ? 'Pause' : 'Run'}
             </button>
@@ -4587,6 +4604,11 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
           </>
         );
       })()}
+      <LoadExampleModal
+        isOpen={examplesModalOpen}
+        onClose={() => setExamplesModalOpen(false)}
+        onLoad={handleLoadExample}
+      />
     </div>
   );
 }

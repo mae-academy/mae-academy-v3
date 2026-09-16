@@ -55,7 +55,7 @@ const a2Components = [
 const a2Wires = [
   wire('w1', 'v1', 'pos', 'r1', 'a', [200, 110], [390, 160]),
   wire('w2', 'r1', 'b', 'v2', 'pos', [450, 160], [640, 170]),
-  wire('w3', 'v2', 'neg', 'r2', 'a', [640, 270], [640, 370]),
+  wire('w3', 'r1', 'b', 'r2', 'a', [450, 160], [640, 370]),
   wire('w4', 'v1', 'pos', 'r4', 'a', [200, 110], [350, 460]),
   wire('w5', 'r4', 'b', 'v2', 'neg', [410, 460], [640, 270]),
   wire('w6', 'r2', 'b', 'g1', 'gnd', [640, 430], [400, 560]),
@@ -78,7 +78,7 @@ const A2: ExampleDefinition = {
   educationalNarrative:
     'When a voltage source is not connected to ground, it forms a supernode. The constraint V2 - V3 = 5V is used alongside the merged KCL equation for nodes 2 and 3 — exactly what the Academic Analysis Workspace\'s "Supernode boundary and constraint" step renders.',
   expectedResults: {
-    nodeVoltages: { 'Node 1 (V1)': 20, 'Node 2': 13.176471, 'Node 3': 5.176471 },
+    nodeVoltages: { 'Node 1 (V1)': 20, 'Node 2': 11.764706, 'Node 3': 6.764706 },
     notes: ['V2 − V3 = 5 V is enforced exactly by the supernode constraint row.'],
   },
   suggestedModifications: [
@@ -129,12 +129,13 @@ const A3: ExampleDefinition = {
   spiceNetlist: `* Example: Dependent Source (VCVS) in Nodal Analysis\n* Purpose: Learn how controlled sources affect nodal equations\n* Difficulty: Intermediate\n\n.title VCVS Dependent Source - Nodal Analysis\n\nV1 1 0 DC 10V\nR1 1 2 1k\nE1 3 0 2 0 3\nR2 3 4 2k\nR3 4 0 1k\n\n.dc V1 10 10 1\n.print dc v(1) v(2) v(3) v(4) i(V1)\n.end`,
   schematicAscii: `    +10V (Node 1)\n      |\n     R1 (1kΩ)\n      |\n    Node 2 (sensed by E1, effectively open)\n      |\n    [E1] (VCVS: Gain=3, controlled by V2)\n      |\n    Node 3 (output = 3 × V2)\n      |\n     R2 (2kΩ)\n      |\n    Node 4\n      |\n     R3 (1kΩ)\n      |\n     GND`,
   educationalNarrative:
-    'Dependent (controlled) sources create coupling in the nodal equations: the voltage at node 3 depends on node 2, V3 = 3×V2. Because an ideal VCVS control input draws zero current, node 2 is otherwise a dead end off R1 — so R1 carries no current and V2 equals V1 exactly. This is a classic, deliberately "degenerate" sensing topology and a great first look at how a dependent source constraint enters the matrix without touching the KCL sum at its own node.',
+    'Dependent (controlled) sources create coupling in the nodal equations: the voltage at node 3 depends on node 2, V3 = 3×V2. Because an ideal VCVS control input draws zero current, node 2 is otherwise a dead end off R1 — so R1 carries no current and V2 equals V1 exactly. Node 3\'s stiff 30V output then drives R2 and R3 as an ordinary loaded voltage divider down to node 4, so V4 = V3 × R3/(R2+R3) — a good look at how a dependent-source constraint enters the matrix without touching the KCL sum at its own node, feeding a completely ordinary resistor network downstream.',
   expectedResults: {
-    nodeVoltages: { 'Node 2 (sensed)': 10, 'Node 3 (E1 output)': 30, 'Node 4': 20 },
+    nodeVoltages: { 'Node 2 (sensed)': 10, 'Node 3 (E1 output)': 30, 'Node 4 (divided by R2, R3)': 10 },
     notes: [
       'V2 = V1 = 10 V because the ideal VCVS control input draws no current, so R1 carries 0 A.',
-      'V3 = 3 × V2 = 30 V by the VCVS gain relation.',
+      'V3 = 3 × V2 = 30 V by the VCVS gain relation — this output is stiff regardless of R2/R3.',
+      'V4 = V3 × R3/(R2+R3) = 30 × 1k/3k = 10 V, an ordinary loaded divider fed by the dependent source.',
       'A 10 MΩ sense resistor gives the dependent source a real two-terminal target; its loading effect on node 2 is below 0.001%.',
     ],
   },
