@@ -103,7 +103,7 @@ import { parseSpiceResults } from '@/simulators/circuit-engine/engine/spice/spic
 import { buildSpiceInstrumentReadings } from '@/simulators/circuit-engine/engine/spice/spiceInstruments';
 import { filterTabDCatalog, filterTabDImportedComponents, isTabDComponentAvailable } from '@/simulators/circuit-engine/models/analogComponentCatalog';
 import { alignTabDTerminalToGrid, calculateMeshLoopBounds, calculateTabDPlanarCavity, dynamicRubberBandPath, getExactTerminalOffset, isExactCadComponent, lockTabDWireCorner, MESH_LOOP_COLORS, moveTabDOrthogonalLane, tabDComponentLabelAnchors, tabDGentleWheelZoomFactor, tabDOrthogonalDraftPath, tabDTerminalOrthogonalPath, type ObstacleBox, type TabDTerminalAxis } from '@/simulators/circuit-engine/components/analogCanvasGeometry';
-import { formatMeterReading, renderComponentCanvasLabel, renderSymbol } from '@/simulators/circuit-engine/components/symbols';
+import { formatMeterReading, renderComponentCanvasLabel, renderSymbol, formatDependentSourceMath, renderDependentSourceValueTspans } from '@/simulators/circuit-engine/components/symbols';
 import { applySwitchHotkey, directControlKind, hotkeyDigit, isTextEntryTarget, momentaryControlProps, nextLatchingControlProps, releaseHeldPushbuttons } from '@/simulators/circuit-engine/models/componentInteraction';
 import {
   addWireCorner,
@@ -4295,8 +4295,10 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                               </g>
                             </g>;
                           })}
-                          {isSelected && (component.type === 'cccs' || component.type === 'ccvs' || component.type === 'vcvs' || component.type === 'vccs') && typeof component.props.controlSourceId === 'string' && component.props.controlSourceId && (() => {
-                            const sensedComponent = components.find(c => c.label === component.props.controlSourceId || c.id === component.props.controlSourceId);
+                          {isSelected && (component.type === 'cccs' || component.type === 'ccvs' || component.type === 'vcvs' || component.type === 'vccs') && (() => {
+                            const targetRef = String(component.props.targetId || component.props.controlSourceId || '');
+                            if (!targetRef) return null;
+                            const sensedComponent = components.find(c => c.id === targetRef || c.label === targetRef);
                             if (!sensedComponent) return null;
                             const dx = sensedComponent.x - component.x;
                             const dy = sensedComponent.y - component.y;
@@ -4325,7 +4327,6 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                         const refY = component.y + anchors.reference[1];
                         const valX = component.x + anchors.value[0];
                         const valY = component.y + anchors.value[1];
-                        const value = componentDisplayValue(definition, component);
                         const isGround = component.type === 'ground' || /^GND\d*$/i.test(component.label);
                         const refFill = darkPreview ? '#f1f5f9' : '#1e293b';
                         const valFill = darkPreview ? '#94a3b8' : '#64748b';
@@ -4336,6 +4337,8 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                         // During Superposition, deactivated sources (short/open) hide their labels completely
                         if (isSuperpositionDimmedSource) return null;
                         const labelOpacity = isTheveninRemovedLoad ? 0.45 : 1;
+
+                        const isDependentSource = component.type === 'vcvs' || component.type === 'vccs' || component.type === 'ccvs' || component.type === 'cccs';
 
                         return (
                           <g key={`labels-${component.id}`} opacity={labelOpacity} style={{ transition: 'opacity 0.25s ease' }}>
@@ -4364,28 +4367,93 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                             )}
 
                             {/* Component Value Label */}
-                            {value && !hideValue && (
-                              <text
-                                x={valX}
-                                y={valY}
-                                textAnchor={valTextAnchor}
-                                dominantBaseline="central"
-                                fontFamily="'KaTeX_Main', 'KaTeX_Math', serif"
-                                style={{
-                                  fontFamily: "'KaTeX_Main', 'KaTeX_Math', serif",
-                                  fontSize: 11,
-                                  fontWeight: 400,
-                                  fill: valFill,
-                                  paintOrder: 'stroke fill',
-                                  stroke: colors.canvas,
-                                  strokeWidth: 3,
-                                  strokeLinejoin: 'round',
-                                  strokeLinecap: 'round',
-                                }}
-                              >
-                                {renderFormattedValueTspans(value)}
-                              </text>
-                            )}
+                            {!hideValue && isDependentSource && (() => {
+                              const targetRef = String(component.props.targetId || component.props.controlSourceId || '');
+                              const targetComp = components.find(c => c.id === targetRef || c.label === targetRef);
+                              const targetLabel = targetComp ? targetComp.label : '';
+                              const gain = component.props.gain ?? 1;
+                              const mathStr = formatDependentSourceMath(component.type, gain, targetLabel);
+                              return (
+                                <g>
+                                  {/* High-fidelity KaTeX HTML/MathML rendering on live canvas */}
+                                  <foreignObject
+                                    x={valTextAnchor === 'end' ? valX - 90 : valTextAnchor === 'middle' ? valX - 45 : valX}
+                                    y={valY - 14}
+                                    width={90}
+                                    height={28}
+                                    style={{ overflow: 'visible' }}
+                                  >
+                                    <div
+                                      style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: valTextAnchor === 'end' ? 'flex-end' : valTextAnchor === 'middle' ? 'center' : 'flex-start',
+                                        width: '100%',
+                                        height: '100%',
+                                        color: valFill,
+                                        fontSize: 11,
+                                        lineHeight: 1,
+                                        whiteSpace: 'nowrap',
+                                        filter: `drop-shadow(0 0 2px ${colors.canvas}) drop-shadow(0 0 2px ${colors.canvas})`,
+                                      }}
+                                    >
+                                      <V3Math math={mathStr} />
+                                    </div>
+                                  </foreignObject>
+                                  {/* Fallback SVG text with KaTeX fonts for pure SVG export / print */}
+                                  <text
+                                    className="v3-export-math-fallback"
+                                    x={valX}
+                                    y={valY}
+                                    textAnchor={valTextAnchor}
+                                    dominantBaseline="central"
+                                    fontFamily="'KaTeX_Main', 'KaTeX_Math', serif"
+                                    data-math={mathStr}
+                                    style={{
+                                      display: 'none',
+                                      fontFamily: "'KaTeX_Main', 'KaTeX_Math', serif",
+                                      fontSize: 11,
+                                      fontWeight: 400,
+                                      fill: valFill,
+                                      paintOrder: 'stroke fill',
+                                      stroke: colors.canvas,
+                                      strokeWidth: 3,
+                                      strokeLinejoin: 'round',
+                                      strokeLinecap: 'round',
+                                    }}
+                                  >
+                                    {renderDependentSourceValueTspans(component.type, gain, targetLabel)}
+                                  </text>
+                                </g>
+                              );
+                            })()}
+
+                            {!hideValue && !isDependentSource && (() => {
+                              const value = componentDisplayValue(definition, component);
+                              if (!value) return null;
+                              return (
+                                <text
+                                  x={valX}
+                                  y={valY}
+                                  textAnchor={valTextAnchor}
+                                  dominantBaseline="central"
+                                  fontFamily="'KaTeX_Main', 'KaTeX_Math', serif"
+                                  style={{
+                                    fontFamily: "'KaTeX_Main', 'KaTeX_Math', serif",
+                                    fontSize: 11,
+                                    fontWeight: 400,
+                                    fill: valFill,
+                                    paintOrder: 'stroke fill',
+                                    stroke: colors.canvas,
+                                    strokeWidth: 3,
+                                    strokeLinejoin: 'round',
+                                    strokeLinecap: 'round',
+                                  }}
+                                >
+                                  {renderFormattedValueTspans(value)}
+                                </text>
+                              );
+                            })()}
                           </g>
                         );
                       })}
@@ -4635,7 +4703,31 @@ function ComponentInspector({ colors, component, definition, allComponents, link
           );
         }
         if (key === 'linkedTo') return <PropertyRow key={key} colors={colors} label={property.label ?? key}><select value={String(component.props[key] ?? '')} onChange={event => onPropertyChange(key, event.target.value)} style={inputStyle(colors)}><option value="">Select coil reference</option>{linkedCoils.filter(coil => coil.id !== component.id).map(coil => <option key={coil.id} value={coil.label}>{coil.label} · {getDef(coil.type)?.name}</option>)}</select></PropertyRow>;
-        if (key === 'controlSourceId') return <PropertyRow key={key} colors={colors} label={property.label ?? key}><select value={String(component.props[key] ?? '')} onChange={event => onPropertyChange(key, event.target.value)} style={inputStyle(colors)}><option value="">Select target branch/node</option>{allComponents.filter(c => c.id !== component.id && c.type !== 'ground').map(c => <option key={c.id} value={c.label}>{c.label} · {getDef(c.type)?.name}</option>)}</select></PropertyRow>;
+        if (key === 'targetId' || key === 'controlSourceId') {
+          const selectedTarget = String(component.props.targetId ?? component.props.controlSourceId ?? '');
+          const eligibleTargets = allComponents.filter(c => c.id !== component.id && c.type !== 'ground');
+          return (
+            <PropertyRow key={key} colors={colors} label={property.label ?? 'Target Component'}>
+              <select
+                value={selectedTarget}
+                onChange={event => {
+                  onPropertyChange('targetId', event.target.value);
+                  if (component.props.controlSourceId !== undefined) {
+                    onPropertyChange('controlSourceId', event.target.value);
+                  }
+                }}
+                style={inputStyle(colors)}
+              >
+                <option value="">Select target component</option>
+                {eligibleTargets.map(c => (
+                  <option key={c.id} value={c.id}>
+                    {c.label} · {getDef(c.type)?.name ?? c.type}
+                  </option>
+                ))}
+              </select>
+            </PropertyRow>
+          );
+        }
         // three-phase-source/rail's lineVoltage means whichever quantity voltageReference names
         // (see computeThreePhaseVoltages) — the label follows the sibling property's live value so
         // the entered number is never mislabelled as line voltage while it's actually phase voltage.
@@ -4757,6 +4849,7 @@ function InstrumentText({ reading, x, y, color }: { reading?: InstrumentReading;
 function ElectricalLabel({ label, unit }: { label: string; unit?: string }) {
   const symbol: Record<string, string> = {
     'Voltage': 'V', 'Current': 'I', 'Resistance': 'R', 'Capacitance': 'C', 'Inductance': 'L', 'Frequency': 'f', 'Phase': '\\phi',
+    'Gain (g)': 'g', 'Gain (μ)': '\\mu', 'Gain (β)': '\\beta', 'Gain (r)': 'r', 'Gain (k)': 'k', 'Gain': 'k',
   };
   const unitMath: Record<string, string> = { 'Ohm': '\\Omega', 'Ω': '\\Omega', 'kΩ': '\\mathrm{k}\\Omega', 'MΩ': '\\mathrm{M}\\Omega', 'mH': '\\mathrm{mH}', 'H': '\\mathrm{H}', 'µH': '\\mu\\mathrm{H}', 'uH': '\\mu\\mathrm{H}', 'µF': '\\mu\\mathrm{F}', 'uF': '\\mu\\mathrm{F}', 'nF': '\\mathrm{nF}', 'pF': '\\mathrm{pF}', 'V': '\\mathrm{V}', 'A': '\\mathrm{A}', 'Hz': '\\mathrm{Hz}', 's': '\\mathrm{s}' };
   const math = symbol[label];

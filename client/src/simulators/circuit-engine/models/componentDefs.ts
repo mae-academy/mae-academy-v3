@@ -283,25 +283,25 @@ const CONTROLLED_SOURCES: Record<string, ComponentDef> = {
   'vccs': {
     id: 'vccs', name: 'VCCS', category: 'Controlled Sources', width: 70, height: 70, symbol: 'vccs',
     terminals: [{ id: 'pos', name: '+', x: 0, y: -30, type: 'output' }, { id: 'neg', name: '−', x: 0, y: 30, type: 'output' }],
-    properties: { transconductance: { type: 'number', value: 0.001, unit: 'S', min: -1e6, max: 1e6, label: 'Transconductance' }, controlSourceId: { type: 'text', value: '', label: 'Control Source ID' } },
+    properties: { gain: { type: 'number', value: 0.001, unit: '', min: -1e6, max: 1e6, label: 'Gain (g)' }, targetId: { type: 'text', value: '', label: 'Target Component' } },
     description: 'Voltage-controlled current source (IEEE dependent source)',
   },
   'vcvs': {
     id: 'vcvs', name: 'VCVS', category: 'Controlled Sources', width: 70, height: 70, symbol: 'vcvs',
     terminals: [{ id: 'pos', name: '+', x: 0, y: -30, type: 'output' }, { id: 'neg', name: '−', x: 0, y: 30, type: 'output' }],
-    properties: { gain: { type: 'number', value: 2, unit: 'V/V', min: -1e6, max: 1e6, label: 'Voltage Gain' }, controlSourceId: { type: 'text', value: '', label: 'Control Source ID' } },
+    properties: { gain: { type: 'number', value: 2, unit: '', min: -1e6, max: 1e6, label: 'Gain (μ)' }, targetId: { type: 'text', value: '', label: 'Target Component' } },
     description: 'Voltage-controlled voltage source (IEEE dependent source)',
   },
   'cccs': {
     id: 'cccs', name: 'CCCS', category: 'Controlled Sources', width: 70, height: 70, symbol: 'cccs',
     terminals: [{ id: 'pos', name: '+', x: 0, y: -30, type: 'output' }, { id: 'neg', name: '−', x: 0, y: 30, type: 'output' }],
-    properties: { gain: { type: 'number', value: 1, unit: 'A/A', min: -1e6, max: 1e6, label: 'Current Gain' }, controlSourceId: { type: 'text', value: '', label: 'Control Source ID' } },
+    properties: { gain: { type: 'number', value: 1, unit: '', min: -1e6, max: 1e6, label: 'Gain (β)' }, targetId: { type: 'text', value: '', label: 'Target Component' } },
     description: 'Current-controlled current source with inline 0 V current-sense branch',
   },
   'ccvs': {
     id: 'ccvs', name: 'CCVS', category: 'Controlled Sources', width: 70, height: 70, symbol: 'ccvs',
     terminals: [{ id: 'pos', name: '+', x: 0, y: -30, type: 'output' }, { id: 'neg', name: '−', x: 0, y: 30, type: 'output' }],
-    properties: { transresistance: { type: 'number', value: 1000, unit: 'Ω', min: -1e9, max: 1e9, label: 'Transresistance' }, controlSourceId: { type: 'text', value: '', label: 'Control Source ID' } },
+    properties: { gain: { type: 'number', value: 1000, unit: '', min: -1e9, max: 1e9, label: 'Gain (r)' }, targetId: { type: 'text', value: '', label: 'Target Component' } },
     description: 'Current-controlled voltage source with inline 0 V current-sense branch',
   },
 

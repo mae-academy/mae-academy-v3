@@ -12,6 +12,13 @@ export interface CircuitComponent {
   props: Record<string, unknown>;
 }
 
+export type DependentSourceType = 'vcvs' | 'vccs' | 'ccvs' | 'cccs';
+
+export interface DependentSourceProps {
+  gain: number;
+  targetId: string;
+}
+
 export type WireRouting = 'orthogonal' | 'straight' | 'manual';
 
 export interface CircuitWire {

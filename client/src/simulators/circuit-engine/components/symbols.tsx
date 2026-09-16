@@ -1725,3 +1725,153 @@ export function renderSymbol(
   if (!Sym) return <text x={0} y={5} textAnchor="middle" fontSize={10} fill="#666">?</text>;
   return <Sym powered={powered} props={props} animTime={animTime} />;
 }
+
+/**
+ * Generates academic KaTeX math string for dependent sources:
+ * - VCVS: `${gain} V_{${targetLabel}}` (e.g., `5 V_{R_1}`)
+ * - VCCS: `${gain} V_{${targetLabel}}` (e.g., `5 V_{R_1}`)
+ * - CCVS: `${gain} I_{${targetLabel}}` (e.g., `5 I_{R_1}`)
+ * - CCCS: `${gain} I_{${targetLabel}}` (e.g., `5 I_{R_1}`)
+ */
+export function formatDependentSourceMath(
+  type: string,
+  gain: number | string | undefined,
+  targetLabel?: string,
+): string {
+  const numericGain = typeof gain === 'number' ? gain : Number(gain ?? 1);
+  const isVoltageControlled = type === 'vcvs' || type === 'vccs';
+  const isCurrentControlled = type === 'ccvs' || type === 'cccs';
+
+  if (!isVoltageControlled && !isCurrentControlled) {
+    return `${numericGain}`;
+  }
+
+  const controlVar = isVoltageControlled ? 'V' : 'I';
+
+  if (!targetLabel || !targetLabel.trim()) {
+    return `${numericGain}`;
+  }
+
+  const trimmed = targetLabel.trim();
+  const subMatch =
+    trimmed.match(/^([A-Za-z]+)_\{([^}]+)\}$/) ??
+    trimmed.match(/^([A-Za-z]+)_([A-Za-z0-9]+)$/) ??
+    trimmed.match(/^([A-Za-z]+)(\d+)$/);
+
+  let formattedTargetLatex: string;
+  if (subMatch) {
+    const [, base, sub] = subMatch;
+    formattedTargetLatex = `${base}_${sub}`;
+  } else {
+    formattedTargetLatex = trimmed;
+  }
+
+  return `${numericGain} ${controlVar}_{${formattedTargetLatex}}`;
+}
+
+/**
+ * Renders SVG tspans for dependent source value labels, formatting:
+ * - Gain number as upright KaTeX_Main
+ * - Control variable (V or I) as italic KaTeX_Math
+ * - Subscript label with upright KaTeX_Main and dy="2.5" offset
+ */
+export function renderDependentSourceValueTspans(
+  type: string,
+  gain: number | string | undefined,
+  targetLabel?: string,
+): React.ReactNode {
+  const numericGain = typeof gain === 'number' ? gain : Number(gain ?? 1);
+  const isVoltageControlled = type === 'vcvs' || type === 'vccs';
+  const isCurrentControlled = type === 'ccvs' || type === 'cccs';
+
+  if (!isVoltageControlled && !isCurrentControlled) {
+    return (
+      <tspan
+        fontFamily="'KaTeX_Main', serif"
+        fontStyle="normal"
+        style={{ fontFamily: "'KaTeX_Main', serif", fontStyle: 'normal' }}
+      >
+        {numericGain}
+      </tspan>
+    );
+  }
+
+  const controlVar = isVoltageControlled ? 'V' : 'I';
+
+  if (!targetLabel || !targetLabel.trim()) {
+    return (
+      <tspan
+        fontFamily="'KaTeX_Main', serif"
+        fontStyle="normal"
+        style={{ fontFamily: "'KaTeX_Main', serif", fontStyle: 'normal' }}
+      >
+        {numericGain}
+      </tspan>
+    );
+  }
+
+  const trimmed = targetLabel.trim();
+  const subMatch =
+    trimmed.match(/^([A-Za-z]+)_\{([^}]+)\}$/) ??
+    trimmed.match(/^([A-Za-z]+)_([A-Za-z0-9]+)$/) ??
+    trimmed.match(/^([A-Za-z]+)(\d+)$/);
+
+  let base = trimmed;
+  let sub = '';
+  if (subMatch) {
+    base = subMatch[1];
+    sub = subMatch[2];
+  }
+
+  return (
+    <>
+      <tspan
+        fontFamily="'KaTeX_Main', serif"
+        fontStyle="normal"
+        style={{ fontFamily: "'KaTeX_Main', serif", fontStyle: 'normal' }}
+      >
+        {numericGain}
+      </tspan>
+      <tspan> </tspan>
+      <tspan
+        fontFamily="'KaTeX_Math', serif"
+        fontStyle="italic"
+        style={{ fontFamily: "'KaTeX_Math', serif", fontStyle: 'italic' }}
+      >
+        {controlVar}
+      </tspan>
+      {sub ? (
+        <tspan
+          dy="2.5"
+          fontFamily="'KaTeX_Main', serif"
+          fontSize="8.5px"
+          fontStyle="normal"
+          style={{
+            fontSize: '8.5px',
+            fontWeight: 400,
+            fontStyle: 'normal',
+            fontFamily: "'KaTeX_Main', serif",
+          }}
+        >
+          {base.length === 1 ? `${base}${sub}` : `${base}_${sub}`}
+        </tspan>
+      ) : (
+        <tspan
+          dy="2.5"
+          fontFamily="'KaTeX_Main', serif"
+          fontSize="8.5px"
+          fontStyle="normal"
+          style={{
+            fontSize: '8.5px',
+            fontWeight: 400,
+            fontStyle: 'normal',
+            fontFamily: "'KaTeX_Main', serif",
+          }}
+        >
+          {base}
+        </tspan>
+      )}
+    </>
+  );
+}
+

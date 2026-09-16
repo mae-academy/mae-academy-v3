@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { formatMeterReading, renderComponentCanvasLabel, renderSymbol, ThreePhaseMotorSymbol } from '@/simulators/circuit-engine/components/symbols';
+import { formatMeterReading, renderComponentCanvasLabel, renderSymbol, ThreePhaseMotorSymbol, formatDependentSourceMath, renderDependentSourceValueTspans } from '@/simulators/circuit-engine/components/symbols';
 
 function markup(symbolId: string, props: Record<string, unknown> = {}, powered = false, animTime = 0) {
   return renderToStaticMarkup(<svg>{renderSymbol(symbolId, powered, props, animTime)}</svg>);
@@ -483,4 +483,51 @@ describe('Tab D SVG symbol language', () => {
     expect(dmm1).toContain('>1</tspan>');
     expect(dmm1).not.toContain('font-style="italic"');
   });
+
+  describe('Dependent Sources Dynamic Academic Labels', () => {
+    it('generates academic KaTeX string for VCVS and VCCS based on target voltage', () => {
+      // VCVS: controls voltage based on target voltage -> 5 V_{R_1}
+      expect(formatDependentSourceMath('vcvs', 5, 'R1')).toBe('5 V_{R_1}');
+      expect(formatDependentSourceMath('vcvs', 2.5, 'R_2')).toBe('2.5 V_{R_2}');
+      // VCCS: controls current based on target voltage -> 0.05 V_{R_1}
+      expect(formatDependentSourceMath('vccs', 0.05, 'R1')).toBe('0.05 V_{R_1}');
+      expect(formatDependentSourceMath('vccs', 10, 'C1')).toBe('10 V_{C_1}');
+    });
+
+    it('generates academic KaTeX string for CCVS and CCCS based on target current', () => {
+      // CCVS: controls voltage based on target current -> 1000 I_{R_1}
+      expect(formatDependentSourceMath('ccvs', 1000, 'R1')).toBe('1000 I_{R_1}');
+      expect(formatDependentSourceMath('ccvs', 50, 'L1')).toBe('50 I_{L_1}');
+      // CCCS: controls current based on target current -> 100 I_{R_1}
+      expect(formatDependentSourceMath('cccs', 100, 'R1')).toBe('100 I_{R_1}');
+      expect(formatDependentSourceMath('cccs', 2, 'R_load')).toBe('2 I_{R_load}');
+    });
+
+    it('falls back to numeric gain when no target component is selected yet', () => {
+      expect(formatDependentSourceMath('vcvs', 5, '')).toBe('5');
+      expect(formatDependentSourceMath('vccs', 2, undefined)).toBe('2');
+      expect(formatDependentSourceMath('ccvs', 10, '   ')).toBe('10');
+    });
+
+    it('renders SVG tspans with italic control variable (V/I) and upright numeric gain and subscript', () => {
+      const vcvsMarkup = renderToStaticMarkup(<text>{renderDependentSourceValueTspans('vcvs', 5, 'R1')}</text>);
+      // Upright gain
+      expect(vcvsMarkup).toContain('>5</tspan>');
+      // Italic V variable
+      expect(vcvsMarkup).toContain('font-style="italic"');
+      expect(vcvsMarkup).toContain('>V</tspan>');
+      // Subscript R1
+      expect(vcvsMarkup).toContain('>R1</tspan>');
+
+      const cccsMarkup = renderToStaticMarkup(<text>{renderDependentSourceValueTspans('cccs', 2, 'R2')}</text>);
+      // Upright gain
+      expect(cccsMarkup).toContain('>2</tspan>');
+      // Italic I variable
+      expect(cccsMarkup).toContain('font-style="italic"');
+      expect(cccsMarkup).toContain('>I</tspan>');
+      // Subscript R2
+      expect(cccsMarkup).toContain('>R2</tspan>');
+    });
+  });
 });
+
