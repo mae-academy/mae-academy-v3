@@ -109,5 +109,63 @@ describe('Tab D Academic Analysis Workspace', () => {
       expect(trace.steps[0].math).not.toContain('PT_0LBZklQz');
     });
   });
+
+  describe('Part 5: AC Circuit Detection & Coming Soon UI Graceful Placeholder', () => {
+    it('renders the Coming Soon placeholder when AC components are present', () => {
+      const acComponents = [
+        { id: 'v1', type: 'dc-voltage', x: 0, y: 0, rotation: 0, flipH: false, flipV: false, label: 'V1', props: {} },
+        { id: 'r1', type: 'resistor', x: 0, y: 0, rotation: 0, flipH: false, flipV: false, label: 'R1', props: {} },
+        { id: 'c1', type: 'capacitor', x: 0, y: 0, rotation: 0, flipH: false, flipV: false, label: 'C1', props: {} },
+      ];
+
+      const markup = renderToStaticMarkup(
+        <AnalysisBox elements={elements} components={acComponents} colors={colors} standalone />
+      );
+
+      // Title & description
+      expect(markup).toContain('AC Analysis (Phasors) — Coming Soon');
+      expect(markup).toContain(
+        'The simulator engine is successfully running your AC circuit in the background. However, step-by-step academic derivations using complex numbers (Phasors) for Nodal, Mesh, Superposition, and Thévenin are locked for a future update.'
+      );
+
+      // Math steps should NOT be rendered
+      expect(markup).not.toContain('Step 1');
+      expect(markup).not.toContain('Solver-backed derivation');
+
+      // Method tabs are still visible
+      expect(markup).toContain('Nodal');
+      expect(markup).toContain('Mesh');
+      expect(markup).toContain('Superposition');
+      expect(markup).toContain('Thévenin');
+    });
+
+    it('renders academic derivations when only DC components are present, and reverts instantly when AC component is removed', () => {
+      const pureDcComponents = [
+        { id: 'v1', type: 'dc-voltage', x: 0, y: 0, rotation: 0, flipH: false, flipV: false, label: 'V1', props: {} },
+        { id: 'r1', type: 'resistor', x: 0, y: 0, rotation: 0, flipH: false, flipV: false, label: 'R1', props: {} },
+      ];
+
+      const dcMarkup = renderToStaticMarkup(
+        <AnalysisBox elements={elements} components={pureDcComponents} colors={colors} standalone />
+      );
+
+      expect(dcMarkup).not.toContain('AC Analysis (Phasors) — Coming Soon');
+      expect(dcMarkup).toContain('Solver-backed derivation');
+      expect(dcMarkup).toContain('KCL');
+      expect(dcMarkup).toContain('Step 1');
+    });
+
+    it('detects various AC components (inductor, ac-voltage, transformer) and displays the placeholder', () => {
+      for (const acType of ['inductor', 'ac-voltage', 'transformer', 'impedance', 'three-phase-source']) {
+        const comps = [
+          { id: 'ac1', type: acType, x: 0, y: 0, rotation: 0, flipH: false, flipV: false, label: 'AC1', props: {} },
+        ];
+        const markup = renderToStaticMarkup(
+          <AnalysisBox elements={elements} components={comps} colors={colors} standalone />
+        );
+        expect(markup).toContain('AC Analysis (Phasors) — Coming Soon');
+      }
+    });
+  });
 });
 

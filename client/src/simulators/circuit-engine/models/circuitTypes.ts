@@ -216,3 +216,5 @@ export function formatEngineering(value: number, unit: string, precision = 3): s
   const [scale, prefix] = found;
   return `${(value / scale).toFixed(precision)} ${prefix}${unit}`;
 }
+
+export { isACCircuit, AC_COMPONENT_TYPES } from '@/simulators/circuit-engine/models/isACCircuit';

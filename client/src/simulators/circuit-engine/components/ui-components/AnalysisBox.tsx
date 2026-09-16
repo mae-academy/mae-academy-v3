@@ -15,6 +15,8 @@ import { MESH_LOOP_COLORS } from '@/simulators/circuit-engine/components/analogC
 import { AcademicNodalDictionary } from '@/simulators/circuit-engine/models/AcademicNodalDictionary';
 import type { CircuitComponent } from '@/simulators/circuit-engine/models/circuitTypes';
 import { TargetLoadSelector, DecimalPlacesSelector } from '@/simulators/circuit-engine/components/ui-components/TargetLoadSelector';
+import { Sparkles } from 'lucide-react';
+import { isACCircuit } from '@/simulators/circuit-engine/models/isACCircuit';
 
 const METHODS: Array<{ id: AnalysisMethod; label: string }> = [
   { id: 'nodal', label: 'Nodal' },
@@ -48,6 +50,8 @@ export function AnalysisBox({
   const [precision, setPrecision] = useState(4);
   const [activeStepIndex, setActiveStepIndex] = useState<number>(0);
 
+  const hasAC = useMemo(() => isACCircuit(components), [components]);
+
   // Dynamically merge live component labels to ensure instant synchronization when renamed on canvas
   const liveElements = useMemo(() => {
     if (!components || components.length === 0) return elements;
@@ -71,13 +75,22 @@ export function AnalysisBox({
   }, [method]);
 
   const rawTrace = useMemo<AnalysisTrace>(() => {
+    if (hasAC) {
+      return {
+        method,
+        status: 'unsupported',
+        heading: 'Academic Analysis',
+        steps: [],
+        warning: undefined,
+      };
+    }
     if (!liveElements.length) return { method, status: 'unsupported', heading: 'Academic Analysis', steps: [], warning: 'Build a grounded DC circuit to generate a derivation.' };
     if (method === 'nodal') return new NodalSolver(liveElements, nodalNodes).analyze();
     if (method === 'mesh') return new MeshSolver(liveElements, geometry).analyze();
     if (method === 'superposition') return new SuperpositionSolver(liveElements).analyze(targetResistor);
     if (method === 'transform') return new SourceTransformationSolver(liveElements).analyze(targetSource, targetResistor);
     return new TheveninSolver(liveElements).analyze(targetResistor);
-  }, [liveElements, geometry, method, nodalNodes, targetResistor, targetSource]);
+  }, [hasAC, liveElements, geometry, method, nodalNodes, targetResistor, targetSource]);
 
   // ID-to-Label mapping for intercepting UUIDs in derivations and dropdowns, strictly synchronized with latest component labels
   const idToLabelMap = useMemo(() => buildIdToLabelMap(liveElements, nodalNodes, components), [liveElements, nodalNodes, components]);
@@ -131,15 +144,15 @@ export function AnalysisBox({
       <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
         <div>
           <div className="text-sm font-bold uppercase tracking-wider text-slate-800 dark:text-white">
-            {trace.heading}
+            {hasAC ? 'AC Analysis (Phasors)' : trace.heading}
           </div>
-          {trace.status === 'ready' && (
+          {!hasAC && trace.status === 'ready' && (
             <div style={{ marginTop: 3, color: colors.muted, fontSize: 10 }}>
               Solver-backed derivation
             </div>
           )}
         </div>
-        <DecimalPlacesSelector precision={precision} onChangePrecision={setPrecision} />
+        {!hasAC && <DecimalPlacesSelector precision={precision} onChangePrecision={setPrecision} />}
       </div>
 
       <div className="mb-4 flex flex-wrap gap-2">
@@ -164,69 +177,86 @@ export function AnalysisBox({
         })}
       </div>
 
-      {(method === 'superposition' || method === 'transform' || method === 'thevenin') && (
-        <div className="mb-3">
-          <TargetLoadSelector
-            elements={liveElements}
-            resistors={resistors}
-            targetResistor={targetResistor}
-            onSelectTarget={setTargetResistor}
-          />
+      {hasAC ? (
+        <div
+          data-testid="ac-analysis-coming-soon"
+          className="my-3 flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50/70 p-8 text-center dark:border-slate-800 dark:bg-[#0d0f12]/60"
+        >
+          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-blue-500/20 bg-gradient-to-br from-blue-500/10 to-purple-500/10 text-blue-600 shadow-sm dark:border-blue-500/30 dark:from-blue-500/20 dark:to-purple-500/20 dark:text-blue-400">
+            <Sparkles className="h-7 w-7" />
+          </div>
+          <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100">
+            AC Analysis (Phasors) — Coming Soon
+          </h3>
+          <p className="mt-2 max-w-md text-center text-sm text-slate-500 dark:text-slate-400">
+            The simulator engine is successfully running your AC circuit in the background. However, step-by-step academic derivations using complex numbers (Phasors) for Nodal, Mesh, Superposition, and Thévenin are locked for a future update.
+          </p>
+        </div>
+      ) : (
+        <>
+          {(method === 'superposition' || method === 'transform' || method === 'thevenin') && (
+            <div className="mb-3">
+              <TargetLoadSelector
+                elements={liveElements}
+                resistors={resistors}
+                targetResistor={targetResistor}
+                onSelectTarget={setTargetResistor}
+              />
 
-          {method === 'transform' && (
-            <div className="flex flex-col gap-1.5 font-sans mt-2">
-              <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                <span>SOURCE / RESISTOR PAIR</span>
-              </div>
-              <div className="relative">
-                <div className="flex min-h-[38px] items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-sans text-slate-700 shadow-sm dark:border-[#282d38] dark:bg-[#13161c] dark:text-slate-200">
-                  <div className="flex items-center gap-2">
-                    <span className="text-slate-400 font-sans text-xs">Source:</span>
-                    <span className="font-sans font-medium text-slate-800 dark:text-slate-100">
-                      <V3Math math={transformSourceMath} />
-                    </span>
+              {method === 'transform' && (
+                <div className="flex flex-col gap-1.5 font-sans mt-2">
+                  <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    <span>SOURCE / RESISTOR PAIR</span>
                   </div>
-                  <svg className="h-4 w-4 text-slate-400 shrink-0 ml-2" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
-                  </svg>
+                  <div className="relative">
+                    <div className="flex min-h-[38px] items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-sans text-slate-700 shadow-sm dark:border-[#282d38] dark:bg-[#13161c] dark:text-slate-200">
+                      <div className="flex items-center gap-2">
+                        <span className="text-slate-400 font-sans text-xs">Source:</span>
+                        <span className="font-sans font-medium text-slate-800 dark:text-slate-100">
+                          <V3Math math={transformSourceMath} />
+                        </span>
+                      </div>
+                      <svg className="h-4 w-4 text-slate-400 shrink-0 ml-2" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <select
+                      value={targetSource}
+                      onChange={(event) => setTargetSource(event.target.value)}
+                      className="absolute inset-0 h-full w-full cursor-pointer opacity-0 font-sans text-slate-700 dark:text-slate-200"
+                      aria-label="Target source"
+                    >
+                      <option value="">Automatic first voltage source</option>
+                      {voltageSources.map((item) => {
+                        const cleanLabel = dict.element(item).replace(/[\\{}]/g, '').replace(/_/g, '');
+                        return (
+                          <option key={item.id} value={item.id}>
+                            {cleanLabel} ({item.voltage} V)
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
                 </div>
-                <select
-                  value={targetSource}
-                  onChange={(event) => setTargetSource(event.target.value)}
-                  className="absolute inset-0 h-full w-full cursor-pointer opacity-0 font-sans text-slate-700 dark:text-slate-200"
-                  aria-label="Target source"
-                >
-                  <option value="">Automatic first voltage source</option>
-                  {voltageSources.map((item) => {
-                    const cleanLabel = dict.element(item).replace(/[\\{}]/g, '').replace(/_/g, '');
-                    return (
-                      <option key={item.id} value={item.id}>
-                        {cleanLabel} ({item.voltage} V)
-                      </option>
-                    );
-                  })}
-                </select>
-              </div>
+              )}
             </div>
           )}
-        </div>
-      )}
 
-      {trace.warning && (
-        <div
-          role="status"
-          style={{
-            color: trace.status === 'error' ? colors.danger : colors.muted,
-            fontSize: 10,
-            lineHeight: 1.45,
-            marginBottom: 8,
-          }}
-        >
-          {trace.warning}
-        </div>
-      )}
+          {trace.warning && (
+            <div
+              role="status"
+              style={{
+                color: trace.status === 'error' ? colors.danger : colors.muted,
+                fontSize: 10,
+                lineHeight: 1.45,
+                marginBottom: 8,
+              }}
+            >
+              {trace.warning}
+            </div>
+          )}
 
-      <div className="flex flex-col">
+          <div className="flex flex-col">
         {trace.steps.map((step, index) => {
           const isSelectedSuperpositionStep = method === 'superposition' && activeStepIndex === index;
           return (
@@ -290,7 +320,9 @@ export function AnalysisBox({
             </article>
           );
         })}
-      </div>
+          </div>
+        </>
+      )}
     </section>
   );
 }
