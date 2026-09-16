@@ -706,6 +706,44 @@ describe('Phase 3 academic analysis benchmarks', () => {
     expect(rhsFor('n2')).toBeCloseTo(0, 12);
   });
 
+  it('Test R (Grounded dependent source): the rendered system and its KCL text both carry the constraint, not a bare node balance', () => {
+    const circuit: MNAElement[] = [
+      { type: 'voltage', id: 'V1', label: 'V1', positive: 'n1', negative: '0', voltage: 10 },
+      { type: 'resistor', id: 'R1', label: 'R1', positive: 'n1', negative: 'n2', resistance: 1000 },
+      { type: 'resistor', id: 'Rs', label: 'Rs', positive: 'n2', negative: '0', resistance: 1000 },
+      { type: 'vcvs', id: 'E1', label: 'E1', positive: 'out', negative: '0', targetId: 'Rs', gain: 3 },
+      { type: 'resistor', id: 'R2', label: 'R2', positive: 'out', negative: '0', resistance: 2000 },
+    ];
+    // A grounded VCVS is not a floating supernode and not a constant known node, so nothing used to
+    // stamp it: the reduced system silently dropped the source and the trace failed its own residual
+    // certificate. V(out) must be 3 x V(Rs) = 15 V.
+    const trace = new NodalSolver(circuit).analyze();
+    expect(trace.status).toBe('ready');
+    expect(trace.warning).toBeUndefined();
+
+    const mna = new MNASolver(circuit).solve();
+    expect(mna.nodeVoltages.out).toBeCloseTo(15, 9);
+    expect(trace.result?.nodeVoltages.out).toBeCloseTo(15, 9);
+
+    const reduced = generateReducedNodalMatrix(circuit);
+    const row = reduced.unknownNodes.indexOf('out');
+    expect(row).toBeGreaterThanOrEqual(0); // never folded away as a simple node
+    const residual = reduced.conductance[row].reduce(
+      (sum, coefficient, column) => sum + coefficient * (mna.nodeVoltages[reduced.unknownNodes[column]] ?? 0), 0
+    ) - reduced.rhs[row];
+    expect(Math.abs(residual)).toBeLessThan(1e-9);
+
+    // The derivation text must state the same equation the matrix row holds, and the control node
+    // must keep a symbol of its own so the substitution has something to name (it used to render as
+    // the "V_series" placeholder once the node was folded away).
+    const steps = trace.steps.map((step) => step.math).join('\n');
+    expect(steps).toContain('\\text{Constraint from }');
+    expect(steps).toContain('3 \\cdot V_{R_{s}}');
+    expect(steps).toContain('\\text{Substitute } V_{R_{s}}');
+    expect(steps).not.toContain('V_{series}');
+    expect(reduced.unknownNodes).toContain('n2'); // the sensed node stays visible in the system
+  });
+
   it('Test Q (Numerical RHS): the mesh [E] vector subtracts a traversed voltage drop and adds a traversed rise', () => {
     const loop: MNAElement[] = [
       { type: 'voltage', id: 'V1', label: 'V1', positive: 'n1', negative: '0', voltage: 10 },

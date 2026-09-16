@@ -79,6 +79,27 @@ export function identifyFloatingSupernodes(elements: MNAElement[]): FloatingSupe
 }
 
 /**
+ * Ground-referenced VCVS/CCVS branches. `identifyFloatingSupernodes` deliberately skips them (a
+ * grounded source is not a floating supernode) and `extractPolarityAwareKnownNodes` only recognises
+ * independent sources, so without this list nothing would stamp them: their output node would get a
+ * plain KCL row that ignores the source and the rendered system would not match the MNA solution.
+ * Their output voltage is defined, but by a gain relation rather than a constant, so it needs a
+ * constraint row instead of a known-node entry.
+ */
+export function identifyGroundedDependentVoltageSources(
+  elements: MNAElement[]
+): Array<{ element: Extract<MNAElement, { type: 'vcvs' | 'ccvs' }>; outputNode: string; outputSign: number }> {
+  return elements.flatMap((element) => {
+    if (element.type !== 'vcvs' && element.type !== 'ccvs') return [];
+    const positiveGrounded = element.positive === '0';
+    const negativeGrounded = element.negative === '0';
+    if (positiveGrounded === negativeGrounded) return [];
+    // V(out) - gain·V(control) = 0, negated when the source sits with its + terminal on ground.
+    return [{ element, outputNode: positiveGrounded ? element.negative : element.positive, outputSign: positiveGrounded ? -1 : 1 }];
+  });
+}
+
+/**
  * Detects a degree-two resistor-to-ground / independent-voltage-source series
  * leg. The returned offset is algebraic and is shared by symbolic KCL and RHS
  * stamping: V_simple = V_primary + simpleOffset.
@@ -187,9 +208,25 @@ export function filterEssentialNodes(elements: MNAElement[], knownNodes: Map<str
   const supernodeNodes = new Set(compound.flatMap((cs) => cs.nodes));
   const seriesBranches = detectGroundedSourceResistorBranches(elements);
   const seriesNodes = new Set(seriesBranches.map((b) => b.simpleNode));
+  // A grounded dependent source's output node carries a constraint row, so it can never be folded
+  // away as a simple node however low its branch degree is — nothing else would define its voltage.
+  const dependentOutputs = new Set(identifyGroundedDependentVoltageSources(elements).map((item) => item.outputNode));
+  // A dependent source's control/target pins must also survive: the derivation substitutes their
+  // voltage by name, and an eliminated node has no symbol to substitute (it would render as the
+  // "V_series" placeholder even though the reduced matrix folded it in correctly).
+  const dependentControls = new Set(
+    elements.flatMap((element) => {
+      if (element.type !== 'vccs' && element.type !== 'vcvs' && element.type !== 'cccs' && element.type !== 'ccvs') return [];
+      const target = resolveTargetResistor(elements, element);
+      const positive = ('controlPositive' in element ? element.controlPositive : undefined) ?? target?.positive;
+      const negative = ('controlNegative' in element ? element.controlNegative : undefined) ?? target?.negative;
+      return [positive, negative].filter((node): node is string => Boolean(node) && node !== '0');
+    })
+  );
 
   const essential = nonReferenceNodes(elements).filter(
-    (node) => !knownNodes.has(node) && !seriesNodes.has(node) && (academicBranchDegree(elements, node) >= 3 || supernodeNodes.has(node))
+    (node) => !knownNodes.has(node) && !seriesNodes.has(node)
+      && (academicBranchDegree(elements, node) >= 3 || supernodeNodes.has(node) || dependentOutputs.has(node) || dependentControls.has(node))
   );
   if (essential.length === 0) {
     return nonReferenceNodes(elements).filter((node) => !knownNodes.has(node) && !seriesNodes.has(node));
@@ -315,6 +352,45 @@ export function generateReducedNodalMatrix(elements: MNAElement[]): ReducedNodal
     fullConductance[row][row] += conductanceValue;
     // (V_primary + offset)/R = 0  =>  G·V_primary = -offset/R.
     fullRhs[row] -= conductanceValue * branch.simpleOffset;
+  }
+
+  // A grounded ideal dependent source supplies its output node's current through ground, so that
+  // node's KCL row carries an unknown branch current and cannot be written in node voltages alone.
+  // Replace it with the source's defining constraint, exactly as the supernode branch below does.
+  // Stamping here (pre-reduction, on the full index) lets the Schur complement keep folding away any
+  // eliminated control node instead of dropping its term.
+  for (const source of identifyGroundedDependentVoltageSources(elements)) {
+    const row = index.get(source.outputNode);
+    if (row === undefined) continue;
+    fullConductance[row] = Array<number>(allUnknownNodes.length).fill(0);
+    fullRhs[row] = 0;
+    fullConductance[row][row] = source.outputSign;
+    const stampControl = (node: string, coefficient: number) => {
+      if (node === '0') return;
+      const column = index.get(node);
+      if (column !== undefined) { fullConductance[row][column] += coefficient; return; }
+      if (knownNodes.has(node)) { fullRhs[row] -= coefficient * knownNodes.get(node)!; return; }
+      // A control pin landing on an eliminated series node resolves through V_simple = V_primary + offset.
+      const series = sourceResistorBranches.find((branch) => branch.simpleNode === node);
+      if (!series) return;
+      const primaryColumn = index.get(series.primaryNode);
+      if (primaryColumn !== undefined) fullConductance[row][primaryColumn] += coefficient;
+      fullRhs[row] -= coefficient * series.simpleOffset;
+    };
+    if (source.element.type === 'vcvs') {
+      const gain = source.element.gain;
+      const targetResistor = resolveTargetResistor(elements, source.element);
+      stampControl(source.element.controlPositive ?? targetResistor?.positive ?? '0', -gain);
+      stampControl(source.element.controlNegative ?? targetResistor?.negative ?? '0', gain);
+    } else {
+      const gain = source.element.gain ?? source.element.transresistance ?? 0;
+      const targetResistor = resolveTargetResistor(elements, source.element);
+      if (targetResistor) {
+        const transfer = gain / targetResistor.resistance;
+        stampControl(targetResistor.positive, -transfer);
+        stampControl(targetResistor.negative, transfer);
+      }
+    }
   }
   const primary = unknownNodes.map((node) => index.get(node)!);
   const simple = allUnknownNodes.filter((node) => !unknownNodes.includes(node)).map((node) => index.get(node)!);

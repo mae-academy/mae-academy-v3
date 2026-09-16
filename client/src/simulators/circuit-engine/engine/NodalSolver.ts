@@ -8,6 +8,7 @@ import {
   reindexUINodes,
   identifyCompoundSupernodes,
   identifyFloatingSupernodes,
+  identifyGroundedDependentVoltageSources,
   resolveTargetResistor,
   type FloatingSupernode,
   type CompoundSupernode,
@@ -185,9 +186,25 @@ export class NodalSolver {
         if (!series) return '\\mathrm{V_{series}}';
         return `\\left(${symbolicVoltage(series.primaryNode)}${series.simpleOffset >= 0 ? '+' : '-'}${algebraicNumber(Math.abs(series.simpleOffset))}\\right)`;
       };
+      // A grounded dependent source defines its output node's voltage, so that node's row in the
+      // rendered matrix is the source's constraint, not a KCL balance. Print the same equation the
+      // matrix actually contains rather than a KCL line the system no longer uses.
+      const groundedDependent = new Map(
+        identifyGroundedDependentVoltageSources(this.elements).map((item) => [item.outputNode, item])
+      );
       const kclLines = reduced.unknownNodes
         .filter((node) => !supernodeMembers.has(node) && !knownVoltageNodes.has(node))
         .flatMap((node) => {
+          const dependent = groundedDependent.get(node);
+          if (dependent) {
+            const info = getDependentSourceInfo(dependent.element, this.elements, dictionary, symbolicVoltage);
+            const gain = dependent.outputSign * info.gain;
+            const gainStr = Math.abs(gain - 1) < 1e-12 ? '' : `${algebraicNumber(gain)} \\cdot `;
+            return [
+              `\\text{Constraint from }${dictionary.element(dependent.element)} &: ${dictionary.coloredVoltage(node)}=${gainStr}${info.varName}`,
+              `\\text{Substitute } ${info.varName} = ${info.subDef} &: ${dictionary.coloredVoltage(node)}=${algebraicNumber(gain)}\\left(${info.subExpr}\\right)`,
+            ];
+          }
           const boundary = new Set([node]);
           const depCrossing = this.elements.filter(
             (e): e is Extract<MNAElement, { type: 'vccs' | 'cccs' }> =>

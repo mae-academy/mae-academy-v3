@@ -111,3 +111,9 @@ temp/
 # Manus version file (auto-generated, not part of source)
 client/public/__manus__/version.json
 .project-config.json
+
+# Per-run evidence tables emitted by the MNA validation suite; their content is
+# consolidated into docs/MNA_ENGINE_VALIDATION_REPORT.md, and the raw files churn
+# on every run because they carry timings.
+client/src/simulators/circuit-engine/engine/mnaValidationSuite.report.md
+client/src/simulators/circuit-engine/engine/spice/mnaValidationSuite.ac.report.md
