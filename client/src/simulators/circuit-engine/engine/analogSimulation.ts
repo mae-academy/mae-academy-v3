@@ -379,8 +379,8 @@ export class TabDSimulationEngine extends SimulationEngine {
           const currentPhase = this.wirePhases.get(wire.id) ?? 0;
 
           if (brokenWireIds.has(wire.id) || Math.abs(wireI) < 1e-7 || maxAbsWireCurrent < 1e-7) {
-            // Zero current / open circuit: rate is exactly 0, electrons remain completely stationary
-            this.wirePhases.set(wire.id, currentPhase);
+            // Zero current / open circuit: instantly delete particle phase so electrons disappear immediately
+            this.wirePhases.delete(wire.id);
           } else {
             const relativeRatio = Math.min(1, Math.max(0, Math.abs(wireI) / maxAbsWireCurrent));
             const speed = V_BASE + (V_TOP - V_BASE) * Math.pow(relativeRatio, 0.35);
@@ -844,45 +844,66 @@ export class TabDSimulationEngine extends SimulationEngine {
         }
         case 'diode-ideal': {
           const anode = p('anode'); const cathode = p('cathode');
-          nonlinear.push({ id: component.id, positive: anode, negative: cathode, controls: [anode, cathode], current: (nodes: Record<string, number>) => shockleyCurrent((nodes[anode] ?? 0) - (nodes[cathode] ?? 0), 1e-8, 0.01) });
+          const intAnode = `${anode}:rs:${component.id}`;
+          primitives.push({ kind: 'resistor', id: `${component.id}:rs`, positive: anode, negative: intAnode, resistance: 0.001 });
+          nonlinear.push({ id: component.id, positive: intAnode, negative: cathode, controls: [intAnode, cathode], current: (nodes: Record<string, number>) => shockleyCurrent((nodes[intAnode] ?? 0) - (nodes[cathode] ?? 0), 1e-8, 0.01) });
           break;
         }
         case 'diode': {
           const anode = p('anode'); const cathode = p('cathode');
+          const intAnode = `${anode}:rs:${component.id}`;
+          primitives.push({ kind: 'resistor', id: `${component.id}:rs`, positive: anode, negative: intAnode, resistance: 0.001 });
           const material = String(component.props.material ?? 'silicon').toLowerCase();
           const saturationByMaterial: Record<string, number> = { silicon: 1e-12, germanium: 1e-6, gaas: 1e-18 };
           const ideal = material === 'ideal';
           const saturation = ideal ? 1e-8 : saturationByMaterial[material] ?? 1e-12;
           const thermal = ideal ? 0.01 : 0.02585;
-          nonlinear.push({ id: component.id, positive: anode, negative: cathode, controls: [anode, cathode], current: (nodes: Record<string, number>) => shockleyCurrent((nodes[anode] ?? 0) - (nodes[cathode] ?? 0), saturation, thermal) });
+          nonlinear.push({ id: component.id, positive: intAnode, negative: cathode, controls: [intAnode, cathode], current: (nodes: Record<string, number>) => shockleyCurrent((nodes[intAnode] ?? 0) - (nodes[cathode] ?? 0), saturation, thermal) });
           break;
         }
         case 'diode-silicon': case 'diode-germanium': case 'diode-gaas': {
           const anode = p('anode'); const cathode = p('cathode');
-          nonlinear.push({ id: component.id, positive: anode, negative: cathode, controls: [anode, cathode], current: (nodes: Record<string, number>) => shockleyCurrent((nodes[anode] ?? 0) - (nodes[cathode] ?? 0), value(component, 'Is', 1e-12)) });
+          const intAnode = `${anode}:rs:${component.id}`;
+          primitives.push({ kind: 'resistor', id: `${component.id}:rs`, positive: anode, negative: intAnode, resistance: 0.001 });
+          nonlinear.push({ id: component.id, positive: intAnode, negative: cathode, controls: [intAnode, cathode], current: (nodes: Record<string, number>) => shockleyCurrent((nodes[intAnode] ?? 0) - (nodes[cathode] ?? 0), value(component, 'Is', 1e-12)) });
           break;
         }
         case 'led': {
           const anode = p('anode'); const cathode = p('cathode');
+          const intAnode = `${anode}:rs:${component.id}`;
+          primitives.push({ kind: 'resistor', id: `${component.id}:rs`, positive: anode, negative: intAnode, resistance: 0.001 });
           const vf = Math.max(0.1, value(component, 'forwardVoltage', 2));
-          const ratedCurrent = Math.max(1e-9, value(component, 'maxCurrent', 0.02));
-          const is = ratedCurrent / Math.max(1, Math.exp(Math.min(40, vf / 0.02585)) - 1);
-          nonlinear.push({ id: component.id, positive: anode, negative: cathode, controls: [anode, cathode], current: (nodes: Record<string, number>) => shockleyCurrent((nodes[anode] ?? 0) - (nodes[cathode] ?? 0), is) });
+          nonlinear.push({
+            id: component.id,
+            positive: intAnode,
+            negative: cathode,
+            controls: [intAnode, cathode],
+            current: (nodes: Record<string, number>) => {
+              const v = (nodes[intAnode] ?? 0) - (nodes[cathode] ?? 0);
+              return shockleyCurrent(v - (vf - 0.7), 1e-12, 0.02585);
+            }
+          });
           break;
         }
         case 'zener': {
-          const anode = p('anode'); const cathode = p('cathode'); const breakdown = Math.max(0.1, value(component, 'breakdownVoltage', 5.1));
+          const anode = p('anode'); const cathode = p('cathode');
+          const intAnode = `${anode}:rs:${component.id}`;
+          primitives.push({ kind: 'resistor', id: `${component.id}:rs`, positive: anode, negative: intAnode, resistance: 0.001 });
+          const breakdown = Math.max(0.1, value(component, 'breakdownVoltage', 5.1));
           nonlinear.push({
-            id: component.id, positive: anode, negative: cathode, controls: [anode, cathode], current: (nodes: Record<string, number>) => {
-              const v = (nodes[anode] ?? 0) - (nodes[cathode] ?? 0);
+            id: component.id, positive: intAnode, negative: cathode, controls: [intAnode, cathode], breakdownVoltage: breakdown, current: (nodes: Record<string, number>) => {
+              const v = (nodes[intAnode] ?? 0) - (nodes[cathode] ?? 0);
               return shockleyCurrent(v, 1e-12) - shockleyCurrent(-v - breakdown, 1e-6, 0.05);
             }
           });
           break;
         }
         case 'photodiode': {
-          const anode = p('anode'); const cathode = p('cathode'); const dark = Math.max(0, value(component, 'darkCurrent', 1e-9));
-          nonlinear.push({ id: component.id, positive: anode, negative: cathode, controls: [anode, cathode], current: (nodes: Record<string, number>) => shockleyCurrent((nodes[anode] ?? 0) - (nodes[cathode] ?? 0), dark) - dark });
+          const anode = p('anode'); const cathode = p('cathode');
+          const intAnode = `${anode}:rs:${component.id}`;
+          primitives.push({ kind: 'resistor', id: `${component.id}:rs`, positive: anode, negative: intAnode, resistance: 0.001 });
+          const dark = Math.max(0, value(component, 'darkCurrent', 1e-9));
+          nonlinear.push({ id: component.id, positive: intAnode, negative: cathode, controls: [intAnode, cathode], current: (nodes: Record<string, number>) => shockleyCurrent((nodes[intAnode] ?? 0) - (nodes[cathode] ?? 0), dark) - dark });
           break;
         }
         case 'bjt-npn': {

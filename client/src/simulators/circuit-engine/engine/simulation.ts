@@ -473,7 +473,7 @@ export class SimulationEngine {
       const wireI = wireCurrents[wire.id] ?? 0;
       const currentPhase = this.wirePhases.get(wire.id) ?? 0;
       if (brokenWireIds.has(wire.id) || Math.abs(wireI) < 1e-7 || maxAbsWireCurrent < 1e-7) {
-        this.wirePhases.set(wire.id, currentPhase);
+        this.wirePhases.delete(wire.id);
       } else {
         const relativeRatio = Math.min(1, Math.max(0, Math.abs(wireI) / maxAbsWireCurrent));
         const speed = V_BASE + (V_TOP - V_BASE) * Math.pow(relativeRatio, 0.35);

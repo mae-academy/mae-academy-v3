@@ -270,3 +270,57 @@ describe('Phase 3: Auto-Repair on Reset', () => {
     expect(brokenAfter.size).toBe(0);
   });
 });
+
+describe('Phase 2 Test: 12V across Diode/LED/Zener', () => {
+  it('tests 12V directly across LED', () => {
+    const engine = new TabDSimulationEngine();
+    engine.setCircuit([
+      component('V1', 'dc-voltage', { voltage: 12 }),
+      component('LED1', 'led'),
+      component('GND', 'ground'),
+    ], [
+      wire('w1', 'V1', 'pos', 'LED1', 'anode'),
+      wire('w2', 'LED1', 'cathode', 'V1', 'neg'),
+      wire('w3', 'V1', 'neg', 'GND', 'gnd'),
+    ]);
+    const snap = engine.step(0.016);
+    expect(snap.converged).toBe(true);
+    expect(snap.warnings).toEqual([]);
+    expect(snap.branchCurrents['LED1']).toBeGreaterThan(5000);
+  });
+
+  it('tests 12V directly across silicon diode', () => {
+    const engine = new TabDSimulationEngine();
+    engine.setCircuit([
+      component('V1', 'dc-voltage', { voltage: 12 }),
+      component('D1', 'diode', { material: 'silicon' }),
+      component('GND', 'ground'),
+    ], [
+      wire('w1', 'V1', 'pos', 'D1', 'anode'),
+      wire('w2', 'D1', 'cathode', 'V1', 'neg'),
+      wire('w3', 'V1', 'neg', 'GND', 'gnd'),
+    ]);
+    const snap = engine.step(0.016);
+    expect(snap.converged).toBe(true);
+    expect(snap.warnings).toEqual([]);
+    expect(snap.branchCurrents['D1']).toBeGreaterThan(5000);
+  });
+
+  it('tests 12V directly across zener diode in reverse breakdown', () => {
+    const engine = new TabDSimulationEngine();
+    engine.setCircuit([
+      component('V1', 'dc-voltage', { voltage: 12 }),
+      component('Z1', 'zener', { breakdownVoltage: 5.1 }),
+      component('GND', 'ground'),
+    ], [
+      wire('w1', 'V1', 'pos', 'Z1', 'cathode'),
+      wire('w2', 'Z1', 'anode', 'V1', 'neg'),
+      wire('w3', 'V1', 'neg', 'GND', 'gnd'),
+    ]);
+    const snap = engine.step(0.016);
+    console.log('Zener snap warnings:', snap.warnings);
+    expect(snap.converged).toBe(true);
+    expect(snap.warnings).toEqual([]);
+    expect(Math.abs(snap.branchCurrents['Z1'])).toBeGreaterThan(5000);
+  });
+});

@@ -151,7 +151,7 @@ describe('Tab D documented runtime binding', () => {
     expect(snapshot.warnings).toEqual([expect.objectContaining({ code: 'TAB_D_MNA', message: expect.stringMatching(/singular|conflicting/i) })]);
   });
 
-  it('converts bounded Newton-Raphson non-convergence under extreme diode bias into a Tab D warning', () => {
+  it('allows extreme diode bias to converge cleanly with massive current via parasitic Rs without solver crash', () => {
     const engine = new TabDSimulationEngine();
     engine.setCircuit(
       [component('V1', 'dc-voltage', { voltage: 1000 }), component('D1', 'diode', { material: 'silicon' }), component('GND', 'ground')],
@@ -159,8 +159,9 @@ describe('Tab D documented runtime binding', () => {
     );
 
     const snapshot = engine.step(1e-3);
-    expect(snapshot.converged).toBe(false);
-    expect(snapshot.warnings).toEqual([expect.objectContaining({ code: 'TAB_D_MNA', message: expect.stringMatching(/did not converge|Newton-Raphson/i) })]);
+    expect(snapshot.converged).toBe(true);
+    expect(snapshot.warnings.filter(w => w.message.includes('Newton-Raphson'))).toEqual([]);
+    expect(Math.abs(snapshot.branchCurrents.D1)).toBeGreaterThan(1000);
   });
 
   it('computes stable RMS values for AC voltmeter, ammeter, and DMM ACV/ACA modes', () => {

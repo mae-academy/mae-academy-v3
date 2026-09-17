@@ -8,6 +8,7 @@ export interface TabDNonlinearDevice {
   current: (nodeVoltages: Record<string, number>) => number;
   /** Nodes on which the device current depends; omitted nodes are treated as zero. */
   controls: string[];
+  breakdownVoltage?: number;
 }
 
 export interface TabDNewtonOptions {
@@ -37,8 +38,14 @@ function finite(value: number) {
 
 /** Bounded Shockley branch current with standard thermal-voltage normalization. */
 export function shockleyCurrent(voltage: number, saturationCurrent: number, thermalVoltage = 0.02585, emissionCoefficient = 1) {
-  const exponent = clamp(voltage / Math.max(1e-6, thermalVoltage * emissionCoefficient), -40, 40);
-  return clamp(Math.max(0, saturationCurrent) * (Math.exp(exponent) - 1), -MAX_CURRENT, MAX_CURRENT);
+  const vt = Math.max(1e-6, thermalVoltage * emissionCoefficient);
+  const exponent = voltage / vt;
+  if (exponent > 40) {
+    const base = Math.max(0, saturationCurrent) * Math.exp(40);
+    return clamp(base + (base / vt) * (voltage - 40 * vt), -MAX_CURRENT, MAX_CURRENT);
+  }
+  const clampedExp = Math.max(-40, exponent);
+  return clamp(Math.max(0, saturationCurrent) * (Math.exp(clampedExp) - 1), -MAX_CURRENT, MAX_CURRENT);
 }
 
 /**
@@ -46,7 +53,12 @@ export function shockleyCurrent(voltage: number, saturationCurrent: number, ther
  * Restricts exponential step jumps exclusively across non-linear device terminals
  * (V_junction = V_pos - V_neg) while allowing linear nodes to update unhindered.
  */
-export function pnjlim(vnew: number, vold: number, vt = 0.02585, vcrit?: number): number {
+/**
+ * SPICE-standard p-n junction voltage limiting algorithm (pnjlim).
+ * Restricts exponential step jumps across non-linear device terminals in both
+ * forward conduction and reverse breakdown.
+ */
+export function pnjlim(vnew: number, vold: number, vt = 0.02585, vcrit?: number, vbreakdown?: number): number {
   const critical = vcrit ?? (vt * Math.log(Math.max(1, vt / (Math.SQRT2 * 1e-12))));
   if (vnew > critical && Math.abs(vnew - vold) > 2 * vt) {
     if (vold > 0) {
@@ -55,6 +67,19 @@ export function pnjlim(vnew: number, vold: number, vt = 0.02585, vcrit?: number)
       return critical;
     }
     return vnew > 0 ? vt * Math.log(Math.max(1e-12, vnew / vt)) : critical;
+  }
+  if (vbreakdown !== undefined && vbreakdown > 0) {
+    const vrevNew = -vnew;
+    const vrevOld = -vold;
+    const revCrit = vbreakdown + vt * Math.log(Math.max(1, vt / (Math.SQRT2 * 1e-6)));
+    if (vrevNew > revCrit && Math.abs(vrevNew - vrevOld) > 2 * vt) {
+      if (vrevOld > vbreakdown) {
+        const arg = 1 + (vrevNew - vrevOld) / vt;
+        if (arg > 0) return -(vrevOld + vt * Math.log(arg));
+        return -revCrit;
+      }
+      return -(vbreakdown + (vrevNew > vbreakdown ? vt * Math.log(Math.max(1e-12, (vrevNew - vbreakdown) / vt)) : 0));
+    }
   }
   return vnew;
 }
@@ -117,7 +142,7 @@ export class TabDNewtonMna {
         const neg = device.negative;
         const vOld = (guess[pos] ?? 0) - (guess[neg] ?? 0);
         const vNew = (latest.nodeVoltages[pos] ?? 0) - (latest.nodeVoltages[neg] ?? 0);
-        const vLim = pnjlim(vNew, vOld);
+        const vLim = pnjlim(vNew, vOld, 0.02585, undefined, device.breakdownVoltage);
         targetJunctions.set(device.id, vOld + damping * (vLim - vOld));
       }
 

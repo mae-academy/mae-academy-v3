@@ -2156,9 +2156,19 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
   // state change SPICE should react to immediately, not after the drag-coalescing debounce.
   const updateComponentPropsById = useCallback((id: string, updates: Record<string, unknown>) => {
     requestEagerSpiceRun();
-    setComponents(previous => previous.map(component => component.id === id
+    const nextComponents = liveComponentsRef.current.map(component => component.id === id
       ? { ...component, props: { ...component.props, ...updates } }
-      : component));
+      : component);
+    liveComponentsRef.current = nextComponents;
+    setComponents(nextComponents);
+    simulation.current.setCircuit(nextComponents, wiresRef.current);
+    const snap = simulation.current.getSnapshot();
+    const brokenWires = getBrokenWireIds(nextComponents, wiresRef.current);
+    brokenWires.forEach(wireId => {
+      if (snap.wireCurrents) snap.wireCurrents[wireId] = 0;
+      if (snap.wirePhases) delete snap.wirePhases[wireId];
+    });
+    setSnapshot(snap);
   }, [requestEagerSpiceRun]);
 
   const releaseMomentaryControl = useCallback(() => {
@@ -2624,6 +2634,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
         .map(evaluatedComponent => evaluatedComponent.id);
       if (newlyBurnedIds.length > 0) {
         liveComponentsRef.current = evaluated;
+        simulation.current.setCircuit(evaluated, wiresRef.current);
         const burnedIdSet = new Set(newlyBurnedIds);
         setComponents(previous => previous.map(component =>
           burnedIdSet.has(component.id) ? { ...component, state: { ...component.state, isBurned: true } } : component
@@ -2639,6 +2650,17 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
             if (result.componentIntensity) result.componentIntensity[component.id] = 0;
           }
         }
+      }
+
+      // Flush broken wire currents and purge phases so particles disappear immediately
+      const activeBrokenWireIds = getBrokenWireIds(liveComponentsRef.current, wiresRef.current);
+      if (result.wireCurrents) {
+        activeBrokenWireIds.forEach(wireId => {
+          if (result.wireCurrents) result.wireCurrents[wireId] = 0;
+          if (result.wirePhases) {
+            delete result.wirePhases[wireId];
+          }
+        });
       }
       setSnapshot(result);
       setAnimationTime(result.time);
@@ -3790,6 +3812,15 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
         const next = update(previous);
         if (!next) return previous;
         requestEagerSpiceRun();
+        liveComponentsRef.current = next;
+        simulation.current.setCircuit(next, wiresRef.current);
+        const snap = simulation.current.getSnapshot();
+        const brokenWires = getBrokenWireIds(next, wiresRef.current);
+        brokenWires.forEach(wireId => {
+          if (snap.wireCurrents) snap.wireCurrents[wireId] = 0;
+          if (snap.wirePhases) delete snap.wirePhases[wireId];
+        });
+        setSnapshot(snap);
         return next;
       });
     };
@@ -4168,14 +4199,38 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                   {/* Dedicated layer containing ONLY components, wires, labels, and texts for tight export bounding box */}
                   <g id="circuit-elements-layer">
                     {(() => {
-                      const brokenWireIds = getBrokenWireIds(components, wires);
+                      const activeComponents = liveComponentsRef.current.length > 0 ? liveComponentsRef.current : components;
+                      const brokenWireIds = getBrokenWireIds(activeComponents, wires);
                       return wires.map(wire => {
                         const selected = selection?.kind === 'wire' && selection.id === wire.id;
                         const isBroken = brokenWireIds.has(wire.id);
                         const phase = isBroken ? 0 : (snapshot.wirePhases?.[wire.id] ?? 0);
                         const wireCurrent = isBroken ? 0 : Math.abs(snapshot.wireCurrents?.[wire.id] ?? 0);
-                        const isCurrentFlowing = wireCurrent >= 1e-7;
-                        const path = getWirePoints(wire);
+                        const isCurrentFlowing = !isBroken && wireCurrent >= 1e-7 && snapshot.wirePhases?.[wire.id] !== undefined;
+                        
+                        // Dynamically ensure wire waypoints strictly anchor to the live component terminal positions
+                        const endpoints = canvasWireEndpoints(wire, activeComponents);
+                        let path = getWirePoints(wire);
+                        if (endpoints && path.length >= 2) {
+                          if (
+                            Math.abs(path[0][0] - endpoints.from[0]) > 0.5 ||
+                            Math.abs(path[0][1] - endpoints.from[1]) > 0.5 ||
+                            Math.abs(path[path.length - 1][0] - endpoints.to[0]) > 0.5 ||
+                            Math.abs(path[path.length - 1][1] - endpoints.to[1]) > 0.5
+                          ) {
+                            path = reconnectPathEndpoints(
+                              path,
+                              endpoints.from,
+                              endpoints.to,
+                              wire.routing,
+                              [],
+                              wire.waypoints,
+                              gridSize,
+                              endpoints.fromAxis,
+                            );
+                          }
+                        }
+
                         // Phase 2: use jump-arc path for the visible stroke; hitbox uses the
                         // plain polyline so clicks always register even near arc breaks.
                         const hitPath = pointsToPath(path);
@@ -4183,7 +4238,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                         const len = pathLength(path);
                         // Persistent charge particles: uniform spacing based solely on physical length (N = round(length / spacing))
                         const numDots = Math.max(1, Math.round(len / 36));
-                        const dots = getDotsOnPath(path, numDots, phase);
+                        const dots = isCurrentFlowing ? getDotsOnPath(path, numDots, phase) : [];
                         const isSensingWire = false;
                         const strokeColor = selected ? colors.selection : (wire.color ?? colors.text);
                         const strokeWidth = selected ? 2 : 1.5;
