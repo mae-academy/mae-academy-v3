@@ -722,6 +722,10 @@ export const reconstructBranchCurrents = (
 ): Record<string, number> => {
   const branchCurrents: Record<string, number> = {};
   for (const element of elements) {
+    if (element.isBurned) {
+      branchCurrents[element.id] = 0;
+      continue;
+    }
     let current = 0;
     cycles.forEach((cycle, k) => {
       const coeff = cycle.get(element.id) ?? 0;

@@ -529,5 +529,15 @@ describe('Tab D SVG symbol language', () => {
       expect(cccsMarkup).toContain('>R2</tspan>');
     });
   });
+
+  describe('Burnout explosion and body tinting', () => {
+    it('renders a transient explode-fade animation with forwards fill mode and #EF4444 color tint', () => {
+      const burnedResistor = markup('resistor', { _isBurned: true });
+      expect(burnedResistor).toContain('color="#EF4444"');
+      expect(burnedResistor).toContain('animation:explode-fade 1s cubic-bezier(0.16, 1, 0.3, 1) forwards');
+      expect(burnedResistor).toContain('@keyframes explode-fade');
+      expect(burnedResistor).not.toContain('animate-pulse');
+    });
+  });
 });
 

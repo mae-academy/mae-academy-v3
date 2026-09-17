@@ -35,8 +35,8 @@ export class MNAError extends Error {
 
 const PIVOT_EPSILON = 1e-12;
 const VALUE_EPSILON = 1e-9;
-/** Stand-in resistance for a burned-out component: physically an open circuit. */
-export const BURNED_OUT_RESISTANCE = 1e9;
+/** Stand-in resistance for a burned-out component: 1 TΩ (1e-12 S conductance), safely severing the node while preventing singular matrices. */
+export const BURNED_OUT_RESISTANCE = 1e12;
 
 function finite(value: number, label: string) {
   if (!Number.isFinite(value)) throw new MNAError('INVALID_ELEMENT', `Invalid Circuit: ${label} must be finite`);
@@ -222,10 +222,7 @@ export class MNASolver {
     voltageBranches.forEach((element, index) => { branchCurrents[element.id] = solution[nodeOrder.length + index]; });
     for (const element of this.elements) {
       if (element.isBurned) {
-        const [positiveId, negativeId] = element.type === 'current' ? [element.from, element.to] : [element.positive, element.negative];
-        const vp = nodeVoltages[positiveId] ?? 0;
-        const vn = nodeVoltages[negativeId] ?? 0;
-        branchCurrents[element.id] = (vp - vn) / BURNED_OUT_RESISTANCE;
+        branchCurrents[element.id] = 0;
       } else if (element.type === 'resistor') {
         const vp = nodeVoltages[element.positive] ?? 0;
         const vn = nodeVoltages[element.negative] ?? 0;

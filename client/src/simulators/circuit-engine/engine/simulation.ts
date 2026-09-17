@@ -233,7 +233,7 @@ export class SimulationEngine {
   }
 
   setCircuit(components: CircuitComponent[], wires: CircuitWire[]) {
-    this.components = components.map(component => ({ ...component, props: { ...component.props } }));
+    this.components = components.map(component => ({ ...component, props: { ...component.props }, state: component.state ? { ...component.state } : undefined }));
     this.wires = wires.map(wire => ({ ...wire, path: wire.path.map(point => [...point] as [number, number]) }));
     this.network = this.buildNetwork();
     this.wirePhases.clear();
@@ -441,6 +441,13 @@ export class SimulationEngine {
       controls = nextControls;
     }
     if (!result) result = this.blankResult(staticWarnings);
+    for (const component of this.components) {
+      if (component.state?.isBurned) {
+        result.branchCurrents[component.id] = 0;
+        result.powered[component.id] = false;
+        result.intensity[component.id] = 0;
+      }
+    }
     this.relayStates = controls;
 
     this.updateDynamicStates(result, dt);
@@ -547,6 +554,12 @@ export class SimulationEngine {
     };
 
     for (const component of this.components) {
+      if (component.state?.isBurned) {
+        branchCurrents[component.id] = 0;
+        powered[component.id] = false;
+        intensity[component.id] = 0;
+        continue;
+      }
       const props = component.props;
       const type = component.type;
       let current = 0;

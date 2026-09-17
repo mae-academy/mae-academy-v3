@@ -24,7 +24,15 @@ export function useSimulation(components: CircuitComponent[], wires: CircuitWire
     try {
       const elements = compileDcTopology(components, wires, normalizedGraph);
       if (!elements.length) return { result: null, error: null, elements };
-      return { result: new MNASolver(elements).solve(), error: null, elements };
+      const rawResult = new MNASolver(elements).solve();
+      if (rawResult?.branchCurrents) {
+        for (const component of components) {
+          if (component.state?.isBurned) {
+            rawResult.branchCurrents[component.id] = 0;
+          }
+        }
+      }
+      return { result: rawResult, error: null, elements };
     } catch (error) {
       return { result: null, error: error instanceof MNAError ? error.message : 'Invalid Circuit: MNA evaluation failed', elements: [] };
     }

@@ -173,4 +173,13 @@ describe('Tab B Phase 2 strict MNA solver', () => {
     result.rhs!.forEach((value, row) => expect(value).toBe(row === v1Row ? 10 : 0));
     expect(result.residualInfinity).toBeLessThanOrEqual(1e-9);
   });
+
+  it('strictly forces 0A branch current and true open circuit for burned components', () => {
+    const result = new MNASolver([
+      { type: 'voltage', id: 'V1', positive: '1', negative: '0', voltage: 12 },
+      { type: 'resistor', id: 'R1', positive: '1', negative: '0', resistance: 100, isBurned: true },
+    ]).solve();
+    expect(result.branchCurrents.R1).toBe(0);
+    expect(Math.abs(result.voltageSourceCurrents.V1)).toBeLessThanOrEqual(1e-10);
+  });
 });

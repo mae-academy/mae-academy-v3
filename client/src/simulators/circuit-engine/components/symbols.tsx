@@ -1722,11 +1722,25 @@ const BURN_ORANGE = '#F97316';
 
 /**
  * Jagged burst + smoke puffs, centered on the symbol's own origin (every symbol in this file is
- * drawn centered at (0,0), so no extra positioning is needed). `animate-pulse` is Tailwind's
- * built-in opacity-pulse keyframe, reused here rather than hand-rolling one.
+ * drawn centered at (0,0), so no extra positioning is needed).
+ * Transient explosion animation: explodes quickly, then fades out to opacity: 0 after ~1 second
+ * and stays hidden (forwards).
  */
 const BurnOverlay: SymbolFC = () => (
-  <g className="animate-pulse" pointerEvents="none">
+  <g
+    pointerEvents="none"
+    style={{
+      animation: 'explode-fade 1s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+      transformOrigin: '0 0',
+    }}
+  >
+    <style>{`
+      @keyframes explode-fade {
+        0% { opacity: 1; transform: scale(0.8); }
+        20% { opacity: 1; transform: scale(1.2); }
+        100% { opacity: 0; transform: scale(1.3); }
+      }
+    `}</style>
     <polygon
       points="0,-26 6,-9 22,-14 10,-2 26,4 8,6 12,22 0,10 -12,22 -8,6 -26,4 -10,-2 -22,-14 -6,-9"
       fill={BURN_ORANGE}

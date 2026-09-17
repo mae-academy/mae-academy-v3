@@ -94,7 +94,7 @@ export class TabDSimulationEngine extends SimulationEngine {
 
   override setCircuit(components: CircuitComponent[], wires: CircuitWire[]) {
     super.setCircuit(components, wires);
-    this.tabDComponents = components.map(component => ({ ...component, props: { ...component.props } }));
+    this.tabDComponents = components.map(component => ({ ...component, props: { ...component.props }, state: component.state ? { ...component.state } : undefined }));
     this.tabDWires = wires.map(wire => ({ ...wire, path: wire.path.map(point => [...point] as [number, number]) }));
     this.documentedMna.reset();
     this.documentedSnapshot = null;
@@ -185,6 +185,24 @@ export class TabDSimulationEngine extends SimulationEngine {
           ...result.branchCurrents,
           ...Object.fromEntries(compiled.nonlinear.map(device => [device.id, device.current(result.nodeVoltages)])),
         };
+        for (const comp of this.tabDComponents) {
+          if (comp.state?.isBurned) {
+            branchCurrents[comp.id] = 0;
+            branchCurrents[`${comp.id}:1`] = 0;
+            branchCurrents[`${comp.id}:2`] = 0;
+            branchCurrents[`${comp.id}:3`] = 0;
+            branchCurrents[`${comp.id}:12`] = 0;
+            branchCurrents[`${comp.id}:23`] = 0;
+            branchCurrents[`${comp.id}:31`] = 0;
+            branchCurrents[`${comp.id}:a`] = 0;
+            branchCurrents[`${comp.id}:b`] = 0;
+            branchCurrents[`${comp.id}:coil`] = 0;
+            branchCurrents[`${comp.id}:no`] = 0;
+            branchCurrents[`${comp.id}:nc`] = 0;
+            branchCurrents[`${comp.id}:secondary`] = 0;
+            branchCurrents[`${comp.id}:top`] = 0;
+          }
+        }
         compiled.commit(result.nodeVoltages, branchCurrents, fixedDt);
         const terminalVoltages = this.terminalVoltages(compiled.netForTerminal, result.nodeVoltages);
 
@@ -195,6 +213,12 @@ export class TabDSimulationEngine extends SimulationEngine {
         // Compute terminal currents dictionary for all components
         const terminalCurrentMap: Record<string, number> = {};
         for (const comp of this.tabDComponents) {
+          if (comp.state?.isBurned) {
+            for (const terminal of getDef(comp.type)?.terminals ?? []) {
+              terminalCurrentMap[terminalKey(comp.id, terminal.id)] = 0;
+            }
+            continue;
+          }
           const bI = branchCurrents[comp.id] ?? 0;
           if (comp.type === 'resistor' || comp.type === 'lamp') {
             terminalCurrentMap[terminalKey(comp.id, 'a')] = bI;
@@ -422,6 +446,9 @@ export class TabDSimulationEngine extends SimulationEngine {
         wireCurrents: wireCurrentsOut,
         wirePhases: Object.fromEntries(this.wirePhases),
         componentPowered: Object.fromEntries(this.tabDComponents.map(component => {
+          if (component.state?.isBurned) {
+            return [component.id, false];
+          }
           if (['relay-spst', 'relay-spdt', 'relay-dpst', 'contactor'].includes(component.type)) {
             return [component.id, Boolean(this.tabDRelayStates.get(component.id))];
           }
@@ -549,7 +576,7 @@ export class TabDSimulationEngine extends SimulationEngine {
      * without changing the two-phase (build → commit) architecture.
      */
     for (const c of this.tabDComponents) {
-      if (c.type !== 'coil') continue;
+      if (c.type !== 'coil' || c.state?.isBurned) continue;
       const posNet = netForTerminal(c.id, 'pos');
       const negNet = netForTerminal(c.id, 'neg');
       const V_pos = priorVoltage(posNet);
@@ -573,6 +600,7 @@ export class TabDSimulationEngine extends SimulationEngine {
     }
 
     for (const component of this.tabDComponents) {
+      if (component.state?.isBurned) continue;
       const p = (terminal: string) => netForTerminal(component.id, terminal);
       switch (component.type) {
         case 'ground': break;

@@ -2609,16 +2609,6 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
       const elapsed = Math.min(0.03, (now - last) / 1000);
       last = now;
       const result = simulation.current.step(Math.max(0.0001, elapsed * simulationSpeed));
-      setSnapshot(result);
-      setAnimationTime(result.time);
-
-      // Burnout health check: only components exceeding their ratings for the first time write
-      // back to React state, so an already-burned part (skipped internally by the health check)
-      // never re-triggers a render. `liveComponentsRef` is updated synchronously right here (not
-      // left to the [effectiveCircuitComponents] effect above) — this loop runs on every rAF tick,
-      // faster than React commits a render, so waiting for that effect to catch up let the same
-      // component re-qualify as "newly burned" on the next tick or two and spin `setComponents`
-      // into React's "Maximum update depth exceeded" — reproduced live before this fix.
       const evaluated = evaluateComponentHealth({ components: liveComponentsRef.current }, result);
       const newlyBurnedIds = evaluated
         .filter((evaluatedComponent, index) => evaluatedComponent.state?.isBurned && !liveComponentsRef.current[index]?.state?.isBurned)
@@ -2630,6 +2620,19 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
           burnedIdSet.has(component.id) ? { ...component, state: { ...component.state, isBurned: true } } : component
         ));
       }
+
+      // Hardcode branch current to strictly 0 for burned components in output results
+      if (result.branchCurrents) {
+        for (const component of liveComponentsRef.current) {
+          if (component.state?.isBurned) {
+            result.branchCurrents[component.id] = 0;
+            if (result.componentPowered) result.componentPowered[component.id] = false;
+            if (result.componentIntensity) result.componentIntensity[component.id] = 0;
+          }
+        }
+      }
+      setSnapshot(result);
+      setAnimationTime(result.time);
 
       animationFrame.current = requestAnimationFrame(animate);
     };
@@ -4155,8 +4158,11 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                   <g id="circuit-elements-layer">
                     {wires.map(wire => {
                       const selected = selection?.kind === 'wire' && selection.id === wire.id;
-                      const phase = snapshot.wirePhases?.[wire.id] ?? 0;
-                      const wireCurrent = Math.abs(snapshot.wireCurrents?.[wire.id] ?? 0);
+                      const fromComp = components.find(c => c.id === wire.fromComp);
+                      const toComp = components.find(c => c.id === wire.toComp);
+                      const hasBurnedTerm = Boolean(fromComp?.state?.isBurned || toComp?.state?.isBurned);
+                      const phase = hasBurnedTerm ? 0 : (snapshot.wirePhases?.[wire.id] ?? 0);
+                      const wireCurrent = hasBurnedTerm ? 0 : Math.abs(snapshot.wireCurrents?.[wire.id] ?? 0);
                       const isCurrentFlowing = wireCurrent >= 1e-7;
                       const path = getWirePoints(wire);
                       // Phase 2: use jump-arc path for the visible stroke; hitbox uses the
@@ -4333,7 +4339,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                           onPointerEnter={() => setHoveredComponentId(component.id)}
                           onPointerLeave={() => setHoveredComponentId(null)}
                         >
-                          {component.state?.isBurned && <title>⚠️ COMPONENT DESTROYED - Exceeded maximum ratings</title>}
+                          {component.state?.isBurned && <title>COMPONENT DESTROYED - Exceeded maximum ratings</title>}
                           {isSuperpositionDeactivatedVoltage ? (
                             /* Deactivated Voltage Source (Short Circuit): ghosted original source with solid wire overlay connecting pin1 to pin2 matching circuit wire stroke width */
                             (() => {
@@ -4821,7 +4827,7 @@ function ComponentInspector({ colors, component, definition, allComponents, link
           fontWeight: 600,
         }}
       >
-        ⚠️ COMPONENT DESTROYED - Exceeded maximum ratings
+        COMPONENT DESTROYED - Exceeded maximum ratings
       </div>
     )}
     <InspectorSection colors={colors} label="Instance label">
