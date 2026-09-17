@@ -1086,16 +1086,16 @@ const Lamp: SymbolFC = ({ powered }) => (
 const Opamp: SymbolFC = () => (
   <g>
     {/* Well-proportioned isosceles/equilateral op-amp triangle: apex at (25, 0), flat back wall at x=-20, vertices (-20, -32) and (-20, 32) */}
-    <polygon points="-20,-32 -20,32 25,0" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinejoin="round" />
+    <polygon points="-35,-40 -35,40 35,0" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinejoin="round" />
     {/* Inverting input lead to terminal IN- at (-50, -25) */}
-    <line x1={-50} y1={-25} x2={-20} y2={-25} stroke="currentColor" strokeWidth={1.5} />
+    <line x1={-50} y1={-25} x2={-35} y2={-25} stroke="currentColor" strokeWidth={1.5} />
     {/* Non-inverting input lead to terminal IN+ at (-50, 25) */}
-    <line x1={-50} y1={25} x2={-20} y2={25} stroke="currentColor" strokeWidth={1.5} />
+    <line x1={-50} y1={25} x2={-35} y2={25} stroke="currentColor" strokeWidth={1.5} />
     {/* Output lead to terminal OUT at (50, 0) */}
-    <line x1={25} y1={0} x2={50} y2={0} stroke="currentColor" strokeWidth={1.5} />
+    <line x1={35} y1={0} x2={50} y2={0} stroke="currentColor" strokeWidth={1.5} />
     {/* Polarity indicators pushed inward toward the center of the triangle */}
-    <text x={-10} y={-18} fontSize={12} fill="currentColor" dominantBaseline="central" textAnchor="middle">-</text>
-    <text x={-10} y={18} fontSize={12} fill="currentColor" dominantBaseline="central" textAnchor="middle">+</text>
+    <text x={-25} y={-24} fontSize={20} fill="currentColor" dominantBaseline="central" textAnchor="middle">-</text>
+    <text x={-25} y={26} fontSize={20} fill="currentColor" dominantBaseline="central" textAnchor="middle">+</text>
   </g>
 );
 
@@ -1378,7 +1378,7 @@ const DmmSymbol: SymbolFC = ({ props }) => {
   const raw = String(props?.label || 'DMM');
   return (
     <g>
-      {/* Main Body - Inverted clean off-white enclosure in Dark Mode, dark charcoal in Light Mode */}
+      {/* Main Body - Light gray enclosure in Dark Mode, dark charcoal in Light Mode */}
       <rect
         x={-35}
         y={-50}
@@ -1386,8 +1386,8 @@ const DmmSymbol: SymbolFC = ({ props }) => {
         height={100}
         rx={6}
         className="dmm-body"
-        fill={isDark ? '#f1f5f9' : '#1e232d'}
-        stroke={isDark ? '#cbd5e1' : '#111827'}
+        fill={isDark ? '#e2e8f0' : '#1e232d'}
+        stroke={isDark ? '#94a3b8' : '#111827'}
         strokeWidth={1.5}
       />
       {/* Top Header Label - Only rendered when on active canvas (suppressed in component library sidebar) */}
@@ -1412,7 +1412,7 @@ const DmmSymbol: SymbolFC = ({ props }) => {
           {renderComponentCanvasLabel(raw, false)}
         </text>
       )}
-      {/* LCD Display Screen - Soft neutral LCD background */}
+      {/* LCD Display Screen - Dark blue in dark mode, light blue matching Live Multimeter panel in light mode */}
       <rect
         x={-25}
         y={-38}
@@ -1420,8 +1420,8 @@ const DmmSymbol: SymbolFC = ({ props }) => {
         height={22}
         rx={3}
         className="dmm-screen"
-        fill="#edf2f7"
-        stroke="#cbd5e1"
+        fill={isDark ? '#0f2744' : '#e0f2fe'}
+        stroke={isDark ? '#1e4976' : '#7dd3fc'}
         strokeWidth={1}
       />
       {/* Dial - Tinted with contrasting darker grays in dark mode */}
@@ -1447,16 +1447,17 @@ const DmmSymbol: SymbolFC = ({ props }) => {
         stroke={isDark ? '#334155' : '#000000'}
         strokeWidth={1.5}
       />
-      {/* LCD Text - High-contrast dark digits */}
+      {/* LCD Text - Glowing blue in dark mode, vibrant sky blue in light mode */}
       <text
         x={0}
         y={-27}
         textAnchor="middle"
         fontSize={11}
-        fontWeight={700}
+        fontWeight={800}
         fontFamily="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
         className="dmm-screen-text"
-        fill="#0f172a"
+        fill={isDark ? '#38bdf8' : '#0284c7'}
+        letterSpacing="0.05em"
       >
         {String(props?.displayValue ?? props?.mode ?? 'DCV')}
       </text>
@@ -1468,15 +1469,15 @@ const OscilloscopeSymbol: SymbolFC = ({ props }) => {
   const isDark = Boolean(props?._isDark || props?.isDark);
   return (
     <g>
-      {/* Main Widescreen Body: Inverted off-white enclosure in Dark Mode, dark charcoal in Light Mode */}
+      {/* Main Widescreen Body: Light gray enclosure in Dark Mode, dark charcoal in Light Mode */}
       <rect
         x={-70}
         y={-60}
         width={140}
         height={100}
         rx={6}
-        fill={isDark ? '#f1f5f9' : '#1e232d'}
-        stroke={isDark ? '#cbd5e1' : '#111827'}
+        fill={isDark ? '#e2e8f0' : '#1e232d'}
+        stroke={isDark ? '#94a3b8' : '#111827'}
         strokeWidth={1.5}
       />
 
@@ -1488,7 +1489,7 @@ const OscilloscopeSymbol: SymbolFC = ({ props }) => {
         height={60}
         rx={3}
         fill="#030712"
-        stroke={isDark ? '#cbd5e1' : '#1b2028'}
+        stroke={isDark ? '#94a3b8' : '#1b2028'}
         strokeWidth={1.5}
       />
 

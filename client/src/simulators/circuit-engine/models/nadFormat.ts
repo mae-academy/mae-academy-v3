@@ -15,18 +15,50 @@ export interface NADDocument {
   workspace: { gridVisible: boolean; snapEnabled: boolean };
 }
 
+export function normalizePoint(pt: unknown): Point | null {
+  if (Array.isArray(pt) && pt.length >= 2) {
+    const x = Number(pt[0]);
+    const y = Number(pt[1]);
+    if (Number.isFinite(x) && Number.isFinite(y)) return [x, y];
+  }
+  if (pt && typeof pt === 'object') {
+    const p = pt as Record<string, unknown>;
+    const x = Number(p.x ?? (Array.isArray(p) ? p[0] : undefined));
+    const y = Number(p.y ?? (Array.isArray(p) ? p[1] : undefined));
+    if (Number.isFinite(x) && Number.isFinite(y)) return [x, y];
+  }
+  return null;
+}
+
 export function normalizeWire(rawWire: unknown): CircuitWire {
   const w = (rawWire && typeof rawWire === 'object' ? rawWire : {}) as Record<string, unknown>;
   const fromComp = String(w.fromComp || w.sourceComponentId || '');
-  const fromTerm = String(w.fromTerm || w.sourcePinId || '');
   const toComp = String(w.toComp || w.targetComponentId || '');
-  const toTerm = String(w.toTerm || w.targetPinId || '');
-  const path = Array.isArray(w.path) ? (w.path as Point[]) : [];
-  const waypoints = Array.isArray(w.waypoints)
-    ? (w.waypoints as Point[])
-    : path.length > 2
-      ? path.slice(1, -1)
-      : undefined;
+  const fromTerm = String(w.fromTerm || w.sourcePinId || (fromComp.startsWith('junc_') ? 'p' : ''));
+  const toTerm = String(w.toTerm || w.targetPinId || (toComp.startsWith('junc_') ? 'p' : ''));
+
+  const rawPath = Array.isArray(w.path) ? w.path : [];
+  const path: Point[] = rawPath.map(normalizePoint).filter((p): p is Point => p !== null);
+
+  const rawWaypoints = Array.isArray(w.waypoints) ? w.waypoints : undefined;
+  let waypoints: Point[] | undefined = undefined;
+  if (rawWaypoints) {
+    const parsed = rawWaypoints.map(normalizePoint).filter((p): p is Point => p !== null);
+    if (parsed.length > 0) {
+      waypoints = parsed;
+    }
+  }
+  if (!waypoints && path.length > 2) {
+    waypoints = path.slice(1, -1);
+  }
+
+  const junctionPoint = normalizePoint(w.junctionPoint) ?? undefined;
+  const junctionWireId = typeof w.junctionWireId === 'string' ? w.junctionWireId : undefined;
+
+  let routing: CircuitWire['routing'] = 'orthogonal';
+  if (w.routing === 'straight' || w.routing === 'manual' || w.routing === 'orthogonal') {
+    routing = w.routing;
+  }
 
   return {
     id: String(w.id || `w_${Math.random().toString(36).slice(2, 9)}`),
@@ -40,21 +72,26 @@ export function normalizeWire(rawWire: unknown): CircuitWire {
     targetPinId: toTerm,
     path,
     waypoints,
-    routing: (w.routing as CircuitWire['routing']) || 'orthogonal',
+    routing,
     color: typeof w.color === 'string' ? w.color : undefined,
-    junctionPoint: Array.isArray(w.junctionPoint) ? (w.junctionPoint as Point) : undefined,
-    junctionWireId: typeof w.junctionWireId === 'string' ? w.junctionWireId : undefined,
+    junctionPoint,
+    junctionWireId,
   };
 }
 
 export function normalizeComponent(rawComp: unknown): CircuitComponent {
   const c = (rawComp && typeof rawComp === 'object' ? rawComp : {}) as Record<string, unknown>;
+  const num = (v: unknown, fallback = 0): number => {
+    const n = typeof v === 'number' ? v : Number(v);
+    return Number.isFinite(n) ? n : fallback;
+  };
+
   return {
     id: String(c.id || `c_${Math.random().toString(36).slice(2, 9)}`),
     type: String(c.type || 'resistor'),
-    x: typeof c.x === 'number' && Number.isFinite(c.x) ? c.x : 0,
-    y: typeof c.y === 'number' && Number.isFinite(c.y) ? c.y : 0,
-    rotation: typeof c.rotation === 'number' ? c.rotation : 0,
+    x: num(c.x, 0),
+    y: num(c.y, 0),
+    rotation: num(c.rotation, 0),
     flipH: Boolean(c.flipH),
     flipV: Boolean(c.flipV),
     label: typeof c.label === 'string' ? c.label : '',
@@ -79,21 +116,24 @@ export function createNadDocument(input: Partial<Omit<NADDocument, 'format' | 'v
 
 export function serializeNad(document: NADDocument): string {
   // Ensure every wire exports both standard fromComp/fromTerm/toComp/toTerm
-  // and explicit sourceComponentId/sourcePinId/targetComponentId/targetPinId and waypoints
+  // and explicit sourceComponentId/sourcePinId/targetComponentId/targetPinId, waypoints, and junction metadata
   const strictDocument: NADDocument = {
     ...document,
     components: document.components.map(c => ({
       ...c,
       id: String(c.id),
     })),
-    wires: document.wires.map(w => ({
-      ...normalizeWire(w),
-      sourceComponentId: w.fromComp,
-      sourcePinId: w.fromTerm,
-      targetComponentId: w.toComp,
-      targetPinId: w.toTerm,
-      waypoints: w.waypoints ?? (w.path.length > 2 ? w.path.slice(1, -1) : undefined),
-    })),
+    wires: document.wires.map(w => {
+      const norm = normalizeWire(w);
+      return {
+        ...norm,
+        sourceComponentId: norm.fromComp,
+        sourcePinId: norm.fromTerm,
+        targetComponentId: norm.toComp,
+        targetPinId: norm.toTerm,
+        waypoints: norm.waypoints ?? (norm.path.length > 2 ? norm.path.slice(1, -1) : undefined),
+      };
+    }),
   };
   return JSON.stringify(strictDocument, null, 2);
 }
@@ -103,36 +143,43 @@ function arrayOf(value: unknown, label: string): unknown[] {
   return value;
 }
 
-function finite(value: unknown, label: string): number {
-  if (typeof value !== 'number' || !Number.isFinite(value)) throw new Error(`Invalid NAD file: ${label} must be finite.`);
-  return value;
-}
-
 export function parseNad(text: string): NADDocument {
   let parsed: unknown;
   try { parsed = JSON.parse(text); } catch { throw new Error('Invalid NAD file: the document is not valid JSON.'); }
   if (!parsed || typeof parsed !== 'object') throw new Error('Invalid NAD file: root document is required.');
   const raw = parsed as Record<string, unknown>;
-  if (raw.format !== NAD_FORMAT) throw new Error('Invalid NAD file: unsupported document format.');
-  if (raw.version !== NAD_VERSION) throw new Error('Invalid NAD file: unsupported format version.');
+  if (raw.format !== undefined && raw.format !== NAD_FORMAT) throw new Error('Invalid NAD file: unsupported document format.');
+  if (raw.version !== undefined && raw.version !== NAD_VERSION) throw new Error('Invalid NAD file: unsupported format version.');
   const rawComponents = arrayOf(raw.components, 'components');
   const rawWires = arrayOf(raw.wires, 'wires');
-  const texts = arrayOf(raw.texts, 'texts') as WorkspaceText[];
+  const texts = Array.isArray(raw.texts) ? (raw.texts as WorkspaceText[]) : [];
   const viewport = raw.viewport as { pan?: unknown; zoom?: unknown } | undefined;
   const workspace = raw.workspace as { gridVisible?: unknown; snapEnabled?: unknown } | undefined;
-  if (!viewport || !Array.isArray(viewport.pan) || viewport.pan.length !== 2) throw new Error('Invalid NAD file: viewport pan is required.');
-  const pan: Point = [finite(viewport.pan[0], 'viewport.pan[0]'), finite(viewport.pan[1], 'viewport.pan[1]')];
-  const zoom = finite(viewport.zoom, 'viewport.zoom');
-  if (zoom < 0.2 || zoom > 3) throw new Error('Invalid NAD file: viewport zoom is out of range.');
-  if (!workspace || typeof workspace.gridVisible !== 'boolean' || typeof workspace.snapEnabled !== 'boolean') throw new Error('Invalid NAD file: workspace settings are required.');
-  
+
+  let pan: Point = [0, 0];
+  if (viewport && Array.isArray(viewport.pan) && viewport.pan.length >= 2) {
+    const px = Number(viewport.pan[0]);
+    const py = Number(viewport.pan[1]);
+    if (Number.isFinite(px) && Number.isFinite(py)) {
+      pan = [px, py];
+    }
+  }
+
+  let zoom = 1;
+  if (viewport && typeof viewport.zoom === 'number' && Number.isFinite(viewport.zoom)) {
+    zoom = Math.max(0.2, Math.min(3, viewport.zoom));
+  }
+
+  const gridVisible = workspace && typeof workspace.gridVisible === 'boolean' ? workspace.gridVisible : true;
+  const snapEnabled = workspace && typeof workspace.snapEnabled === 'boolean' ? workspace.snapEnabled : true;
+
   const components = rawComponents.map(normalizeComponent);
   const wires = rawWires.map(normalizeWire);
 
   if (!components.every((item) => item && typeof item.id === 'string' && typeof item.type === 'string' && Number.isFinite(item.x) && Number.isFinite(item.y))) throw new Error('Invalid NAD file: component records are malformed.');
   if (!wires.every((item) => item && typeof item.id === 'string' && Array.isArray(item.path))) throw new Error('Invalid NAD file: wire records are malformed.');
   if (!texts.every((item) => item && typeof item.id === 'string' && typeof item.text === 'string')) throw new Error('Invalid NAD file: annotation records are malformed.');
-  
+
   return {
     format: NAD_FORMAT,
     version: NAD_VERSION,
@@ -140,7 +187,7 @@ export function parseNad(text: string): NADDocument {
     wires,
     texts,
     viewport: { pan, zoom },
-    workspace: { gridVisible: workspace.gridVisible, snapEnabled: workspace.snapEnabled }
+    workspace: { gridVisible, snapEnabled }
   };
 }
 

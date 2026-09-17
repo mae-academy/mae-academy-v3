@@ -364,7 +364,7 @@ function SvgKaTeXLabel({ x, y, math, color, ariaLabel, width = 64, height = 28 }
   return <foreignObject x={x - width / 2} y={y - height / 2} width={width} height={height} pointerEvents="none" aria-label={ariaLabel} style={{ overflow: 'visible' }}><div className="flex h-full w-full items-center justify-center whitespace-nowrap" style={{ color, fontSize: 13, fontWeight: 400, lineHeight: 1, overflow: 'visible' }}><V3Math math={math} /></div></foreignObject>;
 }
 
-function ComponentPaletteIcon({ definition, colors, documented }: { definition: ComponentDef; colors: Palette; documented: boolean }) {
+function ComponentPaletteIcon({ definition, colors, documented, isDark }: { definition: ComponentDef; colors: Palette; documented: boolean; isDark?: boolean }) {
   const padding = 20; // Safe optical padding
   let w = definition.width + padding;
   let h = definition.height + padding;
@@ -396,7 +396,7 @@ function ComponentPaletteIcon({ definition, colors, documented }: { definition: 
       style={{ overflow: 'visible', color: colors.text, pointerEvents: 'none' }}
     >
       <g>
-        {renderSymbol(definition.symbol, false, { ...defaultProps(definition), _documentedStyle: documented, _isLibraryThumbnail: true }, 0)}
+        {renderSymbol(definition.symbol, false, { ...defaultProps(definition), _documentedStyle: documented, _isLibraryThumbnail: true, isDark, _isDark: isDark }, 0)}
       </g>
     </svg>
   );
@@ -4159,7 +4159,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                             <>
                               {/* Top Section: Scaled & Centered Canvas */}
                               <div className="flex flex-1 min-h-0 w-full items-center justify-center p-2">
-                                <ComponentPaletteIcon definition={item} colors={colors} documented={tabDUiRefinement} />
+                                <ComponentPaletteIcon definition={item} colors={colors} documented={tabDUiRefinement} isDark={darkPreview} />
                               </div>
                               {/* Bottom Section: Fixed height banner with clear readable component names */}
                               <div className="flex h-7 w-full shrink-0 items-center justify-center border-t px-1.5" style={{ borderColor: colors.line, background: `${colors.line}15` }}>
@@ -4832,7 +4832,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
           <aside className="w-full min-h-0 overflow-y-auto rounded-xl border border-slate-200 bg-white dark:border-[#1a1d24] dark:bg-[#0d0f12]" style={{ background: colors.panel, borderColor: colors.line, display: 'flex', flexDirection: 'column' }}>
             {/* Top Section: Live Oscilloscope (OSC) and Digital Multimeter (DMM) display screens */}
             <OscilloscopeTracePanel colors={colors} scopes={components.filter(c => c.type === 'oscilloscope')} instrumentReadings={effectiveSnapshot.instrumentReadings} displaySettings={oscilloscopeDisplaySettings} />
-            <PersistentDmmPanel colors={colors} dmms={components.filter(c => c.type === 'dmm')} snapshot={effectiveSnapshot} />
+            <PersistentDmmPanel colors={colors} dmms={components.filter(c => c.type === 'dmm')} snapshot={effectiveSnapshot} darkPreview={darkPreview} />
 
             {/* Below Instruments: ACTIVE ELEMENT & PROPERTIES inspector */}
             <div className="border-b px-3 py-2" style={{ borderColor: colors.line }}><div className={CONTROL_SYSTEMS_HEADING}>Active Element &amp; Properties</div></div>
@@ -4973,22 +4973,26 @@ function ReplaceComponentControl({ colors, currentType, tabDUiRefinement, onRepl
           width: '100%',
           display: 'inline-flex',
           alignItems: 'center',
-          justifyContent: 'center',
-          gap: 6,
-          padding: '6px 14px',
-          minHeight: 32,
-          borderRadius: 8,
-          border: open ? '1px solid transparent' : `1px solid ${colors.line}`,
-          background: open ? TAB_GRADIENT : colors.panelAlt,
-          color: open ? '#ffffff' : colors.text,
-          fontSize: 12,
-          fontWeight: 600,
+          justifyContent: 'flex-start',
+          gap: 8,
+          padding: '4px 12px',
+          height: 32,
+          boxSizing: 'border-box',
+          borderRadius: 12,
+          border: `1px solid ${colors.line}`,
+          background: colors.input,
+          color: colors.text,
+          fontSize: 13,
+          fontFamily: 'inherit',
+          fontWeight: 500,
           cursor: 'pointer',
-          boxShadow: open ? TAB_ACTIVE_SHADOW : 'none',
-          transition: 'all 0.15s ease',
+          boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)',
+          transition: 'border-color 0.15s ease, background 0.15s ease',
         }}
+        onMouseEnter={e => { e.currentTarget.style.borderColor = colors.primary; }}
+        onMouseLeave={e => { e.currentTarget.style.borderColor = colors.line; }}
       >
-        <RefreshCw size={13} />
+        <RefreshCw size={13} style={{ flexShrink: 0, color: colors.muted }} />
         <span>Replace</span>
       </button>
       {open && (
@@ -5210,7 +5214,7 @@ function TextInspector({ colors, text, onUpdate, onMove, onDelete }: { colors: P
   return <div style={{ overflowY: 'auto' }}><InspectorHeader colors={colors} title="Workspace text" subtitle="Editable annotation that can be placed anywhere in the schematic." /><InspectorSection colors={colors} label="Text properties"><PropertyRow colors={colors} label="Content"><input value={text.text} onChange={event => onUpdate({ text: event.target.value })} style={inputStyle(colors)} /></PropertyRow><PropertyRow colors={colors} label="Size"><input type="number" min={8} max={72} value={text.fontSize} onChange={event => onUpdate({ fontSize: numeric(event.target.value, 16) })} style={inputStyle(colors)} /></PropertyRow><PropertyRow colors={colors} label="Color"><input type="color" value={text.color} onChange={event => onUpdate({ color: event.target.value })} style={{ width: '100%', height: 30, border: `1px solid ${colors.line}`, borderRadius: 5, background: colors.input }} /></PropertyRow><PropertyRow colors={colors} label="X"><input type="number" value={text.x} onChange={event => onUpdate({ x: numeric(event.target.value, text.x) })} style={inputStyle(colors)} /></PropertyRow><PropertyRow colors={colors} label="Y"><input type="number" value={text.y} onChange={event => onUpdate({ y: numeric(event.target.value, text.y) })} style={inputStyle(colors)} /></PropertyRow></InspectorSection><InspectorSection colors={colors} label="Move"><div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 5 }}><InspectorButton colors={colors} onClick={() => onMove(0, -20)}><ArrowUp size={13} /></InspectorButton><InspectorButton colors={colors} onClick={() => onMove(-20, 0)}><ArrowLeft size={13} /></InspectorButton><InspectorButton colors={colors} onClick={() => onMove(20, 0)}><ArrowRight size={13} /></InspectorButton><InspectorButton colors={colors} onClick={() => onMove(0, 20)}><ArrowDown size={13} /></InspectorButton></div></InspectorSection></div>;
 }
 
-function PersistentDmmPanel({ colors, dmms, snapshot }: { colors: Palette; dmms: CircuitComponent[]; snapshot: SimulationSnapshot }) {
+function PersistentDmmPanel({ colors, dmms, snapshot, darkPreview }: { colors: Palette; dmms: CircuitComponent[]; snapshot: SimulationSnapshot; darkPreview?: boolean }) {
   const audioRef = useRef<{ ctx: AudioContext, osc: OscillatorNode, gain: GainNode } | null>(null);
 
   useEffect(() => {
@@ -5261,8 +5265,17 @@ function PersistentDmmPanel({ colors, dmms, snapshot }: { colors: Palette; dmms:
           return (
             <div key={dmm.id} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               <div style={{ fontSize: 10, fontWeight: 700, color: colors.subtle, textTransform: 'uppercase', letterSpacing: '.05em' }}>{dmm.label}</div>
-              <div style={{ padding: 10, background: '#e0f2fe', border: '1px solid #7dd3fc', borderRadius: 7, textAlign: 'right', color: '#0284c7', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>
-                <div style={{ fontSize: 22, fontWeight: 800 }}>
+              <div style={{
+                padding: '10px 12px',
+                background: darkPreview ? '#0f2744' : '#e0f2fe',
+                border: `1px solid ${darkPreview ? '#1e4976' : '#7dd3fc'}`,
+                borderRadius: 8,
+                textAlign: 'right',
+                color: darkPreview ? '#38bdf8' : '#0284c7',
+                fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+                boxShadow: darkPreview ? 'inset 0 1px 3px rgba(0,0,0,0.4)' : 'inset 0 1px 3px rgba(0,0,0,0.05)'
+              }}>
+                <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '0.05em' }}>
                   {reading?.status === 'open' || ((reading?.unit === 'Ω' || reading?.unit === 'Ohm') && (reading?.value === undefined || !Number.isFinite(reading.value) || Math.abs(reading.value) >= 1e7))
                     ? 'O.L'
                     : isShorted
@@ -5271,7 +5284,7 @@ function PersistentDmmPanel({ colors, dmms, snapshot }: { colors: Palette; dmms:
                         ? <EngineeringMath value={reading.value} unit={reading.unit} />
                         : '—'}
                 </div>
-                <div style={{ marginTop: 4, fontSize: 10, color: '#0369a1' }}>{reading?.status === 'ready' ? (isShorted ? 'Continuity detected' : 'Probe-linked measurement') : reading?.status === 'open' ? 'Open / not fully connected' : 'Connect HI and COM probes'}</div>
+                <div style={{ marginTop: 4, fontSize: 10, color: darkPreview ? '#7dd3fc' : '#0369a1', fontWeight: 600 }}>{reading?.status === 'ready' ? (isShorted ? 'Continuity detected' : 'Probe-linked measurement') : reading?.status === 'open' ? 'Open / not fully connected' : 'Connect HI and COM probes'}</div>
               </div>
             </div>
           );

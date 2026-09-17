@@ -79,18 +79,18 @@ export const LED_COLOR_LABELS: Record<string, string> = Object.fromEntries(
 const SOURCES: Record<string, ComponentDef> = {
   'ground': {
     id: 'ground', name: 'Ground', category: 'Sources',
-    width: 30, height: 30, symbol: 'ground',
+    width: 20, height: 20, symbol: 'ground',
     terminals: [
-      { id: 'gnd', name: 'GND', x: 0, y: -15, type: 'bidirectional' },
+      { id: 'gnd', name: 'GND', x: 0, y: -5, type: 'bidirectional' },
     ],
     properties: {},
     description: 'Ground reference (0 V)',
   },
   'dc-rail': {
     id: 'dc-rail', name: 'DC Power Rail', category: 'Sources',
-    width: 70, height: 50, symbol: 'dc-rail',
+    width: 20, height: 20, symbol: 'dc-rail',
     terminals: [
-      { id: 'pos', name: '+V', x: 0, y: 0, type: 'output' },
+      { id: 'pos', name: '+V', x: 0, y: -5, type: 'output' },
     ],
     properties: {
       voltage: { type: 'number', value: 24, unit: 'V', min: 0, max: 10000, label: 'Rail Voltage' },
@@ -733,8 +733,8 @@ const PROTECTION: Record<string, ComponentDef> = {
     description: 'Double-Pole Single-Throw Relay',
   },
   'contactor': {
-    id: 'contactor', name: 'Contactor', category: 'Switches',
-    width: 100, height: 145, symbol: 'contactor',
+    id: 'contactor', name: 'Contactor', category: 'Protection',
+    width: 100, height: 120, symbol: 'contactor',
     terminals: [
       { id: 'coil+', name: 'A1', x: -50, y: -50, type: 'input' },
       { id: 'coil-', name: 'A2', x: 50, y: -50, type: 'input' },
@@ -817,7 +817,7 @@ const PROTECTION: Record<string, ComponentDef> = {
 const TRANSFORMERS: Record<string, ComponentDef> = {
   'transformer': {
     id: 'transformer', name: 'Transformer', category: 'Transformers',
-    width: 100, height: 100, symbol: 'transformer',
+    width: 75, height: 75, symbol: 'transformer',
     terminals: [
       { id: 'p1', name: 'PRI+', x: -50, y: -50, type: 'input' },
       { id: 'p2', name: 'PRI-', x: -50, y: 50, type: 'input' },
@@ -829,7 +829,7 @@ const TRANSFORMERS: Record<string, ComponentDef> = {
   },
   'transformer-ct': {
     id: 'transformer-ct', name: 'Transformer (CT)', category: 'Transformers',
-    width: 100, height: 100, symbol: 'transformer-ct',
+    width: 75, height: 75, symbol: 'transformer-ct',
     terminals: [
       { id: 'p1', name: 'PRI+', x: -50, y: -50, type: 'input' },
       { id: 'p2', name: 'PRI-', x: -50, y: 50, type: 'input' },
@@ -842,7 +842,7 @@ const TRANSFORMERS: Record<string, ComponentDef> = {
   },
   'autotransformer': {
     id: 'autotransformer', name: 'Autotransformer', category: 'Transformers',
-    width: 100, height: 100, symbol: 'autotransformer',
+    width: 75, height: 75, symbol: 'autotransformer',
     terminals: [
       { id: 'in1', name: 'In1', x: -50, y: -50, type: 'input' },
       { id: 'in2', name: 'In2', x: -50, y: 50, type: 'input' },
@@ -904,9 +904,14 @@ const POWER_SEMI: Record<string, ComponentDef> = {
     },
     description: 'Triac – bidirectional thyristor',
   },
+
+};
+
+// ─── OTHER COMPONENTS ────────────────────────────────────────────────────────
+const OTHER_COMPONENTS: Record<string, ComponentDef> = {
   'opamp': {
     id: 'opamp', name: 'Op-Amp', category: 'Other Components',
-    width: 100, height: 75, symbol: 'opamp',
+    width: 75, height: 50, symbol: 'opamp',
     terminals: [
       { id: 'in-', name: 'IN-', x: -50, y: -25, type: 'input' },
       { id: 'in+', name: 'IN+', x: -50, y: 25, type: 'input' },
@@ -914,24 +919,6 @@ const POWER_SEMI: Record<string, ComponentDef> = {
     ],
     properties: { gain: { type: 'number', value: 10, unit: 'V/V', min: 1, max: 1e7, label: 'Open-loop Gain' }, vcc: { type: 'number', value: 15, unit: 'V', min: 1, max: 100, label: 'Supply (±)' } },
     description: 'Operational Amplifier (Ideal)',
-  },
-};
-
-// ─── OTHER COMPONENTS ────────────────────────────────────────────────────────
-const OTHER_COMPONENTS: Record<string, ComponentDef> = {
-  'motor-dc': {
-    id: 'motor-dc', name: 'DC Motor', category: 'Other Components',
-    width: 60, height: 60, symbol: 'motor-dc',
-    terminals: [{ id: 'pos', name: '+', x: -30, y: 0, type: 'input' }, { id: 'neg', name: '-', x: 30, y: 0, type: 'output' }],
-    properties: { nominalV: { type: 'number', value: 12, unit: 'V', min: 1, max: 1000, label: 'Nominal V' }, nominalPower: { type: 'number', value: 100, unit: 'W', min: 1, max: 10000, label: 'Nominal Power' } },
-    description: 'Direct Current Motor',
-  },
-  'motor-3phase': {
-    id: 'motor-3phase', name: '3-Phase Motor', category: 'Other Components',
-    width: 80, height: 80, symbol: 'motor-3phase',
-    terminals: [{ id: 'u', name: 'U', x: -40, y: -20, type: 'input' }, { id: 'v', name: 'V', x: -40, y: 0, type: 'input' }, { id: 'w', name: 'W', x: -40, y: 20, type: 'input' }, { id: 'pe', name: 'PE', x: 0, y: 40, type: 'output' }],
-    properties: { nominalV: { type: 'number', value: 400, unit: 'V', min: 10, max: 10000, label: 'Line Voltage' }, nominalPower: { type: 'number', value: 5000, unit: 'W', min: 10, max: 1000000, label: 'Nominal Power' } },
-    description: 'Three-Phase Induction Motor',
   },
   'lamp': {
     id: 'lamp', name: 'Lamp', category: 'Other Components',
@@ -941,6 +928,21 @@ const OTHER_COMPONENTS: Record<string, ComponentDef> = {
     description: 'Incandescent Lamp',
     ratings: { maxPower: 5, maxVoltage: 12 },
   },
+  'motor-dc': {
+    id: 'motor-dc', name: 'DC Motor', category: 'Other Components',
+    width: 50, height: 50, symbol: 'motor-dc',
+    terminals: [{ id: 'pos', name: '+', x: -30, y: 0, type: 'input' }, { id: 'neg', name: '-', x: 30, y: 0, type: 'output' }],
+    properties: { nominalV: { type: 'number', value: 12, unit: 'V', min: 1, max: 1000, label: 'Nominal V' }, nominalPower: { type: 'number', value: 100, unit: 'W', min: 1, max: 10000, label: 'Nominal Power' } },
+    description: 'Direct Current Motor',
+  },
+  'motor-3phase': {
+    id: 'motor-3phase', name: '3-Phase Motor', category: 'Other Components',
+    width: 50, height: 50, symbol: 'motor-3phase',
+    terminals: [{ id: 'u', name: 'U', x: -35, y: -25, type: 'input' }, { id: 'v', name: 'V', x: -35, y: 0, type: 'input' }, { id: 'w', name: 'W', x: -35, y: 25, type: 'input' }, { id: 'pe', name: 'PE', x: 25, y: 25, type: 'output' }],
+    properties: { nominalV: { type: 'number', value: 400, unit: 'V', min: 10, max: 10000, label: 'Line Voltage' }, nominalPower: { type: 'number', value: 5000, unit: 'W', min: 10, max: 1000000, label: 'Nominal Power' } },
+    description: 'Three-Phase Induction Motor',
+  },
+
 };
 
 // ─── DIGITAL LOGIC ────────────────────────────────────────────────────────────
@@ -970,7 +972,7 @@ const DIGITAL_LOGIC: Record<string, ComponentDef> = {
 const MEASUREMENT: Record<string, ComponentDef> = {
   'voltmeter': {
     id: 'voltmeter', name: 'Voltmeter', category: 'Measurement',
-    width: 100, height: 100, symbol: 'voltmeter',
+    width: 50, height: 50, symbol: 'voltmeter',
     terminals: [
       { id: 'pos', name: '+', x: -50, y: 0, type: 'input' },
       { id: 'neg', name: '−', x: 50, y: 0, type: 'input' },
@@ -983,7 +985,7 @@ const MEASUREMENT: Record<string, ComponentDef> = {
   },
   'ammeter': {
     id: 'ammeter', name: 'Ammeter', category: 'Measurement',
-    width: 100, height: 100, symbol: 'ammeter',
+    width: 50, height: 50, symbol: 'ammeter',
     terminals: [
       { id: 'pos', name: '+', x: -50, y: 0, type: 'input' },
       { id: 'neg', name: '−', x: 50, y: 0, type: 'input' },

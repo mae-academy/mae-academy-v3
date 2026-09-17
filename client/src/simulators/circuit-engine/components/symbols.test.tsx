@@ -271,10 +271,10 @@ describe('Tab D SVG symbol language', () => {
     expect(dmm).toContain('fill="#1e232d"');
     expect(dmm).toContain('stroke="#111827"');
 
-    // Dark mode: inverted off-white high-contrast body
+    // Dark mode: light gray body
     const dmmDark = markup('dmm', { _isDark: true });
-    expect(dmmDark).toContain('fill="#f1f5f9"');
-    expect(dmmDark).toContain('stroke="#cbd5e1"');
+    expect(dmmDark).toContain('fill="#e2e8f0"');
+    expect(dmmDark).toContain('stroke="#94a3b8"');
 
     // Multi-letter acronyms (DMM) must render in upright KaTeX_Main, not italic
     const dmm1 = markup('dmm', { label: 'DMM1' });
@@ -288,11 +288,12 @@ describe('Tab D SVG symbol language', () => {
     expect(dmmLibrary).not.toContain('mae-component-label');
     expect(dmmLibrary).not.toContain('y="-58"');
 
-    // LCD screen is always bright (#edf2f7) with dark digits (#0f172a) in both modes
-    expect(dmm).toContain('fill="#edf2f7"');
-    expect(dmm).toContain('fill="#0f172a"');
-    expect(dmmDark).toContain('fill="#edf2f7"');
-    expect(dmmDark).toContain('fill="#0f172a"');
+    // LCD screen in light mode matches Live Multimeters colors (#e0f2fe background, #0284c7 digits)
+    expect(dmm).toContain('fill="#e0f2fe"');
+    expect(dmm).toContain('fill="#0284c7"');
+    // LCD screen in dark mode has dark blue display (#0f2744 background, #38bdf8 digits)
+    expect(dmmDark).toContain('fill="#0f2744"');
+    expect(dmmDark).toContain('fill="#38bdf8"');
   });
 
   it('renders Voltmeter and Ammeter with dynamic displayValue or fallback, in upright KaTeX_Main typography', () => {
@@ -345,10 +346,10 @@ describe('Tab D SVG symbol language', () => {
     expect(unselectedScope).not.toContain('>CH4<');
     expect(unselectedScope).not.toContain('>GND<');
 
-    // Dark mode: inverted off-white body
+    // Dark mode: light gray body
     const darkScope = markup('oscilloscope', { _isDark: true });
-    expect(darkScope).toContain('fill="#f1f5f9"');
-    expect(darkScope).toContain('stroke="#cbd5e1"');
+    expect(darkScope).toContain('fill="#e2e8f0"');
+    expect(darkScope).toContain('stroke="#94a3b8"');
 
     const selectedScope = markup('oscilloscope', { selected: true });
     // External labels MUST appear when selected

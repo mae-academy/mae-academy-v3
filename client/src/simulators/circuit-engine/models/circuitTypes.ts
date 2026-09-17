@@ -216,6 +216,75 @@ export function copyComponentForPaste(
   };
 }
 
+export interface ReplaceComponentResult {
+  components: CircuitComponent[];
+  wires: CircuitWire[];
+}
+
+/**
+ * Swaps `oldComponentId` for `replacement`, inheriting its position/rotation/flip. `oldTerminalIds`
+ * and `newTerminalIds` are each definition's `terminals` in declared order — wires reconnect
+ * pin-for-pin by that order (pin 1 -> pin 1, pin 2 -> pin 2, …) only when both parts have the same
+ * terminal count; terminal id strings differ across kinds (a resistor's `a`/`b` vs a diode's
+ * `anode`/`cathode`), so matching by position rather than by literal id is what actually preserves
+ * "the same pin". A differing count has no safe mapping, so those wires are dropped instead of
+ * risking a wire stitched onto the wrong physical pin.
+ */
+export function replaceComponent(
+  components: CircuitComponent[],
+  wires: CircuitWire[],
+  oldComponentId: string,
+  oldTerminalIds: string[],
+  newTerminalIds: string[],
+  replacement: Omit<CircuitComponent, 'x' | 'y' | 'rotation' | 'flipH' | 'flipV'>,
+): ReplaceComponentResult | null {
+  const oldIndex = components.findIndex((component) => component.id === oldComponentId);
+  if (oldIndex === -1) return null;
+  const oldComponent = components[oldIndex];
+
+  const newComponent: CircuitComponent = {
+    ...replacement,
+    x: oldComponent.x,
+    y: oldComponent.y,
+    rotation: oldComponent.rotation,
+    flipH: oldComponent.flipH,
+    flipV: oldComponent.flipV,
+  };
+  const nextComponents = components.map((component, index) => (index === oldIndex ? newComponent : component));
+
+  const pinsMatch = oldTerminalIds.length > 0 && oldTerminalIds.length === newTerminalIds.length;
+  const remapTerminal = (terminalId: string): string | undefined => {
+    const position = oldTerminalIds.indexOf(terminalId);
+    return position === -1 ? undefined : newTerminalIds[position];
+  };
+
+  const nextWires = pinsMatch
+    ? wires.reduce<CircuitWire[]>((kept, wire) => {
+        const touchesFrom = wire.fromComp === oldComponentId;
+        const touchesTo = wire.toComp === oldComponentId;
+        if (!touchesFrom && !touchesTo) {
+          kept.push(wire);
+          return kept;
+        }
+        const nextFromTerm = touchesFrom ? remapTerminal(wire.fromTerm) : wire.fromTerm;
+        const nextToTerm = touchesTo ? remapTerminal(wire.toTerm) : wire.toTerm;
+        // Defensive: a wire whose recorded terminal isn't in the old definition can't be remapped
+        // safely, so it is dropped rather than left pointing at a nonexistent or wrong pin.
+        if (nextFromTerm === undefined || nextToTerm === undefined) return kept;
+        kept.push({
+          ...wire,
+          fromComp: touchesFrom ? newComponent.id : wire.fromComp,
+          fromTerm: nextFromTerm,
+          toComp: touchesTo ? newComponent.id : wire.toComp,
+          toTerm: nextToTerm,
+        });
+        return kept;
+      }, [])
+    : wires.filter((wire) => wire.fromComp !== oldComponentId && wire.toComp !== oldComponentId);
+
+  return { components: nextComponents, wires: nextWires };
+}
+
 export function formatEngineering(value: number, unit: string, precision = 3): string {
   if (!Number.isFinite(value)) return 'O.L';
   const isOhm = unit === 'Ω' || unit === 'Ohm' || unit === 'ohms';
