@@ -114,9 +114,9 @@ const DIGITAL_LOGIC_COMPONENT_IDS = LOGIC_COMPONENT_TYPES;
 const DIGITAL_LOGIC_IO_TYPES = new Set(['digital-input', 'digital-output']);
 
 const CONTROL_SYSTEMS_HEADING = 'text-sm font-bold uppercase tracking-wider text-slate-800 dark:text-white';
-/* Unified signature gradient pills (blue-600 -> pink-500). */
-const TAB_GRADIENT = 'linear-gradient(90deg, #2563eb 0%, #7c3aed 50%, #f43f5e 100%)';
-const TAB_GRADIENT_REV = 'linear-gradient(90deg, #f43f5e 0%, #7c3aed 50%, #2563eb 100%)';
+/* Unified signature gradient matching the Mesh tab button (135deg from blue-600 through purple to rose). */
+const TAB_GRADIENT = 'linear-gradient(135deg, #2563EB 0%, #7C3AED 50%, #E11D48 100%)';
+const TAB_GRADIENT_REV = 'linear-gradient(135deg, #E11D48 0%, #7C3AED 50%, #2563EB 100%)';
 const TAB_ACTIVE_SHADOW = '0 1px 3px rgba(2, 6, 23, 0.18)';
 
 const DIGITAL_LOGIC_CATEGORY_ORDER = ['I/O', 'Logic Gates', 'Combinational Circuits', 'Sequential Circuits'] as const;
@@ -2939,7 +2939,7 @@ function ToolbarButton({ colors, icon, label, title, onClick, active, disabled }
         border: isActive ? '1px solid transparent' : `1px solid ${colors.line}`,
         background: isActive ? TAB_GRADIENT : colors.panelAlt,
         color: isActive ? '#ffffff' : disabled ? colors.subtle : colors.muted,
-        borderRadius: 9,
+        borderRadius: 8,
         padding: '6px 12px',
         minHeight: 32,
         display: 'inline-flex',

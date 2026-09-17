@@ -98,7 +98,7 @@ describe('Part 3: ExportPreviewModal Component', () => {
     expect(markup).toContain('Copy');
     expect(markup).toContain('Save');
     expect(markup).toContain('Download All');
-    expect(markup).toContain('bg-gradient-to-r from-blue-600 via-purple-600 to-rose-500');
+    expect(markup).toContain('bg-brand-gradient');
   });
 
   it('renders Copy button for SVG export items and displays SVG filenames with editable input', () => {

@@ -1557,7 +1557,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
 
   const addComponent = useCallback((type: string, x?: number, y?: number) => {
     if (tabDUiRefinement && !isTabDComponentAvailable(type)) {
-      toast.error('This power semiconductor is unavailable in Tab D');
+      toast.error('This power semiconductor is unavailable in this mode');
       return;
     }
     const definition = getDef(type);
@@ -1657,7 +1657,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
   const pasteClipboard = useCallback(() => {
     if (!clipboard || (clipboard.components.length === 0 && clipboard.texts.length === 0 && clipboard.wires.length === 0)) return;
     if (tabDUiRefinement && clipboard.components.some(c => !isTabDComponentAvailable(c.type))) {
-      toast.error('Some power semiconductors are unavailable in Tab D');
+      toast.error('Some power semiconductors are unavailable in this mode');
       return;
     }
     const origin = sourcePointFromElement(svgRef.current, pan, zoom);
@@ -2448,6 +2448,13 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
       return;
     }
 
+    const hitWire = findWireNearPoint(point);
+    if (hitWire) {
+      setMarqueeIds([]);
+      setSelection({ kind: 'wire', id: hitWire.wire.id });
+      return;
+    }
+
     setSelection(null);
     setMarqueeIds([]);
     setDragState({ kind: 'marquee', start: point, end: point });
@@ -2547,6 +2554,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
       connectWireToExistingWire(wiring.from, wire, point, wiring.lockedCorners);
       return;
     }
+    setMarqueeIds([]);
     setSelection({ kind: 'wire', id: wire.id });
   }, [clientToWorld, connectWireToExistingWire, wiring.from, wiring.lockedCorners]);
 
@@ -2567,12 +2575,14 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     });
     setWires(nextWires);
     commitSnapshot({ wires: nextWires });
+    setMarqueeIds([]);
     setSelection({ kind: 'wire', id: wire.id });
   }, [clientToWorld, commitSnapshot, gridSize, wires]);
 
   const handleTextMouseDown = useCallback((event: React.MouseEvent<HTMLElement | SVGElement>, text: WorkspaceText) => {
     event.stopPropagation();
     const point = clientToWorld(event.clientX, event.clientY);
+    setMarqueeIds([]);
     setSelection({ kind: 'text', id: text.id });
     dragStartSnapshotRef.current = cloneSnapshot({
       components: componentRef.current,
@@ -5203,11 +5213,7 @@ function PrefixedPropertyEditorField({ colors, propertyKey, label, definition, v
 }
 
 function WireInspector({ colors, wire, tabDUiRefinement, onRouting, onAddCorner, onNudge, onDelete }: { colors: Palette; wire: CircuitWire; tabDUiRefinement: boolean; onRouting: (routing: CircuitWire['routing']) => void; onAddCorner: () => void; onNudge: (amount: number) => void; onDelete: () => void }) {
-  return <div style={{ overflowY: 'auto' }}><InspectorHeader colors={colors} title="Wire path" subtitle={tabDUiRefinement ? 'Tab D uses a one-bend Manhattan route between terminals.' : 'Click to select. Double-click the line or add a corner, then drag the handles.'} /><InspectorSection colors={colors} label="Route">
-    <PropertyRow colors={colors} label="Routing"><select value={tabDUiRefinement ? 'orthogonal' : wire.routing} onChange={event => onRouting(event.target.value as CircuitWire['routing'])} disabled={tabDUiRefinement} style={inputStyle(colors)}><option value="orthogonal">Orthogonal</option>{!tabDUiRefinement && <><option value="straight">Straight</option><option value="manual">Manual</option></>}</select></PropertyRow>
-    <div style={{ fontSize: 11, color: colors.text, marginBottom: 7 }}>Geometric length: <strong>{pathLength(wire.path).toFixed(1)} px</strong></div>
-    {!tabDUiRefinement && <div style={{ display: 'flex', gap: 5 }}><InspectorButton colors={colors} onClick={onAddCorner}><Plus size={13} />Corner</InspectorButton><InspectorButton colors={colors} onClick={() => onNudge(-20)}><Minus size={13} />Bend</InspectorButton><InspectorButton colors={colors} onClick={() => onNudge(20)}><Plus size={13} />Bend</InspectorButton></div>}
-  </InspectorSection><InspectorSection colors={colors} label="Electrical meaning"><p style={{ color: colors.muted, fontSize: 10, lineHeight: 1.45, margin: 0 }}>Wire geometry is editable for documentation and layout. The ideal wire remains a zero-ohm connection in the solver; electron markers only appear when solved branch current exists.</p></InspectorSection></div>;
+  return <div style={{ overflowY: 'auto' }}><InspectorHeader colors={colors} title="Wire path" subtitle="Ideal conductor connection between terminals." /><InspectorSection colors={colors} label="Electrical meaning"><p style={{ color: colors.muted, fontSize: 10, lineHeight: 1.45, margin: 0 }}>Wire geometry is editable for documentation and layout. The ideal wire remains a zero-ohm connection in the solver; electron markers only appear when solved branch current exists.</p></InspectorSection></div>;
 }
 
 function TextInspector({ colors, text, onUpdate, onMove, onDelete }: { colors: Palette; text: WorkspaceText; onUpdate: (update: Partial<WorkspaceText>) => void; onMove: (dx: number, dy: number) => void; onDelete: () => void }) {

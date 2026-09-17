@@ -117,7 +117,7 @@ export function LoadExampleModal({ isOpen, onClose, onLoad }: LoadExampleModalPr
                   onClick={() => selectCategory(category)}
                   className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all cursor-pointer ${
                     activeCategory === category
-                      ? 'bg-gradient-to-r from-blue-600 via-purple-600 to-rose-500 text-white shadow-sm'
+                      ? 'bg-brand-gradient text-white shadow-sm'
                       : 'bg-white dark:bg-[#13161c] text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-[#222834] hover:bg-slate-100 dark:hover:bg-[#1a1f28]'
                   }`}
                 >
@@ -285,7 +285,7 @@ export function LoadExampleModal({ isOpen, onClose, onLoad }: LoadExampleModalPr
                 <button
                   type="button"
                   onClick={handleLoad}
-                  className="bg-gradient-to-r from-blue-600 via-purple-600 to-rose-500 text-white font-semibold hover:opacity-95 shadow-sm h-10 px-6 rounded-xl text-sm transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  className="bg-brand-gradient text-white font-semibold hover:opacity-95 shadow-sm h-10 px-6 rounded-lg text-sm transition-all flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <Sparkles size={16} />
                   <span>Load into Simulator</span>

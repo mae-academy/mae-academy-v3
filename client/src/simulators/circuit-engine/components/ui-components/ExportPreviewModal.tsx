@@ -447,8 +447,8 @@ export function ExportPreviewModal({
               <button
                 type="button"
                 onClick={() => handleToggleGlobalFormat('png')}
-                className={`px-4 py-1.5 text-xs font-semibold rounded-xl transition-all ${globalFormat === 'png'
-                    ? 'bg-gradient-to-r from-blue-600 via-purple-600 to-rose-500 text-white shadow-md'
+                className={`px-4 py-1.5 text-xs font-semibold rounded-lg transition-all ${globalFormat === 'png'
+                    ? 'bg-brand-gradient text-white shadow-md'
                     : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#1b2028]'
                   }`}
               >
@@ -457,8 +457,8 @@ export function ExportPreviewModal({
               <button
                 type="button"
                 onClick={() => handleToggleGlobalFormat('svg')}
-                className={`px-4 py-1.5 text-xs font-semibold rounded-xl transition-all ${globalFormat === 'svg'
-                    ? 'bg-gradient-to-r from-blue-600 via-purple-600 to-rose-500 text-white shadow-md'
+                className={`px-4 py-1.5 text-xs font-semibold rounded-lg transition-all ${globalFormat === 'svg'
+                    ? 'bg-brand-gradient text-white shadow-md'
                     : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#1b2028]'
                   }`}
               >
@@ -508,8 +508,8 @@ export function ExportPreviewModal({
                           <button
                             type="button"
                             onClick={() => handleToggleItemFormat(item.id, 'png')}
-                            className={`px-2.5 py-0.5 text-[11px] font-semibold rounded-lg transition-all ${activeFormat === 'png'
-                                ? 'bg-gradient-to-r from-blue-600 via-purple-600 to-rose-500 text-white shadow-xs'
+                            className={`px-3 py-1 text-[11px] font-semibold rounded-lg transition-all ${activeFormat === 'png'
+                                ? 'bg-brand-gradient text-white shadow-xs'
                                 : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-[#1b2028]'
                               }`}
                           >
@@ -518,8 +518,8 @@ export function ExportPreviewModal({
                           <button
                             type="button"
                             onClick={() => handleToggleItemFormat(item.id, 'svg')}
-                            className={`px-2.5 py-0.5 text-[11px] font-semibold rounded-lg transition-all ${activeFormat === 'svg'
-                                ? 'bg-gradient-to-r from-blue-600 via-purple-600 to-rose-500 text-white shadow-xs'
+                            className={`px-3 py-1 text-[11px] font-semibold rounded-lg transition-all ${activeFormat === 'svg'
+                                ? 'bg-brand-gradient text-white shadow-xs'
                                 : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-[#1b2028]'
                               }`}
                           >
@@ -597,7 +597,7 @@ export function ExportPreviewModal({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#1b2028] transition-colors"
+              className="px-4 py-2 rounded-lg text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#1b2028] transition-colors"
             >
               Close
             </button>
@@ -605,7 +605,7 @@ export function ExportPreviewModal({
               type="button"
               onClick={handleDownloadAll}
               disabled={items.length === 0}
-              className="bg-gradient-to-r from-blue-600 via-purple-600 to-rose-500 text-white rounded-xl px-5 py-2 text-xs font-semibold shadow-md hover:opacity-95 active:scale-98 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="bg-brand-gradient text-white rounded-lg px-5 py-2 text-xs font-semibold shadow-md hover:opacity-95 active:scale-98 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Download size={14} />
               <span>Download All</span>

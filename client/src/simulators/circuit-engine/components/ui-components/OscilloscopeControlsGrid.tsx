@@ -41,7 +41,7 @@ export function OscilloscopeControlsGrid({
           type="button"
           onClick={onAutoscale}
           disabled={isAutoscaleDisabled}
-          className="bg-gradient-to-r from-blue-600 via-purple-600 to-rose-500 !text-white font-semibold shadow-sm hover:opacity-95 h-8 rounded-xl text-xs transition-opacity cursor-pointer disabled:cursor-not-allowed disabled:bg-slate-300 dark:disabled:bg-[#1a1d24] disabled:!text-slate-500 flex items-center justify-center"
+          className="bg-brand-gradient !text-white font-semibold shadow-sm hover:opacity-95 h-8 rounded-lg text-xs transition-opacity cursor-pointer disabled:cursor-not-allowed disabled:bg-slate-300 dark:disabled:bg-[#1a1d24] disabled:!text-slate-500 flex items-center justify-center"
           style={{ color: isAutoscaleDisabled ? undefined : '#ffffff' }}
           title="Fit Offset / Time-Div / Volt-Div to this channel's captured signal"
         >
@@ -52,9 +52,9 @@ export function OscilloscopeControlsGrid({
         <button
           type="button"
           onClick={() => onChange({ acquisitionMode: settings.acquisitionMode === 'step' ? 'live' : 'step' })}
-          className={`h-8 rounded-xl text-xs font-medium transition-all cursor-pointer flex items-center justify-center px-1 truncate ${
+          className={`h-8 rounded-lg text-xs font-medium transition-all cursor-pointer flex items-center justify-center px-1 truncate ${
             settings.acquisitionMode === 'step'
-              ? 'bg-gradient-to-r from-blue-600 via-purple-600 to-rose-500 !text-white border-transparent shadow-sm'
+              ? 'bg-brand-gradient !text-white border-transparent shadow-sm'
               : 'bg-white dark:bg-[#13161c] border border-slate-200 dark:border-[#282d38] text-slate-700 dark:text-[#f8fafc] hover:bg-slate-50 dark:hover:bg-[#1a1d24]'
           }`}
           title={settings.acquisitionMode === 'step' ? 'Switch to Live Rolling mode' : 'Switch to Step Response (Transient Capture) mode'}
@@ -75,9 +75,9 @@ export function OscilloscopeControlsGrid({
         <button
           type="button"
           onClick={() => onChange({ isDarkMode: !settings.isDarkMode })}
-          className={`h-8 w-full rounded-xl text-[12px] font-medium transition-all cursor-pointer flex items-center justify-center px-1 truncate ${
+          className={`h-8 w-full rounded-lg text-[12px] font-medium transition-all cursor-pointer flex items-center justify-center px-1 truncate ${
             settings.isDarkMode
-              ? 'bg-gradient-to-r from-blue-600 via-purple-600 to-rose-500 !text-white border-transparent shadow-sm'
+              ? 'bg-brand-gradient !text-white border-transparent shadow-sm'
               : 'bg-white dark:bg-[#13161c] border border-slate-200 dark:border-[#282d38] text-slate-700 dark:text-[#f8fafc] hover:bg-slate-50 dark:hover:bg-[#1a1d24]'
           }`}
           title={`Screen theme: ${settings.isDarkMode ? 'Dark' : 'Light'}`}
@@ -103,9 +103,9 @@ export function OscilloscopeControlsGrid({
         <button
           type="button"
           onClick={() => onChange({ showValues: !settings.showValues })}
-          className={`h-8 w-full rounded-xl text-[12px] font-medium transition-all cursor-pointer flex items-center justify-center px-1 truncate ${
+          className={`h-8 w-full rounded-lg text-[12px] font-medium transition-all cursor-pointer flex items-center justify-center px-1 truncate ${
             settings.showValues
-              ? 'bg-gradient-to-r from-blue-600 via-purple-600 to-rose-500 !text-white border-transparent shadow-sm'
+              ? 'bg-brand-gradient !text-white border-transparent shadow-sm'
               : 'bg-white dark:bg-[#13161c] border border-slate-200 dark:border-[#282d38] text-slate-700 dark:text-[#f8fafc] hover:bg-slate-50 dark:hover:bg-[#1a1d24]'
           }`}
           title="Toggle visibility of on-screen measurement values"
@@ -146,7 +146,7 @@ function ChannelColorTrigger({
     <button
       type="button"
       onClick={() => inputRef.current?.click()}
-      className="relative h-8 w-full rounded-xl border border-slate-200 dark:border-[#282d38] shadow-inner flex items-center justify-center cursor-pointer transition-transform hover:scale-[1.02] overflow-hidden"
+      className="relative h-8 w-full rounded-lg border border-slate-200 dark:border-[#282d38] shadow-inner flex items-center justify-center cursor-pointer transition-transform hover:scale-[1.02] overflow-hidden"
       style={{ backgroundColor: color }}
       title={`Set ${label} color`}
       aria-label={`${label} color picker`}

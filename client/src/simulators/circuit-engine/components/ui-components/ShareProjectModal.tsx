@@ -130,7 +130,7 @@ export function ShareProjectModal({
             <button
               type="button"
               onClick={handleCopy}
-              className="bg-gradient-to-r from-blue-600 via-purple-600 to-rose-500 text-white font-semibold hover:opacity-95 shadow-sm h-10 px-5 rounded-xl text-xs sm:text-sm transition-all flex items-center justify-center gap-2 flex-1 cursor-pointer"
+              className="bg-brand-gradient text-white font-semibold hover:opacity-95 shadow-sm h-10 px-5 rounded-lg text-xs sm:text-sm transition-all flex items-center justify-center gap-2 flex-1 cursor-pointer"
             >
               {copied ? <Check size={16} className="text-emerald-200" /> : <Copy size={16} />}
               <span>{copied ? 'Copied!' : 'Copy Link'}</span>
@@ -141,7 +141,7 @@ export function ShareProjectModal({
               <button
                 type="button"
                 onClick={handleNativeShare}
-                className="h-10 px-5 rounded-xl border border-slate-200 dark:border-[#222834] bg-white dark:bg-[#13161c] hover:bg-slate-50 dark:hover:bg-[#1a1f28] text-slate-700 dark:text-slate-200 font-medium text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs"
+                className="h-10 px-5 rounded-lg border border-slate-200 dark:border-[#222834] bg-white dark:bg-[#13161c] hover:bg-slate-50 dark:hover:bg-[#1a1f28] text-slate-700 dark:text-slate-200 font-medium text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs"
               >
                 <Share2 size={16} className="text-blue-500" />
                 <span>Share via Apps</span>
