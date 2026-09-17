@@ -25,6 +25,7 @@ import {
   Pause,
   Play,
   Plus,
+  RefreshCw,
   RotateCcw,
   RotateCw,
   Scissors,
@@ -64,6 +65,7 @@ import {
   copyComponentForPaste,
   formatEngineering,
   nextComponentLabel,
+  replaceComponent,
   terminalKey,
   type CircuitComponent,
   type CircuitWire,
@@ -2070,8 +2072,10 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
 
   const rotateSelected = useCallback((degrees: number) => {
     if (!selectedComponent) return;
+    // Enforce strict 90-degree increments (0, 90, 180, 270)
+    const step = Math.round(degrees / 90) * 90 || 90;
     const nextComponents = components.map(component => component.id === selectedComponent.id
-      ? { ...component, rotation: (component.rotation + degrees + 360) % 360 }
+      ? { ...component, rotation: ((Math.round((component.rotation + step) / 90) * 90) % 360 + 360) % 360 }
       : component);
     const nextWires = refreshCanvasWireEndpoints(wires, nextComponents, selectedComponent.id);
     setComponents(nextComponents);
@@ -2151,6 +2155,33 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     setComponents(nextComponents);
     commitSnapshot({ components: nextComponents });
   }, [commitSnapshot, components, selectedComponent]);
+
+  // Swaps the selected component for a fresh instance of `newType` in place: same position,
+  // rotation and flip, a freshly generated id/reference, and wires reconnected pin-for-pin when
+  // (and only when) the old and new parts have the same terminal count — see replaceComponent's
+  // own doc comment for why that has to be positional rather than by terminal id string.
+  const replaceSelectedComponent = useCallback((newType: string) => {
+    if (!selectedComponent) return;
+    const newDefinition = getDef(newType);
+    if (!newDefinition) return;
+    const oldTerminalIds = (getDef(selectedComponent.type)?.terminals ?? []).map(terminal => terminal.id);
+    const newTerminalIds = newDefinition.terminals.map(terminal => terminal.id);
+    const newId = nanoid(10);
+    const outcome = replaceComponent(components, wires, selectedComponent.id, oldTerminalIds, newTerminalIds, {
+      id: newId,
+      type: newType,
+      label: nextComponentLabel(newType, components),
+      props: defaultProps(newDefinition),
+    });
+    if (!outcome) return;
+    const nextWires = refreshCanvasWireEndpoints(outcome.wires, outcome.components, newId);
+    setComponents(outcome.components);
+    setWires(nextWires);
+    commitSnapshot({ components: outcome.components, wires: nextWires });
+    setSelection({ kind: 'component', id: newId });
+    requestEagerSpiceRun();
+    toast.success(`Replaced with ${newDefinition.name}`);
+  }, [commitSnapshot, components, refreshCanvasWireEndpoints, requestEagerSpiceRun, selectedComponent, wires]);
 
   // Its only callers are the momentary pushbutton press/release handlers below — an electrical
   // state change SPICE should react to immediately, not after the drag-coalescing debounce.
@@ -3915,7 +3946,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
         return;
       }
       if (event.key.toLowerCase() === 'r' && selectedComponent) {
-        rotateSelected(45);
+        rotateSelected(90);
         return;
       }
       const movement = event.shiftKey ? gridSize * 5 : (snapEnabled ? gridSize : 1);
@@ -4027,29 +4058,33 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
             <ToolbarButton colors={colors} icon={<Clipboard size={14} />} title="Paste (Ctrl/Cmd+V)" onClick={pasteClipboard} disabled={!clipboard || (clipboard.components.length === 0 && clipboard.wires.length === 0 && clipboard.texts.length === 0)} />
             <ToolbarButton colors={colors} icon={<Trash2 size={14} />} title="Delete (Del/Backspace)" onClick={removeSelection} disabled={!selectedComponent && !selectedWire && !selectedText && marqueeIds.length === 0} />
             <ToolbarDivider colors={colors} />
-            <ToolbarButton
-              colors={colors}
-              label="Dotted"
-              title="Dotted grid background"
-              onClick={() => { setTabDGridMode('dots'); setGridVisible(true); }}
-              active={tabDGridMode === 'dots' && gridVisible}
-            />
-            <ToolbarButton
-              colors={colors}
-              label="Cartesian"
-              title="Cartesian grid background"
-              onClick={() => { setTabDGridMode('cartesian'); setGridVisible(true); }}
-              active={tabDGridMode === 'cartesian' && gridVisible}
-            />
-            <ToolbarButton
-              colors={colors}
-              label="Hidden"
-              title="Hide grid"
-              onClick={() => { setTabDGridMode('hidden'); setGridVisible(false); }}
-              active={tabDGridMode === 'hidden' || !gridVisible}
-            />
-            <ToolbarDivider colors={colors} />
-            <ToolbarButton colors={colors} icon={<Type size={14} />} label="Text" title="Add editable workspace text (T)" onClick={addText} />
+            <div className="flex items-center gap-2">
+              <ToolbarButton
+                colors={colors}
+                label="Dotted"
+                title="Dotted grid background"
+                onClick={() => { setTabDGridMode('dots'); setGridVisible(true); }}
+                active={tabDGridMode === 'dots' && gridVisible}
+                rounded
+              />
+              <ToolbarButton
+                colors={colors}
+                label="Cartesian"
+                title="Cartesian grid background"
+                onClick={() => { setTabDGridMode('cartesian'); setGridVisible(true); }}
+                active={tabDGridMode === 'cartesian' && gridVisible}
+                rounded
+              />
+              <ToolbarButton
+                colors={colors}
+                label="Hidden"
+                title="Hide grid"
+                onClick={() => { setTabDGridMode('hidden'); setGridVisible(false); }}
+                active={tabDGridMode === 'hidden' || !gridVisible}
+                rounded
+              />
+              <ToolbarButton colors={colors} icon={<Type size={14} />} label="Text" title="Add editable workspace text (T)" onClick={addText} rounded />
+            </div>
             {tabDUiRefinement && <><ToolbarDivider colors={colors} /><ToolbarButton colors={colors} icon={<RotateCw size={14} />} label="90°" title="Rotate selected component 90°" onClick={() => rotateSelected(90)} disabled={!selectedComponent} /><ToolbarButton colors={colors} icon={<FlipHorizontal size={14} />} label="Flip X" title="Reflect selected component horizontally" onClick={() => flipSelected('h')} disabled={!selectedComponent} /><ToolbarButton colors={colors} icon={<FlipVertical size={14} />} label="Flip Y" title="Reflect selected component vertically" onClick={() => flipSelected('v')} disabled={!selectedComponent} /></>}
           </div>
 
@@ -4062,7 +4097,8 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
             <ToolbarButton colors={colors} icon={<ImageIcon size={14} />} label="Save Image" title="Save circuit as image (PNG or SVG)" onClick={handleOpenSaveImage} />
             <ToolbarButton colors={colors} icon={<Share2 size={14} />} label="Share Project" title="Share circuit via Web Share API or deep link" onClick={handleShareProject} />
             <ToolbarDivider colors={colors} />
-            <ToolbarButton colors={colors} icon={<Library size={14} />} label="Examples" title="Browse the Interactive Examples Library" onClick={() => setExamplesModalOpen(true)} />
+            {/* Examples button hidden for final launch UI polish */}
+            {/* <ToolbarButton colors={colors} icon={<Library size={14} />} label="Examples" title="Browse the Interactive Examples Library" onClick={() => setExamplesModalOpen(true)} /> */}
             <button onClick={() => { hasStartedSimulation.current = true; setSimulationRunning(value => !value); }} title={simulationRunning ? 'Pause simulation' : 'Run simulation'} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: (!simulationRunning && hasStartedSimulation.current) ? TAB_GRADIENT_REV : TAB_GRADIENT, color: '#ffffff', fontWeight: 500, padding: '6px 14px', minHeight: 30, borderRadius: 8, fontSize: 12, boxShadow: TAB_ACTIVE_SHADOW, border: '1px solid transparent', cursor: 'pointer', whiteSpace: 'nowrap', transition: 'background .3s ease' }}>
               {simulationRunning ? <Pause size={14} /> : <Play size={14} />}{simulationRunning ? 'Pause' : 'Run'}
             </button>
@@ -4804,7 +4840,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
             {/* Below Instruments: ACTIVE ELEMENT & PROPERTIES inspector */}
             <div className="border-b px-3 py-2" style={{ borderColor: colors.line }}><div className={CONTROL_SYSTEMS_HEADING}>Active Element &amp; Properties</div></div>
             {selectedComponent ? (
-              <ComponentInspector colors={colors} component={selectedComponent} definition={getDef(selectedComponent.type)!} allComponents={components} linkedCoils={linkedCoils} reading={effectiveSnapshot.instrumentReadings[selectedComponent.id]} snapshot={effectiveSnapshot} tabDUiRefinement={tabDUiRefinement} oscilloscopeDisplaySettings={oscilloscopeDisplaySettings} onOscilloscopeDisplaySettingsChange={setOscilloscopeDisplaySettings} onLabelChange={label => updateComponent(selectedComponent.id, { label })} onPropertyChange={updateComponentProperty} onPropertiesChange={updateComponentProperties} onDelete={removeSelection} />
+              <ComponentInspector colors={colors} component={selectedComponent} definition={getDef(selectedComponent.type)!} allComponents={components} linkedCoils={linkedCoils} reading={effectiveSnapshot.instrumentReadings[selectedComponent.id]} snapshot={effectiveSnapshot} tabDUiRefinement={tabDUiRefinement} oscilloscopeDisplaySettings={oscilloscopeDisplaySettings} onOscilloscopeDisplaySettingsChange={setOscilloscopeDisplaySettings} onLabelChange={label => updateComponent(selectedComponent.id, { label })} onPropertyChange={updateComponentProperty} onPropertiesChange={updateComponentProperties} onDelete={removeSelection} onReplace={replaceSelectedComponent} />
             ) : selectedWire ? (
               <WireInspector colors={colors} wire={selectedWire} tabDUiRefinement={tabDUiRefinement} onRouting={updateWireRouting} onAddCorner={addSelectedWireCorner} onNudge={nudgeSelectedWire} onDelete={removeSelection} />
             ) : selectedText ? (
@@ -4867,15 +4903,15 @@ export default function Home() {
 
 interface Palette { background: string; canvas: string; panel: string; panelAlt: string; line: string; text: string; muted: string; subtle: string; primary: string; accent: string; danger: string; selection: string; grid: string; wire: string; powered: string; input: string; shadow: string; }
 
-function ToolbarButton({ colors, icon, label, title, onClick, active, disabled }: { colors: Palette; icon?: React.ReactNode; label?: string; title: string; onClick: () => void; active?: boolean; disabled?: boolean }) {
+function ToolbarButton({ colors, icon, label, title, onClick, active, disabled, rounded }: { colors: Palette; icon?: React.ReactNode; label?: string; title: string; onClick: () => void; active?: boolean; disabled?: boolean; rounded?: boolean }) {
   const isActive = Boolean(active) && !disabled;
-  return <button title={title} onClick={onClick} disabled={disabled} style={{ border: isActive ? '1px solid transparent' : `1px solid ${colors.line}`, background: isActive ? TAB_GRADIENT : colors.panelAlt, color: isActive ? '#ffffff' : disabled ? colors.subtle : colors.muted, borderRadius: 9, padding: '6px 12px', minHeight: 32, display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 500, cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? .5 : 1, boxShadow: isActive ? TAB_ACTIVE_SHADOW : 'none', flexShrink: 0, whiteSpace: 'nowrap', transition: 'background .15s ease' }}>{icon}{label}</button>;
+  return <button title={title} onClick={onClick} disabled={disabled} style={{ border: isActive ? '1px solid transparent' : `1px solid ${colors.line}`, background: isActive ? TAB_GRADIENT : colors.panelAlt, color: isActive ? '#ffffff' : disabled ? colors.subtle : colors.muted, borderRadius: rounded ? 9999 : 9, padding: '6px 12px', minHeight: 32, display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 500, cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? .5 : 1, boxShadow: isActive ? TAB_ACTIVE_SHADOW : 'none', flexShrink: 0, whiteSpace: 'nowrap', transition: 'background .15s ease' }}>{icon}{label}</button>;
 }
 
 function ToolbarDivider({ colors }: { colors: Palette }) { return <span style={{ width: 1, height: 20, background: colors.line, margin: '0 1px', flexShrink: 0 }} />; }
 
 function InspectorHeader({ colors, title, subtitle }: { colors: Palette; title: React.ReactNode; subtitle: string }) {
-  return <div style={{ padding: '15px 15px 12px', borderBottom: `1px solid ${colors.line}` }}><div><div className="text-sm font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">{title}</div><div className="text-slate-600 dark:text-slate-400" style={{ marginTop: 2, fontSize: 10, lineHeight: 1.0 }}>{subtitle}</div></div></div>;
+  return <div style={{ padding: '16px 16px 14px', borderBottom: `1px solid ${colors.line}` }}><div><div className="text-xl font-bold tracking-tight text-slate-800 dark:text-slate-100">{title}</div><div className="text-slate-600 dark:text-slate-400" style={{ marginTop: 4, fontSize: 11, lineHeight: 1.25 }}>{subtitle}</div></div></div>;
 }
 
 function InspectorButton({ colors, children, onClick, danger, active, disabled }: { colors: Palette; children: React.ReactNode; onClick: () => void; danger?: boolean; active?: boolean; disabled?: boolean }) {
@@ -4887,12 +4923,120 @@ function InspectorSection({ colors, label, children }: { colors: Palette; label:
 
 function PropertyRow({ colors, label, unit, children }: { colors: Palette; label: string; unit?: string; children: React.ReactNode }) { return <label style={{ display: 'grid', gridTemplateColumns: '1fr 156px', gap: 8, alignItems: 'center', marginBottom: 8 }}><span className="mae-panel-field-label" style={{ lineHeight: 1.25 }}><ElectricalLabel label={label} unit={unit} /></span>{children}</label>; }
 
-function ComponentInspector({ colors, component, definition, allComponents, linkedCoils, reading, snapshot, tabDUiRefinement, oscilloscopeDisplaySettings, onOscilloscopeDisplaySettingsChange, onLabelChange, onPropertyChange, onPropertiesChange, onDelete }: { colors: Palette; component: CircuitComponent; definition: ComponentDef; allComponents: CircuitComponent[]; linkedCoils: CircuitComponent[]; reading?: InstrumentReading; snapshot: SimulationSnapshot; tabDUiRefinement: boolean; oscilloscopeDisplaySettings: OscilloscopeDisplaySettings; onOscilloscopeDisplaySettingsChange: (next: Partial<OscilloscopeDisplaySettings>) => void; onLabelChange: (value: string) => void; onPropertyChange: (key: string, value: unknown) => void; onPropertiesChange: (updates: Record<string, unknown>) => void; onDelete: () => void }) {
+/**
+ * "Replace Component" control for the Properties panel: a button that opens a small
+ * category-grouped catalog picker (the same catalog the main sidebar draws from) so a student can
+ * swap the selected part in place instead of deleting it and dragging a new one from scratch.
+ */
+function ReplaceComponentControl({ colors, currentType, tabDUiRefinement, onReplace }: { colors: Palette; currentType: string; tabDUiRefinement: boolean; onReplace: (newType: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const handlePointerDown = (event: PointerEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener('pointerdown', handlePointerDown);
+    return () => document.removeEventListener('pointerdown', handlePointerDown);
+  }, [open]);
+
+  const categories = useMemo(() => {
+    if (!open) return {};
+    const trimmedQuery = query.trim().toLowerCase();
+    return CATEGORIES.reduce<Record<string, ComponentDef[]>>((all, category) => {
+      if (category === 'Classic Control') return all;
+      let items = getComponentsByCategory(category).filter(item => !item.hidden);
+      if (tabDUiRefinement && category === 'Passive') {
+        items = [...items, ...['star-resistor-pack', 'delta-resistor-pack'].map(getDef).filter((item): item is ComponentDef => Boolean(item))];
+      }
+      if (tabDUiRefinement && category === 'Controlled Sources') {
+        items = items.filter(item => !['star-resistor-pack', 'delta-resistor-pack'].includes(item.id));
+      }
+      if (tabDUiRefinement && category === 'Diodes') {
+        items = items.filter(item => !['diode-ideal', 'diode-silicon', 'diode-germanium', 'diode-gaas'].includes(item.id));
+      }
+      if (tabDUiRefinement) items = filterTabDCatalog(items);
+      if (!tabDUiRefinement && category === 'Diodes') {
+        items = items.filter(item => item.id !== 'diode');
+      }
+      items = items.filter(item => !trimmedQuery || item.name.toLowerCase().includes(trimmedQuery) || item.description.toLowerCase().includes(trimmedQuery));
+      if (items.length) all[category] = items;
+      return all;
+    }, {});
+  }, [open, query, tabDUiRefinement]);
+
+  return (
+    <div ref={containerRef} style={{ position: 'relative', width: '100%' }}>
+      <button
+        onClick={() => setOpen(value => !value)}
+        title="Replace selected component with another from library"
+        style={{
+          width: '100%',
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 6,
+          padding: '6px 14px',
+          minHeight: 32,
+          borderRadius: 8,
+          border: open ? '1px solid transparent' : `1px solid ${colors.line}`,
+          background: open ? TAB_GRADIENT : colors.panelAlt,
+          color: open ? '#ffffff' : colors.text,
+          fontSize: 12,
+          fontWeight: 600,
+          cursor: 'pointer',
+          boxShadow: open ? TAB_ACTIVE_SHADOW : 'none',
+          transition: 'all 0.15s ease',
+        }}
+      >
+        <RefreshCw size={13} />
+        <span>Replace</span>
+      </button>
+      {open && (
+        <div style={{ position: 'absolute', zIndex: 50, top: '100%', right: 0, marginTop: 6, width: 280, maxHeight: 360, overflowY: 'auto', background: colors.panel, border: `1px solid ${colors.line}`, borderRadius: 10, boxShadow: '0 12px 28px rgba(0,0,0,0.35)', padding: 10 }}>
+          <input
+            autoFocus
+            placeholder="Search library components"
+            value={query}
+            onChange={event => setQuery(event.target.value)}
+            style={{ ...inputStyle(colors), width: '100%', marginBottom: 6 }}
+          />
+          <div style={{ marginTop: 4 }}>
+            {Object.entries(categories).map(([category, items]) => (
+              <div key={category} style={{ marginBottom: 8 }}>
+                <div className="mae-panel-section-header" style={{ padding: '4px 2px', fontSize: 10, opacity: 0.75 }}>{category}</div>
+                {items.map(item => (
+                  <button
+                    key={item.id}
+                    onClick={() => { onReplace(item.id); setOpen(false); setQuery(''); }}
+                    style={{ width: '100%', textAlign: 'left', border: 'none', background: item.id === currentType ? colors.panelAlt : 'transparent', color: colors.text, cursor: 'pointer', borderRadius: 6, padding: '6px 8px', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between', transition: 'background 0.1s ease' }}
+                    onMouseEnter={event => { event.currentTarget.style.background = colors.panelAlt; }}
+                    onMouseLeave={event => { event.currentTarget.style.background = item.id === currentType ? colors.panelAlt : 'transparent'; }}
+                  >
+                    <ElectricalLabel label={item.name} />
+                    {item.id === currentType && <span style={{ fontSize: 10, color: colors.accent, fontWeight: 700 }}>Current</span>}
+                  </button>
+                ))}
+              </div>
+            ))}
+            {Object.keys(categories).length === 0 && (
+              <div style={{ padding: 10, fontSize: 11, color: colors.subtle, textAlign: 'center' }}>No components match your search</div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ComponentInspector({ colors, component, definition, allComponents, linkedCoils, reading, snapshot, tabDUiRefinement, oscilloscopeDisplaySettings, onOscilloscopeDisplaySettingsChange, onLabelChange, onPropertyChange, onPropertiesChange, onDelete, onReplace }: { colors: Palette; component: CircuitComponent; definition: ComponentDef; allComponents: CircuitComponent[]; linkedCoils: CircuitComponent[]; reading?: InstrumentReading; snapshot: SimulationSnapshot; tabDUiRefinement: boolean; oscilloscopeDisplaySettings: OscilloscopeDisplaySettings; onOscilloscopeDisplaySettingsChange: (next: Partial<OscilloscopeDisplaySettings>) => void; onLabelChange: (value: string) => void; onPropertyChange: (key: string, value: unknown) => void; onPropertiesChange: (updates: Record<string, unknown>) => void; onDelete: () => void; onReplace: (newType: string) => void }) {
   // Check if the component actually has a numeric value to display (oscilloscope has its own dedicated panel and no floating/inspector value)
   const hasValue = component.type !== 'oscilloscope' && Object.values(definition.properties).some(p => p.type === 'number' && p.unit);
 
   return <div style={{ overflowY: 'auto', minHeight: 0 }}>
-    <InspectorHeader colors={colors} title={<span className="text-slate-800 dark:text-slate-200" style={{ display: 'inline-flex', alignItems: 'baseline', gap: 6 }}><span style={{ fontFamily: "'KaTeX_Math', 'KaTeX_Main', serif", fontSize: 15 }}><V3Math math={componentLabelToLatex(component.type === 'ground' ? 'GND' : component.label)} /></span><span className="text-slate-600 dark:text-slate-300" style={{ fontSize: 11, letterSpacing: 0, textTransform: 'none', fontFamily: "'KaTeX_Main', 'KaTeX_Math', serif" }}><ElectricalLabel label={definition.name} /></span></span>} subtitle={definition.description} />
+    <InspectorHeader colors={colors} title={<span className="text-slate-800 dark:text-slate-100" style={{ display: 'inline-flex', alignItems: 'baseline', gap: 8 }}><span style={{ fontFamily: "'KaTeX_Math', 'KaTeX_Main', serif", fontSize: 24, fontWeight: 700 }}><V3Math math={componentLabelToLatex(component.type === 'ground' ? 'GND' : component.label)} /></span><span className="text-slate-700 dark:text-slate-300 font-semibold text-lg" style={{ letterSpacing: 0, textTransform: 'none', fontFamily: "'KaTeX_Main', 'KaTeX_Math', serif" }}><ElectricalLabel label={definition.name} /></span></span>} subtitle={definition.description} />
     {component.state?.isBurned && (
       <div
         role="alert"
@@ -4913,6 +5057,10 @@ function ComponentInspector({ colors, component, definition, allComponents, link
     <InspectorSection colors={colors} label="Instance label">
       <PropertyRow colors={colors} label="Reference">
         <input value={component.type === 'ground' ? 'GND' : component.label} disabled={component.type === 'ground'} onChange={event => onLabelChange(component.type === 'ground' ? 'GND' : event.target.value)} style={mathReferenceInputStyle(colors)} />
+      </PropertyRow>
+
+      <PropertyRow colors={colors} label="Component">
+        <ReplaceComponentControl colors={colors} currentType={component.type} tabDUiRefinement={tabDUiRefinement} onReplace={onReplace} />
       </PropertyRow>
 
       {/* NEW: Label Visibility Toggle */}

@@ -86,12 +86,12 @@ describe('Tab D SVG symbol language', () => {
 
   it('renders the 3-terminal op-amp with hidden power rails and +/- input polarity indicators', () => {
     const opamp = markup('opamp');
-    expect(opamp).toContain('points="-20,-32 -20,32 25,0"');
-    expect(opamp).toContain('x1="-50" y1="-25" x2="-20" y2="-25"');
-    expect(opamp).toContain('x1="-50" y1="25" x2="-20" y2="25"');
-    expect(opamp).toContain('x1="25" y1="0" x2="50" y2="0"');
-    expect(opamp).toContain('x="-10" y="-18"');
-    expect(opamp).toContain('x="-10" y="18"');
+    expect(opamp).toContain('points="-35,-40 -35,40 35,0"');
+    expect(opamp).toContain('x1="-50" y1="-25" x2="-35" y2="-25"');
+    expect(opamp).toContain('x1="-50" y1="25" x2="-35" y2="25"');
+    expect(opamp).toContain('x1="35" y1="0" x2="50" y2="0"');
+    expect(opamp).toContain('x="-25" y="-24"');
+    expect(opamp).toContain('x="-25" y="26"');
   });
 
   it('uses orthogonal collector/emitter routing and distinct regular arrowheads for NPN and PNP symbols', () => {

@@ -8,7 +8,6 @@ describe('Part 1: Classic Control Components Hidden (UI Only)', () => {
     expect(COMPONENT_DEFS['aux-contact-no']?.hidden).toBe(true);
     expect(COMPONENT_DEFS['aux-contact-3phase']?.hidden).toBe(true);
     expect(COMPONENT_DEFS['coil']?.hidden).toBe(true);
-    expect(COMPONENT_DEFS['contactor']?.hidden).toBe(true);
   });
 
   it('filters out hidden Classic Control components from getComponentsByCategory', () => {

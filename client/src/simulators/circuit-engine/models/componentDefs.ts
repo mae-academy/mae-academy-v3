@@ -733,9 +733,8 @@ const PROTECTION: Record<string, ComponentDef> = {
     description: 'Double-Pole Single-Throw Relay',
   },
   'contactor': {
-    id: 'contactor', name: 'Contactor', category: 'Protection',
+    id: 'contactor', name: 'Contactor', category: 'Switches',
     width: 100, height: 145, symbol: 'contactor',
-    hidden: true,
     terminals: [
       { id: 'coil+', name: 'A1', x: -50, y: -50, type: 'input' },
       { id: 'coil-', name: 'A2', x: 50, y: -50, type: 'input' },
@@ -906,7 +905,7 @@ const POWER_SEMI: Record<string, ComponentDef> = {
     description: 'Triac – bidirectional thyristor',
   },
   'opamp': {
-    id: 'opamp', name: 'Op-Amp', category: 'Power Semiconductors',
+    id: 'opamp', name: 'Op-Amp', category: 'Other Components',
     width: 100, height: 75, symbol: 'opamp',
     terminals: [
       { id: 'in-', name: 'IN-', x: -50, y: -25, type: 'input' },
