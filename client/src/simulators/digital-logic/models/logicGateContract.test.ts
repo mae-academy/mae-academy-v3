@@ -12,15 +12,15 @@ describe('Digital Logic multi-input gate contract', () => {
     expect(normalizedInputCount(3)).toBe(3);
     expect(normalizedInputCount(9)).toBe(8);
   });
-  it('keeps every configurable gate output beyond the body with a common terminal position', () => {
+  it('keeps every configurable gate output beyond the body with a common terminal position on the 25px grid', () => {
     ['gate-and', 'gate-or', 'gate-nand', 'gate-nor', 'gate-xor', 'gate-xnor', 'gate-not'].forEach(type => {
-      expect(getDef(type)!.terminals.find(terminal => terminal.id === 'y')?.x).toBe(45);
+      expect(getDef(type)!.terminals.find(terminal => terminal.id === 'y')?.x).toBe(50);
     });
   });
-  it('keeps Logic Input and Logic Output terminals exactly at their symbol-lead endpoints', () => {
+  it('keeps Logic Input and Logic Output terminals exactly at their symbol-lead endpoints on the 25px grid', () => {
     const input = { id: 'I', type: 'digital-input', x: 0, y: 0, rotation: 0, flipH: false, flipV: false, label: 'I1', props: {} };
     const output = { id: 'O', type: 'digital-output', x: 0, y: 0, rotation: 0, flipH: false, flipV: false, label: 'O1', props: {} };
-    expect(getLogicComponentTerminals(input, getDef('digital-input')!)).toEqual([{ id: 'out', name: 'OUT', x: 30, y: 0, type: 'output' }]);
-    expect(getLogicComponentTerminals(output, getDef('digital-output')!)).toEqual([{ id: 'in', name: 'IN', x: -30, y: 0, type: 'input' }]);
+    expect(getLogicComponentTerminals(input, getDef('digital-input')!)).toEqual([{ id: 'out', name: 'OUT', x: 25, y: 0, type: 'output' }]);
+    expect(getLogicComponentTerminals(output, getDef('digital-output')!)).toEqual([{ id: 'in', name: 'IN', x: -25, y: 0, type: 'input' }]);
   });
 });

@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { dynamicGateGeometryFor, isScalableLogicGate, logicBlockLayoutFor, logicBodyBoundaryForPin, type LogicBlockLayout, type LogicSymbolPin } from '@/simulators/digital-logic/components/dynamicLogicGeometry';
+import { dynamicGateGeometryFor, GRID, isScalableLogicGate, logicBlockLayoutFor, logicBodyBoundaryForPin, type LogicBlockLayout, type LogicSymbolPin } from '@/simulators/digital-logic/components/dynamicLogicGeometry';
 import { getDef } from '@/simulators/digital-logic/models/componentDefs';
 
 interface SymbolProps {
@@ -959,25 +959,26 @@ const LogicGate: SymbolFC = ({ props }) => {
   const inputY = scalable ? geometry.inputY : inputCount === 2 ? [-15, 15] : inputCount === 3 ? [-20, 0, 20] : [-22, -7, 7, 22];
   const orFamily = kind === 'OR' || kind === 'NOR' || kind === 'XOR' || kind === 'XNOR';
   const halfHeight = scalable ? geometry.bodyHeight / 2 : 23;
+  const unaryInputX = -GRID * 2;
   return <g>
-    {unary ? <line x1={-35} y1={0} x2={-22} y2={0} stroke="currentColor" strokeWidth={2} /> : inputY.map(y => <line key={y} x1={scalable ? geometry.inputX : -35} y1={y} x2={orFamily ? -18 : -22} y2={y} stroke="currentColor" strokeWidth={2} />)}
+    {unary ? <line x1={unaryInputX} y1={0} x2={-22} y2={0} stroke="currentColor" strokeWidth={2} /> : inputY.map(y => <line key={y} x1={scalable ? geometry.inputX : unaryInputX} y1={y} x2={orFamily ? -18 : -22} y2={y} stroke="currentColor" strokeWidth={2} />)}
     {unary ? <path d="M -22,-23 L 22,0 L -22,23 Z" fill="none" stroke="currentColor" strokeWidth={2} /> : orFamily ? <path d={`M -26,${-halfHeight} C -9,${-halfHeight} 12,${-halfHeight * .82} 25,0 C 12,${halfHeight * .82} -9,${halfHeight} -26,${halfHeight} C -16,${halfHeight * .52} -16,${-halfHeight * .52} -26,${-halfHeight} Z`} fill="none" stroke="currentColor" strokeWidth={2} /> : <path d={`M -22,${-halfHeight} H 2 A 23,${halfHeight} 0 0 1 2,${halfHeight} H -22 Z`} fill="none" stroke="currentColor" strokeWidth={2} />}
     {(kind === 'XOR' || kind === 'XNOR') && <path d={`M -32,${-halfHeight} C -22,${-halfHeight * .52} -22,${halfHeight * .52} -32,${halfHeight}`} fill="none" stroke="currentColor" strokeWidth={2} />}
     {inverted && <circle cx={30} cy={0} r={4} fill="none" stroke="currentColor" strokeWidth={2} />}
-    <line x1={inverted ? 34 : 25} y1={0} x2={45} y2={0} stroke="currentColor" strokeWidth={2} strokeLinecap="round" />
+    <line x1={inverted ? 34 : 25} y1={0} x2={GRID * 2} y2={0} stroke="currentColor" strokeWidth={2} strokeLinecap="round" />
   </g>;
 };
 
 const DigitalInputSymbol: SymbolFC = ({ props }) => <g>
   <rect x={-25} y={-12} width={42} height={24} rx={4} fill="none" stroke="currentColor" strokeWidth={2} />
   <text x={-4} y={4} textAnchor="middle" fontSize={10} fontFamily="'KaTeX_Main', serif" fontWeight={700} fill="currentColor">{props?.state === 'HIGH' ? '1' : '0'}</text>
-  <line x1={17} y1={0} x2={30} y2={0} stroke="currentColor" strokeWidth={2} />
+  <line x1={17} y1={0} x2={GRID} y2={0} stroke="currentColor" strokeWidth={2} />
 </g>;
 
 const DigitalOutputSymbol: SymbolFC = ({ powered }) => <g>
   <rect x={-17} y={-12} width={42} height={24} rx={4} fill="none" stroke="currentColor" strokeWidth={2} />
   <text x={4} y={4} textAnchor="middle" fontSize={10} fontFamily="'KaTeX_Main', serif" fontWeight={700} fill="currentColor">{powered ? '1' : '0'}</text>
-  <line x1={-30} y1={0} x2={-17} y2={0} stroke="currentColor" strokeWidth={2} />
+  <line x1={-GRID} y1={0} x2={-17} y2={0} stroke="currentColor" strokeWidth={2} />
 </g>;
 
 export const BLOCK_ABBREVIATIONS: Record<string, string> = {
@@ -1041,7 +1042,7 @@ export function normalizeLogicType(raw: string): string {
 
 export const LogicClockSymbol: SymbolFC = ({ powered }) => (
   <g>
-    <rect x={-20} y={-20} width={40} height={40} rx={4} fill={powered ? '#eef6ff' : 'white'} stroke="currentColor" strokeWidth={2} />
+    <rect x={-20} y={-20} width={40} height={40} rx={4} fill="none" stroke={powered ? '#38bdf8' : 'currentColor'} strokeWidth={2} />
     <path
       d="M -12,4 H -4 V -6 H 4 V 4 H 12 V -6"
       fill="none"
@@ -1051,7 +1052,8 @@ export const LogicClockSymbol: SymbolFC = ({ powered }) => (
       strokeLinejoin="round"
     />
     <text x={0} y={15} textAnchor="middle" fontSize={7} fontFamily="'KaTeX_Main', serif" fontWeight={700} fill="currentColor">CLK</text>
-    <line x1={20} y1={0} x2={50} y2={0} stroke="currentColor" strokeWidth={2} strokeLinecap="round" />
+    {/* Lead terminates at (bodyHalfWidth + lead) = (GRID*2 + GRID) from logicBlockLayoutFor's single-output layout, matching the actual dynamic terminal position. */}
+    <line x1={20} y1={0} x2={GRID * 3} y2={0} stroke="currentColor" strokeWidth={2} strokeLinecap="round" />
   </g>
 );
 
@@ -1088,7 +1090,8 @@ const StandardLogicBlockSymbol: SymbolFC = ({ powered, props }) => {
     outputs.length ? outputs : Array.from({ length: outputCount }, (_, index) => `out${index}`)
   );
   const { bodyHalfWidth: w, bodyHalfHeight: h } = layout;
-  const fill = powered ? '#eef6ff' : '#ffffff';
+  const fill = 'none';
+  const bodyStroke = powered ? '#38bdf8' : 'currentColor';
 
   const defaultAbbr = BLOCK_ABBREVIATIONS[type] || def?.name || 'LOGIC';
   const title = String(props?._blockLabel || defaultAbbr);
@@ -1105,13 +1108,13 @@ const StandardLogicBlockSymbol: SymbolFC = ({ powered, props }) => {
   const isShiftReg = type === 'logic-shift-register';
 
   const body = isMux ? (
-    <path d={`M ${-w},${-h} L ${w},${-h * 0.62} L ${w},${h * 0.62} L ${-w},${h} Z`} fill={fill} stroke="currentColor" strokeWidth={2} />
+    <path d={`M ${-w},${-h} L ${w},${-h * 0.62} L ${w},${h * 0.62} L ${-w},${h} Z`} fill={fill} stroke={bodyStroke} strokeWidth={2} />
   ) : isDemux ? (
-    <path d={`M ${-w},${-h * 0.62} L ${w},${-h} L ${w},${h} L ${-w},${h * 0.62} Z`} fill={fill} stroke="currentColor" strokeWidth={2} />
+    <path d={`M ${-w},${-h * 0.62} L ${w},${-h} L ${w},${h} L ${-w},${h * 0.62} Z`} fill={fill} stroke={bodyStroke} strokeWidth={2} />
   ) : isAlu ? (
-    <path d={`M ${-w},${-h} H ${w} V ${h} H ${-w} V ${h * 0.34} L ${-w + 17},0 L ${-w},${-h * 0.34} Z`} fill={fill} stroke="currentColor" strokeWidth={2} />
+    <path d={`M ${-w},${-h} H ${w} V ${h} H ${-w} V ${h * 0.34} L ${-w + 17},0 L ${-w},${-h * 0.34} Z`} fill={fill} stroke={bodyStroke} strokeWidth={2} />
   ) : (
-    <rect x={-w} y={-h} width={w * 2} height={h * 2} rx={isMemory ? 4 : 3} fill={fill} stroke="currentColor" strokeWidth={2} />
+    <rect x={-w} y={-h} width={w * 2} height={h * 2} rx={isMemory ? 4 : 3} fill={fill} stroke={bodyStroke} strokeWidth={2} />
   );
 
   const clockPin = terminals.find(pin => pin.id === 'clk');

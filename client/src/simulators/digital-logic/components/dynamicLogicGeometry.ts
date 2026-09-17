@@ -6,11 +6,19 @@
 
 import type { CircuitWire } from '@/simulators/digital-logic/models/circuitTypes';
 
+/** Canvas snap lattice. Every terminal coordinate below MUST be an exact multiple of this. */
+export const GRID = 25;
+
 export const SCALABLE_LOGIC_GATE_TYPES = new Set(['gate-and', 'gate-or', 'gate-nand', 'gate-nor', 'gate-xor', 'gate-xnor']);
 export const DYNAMIC_GATE_MIN_INPUTS = 2;
 export const DYNAMIC_GATE_MAX_INPUTS = 8;
-export const DYNAMIC_PIN_PITCH = 20;
-export const DYNAMIC_BASE_PADDING = 20;
+/**
+ * Pin pitch for stacked gate inputs. A symmetric, centered stack of N pins can only land
+ * every pin on an exact GRID multiple (for both odd and even N) when the pitch is 2*GRID —
+ * an even N always centers on a half-grid point, so doubling the step cancels the .5 remainder.
+ */
+export const DYNAMIC_PIN_PITCH = GRID * 2;
+export const DYNAMIC_BASE_PADDING = GRID;
 export const SELECTOR_COUNT_OPTIONS = [1, 2, 3] as const;
 export const BIT_WIDTH_OPTIONS = [4, 8] as const;
 const GATE_INPUT_IDS = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'] as const;
@@ -31,8 +39,8 @@ export type LogicBlockGeometry = {
   bodyHeight: number;
 };
 
-/** 50/3 local units project to one 25px workspace step at the Digital Logic symbol scale (1.5). */
-export const LOGIC_SYMBOL_GRID_UNIT = 50 / 3;
+/** One local unit == one 25px workspace grid step (components render at native world scale, no transform). */
+export const LOGIC_SYMBOL_GRID_UNIT = GRID;
 export type LogicSymbolPin = { id: string; x: number; y: number; type: 'input' | 'output'; side: 'left' | 'right' | 'top' | 'bottom' };
 export type LogicBlockLayout = { width: number; height: number; bodyHalfWidth: number; bodyHalfHeight: number; pins: LogicSymbolPin[] };
 
@@ -133,11 +141,11 @@ export const dynamicGateGeometryFor = (type: string, value: unknown): DynamicGat
   const height = Math.max(60, DYNAMIC_BASE_PADDING + inputCount * DYNAMIC_PIN_PITCH);
   return {
     inputCount,
-    width: 70,
+    width: GRID * 4,
     height,
     bodyHeight: height - 14,
-    inputX: -35,
-    outputX: 45,
+    inputX: -GRID * 2,
+    outputX: GRID * 2,
     inputY: centeredPinAxisFor(inputCount),
   };
 };
