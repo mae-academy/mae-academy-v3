@@ -179,11 +179,12 @@ interface AStarNode {
   row: number;
   dir: Dir | -1;   // -1 = start (no direction yet)
   g: number;       // cost from start
+  h: number;       // heuristic to end
   f: number;       // g + h
   parent: AStarNode | null;
 }
 
-const TURN_PENALTY = 2;   // extra cost per 90° direction change
+const TURN_PENALTY = 25;   // heavily penalize direction changes to enforce minimal-bend straight runs
 
 /** Manhattan distance heuristic (admissible — never overestimates). */
 function heuristic(ac: number, ar: number, bc: number, br: number): number {
@@ -200,32 +201,30 @@ function aStarSearch(
   startRow: number,
   endCol: number,
   endRow: number,
+  fromAxis?: 'horizontal' | 'vertical',
+  toAxis?: 'horizontal' | 'vertical',
 ): Point[] | null {
   const { costs, rows, cols, gridSize, originX, originY } = grid;
 
-  // gCost[row][col][dir+1] — +1 because dir starts at -1 (start node).
-  // Keyed by (col, row, dir) — we need per-direction costs because a turn
-  // from one direction is cheaper than a turn from another.
   const gBest = new Map<string, number>();
-
   const key = (c: number, r: number, d: number) => `${c},${r},${d}`;
 
-  // Min-heap via a sorted insertion (small grids); for large grids a binary
-  // heap is preferable but this is sufficient for Phase 1 correctness.
   const open: AStarNode[] = [];
 
+  const startH = heuristic(startCol, startRow, endCol, endRow);
   const startNode: AStarNode = {
     col: startCol, row: startRow, dir: -1,
     g: 0,
-    f: heuristic(startCol, startRow, endCol, endRow),
+    h: startH,
+    f: startH,
     parent: null,
   };
   open.push(startNode);
   gBest.set(key(startCol, startRow, -1), 0);
 
   while (open.length > 0) {
-    // Pop the node with lowest f.
-    open.sort((a, b) => a.f - b.f);
+    // Pop node with lowest f, tie-breaking on smaller h to prefer straight lines toward the goal.
+    open.sort((a, b) => (a.f !== b.f ? a.f - b.f : a.h - b.h));
     const current = open.shift()!;
 
     if (current.col === endCol && current.row === endRow) {
@@ -247,18 +246,36 @@ function aStarSearch(
       if (nc < 0 || nc >= cols || nr < 0 || nr >= rows) continue;
       if (costs[nr][nc] === Infinity) continue;
 
-      const isTurn = current.dir !== -1 && current.dir !== d;
-      const moveCost = costs[nr][nc] + (isTurn ? TURN_PENALTY : 0);
+      let extraCost = 0;
+      if (current.dir !== -1) {
+        if (current.dir !== d) {
+          extraCost += TURN_PENALTY;
+        }
+      } else if (fromAxis) {
+        // Leaving initial terminal against its preferred axis incurs turn penalty
+        if (fromAxis === 'horizontal' && (d === 1 || d === 3)) extraCost += TURN_PENALTY;
+        if (fromAxis === 'vertical' && (d === 0 || d === 2)) extraCost += TURN_PENALTY;
+      }
+
+      // Entering target terminal against its preferred axis incurs turn penalty
+      if (nc === endCol && nr === endRow && toAxis) {
+        if (toAxis === 'horizontal' && (d === 1 || d === 3)) extraCost += TURN_PENALTY;
+        if (toAxis === 'vertical' && (d === 0 || d === 2)) extraCost += TURN_PENALTY;
+      }
+
+      const moveCost = costs[nr][nc] + extraCost;
       const ng = current.g + moveCost;
       const nk = key(nc, nr, d);
 
       if ((gBest.get(nk) ?? Infinity) <= ng) continue;
 
+      const nh = heuristic(nc, nr, endCol, endRow);
       gBest.set(nk, ng);
       open.push({
         col: nc, row: nr, dir: d as Dir,
         g: ng,
-        f: ng + heuristic(nc, nr, endCol, endRow),
+        h: nh,
+        f: ng + nh,
         parent: current,
       });
     }
@@ -280,8 +297,10 @@ function aStarSearch(
  * @param components All placed CircuitComponents in the document.
  * @param gridSize   Canvas snap grid size in pixels (e.g. 25).
  * @param excludeIds IDs of components to ignore as obstacles (typically the
- *                   two components being connected, so their terminal areas
+ *                   dragged and connected components, so their terminal areas
  *                   remain freely accessible).
+ * @param fromAxis   Optional terminal exit axis preference ('horizontal' | 'vertical').
+ * @param toAxis     Optional terminal entry axis preference ('horizontal' | 'vertical').
  * @returns          A simplified array of corner Points forming the routed
  *                   path, or a single-elbow L-shape fallback.
  */
@@ -291,18 +310,36 @@ export function calculateOrthogonalPath(
   components: CircuitComponent[],
   gridSize: number,
   excludeIds: Set<string> = new Set(),
+  fromAxis?: 'horizontal' | 'vertical',
+  toAxis?: 'horizontal' | 'vertical',
 ): Point[] {
-  // Trivially aligned — a straight wire needs no routing.
-  if (startPt[0] === endPt[0] || startPt[1] === endPt[1]) {
-    return [startPt, endPt];
-  }
-
   const bboxes = buildComponentBBoxes(components, gridSize, excludeIds);
 
-  // Quick check: if there are no obstacles at all, use the simple L-shape
-  // to avoid the overhead of a grid search.
+  // Trivially aligned — check if there are any obstacles blocking the straight segment
+  if (Math.abs(startPt[0] - endPt[0]) < 1e-4 || Math.abs(startPt[1] - endPt[1]) < 1e-4) {
+    const isBlocked = bboxes.some(b => {
+      if (Math.abs(startPt[0] - endPt[0]) < 1e-4) {
+        // Vertical line at x = startPt[0]
+        const minY = Math.min(startPt[1], endPt[1]);
+        const maxY = Math.max(startPt[1], endPt[1]);
+        return startPt[0] >= b.xMin && startPt[0] <= b.xMax && maxY >= b.yMin && minY <= b.yMax;
+      } else {
+        // Horizontal line at y = startPt[1]
+        const minX = Math.min(startPt[0], endPt[0]);
+        const maxX = Math.max(startPt[0], endPt[0]);
+        return startPt[1] >= b.yMin && startPt[1] <= b.yMax && maxX >= b.xMin && minX <= b.xMax;
+      }
+    });
+    if (!isBlocked) {
+      return [startPt, endPt];
+    }
+  }
+
+  // Quick check: if there are no obstacles at all, use a clean single-elbow L-shape
   if (bboxes.length === 0) {
-    return [startPt, [endPt[0], startPt[1]], endPt];
+    const preferH = fromAxis === 'horizontal' ? true : fromAxis === 'vertical' ? false : (Math.abs(endPt[0] - startPt[0]) >= Math.abs(endPt[1] - startPt[1]));
+    const corner: Point = preferH ? [endPt[0], startPt[1]] : [startPt[0], endPt[1]];
+    return simplifyOrthogonalPath([startPt, corner, endPt]);
   }
 
   const grid = buildRoutingGrid(startPt, endPt, bboxes, gridSize);
@@ -312,12 +349,16 @@ export function calculateOrthogonalPath(
   const endCol   = Math.round((endPt[0]   - grid.originX) / gridSize);
   const endRow   = Math.round((endPt[1]   - grid.originY) / gridSize);
 
-  const raw = aStarSearch(grid, startCol, startRow, endCol, endRow);
+  const raw = aStarSearch(grid, startCol, startRow, endCol, endRow, fromAxis, toAxis);
 
   if (raw && raw.length >= 2) {
+    raw[0] = startPt;
+    raw[raw.length - 1] = endPt;
     return simplifyOrthogonalPath(raw);
   }
 
-  // Fallback: simple L-shape (horizontal-first).
-  return simplifyOrthogonalPath([startPt, [endPt[0], startPt[1]], endPt]);
+  // Fallback: simple single-elbow L-shape respecting axis preferences
+  const preferH = fromAxis === 'horizontal' ? true : fromAxis === 'vertical' ? false : (Math.abs(endPt[0] - startPt[0]) >= Math.abs(endPt[1] - startPt[1]));
+  const corner: Point = preferH ? [endPt[0], startPt[1]] : [startPt[0], endPt[1]];
+  return simplifyOrthogonalPath([startPt, corner, endPt]);
 }

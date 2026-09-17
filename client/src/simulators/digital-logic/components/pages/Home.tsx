@@ -256,7 +256,7 @@ function refreshWireEndpoints(wires: CircuitWire[], components: CircuitComponent
     if (!endpoints) return wire;
     const isConnectedToDragged = Boolean(draggedComponentId && (wire.fromComp === draggedComponentId || wire.toComp === draggedComponentId));
     if (isConnectedToDragged) {
-      if (wire.routing === 'manual' || (wire.waypoints && wire.waypoints.length > 0) || wire.path.length > 2) {
+      if (wire.routing === 'manual') {
         const updatedPath = reconnectPathEndpoints(wire.path, endpoints.from, endpoints.to, wire.routing, [], wire.waypoints, undefined, endpoints.fromAxis);
         return {
           ...wire,
@@ -892,7 +892,7 @@ export function DigitalLogicSimulatorHome({
       const isConnectedToDragged = Boolean(activeDraggedId && (wire.fromComp === activeDraggedId || wire.toComp === activeDraggedId));
 
       if (isConnectedToDragged) {
-        if (wire.routing === 'manual' || (wire.waypoints && wire.waypoints.length > 0) || wire.path.length > 2) {
+        if (wire.routing === 'manual') {
           const updatedPath = reconnectPathEndpoints(wire.path, endpoints.from, endpoints.to, wire.routing, [], wire.waypoints, gridSize, endpoints.fromAxis);
           return {
             ...wire,

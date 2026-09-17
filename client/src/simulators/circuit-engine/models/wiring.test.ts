@@ -11,6 +11,8 @@ import {
   simplifyOrthogonalPath,
   type Point,
 } from '@/simulators/circuit-engine/models/wiring';
+import { calculateOrthogonalPath, buildComponentBBoxes } from '@/simulators/circuit-engine/models/wireRouter';
+import type { CircuitComponent } from '@/simulators/circuit-engine/models/circuitTypes';
 
 describe('ElectroLab Wire Routing & Waypoint Stability', () => {
   describe('1. Minimal Bend Orthogonal Routing (Fallback/Auto mode)', () => {
@@ -309,6 +311,109 @@ describe('ElectroLab Wire Routing & Waypoint Stability', () => {
       const pathV = routePath([0, 0], [100, 80], 'orthogonal', [], 20, 'vertical');
       expect(pathV).toEqual([[0, 0], [0, 80], [100, 80]]);
       expect(pathV.length).toBe(3);
+    });
+  });
+
+  describe('7. Dragging & Overhaul Orthogonal Optimization', () => {
+    it('collapses 3 consecutive collinear waypoints (A, B, C) sharing the same X or Y axis', () => {
+      // Horizontal collinear
+      const hPoints: Point[] = [[0, 100], [50, 100], [200, 100]];
+      expect(simplifyOrthogonalPath(hPoints)).toEqual([[0, 100], [200, 100]]);
+
+      // Vertical collinear
+      const vPoints: Point[] = [[100, 0], [100, 50], [100, 200]];
+      expect(simplifyOrthogonalPath(vPoints)).toEqual([[100, 0], [100, 200]]);
+    });
+
+    it('collapses 180° backtracks on the same straight line into a single segment', () => {
+      // Route right to 100, then retrace back left to 40 on same line
+      const backtrackH: Point[] = [[0, 0], [100, 0], [40, 0]];
+      expect(simplifyOrthogonalPath(backtrackH)).toEqual([[0, 0], [40, 0]]);
+
+      // Route down to 100, then retrace back up to 30 on same line
+      const backtrackV: Point[] = [[0, 0], [0, 100], [0, 30]];
+      expect(simplifyOrthogonalPath(backtrackV)).toEqual([[0, 0], [0, 30]]);
+    });
+
+    it('collapses U-turns (e.g. routing right, then up, then left back over itself)', () => {
+      // Start (0, 0), route right to (100, 0), up to (100, 20), then left back to (40, 20), down to (40, 60)
+      // This is the exact overshoot loop that happens when a component is dragged backwards.
+      const uTurnPath: Point[] = [
+        [0, 0],
+        [100, 0],
+        [100, 20],
+        [40, 20],
+        [40, 60],
+      ];
+      const simplified = simplifyOrthogonalPath(uTurnPath);
+      // The redundant detour to X=100 is eliminated; wire turns cleanly at X=40
+      expect(simplified).toEqual([
+        [0, 0],
+        [40, 0],
+        [40, 60],
+      ]);
+    });
+
+    it('removes interior self-intersecting loops', () => {
+      // Loop: (0, 50) -> (100, 50) -> (100, 100) -> (50, 100) -> (50, 0)
+      // Segment (50, 100)->(50, 0) crosses segment (0, 50)->(100, 50) at (50, 50)
+      const loopPath: Point[] = [
+        [0, 50],
+        [100, 50],
+        [100, 100],
+        [50, 100],
+        [50, 0],
+      ];
+      const simplified = simplifyOrthogonalPath(loopPath);
+      expect(simplified).toEqual([
+        [0, 50],
+        [50, 50],
+        [50, 0],
+      ]);
+    });
+
+    it('ensures wires connected to a component ignore that component bounding box during drag routing', () => {
+      const draggedComp: CircuitComponent = {
+        id: 'res-1',
+        type: 'resistor',
+        x: 100,
+        y: 100,
+        rotation: 0,
+        flipH: false,
+        flipV: false,
+        label: 'R1',
+        props: {},
+      };
+      const stationaryComp: CircuitComponent = {
+        id: 'res-2',
+        type: 'resistor',
+        x: 300,
+        y: 100,
+        rotation: 0,
+        flipH: false,
+        flipV: false,
+        label: 'R2',
+        props: {},
+      };
+
+      const components = [draggedComp, stationaryComp];
+      const excludeIds = new Set(['res-1', 'res-2']);
+
+      // BBoxes should be completely empty since both connected endpoints are excluded
+      const bboxes = buildComponentBBoxes(components, 25, excludeIds);
+      expect(bboxes.length).toBe(0);
+
+      // Route between the two components
+      const path = calculateOrthogonalPath([100, 100], [300, 100], components, 25, excludeIds);
+      expect(path).toEqual([[100, 100], [300, 100]]);
+    });
+
+    it('heavily penalizes bends to produce minimal-turn paths rather than staircases', () => {
+      // Route between diagonally offset points with no obstacles
+      const path = calculateOrthogonalPath([0, 0], [100, 100], [], 25);
+      // Must be a single-bend L-shape (3 points, exactly 1 corner), never a multi-turn staircase
+      expect(path.length).toBe(3);
+      expect(path).toEqual([[0, 0], [100, 0], [100, 100]]);
     });
   });
 });

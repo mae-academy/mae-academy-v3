@@ -276,7 +276,7 @@ function refreshWireEndpoints(wires: CircuitWire[], components: CircuitComponent
     if (!endpoints) return wire;
     const isConnectedToDragged = Boolean(draggedComponentId && (wire.fromComp === draggedComponentId || wire.toComp === draggedComponentId));
     if (isConnectedToDragged) {
-      if (wire.routing === 'manual' || (wire.waypoints && wire.waypoints.length > 0) || wire.path.length > 2) {
+      if (wire.routing === 'manual') {
         const updatedPath = reconnectPathEndpoints(wire.path, endpoints.from, endpoints.to, wire.routing, [], wire.waypoints, undefined, endpoints.fromAxis);
         return {
           ...wire,
@@ -284,8 +284,16 @@ function refreshWireEndpoints(wires: CircuitWire[], components: CircuitComponent
           waypoints: updatedPath.length > 2 ? updatedPath.slice(1, -1) : wire.waypoints,
         };
       }
-      const movingEnd = wire.toComp === draggedComponentId ? 'to' : wire.fromComp === draggedComponentId ? 'from' : 'none';
-      const newPath = dynamicRubberBandPath(endpoints.from, endpoints.to, endpoints.fromAxis, endpoints.toAxis, movingEnd);
+      const excludeIds = new Set([wire.fromComp, wire.toComp, draggedComponentId].filter(Boolean) as string[]);
+      const newPath = calculateOrthogonalPath(
+        endpoints.from,
+        endpoints.to,
+        components,
+        25,
+        excludeIds,
+        endpoints.fromAxis,
+        endpoints.toAxis,
+      );
       return {
         ...wire,
         routing: 'orthogonal' as const,
@@ -1368,7 +1376,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
       const isConnectedToDragged = Boolean(activeDraggedId && (wire.fromComp === activeDraggedId || wire.toComp === activeDraggedId));
 
       if (isConnectedToDragged) {
-        if (wire.routing === 'manual' || (wire.waypoints && wire.waypoints.length > 0) || wire.path.length > 2) {
+        if (wire.routing === 'manual') {
           const updatedPath = reconnectPathEndpoints(wire.path, endpoints.from, endpoints.to, wire.routing, [], wire.waypoints, gridSize, endpoints.fromAxis);
           return {
             ...wire,
@@ -1376,25 +1384,24 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
             waypoints: updatedPath.length > 2 ? updatedPath.slice(1, -1) : wire.waypoints,
           };
         }
-        // Phase 3: auto-routed wires reroute via A* during drag so they stay
-        // orthogonal and avoid the updated component positions.  The dragged
-        // component itself (and its connection partner) are excluded from the
-        // obstacle grid so the router can reach their terminals freely.
-        // calculateOrthogonalPath already falls back to a single-elbow L-shape
-        // when no clear path exists, so this is always safe.
-        const excludeIds = new Set([wire.fromComp, wire.toComp]);
+        // Force complete recalculation of the entire path for all wires connected to its pins.
+        // Intercept connected wires, purge old intermediate waypoints, and call routing engine.
+        // Dragged component itself and connection partner are excluded from obstacle collision.
+        const excludeIds = new Set([wire.fromComp, wire.toComp, activeDraggedId].filter(Boolean) as string[]);
         const newPath = calculateOrthogonalPath(
           endpoints.from,
           endpoints.to,
           documentComponents,
           gridSize,
           excludeIds,
+          endpoints.fromAxis,
+          endpoints.toAxis,
         );
         return {
           ...wire,
           routing: 'orthogonal' as const,
           path: newPath,
-          waypoints: newPath.length > 2 ? newPath.slice(1, -1) : undefined,
+          waypoints: undefined,
         };
       }
 
@@ -1441,12 +1448,12 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
         return wire;
       }
 
-      // 3. Manual routing OR wires with existing corners/waypoints: preserve interior geometry
+      // 3. Manual routing with explicit user waypoints: preserve interior geometry
       const existingWaypoints = (wire.waypoints && wire.waypoints.length > 0)
         ? wire.waypoints
-        : (wire.path.length > 2 ? wire.path.slice(1, -1) : undefined);
+        : (wire.routing === 'manual' && wire.path.length > 2 ? wire.path.slice(1, -1) : undefined);
 
-      if (wire.routing === 'manual' || existingWaypoints) {
+      if (wire.routing === 'manual') {
         const updatedPath = reconnectPathEndpoints(
           wire.path,
           endpoints.from,
@@ -1474,7 +1481,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
         };
       }
 
-      // 5. Unrouted 2-point draft wires (e.g. from schematic helpers / examples): calculate orthogonal path
+      // 5. Automatic routing: calculate obstacle-avoiding orthogonal path
       const excludeIds = new Set([wire.fromComp, wire.toComp]);
       const newPath = calculateOrthogonalPath(
         endpoints.from,
@@ -1482,12 +1489,14 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
         documentComponents,
         gridSize,
         excludeIds,
+        endpoints.fromAxis,
+        endpoints.toAxis,
       );
       return {
         ...wire,
         routing: 'orthogonal' as const,
         path: newPath,
-        waypoints: newPath.length > 2 ? newPath.slice(1, -1) : undefined,
+        waypoints: undefined,
       };
     });
   }, [canvasWireEndpoints, gridSize]);

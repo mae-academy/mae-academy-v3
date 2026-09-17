@@ -132,42 +132,220 @@ export function enforceOrthogonal(points: Point[]): Point[] {
 }
 
 /**
- * Collapses consecutive duplicates and collinear horizontal/vertical intermediate vertices
- * into the simplest clean orthogonal path.  After simplification, enforces the strict
- * rectilinear invariant so that NO diagonal segment can ever survive.
+ * Removes consecutive duplicate points within floating-point tolerance.
  */
-export function simplifyOrthogonalPath(points: Point[]): Point[] {
-  if (points.length <= 2) return enforceOrthogonal(points);
-
-  // 1. Remove consecutive duplicates
-  const dedup: Point[] = [points[0]];
-  for (let i = 1; i < points.length; i++) {
-    const prev = dedup[dedup.length - 1];
-    const curr = points[i];
-    if (curr[0] !== prev[0] || curr[1] !== prev[1]) {
-      dedup.push(curr);
+function removeDuplicates(pts: Point[]): Point[] {
+  if (pts.length <= 1) return pts;
+  const result: Point[] = [pts[0]];
+  for (let i = 1; i < pts.length; i++) {
+    const prev = result[result.length - 1];
+    const curr = pts[i];
+    if (Math.abs(curr[0] - prev[0]) > 1e-4 || Math.abs(curr[1] - prev[1]) > 1e-4) {
+      result.push(curr);
     }
   }
-  if (dedup.length <= 2) return enforceOrthogonal(dedup);
+  return result;
+}
 
-  // 2. Remove collinear intermediate points
-  const simplified: Point[] = [dedup[0]];
-  for (let i = 1; i < dedup.length - 1; i++) {
-    const prev = simplified[simplified.length - 1];
-    const curr = dedup[i];
-    const next = dedup[i + 1];
+/**
+ * Removes intermediate vertices when three consecutive points share the same X or Y axis.
+ * Also eliminates 180° backtracks along the same straight line.
+ */
+function removeCollinear(pts: Point[]): Point[] {
+  if (pts.length <= 2) return pts;
+  const result: Point[] = [pts[0]];
+  for (let i = 1; i < pts.length - 1; i++) {
+    const prev = result[result.length - 1];
+    const curr = pts[i];
+    const next = pts[i + 1];
 
-    const isCollinearH = prev[1] === curr[1] && curr[1] === next[1];
-    const isCollinearV = prev[0] === curr[0] && curr[0] === next[0];
+    const isCollinearH = Math.abs(prev[1] - curr[1]) < 1e-4 && Math.abs(curr[1] - next[1]) < 1e-4;
+    const isCollinearV = Math.abs(prev[0] - curr[0]) < 1e-4 && Math.abs(curr[0] - next[0]) < 1e-4;
 
     if (!isCollinearH && !isCollinearV) {
-      simplified.push(curr);
+      result.push(curr);
     }
   }
-  simplified.push(dedup[dedup.length - 1]);
+  result.push(pts[pts.length - 1]);
+  return result;
+}
 
-  // 3. Final safety: enforce orthogonal on the simplified result
-  return enforceOrthogonal(simplified);
+/**
+ * Collapses 3-segment U-turns (bracket/hairpin detours A -> B -> C -> D)
+ * where segments AB and CD are parallel and opposite, eliminating redundant loops.
+ */
+function collapseUTurns(pts: Point[]): { changed: boolean; points: Point[] } {
+  if (pts.length < 4) return { changed: false, points: pts };
+
+  for (let i = 0; i < pts.length - 3; i++) {
+    const a = pts[i];
+    const b = pts[i + 1];
+    const c = pts[i + 2];
+    const d = pts[i + 3];
+
+    // Case 1: Horizontal -> Vertical -> Horizontal
+    const abH = Math.abs(a[1] - b[1]) < 1e-4;
+    const bcV = Math.abs(b[0] - c[0]) < 1e-4;
+    const cdH = Math.abs(c[1] - d[1]) < 1e-4;
+
+    if (abH && bcV && cdH) {
+      const dxAB = b[0] - a[0];
+      const dxCD = d[0] - c[0];
+      if (dxAB * dxCD < -1e-4) {
+        const minAB = Math.min(a[0], b[0]);
+        const maxAB = Math.max(a[0], b[0]);
+
+        if (d[0] >= minAB - 1e-4 && d[0] <= maxAB + 1e-4) {
+          const newCorner: Point = [d[0], a[1]];
+          const newPts = [...pts.slice(0, i + 1), newCorner, ...pts.slice(i + 3)];
+          return { changed: true, points: newPts };
+        }
+
+        const minCD = Math.min(c[0], d[0]);
+        const maxCD = Math.max(c[0], d[0]);
+        if (a[0] >= minCD - 1e-4 && a[0] <= maxCD + 1e-4) {
+          const newCorner: Point = [a[0], c[1]];
+          const newPts = [...pts.slice(0, i + 1), newCorner, ...pts.slice(i + 3)];
+          return { changed: true, points: newPts };
+        }
+      }
+    }
+
+    // Case 2: Vertical -> Horizontal -> Vertical
+    const abV = Math.abs(a[0] - b[0]) < 1e-4;
+    const bcH = Math.abs(b[1] - c[1]) < 1e-4;
+    const cdV = Math.abs(c[0] - d[0]) < 1e-4;
+
+    if (abV && bcH && cdV) {
+      const dyAB = b[1] - a[1];
+      const dyCD = d[1] - c[1];
+      if (dyAB * dyCD < -1e-4) {
+        const minAB = Math.min(a[1], b[1]);
+        const maxAB = Math.max(a[1], b[1]);
+
+        if (d[1] >= minAB - 1e-4 && d[1] <= maxAB + 1e-4) {
+          const newCorner: Point = [a[0], d[1]];
+          const newPts = [...pts.slice(0, i + 1), newCorner, ...pts.slice(i + 3)];
+          return { changed: true, points: newPts };
+        }
+
+        const minCD = Math.min(c[1], d[1]);
+        const maxCD = Math.max(c[1], d[1]);
+        if (a[1] >= minCD - 1e-4 && a[1] <= maxCD + 1e-4) {
+          const newCorner: Point = [c[0], a[1]];
+          const newPts = [...pts.slice(0, i + 1), newCorner, ...pts.slice(i + 3)];
+          return { changed: true, points: newPts };
+        }
+      }
+    }
+  }
+
+  return { changed: false, points: pts };
+}
+
+/**
+ * Detects and snips interior self-intersecting loops in an orthogonal path.
+ */
+function removeSelfIntersections(pts: Point[]): { changed: boolean; points: Point[] } {
+  if (pts.length < 4) return { changed: false, points: pts };
+
+  for (let i = 0; i < pts.length - 2; i++) {
+    const p1 = pts[i];
+    const p2 = pts[i + 1];
+    const seg1H = Math.abs(p1[1] - p2[1]) < 1e-4;
+    const seg1V = Math.abs(p1[0] - p2[0]) < 1e-4;
+
+    for (let j = i + 2; j < pts.length - 1; j++) {
+      const p3 = pts[j];
+      const p4 = pts[j + 1];
+      const seg2H = Math.abs(p3[1] - p4[1]) < 1e-4;
+      const seg2V = Math.abs(p3[0] - p4[0]) < 1e-4;
+
+      if (seg1H && seg2V) {
+        const hY = p1[1];
+        const minX = Math.min(p1[0], p2[0]);
+        const maxX = Math.max(p1[0], p2[0]);
+
+        const vX = p3[0];
+        const minY = Math.min(p3[1], p4[1]);
+        const maxY = Math.max(p3[1], p4[1]);
+
+        if (vX > minX + 1e-4 && vX < maxX - 1e-4 && hY > minY + 1e-4 && hY < maxY - 1e-4) {
+          const inter: Point = [vX, hY];
+          const newPts = [...pts.slice(0, i + 1), inter, ...pts.slice(j + 1)];
+          return { changed: true, points: newPts };
+        }
+      } else if (seg1V && seg2H) {
+        const vX = p1[0];
+        const minY = Math.min(p1[1], p2[1]);
+        const maxY = Math.max(p1[1], p2[1]);
+
+        const hY = p3[1];
+        const minX = Math.min(p3[0], p4[0]);
+        const maxX = Math.max(p3[0], p4[0]);
+
+        if (vX > minX + 1e-4 && vX < maxX - 1e-4 && hY > minY + 1e-4 && hY < maxY - 1e-4) {
+          const inter: Point = [vX, hY];
+          const newPts = [...pts.slice(0, i + 1), inter, ...pts.slice(j + 1)];
+          return { changed: true, points: newPts };
+        }
+      }
+    }
+  }
+
+  return { changed: false, points: pts };
+}
+
+export interface SimplifyOptions {
+  preserveCorners?: boolean;
+}
+
+/**
+ * Collapses consecutive duplicates, collinear horizontal/vertical intermediate vertices,
+ * redundant 180° backtracks, U-turn detours, and self-intersections into the cleanest minimal
+ * orthogonal path. After simplification, enforces strict rectilinear geometry.
+ * When `preserveCorners` is true, explicit user corners/waypoints are not collapsed by U-turn reduction.
+ */
+export function simplifyOrthogonalPath(points: Point[], options?: SimplifyOptions): Point[] {
+  if (points.length <= 2) return enforceOrthogonal(points);
+
+  let current = enforceOrthogonal(points);
+  const preserveCorners = options?.preserveCorners ?? false;
+
+  // Run iterative reduction until convergence (max 10 iterations to prevent infinite loops)
+  for (let iter = 0; iter < 10; iter++) {
+    const prevLen = current.length;
+
+    // 1. Remove consecutive duplicates
+    current = removeDuplicates(current);
+    if (current.length <= 2) break;
+
+    // 2. Remove collinear intermediate points and straight 180° backtracks
+    current = removeCollinear(current);
+    if (current.length <= 2) break;
+
+    if (!preserveCorners) {
+      // 3. Collapse U-turns (bracket detours)
+      const uTurnResult = collapseUTurns(current);
+      if (uTurnResult.changed) {
+        current = uTurnResult.points;
+        continue;
+      }
+
+      // 4. Remove self-intersecting loops
+      const loopResult = removeSelfIntersections(current);
+      if (loopResult.changed) {
+        current = loopResult.points;
+        continue;
+      }
+    }
+
+    if (current.length === prevLen) {
+      break;
+    }
+  }
+
+  return enforceOrthogonal(current);
 }
 
 /**
@@ -244,7 +422,7 @@ export function routeTJunctionPath(
   }
 
   const rawPath: Point[] = [from, ...lockedCorners, approachCorner, junctionPoint];
-  return simplifyOrthogonalPath(rawPath);
+  return simplifyOrthogonalPath(rawPath, { preserveCorners: lockedCorners.length > 0 });
 }
 
 /**
@@ -401,10 +579,10 @@ export function reconnectPathEndpoints(
     return existingPath;
   }
   if (waypoints && waypoints.length > 0) {
-    return simplifyOrthogonalPath([from, ...waypoints, to]);
+    return simplifyOrthogonalPath([from, ...waypoints, to], { preserveCorners: true });
   }
   if (routing === 'manual' && existingPath.length > 2) {
-    return simplifyOrthogonalPath([from, ...existingPath.slice(1, -1), to]);
+    return simplifyOrthogonalPath([from, ...existingPath.slice(1, -1), to], { preserveCorners: true });
   }
   if (routing === 'straight') return enforceOrthogonal([from, to]);
   return routePath(from, to, routing, obstacles, grid, fromAxis);
