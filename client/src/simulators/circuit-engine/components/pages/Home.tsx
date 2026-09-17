@@ -75,6 +75,7 @@ import {
 } from '@/simulators/circuit-engine/models/circuitTypes';
 import { SimulationEngine } from '@/simulators/circuit-engine/engine/simulation';
 import { detectCoilConflicts } from '@/simulators/circuit-engine/engine/analogSimulation';
+import { evaluateComponentHealth } from '@/simulators/circuit-engine/models/componentHealthCheck';
 import { compileNodalGeometry, useSimulation, type TabBMnaState } from '@/simulators/circuit-engine/components/hooks/useSimulation';
 import type { MNAElement } from '@/simulators/circuit-engine/engine/mnaSolver';
 import { compileMeshGeometry } from '@/simulators/circuit-engine/components/meshGeometry';
@@ -1059,6 +1060,9 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
   const nadInputRef = useRef<HTMLInputElement>(null);
   const simulation = useRef<SimulationEngine>(createSimulationEngine());
   const animationFrame = useRef<number | null>(null);
+  // Read inside the rAF loop below instead of a dependency, so a burnout write-back (which changes
+  // `effectiveCircuitComponents`) never tears down and restarts the loop mid-run.
+  const liveComponentsRef = useRef<CircuitComponent[]>([]);
   const componentRef = useRef(components);
   const wiresRef = useRef(wires);
   const textsRef = useRef(texts);
@@ -2595,6 +2599,10 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
   }, [effectiveCircuitComponents, wires]);
 
   useEffect(() => {
+    liveComponentsRef.current = effectiveCircuitComponents;
+  }, [effectiveCircuitComponents]);
+
+  useEffect(() => {
     if (!simulationRunning) return undefined;
     let last = performance.now();
     const animate = (now: number) => {
@@ -2603,6 +2611,26 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
       const result = simulation.current.step(Math.max(0.0001, elapsed * simulationSpeed));
       setSnapshot(result);
       setAnimationTime(result.time);
+
+      // Burnout health check: only components exceeding their ratings for the first time write
+      // back to React state, so an already-burned part (skipped internally by the health check)
+      // never re-triggers a render. `liveComponentsRef` is updated synchronously right here (not
+      // left to the [effectiveCircuitComponents] effect above) — this loop runs on every rAF tick,
+      // faster than React commits a render, so waiting for that effect to catch up let the same
+      // component re-qualify as "newly burned" on the next tick or two and spin `setComponents`
+      // into React's "Maximum update depth exceeded" — reproduced live before this fix.
+      const evaluated = evaluateComponentHealth({ components: liveComponentsRef.current }, result);
+      const newlyBurnedIds = evaluated
+        .filter((evaluatedComponent, index) => evaluatedComponent.state?.isBurned && !liveComponentsRef.current[index]?.state?.isBurned)
+        .map(evaluatedComponent => evaluatedComponent.id);
+      if (newlyBurnedIds.length > 0) {
+        liveComponentsRef.current = evaluated;
+        const burnedIdSet = new Set(newlyBurnedIds);
+        setComponents(previous => previous.map(component =>
+          burnedIdSet.has(component.id) ? { ...component, state: { ...component.state, isBurned: true } } : component
+        ));
+      }
+
       animationFrame.current = requestAnimationFrame(animate);
     };
     animationFrame.current = requestAnimationFrame(animate);
