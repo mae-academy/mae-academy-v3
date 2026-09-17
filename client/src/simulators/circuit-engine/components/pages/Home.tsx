@@ -233,18 +233,36 @@ function getComponentTerminalPosition(component: CircuitComponent, terminalId: s
 }
 
 function currentWireEndpoints(wire: CircuitWire, components: CircuitComponent[]): { from: Point; to: Point; fromAxis: TabDTerminalAxis; toAxis: TabDTerminalAxis } | null {
-  const fromComponent = components.find(component => component.id === wire.fromComp);
-  if (!fromComponent) return null;
-  const from = getComponentTerminalPosition(fromComponent, wire.fromTerm);
-  const fromAxis: TabDTerminalAxis = from && Math.abs(from[0] - fromComponent.x) >= Math.abs(from[1] - fromComponent.y) ? 'horizontal' : 'vertical';
+  const isJunc = (id: string) => id.startsWith('junc_') || id.startsWith('junction') || id === 'junc' || id === 'junction';
+  let from: Point | null = null;
+  let fromAxis: TabDTerminalAxis = 'horizontal';
+
+  if (isJunc(wire.fromComp)) {
+    from = wire.path?.[0] ?? wire.junctionPoint ?? null;
+    fromAxis = wire.path && wire.path.length > 1 && Math.abs(wire.path[1][0] - wire.path[0][0]) > Math.abs(wire.path[1][1] - wire.path[0][1]) ? 'horizontal' : 'vertical';
+  } else {
+    const fromComponent = components.find(component => component.id === wire.fromComp);
+    if (!fromComponent) return null;
+    from = getComponentTerminalPosition(fromComponent, wire.fromTerm);
+    fromAxis = from && Math.abs(from[0] - fromComponent.x) >= Math.abs(from[1] - fromComponent.y) ? 'horizontal' : 'vertical';
+  }
 
   if (wire.junctionPoint) {
     return from ? { from, to: wire.junctionPoint, fromAxis, toAxis: fromAxis } : null;
   }
-  const toComponent = components.find(component => component.id === wire.toComp);
-  if (!toComponent) return null;
-  const to = getComponentTerminalPosition(toComponent, wire.toTerm);
-  const toAxis: TabDTerminalAxis = to && Math.abs(to[0] - toComponent.x) >= Math.abs(to[1] - toComponent.y) ? 'horizontal' : 'vertical';
+
+  let to: Point | null = null;
+  let toAxis: TabDTerminalAxis = 'horizontal';
+  if (isJunc(wire.toComp)) {
+    to = wire.path?.[wire.path.length - 1] ?? wire.junctionPoint ?? null;
+    toAxis = wire.path && wire.path.length > 1 && Math.abs(wire.path[wire.path.length - 1][0] - wire.path[wire.path.length - 2][0]) > Math.abs(wire.path[wire.path.length - 1][1] - wire.path[wire.path.length - 2][1]) ? 'horizontal' : 'vertical';
+  } else {
+    const toComponent = components.find(component => component.id === wire.toComp);
+    if (!toComponent) return null;
+    to = getComponentTerminalPosition(toComponent, wire.toTerm);
+    toAxis = to && Math.abs(to[0] - toComponent.x) >= Math.abs(to[1] - toComponent.y) ? 'horizontal' : 'vertical';
+  }
+
   return from && to ? { from, to, fromAxis, toAxis } : null;
 }
 
@@ -1292,9 +1310,11 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     let from: Point | null = null;
     let fromAxis: TabDTerminalAxis = 'horizontal';
 
-    if (wire.fromComp.startsWith('junc_')) {
-      from = wire.path[0];
-      fromAxis = wire.path.length > 1 && Math.abs(wire.path[1][0] - wire.path[0][0]) > Math.abs(wire.path[1][1] - wire.path[0][1]) ? 'horizontal' : 'vertical';
+    const isJunc = (id: string) => id.startsWith('junc_') || id.startsWith('junction') || id === 'junc' || id === 'junction';
+
+    if (isJunc(wire.fromComp)) {
+      from = wire.path?.[0] ?? wire.junctionPoint ?? null;
+      fromAxis = wire.path && wire.path.length > 1 && Math.abs(wire.path[1][0] - wire.path[0][0]) > Math.abs(wire.path[1][1] - wire.path[0][1]) ? 'horizontal' : 'vertical';
     } else {
       const fromComponent = documentComponents.find(component => component.id === wire.fromComp);
       if (!fromComponent) return null;
@@ -1310,9 +1330,9 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
 
     let to: Point | null = null;
     let toAxis: TabDTerminalAxis = 'horizontal';
-    if (wire.toComp.startsWith('junc_')) {
-      to = wire.path[wire.path.length - 1];
-      toAxis = wire.path.length > 1 && Math.abs(wire.path[wire.path.length - 1][0] - wire.path[wire.path.length - 2][0]) > Math.abs(wire.path[wire.path.length - 1][1] - wire.path[wire.path.length - 2][1]) ? 'horizontal' : 'vertical';
+    if (isJunc(wire.toComp)) {
+      to = wire.path?.[wire.path.length - 1] ?? wire.junctionPoint ?? null;
+      toAxis = wire.path && wire.path.length > 1 && Math.abs(wire.path[wire.path.length - 1][0] - wire.path[wire.path.length - 2][0]) > Math.abs(wire.path[wire.path.length - 1][1] - wire.path[wire.path.length - 2][1]) ? 'horizontal' : 'vertical';
     } else {
       const toComponent = documentComponents.find(component => component.id === wire.toComp);
       if (!toComponent) return null;
@@ -1393,14 +1413,40 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
       const endpoints = canvasWireEndpoints(wire, documentComponents);
       if (!endpoints) return wire;
 
-      if (wire.routing === 'manual' || (wire.waypoints && wire.waypoints.length > 0)) {
+      // 1. Straight wires: preserve 'straight' routing and simple 2-point line
+      if (wire.routing === 'straight') {
+        return {
+          ...wire,
+          routing: 'straight',
+          path: [endpoints.from, endpoints.to],
+          waypoints: undefined,
+        };
+      }
+
+      // 2. If the wire already has a valid path matching the live endpoints within 1px, keep it untouched
+      if (
+        wire.path.length >= 2 &&
+        Math.abs(wire.path[0][0] - endpoints.from[0]) < 1 &&
+        Math.abs(wire.path[0][1] - endpoints.from[1]) < 1 &&
+        Math.abs(wire.path[wire.path.length - 1][0] - endpoints.to[0]) < 1 &&
+        Math.abs(wire.path[wire.path.length - 1][1] - endpoints.to[1]) < 1
+      ) {
+        return wire;
+      }
+
+      // 3. Manual routing OR wires with existing corners/waypoints: preserve interior geometry
+      const existingWaypoints = (wire.waypoints && wire.waypoints.length > 0)
+        ? wire.waypoints
+        : (wire.path.length > 2 ? wire.path.slice(1, -1) : undefined);
+
+      if (wire.routing === 'manual' || existingWaypoints) {
         const updatedPath = reconnectPathEndpoints(
           wire.path,
           endpoints.from,
           endpoints.to,
           wire.routing,
           [],
-          wire.waypoints,
+          existingWaypoints,
           gridSize,
           endpoints.fromAxis,
         );
@@ -1411,6 +1457,17 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
         };
       }
 
+      // 4. Trivially aligned endpoints (straight horizontal or vertical)
+      if (endpoints.from[0] === endpoints.to[0] || endpoints.from[1] === endpoints.to[1]) {
+        return {
+          ...wire,
+          routing: 'orthogonal' as const,
+          path: [endpoints.from, endpoints.to],
+          waypoints: undefined,
+        };
+      }
+
+      // 5. Unrouted 2-point draft wires (e.g. from schematic helpers / examples): calculate orthogonal path
       const excludeIds = new Set([wire.fromComp, wire.toComp]);
       const newPath = calculateOrthogonalPath(
         endpoints.from,
@@ -1627,12 +1684,24 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
       y: t.y + dy
     }));
 
+    // Map any junction IDs in clipboard wires to new unique junction IDs
+    for (const w of clipboard.wires) {
+      if (w.fromComp.startsWith('junc_') && !idMap.has(w.fromComp)) {
+        idMap.set(w.fromComp, `junc_${nanoid(10)}`);
+      }
+      if (w.toComp.startsWith('junc_') && !idMap.has(w.toComp)) {
+        idMap.set(w.toComp, `junc_${nanoid(10)}`);
+      }
+    }
+
     const pastedWires = clipboard.wires.map(w => ({
       ...w,
       id: nanoid(10),
       fromComp: idMap.get(w.fromComp) ?? w.fromComp,
       toComp: idMap.get(w.toComp) ?? w.toComp,
-      path: w.path.map(p => [p[0] + dx, p[1] + dy] as Point)
+      path: w.path.map(p => [p[0] + dx, p[1] + dy] as Point),
+      waypoints: w.waypoints ? w.waypoints.map(p => [p[0] + dx, p[1] + dy] as Point) : undefined,
+      junctionPoint: w.junctionPoint ? [w.junctionPoint[0] + dx, w.junctionPoint[1] + dy] as Point : undefined,
     }));
 
     const nextPastedComponents = [...components, ...pastedComponents];
@@ -1667,9 +1736,50 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
   const loadCircuitDocument = useCallback((document: NADDocument) => {
     const importedComponents = tabDUiRefinement ? filterTabDImportedComponents(document.components) : document.components;
     const importedIds = new Set(importedComponents.map((component) => component.id));
-    const importedWires = document.wires
-      .map(normalizeWire)
-      .filter((wire) => importedIds.has(wire.fromComp) && importedIds.has(wire.toComp));
+
+    const isJunction = (id: string) =>
+      id.startsWith('junc_') ||
+      id.startsWith('junction') ||
+      id === 'junction' ||
+      id === 'junc';
+
+    const normalizedWires = document.wires.map(normalizeWire);
+
+    // Find all junctions that are transitively connected to at least one valid imported component
+    const validJunctions = new Set<string>();
+    const queue: string[] = Array.from(importedIds);
+    const visited = new Set<string>(queue);
+
+    const adj = new Map<string, Set<string>>();
+    for (const w of normalizedWires) {
+      if (!adj.has(w.fromComp)) adj.set(w.fromComp, new Set());
+      if (!adj.has(w.toComp)) adj.set(w.toComp, new Set());
+      adj.get(w.fromComp)!.add(w.toComp);
+      adj.get(w.toComp)!.add(w.fromComp);
+    }
+
+    while (queue.length > 0) {
+      const curr = queue.shift()!;
+      const neighbors = adj.get(curr);
+      if (neighbors) {
+        neighbors.forEach((nbr) => {
+          if (!visited.has(nbr)) {
+            visited.add(nbr);
+            if (isJunction(nbr)) {
+              validJunctions.add(nbr);
+              queue.push(nbr);
+            }
+          }
+        });
+      }
+    }
+
+    const importedWires = normalizedWires.filter((wire) => {
+      const fromValid = importedIds.has(wire.fromComp) || validJunctions.has(wire.fromComp);
+      const toValid = importedIds.has(wire.toComp) || validJunctions.has(wire.toComp) || Boolean(wire.junctionPoint);
+      return fromValid && toValid;
+    });
+
     const refreshedWires = recalculateAllOrthogonalPaths(importedWires, importedComponents);
 
     setComponents(importedComponents);
@@ -1782,11 +1892,22 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
           }
         });
       }
+      if (wire.junctionPoint && Number.isFinite(wire.junctionPoint[0]) && Number.isFinite(wire.junctionPoint[1])) {
+        expand(wire.junctionPoint[0], wire.junctionPoint[1]);
+      }
+      if (Array.isArray(wire.waypoints)) {
+        wire.waypoints.forEach((point) => {
+          if (point && point.length >= 2 && Number.isFinite(point[0]) && Number.isFinite(point[1])) {
+            expand(point[0], point[1]);
+          }
+        });
+      }
     });
 
     texts.forEach((text) => {
       expand(text.x, text.y);
-      expand(text.x + 80, text.y + 24);
+      const approxWidth = Math.max(80, (text.text?.length || 10) * (text.fontSize || 14) * 0.65);
+      expand(text.x + approxWidth, text.y + (text.fontSize || 14) * 1.5);
     });
 
     if (!Number.isFinite(minX) || !Number.isFinite(maxX) || !Number.isFinite(minY) || !Number.isFinite(maxY)) {
@@ -3193,10 +3314,14 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
         if (elementsLayer && typeof elementsLayer.getBBox === 'function') {
           const liveBbox = elementsLayer.getBBox();
           if (Number.isFinite(liveBbox.x) && Number.isFinite(liveBbox.y) && liveBbox.width > 0 && liveBbox.height > 0) {
-            cropX = Math.round(liveBbox.x - padding);
-            cropY = Math.round(liveBbox.y - padding);
-            cropWidth = Math.round(liveBbox.width + padding * 2);
-            cropHeight = Math.round(liveBbox.height + padding * 2);
+            const combinedMinX = Math.min(bounds.minX, liveBbox.x);
+            const combinedMinY = Math.min(bounds.minY, liveBbox.y);
+            const combinedMaxX = Math.max(bounds.maxX, liveBbox.x + liveBbox.width);
+            const combinedMaxY = Math.max(bounds.maxY, liveBbox.y + liveBbox.height);
+            cropX = Math.round(combinedMinX - padding);
+            cropY = Math.round(combinedMinY - padding);
+            cropWidth = Math.round((combinedMaxX - combinedMinX) + padding * 2);
+            cropHeight = Math.round((combinedMaxY - combinedMinY) + padding * 2);
           }
         }
       } catch {
@@ -3409,10 +3534,14 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
         if (elementsLayer && typeof elementsLayer.getBBox === 'function') {
           const liveBbox = elementsLayer.getBBox();
           if (Number.isFinite(liveBbox.x) && Number.isFinite(liveBbox.y) && liveBbox.width > 0 && liveBbox.height > 0) {
-            cropX = Math.round(liveBbox.x - padding);
-            cropY = Math.round(liveBbox.y - padding);
-            cropWidth = Math.round(liveBbox.width + padding * 2);
-            cropHeight = Math.round(liveBbox.height + padding * 2);
+            const combinedMinX = Math.min(bounds.minX, liveBbox.x);
+            const combinedMinY = Math.min(bounds.minY, liveBbox.y);
+            const combinedMaxX = Math.max(bounds.maxX, liveBbox.x + liveBbox.width);
+            const combinedMaxY = Math.max(bounds.maxY, liveBbox.y + liveBbox.height);
+            cropX = Math.round(combinedMinX - padding);
+            cropY = Math.round(combinedMinY - padding);
+            cropWidth = Math.round((combinedMaxX - combinedMinX) + padding * 2);
+            cropHeight = Math.round((combinedMaxY - combinedMinY) + padding * 2);
           }
         }
       } catch {
@@ -4176,6 +4305,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                           onPointerEnter={() => setHoveredComponentId(component.id)}
                           onPointerLeave={() => setHoveredComponentId(null)}
                         >
+                          {component.state?.isBurned && <title>⚠️ COMPONENT DESTROYED - Exceeded maximum ratings</title>}
                           {isSuperpositionDeactivatedVoltage ? (
                             /* Deactivated Voltage Source (Short Circuit): ghosted original source with solid wire overlay connecting pin1 to pin2 matching circuit wire stroke width */
                             (() => {
@@ -4201,6 +4331,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                                         isEnergized: powered,
                                         isConflicted: conflictedCoilIds.has(component.id),
                                         _intensity: intensity,
+                                        _isBurned: Boolean(component.state?.isBurned),
                                         _superpositionActive: false,
                                         ...(motorVEff !== undefined ? { _vEff: motorVEff } : {}),
                                         _documentedStyle: tabDUiRefinement,
@@ -4253,6 +4384,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                                         isEnergized: powered,
                                         isConflicted: conflictedCoilIds.has(component.id),
                                         _intensity: intensity,
+                                        _isBurned: Boolean(component.state?.isBurned),
                                         _superpositionActive: false,
                                         ...(motorVEff !== undefined ? { _vEff: motorVEff } : {}),
                                         _documentedStyle: tabDUiRefinement,
@@ -4285,6 +4417,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                                   isEnergized: powered,
                                   isConflicted: conflictedCoilIds.has(component.id),
                                   _intensity: intensity,
+                                  _isBurned: Boolean(component.state?.isBurned),
                                   _superpositionActive: isSuperpositionActiveSource,
                                   ...(motorVEff !== undefined ? { _vEff: motorVEff } : {}),
                                   _documentedStyle: tabDUiRefinement,
@@ -4646,6 +4779,23 @@ function ComponentInspector({ colors, component, definition, allComponents, link
 
   return <div style={{ overflowY: 'auto', minHeight: 0 }}>
     <InspectorHeader colors={colors} title={<span className="text-slate-800 dark:text-slate-200" style={{ display: 'inline-flex', alignItems: 'baseline', gap: 6 }}><span style={{ fontFamily: "'KaTeX_Math', 'KaTeX_Main', serif", fontSize: 15 }}><V3Math math={componentLabelToLatex(component.type === 'ground' ? 'GND' : component.label)} /></span><span className="text-slate-600 dark:text-slate-300" style={{ fontSize: 11, letterSpacing: 0, textTransform: 'none', fontFamily: "'KaTeX_Main', 'KaTeX_Math', serif" }}><ElectricalLabel label={definition.name} /></span></span>} subtitle={definition.description} />
+    {component.state?.isBurned && (
+      <div
+        role="alert"
+        style={{
+          margin: '0 12px 10px',
+          padding: '8px 10px',
+          borderRadius: 6,
+          background: 'rgba(239, 68, 68, 0.12)',
+          border: '1px solid #EF4444',
+          color: '#EF4444',
+          fontSize: 12,
+          fontWeight: 600,
+        }}
+      >
+        ⚠️ COMPONENT DESTROYED - Exceeded maximum ratings
+      </div>
+    )}
     <InspectorSection colors={colors} label="Instance label">
       <PropertyRow colors={colors} label="Reference">
         <input value={component.type === 'ground' ? 'GND' : component.label} disabled={component.type === 'ground'} onChange={event => onLabelChange(component.type === 'ground' ? 'GND' : event.target.value)} style={mathReferenceInputStyle(colors)} />

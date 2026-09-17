@@ -1715,6 +1715,33 @@ export const SYMBOL_MAP: Record<string, SymbolFC> = {
   'coil': CoilSymbol,
 };
 
+/** Burned-component body tint (Red-500), applied via `currentColor` so it reaches every symbol's strokes/fills at once. */
+const BURN_RED = '#EF4444';
+/** Explosion/smoke accent (Orange-500). */
+const BURN_ORANGE = '#F97316';
+
+/**
+ * Jagged burst + smoke puffs, centered on the symbol's own origin (every symbol in this file is
+ * drawn centered at (0,0), so no extra positioning is needed). `animate-pulse` is Tailwind's
+ * built-in opacity-pulse keyframe, reused here rather than hand-rolling one.
+ */
+const BurnOverlay: SymbolFC = () => (
+  <g className="animate-pulse" pointerEvents="none">
+    <polygon
+      points="0,-26 6,-9 22,-14 10,-2 26,4 8,6 12,22 0,10 -12,22 -8,6 -26,4 -10,-2 -22,-14 -6,-9"
+      fill={BURN_ORANGE}
+      fillOpacity={0.55}
+      stroke={BURN_RED}
+      strokeWidth={1}
+      strokeOpacity={0.75}
+      strokeLinejoin="round"
+    />
+    <circle cx={-11} cy={-21} r={6} fill={BURN_RED} fillOpacity={0.35} />
+    <circle cx={13} cy={-25} r={4} fill={BURN_ORANGE} fillOpacity={0.4} />
+    <circle cx={0} cy={0} r={30} fill="none" stroke={BURN_RED} strokeWidth={1} strokeOpacity={0.3} />
+  </g>
+);
+
 export function renderSymbol(
   symbolId: string,
   powered: boolean,
@@ -1723,6 +1750,17 @@ export function renderSymbol(
 ): ReactNode {
   const Sym = SYMBOL_MAP[symbolId];
   if (!Sym) return <text x={0} y={5} textAnchor="middle" fontSize={10} fill="#666">?</text>;
+  const isBurned = Boolean(props?._isBurned);
+  if (isBurned) {
+    // A burned part draws no current, so it never re-lights; `color` cascades to every
+    // `stroke`/`fill="currentColor"` in the symbol, turning its body red in one place.
+    return (
+      <g color={BURN_RED}>
+        <Sym powered={false} props={props} animTime={animTime} />
+        <BurnOverlay powered={false} props={props} animTime={animTime} />
+      </g>
+    );
+  }
   return <Sym powered={powered} props={props} animTime={animTime} />;
 }
 
