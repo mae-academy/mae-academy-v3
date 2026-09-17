@@ -1,12 +1,22 @@
 /** Turns netlist-ready SPICE components into a deck ngspice can run in batch mode. */
 
 import {
+  DEFAULT_OPAMP_GAIN,
+  DEFAULT_OPAMP_GBW,
+  DEFAULT_OPAMP_INPUT_RESISTANCE,
+  DEFAULT_OPAMP_OUTPUT_RESISTANCE,
+  DEFAULT_OPAMP_RAIL_MARGIN,
+  DEFAULT_OPAMP_SLEW_RATE,
+  DEFAULT_OPAMP_SUPPLY,
   elementNets,
+  IDEAL_OPAMP_GAIN,
   isSpiceElement,
+  MIN_OPAMP_GAIN,
   SPICE_GROUND,
   SPICE_PREFIXES,
   type SpiceComponent,
   type SpiceNet,
+  type SpiceOpAmp,
 } from "@/simulators/circuit-engine/engine/spice/spiceTypes";
 import type { SimulationMode } from "@/simulators/circuit-engine/engine/spice/spiceAdapter";
 
@@ -544,6 +554,174 @@ const THYRISTOR_GATE_SHUNT = 1000;
  */
 const THYRISTOR_ANODE_SHUNT = 10000;
 
+/* ------------------------------------------------------------------ Op-amp macromodel --- */
+
+/** Ideal mode's stand-ins for infinite input impedance and zero output impedance. */
+const IDEAL_OPAMP_INPUT_RESISTANCE = 1e12;
+const IDEAL_OPAMP_OUTPUT_RESISTANCE = 1e-3;
+
+/**
+ * Compensation capacitance the dominant pole is built around, in farads. Any value works — the pole
+ * resistor is solved from it — but 1 nF keeps both that resistor (~16 MΩ at f_b = 10 Hz) and the
+ * slew-limited charging current (~0.5 mA at 0.5 V/µs) in ranges ngspice conditions well.
+ */
+const OPAMP_COMPENSATION_CAPACITANCE = 1e-9;
+
+/**
+ * The saturating gain stage, as a B-source expression: `Vsat·tanh(A·Vd/Vsat)`.
+ *
+ * Small-signal slope at Vd = 0 is exactly A, and the output asymptotes to ±Vsat, so a comparator
+ * clamps at the rail without the derivative discontinuity a piecewise `limit()` would introduce at
+ * the knee. The soft knee costs nothing in closed-loop accuracy: with feedback, the error against
+ * the ideal gain is Vd/Vin, and Vd stays in the microvolts for any A at or above `MIN_OPAMP_GAIN`.
+ */
+function saturatingGainExpression(gain: string, vsat: string): string {
+  return `${vsat}*tanh(${gain}*(V(INP)-V(INM))/${vsat})`;
+}
+
+/**
+ * The op-amp `.SUBCKT`, in whichever of the two modes the part selects.
+ *
+ * Ideal (the default, and what an academic derivation assumes):
+ *
+ *     INP ──┬── RIN(1e12) ──┬── INM        Vout = Vsat·tanh(A·(V(INP)−V(INM))/Vsat)
+ *           └──── gain stage ──── ROUT(1 mΩ) ──── OUT
+ *
+ * Realistic is a three-stage Boyle-style macromodel, each stage owning one non-ideality:
+ *
+ *     input stage    I(PL) = Imax·tanh(gm·Vd / Imax)        slew rate: dV(PL)/dt ≤ Imax/Cp
+ *     dominant pole  RP ∥ CP on node PL                      GBW: f_b = 1/(2π·Rp·Cp) = GBW / A
+ *     output clamp   DHI/DLO to ±Vsat, then unity buffer     saturation, without integrator windup
+ *     output         ROUT                                    finite output resistance
+ *
+ * with Cp fixed at `OPAMP_COMPENSATION_CAPACITANCE` and
+ *
+ *     Rp   = 1 / (2π·f_b·Cp)
+ *     gm   = A / Rp            (so the DC gain across RP is exactly A)
+ *     Imax = SR · Cp
+ *
+ * The order is load-bearing. Saturating *before* the pole (as the ideal stage does) caps the pole's
+ * charging current at Vsat/Rp — under a microamp — which would silently impose a slew rate three
+ * orders of magnitude below the one configured. Saturating *after* it with a soft function leaves
+ * PL free to wind up to A·Vd (≈ 10⁵ V on an open-loop comparator), which then takes seconds to slew
+ * back out of. Clamping PL itself with diodes to ±Vsat, as the original Boyle model does, avoids
+ * both — and ngspice's junction-voltage limiting keeps Newton iteration stable across the knee,
+ * which a B-source `exp`/`max` clamp would not get.
+ */
+function opAmpMacro(element: SpiceOpAmp, name: string): SpiceMacro {
+  const macroName = `OPAMP_${name}`;
+  const realistic = element.model === "realistic";
+
+  const gain = Math.max(
+    MIN_OPAMP_GAIN,
+    element.gain > 0 ? element.gain : (realistic ? DEFAULT_OPAMP_GAIN : IDEAL_OPAMP_GAIN)
+  );
+  const supply = element.vcc !== undefined && element.vcc > 0 ? element.vcc : DEFAULT_OPAMP_SUPPLY;
+  const margin = realistic ? (element.railMargin ?? DEFAULT_OPAMP_RAIL_MARGIN) : 0;
+  // A margin wider than the supply would invert the rails; a floor of 10% of the supply keeps a
+  // mis-set margin a degraded swing rather than a sign flip.
+  const vsat = Math.max(supply * 0.1, supply - Math.max(0, margin));
+
+  const gainText = formatValue(gain, element, "gain");
+  const vsatText = formatValue(vsat, element, "vcc");
+
+  if (!realistic) {
+    const stage = saturatingGainExpression(gainText, vsatText);
+    return {
+      name: macroName,
+      lines: [
+        `.SUBCKT ${macroName} INP INM OUT`,
+        `RIN INP INM ${IDEAL_OPAMP_INPUT_RESISTANCE}`,
+        `BGAIN INT 0 V={${stage}}`,
+        `ROUT INT OUT ${IDEAL_OPAMP_OUTPUT_RESISTANCE}`,
+        `.ENDS ${macroName}`,
+      ],
+    };
+  }
+
+  const gbw = element.gainBandwidth !== undefined && element.gainBandwidth > 0
+    ? element.gainBandwidth
+    : DEFAULT_OPAMP_GBW;
+  const slewRate = element.slewRate !== undefined && element.slewRate > 0
+    ? element.slewRate
+    : DEFAULT_OPAMP_SLEW_RATE;
+  const rin = element.inputResistance !== undefined && element.inputResistance > 0
+    ? element.inputResistance
+    : DEFAULT_OPAMP_INPUT_RESISTANCE;
+  const rout = element.outputResistance !== undefined && element.outputResistance > 0
+    ? element.outputResistance
+    : DEFAULT_OPAMP_OUTPUT_RESISTANCE;
+
+  const cp = OPAMP_COMPENSATION_CAPACITANCE;
+  // GBW can never exceed A·f_b for a single-pole part, so a GBW set above the DC gain's own corner
+  // is meaningless; the corner is what the pole is solved from either way.
+  const breakFrequency = gbw / gain;
+  const rp = 1 / (2 * Math.PI * breakFrequency * cp);
+  const gm = gain / rp;
+  const imax = slewRate * cp;
+  const imaxText = formatValue(imax, element, "slewRate");
+  const clampModel = `DCLAMP_${name}`;
+
+  return {
+    name: macroName,
+    lines: [
+      `.SUBCKT ${macroName} INP INM OUT`,
+      `RIN INP INM ${formatValue(rin, element, "inputResistance")}`,
+      `BGM 0 PL I={${imaxText}*tanh(${formatValue(gm, element, "gain")}*(V(INP)-V(INM))/${imaxText})}`,
+      `RP PL 0 ${formatValue(rp, element, "gainBandwidth")}`,
+      `CP PL 0 ${formatValue(cp, element, "gainBandwidth")}`,
+      // Rail clamp on the pole node itself. N = 0.05 keeps the clamp's own forward drop to ~30 mV
+      // even at the full slew current, so the output saturates at Vsat rather than a diode above it.
+      `DHI PL VHI ${clampModel}`,
+      `VHI VHI 0 DC ${vsatText}`,
+      `DLO VLO PL ${clampModel}`,
+      `VLO VLO 0 DC -${vsatText}`,
+      `.MODEL ${clampModel} D (IS=1e-14 N=0.05)`,
+      // Unity buffer isolating the pole from the load; E takes both control nodes, PL and 0.
+      "EBUF INT 0 PL 0 1",
+      `ROUT INT OUT ${formatValue(rout, element, "outputResistance")}`,
+      `.ENDS ${macroName}`,
+    ],
+  };
+}
+
+/**
+ * Whether a `.tran` over this circuit has to carry `uic`, because at least one op-amp's only
+ * feedback path back to its inverting input is capacitive — the ideal-integrator topology.
+ *
+ * Such a stage has no DC feedback at all: the capacitor is an open circuit at the operating point,
+ * so the inverting node floats up to whatever the input network sets, the differential input is a
+ * volt or more, and ngspice's `.op` legitimately parks the output on a rail. Handing that bias
+ * point to the transient as its initial state starts the integrator already saturated with the
+ * feedback capacitor pre-charged, and the ramp never appears. `uic` starts every node at 0 V
+ * instead — an uncharged capacitor and an output at rest, which is the initial condition the
+ * closed-form V(t) = −(1/RC)∫V_in dt is derived under.
+ *
+ * Deliberately narrow: an op-amp whose feedback also includes a resistor has a well-defined bias
+ * point and keeps ngspice's own `.op`, as does an op-amp-free RC circuit.
+ */
+export function requiresTransientInitialConditions(
+  components: SpiceComponent[]
+): boolean {
+  const opAmps = components.filter(
+    (component): component is SpiceOpAmp => component.kind === "opamp"
+  );
+  if (opAmps.length === 0) return false;
+
+  return opAmps.some(opAmp => {
+    const spans = (kind: "capacitor" | "resistor") =>
+      components.some(
+        component =>
+          component.kind === kind &&
+          ((component.positive === opAmp.out &&
+            component.negative === opAmp.inInverting) ||
+            (component.negative === opAmp.out &&
+              component.positive === opAmp.inInverting))
+      );
+    return spans("capacitor") && !spans("resistor");
+  });
+}
+
 /**
  * The `.SUBCKT` an element expands into, or `undefined` when it maps to native SPICE elements.
  * `name` is the already-uniqued element name, which per-device macros key off so two motors with
@@ -657,20 +835,8 @@ function macroFor(
       };
     }
 
-    case "opamp": {
-      const macroName = `OPAMP_${name}`;
-      const gain = formatValue(element.gain, element, "gain");
-      return {
-        name: macroName,
-        lines: [
-          `.SUBCKT ${macroName} INP INM OUT`,
-          "RIN INP INM 1E12",
-          `EGAIN INT 0 INP INM ${gain}`,
-          "ROUT INT OUT 50",
-          `.ENDS ${macroName}`,
-        ],
-      };
-    }
+    case "opamp":
+      return opAmpMacro(element, name);
 
     default:
       return undefined;

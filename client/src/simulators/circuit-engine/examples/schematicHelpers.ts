@@ -1,4 +1,5 @@
 import type { CircuitComponent, CircuitWire } from '@/simulators/circuit-engine/models/circuitTypes';
+import { getDef } from '@/simulators/circuit-engine/models/componentDefs';
 
 /**
  * Authoring helpers for example schematics. Wire *paths* below are deliberately only
@@ -22,6 +23,42 @@ export function part(id: string, type: string, x: number, y: number, props: Reco
 
 export function wire(id: string, fromComp: string, fromTerm: string, toComp: string, toTerm: string, fromPt: [number, number], toPt: [number, number]): CircuitWire {
   return { id, fromComp, fromTerm, toComp, toTerm, path: [fromPt, toPt], routing: 'orthogonal' };
+}
+
+/**
+ * Oscilloscope props for an example: one shared time base on all four channels (which also sets
+ * the live `.tran` window — Home.tsx runs for 10 × the widest time/div) and per-channel volts/div.
+ */
+export function oscilloscopeProps(timeDiv: number, voltDiv: [number, number, number, number]): Record<string, number> {
+  const props: Record<string, number> = {};
+  (['ch1', 'ch2', 'ch3', 'ch4'] as const).forEach((channel, index) => {
+    props[`timeDiv_${channel}`] = timeDiv;
+    props[`voltDiv_${channel}`] = voltDiv[index];
+  });
+  return props;
+}
+
+/**
+ * Returns a `wire` factory bound to a set of placed components, which fills each wire's end points
+ * from the terminal's own offset in componentDefs — so a hand-placed, unrotated multi-terminal
+ * schematic (an op-amp stage, say) needs only the electrical connection spelled out.
+ */
+export function pinWires(components: CircuitComponent[]): (fromComp: string, fromTerm: string, toComp: string, toTerm: string) => CircuitWire {
+  const byId = new Map(components.map((component) => [component.id, component]));
+  const pin = (componentId: string, terminalId: string): [number, number] => {
+    const component = byId.get(componentId);
+    const terminal = component ? getDef(component.type)?.terminals.find((t) => t.id === terminalId) : undefined;
+    return component && terminal ? [component.x + terminal.x, component.y + terminal.y] : [component?.x ?? 0, component?.y ?? 0];
+  };
+  return (fromComp, fromTerm, toComp, toTerm) => {
+    const from = pin(fromComp, fromTerm);
+    const to = pin(toComp, toTerm);
+    // Horizontal–vertical–horizontal dog-leg, so the wire is orthogonal even before (or without)
+    // the canvas re-routing it.
+    const midX = Math.round((from[0] + to[0]) / 2);
+    const path: Array<[number, number]> = from[0] === to[0] || from[1] === to[1] ? [from, to] : [from, [midX, from[1]], [midX, to[1]], to];
+    return { id: uid('w'), fromComp, fromTerm, toComp, toTerm, path, routing: 'orthogonal' };
+  };
 }
 
 /**

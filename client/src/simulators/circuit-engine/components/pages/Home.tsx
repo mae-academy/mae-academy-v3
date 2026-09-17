@@ -44,6 +44,7 @@ import { toast } from 'sonner';
 import { V3Math } from '@/components/ui/V3Math';
 import { KATEX_EMBEDDED_FONT_CSS } from '@/simulators/circuit-engine/models/katexSvgFonts';
 import { AnalysisBox } from '@/simulators/circuit-engine/components/ui-components/AnalysisBox';
+import SegmentedControl from '@/components/ui/SegmentedControl';
 import { OscilloscopeTracePanel } from '@/simulators/circuit-engine/components/ui-components/OscilloscopeTracePanel';
 import { OscilloscopeComponentPanel } from '@/simulators/circuit-engine/components/inspector-panels/OscilloscopeComponentPanel';
 import { useOscilloscopeDisplaySettings, type OscilloscopeDisplaySettings } from '@/simulators/circuit-engine/components/ui-components/oscilloscopeDisplaySettings';
@@ -4137,26 +4138,24 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
             <ToolbarButton colors={colors} icon={<Trash2 size={14} />} title="Delete (Del/Backspace)" onClick={removeSelection} disabled={!selectedComponent && !selectedWire && !selectedText && marqueeIds.length === 0} />
             <ToolbarDivider colors={colors} />
             <div className="flex items-center gap-2">
-              <ToolbarButton
-                colors={colors}
-                label="Dotted"
-                title="Dotted grid background"
-                onClick={() => { setTabDGridMode('dots'); setGridVisible(true); }}
-                active={tabDGridMode === 'dots' && gridVisible}
-              />
-              <ToolbarButton
-                colors={colors}
-                label="Cartesian"
-                title="Cartesian grid background"
-                onClick={() => { setTabDGridMode('cartesian'); setGridVisible(true); }}
-                active={tabDGridMode === 'cartesian' && gridVisible}
-              />
-              <ToolbarButton
-                colors={colors}
-                label="Hidden"
-                title="Hide grid"
-                onClick={() => { setTabDGridMode('hidden'); setGridVisible(false); }}
-                active={tabDGridMode === 'hidden' || !gridVisible}
+              <SegmentedControl
+                options={[
+                  { label: "Dotted", value: "dots" },
+                  { label: "Cartesian", value: "cartesian" },
+                  { label: "Hidden", value: "hidden" },
+                ]}
+                value={gridVisible ? tabDGridMode : "hidden"}
+                onChange={(val) => {
+                  if (val === "hidden") {
+                    setGridVisible(false);
+                    setTabDGridMode("hidden");
+                  } else {
+                    setGridVisible(true);
+                    setTabDGridMode(val as "dots" | "cartesian");
+                  }
+                }}
+                size="sm"
+                aria-label="Grid Style"
               />
               <ToolbarButton colors={colors} icon={<Type size={14} />} label="Text" title="Add editable workspace text (T)" onClick={addText} />
             </div>
@@ -4174,8 +4173,17 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
             <ToolbarDivider colors={colors} />
             {/* Examples button hidden for final launch UI polish */}
             {/* <ToolbarButton colors={colors} icon={<Library size={14} />} label="Examples" title="Browse the Interactive Examples Library" onClick={() => setExamplesModalOpen(true)} /> */}
-            <button onClick={() => { hasStartedSimulation.current = true; setSimulationRunning(value => !value); }} title={simulationRunning ? 'Pause simulation' : 'Run simulation'} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: (!simulationRunning && hasStartedSimulation.current) ? TAB_GRADIENT_REV : TAB_GRADIENT, color: '#ffffff', fontWeight: 500, padding: '6px 14px', minHeight: 32, borderRadius: 8, fontSize: 12, boxShadow: TAB_ACTIVE_SHADOW, border: '1px solid transparent', cursor: 'pointer', whiteSpace: 'nowrap', transition: 'background .3s ease' }}>
-              {simulationRunning ? <Pause size={14} /> : <Play size={14} />}{simulationRunning ? 'Pause' : 'Run'}
+            <button
+              onClick={() => { hasStartedSimulation.current = true; setSimulationRunning(value => !value); }}
+              title={simulationRunning ? 'Pause simulation' : 'Run simulation'}
+              className={`h-8 inline-flex items-center justify-center gap-1.5 px-3.5 text-xs font-semibold cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 whitespace-nowrap shrink-0 ${
+                !simulationRunning && hasStartedSimulation.current
+                  ? "brand-pill-active-rev"
+                  : "brand-pill-active"
+              }`}
+            >
+              {simulationRunning ? <Pause size={14} /> : <Play size={14} />}
+              <span>{simulationRunning ? 'Pause' : 'Run'}</span>
             </button>
             <ToolbarButton colors={colors} icon={<Zap size={14} />} title="Show / Hide electron flow" onClick={() => setShowElectrons(v => { const next = !v; try { localStorage.setItem('mae-show-electrons', String(next)); } catch { } return next; })} active={showElectrons} />
             <ToolbarButton colors={colors} icon={<RotateCcw size={14} />} title="Reset simulation" onClick={resetSimulation} />

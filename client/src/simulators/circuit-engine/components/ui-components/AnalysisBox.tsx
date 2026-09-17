@@ -16,6 +16,7 @@ import { AcademicNodalDictionary } from '@/simulators/circuit-engine/models/Acad
 import type { CircuitComponent } from '@/simulators/circuit-engine/models/circuitTypes';
 import { TargetLoadSelector, DecimalPlacesSelector } from '@/simulators/circuit-engine/components/ui-components/TargetLoadSelector';
 import { isACCircuit } from '@/simulators/circuit-engine/models/isACCircuit';
+import SegmentedControl from '@/components/ui/SegmentedControl';
 
 const METHODS: Array<{ id: AnalysisMethod; label: string }> = [
   { id: 'nodal', label: 'Nodal' },
@@ -154,26 +155,14 @@ export function AnalysisBox({
         {!hasAC && <DecimalPlacesSelector precision={precision} onChangePrecision={setPrecision} />}
       </div>
 
-      <div className="mb-4 flex flex-wrap gap-2">
-        {METHODS.map((item) => {
-          const sel = method === item.id;
-          return (
-            <button
-              key={item.id}
-              type="button"
-              role="tab"
-              aria-selected={sel}
-              onClick={() => setMethod(item.id)}
-              className={`inline-flex min-h-[36px] items-center justify-center rounded-lg px-4 py-2 text-xs font-medium transition-colors ${
-                sel
-                  ? 'bg-brand-gradient text-white shadow-sm'
-                  : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-[#282d38] dark:bg-[#13161c] dark:text-slate-400 dark:hover:bg-[#1a1d24]'
-              }`}
-            >
-              {item.label}
-            </button>
-          );
-        })}
+      <div className="mb-4">
+        <SegmentedControl
+          options={METHODS.map((item) => ({ label: item.label, value: item.id }))}
+          value={method}
+          onChange={setMethod}
+          size="md"
+          aria-label="Analysis method"
+        />
       </div>
 
       {hasAC ? (

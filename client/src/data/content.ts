@@ -340,7 +340,7 @@ localizedContent.en.collections.simulations = {
     { title: "Control Systems", description: "Tune feedback, stability, and transient response inside a visible control loop.", code: "S.01" },
     { title: "Electrical Circuits", description: "Probe current, voltage, and signal behavior across an interactive circuit bench.", code: "S.02" },
     { title: "Power Electronics", description: "Test switching topologies, conversion stages, and power-flow decisions.", code: "S.03" },
-    { title: "Assembler", description: "Trace instructions, registers, memory flow, and low-level program logic.", code: "S.04" },
+    { title: "Code Studio", description: "Interactive Multi-Language Simulation & Trace Studio (MASM 8086, Python, C++, C).", code: "S.04" },
     { title: "PLC", description: "Build ladder logic and observe industrial control sequences in motion.", code: "S.05" },
     { title: "Signals and Systems", description: "Transform, filter, and interpret signals across time and frequency domains.", code: "S.06" },
     { title: "Digital Logic Design", description: "Compose gates, truth states, and logic paths into working digital systems.", code: "S.07" },
@@ -359,7 +359,7 @@ localizedContent.ar.collections.simulations = {
     { title: "أنظمة التحكم", description: "اضبط التغذية الراجعة والاستقرار والاستجابة العابرة داخل حلقة تحكم مرئية.", code: "S.01" },
     { title: "الدوائر الكهربائية", description: "افحص التيار والجهد وسلوك الإشارة عبر منصة دوائر تفاعلية.", code: "S.02" },
     { title: "إلكترونيات القدرة", description: "اختبر طوبولوجيا التبديل ومراحل التحويل وقرارات تدفق القدرة.", code: "S.03" },
-    { title: "لغة التجميع", description: "تتبّع التعليمات والسجلات وتدفق الذاكرة ومنطق البرنامج منخفض المستوى.", code: "S.04" },
+    { title: "Code Studio", description: "Interactive Multi-Language Simulation & Trace Studio (MASM 8086, Python, C++, C).", code: "S.04" },
     { title: "PLC", description: "ابنِ منطق السلم وراقب تسلسلات التحكم الصناعي أثناء الحركة.", code: "S.05" },
     { title: "الإشارات والأنظمة", description: "حوّل الإشارات ورشّحها وفسّرها عبر نطاقي الزمن والتردد.", code: "S.06" },
     { title: "تصميم المنطق الرقمي", description: "ركّب البوابات وحالات الحقيقة ومسارات المنطق في أنظمة رقمية عاملة.", code: "S.07" },
@@ -378,7 +378,7 @@ localizedContent.es.collections.simulations = {
     { title: "Sistemas de control", description: "Ajusta retroalimentación, estabilidad y respuesta transitoria en un bucle de control visible.", code: "S.01" },
     { title: "Circuitos Eléctricos", description: "Mide corriente, voltaje y comportamiento de señales en un banco de circuitos interactivo.", code: "S.02" },
     { title: "Electrónica de potencia", description: "Prueba topologías de conmutación, etapas de conversión y decisiones de flujo de potencia.", code: "S.03" },
-    { title: "Ensamblador", description: "Sigue instrucciones, registros, flujo de memoria y lógica de programas de bajo nivel.", code: "S.04" },
+    { title: "Code Studio", description: "Interactive Multi-Language Simulation & Trace Studio (MASM 8086, Python, C++, C).", code: "S.04" },
     { title: "PLC", description: "Construye lógica de escalera y observa secuencias de control industrial en movimiento.", code: "S.05" },
     { title: "Señales y sistemas", description: "Transforma, filtra e interpreta señales en los dominios del tiempo y la frecuencia.", code: "S.06" },
     { title: "Diseño de lógica digital", description: "Compone compuertas, estados de verdad y rutas lógicas en sistemas digitales funcionales.", code: "S.07" },
@@ -391,11 +391,11 @@ localizedContent.es.collections.simulations = {
 };
 
 localizedContent.en.blueprints.stations.simulations = [
-  { label: "CONTROL LOOP", sublabel: "Control systems" }, { label: "CIRCUIT BENCH", sublabel: "Electrical Circuits" }, { label: "POWER STAGE", sublabel: "Power electronics" }, { label: "INSTRUCTION MAP", sublabel: "Assembler" }, { label: "LADDER LOGIC", sublabel: "PLC" }, { label: "SIGNAL FIELD", sublabel: "Signals and systems" }, { label: "GATE ARRAY", sublabel: "Digital logic design" }, { label: "MATRIX PLANE", sublabel: "Linear algebra" }, { label: "NETWORK LINK", sublabel: "Communication and network" },
+  { label: "CONTROL LOOP", sublabel: "Control systems" }, { label: "CIRCUIT BENCH", sublabel: "Electrical Circuits" }, { label: "POWER STAGE", sublabel: "Power electronics" }, { label: "CODE STUDIO", sublabel: "Code Studio" }, { label: "LADDER LOGIC", sublabel: "PLC" }, { label: "SIGNAL FIELD", sublabel: "Signals and systems" }, { label: "GATE ARRAY", sublabel: "Digital logic design" }, { label: "MATRIX PLANE", sublabel: "Linear algebra" }, { label: "NETWORK LINK", sublabel: "Communication and network" },
 ];
 localizedContent.ar.blueprints.stations.simulations = [
-  { label: "حلقة التحكم", sublabel: "أنظمة التحكم" }, { label: "منصة الدوائر", sublabel: "الدوائر الكهربائية" }, { label: "مرحلة القدرة", sublabel: "إلكترونيات القدرة" }, { label: "خريطة التعليمات", sublabel: "لغة التجميع" }, { label: "منطق السلم", sublabel: "PLC" }, { label: "مجال الإشارة", sublabel: "الإشارات والأنظمة" }, { label: "مصفوفة البوابات", sublabel: "تصميم المنطق الرقمي" }, { label: "مستوى المصفوفة", sublabel: "الجبر الخطي" }, { label: "وصلة الشبكة", sublabel: "الاتصالات والشبكات" },
+  { label: "حلقة التحكم", sublabel: "أنظمة التحكم" }, { label: "منصة الدوائر", sublabel: "الدوائر الكهربائية" }, { label: "مرحلة القدرة", sublabel: "إلكترونيات القدرة" }, { label: "CODE STUDIO", sublabel: "Code Studio" }, { label: "منطق السلم", sublabel: "PLC" }, { label: "مجال الإشارة", sublabel: "الإشارات والأنظمة" }, { label: "مصفوفة البوابات", sublabel: "تصميم المنطق الرقمي" }, { label: "مستوى المصفوفة", sublabel: "الجبر الخطي" }, { label: "وصلة الشبكة", sublabel: "الاتصالات والشبكات" },
 ];
 localizedContent.es.blueprints.stations.simulations = [
-  { label: "BUCLE DE CONTROL", sublabel: "Sistemas de control" }, { label: "BANCO DE CIRCUITOS", sublabel: "Circuitos Eléctricos" }, { label: "ETAPA DE POTENCIA", sublabel: "Electrónica de potencia" }, { label: "MAPA DE INSTRUCCIONES", sublabel: "Ensamblador" }, { label: "LÓGICA DE ESCALERA", sublabel: "PLC" }, { label: "CAMPO DE SEÑAL", sublabel: "Señales y sistemas" }, { label: "MATRIZ DE COMPUERTAS", sublabel: "Diseño de lógica digital" }, { label: "PLANO MATRICIAL", sublabel: "Álgebra lineal" }, { label: "ENLACE DE RED", sublabel: "Comunicación y redes" },
+  { label: "BUCLE DE CONTROL", sublabel: "Sistemas de control" }, { label: "BANCO DE CIRCUITOS", sublabel: "Circuitos Eléctricos" }, { label: "ETAPA DE POTENCIA", sublabel: "Electrónica de potencia" }, { label: "CODE STUDIO", sublabel: "Code Studio" }, { label: "LÓGICA DE ESCALERA", sublabel: "PLC" }, { label: "CAMPO DE SEÑAL", sublabel: "Señales y sistemas" }, { label: "MATRIZ DE COMPUERTAS", sublabel: "Diseño de lógica digital" }, { label: "PLANO MATRICIAL", sublabel: "Álgebra lineal" }, { label: "ENLACE DE RED", sublabel: "Comunicación y redes" },
 ];

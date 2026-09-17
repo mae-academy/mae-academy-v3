@@ -54,9 +54,72 @@ declare module "JSCPP" {
     maxTimeout?: number;
   }
 
+  /** Opaque type token (e.g. `rt.intTypeLiteral`), and value wrapper JSCPP passes to every operator/method. */
+  export interface JscppType {
+    readonly type: string;
+    readonly name?: string;
+  }
+  export interface JscppValue<V = unknown> {
+    t: JscppType;
+    v: V;
+    left: boolean;
+  }
+  export interface JscppClassMember {
+    name: string;
+    type: JscppType;
+    initialize?: (rt: JscppCRuntime, _this: JscppValue) => JscppValue;
+  }
+  /** The subset of JSCPP's internal `CRuntime` needed to write an `includes/*` STL shim. */
+  export interface JscppCRuntime {
+    readonly intTypeLiteral: JscppType;
+    readonly unsignedintTypeLiteral: JscppType;
+    readonly doubleTypeLiteral: JscppType;
+    readonly boolTypeLiteral: JscppType;
+    readonly charTypeLiteral: JscppType;
+    readonly voidTypeLiteral: JscppType;
+    val<V>(t: JscppType, v: V, left?: boolean, isInitializing?: boolean): JscppValue<V>;
+    clone<V>(v: JscppValue<V>, isInitializing?: boolean): JscppValue<V>;
+    newClass(classname: string, members: JscppClassMember[]): JscppType;
+    getTypeSignature(t: JscppType): string;
+    regFunc(
+      f: (rt: JscppCRuntime, _this: JscppValue, ...args: JscppValue[]) => JscppValue | void,
+      lt: JscppType | "global",
+      name: string,
+      args: JscppType[],
+      retType: JscppType
+    ): JscppType;
+    regOperator(
+      f: (rt: JscppCRuntime, _this: JscppValue, ...args: JscppValue[]) => JscppValue,
+      lt: JscppType,
+      name: string,
+      args: JscppType[],
+      retType: JscppType
+    ): JscppType;
+    raiseException(message: string): never;
+    castable(type1: JscppType, type2: JscppType): boolean;
+    normalPointerType(target: JscppType): JscppType;
+    arrayPointerType(elementType: JscppType, size: number): JscppType;
+    isStringType(t: JscppType): boolean;
+    getStringFromCharArray(element: JscppValue): string;
+    makeCharArrayFromString(str: string, typename?: string): JscppValue<{ target: JscppValue<number>[]; position: number }>;
+    /** Keyed by `getTypeSignature`; only the slice this shim touches (`father`/`cConstructor`/`handlers`) is declared. */
+    types: Record<
+      string,
+      {
+        father?: string;
+        cConstructor?: (rt: JscppCRuntime, _this: JscppValue) => void;
+        handlers?: Record<string, { default: (rt: JscppCRuntime, _this: JscppValue, ...args: JscppValue[]) => JscppValue }>;
+      }
+    >;
+  }
+  export interface JscppInclude {
+    load(rt: JscppCRuntime): void;
+  }
+
   const JSCPP: {
     run(code: string, input: string, config: JscppConfig & { debug: true }): JscppDebugger;
     run(code: string, input: string, config?: JscppConfig): number;
+    includes: Record<string, JscppInclude>;
   };
   export default JSCPP;
 }

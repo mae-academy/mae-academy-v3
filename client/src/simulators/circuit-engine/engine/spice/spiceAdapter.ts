@@ -7,7 +7,17 @@ import type {
 } from "@/simulators/circuit-engine/models/circuitTypes";
 import { NormalizedCircuitGraph } from "@/simulators/circuit-engine/models/NormalizedCircuitGraph";
 import {
+  DEFAULT_OPAMP_GAIN,
+  DEFAULT_OPAMP_GBW,
+  DEFAULT_OPAMP_INPUT_RESISTANCE,
+  DEFAULT_OPAMP_OUTPUT_RESISTANCE,
+  DEFAULT_OPAMP_RAIL_MARGIN,
+  DEFAULT_OPAMP_SLEW_RATE,
+  DEFAULT_OPAMP_SUPPLY,
+  IDEAL_OPAMP_GAIN,
+  MIN_OPAMP_GAIN,
   SPICE_GROUND,
+  type OpAmpModel,
   type SpiceComponent,
   type SpiceNet,
 } from "@/simulators/circuit-engine/engine/spice/spiceTypes";
@@ -1282,8 +1292,21 @@ function mapPart(ctx: PartContext): Mapping {
         unsupported: "dependent sources are not in the SPICE component set",
       };
     case "opamp": {
-      const gain = Math.max(1, num("gain", 100000));
-      const vcc = num("vcc", 15);
+      const model: OpAmpModel =
+        stringProp(component, "model", "ideal") === "realistic"
+          ? "realistic"
+          : "ideal";
+      // Academic mode always gets the textbook element, whatever the part is set to: the whole
+      // point of that mode is that a hand derivation and the simulator agree exactly.
+      const effectiveModel: OpAmpModel =
+        simulationMode === "academic" ? "ideal" : model;
+      // The floor is applied here as well as in the generator so a circuit imported with a legacy
+      // `gain: 10` (the old default, which turns an integrator into a first-order lag — see
+      // MIN_OPAMP_GAIN) is lifted before anything downstream reads it.
+      const gain = Math.max(
+        MIN_OPAMP_GAIN,
+        num("gain", effectiveModel === "realistic" ? DEFAULT_OPAMP_GAIN : IDEAL_OPAMP_GAIN)
+      );
       return [
         {
           kind: "opamp",
@@ -1292,7 +1315,14 @@ function mapPart(ctx: PartContext): Mapping {
           inInverting: net("in-"),
           out: net("out"),
           gain,
-          vcc,
+          vcc: Math.abs(num("vcc", DEFAULT_OPAMP_SUPPLY)),
+          model: effectiveModel,
+          gainBandwidth: num("gbw", DEFAULT_OPAMP_GBW),
+          // Authored in V/µs, the unit every datasheet quotes; the netlist works in V/s.
+          slewRate: num("slewRate", DEFAULT_OPAMP_SLEW_RATE / 1e6) * 1e6,
+          inputResistance: num("rin", DEFAULT_OPAMP_INPUT_RESISTANCE),
+          outputResistance: num("rout", DEFAULT_OPAMP_OUTPUT_RESISTANCE),
+          railMargin: num("railMargin", DEFAULT_OPAMP_RAIL_MARGIN),
         },
       ];
     }

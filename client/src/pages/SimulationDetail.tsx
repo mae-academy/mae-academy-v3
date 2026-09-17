@@ -18,7 +18,7 @@ import { InverterStudio } from "@/components/power/InverterStudio";
 import { ACVoltageControllerStudio } from "@/components/power/ACVoltageControllerStudio";
 import { ChopperStudio } from "@/components/power/ChopperStudio";
 import { SiemensS7200Studio } from "@/components/plc/SiemensS7200Studio";
-import { AssemblerStudioCompact } from "@/components/assembler/AssemblerStudioCompact";
+import { AssemblerStudio } from "@/components/assembler/AssemblerStudio";
 import { AnalogCircuitSimulator } from "@/simulators/circuit-engine/components/AnalogCircuitSimulator";
 import { DigitalCircuitSimulator } from "@/simulators/digital-logic/components/DigitalCircuitSimulator";
 import { DigitalLogicSimulator } from "@/components/digitalLogic/DigitalLogicSimulator";
@@ -44,10 +44,14 @@ const circuitTabCopy = {
 export default function SimulationDetail() {
   const [location, setLocation] = useLocation();
   const lastNestedRoute = useRef(location);
-  if (location.startsWith("/simulations/")) lastNestedRoute.current = location;
+  const isDirectCode = location === "/code" || location.startsWith("/code/");
+  const isDirectAssembler = location === "/assembler" || location.startsWith("/assembler/");
+  if (location.startsWith("/simulations/") || isDirectCode || isDirectAssembler) lastNestedRoute.current = location;
   const activeRoute = lastNestedRoute.current;
-  const [, , rawSlug, tool] = activeRoute.split("/");
-  const slug = rawSlug === "circuits" ? "circuit-lab" : rawSlug === "assembly" ? "assembler" : rawSlug;
+  const segments = activeRoute.split("/").filter(Boolean);
+  const rawSlug = segments[0] === "simulations" ? segments[1] : segments[0];
+  const tool = segments[0] === "simulations" ? segments[2] : segments[1];
+  const slug = rawSlug === "circuits" ? "circuit-lab" : (rawSlug === "assembly" || rawSlug === "assembler") ? "code" : rawSlug;
   const meta = simulationRouteMeta.find((entry) => entry.slug === slug);
   const { copy, isRtl, locale } = useLocale();
   if (!meta) return <NotFound />;
@@ -60,6 +64,7 @@ export default function SimulationDetail() {
   const isLinearAlgebra = meta.slug === "linear-algebra";
   const isCircuitLab = meta.slug === "circuit-lab";
   const isDigitalLogicDesign = meta.slug === "digital-logic-design";
+  const isCodeStudio = meta.slug === "code";
   const circuitLabClone = meta.slug === "circuitlab-1" || meta.slug === "circuitlab-2" || meta.slug === "circuitlab-3";
   const circuitTabs = circuitTabCopy[locale];
   const tools = isControlSystems ? controlSystemToolMeta[locale]
@@ -69,16 +74,31 @@ export default function SimulationDetail() {
           : isLinearAlgebra ? linearAlgebraToolMeta[locale]
             : isCircuitLab ? [{ slug: "workspace", label: circuitTabs.canvas }]
               : isDigitalLogicDesign ? [{ slug: "workspace", label: simulation.title }]
+                : isCodeStudio ? [{ slug: "", label: simulation.title }]
                 : circuitLabClone ? [{ slug: "a", label: simulation.title }]
                   : ["A", "B", "C", "D", "E"].map((label) => ({ slug: label.toLowerCase(), label }));
   const defaultTool = tools[0].slug;
 
   useEffect(() => {
+    if (isCodeStudio) return; // Dynamic multi-language SEO title & meta is managed by CodeStudio
     const timer = window.setTimeout(() => { document.title = `MAE Academy — ${simulation.title}`; }, 0);
     return () => window.clearTimeout(timer);
-  }, [simulation.title]);
-  useEffect(() => { if (!tool) setLocation(`/simulations/${meta.slug}/${defaultTool}`, { replace: true }); }, [defaultTool, meta.slug, setLocation, tool]);
-  if (!tool) return null;
+  }, [isCodeStudio, simulation.title]);
+
+  useEffect(() => {
+    if (isCodeStudio) {
+      // Clean redirection for all legacy paths (/code, /code/:lang, /assembler, /simulations/assembler) -> /simulations/code/:lang
+      const isLegacy = location.startsWith("/code") || location.startsWith("/assembler") || location.startsWith("/simulations/assembler");
+      if (isLegacy) {
+        const langSubroute = tool && ["masm8086", "python", "cpp", "c"].includes(tool.toLowerCase()) ? `/${tool.toLowerCase()}` : "";
+        setLocation(`/simulations/code${langSubroute}`, { replace: true });
+      }
+      return;
+    }
+    if (!tool) setLocation(`/simulations/${meta.slug}/${defaultTool}`, { replace: true });
+  }, [defaultTool, isCodeStudio, location, meta.slug, setLocation, tool]);
+
+  if (!tool && !isCodeStudio) return null;
 
   const isRootLocus = isControlSystems && tool === "root-locus";
   const isPidStudio = isControlSystems && tool === "pid";
@@ -90,17 +110,17 @@ export default function SimulationDetail() {
   const isAcVoltageControllerStudio = isPowerElectronics && tool === "c";
   const isChopperStudio = isPowerElectronics && tool === "d";
   const isSiemensS7200Studio = isPlc && tool === "a";
-  const isAssemblerStudio = meta.slug === "assembler" && tool === "a";
+  const isCodeStudioContent = isCodeStudio;
   const isDigitalLogicWorkspace = isDigitalLogicDesign && tool === "workspace";
   const isLinearAlgebraStudio = isLinearAlgebra && ["a", "b", "c", "d", "e"].includes(tool);
   const circuitToolContent = isCircuitLab
     ? <DigitalCircuitSimulator />
     : circuitLabClone ? <AnalogCircuitSimulator instanceId={meta.slug} label={simulation.title} /> : null;
-  const toolContent = circuitToolContent ?? (isSignalsAndSystems && tool === "a" ? <SignalOperationsLab /> : isSignalsAndSystems && tool === "b" ? <SystemClassificationLab /> : isSignalsAndSystems && tool === "c" ? <ConvolutionLab /> : isSignalsAndSystems && tool === "d" ? <FourierAnalysisLab /> : isSignalsAndSystems && tool === "e" ? <LaplaceZPlaneLab /> : isDigitalLogicWorkspace ? <DigitalLogicSimulator /> : isRootLocus ? <RootLocusStudio /> : isPidStudio ? <PIDStudio /> : isFrequencyResponse ? <FrequencyResponseStudio /> : isStateSpaceStudio ? <StateSpaceStudio /> : isBlockDiagram ? <BlockDiagramStudio /> : isRectifierStudio ? <RectifierStudio /> : isInverterStudio ? <InverterStudio /> : isAcVoltageControllerStudio ? <ACVoltageControllerStudio /> : isChopperStudio ? <ChopperStudio /> : isSiemensS7200Studio ? <SiemensS7200Studio /> : isAssemblerStudio ? <AssemblerStudioCompact /> : isLinearAlgebraStudio ? <LinearAlgebraStudio section={tool as "a" | "b" | "c" | "d" | "e"} /> : <SimulationToolWorkspace toolKey={`${meta.slug}-${tool}`} />);
+  const toolContent = circuitToolContent ?? (isSignalsAndSystems && tool === "a" ? <SignalOperationsLab /> : isSignalsAndSystems && tool === "b" ? <SystemClassificationLab /> : isSignalsAndSystems && tool === "c" ? <ConvolutionLab /> : isSignalsAndSystems && tool === "d" ? <FourierAnalysisLab /> : isSignalsAndSystems && tool === "e" ? <LaplaceZPlaneLab /> : isDigitalLogicWorkspace ? <DigitalLogicSimulator /> : isRootLocus ? <RootLocusStudio /> : isPidStudio ? <PIDStudio /> : isFrequencyResponse ? <FrequencyResponseStudio /> : isStateSpaceStudio ? <StateSpaceStudio /> : isBlockDiagram ? <BlockDiagramStudio /> : isRectifierStudio ? <RectifierStudio /> : isInverterStudio ? <InverterStudio /> : isAcVoltageControllerStudio ? <ACVoltageControllerStudio /> : isChopperStudio ? <ChopperStudio /> : isSiemensS7200Studio ? <SiemensS7200Studio /> : isCodeStudioContent ? <AssemblerStudio /> : isLinearAlgebraStudio ? <LinearAlgebraStudio section={tool as "a" | "b" | "c" | "d" | "e"} /> : <SimulationToolWorkspace toolKey={`${meta.slug}-${tool}`} />);
 
   return <motion.div variants={container} initial="hidden" animate="visible">
-    <SimulatorLayout title={isDigitalLogicDesign ? "" : simulation.title} tabs={tools} activeTab={tool} routePrefix={`/simulations/${meta.slug}`} backLabel={copy.footer.simulations} isRtl={isRtl} hideToolNavigation={isDigitalLogicDesign || isCircuitLab}>
-      <motion.div variants={item} className="mt-12">{toolContent}</motion.div>
+    <SimulatorLayout title={isDigitalLogicDesign ? "" : simulation.title} tabs={tools} activeTab={tool || ""} routePrefix={isDirectCode ? "/code" : `/simulations/${meta.slug}`} backLabel={copy.footer.simulations} isRtl={isRtl} hideToolNavigation={isDigitalLogicDesign || isCircuitLab || isCodeStudio} compact={isCodeStudio}>
+      <motion.div variants={item} className={isCodeStudio ? "mt-3" : "mt-12"}>{toolContent}</motion.div>
     </SimulatorLayout>
   </motion.div>;
 }

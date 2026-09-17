@@ -1,5 +1,10 @@
 import type { ExampleDefinition, OscilloscopeSettings } from '@/simulators/circuit-engine/examples/types';
 import { buildSeriesChain } from '@/simulators/circuit-engine/examples/schematicHelpers';
+import { OPAMP_IDEAL_INTEGRATOR } from '@/simulators/circuit-engine/examples/transient-analysis/opamp-ideal-integrator';
+import { OPAMP_DIFFERENTIATOR } from '@/simulators/circuit-engine/examples/transient-analysis/opamp-differentiator';
+import { OPAMP_COMPARATOR } from '@/simulators/circuit-engine/examples/transient-analysis/opamp-comparator';
+import { OPAMP_SCHMITT_TRIGGER } from '@/simulators/circuit-engine/examples/transient-analysis/opamp-schmitt-trigger';
+import { OPAMP_SUMMING_AMPLIFIER } from '@/simulators/circuit-engine/examples/transient-analysis/opamp-summing-amplifier';
 
 /* E.1 — RC Charging — Capacitor Transient Response */
 const e1Chain = buildSeriesChain({
@@ -301,4 +306,11 @@ const E6: ExampleDefinition = {
   schematic: e6Chain,
 };
 
-export const TRANSIENT_ANALYSIS_EXAMPLES: ExampleDefinition[] = [E1, E2, E3, E4, E5, E6];
+export const TRANSIENT_ANALYSIS_EXAMPLES: ExampleDefinition[] = [
+  E1, E2, E3, E4, E5, E6,
+  OPAMP_IDEAL_INTEGRATOR,
+  OPAMP_DIFFERENTIATOR,
+  OPAMP_COMPARATOR,
+  OPAMP_SCHMITT_TRIGGER,
+  OPAMP_SUMMING_AMPLIFIER,
+];

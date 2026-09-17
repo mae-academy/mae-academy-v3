@@ -161,7 +161,7 @@ function parseSource(source: string, diagnostics: AssemblerDiagnostic[]) {
     const { line, text } = record; let rest = stripComment(text); if (!rest) { statements.push({ line, text, kind: "ignore", operands: [] }); continue; }
     const org = rest.match(/^org\s+(.+)$/i);
     if (org) { const nextOrigin = parseInteger(org[1]); if (nextOrigin === null || nextOrigin < 0 || nextOrigin > 0xffff) diagnostics.push({ line, message: "ORG requires a 16-bit numeric offset", source: text }); else if (emitted) diagnostics.push({ line, message: "ORG must appear before emitted COM bytes", source: text }); else { origin = nextOrigin; lc = nextOrigin; } statements.push({ line, text, kind: "ignore", operands: [] }); continue; }
-    if (/^\.(model|stack|data|code)\b/i.test(rest) || /^end\b/i.test(rest)) { statements.push({ line, text, kind: "ignore", operands: [] }); continue; }
+    if (/^\.(model|stack|data|code|[2-5]86p?)\b/i.test(rest) || /^(end|assume|include|public|extrn)\b/i.test(rest)) { statements.push({ line, text, kind: "ignore", operands: [] }); continue; }
     const colonLabel = rest.match(/^([a-z_][\w$]*):\s*(.*)$/i);
     if (colonLabel) { define(colonLabel[1], line, text); rest = colonLabel[2].trim(); if (!rest) { statements.push({ line, text, kind: "ignore", operands: [] }); continue; } }
     const namedData = rest.match(/^([a-z_][\w$]*)\s+(db|dw)\s+(.+)$/i);

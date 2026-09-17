@@ -1,5 +1,6 @@
 import { ArrowLeft } from "lucide-react";
 import { Link } from "wouter";
+import SegmentedControl from "@/components/ui/SegmentedControl";
 
 /**
  * A single reusable tool-tab item for the MAE Academy simulator toolbar.
@@ -63,30 +64,21 @@ export default function SimulationPageHeader({
       ) : null}
 
       {showTitle && title ? (
-        <h1 className={`mae-display text-center font-extrabold tracking-tight text-slate-900 dark:text-white ${compact ? "mt-4 mb-5 text-3xl md:text-4xl" : "mt-6 mb-12 text-5xl md:text-6xl"}`}>
+        <h1 className={`mae-display text-center tracking-tight text-slate-900 dark:text-white ${compact ? "mt-4 mb-5 text-4xl md:text-5xl font-black" : "mt-6 mb-12 text-5xl md:text-6xl font-extrabold"}`}>
           {title}
         </h1>
       ) : null}
 
       {showToolNavigation && tools.length > 0 ? (
-        <nav aria-label={`${title ?? "Simulation"} tools`} className={`${compact ? "mb-4" : "mb-8"} overflow-x-auto pb-1`}>
-          <div className="mx-auto flex w-full min-w-max max-w-5xl overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-[#08080A]">
-            {tools.map((tool, index) => {
-              const active = tool.id === activeTool;
-              return (
-                <button
-                  key={tool.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={active}
-                  onClick={() => onSelectTool(tool.id)}
-                  className={`flex min-h-14 flex-1 items-center justify-center px-6 py-4 text-center text-sm font-semibold transition-all focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-blue-600 ${active ? (compact ? "bg-violet-700 text-white" : "bg-brand-gradient text-white") : `bg-white text-slate-500 hover:bg-gray-50 hover:text-slate-700 dark:bg-[#08080A] dark:text-zinc-400 dark:hover:bg-white/[0.04] dark:hover:text-white ${index === 0 ? "" : "border-s border-gray-200 dark:border-white/[0.08]"}`}`}
-                >
-                  {tool.label}
-                </button>
-              );
-            })}
-          </div>
+        <nav aria-label={`${title ?? "Simulation"} tools`} className={`${compact ? "mb-4" : "mb-8"} flex justify-center overflow-x-auto pb-1`}>
+          <SegmentedControl
+            options={tools.map((tool) => ({ label: tool.label, value: tool.id }))}
+            value={activeTool}
+            onChange={onSelectTool}
+            size={compact ? "md" : "lg"}
+            className="shadow-sm"
+            aria-label={`${title ?? "Simulation"} tools`}
+          />
         </nav>
       ) : null}
     </>

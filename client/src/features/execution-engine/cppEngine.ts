@@ -2,7 +2,22 @@
 import JSCPP from "JSCPP";
 import type { JscppDebugger } from "JSCPP";
 
+import algorithmInclude from "./cppStl/algorithmInclude";
+import { wrapIostreamForContainerPrinting } from "./cppStl/iostreamPatch";
+import { preprocessCpp } from "./cppStl/preprocess";
+import queueInclude from "./cppStl/queueInclude";
+import setInclude from "./cppStl/setInclude";
+import stackInclude from "./cppStl/stackInclude";
+import vectorInclude from "./cppStl/vectorInclude";
 import type { ExecutionOptions, ExecutionResult, TraceStep, TraceVariable } from "./types";
+
+JSCPP.includes.vector = vectorInclude;
+JSCPP.includes.algorithm = algorithmInclude;
+JSCPP.includes.stack = stackInclude;
+JSCPP.includes.queue = queueInclude;
+JSCPP.includes.set = setInclude;
+// Must wrap (not replace) the real iostream — `cout` itself is only created by its own load().
+JSCPP.includes.iostream = wrapIostreamForContainerPrinting(JSCPP.includes.iostream);
 
 const DEFAULT_MAX_STEPS = 20000;
 
@@ -26,7 +41,7 @@ export async function run(code: string, options: ExecutionOptions = {}): Promise
 
   let mydebugger: JscppDebugger;
   try {
-    mydebugger = JSCPP.run(code, options.stdin ?? "", {
+    mydebugger = JSCPP.run(preprocessCpp(code), options.stdin ?? "", {
       debug: true,
       unsigned_overflow: "error",
       stdio: {

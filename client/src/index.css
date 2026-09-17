@@ -252,7 +252,65 @@
   .mae-wave-grid { position: relative; }
   .mae-wave-grid::before { content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none; background-image: radial-gradient(rgb(148 163 184 / .35) 1px, transparent 1px); background-size: 26px 26px; mask-image: radial-gradient(circle at center, black 55%, transparent 90%); }
   .dark .mae-wave-grid::before { background-image: radial-gradient(rgb(255 255 255 / .12) 1px, transparent 1px); }
-  .bg-brand-gradient { background: linear-gradient(135deg, #2563EB 0%, #7C3AED 50%, #E11D48 100%) !important; }
+  /* Universal Platform Signature Pill */
+  .brand-pill-active,
+  .tab-brand-gradient[data-state=active],
+  [data-state=active].tab-brand-gradient,
+  [data-state=active].brand-pill-tab {
+    background: linear-gradient(135deg, #2563eb 0%, #7c3aed 50%, #f43f5e 100%) !important;
+    color: #ffffff !important;
+    border-radius: 9999px !important; /* rounded-full */
+    box-shadow: 0 2px 8px -1px rgba(124, 58, 237, 0.35) !important;
+    border: 1px solid transparent !important;
+    font-weight: 500;
+    transition: all 0.15s ease-in-out;
+  }
+
+  .brand-pill-active-rev {
+    background: linear-gradient(135deg, #f43f5e 0%, #7c3aed 50%, #2563eb 100%) !important;
+    color: #ffffff !important;
+    border-radius: 9999px !important; /* rounded-full */
+    box-shadow: 0 2px 8px -1px rgba(124, 58, 237, 0.35) !important;
+    border: 1px solid transparent !important;
+    font-weight: 500;
+    transition: all 0.15s ease-in-out;
+  }
+
+  .brand-pill-inactive,
+  .tab-brand-gradient[data-state=inactive],
+  [data-state=inactive].tab-brand-gradient,
+  [data-state=inactive].brand-pill-tab {
+    background: transparent;
+    color: #64748b; /* slate-500 */
+    border-radius: 9999px;
+    border: 1px solid transparent;
+    transition: all 0.15s ease-in-out;
+  }
+  .brand-pill-inactive:hover,
+  .tab-brand-gradient[data-state=inactive]:hover,
+  [data-state=inactive].tab-brand-gradient:hover,
+  [data-state=inactive].brand-pill-tab:hover {
+    color: #0f172a; /* slate-900 */
+    background: rgba(241, 245, 249, 0.6);
+  }
+  .dark .brand-pill-inactive:hover,
+  .dark .tab-brand-gradient[data-state=inactive]:hover,
+  .dark [data-state=inactive].tab-brand-gradient:hover,
+  .dark [data-state=inactive].brand-pill-tab:hover {
+    color: #f8fafc;
+    background: rgba(255, 255, 255, 0.05);
+  }
+
+  .bg-brand-gradient {
+    background: linear-gradient(135deg, #2563eb 0%, #7c3aed 50%, #f43f5e 100%) !important;
+    color: #ffffff !important;
+  }
+  .tab-brand-gradient,
+  [data-slot=tabs-trigger] {
+    transition: none !important;
+    animation: none !important;
+    transform: none !important;
+  }
   .brand-slider {
     -webkit-appearance: none;
     appearance: none;
@@ -347,24 +405,40 @@
   .simulation-tool-rail { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); overflow: hidden; border: 1px solid rgb(148 163 184 / .35); border-radius: .9rem; background: rgb(255 255 255 / .45); }
   .dark .simulation-tool-rail { border-color: rgba(255, 255, 255, 0.08); background: rgba(255, 255, 255, 0.02); }
   .mae-noise { background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.95'/%3E%3C/svg%3E"); }
-  /* Assembler Studio: Tajawal labels, strict monospaced machine values, and sharp technical-paper frames. */
-  .assembler-studio { font-family: var(--font-arabic); }
-  .assembler-token-instruction { color: #7c3aed; font-weight: 800; }
-  .assembler-token-register { color: #0f766e; font-weight: 700; }
-  .assembler-token-number { color: #b45309; font-weight: 700; }
-  .assembler-token-directive { color: #2563eb; font-weight: 700; }
-  .assembler-token-comment { color: #64748b; font-style: italic; }
-  .dark .assembler-token-instruction { color: #c4b5fd; }
-  .dark .assembler-token-register { color: #5eead4; }
-  .dark .assembler-token-number { color: #fbbf24; }
-  .dark .assembler-token-directive { color: #93c5fd; }
-  .dark .assembler-token-comment { color: #94a3b8; }
-  .assembler-studio { position: relative; isolation: isolate; }
-  .assembler-studio::before { content: ""; position: absolute; inset: .75rem 0 auto; height: 26rem; z-index: -1; opacity: .55; background-image: linear-gradient(rgb(124 58 237 / .08) 1px, transparent 1px), linear-gradient(90deg, rgb(124 58 237 / .08) 1px, transparent 1px); background-size: 24px 24px; mask-image: linear-gradient(to bottom, black, transparent); pointer-events: none; }
-  .assembler-register-flash { animation: assembler-register-flash 1s ease-out; }
-  @keyframes assembler-register-flash { 0% { box-shadow: 0 0 0 0 rgb(16 185 129 / .78); background-color: rgb(209 250 229); } 100% { box-shadow: 0 0 0 8px rgb(16 185 129 / 0); } }
-  .dark .assembler-register-flash { animation-name: assembler-register-flash-dark; }
-  @keyframes assembler-register-flash-dark { 0% { box-shadow: 0 0 0 0 rgb(52 211 153 / .72); background-color: rgb(6 78 59 / .65); } 100% { box-shadow: 0 0 0 8px rgb(52 211 153 / 0); } }
+  /* Code Studio: Tajawal labels, strict monospaced machine values, and sharp technical-paper frames. */
+  .code-studio, .assembler-studio { font-family: var(--font-arabic); }
+  /* Code Studio & Multi-Language Syntax Highlighting Tokens */
+  .syntax-keyword-type, .assembler-token-directive { color: #2563eb; font-weight: 400; }
+  .syntax-control-flow, .assembler-token-instruction { color: #7c3aed; font-weight: 400; }
+  .syntax-literal-number, .assembler-token-number { color: #e11d48; font-weight: 400; }
+  .syntax-string { color: #be185d; font-weight: 400; }
+  .syntax-function, .assembler-token-register { color: #4f46e5; font-weight: 400; }
+  .syntax-preprocessor { color: #0284c7; font-weight: 400; }
+  .syntax-comment, .assembler-token-comment { color: #64748b; font-style: italic; font-weight: 400; }
+  .syntax-operator { color: #475569; font-weight: 400; }
+
+  /* Code Studio Editor Strict Normal Font-Weight (Never bold on hover/focus) */
+  .code-studio textarea,
+  .code-studio textarea:hover,
+  .code-studio textarea:focus,
+  .code-studio textarea:active,
+  .code-studio pre,
+  .code-studio pre *,
+  .code-studio .npm__react-simple-code-editor__textarea {
+    font-weight: 400 !important;
+  }
+
+  .dark .syntax-keyword-type, .dark .assembler-token-directive { color: #60a5fa; }
+  .dark .syntax-control-flow, .dark .assembler-token-instruction { color: #c4b5fd; }
+  .dark .syntax-literal-number, .dark .assembler-token-number { color: #fb7185; }
+  .dark .syntax-string { color: #f472b6; }
+  .dark .syntax-function, .dark .assembler-token-register { color: #a5b4fc; }
+  .dark .syntax-preprocessor { color: #38bdf8; }
+  .dark .syntax-comment, .dark .assembler-token-comment { color: #94a3b8; }
+  .dark .syntax-operator { color: #cbd5e1; }
+  .code-studio, .assembler-studio { position: relative; isolation: isolate; }
+  .code-studio::before, .assembler-studio::before { content: ""; position: absolute; inset: .75rem 0 auto; height: 26rem; z-index: -1; opacity: .55; background-image: linear-gradient(rgb(124 58 237 / .08) 1px, transparent 1px), linear-gradient(90deg, rgb(124 58 237 / .08) 1px, transparent 1px); background-size: 24px 24px; mask-image: linear-gradient(to bottom, black, transparent); pointer-events: none; }
+  .assembler-register-flash { animation: none !important; }
   @keyframes explode-fade {
     0% { opacity: 1; transform: scale(0.8); }
     20% { opacity: 1; transform: scale(1.2); }

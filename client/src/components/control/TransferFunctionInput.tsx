@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { KatexMath } from "../ui/KatexMath";
+import SegmentedControl from "../ui/SegmentedControl";
 import { rootsToPolynomial, parseRootsList, Complex } from "@/features/control/controlMath";
 
 export type TfInputMode = "polynomial" | "zpk";
@@ -194,20 +195,16 @@ export function TransferFunctionInput({ onUpdate, defaultData, gainK }: Transfer
         <h3 className="text-sm font-bold uppercase tracking-wider text-slate-800 dark:text-white">Transfer Function Engine</h3>
 
         {/* Toggle Mode */}
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => setMode("polynomial")}
-            className={`rounded-lg px-3 py-1.5 text-xs font-medium shadow-sm ${mode === "polynomial" ? "bg-brand-gradient text-white" : "border border-slate-200 bg-white text-slate-500 hover:border-blue-400 hover:text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400 dark:hover:border-blue-400 dark:hover:text-slate-200"}`}
-          >
-            Polynomial
-          </button>
-          <button
-            onClick={() => setMode("zpk")}
-            className={`rounded-lg px-3 py-1.5 text-xs font-medium shadow-sm ${mode === "zpk" ? "bg-brand-gradient text-white" : "border border-slate-200 bg-white text-slate-500 hover:border-blue-400 hover:text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400 dark:hover:border-blue-400 dark:hover:text-slate-200"}`}
-          >
-            ZPK
-          </button>
-        </div>
+        <SegmentedControl
+          options={[
+            { label: "Polynomial", value: "polynomial" },
+            { label: "ZPK", value: "zpk" },
+          ]}
+          value={mode}
+          onChange={setMode}
+          size="sm"
+          aria-label="Transfer Function Input Mode"
+        />
       </div>
 
       <div className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-2">

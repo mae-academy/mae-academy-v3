@@ -36,6 +36,13 @@ export function getExamplesByCategory(category: ExampleCategory): ExampleDefinit
   return EXAMPLE_LIBRARY.filter((example) => example.categoryGroup === category);
 }
 
+/** Op-amp examples; already part of TRANSIENT_ANALYSIS_EXAMPLES, exported individually for direct loading. */
+export { OPAMP_IDEAL_INTEGRATOR } from '@/simulators/circuit-engine/examples/transient-analysis/opamp-ideal-integrator';
+export { OPAMP_DIFFERENTIATOR } from '@/simulators/circuit-engine/examples/transient-analysis/opamp-differentiator';
+export { OPAMP_COMPARATOR } from '@/simulators/circuit-engine/examples/transient-analysis/opamp-comparator';
+export { OPAMP_SCHMITT_TRIGGER } from '@/simulators/circuit-engine/examples/transient-analysis/opamp-schmitt-trigger';
+export { OPAMP_SUMMING_AMPLIFIER } from '@/simulators/circuit-engine/examples/transient-analysis/opamp-summing-amplifier';
+
 /** Re-exported per-category arrays, for anything that wants to import a single section directly. */
 export {
   NODAL_ANALYSIS_EXAMPLES,

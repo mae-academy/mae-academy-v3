@@ -38,22 +38,20 @@ export function AssemblerVariables({
 }: VariablesProps) {
   const entries = Object.entries(variables);
   return (
-    <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-sm font-bold uppercase tracking-wider text-slate-800 dark:text-white">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
             {copy.variablesTitle}
           </h3>
-          <p className="mt-1 text-xs text-violet-700 dark:text-violet-300">
-            {copy.name} · {copy.type} · {copy.value}
-          </p>
         </div>
-        <span className="rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 font-mono text-[10px] font-bold text-violet-700 dark:border-violet-400/30 dark:bg-violet-500/15 dark:text-violet-200">
-          {entries.length}
+        <span className="rounded-full border border-slate-200 dark:border-[#1a1d24] bg-slate-100 dark:bg-[#13161c] px-2.5 py-0.5 font-mono text-[10px] font-bold text-violet-600 dark:text-violet-400">
+          {entries.length} variables
         </span>
       </div>
-      <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800">
-        <div className="grid grid-cols-[1fr_1fr_1.4fr] bg-slate-50 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:bg-slate-950 dark:text-slate-400">
+
+      <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-[#1a1d24] bg-white dark:bg-[#090a0d]">
+        <div className="grid grid-cols-[1fr_1fr_1.4fr] bg-slate-50 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:bg-[#13161c] dark:text-slate-400 border-b border-slate-200 dark:border-[#1a1d24]">
           <span>{copy.name}</span>
           <span>{copy.type}</span>
           <span>{copy.value}</span>
@@ -67,9 +65,13 @@ export function AssemblerVariables({
             return (
               <div
                 key={name}
-                className={`grid grid-cols-[1fr_1fr_1.4fr] border-t border-slate-100 px-3 py-2 font-mono text-xs dark:border-slate-800 ${changed ? "bg-violet-50 text-violet-800 dark:bg-violet-500/15 dark:text-violet-100" : ""}`}
+                className={`grid grid-cols-[1fr_1fr_1.4fr] border-t border-slate-100 dark:border-[#1a1d24] px-3 py-2 font-mono text-xs ${
+                  changed
+                    ? "bg-violet-50 text-violet-800 dark:bg-violet-950/30 dark:text-violet-200"
+                    : "text-slate-700 dark:text-slate-300"
+                }`}
               >
-                <span className="truncate font-bold">{name}</span>
+                <span className="truncate font-semibold">{name}</span>
                 <span className="truncate text-slate-500 dark:text-slate-400">
                   {variable.type}
                 </span>
@@ -80,32 +82,30 @@ export function AssemblerVariables({
             );
           })
         ) : (
-          <p className="px-3 py-5 font-mono text-xs text-slate-500 dark:text-slate-400">
+          <div className="px-4 py-8 text-center font-mono text-xs text-slate-400 dark:text-slate-500">
             {copy.empty}
-          </p>
+          </div>
         )}
       </div>
-      <div className="mt-4 border-t border-slate-200 pt-4 dark:border-slate-800">
-        <h4 className={subheading}>{copy.callStackTitle}</h4>
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {callStack.length ? (
-            callStack.map((frame, index) => (
+
+      {callStack.length > 0 && (
+        <div className="border-t border-slate-200 dark:border-[#1a1d24] pt-3">
+          <h4 className={subheading}>{copy.callStackTitle}</h4>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {callStack.map((frame, index) => (
               <span
                 key={`${frame}-${index}`}
-                className={`${cell} font-mono text-[11px] font-bold text-slate-700 dark:text-slate-200`}
+                className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 font-mono text-[11px] font-semibold text-slate-700 dark:border-[#1a1d24] dark:bg-[#13161c] dark:text-slate-200"
               >
                 {frame}
               </span>
-            ))
-          ) : (
-            <span className="font-mono text-xs text-slate-500 dark:text-slate-400">
-              {copy.empty}
-            </span>
-          )}
+            ))}
+          </div>
         </div>
-      </div>
-    </section>
+      )}
+    </div>
   );
 }
 
 export default AssemblerVariables;
+

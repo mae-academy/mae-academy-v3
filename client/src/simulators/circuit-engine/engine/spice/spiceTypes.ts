@@ -265,15 +265,81 @@ export interface SpiceDcMotor extends SpiceElementBase {
 }
 
 /**
-  * Operational Amplifier macromodel. Open-loop gain with differential input resistance and output resistance.
-  */
+ * Which op-amp macromodel `netlistGenerator` expands the part into.
+ * - `ideal`: single-pole-free high-gain stage with rail clamping. Infinite input impedance, zero
+ *   output impedance, infinite bandwidth, infinite slew rate — the textbook element, where a
+ *   closed-loop result is set purely by the feedback network.
+ * - `realistic`: the same gain stage followed by an internal dominant pole (which fixes the
+ *   gain-bandwidth product), a slew-rate limit on that pole's charging current, and finite
+ *   input/output resistances plus a saturation margin short of each rail.
+ */
+export type OpAmpModel = "ideal" | "realistic";
+
+/**
+ * Floor for any op-amp's open-loop gain, in V/V.
+ *
+ * A gain anywhere near unity is never a legitimate op-amp: it silently turns every textbook
+ * configuration into something else. The inverting integrator is the clearest case — with feedback
+ * capacitor C, input resistor R and open-loop gain A, the exact closed-loop response is a
+ * first-order lag, not an integrator:
+ *
+ *     Vout(s) / Vin(s) = −A / (1 + sRC(A + 1))   ⇒   τ_eff = RC(A + 1)
+ *
+ * At A = 10 with R = 1 kΩ and C = 1 µF that is τ_eff = 11 ms, so a 2 V step produces
+ * V(t) = 20(1 − e^(−t/11ms)) — an exponential that softly plateaus at 20 V — instead of the
+ * −(1/RC)∫V_in dt ramp. Only as A → ∞ does τ_eff → ∞ and the lag become a true integrator: at
+ * A = 1e5 the pole sits at 110 s, so across a 100 ms window the response is linear to within
+ * ~0.05%, and at 1e6 to within ~0.005%.
+ */
+export const MIN_OPAMP_GAIN = 1e5;
+
+/** Open-loop gain used for an op-amp in `ideal` mode, unless the part carries a larger one. */
+export const IDEAL_OPAMP_GAIN = 1e6;
+
+/** ±15 V, the standard bench supply every textbook op-amp example assumes. */
+export const DEFAULT_OPAMP_SUPPLY = 15;
+
+/** Realistic-mode defaults, roughly a general-purpose bipolar part (TL07x / LM358 class). */
+export const DEFAULT_OPAMP_GAIN = 1e5;
+/** Gain-bandwidth product, in Hz. */
+export const DEFAULT_OPAMP_GBW = 1e6;
+/** Slew rate, in V/s — 0.5 V/µs. */
+export const DEFAULT_OPAMP_SLEW_RATE = 5e5;
+/** Differential input resistance, in Ω. */
+export const DEFAULT_OPAMP_INPUT_RESISTANCE = 1e7;
+/** Open-loop output resistance, in Ω. */
+export const DEFAULT_OPAMP_OUTPUT_RESISTANCE = 50;
+/** Volts short of each rail a non-rail-to-rail output stage saturates at. */
+export const DEFAULT_OPAMP_RAIL_MARGIN = 1.5;
+
+/**
+ * Operational amplifier macromodel. The gain stage is `Vsat·tanh(A·Vd/Vsat)` in both modes: its
+ * small-signal slope is exactly the open-loop gain A, and it saturates smoothly at the supply rail
+ * instead of hard-limiting, which keeps the Jacobian continuous through the saturation knee (a
+ * piecewise `limit()` puts a derivative discontinuity right where a comparator operates, and
+ * ngspice's Newton iteration stalls on it).
+ */
 export interface SpiceOpAmp extends SpiceElementBase {
   kind: "opamp";
   inNonInverting: SpiceNet;
   inInverting: SpiceNet;
   out: SpiceNet;
+  /** Open-loop DC gain A_OL, in V/V. Never below `MIN_OPAMP_GAIN`. */
   gain: number;
+  /** Supply magnitude; the output saturates at ±(vcc − railMargin). */
   vcc?: number;
+  /** Defaults to `ideal` when absent. */
+  model?: OpAmpModel;
+  /** Gain-bandwidth product f_T, in Hz. Realistic mode only; sets the dominant pole f_b = f_T / A. */
+  gainBandwidth?: number;
+  /** Slew rate, in V/s. Realistic mode only. */
+  slewRate?: number;
+  /** Differential input resistance, in Ω. Realistic mode only. */
+  inputResistance?: number;
+  /** Open-loop output resistance, in Ω. Realistic mode only. */
+  outputResistance?: number;
+  /** Volts short of each supply rail the output saturates at. Realistic mode only. */
+  railMargin?: number;
 }
 
 /* ------------------------------------------------------------ Switches & electromechanical --- */

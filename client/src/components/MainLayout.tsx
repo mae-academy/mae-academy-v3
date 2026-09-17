@@ -10,6 +10,7 @@ import SocialLinks from "@/components/SocialLinks";
 import { LocaleProvider } from "@/contexts/LocaleContext";
 import { localizedContent } from "@/data/content";
 import LanguageTransition from "@/components/LanguageTransition";
+import SegmentedControl from "@/components/ui/SegmentedControl";
 
 type MainLayoutProps = { children: ReactNode };
 
@@ -116,25 +117,17 @@ export default function MainLayout({ children }: MainLayoutProps) {
           <div className="flex flex-col justify-between gap-6">
             <div className="space-y-4">
               {/* Language Switcher */}
-              <div className="flex items-center gap-1 rounded-lg border border-slate-200/80 bg-slate-100/60 p-1 w-fit dark:border-white/10 dark:bg-white/5">
-                {languageOptions.map((opt) => {
-                  const isActive = locale === opt.key;
-                  return (
-                    <button
-                      key={opt.key}
-                      onClick={() => handleLocaleChange(opt.key)}
-                      disabled={Boolean(languageTarget)}
-                      className={`rounded-md px-2.5 py-1 text-xs font-semibold transition-all ${isActive
-                          ? "bg-white text-violet-700 shadow-xs dark:bg-white/15 dark:text-white"
-                          : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
-                        }`}
-                      aria-label={`Switch language to ${opt.sub}`}
-                    >
-                      <span>{opt.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
+              <SegmentedControl
+                options={languageOptions.map((opt) => ({
+                  label: opt.label,
+                  value: opt.key,
+                }))}
+                value={locale}
+                onChange={handleLocaleChange}
+                disabled={Boolean(languageTarget)}
+                size="sm"
+                aria-label="Platform Language"
+              />
 
               {/* Social Links */}
               <div>

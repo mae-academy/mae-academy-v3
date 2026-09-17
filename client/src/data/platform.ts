@@ -30,7 +30,7 @@ export const homeGatewayMeta: HomeGatewayMeta[] = [
 
 export const simulationRouteMeta = [
   { slug: "control-systems", index: 0 }, { slug: "circuit-lab", index: 1 }, { slug: "power-electronics", index: 2 },
-  { slug: "assembler", index: 3 }, { slug: "plc", index: 4 }, { slug: "signals-and-systems", index: 5 },
+  { slug: "code", index: 3 }, { slug: "plc", index: 4 }, { slug: "signals-and-systems", index: 5 },
   { slug: "digital-logic-design", index: 6 }, { slug: "linear-algebra", index: 7 }, { slug: "communication-and-network", index: 8 },
   { slug: "circuitlab-1", index: 9, visualVariant: 1 }, { slug: "circuitlab-2", index: 10, visualVariant: 1 }, { slug: "circuitlab-3", index: 11, visualVariant: 1 },
 ] as const;

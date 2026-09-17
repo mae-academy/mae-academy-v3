@@ -28,13 +28,23 @@ const near = (actual: number, expected: number, tolerance = Math.max(Math.abs(ex
 
 /** Component:terminal keys that are deliberate open Thévenin test points (see each example's own
  * comment for why) — legitimate single-branch MNA nodes, not a wiring mistake. */
+const UNUSED_SCOPE_CHANNELS = ['osc1:ch3', 'osc1:ch4'];
 const OPEN_TEST_POINTS: Record<string, string[]> = {
   'thevenin-dependent-source': ['r2:b'],
+  // The op-amp examples place a real oscilloscope on the canvas and probe two channels; an unused
+  // scope input is an idle high-impedance probe, not an unconnected circuit pin.
+  'transient-opamp-ideal-integrator': UNUSED_SCOPE_CHANNELS,
+  'transient-opamp-differentiator': UNUSED_SCOPE_CHANNELS,
+  'transient-opamp-comparator': UNUSED_SCOPE_CHANNELS,
+  'transient-opamp-schmitt-trigger': UNUSED_SCOPE_CHANNELS,
+  'transient-opamp-summing-amplifier': UNUSED_SCOPE_CHANNELS,
 };
 
 describe('Interactive Examples Library — registry integrity', () => {
-  it('has 20 examples with unique ids, spanning all 6 categories', () => {
-    expect(EXAMPLE_LIBRARY.length).toBe(20);
+  it('has 25 examples with unique ids, spanning all 6 categories', () => {
+    // 20 original examples + 5 op-amp transient examples (integrator, differentiator, comparator,
+    // Schmitt trigger, summing amplifier).
+    expect(EXAMPLE_LIBRARY.length).toBe(25);
     const ids = EXAMPLE_LIBRARY.map((example) => example.id);
     expect(new Set(ids).size).toBe(ids.length);
     const groupsPresent = new Set(EXAMPLE_LIBRARY.map((example) => example.categoryGroup));

@@ -81,7 +81,7 @@ const SOURCES: Record<string, ComponentDef> = {
     id: 'ground', name: 'Ground', category: 'Sources',
     width: 20, height: 20, symbol: 'ground',
     terminals: [
-      { id: 'gnd', name: 'GND', x: 0, y: -5, type: 'bidirectional' },
+      { id: 'gnd', name: 'GND', x: 0, y: -10, type: 'bidirectional' },
     ],
     properties: {},
     description: 'Ground reference (0 V)',
@@ -917,8 +917,22 @@ const OTHER_COMPONENTS: Record<string, ComponentDef> = {
       { id: 'in+', name: 'IN+', x: -50, y: 25, type: 'input' },
       { id: 'out', name: 'OUT', x: 50, y: 0, type: 'output' },
     ],
-    properties: { gain: { type: 'number', value: 10, unit: 'V/V', min: 1, max: 1e7, label: 'Open-loop Gain' }, vcc: { type: 'number', value: 15, unit: 'V', min: 1, max: 100, label: 'Supply (±)' } },
-    description: 'Operational Amplifier (Ideal)',
+    // `gain` is the open-loop gain A_OL, and it must stay orders of magnitude above unity: at
+    // A = 10 (this part's original default) an inverting integrator is not an integrator at all
+    // but a first-order lag with τ = RC(A + 1) — see MIN_OPAMP_GAIN in spiceTypes.ts. The
+    // realistic-only fields below (gbw/slewRate/rin/rout/railMargin) are hidden from the inspector
+    // while `model` is 'ideal', where the macromodel ignores them.
+    properties: {
+      model: { type: 'select', value: 'ideal', options: ['ideal', 'realistic'], optionLabels: { ideal: 'Ideal Op-Amp', realistic: 'Realistic Op-Amp' }, label: 'Model' },
+      gain: { type: 'number', value: 1e6, unit: 'V/V', min: 1e5, max: 1e8, label: 'Open-loop Gain (A_OL)' },
+      vcc: { type: 'number', value: 15, unit: 'V', min: 1, max: 100, label: 'Supply (±)' },
+      gbw: { type: 'number', value: 1e6, unit: 'Hz', min: 1e3, max: 1e9, label: 'Gain–Bandwidth (f_T)' },
+      slewRate: { type: 'number', value: 0.5, unit: 'V/µs', min: 0.001, max: 10000, label: 'Slew Rate' },
+      rin: { type: 'number', value: 1e7, unit: 'Ω', min: 1e3, max: 1e15, label: 'Input Resistance' },
+      rout: { type: 'number', value: 50, unit: 'Ω', min: 0.001, max: 10000, label: 'Output Resistance' },
+      railMargin: { type: 'number', value: 1.5, unit: 'V', min: 0, max: 10, step: 0.1, label: 'Rail Margin' },
+    },
+    description: 'Operational Amplifier — ideal (A_OL = 10⁶) or realistic (GBW, slew rate, finite Rin/Rout)',
   },
   'lamp': {
     id: 'lamp', name: 'Lamp', category: 'Other Components',
