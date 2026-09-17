@@ -900,6 +900,27 @@ function singleElementLine(
   }
 }
 
+/** SPICE's native G (giga) numeric suffix — 1e9 Ω, effectively an open circuit. */
+const BURNED_OUT_RESISTANCE = "1G";
+
+/**
+ * A burned-out component emits no model/element line of its own; every node it would normally
+ * touch is instead chained through 1 GΩ resistors (rather than just its first two nodes), so a
+ * burned three-plus-terminal part — a transistor, say — is fully isolated on every leg without
+ * leaving any node floating for `floatingGroundTies` to trip over.
+ */
+function burnedOutLines(name: string, nodeNames: string[]): string[] {
+  const uniqueNodes = Array.from(new Set(nodeNames));
+  const lines = ["* COMPONENT BURNED OUT"];
+  for (let i = 1; i < uniqueNodes.length; i++) {
+    const suffix = uniqueNodes.length > 2 ? `_${i}` : "";
+    lines.push(
+      `R_blown_${name}${suffix} ${uniqueNodes[0]} ${uniqueNodes[i]} ${BURNED_OUT_RESISTANCE}`
+    );
+  }
+  return lines;
+}
+
 /**
  * The lines an element expands into. Most produce exactly one; transformers produce one `L` per
  * winding plus the `K` directives that couple them, so they are handled here rather than as a
@@ -1163,6 +1184,15 @@ export function generateNetlist(
       name = `${sanitizeLabel(element.label, prefix, index + 1)}_${suffix}`;
     }
     used.add(name.toUpperCase());
+
+    if (element.isBurned) {
+      const emitted = burnedOutLines(
+        name,
+        elementNets(element).map(net => nodes.nameFor(net))
+      );
+      for (const line of emitted) used.add(line.split(" ")[0].toUpperCase());
+      return emitted;
+    }
 
     const model = modelFor(element, mode);
     for (const card of modelsFor(element, mode)) {

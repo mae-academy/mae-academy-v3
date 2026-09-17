@@ -2,6 +2,8 @@ export interface MNAIdentity {
   id: string;
   name?: string;
   label?: string;
+  /** Mirrors `CircuitComponent.state.isBurned`; forces a 1 GΩ open-circuit stamp regardless of type. */
+  isBurned?: boolean;
 }
 export type MNAElement =
   | (MNAIdentity & { type: 'resistor'; positive: string; negative: string; resistance: number })
@@ -33,6 +35,8 @@ export class MNAError extends Error {
 
 const PIVOT_EPSILON = 1e-12;
 const VALUE_EPSILON = 1e-9;
+/** Stand-in resistance for a burned-out component: physically an open circuit. */
+export const BURNED_OUT_RESISTANCE = 1e9;
 
 function finite(value: number, label: string) {
   if (!Number.isFinite(value)) throw new MNAError('INVALID_ELEMENT', `Invalid Circuit: ${label} must be finite`);
@@ -57,7 +61,9 @@ export class MNASolver {
     this.assertIndependentVoltageConsistency();
     const nodeOrder = this.collectNonReferenceNodes();
     const nodeIndex = new Map(nodeOrder.map((node, index) => [node, index]));
-    const voltageBranches = this.elements.filter(isVoltageBranch);
+    // A burned voltage branch no longer imposes its nominal voltage — it is stamped as a plain
+    // resistor below — so it must not reserve a branch-current row/column.
+    const voltageBranches = this.elements.filter(element => isVoltageBranch(element) && !element.isBurned);
     const branchIndex = new Map<string, number>();
     voltageBranches.forEach((element, index) => {
       branchIndex.set(element.id, nodeOrder.length + index);
@@ -110,6 +116,13 @@ export class MNASolver {
     };
 
     for (const element of this.elements) {
+      if (element.isBurned) {
+        // Blown: exactly a 1 GΩ resistor between its own two terminals, regardless of what it
+        // would normally stamp (resistor, source, or dependent-source branch).
+        const [positiveId, negativeId] = element.type === 'current' ? [element.from, element.to] : [element.positive, element.negative];
+        stampResistor(node(positiveId), node(negativeId), BURNED_OUT_RESISTANCE);
+        continue;
+      }
       if (element.type === 'current') {
         stampCurrent(node(element.from), node(element.to), element.current);
         continue;
@@ -208,7 +221,12 @@ export class MNASolver {
     const branchCurrents: Record<string, number> = {};
     voltageBranches.forEach((element, index) => { branchCurrents[element.id] = solution[nodeOrder.length + index]; });
     for (const element of this.elements) {
-      if (element.type === 'resistor') {
+      if (element.isBurned) {
+        const [positiveId, negativeId] = element.type === 'current' ? [element.from, element.to] : [element.positive, element.negative];
+        const vp = nodeVoltages[positiveId] ?? 0;
+        const vn = nodeVoltages[negativeId] ?? 0;
+        branchCurrents[element.id] = (vp - vn) / BURNED_OUT_RESISTANCE;
+      } else if (element.type === 'resistor') {
         const vp = nodeVoltages[element.positive] ?? 0;
         const vn = nodeVoltages[element.negative] ?? 0;
         branchCurrents[element.id] = (vp - vn) / element.resistance;
@@ -281,7 +299,7 @@ export class MNASolver {
 
   private assertIndependentVoltageConsistency() {
     const known = new Map<string, number>();
-    for (const element of this.elements.filter((item): item is Extract<MNAElement, { type: 'voltage' }> => item.type === 'voltage')) {
+    for (const element of this.elements.filter((item): item is Extract<MNAElement, { type: 'voltage' }> => item.type === 'voltage' && !item.isBurned)) {
       const [left, right] = [element.positive, element.negative].sort();
       const orientedValue = element.positive === left ? element.voltage : -element.voltage;
       const previous = known.get(`${left}|${right}`);

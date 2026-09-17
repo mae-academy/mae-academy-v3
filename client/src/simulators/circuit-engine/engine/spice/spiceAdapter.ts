@@ -1344,7 +1344,13 @@ export function convertToSpiceComponents(
       simulationMode,
     });
     if (Array.isArray(mapping)) {
-      spice.push(...mapping);
+      // Burnout is orthogonal to the per-kind mapping above: stamp it onto whatever that mapping
+      // produced rather than teaching every mapPart branch about it.
+      spice.push(
+        ...(component.state?.isBurned
+          ? mapping.map(part => (part.kind === "ground" ? part : { ...part, isBurned: true }))
+          : mapping)
+      );
     } else {
       unsupported.push({
         id: component.id,

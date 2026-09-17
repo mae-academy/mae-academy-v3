@@ -19,6 +19,8 @@ interface SpiceElementBase {
   id: string;
   /** The canvas label (`R1`, `V2`, …). The generator enforces the type-correct SPICE prefix. */
   label: string;
+  /** Mirrors `CircuitComponent.state.isBurned`; forces an open-circuit emission in netlistGenerator. */
+  isBurned?: boolean;
 }
 
 interface SpiceTwoTerminal extends SpiceElementBase {

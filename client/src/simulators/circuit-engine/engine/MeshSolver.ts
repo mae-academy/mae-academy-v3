@@ -1,4 +1,4 @@
-import { MNASolver, type MNAElement } from '@/simulators/circuit-engine/engine/mnaSolver';
+import { MNASolver, BURNED_OUT_RESISTANCE, type MNAElement } from '@/simulators/circuit-engine/engine/mnaSolver';
 import { AcademicNodalDictionary, formatAcademicUserLabel } from '@/simulators/circuit-engine/models/AcademicNodalDictionary';
 import { MESH_COLORS, type AnalysisTrace, type MeshCycle } from '@/simulators/circuit-engine/models/analysisTypes';
 import { formatAcademicNumber } from '@/simulators/circuit-engine/models/analysisFormatting';
@@ -208,6 +208,11 @@ function getTargetMeshParticipation(
 }
 
 const meshEdges = (elements: MNAElement[]): MeshEdge[] => elements.flatMap<MeshEdge>((element) => {
+  if (element.isBurned) {
+    // Blown: exactly a 1 GΩ resistor edge, regardless of what it would normally stamp.
+    const [from, to] = element.type === 'current' ? [element.from, element.to] : [element.positive, element.negative];
+    return [{ id: element.id, type: 'resistor', from, to, value: BURNED_OUT_RESISTANCE, element }];
+  }
   if (element.type === 'resistor') return [{ id: element.id, type: 'resistor', from: element.positive, to: element.negative, value: element.resistance, element }];
   if (element.type === 'voltage') return [{ id: element.id, type: 'voltage', from: element.positive, to: element.negative, value: element.voltage, element }];
   if (element.type === 'current') return [{ id: element.id, type: 'current', from: element.from, to: element.to, value: element.current, element }];
@@ -826,6 +831,10 @@ export class MeshSolver {
         const element = this.elements.find((item) => item.id === key);
         return `${element ? `i_{${dictionary.element(element)}}` : 'i_x'}=${formatAcademicNumber(value)}\\,\\mathrm{A}`;
       }).join(',\\qquad ');
+      const burnedElements = this.elements.filter((element) => element.isBurned);
+      const burnedNote = burnedElements.length
+        ? ` ${burnedElements.map((element) => dictionary.element(element)).join(', ')}: Component is blown (Open Circuit), stamped at ${formatAcademicNumber(BURNED_OUT_RESISTANCE)}\\,\\Omega.`
+        : '';
       const topologyMath = `M=B-N+C=${system.topology.branchCount}-${system.topology.netCount}+${system.topology.connectedComponents}=${system.topology.expectedMeshCount}`;
       const rankMath = `\\mathrm{rank}(Z_m)=${system.rank}`;
       const supermeshMath = currentConstraints.map((constraint) => {
@@ -840,7 +849,7 @@ export class MeshSolver {
           title: '2. KVL loop equations · assembled mesh-current coefficient system',
           math: (kvlDerivations.length ? `\\begin{aligned}${kvlDerivations.join(' \\\\ ')}\\end{aligned}\\\\ ` : '') +
             `${loopSystem}\\qquad\\left[Z_m\\right]\\left[I_m\\right]=\\left[E_m\\right]`,
-          prose: 'Each diagonal entry is the sum of resistances in its mesh. An off-diagonal entry is the signed negative shared resistance, so this system has exactly one row and one column per mesh.',
+          prose: 'Each diagonal entry is the sum of resistances in its mesh. An off-diagonal entry is the signed negative shared resistance, so this system has exactly one row and one column per mesh.' + burnedNote,
         },
         ...(hasSupermesh ? [{ title: '3. Supermesh constraints', math: supermeshMath || 'i_b-i_a=I_s', prose: currentConstraints.length ? 'Each ideal current-source branch replaces one KVL row with its signed mesh-current constraint, preventing a singular mesh-current system.' : 'A dependent current-source branch is excluded from the KVL perimeter and restored by its explicit controlled-current constraint.' }] : []),
         { title: hasSupermesh ? '4. Solved mesh-current vector' : '3. Solved mesh-current vector', math: solvedVector, prose: 'The solved I_1 through I_n values come directly from the displayed mesh coefficient system and are the mesh-level current readings.' },

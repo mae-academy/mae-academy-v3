@@ -55,6 +55,9 @@ export function compileDcTopology(components: CircuitComponent[], wires: Circuit
   };
   const elements: MNAElement[] = [];
   for (const component of components) {
+    // Every element this component pushes below is patched afterward, so burnout applies
+    // regardless of which branch produced it (single resistor, resistor pair, …).
+    const elementsBeforeComponent = elements.length;
     if (component.type === 'resistor') elements.push({ type: 'resistor', id: component.id, label: component.label, positive: nodeFor(component, 'a'), negative: nodeFor(component, 'b'), resistance: number(component, 'resistance', 1000) });
     if (component.type === 'impedance') {
       const format = String(component.props.format ?? 'rectangular');
@@ -155,6 +158,9 @@ export function compileDcTopology(components: CircuitComponent[], wires: Circuit
       elements.push({ type: 'resistor', id: `${component.id}:rab`, positive: a, negative: b, resistance: number(component, 'rAB', 30) });
       elements.push({ type: 'resistor', id: `${component.id}:rbc`, positive: b, negative: c, resistance: number(component, 'rBC', 30) });
       elements.push({ type: 'resistor', id: `${component.id}:rca`, positive: c, negative: a, resistance: number(component, 'rCA', 30) });
+    }
+    if (component.state?.isBurned) {
+      for (let i = elementsBeforeComponent; i < elements.length; i++) elements[i] = { ...elements[i], isBurned: true };
     }
   }
   return elements;
