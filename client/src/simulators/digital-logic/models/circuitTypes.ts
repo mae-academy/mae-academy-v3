@@ -193,3 +193,67 @@ export function formatEngineering(value: number, unit: string, precision = 3): s
   const [scale, prefix] = found;
   return `${(value / scale).toFixed(precision)} ${prefix}${unit}`;
 }
+
+export interface ReplaceComponentResult {
+  components: CircuitComponent[];
+  wires: CircuitWire[];
+}
+
+/**
+ * Swaps `oldComponentId` for `replacement`, inheriting its position/rotation/flip.
+ * Old and new terminals reconnect pin-for-pin when counts match; otherwise mismatched
+ * wires are safely dropped.
+ */
+export function replaceComponent(
+  components: CircuitComponent[],
+  wires: CircuitWire[],
+  oldComponentId: string,
+  oldTerminalIds: string[],
+  newTerminalIds: string[],
+  replacement: Omit<CircuitComponent, 'x' | 'y' | 'rotation' | 'flipH' | 'flipV'>,
+): ReplaceComponentResult | null {
+  const oldIndex = components.findIndex((component) => component.id === oldComponentId);
+  if (oldIndex === -1) return null;
+  const oldComponent = components[oldIndex];
+
+  const newComponent: CircuitComponent = {
+    ...replacement,
+    x: oldComponent.x,
+    y: oldComponent.y,
+    rotation: oldComponent.rotation,
+    flipH: oldComponent.flipH,
+    flipV: oldComponent.flipV,
+  };
+  const nextComponents = components.map((component, index) => (index === oldIndex ? newComponent : component));
+
+  const pinsMatch = oldTerminalIds.length > 0 && oldTerminalIds.length === newTerminalIds.length;
+  const remapTerminal = (terminalId: string): string | undefined => {
+    const position = oldTerminalIds.indexOf(terminalId);
+    return position === -1 ? undefined : newTerminalIds[position];
+  };
+
+  const nextWires = pinsMatch
+    ? wires.reduce<CircuitWire[]>((kept, wire) => {
+        const touchesFrom = wire.fromComp === oldComponentId;
+        const touchesTo = wire.toComp === oldComponentId;
+        if (!touchesFrom && !touchesTo) {
+          kept.push(wire);
+          return kept;
+        }
+        const nextFromTerm = touchesFrom ? remapTerminal(wire.fromTerm) : wire.fromTerm;
+        const nextToTerm = touchesTo ? remapTerminal(wire.toTerm) : wire.toTerm;
+        if (nextFromTerm === undefined || nextToTerm === undefined) return kept;
+        kept.push({
+          ...wire,
+          fromComp: touchesFrom ? newComponent.id : wire.fromComp,
+          fromTerm: nextFromTerm,
+          toComp: touchesTo ? newComponent.id : wire.toComp,
+          toTerm: nextToTerm,
+        });
+        return kept;
+      }, [])
+    : wires.filter((wire) => wire.fromComp !== oldComponentId && wire.toComp !== oldComponentId);
+
+  return { components: nextComponents, wires: nextWires };
+}
+

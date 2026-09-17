@@ -272,6 +272,18 @@ export class DiscreteEventLogicEngine extends SimulationEngine {
     if (!runtime) return 'X';
     return runtime.pinMap.outputs.includes(pin) ? runtime.getOutput(pin) : runtime.inputs.get(pin) ?? 'X';
   }
+  getWireLogicState(wireId: string): LogicState {
+    const conn = this.connections.find(c => c.wire.id === wireId);
+    if (!conn) return 'X';
+    return this.runtimes.get(conn.driver)?.getOutput(conn.driverPin) ?? 'X';
+  }
+  toggleDigitalInput(componentId: string) {
+    const source = this.logicComponents.find(c => c.id === componentId && c.type === 'digital-input');
+    if (!source) return this.snapshot;
+    const currentState = asLogicState(source.props.state);
+    const nextState: LogicState = currentState === 1 ? 0 : 1;
+    return this.driveDigitalInput(componentId, nextState);
+  }
   driveDigitalInput(componentId: string, value: LogicState) {
     const source = this.logicComponents.find(component => component.id === componentId && component.type === 'digital-input');
     const runtime = this.runtimes.get(componentId);
