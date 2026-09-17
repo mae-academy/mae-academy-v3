@@ -1,5 +1,18 @@
 import type { Point } from '@/simulators/circuit-engine/models/wiring';
 
+/** Absolute maximum electrical ratings before a component is considered burned out. */
+export interface ComponentRatings {
+  maxPower?: number;
+  maxCurrent?: number;
+  maxVoltage?: number;
+}
+
+/** Runtime component state that persists independently of simulation results (e.g. burnout). */
+export interface ComponentState {
+  isBurned?: boolean;
+  [key: string]: unknown;
+}
+
 export interface CircuitComponent {
   id: string;
   type: string;
@@ -10,6 +23,9 @@ export interface CircuitComponent {
   flipV: boolean;
   label: string;
   props: Record<string, unknown>;
+  /** Overrides the catalog default ratings from ComponentDef when set. */
+  ratings?: ComponentRatings;
+  state?: ComponentState;
 }
 
 export type DependentSourceType = 'vcvs' | 'vccs' | 'ccvs' | 'cccs';

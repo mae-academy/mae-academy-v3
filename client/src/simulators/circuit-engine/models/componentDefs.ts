@@ -4,6 +4,8 @@
  * All terminals touch the component graphic boundary
  */
 
+import type { ComponentRatings } from '@/simulators/circuit-engine/models/circuitTypes';
+
 export interface Terminal {
   id: string;
   name: string;
@@ -23,6 +25,8 @@ export interface ComponentDef {
   description: string;
   symbol: string;
   hidden?: boolean;
+  /** Default max ratings for burnout evaluation; overridable per-instance via CircuitComponent.ratings. */
+  ratings?: ComponentRatings;
 }
 
 export interface PropertyDef {
@@ -217,6 +221,7 @@ const PASSIVE: Record<string, ComponentDef> = {
       power: { type: 'number', value: 0.25, unit: 'W', min: 0.125, max: 1000, label: 'Power Rating' },
     },
     description: 'Resistor (IEEE 315)',
+    ratings: { maxPower: 0.25 },
   },
   'potentiometer': {
     id: 'potentiometer', name: 'Variable Resistor', category: 'Passive',
@@ -245,6 +250,7 @@ const PASSIVE: Record<string, ComponentDef> = {
       type: { type: 'select', value: 'ceramic', options: ['ceramic', 'electrolytic', 'film', 'mica', 'tantalum'], label: 'Type' },
     },
     description: 'Capacitor',
+    ratings: { maxVoltage: 50 },
   },
   'inductor': {
     id: 'inductor', name: 'Inductor', category: 'Passive',
@@ -322,6 +328,7 @@ const DIODES: Record<string, ComponentDef> = {
       Is: { type: 'number', value: 1e-12, unit: 'A', min: 1e-20, max: 1e-3, label: 'Saturation Current' },
     },
     description: 'Material-selectable diode: Ideal, Si, Ge, or GaAs',
+    ratings: { maxCurrent: 0.5, maxPower: 0.5 },
   },
   'diode-ideal': {
     id: 'diode-ideal', name: 'Ideal Diode', category: 'Diodes',
@@ -349,6 +356,7 @@ const DIODES: Record<string, ComponentDef> = {
       Is: { type: 'number', value: 1e-12, unit: 'A', min: 1e-15, max: 1e-6, label: 'Saturation Current' },
     },
     description: 'Silicon PN junction diode (Vf ≈ 0.7 V)',
+    ratings: { maxCurrent: 0.5, maxPower: 0.5 },
   },
   'diode-germanium': {
     id: 'diode-germanium', name: 'PN Diode (Ge)', category: 'Diodes',
@@ -364,6 +372,7 @@ const DIODES: Record<string, ComponentDef> = {
       Is: { type: 'number', value: 1e-6, unit: 'A', min: 1e-9, max: 1e-3, label: 'Saturation Current' },
     },
     description: 'Germanium PN junction diode (Vf ≈ 0.3 V)',
+    ratings: { maxCurrent: 0.04, maxPower: 0.15 },
   },
   'diode-gaas': {
     id: 'diode-gaas', name: 'PN Diode (GaAs)', category: 'Diodes',
@@ -379,6 +388,7 @@ const DIODES: Record<string, ComponentDef> = {
       Is: { type: 'number', value: 1e-18, unit: 'A', min: 1e-20, max: 1e-12, label: 'Saturation Current' },
     },
     description: 'GaAs PN junction diode (Vf ≈ 1.2 V)',
+    ratings: { maxCurrent: 0.1, maxPower: 0.5 },
   },
   'zener': {
     id: 'zener', name: 'Zener Diode', category: 'Diodes',
@@ -392,6 +402,7 @@ const DIODES: Record<string, ComponentDef> = {
       maxPower: { type: 'number', value: 0.5, unit: 'W', min: 0.1, max: 50, label: 'Max Power' },
     },
     description: 'Zener diode – voltage regulator',
+    ratings: { maxPower: 0.5 },
   },
   'led': {
     id: 'led', name: 'LED', category: 'Diodes',
@@ -408,6 +419,7 @@ const DIODES: Record<string, ComponentDef> = {
       maxCurrent: { type: 'number', value: 0.02, unit: 'A', min: 0.001, max: 1, label: 'Max Current' },
     },
     description: 'Light-emitting diode',
+    ratings: { maxCurrent: 0.02 },
   },
   'photodiode': {
     id: 'photodiode', name: 'Photodiode', category: 'Diodes',
@@ -443,6 +455,7 @@ const TRANSISTORS: Record<string, ComponentDef> = {
       icMax: { type: 'number', value: 0.1, unit: 'A', min: 0.001, max: 1000, label: 'Ic max' },
     },
     description: 'NPN Bipolar Junction Transistor',
+    ratings: { maxCurrent: 0.1 },
   },
   'bjt-pnp': {
     id: 'bjt-pnp', name: 'BJT PNP', category: 'Transistors',
@@ -459,6 +472,7 @@ const TRANSISTORS: Record<string, ComponentDef> = {
       icMax: { type: 'number', value: 0.1, unit: 'A', min: 0.001, max: 1000, label: 'Ic max' },
     },
     description: 'PNP Bipolar Junction Transistor',
+    ratings: { maxCurrent: 0.1 },
   },
   'mosfet-n': {
     id: 'mosfet-n', name: 'MOSFET N-ch', category: 'Transistors',
@@ -474,6 +488,7 @@ const TRANSISTORS: Record<string, ComponentDef> = {
       idMax: { type: 'number', value: 10, unit: 'A', min: 0.1, max: 1000, label: 'Id max' },
     },
     description: 'N-channel Enhancement MOSFET',
+    ratings: { maxCurrent: 10 },
   },
   'mosfet-p': {
     id: 'mosfet-p', name: 'MOSFET P-ch', category: 'Transistors',
@@ -489,6 +504,7 @@ const TRANSISTORS: Record<string, ComponentDef> = {
       idMax: { type: 'number', value: 10, unit: 'A', min: 0.1, max: 1000, label: 'Id max' },
     },
     description: 'P-channel Enhancement MOSFET',
+    ratings: { maxCurrent: 10 },
   },
   'jfet-n': {
     id: 'jfet-n', name: 'JFET N-ch', category: 'Transistors',
@@ -749,6 +765,7 @@ const PROTECTION: Record<string, ComponentDef> = {
     ],
     properties: { ratedCurrent: { type: 'number', value: 10, unit: 'A', min: 0.1, max: 1000, label: 'Rated Current' } },
     description: 'Single-phase Fuse',
+    ratings: { maxCurrent: 10 },
   },
   'fuse-3phase': {
     id: 'fuse-3phase', name: '3-Phase Fuse', category: 'Protection',
@@ -763,6 +780,7 @@ const PROTECTION: Record<string, ComponentDef> = {
     ],
     properties: { ratedCurrent: { type: 'number', value: 10, unit: 'A', min: 0.1, max: 1000, label: 'Rated Current' } },
     description: 'Three-phase Fuse',
+    ratings: { maxCurrent: 10 },
   },
   'circuit-breaker': {
     id: 'circuit-breaker', name: 'Circuit Breaker', category: 'Protection',
@@ -922,6 +940,7 @@ const OTHER_COMPONENTS: Record<string, ComponentDef> = {
     terminals: [{ id: 'a', name: 'A', x: -25, y: 0, type: 'bidirectional' }, { id: 'b', name: 'B', x: 25, y: 0, type: 'bidirectional' }],
     properties: { ratedV: { type: 'number', value: 12, unit: 'V', min: 1, max: 1000, label: 'Rated V' }, ratedPower: { type: 'number', value: 5, unit: 'W', min: 0.1, max: 1000, label: 'Rated Power' } },
     description: 'Incandescent Lamp',
+    ratings: { maxPower: 5, maxVoltage: 12 },
   },
 };
 
