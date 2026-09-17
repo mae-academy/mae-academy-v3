@@ -104,7 +104,7 @@ import type { SpiceNet } from '@/simulators/circuit-engine/engine/spice/spiceTyp
 
 /** Coil-driven part types whose armature can stay latched via a contact wired back onto its own coil. */
 const COIL_DRIVEN_TYPES = ['coil', 'contactor', 'relay-spst', 'relay-spdt', 'relay-dpst'];
-import { buildSpiceNodeMap, generateNetlist, NetlistError, type SpiceNodeMap } from '@/simulators/circuit-engine/engine/spice/netlistGenerator';
+import { buildSpiceNodeMap, generateNetlist, NetlistError, requiresTransientInitialConditions, type SpiceNodeMap } from '@/simulators/circuit-engine/engine/spice/netlistGenerator';
 import { parseSpiceResults } from '@/simulators/circuit-engine/engine/spice/spiceParser';
 import { buildSpiceInstrumentReadings } from '@/simulators/circuit-engine/engine/spice/spiceInstruments';
 import { filterTabDCatalog, filterTabDImportedComponents, isTabDComponentAvailable } from '@/simulators/circuit-engine/models/analogComponentCatalog';
@@ -2776,6 +2776,9 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
       // A seeded `.IC` is inert without `uic` (ngspice otherwise recomputes its own t=0 bias and
       // discards it) — see GenerateNetlistOptions.initialNodeVoltages.
       const hasLatchedCoil = coilInitialVoltagesRef.current.size > 0;
+      // An op-amp integrator has no DC feedback path, so `.op` parks it on a rail and hands the
+      // transient a pre-charged feedback capacitor — see requiresTransientInitialConditions.
+      const needsRestState = requiresTransientInitialConditions(spiceComponents);
       const maxScopeWindow = effectiveCircuitComponents
         .filter(c => c.type === 'oscilloscope')
         .reduce((max, scope) => {
@@ -2784,7 +2787,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
         }, 0);
       const frequency = Math.max(0.001, detectSystemFrequency(effectiveCircuitComponents));
       const duration = Math.min(2.0, Math.max(0.02, SPICE_TRAN_PERIODS / frequency, maxScopeWindow));
-      const analysis = [`.tran ${duration / 2000} ${duration}${isStepMode || hasLatchedCoil ? ' uic' : ''}`];
+      const analysis = [`.tran ${duration / 2000} ${duration}${isStepMode || hasLatchedCoil || needsRestState ? ' uic' : ''}`];
       netlist = generateNetlist(spiceComponents, {
         analysis,
         simulationMode,
@@ -2865,6 +2868,8 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     if (!spiceEngine.results) return;
     const results = parseSpiceResults(spiceEngine.results, spiceEngine.results.time ?? []);
     spiceReadingsRef.current = buildSpiceInstrumentReadings(context.components, context.nets, context.nodeMap, results);
+    // Dev-server only: lets headless E2E runs read the exact samples the oscilloscope canvas draws.
+    if (import.meta.env.DEV) (window as Window & { __MAE_SPICE_READINGS__?: Record<string, InstrumentReading> }).__MAE_SPICE_READINGS__ = spiceReadingsRef.current;
     setSpiceReadingsVersion(version => version + 1);
     setSpiceStatus({ kind: 'ready' });
 
@@ -4059,6 +4064,60 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     );
   }, [wiring.from, wiring.lockedCorners, previewTarget, components, gridSize]);
 
+  const activeComponentsForWires = liveComponentsRef.current.length > 0 ? liveComponentsRef.current : components;
+  const brokenWireIdsForRender = getBrokenWireIds(activeComponentsForWires, wires);
+  const wireRenderData = wires.map(wire => {
+    const selected = selection?.kind === 'wire' && selection.id === wire.id;
+    const isBroken = brokenWireIdsForRender.has(wire.id);
+    const phase = isBroken ? 0 : (snapshot.wirePhases?.[wire.id] ?? 0);
+    const wireCurrent = isBroken ? 0 : Math.abs(snapshot.wireCurrents?.[wire.id] ?? 0);
+    const isCurrentFlowing = !isBroken && wireCurrent >= 1e-7 && snapshot.wirePhases?.[wire.id] !== undefined;
+
+    const endpoints = canvasWireEndpoints(wire, activeComponentsForWires);
+    let path = getWirePoints(wire);
+    if (endpoints && path.length >= 2) {
+      if (
+        Math.abs(path[0][0] - endpoints.from[0]) > 0.5 ||
+        Math.abs(path[0][1] - endpoints.from[1]) > 0.5 ||
+        Math.abs(path[path.length - 1][0] - endpoints.to[0]) > 0.5 ||
+        Math.abs(path[path.length - 1][1] - endpoints.to[1]) > 0.5
+      ) {
+        path = reconnectPathEndpoints(
+          path,
+          endpoints.from,
+          endpoints.to,
+          wire.routing,
+          [],
+          wire.waypoints,
+          gridSize,
+          endpoints.fromAxis,
+        );
+      }
+    }
+
+    const hitPath = pointsToPath(path);
+    const renderPath = buildJumpArcPath(path, wireIntersectionList, wire.id, 4);
+    const len = pathLength(path);
+    const numDots = Math.max(1, Math.round(len / 36));
+    const dots = isCurrentFlowing ? getDotsOnPath(path, numDots, phase) : [];
+    const isSensingWire = false;
+    const strokeColor = selected ? colors.selection : (wire.color ?? colors.text);
+    const strokeWidth = selected ? 2 : 1.5;
+
+    return {
+      wire,
+      selected,
+      path,
+      hitPath,
+      renderPath,
+      dots,
+      isSensingWire,
+      strokeColor,
+      strokeWidth,
+      isCurrentFlowing,
+    };
+  });
+
   return (
     <div className="v3-mae-layout font-sans text-slate-900 dark:text-slate-100" style={{ minHeight: 760, color: colors.text }}>
       <section className="mb-4 overflow-x-auto rounded-xl border border-slate-200 bg-white dark:border-[#1a1d24] dark:bg-[#0d0f12]" style={{ borderColor: colors.line, background: colors.panel }}>
@@ -4250,79 +4309,22 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
 
                   {/* Dedicated layer containing ONLY components, wires, labels, and texts for tight export bounding box */}
                   <g id="circuit-elements-layer">
-                    {(() => {
-                      const activeComponents = liveComponentsRef.current.length > 0 ? liveComponentsRef.current : components;
-                      const brokenWireIds = getBrokenWireIds(activeComponents, wires);
-                      return wires.map(wire => {
-                        const selected = selection?.kind === 'wire' && selection.id === wire.id;
-                        const isBroken = brokenWireIds.has(wire.id);
-                        const phase = isBroken ? 0 : (snapshot.wirePhases?.[wire.id] ?? 0);
-                        const wireCurrent = isBroken ? 0 : Math.abs(snapshot.wireCurrents?.[wire.id] ?? 0);
-                        const isCurrentFlowing = !isBroken && wireCurrent >= 1e-7 && snapshot.wirePhases?.[wire.id] !== undefined;
-                        
-                        // Dynamically ensure wire waypoints strictly anchor to the live component terminal positions
-                        const endpoints = canvasWireEndpoints(wire, activeComponents);
-                        let path = getWirePoints(wire);
-                        if (endpoints && path.length >= 2) {
-                          if (
-                            Math.abs(path[0][0] - endpoints.from[0]) > 0.5 ||
-                            Math.abs(path[0][1] - endpoints.from[1]) > 0.5 ||
-                            Math.abs(path[path.length - 1][0] - endpoints.to[0]) > 0.5 ||
-                            Math.abs(path[path.length - 1][1] - endpoints.to[1]) > 0.5
-                          ) {
-                            path = reconnectPathEndpoints(
-                              path,
-                              endpoints.from,
-                              endpoints.to,
-                              wire.routing,
-                              [],
-                              wire.waypoints,
-                              gridSize,
-                              endpoints.fromAxis,
-                            );
-                          }
-                        }
-
-                        // Phase 2: use jump-arc path for the visible stroke; hitbox uses the
-                        // plain polyline so clicks always register even near arc breaks.
-                        const hitPath = pointsToPath(path);
-                        const renderPath = buildJumpArcPath(path, wireIntersectionList, wire.id, 4);
-                        const len = pathLength(path);
-                        // Persistent charge particles: uniform spacing based solely on physical length (N = round(length / spacing))
-                        const numDots = Math.max(1, Math.round(len / 36));
-                        const dots = isCurrentFlowing ? getDotsOnPath(path, numDots, phase) : [];
-                        const isSensingWire = false;
-                        const strokeColor = selected ? colors.selection : (wire.color ?? colors.text);
-                        const strokeWidth = selected ? 2 : 1.5;
-
-                        return (
-                          <g key={wire.id}>
-                            {/* Wide transparent hitbox — uses plain polyline for reliable click detection */}
-                            <path d={hitPath} fill="none" stroke="transparent" strokeWidth={17} strokeLinecap="round" strokeLinejoin="round" onMouseDown={event => handleWireMouseDown(event, wire)} onDoubleClick={event => handleWireDoubleClick(event, wire)} style={{ cursor: 'pointer' }} />
-                            {/* Visible stroke with jump-arc splices at cross-net crossings */}
-                            <path d={renderPath} fill="none" stroke={strokeColor} strokeWidth={strokeWidth} strokeDasharray={isSensingWire ? "3 3" : undefined} strokeLinecap="round" strokeLinejoin="round" pointerEvents="none" />
-                            {showElectrons && isCurrentFlowing && dots.map((dot, index) => (
-                              <circle
-                                key={index}
-                                cx={dot[0]}
-                                cy={dot[1]}
-                                r={3}
-                                fill={colors.powered}
-                                pointerEvents="none"
-                              />
-                            ))}
-                            {selected && path.length > 2 && path.slice(1, -1).map((corner, index) => {
-                              const cornerIndex = index + 1;
-                              return <circle key={`${wire.id}-${cornerIndex}`} cx={corner[0]} cy={corner[1]} r={6} fill={colors.panel} stroke={colors.selection} strokeWidth={2} onMouseDown={event => {
-                                event.stopPropagation();
-                                dragStartSnapshotRef.current = cloneSnapshot({ components: componentRef.current, wires: wiresRef.current, texts: textsRef.current });
-                                setDragState({ kind: 'wireCorner', id: wire.id, corner: cornerIndex });
-                              }} style={{ cursor: 'move' }} />;
-                            })}
-                          </g>
-                        );
-                      });
-                    })()}
+                    {wireRenderData.map(({ wire, selected, path, hitPath, renderPath, isSensingWire, strokeColor, strokeWidth }) => (
+                      <g key={wire.id}>
+                        {/* Wide transparent hitbox — uses plain polyline for reliable click detection */}
+                        <path d={hitPath} fill="none" stroke="transparent" strokeWidth={17} strokeLinecap="round" strokeLinejoin="round" onMouseDown={event => handleWireMouseDown(event, wire)} onDoubleClick={event => handleWireDoubleClick(event, wire)} style={{ cursor: 'pointer' }} />
+                        {/* Visible stroke with jump-arc splices at cross-net crossings */}
+                        <path d={renderPath} fill="none" stroke={strokeColor} strokeWidth={strokeWidth} strokeDasharray={isSensingWire ? "3 3" : undefined} strokeLinecap="round" strokeLinejoin="round" pointerEvents="none" />
+                        {selected && path.length > 2 && path.slice(1, -1).map((corner, index) => {
+                          const cornerIndex = index + 1;
+                          return <circle key={`${wire.id}-${cornerIndex}`} cx={corner[0]} cy={corner[1]} r={6} fill={colors.panel} stroke={colors.selection} strokeWidth={2} onMouseDown={event => {
+                            event.stopPropagation();
+                            dragStartSnapshotRef.current = cloneSnapshot({ components: componentRef.current, wires: wiresRef.current, texts: textsRef.current });
+                            setDragState({ kind: 'wireCorner', id: wire.id, corner: cornerIndex });
+                          }} style={{ cursor: 'move' }} />;
+                        })}
+                      </g>
+                    ))}
 
                     {/* Phase 2: same-net junction dots for interior crossing points, T-junctions, and cross-junctions */}
                     {junctionDots.map(([jx, jy]) => (
@@ -4773,6 +4775,24 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                           </g>
                         );
                       })}
+
+                      {/* Electron Flow Particles Layer (renders strictly on top of wire paths and component bodies) */}
+                      {showElectrons && (
+                        <g className="electron-particles" pointerEvents="none">
+                          {wireRenderData.map(({ wire, dots, isCurrentFlowing }) =>
+                            isCurrentFlowing ? dots.map((dot, index) => (
+                              <circle
+                                key={`${wire.id}-particle-${index}`}
+                                cx={dot[0]}
+                                cy={dot[1]}
+                                r={3}
+                                fill={colors.powered}
+                                pointerEvents="none"
+                              />
+                            )) : null
+                          )}
+                        </g>
+                      )}
                     </g>
 
                     {texts.map(text => (
@@ -5132,6 +5152,10 @@ function ComponentInspector({ colors, component, definition, allComponents, link
       {Object.entries(definition.properties).map(([key, property]) => {
         // Derived properties (an LED's forwardVoltage, set by its colour) are simulated but not editable.
         if (property.hidden) return null;
+        // An ideal op-amp's macromodel has no dominant pole, no slew limit and no parasitics, so
+        // offering those fields there would invite edits the simulation cannot honour.
+        if (component.type === 'opamp' && String(component.props.model ?? 'ideal') !== 'realistic'
+          && ['gbw', 'slewRate', 'rin', 'rout', 'railMargin'].includes(key)) return null;
         if (component.type === 'impedance' || component.type === 'ac-voltage' || component.type === 'ac-current') {
           const isImpedance = component.type === 'impedance';
           const format = String(component.props.format ?? (isImpedance ? 'rectangular' : 'polar'));

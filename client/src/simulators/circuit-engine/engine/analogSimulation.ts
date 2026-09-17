@@ -110,6 +110,9 @@ export class TabDSimulationEngine extends SimulationEngine {
     this.lastDisplayTime = -1;
     this.timeAccumulator = 0;
     this.wirePhases.clear();
+    this.visualAcTime = 0;
+    this.wirePeakCurrents.clear();
+    this.wirePolarities.clear();
     this.lastWireCurrents = {};
   }
 
@@ -128,6 +131,9 @@ export class TabDSimulationEngine extends SimulationEngine {
     this.lastDisplayTime = -1;
     this.timeAccumulator = 0;
     this.wirePhases.clear();
+    this.visualAcTime = 0;
+    this.wirePeakCurrents.clear();
+    this.wirePolarities.clear();
     this.lastWireCurrents = {};
   }
 
@@ -369,23 +375,94 @@ export class TabDSimulationEngine extends SimulationEngine {
         }
 
         // Pass 2: Calculate smooth relative speed and integrate phase
-        // V_BASE: 2.5 cycles/s (~90 px/s) - clear, lively drift for low currents
-        // V_TOP: 8.0 cycles/s (~288 px/s) - dynamic, active flow for peak currents
-        const V_BASE = 2.5;
-        const V_TOP = 8.0;
+        const acSource = this.tabDComponents.find((c) => ['ac-voltage', 'ac-current', 'three-phase-source', 'three-phase-rail'].includes(c.type));
+        const isAcCircuit = Boolean(acSource);
 
-        for (const wire of this.tabDWires) {
-          const wireI = subStepWireCurrents[wire.id] ?? 0;
-          const currentPhase = this.wirePhases.get(wire.id) ?? 0;
+        if (isAcCircuit && acSource) {
+          const waveformKind = String(acSource.props?.waveform ?? 'sine').toLowerCase();
+          const sourceFreq = Math.max(0.001, Number(acSource.props?.frequency ?? 60));
+          const phaseDeg = Number(acSource.props?.phase ?? 0);
+          const sourcePhaseRad = (phaseDeg * Math.PI) / 180;
+          const fVis = Math.min(Math.max(0.2, sourceFreq), 1.0);
 
-          if (brokenWireIds.has(wire.id) || Math.abs(wireI) < 1e-7 || maxAbsWireCurrent < 1e-7) {
-            // Zero current / open circuit: instantly delete particle phase so electrons disappear immediately
-            this.wirePhases.delete(wire.id);
+          this.visualAcTime += fixedDt;
+          const visualAngle = 2 * Math.PI * fVis * this.visualAcTime + sourcePhaseRad;
+          const cycle = ((visualAngle / (2 * Math.PI)) % 1 + 1) % 1;
+
+          // Visual oscillation amplitude along the wire (0.45 cycles ~ 32.4px peak-to-peak stroke length)
+          const A = 0.45;
+          let vNorm = 0;
+          if (waveformKind === 'triangle') {
+            // Triangle Wave: constant speed in one direction, instantaneous velocity reversal at peaks, constant speed back
+            const vTri = 4 * A * fVis;
+            vNorm = cycle < 0.5 ? vTri : -vTri;
+          } else if (waveformKind === 'square') {
+            // Square Wave: constant velocity, hold, then switch direction sharply with a short pulse transition
+            const alpha = 0.25;
+            const vSq = (4 * A * fVis) / alpha;
+            if (cycle < 0.5) {
+              vNorm = cycle < 0.5 * alpha ? vSq : 0;
+            } else {
+              vNorm = (cycle - 0.5) < 0.5 * alpha ? -vSq : 0;
+            }
+          } else if (waveformKind === 'sawtooth') {
+            const vFwd = (2 * A * fVis) / 0.8;
+            const vRev = -(2 * A * fVis) / 0.2;
+            vNorm = cycle < 0.8 ? vFwd : vRev;
           } else {
-            const relativeRatio = Math.min(1, Math.max(0, Math.abs(wireI) / maxAbsWireCurrent));
-            const speed = V_BASE + (V_TOP - V_BASE) * Math.pow(relativeRatio, 0.35);
-            const phaseRate = Math.sign(wireI) * speed;
-            this.wirePhases.set(wire.id, currentPhase + phaseRate * fixedDt);
+            // Sine Wave: smooth sinusoidal acceleration/deceleration v(t) = v_max * sin(wt + phi)
+            // Decelerates smoothly, momentarily freezes at zero-crossings, smoothly accelerates in reverse
+            const vMax = 2 * Math.PI * fVis * A;
+            vNorm = vMax * Math.sin(visualAngle);
+          }
+
+          let maxWirePeak = 0;
+          for (const wire of this.tabDWires) {
+            const currentAbs = Math.abs(subStepWireCurrents[wire.id] ?? 0);
+            const prevPeak = this.wirePeakCurrents.get(wire.id) ?? 0;
+            const newPeak = Math.max(currentAbs, prevPeak * Math.exp(-fixedDt / 0.5));
+            this.wirePeakCurrents.set(wire.id, newPeak);
+            if (newPeak > maxWirePeak) maxWirePeak = newPeak;
+
+            const sourceAngle = 2 * Math.PI * sourceFreq * this.documentedMna.getTime() + sourcePhaseRad;
+            const isSourcePos = Math.sin(sourceAngle) >= 0;
+            const topologicalSign = isSourcePos ? Math.sign(subStepWireCurrents[wire.id] ?? 0) : -Math.sign(subStepWireCurrents[wire.id] ?? 0);
+            if (!this.wirePolarities.has(wire.id) && currentAbs > 1e-6) {
+              this.wirePolarities.set(wire.id, topologicalSign || 1);
+            }
+          }
+
+          for (const wire of this.tabDWires) {
+            const wireI = subStepWireCurrents[wire.id] ?? 0;
+            const currentPhase = this.wirePhases.get(wire.id) ?? 0;
+            const peakI = this.wirePeakCurrents.get(wire.id) ?? 0;
+            const wirePolarity = this.wirePolarities.get(wire.id) ?? (wireI >= 0 ? 1 : -1);
+
+            if (brokenWireIds.has(wire.id) || peakI < 1e-7 || maxWirePeak < 1e-7) {
+              this.wirePhases.delete(wire.id);
+            } else {
+              const relativeRatio = Math.min(1, Math.max(0, peakI / maxWirePeak));
+              const speedScale = Math.pow(relativeRatio, 0.4);
+              const phaseRate = wirePolarity * speedScale * vNorm;
+              this.wirePhases.set(wire.id, currentPhase + phaseRate * fixedDt);
+            }
+          }
+        } else {
+          const V_BASE = 2.5;
+          const V_TOP = 8.0;
+          for (const wire of this.tabDWires) {
+            const wireI = subStepWireCurrents[wire.id] ?? 0;
+            const currentPhase = this.wirePhases.get(wire.id) ?? 0;
+
+            if (brokenWireIds.has(wire.id) || Math.abs(wireI) < 1e-7 || maxAbsWireCurrent < 1e-7) {
+              // Zero current / open circuit: instantly delete particle phase so electrons disappear immediately
+              this.wirePhases.delete(wire.id);
+            } else {
+              const relativeRatio = Math.min(1, Math.max(0, Math.abs(wireI) / maxAbsWireCurrent));
+              const speed = V_BASE + (V_TOP - V_BASE) * Math.pow(relativeRatio, 0.35);
+              const phaseRate = Math.sign(wireI) * speed;
+              this.wirePhases.set(wire.id, currentPhase + phaseRate * fixedDt);
+            }
           }
         }
 

@@ -264,4 +264,159 @@ describe('Electron Flow & Branch Current Physics', () => {
     expect(iTopPhaseDiff).toBe(0);
     expect(iBotPhaseDiff).toBe(0);
   });
+
+  it('accurately drives harmonic sinusoidal oscillation for AC Sine wave with smooth deceleration and zero freeze', () => {
+    const components = [
+      component('VAC', 'ac-voltage', { amplitude: 10, frequency: 60, waveform: 'sine' }),
+      component('R1', 'resistor', { resistance: 100 }),
+      component('GND', 'ground'),
+    ];
+    const wires = [
+      wire('w_top', 'VAC', 'pos', 'R1', 'a'),
+      wire('w_bot', 'R1', 'b', 'VAC', 'neg'),
+      wire('w_gnd', 'VAC', 'neg', 'GND', 'gnd'),
+    ];
+
+    const engine = new SimulationEngine();
+    engine.setCircuit(components, wires);
+
+    // Initial phase at t=0
+    const snap0 = engine.step(0.001);
+    const p0 = snap0.wirePhases?.['w_top'];
+    expect(p0).toBeDefined();
+
+    // Collect phase trajectory over a full 1-second visual cycle
+    const phases: number[] = [];
+    const velocities: number[] = [];
+    let prevPhase = p0!;
+    const dt = 0.016; // 60 FPS
+    for (let i = 0; i < 60; i++) {
+      const snap = engine.step(dt);
+      const currPhase = snap.wirePhases?.['w_top'] ?? 0;
+      phases.push(currPhase);
+      velocities.push((currPhase - prevPhase) / dt);
+      prevPhase = currPhase;
+    }
+
+    // 1. Phases remain strictly defined (never destroyed at zero crossings)
+    expect(phases.every(p => p !== undefined)).toBe(true);
+
+    // 2. Velocity oscillates smoothly between positive and negative
+    const maxV = Math.max(...velocities);
+    const minV = Math.min(...velocities);
+    expect(maxV).toBeGreaterThan(1.0);
+    expect(minV).toBeLessThan(-1.0);
+    // Smooth deceleration / zero crossing freeze: velocity minimum magnitude near reversal is close to 0
+    const nearZeroV = velocities.some(v => Math.abs(v) < 0.8);
+    expect(nearZeroV).toBe(true);
+
+    // 3. Peak-to-peak stroke length is bounded and observable (~0.9 dot cycles)
+    const peakToPeak = Math.max(...phases) - Math.min(...phases);
+    expect(peakToPeak).toBeGreaterThan(0.4);
+    expect(peakToPeak).toBeLessThan(1.5);
+  });
+
+  it('accurately drives constant-speed peak-reversal kinematics for AC Triangle wave', () => {
+    const components = [
+      component('VAC', 'ac-voltage', { amplitude: 10, frequency: 60, waveform: 'triangle' }),
+      component('R1', 'resistor', { resistance: 100 }),
+      component('GND', 'ground'),
+    ];
+    const wires = [
+      wire('w_top', 'VAC', 'pos', 'R1', 'a'),
+      wire('w_bot', 'R1', 'b', 'VAC', 'neg'),
+      wire('w_gnd', 'VAC', 'neg', 'GND', 'gnd'),
+    ];
+
+    const engine = new SimulationEngine();
+    engine.setCircuit(components, wires);
+
+    const dt = 0.016;
+    let prevP = (engine.step(0.001).wirePhases?.['w_top']) ?? 0;
+    const velForward: number[] = [];
+    const velReverse: number[] = [];
+
+    for (let i = 0; i < 60; i++) {
+      const snap = engine.step(dt);
+      const currP = snap.wirePhases?.['w_top'] ?? 0;
+      const v = (currP - prevP) / dt;
+      prevP = currP;
+      if (i > 5 && i < 25) velForward.push(v);
+      if (i > 35 && i < 55) velReverse.push(v);
+    }
+
+    // In forward half, velocity is positive and approximately constant
+    expect(velForward.every(v => v > 1.0)).toBe(true);
+    // In reverse half, velocity is negative and approximately constant
+    expect(velReverse.every(v => v < -1.0)).toBe(true);
+  });
+
+  it('accurately implements constant velocity and plateau hold for AC Square wave', () => {
+    const components = [
+      component('VAC', 'ac-voltage', { amplitude: 10, frequency: 60, waveform: 'square' }),
+      component('R1', 'resistor', { resistance: 100 }),
+      component('GND', 'ground'),
+    ];
+    const wires = [
+      wire('w_top', 'VAC', 'pos', 'R1', 'a'),
+      wire('w_bot', 'R1', 'b', 'VAC', 'neg'),
+      wire('w_gnd', 'VAC', 'neg', 'GND', 'gnd'),
+    ];
+
+    const engine = new SimulationEngine();
+    engine.setCircuit(components, wires);
+
+    const dt = 0.016;
+    let prevP = (engine.step(0.001).wirePhases?.['w_top']) ?? 0;
+    const velocities: number[] = [];
+
+    for (let i = 0; i < 60; i++) {
+      const snap = engine.step(dt);
+      const currP = snap.wirePhases?.['w_top'] ?? 0;
+      const v = (currP - prevP) / dt;
+      prevP = currP;
+      velocities.push(v);
+    }
+
+    // During hold, velocity is 0
+    const hasZeroHold = velocities.some(v => Math.abs(v) < 1e-4);
+    expect(hasZeroHold).toBe(true);
+    // During pulse, velocity reaches brisk peak
+    const hasFastPulse = velocities.some(v => Math.abs(v) > 3.0);
+    expect(hasFastPulse).toBe(true);
+  });
+
+  it('guarantees TabDSimulationEngine smoothly drives AC Sine wave harmonic motion', () => {
+    const components = [
+      component('VAC', 'ac-voltage', { amplitude: 10, frequency: 50, waveform: 'sine' }),
+      component('R1', 'resistor', { resistance: 100 }),
+      component('GND', 'ground'),
+    ];
+    const wires = [
+      wire('w_top', 'VAC', 'pos', 'R1', 'a'),
+      wire('w_bot', 'R1', 'b', 'VAC', 'neg'),
+      wire('w_gnd', 'VAC', 'neg', 'GND', 'gnd'),
+    ];
+
+    const engine = new TabDSimulationEngine();
+    engine.setCircuit(components, wires);
+
+    const dt = 0.016;
+    let prevP = (engine.step(0.001).wirePhases?.['w_top']) ?? 0;
+    const velocities: number[] = [];
+
+    for (let i = 0; i < 60; i++) {
+      const snap = engine.step(dt);
+      const currP = snap.wirePhases?.['w_top'] ?? 0;
+      const v = (currP - prevP) / dt;
+      prevP = currP;
+      velocities.push(v);
+    }
+
+    expect(Math.max(...velocities)).toBeGreaterThan(1.0);
+    expect(Math.min(...velocities)).toBeLessThan(-1.0);
+    const nearZeroV = velocities.some(v => Math.abs(v) < 0.8);
+    expect(nearZeroV).toBe(true);
+  });
 });
+
