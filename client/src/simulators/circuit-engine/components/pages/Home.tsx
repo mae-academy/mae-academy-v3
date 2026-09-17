@@ -4862,6 +4862,31 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
             ) : selectedText ? (
               <TextInspector colors={colors} text={selectedText} onUpdate={updateText} onMove={moveSelected} onDelete={removeSelection} />
             ) : null}
+
+            {/* Electrical Circuit Lab Informational Card */}
+            <div className="p-5 border-t border-slate-200 bg-white dark:border-[#1a1d24] dark:bg-[#0d0f12]">
+              <h3 className="text-sm font-bold tracking-wider text-slate-900 dark:text-white mb-3 uppercase">
+                Electrical Circuit Lab
+              </h3>
+              <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+                The engine models continuous-time electrical behavior using Modified Nodal Analysis (MNA) and SPICE algorithms. Build circuits, run the simulation, and interact with components like switches or potentiometers in real-time.
+              </p>
+            </div>
+
+            {/* Keyboard Shortcuts Card */}
+            <div className="p-5 border-t border-slate-200 bg-white dark:border-[#1a1d24] dark:bg-[#0d0f12]">
+              <h3 className="text-sm font-bold tracking-wider text-slate-900 dark:text-white mb-3 uppercase">
+                Keyboard Shortcuts
+              </h3>
+              <div className="text-sm text-slate-600 dark:text-slate-400 space-y-2">
+                <div><span className="font-semibold text-slate-700 dark:text-slate-300">Arrows</span>: move selection</div>
+                <div><span className="font-semibold text-slate-700 dark:text-slate-300">Shift + arrows</span>: 5-grid move</div>
+                <div><span className="font-semibold text-slate-700 dark:text-slate-300">Ctrl/Cmd+Z</span>: undo &middot; <span className="font-semibold text-slate-700 dark:text-slate-300">Ctrl/Cmd+Shift+Z</span>: redo</div>
+                <div><span className="font-semibold text-slate-700 dark:text-slate-300">Ctrl/Cmd+C / X / V</span>: copy, cut, paste items</div>
+                <div><span className="font-semibold text-slate-700 dark:text-slate-300">Del / Backspace</span>: delete</div>
+                <div><span className="font-semibold text-slate-700 dark:text-slate-300">Space</span>: rotate 90&deg; &middot; <span className="font-semibold text-slate-700 dark:text-slate-300">T</span>: add text</div>
+              </div>
+            </div>
           </aside>
         </div>
       </div>
