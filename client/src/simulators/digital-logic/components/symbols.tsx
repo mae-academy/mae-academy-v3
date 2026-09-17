@@ -6,6 +6,7 @@
 
 import React from 'react';
 import { dynamicGateGeometryFor, isScalableLogicGate, logicBlockLayoutFor, logicBodyBoundaryForPin, type LogicBlockLayout, type LogicSymbolPin } from '@/simulators/digital-logic/components/dynamicLogicGeometry';
+import { getDef } from '@/simulators/digital-logic/models/componentDefs';
 
 interface SymbolProps {
   powered?: boolean;
@@ -979,55 +980,228 @@ const DigitalOutputSymbol: SymbolFC = ({ powered }) => <g>
   <line x1={-30} y1={0} x2={-17} y2={0} stroke="#1a2744" strokeWidth={2} />
 </g>;
 
-const STANDARD_LOGIC_BLOCKS = new Set(['logic-mux', 'logic-demux', 'logic-decoder', 'logic-alu-4bit', 'logic-half-adder', 'logic-full-adder', 'logic-half-subtractor', 'logic-full-subtractor', 'logic-nbit-adder', 'logic-ff-sr', 'logic-ff-d', 'logic-ff-jk', 'logic-ff-t', 'logic-nbit-register', 'logic-frequency-divider', 'logic-ram-16x8', 'logic-rom-16x8']);
+export const BLOCK_ABBREVIATIONS: Record<string, string> = {
+  'logic-half-adder': 'HA',
+  'logic-full-adder': 'FA',
+  'logic-half-subtractor': 'HS',
+  'logic-full-subtractor': 'FS',
+  'logic-nbit-adder': 'ADDER',
+  'logic-comparator': 'COMP',
+  'logic-mux': 'MUX',
+  'logic-demux': 'DEMUX',
+  'logic-encoder': 'ENC',
+  'logic-decoder': 'DEC',
+  'logic-parity': 'PARITY',
+  'logic-alu-4bit': 'ALU',
+  'logic-clock': 'CLK',
+  'logic-ff-sr': 'SR-FF',
+  'logic-ff-d': 'D-FF',
+  'logic-ff-jk': 'JK-FF',
+  'logic-ff-t': 'T-FF',
+  'logic-shift-register': 'SHIFT REG',
+  'logic-counter': 'CTR',
+  'logic-nbit-register': 'REG',
+  'logic-ram-16x8': 'RAM',
+  'logic-rom-16x8': 'ROM',
+  'logic-frequency-divider': 'DIV',
+};
+
+export function normalizeLogicType(raw: string): string {
+  const s = raw.toLowerCase().trim().replace(/_/g, '-');
+  if (s.startsWith('logic-')) return s;
+  if (s.startsWith('gate-')) return s;
+  if (['and', 'or', 'not', 'nand', 'nor', 'xor', 'xnor'].includes(s)) return `gate-${s}`;
+  if (['input', 'digital-input', 'logic-input'].includes(s)) return 'digital-input';
+  if (['output', 'digital-output', 'logic-output', 'probe'].includes(s)) return 'digital-output';
+  if (['clock', 'logic-clock', 'clk'].includes(s)) return 'logic-clock';
+  if (['half-adder', 'halfadder'].includes(s)) return 'logic-half-adder';
+  if (['full-adder', 'fulladder'].includes(s)) return 'logic-full-adder';
+  if (['half-subtractor', 'halfsubtractor'].includes(s)) return 'logic-half-subtractor';
+  if (['full-subtractor', 'fullsubtractor'].includes(s)) return 'logic-full-subtractor';
+  if (['comparator'].includes(s)) return 'logic-comparator';
+  if (['mux', 'multiplexer'].includes(s)) return 'logic-mux';
+  if (['demux', 'demultiplexer'].includes(s)) return 'logic-demux';
+  if (['encoder'].includes(s)) return 'logic-encoder';
+  if (['decoder'].includes(s)) return 'logic-decoder';
+  if (['nbit-adder', 'adder'].includes(s)) return 'logic-nbit-adder';
+  if (['parity'].includes(s)) return 'logic-parity';
+  if (['alu', 'alu-4bit'].includes(s)) return 'logic-alu-4bit';
+  if (['ff-sr', 'sr-ff'].includes(s)) return 'logic-ff-sr';
+  if (['ff-d', 'd-ff'].includes(s)) return 'logic-ff-d';
+  if (['ff-jk', 'jk-ff'].includes(s)) return 'logic-ff-jk';
+  if (['ff-t', 't-ff'].includes(s)) return 'logic-ff-t';
+  if (['shift-register', 'shiftreg'].includes(s)) return 'logic-shift-register';
+  if (['counter', 'count'].includes(s)) return 'logic-counter';
+  if (['register', 'nbit-register'].includes(s)) return 'logic-nbit-register';
+  if (['ram', 'ram-16x8'].includes(s)) return 'logic-ram-16x8';
+  if (['rom', 'rom-16x8'].includes(s)) return 'logic-rom-16x8';
+  if (['divider', 'frequency-divider'].includes(s)) return 'logic-frequency-divider';
+  return s.startsWith('logic-') ? s : `logic-${s}`;
+}
+
+export const LogicClockSymbol: SymbolFC = ({ powered }) => (
+  <g>
+    <rect x={-20} y={-20} width={40} height={40} rx={4} fill={powered ? '#eef6ff' : 'white'} stroke="#1a2744" strokeWidth={2} />
+    <path
+      d="M -12,4 H -4 V -6 H 4 V 4 H 12 V -6"
+      fill="none"
+      stroke="#1a2744"
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <text x={0} y={15} textAnchor="middle" fontSize={7} fontFamily="'KaTeX_Main', serif" fontWeight={700} fill="#1a2744">CLK</text>
+    <line x1={20} y1={0} x2={50} y2={0} stroke="#1a2744" strokeWidth={2} strokeLinecap="round" />
+  </g>
+);
+
+export const STANDARD_LOGIC_BLOCKS = new Set([
+  'logic-mux', 'logic-demux', 'logic-decoder', 'logic-encoder', 'logic-comparator',
+  'logic-alu-4bit', 'logic-half-adder', 'logic-full-adder', 'logic-half-subtractor',
+  'logic-full-subtractor', 'logic-nbit-adder', 'logic-parity',
+  'logic-ff-sr', 'logic-ff-d', 'logic-ff-jk', 'logic-ff-t',
+  'logic-shift-register', 'logic-counter', 'logic-nbit-register',
+  'logic-frequency-divider', 'logic-ram-16x8', 'logic-rom-16x8',
+]);
+
 const leadForPin = (type: string, pin: LogicSymbolPin, layout: LogicBlockLayout) => {
   const bodyPoint = logicBodyBoundaryForPin(type, pin, layout);
   return <line key={pin.id} x1={bodyPoint[0]} y1={bodyPoint[1]} x2={pin.x} y2={pin.y} stroke="#1a2744" strokeWidth={2} strokeLinecap="round" />;
 };
+
 const StandardLogicBlockSymbol: SymbolFC = ({ powered, props }) => {
-  const type = String(props?._componentType ?? 'logic-block');
-  const terminals = (props?._terminals ?? []) as LogicSymbolPin[];
+  const rawType = String(props?._componentType || props?.type || props?.id || 'logic-block');
+  const type = normalizeLogicType(rawType);
+  const def = getDef(type);
+  const terminals = ((props?._terminals && (props._terminals as any[]).length > 0)
+    ? props._terminals
+    : def?.terminals ?? []) as LogicSymbolPin[];
+
+  const inputCount = Number(props?._inputCount ?? (terminals.filter(pin => pin.type === 'input').length || 2));
+  const outputCount = Number(props?._outputCount ?? (terminals.filter(pin => pin.type === 'output').length || 1));
+
   const inputs = terminals.filter(pin => pin.type === 'input').map(pin => pin.id);
   const outputs = terminals.filter(pin => pin.type === 'output').map(pin => pin.id);
-  const layout = logicBlockLayoutFor(type, inputs, outputs);
+  const layout = logicBlockLayoutFor(
+    type,
+    inputs.length ? inputs : Array.from({ length: inputCount }, (_, index) => `in${index}`),
+    outputs.length ? outputs : Array.from({ length: outputCount }, (_, index) => `out${index}`)
+  );
   const { bodyHalfWidth: w, bodyHalfHeight: h } = layout;
   const fill = powered ? '#eef6ff' : '#ffffff';
-  const title = String(props?._blockLabel ?? 'LOGIC');
-  const isMux = type === 'logic-mux'; const isDemux = type === 'logic-demux'; const isAlu = type === 'logic-alu-4bit';
-  const isAdder = type === 'logic-half-adder' || type === 'logic-full-adder' || type === 'logic-half-subtractor' || type === 'logic-full-subtractor' || type === 'logic-nbit-adder';
+
+  const defaultAbbr = BLOCK_ABBREVIATIONS[type] || def?.name || 'LOGIC';
+  const title = String(props?._blockLabel || defaultAbbr);
+
+  const isMux = type === 'logic-mux';
+  const isDemux = type === 'logic-demux';
+  const isAlu = type === 'logic-alu-4bit';
+  const isAdder = type === 'logic-half-adder' || type === 'logic-full-adder' || type === 'logic-nbit-adder';
+  const isSubtractor = type === 'logic-half-subtractor' || type === 'logic-full-subtractor';
+  const isComparator = type === 'logic-comparator';
   const isFlipFlop = type.startsWith('logic-ff-') || type === 'logic-nbit-register' || type === 'logic-frequency-divider';
   const isMemory = type === 'logic-ram-16x8' || type === 'logic-rom-16x8';
-  const body = isMux ? <path d={`M ${-w},${-h} L ${w},${-h * .62} L ${w},${h * .62} L ${-w},${h} Z`} fill={fill} stroke="#1a2744" strokeWidth={2} />
-    : isDemux ? <path d={`M ${-w},${-h * .62} L ${w},${-h} L ${w},${h} L ${-w},${h * .62} Z`} fill={fill} stroke="#1a2744" strokeWidth={2} />
-      : isAlu ? <path d={`M ${-w},${-h} H ${w} V ${h} H ${-w} V ${h * .34} L ${-w + 17},0 L ${-w},${-h * .34} Z`} fill={fill} stroke="#1a2744" strokeWidth={2} />
-        : <rect x={-w} y={-h} width={w * 2} height={h * 2} rx={isMemory ? 4 : 3} fill={fill} stroke="#1a2744" strokeWidth={2} />;
+  const isCounter = type === 'logic-counter';
+  const isShiftReg = type === 'logic-shift-register';
+
+  const body = isMux ? (
+    <path d={`M ${-w},${-h} L ${w},${-h * 0.62} L ${w},${h * 0.62} L ${-w},${h} Z`} fill={fill} stroke="#1a2744" strokeWidth={2} />
+  ) : isDemux ? (
+    <path d={`M ${-w},${-h * 0.62} L ${w},${-h} L ${w},${h} L ${-w},${h * 0.62} Z`} fill={fill} stroke="#1a2744" strokeWidth={2} />
+  ) : isAlu ? (
+    <path d={`M ${-w},${-h} H ${w} V ${h} H ${-w} V ${h * 0.34} L ${-w + 17},0 L ${-w},${-h * 0.34} Z`} fill={fill} stroke="#1a2744" strokeWidth={2} />
+  ) : (
+    <rect x={-w} y={-h} width={w * 2} height={h * 2} rx={isMemory ? 4 : 3} fill={fill} stroke="#1a2744" strokeWidth={2} />
+  );
+
   const clockPin = terminals.find(pin => pin.id === 'clk');
-  return <g>
-    {body}
-    {isMemory && <g opacity={0.05} stroke="#1a2744" strokeWidth={0.55}>{Array.from({ length: 7 }, (_, index) => <line key={`vm-${index}`} x1={-w + (index + 1) * (2 * w / 8)} y1={-h + 8} x2={-w + (index + 1) * (2 * w / 8)} y2={h - 8} />)}{Array.from({ length: 5 }, (_, index) => <line key={`hm-${index}`} x1={-w + 8} y1={-h + (index + 1) * (2 * h / 6)} x2={w - 8} y2={-h + (index + 1) * (2 * h / 6)} />)}</g>}
-    {layout.pins.map(pin => leadForPin(type, pin, layout))}
-    {isAlu && <><text x={-w + 10} y={-h * .38} fontSize={7} fontFamily="'KaTeX_Main', serif" fontWeight={700} fill="#1a2744">A</text><text x={-w + 10} y={h * .45} fontSize={7} fontFamily="'KaTeX_Main', serif" fontWeight={700} fill="#1a2744">B</text></>}
-    {isAdder && <text x={0} y={4} textAnchor="middle" fontSize={18} fontFamily="'KaTeX_Main', serif" fontWeight={700} fill="#1a2744">Σ</text>}
-    {isFlipFlop && clockPin && <path d={`M ${-w + 7},${clockPin.y - 5} L ${-w + 15},${clockPin.y} L ${-w + 7},${clockPin.y + 5} Z`} fill="none" stroke="#1a2744" strokeWidth={1.5} />}
-    <text x={0} y={isAdder ? 22 : -3} textAnchor="middle" fontSize={8} fontFamily="'KaTeX_Main', serif" fontWeight={700} fill="#1a2744">{title}</text>
-  </g>;
+
+  return (
+    <g>
+      {body}
+      {isMemory && (
+        <g opacity={0.05} stroke="#1a2744" strokeWidth={0.55}>
+          {Array.from({ length: 7 }, (_, index) => (
+            <line key={`vm-${index}`} x1={-w + (index + 1) * (2 * w / 8)} y1={-h + 8} x2={-w + (index + 1) * (2 * w / 8)} y2={h - 8} />
+          ))}
+          {Array.from({ length: 5 }, (_, index) => (
+            <line key={`hm-${index}`} x1={-w + 8} y1={-h + (index + 1) * (2 * h / 6)} x2={w - 8} y2={-h + (index + 1) * (2 * h / 6)} />
+          ))}
+        </g>
+      )}
+      {layout.pins.map(pin => leadForPin(type, pin, layout))}
+
+      {type !== 'logic-block' && layout.pins.map(pin => {
+        const isLeft = pin.side === 'left';
+        const isRight = pin.side === 'right';
+        const isTop = pin.side === 'top';
+        const isBottom = pin.side === 'bottom';
+        const px = isLeft ? -w + 6 : isRight ? w - 6 : pin.x;
+        const py = isTop ? -h + 9 : isBottom ? h - 5 : pin.y + 3;
+        const anchor = isLeft ? 'start' : isRight ? 'end' : 'middle';
+        const name = pin.id.toUpperCase();
+        if (name.length > 5 || isMux || isDemux || name.startsWith('IN') || name.startsWith('OUT')) return null;
+        return (
+          <text
+            key={`pin-lbl-${pin.id}`}
+            x={px}
+            y={py}
+            textAnchor={anchor}
+            fontSize={6}
+            fontFamily="'KaTeX_Main', serif"
+            fontWeight={600}
+            fill="#64748b"
+          >
+            {name}
+          </text>
+        );
+      })}
+
+      {isAlu && (
+        <>
+          <text x={-w + 10} y={-h * 0.38} fontSize={7} fontFamily="'KaTeX_Main', serif" fontWeight={700} fill="#1a2744">A</text>
+          <text x={-w + 10} y={h * 0.45} fontSize={7} fontFamily="'KaTeX_Main', serif" fontWeight={700} fill="#1a2744">B</text>
+        </>
+      )}
+
+      {isAdder && (
+        <text x={0} y={4} textAnchor="middle" fontSize={18} fontFamily="'KaTeX_Main', serif" fontWeight={700} fill="#1a2744">Σ</text>
+      )}
+
+      {isSubtractor && (
+        <text x={0} y={4} textAnchor="middle" fontSize={20} fontFamily="'KaTeX_Main', serif" fontWeight={700} fill="#1a2744">−</text>
+      )}
+
+      {isComparator && (
+        <text x={0} y={4} textAnchor="middle" fontSize={11} fontFamily="'KaTeX_Main', serif" fontWeight={700} fill="#1a2744">A ? B</text>
+      )}
+
+      {(isFlipFlop || isCounter || isShiftReg) && clockPin && (
+        <path
+          d={`M ${-w + 7},${clockPin.y - 5} L ${-w + 15},${clockPin.y} L ${-w + 7},${clockPin.y + 5} Z`}
+          fill="none"
+          stroke="#1a2744"
+          strokeWidth={1.5}
+        />
+      )}
+
+      <text
+        x={0}
+        y={isAdder || isSubtractor || isComparator ? 22 : isMux || isDemux ? 4 : -3}
+        textAnchor="middle"
+        fontSize={isMux || isDemux ? 12 : 8}
+        fontFamily="'KaTeX_Main', serif"
+        fontWeight={700}
+        fill="#1a2744"
+      >
+        {title}
+      </text>
+    </g>
+  );
 };
 
 const LogicBlockSymbol: SymbolFC = ({ powered, props }) => {
-  const type = String(props?._componentType ?? '');
-  if (STANDARD_LOGIC_BLOCKS.has(type)) return <StandardLogicBlockSymbol powered={powered} props={props} />;
-  const inputCount = Number(props?._inputCount ?? 1);
-  const outputCount = Number(props?._outputCount ?? 1);
-  const terminals = (props?._terminals ?? []) as LogicSymbolPin[];
-  const inputs = terminals.filter(pin => pin.type === 'input').map(pin => pin.id);
-  const outputs = terminals.filter(pin => pin.type === 'output').map(pin => pin.id);
-  const layout = logicBlockLayoutFor(type || 'logic-block', inputs.length ? inputs : Array.from({ length: inputCount }, (_, index) => `in${index}`), outputs.length ? outputs : Array.from({ length: outputCount }, (_, index) => `out${index}`));
-  const { bodyHalfWidth: w, bodyHalfHeight: h } = layout;
-  return <g>
-    <rect x={-w} y={-h} width={w * 2} height={h * 2} rx={4} fill={powered ? '#eef6ff' : 'white'} stroke="#1a2744" strokeWidth={2} />
-    <text x={0} y={-3} textAnchor="middle" fontSize={8} fontFamily="'KaTeX_Main', serif" fontWeight={700} fill="#1a2744">{String(props?._blockLabel ?? 'LOGIC')}</text>
-    {layout.pins.map(pin => leadForPin(type || 'logic-block', pin, layout))}
-  </g>;
+  return <StandardLogicBlockSymbol powered={powered} props={props} />;
 };
 
 const RelayDpdt: SymbolFC = ({ powered, props }) => (
@@ -1060,7 +1234,7 @@ const RelayDpdt: SymbolFC = ({ powered, props }) => (
 
 // ─── SYMBOL MAP ───────────────────────────────────────────────────────────────
 
-export const SYMBOL_MAP: Record<string, SymbolFC> = {
+export const SYMBOL_MAP: Record<string, SymbolFC | undefined> = {
   'dc-voltage': DcVoltage,
   'dc-rail': DcRail,
   'ac-voltage': AcVoltage,
@@ -1117,16 +1291,136 @@ export const SYMBOL_MAP: Record<string, SymbolFC> = {
   'motor-3phase': Motor3Phase,
   'lamp': Lamp,
   'opamp': Opamp,
+  // Inputs & Probes
   'digital-input': DigitalInputSymbol,
+  'input': DigitalInputSymbol,
+  'logic-input': DigitalInputSymbol,
+
   'digital-output': DigitalOutputSymbol,
-  'logic-block': LogicBlockSymbol,
+  'output': DigitalOutputSymbol,
+  'logic-output': DigitalOutputSymbol,
+  'probe': DigitalOutputSymbol,
+
+  'logic-clock': LogicClockSymbol,
+  'clock': LogicClockSymbol,
+  'clk': LogicClockSymbol,
+
+  // Logic Gates
   'gate-and': (p) => <LogicGate {...p} props={{ ...p.props, _kind: 'AND' }} />,
+  'and': (p) => <LogicGate {...p} props={{ ...p.props, _kind: 'AND' }} />,
+  'gate_and': (p) => <LogicGate {...p} props={{ ...p.props, _kind: 'AND' }} />,
+
   'gate-or': (p) => <LogicGate {...p} props={{ ...p.props, _kind: 'OR' }} />,
+  'or': (p) => <LogicGate {...p} props={{ ...p.props, _kind: 'OR' }} />,
+  'gate_or': (p) => <LogicGate {...p} props={{ ...p.props, _kind: 'OR' }} />,
+
   'gate-not': (p) => <LogicGate {...p} props={{ ...p.props, _kind: 'NOT' }} />,
+  'not': (p) => <LogicGate {...p} props={{ ...p.props, _kind: 'NOT' }} />,
+  'gate_not': (p) => <LogicGate {...p} props={{ ...p.props, _kind: 'NOT' }} />,
+
   'gate-nand': (p) => <LogicGate {...p} props={{ ...p.props, _kind: 'NAND' }} />,
+  'nand': (p) => <LogicGate {...p} props={{ ...p.props, _kind: 'NAND' }} />,
+  'gate_nand': (p) => <LogicGate {...p} props={{ ...p.props, _kind: 'NAND' }} />,
+
   'gate-nor': (p) => <LogicGate {...p} props={{ ...p.props, _kind: 'NOR' }} />,
+  'nor': (p) => <LogicGate {...p} props={{ ...p.props, _kind: 'NOR' }} />,
+  'gate_nor': (p) => <LogicGate {...p} props={{ ...p.props, _kind: 'NOR' }} />,
+
   'gate-xor': (p) => <LogicGate {...p} props={{ ...p.props, _kind: 'XOR' }} />,
+  'xor': (p) => <LogicGate {...p} props={{ ...p.props, _kind: 'XOR' }} />,
+  'gate_xor': (p) => <LogicGate {...p} props={{ ...p.props, _kind: 'XOR' }} />,
+
   'gate-xnor': (p) => <LogicGate {...p} props={{ ...p.props, _kind: 'XNOR' }} />,
+  'xnor': (p) => <LogicGate {...p} props={{ ...p.props, _kind: 'XNOR' }} />,
+  'gate_xnor': (p) => <LogicGate {...p} props={{ ...p.props, _kind: 'XNOR' }} />,
+
+  // Combinational
+  'logic-half-adder': (p) => <StandardLogicBlockSymbol {...p} props={{ ...p.props, _componentType: 'logic-half-adder', _blockLabel: 'HA' }} />,
+  'half_adder': (p) => <StandardLogicBlockSymbol {...p} props={{ ...p.props, _componentType: 'logic-half-adder', _blockLabel: 'HA' }} />,
+  'half-adder': (p) => <StandardLogicBlockSymbol {...p} props={{ ...p.props, _componentType: 'logic-half-adder', _blockLabel: 'HA' }} />,
+
+  'logic-full-adder': (p) => <StandardLogicBlockSymbol {...p} props={{ ...p.props, _componentType: 'logic-full-adder', _blockLabel: 'FA' }} />,
+  'full_adder': (p) => <StandardLogicBlockSymbol {...p} props={{ ...p.props, _componentType: 'logic-full-adder', _blockLabel: 'FA' }} />,
+  'full-adder': (p) => <StandardLogicBlockSymbol {...p} props={{ ...p.props, _componentType: 'logic-full-adder', _blockLabel: 'FA' }} />,
+
+  'logic-half-subtractor': (p) => <StandardLogicBlockSymbol {...p} props={{ ...p.props, _componentType: 'logic-half-subtractor', _blockLabel: 'HS' }} />,
+  'half_subtractor': (p) => <StandardLogicBlockSymbol {...p} props={{ ...p.props, _componentType: 'logic-half-subtractor', _blockLabel: 'HS' }} />,
+  'half-subtractor': (p) => <StandardLogicBlockSymbol {...p} props={{ ...p.props, _componentType: 'logic-half-subtractor', _blockLabel: 'HS' }} />,
+
+  'logic-full-subtractor': (p) => <StandardLogicBlockSymbol {...p} props={{ ...p.props, _componentType: 'logic-full-subtractor', _blockLabel: 'FS' }} />,
+  'full_subtractor': (p) => <StandardLogicBlockSymbol {...p} props={{ ...p.props, _componentType: 'logic-full-subtractor', _blockLabel: 'FS' }} />,
+  'full-subtractor': (p) => <StandardLogicBlockSymbol {...p} props={{ ...p.props, _componentType: 'logic-full-subtractor', _blockLabel: 'FS' }} />,
+
+  'logic-comparator': (p) => <StandardLogicBlockSymbol {...p} props={{ ...p.props, _componentType: 'logic-comparator', _blockLabel: 'COMP' }} />,
+  'comparator': (p) => <StandardLogicBlockSymbol {...p} props={{ ...p.props, _componentType: 'logic-comparator', _blockLabel: 'COMP' }} />,
+
+  'logic-mux': (p) => <StandardLogicBlockSymbol {...p} props={{ ...p.props, _componentType: 'logic-mux', _blockLabel: 'MUX' }} />,
+  'mux': (p) => <StandardLogicBlockSymbol {...p} props={{ ...p.props, _componentType: 'logic-mux', _blockLabel: 'MUX' }} />,
+  'multiplexer': (p) => <StandardLogicBlockSymbol {...p} props={{ ...p.props, _componentType: 'logic-mux', _blockLabel: 'MUX' }} />,
+
+  'logic-demux': (p) => <StandardLogicBlockSymbol {...p} props={{ ...p.props, _componentType: 'logic-demux', _blockLabel: 'DEMUX' }} />,
+  'demux': (p) => <StandardLogicBlockSymbol {...p} props={{ ...p.props, _componentType: 'logic-demux', _blockLabel: 'DEMUX' }} />,
+  'demultiplexer': (p) => <StandardLogicBlockSymbol {...p} props={{ ...p.props, _componentType: 'logic-demux', _blockLabel: 'DEMUX' }} />,
+
+  'logic-encoder': (p) => <StandardLogicBlockSymbol {...p} props={{ ...p.props, _componentType: 'logic-encoder', _blockLabel: 'ENC' }} />,
+  'encoder': (p) => <StandardLogicBlockSymbol {...p} props={{ ...p.props, _componentType: 'logic-encoder', _blockLabel: 'ENC' }} />,
+
+  'logic-decoder': (p) => <StandardLogicBlockSymbol {...p} props={{ ...p.props, _componentType: 'logic-decoder', _blockLabel: 'DEC' }} />,
+  'decoder': (p) => <StandardLogicBlockSymbol {...p} props={{ ...p.props, _componentType: 'logic-decoder', _blockLabel: 'DEC' }} />,
+
+  'logic-nbit-adder': (p) => <StandardLogicBlockSymbol {...p} props={{ ...p.props, _componentType: 'logic-nbit-adder', _blockLabel: 'ADDER' }} />,
+  'nbit-adder': (p) => <StandardLogicBlockSymbol {...p} props={{ ...p.props, _componentType: 'logic-nbit-adder', _blockLabel: 'ADDER' }} />,
+  'nbit_adder': (p) => <StandardLogicBlockSymbol {...p} props={{ ...p.props, _componentType: 'logic-nbit-adder', _blockLabel: 'ADDER' }} />,
+
+  'logic-parity': (p) => <StandardLogicBlockSymbol {...p} props={{ ...p.props, _componentType: 'logic-parity', _blockLabel: 'PARITY' }} />,
+  'parity': (p) => <StandardLogicBlockSymbol {...p} props={{ ...p.props, _componentType: 'logic-parity', _blockLabel: 'PARITY' }} />,
+
+  'logic-alu-4bit': (p) => <StandardLogicBlockSymbol {...p} props={{ ...p.props, _componentType: 'logic-alu-4bit', _blockLabel: 'ALU' }} />,
+  'alu': (p) => <StandardLogicBlockSymbol {...p} props={{ ...p.props, _componentType: 'logic-alu-4bit', _blockLabel: 'ALU' }} />,
+  'alu-4bit': (p) => <StandardLogicBlockSymbol {...p} props={{ ...p.props, _componentType: 'logic-alu-4bit', _blockLabel: 'ALU' }} />,
+  'alu_4bit': (p) => <StandardLogicBlockSymbol {...p} props={{ ...p.props, _componentType: 'logic-alu-4bit', _blockLabel: 'ALU' }} />,
+
+  // Sequential
+  'logic-ff-sr': (p) => <StandardLogicBlockSymbol {...p} props={{ ...p.props, _componentType: 'logic-ff-sr', _blockLabel: 'SR-FF' }} />,
+  'sr-ff': (p) => <StandardLogicBlockSymbol {...p} props={{ ...p.props, _componentType: 'logic-ff-sr', _blockLabel: 'SR-FF' }} />,
+  'sr_ff': (p) => <StandardLogicBlockSymbol {...p} props={{ ...p.props, _componentType: 'logic-ff-sr', _blockLabel: 'SR-FF' }} />,
+
+  'logic-ff-d': (p) => <StandardLogicBlockSymbol {...p} props={{ ...p.props, _componentType: 'logic-ff-d', _blockLabel: 'D-FF' }} />,
+  'd-ff': (p) => <StandardLogicBlockSymbol {...p} props={{ ...p.props, _componentType: 'logic-ff-d', _blockLabel: 'D-FF' }} />,
+  'd_ff': (p) => <StandardLogicBlockSymbol {...p} props={{ ...p.props, _componentType: 'logic-ff-d', _blockLabel: 'D-FF' }} />,
+
+  'logic-ff-jk': (p) => <StandardLogicBlockSymbol {...p} props={{ ...p.props, _componentType: 'logic-ff-jk', _blockLabel: 'JK-FF' }} />,
+  'jk-ff': (p) => <StandardLogicBlockSymbol {...p} props={{ ...p.props, _componentType: 'logic-ff-jk', _blockLabel: 'JK-FF' }} />,
+  'jk_ff': (p) => <StandardLogicBlockSymbol {...p} props={{ ...p.props, _componentType: 'logic-ff-jk', _blockLabel: 'JK-FF' }} />,
+
+  'logic-ff-t': (p) => <StandardLogicBlockSymbol {...p} props={{ ...p.props, _componentType: 'logic-ff-t', _blockLabel: 'T-FF' }} />,
+  't-ff': (p) => <StandardLogicBlockSymbol {...p} props={{ ...p.props, _componentType: 'logic-ff-t', _blockLabel: 'T-FF' }} />,
+  't_ff': (p) => <StandardLogicBlockSymbol {...p} props={{ ...p.props, _componentType: 'logic-ff-t', _blockLabel: 'T-FF' }} />,
+
+  'logic-shift-register': (p) => <StandardLogicBlockSymbol {...p} props={{ ...p.props, _componentType: 'logic-shift-register', _blockLabel: 'SHIFT REG' }} />,
+  'shift-register': (p) => <StandardLogicBlockSymbol {...p} props={{ ...p.props, _componentType: 'logic-shift-register', _blockLabel: 'SHIFT REG' }} />,
+  'shift_register': (p) => <StandardLogicBlockSymbol {...p} props={{ ...p.props, _componentType: 'logic-shift-register', _blockLabel: 'SHIFT REG' }} />,
+
+  'logic-counter': (p) => <StandardLogicBlockSymbol {...p} props={{ ...p.props, _componentType: 'logic-counter', _blockLabel: 'CTR' }} />,
+  'counter': (p) => <StandardLogicBlockSymbol {...p} props={{ ...p.props, _componentType: 'logic-counter', _blockLabel: 'CTR' }} />,
+
+  'logic-nbit-register': (p) => <StandardLogicBlockSymbol {...p} props={{ ...p.props, _componentType: 'logic-nbit-register', _blockLabel: 'REG' }} />,
+  'register': (p) => <StandardLogicBlockSymbol {...p} props={{ ...p.props, _componentType: 'logic-nbit-register', _blockLabel: 'REG' }} />,
+  'nbit-register': (p) => <StandardLogicBlockSymbol {...p} props={{ ...p.props, _componentType: 'logic-nbit-register', _blockLabel: 'REG' }} />,
+
+  'logic-ram-16x8': (p) => <StandardLogicBlockSymbol {...p} props={{ ...p.props, _componentType: 'logic-ram-16x8', _blockLabel: 'RAM' }} />,
+  'ram': (p) => <StandardLogicBlockSymbol {...p} props={{ ...p.props, _componentType: 'logic-ram-16x8', _blockLabel: 'RAM' }} />,
+  'ram-16x8': (p) => <StandardLogicBlockSymbol {...p} props={{ ...p.props, _componentType: 'logic-ram-16x8', _blockLabel: 'RAM' }} />,
+
+  'logic-rom-16x8': (p) => <StandardLogicBlockSymbol {...p} props={{ ...p.props, _componentType: 'logic-rom-16x8', _blockLabel: 'ROM' }} />,
+  'rom': (p) => <StandardLogicBlockSymbol {...p} props={{ ...p.props, _componentType: 'logic-rom-16x8', _blockLabel: 'ROM' }} />,
+  'rom-16x8': (p) => <StandardLogicBlockSymbol {...p} props={{ ...p.props, _componentType: 'logic-rom-16x8', _blockLabel: 'ROM' }} />,
+
+  'logic-frequency-divider': (p) => <StandardLogicBlockSymbol {...p} props={{ ...p.props, _componentType: 'logic-frequency-divider', _blockLabel: 'DIV' }} />,
+  'frequency-divider': (p) => <StandardLogicBlockSymbol {...p} props={{ ...p.props, _componentType: 'logic-frequency-divider', _blockLabel: 'DIV' }} />,
+  'divider': (p) => <StandardLogicBlockSymbol {...p} props={{ ...p.props, _componentType: 'logic-frequency-divider', _blockLabel: 'DIV' }} />,
+
+  'logic-block': StandardLogicBlockSymbol,
   'voltmeter': Voltmeter,
   'ammeter': Ammeter,
   'dmm': DmmSymbol,
@@ -1136,10 +1430,48 @@ export const SYMBOL_MAP: Record<string, SymbolFC> = {
 export function renderSymbol(
   symbolId: string,
   powered: boolean,
-  props: Record<string, any>,
-  animTime: number,
+  props: Record<string, any> = {},
+  animTime = 0,
 ): React.ReactNode {
-  const Sym = SYMBOL_MAP[symbolId];
-  if (!Sym) return <text x={0} y={5} textAnchor="middle" fontSize={10} fill="#666">?</text>;
-  return <Sym powered={powered} props={props} animTime={animTime} />;
+  // 1. Direct match in SYMBOL_MAP
+  let Sym: SymbolFC | undefined = SYMBOL_MAP[symbolId];
+
+  // 2. Normalized match (handles snake_case, short names, prefixes)
+  if (!Sym) {
+    const normalized = normalizeLogicType(symbolId);
+    const candidate = SYMBOL_MAP[normalized];
+    if (candidate) {
+      Sym = candidate;
+      symbolId = normalized;
+    }
+  }
+
+  // 3. Fallback from props if symbolId was generic or not matched
+  if (symbolId === 'logic-block' || !Sym) {
+    const compType = String(props?._componentType || props?.type || props?.id || '');
+    if (compType) {
+      const normalizedComp = normalizeLogicType(compType);
+      const candidate = SYMBOL_MAP[normalizedComp];
+      if (candidate) {
+        Sym = candidate;
+        symbolId = normalizedComp;
+      }
+    }
+  }
+
+  if (!Sym) {
+    // If still not matched but looks like a logic component, use StandardLogicBlockSymbol
+    if (symbolId.includes('logic') || symbolId.includes('gate') || symbolId.includes('adder') || symbolId.includes('mux')) {
+      return <StandardLogicBlockSymbol powered={powered} props={{ ...props, _componentType: symbolId }} animTime={animTime} />;
+    }
+    return <text x={0} y={5} textAnchor="middle" fontSize={10} fill="#666">?</text>;
+  }
+
+  const enrichedProps = {
+    ...props,
+    _componentType: props?._componentType || symbolId,
+    _blockLabel: props?._blockLabel || BLOCK_ABBREVIATIONS[symbolId] || BLOCK_ABBREVIATIONS[normalizeLogicType(symbolId)],
+  };
+
+  return <Sym powered={powered} props={enrichedProps} animTime={animTime} />;
 }

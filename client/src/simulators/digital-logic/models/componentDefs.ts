@@ -928,7 +928,7 @@ const DIGITAL_LOGIC: Record<string, ComponentDef> = {
 };
 
 const logicBlock = (id: string, name: string, inputs: string[], outputs: string[], description: string): ComponentDef => ({
-  id, name, category: 'Digital Logic', width: 100, height: 80, symbol: 'logic-block',
+  id, name, category: 'Digital Logic', width: 100, height: 80, symbol: id,
   terminals: [
     ...inputs.map((pin, index) => ({ id: pin, name: pin.toUpperCase(), x: -50, y: (index - (inputs.length - 1) / 2) * 20, type: 'input' as const })),
     ...outputs.map((pin, index) => ({ id: pin, name: pin.toUpperCase(), x: 50, y: (index - (outputs.length - 1) / 2) * 20, type: 'output' as const })),

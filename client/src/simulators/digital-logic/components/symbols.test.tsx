@@ -138,4 +138,118 @@ describe('Tab D SVG symbol language', () => {
     expect((contactor.match(/ C /g) ?? []).length).toBeGreaterThanOrEqual(1);
     expect(contactor).toContain('x1="-40" y1="0"');
   });
+
+  it('renders distinct SVG symbols and dynamic IC block labels for all digital logic catalog components', () => {
+    // 1. Clock oscillator symbol
+    const clockSvg = markup('logic-clock');
+    expect(clockSvg).toContain('CLK');
+    expect(clockSvg).toMatch(/d="M -12,4 H -4 V -6 H 4 V 4 H 12 V -6"/);
+    expect(clockSvg).not.toContain('LOGIC');
+
+    // 2. Adders and Subtractors with math symbols and specific titles
+    const haSvg = markup('half_adder');
+    expect(haSvg).toContain('Σ');
+    expect(haSvg).toContain('HA');
+    expect(haSvg).not.toContain('LOGIC');
+
+    const faSvg = markup('full_adder');
+    expect(faSvg).toContain('Σ');
+    expect(faSvg).toContain('FA');
+    expect(faSvg).not.toContain('LOGIC');
+
+    const hsSvg = markup('half_subtractor');
+    expect(hsSvg).toContain('−');
+    expect(hsSvg).toContain('HS');
+    expect(hsSvg).not.toContain('LOGIC');
+
+    const fsSvg = markup('full_subtractor');
+    expect(fsSvg).toContain('−');
+    expect(fsSvg).toContain('FS');
+    expect(fsSvg).not.toContain('LOGIC');
+
+    // 3. MUX and DEMUX trapezoids
+    const muxSvg = markup('mux');
+    expect(muxSvg).toContain('MUX');
+    expect(muxSvg).toContain('path');
+    expect(muxSvg).not.toContain('LOGIC');
+
+    const demuxSvg = markup('demux');
+    expect(demuxSvg).toContain('DEMUX');
+    expect(demuxSvg).toContain('path');
+    expect(demuxSvg).not.toContain('LOGIC');
+
+    // 4. Encoders and Decoders
+    const encSvg = markup('encoder');
+    expect(encSvg).toContain('ENC');
+    expect(encSvg).not.toContain('LOGIC');
+
+    const decSvg = markup('decoder');
+    expect(decSvg).toContain('DEC');
+    expect(decSvg).not.toContain('LOGIC');
+
+    // 5. Comparator
+    const compSvg = markup('comparator');
+    expect(compSvg).toContain('A ? B');
+    expect(compSvg).toContain('COMP');
+    expect(compSvg).not.toContain('LOGIC');
+
+    // 6. Flip-flops with distinct abbreviations and clock edge markers
+    const dffSvg = markup('d_ff');
+    expect(dffSvg).toContain('D-FF');
+    expect(dffSvg).not.toContain('LOGIC');
+
+    const jkffSvg = markup('jk_ff');
+    expect(jkffSvg).toContain('JK-FF');
+    expect(jkffSvg).not.toContain('LOGIC');
+
+    const tffSvg = markup('t_ff');
+    expect(tffSvg).toContain('T-FF');
+    expect(tffSvg).not.toContain('LOGIC');
+
+    const srffSvg = markup('sr_ff');
+    expect(srffSvg).toContain('SR-FF');
+    expect(srffSvg).not.toContain('LOGIC');
+
+    // 7. ALU 4-bit
+    const aluSvg = markup('alu_4bit');
+    expect(aluSvg).toContain('ALU');
+    expect(aluSvg).toContain('A');
+    expect(aluSvg).toContain('B');
+    expect(aluSvg).not.toContain('LOGIC');
+
+    // 8. Counter, Shift Register, RAM, ROM
+    expect(markup('counter')).toContain('CTR');
+    expect(markup('shift_register')).toContain('SHIFT REG');
+    expect(markup('ram_16x8')).toContain('RAM');
+    expect(markup('rom_16x8')).toContain('ROM');
+  });
+
+  it('verifies all components in digitalLogicCatalog render distinct symbols and zero generic LOGIC fallbacks', async () => {
+    const { getAllDigitalLogicComponentDefs } = await import('@/simulators/digital-logic/models/digitalLogicCatalog');
+    const allDefs = getAllDigitalLogicComponentDefs();
+    expect(allDefs.length).toBeGreaterThanOrEqual(20);
+
+    for (const def of allDefs) {
+      const rendered = renderToStaticMarkup(
+        <svg>
+          {renderSymbol(
+            def.symbol,
+            false,
+            {
+              _componentType: def.id,
+              _blockLabel: def.name,
+              _terminals: def.terminals,
+            },
+            0
+          )}
+        </svg>
+      );
+      // Ensure no component falls back to the generic 'LOGIC' text
+      expect(rendered, `Component ${def.id} (${def.name}) must not render generic LOGIC label`).not.toContain('>LOGIC<');
+      // Ensure no component falls back to unknown '?'
+      expect(rendered, `Component ${def.id} (${def.name}) must not render unknown ? marker`).not.toContain('>?<');
+    }
+  });
 });
+
+

@@ -288,18 +288,21 @@ function refreshCanvasWireEndpoints(wires: CircuitWire[], components: CircuitCom
 }
 
 function ComponentPaletteIcon({ definition, colors, documented, isDark }: { definition: ComponentDef; colors: Palette; documented: boolean; isDark?: boolean }) {
-  const padding = 20;
+  const padding = 24;
   let w = definition.width + padding;
   let h = definition.height + padding;
   let offsetY = 0;
 
   if (definition.terminals && definition.terminals.length > 0) {
+    const xCoords = definition.terminals.map(t => Math.abs(t.x));
+    const maxX = Math.max(...xCoords, definition.width / 2);
+    w = Math.max(w, maxX * 2 + padding);
+
     const yCoords = definition.terminals.map(t => t.y);
-    const minY = Math.min(...yCoords);
-    const maxY = Math.max(...yCoords);
-    if (minY !== -maxY) {
-      offsetY = (minY + maxY) / 2;
-    }
+    const minY = Math.min(...yCoords, -definition.height / 2);
+    const maxY = Math.max(...yCoords, definition.height / 2);
+    h = Math.max(h, (maxY - minY) + padding);
+    offsetY = (minY + maxY) / 2;
   }
 
   return (
@@ -311,7 +314,21 @@ function ComponentPaletteIcon({ definition, colors, documented, isDark }: { defi
       style={{ overflow: 'visible', color: colors.text, pointerEvents: 'none' }}
     >
       <g>
-        {renderSymbol(definition.symbol, false, { ...defaultProps(definition), _documentedStyle: documented, _isLibraryThumbnail: true, isDark, _isDark: isDark }, 0)}
+        {renderSymbol(
+          definition.symbol,
+          false,
+          {
+            ...defaultProps(definition),
+            _componentType: definition.id,
+            _blockLabel: definition.name,
+            _terminals: definition.terminals,
+            _documentedStyle: documented,
+            _isLibraryThumbnail: true,
+            isDark,
+            _isDark: isDark,
+          },
+          0
+        )}
       </g>
     </svg>
   );
@@ -1542,7 +1559,18 @@ export function DigitalLogicSimulatorHome({
 
                           {/* Render logic symbol */}
                           <g style={{ color: colors.text }}>
-                            {renderSymbol(def.symbol, inputVal === 1 || outputState === 1, component.props, snapshot.time)}
+                            {renderSymbol(
+                              def.symbol,
+                              inputVal === 1 || outputState === 1,
+                              {
+                                ...component.props,
+                                _componentType: component.type,
+                                _blockLabel: def.name ?? component.label,
+                                _terminals: terminals,
+                                isDark: darkPreview,
+                              },
+                              snapshot.time
+                            )}
                           </g>
 
                           {/* Terminals */}

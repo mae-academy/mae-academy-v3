@@ -164,7 +164,7 @@ export function calculateWireIntersections(
       (w as any).netId ??
       (w as any).net ??
       w.junctionWireId ??
-      (w.from ? `${w.from.componentId}:${w.from.terminalId}` : `${w.fromComp}:${w.fromTerm}`));
+      ((w as any).from ? `${(w as any).from.componentId}:${(w as any).from.terminalId}` : `${w.fromComp}:${w.fromTerm}`));
 
   // Decompose every wire into canonical segments
   const hSegs: Segment[] = [];
@@ -378,7 +378,7 @@ export function junctionDotPositions(
         (w as any).netId ??
         (w as any).net ??
         w.junctionWireId ??
-        (w.from ? `${w.from.componentId}:${w.from.terminalId}` : `${w.fromComp}:${w.fromTerm}`));
+        ((w as any).from ? `${(w as any).from.componentId}:${(w as any).from.terminalId}` : `${w.fromComp}:${w.fromTerm}`));
 
     const pointBranches = new Map<string, { x: number; y: number; count: number }>();
 
