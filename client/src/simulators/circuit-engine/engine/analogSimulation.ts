@@ -6,6 +6,7 @@ import { SimulationEngine } from '@/simulators/circuit-engine/engine/simulation'
 import { TabDMnaError, type TabDPrimitive } from '@/simulators/circuit-engine/engine/analogDocumentedMna';
 import { shockleyCurrent, TabDNewtonMna, type TabDNonlinearDevice } from '@/simulators/circuit-engine/engine/analogNewtonMna';
 import { toTabDObservableOperatingPoint, type TabDObservableOperatingPoint } from '@/simulators/circuit-engine/models/analogResultAdapter';
+import { getBrokenWireIds, isComponentOpen } from '@/simulators/circuit-engine/engine/brokenBranches';
 
 class SignalIntegrator {
   private window: { val: number; sq: number; dt: number }[] = [];
@@ -302,6 +303,7 @@ export class TabDSimulationEngine extends SimulationEngine {
 
         // Pass 1: Resolve physical wire currents with strict series continuity and open-circuit isolation
         const subStepWireCurrents: Record<string, number> = {};
+        const brokenWireIds = getBrokenWireIds(this.tabDComponents, this.tabDWires);
         let maxAbsWireCurrent = 0;
 
         for (const wire of this.tabDWires) {
@@ -353,7 +355,7 @@ export class TabDSimulationEngine extends SimulationEngine {
           }
 
           // Strict cutoff for open-circuit, disconnected, or negligible leakage current (< 100 nA)
-          if (Math.abs(wireI) < 1e-7) {
+          if (brokenWireIds.has(wire.id) || Math.abs(wireI) < 1e-7) {
             wireI = 0;
           }
 
@@ -376,7 +378,7 @@ export class TabDSimulationEngine extends SimulationEngine {
           const wireI = subStepWireCurrents[wire.id] ?? 0;
           const currentPhase = this.wirePhases.get(wire.id) ?? 0;
 
-          if (Math.abs(wireI) < 1e-7 || maxAbsWireCurrent < 1e-7) {
+          if (brokenWireIds.has(wire.id) || Math.abs(wireI) < 1e-7 || maxAbsWireCurrent < 1e-7) {
             // Zero current / open circuit: rate is exactly 0, electrons remain completely stationary
             this.wirePhases.set(wire.id, currentPhase);
           } else {
@@ -1169,9 +1171,16 @@ export class TabDSimulationEngine extends SimulationEngine {
           } else if (mode === 'HZ') {
             readings[component.id] = { value: 0, unit: 'Hz', status: 'ready' };
           } else {
+            const isDirectlyOpen = this.isDmmMeasuringOpenCircuit(component);
             const voltage = difference(component, pTerm, nTerm);
-            const resistance = Math.abs(voltage) / 0.001;
-            readings[component.id] = { value: resistance, unit: 'Ω', status: 'ready', continuity: mode === 'CONT' ? resistance < 50 : undefined };
+            const resistance = isDirectlyOpen ? Infinity : Math.abs(voltage) / 0.001;
+            const open = isDirectlyOpen || !Number.isFinite(resistance) || resistance >= 1e7;
+            readings[component.id] = {
+              value: open ? Infinity : resistance,
+              unit: 'Ω',
+              status: open ? 'open' : 'ready',
+              continuity: mode === 'CONT' ? (!open && resistance < 50) : undefined,
+            };
           }
         }
       }
@@ -1179,6 +1188,27 @@ export class TabDSimulationEngine extends SimulationEngine {
       this.lastDisplayTime = currentTime;
     }
     return this.displayReadings;
+  }
+
+  protected override isDmmMeasuringOpenCircuit(dmm: CircuitComponent): boolean {
+    const dmmWires = this.tabDWires.filter(w => w.fromComp === dmm.id || w.toComp === dmm.id);
+    const hiWire = dmmWires.find(w => (w.fromComp === dmm.id && (w.fromTerm === 'hi' || w.fromTerm === 'pos')) || (w.toComp === dmm.id && (w.toTerm === 'hi' || w.toTerm === 'pos')));
+    const comWire = dmmWires.find(w => (w.fromComp === dmm.id && (w.fromTerm === 'com' || w.fromTerm === 'neg')) || (w.toComp === dmm.id && (w.toTerm === 'com' || w.toTerm === 'neg')));
+    if (!hiWire || !comWire) return true;
+
+    const getTargetComp = (w: CircuitWire) => w.fromComp === dmm.id ? w.toComp : w.fromComp;
+    const targetA = getTargetComp(hiWire);
+    const targetB = getTargetComp(comWire);
+
+    if (targetA === targetB) {
+      const comp = this.tabDComponents.find(c => c.id === targetA);
+      if (comp && (Boolean(comp.state?.isBurned) || isComponentOpen(comp))) return true;
+    }
+
+    const brokenWires = getBrokenWireIds(this.tabDComponents, this.tabDWires);
+    if (brokenWires.has(hiWire.id) || brokenWires.has(comWire.id)) return true;
+
+    return false;
   }
 }
 

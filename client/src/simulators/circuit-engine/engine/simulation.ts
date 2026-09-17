@@ -11,6 +11,7 @@ import {
   type SimulationSnapshot,
   type SimulationWarning,
 } from '@/simulators/circuit-engine/models/circuitTypes';
+import { getBrokenWireIds, isComponentOpen } from '@/simulators/circuit-engine/engine/brokenBranches';
 
 /**
  * The solver uses modified nodal analysis with Norton-equivalent voltage sources.
@@ -454,6 +455,10 @@ export class SimulationEngine {
     this.recordHistories(result);
     const instrumentReadings = this.computeInstrumentReadings(result);
     const wireCurrents = this.computeWireCurrents(result.terminalCurrents);
+    const brokenWireIds = getBrokenWireIds(this.components, this.wires);
+    brokenWireIds.forEach(wireId => {
+      wireCurrents[wireId] = 0;
+    });
     const nodeVoltages = this.nodeVoltageMap(result.voltages);
 
     let maxAbsWireCurrent = 0;
@@ -467,7 +472,7 @@ export class SimulationEngine {
     for (const wire of this.wires) {
       const wireI = wireCurrents[wire.id] ?? 0;
       const currentPhase = this.wirePhases.get(wire.id) ?? 0;
-      if (Math.abs(wireI) < 1e-7 || maxAbsWireCurrent < 1e-7) {
+      if (brokenWireIds.has(wire.id) || Math.abs(wireI) < 1e-7 || maxAbsWireCurrent < 1e-7) {
         this.wirePhases.set(wire.id, currentPhase);
       } else {
         const relativeRatio = Math.min(1, Math.max(0, Math.abs(wireI) / maxAbsWireCurrent));
@@ -1122,9 +1127,12 @@ export class SimulationEngine {
           const hiRoot = this.network.terminalRoots.get(hi);
           const comRoot = this.network.terminalRoots.get(com);
           const nodeForRoot = (root: string | undefined) => !root || root === this.network.referenceRoot ? '0' : `n:${root}`;
-          const resistance = measureResistanceWithTestSource(compileDcTopology(this.components, this.wires), nodeForRoot(hiRoot), nodeForRoot(comRoot));
-          const open = !Number.isFinite(resistance) || resistance > 1e9;
-          reading = this.reading(open ? Infinity : resistance, 'Ω', open ? 'open' : 'ready', mode === 'CONT' ? { continuity: resistance < 50 } : {});
+          const isDirectlyOpen = this.isDmmMeasuringOpenCircuit(component);
+          const resistance = isDirectlyOpen
+            ? Infinity
+            : measureResistanceWithTestSource(compileDcTopology(this.components, this.wires), nodeForRoot(hiRoot), nodeForRoot(comRoot));
+          const open = isDirectlyOpen || !Number.isFinite(resistance) || resistance >= 1e7;
+          reading = this.reading(open ? Infinity : resistance, 'Ω', open ? 'open' : 'ready', mode === 'CONT' ? { continuity: !open && resistance < 50 } : {});
         }
         const unit = reading.unit as 'V' | 'A' | 'Ω';
         const limit = this.rangeLimit(propString(component.props, 'range', 'auto'), unit);
@@ -1147,6 +1155,27 @@ export class SimulationEngine {
       }
     }
     return readings;
+  }
+
+  protected isDmmMeasuringOpenCircuit(dmm: CircuitComponent): boolean {
+    const dmmWires = this.wires.filter(w => w.fromComp === dmm.id || w.toComp === dmm.id);
+    const hiWire = dmmWires.find(w => (w.fromComp === dmm.id && (w.fromTerm === 'hi' || w.fromTerm === 'pos')) || (w.toComp === dmm.id && (w.toTerm === 'hi' || w.toTerm === 'pos')));
+    const comWire = dmmWires.find(w => (w.fromComp === dmm.id && (w.fromTerm === 'com' || w.fromTerm === 'neg')) || (w.toComp === dmm.id && (w.toTerm === 'com' || w.toTerm === 'neg')));
+    if (!hiWire || !comWire) return true;
+
+    const getTargetComp = (w: CircuitWire) => w.fromComp === dmm.id ? w.toComp : w.fromComp;
+    const targetA = getTargetComp(hiWire);
+    const targetB = getTargetComp(comWire);
+
+    if (targetA === targetB) {
+      const comp = this.components.find(c => c.id === targetA);
+      if (comp && (Boolean(comp.state?.isBurned) || isComponentOpen(comp))) return true;
+    }
+
+    const brokenWires = getBrokenWireIds(this.components, this.wires);
+    if (brokenWires.has(hiWire.id) || brokenWires.has(comWire.id)) return true;
+
+    return false;
   }
 
   private computeWireCurrents(terminalCurrents: Record<string, number>): Record<string, number> {

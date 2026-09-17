@@ -109,6 +109,7 @@ import { filterTabDCatalog, filterTabDImportedComponents, isTabDComponentAvailab
 import { alignTabDTerminalToGrid, calculateMeshLoopBounds, calculateTabDPlanarCavity, dynamicRubberBandPath, getExactTerminalOffset, isExactCadComponent, lockTabDWireCorner, MESH_LOOP_COLORS, moveTabDOrthogonalLane, tabDComponentLabelAnchors, tabDGentleWheelZoomFactor, tabDOrthogonalDraftPath, tabDTerminalOrthogonalPath, type ObstacleBox, type TabDTerminalAxis } from '@/simulators/circuit-engine/components/analogCanvasGeometry';
 import { formatMeterReading, renderComponentCanvasLabel, renderSymbol, formatDependentSourceMath, renderDependentSourceValueTspans } from '@/simulators/circuit-engine/components/symbols';
 import { applySwitchHotkey, directControlKind, hotkeyDigit, isTextEntryTarget, momentaryControlProps, nextLatchingControlProps, releaseHeldPushbuttons } from '@/simulators/circuit-engine/models/componentInteraction';
+import { getBrokenWireIds } from '@/simulators/circuit-engine/engine/brokenBranches';
 import {
   addWireCorner,
   getDotsOnPath,
@@ -2587,11 +2588,19 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
   }, [commitSnapshot, selectedWire, wires]);
 
   const resetSimulation = useCallback(() => {
+    const repairedComponents = components.map(component => {
+      if (!component.state?.isBurned) return component;
+      const nextState = { ...component.state };
+      delete nextState.isBurned;
+      return { ...component, state: nextState };
+    });
+    setComponents(repairedComponents);
+    liveComponentsRef.current = repairedComponents;
     simulation.current.reset();
-    simulation.current.setCircuit(effectiveCircuitComponents, wires);
+    simulation.current.setCircuit(repairedComponents, wires);
     setSnapshot(simulation.current.getSnapshot());
     setAnimationTime(0);
-  }, [effectiveCircuitComponents, wires]);
+  }, [components, wires]);
 
   useEffect(() => {
     simulation.current.setCircuit(effectiveCircuitComponents, wires);
@@ -3171,14 +3180,16 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     let valueText = '—';
     const isShorted = reading?.continuity === true;
     if (reading?.status === 'open') {
-      valueText = 'OL';
+      valueText = 'O.L';
     } else if (isShorted) {
       valueText = 'SHORTED';
     } else if (reading && typeof reading.value === 'number') {
       const val = reading.value;
       const abs = Math.abs(val);
       const unit = reading.unit || '';
-      if (abs >= 1e6) valueText = `${(val / 1e6).toFixed(3)} M${unit}`;
+      if ((unit === 'Ω' || unit === 'Ohm') && (!Number.isFinite(val) || abs >= 1e7)) {
+        valueText = 'O.L';
+      } else if (abs >= 1e6) valueText = `${(val / 1e6).toFixed(3)} M${unit}`;
       else if (abs >= 1e3) valueText = `${(val / 1e3).toFixed(3)} k${unit}`;
       else if (abs >= 1) valueText = `${val.toFixed(3)} ${unit}`;
       else if (abs >= 1e-3) valueText = `${(val * 1e3).toFixed(2)} m${unit}`;
@@ -4156,55 +4167,55 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
 
                   {/* Dedicated layer containing ONLY components, wires, labels, and texts for tight export bounding box */}
                   <g id="circuit-elements-layer">
-                    {wires.map(wire => {
-                      const selected = selection?.kind === 'wire' && selection.id === wire.id;
-                      const fromComp = components.find(c => c.id === wire.fromComp);
-                      const toComp = components.find(c => c.id === wire.toComp);
-                      const hasBurnedTerm = Boolean(fromComp?.state?.isBurned || toComp?.state?.isBurned);
-                      const phase = hasBurnedTerm ? 0 : (snapshot.wirePhases?.[wire.id] ?? 0);
-                      const wireCurrent = hasBurnedTerm ? 0 : Math.abs(snapshot.wireCurrents?.[wire.id] ?? 0);
-                      const isCurrentFlowing = wireCurrent >= 1e-7;
-                      const path = getWirePoints(wire);
-                      // Phase 2: use jump-arc path for the visible stroke; hitbox uses the
-                      // plain polyline so clicks always register even near arc breaks.
-                      const hitPath = pointsToPath(path);
-                      const renderPath = buildJumpArcPath(path, wireIntersectionList, wire.id, 4);
-                      const len = pathLength(path);
-                      // Persistent charge particles: uniform spacing based solely on physical length (N = round(length / spacing))
-                      const numDots = Math.max(1, Math.round(len / 36));
-                      const dots = getDotsOnPath(path, numDots, phase);
-                      const isSensingWire = false;
-                      const strokeColor = selected ? colors.selection : (wire.color ?? colors.text);
-                      const strokeWidth = selected ? 2 : 1.5;
+                    {(() => {
+                      const brokenWireIds = getBrokenWireIds(components, wires);
+                      return wires.map(wire => {
+                        const selected = selection?.kind === 'wire' && selection.id === wire.id;
+                        const isBroken = brokenWireIds.has(wire.id);
+                        const phase = isBroken ? 0 : (snapshot.wirePhases?.[wire.id] ?? 0);
+                        const wireCurrent = isBroken ? 0 : Math.abs(snapshot.wireCurrents?.[wire.id] ?? 0);
+                        const isCurrentFlowing = wireCurrent >= 1e-7;
+                        const path = getWirePoints(wire);
+                        // Phase 2: use jump-arc path for the visible stroke; hitbox uses the
+                        // plain polyline so clicks always register even near arc breaks.
+                        const hitPath = pointsToPath(path);
+                        const renderPath = buildJumpArcPath(path, wireIntersectionList, wire.id, 4);
+                        const len = pathLength(path);
+                        // Persistent charge particles: uniform spacing based solely on physical length (N = round(length / spacing))
+                        const numDots = Math.max(1, Math.round(len / 36));
+                        const dots = getDotsOnPath(path, numDots, phase);
+                        const isSensingWire = false;
+                        const strokeColor = selected ? colors.selection : (wire.color ?? colors.text);
+                        const strokeWidth = selected ? 2 : 1.5;
 
-                      return (
-                        <g key={wire.id}>
-                          {/* Wide transparent hitbox — uses plain polyline for reliable click detection */}
-                          <path d={hitPath} fill="none" stroke="transparent" strokeWidth={17} strokeLinecap="round" strokeLinejoin="round" onMouseDown={event => handleWireMouseDown(event, wire)} onDoubleClick={event => handleWireDoubleClick(event, wire)} style={{ cursor: 'pointer' }} />
-                          {/* Visible stroke with jump-arc splices at cross-net crossings */}
-                          <path d={renderPath} fill="none" stroke={strokeColor} strokeWidth={strokeWidth} strokeDasharray={isSensingWire ? "3 3" : undefined} strokeLinecap="round" strokeLinejoin="round" pointerEvents="none" />
-                          {showElectrons && dots.map((dot, index) => (
-                            <circle
-                              key={index}
-                              cx={dot[0]}
-                              cy={dot[1]}
-                              r={3}
-                              fill={colors.powered}
-                              opacity={isCurrentFlowing ? 1 : 0.25}
-                              pointerEvents="none"
-                            />
-                          ))}
-                          {selected && path.length > 2 && path.slice(1, -1).map((corner, index) => {
-                            const cornerIndex = index + 1;
-                            return <circle key={`${wire.id}-${cornerIndex}`} cx={corner[0]} cy={corner[1]} r={6} fill={colors.panel} stroke={colors.selection} strokeWidth={2} onMouseDown={event => {
-                              event.stopPropagation();
-                              dragStartSnapshotRef.current = cloneSnapshot({ components: componentRef.current, wires: wiresRef.current, texts: textsRef.current });
-                              setDragState({ kind: 'wireCorner', id: wire.id, corner: cornerIndex });
-                            }} style={{ cursor: 'move' }} />;
-                          })}
-                        </g>
-                      );
-                    })}
+                        return (
+                          <g key={wire.id}>
+                            {/* Wide transparent hitbox — uses plain polyline for reliable click detection */}
+                            <path d={hitPath} fill="none" stroke="transparent" strokeWidth={17} strokeLinecap="round" strokeLinejoin="round" onMouseDown={event => handleWireMouseDown(event, wire)} onDoubleClick={event => handleWireDoubleClick(event, wire)} style={{ cursor: 'pointer' }} />
+                            {/* Visible stroke with jump-arc splices at cross-net crossings */}
+                            <path d={renderPath} fill="none" stroke={strokeColor} strokeWidth={strokeWidth} strokeDasharray={isSensingWire ? "3 3" : undefined} strokeLinecap="round" strokeLinejoin="round" pointerEvents="none" />
+                            {showElectrons && isCurrentFlowing && dots.map((dot, index) => (
+                              <circle
+                                key={index}
+                                cx={dot[0]}
+                                cy={dot[1]}
+                                r={3}
+                                fill={colors.powered}
+                                pointerEvents="none"
+                              />
+                            ))}
+                            {selected && path.length > 2 && path.slice(1, -1).map((corner, index) => {
+                              const cornerIndex = index + 1;
+                              return <circle key={`${wire.id}-${cornerIndex}`} cx={corner[0]} cy={corner[1]} r={6} fill={colors.panel} stroke={colors.selection} strokeWidth={2} onMouseDown={event => {
+                                event.stopPropagation();
+                                dragStartSnapshotRef.current = cloneSnapshot({ components: componentRef.current, wires: wiresRef.current, texts: textsRef.current });
+                                setDragState({ kind: 'wireCorner', id: wire.id, corner: cornerIndex });
+                              }} style={{ cursor: 'move' }} />;
+                            })}
+                          </g>
+                        );
+                      });
+                    })()}
 
                     {/* Phase 2: same-net junction dots for interior crossing points, T-junctions, and cross-junctions */}
                     {junctionDots.map(([jx, jy]) => (
@@ -4318,7 +4329,21 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
                       // reading yet (never simulated) or an unwired meter falls back to the plain "V"/"A"
                       // glyph inside the symbol, unchanged.
                       const meterUnit = component.type === 'voltmeter' ? 'V' : component.type === 'ammeter' ? 'A' : null;
-                      const meterDisplayValue = meterUnit && reading?.status === 'ready' ? formatMeterReading(reading.value, meterUnit) : undefined;
+                      let dmmDisplayValue: string | undefined = undefined;
+                      if (component.type === 'dmm') {
+                        const mode = String(component.props?.mode ?? 'DCV');
+                        if (reading) {
+                          const isOhmMode = mode === 'OHM' || mode === 'CONT' || reading.unit === 'Ω' || reading.unit === 'Ohm';
+                          if (reading.status === 'open' || (isOhmMode && (!Number.isFinite(reading.value) || Math.abs(reading.value) >= 1e7))) {
+                            dmmDisplayValue = 'O.L';
+                          } else if (reading.status === 'ready') {
+                            dmmDisplayValue = formatEngineering(reading.value, reading.unit, 1);
+                          }
+                        }
+                      }
+                      const meterDisplayValue = (meterUnit && reading?.status === 'ready')
+                        ? formatMeterReading(reading.value, meterUnit)
+                        : dmmDisplayValue;
                       const transform = `translate(${component.x},${component.y})`;
                       const symbolTransform = `rotate(${component.rotation}) scale(${component.flipH ? -1 : 1},${component.flipV ? -1 : 1}) scale(${isExactCadComponent(component.type) ? 1 : visualSymbolScale})`;
                       const isTheveninRemovedLoad = isTheveninActive && theveninTargetId === component.id;
@@ -5037,7 +5062,15 @@ function PersistentDmmPanel({ colors, dmms, snapshot }: { colors: Palette; dmms:
             <div key={dmm.id} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               <div style={{ fontSize: 10, fontWeight: 700, color: colors.subtle, textTransform: 'uppercase', letterSpacing: '.05em' }}>{dmm.label}</div>
               <div style={{ padding: 10, background: '#e0f2fe', border: '1px solid #7dd3fc', borderRadius: 7, textAlign: 'right', color: '#0284c7', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>
-                <div style={{ fontSize: 22, fontWeight: 800 }}>{reading?.status === 'open' ? 'OL' : isShorted ? 'SHORTED' : reading ? <EngineeringMath value={reading.value} unit={reading.unit} /> : '—'}</div>
+                <div style={{ fontSize: 22, fontWeight: 800 }}>
+                  {reading?.status === 'open' || ((reading?.unit === 'Ω' || reading?.unit === 'Ohm') && (reading?.value === undefined || !Number.isFinite(reading.value) || Math.abs(reading.value) >= 1e7))
+                    ? 'O.L'
+                    : isShorted
+                      ? 'SHORTED'
+                      : reading
+                        ? <EngineeringMath value={reading.value} unit={reading.unit} />
+                        : '—'}
+                </div>
                 <div style={{ marginTop: 4, fontSize: 10, color: '#0369a1' }}>{reading?.status === 'ready' ? (isShorted ? 'Continuity detected' : 'Probe-linked measurement') : reading?.status === 'open' ? 'Open / not fully connected' : 'Connect HI and COM probes'}</div>
               </div>
             </div>
@@ -5049,7 +5082,11 @@ function PersistentDmmPanel({ colors, dmms, snapshot }: { colors: Palette; dmms:
 }
 
 
-function InstrumentText({ reading, x, y, color }: { reading?: InstrumentReading; x: number; y: number; color: string }) { const label = reading?.status === 'open' ? 'OL' : reading?.status === 'ready' ? formatEngineering(reading.value, reading.unit, 2) : '—'; return <text x={x} y={y} textAnchor="middle" fontFamily="monospace" fontSize={9} fontWeight={400} fill={color} pointerEvents="none">{label}</text>; }
+function InstrumentText({ reading, x, y, color }: { reading?: InstrumentReading; x: number; y: number; color: string }) {
+  const isOhmOpen = reading && (reading.unit === 'Ω' || reading.unit === 'Ohm') && (!Number.isFinite(reading.value) || Math.abs(reading.value) >= 1e7);
+  const label = (reading?.status === 'open' || isOhmOpen) ? 'O.L' : reading?.status === 'ready' ? formatEngineering(reading.value, reading.unit, 2) : '—';
+  return <text x={x} y={y} textAnchor="middle" fontFamily="monospace" fontSize={9} fontWeight={400} fill={color} pointerEvents="none">{label}</text>;
+}
 
 
 function ElectricalLabel({ label, unit }: { label: string; unit?: string }) {
@@ -5079,7 +5116,11 @@ function componentLabelToLatex(label: string): string {
 }
 
 function EngineeringMath({ value, unit }: { value: number; unit?: string }) {
+  if ((unit === 'Ω' || unit === 'Ohm') && (!Number.isFinite(value) || Math.abs(value) >= 1e7)) {
+    return <>O.L</>;
+  }
   const formatted = formatEngineering(value, unit ?? '');
+  if (formatted === 'O.L' || formatted === 'OL') return <>O.L</>;
   const match = formatted.match(/^([-+]?\d+(?:\.\d+)?)(?:\s*)(.*)$/);
   if (!match) return <>{formatted}</>;
   const suffix = match[2].trim();

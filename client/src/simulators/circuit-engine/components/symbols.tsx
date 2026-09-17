@@ -1458,7 +1458,7 @@ const DmmSymbol: SymbolFC = ({ props }) => {
         className="dmm-screen-text"
         fill="#0f172a"
       >
-        {String(props?.mode ?? 'DCV')}
+        {String(props?.displayValue ?? props?.mode ?? 'DCV')}
       </text>
     </g>
   );

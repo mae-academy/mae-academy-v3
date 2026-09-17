@@ -217,7 +217,9 @@ export function copyComponentForPaste(
 }
 
 export function formatEngineering(value: number, unit: string, precision = 3): string {
-  if (!Number.isFinite(value)) return 'OL';
+  if (!Number.isFinite(value)) return 'O.L';
+  const isOhm = unit === 'Ω' || unit === 'Ohm' || unit === 'ohms';
+  if (isOhm && Math.abs(value) >= 1e7) return 'O.L';
   const absolute = Math.abs(value);
   const prefixes: Array<[number, string]> = [
     [1e9, 'G'],
