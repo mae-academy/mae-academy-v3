@@ -349,6 +349,7 @@ export function DigitalLogicSimulatorHome({
   const [wires, setWires] = useState<CircuitWire[]>([]);
   const [texts, setTexts] = useState<WorkspaceText[]>([]);
   const [selection, setSelection] = useState<Selection>(null);
+  const [hoveredComponentId, setHoveredComponentId] = useState<string | null>(null);
   const [marqueeIds, setMarqueeIds] = useState<string[]>([]);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState<Point>([0, 0]);
@@ -1539,26 +1540,12 @@ export function DigitalLogicSimulatorHome({
                             });
                           }}
                           onClick={() => handleComponentClick(component)}
+                          onMouseEnter={() => setHoveredComponentId(component.id)}
+                          onMouseLeave={() => setHoveredComponentId(prev => (prev === component.id ? null : prev))}
                           style={{ cursor: isInput ? 'pointer' : 'move' }}
                         >
-                          {/* Selection highlight */}
-                          {isHighlighted && (
-                            <rect
-                              x={-def.width / 2 - 6}
-                              y={-def.height / 2 - 6}
-                              width={def.width + 12}
-                              height={def.height + 12}
-                              rx={8}
-                              fill={`${colors.selection}15`}
-                              stroke={colors.selection}
-                              strokeWidth={1.5}
-                              strokeDasharray="4 3"
-                              pointerEvents="none"
-                            />
-                          )}
-
-                          {/* Render logic symbol */}
-                          <g style={{ color: colors.text }}>
+                          {/* Render logic symbol — selection overrides stroke/color instead of a bounding box */}
+                          <g style={{ color: isHighlighted ? colors.selection : colors.text }}>
                             {renderSymbol(
                               def.symbol,
                               inputVal === 1 || outputState === 1,
@@ -1573,9 +1560,10 @@ export function DigitalLogicSimulatorHome({
                             )}
                           </g>
 
-                          {/* Terminals */}
+                          {/* Terminals — hidden unless hovered, selected, or an active wire is being drawn */}
                           {terminals.map(term => {
                             const termAxis = Math.abs(term.x) >= Math.abs(term.y) ? 'horizontal' : 'vertical';
+                            const showTerminals = isHighlighted || hoveredComponentId === component.id || Boolean(wiring.from);
                             return (
                               <g key={term.id} transform={`translate(${term.x}, ${term.y})`}>
                                 <circle
@@ -1584,13 +1572,14 @@ export function DigitalLogicSimulatorHome({
                                   onMouseDown={event => handleTerminalMouseDown(event, component, term.id, termAxis)}
                                   style={{ cursor: 'crosshair' }}
                                 />
-                                <circle
-                                  r={TERMINAL_RADIUS}
-                                  fill={colors.panel}
-                                  stroke={colors.line}
-                                  strokeWidth={1.5}
-                                  pointerEvents="none"
-                                />
+                                <g style={{ opacity: showTerminals ? 1 : 0, transition: 'opacity 0.2s ease-in-out' }} pointerEvents="none">
+                                  <circle
+                                    r={TERMINAL_RADIUS}
+                                    fill={colors.panel}
+                                    stroke={colors.line}
+                                    strokeWidth={1.5}
+                                  />
+                                </g>
                               </g>
                             );
                           })}

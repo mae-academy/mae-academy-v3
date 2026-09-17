@@ -5,7 +5,8 @@
  * an A* search with a turn-direction penalty to produce clean L- or U-shaped
  * orthogonal paths that avoid component bodies.
  *
- * Parity with Analog wireRouter with dynamic digital logic terminal support.
+ * Parity with Analog wireRouter (collinear simplification, strict 90-degree
+ * routing, axis-aware turn penalties) with dynamic digital logic terminal support.
  */
 
 import type { CircuitComponent } from '@/simulators/digital-logic/models/circuitTypes';
@@ -47,11 +48,12 @@ export function buildComponentBBoxes(
     const def = getDef(comp.type);
     if (!def) continue;
 
-    // Visual half-extents
+    // Visual half-extents (unscaled — canvas uses world coords directly)
     const hw = def.width / 2;
     const hh = def.height / 2;
 
-    // Expand by one grid cell so wires route around the component body
+    // Expand by exactly one grid cell on every side so wires travel
+    // outside the visual body rather than clipping through it.
     const pad = gridSize;
     const xMin = comp.x - hw - pad;
     const xMax = comp.x + hw + pad;
@@ -83,6 +85,11 @@ export interface RoutingGrid {
   gridSize: number;
 }
 
+/**
+ * Build the routing cost grid bounded to the region the wire needs to
+ * navigate.  The grid extends from startPt / endPt outward by `margin`
+ * grid cells so the router has room to detour around components.
+ */
 export function buildRoutingGrid(
   startPt: Point,
   endPt: Point,
@@ -97,18 +104,23 @@ export function buildRoutingGrid(
   const rawYMin = Math.min(startPt[1], endPt[1]) - margin_world;
   const rawYMax = Math.max(startPt[1], endPt[1]) + margin_world;
 
+  // Snap origin to grid so terminal positions map exactly onto cells.
   const originX = Math.floor(rawXMin / gridSize) * gridSize;
   const originY = Math.floor(rawYMin / gridSize) * gridSize;
 
   const cols = Math.ceil((rawXMax - originX) / gridSize) + 1;
   const rows = Math.ceil((rawYMax - originY) / gridSize) + 1;
 
+  // Initialise every cell as free (cost 1).
   const costs: number[][] = Array.from({ length: rows }, () => new Array(cols).fill(1));
 
+  // Helper: world → grid index (clamped).
   const toCol = (wx: number) => Math.round((wx - originX) / gridSize);
   const toRow = (wy: number) => Math.round((wy - originY) / gridSize);
 
+  // Mark obstacle cells.
   for (const bbox of bboxes) {
+    // Build set of whitelisted (terminal-pin) cells.
     const pinCells = new Set<string>();
     for (const pin of bbox.terminalPins) {
       pinCells.add(`${toCol(pin[0])},${toRow(pin[1])}`);
@@ -143,24 +155,32 @@ const DY: number[] = [0, 1, 0, -1];
 interface AStarNode {
   col: number;
   row: number;
-  dir: Dir | -1;
-  g: number;
-  f: number;
+  dir: Dir | -1;   // -1 = start (no direction yet)
+  g: number;       // cost from start
+  h: number;       // heuristic to end
+  f: number;       // g + h
   parent: AStarNode | null;
 }
 
-const TURN_PENALTY = 2;
+const TURN_PENALTY = 25;   // heavily penalize direction changes to enforce minimal-bend straight runs
 
+/** Manhattan distance heuristic (admissible — never overestimates). */
 function heuristic(ac: number, ar: number, bc: number, br: number): number {
   return Math.abs(ac - bc) + Math.abs(ar - br);
 }
 
+/**
+ * Run orthogonal A* on a RoutingGrid.
+ * Returns the path as an array of world-space Points, or `null` if blocked.
+ */
 function aStarSearch(
   grid: RoutingGrid,
   startCol: number,
   startRow: number,
   endCol: number,
   endRow: number,
+  fromAxis?: 'horizontal' | 'vertical',
+  toAxis?: 'horizontal' | 'vertical',
 ): Point[] | null {
   const { costs, rows, cols, gridSize, originX, originY } = grid;
 
@@ -169,22 +189,24 @@ function aStarSearch(
 
   const open: AStarNode[] = [];
 
+  const startH = heuristic(startCol, startRow, endCol, endRow);
   const startNode: AStarNode = {
-    col: startCol,
-    row: startRow,
-    dir: -1,
+    col: startCol, row: startRow, dir: -1,
     g: 0,
-    f: heuristic(startCol, startRow, endCol, endRow),
+    h: startH,
+    f: startH,
     parent: null,
   };
   open.push(startNode);
   gBest.set(key(startCol, startRow, -1), 0);
 
   while (open.length > 0) {
-    open.sort((a, b) => a.f - b.f);
+    // Pop node with lowest f, tie-breaking on smaller h to prefer straight lines toward the goal.
+    open.sort((a, b) => (a.f !== b.f ? a.f - b.f : a.h - b.h));
     const current = open.shift()!;
 
     if (current.col === endCol && current.row === endRow) {
+      // Reconstruct path.
       const pts: Point[] = [];
       let n: AStarNode | null = current;
       while (n) {
@@ -202,26 +224,42 @@ function aStarSearch(
       if (nc < 0 || nc >= cols || nr < 0 || nr >= rows) continue;
       if (costs[nr][nc] === Infinity) continue;
 
-      const isTurn = current.dir !== -1 && current.dir !== d;
-      const moveCost = costs[nr][nc] + (isTurn ? TURN_PENALTY : 0);
+      let extraCost = 0;
+      if (current.dir !== -1) {
+        if (current.dir !== d) {
+          extraCost += TURN_PENALTY;
+        }
+      } else if (fromAxis) {
+        // Leaving initial terminal against its preferred axis incurs turn penalty
+        if (fromAxis === 'horizontal' && (d === 1 || d === 3)) extraCost += TURN_PENALTY;
+        if (fromAxis === 'vertical' && (d === 0 || d === 2)) extraCost += TURN_PENALTY;
+      }
+
+      // Entering target terminal against its preferred axis incurs turn penalty
+      if (nc === endCol && nr === endRow && toAxis) {
+        if (toAxis === 'horizontal' && (d === 1 || d === 3)) extraCost += TURN_PENALTY;
+        if (toAxis === 'vertical' && (d === 0 || d === 2)) extraCost += TURN_PENALTY;
+      }
+
+      const moveCost = costs[nr][nc] + extraCost;
       const ng = current.g + moveCost;
       const nk = key(nc, nr, d);
 
       if ((gBest.get(nk) ?? Infinity) <= ng) continue;
 
+      const nh = heuristic(nc, nr, endCol, endRow);
       gBest.set(nk, ng);
       open.push({
-        col: nc,
-        row: nr,
-        dir: d as Dir,
+        col: nc, row: nr, dir: d as Dir,
         g: ng,
-        f: ng + heuristic(nc, nr, endCol, endRow),
+        h: nh,
+        f: ng + nh,
         parent: current,
       });
     }
   }
 
-  return null;
+  return null; // no path
 }
 
 // ---------------------------------------------------------------------------
@@ -231,6 +269,9 @@ function aStarSearch(
 /**
  * Calculate an obstacle-avoiding strictly orthogonal path between two world-
  * space points for digital logic wiring.
+ *
+ * @param fromAxis Optional terminal exit axis preference ('horizontal' | 'vertical').
+ * @param toAxis   Optional terminal entry axis preference ('horizontal' | 'vertical').
  */
 export function calculateOrthogonalPath(
   startPt: Point,
@@ -238,29 +279,55 @@ export function calculateOrthogonalPath(
   components: CircuitComponent[],
   gridSize: number,
   excludeIds: Set<string> = new Set(),
+  fromAxis?: 'horizontal' | 'vertical',
+  toAxis?: 'horizontal' | 'vertical',
 ): Point[] {
-  if (startPt[0] === endPt[0] || startPt[1] === endPt[1]) {
-    return [startPt, endPt];
-  }
-
   const bboxes = buildComponentBBoxes(components, gridSize, excludeIds);
 
+  // Trivially aligned — check if there are any obstacles blocking the straight segment
+  if (Math.abs(startPt[0] - endPt[0]) < 1e-4 || Math.abs(startPt[1] - endPt[1]) < 1e-4) {
+    const isBlocked = bboxes.some(b => {
+      if (Math.abs(startPt[0] - endPt[0]) < 1e-4) {
+        // Vertical line at x = startPt[0]
+        const minY = Math.min(startPt[1], endPt[1]);
+        const maxY = Math.max(startPt[1], endPt[1]);
+        return startPt[0] >= b.xMin && startPt[0] <= b.xMax && maxY >= b.yMin && minY <= b.yMax;
+      } else {
+        // Horizontal line at y = startPt[1]
+        const minX = Math.min(startPt[0], endPt[0]);
+        const maxX = Math.max(startPt[0], endPt[0]);
+        return startPt[1] >= b.yMin && startPt[1] <= b.yMax && maxX >= b.xMin && minX <= b.xMax;
+      }
+    });
+    if (!isBlocked) {
+      return [startPt, endPt];
+    }
+  }
+
+  // Quick check: if there are no obstacles at all, use a clean single-elbow L-shape
   if (bboxes.length === 0) {
-    return [startPt, [endPt[0], startPt[1]], endPt];
+    const preferH = fromAxis === 'horizontal' ? true : fromAxis === 'vertical' ? false : (Math.abs(endPt[0] - startPt[0]) >= Math.abs(endPt[1] - startPt[1]));
+    const corner: Point = preferH ? [endPt[0], startPt[1]] : [startPt[0], endPt[1]];
+    return simplifyOrthogonalPath([startPt, corner, endPt]);
   }
 
   const grid = buildRoutingGrid(startPt, endPt, bboxes, gridSize);
 
   const startCol = Math.round((startPt[0] - grid.originX) / gridSize);
   const startRow = Math.round((startPt[1] - grid.originY) / gridSize);
-  const endCol = Math.round((endPt[0] - grid.originX) / gridSize);
-  const endRow = Math.round((endPt[1] - grid.originY) / gridSize);
+  const endCol   = Math.round((endPt[0]   - grid.originX) / gridSize);
+  const endRow   = Math.round((endPt[1]   - grid.originY) / gridSize);
 
-  const raw = aStarSearch(grid, startCol, startRow, endCol, endRow);
+  const raw = aStarSearch(grid, startCol, startRow, endCol, endRow, fromAxis, toAxis);
 
   if (raw && raw.length >= 2) {
+    raw[0] = startPt;
+    raw[raw.length - 1] = endPt;
     return simplifyOrthogonalPath(raw);
   }
 
-  return simplifyOrthogonalPath([startPt, [endPt[0], startPt[1]], endPt]);
+  // Fallback: simple single-elbow L-shape respecting axis preferences
+  const preferH = fromAxis === 'horizontal' ? true : fromAxis === 'vertical' ? false : (Math.abs(endPt[0] - startPt[0]) >= Math.abs(endPt[1] - startPt[1]));
+  const corner: Point = preferH ? [endPt[0], startPt[1]] : [startPt[0], endPt[1]];
+  return simplifyOrthogonalPath([startPt, corner, endPt]);
 }
