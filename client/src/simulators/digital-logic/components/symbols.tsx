@@ -48,7 +48,7 @@ function RectangularResistor({ strokeWidth = 2, halfLength = DOCUMENTED_GRID_LOC
   const bodyEnd = bodyWidth / 2;
   return <g data-rectangular-resistor="potentiometer-style">
     <line x1={-halfLength} y1={0} x2={bodyStart} y2={0} stroke="currentColor" strokeWidth={strokeWidth} />
-    <rect x={bodyStart} y={-bodyHeight / 2} width={bodyWidth} height={bodyHeight} rx={2} fill="white" stroke="currentColor" strokeWidth={strokeWidth} />
+    <rect x={bodyStart} y={-bodyHeight / 2} width={bodyWidth} height={bodyHeight} rx={2} fill="none" stroke="currentColor" strokeWidth={strokeWidth} />
     <line x1={bodyEnd} y1={0} x2={halfLength} y2={0} stroke="currentColor" strokeWidth={strokeWidth} />
   </g>;
 }
@@ -57,7 +57,7 @@ function RectangularResistor({ strokeWidth = 2, halfLength = DOCUMENTED_GRID_LOC
 
 const DcVoltage: SymbolFC = () => (
   <g>
-    <circle cx={0} cy={0} r={22} fill="white" stroke="currentColor" strokeWidth={2} />
+    <circle cx={0} cy={0} r={22} fill="none" stroke="currentColor" strokeWidth={2} />
     {/* + symbol at top, - at bottom */}
     <line x1={-6} y1={-8} x2={6} y2={-8} stroke="currentColor" strokeWidth={2} />
     <line x1={0} y1={-14} x2={0} y2={-2} stroke="currentColor" strokeWidth={2} />
@@ -82,7 +82,7 @@ const AcVoltage: SymbolFC = ({ props }) => {
   const waveSymbol = waveSymbols[wf] || null;
   return (
     <g>
-      <circle cx={0} cy={0} r={22} fill="white" stroke="currentColor" strokeWidth={2} />
+      <circle cx={0} cy={0} r={22} fill="none" stroke="currentColor" strokeWidth={2} />
       {waveSymbol}
       <line x1={0} y1={-22} x2={0} y2={-30} stroke="currentColor" strokeWidth={2} />
       <line x1={0} y1={22} x2={0} y2={30} stroke="currentColor" strokeWidth={2} />
@@ -92,7 +92,7 @@ const AcVoltage: SymbolFC = ({ props }) => {
 
 const DcCurrent: SymbolFC = () => (
   <g>
-    <circle cx={0} cy={0} r={22} fill="white" stroke="currentColor" strokeWidth={2} />
+    <circle cx={0} cy={0} r={22} fill="none" stroke="currentColor" strokeWidth={2} />
     {/* Arrow pointing up */}
     <line x1={0} y1={12} x2={0} y2={-12} stroke="currentColor" strokeWidth={2} />
     <polyline points="-6,-6 0,-14 6,-6" fill="none" stroke="currentColor" strokeWidth={2} strokeLinejoin="round" />
@@ -103,14 +103,14 @@ const DcCurrent: SymbolFC = () => (
 
 const AcCurrent: SymbolFC = ({ props }) => {
   if (props?._documentedStyle !== true) return <g>
-    <circle cx={0} cy={0} r={22} fill="white" stroke="currentColor" strokeWidth={2} />
+    <circle cx={0} cy={0} r={22} fill="none" stroke="currentColor" strokeWidth={2} />
     <path d="M -10,-4 Q -5,-14 0,-4 Q 5,6 10,-4" fill="none" stroke="currentColor" strokeWidth={1.5} />
     <polyline points="-4,-10 0,-16 4,-10" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinejoin="round" />
     <line x1={0} y1={-22} x2={0} y2={-30} stroke="currentColor" strokeWidth={2} />
     <line x1={0} y1={22} x2={0} y2={30} stroke="currentColor" strokeWidth={2} />
   </g>;
   return <g>
-    <circle cx={0} cy={0} r={22} fill="white" stroke="currentColor" strokeWidth={2} />
+    <circle cx={0} cy={0} r={22} fill="none" stroke="currentColor" strokeWidth={2} />
     <line x1={0} y1={-2} x2={0} y2={-13} stroke="currentColor" strokeWidth={2} />
     <polyline points="-5,-7 0,-14 5,-7" fill="none" stroke="currentColor" strokeWidth={2} strokeLinejoin="round" />
     <path d="M -11,0 C -7,-7 -3,-7 0,0 C 3,7 7,7 11,0" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" />
@@ -143,7 +143,7 @@ const ThreePhaseSource: SymbolFC = ({ props }) => {
     </g>;
   }
   return <g>
-    <circle cx={0} cy={0} r={22} fill="white" stroke="currentColor" strokeWidth={2.2} />
+    <circle cx={0} cy={0} r={22} fill="none" stroke="currentColor" strokeWidth={2.2} />
     <text x={0} y={4} textAnchor="middle" fontSize={8.5} fontWeight={750} fill="currentColor">PHASE</text>
     {[-15, 0, 15].map((y) => <line key={y} data-phase-lead={y === 0 ? 'axis' : 'circle'} x1={y === 0 ? 22 : Math.sqrt(22 ** 2 - 15 ** 2)} y1={y} x2={40} y2={y} stroke="currentColor" strokeWidth={2} strokeLinecap="square" />)}
     <line x1={-22} y1={0} x2={-40} y2={0} stroke="currentColor" strokeWidth={2} strokeLinecap="square" />
@@ -171,7 +171,7 @@ const Ground: SymbolFC = () => (
 const Resistor: SymbolFC = ({ props }) => {
   if (props?._documentedStyle !== true) return <g>
     <line x1={-30} y1={0} x2={-15} y2={0} stroke="currentColor" strokeWidth={2} />
-    <rect x={-15} y={-8} width={30} height={16} fill="white" stroke="currentColor" strokeWidth={2} rx={2} />
+    <rect x={-15} y={-8} width={30} height={16} fill="none" stroke="currentColor" strokeWidth={2} rx={2} />
     <line x1={15} y1={0} x2={30} y2={0} stroke="currentColor" strokeWidth={2} />
   </g>;
   return <g>
@@ -208,7 +208,7 @@ const Potentiometer: SymbolFC = ({ props }) => {
   if (!documented) return <g>
     <line x1={-35} y1={-20} x2={-18} y2={-20} stroke="currentColor" strokeWidth={2} />
     <line x1={-35} y1={20} x2={-18} y2={20} stroke="currentColor" strokeWidth={2} />
-    <rect x={-18} y={-24} width={36} height={48} rx={3} fill="white" stroke="currentColor" strokeWidth={2} />
+    <rect x={-18} y={-24} width={36} height={48} rx={3} fill="none" stroke="currentColor" strokeWidth={2} />
     <line x1={-10} y1={-18} x2={10} y2={18} stroke="currentColor" strokeWidth={1.5} opacity={0.35} />
     <line x1={35} y1={0} x2={18} y2={y} stroke="currentColor" strokeWidth={2} />
     <polygon points={`${18},${y} ${25},${y - 4} ${25},${y + 4}`} fill="currentColor" />
@@ -217,7 +217,7 @@ const Potentiometer: SymbolFC = ({ props }) => {
   return (
     <g data-rigid-body="potentiometer">
       <line x1={-30} y1={0} x2={-20} y2={0} stroke="currentColor" strokeWidth={2} />
-      <rect x={-20} y={-7} width={40} height={14} rx={2} fill="white" stroke="currentColor" strokeWidth={2} />
+      <rect x={-20} y={-7} width={40} height={14} rx={2} fill="none" stroke="currentColor" strokeWidth={2} />
       <line x1={20} y1={0} x2={30} y2={0} stroke="currentColor" strokeWidth={2} />
       <line x1={0} y1={-30} x2={0} y2={-11} stroke="currentColor" strokeWidth={2} strokeLinecap="round" />
       <polygon points="0,-7 -4,-12 4,-12" fill="currentColor" />
@@ -229,8 +229,8 @@ const DependentDiamond: SymbolFC = ({ props }) => {
   const currentControlled = String(props?._type) === 'vccs' || String(props?._type) === 'cccs';
   return <g>
     <line x1={0} y1={-35} x2={0} y2={-25} stroke="currentColor" strokeWidth={2} /><line x1={0} y1={25} x2={0} y2={35} stroke="currentColor" strokeWidth={2} />
-    <polygon points="0,-25 20,0 0,25 -20,0" fill="white" stroke="currentColor" strokeWidth={2} />
-    {currentControlled ? <><line x1={0} y1={12} x2={0} y2={-12} stroke="currentColor" strokeWidth={2} /><polyline points="-5,-6 0,-13 5,-6" fill="none" stroke="currentColor" strokeWidth={2} /></> : <><text x={0} y={-7} textAnchor="middle" fontSize={14} fontWeight={700}>+</text><text x={0} y={13} textAnchor="middle" fontSize={16} fontWeight={700}>−</text></>}
+    <polygon points="0,-25 20,0 0,25 -20,0" fill="none" stroke="currentColor" strokeWidth={2} />
+    {currentControlled ? <><line x1={0} y1={12} x2={0} y2={-12} stroke="currentColor" strokeWidth={2} /><polyline points="-5,-6 0,-13 5,-6" fill="none" stroke="currentColor" strokeWidth={2} /></> : <><text x={0} y={-7} textAnchor="middle" fontSize={14} fontWeight={700} fill="currentColor">+</text><text x={0} y={13} textAnchor="middle" fontSize={16} fontWeight={700} fill="currentColor">−</text></>}
     <line x1={-35} y1={-20} x2={-20} y2={-20} stroke="currentColor" strokeWidth={2} /><line x1={-35} y1={20} x2={-20} y2={20} stroke="currentColor" strokeWidth={2} />
   </g>;
 };
@@ -583,7 +583,7 @@ const PbNc: SymbolFC = ({ props }) => {
 const RelaySpst: SymbolFC = ({ powered, props }) => (
   <g>
     {/* Coil */}
-    {props?._documentedStyle === true ? <SemicircularHorizontalCoil x1={-20} x2={20} y={-25} /> : <><rect x={-20} y={-35} width={40} height={20} fill="white" stroke="currentColor" strokeWidth={2} rx={2} /><path d="M -14,-35 Q -10,-45 -6,-35 Q -2,-45 2,-35 Q 6,-45 10,-35 Q 14,-45 18,-35" fill="none" stroke="currentColor" strokeWidth={1.5} /></>}
+    {props?._documentedStyle === true ? <SemicircularHorizontalCoil x1={-20} x2={20} y={-25} /> : <><rect x={-20} y={-35} width={40} height={20} fill="none" stroke="currentColor" strokeWidth={2} rx={2} /><path d="M -14,-35 Q -10,-45 -6,-35 Q -2,-45 2,-35 Q 6,-45 10,-35 Q 14,-45 18,-35" fill="none" stroke="currentColor" strokeWidth={1.5} /></>}
     <line x1={-30} y1={-25} x2={-20} y2={-25} stroke="currentColor" strokeWidth={2} />
     <line x1={20} y1={-25} x2={30} y2={-25} stroke="currentColor" strokeWidth={2} />
     {/* Contact */}
@@ -601,7 +601,7 @@ const RelaySpst: SymbolFC = ({ powered, props }) => (
 const Fuse: SymbolFC = () => (
   <g>
     <line x1={-25} y1={0} x2={-12} y2={0} stroke="currentColor" strokeWidth={2} />
-    <rect x={-12} y={-8} width={24} height={16} fill="white" stroke="currentColor" strokeWidth={2} rx={3} />
+    <rect x={-12} y={-8} width={24} height={16} fill="none" stroke="currentColor" strokeWidth={2} rx={3} />
     <line x1={-8} y1={0} x2={8} y2={0} stroke="currentColor" strokeWidth={1.5} strokeDasharray="3,2" />
     <line x1={12} y1={0} x2={25} y2={0} stroke="currentColor" strokeWidth={2} />
   </g>
@@ -628,7 +628,7 @@ const CircuitBreaker: SymbolFC = ({ props }) => {
 const Contactor: SymbolFC = ({ powered, props }) => (
   <g>
     {/* Coil */}
-    {props?._documentedStyle === true ? <SemicircularHorizontalCoil x1={-25} x2={25} y={-50} /> : <><rect x={-25} y={-60} width={50} height={20} fill="white" stroke="currentColor" strokeWidth={2} rx={2} /><path d="M -18,-60 Q -14,-70 -10,-60 Q -6,-70 -2,-60 Q 2,-70 6,-60 Q 10,-70 14,-60 Q 18,-70 22,-60" fill="none" stroke="currentColor" strokeWidth={1.5} /></>}
+    {props?._documentedStyle === true ? <SemicircularHorizontalCoil x1={-25} x2={25} y={-50} /> : <><rect x={-25} y={-60} width={50} height={20} fill="none" stroke="currentColor" strokeWidth={2} rx={2} /><path d="M -18,-60 Q -14,-70 -10,-60 Q -6,-70 -2,-60 Q 2,-70 6,-60 Q 10,-70 14,-60 Q 18,-70 22,-60" fill="none" stroke="currentColor" strokeWidth={1.5} /></>}
     <line x1={-40} y1={-50} x2={-25} y2={-50} stroke="currentColor" strokeWidth={2} />
     <line x1={25} y1={-50} x2={40} y2={-50} stroke="currentColor" strokeWidth={2} />
     {/* Main contacts L1-T1, L2-T2, L3-T3 */}
@@ -737,7 +737,7 @@ const Scr: SymbolFC = () => (
   <g>
     {/* Anode-cathode vertical */}
     <line x1={0} y1={-30} x2={0} y2={-10} stroke="currentColor" strokeWidth={2} />
-    <polygon points="-10,-10 10,-10 0,10" fill="white" stroke="currentColor" strokeWidth={2} />
+    <polygon points="-10,-10 10,-10 0,10" fill="none" stroke="currentColor" strokeWidth={2} />
     <line x1={-12} y1={10} x2={12} y2={10} stroke="currentColor" strokeWidth={2} />
     <line x1={0} y1={10} x2={0} y2={30} stroke="currentColor" strokeWidth={2} />
     {/* Gate */}
@@ -751,8 +751,8 @@ const Diac: SymbolFC = () => (
   <g>
     <line x1={-20} y1={0} x2={-8} y2={0} stroke="currentColor" strokeWidth={2} />
     {/* Two back-to-back triangles */}
-    <polygon points="-8,-10 -8,10 8,0" fill="white" stroke="currentColor" strokeWidth={2} />
-    <polygon points="8,-10 8,10 -8,0" fill="white" stroke="currentColor" strokeWidth={2} />
+    <polygon points="-8,-10 -8,10 8,0" fill="none" stroke="currentColor" strokeWidth={2} />
+    <polygon points="8,-10 8,10 -8,0" fill="none" stroke="currentColor" strokeWidth={2} />
     <line x1={-8} y1={-12} x2={-8} y2={12} stroke="currentColor" strokeWidth={2} />
     <line x1={8} y1={-12} x2={8} y2={12} stroke="currentColor" strokeWidth={2} />
     <line x1={8} y1={0} x2={20} y2={0} stroke="currentColor" strokeWidth={2} />
@@ -762,8 +762,8 @@ const Diac: SymbolFC = () => (
 const Triac: SymbolFC = () => (
   <g>
     <line x1={0} y1={-30} x2={0} y2={-10} stroke="currentColor" strokeWidth={2} />
-    <polygon points="-10,-10 10,-10 0,10" fill="white" stroke="currentColor" strokeWidth={2} />
-    <polygon points="-10,10 10,10 0,-10" fill="white" stroke="currentColor" strokeWidth={2} />
+    <polygon points="-10,-10 10,-10 0,10" fill="none" stroke="currentColor" strokeWidth={2} />
+    <polygon points="-10,10 10,10 0,-10" fill="none" stroke="currentColor" strokeWidth={2} />
     <line x1={-12} y1={-10} x2={12} y2={-10} stroke="currentColor" strokeWidth={2} />
     <line x1={-12} y1={10} x2={12} y2={10} stroke="currentColor" strokeWidth={2} />
     <line x1={0} y1={10} x2={0} y2={30} stroke="currentColor" strokeWidth={2} />
@@ -777,7 +777,7 @@ const MotorDc: SymbolFC = ({ powered, animTime = 0 }) => {
   const angle = powered ? animTime * 360 : 0;
   return (
     <g>
-      <circle cx={0} cy={0} r={25} fill="white" stroke="currentColor" strokeWidth={2} />
+      <circle cx={0} cy={0} r={25} fill="none" stroke="currentColor" strokeWidth={2} />
       <text x={0} y={5} textAnchor="middle" fontSize={14} fontWeight="bold" fill="currentColor">M</text>
       {/* Rotating indicator */}
       {powered && (
@@ -798,7 +798,7 @@ const Motor3Phase: SymbolFC = ({ powered, animTime = 0 }) => {
   const angle = powered ? animTime * 360 : 0;
   return (
     <g>
-      <circle cx={0} cy={0} r={28} fill="white" stroke="currentColor" strokeWidth={2} />
+      <circle cx={0} cy={0} r={28} fill="none" stroke="currentColor" strokeWidth={2} />
       <text x={0} y={5} textAnchor="middle" fontSize={12} fontWeight="bold" fill="currentColor">3~M</text>
       {powered && (
         <line
@@ -831,7 +831,7 @@ const Lamp: SymbolFC = ({ powered }) => (
 
 const Opamp: SymbolFC = ({ props }) => {
   if (props?._documentedStyle !== true) return <g>
-    <polygon points="-30,-30 -30,30 30,0" fill="white" stroke="currentColor" strokeWidth={2} />
+    <polygon points="-30,-30 -30,30 30,0" fill="none" stroke="currentColor" strokeWidth={2} />
     <line x1={-30} y1={-15} x2={-20} y2={-15} stroke="currentColor" strokeWidth={2} />
     <text x={-16} y={-11} fontSize={10} fill="currentColor">+</text>
     <line x1={-30} y1={15} x2={-20} y2={15} stroke="currentColor" strokeWidth={2} />
@@ -841,7 +841,7 @@ const Opamp: SymbolFC = ({ props }) => {
     <line x1={0} y1={30} x2={0} y2={18} stroke="currentColor" strokeWidth={1.5} strokeDasharray="3,2" />
   </g>;
   return <g data-documented-opamp="ieee-boundary-aligned">
-    <polygon points="-22,-22 -22,22 26,0" fill="white" stroke="currentColor" strokeWidth={2} strokeLinejoin="round" />
+    <polygon points="-22,-22 -22,22 26,0" fill="none" stroke="currentColor" strokeWidth={2} strokeLinejoin="round" />
     <line x1={-DOCUMENTED_GRID_LOCAL} y1={-100 / 6} x2={-22} y2={-100 / 6} stroke="currentColor" strokeWidth={2} />
     <text x={-17} y={-100 / 6 + 4} fontSize={10} fill="currentColor">−</text>
     <line x1={-DOCUMENTED_GRID_LOCAL} y1={100 / 6} x2={-22} y2={100 / 6} stroke="currentColor" strokeWidth={2} />
@@ -856,7 +856,7 @@ const Opamp: SymbolFC = ({ props }) => {
 
 const Voltmeter: SymbolFC = () => (
   <g>
-    <circle cx={0} cy={0} r={22} fill="white" stroke="currentColor" strokeWidth={2} />
+    <circle cx={0} cy={0} r={22} fill="none" stroke="currentColor" strokeWidth={2} />
     <text x={0} y={5} textAnchor="middle" fontSize={14} fontWeight="bold" fill="currentColor">V</text>
     <line x1={-25} y1={0} x2={-22} y2={0} stroke="currentColor" strokeWidth={2} />
     <line x1={22} y1={0} x2={25} y2={0} stroke="currentColor" strokeWidth={2} />
@@ -865,7 +865,7 @@ const Voltmeter: SymbolFC = () => (
 
 const Ammeter: SymbolFC = () => (
   <g>
-    <circle cx={0} cy={0} r={22} fill="white" stroke="currentColor" strokeWidth={2} />
+    <circle cx={0} cy={0} r={22} fill="none" stroke="currentColor" strokeWidth={2} />
     <text x={0} y={5} textAnchor="middle" fontSize={14} fontWeight="bold" fill="currentColor">A</text>
     <line x1={-25} y1={0} x2={-22} y2={0} stroke="currentColor" strokeWidth={2} />
     <line x1={22} y1={0} x2={25} y2={0} stroke="currentColor" strokeWidth={2} />
@@ -877,7 +877,7 @@ const Ammeter: SymbolFC = () => (
 const RelaySpdt: SymbolFC = ({ powered, props }) => (
   <g>
     {/* Coil */}
-    {props?._documentedStyle === true ? <SemicircularHorizontalCoil x1={-20} x2={20} y={-25} /> : <><rect x={-20} y={-35} width={40} height={20} fill="white" stroke="currentColor" strokeWidth={2} rx={2} /><path d="M -14,-35 Q -10,-45 -6,-35 Q -2,-45 2,-35 Q 6,-45 10,-35 Q 14,-45 18,-35" fill="none" stroke="currentColor" strokeWidth={1.5} /></>}
+    {props?._documentedStyle === true ? <SemicircularHorizontalCoil x1={-20} x2={20} y={-25} /> : <><rect x={-20} y={-35} width={40} height={20} fill="none" stroke="currentColor" strokeWidth={2} rx={2} /><path d="M -14,-35 Q -10,-45 -6,-35 Q -2,-45 2,-35 Q 6,-45 10,-35 Q 14,-45 18,-35" fill="none" stroke="currentColor" strokeWidth={1.5} /></>}
     <line x1={-30} y1={-25} x2={-20} y2={-25} stroke="currentColor" strokeWidth={2} />
     <line x1={20} y1={-25} x2={30} y2={-25} stroke="currentColor" strokeWidth={2} />
     {/* Common contact */}
@@ -899,7 +899,7 @@ const RelaySpdt: SymbolFC = ({ powered, props }) => (
 const RelayDpst: SymbolFC = ({ powered, props }) => (
   <g>
     {/* Coil */}
-    {props?._documentedStyle === true ? <SemicircularHorizontalCoil x1={-20} x2={20} y={-40} /> : <><rect x={-20} y={-50} width={40} height={20} fill="white" stroke="currentColor" strokeWidth={2} rx={2} /><path d="M -14,-50 Q -10,-60 -6,-50 Q -2,-60 2,-50 Q 6,-60 10,-50 Q 14,-60 18,-50" fill="none" stroke="currentColor" strokeWidth={1.5} /></>}
+    {props?._documentedStyle === true ? <SemicircularHorizontalCoil x1={-20} x2={20} y={-40} /> : <><rect x={-20} y={-50} width={40} height={20} fill="none" stroke="currentColor" strokeWidth={2} rx={2} /><path d="M -14,-50 Q -10,-60 -6,-50 Q -2,-60 2,-50 Q 6,-60 10,-50 Q 14,-60 18,-50" fill="none" stroke="currentColor" strokeWidth={1.5} /></>}
     <line x1={-30} y1={-40} x2={-20} y2={-40} stroke="currentColor" strokeWidth={2} />
     <line x1={20} y1={-40} x2={30} y2={-40} stroke="currentColor" strokeWidth={2} />
     {/* Contact 1 */}
@@ -961,21 +961,21 @@ const LogicGate: SymbolFC = ({ props }) => {
   const halfHeight = scalable ? geometry.bodyHeight / 2 : 23;
   return <g>
     {unary ? <line x1={-35} y1={0} x2={-22} y2={0} stroke="currentColor" strokeWidth={2} /> : inputY.map(y => <line key={y} x1={scalable ? geometry.inputX : -35} y1={y} x2={orFamily ? -18 : -22} y2={y} stroke="currentColor" strokeWidth={2} />)}
-    {unary ? <path d="M -22,-23 L 22,0 L -22,23 Z" fill="white" stroke="currentColor" strokeWidth={2} /> : orFamily ? <path d={`M -26,${-halfHeight} C -9,${-halfHeight} 12,${-halfHeight * .82} 25,0 C 12,${halfHeight * .82} -9,${halfHeight} -26,${halfHeight} C -16,${halfHeight * .52} -16,${-halfHeight * .52} -26,${-halfHeight} Z`} fill="white" stroke="currentColor" strokeWidth={2} /> : <path d={`M -22,${-halfHeight} H 2 A 23,${halfHeight} 0 0 1 2,${halfHeight} H -22 Z`} fill="white" stroke="currentColor" strokeWidth={2} />}
+    {unary ? <path d="M -22,-23 L 22,0 L -22,23 Z" fill="none" stroke="currentColor" strokeWidth={2} /> : orFamily ? <path d={`M -26,${-halfHeight} C -9,${-halfHeight} 12,${-halfHeight * .82} 25,0 C 12,${halfHeight * .82} -9,${halfHeight} -26,${halfHeight} C -16,${halfHeight * .52} -16,${-halfHeight * .52} -26,${-halfHeight} Z`} fill="none" stroke="currentColor" strokeWidth={2} /> : <path d={`M -22,${-halfHeight} H 2 A 23,${halfHeight} 0 0 1 2,${halfHeight} H -22 Z`} fill="none" stroke="currentColor" strokeWidth={2} />}
     {(kind === 'XOR' || kind === 'XNOR') && <path d={`M -32,${-halfHeight} C -22,${-halfHeight * .52} -22,${halfHeight * .52} -32,${halfHeight}`} fill="none" stroke="currentColor" strokeWidth={2} />}
-    {inverted && <circle cx={30} cy={0} r={4} fill="white" stroke="currentColor" strokeWidth={2} />}
+    {inverted && <circle cx={30} cy={0} r={4} fill="none" stroke="currentColor" strokeWidth={2} />}
     <line x1={inverted ? 34 : 25} y1={0} x2={45} y2={0} stroke="currentColor" strokeWidth={2} strokeLinecap="round" />
   </g>;
 };
 
 const DigitalInputSymbol: SymbolFC = ({ props }) => <g>
-  <rect x={-25} y={-12} width={42} height={24} rx={4} fill="white" stroke="currentColor" strokeWidth={2} />
+  <rect x={-25} y={-12} width={42} height={24} rx={4} fill="none" stroke="currentColor" strokeWidth={2} />
   <text x={-4} y={4} textAnchor="middle" fontSize={10} fontFamily="'KaTeX_Main', serif" fontWeight={700} fill="currentColor">{props?.state === 'HIGH' ? '1' : '0'}</text>
   <line x1={17} y1={0} x2={30} y2={0} stroke="currentColor" strokeWidth={2} />
 </g>;
 
 const DigitalOutputSymbol: SymbolFC = ({ powered }) => <g>
-  <rect x={-17} y={-12} width={42} height={24} rx={4} fill="white" stroke="currentColor" strokeWidth={2} />
+  <rect x={-17} y={-12} width={42} height={24} rx={4} fill="none" stroke="currentColor" strokeWidth={2} />
   <text x={4} y={4} textAnchor="middle" fontSize={10} fontFamily="'KaTeX_Main', serif" fontWeight={700} fill="currentColor">{powered ? '1' : '0'}</text>
   <line x1={-30} y1={0} x2={-17} y2={0} stroke="currentColor" strokeWidth={2} />
 </g>;
@@ -1150,7 +1150,7 @@ const StandardLogicBlockSymbol: SymbolFC = ({ powered, props }) => {
             fontSize={6}
             fontFamily="'KaTeX_Main', serif"
             fontWeight={600}
-            fill="#64748b"
+            fill="currentColor"
           >
             {name}
           </text>
@@ -1207,7 +1207,7 @@ const LogicBlockSymbol: SymbolFC = ({ powered, props }) => {
 const RelayDpdt: SymbolFC = ({ powered, props }) => (
   <g>
     {/* Coil */}
-    {props?._documentedStyle === true ? <SemicircularHorizontalCoil x1={-20} x2={20} y={-45} /> : <><rect x={-20} y={-55} width={40} height={20} fill="white" stroke="currentColor" strokeWidth={2} rx={2} /><path d="M -14,-55 Q -10,-65 -6,-55 Q -2,-65 2,-55 Q 6,-65 10,-55 Q 14,-65 18,-55" fill="none" stroke="currentColor" strokeWidth={1.5} /></>}
+    {props?._documentedStyle === true ? <SemicircularHorizontalCoil x1={-20} x2={20} y={-45} /> : <><rect x={-20} y={-55} width={40} height={20} fill="none" stroke="currentColor" strokeWidth={2} rx={2} /><path d="M -14,-55 Q -10,-65 -6,-55 Q -2,-65 2,-55 Q 6,-65 10,-55 Q 14,-65 18,-55" fill="none" stroke="currentColor" strokeWidth={1.5} /></>}
     <line x1={-30} y1={-45} x2={-20} y2={-45} stroke="currentColor" strokeWidth={2} />
     <line x1={20} y1={-45} x2={30} y2={-45} stroke="currentColor" strokeWidth={2} />
     {/* Pole 1 common */}
@@ -1464,7 +1464,7 @@ export function renderSymbol(
     if (symbolId.includes('logic') || symbolId.includes('gate') || symbolId.includes('adder') || symbolId.includes('mux')) {
       return <StandardLogicBlockSymbol powered={powered} props={{ ...props, _componentType: symbolId }} animTime={animTime} />;
     }
-    return <text x={0} y={5} textAnchor="middle" fontSize={10} fill="#666">?</text>;
+    return <text x={0} y={5} textAnchor="middle" fontSize={10} fill="currentColor">?</text>;
   }
 
   const enrichedProps = {
