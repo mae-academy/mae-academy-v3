@@ -119,11 +119,11 @@ export default function EngineeringPlatformsSection() {
                 </Link>
               </div>
 
-              {/* CTA 1: Electric Blue (#2563EB) to Deep Violet (#7C3AED) */}
+              {/* CTA 1: Electric Blue (#2563EB) to Deep Violet (#9333EA) diagonal */}
               <div className="pt-2">
                 <Link
                   href="/simulations"
-                  className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#2563EB] to-[#7C3AED] hover:from-[#1D4ED8] hover:to-[#6D28D9] text-white px-7 py-3.5 text-base font-semibold shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:shadow-blue-500/25 active:translate-y-0"
+                  className="inline-flex items-center gap-2 rounded-full bg-gradient-to-br from-[#2563eb] to-[#9333ea] hover:from-[#1d4ed8] hover:to-[#7e22ce] text-white px-7 py-3.5 text-base font-semibold shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0"
                 >
                   Explore All Simulations
                   <ArrowRight className="h-4 w-4" />
@@ -172,11 +172,11 @@ export default function EngineeringPlatformsSection() {
                 ))}
               </div>
 
-              {/* CTA 2: Deep Violet (#7C3AED) to Warm Crimson / Rose-Red (#E11D48) */}
+              {/* CTA 2: Deep Violet (#9333EA) to Warm Crimson / Rose-Red (#E11D48) diagonal */}
               <div className="pt-2">
                 <Link
                   href="/courses"
-                  className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#7C3AED] to-[#E11D48] hover:from-[#6D28D9] hover:to-[#BE123C] text-white px-7 py-3.5 text-base font-semibold shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:shadow-violet-500/25 active:translate-y-0"
+                  className="inline-flex items-center gap-2 rounded-full bg-gradient-to-br from-[#9333ea] to-[#e11d48] hover:from-[#7e22ce] hover:to-[#be123c] text-white px-7 py-3.5 text-base font-semibold shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0"
                 >
                   Browse Course Catalog
                   <ArrowRight className="h-4 w-4" />
@@ -234,11 +234,11 @@ export default function EngineeringPlatformsSection() {
                 ))}
               </div>
 
-              {/* CTA 3: Crimson / Rose-Red (#E11D48) to Deep Violet (#7C3AED) */}
+              {/* CTA 3: Crimson / Rose-Red (#E11D48) to Deep Violet (#9333EA) diagonal */}
               <div className="pt-2">
                 <Link
                   href="/research"
-                  className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#E11D48] to-[#7C3AED] hover:from-[#BE123C] hover:to-[#6D28D9] text-white px-7 py-3.5 text-base font-semibold shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:shadow-rose-500/25 active:translate-y-0"
+                  className="inline-flex items-center gap-2 rounded-full bg-gradient-to-br from-[#e11d48] to-[#9333ea] hover:from-[#be123c] hover:to-[#7e22ce] text-white px-7 py-3.5 text-base font-semibold shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0"
                 >
                   Explore Research Notes
                   <ArrowRight className="h-4 w-4" />

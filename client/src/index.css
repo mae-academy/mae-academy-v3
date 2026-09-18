@@ -302,8 +302,79 @@
   }
 
   .bg-brand-gradient {
-    background: linear-gradient(135deg, #2563eb 0%, #7c3aed 50%, #f43f5e 100%) !important;
+    background: linear-gradient(135deg, #2563eb 0%, #9333ea 50%, #e11d48 100%) !important;
     color: #ffffff !important;
+  }
+
+  /* Unified Button Design System (Rectangular full pill-rounded sides + diagonal 135deg gradients) */
+  .btn-brand-hero {
+    border-radius: 9999px;
+    background: linear-gradient(135deg, #2563eb 0%, #9333ea 50%, #e11d48 100%);
+    color: #ffffff;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+    transition: all 0.2s ease-in-out;
+  }
+  .btn-brand-hero:hover {
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+    transform: translateY(-1px);
+  }
+  .btn-brand-hero:active {
+    transform: translateY(0);
+  }
+
+  .btn-brand-blue-purple {
+    border-radius: 9999px;
+    background: linear-gradient(135deg, #2563eb 0%, #9333ea 100%);
+    color: #ffffff;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    transition: all 0.2s ease-in-out;
+  }
+  .btn-brand-blue-purple:hover {
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+    transform: translateY(-1px);
+  }
+  .btn-brand-blue-purple:active {
+    transform: translateY(0);
+  }
+
+  .btn-brand-purple-rose {
+    border-radius: 9999px;
+    background: linear-gradient(135deg, #9333ea 0%, #e11d48 100%);
+    color: #ffffff;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    transition: all 0.2s ease-in-out;
+  }
+  .btn-brand-purple-rose:hover {
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+    transform: translateY(-1px);
+  }
+  .btn-brand-purple-rose:active {
+    transform: translateY(0);
+  }
+
+  .btn-brand-outline {
+    border-radius: 9999px;
+    border: 1px solid #e2e8f0;
+    background-color: #ffffff;
+    color: #334155;
+    transition: all 0.2s ease-in-out;
+  }
+  .btn-brand-outline:hover {
+    background-color: #f8fafc;
+    border-color: #d8b4fe;
+    transform: translateY(-1px);
+  }
+  .btn-brand-outline:active {
+    transform: translateY(0);
+  }
+  .dark .btn-brand-outline {
+    border-color: rgba(255, 255, 255, 0.15);
+    background-color: rgba(255, 255, 255, 0.05);
+    color: #e2e8f0;
+  }
+  .dark .btn-brand-outline:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    border-color: rgba(192, 132, 252, 0.4);
   }
   .tab-brand-gradient,
   [data-slot=tabs-trigger] {

@@ -16,17 +16,18 @@
 import type { JscppCRuntime, JscppInclude, JscppType, JscppValue } from "JSCPP";
 
 import { registerContainerPrinter } from "./containerRegistry";
+import { ensureStackClass } from "./stackInclude";
 
 /** `newClass` gives every instance `.v = { members: {} }`; `items` is this shim's own extension. */
 interface VectorStorage {
   members: Record<string, never>;
-  items: Array<JscppValue<number>>;
+  items: Array<JscppValue<any>>;
 }
 
 /** An iterator just carries a live reference to the same `items` array plus a position in it. */
 export interface VectorIteratorStorage {
   members: Record<string, never>;
-  items: Array<JscppValue<number>>;
+  items: Array<JscppValue<any>>;
   index: number;
 }
 
@@ -80,7 +81,16 @@ export function ensureVectorClass(rt: JscppCRuntime, suffix: string, elementType
 
   rt.regFunc(
     (_rt, _this, x) => {
-      storage(_this).items.push(_rt.val(elementType, x.v as number, true));
+      let valToStore: JscppValue;
+      if (typeof x.v === "object" && x.v !== null && "items" in (x.v as Record<string, unknown>)) {
+        valToStore = _rt.val(elementType, {
+          members: {},
+          items: [...(x.v as { items: JscppValue[] }).items],
+        }, true);
+      } else {
+        valToStore = _rt.val(elementType, x.v as number, true);
+      }
+      storage(_this).items.push(valToStore);
     },
     vectorType,
     "push_back",
@@ -119,6 +129,62 @@ export function ensureVectorClass(rt: JscppCRuntime, suffix: string, elementType
     [],
     iteratorType
   );
+
+  rt.regFunc(
+    (_rt, _this) => {
+      const items = storage(_this).items;
+      if (items.length === 0) _rt.raiseException("vector::pop_back called on an empty vector");
+      items.pop();
+    },
+    vectorType,
+    "pop_back",
+    [],
+    rt.voidTypeLiteral
+  );
+
+  rt.regFunc(
+    (_rt, _this) => {
+      const items = storage(_this).items;
+      if (items.length === 0) _rt.raiseException("vector::front called on an empty vector");
+      return items[0];
+    },
+    vectorType,
+    "front",
+    [],
+    elementType
+  );
+
+  rt.regFunc(
+    (_rt, _this) => {
+      const items = storage(_this).items;
+      if (items.length === 0) _rt.raiseException("vector::back called on an empty vector");
+      return items[items.length - 1];
+    },
+    vectorType,
+    "back",
+    [],
+    elementType
+  );
+
+  rt.regFunc(
+    (_rt, _this, it, x) => {
+      const targetIndex = iteratorStorage(it).index;
+      const items = storage(_this).items;
+      items.splice(targetIndex, 0, _rt.val(elementType, x.v as number, true));
+      return it;
+    },
+    vectorType,
+    "insert",
+    [iteratorType, elementType],
+    iteratorType
+  );
+
+  const iterAddOperator = (_rt: JscppCRuntime, it: JscppValue, offset: JscppValue): JscppValue => {
+    const s = iteratorStorage(it);
+    return _rt.val(iteratorType, { members: {}, items: s.items, index: s.index + (offset.v as number) }, true);
+  };
+  rt.regOperator(iterAddOperator, iteratorType, "+", [rt.intTypeLiteral], iteratorType);
+  rt.regOperator(iterAddOperator, iteratorType, "+", [rt.unsignedintTypeLiteral], iteratorType);
 
   // Returns the live element wrapper (not a copy) so `v[i] = x;` mutates the stored value in
   // place via JSCPP's default `o(=)` handler, which assigns onto whatever object `left` points at.
@@ -201,6 +267,19 @@ const vectorInclude: JscppInclude = {
     ensureVectorClass(rt, "int", rt.intTypeLiteral);
     ensureVectorClass(rt, "double", rt.doubleTypeLiteral);
     ensureStringVectorClass(rt);
+
+    const stackInt = ensureStackClass(rt, "int", rt.intTypeLiteral);
+    ensureVectorClass(rt, "__stack_int", stackInt);
+    const stackDouble = ensureStackClass(rt, "double", rt.doubleTypeLiteral);
+    ensureVectorClass(rt, "__stack_double", stackDouble);
+
+    // Nested `vector<vector<T>>`: preprocess.ts monomorphizes the inner `vector<int>` to
+    // `__vector_int` first, so the outer instantiation needs `__vector_int` registered as an
+    // element type of its own vector class, same as the stack-of-vector shims above.
+    const vectorInt = ensureVectorClass(rt, "int", rt.intTypeLiteral).vector;
+    ensureVectorClass(rt, "__vector_int", vectorInt);
+    const vectorDouble = ensureVectorClass(rt, "double", rt.doubleTypeLiteral).vector;
+    ensureVectorClass(rt, "__vector_double", vectorDouble);
   },
 };
 

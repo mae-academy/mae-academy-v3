@@ -466,7 +466,7 @@ describe("EmulatorCore — directive parsing (Task 8)", () => {
     const emulator = new EmulatorCore({
       onError: message => errors.push(message),
     });
-    const ok = await emulator.assembleAndLoad(`mul bx\nhlt`);
+    const ok = await emulator.assembleAndLoad(`invalid_op bx\nhlt`);
     expect(ok).toBe(false);
     expect(errors.length).toBeGreaterThan(0);
   });

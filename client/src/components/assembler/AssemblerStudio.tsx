@@ -144,7 +144,7 @@ const MASM_PROGRAM = [
   ".model small",
   ".stack 100h",
   ".data",
-  "message db 'MAE 8086 ready.$', 0",
+  "message db 'Welcome to MAE Academy!', 0",
   ".code",
   "main proc",
   "  mov ax, @data",
@@ -172,7 +172,7 @@ const PYTHON_GROUPS: AssemblerTemplateGroup[] = [
 ];
 
 const PYTHON_SOURCES: Record<string, string> = {
-  "Hello World": 'print("Hello, MAE Academy!")\n',
+  "Hello World": 'print("Welcome to MAE Academy!")\n',
   "Variables & Loops":
     "total = 0\nfor i in range(5):\n    total += i\nprint(total)\n",
   "Function Call":
@@ -186,7 +186,7 @@ const CPP_GROUPS: AssemblerTemplateGroup[] = [
 
 const CPP_SOURCES: Record<string, string> = {
   "Hello World":
-    '#include <iostream>\nusing namespace std;\nint main() {\n    cout << "Hello, MAE Academy!" << endl;\n    return 0;\n}\n',
+    '#include <iostream>\nusing namespace std;\nint main() {\n    cout << "Welcome to MAE Academy!" << endl;\n    return 0;\n}\n',
   "Loop Sum":
     "#include <iostream>\nusing namespace std;\nint main() {\n    int total = 0;\n    for (int i = 0; i < 5; i++) {\n        total += i;\n    }\n    cout << total << endl;\n    return 0;\n}\n",
   "Function Call":
@@ -199,7 +199,7 @@ const C_GROUPS: AssemblerTemplateGroup[] = [
 
 const C_SOURCES: Record<string, string> = {
   "Hello World":
-    '#include <stdio.h>\nint main() {\n    printf("Hello, MAE Academy!\\n");\n    return 0;\n}\n',
+    '#include <stdio.h>\nint main() {\n    printf("Welcome to MAE Academy!");\n    return 0;\n}\n',
   "Loop Sum":
     '#include <stdio.h>\nint main() {\n    int total = 0;\n    for (int i = 0; i < 5; i++) {\n        total += i;\n    }\n    printf("%d\\n", total);\n    return 0;\n}\n',
 };
@@ -1446,18 +1446,16 @@ export function AssemblerStudio() {
                               key={reg}
                               className="rounded-lg border border-slate-200 bg-slate-50/80 px-2 py-1.5 dark:border-[#1a1d24] dark:bg-[#090a0d] min-w-0"
                             >
-                              <span className={`block text-[10px] font-bold uppercase tracking-wide ${
-                                isSeg
-                                  ? "text-violet-600 dark:text-violet-400"
-                                  : "text-slate-600 dark:text-slate-300"
-                              }`}>
+                              <span className={`block text-[10px] font-bold uppercase tracking-wide ${isSeg
+                                ? "text-violet-600 dark:text-violet-400"
+                                : "text-slate-600 dark:text-slate-300"
+                                }`}>
                                 {reg}
                               </span>
-                              <span className={`font-mono text-xs font-semibold block truncate ${
-                                isSeg
-                                  ? "text-violet-700 dark:text-violet-300"
-                                  : "text-slate-900 dark:text-slate-100"
-                              }`}>
+                              <span className={`font-mono text-xs font-semibold block truncate ${isSeg
+                                ? "text-violet-700 dark:text-violet-300"
+                                : "text-slate-900 dark:text-slate-100"
+                                }`}>
                                 {formatRegisterValue(registers[reg], registerFormat, 16)}
                               </span>
                             </div>
@@ -1477,33 +1475,29 @@ export function AssemblerStudio() {
                           return (
                             <div
                               key={flag}
-                              className={`rounded-lg border px-2 py-1.5 text-center transition ${
-                                active
-                                  ? "border-violet-500 bg-violet-100/80 text-violet-950 dark:border-violet-400/60 dark:bg-violet-950/50 dark:text-violet-100 shadow-xs"
-                                  : "border-slate-200 bg-slate-50/60 text-slate-500 dark:border-[#1a1d24] dark:bg-[#090a0d] dark:text-slate-400"
-                              }`}
+                              className={`rounded-lg border px-2 py-1.5 text-center transition ${active
+                                ? "border-violet-500 bg-violet-100/80 text-violet-950 dark:border-violet-400/60 dark:bg-violet-950/50 dark:text-violet-100 shadow-xs"
+                                : "border-slate-200 bg-slate-50/60 text-slate-500 dark:border-[#1a1d24] dark:bg-[#090a0d] dark:text-slate-400"
+                                }`}
                             >
                               <div className="flex items-center justify-center gap-1 mb-0.5">
                                 <span
-                                  className={`h-2 w-2 rounded-full ${
-                                    active
-                                      ? "bg-violet-600 shadow-[0_0_6px_rgba(124,58,237,0.7)]"
-                                      : "bg-slate-300 dark:bg-slate-700"
-                                  }`}
+                                  className={`h-2 w-2 rounded-full ${active
+                                    ? "bg-violet-600 shadow-[0_0_6px_rgba(124,58,237,0.7)]"
+                                    : "bg-slate-300 dark:bg-slate-700"
+                                    }`}
                                 />
-                                <span className={`font-mono text-xs font-bold ${
-                                  active
-                                    ? "text-violet-950 dark:text-violet-100"
-                                    : "text-slate-700 dark:text-slate-300"
-                                }`}>
+                                <span className={`font-mono text-xs font-bold ${active
+                                  ? "text-violet-950 dark:text-violet-100"
+                                  : "text-slate-700 dark:text-slate-300"
+                                  }`}>
                                   {flag}
                                 </span>
                               </div>
-                              <span className={`font-mono text-xs font-bold block ${
-                                active
-                                  ? "text-violet-700 dark:text-violet-300"
-                                  : "text-slate-400 dark:text-slate-500"
-                              }`}>
+                              <span className={`font-mono text-xs font-bold block ${active
+                                ? "text-violet-700 dark:text-violet-300"
+                                : "text-slate-400 dark:text-slate-500"
+                                }`}>
                                 {active ? "1" : "0"}
                               </span>
                             </div>
@@ -1607,11 +1601,10 @@ export function AssemblerStudio() {
                     />
                   </label>
                   {spDelta !== null && spDelta !== 0 && (
-                    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                      spDelta < 0
-                        ? "bg-rose-500/15 text-[#F43F5E] border border-rose-500/30"
-                        : "bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/30"
-                    }`}>
+                    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${spDelta < 0
+                      ? "bg-rose-500/15 text-[#F43F5E] border border-rose-500/30"
+                      : "bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/30"
+                      }`}>
                       {spDelta < 0 ? `${spDelta} (PUSH)` : `+${spDelta} (POP)`}
                     </span>
                   )}

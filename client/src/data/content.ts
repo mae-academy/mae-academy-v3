@@ -4,7 +4,7 @@
  */
 import type { CardType, Locale } from "@/data/platform";
 
-type CollectionCard = { title: string; description: string; code: string };
+type CollectionCard = { title: string; description: string; code: string; badge?: string };
 type BlueprintLabel = { label: string; sublabel: string };
 
 export type LocaleContent = {
@@ -335,7 +335,7 @@ export const localizedContent: Record<Locale, LocaleContent> = { en, ar, es };
 localizedContent.en.collections.simulations = {
   eyebrow: "03 / Practical Simulations",
   title: "Build, test, and read the system response.",
-  description: "Nine applied laboratories for control, electronics, computation, mathematics, and connected engineering systems.",
+  description: "Applied laboratories for control, electronics, computation, mathematics, and connected engineering systems.",
   cards: [
     { title: "Control Systems", description: "Tune feedback, stability, and transient response inside a visible control loop.", code: "S.01" },
     { title: "Electrical Circuits", description: "Probe current, voltage, and signal behavior across an interactive circuit bench.", code: "S.02" },
@@ -345,16 +345,13 @@ localizedContent.en.collections.simulations = {
     { title: "Signals and Systems", description: "Transform, filter, and interpret signals across time and frequency domains.", code: "S.06" },
     { title: "Digital Logic Design", description: "Compose gates, truth states, and logic paths into working digital systems.", code: "S.07" },
     { title: "Linear Algebra", description: "Explore matrices, vectors, transformations, and the geometry behind engineering models.", code: "S.08" },
-    { title: "Communication and Network", description: "Model transmission paths, network nodes, and connected-system behavior.", code: "S.09" },
-    { title: "Digital Logic Lab", description: "Use the complete Electrical Circuits bench for independent circuit modeling and analysis.", code: "S.10" },
-    { title: "Block diagram", description: "Use the complete Electrical Circuits bench for a second independent circuit workspace.", code: "S.11" },
-    { title: "extra lab", description: "Use the complete Electrical Circuits bench for a third independent circuit workspace.", code: "S.12" },
+    { title: "Arduino Studio", description: "Embedded Systems & Microcontrollers: write Arduino C++ and watch an interactive UNO board, serial monitor, and live plotter respond.", code: "S.09" },
   ],
 };
 localizedContent.ar.collections.simulations = {
   eyebrow: "03 / المحاكاة العملية",
   title: "ابنِ النظام، اختبره، واقرأ استجابته.",
-  description: "تسعة مختبرات تطبيقية للتحكم والإلكترونيات والحوسبة والرياضيات والأنظمة الهندسية المتصلة.",
+  description: "مختبرات تطبيقية للتحكم والإلكترونيات والحوسبة والرياضيات والأنظمة الهندسية المتصلة.",
   cards: [
     { title: "أنظمة التحكم", description: "اضبط التغذية الراجعة والاستقرار والاستجابة العابرة داخل حلقة تحكم مرئية.", code: "S.01" },
     { title: "الدوائر الكهربائية", description: "افحص التيار والجهد وسلوك الإشارة عبر منصة دوائر تفاعلية.", code: "S.02" },
@@ -364,16 +361,13 @@ localizedContent.ar.collections.simulations = {
     { title: "الإشارات والأنظمة", description: "حوّل الإشارات ورشّحها وفسّرها عبر نطاقي الزمن والتردد.", code: "S.06" },
     { title: "تصميم المنطق الرقمي", description: "ركّب البوابات وحالات الحقيقة ومسارات المنطق في أنظمة رقمية عاملة.", code: "S.07" },
     { title: "الجبر الخطي", description: "استكشف المصفوفات والمتجهات والتحويلات والهندسة الكامنة خلف النماذج الهندسية.", code: "S.08" },
-    { title: "الاتصالات والشبكات", description: "نمذج مسارات الإرسال وعُقد الشبكة وسلوك الأنظمة المتصلة.", code: "S.09" },
-    { title: "Digital Logic Lab", description: "استخدم منصة الدوائر الكهربائية الكاملة لنمذجة الدوائر وتحليلها في مساحة مستقلة.", code: "S.10" },
-    { title: "Block diagram", description: "استخدم منصة الدوائر الكهربائية الكاملة لمساحة دوائر مستقلة ثانية.", code: "S.11" },
-    { title: "extra lab", description: "استخدم منصة الدوائر الكهربائية الكاملة لمساحة دوائر مستقلة ثالثة.", code: "S.12" },
+    { title: "استوديو الأردوينو", description: "الأنظمة المدمجة والمتحكمات: اكتب شيفرة أردوينو C++ وشاهد لوحة UNO التفاعلية ومراقب التسلسل والراسم الحي وهي تستجيب.", code: "S.09" },
   ],
 };
 localizedContent.es.collections.simulations = {
   eyebrow: "03 / Simulaciones prácticas",
   title: "Construye, prueba y lee la respuesta del sistema.",
-  description: "Nueve laboratorios aplicados para control, electrónica, computación, matemáticas y sistemas de ingeniería conectados.",
+  description: "Laboratorios aplicados para control, electrónica, computación, matemáticas y sistemas de ingeniería conectados.",
   cards: [
     { title: "Sistemas de control", description: "Ajusta retroalimentación, estabilidad y respuesta transitoria en un bucle de control visible.", code: "S.01" },
     { title: "Circuitos Eléctricos", description: "Mide corriente, voltaje y comportamiento de señales en un banco de circuitos interactivo.", code: "S.02" },
@@ -383,19 +377,16 @@ localizedContent.es.collections.simulations = {
     { title: "Señales y sistemas", description: "Transforma, filtra e interpreta señales en los dominios del tiempo y la frecuencia.", code: "S.06" },
     { title: "Diseño de lógica digital", description: "Compone compuertas, estados de verdad y rutas lógicas en sistemas digitales funcionales.", code: "S.07" },
     { title: "Álgebra lineal", description: "Explora matrices, vectores, transformaciones y la geometría detrás de los modelos de ingeniería.", code: "S.08" },
-    { title: "Comunicación y redes", description: "Modela rutas de transmisión, nodos de red y comportamiento de sistemas conectados.", code: "S.09" },
-    { title: "Digital Logic Lab", description: "Usa el banco de Circuitos Eléctricos completo para modelado y análisis de circuitos independiente.", code: "S.10" },
-    { title: "Block diagram", description: "Usa el banco de Circuitos Eléctricos completo como un segundo espacio de trabajo independiente.", code: "S.11" },
-    { title: "extra lab", description: "Usa el banco de Circuitos Eléctricos completo como un tercer espacio de trabajo independiente.", code: "S.12" },
+    { title: "Arduino Studio", description: "Sistemas embebidos y microcontroladores: escribe C++ de Arduino y observa la placa UNO interactiva, el monitor serie y el graficador en vivo.", code: "S.09" },
   ],
 };
 
 localizedContent.en.blueprints.stations.simulations = [
-  { label: "CONTROL LOOP", sublabel: "Control systems" }, { label: "CIRCUIT BENCH", sublabel: "Electrical Circuits" }, { label: "POWER STAGE", sublabel: "Power electronics" }, { label: "CODE STUDIO", sublabel: "Code Studio" }, { label: "LADDER LOGIC", sublabel: "PLC" }, { label: "SIGNAL FIELD", sublabel: "Signals and systems" }, { label: "GATE ARRAY", sublabel: "Digital logic design" }, { label: "MATRIX PLANE", sublabel: "Linear algebra" }, { label: "NETWORK LINK", sublabel: "Communication and network" },
+  { label: "CONTROL LOOP", sublabel: "Control systems" }, { label: "CIRCUIT BENCH", sublabel: "Electrical Circuits" }, { label: "POWER STAGE", sublabel: "Power electronics" }, { label: "CODE STUDIO", sublabel: "Code Studio" }, { label: "LADDER LOGIC", sublabel: "PLC" }, { label: "SIGNAL FIELD", sublabel: "Signals and systems" }, { label: "GATE ARRAY", sublabel: "Digital logic design" }, { label: "MATRIX PLANE", sublabel: "Linear algebra" }, { label: "ARDUINO BENCH", sublabel: "Arduino Studio" },
 ];
 localizedContent.ar.blueprints.stations.simulations = [
-  { label: "حلقة التحكم", sublabel: "أنظمة التحكم" }, { label: "منصة الدوائر", sublabel: "الدوائر الكهربائية" }, { label: "مرحلة القدرة", sublabel: "إلكترونيات القدرة" }, { label: "CODE STUDIO", sublabel: "Code Studio" }, { label: "منطق السلم", sublabel: "PLC" }, { label: "مجال الإشارة", sublabel: "الإشارات والأنظمة" }, { label: "مصفوفة البوابات", sublabel: "تصميم المنطق الرقمي" }, { label: "مستوى المصفوفة", sublabel: "الجبر الخطي" }, { label: "وصلة الشبكة", sublabel: "الاتصالات والشبكات" },
+  { label: "حلقة التحكم", sublabel: "أنظمة التحكم" }, { label: "منصة الدوائر", sublabel: "الدوائر الكهربائية" }, { label: "مرحلة القدرة", sublabel: "إلكترونيات القدرة" }, { label: "CODE STUDIO", sublabel: "Code Studio" }, { label: "منطق السلم", sublabel: "PLC" }, { label: "مجال الإشارة", sublabel: "الإشارات والأنظمة" }, { label: "مصفوفة البوابات", sublabel: "تصميم المنطق الرقمي" }, { label: "مستوى المصفوفة", sublabel: "الجبر الخطي" }, { label: "منصة الأردوينو", sublabel: "استوديو الأردوينو" },
 ];
 localizedContent.es.blueprints.stations.simulations = [
-  { label: "BUCLE DE CONTROL", sublabel: "Sistemas de control" }, { label: "BANCO DE CIRCUITOS", sublabel: "Circuitos Eléctricos" }, { label: "ETAPA DE POTENCIA", sublabel: "Electrónica de potencia" }, { label: "CODE STUDIO", sublabel: "Code Studio" }, { label: "LÓGICA DE ESCALERA", sublabel: "PLC" }, { label: "CAMPO DE SEÑAL", sublabel: "Señales y sistemas" }, { label: "MATRIZ DE COMPUERTAS", sublabel: "Diseño de lógica digital" }, { label: "PLANO MATRICIAL", sublabel: "Álgebra lineal" }, { label: "ENLACE DE RED", sublabel: "Comunicación y redes" },
+  { label: "BUCLE DE CONTROL", sublabel: "Sistemas de control" }, { label: "BANCO DE CIRCUITOS", sublabel: "Circuitos Eléctricos" }, { label: "ETAPA DE POTENCIA", sublabel: "Electrónica de potencia" }, { label: "CODE STUDIO", sublabel: "Code Studio" }, { label: "LÓGICA DE ESCALERA", sublabel: "PLC" }, { label: "CAMPO DE SEÑAL", sublabel: "Señales y sistemas" }, { label: "MATRIZ DE COMPUERTAS", sublabel: "Diseño de lógica digital" }, { label: "PLANO MATRICIAL", sublabel: "Álgebra lineal" }, { label: "BANCO ARDUINO", sublabel: "Arduino Studio" },
 ];

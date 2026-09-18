@@ -37,36 +37,40 @@ export default function Home() {
       {/* ============================================================ */}
       {/* HERO SECTION: Balanced Scale, Clean CTAs, Framed Scope       */}
       {/* ============================================================ */}
-      <section className="relative overflow-hidden pt-6 pb-6 lg:pt-10 lg:pb-8">
+      <section className="relative overflow-hidden pt-4 pb-6 sm:pt-6 sm:pb-8 lg:pt-8 lg:pb-12">
         {/* Subtle Tri-Tone Background Ambient Glow */}
         <div className="pointer-events-none absolute -top-24 left-1/2 -translate-x-1/2 w-[850px] h-[360px] opacity-35 blur-3xl mae-gradient-glow rounded-full -z-10 dark:opacity-20" />
 
-        <div className="max-w-[1380px] mx-auto px-6 sm:px-8 lg:px-12 w-full">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center min-h-[520px]">
-            {/* Left Column: Headline, Body, and Primary/Secondary CTAs */}
-            <div className="lg:col-span-7 z-10">
+        <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-12">
+          <div className="grid grid-cols-12 gap-4 lg:gap-8 items-center">
+            {/* Left Column: Headings, Subtitle, Actions (58-60% width) */}
+            <div className="col-span-7 flex flex-col justify-center gap-3 sm:gap-4 z-10 min-w-0">
               <motion.h1
                 variants={itemVariants}
-                className="text-3xl sm:text-4xl lg:text-6xl font-extrabold tracking-tight leading-[1.15] text-slate-900 dark:text-white"
+                className="font-bold tracking-tight text-slate-900 dark:text-white text-xl sm:text-2xl md:text-3xl lg:text-5xl whitespace-nowrap"
               >
-                <span className="block">{home.headlinePrimary}</span>
-                <span className="block mt-1.5 mae-gradient-text">
-                  {home.headlineSecondary}
-                </span>
+                {home.headlinePrimary}
               </motion.h1>
+
+              <motion.h2
+                variants={itemVariants}
+                className="font-extrabold text-xl sm:text-2xl md:text-3xl lg:text-5xl whitespace-nowrap bg-gradient-to-br from-[#2563eb] via-[#9333ea] to-[#e11d48] bg-clip-text text-transparent"
+              >
+                {home.headlineSecondary}
+              </motion.h2>
 
               <motion.p
                 variants={itemVariants}
-                className="mt-6 max-w-2xl text-lg md:text-xl text-slate-600 dark:text-zinc-300 leading-relaxed"
+                className="text-slate-600 dark:text-zinc-300 text-xs sm:text-sm md:text-base max-w-xl leading-relaxed"
               >
                 {home.description}
               </motion.p>
 
               {/* Call-to-Action Buttons */}
-              <motion.div variants={itemVariants} className="mt-8 flex flex-wrap items-center gap-4">
+              <motion.div variants={itemVariants} className="flex flex-wrap items-center gap-2.5 sm:gap-3 mt-1 sm:mt-2">
                 <Link
                   href="/simulations"
-                  className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-blue-600 via-violet-600 to-rose-600 hover:from-blue-700 hover:via-violet-700 hover:to-rose-700 text-white px-8 py-3.5 text-base font-semibold shadow-sm shadow-violet-500/20 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:shadow-violet-500/30 active:translate-y-0"
+                  className="inline-flex items-center gap-2 rounded-full bg-gradient-to-br from-[#2563eb] via-[#9333ea] to-[#e11d48] text-white px-5 sm:px-7 md:px-8 py-2.5 sm:py-3.5 text-xs sm:text-sm md:text-base font-semibold shadow-md hover:shadow-lg transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 shrink-0"
                 >
                   {home.ctaPrimary}
                   <ArrowRight className="h-4 w-4" />
@@ -74,18 +78,18 @@ export default function Home() {
 
                 <Link
                   href="/courses"
-                  className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 px-8 py-3.5 text-base font-semibold shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 active:translate-y-0 dark:border-white/15 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10"
+                  className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white hover:bg-slate-50 hover:border-purple-300 text-slate-700 px-5 sm:px-7 md:px-8 py-2.5 sm:py-3.5 text-xs sm:text-sm md:text-base font-semibold shadow-xs hover:shadow-sm transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 dark:border-white/15 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10 dark:hover:border-purple-400 shrink-0"
                 >
                   {home.ctaSecondary}
                 </Link>
               </motion.div>
             </div>
 
-            {/* Right Column: Framed Engineering Scope / Wave Monitor */}
-            <motion.div variants={itemVariants} className="lg:col-span-5 w-full">
+            {/* Right Column: Oscilloscope (40-42% width) */}
+            <motion.div variants={itemVariants} className="col-span-5 flex justify-end w-full">
               <Suspense
                 fallback={
-                  <div className="min-h-[460px] lg:min-h-[500px] w-full rounded-2xl border border-slate-200/80 bg-slate-50/50 p-6 animate-pulse dark:border-white/[0.08] dark:bg-zinc-950/60" />
+                  <div className="w-full aspect-[4/3] rounded-2xl border border-slate-200/80 bg-slate-50/50 p-4 animate-pulse dark:border-white/[0.08] dark:bg-zinc-950/60" />
                 }
               >
                 <EngineeringScope />
@@ -161,10 +165,10 @@ export default function Home() {
                 </p>
 
                 <div className="pt-1">
-                  {/* Founder Action CTA: Gradient shifting from Deep Violet (#7C3AED) back to Electric Blue (#2563EB) */}
+                  {/* Founder Action CTA: Blue to Purple diagonal gradient with rounded-full */}
                   <Link
                     href="/about"
-                    className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#7C3AED] to-[#2563EB] hover:from-[#6D28D9] hover:to-[#1D4ED8] px-7 py-3.5 text-base font-semibold text-white shadow-sm transition-all duration-200 hover:scale-[1.02] hover:shadow-md hover:shadow-violet-500/25 active:scale-[.98] w-full sm:w-auto justify-center"
+                    className="inline-flex items-center gap-2 rounded-full bg-gradient-to-br from-[#2563eb] to-[#9333ea] hover:from-[#1d4ed8] hover:to-[#7e22ce] px-7 py-3.5 text-sm sm:text-base font-semibold text-white shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 w-full sm:w-auto justify-center"
                   >
                     Meet the Founder & About MAE
                     <MoveRight className="h-4 w-4" />

@@ -168,8 +168,8 @@ describe("compileComProgram — instruction encoding", () => {
   });
 
   it("reports unsupported instructions without throwing", () => {
-    const program = compileComProgram(`mul bx\nhlt`);
-    expect(program.diagnostics.some((d) => /Unsupported instruction: mul/.test(d.message))).toBe(true);
+    const program = compileComProgram(`invalid_op bx\nhlt`);
+    expect(program.diagnostics.some((d) => /Unsupported instruction: invalid_op/i.test(d.message))).toBe(true);
   });
 
   it("encodes AND/OR/XOR reg16,reg16 with the standard opcode family", () => {
@@ -229,4 +229,73 @@ describe("compileComProgram — instruction encoding", () => {
     expect(address).toBe(program.symbols.get("var1"));
     expect(address).toBeGreaterThanOrEqual(COM_SEGMENT ? program.origin : 0);
   });
+
+  it("encodes DUP allocations for DB and DW directives", () => {
+    const program = compileComProgram(`
+      dst db 5 dup(0)
+      tbl dw 3 dup(1234h)
+    `);
+    expect(program.diagnostics).toEqual([]);
+    expect(program.bytes.length).toBe(5 + 6);
+    expect(Array.from(program.bytes.slice(0, 5))).toEqual([0, 0, 0, 0, 0]);
+    expect(Array.from(program.bytes.slice(5, 11))).toEqual([0x34, 0x12, 0x34, 0x12, 0x34, 0x12]);
+  });
+
+  it("encodes indirect memory operands, LEA, INC BL, and DEC DI", () => {
+    const program = compileComProgram(`
+      mov al, [si]
+      add al, [si + 2]
+      inc bl
+      dec di
+      lea dx, [si + 4]
+      hlt
+    `);
+    expect(program.diagnostics).toEqual([]);
+    // mov al, [si]: 8A 04
+    expect(Array.from(program.bytes.slice(0, 2))).toEqual([0x8a, 0x04]);
+    // add al, [si+2]: 02 44 02
+    expect(Array.from(program.bytes.slice(2, 5))).toEqual([0x02, 0x44, 0x02]);
+    // inc bl: FE C3
+    expect(Array.from(program.bytes.slice(5, 7))).toEqual([0xfe, 0xc3]);
+    // dec di: 4F
+    expect(program.bytes[7]).toBe(0x4f);
+    // lea dx, [si+4]: 8D 54 04
+    expect(Array.from(program.bytes.slice(8, 11))).toEqual([0x8d, 0x54, 0x04]);
+  });
+
+  it("encodes CLD, STD, and REP MOVSB string instructions", () => {
+    const program = compileComProgram(`
+      cld
+      std
+      movsb
+      rep movsb
+      hlt
+    `);
+    expect(program.diagnostics).toEqual([]);
+    expect(program.bytes[0]).toBe(0xfc); // CLD
+    expect(program.bytes[1]).toBe(0xfd); // STD
+    expect(program.bytes[2]).toBe(0xa4); // MOVSB
+    expect(program.bytes[3]).toBe(0xf3); // REP prefix
+    expect(program.bytes[4]).toBe(0xa4); // MOVSB
+  });
+
+  it("encodes MUL, DIV, and shifts", () => {
+    const program = compileComProgram(`
+      mul bl
+      div bx
+      shl al, 1
+      shr bx, cl
+      hlt
+    `);
+    expect(program.diagnostics).toEqual([]);
+    // mul bl: F6 E3
+    expect(Array.from(program.bytes.slice(0, 2))).toEqual([0xf6, 0xe3]);
+    // div bx: F7 F3
+    expect(Array.from(program.bytes.slice(2, 4))).toEqual([0xf7, 0xf3]);
+    // shl al, 1: D0 E0
+    expect(Array.from(program.bytes.slice(4, 6))).toEqual([0xd0, 0xe0]);
+    // shr bx, cl: D3 EB
+    expect(Array.from(program.bytes.slice(6, 8))).toEqual([0xd3, 0xeb]);
+  });
 });
+

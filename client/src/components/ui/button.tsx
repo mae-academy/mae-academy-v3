@@ -19,11 +19,17 @@ const buttonVariants = cva(
         ghost:
           "hover:bg-accent dark:hover:bg-accent/50",
         link: "text-primary underline-offset-4 hover:underline",
+        hero: "rounded-full bg-gradient-to-br from-[#2563eb] via-[#9333ea] to-[#e11d48] text-white shadow-md hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0",
+        bluePurple: "rounded-full bg-gradient-to-br from-[#2563eb] to-[#9333ea] text-white shadow-sm hover:shadow-md hover:-translate-y-0.5 active:translate-y-0",
+        purpleRose: "rounded-full bg-gradient-to-br from-[#9333ea] to-[#e11d48] text-white shadow-sm hover:shadow-md hover:-translate-y-0.5 active:translate-y-0",
+        brandOutline: "rounded-full border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:border-purple-300 hover:-translate-y-0.5 active:translate-y-0 dark:border-white/15 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10 dark:hover:border-purple-400",
       },
       size: {
         default: "h-9 px-4 py-2 has-[>svg]:px-3",
         sm: "h-8 rounded-md gap-1.5 px-3 has-[>svg]:px-2.5",
         lg: "h-10 rounded-md px-6 has-[>svg]:px-4",
+        pill: "h-10 rounded-full px-6 has-[>svg]:px-4",
+        "pill-lg": "h-12 rounded-full px-8 text-base has-[>svg]:px-5",
         icon: "size-9",
         "icon-sm": "size-8",
         "icon-lg": "size-10",

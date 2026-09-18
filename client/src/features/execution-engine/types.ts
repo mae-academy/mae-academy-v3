@@ -19,6 +19,8 @@ export interface TraceStep {
   flags?: Record<string, number>;
   /** MASM only: a bounded byte window (e.g. around SP) captured at this step. */
   memory?: Array<{ address: number; value: number }>;
+  /** Optional instruction text executed at this step (e.g. MASM disasm or source line). */
+  instruction?: string;
   stdout?: string;
 }
 

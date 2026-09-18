@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Download, Copy, Check, FileImage, Image as ImageIcon } from 'lucide-react';
 import { toast } from 'sonner';
+import SegmentedControl from '@/components/ui/SegmentedControl';
 
 export interface ExportItem {
   id: string;
@@ -443,28 +444,15 @@ export function ExportPreviewModal({
 
           <div className="flex items-center gap-3">
             {/* Global Format Selector */}
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={() => handleToggleGlobalFormat('png')}
-                className={`px-4 py-1.5 text-xs font-semibold rounded-lg transition-all ${globalFormat === 'png'
-                    ? 'bg-brand-gradient text-white shadow-md'
-                    : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#1b2028]'
-                  }`}
-              >
-                PNG
-              </button>
-              <button
-                type="button"
-                onClick={() => handleToggleGlobalFormat('svg')}
-                className={`px-4 py-1.5 text-xs font-semibold rounded-lg transition-all ${globalFormat === 'svg'
-                    ? 'bg-brand-gradient text-white shadow-md'
-                    : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#1b2028]'
-                  }`}
-              >
-                SVG
-              </button>
-            </div>
+            <SegmentedControl
+              options={[
+                { label: "PNG", value: "png" },
+                { label: "SVG", value: "svg" },
+              ]}
+              value={globalFormat}
+              onChange={(format) => handleToggleGlobalFormat(format as 'png' | 'svg')}
+              aria-label="Export Format"
+            />
 
             <button
               type="button"
@@ -504,28 +492,16 @@ export function ExportPreviewModal({
                       </span>
                       <div className="flex items-center gap-1.5 shrink-0">
                         {/* Per-Item Format Selector */}
-                        <div className="flex items-center gap-1">
-                          <button
-                            type="button"
-                            onClick={() => handleToggleItemFormat(item.id, 'png')}
-                            className={`px-3 py-1 text-[11px] font-semibold rounded-lg transition-all ${activeFormat === 'png'
-                                ? 'bg-brand-gradient text-white shadow-xs'
-                                : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-[#1b2028]'
-                              }`}
-                          >
-                            PNG
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleToggleItemFormat(item.id, 'svg')}
-                            className={`px-3 py-1 text-[11px] font-semibold rounded-lg transition-all ${activeFormat === 'svg'
-                                ? 'bg-brand-gradient text-white shadow-xs'
-                                : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-[#1b2028]'
-                              }`}
-                          >
-                            SVG
-                          </button>
-                        </div>
+                        <SegmentedControl
+                          options={[
+                            { label: "PNG", value: "png" },
+                            { label: "SVG", value: "svg" },
+                          ]}
+                          value={activeFormat}
+                          onChange={(format) => handleToggleItemFormat(item.id, format as 'png' | 'svg')}
+                          size="sm"
+                          aria-label={`${item.title} export format`}
+                        />
 
                         <div className="flex items-center gap-1">
                           <input

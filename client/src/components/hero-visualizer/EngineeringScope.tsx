@@ -356,40 +356,40 @@ export default function EngineeringScope({ className = "" }: EngineeringScopePro
   return (
     <div
       ref={containerRef}
-      className={`rounded-2xl border border-slate-200/80 bg-slate-50/50 p-4 sm:p-5 shadow-sm relative overflow-hidden backdrop-blur-sm dark:border-white/[0.08] dark:bg-zinc-950/60 min-h-[460px] lg:min-h-[500px] flex flex-col justify-between ${className}`}
+      className={`flex flex-col bg-white border border-slate-200/80 rounded-2xl shadow-sm p-3.5 sm:p-4 w-full h-fit self-center relative overflow-hidden backdrop-blur-sm dark:border-white/[0.08] dark:bg-[#08080A] ${className}`}
     >
       {/* Top Tri-Color Signature Accent Line */}
-      <div className="absolute top-0 left-0 right-0 h-[2.5px] bg-gradient-to-r from-[#2563EB] via-[#7C3AED] to-[#E11D48]" />
+      <div className="absolute top-0 left-0 right-0 h-[2.5px] bg-gradient-to-br from-[#2563eb] via-[#9333ea] to-[#e11d48]" />
 
-      {/* Scope Header Bar: Cleaned of redundant Live Signal Monitor, KaTeX timebase */}
-      <div className="flex items-center justify-between gap-3 pb-3 border-b border-slate-200/70 dark:border-white/[0.08]">
-        <div className="flex items-center gap-3 text-[11px] font-medium text-slate-600 dark:text-zinc-400">
+      {/* Scope Header Bar: Channel indicators & Timebase */}
+      <div className="flex items-center justify-between gap-3 mb-3 pb-2.5 border-b border-slate-200/70 dark:border-white/[0.08]">
+        <div className="flex items-center gap-2.5 sm:gap-3 text-xs font-medium text-slate-600 dark:text-zinc-400">
           <span className="flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-full bg-[#2563EB]" />
-            CH1 In
+            <span className="w-2.5 h-2.5 rounded-full bg-blue-600" />
+            CH1
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-full bg-[#7C3AED]" />
-            CH2 Resp
+            <span className="w-2.5 h-2.5 rounded-full bg-purple-600" />
+            CH2
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-full bg-[#E11D48]" />
-            CH3 Env
+            <span className="w-2.5 h-2.5 rounded-full bg-rose-500" />
+            CH3
           </span>
         </div>
 
-        <div className="px-2.5 py-0.5 rounded-md bg-slate-200/60 dark:bg-[#0D0D11] border border-slate-300/40 dark:border-white/[0.08] text-slate-700 dark:text-zinc-200 flex items-center">
+        <div className="px-2.5 py-1 bg-slate-100 rounded-md text-xs font-mono font-medium text-slate-700 dark:bg-white/[0.06] dark:border dark:border-white/[0.08] dark:text-zinc-200 flex items-center">
           <KatexMath math="10\text{ ms/div}" />
         </div>
       </div>
 
-      {/* Interactive Scope Canvas Frame */}
-      <div className="relative mt-3 flex-1 min-h-[300px] lg:min-h-[340px] w-full overflow-hidden rounded-xl border border-slate-200/80 bg-white/95 shadow-inner dark:border-white/[0.08] dark:bg-[#000000]">
+      {/* Grid & Plot Area - Clean aspect ratio hugs canvas perfectly */}
+      <div className="w-full aspect-[4/3] rounded-xl border border-slate-200/60 overflow-hidden relative bg-slate-50/30 dark:border-white/[0.08] dark:bg-[#000000]">
         <canvas
           ref={canvasRef}
           onPointerMove={handlePointerMove}
           onPointerLeave={handlePointerLeave}
-          className="relative z-10 h-full w-full cursor-crosshair touch-none"
+          className="w-full h-full block cursor-crosshair touch-none relative z-10"
         />
 
         {/* KaTeX Mathematical Cursor Tooltip Overlay */}
@@ -408,20 +408,12 @@ export default function EngineeringScope({ className = "" }: EngineeringScopePro
         )}
       </div>
 
-      {/* Standardized Engineering Mathematical Telemetry Bar (KaTeX) */}
-      <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2.5 border-t border-slate-200/70 text-xs text-slate-700 dark:text-zinc-300 dark:border-white/[0.08]">
-        <div className="flex items-center justify-between sm:justify-start">
-          <KatexMath math="f = 120\text{ Hz}" />
-        </div>
-        <div className="flex items-center justify-between sm:justify-start">
-          <KatexMath math="\zeta = 0.35" />
-        </div>
-        <div className="flex items-center justify-between sm:justify-start">
-          <KatexMath math="V_{\text{p-p}} = 3.3\text{ V}" />
-        </div>
-        <div className="flex items-center justify-between sm:justify-start">
-          <KatexMath math="\phi = 42.0^\circ" />
-        </div>
+      {/* Readout Footer snug directly below grid without gaps */}
+      <div className="flex justify-between items-center mt-3 pt-1 text-xs text-slate-600 dark:text-zinc-300 font-mono">
+        <KatexMath math="f = 120\text{ Hz}" />
+        <KatexMath math="\zeta = 0.35" />
+        <KatexMath math="V_{\text{p-p}} = 3.3\text{ V}" />
+        <KatexMath math="\phi = 42.0^\circ" />
       </div>
     </div>
   );

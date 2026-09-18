@@ -7,6 +7,7 @@ import { StateMachineExplorer } from '@/simulators/digital-logic/components/page
 import { DiscreteEventLogicEngine } from '@/simulators/digital-logic/engine/desLogicCore';
 import { useState } from 'react';
 import SimulationPageHeader from '@/components/SimulationPageHeader';
+import SegmentedControl from '@/components/ui/SegmentedControl';
 
 /**
  * Luminous Technical Atelier: Power Electronics-style white segmented controls;
@@ -39,27 +40,15 @@ export function DigitalLogicSimulatorApp() {
         Digital Logic Design
       </h1>
       <div className="flex justify-center overflow-x-auto pb-1">
-        <div className="mx-auto flex w-full min-w-max max-w-5xl items-center overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
-          {DIGITAL_LOGIC_TOOLS.map((tool) => {
-            const active = tool.id === activeTool;
-            return (
-              <button
-                key={tool.id}
-                type="button"
-                role="tab"
-                aria-selected={active}
-                onClick={() => setActiveTool(tool.id as DigitalLogicTool)}
-                style={active ? { background: 'linear-gradient(90deg, #2563eb 0%, #7c3aed 50%, #f43f5e 100%)' } : undefined}
-                className={`flex-1 border-r border-slate-200 py-3 px-6 text-center text-sm last:border-r-0 transition-colors dark:border-slate-700 ${
-                  active
-                    ? "text-white font-semibold"
-                    : "bg-white hover:bg-slate-50 text-slate-600 hover:text-slate-900 font-medium dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-white"
-                }`}
-              >
-                {tool.label}
-              </button>
-            );
-          })}
+        <div className="mx-auto w-full min-w-max max-w-5xl">
+          <SegmentedControl
+            options={DIGITAL_LOGIC_TOOLS.map(tool => ({ label: tool.label, value: tool.id }))}
+            value={activeTool}
+            onChange={setActiveTool}
+            size="lg"
+            fullWidth
+            aria-label="Digital Logic workspace section"
+          />
         </div>
       </div>
     </div>

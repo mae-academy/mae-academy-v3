@@ -24,7 +24,6 @@ import {
   RotateCcw,
   RotateCw,
   Scissors,
-  Search,
   Share2,
   Trash2,
   Type,
@@ -130,37 +129,32 @@ import {
   type CanvasSnapshot,
 } from '@/simulators/digital-logic/components/hooks/useHistory';
 
-const GRID_SIZE = 20;
-const TAB_D_GRID_SIZE = 25;
-const TAB_D_SYMBOL_SCALE = 1.5;
-const TERMINAL_HIT_RADIUS = 13;
-const TERMINAL_RADIUS = 4;
-const CONTROL_SYSTEMS_HEADING = 'text-sm font-bold uppercase tracking-wider text-slate-800 dark:text-white';
+import {
+  GRID_SIZE,
+  TAB_D_GRID_SIZE,
+  TAB_D_SYMBOL_SCALE,
+  TERMINAL_HIT_RADIUS,
+  TERMINAL_RADIUS,
+  ZOOM_STEP,
+  clampZoom,
+  computeTerminalVisibility,
+} from '@/simulators/shared/workspace/workspaceCanvasMechanics';
+import type { Palette } from '@/simulators/shared/workspace/workspaceTheme';
+import { UnifiedWorkspaceShell } from '@/simulators/shared/workspace/UnifiedWorkspaceShell';
+import {
+  TAB_GRADIENT,
+  TAB_ACTIVE_SHADOW,
+  ToolbarButton,
+  ToolbarDivider,
+  InspectorHeader,
+  InspectorButton,
+  InspectorSection,
+  PropertyRow,
+  ElectricalLabel,
+} from '@/simulators/shared/workspace/workspaceChrome';
 
-/* Unified signature gradient matching the Mesh tab button exactly (135deg from blue-600 through purple to rose). */
-const TAB_GRADIENT = 'linear-gradient(135deg, #2563EB 0%, #7C3AED 50%, #E11D48 100%)';
+/* Reversed variant used only by the Run/Pause pill after a session has started; not part of the shared chrome contract. */
 const TAB_GRADIENT_REV = 'linear-gradient(135deg, #E11D48 0%, #7C3AED 50%, #2563EB 100%)';
-const TAB_ACTIVE_SHADOW = '0 1px 3px rgba(2, 6, 23, 0.18)';
-
-interface Palette {
-  background: string;
-  canvas: string;
-  panel: string;
-  panelAlt: string;
-  line: string;
-  text: string;
-  muted: string;
-  subtle: string;
-  primary: string;
-  accent: string;
-  danger: string;
-  selection: string;
-  grid: string;
-  wire: string;
-  powered: string;
-  input: string;
-  shadow: string;
-}
 
 const EMPTY_SNAPSHOT: SimulationSnapshot = {
   time: 0,
@@ -458,7 +452,7 @@ export function DigitalLogicSimulatorHome({
       const mouseX = event.clientX - rect.left;
       const mouseY = event.clientY - rect.top;
       setZoom(current => {
-        const next = Math.max(0.2, Math.min(3, current * factor));
+        const next = clampZoom(current * factor);
         setPan(prev => [mouseX - (mouseX - prev[0]) * (next / current), mouseY - (mouseY - prev[1]) * (next / current)]);
         return next;
       });
@@ -1159,17 +1153,15 @@ export function DigitalLogicSimulatorHome({
   }, [wireIntersections, wires]);
 
   return (
-    <div className="v3-mae-layout font-sans text-slate-900 dark:text-slate-100" style={{ minHeight: 760, color: colors.text }}>
-      {/* Top Toolbar (Exact 2-row layout from Analog simulator) */}
-      <section className="mb-4 overflow-x-auto rounded-xl border border-slate-200 bg-white dark:border-[#1a1d24] dark:bg-[#0d0f12]" style={{ borderColor: colors.line, background: colors.panel }}>
-        <header className="min-w-max" style={{ background: colors.panel, zIndex: 5 }}>
-          {/* Row 1: Workspace navigation, history, clipboard, grids, text, component transformation */}
-          <div className="flex flex-nowrap items-center gap-1.5 px-2 pt-2" style={{ minHeight: 36 }}>
-            <ToolbarButton colors={colors} label="−" title="Zoom out" onClick={() => setZoom(v => Math.max(0.2, v / 1.15))} />
+    <UnifiedWorkspaceShell
+      colors={colors}
+      isDark={darkPreview}
+      toolbarRow1={<>
+            <ToolbarButton colors={colors} label="−" title="Zoom out" onClick={() => setZoom(v => clampZoom(v / ZOOM_STEP))} />
             <span style={{ color: colors.muted, fontSize: 11, minWidth: 42, textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>
               {Math.round(zoom * 100)}%
             </span>
-            <ToolbarButton colors={colors} label="+" title="Zoom in" onClick={() => setZoom(v => Math.min(3, v * 1.15))} />
+            <ToolbarButton colors={colors} label="+" title="Zoom in" onClick={() => setZoom(v => clampZoom(v * ZOOM_STEP))} />
             <ToolbarDivider colors={colors} />
             <ToolbarButton colors={colors} icon={<Undo2 size={14} />} title="Undo (Ctrl/Cmd+Z)" onClick={handleUndo} disabled={!history.canUndo} />
             <ToolbarButton colors={colors} icon={<Redo2 size={14} />} title="Redo (Ctrl/Cmd+Shift+Z)" onClick={handleRedo} disabled={!history.canRedo} />
@@ -1205,10 +1197,8 @@ export function DigitalLogicSimulatorHome({
             <ToolbarButton colors={colors} icon={<RotateCw size={14} />} label="90°" title="Rotate selected component 90°" onClick={() => rotateSelected(90)} disabled={!selectedComponent} />
             <ToolbarButton colors={colors} icon={<FlipHorizontal size={14} />} label="Flip X" title="Reflect selected component horizontally" onClick={() => flipSelected('h')} disabled={!selectedComponent} />
             <ToolbarButton colors={colors} icon={<FlipVertical size={14} />} label="Flip Y" title="Reflect selected component vertically" onClick={() => flipSelected('v')} disabled={!selectedComponent} />
-          </div>
-
-          {/* Row 2: Export, Import, Save Image, Share, Simulation, Speed */}
-          <div className="flex flex-nowrap items-center gap-1.5 px-2 pb-2 pt-1" style={{ minHeight: 36 }}>
+      </>}
+      toolbarRow2={<>
             <ToolbarButton colors={colors} icon={<Download size={14} />} label="Export" title="Export circuit as NAD netlist" onClick={exportNad} />
             <ToolbarButton colors={colors} icon={<Upload size={14} />} label="Import" title="Import circuit from NAD netlist" onClick={() => nadInputRef.current?.click()} />
             <input ref={nadInputRef} type="file" accept=".nad,application/x-mae-nad+json,application/json" onChange={importNad} style={{ display: 'none' }} />
@@ -1271,33 +1261,10 @@ export function DigitalLogicSimulatorHome({
                 <V3Math math={`${simulationSpeed.toFixed(2)}\\times`} />
               </span>
             </div>
-          </div>
-        </header>
-      </section>
-
-      {/* Main Container */}
-      <div className="flex flex-col xl:flex-row gap-4 items-start w-full">
-        {/* Left Column (Library + Canvas + Logic Analysis Workspace) */}
-        <div className="flex-1 min-w-0 flex flex-col gap-4 w-full">
-          {/* Top Row: Library + Canvas */}
-          <div className="flex flex-col md:flex-row gap-4 items-start w-full">
-            {/* Left Sidebar: Component Library */}
-            <aside className="w-full md:w-56 shrink-0 min-h-0 overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-[#1a1d24] dark:bg-[#0d0f12]" style={{ background: colors.panel, borderColor: colors.line, display: 'flex', flexDirection: 'column', height: '700px' }}>
-              <div className="border-b px-3 py-2" style={{ borderColor: colors.line }}>
-                <div className={CONTROL_SYSTEMS_HEADING}>Component Library</div>
-              </div>
-              <div style={{ padding: 10, borderBottom: `1px solid ${colors.line}` }}>
-                <div style={{ position: 'relative' }}>
-                  <Search size={14} style={{ position: 'absolute', left: 9, top: 9, color: colors.subtle }} />
-                  <input
-                    value={search}
-                    onChange={event => setSearch(event.target.value)}
-                    placeholder="Search components"
-                    style={{ width: '100%', boxSizing: 'border-box', border: `1px solid ${colors.line}`, outline: 'none', background: colors.input, color: colors.text, borderRadius: 7, padding: '8px 9px 8px 29px', fontSize: 11 }}
-                  />
-                </div>
-              </div>
-              <div style={{ overflowY: 'auto', padding: '6px 6px 14px' }}>
+      </>}
+      librarySearchValue={search}
+      onLibrarySearchChange={(value: string) => setSearch(value)}
+      libraryContent={<>
                 {Object.entries(filteredCategories).map(([category, items]) => {
                   const collapsed = collapsedCategories.has(category);
                   return (
@@ -1346,88 +1313,20 @@ export function DigitalLogicSimulatorHome({
                     </section>
                   );
                 })}
-              </div>
-            </aside>
-
-            {/* Center Canvas */}
-            <main className="relative flex-1 min-w-0 h-[700px] overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-[#1a1d24] dark:bg-[#07080a]" style={{ background: colors.canvas, borderColor: colors.line }}>
-              <div className="flex items-start justify-between border-b px-4 py-2" style={{ borderColor: colors.line }}>
-                <div>
-                  <div className={CONTROL_SYSTEMS_HEADING}>Interactive Digital Logic Canvas</div>
-                </div>
-                <div className="flex items-center gap-2 font-mono text-[10px]" style={{ color: colors.muted }}>
-                  {components.length} CMP · {wires.length} NET
-                </div>
-              </div>
-
-              <svg
-                ref={svgRef}
-                onMouseDown={handleCanvasMouseDown}
-                onMouseMove={handleCanvasMouseMove}
-                onMouseUp={handleCanvasMouseUp}
-                onMouseLeave={handleCanvasMouseUp}
-                onContextMenu={event => event.preventDefault()}
-                onDragOver={event => event.preventDefault()}
-                onDrop={handleDrop}
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  display: 'block',
-                  cursor: dragState?.kind === 'pan' ? 'grabbing' : wiring.from ? 'crosshair' : 'default',
-                  touchAction: 'none',
-                }}
-              >
-                <defs>
-                  <marker id="arrow" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
-                    <path d="M 0,0 L 6,3 L 0,6 Z" fill="#64748b" />
-                  </marker>
-                  {tabDGridMode === 'dots' ? (
-                    <pattern
-                      key="grid-pattern-dots"
-                      id="workspace-grid-dots"
-                      width={gridSize}
-                      height={gridSize}
-                      patternUnits="userSpaceOnUse"
-                      patternTransform={`translate(${-gridSize / 2}, ${-gridSize / 2})`}
-                    >
-                      <circle
-                        cx={gridSize / 2}
-                        cy={gridSize / 2}
-                        r={1.65}
-                        fill={darkPreview ? '#222630' : '#7a93b1'}
-                        fillOpacity={0.9}
-                      />
-                    </pattern>
-                  ) : (
-                    <pattern
-                      key="grid-pattern-cartesian"
-                      id="workspace-grid-cartesian"
-                      width={gridSize}
-                      height={gridSize}
-                      patternUnits="userSpaceOnUse"
-                    >
-                      <path
-                        d={`M ${gridSize} 0 L 0 0 0 ${gridSize}`}
-                        fill="none"
-                        stroke={darkPreview ? '#1a1d24' : '#a8b8cc'}
-                        strokeWidth={1.15}
-                        strokeOpacity={0.85}
-                      />
-                    </pattern>
-                  )}
-                </defs>
-
-                <g transform={`translate(${pan[0]},${pan[1]}) scale(${zoom})`}>
-                  {gridVisible && tabDGridMode !== 'hidden' && (
-                    <rect
-                      x={-5000}
-                      y={-5000}
-                      width={10000}
-                      height={10000}
-                      fill={`url(#workspace-grid-${tabDGridMode})`}
-                    />
-                  )}
-
+      </>}
+      canvasTitle="Interactive Digital Logic Canvas"
+      canvasStats={`${components.length} CMP · ${wires.length} NET`}
+      svgRef={svgRef}
+      zoom={zoom}
+      pan={pan}
+      gridMode={gridVisible ? tabDGridMode : 'hidden'}
+      gridSize={gridSize}
+      canvasCursor={dragState?.kind === 'pan' ? 'grabbing' : wiring.from ? 'crosshair' : 'default'}
+      onCanvasMouseDown={handleCanvasMouseDown}
+      onCanvasMouseMove={handleCanvasMouseMove}
+      onCanvasMouseUp={handleCanvasMouseUp}
+      onCanvasDrop={handleDrop}
+      canvasContent={<>
                   {dragState?.kind === 'marquee' && (
                     <rect
                       x={Math.min(dragState.start[0], dragState.end[0])}
@@ -1449,7 +1348,7 @@ export function DigitalLogicSimulatorHome({
                       const wireState = simulation.current.getWireLogicState(wire.id);
                       const isHigh = wireState === 1;
                       const strokeColor = selected ? colors.selection : isHigh ? colors.powered : colors.wire;
-                      const strokeWidth = selected ? 2.5 : 1.75;
+                      const strokeWidth = selected ? 2 : 1.5;
                       const hitPath = pointsToPath(wire.path);
                       const renderPath = buildJumpArcPath(wire.path, wireIntersections, wire.id, 4);
                       const len = pathLength(wire.path);
@@ -1562,7 +1461,12 @@ export function DigitalLogicSimulatorHome({
                           {/* Terminals — hidden unless hovered, selected, or an active wire is being drawn */}
                           {terminals.map(term => {
                             const termAxis = Math.abs(term.x) >= Math.abs(term.y) ? 'horizontal' : 'vertical';
-                            const showTerminals = isHighlighted || hoveredComponentId === component.id || Boolean(wiring.from);
+                            const showTerminals = computeTerminalVisibility({
+                              isSelectedOrHighlighted: isHighlighted,
+                              hoveredComponentId,
+                              componentId: component.id,
+                              wiringInProgress: Boolean(wiring.from),
+                            });
                             return (
                               <g key={term.id} transform={`translate(${term.x}, ${term.y})`}>
                                 <circle
@@ -1650,10 +1554,8 @@ export function DigitalLogicSimulatorHome({
                       </g>
                     ))}
                   </g>
-                </g>
-              </svg>
-
-              {components.length === 0 && (
+      </>}
+      canvasEmptyOverlay={components.length === 0 && (
                 <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', pointerEvents: 'none' }}>
                   <div className="flex flex-col items-center justify-center select-none">
                     <div className="px-6 py-2.5 bg-white border border-slate-100 rounded-2xl shadow-sm mb-3 dark:bg-slate-900 dark:border-slate-800">
@@ -1666,26 +1568,10 @@ export function DigitalLogicSimulatorHome({
                     </p>
                   </div>
                 </div>
-              )}
-            </main>
-          </div>
-
-          {/* Bottom Section: Logic Analysis Workspace */}
-          <section className="w-full overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-[#1a1d24] dark:bg-[#0d0f12]" style={{ background: colors.panel, borderColor: colors.line, display: 'flex', flexDirection: 'column' }}>
-            <div className="border-b px-5 py-3" style={{ borderColor: colors.line }}>
-              <div className={CONTROL_SYSTEMS_HEADING}>Logic Analysis Workspace</div>
-            </div>
-            <DigitalLogicAnalysisBox colors={colors} standalone components={components} wires={wires} snapshot={snapshot} />
-          </section>
-        </div>
-
-        {/* Right Column: Active Element & Properties Panel */}
-        <div className="w-full xl:w-80 shrink-0 flex flex-col gap-4">
-          <aside className="w-full min-h-0 overflow-y-auto rounded-xl border border-slate-200 bg-white dark:border-[#1a1d24] dark:bg-[#0d0f12]" style={{ background: colors.panel, borderColor: colors.line, display: 'flex', flexDirection: 'column' }}>
-            <div className="border-b px-3 py-2" style={{ borderColor: colors.line }}>
-              <div className={CONTROL_SYSTEMS_HEADING}>Active Element &amp; Properties</div>
-            </div>
-            {selectedComponent ? (
+      )}
+      analysisTitle="Logic Analysis Workspace"
+      analysisContent={<DigitalLogicAnalysisBox colors={colors} standalone components={components} wires={wires} snapshot={snapshot} />}
+      inspectorContent={selectedComponent ? (
               <ComponentInspector
                 colors={colors}
                 component={selectedComponent}
@@ -1713,16 +1599,8 @@ export function DigitalLogicSimulatorHome({
                 onMove={moveSelected}
                 onDelete={removeSelection}
               />
-            ) : (
-              <div style={{ padding: '24px 16px', textAlign: 'center', color: colors.muted, fontSize: 12 }}>
-                Select an element to inspect its properties.
-              </div>
-            )}
-          </aside>
-        </div>
-      </div>
-
-      {/* Modals */}
+            ) : null}
+    >
       <ExportPreviewModal
         isOpen={exportModalOpen}
         onClose={() => setExportModalOpen(false)}
@@ -1739,7 +1617,7 @@ export function DigitalLogicSimulatorHome({
         wireCount={wires.length}
         previewUrl={null}
       />
-    </div>
+    </UnifiedWorkspaceShell>
   );
 }
 
@@ -2264,111 +2142,8 @@ function PropertyEditorField({ colors, label, definition, value, onChange }: { c
 }
 
 // ─── TOOLBAR & BASE UI HELPERS ──────────────────────────────────────────────
-
-function ToolbarButton({ colors, icon, label, title, onClick, active, disabled }: { colors: Palette; icon?: React.ReactNode; label?: string; title: string; onClick: () => void; active?: boolean; disabled?: boolean }) {
-  const isActive = Boolean(active) && !disabled;
-  return (
-    <button
-      title={title}
-      onClick={onClick}
-      disabled={disabled}
-      style={{
-        border: isActive ? '1px solid transparent' : `1px solid ${colors.line}`,
-        background: isActive ? TAB_GRADIENT : colors.panelAlt,
-        color: isActive ? '#ffffff' : disabled ? colors.subtle : colors.muted,
-        borderRadius: 8,
-        padding: '6px 12px',
-        minHeight: 32,
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 5,
-        fontSize: 12,
-        fontWeight: 500,
-        cursor: disabled ? 'not-allowed' : 'pointer',
-        opacity: disabled ? 0.5 : 1,
-        boxShadow: isActive ? TAB_ACTIVE_SHADOW : 'none',
-        flexShrink: 0,
-        whiteSpace: 'nowrap',
-        transition: 'background .15s ease',
-      }}
-    >
-      {icon}
-      {label}
-    </button>
-  );
-}
-
-function ToolbarDivider({ colors }: { colors: Palette }) {
-  return <span style={{ width: 1, height: 20, background: colors.line, margin: '0 1px', flexShrink: 0 }} />;
-}
-
-function InspectorHeader({ colors, title, subtitle }: { colors: Palette; title: React.ReactNode; subtitle: string }) {
-  return (
-    <div style={{ padding: '16px 16px 14px', borderBottom: `1px solid ${colors.line}` }}>
-      <div>
-        <div className="text-xl font-bold tracking-tight text-slate-800 dark:text-slate-100">{title}</div>
-        <div className="text-slate-600 dark:text-slate-400" style={{ marginTop: 4, fontSize: 11, lineHeight: 1.25 }}>{subtitle}</div>
-      </div>
-    </div>
-  );
-}
-
-function InspectorButton({ colors, children, onClick, danger, active, disabled }: { colors: Palette; children: React.ReactNode; onClick: () => void; danger?: boolean; active?: boolean; disabled?: boolean }) {
-  const tone = danger ? colors.danger : active ? colors.primary : colors.muted;
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      style={{
-        flex: 1,
-        minHeight: 30,
-        display: 'inline-flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 4,
-        border: `1px solid ${tone}55`,
-        borderRadius: 8,
-        background: active || danger ? `${tone}0d` : colors.panelAlt,
-        color: tone,
-        cursor: disabled ? 'not-allowed' : 'pointer',
-        opacity: disabled ? 0.5 : 1,
-        fontSize: 10,
-        fontWeight: 700,
-      }}
-    >
-      {children}
-    </button>
-  );
-}
-
-function InspectorSection({ colors, label, children }: { colors: Palette; label: string; children: React.ReactNode }) {
-  return (
-    <section style={{ padding: '12px 15px', borderBottom: `1px solid ${colors.line}` }}>
-      <div className="mae-panel-section-header" style={{ marginBottom: 8 }}>{label}</div>
-      {children}
-    </section>
-  );
-}
-
-function PropertyRow({ colors, label, unit, children }: { colors: Palette; label: string; unit?: string; children: React.ReactNode }) {
-  return (
-    <label style={{ display: 'grid', gridTemplateColumns: '1fr 156px', gap: 8, alignItems: 'center', marginBottom: 8 }}>
-      <span className="mae-panel-field-label" style={{ lineHeight: 1.25 }}>
-        <ElectricalLabel label={label} unit={unit} />
-      </span>
-      {children}
-    </label>
-  );
-}
-
-function ElectricalLabel({ label, unit }: { label: string; unit?: string }) {
-  return (
-    <>
-      {label}
-      {unit && <span style={{ marginInlineStart: 3, color: 'inherit' }}><V3Math math={`\\mathrm{${unit}}`} /></span>}
-    </>
-  );
-}
+// ToolbarButton, ToolbarDivider, InspectorHeader, InspectorButton, InspectorSection,
+// PropertyRow, and ElectricalLabel now live in the shared workspace chrome module.
 
 function componentLabelToLatex(label: string): string {
   const normalized = label.trim();

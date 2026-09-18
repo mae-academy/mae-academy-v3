@@ -19,9 +19,9 @@ function classAlreadyRegistered(rt: JscppCRuntime, mangledName: string): boolean
   return rt.getTypeSignature({ type: "class", name: mangledName }) in rt.types;
 }
 
-function registerStackClass(rt: JscppCRuntime, suffix: string, elementType: JscppType): void {
+export function ensureStackClass(rt: JscppCRuntime, suffix: string, elementType: JscppType): JscppType {
   const mangledName = `__stack_${suffix}`;
-  if (classAlreadyRegistered(rt, mangledName)) return;
+  if (classAlreadyRegistered(rt, mangledName)) return { type: "class", name: mangledName };
 
   const stackType = rt.newClass(mangledName, []);
   const sig = rt.getTypeSignature(stackType);
@@ -67,12 +67,14 @@ function registerStackClass(rt: JscppCRuntime, suffix: string, elementType: Jscp
   rt.regFunc((_rt, _this) => _rt.val(_rt.intTypeLiteral, storage(_this).items.length), stackType, "size", [], rt.intTypeLiteral);
 
   registerContainerPrinter(sig, { open: "[", close: "]", items: v => storage(v).items });
+
+  return stackType;
 }
 
 const stackInclude: JscppInclude = {
   load(rt) {
-    registerStackClass(rt, "int", rt.intTypeLiteral);
-    registerStackClass(rt, "double", rt.doubleTypeLiteral);
+    ensureStackClass(rt, "int", rt.intTypeLiteral);
+    ensureStackClass(rt, "double", rt.doubleTypeLiteral);
   },
 };
 

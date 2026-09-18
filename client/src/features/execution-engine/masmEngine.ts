@@ -45,6 +45,7 @@ function formatFlags(cpu: Cpu8086): Record<string, number> {
     SF: bit(cpu.flags.sf),
     OF: bit(cpu.flags.of),
     PF: bit(cpu.flags.pf),
+    DF: bit(cpu.flags.df),
   };
 }
 
@@ -114,6 +115,7 @@ export async function run(
       steps.push({
         stepIndex: steps.length,
         line: result.line ?? 0,
+        instruction: result.instruction,
         callStack: [...cpu.callStack],
         variables: {},
         registers: formatRegisters(cpu),

@@ -91,6 +91,7 @@ finally:
 if __mae_steps:
     __mae_steps[-1]["variables"] = __mae_serialize_locals(__mae_namespace)
     __mae_steps[-1]["stdout"] = __mae_stdout.getvalue()
+    __mae_steps[-1]["callStack"] = list(__mae_call_stack)
 
 json.dumps({"steps": __mae_steps, "error": __mae_error}, default=__mae_default)
 `;

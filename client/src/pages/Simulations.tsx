@@ -1,8 +1,9 @@
-/** MAE Academy visual system: locale-driven simulations collection. */
-import CardGridPage from "@/components/CardGridPage";
+/** MAE Academy visual system: Practical Simulations section with rich filtering & sorting. */
+import PracticalSimulations from "@/components/PracticalSimulations";
 import { useLocale } from "@/contexts/LocaleContext";
 
 export default function Simulations() {
   const { copy } = useLocale();
-  return <CardGridPage type="simulations" {...copy.collections.simulations} />;
+  return <PracticalSimulations {...copy.collections.simulations} />;
 }
+

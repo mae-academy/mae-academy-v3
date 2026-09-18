@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import * as masmEngine from "@/features/execution-engine/masmEngine";
+import { executeRemoteC, executeRemoteCpp } from "@/features/execution-engine/remoteCppEngine";
 import type {
   ExecutionRequest,
   ExecutionResponse,
@@ -9,6 +10,7 @@ import type {
   ExecutionOptions,
   ExecutionResult,
   SupportedLanguage,
+  TraceStep,
 } from "@/features/execution-engine/types";
 
 const WORKER_TIMEOUT_MS = 20000;
@@ -31,7 +33,7 @@ export interface UseExecutionEngineReturn {
   reset: () => void;
 }
 
-/** Drives the Pyodide/JSCPP worker for Python and C/C++; MASM runs directly (see masmEngine.ts). */
+/** Drives the execution engine: remote real GCC (Wandbox) for C/C++, Pyodide worker for Python, MASM directly. */
 export function useExecutionEngine(): UseExecutionEngineReturn {
   const [isRunning, setIsRunning] = useState(false);
   const [result, setResult] = useState<ExecutionResult | null>(null);
@@ -59,7 +61,7 @@ export function useExecutionEngine(): UseExecutionEngineReturn {
   const getWorker = useCallback((): Worker => {
     if (workerRef.current) return workerRef.current;
 
-    // Created lazily: a consumer that never runs Python/C++ should not pay for the Pyodide fetch.
+    // Created lazily: a consumer that never runs Python should not pay for the Pyodide fetch.
     const worker = new Worker(
       new URL("./executionWorker.ts", import.meta.url),
       { type: "module" }
@@ -111,18 +113,67 @@ export function useExecutionEngine(): UseExecutionEngineReturn {
         setResult(null);
       }
 
+      const id = String(nextIdRef.current++);
+      latestIdRef.current = id;
+
       if (language === "masm8086") {
         return masmEngine.run(code, options).then(outcome => {
-          if (mountedRef.current) {
+          if (mountedRef.current && id === latestIdRef.current) {
             setIsRunning(false);
             setResult(outcome);
           }
         });
       }
-      const workerLanguage: Exclude<SupportedLanguage, "masm8086"> = language;
 
-      const id = String(nextIdRef.current++);
-      latestIdRef.current = id;
+      if (language === "cpp" || language === "c") {
+        const executor = language === "cpp" ? executeRemoteCpp : executeRemoteC;
+        const stdin = options?.stdin ?? "";
+
+        return executor(code, stdin)
+          .then(remoteOutcome => {
+            if (!mountedRef.current || id !== latestIdRef.current) return;
+            setIsRunning(false);
+
+            const isSuccess = remoteOutcome.success && remoteOutcome.exitCode === 0;
+            const compilerOrRuntimeError = !isSuccess
+              ? (remoteOutcome.stderr || remoteOutcome.error || `Process exited with code ${remoteOutcome.exitCode}`)
+              : undefined;
+
+            const terminalOutput = isSuccess && remoteOutcome.stderr
+              ? (remoteOutcome.stdout ? `${remoteOutcome.stdout}\n${remoteOutcome.stderr}` : remoteOutcome.stderr)
+              : remoteOutcome.stdout;
+
+            const steps: TraceStep[] = [
+              {
+                stepIndex: 0,
+                line: 1,
+                callStack: ["main"],
+                variables: {},
+                stdout: terminalOutput,
+              },
+            ];
+
+            setResult({
+              success: isSuccess,
+              error: compilerOrRuntimeError,
+              steps,
+              totalSteps: steps.length,
+            });
+          })
+          .catch(cause => {
+            if (!mountedRef.current || id !== latestIdRef.current) return;
+            setIsRunning(false);
+            const message = cause instanceof Error ? cause.message : String(cause);
+            setResult({
+              success: false,
+              error: message,
+              steps: [],
+              totalSteps: 0,
+            });
+          });
+      }
+
+      const workerLanguage: "python" = language;
       const worker = getWorker();
 
       return new Promise<void>(resolve => {

@@ -1,13 +1,10 @@
 import type { Point } from '@/simulators/digital-logic/models/wiring';
 import { snapPointToGrid } from '@/simulators/digital-logic/models/wiring';
+import { tabDGentleWheelZoomFactor } from '@/simulators/shared/workspace/workspaceCanvasMechanics';
 
 export type TabDTerminalAxis = 'horizontal' | 'vertical';
 
-/** A deliberately gentle, pixel-normalized wheel response for the documented CAD workspace. */
-export function tabDGentleWheelZoomFactor(deltaY: number): number {
-  const normalizedDelta = Math.max(-80, Math.min(80, deltaY));
-  return Math.exp(-normalizedDelta * 0.00045);
-}
+export { tabDGentleWheelZoomFactor };
 
 /** Projects a visual terminal onto the same lattice used by Tab D components and wires. */
 export function alignTabDTerminalToGrid(point: Point, gridSize: number): Point {

@@ -28,12 +28,116 @@ export const homeGatewayMeta: HomeGatewayMeta[] = [
   { href: "/simulations", index: "03", type: "simulations", visualVariant: 5, accent: "from-indigo-600 via-cyan-500 to-violet-600" },
 ];
 
-export const simulationRouteMeta = [
-  { slug: "control-systems", index: 0 }, { slug: "circuit-lab", index: 1 }, { slug: "power-electronics", index: 2 },
-  { slug: "code", index: 3 }, { slug: "plc", index: 4 }, { slug: "signals-and-systems", index: 5 },
-  { slug: "digital-logic-design", index: 6 }, { slug: "linear-algebra", index: 7 }, { slug: "communication-and-network", index: 8 },
-  { slug: "circuitlab-1", index: 9, visualVariant: 1 }, { slug: "circuitlab-2", index: 10, visualVariant: 1 }, { slug: "circuitlab-3", index: 11, visualVariant: 1 },
-] as const;
+export type SimulationCategory = 'systems-control' | 'circuits-power' | 'embedded-software';
+
+export interface SimulationItem {
+  id: string;
+  title: string;
+  category: 'systems-control' | 'circuits-power' | 'embedded-software';
+  description: string;
+  isFeatured?: boolean; // For "Hot / Special"
+  createdAt: string;     // ISO date for "Newest"
+  href: string;
+  badge?: 'HOT' | 'NEW' | 'BETA';
+  slug?: string;
+  index?: number;
+  visualVariant?: number;
+}
+
+export interface SimulationItemMeta {
+  id: string;
+  slug: string;
+  index: number;
+  category: SimulationCategory;
+  isFeatured?: boolean;
+  createdAt: string;
+  href?: string;
+  badge?: 'HOT' | 'NEW' | 'BETA';
+  visualVariant?: number;
+}
+
+export const simulationsCatalog: SimulationItemMeta[] = [
+  {
+    id: "control-systems",
+    slug: "control-systems",
+    index: 0,
+    category: "systems-control",
+    isFeatured: true,
+    badge: "HOT",
+    createdAt: "2026-01-15T00:00:00Z",
+  },
+  {
+    id: "circuit-lab",
+    slug: "circuit-lab",
+    index: 1,
+    category: "circuits-power",
+    isFeatured: true,
+    badge: "HOT",
+    createdAt: "2026-01-20T00:00:00Z",
+  },
+  {
+    id: "power-electronics",
+    slug: "power-electronics",
+    index: 2,
+    category: "circuits-power",
+    isFeatured: false,
+    createdAt: "2026-02-01T00:00:00Z",
+  },
+  {
+    id: "code",
+    slug: "code",
+    index: 3,
+    category: "embedded-software",
+    isFeatured: true,
+    badge: "HOT",
+    createdAt: "2026-02-10T00:00:00Z",
+  },
+  {
+    id: "plc",
+    slug: "plc",
+    index: 4,
+    category: "systems-control",
+    isFeatured: false,
+    createdAt: "2026-02-15T00:00:00Z",
+  },
+  {
+    id: "signals-and-systems",
+    slug: "signals-and-systems",
+    index: 5,
+    category: "circuits-power",
+    isFeatured: false,
+    createdAt: "2026-02-20T00:00:00Z",
+  },
+  {
+    id: "digital-logic-design",
+    slug: "digital-logic-design",
+    index: 6,
+    category: "circuits-power",
+    isFeatured: false,
+    createdAt: "2026-02-25T00:00:00Z",
+  },
+  {
+    id: "linear-algebra",
+    slug: "linear-algebra",
+    index: 7,
+    category: "systems-control",
+    isFeatured: false,
+    createdAt: "2026-03-01T00:00:00Z",
+  },
+  {
+    id: "arduino-studio",
+    slug: "arduino-studio",
+    index: 8,
+    category: "embedded-software",
+    visualVariant: 3,
+    href: "/simulators/arduino-studio",
+    isFeatured: true,
+    badge: "HOT",
+    createdAt: "2026-03-15T00:00:00Z",
+  },
+];
+
+export const simulationRouteMeta = simulationsCatalog;
 
 export const controlSystemToolMeta: Record<Locale, Array<{ slug: string; label: string }>> = {
   en: [

@@ -27,10 +27,14 @@ function describeError(cause: unknown): string {
 
 function collectVariables(mydebugger: JscppDebugger): Record<string, TraceVariable> {
   const variables: Record<string, TraceVariable> = {};
-  for (const entry of mydebugger.variable()) {
-    // Function bindings (e.g. the global `add`/`main` entries) carry no type/value; skip them.
-    if (entry.type === undefined) continue;
-    variables[entry.name] = { value: entry.value, type: entry.type };
+  try {
+    for (const entry of mydebugger.variable()) {
+      // Function bindings (e.g. the global `add`/`main` entries) carry no type/value; skip them.
+      if (entry.type === undefined) continue;
+      variables[entry.name] = { value: entry.value, type: entry.type };
+    }
+  } catch {
+    // Guard against upstream JSCPP debugger makeValueString crashes on complex types
   }
   return variables;
 }

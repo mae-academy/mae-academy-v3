@@ -3,6 +3,7 @@
  * Route camera pan uses AnimatePresence while persistent chrome remains in MainLayout.
  */
 import { AnimatePresence, motion } from "framer-motion";
+import { lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Route, Switch, useLocation } from "wouter";
@@ -15,6 +16,7 @@ import Simulations from "./pages/Simulations";
 import SimulationDetail from "./pages/SimulationDetail";
 import About from "./pages/About";
 import NotFound from "./pages/NotFound";
+const ArduinoStudioPage = lazy(() => import("./pages/ArduinoStudioPage"));
 import HiddenSymbolDesigner from "./simulators/circuit-engine/components/pages/HiddenSymbolDesigner";
 
 function AnimatedRoutes() {
@@ -53,6 +55,9 @@ function AnimatedRoutes() {
           <Route path="/simulations/:slug/:tool" component={SimulationDetail} />
           <Route path="/simulations/:slug" component={SimulationDetail} />
           <Route path="/simulations" component={Simulations} />
+          <Route path="/simulators/arduino-studio">
+            <Suspense fallback={<div className="container py-16 font-mono text-xs text-slate-500">Loading Arduino Studio…</div>}><ArduinoStudioPage /></Suspense>
+          </Route>
           <Route path="/about" component={About} />
           <Route path="/_dev/symbols" component={HiddenSymbolDesigner} />
           <Route path="/404" component={NotFound} />
