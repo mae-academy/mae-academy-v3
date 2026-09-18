@@ -37,6 +37,7 @@ import {
 import { nanoid } from 'nanoid';
 import { toast } from 'sonner';
 import { V3Math } from '@/components/ui/V3Math';
+import SegmentedControl from '@/components/ui/SegmentedControl';
 import { KATEX_EMBEDDED_FONT_CSS } from '@/simulators/digital-logic/models/katexSvgFonts';
 import { DigitalLogicAnalysisBox } from '@/simulators/digital-logic/components/ui-components/DigitalLogicAnalysisBox';
 import { ExportPreviewModal, svgToPngBlob, type ExportItem } from '@/simulators/circuit-engine/components/ui-components/ExportPreviewModal';
@@ -1179,26 +1180,24 @@ export function DigitalLogicSimulatorHome({
             <ToolbarButton colors={colors} icon={<Trash2 size={14} />} title="Delete (Del/Backspace)" onClick={removeSelection} disabled={!selectedComponent && !selectedWire && !selectedText && marqueeIds.length === 0} />
             <ToolbarDivider colors={colors} />
             <div className="flex items-center gap-2">
-              <ToolbarButton
-                colors={colors}
-                label="Dotted"
-                title="Dotted grid background"
-                onClick={() => { setTabDGridMode('dots'); setGridVisible(true); }}
-                active={tabDGridMode === 'dots' && gridVisible}
-              />
-              <ToolbarButton
-                colors={colors}
-                label="Cartesian"
-                title="Cartesian grid background"
-                onClick={() => { setTabDGridMode('cartesian'); setGridVisible(true); }}
-                active={tabDGridMode === 'cartesian' && gridVisible}
-              />
-              <ToolbarButton
-                colors={colors}
-                label="Hidden"
-                title="Hide grid"
-                onClick={() => { setTabDGridMode('hidden'); setGridVisible(false); }}
-                active={tabDGridMode === 'hidden' || !gridVisible}
+              <SegmentedControl
+                options={[
+                  { label: "Dotted", value: "dots" },
+                  { label: "Cartesian", value: "cartesian" },
+                  { label: "Hidden", value: "hidden" },
+                ]}
+                value={gridVisible ? tabDGridMode : "hidden"}
+                onChange={(val) => {
+                  if (val === "hidden") {
+                    setGridVisible(false);
+                    setTabDGridMode("hidden");
+                  } else {
+                    setGridVisible(true);
+                    setTabDGridMode(val as "dots" | "cartesian");
+                  }
+                }}
+                size="sm"
+                aria-label="Grid Style"
               />
               <ToolbarButton colors={colors} icon={<Type size={14} />} label="Text" title="Add editable workspace text (T)" onClick={addText} />
             </div>
