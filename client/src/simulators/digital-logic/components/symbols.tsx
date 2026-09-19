@@ -963,35 +963,36 @@ const LogicGate: SymbolFC = ({ props }) => {
   const halfHeight = geometry.bodyHeight / 2;
 
   if (unary) {
-    // PART 1: NOT GATE & INVERTER TERMINAL RE-ANCHORING
+    // PART 1: NOT GATE — Strict 25px Grid Geometry
     // 1. Centered around (0,0).
-    // 2. Triangle base: Vertical line at x = -20px spanning from y = -18px to y = +18px.
-    // 3. Input Lead: Straight horizontal line from grid dot at (-25, 0) to triangle base at (-20, 0).
-    // 4. Input Terminal Node: Explicitly anchored at coordinates (-25, 0).
-    // 5. Apex & Inversion Bubble: Triangle apex points right to (+12, 0). Bubble center at (+16, 0) with radius r = 4px.
-    // 6. Output Lead: Extends horizontally from bubble edge (+20, 0) to grid dot at (+25, 0).
-    // 7. Output Terminal Node: Explicitly anchored at coordinates (+25, 0).
+    // 2. Triangle base: vertical line at x = -15px, spanning y = [-15, +15].
+    // 3. Input Lead: horizontal line from grid dot (-25, 0) to base (-15, 0).
+    // 4. Apex: Triangle tip at (+10, 0).
+    // 5. Inversion Bubble: center at (+14, 0), radius r = 4px.
+    // 6. Output Lead: from bubble edge (+18, 0) to grid dot at (+25, 0).
     return (
       <g>
-        <line x1={-25} y1={0} x2={-20} y2={0} stroke="currentColor" strokeWidth={2} />
-        <path d="M -20,-18 L 12,0 L -20,18 Z" fill="none" stroke="currentColor" strokeWidth={2} strokeLinejoin="round" />
-        <circle cx={16} cy={0} r={4} fill="none" stroke="currentColor" strokeWidth={2} />
-        <line x1={20} y1={0} x2={25} y2={0} stroke="currentColor" strokeWidth={2} strokeLinecap="round" />
+        {/* Input lead: grid dot (-25,0) → triangle base (-15,0) */}
+        <line x1={-25} y1={0} x2={-15} y2={0} stroke="currentColor" strokeWidth={2} />
+        {/* Triangle: base at x=-15 spanning ±15px, apex at x=+10 */}
+        <path d="M -15,-15 L 10,0 L -15,15 Z" fill="none" stroke="currentColor" strokeWidth={2} strokeLinejoin="round" />
+        {/* Inversion bubble: center at (+14,0), r=4 */}
+        <circle cx={14} cy={0} r={4} fill="none" stroke="currentColor" strokeWidth={2} />
+        {/* Output lead: bubble edge (+18,0) → grid dot (+25,0) */}
+        <line x1={18} y1={0} x2={25} y2={0} stroke="currentColor" strokeWidth={2} strokeLinecap="round" />
       </g>
     );
   }
 
-  // PART 3: CURVED GATES (OR, NOR, XOR, XNOR) PROPORTIONS & HORNS
-  // 1. Back Arc Curvature & Pin Attachment:
-  //    M x_top y_top Q (x_back + 15) 0, x_bottom y_bottom
-  //    With x_back = -20: corners at (-20, ±halfHeight), control point at (-5, 0).
-  // 2. Top and bottom corners meet front converging arcs seamlessly without sharp horns.
-  // 3. XOR Extra Input Arc: Offset detached rear arc cleanly by 7px behind main gate body (at x = -27).
+  // PART 3: CURVED GATES (OR, NOR, XOR, XNOR) — Corrected 25px-grid arc geometry.
+  // Back arc corners are at x=-25 (matching input lead axis), gentle inward curve via Q(-10, 0).
+  // Front arcs converge smoothly at the output tip (+25, 0), with a lead to geometry.outputX.
+  // leadEndOr computes the back-arc surface x-position at height y (parabolic approximation of Q bezier).
   const leadEndOr = (y: number) => {
-    // Exact back arc curve: x(y) = -20 + 15 * (1 - (y / halfHeight)^2)
-    // Input leads from inputX (-50) connect flush with the back arc:
+    // Back arc: M -25,-halfH Q -10,0 -25,+halfH
+    // Parabolic approximation: x(y) = -25 + 15*(1 - (y/halfH)^2)
     const t = y / halfHeight;
-    return -20 + 15 * (1 - t * t);
+    return -25 + 15 * (1 - t * t);
   };
 
   return (
@@ -1008,14 +1009,17 @@ const LogicGate: SymbolFC = ({ props }) => {
         />
       ))}
       {orFamily ? (
+        // OR/NOR/XOR/XNOR family: corrected arc geometry with body corners at x=-25,
+        // gentle back-arc via Q(-10,0), and smooth front arcs converging at x=+25.
         <path
-          d={`M -20,${-halfHeight} Q 5,${-halfHeight * 0.75} 25,0 Q 5,${halfHeight * 0.75} -20,${halfHeight} Q -5,0 -20,${-halfHeight} Z`}
+          d={`M -25,${-halfHeight} Q 5,0 25,0 Q 5,0 -25,${halfHeight} Q -10,0 -25,${-halfHeight} Z`}
           fill="none"
           stroke="currentColor"
           strokeWidth={2}
           strokeLinejoin="round"
         />
       ) : (
+        // AND/NAND family: rectangular body with right semicircular cap
         <path
           d={`M -22,${-halfHeight} H 2 A 23,${halfHeight} 0 0 1 2,${halfHeight} H -22 Z`}
           fill="none"
@@ -1025,8 +1029,9 @@ const LogicGate: SymbolFC = ({ props }) => {
         />
       )}
       {(kind === 'XOR' || kind === 'XNOR') && (
+        // XOR extra arc: 7px behind the x=-25 body back edge = x=-32
         <path
-          d={`M -27,${-halfHeight} Q -12,0 -27,${halfHeight}`}
+          d={`M -32,${-halfHeight} Q -17,0 -32,${halfHeight}`}
           fill="none"
           stroke="currentColor"
           strokeWidth={2}

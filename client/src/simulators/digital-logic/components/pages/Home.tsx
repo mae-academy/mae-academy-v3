@@ -476,7 +476,7 @@ export function DigitalLogicSimulatorHome({
       danger: '#f43f5e',
       selection: '#a855f7',
       grid: '#181b22',
-      wire: '#a855f7',
+      wire: '#94a3b8',
       powered: '#c084fc',
       input: '#13161c',
       shadow: '0 12px 28px rgba(0,0,0,0.45)',
@@ -495,7 +495,7 @@ export function DigitalLogicSimulatorHome({
       danger: '#be123c',
       selection: '#2563eb',
       grid: '#dbe7f3',
-      wire: '#2563eb',
+      wire: '#334155',
       powered: '#8b5cf6',
       input: '#ffffff',
       shadow: '0 12px 28px rgba(15,23,42,0.10)',
@@ -1442,7 +1442,22 @@ export function DigitalLogicSimulatorHome({
                           onMouseLeave={() => setHoveredComponentId(prev => (prev === component.id ? null : prev))}
                           style={{ cursor: isInput ? 'pointer' : 'move' }}
                         >
-                          {/* Render logic symbol — selection overrides stroke/color instead of a bounding box */}
+                          {/* Invisible bounding hitbox — captures pointer events over the full component area,
+                              preventing click-through to the canvas wire-routing handler. */}
+                          {(() => {
+                            const bounds = getLogicComponentBounds(component, def);
+                            return (
+                              <rect
+                                x={-bounds.width / 2}
+                                y={-bounds.height / 2}
+                                width={bounds.width}
+                                height={bounds.height}
+                                fill="transparent"
+                                pointerEvents="all"
+                              />
+                            );
+                          })()}
+                          {/* Render logic symbol — selection overrides stroke/color */}
                           <g style={{ color: isHighlighted ? colors.selection : colors.text }}>
                             {renderSymbol(
                               def.symbol,
@@ -1487,7 +1502,7 @@ export function DigitalLogicSimulatorHome({
                             );
                           })}
 
-                          {/* Component label */}
+                          {/* Component label — weight 400 + paint-order halo matches analog canvas style */}
                           {!component.props._hideLabel && (
                             <text
                               x={0}
@@ -1495,10 +1510,17 @@ export function DigitalLogicSimulatorHome({
                               textAnchor="middle"
                               fontSize={11}
                               fontFamily="'KaTeX_Math', 'KaTeX_Main', serif"
-                              fontWeight={700}
+                              fontWeight={400}
                               fill={colors.text}
                               pointerEvents="none"
                               transform={`scale(${component.flipH ? -1 : 1}, ${component.flipV ? -1 : 1}) rotate(${-component.rotation})`}
+                              style={{
+                                paintOrder: 'stroke fill',
+                                stroke: colors.canvas,
+                                strokeWidth: 3,
+                                strokeLinejoin: 'round' as const,
+                                strokeLinecap: 'round' as const,
+                              }}
                             >
                               {component.label}
                             </text>
