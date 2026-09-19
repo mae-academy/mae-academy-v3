@@ -884,58 +884,81 @@ const DIGITAL_LOGIC: Record<string, ComponentDef> = {
     description: 'Ideal Boolean state output',
   },
  'gate-and': {
-   id: 'gate-and', name: 'AND Gate', category: 'Digital Logic', width: 100, height: 120, symbol: 'gate-and',
+   id: 'gate-and', name: 'AND Gate', category: 'Digital Logic', width: 100, height: 100, symbol: 'gate-and',
+    // Slot model N=2: pins at y=−25 and y=+25. Centre slot y=0 stays open for a 3rd pin.
     terminals: [{ id: 'a', name: 'A', x: -50, y: -25, type: 'input' }, { id: 'b', name: 'B', x: -50, y: 25, type: 'input' }, { id: 'y', name: 'Y', x: 50, y: 0, type: 'output' }],
     properties: { inputCount: { type: 'select', value: '2', options: ['2', '3', '4', '5', '6', '7', '8'], label: 'Input Count' } },
     description: 'Ideal configurable-input AND gate',
   },
  'gate-or': {
-   id: 'gate-or', name: 'OR Gate', category: 'Digital Logic', width: 100, height: 120, symbol: 'gate-or',
+   id: 'gate-or', name: 'OR Gate', category: 'Digital Logic', width: 100, height: 100, symbol: 'gate-or',
     terminals: [{ id: 'a', name: 'A', x: -50, y: -25, type: 'input' }, { id: 'b', name: 'B', x: -50, y: 25, type: 'input' }, { id: 'y', name: 'Y', x: 50, y: 0, type: 'output' }],
     properties: { inputCount: { type: 'select', value: '2', options: ['2', '3', '4', '5', '6', '7', '8'], label: 'Input Count' } },
     description: 'Ideal configurable-input OR gate',
   },
  'gate-not': {
-   id: 'gate-not', name: 'NOT Gate', category: 'Digital Logic', width: 100, height: 60, symbol: 'gate-not',
+   id: 'gate-not', name: 'NOT Gate', category: 'Digital Logic', width: 100, height: 50, symbol: 'gate-not',
     terminals: [{ id: 'a', name: 'A', x: -50, y: 0, type: 'input' }, { id: 'y', name: 'Y', x: 50, y: 0, type: 'output' }],
     properties: {},
     description: 'Ideal NOT gate',
   },
  'gate-nand': {
-   id: 'gate-nand', name: 'NAND Gate', category: 'Digital Logic', width: 100, height: 120, symbol: 'gate-nand',
+   id: 'gate-nand', name: 'NAND Gate', category: 'Digital Logic', width: 100, height: 100, symbol: 'gate-nand',
     terminals: [{ id: 'a', name: 'A', x: -50, y: -25, type: 'input' }, { id: 'b', name: 'B', x: -50, y: 25, type: 'input' }, { id: 'y', name: 'Y', x: 50, y: 0, type: 'output' }],
     properties: { inputCount: { type: 'select', value: '2', options: ['2', '3', '4', '5', '6', '7', '8'], label: 'Input Count' } },
     description: 'Ideal configurable-input NAND gate',
   },
  'gate-nor': {
-   id: 'gate-nor', name: 'NOR Gate', category: 'Digital Logic', width: 100, height: 120, symbol: 'gate-nor',
+   id: 'gate-nor', name: 'NOR Gate', category: 'Digital Logic', width: 100, height: 100, symbol: 'gate-nor',
     terminals: [{ id: 'a', name: 'A', x: -50, y: -25, type: 'input' }, { id: 'b', name: 'B', x: -50, y: 25, type: 'input' }, { id: 'y', name: 'Y', x: 50, y: 0, type: 'output' }],
     properties: { inputCount: { type: 'select', value: '2', options: ['2', '3', '4', '5', '6', '7', '8'], label: 'Input Count' } },
     description: 'Ideal configurable-input NOR gate',
   },
  'gate-xor': {
-   id: 'gate-xor', name: 'XOR Gate', category: 'Digital Logic', width: 100, height: 120, symbol: 'gate-xor',
+   id: 'gate-xor', name: 'XOR Gate', category: 'Digital Logic', width: 100, height: 100, symbol: 'gate-xor',
     terminals: [{ id: 'a', name: 'A', x: -50, y: -25, type: 'input' }, { id: 'b', name: 'B', x: -50, y: 25, type: 'input' }, { id: 'y', name: 'Y', x: 50, y: 0, type: 'output' }],
     properties: { inputCount: { type: 'select', value: '2', options: ['2', '3', '4', '5', '6', '7', '8'], label: 'Input Count' } },
     description: 'Ideal configurable-input XOR gate',
   },
  'gate-xnor': {
-   id: 'gate-xnor', name: 'XNOR Gate', category: 'Digital Logic', width: 100, height: 120, symbol: 'gate-xnor',
+   id: 'gate-xnor', name: 'XNOR Gate', category: 'Digital Logic', width: 100, height: 100, symbol: 'gate-xnor',
     terminals: [{ id: 'a', name: 'A', x: -50, y: -25, type: 'input' }, { id: 'b', name: 'B', x: -50, y: 25, type: 'input' }, { id: 'y', name: 'Y', x: 50, y: 0, type: 'output' }],
     properties: { inputCount: { type: 'select', value: '2', options: ['2', '3', '4', '5', '6', '7', '8'], label: 'Input Count' } },
     description: 'Ideal configurable-input XNOR gate',
   },
 };
 
+// Expandable-slot pin Y-offset for IC block terminals.
+// Mirrors slotPinsFor() from dynamicLogicGeometry: odd N centres on 0,
+// even N skips the centre slot so y=0 stays open (symmetric around 0).
+// Every result is an exact multiple of 25.
+const pinY = (index: number, total: number): number => {
+  if (total === 1) return 0;
+  if (total % 2 === 0) {
+    const half = total / 2;
+    // slots: -(half),-(half-1),...,-1, +1,...,+(half)
+    const allSlots = [
+      ...Array.from({ length: half }, (_, i) => -(half - i) * 25),
+      ...Array.from({ length: half }, (_, i) => (i + 1) * 25),
+    ];
+    return allSlots[index];
+  } else {
+    const half = Math.floor(total / 2);
+    return (index - half) * 25;
+  }
+};
+
+
 const logicBlock = (id: string, name: string, inputs: string[], outputs: string[], description: string): ComponentDef => ({
   id, name, category: 'Digital Logic', width: 100, height: 80, symbol: id,
   terminals: [
-    ...inputs.map((pin, index) => ({ id: pin, name: pin.toUpperCase(), x: -50, y: (index - (inputs.length - 1) / 2) * 20, type: 'input' as const })),
-    ...outputs.map((pin, index) => ({ id: pin, name: pin.toUpperCase(), x: 50, y: (index - (outputs.length - 1) / 2) * 20, type: 'output' as const })),
+    ...inputs.map((pin, index) => ({ id: pin, name: pin.toUpperCase(), x: -50, y: pinY(index, inputs.length), type: 'input' as const })),
+    ...outputs.map((pin, index) => ({ id: pin, name: pin.toUpperCase(), x: 50, y: pinY(index, outputs.length), type: 'output' as const })),
   ],
   properties: { propagationDelayNs: { type: 'number', value: 10, unit: 'ns', min: 0, max: 10000, label: 'Propagation Delay' } },
   description,
 });
+
 
 const DIGITAL_LOGIC_ADVANCED: Record<string, ComponentDef> = {
   'logic-half-adder': logicBlock('logic-half-adder', 'Half Adder', ['a', 'b'], ['sum', 'carry'], 'Behavioral half adder: Sum = A XOR B, Carry = A AND B'),

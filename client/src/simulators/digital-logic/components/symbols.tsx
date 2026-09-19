@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { dynamicGateGeometryFor, GRID, isScalableLogicGate, logicBlockLayoutFor, logicBodyBoundaryForPin, type LogicBlockLayout, type LogicSymbolPin } from '@/simulators/digital-logic/components/dynamicLogicGeometry';
+import { centeredPinAxisFor, dynamicGateGeometryFor, DYNAMIC_PIN_PITCH, GRID, isScalableLogicGate, logicBlockLayoutFor, logicBodyBoundaryForPin, slotPinsFor, type LogicBlockLayout, type LogicSymbolPin } from '@/simulators/digital-logic/components/dynamicLogicGeometry';
 import { getDef } from '@/simulators/digital-logic/models/componentDefs';
 
 interface SymbolProps {
@@ -956,18 +956,23 @@ const LogicGate: SymbolFC = ({ props }) => {
   const scalable = isScalableLogicGate(gateType);
   const geometry = dynamicGateGeometryFor(gateType, props?.inputCount);
   const inputCount = unary ? 1 : geometry.inputCount;
-  const inputY = scalable ? geometry.inputY : inputCount === 2 ? [-15, 15] : inputCount === 3 ? [-20, 0, 20] : [-22, -7, 7, 22];
+  // slotPinsFor: expandable-slot model — N=2 gives [-25,+25] keeping y=0 open for a 3rd pin.
+  // geometry.inputY already uses slotPinsFor; slotPinsFor(inputCount) is used for the
+  // non-scalable NOT path so both code paths share the same formula.
+  const inputY: readonly number[] = scalable ? geometry.inputY : slotPinsFor(inputCount);
   const orFamily = kind === 'OR' || kind === 'NOR' || kind === 'XOR' || kind === 'XNOR';
-  const halfHeight = scalable ? geometry.bodyHeight / 2 : 23;
+  // halfHeight = bodyHeight/2 = outerPinY(N) + GRID/2 = constant 12.5px arc overhang for all N.
+  const halfHeight = geometry.bodyHeight / 2;
   const unaryInputX = -GRID * 2;
   return <g>
-    {unary ? <line x1={unaryInputX} y1={0} x2={-22} y2={0} stroke="currentColor" strokeWidth={2} /> : inputY.map(y => <line key={y} x1={scalable ? geometry.inputX : unaryInputX} y1={y} x2={orFamily ? -18 : -22} y2={y} stroke="currentColor" strokeWidth={2} />)}
-    {unary ? <path d="M -22,-23 L 22,0 L -22,23 Z" fill="none" stroke="currentColor" strokeWidth={2} /> : orFamily ? <path d={`M -26,${-halfHeight} C -9,${-halfHeight} 12,${-halfHeight * .82} 25,0 C 12,${halfHeight * .82} -9,${halfHeight} -26,${halfHeight} C -16,${halfHeight * .52} -16,${-halfHeight * .52} -26,${-halfHeight} Z`} fill="none" stroke="currentColor" strokeWidth={2} /> : <path d={`M -22,${-halfHeight} H 2 A 23,${halfHeight} 0 0 1 2,${halfHeight} H -22 Z`} fill="none" stroke="currentColor" strokeWidth={2} />}
+    {unary ? <line x1={unaryInputX} y1={0} x2={-25} y2={0} stroke="currentColor" strokeWidth={2} /> : inputY.map(y => <line key={y} x1={scalable ? geometry.inputX : unaryInputX} y1={y} x2={orFamily ? -18 : -22} y2={y} stroke="currentColor" strokeWidth={2} />)}
+    {unary ? <path d="M -25,-15 L 12,0 L -25,15 Z" fill="none" stroke="currentColor" strokeWidth={2} /> : orFamily ? <path d={`M -26,${-halfHeight} C -9,${-halfHeight} 12,${-halfHeight * .82} 25,0 C 12,${halfHeight * .82} -9,${halfHeight} -26,${halfHeight} C -16,${halfHeight * .52} -16,${-halfHeight * .52} -26,${-halfHeight} Z`} fill="none" stroke="currentColor" strokeWidth={2} /> : <path d={`M -22,${-halfHeight} H 2 A 23,${halfHeight} 0 0 1 2,${halfHeight} H -22 Z`} fill="none" stroke="currentColor" strokeWidth={2} />}
     {(kind === 'XOR' || kind === 'XNOR') && <path d={`M -32,${-halfHeight} C -22,${-halfHeight * .52} -22,${halfHeight * .52} -32,${halfHeight}`} fill="none" stroke="currentColor" strokeWidth={2} />}
-    {inverted && <circle cx={30} cy={0} r={4} fill="none" stroke="currentColor" strokeWidth={2} />}
-    <line x1={inverted ? 34 : 25} y1={0} x2={GRID * 2} y2={0} stroke="currentColor" strokeWidth={2} strokeLinecap="round" />
+    {inverted && <circle cx={unary ? 16 : 30} cy={0} r={4} fill="none" stroke="currentColor" strokeWidth={2} />}
+    <line x1={unary ? 20 : (inverted ? 34 : 25)} y1={0} x2={GRID * 2} y2={0} stroke="currentColor" strokeWidth={2} strokeLinecap="round" />
   </g>;
 };
+
 
 const DigitalInputSymbol: SymbolFC = ({ props }) => <g>
   <rect x={-25} y={-12} width={42} height={24} rx={4} fill="none" stroke="currentColor" strokeWidth={2} />
