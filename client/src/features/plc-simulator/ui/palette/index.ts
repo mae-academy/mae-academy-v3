@@ -1,4 +1,5 @@
 export {
+  anchorsToRail,
   PALETTE_CATEGORIES,
   PALETTE_DRAG_TYPE,
   createNode,
@@ -12,3 +13,4 @@ export {
 } from './catalog';
 export { PaletteGlyph } from './PaletteGlyph';
 export { Toolbox, type ToolboxProps } from './Toolbox';
+export default Toolbox;

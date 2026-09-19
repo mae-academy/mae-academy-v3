@@ -48,6 +48,21 @@ export type PaletteItemId =
   | 'wl-or'
   | 'wl-xor';
 
+const RAIL_ITEMS: ReadonlySet<PaletteItemId> = new Set<PaletteItemId>([
+  'coil-out',
+  'coil-set',
+  'coil-reset',
+  'timer-ton',
+  'timer-tof',
+  'timer-tonr',
+  'counter-ctu',
+  'counter-ctd',
+  'counter-ctud',
+]);
+
+/** Coils, timers and counters terminate the rung, so they only ever live on the right rail. */
+export const anchorsToRail = (item: PaletteItemId): boolean => RAIL_ITEMS.has(item);
+
 export interface PlacementContext {
   /** Timer / counter instances already claimed by the program, upper-case. */
   readonly usedInstances: ReadonlySet<string>;

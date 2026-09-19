@@ -1,6 +1,11 @@
 import type { DragEvent } from 'react';
-import { anchorsToRail } from '../canvas/placement-rules';
-import { PALETTE_CATEGORIES, PALETTE_DRAG_TYPE, type PaletteItem, type PaletteItemId } from './catalog';
+import {
+  anchorsToRail,
+  PALETTE_CATEGORIES,
+  PALETTE_DRAG_TYPE,
+  type PaletteItem,
+  type PaletteItemId,
+} from './catalog';
 import { LibraryPanel, tileClass, type LibraryCategory } from './LibraryPanel';
 import { PaletteGlyph } from './PaletteGlyph';
 
@@ -61,3 +66,5 @@ export function Toolbox({ armed, onActivate, onDragStart, onDragEnd, disabled = 
     />
   );
 }
+
+export default Toolbox;

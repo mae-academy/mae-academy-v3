@@ -1,30 +1,17 @@
 import { validateNetworkLayout, type BranchId, type LadNode, type Network, type NodeId } from '../../domain/ast';
 import type { ProgramLimits } from '../../domain/hardware';
 import { inletCount } from '../../engine/compiler';
-import type { PaletteItemId, PlacementContext } from '../palette/catalog';
+import { anchorsToRail, type PaletteItemId, type PlacementContext } from '../palette/catalog';
 import type { Cell } from './geometry';
 import { addLane, addParallelBranch, placeItem, resolveBranch, type EditResult, type PlaceRequest } from './network-edit';
+
+export { anchorsToRail };
 
 /**
  * Canvas placement policy layered over the pure `network-edit` primitives: output elements are
  * anchored to the right power rail, and dropping under an element builds the parallel branch (or
  * extends an existing one) instead of refusing. `network-edit` itself stays policy-free.
  */
-
-const RAIL_ITEMS: ReadonlySet<PaletteItemId> = new Set<PaletteItemId>([
-  'coil-out',
-  'coil-set',
-  'coil-reset',
-  'timer-ton',
-  'timer-tof',
-  'timer-tonr',
-  'counter-ctu',
-  'counter-ctd',
-  'counter-ctud',
-]);
-
-/** Coils, timers and counters terminate the rung, so they only ever live on the right rail. */
-export const anchorsToRail = (item: PaletteItemId): boolean => RAIL_ITEMS.has(item);
 
 const isRailNode = (node: LadNode): boolean => node.type === 'coil' || node.type === 'timer' || node.type === 'counter';
 

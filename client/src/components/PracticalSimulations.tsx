@@ -149,7 +149,7 @@ export default function PracticalSimulations({
           const aFeatured = a.isFeatured || a.badge === "HOT" ? 1 : 0;
           const bFeatured = b.isFeatured || b.badge === "HOT" ? 1 : 0;
           if (bFeatured !== aFeatured) return bFeatured - aFeatured;
-          return a.index - b.index;
+          return (a.index ?? 0) - (b.index ?? 0);
         }
         if (sortBy === "asc") return a.title.localeCompare(b.title);
         if (sortBy === "desc") return b.title.localeCompare(a.title);
@@ -324,7 +324,7 @@ export default function PracticalSimulations({
                       variant={
                         typeof sim.visualVariant === "number"
                           ? sim.visualVariant
-                          : sim.index
+                          : (sim.index ?? 0)
                       }
                       labelled={false}
                       className="aspect-[1.26] w-full transition-transform duration-500 group-hover:scale-[1.035]"
