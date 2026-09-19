@@ -1447,3 +1447,145 @@ export function compileSketch(source: string): CompileResult {
     return { ok: false, error: { line: 1, message: err instanceof Error ? err.message : String(err) } };
   }
 }
+
+// ---------------------------------------------------------------------------
+// Static pin-usage analysis (drives the board's persistent module scaffolding)
+// ---------------------------------------------------------------------------
+export interface PinUsage {
+  /** Digital pins (0-13) read as inputs. */
+  digitalInputs: number[];
+  /** Subset of digitalInputs configured with INPUT_PULLUP. */
+  pullups: number[];
+  /** Analog channels (0-5) read via analogRead(). */
+  analogInputs: number[];
+  /** Digital pins (0-13) driven as outputs. */
+  outputs: number[];
+}
+
+function exprChildren(e: Expr): Expr[] {
+  switch (e.k) {
+    case "bin": return [e.l, e.r];
+    case "un": case "incdec": case "cast": return [e.e];
+    case "assign": return [e.l, e.r];
+    case "cond": return [e.c, e.a, e.b];
+    case "call": return [e.callee, ...e.args];
+    case "member": return [e.obj];
+    case "index": return [e.obj, e.idx];
+    case "sizeof": return e.e ? [e.e] : [];
+    case "comma": return e.list;
+    case "init": return e.items;
+    default: return [];
+  }
+}
+
+function stmtExprs(s: Stmt, visit: (e: Expr) => void, decl: (d: Declarator) => void): void {
+  const sub = (x: Stmt | null): void => {
+    if (x) stmtExprs(x, visit, decl);
+  };
+  switch (s.k) {
+    case "block": s.body.forEach(sub); break;
+    case "decl": s.decls.forEach(d => { decl(d); if (d.init) visit(d.init); d.dims.forEach(x => x && visit(x)); }); break;
+    case "expr": visit(s.e); break;
+    case "if": visit(s.c); sub(s.a); sub(s.b); break;
+    case "for": sub(s.init); if (s.c) visit(s.c); if (s.u) visit(s.u); sub(s.body); break;
+    case "while": case "do": visit(s.c); sub(s.body); break;
+    case "switch": visit(s.e); s.cases.forEach(c => { if (c.test) visit(c.test); c.body.forEach(sub); }); break;
+    case "return": if (s.e) visit(s.e); break;
+    default:
+  }
+}
+
+/** Resolves pin usage from pinMode/digitalRead/analogRead/digitalWrite calls; returns null when the sketch does not parse. */
+export function analyzeSketch(source: string): PinUsage | null {
+  let items: TopItem[];
+  let enums: Map<string, number>;
+  try {
+    const parser = new Parser(preprocess(lex(source)));
+    items = parser.parseProgram();
+    enums = parser.enumConsts;
+  } catch {
+    return null;
+  }
+  const consts = new Map<string, number>();
+  const calls: Extract<Expr, { k: "call" }>[] = [];
+  const evalConst = (e: Expr): number | undefined => {
+    switch (e.k) {
+      case "num": case "chr": return e.v;
+      case "id": {
+        const v = consts.get(e.name) ?? enums.get(e.name);
+        if (v !== undefined) return v;
+        const k = CONSTANTS[e.name];
+        const n = k ? Number(k.v) : NaN;
+        return Number.isNaN(n) ? undefined : n;
+      }
+      case "un": {
+        const v = evalConst(e.e);
+        return v === undefined ? undefined : e.op === "-" ? -v : v;
+      }
+      case "bin": {
+        const a = evalConst(e.l);
+        const b = evalConst(e.r);
+        if (a === undefined || b === undefined) return undefined;
+        return e.op === "+" ? a + b : e.op === "-" ? a - b : e.op === "*" ? a * b : undefined;
+      }
+      default: return undefined;
+    }
+  };
+  const visit = (e: Expr): void => {
+    if (e.k === "call") calls.push(e);
+    exprChildren(e).forEach(visit);
+  };
+  const decls: Declarator[] = [];
+  const collect = (s: Stmt): void => stmtExprs(s, visit, d => decls.push(d));
+  for (const it of items) {
+    if (it.k === "func") it.body?.forEach(collect);
+    else collect(it);
+  }
+  // Only single-assignment scalars are safe to resolve statically.
+  for (const d of decls) if (d.dims.length === 0 && d.init && d.init.k !== "init") {
+    const v = evalConst(d.init);
+    if (v !== undefined) consts.set(d.name, v);
+  }
+  // Global/local integer arrays of constants (e.g. int ledPins[] = {2, 3, 4, 5}) resolve to every element.
+  const arrays = new Map<string, number[]>();
+  for (const d of decls) {
+    if (d.dims.length === 1 && d.init && d.init.k === "init") {
+      const vals = d.init.items.map(evalConst);
+      if (vals.every((v): v is number => v !== undefined)) arrays.set(d.name, vals);
+    }
+  }
+  const pinsOf = (e: Expr | undefined): number[] => {
+    if (!e) return [];
+    const v = evalConst(e);
+    if (v !== undefined) return [v];
+    if (e.k === "index" && e.obj.k === "id") return arrays.get(e.obj.name) ?? [];
+    return [];
+  };
+  const usage = { din: new Set<number>(), pull: new Set<number>(), ain: new Set<number>(), out: new Set<number>() };
+  const declaredOut = new Set<number>();
+  for (const c of calls) {
+    if (c.callee.k !== "id") continue;
+    const name = c.callee.name;
+    const mode = c.args[1] ? evalConst(c.args[1]) : undefined;
+    for (const pin of pinsOf(c.args[0])) {
+      if (!Number.isInteger(pin)) continue;
+      if (name === "analogRead") {
+        const ch = pin >= 14 ? pin - 14 : pin;
+        if (ch >= 0 && ch <= 5) usage.ain.add(ch);
+      } else if (pin >= 0 && pin <= 13) {
+        if (name === "pinMode") {
+          if (mode === 1) declaredOut.add(pin);
+          else if (mode === 0 || mode === 2) {
+            usage.din.add(pin);
+            if (mode === 2) usage.pull.add(pin);
+          }
+        } else if (name === "digitalRead") usage.din.add(pin);
+        else if (name === "digitalWrite" || name === "analogWrite") usage.out.add(pin);
+      }
+    }
+  }
+  declaredOut.forEach(p => usage.out.add(p));
+  usage.out.forEach(p => usage.din.delete(p));
+  const sorted = (s: Set<number>): number[] => Array.from(s).sort((a, b) => a - b);
+  return { digitalInputs: sorted(usage.din), pullups: sorted(usage.pull), analogInputs: sorted(usage.ain), outputs: sorted(usage.out) };
+}

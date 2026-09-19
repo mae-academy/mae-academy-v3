@@ -957,101 +957,20 @@ const LogicGate: SymbolFC = ({ props }) => {
   const geometry = dynamicGateGeometryFor(gateType, props?.inputCount);
   const inputCount = unary ? 1 : geometry.inputCount;
   // slotPinsFor: expandable-slot model — N=2 gives [-25,+25] keeping y=0 open for a 3rd pin.
+  // geometry.inputY already uses slotPinsFor; slotPinsFor(inputCount) is used for the
+  // non-scalable NOT path so both code paths share the same formula.
   const inputY: readonly number[] = scalable ? geometry.inputY : slotPinsFor(inputCount);
   const orFamily = kind === 'OR' || kind === 'NOR' || kind === 'XOR' || kind === 'XNOR';
-  // halfHeight = bodyHeight/2 = outerPinY(N) + GRID/2 = constant 12.5px arc overhang for all N.
+  // halfHeight = bodyHeight/2 = outerPinY(N) + GRID = constant 25px arc overhang for all N.
   const halfHeight = geometry.bodyHeight / 2;
-
-  if (unary) {
-    // PART 1: NOT GATE — Strict 25px Grid Geometry
-    // 1. Centered around (0,0).
-    // 2. Triangle base: vertical line at x = -15px, spanning y = [-15, +15].
-    // 3. Input Lead: horizontal line from grid dot (-25, 0) to base (-15, 0).
-    // 4. Apex: Triangle tip at (+10, 0).
-    // 5. Inversion Bubble: center at (+14, 0), radius r = 4px.
-    // 6. Output Lead: from bubble edge (+18, 0) to grid dot at (+25, 0).
-    return (
-      <g>
-        {/* Input lead: grid dot (-25,0) → triangle base (-15,0) */}
-        <line x1={-25} y1={0} x2={-15} y2={0} stroke="currentColor" strokeWidth={2} />
-        {/* Triangle: base at x=-15 spanning ±15px, apex at x=+10 */}
-        <path d="M -15,-15 L 10,0 L -15,15 Z" fill="none" stroke="currentColor" strokeWidth={2} strokeLinejoin="round" />
-        {/* Inversion bubble: center at (+14,0), r=4 */}
-        <circle cx={14} cy={0} r={4} fill="none" stroke="currentColor" strokeWidth={2} />
-        {/* Output lead: bubble edge (+18,0) → grid dot (+25,0) */}
-        <line x1={18} y1={0} x2={25} y2={0} stroke="currentColor" strokeWidth={2} strokeLinecap="round" />
-      </g>
-    );
-  }
-
-  // PART 3: CURVED GATES (OR, NOR, XOR, XNOR) — Corrected 25px-grid arc geometry.
-  // Back arc corners are at x=-25 (matching input lead axis), gentle inward curve via Q(-10, 0).
-  // Front arcs converge smoothly at the output tip (+25, 0), with a lead to geometry.outputX.
-  // leadEndOr computes the back-arc surface x-position at height y (parabolic approximation of Q bezier).
-  const leadEndOr = (y: number) => {
-    // Back arc: M -25,-halfH Q -10,0 -25,+halfH
-    // Parabolic approximation: x(y) = -25 + 15*(1 - (y/halfH)^2)
-    const t = y / halfHeight;
-    return -25 + 15 * (1 - t * t);
-  };
-
-  return (
-    <g>
-      {inputY.map(y => (
-        <line
-          key={y}
-          x1={geometry.inputX}
-          y1={y}
-          x2={orFamily ? leadEndOr(y) : -22}
-          y2={y}
-          stroke="currentColor"
-          strokeWidth={2}
-        />
-      ))}
-      {orFamily ? (
-        // OR/NOR/XOR/XNOR family: corrected arc geometry with body corners at x=-25,
-        // gentle back-arc via Q(-10,0), and smooth front arcs converging at x=+25.
-        <path
-          d={`M -25,${-halfHeight} Q 5,0 25,0 Q 5,0 -25,${halfHeight} Q -10,0 -25,${-halfHeight} Z`}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={2}
-          strokeLinejoin="round"
-        />
-      ) : (
-        // AND/NAND family: rectangular body with right semicircular cap
-        <path
-          d={`M -22,${-halfHeight} H 2 A 23,${halfHeight} 0 0 1 2,${halfHeight} H -22 Z`}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={2}
-          strokeLinejoin="round"
-        />
-      )}
-      {(kind === 'XOR' || kind === 'XNOR') && (
-        // XOR extra arc: 7px behind the x=-25 body back edge = x=-32
-        <path
-          d={`M -32,${-halfHeight} Q -17,0 -32,${halfHeight}`}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={2}
-          strokeLinecap="round"
-        />
-      )}
-      {inverted && (
-        <circle cx={30} cy={0} r={4} fill="none" stroke="currentColor" strokeWidth={2} />
-      )}
-      <line
-        x1={inverted ? 34 : 25}
-        y1={0}
-        x2={geometry.outputX}
-        y2={0}
-        stroke="currentColor"
-        strokeWidth={2}
-        strokeLinecap="round"
-      />
-    </g>
-  );
+  const unaryInputX = -GRID * 2;
+  return <g>
+    {unary ? <line x1={unaryInputX} y1={0} x2={-22} y2={0} stroke="currentColor" strokeWidth={2} /> : inputY.map(y => <line key={y} x1={scalable ? geometry.inputX : unaryInputX} y1={y} x2={orFamily ? -18 : -22} y2={y} stroke="currentColor" strokeWidth={2} />)}
+    {unary ? <path d="M -22,-23 L 22,0 L -22,23 Z" fill="none" stroke="currentColor" strokeWidth={2} /> : orFamily ? <path d={`M -26,${-halfHeight} C -9,${-halfHeight} 12,${-halfHeight * .82} 25,0 C 12,${halfHeight * .82} -9,${halfHeight} -26,${halfHeight} C -16,${halfHeight * .52} -16,${-halfHeight * .52} -26,${-halfHeight} Z`} fill="none" stroke="currentColor" strokeWidth={2} /> : <path d={`M -22,${-halfHeight} H 2 A 23,${halfHeight} 0 0 1 2,${halfHeight} H -22 Z`} fill="none" stroke="currentColor" strokeWidth={2} />}
+    {(kind === 'XOR' || kind === 'XNOR') && <path d={`M -32,${-halfHeight} C -22,${-halfHeight * .52} -22,${halfHeight * .52} -32,${halfHeight}`} fill="none" stroke="currentColor" strokeWidth={2} />}
+    {inverted && <circle cx={30} cy={0} r={4} fill="none" stroke="currentColor" strokeWidth={2} />}
+    <line x1={inverted ? 34 : 25} y1={0} x2={GRID * 2} y2={0} stroke="currentColor" strokeWidth={2} strokeLinecap="round" />
+  </g>;
 };
 
 

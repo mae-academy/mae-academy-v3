@@ -15,7 +15,7 @@ export default function HeaderNavigationSlider({ locale }: HeaderNavigationSlide
   const [location] = useLocation();
   const { copy } = useLocale();
   const [api, setApi] = useState<CarouselApi>();
-  const isSimulationsActive = location === "/simulations" || location.startsWith("/simulations/") || location === "/assembler" || location.startsWith("/assembler/") || location === "/code" || location.startsWith("/code/");
+  const isSimulationsActive = location === "/simulations" || location.startsWith("/simulations/") || location === "/assembler" || location.startsWith("/assembler/") || location === "/code" || location.startsWith("/code/") || location.startsWith("/simulators/");
   const activeIndex = platformRoutes.findIndex((item) => item.href === "/simulations" ? isSimulationsActive : location === item.href);
 
   useEffect(() => {

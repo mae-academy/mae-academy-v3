@@ -35,23 +35,15 @@ export function DigitalLogicSimulatorApp() {
   const [activeTool, setActiveTool] = useState<DigitalLogicTool>(initialDigitalLogicTool);
   const activeLabel = DIGITAL_LOGIC_TOOLS.find(tool => tool.id === activeTool)?.label ?? 'Digital Logic Lab';
   return <div className="v3-simulator-root simulator-theme-b" data-simulator-theme="b">
-    <div className="mb-8">
-      <h1 className="mae-display text-center font-extrabold tracking-tight text-slate-900 dark:text-white mt-6 mb-12 text-5xl md:text-6xl">
-        Digital Logic Design
-      </h1>
-      <div className="flex justify-center overflow-x-auto pb-1">
-        <div className="mx-auto w-full min-w-max max-w-5xl">
-          <SegmentedControl
-            options={DIGITAL_LOGIC_TOOLS.map(tool => ({ label: tool.label, value: tool.id }))}
-            value={activeTool}
-            onChange={setActiveTool}
-            size="lg"
-            fullWidth
-            aria-label="Digital Logic workspace section"
-          />
-        </div>
-      </div>
-    </div>
+    <SimulationPageHeader
+      title="Digital Logic Design"
+      tools={DIGITAL_LOGIC_TOOLS}
+      activeTool={activeTool}
+      onSelectTool={(id) => setActiveTool(id as DigitalLogicTool)}
+      showBack={false}
+      showTitle={true}
+      showToolNavigation={true}
+    />
 
     <div id="digital-logic-panel-schematic" role="tabpanel" aria-labelledby="digital-logic-tab-schematic" style={{ display: activeTool === 'schematic' ? 'block' : 'none' }}>
       <DigitalLogicSimulatorHome createSimulationEngine={createDigitalLogicEngine} tabDUiRefinement digitalLogicOnly />

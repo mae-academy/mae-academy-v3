@@ -476,7 +476,7 @@ export function DigitalLogicSimulatorHome({
       danger: '#f43f5e',
       selection: '#a855f7',
       grid: '#181b22',
-      wire: '#94a3b8',
+      wire: '#a855f7',
       powered: '#c084fc',
       input: '#13161c',
       shadow: '0 12px 28px rgba(0,0,0,0.45)',
@@ -495,7 +495,7 @@ export function DigitalLogicSimulatorHome({
       danger: '#be123c',
       selection: '#2563eb',
       grid: '#dbe7f3',
-      wire: '#334155',
+      wire: '#2563eb',
       powered: '#8b5cf6',
       input: '#ffffff',
       shadow: '0 12px 28px rgba(15,23,42,0.10)',
@@ -1157,162 +1157,162 @@ export function DigitalLogicSimulatorHome({
       colors={colors}
       isDark={darkPreview}
       toolbarRow1={<>
-            <ToolbarButton colors={colors} label="−" title="Zoom out" onClick={() => setZoom(v => clampZoom(v / ZOOM_STEP))} />
-            <span style={{ color: colors.muted, fontSize: 11, minWidth: 42, textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>
-              {Math.round(zoom * 100)}%
-            </span>
-            <ToolbarButton colors={colors} label="+" title="Zoom in" onClick={() => setZoom(v => clampZoom(v * ZOOM_STEP))} />
-            <ToolbarDivider colors={colors} />
-            <ToolbarButton colors={colors} icon={<Undo2 size={14} />} title="Undo (Ctrl/Cmd+Z)" onClick={handleUndo} disabled={!history.canUndo} />
-            <ToolbarButton colors={colors} icon={<Redo2 size={14} />} title="Redo (Ctrl/Cmd+Shift+Z)" onClick={handleRedo} disabled={!history.canRedo} />
-            <ToolbarButton colors={colors} icon={<Maximize2 size={14} />} title="Auto-scale / Center circuit" onClick={zoomToFit} />
-            <ToolbarButton colors={colors} icon={<Scissors size={14} />} title="Cut (Ctrl/Cmd+X)" onClick={cutSelection} disabled={!selectedComponent && marqueeIds.length === 0} />
-            <ToolbarButton colors={colors} icon={<Copy size={14} />} title="Copy (Ctrl/Cmd+C)" onClick={copySelection} disabled={!selectedComponent && marqueeIds.length === 0} />
-            <ToolbarButton colors={colors} icon={<Clipboard size={14} />} title="Paste (Ctrl/Cmd+V)" onClick={pasteClipboard} disabled={!clipboard} />
-            <ToolbarButton colors={colors} icon={<Trash2 size={14} />} title="Delete (Del/Backspace)" onClick={removeSelection} disabled={!selectedComponent && !selectedWire && !selectedText && marqueeIds.length === 0} />
-            <ToolbarDivider colors={colors} />
-            <div className="flex items-center gap-2">
-              <SegmentedControl
-                options={[
-                  { label: "Dotted", value: "dots" },
-                  { label: "Cartesian", value: "cartesian" },
-                  { label: "Hidden", value: "hidden" },
-                ]}
-                value={gridVisible ? tabDGridMode : "hidden"}
-                onChange={(val) => {
-                  if (val === "hidden") {
-                    setGridVisible(false);
-                    setTabDGridMode("hidden");
-                  } else {
-                    setGridVisible(true);
-                    setTabDGridMode(val as "dots" | "cartesian");
-                  }
-                }}
-                size="sm"
-                aria-label="Grid Style"
-              />
-              <ToolbarButton colors={colors} icon={<Type size={14} />} label="Text" title="Add editable workspace text (T)" onClick={addText} />
-            </div>
-            <ToolbarDivider colors={colors} />
-            <ToolbarButton colors={colors} icon={<RotateCw size={14} />} label="90°" title="Rotate selected component 90°" onClick={() => rotateSelected(90)} disabled={!selectedComponent} />
-            <ToolbarButton colors={colors} icon={<FlipHorizontal size={14} />} label="Flip X" title="Reflect selected component horizontally" onClick={() => flipSelected('h')} disabled={!selectedComponent} />
-            <ToolbarButton colors={colors} icon={<FlipVertical size={14} />} label="Flip Y" title="Reflect selected component vertically" onClick={() => flipSelected('v')} disabled={!selectedComponent} />
+        <ToolbarButton colors={colors} label="−" title="Zoom out" onClick={() => setZoom(v => clampZoom(v / ZOOM_STEP))} />
+        <span style={{ color: colors.muted, fontSize: 11, minWidth: 42, textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>
+          {Math.round(zoom * 100)}%
+        </span>
+        <ToolbarButton colors={colors} label="+" title="Zoom in" onClick={() => setZoom(v => clampZoom(v * ZOOM_STEP))} />
+        <ToolbarDivider colors={colors} />
+        <ToolbarButton colors={colors} icon={<Undo2 size={14} />} title="Undo (Ctrl/Cmd+Z)" onClick={handleUndo} disabled={!history.canUndo} />
+        <ToolbarButton colors={colors} icon={<Redo2 size={14} />} title="Redo (Ctrl/Cmd+Shift+Z)" onClick={handleRedo} disabled={!history.canRedo} />
+        <ToolbarButton colors={colors} icon={<Maximize2 size={14} />} title="Auto-scale / Center circuit" onClick={zoomToFit} />
+        <ToolbarButton colors={colors} icon={<Scissors size={14} />} title="Cut (Ctrl/Cmd+X)" onClick={cutSelection} disabled={!selectedComponent && marqueeIds.length === 0} />
+        <ToolbarButton colors={colors} icon={<Copy size={14} />} title="Copy (Ctrl/Cmd+C)" onClick={copySelection} disabled={!selectedComponent && marqueeIds.length === 0} />
+        <ToolbarButton colors={colors} icon={<Clipboard size={14} />} title="Paste (Ctrl/Cmd+V)" onClick={pasteClipboard} disabled={!clipboard} />
+        <ToolbarButton colors={colors} icon={<Trash2 size={14} />} title="Delete (Del/Backspace)" onClick={removeSelection} disabled={!selectedComponent && !selectedWire && !selectedText && marqueeIds.length === 0} />
+        <ToolbarDivider colors={colors} />
+        <div className="flex items-center gap-2">
+          <SegmentedControl
+            options={[
+              { label: "Dotted", value: "dots" },
+              { label: "Cartesian", value: "cartesian" },
+              { label: "Hidden", value: "hidden" },
+            ]}
+            value={gridVisible ? tabDGridMode : "hidden"}
+            onChange={(val) => {
+              if (val === "hidden") {
+                setGridVisible(false);
+                setTabDGridMode("hidden");
+              } else {
+                setGridVisible(true);
+                setTabDGridMode(val as "dots" | "cartesian");
+              }
+            }}
+            size="sm"
+            aria-label="Grid Style"
+          />
+          <ToolbarButton colors={colors} icon={<Type size={14} />} label="Text" title="Add editable workspace text (T)" onClick={addText} />
+        </div>
+        <ToolbarDivider colors={colors} />
+        <ToolbarButton colors={colors} icon={<RotateCw size={14} />} label="90°" title="Rotate selected component 90°" onClick={() => rotateSelected(90)} disabled={!selectedComponent} />
+        <ToolbarButton colors={colors} icon={<FlipHorizontal size={14} />} label="Flip X" title="Reflect selected component horizontally" onClick={() => flipSelected('h')} disabled={!selectedComponent} />
+        <ToolbarButton colors={colors} icon={<FlipVertical size={14} />} label="Flip Y" title="Reflect selected component vertically" onClick={() => flipSelected('v')} disabled={!selectedComponent} />
       </>}
       toolbarRow2={<>
-            <ToolbarButton colors={colors} icon={<Download size={14} />} label="Export" title="Export circuit as NAD netlist" onClick={exportNad} />
-            <ToolbarButton colors={colors} icon={<Upload size={14} />} label="Import" title="Import circuit from NAD netlist" onClick={() => nadInputRef.current?.click()} />
-            <input ref={nadInputRef} type="file" accept=".nad,application/x-mae-nad+json,application/json" onChange={importNad} style={{ display: 'none' }} />
-            <ToolbarDivider colors={colors} />
-            <ToolbarButton colors={colors} icon={<ImageIcon size={14} />} label="Save Image" title="Save circuit as image (PNG or SVG)" onClick={handleOpenSaveImage} />
-            <ToolbarButton colors={colors} icon={<Share2 size={14} />} label="Share Project" title="Share circuit via Web Share API or deep link" onClick={handleShareProject} />
-            <ToolbarDivider colors={colors} />
-            <button
-              onClick={() => { hasStartedSimulation.current = true; setSimulationRunning(v => !v); }}
-              title={simulationRunning ? 'Pause simulation' : 'Run simulation'}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 5,
-                background: (!simulationRunning && hasStartedSimulation.current) ? TAB_GRADIENT_REV : TAB_GRADIENT,
-                color: '#ffffff',
-                fontWeight: 500,
-                padding: '6px 14px',
-                minHeight: 32,
-                borderRadius: 8,
-                fontSize: 12,
-                boxShadow: TAB_ACTIVE_SHADOW,
-                border: '1px solid transparent',
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-                transition: 'background .3s ease',
-              }}
-            >
-              {simulationRunning ? <Pause size={14} /> : <Play size={14} />}
-              {simulationRunning ? 'Pause' : 'Run'}
-            </button>
-            <ToolbarButton
-              colors={colors}
-              icon={<Zap size={14} />}
-              title="Show / Hide signal flow"
-              onClick={() => setShowElectrons(v => {
-                const next = !v;
-                try { localStorage.setItem('mae-show-electrons', String(next)); } catch { }
-                return next;
-              })}
-              active={showElectrons}
-            />
-            <ToolbarButton colors={colors} icon={<RotateCcw size={14} />} title="Reset simulation" onClick={resetSimulation} />
-            <span className="text-sm font-medium text-slate-700 dark:text-slate-300" style={{ minWidth: 65, textAlign: 'center', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-              <V3Math math={`${snapshot.time.toFixed(3)}\\,\\mathrm{s}`} />
-            </span>
-            <ToolbarDivider colors={colors} />
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <input
-                aria-label="Simulation speed"
-                type="range"
-                min={0.25}
-                max={4}
-                step={0.25}
-                value={simulationSpeed}
-                onChange={event => setSimulationSpeed(numeric(event.target.value, 1))}
-                className="h-1.5 w-24 cursor-pointer appearance-none rounded-full bg-brand-gradient [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-0 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:ring-2 [&::-webkit-slider-thumb]:ring-blue-500 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:shadow"
-              />
-              <span className="text-sm font-medium text-slate-700 dark:text-slate-300" style={{ minWidth: 42, display: 'inline-flex', alignItems: 'center' }}>
-                <V3Math math={`${simulationSpeed.toFixed(2)}\\times`} />
-              </span>
-            </div>
+        <ToolbarButton colors={colors} icon={<Download size={14} />} label="Export" title="Export circuit as NAD netlist" onClick={exportNad} />
+        <ToolbarButton colors={colors} icon={<Upload size={14} />} label="Import" title="Import circuit from NAD netlist" onClick={() => nadInputRef.current?.click()} />
+        <input ref={nadInputRef} type="file" accept=".nad,application/x-mae-nad+json,application/json" onChange={importNad} style={{ display: 'none' }} />
+        <ToolbarDivider colors={colors} />
+        <ToolbarButton colors={colors} icon={<ImageIcon size={14} />} label="Save Image" title="Save circuit as image (PNG or SVG)" onClick={handleOpenSaveImage} />
+        <ToolbarButton colors={colors} icon={<Share2 size={14} />} label="Share Project" title="Share circuit via Web Share API or deep link" onClick={handleShareProject} />
+        <ToolbarDivider colors={colors} />
+        <button
+          onClick={() => { hasStartedSimulation.current = true; setSimulationRunning(v => !v); }}
+          title={simulationRunning ? 'Pause simulation' : 'Run simulation'}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 5,
+            background: (!simulationRunning && hasStartedSimulation.current) ? TAB_GRADIENT_REV : TAB_GRADIENT,
+            color: '#ffffff',
+            fontWeight: 500,
+            padding: '6px 14px',
+            minHeight: 32,
+            borderRadius: 8,
+            fontSize: 12,
+            boxShadow: TAB_ACTIVE_SHADOW,
+            border: '1px solid transparent',
+            cursor: 'pointer',
+            whiteSpace: 'nowrap',
+            transition: 'background .3s ease',
+          }}
+        >
+          {simulationRunning ? <Pause size={14} /> : <Play size={14} />}
+          {simulationRunning ? 'Pause' : 'Run'}
+        </button>
+        <ToolbarButton
+          colors={colors}
+          icon={<Zap size={14} />}
+          title="Show / Hide signal flow"
+          onClick={() => setShowElectrons(v => {
+            const next = !v;
+            try { localStorage.setItem('mae-show-electrons', String(next)); } catch { }
+            return next;
+          })}
+          active={showElectrons}
+        />
+        <ToolbarButton colors={colors} icon={<RotateCcw size={14} />} title="Reset simulation" onClick={resetSimulation} />
+        <span className="text-sm font-medium text-slate-700 dark:text-slate-300" style={{ minWidth: 65, textAlign: 'center', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+          <V3Math math={`${snapshot.time.toFixed(3)}\\,\\mathrm{s}`} />
+        </span>
+        <ToolbarDivider colors={colors} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <input
+            aria-label="Simulation speed"
+            type="range"
+            min={0.25}
+            max={4}
+            step={0.25}
+            value={simulationSpeed}
+            onChange={event => setSimulationSpeed(numeric(event.target.value, 1))}
+            className="h-1.5 w-24 cursor-pointer appearance-none rounded-full bg-brand-gradient [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-0 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:ring-2 [&::-webkit-slider-thumb]:ring-blue-500 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:shadow"
+          />
+          <span className="text-sm font-medium text-slate-700 dark:text-slate-300" style={{ minWidth: 42, display: 'inline-flex', alignItems: 'center' }}>
+            <V3Math math={`${simulationSpeed.toFixed(2)}\\times`} />
+          </span>
+        </div>
       </>}
       librarySearchValue={search}
       onLibrarySearchChange={(value: string) => setSearch(value)}
       libraryContent={<>
-                {Object.entries(filteredCategories).map(([category, items]) => {
-                  const collapsed = collapsedCategories.has(category);
-                  return (
-                    <section key={category} style={{ marginBottom: 3 }}>
-                      <button
-                        onClick={() => setCollapsedCategories(prev => {
-                          const next = new Set(prev);
-                          if (next.has(category)) next.delete(category); else next.add(category);
-                          return next;
-                        })}
-                        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: 'none', background: 'transparent', color: colors.text, cursor: 'pointer', padding: '8px 5px', fontSize: 11, fontWeight: 750 }}
-                      >
-                        <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                          {collapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}{category}
-                        </span>
-                        <span style={{ color: colors.subtle, fontWeight: 600 }}>{items.length}</span>
-                      </button>
-                      {!collapsed && (
-                        <div className="grid grid-cols-2 gap-2 px-1 pb-3">
-                          {items.map(item => (
-                            <button
-                              key={item.id}
-                              draggable
-                              onDragStart={event => {
-                                event.dataTransfer.setData('application/electrolab-component', item.id);
-                                event.dataTransfer.effectAllowed = 'copy';
-                              }}
-                              onClick={() => addComponent(item.id)}
-                              className="flex h-[110px] flex-col overflow-hidden rounded-md border transition-all active:scale-[.97]"
-                              style={{ borderColor: colors.line, background: colors.panel, cursor: 'grab' }}
-                              onMouseEnter={event => { event.currentTarget.style.background = colors.panelAlt; }}
-                              onMouseLeave={event => { event.currentTarget.style.background = colors.panel; }}
-                            >
-                              <div className="flex flex-1 min-h-0 w-full items-center justify-center p-2">
-                                <ComponentPaletteIcon definition={item} colors={colors} documented={tabDUiRefinement} isDark={darkPreview} />
-                              </div>
-                              <div className="flex h-7 w-full shrink-0 items-center justify-center border-t px-1.5" style={{ borderColor: colors.line, background: `${colors.line}15` }}>
-                                <span className="flex items-center justify-center text-[11px] font-medium text-slate-800 dark:text-slate-200 tracking-tight text-center leading-tight truncate w-full" title={item.name}>
-                                  <ElectricalLabel label={item.name} />
-                                </span>
-                              </div>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </section>
-                  );
+        {Object.entries(filteredCategories).map(([category, items]) => {
+          const collapsed = collapsedCategories.has(category);
+          return (
+            <section key={category} style={{ marginBottom: 3 }}>
+              <button
+                onClick={() => setCollapsedCategories(prev => {
+                  const next = new Set(prev);
+                  if (next.has(category)) next.delete(category); else next.add(category);
+                  return next;
                 })}
+                style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: 'none', background: 'transparent', color: colors.text, cursor: 'pointer', padding: '8px 5px', fontSize: 11, fontWeight: 750 }}
+              >
+                <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                  {collapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}{category}
+                </span>
+                <span style={{ color: colors.subtle, fontWeight: 600 }}>{items.length}</span>
+              </button>
+              {!collapsed && (
+                <div className="grid grid-cols-2 gap-2 px-1 pb-3">
+                  {items.map(item => (
+                    <button
+                      key={item.id}
+                      draggable
+                      onDragStart={event => {
+                        event.dataTransfer.setData('application/electrolab-component', item.id);
+                        event.dataTransfer.effectAllowed = 'copy';
+                      }}
+                      onClick={() => addComponent(item.id)}
+                      className="flex h-[110px] flex-col overflow-hidden rounded-md border transition-all active:scale-[.97]"
+                      style={{ borderColor: colors.line, background: colors.panel, cursor: 'grab' }}
+                      onMouseEnter={event => { event.currentTarget.style.background = colors.panelAlt; }}
+                      onMouseLeave={event => { event.currentTarget.style.background = colors.panel; }}
+                    >
+                      <div className="flex flex-1 min-h-0 w-full items-center justify-center p-2">
+                        <ComponentPaletteIcon definition={item} colors={colors} documented={tabDUiRefinement} isDark={darkPreview} />
+                      </div>
+                      <div className="flex h-7 w-full shrink-0 items-center justify-center border-t px-1.5" style={{ borderColor: colors.line, background: `${colors.line}15` }}>
+                        <span className="flex items-center justify-center text-[11px] font-medium text-slate-800 dark:text-slate-200 tracking-tight text-center leading-tight truncate w-full" title={item.name}>
+                          <ElectricalLabel label={item.name} />
+                        </span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </section>
+          );
+        })}
       </>}
       canvasTitle="Interactive Digital Logic Canvas"
       canvasStats={`${components.length} CMP · ${wires.length} NET`}
@@ -1327,309 +1327,287 @@ export function DigitalLogicSimulatorHome({
       onCanvasMouseUp={handleCanvasMouseUp}
       onCanvasDrop={handleDrop}
       canvasContent={<>
-                  {dragState?.kind === 'marquee' && (
-                    <rect
-                      x={Math.min(dragState.start[0], dragState.end[0])}
-                      y={Math.min(dragState.start[1], dragState.end[1])}
-                      width={Math.abs(dragState.end[0] - dragState.start[0])}
-                      height={Math.abs(dragState.end[1] - dragState.start[1])}
-                      fill={`${colors.selection}18`}
-                      stroke={colors.selection}
-                      strokeWidth={1.2}
-                      strokeDasharray="5 4"
-                      pointerEvents="none"
-                    />
+        {dragState?.kind === 'marquee' && (
+          <rect
+            x={Math.min(dragState.start[0], dragState.end[0])}
+            y={Math.min(dragState.start[1], dragState.end[1])}
+            width={Math.abs(dragState.end[0] - dragState.start[0])}
+            height={Math.abs(dragState.end[1] - dragState.start[1])}
+            fill={`${colors.selection}18`}
+            stroke={colors.selection}
+            strokeWidth={1.2}
+            strokeDasharray="5 4"
+            pointerEvents="none"
+          />
+        )}
+
+        <g id="circuit-elements-layer">
+          {/* Wires */}
+          {wires.map(wire => {
+            const selected = selection?.kind === 'wire' && selection.id === wire.id;
+            const wireState = simulation.current.getWireLogicState(wire.id);
+            const isHigh = wireState === 1;
+            const strokeColor = selected ? colors.selection : isHigh ? colors.powered : colors.wire;
+            const strokeWidth = selected ? 2 : 1.5;
+            const hitPath = pointsToPath(wire.path);
+            const renderPath = buildJumpArcPath(wire.path, wireIntersections, wire.id, 4);
+            const len = pathLength(wire.path);
+            const numDots = Math.max(1, Math.round(len / 36));
+            const dots = showElectrons && isHigh ? getDotsOnPath(wire.path, numDots, snapshot.time * 2) : [];
+
+            return (
+              <g key={wire.id}>
+                <path
+                  d={hitPath}
+                  fill="none"
+                  stroke="transparent"
+                  strokeWidth={17}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  onMouseDown={event => {
+                    event.stopPropagation();
+                    setSelection({ kind: 'wire', id: wire.id });
+                  }}
+                  style={{ cursor: 'pointer' }}
+                />
+                <path
+                  ref={el => {
+                    if (el) wirePathRefs.current.set(wire.id, el);
+                    else wirePathRefs.current.delete(wire.id);
+                  }}
+                  d={renderPath}
+                  fill="none"
+                  stroke={strokeColor}
+                  strokeWidth={strokeWidth}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  pointerEvents="none"
+                />
+                {dots.map((dot, idx) => (
+                  <circle
+                    key={idx}
+                    cx={dot[0]}
+                    cy={dot[1]}
+                    r={3}
+                    fill={colors.powered}
+                    opacity={0.9}
+                    pointerEvents="none"
+                  />
+                ))}
+              </g>
+            );
+          })}
+
+          {/* Junction dots */}
+          {junctionDots.map((dot, idx) => (
+            <circle
+              key={`junc-${idx}`}
+              cx={dot[0]}
+              cy={dot[1]}
+              r={3.5}
+              fill={colors.wire}
+              pointerEvents="none"
+            />
+          ))}
+
+          {/* Components */}
+          {components.map(component => {
+            const def = getDef(component.type);
+            if (!def) return null;
+            const selected = selection?.kind === 'component' && selection.id === component.id;
+            const inMarquee = marqueeIds.includes(component.id);
+            const isHighlighted = selected || inMarquee;
+            const terminals = getLogicComponentTerminals(component, def) ?? def.terminals;
+            const isInput = component.type === 'digital-input';
+            const isOutput = component.type === 'digital-output';
+            const inputVal = isInput ? (component.props.state === 'HIGH' ? 1 : 0) : 0;
+            const outputState = isOutput ? (snapshot.terminalVoltages[`${component.id}:in`] ?? 0) : 0;
+
+            return (
+              <g
+                key={component.id}
+                transform={`translate(${component.x},${component.y}) rotate(${component.rotation}) scale(${component.flipH ? -1 : 1}, ${component.flipV ? -1 : 1})`}
+                onMouseDown={event => {
+                  event.stopPropagation();
+                  if (wiring.from) return;
+                  setSelection({ kind: 'component', id: component.id });
+                  setDragState({
+                    kind: 'component',
+                    id: component.id,
+                    offset: [mousePos[0] - component.x, mousePos[1] - component.y],
+                  });
+                }}
+                onClick={() => handleComponentClick(component)}
+                onMouseEnter={() => setHoveredComponentId(component.id)}
+                onMouseLeave={() => setHoveredComponentId(prev => (prev === component.id ? null : prev))}
+                style={{ cursor: isInput ? 'pointer' : 'move' }}
+              >
+                {/* Render logic symbol — selection overrides stroke/color instead of a bounding box */}
+                <g style={{ color: isHighlighted ? colors.selection : colors.text }}>
+                  {renderSymbol(
+                    def.symbol,
+                    inputVal === 1 || outputState === 1,
+                    {
+                      ...component.props,
+                      _componentType: component.type,
+                      _blockLabel: def.name ?? component.label,
+                      _terminals: terminals,
+                      isDark: darkPreview,
+                    },
+                    snapshot.time
                   )}
+                </g>
 
-                  <g id="circuit-elements-layer">
-                    {/* Wires */}
-                    {wires.map(wire => {
-                      const selected = selection?.kind === 'wire' && selection.id === wire.id;
-                      const wireState = simulation.current.getWireLogicState(wire.id);
-                      const isHigh = wireState === 1;
-                      const strokeColor = selected ? colors.selection : isHigh ? colors.powered : colors.wire;
-                      const strokeWidth = selected ? 2 : 1.5;
-                      const hitPath = pointsToPath(wire.path);
-                      const renderPath = buildJumpArcPath(wire.path, wireIntersections, wire.id, 4);
-                      const len = pathLength(wire.path);
-                      const numDots = Math.max(1, Math.round(len / 36));
-                      const dots = showElectrons && isHigh ? getDotsOnPath(wire.path, numDots, snapshot.time * 2) : [];
-
-                      return (
-                        <g key={wire.id}>
-                          <path
-                            d={hitPath}
-                            fill="none"
-                            stroke="transparent"
-                            strokeWidth={17}
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            onMouseDown={event => {
-                              event.stopPropagation();
-                              setSelection({ kind: 'wire', id: wire.id });
-                            }}
-                            style={{ cursor: 'pointer' }}
-                          />
-                          <path
-                            ref={el => {
-                              if (el) wirePathRefs.current.set(wire.id, el);
-                              else wirePathRefs.current.delete(wire.id);
-                            }}
-                            d={renderPath}
-                            fill="none"
-                            stroke={strokeColor}
-                            strokeWidth={strokeWidth}
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            pointerEvents="none"
-                          />
-                          {dots.map((dot, idx) => (
-                            <circle
-                              key={idx}
-                              cx={dot[0]}
-                              cy={dot[1]}
-                              r={3}
-                              fill={colors.powered}
-                              opacity={0.9}
-                              pointerEvents="none"
-                            />
-                          ))}
-                        </g>
-                      );
-                    })}
-
-                    {/* Junction dots */}
-                    {junctionDots.map((dot, idx) => (
+                {/* Terminals — hidden unless hovered, selected, or an active wire is being drawn */}
+                {terminals.map(term => {
+                  const termAxis = Math.abs(term.x) >= Math.abs(term.y) ? 'horizontal' : 'vertical';
+                  const showTerminals = computeTerminalVisibility({
+                    isSelectedOrHighlighted: isHighlighted,
+                    hoveredComponentId,
+                    componentId: component.id,
+                    wiringInProgress: Boolean(wiring.from),
+                  });
+                  return (
+                    <g key={term.id} transform={`translate(${term.x}, ${term.y})`}>
                       <circle
-                        key={`junc-${idx}`}
-                        cx={dot[0]}
-                        cy={dot[1]}
-                        r={3.5}
-                        fill={colors.wire}
-                        pointerEvents="none"
+                        r={TERMINAL_HIT_RADIUS}
+                        fill="transparent"
+                        onMouseDown={event => handleTerminalMouseDown(event, component, term.id, termAxis)}
+                        style={{ cursor: 'crosshair' }}
                       />
-                    ))}
-
-                    {/* Components */}
-                    {components.map(component => {
-                      const def = getDef(component.type);
-                      if (!def) return null;
-                      const selected = selection?.kind === 'component' && selection.id === component.id;
-                      const inMarquee = marqueeIds.includes(component.id);
-                      const isHighlighted = selected || inMarquee;
-                      const terminals = getLogicComponentTerminals(component, def) ?? def.terminals;
-                      const isInput = component.type === 'digital-input';
-                      const isOutput = component.type === 'digital-output';
-                      const inputVal = isInput ? (component.props.state === 'HIGH' ? 1 : 0) : 0;
-                      const outputState = isOutput ? (snapshot.terminalVoltages[`${component.id}:in`] ?? 0) : 0;
-
-                      return (
-                        <g
-                          key={component.id}
-                          transform={`translate(${component.x},${component.y}) rotate(${component.rotation}) scale(${component.flipH ? -1 : 1}, ${component.flipV ? -1 : 1})`}
-                          onMouseDown={event => {
-                            event.stopPropagation();
-                            if (wiring.from) return;
-                            setSelection({ kind: 'component', id: component.id });
-                            setDragState({
-                              kind: 'component',
-                              id: component.id,
-                              offset: [mousePos[0] - component.x, mousePos[1] - component.y],
-                            });
-                          }}
-                          onClick={() => handleComponentClick(component)}
-                          onMouseEnter={() => setHoveredComponentId(component.id)}
-                          onMouseLeave={() => setHoveredComponentId(prev => (prev === component.id ? null : prev))}
-                          style={{ cursor: isInput ? 'pointer' : 'move' }}
-                        >
-                          {/* Invisible bounding hitbox — captures pointer events over the full component area,
-                              preventing click-through to the canvas wire-routing handler. */}
-                          {(() => {
-                            const bounds = getLogicComponentBounds(component, def);
-                            return (
-                              <rect
-                                x={-bounds.width / 2}
-                                y={-bounds.height / 2}
-                                width={bounds.width}
-                                height={bounds.height}
-                                fill="transparent"
-                                pointerEvents="all"
-                              />
-                            );
-                          })()}
-                          {/* Render logic symbol — selection overrides stroke/color */}
-                          <g style={{ color: isHighlighted ? colors.selection : colors.text }}>
-                            {renderSymbol(
-                              def.symbol,
-                              inputVal === 1 || outputState === 1,
-                              {
-                                ...component.props,
-                                _componentType: component.type,
-                                _blockLabel: def.name ?? component.label,
-                                _terminals: terminals,
-                                isDark: darkPreview,
-                              },
-                              snapshot.time
-                            )}
-                          </g>
-
-                          {/* Terminals — hidden unless hovered, selected, or an active wire is being drawn */}
-                          {terminals.map(term => {
-                            const termAxis = Math.abs(term.x) >= Math.abs(term.y) ? 'horizontal' : 'vertical';
-                            const showTerminals = computeTerminalVisibility({
-                              isSelectedOrHighlighted: isHighlighted,
-                              hoveredComponentId,
-                              componentId: component.id,
-                              wiringInProgress: Boolean(wiring.from),
-                            });
-                            return (
-                              <g key={term.id} transform={`translate(${term.x}, ${term.y})`}>
-                                <circle
-                                  r={TERMINAL_HIT_RADIUS}
-                                  fill="transparent"
-                                  onMouseDown={event => handleTerminalMouseDown(event, component, term.id, termAxis)}
-                                  style={{ cursor: 'crosshair' }}
-                                />
-                                <g style={{ opacity: showTerminals ? 1 : 0, transition: 'opacity 0.2s ease-in-out' }} pointerEvents="none">
-                                  <circle
-                                    r={TERMINAL_RADIUS}
-                                    fill={colors.panel}
-                                    stroke={colors.line}
-                                    strokeWidth={1.5}
-                                  />
-                                </g>
-                              </g>
-                            );
-                          })}
-
-                          {/* Component label — weight 400 + paint-order halo matches analog canvas style */}
-                          {!component.props._hideLabel && (
-                            <text
-                              x={0}
-                              y={def.height / 2 + 16}
-                              textAnchor="middle"
-                              fontSize={11}
-                              fontFamily="'KaTeX_Math', 'KaTeX_Main', serif"
-                              fontWeight={400}
-                              fill={colors.text}
-                              pointerEvents="none"
-                              transform={`scale(${component.flipH ? -1 : 1}, ${component.flipV ? -1 : 1}) rotate(${-component.rotation})`}
-                              style={{
-                                paintOrder: 'stroke fill',
-                                stroke: colors.canvas,
-                                strokeWidth: 3,
-                                strokeLinejoin: 'round' as const,
-                                strokeLinecap: 'round' as const,
-                              }}
-                            >
-                              {component.label}
-                            </text>
-                          )}
-                        </g>
-                      );
-                    })}
-
-                    {/* Active wiring line preview */}
-                    {wiring.from && (
-                      <path
-                        d={pointsToPath(
-                          calculateOrthogonalPath(
-                            wiring.from.position,
-                            snapPointToGrid(mousePos, gridSize),
-                            components,
-                            gridSize,
-                          ),
-                        )}
-                        fill="none"
-                        stroke={colors.accent}
-                        strokeWidth={2}
-                        strokeDasharray="5 4"
-                        pointerEvents="none"
-                      />
-                    )}
-
-                    {/* Texts */}
-                    {texts.map(text => (
-                      <g
-                        key={text.id}
-                        transform={`translate(${text.x}, ${text.y})`}
-                        onMouseDown={event => {
-                          event.stopPropagation();
-                          setSelection({ kind: 'text', id: text.id });
-                          setDragState({
-                            kind: 'text',
-                            id: text.id,
-                            offset: [mousePos[0] - text.x, mousePos[1] - text.y],
-                          });
-                        }}
-                        style={{ cursor: 'move' }}
-                      >
-                        <text
-                          fontSize={text.fontSize}
-                          fill={text.color}
-                          fontFamily="'KaTeX_Main', 'KaTeX_Math', serif"
-                          fontWeight={600}
-                          dominantBaseline="hanging"
-                        >
-                          {text.text}
-                        </text>
+                      <g style={{ opacity: showTerminals ? 1 : 0, transition: 'opacity 0.2s ease-in-out' }} pointerEvents="none">
+                        <circle
+                          r={TERMINAL_RADIUS}
+                          fill={colors.panel}
+                          stroke={colors.line}
+                          strokeWidth={1.5}
+                        />
                       </g>
-                    ))}
-                  </g>
+                    </g>
+                  );
+                })}
+
+                {/* Component label */}
+                {!component.props._hideLabel && (
+                  <text
+                    x={0}
+                    y={def.height / 2 + 16}
+                    textAnchor="middle"
+                    fontSize={11}
+                    fontFamily="'KaTeX_Math', 'KaTeX_Main', serif"
+                    fontWeight={700}
+                    fill={colors.text}
+                    pointerEvents="none"
+                    transform={`scale(${component.flipH ? -1 : 1}, ${component.flipV ? -1 : 1}) rotate(${-component.rotation})`}
+                  >
+                    {component.label}
+                  </text>
+                )}
+              </g>
+            );
+          })}
+
+          {/* Active wiring line preview */}
+          {wiring.from && (
+            <path
+              d={pointsToPath(
+                calculateOrthogonalPath(
+                  wiring.from.position,
+                  snapPointToGrid(mousePos, gridSize),
+                  components,
+                  gridSize,
+                ),
+              )}
+              fill="none"
+              stroke={colors.accent}
+              strokeWidth={2}
+              strokeDasharray="5 4"
+              pointerEvents="none"
+            />
+          )}
+
+          {/* Texts */}
+          {texts.map(text => (
+            <g
+              key={text.id}
+              transform={`translate(${text.x}, ${text.y})`}
+              onMouseDown={event => {
+                event.stopPropagation();
+                setSelection({ kind: 'text', id: text.id });
+                setDragState({
+                  kind: 'text',
+                  id: text.id,
+                  offset: [mousePos[0] - text.x, mousePos[1] - text.y],
+                });
+              }}
+              style={{ cursor: 'move' }}
+            >
+              <text
+                fontSize={text.fontSize}
+                fill={text.color}
+                fontFamily="'KaTeX_Main', 'KaTeX_Math', serif"
+                fontWeight={600}
+                dominantBaseline="hanging"
+              >
+                {text.text}
+              </text>
+            </g>
+          ))}
+        </g>
       </>}
       canvasEmptyOverlay={components.length === 0 && (
-                <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', pointerEvents: 'none' }}>
-                  <div className="flex flex-col items-center justify-center select-none">
-                    <div className="px-6 py-2.5 bg-white border border-slate-100 rounded-2xl shadow-sm mb-3 dark:bg-slate-900 dark:border-slate-800">
-                      <span className="text-base font-semibold text-slate-900 tracking-tight dark:text-white">
-                        Canvas Ready
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-400 font-normal">
-                      Drag and drop logic gates, inputs, and components from the library to begin.
-                    </p>
-                  </div>
-                </div>
+        <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', pointerEvents: 'none' }}>
+          <div className="flex flex-col items-center justify-center select-none">
+            <div className="px-6 py-2.5 bg-white border border-slate-100 rounded-2xl shadow-sm mb-3 dark:bg-slate-900 dark:border-slate-800">
+              <span className="text-base font-semibold text-slate-900 tracking-tight dark:text-white">
+                Canvas Ready
+              </span>
+            </div>
+            <p className="text-xs text-slate-400 font-normal">
+              Drag and drop logic gates, inputs, and components from the library to begin.
+            </p>
+          </div>
+        </div>
       )}
       analysisTitle="Logic Analysis Workspace"
       analysisContent={<DigitalLogicAnalysisBox colors={colors} standalone components={components} wires={wires} snapshot={snapshot} />}
       inspectorContent={selectedComponent ? (
-              <ComponentInspector
-                colors={colors}
-                component={selectedComponent}
-                definition={getDef(selectedComponent.type)!}
-                allComponents={components}
-                snapshot={snapshot}
-                onLabelChange={label => updateComponent(selectedComponent.id, { label })}
-                onPropertyChange={updateComponentProperty}
-                onPropertiesChange={updateComponentProperties}
-                onDelete={removeSelection}
-                onReplace={replaceSelectedComponent}
-              />
-            ) : selectedWire ? (
-              <WireInspector
-                colors={colors}
-                wire={selectedWire}
-                onRouting={updateWireRouting}
-                onDelete={removeSelection}
-              />
-            ) : selectedText ? (
-              <TextInspector
-                colors={colors}
-                text={selectedText}
-                onUpdate={updateText}
-                onMove={moveSelected}
-                onDelete={removeSelection}
-              />
-            ) : null}
+        <ComponentInspector
+          colors={colors}
+          component={selectedComponent}
+          definition={getDef(selectedComponent.type)!}
+          allComponents={components}
+          snapshot={snapshot}
+          onLabelChange={label => updateComponent(selectedComponent.id, { label })}
+          onPropertyChange={updateComponentProperty}
+          onPropertiesChange={updateComponentProperties}
+          onDelete={removeSelection}
+          onReplace={replaceSelectedComponent}
+        />
+      ) : selectedWire ? (
+        <WireInspector
+          colors={colors}
+          wire={selectedWire}
+          onRouting={updateWireRouting}
+          onDelete={removeSelection}
+        />
+      ) : selectedText ? (
+        <TextInspector
+          colors={colors}
+          text={selectedText}
+          onUpdate={updateText}
+          onMove={moveSelected}
+          onDelete={removeSelection}
+        />
+      ) : null}
     >
       <ExportPreviewModal
         isOpen={exportModalOpen}
         onClose={() => setExportModalOpen(false)}
         items={exportItems}
         format={exportFormat}
-        onItemDownloaded={() => {}}
-        onAllDownloaded={() => {}}
+        onItemDownloaded={() => { }}
+        onAllDownloaded={() => { }}
       />
       <ShareProjectModal
         isOpen={shareModalOpen}
@@ -1775,11 +1753,10 @@ function ComponentInspector({
             <PropertyRow colors={colors} label="Live state">
               <div style={{ display: 'flex', alignItems: 'center', height: 32 }}>
                 <span
-                  className={`px-2.5 py-1 rounded-md text-xs font-mono font-bold ${
-                    currentInputState === 'HIGH'
+                  className={`px-2.5 py-1 rounded-md text-xs font-mono font-bold ${currentInputState === 'HIGH'
                       ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
                       : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
-                  }`}
+                    }`}
                 >
                   {currentInputState === 'HIGH' ? '1 · HIGH' : currentInputState === 'LOW' ? '0 · LOW' : currentInputState}
                 </span>
@@ -1793,11 +1770,10 @@ function ComponentInspector({
           <div style={{ padding: '8px 12px', background: colors.panelAlt, border: `1px solid ${colors.line}`, borderRadius: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">MEASURED OUTPUT</span>
             <span
-              className={`px-2.5 py-1 rounded-md text-xs font-mono font-bold ${
-                currentOutputState === 1
+              className={`px-2.5 py-1 rounded-md text-xs font-mono font-bold ${currentOutputState === 1
                   ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
                   : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
-              }`}
+                }`}
             >
               <V3Math math={currentOutputState === 1 ? '1\\;(\\mathrm{HIGH})' : '0\\;(\\mathrm{LOW})'} />
             </span>

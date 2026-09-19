@@ -45,9 +45,9 @@ export interface LedGeom {
 }
 
 export const LEDS: readonly LedGeom[] = [
-  { id: "L", x: 126.2, y: 50.3, w: 9.2, h: 4.8, color: "#fbbf24" },
-  { id: "TX", x: 126.1, y: 66.9, w: 9.2, h: 4.8, color: "#fbbf24" },
-  { id: "RX", x: 126.1, y: 75, w: 9.2, h: 4.8, color: "#fbbf24" },
+  { id: "L", x: 126.2, y: 50.3, w: 9.2, h: 4.8, color: "#ef4444" },
+  { id: "TX", x: 126.1, y: 66.9, w: 9.2, h: 4.8, color: "#dc2626" },
+  { id: "RX", x: 126.1, y: 75, w: 9.2, h: 4.8, color: "#dc2626" },
   { id: "ON", x: 237.8, y: 67.1, w: 9.2, h: 4.8, color: "#4ade80" },
 ];
 

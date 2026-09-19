@@ -17,7 +17,6 @@ import { RectifierStudio } from "@/components/power/RectifierStudio";
 import { InverterStudio } from "@/components/power/InverterStudio";
 import { ACVoltageControllerStudio } from "@/components/power/ACVoltageControllerStudio";
 import { ChopperStudio } from "@/components/power/ChopperStudio";
-import { SiemensS7200Studio } from "@/components/plc/SiemensS7200Studio";
 import { AssemblerStudio } from "@/components/assembler/AssemblerStudio";
 import { AnalogCircuitSimulator } from "@/simulators/circuit-engine/components/AnalogCircuitSimulator";
 import { DigitalCircuitSimulator } from "@/simulators/digital-logic/components/DigitalCircuitSimulator";
@@ -29,7 +28,7 @@ import { ConvolutionLab } from "@/components/signals/ConvolutionLab";
 import { FourierAnalysisLab } from "@/components/signals/FourierAnalysisLab";
 import { LaplaceZPlaneLab } from "@/components/signals/LaplaceZPlaneLab";
 import { useLocale } from "@/contexts/LocaleContext";
-import { controlSystemToolMeta, linearAlgebraToolMeta, plcToolMeta, powerElectronicsToolMeta, signalsAndSystemsToolMeta, simulationRouteMeta } from "@/data/platform";
+import { controlSystemToolMeta, linearAlgebraToolMeta, powerElectronicsToolMeta, signalsAndSystemsToolMeta, simulationRouteMeta } from "@/data/platform";
 import NotFound from "./NotFound";
 
 const container: Variants = { hidden: {}, visible: { transition: { staggerChildren: 0.1 } } };
@@ -59,7 +58,6 @@ export default function SimulationDetail() {
   const simulation = copy.collections.simulations.cards[meta.index];
   const isControlSystems = meta.slug === "control-systems";
   const isPowerElectronics = meta.slug === "power-electronics";
-  const isPlc = meta.slug === "plc";
   const isSignalsAndSystems = meta.slug === "signals-and-systems";
   const isLinearAlgebra = meta.slug === "linear-algebra";
   const isCircuitLab = meta.slug === "circuit-lab";
@@ -69,7 +67,6 @@ export default function SimulationDetail() {
   const circuitTabs = circuitTabCopy[locale];
   const tools = isControlSystems ? controlSystemToolMeta[locale]
     : isPowerElectronics ? powerElectronicsToolMeta
-      : isPlc ? plcToolMeta
         : isSignalsAndSystems ? signalsAndSystemsToolMeta
           : isLinearAlgebra ? linearAlgebraToolMeta[locale]
             : isCircuitLab ? [{ slug: "workspace", label: circuitTabs.canvas }]
@@ -109,18 +106,17 @@ export default function SimulationDetail() {
   const isInverterStudio = isPowerElectronics && tool === "b";
   const isAcVoltageControllerStudio = isPowerElectronics && tool === "c";
   const isChopperStudio = isPowerElectronics && tool === "d";
-  const isSiemensS7200Studio = isPlc && tool === "a";
   const isCodeStudioContent = isCodeStudio;
   const isDigitalLogicWorkspace = isDigitalLogicDesign && tool === "workspace";
   const isLinearAlgebraStudio = isLinearAlgebra && ["a", "b", "c", "d", "e"].includes(tool);
   const circuitToolContent = isCircuitLab
     ? <DigitalCircuitSimulator />
     : circuitLabClone ? <AnalogCircuitSimulator instanceId={meta.slug} label={simulation.title} /> : null;
-  const toolContent = circuitToolContent ?? (isSignalsAndSystems && tool === "a" ? <SignalOperationsLab /> : isSignalsAndSystems && tool === "b" ? <SystemClassificationLab /> : isSignalsAndSystems && tool === "c" ? <ConvolutionLab /> : isSignalsAndSystems && tool === "d" ? <FourierAnalysisLab /> : isSignalsAndSystems && tool === "e" ? <LaplaceZPlaneLab /> : isDigitalLogicWorkspace ? <DigitalLogicSimulator /> : isRootLocus ? <RootLocusStudio /> : isPidStudio ? <PIDStudio /> : isFrequencyResponse ? <FrequencyResponseStudio /> : isStateSpaceStudio ? <StateSpaceStudio /> : isBlockDiagram ? <BlockDiagramStudio /> : isRectifierStudio ? <RectifierStudio /> : isInverterStudio ? <InverterStudio /> : isAcVoltageControllerStudio ? <ACVoltageControllerStudio /> : isChopperStudio ? <ChopperStudio /> : isSiemensS7200Studio ? <SiemensS7200Studio /> : isCodeStudioContent ? <AssemblerStudio /> : isLinearAlgebraStudio ? <LinearAlgebraStudio section={tool as "a" | "b" | "c" | "d" | "e"} /> : <SimulationToolWorkspace toolKey={`${meta.slug}-${tool}`} />);
+  const toolContent = circuitToolContent ?? (isSignalsAndSystems && tool === "a" ? <SignalOperationsLab /> : isSignalsAndSystems && tool === "b" ? <SystemClassificationLab /> : isSignalsAndSystems && tool === "c" ? <ConvolutionLab /> : isSignalsAndSystems && tool === "d" ? <FourierAnalysisLab /> : isSignalsAndSystems && tool === "e" ? <LaplaceZPlaneLab /> : isDigitalLogicWorkspace ? <DigitalLogicSimulator /> : isRootLocus ? <RootLocusStudio /> : isPidStudio ? <PIDStudio /> : isFrequencyResponse ? <FrequencyResponseStudio /> : isStateSpaceStudio ? <StateSpaceStudio /> : isBlockDiagram ? <BlockDiagramStudio /> : isRectifierStudio ? <RectifierStudio /> : isInverterStudio ? <InverterStudio /> : isAcVoltageControllerStudio ? <ACVoltageControllerStudio /> : isChopperStudio ? <ChopperStudio /> : isCodeStudioContent ? <AssemblerStudio /> : isLinearAlgebraStudio ? <LinearAlgebraStudio section={tool as "a" | "b" | "c" | "d" | "e"} /> : <SimulationToolWorkspace toolKey={`${meta.slug}-${tool}`} />);
 
   return <motion.div variants={container} initial="hidden" animate="visible">
-    <SimulatorLayout title={isDigitalLogicDesign ? "" : simulation.title} tabs={tools} activeTab={tool || ""} routePrefix={isDirectCode ? "/code" : `/simulations/${meta.slug}`} backLabel={copy.footer.simulations} isRtl={isRtl} hideToolNavigation={isDigitalLogicDesign || isCircuitLab || isCodeStudio} compact={isCodeStudio}>
-      <motion.div variants={item} className={isCodeStudio ? "mt-3" : "mt-12"}>{toolContent}</motion.div>
+    <SimulatorLayout title={isDigitalLogicDesign ? "" : simulation.title} tabs={tools} activeTab={tool || ""} routePrefix={isDirectCode ? "/code" : `/simulations/${meta.slug}`} backLabel={copy.footer.simulations} isRtl={isRtl} hideToolNavigation={isDigitalLogicDesign || isCircuitLab || isCodeStudio}>
+      <motion.div variants={item} className="mt-0">{toolContent}</motion.div>
     </SimulatorLayout>
   </motion.div>;
 }

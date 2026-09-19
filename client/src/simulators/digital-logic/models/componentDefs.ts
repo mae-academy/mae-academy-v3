@@ -897,7 +897,7 @@ const DIGITAL_LOGIC: Record<string, ComponentDef> = {
     description: 'Ideal configurable-input OR gate',
   },
   'gate-not': {
-    id: 'gate-not', name: 'NOT Gate', category: 'Digital Logic', width: 50, height: 50, symbol: 'gate-not',
+    id: 'gate-not', name: 'NOT Gate', category: 'Digital Logic', width: 100, height: 50, symbol: 'gate-not',
     terminals: [{ id: 'a', name: 'A', x: -25, y: 0, type: 'input' }, { id: 'y', name: 'Y', x: 25, y: 0, type: 'output' }],
     properties: {},
     description: 'Ideal NOT gate',

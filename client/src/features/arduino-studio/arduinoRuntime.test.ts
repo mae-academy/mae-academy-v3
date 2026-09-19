@@ -142,3 +142,19 @@ describe("arduino compiler + runtime", () => {
     expect(busy.errors).toEqual([]);
   });
 });
+
+import { analyzeSketch } from "./arduinoCompiler";
+describe("static pin analysis", () => {
+  it("resolves constants and classifies pins", () => {
+    const u = analyzeSketch(`
+      #define LEDP 9
+      const int btn = 2;
+      int pot = A0;
+      void setup(){ pinMode(btn, INPUT_PULLUP); pinMode(LEDP, OUTPUT); pinMode(LED_BUILTIN, OUTPUT); }
+      void loop(){ digitalWrite(LEDP, digitalRead(btn)); analogRead(pot); analogWrite(5, 10); }`);
+    expect(u).toEqual({ digitalInputs: [2], pullups: [2], analogInputs: [0], outputs: [5, 9, 13] });
+    expect(analyzeSketch("void setup( {")).toBeNull();
+    const arr = analyzeSketch("int pins[] = {2, 3, 4, 5}; void setup(){ for (int i = 0; i < 4; i++) pinMode(pins[i], OUTPUT); } void loop(){ digitalWrite(pins[1], HIGH); }");
+    expect(arr?.outputs).toEqual([2, 3, 4, 5]);
+  });
+});

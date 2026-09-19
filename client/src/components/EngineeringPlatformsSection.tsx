@@ -119,11 +119,11 @@ export default function EngineeringPlatformsSection() {
                 </Link>
               </div>
 
-              {/* CTA 1: Electric Blue (#2563EB) to Deep Violet (#9333EA) diagonal */}
+              {/* CTA 1: Unified diagonal brand gradient */}
               <div className="pt-2">
                 <Link
                   href="/simulations"
-                  className="inline-flex items-center gap-2 rounded-full bg-gradient-to-br from-[#2563eb] to-[#9333ea] hover:from-[#1d4ed8] hover:to-[#7e22ce] text-white px-7 py-3.5 text-base font-semibold shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0"
+                  className="btn-brand-primary px-7 py-3.5 text-base font-semibold gap-2"
                 >
                   Explore All Simulations
                   <ArrowRight className="h-4 w-4" />
@@ -172,11 +172,11 @@ export default function EngineeringPlatformsSection() {
                 ))}
               </div>
 
-              {/* CTA 2: Deep Violet (#9333EA) to Warm Crimson / Rose-Red (#E11D48) diagonal */}
+              {/* CTA 2: Unified diagonal brand gradient */}
               <div className="pt-2">
                 <Link
                   href="/courses"
-                  className="inline-flex items-center gap-2 rounded-full bg-gradient-to-br from-[#9333ea] to-[#e11d48] hover:from-[#7e22ce] hover:to-[#be123c] text-white px-7 py-3.5 text-base font-semibold shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0"
+                  className="btn-brand-primary px-7 py-3.5 text-base font-semibold gap-2"
                 >
                   Browse Course Catalog
                   <ArrowRight className="h-4 w-4" />
@@ -234,11 +234,11 @@ export default function EngineeringPlatformsSection() {
                 ))}
               </div>
 
-              {/* CTA 3: Crimson / Rose-Red (#E11D48) to Deep Violet (#9333EA) diagonal */}
+              {/* CTA 3: Unified diagonal brand gradient */}
               <div className="pt-2">
                 <Link
                   href="/research"
-                  className="inline-flex items-center gap-2 rounded-full bg-gradient-to-br from-[#e11d48] to-[#9333ea] hover:from-[#be123c] hover:to-[#7e22ce] text-white px-7 py-3.5 text-base font-semibold shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0"
+                  className="btn-brand-primary px-7 py-3.5 text-base font-semibold gap-2"
                 >
                   Explore Research Notes
                   <ArrowRight className="h-4 w-4" />

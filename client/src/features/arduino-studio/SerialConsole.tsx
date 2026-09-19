@@ -1,15 +1,20 @@
 /** Serial Monitor (Serial.print/println output + input buffer for Serial.read) and a real-time waveform plotter. */
-import { ChevronDown, ChevronUp, CornerDownLeft, LineChart, Terminal, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronUp, CornerDownLeft, Terminal, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { SerialState } from "./useArduinoRuntime";
 
-const SERIES_COLORS = ["#38bdf8", "#f472b6", "#a3e635", "#fbbf24", "#a78bfa", "#fb7185"] as const;
-const MAX_SAMPLES = 300;
+const SERIES_COLORS = ["#ef4444", "#06b6d4", "#8b5cf6", "#f59e0b", "#22c55e", "#ec4899"] as const;
+/** Oscilloscope time base: the plot always spans exactly this many seconds, independent of print rate. */
+const WINDOW_S = 10;
+const WINDOW_MS = WINDOW_S * 1000;
+const MAX_ROWS = 1000;
 const NUMERIC = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?$/;
 
 export interface PlotData {
   labels: string[];
   series: number[][];
+  /** Simulation time (ms) of each sample. */
+  times: number[];
 }
 
 /** Parses "1", "1,2,3", "a:1 b:2" style lines (Arduino Serial Plotter formats); returns null for non-numeric lines. */
@@ -27,26 +32,49 @@ export function parsePlotLine(line: string): { label: string | null; value: numb
   return out;
 }
 
-export function buildPlotData(lines: readonly string[]): PlotData {
+export function buildPlotData(lines: readonly string[], times: readonly number[]): PlotData {
   const rows: { label: string | null; value: number }[][] = [];
-  for (let i = lines.length - 1; i >= 0 && rows.length < MAX_SAMPLES; i--) {
+  const t: number[] = [];
+  let newest = -1;
+  for (let i = lines.length - 1; i >= 0 && rows.length < MAX_ROWS; i--) {
     const parsed = parsePlotLine(lines[i]);
-    if (parsed) rows.unshift(parsed);
+    if (!parsed) continue;
+    const ti = times[i] ?? 0;
+    if (newest < 0) newest = ti;
+    if (ti < newest - WINDOW_MS) break;
+    rows.unshift(parsed);
+    t.unshift(ti);
   }
   const width = rows.reduce((m, r) => Math.max(m, r.length), 0);
   const labels = Array.from({ length: width }, (_, i) => rows.map(r => r[i]?.label).find(l => l) ?? `Series ${i + 1}`);
   const series = Array.from({ length: width }, (_, i) => rows.map(r => r[i]?.value ?? NaN));
-  return { labels, series };
+  return { labels, series, times: t };
+}
+
+/** Catmull-Rom spline through the points, converted to cubic Beziers for smooth anti-aliased curves. */
+function smoothPath(pts: [number, number][]): string {
+  if (pts.length < 3) return pts.map((p, i) => `${i ? "L" : "M"}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ");
+  let d = `M${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[Math.max(0, i - 1)];
+    const p1 = pts[i];
+    const p2 = pts[i + 1];
+    const p3 = pts[Math.min(pts.length - 1, i + 2)];
+    const c1: [number, number] = [p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6];
+    const c2: [number, number] = [p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6];
+    d += ` C${c1[0].toFixed(1)},${c1[1].toFixed(1)} ${c2[0].toFixed(1)},${c2[1].toFixed(1)} ${p2[0].toFixed(1)},${p2[1].toFixed(1)}`;
+  }
+  return d;
 }
 
 function Plotter({ data }: { data: PlotData }) {
   const W = 400;
   const H = 160;
-  const pad = { l: 34, r: 8, t: 8, b: 14 };
+  const pad = { l: 34, r: 8, t: 8, b: 4 };
   const finite = data.series.flat().filter(Number.isFinite);
   if (finite.length === 0) {
     return (
-      <div className="flex h-full items-center justify-center px-4 text-center font-mono text-[11px] text-slate-500">
+      <div className="flex h-full items-center justify-center px-4 text-center font-mono text-[11px] text-slate-400 dark:text-slate-600">
         Print numeric values (one per line, comma-separated for several series) to plot them live.
       </div>
     );
@@ -60,34 +88,52 @@ function Plotter({ data }: { data: PlotData }) {
   const span = max - min;
   min -= span * 0.08;
   max += span * 0.08;
-  const n = data.series[0].length;
-  const x = (i: number) => pad.l + (n <= 1 ? 0 : (i / (n - 1)) * (W - pad.l - pad.r));
+  const latest = data.times[data.times.length - 1] ?? 0;
+  const tEnd = Math.max(latest, WINDOW_MS);
+  const tStart = tEnd - WINDOW_MS;
+  const xt = (ms: number) => pad.l + ((ms - tStart) / WINDOW_MS) * (W - pad.l - pad.r);
+  const xTicks: number[] = [];
+  for (let ms = Math.ceil(tStart / 2000) * 2000; ms <= tEnd; ms += 2000) xTicks.push(ms);
   const y = (v: number) => pad.t + (1 - (v - min) / (max - min)) * (H - pad.t - pad.b);
   const ticks = Array.from({ length: 5 }, (_, i) => min + ((max - min) * i) / 4);
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="min-h-0 flex-1" role="img" aria-label="Serial plotter">
+      <div className="relative min-h-0 flex-1">
+        <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="absolute inset-0 h-full w-full" role="img" aria-label="Serial plotter" shapeRendering="geometricPrecision">
+          {ticks.map(t => (
+            <line key={t} x1={pad.l} x2={W - pad.r} y1={y(t)} y2={y(t)} className="stroke-slate-200 dark:stroke-slate-800" strokeWidth={0.6} vectorEffect="non-scaling-stroke" />
+          ))}
+          <line x1={pad.l} x2={W - pad.r} y1={H - pad.b} y2={H - pad.b} className="stroke-slate-300 dark:stroke-slate-700" strokeWidth={1} vectorEffect="non-scaling-stroke" />
+          {xTicks.map(i => (
+            <line key={i} x1={xt(i)} x2={xt(i)} y1={H - pad.b - 4} y2={H - pad.b} className="stroke-slate-300 dark:stroke-slate-700" strokeWidth={1} vectorEffect="non-scaling-stroke" />
+          ))}
+          {data.series.map((s, si) => {
+            const pts = s.map((v, i): [number, number] | null => (Number.isFinite(v) ? [xt(data.times[i]), y(v)] : null)).filter((p): p is [number, number] => p !== null);
+            return <path key={si} d={smoothPath(pts)} fill="none" stroke={SERIES_COLORS[si % SERIES_COLORS.length]} strokeWidth={1.6} vectorEffect="non-scaling-stroke" strokeLinejoin="round" strokeLinecap="round" />;
+          })}
+        </svg>
         {ticks.map(t => (
-          <g key={t}>
-            <line x1={pad.l} x2={W - pad.r} y1={y(t)} y2={y(t)} stroke="currentColor" className="text-slate-700/60" strokeWidth={0.5} strokeDasharray="2 3" />
-            <text x={pad.l - 4} y={y(t) + 3} textAnchor="end" className="fill-slate-500" fontSize={8} fontFamily="ui-monospace, monospace">
-              {Math.abs(t) >= 100 ? t.toFixed(0) : t.toFixed(1)}
-            </text>
-          </g>
+          <span key={t} className="pointer-events-none absolute start-1 -translate-y-1/2 font-mono text-[9px] leading-none text-slate-400 dark:text-slate-500" style={{ top: `${(y(t) / H) * 100}%` }}>
+            {Math.abs(t) >= 100 ? t.toFixed(0) : t.toFixed(1)}
+          </span>
         ))}
-        {data.series.map((s, si) => {
-          const pts = s.map((v, i) => (Number.isFinite(v) ? `${x(i).toFixed(1)},${y(v).toFixed(1)}` : null)).filter(Boolean).join(" ");
-          return <polyline key={si} points={pts} fill="none" stroke={SERIES_COLORS[si % SERIES_COLORS.length]} strokeWidth={1.4} vectorEffect="non-scaling-stroke" strokeLinejoin="round" />;
-        })}
-      </svg>
-      <div className="flex flex-wrap gap-x-3 gap-y-0.5 px-2 pb-1 font-mono text-[10px]">
+      </div>
+      <div className="relative mx-0 h-6 shrink-0 font-mono text-[9px] leading-none text-slate-400 dark:text-slate-500">
+        {xTicks.map(ms => (
+          <span key={ms} className="absolute top-0.5 -translate-x-1/2 tabular-nums" style={{ left: `${(xt(ms) / W) * 100}%` }}>
+            {(ms / 1000).toFixed(0)}
+          </span>
+        ))}
+        <span className="absolute inset-x-0 top-3 text-center font-semibold text-slate-500 dark:text-slate-400">Time (s)</span>
+      </div>
+      <div className="flex flex-wrap gap-1.5 px-2 pb-1.5 pt-1 font-mono text-[10px]">
         {data.labels.map((label, i) => {
           const last = data.series[i][data.series[i].length - 1];
           return (
-            <span key={label + i} className="inline-flex items-center gap-1 text-slate-400">
-              <span className="h-1.5 w-3 rounded-full" style={{ background: SERIES_COLORS[i % SERIES_COLORS.length] }} />
+            <span key={label + i} className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-slate-500 dark:border-[#1a1d24] dark:bg-[#090a0d] dark:text-slate-400">
+              <span className="h-1.5 w-1.5 rounded-full" style={{ background: SERIES_COLORS[i % SERIES_COLORS.length] }} />
               {label}
-              <span className="text-slate-200 tabular-nums">{Number.isFinite(last) ? last : "—"}</span>
+              <span className="tabular-nums text-slate-800 dark:text-slate-200">{Number.isFinite(last) ? last : "—"}</span>
             </span>
           );
         })}
@@ -95,9 +141,6 @@ function Plotter({ data }: { data: PlotData }) {
     </div>
   );
 }
-
-const LINE_ENDINGS = { none: "", nl: "\n", cr: "\r", both: "\r\n" } as const;
-type LineEnding = keyof typeof LINE_ENDINGS;
 
 interface Props {
   serial: SerialState;
@@ -110,10 +153,9 @@ interface Props {
 
 export function SerialConsole({ serial, baud, collapsed, onToggleCollapsed, onSend, onClear }: Props) {
   const [input, setInput] = useState("");
-  const [ending, setEnding] = useState<LineEnding>("nl");
   const [autoscroll, setAutoscroll] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const plot = useMemo(() => buildPlotData(serial.lines), [serial.lines]);
+  const plot = useMemo(() => buildPlotData(serial.lines, serial.times), [serial.lines, serial.times]);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -122,8 +164,8 @@ export function SerialConsole({ serial, baud, collapsed, onToggleCollapsed, onSe
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input && ending === "none") return;
-    onSend(input + LINE_ENDINGS[ending]);
+    if (!input) return;
+    onSend(`${input}\n`);
     setInput("");
   };
 
@@ -154,10 +196,10 @@ export function SerialConsole({ serial, baud, collapsed, onToggleCollapsed, onSe
 
       {!collapsed && (
         <div className="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-2">
-          <div className="flex min-h-0 flex-col border-b border-[#1a1d24] md:border-b-0 md:border-e">
-            <div ref={scrollRef} className="min-h-0 flex-1 select-text overflow-y-auto bg-[#050608] p-2.5 font-mono text-xs leading-relaxed text-slate-100">
+          <div className="flex min-h-0 flex-col border-b border-slate-200 dark:border-[#1a1d24] md:border-b-0 md:border-e">
+            <div ref={scrollRef} className="min-h-0 flex-1 select-text overflow-y-auto bg-white p-2.5 font-mono text-xs leading-relaxed text-slate-800 dark:bg-[#050608] dark:text-slate-100">
               {serial.lines.length === 0 && !serial.partial ? (
-                <div className="italic text-slate-600">Serial output appears here. Call Serial.begin() then Serial.println().</div>
+                <div className="italic text-slate-400 dark:text-slate-600">Serial output appears here. Call Serial.begin() then Serial.println().</div>
               ) : (
                 <>
                   {serial.lines.map((line, i) => (
@@ -169,39 +211,23 @@ export function SerialConsole({ serial, baud, collapsed, onToggleCollapsed, onSe
                 </>
               )}
             </div>
-            <form onSubmit={submit} className="flex shrink-0 items-center gap-1.5 border-t border-[#1a1d24] bg-[#090a0d] p-1.5">
+            <form onSubmit={submit} className="flex shrink-0 items-center gap-1.5 border-t border-slate-200 bg-slate-50 p-1.5 dark:border-[#1a1d24] dark:bg-[#090a0d]">
               <span className="ps-2 font-mono text-xs font-bold text-violet-400">&gt;</span>
               <input
                 aria-label="Serial input buffer"
                 value={input}
                 onChange={e => setInput(e.target.value)}
-                placeholder="Send to Serial.read()…"
-                className="min-w-0 flex-1 bg-transparent px-2 py-1 font-mono text-xs text-slate-100 outline-none placeholder:text-slate-600"
+                placeholder="Keyboard entry (stdin buffer)…"
+                className="min-w-0 flex-1 bg-transparent px-2 py-1 font-mono text-xs text-slate-800 outline-none placeholder:text-slate-400 dark:text-slate-100 dark:placeholder:text-slate-600"
               />
-              <select
-                aria-label="Line ending"
-                value={ending}
-                onChange={e => setEnding(e.target.value as LineEnding)}
-                className="cursor-pointer rounded-md border border-[#1a1d24] bg-[#13161c] px-1.5 py-1 font-mono text-[10px] text-slate-300 outline-none"
-              >
-                <option value="none">No line ending</option>
-                <option value="nl">Newline</option>
-                <option value="cr">Carriage return</option>
-                <option value="both">Both NL &amp; CR</option>
-              </select>
-              <button type="submit" className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-[#1a1d24] bg-[#13161c] px-2.5 py-1 text-xs font-medium text-slate-300 transition hover:bg-[#1b2028] hover:text-white">
+              <button type="submit" className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 transition hover:bg-slate-100 dark:border-[#1a1d24] dark:bg-[#13161c] dark:text-slate-300 dark:hover:bg-[#1b2028] dark:hover:text-white">
                 <CornerDownLeft className="h-3 w-3" />
                 Send
               </button>
             </form>
           </div>
 
-          <div className="flex min-h-0 flex-col bg-[#050608]">
-            <div className="flex shrink-0 items-center gap-1.5 border-b border-[#1a1d24] px-2.5 py-1 font-mono text-[10px] uppercase tracking-wider text-slate-500">
-              <LineChart className="h-3 w-3" />
-              serial plotter
-              <span className="ms-auto normal-case">last {MAX_SAMPLES} samples</span>
-            </div>
+          <div className="flex min-h-0 flex-col bg-white dark:bg-[#050608]">
             <div className="min-h-0 flex-1">
               <Plotter data={plot} />
             </div>

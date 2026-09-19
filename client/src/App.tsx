@@ -17,6 +17,7 @@ import SimulationDetail from "./pages/SimulationDetail";
 import About from "./pages/About";
 import NotFound from "./pages/NotFound";
 const ArduinoStudioPage = lazy(() => import("./pages/ArduinoStudioPage"));
+const PlcSimulatorPage = lazy(() => import("./pages/PlcSimulatorPage"));
 import HiddenSymbolDesigner from "./simulators/circuit-engine/components/pages/HiddenSymbolDesigner";
 
 function AnimatedRoutes() {
@@ -52,6 +53,19 @@ function AnimatedRoutes() {
           <Route path="/code" component={SimulationDetail} />
           <Route path="/assembler/:tool" component={SimulationDetail} />
           <Route path="/assembler" component={SimulationDetail} />
+          <Route path="/simulations/arduino-studio">
+            <Suspense fallback={<div className="container py-16 font-mono text-xs text-slate-500">Loading Arduino Studio…</div>}><ArduinoStudioPage /></Suspense>
+          </Route>
+          {/* PLC: the card resolves to /simulations/plc; legacy /simulations/plc/<tool> deep links land here too. */}
+          <Route path="/simulations/plc/:tool">
+            <Suspense fallback={<div className="container py-16 font-mono text-xs text-slate-500">Loading PLC Simulator…</div>}><PlcSimulatorPage /></Suspense>
+          </Route>
+          <Route path="/simulations/plc">
+            <Suspense fallback={<div className="container py-16 font-mono text-xs text-slate-500">Loading PLC Simulator…</div>}><PlcSimulatorPage /></Suspense>
+          </Route>
+          <Route path="/simulators/plc-simulator">
+            <Suspense fallback={<div className="container py-16 font-mono text-xs text-slate-500">Loading PLC Simulator…</div>}><PlcSimulatorPage /></Suspense>
+          </Route>
           <Route path="/simulations/:slug/:tool" component={SimulationDetail} />
           <Route path="/simulations/:slug" component={SimulationDetail} />
           <Route path="/simulations" component={Simulations} />

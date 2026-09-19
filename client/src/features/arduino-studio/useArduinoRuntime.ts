@@ -7,6 +7,8 @@ const MAX_LINES = 1000;
 export interface SerialState {
   /** Completed lines (without terminators). */
   lines: string[];
+  /** Simulation time (ms) at which each line completed; parallel to `lines`. */
+  times: number[];
   /** Text after the last newline. */
   partial: string;
 }
@@ -41,25 +43,37 @@ export interface ArduinoStudioRuntime {
 
 export function useArduinoRuntime(): ArduinoStudioRuntime {
   const [snapshot, setSnapshot] = useState<HardwareSnapshot>(IDLE_SNAPSHOT);
-  const [serial, setSerial] = useState<SerialState>({ lines: [], partial: "" });
+  const [serial, setSerial] = useState<SerialState>({ lines: [], times: [], partial: "" });
   const [diagnostic, setDiagnostic] = useState<Diagnostic | null>(null);
   const [runtimeError, setRuntimeError] = useState<string | null>(null);
-  const pending = useRef("");
+  const pending = useRef<{ text: string; t: number }[]>([]);
   const flushScheduled = useRef(false);
   const speedRef = useRef<ArduinoSpeed>(1);
   const runtimeRef = useRef<ArduinoRuntime | null>(null);
 
   const flush = useCallback(() => {
     flushScheduled.current = false;
-    const chunk = pending.current;
-    pending.current = "";
-    if (!chunk) return;
+    const chunks = pending.current;
+    pending.current = [];
+    if (chunks.length === 0) return;
     setSerial(prev => {
-      const parts = (prev.partial + chunk).split("\n");
-      const partial = parts.pop() ?? "";
-      const lines = parts.map(l => l.replace(/\r$/, ""));
-      const merged = prev.lines.length + lines.length > MAX_LINES ? [...prev.lines, ...lines].slice(-MAX_LINES) : [...prev.lines, ...lines];
-      return { lines: merged, partial: partial.length > 4000 ? partial.slice(-4000) : partial };
+      let partial = prev.partial;
+      const lines = prev.lines.slice();
+      const times = prev.times.slice();
+      for (const { text, t } of chunks) {
+        const parts = (partial + text).split("\n");
+        partial = parts.pop() ?? "";
+        for (const l of parts) {
+          lines.push(l.replace(/\r$/, ""));
+          times.push(t);
+        }
+      }
+      const over = lines.length - MAX_LINES;
+      return {
+        lines: over > 0 ? lines.slice(over) : lines,
+        times: over > 0 ? times.slice(over) : times,
+        partial: partial.length > 4000 ? partial.slice(-4000) : partial,
+      };
     });
   }, []);
 
@@ -67,9 +81,9 @@ export function useArduinoRuntime(): ArduinoStudioRuntime {
     if (!runtimeRef.current) {
       runtimeRef.current = new ArduinoRuntime({
         onSnapshot: setSnapshot,
-        onSerialOut: text => {
-          pending.current += text;
-          if (pending.current.length > 100_000) pending.current = pending.current.slice(-50_000);
+        onSerialOut: (text, t) => {
+          pending.current.push({ text, t });
+          if (pending.current.length > 5000) pending.current = pending.current.slice(-2500);
           if (!flushScheduled.current) {
             flushScheduled.current = true;
             requestAnimationFrame(flush);
@@ -106,8 +120,8 @@ export function useArduinoRuntime(): ArduinoStudioRuntime {
       }
       setDiagnostic(null);
       setRuntimeError(null);
-      pending.current = "";
-      setSerial({ lines: [], partial: "" });
+      pending.current = [];
+      setSerial({ lines: [], times: [], partial: "" });
       rt.load(result.sketch);
       rt.start();
     },
@@ -118,8 +132,8 @@ export function useArduinoRuntime(): ArduinoStudioRuntime {
 
   const reset = useCallback(() => {
     runtimeRef.current?.reset();
-    pending.current = "";
-    setSerial({ lines: [], partial: "" });
+    pending.current = [];
+    setSerial({ lines: [], times: [], partial: "" });
     setDiagnostic(null);
     setRuntimeError(null);
   }, []);
@@ -146,8 +160,8 @@ export function useArduinoRuntime(): ArduinoStudioRuntime {
       setAnalogInput: (channel, value) => getRuntime().setAnalogInput(channel, value),
       sendSerial: text => getRuntime().sendSerial(text),
       clearSerial: () => {
-        pending.current = "";
-        setSerial({ lines: [], partial: "" });
+        pending.current = [];
+        setSerial({ lines: [], times: [], partial: "" });
       },
     }),
     [snapshot, serial, diagnostic, runtimeError, run, pause, reset, setSpeed, getRuntime],

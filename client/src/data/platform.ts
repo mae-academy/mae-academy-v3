@@ -170,14 +170,6 @@ export const powerElectronicsToolMeta = [
   { slug: "d", label: "Choppers" },
 ] as const;
 
-export const plcToolMeta = [
-  { slug: "a", label: "Siemens S7-200" },
-  { slug: "b", label: "Scan Cycle" },
-  { slug: "c", label: "Instruction Set" },
-  { slug: "d", label: "I/O Mapping" },
-  { slug: "e", label: "Fault Tracing" },
-] as const;
-
 export const signalsAndSystemsToolMeta = [
   { slug: "a", label: "Signal Operations & Properties" },
   { slug: "b", label: "System Classification" },

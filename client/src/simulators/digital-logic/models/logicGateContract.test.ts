@@ -13,10 +13,9 @@ describe('Digital Logic multi-input gate contract', () => {
     expect(normalizedInputCount(9)).toBe(8);
   });
   it('keeps every configurable gate output beyond the body with a common terminal position on the 25px grid', () => {
-    ['gate-and', 'gate-or', 'gate-nand', 'gate-nor', 'gate-xor', 'gate-xnor'].forEach(type => {
+    ['gate-and', 'gate-or', 'gate-nand', 'gate-nor', 'gate-xor', 'gate-xnor', 'gate-not'].forEach(type => {
       expect(getDef(type)!.terminals.find(terminal => terminal.id === 'y')?.x).toBe(50);
     });
-    expect(getDef('gate-not')!.terminals.find(terminal => terminal.id === 'y')?.x).toBe(25);
   });
   it('keeps Logic Input and Logic Output terminals exactly at their symbol-lead endpoints on the 25px grid', () => {
     const input = { id: 'I', type: 'digital-input', x: 0, y: 0, rotation: 0, flipH: false, flipV: false, label: 'I1', props: {} };
@@ -24,11 +23,11 @@ describe('Digital Logic multi-input gate contract', () => {
     expect(getLogicComponentTerminals(input, getDef('digital-input')!)).toEqual([{ id: 'out', name: 'OUT', x: 25, y: 0, type: 'output' }]);
     expect(getLogicComponentTerminals(output, getDef('digital-output')!)).toEqual([{ id: 'in', name: 'IN', x: -25, y: 0, type: 'input' }]);
   });
-  it('anchors NOT gate terminals explicitly at (-25, 0) and (+25, 0)', () => {
-    const notGate = { id: 'N', type: 'gate-not', x: 0, y: 0, rotation: 0, flipH: false, flipV: false, label: 'N1', props: {} };
-    expect(getLogicComponentTerminals(notGate, getDef('gate-not')!)).toEqual([
-      { id: 'a', name: 'A', x: -25, y: 0, type: 'input' },
-      { id: 'y', name: 'Y', x: 25, y: 0, type: 'output' },
-    ]);
+});
+const notGate = { id: 'N', type: 'gate-not', x: 0, y: 0, rotation: 0, flipH: false, flipV: false, label: 'N1', props: {} };
+expect(getLogicComponentTerminals(notGate, getDef('gate-not')!)).toEqual([
+  { id: 'a', name: 'A', x: -25, y: 0, type: 'input' },
+  { id: 'y', name: 'Y', x: 25, y: 0, type: 'output' },
+]);
   });
 });

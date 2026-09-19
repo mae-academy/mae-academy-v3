@@ -203,11 +203,10 @@ export default function PracticalSimulations({
                   key={cat.id}
                   onClick={() => setSelectedCategory(cat.id)}
                   type="button"
-                  className={`whitespace-nowrap rounded-full px-5 py-1.5 text-sm font-medium transition-all duration-200 ${
-                    isActive
+                  className={`whitespace-nowrap rounded-full px-5 py-1.5 text-sm font-medium transition-all duration-200 ${isActive
                       ? "bg-gradient-to-br from-blue-600 via-purple-600 to-rose-500 text-white shadow-md"
                       : "bg-transparent text-slate-600 hover:text-slate-900 dark:text-zinc-400 dark:hover:text-white"
-                  }`}
+                    }`}
                 >
                   {cat.label}
                 </button>
@@ -229,8 +228,8 @@ export default function PracticalSimulations({
                 locale === "ar"
                   ? "بحث في المحاكاة..."
                   : locale === "es"
-                  ? "Buscar simulaciones..."
-                  : "Search simulations..."
+                    ? "Buscar simulaciones..."
+                    : "Search simulations..."
               }
               className="h-10 w-full rounded-full border border-slate-200 bg-white pl-10 pr-8 py-2 text-sm text-slate-800 placeholder-slate-400 shadow-xs transition-colors focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/20 dark:border-white/10 dark:bg-white/5 dark:text-white dark:placeholder-zinc-500 dark:focus:border-purple-400 rtl:pl-8 rtl:pr-10"
             />
@@ -264,29 +263,29 @@ export default function PracticalSimulations({
                   {locale === "ar"
                     ? "المميز والأحدث (افتراضي)"
                     : locale === "es"
-                    ? "Destacados / Hot"
-                    : "Featured / Hot"}
+                      ? "Destacados / Hot"
+                      : "Featured / Hot"}
                 </SelectItem>
                 <SelectItem value="alphabetical-asc">
                   {locale === "ar"
                     ? "أبجدياً: أ إلى ي"
                     : locale === "es"
-                    ? "Alfabético: A a Z"
-                    : "Alphabetical: A to Z"}
+                      ? "Alfabético: A a Z"
+                      : "Alphabetical: A to Z"}
                 </SelectItem>
                 <SelectItem value="alphabetical-desc">
                   {locale === "ar"
                     ? "أبجدياً: ي إلى أ"
                     : locale === "es"
-                    ? "Alfabético: Z a A"
-                    : "Alphabetical: Z to A"}
+                      ? "Alfabético: Z a A"
+                      : "Alphabetical: Z to A"}
                 </SelectItem>
                 <SelectItem value="newest">
                   {locale === "ar"
                     ? "الأحدث أولاً"
                     : locale === "es"
-                    ? "Más recientes primero"
-                    : "Newest First"}
+                      ? "Más recientes primero"
+                      : "Newest First"}
                 </SelectItem>
               </SelectContent>
             </Select>
@@ -380,15 +379,15 @@ export default function PracticalSimulations({
             {locale === "ar"
               ? "لم يتم العثور على محاكاة تطابق بحثك"
               : locale === "es"
-              ? "No se encontraron simulaciones"
-              : "No simulations found"}
+                ? "No se encontraron simulaciones"
+                : "No simulations found"}
           </h3>
           <p className="max-w-md text-xs text-slate-500 dark:text-zinc-400">
             {locale === "ar"
               ? "جرب تعديل معايير البحث أو اختيار تبويب تصنيف آخر."
               : locale === "es"
-              ? "Intenta ajustar los términos de búsqueda o cambiar de categoría."
-              : "Try adjusting your search terms or selecting another category."}
+                ? "Intenta ajustar los términos de búsqueda o cambiar de categoría."
+                : "Try adjusting your search terms or selecting another category."}
           </p>
           <button
             type="button"
@@ -401,8 +400,8 @@ export default function PracticalSimulations({
             {locale === "ar"
               ? "إعادة ضبط الفلاتر"
               : locale === "es"
-              ? "Restablecer filtros"
-              : "Reset filters"}
+                ? "Restablecer filtros"
+                : "Reset filters"}
           </button>
         </motion.div>
       )}

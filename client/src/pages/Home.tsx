@@ -54,7 +54,7 @@ export default function Home() {
 
               <motion.h2
                 variants={itemVariants}
-                className="font-extrabold text-xl sm:text-2xl md:text-3xl lg:text-5xl whitespace-nowrap bg-gradient-to-br from-[#2563eb] via-[#9333ea] to-[#e11d48] bg-clip-text text-transparent"
+                className="font-extrabold text-xl sm:text-2xl md:text-3xl lg:text-5xl whitespace-nowrap text-brand-gradient"
               >
                 {home.headlineSecondary}
               </motion.h2>
@@ -70,7 +70,7 @@ export default function Home() {
               <motion.div variants={itemVariants} className="flex flex-wrap items-center gap-2.5 sm:gap-3 mt-1 sm:mt-2">
                 <Link
                   href="/simulations"
-                  className="inline-flex items-center gap-2 rounded-full bg-gradient-to-br from-[#2563eb] via-[#9333ea] to-[#e11d48] text-white px-5 sm:px-7 md:px-8 py-2.5 sm:py-3.5 text-xs sm:text-sm md:text-base font-semibold shadow-md hover:shadow-lg transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 shrink-0"
+                  className="btn-brand-primary px-5 sm:px-7 md:px-8 py-2.5 sm:py-3.5 text-xs sm:text-sm md:text-base font-semibold shrink-0 gap-2"
                 >
                   {home.ctaPrimary}
                   <ArrowRight className="h-4 w-4" />
@@ -78,7 +78,7 @@ export default function Home() {
 
                 <Link
                   href="/courses"
-                  className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white hover:bg-slate-50 hover:border-purple-300 text-slate-700 px-5 sm:px-7 md:px-8 py-2.5 sm:py-3.5 text-xs sm:text-sm md:text-base font-semibold shadow-xs hover:shadow-sm transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 dark:border-white/15 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10 dark:hover:border-purple-400 shrink-0"
+                  className="btn-brand-subtle px-5 sm:px-7 md:px-8 py-2.5 sm:py-3.5 text-xs sm:text-sm md:text-base font-semibold shadow-xs hover:shadow-sm shrink-0 gap-2"
                 >
                   {home.ctaSecondary}
                 </Link>

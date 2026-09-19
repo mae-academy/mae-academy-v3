@@ -37,7 +37,7 @@ export interface HardwareSnapshot {
 
 export interface RuntimeHandlers {
   onSnapshot: (snapshot: HardwareSnapshot) => void;
-  onSerialOut: (text: string) => void;
+  onSerialOut: (text: string, timeMs: number) => void;
   onError: (message: string) => void;
 }
 
@@ -399,7 +399,7 @@ export class ArduinoRuntime {
     if (newline) text += "\r\n";
     if (text.length > 0) {
       this.txCount++;
-      this.handlers.onSerialOut(text);
+      this.handlers.onSerialOut(text, Math.floor(this.nowUs() / 1000));
       this.markDirty();
     }
     return text.length;
