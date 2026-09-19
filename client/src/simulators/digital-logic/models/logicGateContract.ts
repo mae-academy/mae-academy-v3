@@ -20,7 +20,7 @@ export const getLogicComponentBounds = (component: CircuitComponent, definition:
 
 export const getLogicComponentTerminals = (component: CircuitComponent, definition: ComponentDef): ComponentDef['terminals'] => {
   if (component.type === 'digital-input' || component.type === 'digital-output') return definition.terminals;
-  if (LOGIC_COMPONENT_TYPES.has(component.type) && !MULTI_INPUT_GATE_TYPES.has(component.type)) {
+  if (component.type.startsWith('logic-')) {
     const pins = logicPinsFor(component);
     if (pins.inputs.length || pins.outputs.length) {
       return logicBlockLayoutFor(component.type, pins.inputs, pins.outputs).pins.map(pin => ({ id: pin.id, name: pin.id.toUpperCase(), x: pin.x, y: pin.y, type: pin.type }));

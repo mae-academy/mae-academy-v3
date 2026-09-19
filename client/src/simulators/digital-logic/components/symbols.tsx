@@ -665,23 +665,23 @@ const Transformer: SymbolFC = ({ props }) => props?._documentedStyle === true ? 
   <line x1={-6} y1={-25} x2={-6} y2={25} stroke="currentColor" strokeWidth={2.5} />
   <line x1={6} y1={-25} x2={6} y2={25} stroke="currentColor" strokeWidth={2.5} />
 </g> : <g>
-    {/* Primary coil */}
-    {[-20, -8, 4].map((y, i) => (
-      <path key={i} d={`M -35,${y} Q -28,${y - 10} -22,${y} Q -16,${y + 10} -10,${y}`} fill="none" stroke="currentColor" strokeWidth={2} />
-    ))}
-    <line x1={-35} y1={-20} x2={-35} y2={-30} stroke="currentColor" strokeWidth={2} />
-    <line x1={-35} y1={4} x2={-35} y2={20} stroke="currentColor" strokeWidth={2} />
-    {/* Core */}
-    <line x1={-6} y1={-25} x2={-6} y2={25} stroke="currentColor" strokeWidth={3} />
-    <line x1={6} y1={-25} x2={6} y2={25} stroke="currentColor" strokeWidth={3} />
-    {/* Secondary coil */}
-    {[-20, -8, 4].map((y, i) => (
-      <path key={i} d={`M 10,${y} Q 16,${y - 10} 22,${y} Q 28,${y + 10} 35,${y}`} fill="none" stroke="currentColor" strokeWidth={2} />
-    ))}
-    <line x1={35} y1={-20} x2={35} y2={-30} stroke="currentColor" strokeWidth={2} />
-    <line x1={35} y1={4} x2={35} y2={20} stroke="currentColor" strokeWidth={2} />
-  </g>
-;
+  {/* Primary coil */}
+  {[-20, -8, 4].map((y, i) => (
+    <path key={i} d={`M -35,${y} Q -28,${y - 10} -22,${y} Q -16,${y + 10} -10,${y}`} fill="none" stroke="currentColor" strokeWidth={2} />
+  ))}
+  <line x1={-35} y1={-20} x2={-35} y2={-30} stroke="currentColor" strokeWidth={2} />
+  <line x1={-35} y1={4} x2={-35} y2={20} stroke="currentColor" strokeWidth={2} />
+  {/* Core */}
+  <line x1={-6} y1={-25} x2={-6} y2={25} stroke="currentColor" strokeWidth={3} />
+  <line x1={6} y1={-25} x2={6} y2={25} stroke="currentColor" strokeWidth={3} />
+  {/* Secondary coil */}
+  {[-20, -8, 4].map((y, i) => (
+    <path key={i} d={`M 10,${y} Q 16,${y - 10} 22,${y} Q 28,${y + 10} 35,${y}`} fill="none" stroke="currentColor" strokeWidth={2} />
+  ))}
+  <line x1={35} y1={-20} x2={35} y2={-30} stroke="currentColor" strokeWidth={2} />
+  <line x1={35} y1={4} x2={35} y2={20} stroke="currentColor" strokeWidth={2} />
+</g>
+  ;
 
 const TransformerCt: SymbolFC = ({ props }) => props?._documentedStyle === true ? <g>
   <line x1={-35} y1={-25} x2={-24} y2={-25} stroke="currentColor" strokeWidth={2} />
@@ -694,22 +694,22 @@ const TransformerCt: SymbolFC = ({ props }) => props?._documentedStyle === true 
   <line x1={-6} y1={-30} x2={-6} y2={30} stroke="currentColor" strokeWidth={2.5} />
   <line x1={6} y1={-30} x2={6} y2={30} stroke="currentColor" strokeWidth={2.5} />
 </g> : <g>
-    {[-25, -10, 5].map((y, i) => (
-      <path key={i} d={`M -35,${y} Q -28,${y - 10} -22,${y} Q -16,${y + 10} -10,${y}`} fill="none" stroke="currentColor" strokeWidth={2} />
-    ))}
-    <line x1={-35} y1={-25} x2={-35} y2={-35} stroke="currentColor" strokeWidth={2} />
-    <line x1={-35} y1={5} x2={-35} y2={25} stroke="currentColor" strokeWidth={2} />
-    <line x1={-6} y1={-30} x2={-6} y2={30} stroke="currentColor" strokeWidth={3} />
-    <line x1={6} y1={-30} x2={6} y2={30} stroke="currentColor" strokeWidth={3} />
-    {[-25, -10, 5].map((y, i) => (
-      <path key={i} d={`M 10,${y} Q 16,${y - 10} 22,${y} Q 28,${y + 10} 35,${y}`} fill="none" stroke="currentColor" strokeWidth={2} />
-    ))}
-    <line x1={35} y1={-25} x2={35} y2={-35} stroke="currentColor" strokeWidth={2} />
-    {/* Center tap */}
-    <line x1={35} y1={-10} x2={45} y2={-10} stroke="currentColor" strokeWidth={2} />
-    <line x1={35} y1={5} x2={35} y2={25} stroke="currentColor" strokeWidth={2} />
-  </g>
-;
+  {[-25, -10, 5].map((y, i) => (
+    <path key={i} d={`M -35,${y} Q -28,${y - 10} -22,${y} Q -16,${y + 10} -10,${y}`} fill="none" stroke="currentColor" strokeWidth={2} />
+  ))}
+  <line x1={-35} y1={-25} x2={-35} y2={-35} stroke="currentColor" strokeWidth={2} />
+  <line x1={-35} y1={5} x2={-35} y2={25} stroke="currentColor" strokeWidth={2} />
+  <line x1={-6} y1={-30} x2={-6} y2={30} stroke="currentColor" strokeWidth={3} />
+  <line x1={6} y1={-30} x2={6} y2={30} stroke="currentColor" strokeWidth={3} />
+  {[-25, -10, 5].map((y, i) => (
+    <path key={i} d={`M 10,${y} Q 16,${y - 10} 22,${y} Q 28,${y + 10} 35,${y}`} fill="none" stroke="currentColor" strokeWidth={2} />
+  ))}
+  <line x1={35} y1={-25} x2={35} y2={-35} stroke="currentColor" strokeWidth={2} />
+  {/* Center tap */}
+  <line x1={35} y1={-10} x2={45} y2={-10} stroke="currentColor" strokeWidth={2} />
+  <line x1={35} y1={5} x2={35} y2={25} stroke="currentColor" strokeWidth={2} />
+</g>
+  ;
 
 const Autotransformer: SymbolFC = ({ props }) => props?._documentedStyle === true ? <g>
   <line x1={-30} y1={-25} x2={-10} y2={-25} stroke="currentColor" strokeWidth={2} />
@@ -720,16 +720,16 @@ const Autotransformer: SymbolFC = ({ props }) => props?._documentedStyle === tru
   <line x1={2} y1={0} x2={18} y2={0} stroke="currentColor" strokeWidth={2} />
   <circle cx={2} cy={0} r={2.2} fill="currentColor" />
 </g> : <g>
-    {[-25, -10, 5].map((y, i) => (
-      <path key={i} d={`M -30,${y} Q -22,${y - 10} -15,${y} Q -8,${y + 10} 0,${y}`} fill="none" stroke="currentColor" strokeWidth={2} />
-    ))}
-    <line x1={-30} y1={-25} x2={-30} y2={-35} stroke="currentColor" strokeWidth={2} />
-    <line x1={-30} y1={5} x2={-30} y2={25} stroke="currentColor" strokeWidth={2} />
-    {/* Tap */}
-    <line x1={0} y1={-10} x2={30} y2={-10} stroke="currentColor" strokeWidth={2} />
-    <line x1={0} y1={5} x2={30} y2={5} stroke="currentColor" strokeWidth={2} />
-  </g>
-;
+  {[-25, -10, 5].map((y, i) => (
+    <path key={i} d={`M -30,${y} Q -22,${y - 10} -15,${y} Q -8,${y + 10} 0,${y}`} fill="none" stroke="currentColor" strokeWidth={2} />
+  ))}
+  <line x1={-30} y1={-25} x2={-30} y2={-35} stroke="currentColor" strokeWidth={2} />
+  <line x1={-30} y1={5} x2={-30} y2={25} stroke="currentColor" strokeWidth={2} />
+  {/* Tap */}
+  <line x1={0} y1={-10} x2={30} y2={-10} stroke="currentColor" strokeWidth={2} />
+  <line x1={0} y1={5} x2={30} y2={5} stroke="currentColor" strokeWidth={2} />
+</g>
+  ;
 
 // ─── POWER SEMICONDUCTORS ─────────────────────────────────────────────────────
 
@@ -957,20 +957,96 @@ const LogicGate: SymbolFC = ({ props }) => {
   const geometry = dynamicGateGeometryFor(gateType, props?.inputCount);
   const inputCount = unary ? 1 : geometry.inputCount;
   // slotPinsFor: expandable-slot model — N=2 gives [-25,+25] keeping y=0 open for a 3rd pin.
-  // geometry.inputY already uses slotPinsFor; slotPinsFor(inputCount) is used for the
-  // non-scalable NOT path so both code paths share the same formula.
   const inputY: readonly number[] = scalable ? geometry.inputY : slotPinsFor(inputCount);
   const orFamily = kind === 'OR' || kind === 'NOR' || kind === 'XOR' || kind === 'XNOR';
   // halfHeight = bodyHeight/2 = outerPinY(N) + GRID/2 = constant 12.5px arc overhang for all N.
   const halfHeight = geometry.bodyHeight / 2;
-  const unaryInputX = -GRID * 2;
-  return <g>
-    {unary ? <line x1={unaryInputX} y1={0} x2={-25} y2={0} stroke="currentColor" strokeWidth={2} /> : inputY.map(y => <line key={y} x1={scalable ? geometry.inputX : unaryInputX} y1={y} x2={orFamily ? -18 : -22} y2={y} stroke="currentColor" strokeWidth={2} />)}
-    {unary ? <path d="M -25,-15 L 12,0 L -25,15 Z" fill="none" stroke="currentColor" strokeWidth={2} /> : orFamily ? <path d={`M -26,${-halfHeight} C -9,${-halfHeight} 12,${-halfHeight * .82} 25,0 C 12,${halfHeight * .82} -9,${halfHeight} -26,${halfHeight} C -16,${halfHeight * .52} -16,${-halfHeight * .52} -26,${-halfHeight} Z`} fill="none" stroke="currentColor" strokeWidth={2} /> : <path d={`M -22,${-halfHeight} H 2 A 23,${halfHeight} 0 0 1 2,${halfHeight} H -22 Z`} fill="none" stroke="currentColor" strokeWidth={2} />}
-    {(kind === 'XOR' || kind === 'XNOR') && <path d={`M -32,${-halfHeight} C -22,${-halfHeight * .52} -22,${halfHeight * .52} -32,${halfHeight}`} fill="none" stroke="currentColor" strokeWidth={2} />}
-    {inverted && <circle cx={unary ? 16 : 30} cy={0} r={4} fill="none" stroke="currentColor" strokeWidth={2} />}
-    <line x1={unary ? 20 : (inverted ? 34 : 25)} y1={0} x2={GRID * 2} y2={0} stroke="currentColor" strokeWidth={2} strokeLinecap="round" />
-  </g>;
+
+  if (unary) {
+    // PART 1: NOT GATE & INVERTER TERMINAL RE-ANCHORING
+    // 1. Centered around (0,0).
+    // 2. Triangle base: Vertical line at x = -20px spanning from y = -18px to y = +18px.
+    // 3. Input Lead: Straight horizontal line from grid dot at (-25, 0) to triangle base at (-20, 0).
+    // 4. Input Terminal Node: Explicitly anchored at coordinates (-25, 0).
+    // 5. Apex & Inversion Bubble: Triangle apex points right to (+12, 0). Bubble center at (+16, 0) with radius r = 4px.
+    // 6. Output Lead: Extends horizontally from bubble edge (+20, 0) to grid dot at (+25, 0).
+    // 7. Output Terminal Node: Explicitly anchored at coordinates (+25, 0).
+    return (
+      <g>
+        <line x1={-25} y1={0} x2={-20} y2={0} stroke="currentColor" strokeWidth={2} />
+        <path d="M -20,-18 L 12,0 L -20,18 Z" fill="none" stroke="currentColor" strokeWidth={2} strokeLinejoin="round" />
+        <circle cx={16} cy={0} r={4} fill="none" stroke="currentColor" strokeWidth={2} />
+        <line x1={20} y1={0} x2={25} y2={0} stroke="currentColor" strokeWidth={2} strokeLinecap="round" />
+      </g>
+    );
+  }
+
+  // PART 3: CURVED GATES (OR, NOR, XOR, XNOR) PROPORTIONS & HORNS
+  // 1. Back Arc Curvature & Pin Attachment:
+  //    M x_top y_top Q (x_back + 15) 0, x_bottom y_bottom
+  //    With x_back = -20: corners at (-20, ±halfHeight), control point at (-5, 0).
+  // 2. Top and bottom corners meet front converging arcs seamlessly without sharp horns.
+  // 3. XOR Extra Input Arc: Offset detached rear arc cleanly by 7px behind main gate body (at x = -27).
+  const leadEndOr = (y: number) => {
+    // Exact back arc curve: x(y) = -20 + 15 * (1 - (y / halfHeight)^2)
+    // Input leads from inputX (-50) connect flush with the back arc:
+    const t = y / halfHeight;
+    return -20 + 15 * (1 - t * t);
+  };
+
+  return (
+    <g>
+      {inputY.map(y => (
+        <line
+          key={y}
+          x1={geometry.inputX}
+          y1={y}
+          x2={orFamily ? leadEndOr(y) : -22}
+          y2={y}
+          stroke="currentColor"
+          strokeWidth={2}
+        />
+      ))}
+      {orFamily ? (
+        <path
+          d={`M -20,${-halfHeight} Q 5,${-halfHeight * 0.75} 25,0 Q 5,${halfHeight * 0.75} -20,${halfHeight} Q -5,0 -20,${-halfHeight} Z`}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+          strokeLinejoin="round"
+        />
+      ) : (
+        <path
+          d={`M -22,${-halfHeight} H 2 A 23,${halfHeight} 0 0 1 2,${halfHeight} H -22 Z`}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+          strokeLinejoin="round"
+        />
+      )}
+      {(kind === 'XOR' || kind === 'XNOR') && (
+        <path
+          d={`M -27,${-halfHeight} Q -12,0 -27,${halfHeight}`}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+          strokeLinecap="round"
+        />
+      )}
+      {inverted && (
+        <circle cx={30} cy={0} r={4} fill="none" stroke="currentColor" strokeWidth={2} />
+      )}
+      <line
+        x1={inverted ? 34 : 25}
+        y1={0}
+        x2={geometry.outputX}
+        y2={0}
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinecap="round"
+      />
+    </g>
+  );
 };
 
 

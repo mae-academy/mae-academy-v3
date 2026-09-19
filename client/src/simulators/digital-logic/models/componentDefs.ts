@@ -883,45 +883,45 @@ const DIGITAL_LOGIC: Record<string, ComponentDef> = {
     properties: {},
     description: 'Ideal Boolean state output',
   },
- 'gate-and': {
-   id: 'gate-and', name: 'AND Gate', category: 'Digital Logic', width: 100, height: 100, symbol: 'gate-and',
+  'gate-and': {
+    id: 'gate-and', name: 'AND Gate', category: 'Digital Logic', width: 100, height: 100, symbol: 'gate-and',
     // Slot model N=2: pins at y=−25 and y=+25. Centre slot y=0 stays open for a 3rd pin.
     terminals: [{ id: 'a', name: 'A', x: -50, y: -25, type: 'input' }, { id: 'b', name: 'B', x: -50, y: 25, type: 'input' }, { id: 'y', name: 'Y', x: 50, y: 0, type: 'output' }],
     properties: { inputCount: { type: 'select', value: '2', options: ['2', '3', '4', '5', '6', '7', '8'], label: 'Input Count' } },
     description: 'Ideal configurable-input AND gate',
   },
- 'gate-or': {
-   id: 'gate-or', name: 'OR Gate', category: 'Digital Logic', width: 100, height: 100, symbol: 'gate-or',
+  'gate-or': {
+    id: 'gate-or', name: 'OR Gate', category: 'Digital Logic', width: 100, height: 100, symbol: 'gate-or',
     terminals: [{ id: 'a', name: 'A', x: -50, y: -25, type: 'input' }, { id: 'b', name: 'B', x: -50, y: 25, type: 'input' }, { id: 'y', name: 'Y', x: 50, y: 0, type: 'output' }],
     properties: { inputCount: { type: 'select', value: '2', options: ['2', '3', '4', '5', '6', '7', '8'], label: 'Input Count' } },
     description: 'Ideal configurable-input OR gate',
   },
- 'gate-not': {
-   id: 'gate-not', name: 'NOT Gate', category: 'Digital Logic', width: 100, height: 50, symbol: 'gate-not',
-    terminals: [{ id: 'a', name: 'A', x: -50, y: 0, type: 'input' }, { id: 'y', name: 'Y', x: 50, y: 0, type: 'output' }],
+  'gate-not': {
+    id: 'gate-not', name: 'NOT Gate', category: 'Digital Logic', width: 50, height: 50, symbol: 'gate-not',
+    terminals: [{ id: 'a', name: 'A', x: -25, y: 0, type: 'input' }, { id: 'y', name: 'Y', x: 25, y: 0, type: 'output' }],
     properties: {},
     description: 'Ideal NOT gate',
   },
- 'gate-nand': {
-   id: 'gate-nand', name: 'NAND Gate', category: 'Digital Logic', width: 100, height: 100, symbol: 'gate-nand',
+  'gate-nand': {
+    id: 'gate-nand', name: 'NAND Gate', category: 'Digital Logic', width: 100, height: 100, symbol: 'gate-nand',
     terminals: [{ id: 'a', name: 'A', x: -50, y: -25, type: 'input' }, { id: 'b', name: 'B', x: -50, y: 25, type: 'input' }, { id: 'y', name: 'Y', x: 50, y: 0, type: 'output' }],
     properties: { inputCount: { type: 'select', value: '2', options: ['2', '3', '4', '5', '6', '7', '8'], label: 'Input Count' } },
     description: 'Ideal configurable-input NAND gate',
   },
- 'gate-nor': {
-   id: 'gate-nor', name: 'NOR Gate', category: 'Digital Logic', width: 100, height: 100, symbol: 'gate-nor',
+  'gate-nor': {
+    id: 'gate-nor', name: 'NOR Gate', category: 'Digital Logic', width: 100, height: 100, symbol: 'gate-nor',
     terminals: [{ id: 'a', name: 'A', x: -50, y: -25, type: 'input' }, { id: 'b', name: 'B', x: -50, y: 25, type: 'input' }, { id: 'y', name: 'Y', x: 50, y: 0, type: 'output' }],
     properties: { inputCount: { type: 'select', value: '2', options: ['2', '3', '4', '5', '6', '7', '8'], label: 'Input Count' } },
     description: 'Ideal configurable-input NOR gate',
   },
- 'gate-xor': {
-   id: 'gate-xor', name: 'XOR Gate', category: 'Digital Logic', width: 100, height: 100, symbol: 'gate-xor',
+  'gate-xor': {
+    id: 'gate-xor', name: 'XOR Gate', category: 'Digital Logic', width: 100, height: 100, symbol: 'gate-xor',
     terminals: [{ id: 'a', name: 'A', x: -50, y: -25, type: 'input' }, { id: 'b', name: 'B', x: -50, y: 25, type: 'input' }, { id: 'y', name: 'Y', x: 50, y: 0, type: 'output' }],
     properties: { inputCount: { type: 'select', value: '2', options: ['2', '3', '4', '5', '6', '7', '8'], label: 'Input Count' } },
     description: 'Ideal configurable-input XOR gate',
   },
- 'gate-xnor': {
-   id: 'gate-xnor', name: 'XNOR Gate', category: 'Digital Logic', width: 100, height: 100, symbol: 'gate-xnor',
+  'gate-xnor': {
+    id: 'gate-xnor', name: 'XNOR Gate', category: 'Digital Logic', width: 100, height: 100, symbol: 'gate-xnor',
     terminals: [{ id: 'a', name: 'A', x: -50, y: -25, type: 'input' }, { id: 'b', name: 'B', x: -50, y: 25, type: 'input' }, { id: 'y', name: 'Y', x: 50, y: 0, type: 'output' }],
     properties: { inputCount: { type: 'select', value: '2', options: ['2', '3', '4', '5', '6', '7', '8'], label: 'Input Count' } },
     description: 'Ideal configurable-input XNOR gate',
@@ -973,10 +973,12 @@ const DIGITAL_LOGIC_ADVANCED: Record<string, ComponentDef> = {
   'logic-nbit-adder': { ...logicBlock('logic-nbit-adder', 'N-Bit Adder', ['a0', 'a1', 'a2', 'a3', 'b0', 'b1', 'b2', 'b3', 'cin'], ['sum0', 'sum1', 'sum2', 'sum3', 'cout'], 'Behavioral ripple-carry adder with selectable 4-bit or 8-bit width'), properties: { propagationDelayNs: { type: 'number', value: 10, unit: 'ns', min: 0, max: 10000, label: 'Propagation Delay' }, bitWidth: { type: 'select', value: '4', options: ['4', '8'], label: 'Bit Width' } } },
   'logic-parity': logicBlock('logic-parity', 'Parity Generator / Checker', ['d0', 'd1', 'd2', 'd3', 'p'], ['even', 'odd', 'valid'], 'Four-bit even/odd parity generator with even-parity checker'),
   'logic-alu-4bit': logicBlock('logic-alu-4bit', 'ALU (4-bit)', ['a0', 'a1', 'a2', 'a3', 'b0', 'b1', 'b2', 'b3', 'op0', 'op1', 'cin'], ['y0', 'y1', 'y2', 'y3', 'cout', 'zero'], '4-bit ALU: 00 ADD, 01 SUB, 10 AND, 11 OR'),
-  'logic-clock': { ...logicBlock('logic-clock', 'Clock', [], ['out'], 'Discrete-event oscillator'), properties: {
-    propagationDelayNs: { type: 'number', value: 10, unit: 'ns', min: 0, max: 10000, label: 'Propagation Delay' },
-    clockPeriodMs: { type: 'number', value: 250, unit: 'ms', min: 0.002, max: 60000, label: 'Clock Period' },
-  } },
+  'logic-clock': {
+    ...logicBlock('logic-clock', 'Clock', [], ['out'], 'Discrete-event oscillator'), properties: {
+      propagationDelayNs: { type: 'number', value: 10, unit: 'ns', min: 0, max: 10000, label: 'Propagation Delay' },
+      clockPeriodMs: { type: 'number', value: 250, unit: 'ms', min: 0.002, max: 60000, label: 'Clock Period' },
+    }
+  },
   'logic-ff-sr': logicBlock('logic-ff-sr', 'SR Flip-Flop', ['s', 'r', 'clk'], ['q', 'qn'], 'Edge-triggered SR flip-flop'),
   'logic-ff-d': logicBlock('logic-ff-d', 'D Flip-Flop', ['d', 'clk'], ['q', 'qn'], 'Edge-triggered D flip-flop with two-phase commit'),
   'logic-ff-jk': logicBlock('logic-ff-jk', 'JK Flip-Flop', ['j', 'k', 'clk'], ['q', 'qn'], 'Edge-triggered JK flip-flop'),
