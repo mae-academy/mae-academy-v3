@@ -19,6 +19,9 @@ export interface NodeViewProps {
   placement: LeafPlacement | null;
   selected: boolean;
   onSelect: (nodeId: NodeId) => void;
+  networkId?: string;
+  interactive?: boolean;
+  onDragStart?: (event: React.PointerEvent<SVGGElement>, networkId: string, nodeId: string) => void;
 }
 
 const bit = (mask: number, index: number): boolean => (mask & (1 << index)) !== 0;
@@ -51,8 +54,9 @@ export function describeNode(node: LadNode): string {
  * One placed element. Subscribes to its own power flow and its own memory bit / word only, so a
  * scan that toggles some other part of the rung never re-renders this component.
  */
-function NodeViewImpl({ node, placement, selected, onSelect }: NodeViewProps) {
+function NodeViewImpl({ node, placement, selected, onSelect, networkId, interactive, onDragStart }: NodeViewProps) {
   const env = useLadderEnv();
+  const canDrag = Boolean(interactive ?? env?.interactive);
 
   // Layout of the mask: input pins, then this node's own output, then the left rail.
   const pinCount = placement?.pinFlows.length ?? 0;
@@ -78,8 +82,10 @@ function NodeViewImpl({ node, placement, selected, onSelect }: NodeViewProps) {
   const y = rowY(row);
   const orphan = placement === null;
 
-  const symbolFor = (address: string | undefined): string | undefined =>
-    address === undefined ? undefined : env?.symbols[address.toUpperCase()]?.name;
+  const symbolFor = (address: string | undefined): string | undefined => {
+    if (node.symbol !== undefined) return node.symbol || undefined;
+    return address === undefined ? undefined : env?.symbols[address.toUpperCase()]?.name;
+  };
 
   let body: ReactElement | null = null;
   switch (node.type) {
@@ -88,7 +94,7 @@ function NodeViewImpl({ node, placement, selected, onSelect }: NodeViewProps) {
       const tag = symbolFor(node.operand);
       body = (
         <>
-          <ContactSymbol x={x} y={y} variant={node.variant} flowIn={flowIn} flowOut={flowOut} closed={closed} />
+          <ContactSymbol x={x} y={y} variant={node.variant} flowIn={flowIn} flowOut={flowOut} closed={closed} selected={selected} />
           <SymbolLabel nodeId={node.id} slot="operand" x={x + CELL_WIDTH / 2} y={y - 22} text={node.operand} tone="address" />
           {tag && <SymbolLabel nodeId={node.id} x={x + CELL_WIDTH / 2} y={y + 32} text={tag} tone="tag" />}
         </>
@@ -99,14 +105,14 @@ function NodeViewImpl({ node, placement, selected, onSelect }: NodeViewProps) {
       const glyph = node.variant === 'MASTER' ? (node.mode === 'begin' ? 'MCR' : 'MCRE') : COIL_GLYPH[node.variant];
       const coilActive = running && flowIn;
       if (node.variant === 'MASTER') {
-        body = <CoilSymbol x={x} y={y} variant={node.variant} glyph={glyph} flowIn={flowIn} flowOut={flowOut} active={coilActive} />;
+        body = <CoilSymbol x={x} y={y} variant={node.variant} glyph={glyph} flowIn={flowIn} flowOut={flowOut} active={coilActive} selected={selected} />;
       } else {
         const tag = symbolFor(node.target);
         const bits = node.variant === 'SET' || node.variant === 'RESET' ? node.count : 1;
         const caption = [tag, bits > 1 ? `x${bits}` : undefined].filter(Boolean).join(' ');
         body = (
           <>
-            <CoilSymbol x={x} y={y} variant={node.variant} glyph={glyph} flowIn={flowIn} flowOut={flowOut} active={coilActive || (running && bitValue && node.variant !== 'RESET')} />
+            <CoilSymbol x={x} y={y} variant={node.variant} glyph={glyph} flowIn={flowIn} flowOut={flowOut} active={coilActive || (running && bitValue && node.variant !== 'RESET')} selected={selected} />
             <SymbolLabel nodeId={node.id} slot="target" x={x + CELL_WIDTH / 2} y={y - 22} text={node.target} tone="address" />
             {caption && <SymbolLabel nodeId={node.id} x={x + CELL_WIDTH / 2} y={y + 32} text={caption} tone="tag" />}
           </>
@@ -126,18 +132,34 @@ function NodeViewImpl({ node, placement, selected, onSelect }: NodeViewProps) {
           rhs={readSlot(node, 'rhs')}
           flowIn={flowIn}
           flowOut={flowOut}
+          selected={selected}
         />
       );
       break;
     default:
       body = spec ? (
-        <BoxSymbol nodeId={node.id} spec={spec} x={x} row={row} pinFlows={pinFlows} flowOut={flowOut} liveValue={running ? liveValue : null} />
+        <BoxSymbol nodeId={node.id} spec={spec} x={x} row={row} pinFlows={pinFlows} flowOut={flowOut} liveValue={running ? liveValue : null} selected={selected} />
       ) : null;
   }
 
   const top = cellTop(row);
   const height = rowSpan * CELL_HEIGHT;
   const firstSlot = slotsOf(node)[0];
+
+  const selectionBounds = useMemo(() => {
+    const cx = x + CELL_WIDTH / 2;
+    if (node.type === 'contact') {
+      return { x: cx - 26, y: y - 18, width: 52, height: 36, rx: 5 };
+    }
+    if (node.type === 'coil') {
+      return { x: cx - 24, y: y - 18, width: 48, height: 36, rx: 5 };
+    }
+    if (node.type === 'compare') {
+      return { x: cx - 32, y: y - 20, width: 64, height: 40, rx: 5 };
+    }
+    const colSpan = node.layout.colSpan ?? 1;
+    return { x: x + 6, y: top + 6, width: colSpan * CELL_WIDTH - 12, height: height - 12, rx: 6 };
+  }, [node.type, node.layout.colSpan, x, y, top, height]);
 
   const onKeyDown = (event: KeyboardEvent<SVGGElement>): void => {
     if (event.key === 'Enter' || event.key === ' ') {
@@ -154,23 +176,40 @@ function NodeViewImpl({ node, placement, selected, onSelect }: NodeViewProps) {
       aria-label={`${describeNode(node)}${orphan ? ' (not connected to the rung)' : ''}`}
       aria-pressed={selected}
       data-node-id={node.id}
-      className="cursor-pointer outline-none [&:focus-visible>rect]:stroke-sky-500 [&:focus-visible>rect]:stroke-[1.5]"
+      className={`group outline-none ${
+        canDrag ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'
+      }`}
+      onPointerDown={(event) => {
+        if (!canDrag) return;
+        event.stopPropagation();
+        onDragStart?.(event, networkId ?? '', node.id);
+      }}
       onClick={(event) => {
         event.stopPropagation();
         onSelect(node.id);
       }}
       onKeyDown={onKeyDown}
     >
+      {/* Full-cell hit target */}
       <rect
-        x={x + 2}
-        y={top + 2}
-        width={CELL_WIDTH - 4}
-        height={height - 4}
-        rx={4}
-        strokeWidth={selected || orphan ? 1.5 : 0}
-        strokeDasharray={orphan ? '4 3' : undefined}
-        className={orphan ? `${ERROR_FILL} ${ERROR_STROKE}` : selected ? `${SELECTED_FILL} ${SELECTED_STROKE}` : 'fill-transparent'}
+        x={x}
+        y={top}
+        width={CELL_WIDTH * (node.layout.colSpan ?? 1)}
+        height={height}
+        className="fill-transparent"
       />
+      {orphan && (
+        <rect
+          x={selectionBounds.x}
+          y={selectionBounds.y}
+          width={selectionBounds.width}
+          height={selectionBounds.height}
+          rx={selectionBounds.rx}
+          strokeWidth={1.5}
+          strokeDasharray="4 3"
+          className={`${ERROR_FILL} ${ERROR_STROKE}`}
+        />
+      )}
       {orphan && <title>Not reachable: place it on the main rung or inside a parallel branch</title>}
       {body}
     </g>

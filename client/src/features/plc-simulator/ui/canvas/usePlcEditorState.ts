@@ -27,9 +27,14 @@ export interface PlcEditorActions {
   moveNode(networkId: NetworkId, nodeId: NodeId, row: number, col: number): void;
   deleteSelection(): void;
   setSlot(networkId: NetworkId, nodeId: NodeId, slot: SlotKey, text: string): void;
+  setNodeSymbol(networkId: NetworkId, nodeId: NodeId, symbol: string): void;
   retype(networkId: NetworkId, nodeId: NodeId, dataType: NumericType): void;
   addBranch(networkId: NetworkId, nodeId: NodeId): void;
   addLane(networkId: NetworkId, branchId: BranchId): void;
+  extendBranchLeft(networkId: NetworkId, branchId: BranchId): void;
+  extendBranchRight(networkId: NetworkId, branchId: BranchId): void;
+  shrinkBranchLeft(networkId: NetworkId, branchId: BranchId): void;
+  shrinkBranchRight(networkId: NetworkId, branchId: BranchId): void;
   resizeGrid(networkId: NetworkId, cols: number): void;
   addNetwork(afterId?: NetworkId): void;
   deleteNetwork(networkId: NetworkId): void;
@@ -78,9 +83,14 @@ export function usePlcEditorState(profile: HardwareProfile, initial: readonly Ne
       moveNode: (networkId, nodeId, row, col) => dispatch({ type: 'moveNode', networkId, nodeId, row, col }),
       deleteSelection: () => dispatch({ type: 'deleteSelection' }),
       setSlot: (networkId, nodeId, slot, text) => dispatch({ type: 'setSlot', networkId, nodeId, slot, text }),
+      setNodeSymbol: (networkId, nodeId, symbol) => dispatch({ type: 'setNodeSymbol', networkId, nodeId, symbol }),
       retype: (networkId, nodeId, dataType) => dispatch({ type: 'retype', networkId, nodeId, dataType }),
       addBranch: (networkId, nodeId) => dispatch({ type: 'addBranch', networkId, nodeId }),
       addLane: (networkId, branchId) => dispatch({ type: 'addLane', networkId, branchId }),
+      extendBranchLeft: (networkId, branchId) => dispatch({ type: 'extendBranchLeft', networkId, branchId }),
+      extendBranchRight: (networkId, branchId) => dispatch({ type: 'extendBranchRight', networkId, branchId }),
+      shrinkBranchLeft: (networkId, branchId) => dispatch({ type: 'shrinkBranchLeft', networkId, branchId }),
+      shrinkBranchRight: (networkId, branchId) => dispatch({ type: 'shrinkBranchRight', networkId, branchId }),
       resizeGrid: (networkId, cols) => dispatch({ type: 'resizeGrid', networkId, cols }),
       addNetwork: (afterId) => dispatch({ type: 'addNetwork', afterId }),
       deleteNetwork: (networkId) => dispatch({ type: 'deleteNetwork', networkId }),

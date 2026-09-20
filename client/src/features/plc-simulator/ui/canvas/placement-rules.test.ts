@@ -107,4 +107,15 @@ describe('parallel branches from a drop', () => {
     expect(again.ok).toBe(false);
     if (!again.ok) expect(again.reason).toContain('occupied');
   });
+
+  it('shifts sibling contacts in an active parallel branch to insert in series', () => {
+    const forked = must(plan(withContact(), 'contact-no', 1, 0, 'c2')).network;
+    const shifted = must(plan(forked, 'contact-nc', 1, 0, 'c3'));
+    expect(shifted.ok).toBe(true);
+    expect(validateNetworkLayout(shifted.network)).toEqual([]);
+    const c2Node = shifted.network.nodes.find((n) => n.id === 'c2');
+    const c3Node = shifted.network.nodes.find((n) => n.id === 'c3');
+    expect(c3Node?.layout).toMatchObject({ row: 1, col: 0 });
+    expect(c2Node?.layout).toMatchObject({ row: 1, col: 1 });
+  });
 });

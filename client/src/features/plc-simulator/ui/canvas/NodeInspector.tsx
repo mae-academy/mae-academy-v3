@@ -1,7 +1,8 @@
 import { useId, useState } from 'react';
 import type { LadNode, NetworkId, NumericType } from '../../domain/ast';
 import type { HardwareProfile } from '../../domain/hardware';
-import { Trash2 } from 'lucide-react';
+import type { SymbolMap } from '../../transpiler';
+import { Trash2, X } from 'lucide-react';
 import { FIELD_INPUT, PANEL, PANEL_TITLE } from '../chrome';
 import { describeNode } from './components/symbols/NodeView';
 import { findNode } from './network-edit';
@@ -59,11 +60,73 @@ function SlotField({ label, value, validate, onCommit }: SlotFieldProps) {
   );
 }
 
+interface SymbolFieldProps {
+  label: string;
+  value: string;
+  onCommit: (text: string) => void;
+}
+
+function SymbolField({ label, value, onCommit }: SymbolFieldProps) {
+  const [draft, setDraft] = useState(value);
+  const [seen, setSeen] = useState(value);
+  if (value !== seen) {
+    setSeen(value);
+    setDraft(value);
+  }
+  const commit = (): void => {
+    if (draft.trim() !== value) onCommit(draft.trim());
+  };
+
+  return (
+    <label className="grid grid-cols-[5.5rem_minmax(0,1fr)] items-center gap-x-2 gap-y-0.5 text-xs">
+      <span className="mae-panel-field-label">{label}</span>
+      <div className="relative flex items-center">
+        <input
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
+          onBlur={commit}
+          onKeyDown={(event) => {
+            event.stopPropagation();
+            if (event.key === 'Enter') commit();
+            if (event.key === 'Escape') setDraft(value);
+          }}
+          placeholder="e.g. Start_PB, Motor"
+          spellCheck={false}
+          className={`${FIELD_INPUT} font-mono pe-6`}
+        />
+        {draft && (
+          <button
+            type="button"
+            aria-label="Clear symbol tag"
+            onClick={() => {
+              setDraft('');
+              onCommit('');
+            }}
+            className="absolute end-1.5 flex h-5 w-5 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+          >
+            <X size={12} aria-hidden="true" />
+          </button>
+        )}
+      </div>
+    </label>
+  );
+}
+
 /**
  * Form view of the selected element. Every operand is reachable here, including ones a compact
  * box has no room to draw, and the same validation that guards inline edits applies.
  */
-export function NodeInspector({ editor, profile, className = '' }: { editor: PlcEditor; profile: HardwareProfile; className?: string }) {
+export function NodeInspector({
+  editor,
+  profile,
+  symbols,
+  className = '',
+}: {
+  editor: PlcEditor;
+  profile: HardwareProfile;
+  symbols?: SymbolMap;
+  className?: string;
+}) {
   const { selection, networks, actions } = editor;
   const networkId: NetworkId | null = selection.networkId;
   const network = networkId === null ? undefined : networks.find((n) => n.id === networkId);
@@ -86,15 +149,34 @@ export function NodeInspector({ editor, profile, className = '' }: { editor: Plc
             </div>
           </div>
 
-          {slotsOf(node).map((slot) => (
-            <SlotField
-              key={`${node.id}:${slot.key}`}
-              label={slot.label}
-              value={readSlot(node, slot.key)}
-              validate={(text) => validateSlot(node, slot.key as SlotKey, text, profile)}
-              onCommit={(text) => actions.setSlot(networkId, node.id, slot.key, text)}
-            />
-          ))}
+          {slotsOf(node).map((slot) => {
+            const isAddressSlot = slot.key === 'operand' || slot.key === 'target' || slot.key === 'instance';
+            const address = isAddressSlot ? readSlot(node, slot.key) : undefined;
+            const currentSymbol =
+              node.symbol !== undefined
+                ? node.symbol
+                : address && symbols
+                  ? (symbols[address.toUpperCase()]?.name ?? '')
+                  : '';
+
+            return (
+              <div key={`${node.id}:${slot.key}`} className="contents">
+                <SlotField
+                  label={slot.label}
+                  value={readSlot(node, slot.key)}
+                  validate={(text) => validateSlot(node, slot.key as SlotKey, text, profile)}
+                  onCommit={(text) => actions.setSlot(networkId, node.id, slot.key, text)}
+                />
+                {isAddressSlot && (
+                  <SymbolField
+                    label="Symbol Name"
+                    value={currentSymbol}
+                    onCommit={(text) => actions.setNodeSymbol(networkId, node.id, text)}
+                  />
+                )}
+              </div>
+            );
+          })}
 
           {(node.type === 'compare' || node.type === 'math') && (
             <label className="grid grid-cols-[5.5rem_minmax(0,1fr)] items-center gap-x-2 text-xs">

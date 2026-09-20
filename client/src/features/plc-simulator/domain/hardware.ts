@@ -102,7 +102,7 @@ export const S7_200_CPU224 = defineProfile({
     T: { kind: 'indexed', ranges: range(0, 255) },
     C: { kind: 'indexed', ranges: range(0, 255) },
   },
-  limits: { maxNetworks: 256, maxNodesPerNetwork: 64, maxGridRows: 16, maxGridCols: 12 },
+  limits: { maxNetworks: 256, maxNodesPerNetwork: 64, maxGridRows: 16, maxGridCols: 8 },
 });
 
 /** S7-200 CPU 226 + expansion modules: 40 DI (I0.0-I4.7), 32 DO (Q0.0-Q3.7), 10 KB V-memory. */
@@ -122,7 +122,7 @@ export const S7_200_CPU226_EXP = defineProfile({
     T: { kind: 'indexed', ranges: range(0, 255) },
     C: { kind: 'indexed', ranges: range(0, 255) },
   },
-  limits: { maxNetworks: 512, maxNodesPerNetwork: 128, maxGridRows: 32, maxGridCols: 16 },
+  limits: { maxNetworks: 512, maxNodesPerNetwork: 128, maxGridRows: 32, maxGridCols: 8 },
 });
 
 const registry = new Map<string, HardwareProfile>();

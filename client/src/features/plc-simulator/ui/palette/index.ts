@@ -12,5 +12,4 @@ export {
   type PlacementContext,
 } from './catalog';
 export { PaletteGlyph } from './PaletteGlyph';
-export { Toolbox, type ToolboxProps } from './Toolbox';
-export default Toolbox;
+export { default, Toolbox, type ToolboxProps } from './Toolbox';

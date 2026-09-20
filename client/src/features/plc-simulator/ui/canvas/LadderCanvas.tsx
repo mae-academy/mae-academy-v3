@@ -1,5 +1,5 @@
 import { Plus, Trash2 } from 'lucide-react';
-import { useCallback, useMemo, useState, type KeyboardEvent } from 'react';
+import { useCallback, useEffect, useMemo, useState, type KeyboardEvent } from 'react';
 import type { Network, NetworkId, NodeId } from '../../domain/ast';
 import type { HardwareProfile } from '../../domain/hardware';
 import { buildNetworkTree, type EvalTree } from '../../engine/compiler';
@@ -45,8 +45,10 @@ const ARROWS: Readonly<Record<string, readonly [number, number]>> = {
 };
 
 /**
- * The interactive canvas: a stack of ladder rungs plus every pointer / keyboard handler. All SVG
- * drawing is delegated to `LadderRung` and the symbol components; this file only turns user input
+ * Renders the ladder diagram: one rung per network in sequence, with SVG wiring, drag-and-drop
+ * placement, on-canvas branch creation, and live power flow when attached to a running controller.
+ *
+ * All state lives in `usePlcEditorState`; the canvas only translates gestures (clicks, drags, drops)
  * into editor actions, so the two concerns never share code.
  */
 export function LadderCanvas({ editor, profile, symbols = NO_SYMBOLS, readOnly = false, className = '' }: LadderCanvasProps) {
@@ -55,6 +57,14 @@ export function LadderCanvas({ editor, profile, symbols = NO_SYMBOLS, readOnly =
   const programVersion = useProgramVersion();
   const interactive = !readOnly && sim === null;
   const [editing, setEditing] = useState<EditingTarget | null>(null);
+
+  // Auto-deselect immediately on run mode
+  useEffect(() => {
+    if (sim !== null) {
+      actions.clearSelection();
+      setEditing(null);
+    }
+  }, [sim, actions]);
 
   // In a simulation the runtime's own trees are used so wire colours can be looked up by identity;
   // if the loaded program is not this exact network, fall back to a local tree (drawn unpowered).
@@ -168,6 +178,13 @@ export function LadderCanvas({ editor, profile, symbols = NO_SYMBOLS, readOnly =
     }
   };
 
+  const onMoveNode = useCallback(
+    (networkId: string, nodeId: string, row: number, col: number) => {
+      actions.moveNode(networkId, nodeId, row, col);
+    },
+    [actions],
+  );
+
   const selectedNode =
     selection.networkId !== null && selection.nodeId !== null
       ? networks.find((n) => n.id === selection.networkId)?.nodes.find((n) => n.id === selection.nodeId)
@@ -188,7 +205,7 @@ export function LadderCanvas({ editor, profile, symbols = NO_SYMBOLS, readOnly =
         aria-label="Ladder logic editor. Arrow keys move between cells, Enter places the armed instruction or edits the selected one, Delete removes it."
         tabIndex={interactive ? 0 : -1}
         onKeyDown={onKeyDown}
-        className={`relative flex flex-col gap-4 overflow-auto rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60 ${className}`}
+        className={`relative flex flex-col gap-4 overflow-auto rounded-lg bg-white dark:bg-[#090a0d] outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60 ${className}`}
         data-armed={state.armed ?? undefined}
       >
         <div role="status" aria-live="polite" className="sr-only">
@@ -198,7 +215,7 @@ export function LadderCanvas({ editor, profile, symbols = NO_SYMBOLS, readOnly =
         {state.notice !== null && (
           <div
             role="alert"
-            className="sticky top-0 z-10 flex items-center justify-between gap-3 rounded-md border border-red-300 bg-red-50 px-3 py-1.5 text-xs text-red-800 dark:border-red-500/40 dark:bg-red-950/60 dark:text-red-200"
+            className="sticky top-0 z-10 flex items-center justify-between gap-3 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-xs text-red-700 dark:text-red-400"
           >
             <span>{state.notice}</span>
             <button type="button" onClick={actions.dismissNotice} className="font-semibold underline">
@@ -231,15 +248,6 @@ export function LadderCanvas({ editor, profile, symbols = NO_SYMBOLS, readOnly =
                   <span className="ml-auto flex items-center gap-1">
                     <button
                       type="button"
-                      aria-label={`Add a column to network ${index + 1}`}
-                      disabled={network.grid.cols >= profile.limits.maxGridCols}
-                      onClick={() => actions.resizeGrid(network.id, network.grid.cols + 1)}
-                      className="inline-flex h-6 items-center gap-1 rounded px-1.5 hover:bg-slate-200 disabled:opacity-40 dark:hover:bg-slate-700"
-                    >
-                      <Plus className="h-3 w-3" aria-hidden="true" /> col
-                    </button>
-                    <button
-                      type="button"
                       aria-label={`Add a network below network ${index + 1}`}
                       onClick={() => actions.addNetwork(network.id)}
                       className="inline-flex h-6 items-center gap-1 rounded px-1.5 hover:bg-slate-200 dark:hover:bg-slate-700"
@@ -258,21 +266,26 @@ export function LadderCanvas({ editor, profile, symbols = NO_SYMBOLS, readOnly =
                   </span>
                 )}
               </header>
-              <div className="rounded-md border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-950">
+              <div className="rounded-md border border-slate-200 bg-white dark:border-[#1a1d24] dark:bg-[#0d0f14]">
                 <LadderRung
                   network={network}
                   index={index}
                   tree={tree}
-                  selectedNodeId={selection.networkId === network.id ? selection.nodeId : null}
-                  selectedCell={selection.networkId === network.id ? selection.cell : null}
+                  selectedNodeId={interactive && selection.networkId === network.id ? selection.nodeId : null}
+                  selectedCell={interactive && selection.networkId === network.id ? selection.cell : null}
                   armed={interactive ? state.armed : null}
                   interactive={interactive}
                   previewCell={editor.previewCell}
                   onAddBranch={actions.addBranch}
                   onAddLane={actions.addLane}
+                  onExtendBranchLeft={actions.extendBranchLeft}
+                  onExtendBranchRight={actions.extendBranchRight}
+                  onShrinkBranchLeft={actions.shrinkBranchLeft}
+                  onShrinkBranchRight={actions.shrinkBranchRight}
                   onSelectCell={onSelectCell}
                   onSelectNode={onSelectNode}
                   onPlace={onPlace}
+                  onMoveNode={onMoveNode}
                 />
               </div>
             </section>

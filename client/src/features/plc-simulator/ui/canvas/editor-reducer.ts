@@ -7,6 +7,8 @@ import {
   addLane,
   addParallelBranch,
   createEmptyNetwork,
+  extendBranchLeft,
+  extendBranchRight,
   moveNode,
   padNetwork,
   placeItem,
@@ -14,6 +16,9 @@ import {
   resizeGrid,
   retype,
   setSlot,
+  shrinkBranchLeft,
+  shrinkBranchRight,
+  usedAddresses,
   usedInstances,
   type EditResult,
 } from './network-edit';
@@ -65,9 +70,14 @@ export type EditorAction =
   | { readonly type: 'moveNode'; readonly networkId: NetworkId; readonly nodeId: NodeId; readonly row: number; readonly col: number }
   | { readonly type: 'deleteSelection' }
   | { readonly type: 'setSlot'; readonly networkId: NetworkId; readonly nodeId: NodeId; readonly slot: SlotKey; readonly text: string }
+  | { readonly type: 'setNodeSymbol'; readonly networkId: NetworkId; readonly nodeId: NodeId; readonly symbol: string }
   | { readonly type: 'retype'; readonly networkId: NetworkId; readonly nodeId: NodeId; readonly dataType: NumericType }
   | { readonly type: 'addBranch'; readonly networkId: NetworkId; readonly nodeId: NodeId }
   | { readonly type: 'addLane'; readonly networkId: NetworkId; readonly branchId: BranchId }
+  | { readonly type: 'extendBranchLeft'; readonly networkId: NetworkId; readonly branchId: BranchId }
+  | { readonly type: 'extendBranchRight'; readonly networkId: NetworkId; readonly branchId: BranchId }
+  | { readonly type: 'shrinkBranchLeft'; readonly networkId: NetworkId; readonly branchId: BranchId }
+  | { readonly type: 'shrinkBranchRight'; readonly networkId: NetworkId; readonly branchId: BranchId }
   | { readonly type: 'resizeGrid'; readonly networkId: NetworkId; readonly cols: number }
   | { readonly type: 'addNetwork'; readonly afterId?: NetworkId }
   | { readonly type: 'deleteNetwork'; readonly networkId: NetworkId }
@@ -183,7 +193,7 @@ export function checkPlacement(
   const result = placeItem(
     network,
     { itemId, nodeId: '__preview__', row, col },
-    { usedInstances: usedInstances(networks) },
+    { usedInstances: usedInstances(networks), usedAddresses: usedAddresses(networks) },
     profile.limits,
   );
   return result.ok ? null : result.reason;
@@ -203,7 +213,7 @@ export function previewPlacement(
   return planPlacement(
     network,
     { itemId, nodeId: '__preview__', row, col },
-    { usedInstances: usedInstances(networks) },
+    { usedInstances: usedInstances(networks), usedAddresses: usedAddresses(networks) },
     profile.limits,
     '__preview_branch__',
   );
@@ -260,7 +270,7 @@ export function createEditorReducer(profile: HardwareProfile) {
             const plan = planPlacement(
               network,
               { itemId: action.itemId, nodeId: minted.id, row: action.row, col: action.col },
-              { usedInstances: usedInstances(state.present) },
+              { usedInstances: usedInstances(state.present), usedAddresses: usedAddresses(state.present) },
               limits,
               branch.id,
             );
@@ -288,7 +298,10 @@ export function createEditorReducer(profile: HardwareProfile) {
         return applyEdit(
           state,
           action.networkId,
-          (network) => moveNode(network, action.nodeId, action.row, action.col, limits),
+          (network) => {
+            const moved = moveNode(network, action.nodeId, action.row, action.col, limits);
+            return moved.ok ? { ...moved, network: anchorRailNodes(moved.network) } : moved;
+          },
           state.idCounter,
           () => ({
             selection: {
@@ -317,6 +330,22 @@ export function createEditorReducer(profile: HardwareProfile) {
           state.idCounter,
         );
 
+      case 'setNodeSymbol':
+        return applyEdit(
+          state,
+          action.networkId,
+          (network) => ({
+            ok: true,
+            network: {
+              ...network,
+              nodes: network.nodes.map((n) =>
+                n.id === action.nodeId ? { ...n, symbol: action.symbol } : n,
+              ),
+            },
+          }),
+          state.idCounter,
+        );
+
       case 'retype':
         return applyEdit(
           state,
@@ -340,6 +369,38 @@ export function createEditorReducer(profile: HardwareProfile) {
           state,
           action.networkId,
           (network) => addLane(network, action.branchId, limits),
+          state.idCounter,
+        );
+
+      case 'extendBranchLeft':
+        return applyEdit(
+          state,
+          action.networkId,
+          (network) => extendBranchLeft(network, action.branchId, limits),
+          state.idCounter,
+        );
+
+      case 'extendBranchRight':
+        return applyEdit(
+          state,
+          action.networkId,
+          (network) => extendBranchRight(network, action.branchId, limits),
+          state.idCounter,
+        );
+
+      case 'shrinkBranchLeft':
+        return applyEdit(
+          state,
+          action.networkId,
+          (network) => shrinkBranchLeft(network, action.branchId, limits),
+          state.idCounter,
+        );
+
+      case 'shrinkBranchRight':
+        return applyEdit(
+          state,
+          action.networkId,
+          (network) => shrinkBranchRight(network, action.branchId, limits),
           state.idCounter,
         );
 

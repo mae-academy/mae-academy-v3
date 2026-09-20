@@ -3,7 +3,15 @@ import type { ProgramLimits } from '../../domain/hardware';
 import { inletCount } from '../../engine/compiler';
 import { anchorsToRail, type PaletteItemId, type PlacementContext } from '../palette/catalog';
 import type { Cell } from './geometry';
-import { addLane, addParallelBranch, placeItem, resolveBranch, type EditResult, type PlaceRequest } from './network-edit';
+import {
+  addLane,
+  addParallelBranch,
+  extendBranchRight,
+  placeItem,
+  resolveBranch,
+  type EditResult,
+  type PlaceRequest,
+} from './network-edit';
 
 export { anchorsToRail };
 
@@ -113,6 +121,7 @@ export function planPlacement(
 
   const direct = placeItem(network, snapped, ctx, limits);
   if (direct.ok) return finish(direct, cell, 'direct', {});
+
   if (cell.row === 0) return { ok: false, cell, reason: direct.reason };
 
   // Below the main rung a cell only carries power inside a branch, so grow one under what is above.

@@ -50,9 +50,8 @@ export function Toolbox({ armed, onActivate, onDragStart, onDragEnd, disabled = 
             type="button"
             draggable={!disabled}
             disabled={disabled}
-            aria-pressed={isArmed}
-            aria-label={`${item.description}${isArmed ? ' (armed: click a cell to place)' : ''}`}
-            title={`${item.description}${anchorsToRail(item.id) ? ' (snaps to the right rail)' : ''}: drag onto the ladder, or select a cell and click`}
+            aria-label={item.description}
+            title={`${item.description}${anchorsToRail(item.id) ? ' (snaps to the right rail)' : ''}: drag onto the ladder`}
             onClick={() => onActivate(item.id)}
             onDragStart={(event) => handleDragStart(event, item)}
             onDragEnd={onDragEnd}

@@ -42,6 +42,7 @@ export interface PlcHost {
   run(): boolean;
   pause(): void;
   stop(): void;
+  reset(): void;
   step(): void;
   readMetrics(): ScanMetrics | null;
   /** LOGO! front-panel bridge. */
@@ -134,6 +135,10 @@ export function usePlcHost(
 
   const stop = useCallback((): void => runtime.stop(), [runtime]);
   const pause = useCallback((): void => runtime.pause(), [runtime]);
+  const reset = useCallback((): void => {
+    runtime.reset();
+    field.clearInputs();
+  }, [runtime, field]);
 
   const step = useCallback((): void => {
     if (!guard() || !ready()) return;
@@ -235,6 +240,7 @@ export function usePlcHost(
     run,
     pause,
     stop,
+    reset,
     step,
     readMetrics: () => runtime.metrics,
     lcd,

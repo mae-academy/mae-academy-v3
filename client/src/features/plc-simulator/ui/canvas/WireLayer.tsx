@@ -22,7 +22,14 @@ const Wire = memo(function Wire({ segment }: { segment: HSegment }) {
 
 export function WireLayer({ segments }: { segments: readonly HSegment[] }) {
   return (
-    <g fill="none" strokeWidth={2} strokeLinecap="butt" shapeRendering="crispEdges" data-layer="wires">
+    <g
+      fill="none"
+      strokeWidth={2}
+      strokeLinecap="butt"
+      shapeRendering="crispEdges"
+      pointerEvents="none"
+      data-layer="wires"
+    >
       {segments.map((segment) => (
         <Wire key={segment.key} segment={segment} />
       ))}

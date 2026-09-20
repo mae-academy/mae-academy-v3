@@ -156,7 +156,7 @@ const en: LocaleContent = {
   },
   collections: {
     research: {
-      eyebrow: "01 / Academic Research", title: "Turn evidence into engineering direction.", description: "Six research cells designed to make emerging questions legible, structured, and ready for deeper investigation.", cards: [
+      eyebrow: "01 / Academic Research", title: "Turn evidence into engineering direction.", description: "An open-access engineering paper catalog and discovery engine. Search, read, and download live research.", cards: [
         { title: "Systems as Evidence", description: "Frame complex engineering questions into traceable, testable research paths.", code: "R.01" }, { title: "Applied Mechanics", description: "Explore the relationship between materials, force, and real-world constraints.", code: "R.02" }, { title: "Smart Infrastructure", description: "Research the sensing, feedback, and resilience patterns shaping civic systems.", code: "R.03" }, { title: "Energy Transitions", description: "Map emerging technical choices across clean generation and distribution.", code: "R.04" }, { title: "Computational Design", description: "Study procedural models that turn constraints into new possibilities.", code: "R.05" }, { title: "Engineering Ethics", description: "Test the social, environmental, and human assumptions inside every system.", code: "R.06" },
       ]
     },
@@ -233,7 +233,7 @@ const ar: LocaleContent = {
   },
   collections: {
     research: {
-      eyebrow: "01 / البحث الأكاديمي", title: "حوّل الأدلة إلى اتجاه هندسي.", description: "ست خلايا بحثية تجعل الأسئلة الناشئة واضحة ومنظمة وجاهزة للاستقصاء المتعمق.", cards: [
+      eyebrow: "01 / البحث الأكاديمي", title: "حوّل الأدلة إلى اتجاه هندسي.", description: "فهرس مفتوح الوصول للأوراق البحثية الهندسية ومحرك استكشاف. ابحث واقرأ وحمّل أحدث الأبحاث.", cards: [
         { title: "الأنظمة بوصفها أدلة", description: "صُغ الأسئلة الهندسية المعقدة في مسارات بحث قابلة للتتبع والاختبار.", code: "R.01" }, { title: "الميكانيكا التطبيقية", description: "استكشف العلاقة بين المواد والقوة والقيود الواقعية.", code: "R.02" }, { title: "البنية التحتية الذكية", description: "ابحث في أنماط الاستشعار والتغذية الراجعة والمرونة التي تشكل الأنظمة المدنية.", code: "R.03" }, { title: "تحولات الطاقة", description: "ارسم خريطة الخيارات التقنية الناشئة عبر التوليد النظيف والتوزيع.", code: "R.04" }, { title: "التصميم الحاسوبي", description: "ادرس النماذج الإجرائية التي تحوّل القيود إلى إمكانات جديدة.", code: "R.05" }, { title: "أخلاقيات الهندسة", description: "اختبر الافتراضات الاجتماعية والبيئية والإنسانية داخل كل نظام.", code: "R.06" },
       ]
     },
@@ -310,7 +310,7 @@ const es: LocaleContent = {
   },
   collections: {
     research: {
-      eyebrow: "01 / Investigación académica", title: "Convierte la evidencia en dirección de ingeniería.", description: "Seis células de investigación diseñadas para hacer legibles, estructuradas y listas para profundizar las preguntas emergentes.", cards: [
+      eyebrow: "01 / Investigación académica", title: "Convierte la evidencia en dirección de ingeniería.", description: "Un catálogo de artículos de ingeniería de acceso abierto y motor de descubrimiento. Busca, lee y descarga investigaciones.", cards: [
         { title: "Sistemas como evidencia", description: "Convierte preguntas complejas de ingeniería en rutas de investigación trazables y comprobables.", code: "R.01" }, { title: "Mecánica aplicada", description: "Explora la relación entre materiales, fuerza y restricciones reales.", code: "R.02" }, { title: "Infraestructura inteligente", description: "Investiga los patrones de detección, retroalimentación y resiliencia que dan forma a los sistemas cívicos.", code: "R.03" }, { title: "Transiciones energéticas", description: "Traza opciones técnicas emergentes en generación limpia y distribución.", code: "R.04" }, { title: "Diseño computacional", description: "Estudia modelos procedimentales que convierten restricciones en nuevas posibilidades.", code: "R.05" }, { title: "Ética de la ingeniería", description: "Prueba las suposiciones sociales, ambientales y humanas dentro de cada sistema.", code: "R.06" },
       ]
     },

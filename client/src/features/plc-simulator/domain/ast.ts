@@ -50,6 +50,7 @@ export interface Branch {
 interface NodeBase {
   readonly id: NodeId;
   readonly layout: GridPlacement;
+  readonly symbol?: string;
 }
 
 // ---- contacts & coils ------------------------------------------------------------------------

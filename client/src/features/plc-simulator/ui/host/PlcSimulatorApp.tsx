@@ -1,4 +1,3 @@
-import { Boxes, Workflow } from 'lucide-react';
 import { useCallback, useRef, useState } from 'react';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import type { Network } from '../../domain/ast';
@@ -25,14 +24,9 @@ export interface PlcSimulatorAppProps {
 }
 
 const PLATFORM_OPTIONS = [
-  { label: 'S7-200 CPU', value: 's7', icon: <Workflow className="h-full w-full" aria-hidden="true" /> },
-  { label: 'LOGO! 0BA8', value: 'logo', icon: <Boxes className="h-full w-full" aria-hidden="true" /> },
-] as const satisfies readonly { label: string; value: PlcPlatform; icon: React.ReactNode }[];
-
-const SUBTITLE: Readonly<Record<PlcPlatform, string>> = {
-  s7: 'STEP 7-Micro/WIN · Ladder (LAD) and Instruction List (IL/STL)',
-  logo: 'LOGO!Soft Comfort · Function Block Diagram (FBD) only',
-};
+  { label: 'S7-200', value: 's7' },
+  { label: 'LOGO!', value: 'logo' },
+] as const satisfies readonly { label: string; value: PlcPlatform }[];
 
 /**
  * The PLC studio. Two fully separate environments behind one master switch: a Siemens S7-200 CPU
@@ -60,7 +54,7 @@ export function PlcSimulatorApp({
 
   return (
     <div className={`flex h-[calc(100vh-15rem)] min-h-[640px] w-full flex-col gap-2.5 font-sans text-slate-800 dark:text-slate-200 ${className}`}>
-      <div className="flex shrink-0 flex-wrap items-center gap-3">
+      <div className="flex shrink-0 items-center justify-center py-0.5">
         <SegmentedControl<PlcPlatform>
           aria-label="Controller platform"
           size="md"
@@ -69,7 +63,6 @@ export function PlcSimulatorApp({
           onChange={setPlatform}
           className="border-slate-200/80 bg-slate-200/60 dark:border-[#1a1d24] dark:bg-[#13161c]"
         />
-        <span className="text-xs text-slate-500 dark:text-slate-400">{SUBTITLE[platform]}</span>
       </div>
 
       <div hidden={platform !== 's7'} className={`min-h-0 flex-1 flex-col ${platform === 's7' ? 'flex' : 'hidden'}`}>

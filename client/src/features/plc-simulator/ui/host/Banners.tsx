@@ -9,11 +9,7 @@ export function IssueBanner({ label, issues }: { label: string; issues: readonly
   return (
     <details
       open={errors > 0}
-      className={`shrink-0 rounded-xl border px-3 py-2 text-xs ${
-        errors > 0
-          ? 'border-rose-500/30 bg-rose-500/10 text-rose-800 dark:text-rose-200'
-          : 'border-amber-500/30 bg-amber-500/10 text-amber-800 dark:text-amber-200'
-      }`}
+      className="shrink-0 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-700 dark:text-red-400"
     >
       <summary className="flex cursor-pointer items-center gap-1.5 font-semibold">
         <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />
@@ -33,7 +29,7 @@ export function NoticeBanner({ message, onDismiss }: { message: string | null; o
   return (
     <div
       role="alert"
-      className="flex shrink-0 items-center justify-between gap-3 rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-1.5 text-xs text-rose-800 dark:text-rose-200"
+      className="flex shrink-0 items-center justify-between gap-3 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-xs text-red-700 dark:text-red-400"
     >
       <span>{message}</span>
       <button type="button" onClick={onDismiss} className="font-semibold underline">

@@ -1,5 +1,6 @@
 import { Boxes, Redo2, Undo2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import { LOGO_0BA8 } from '../../domain/hardware';
 import type { MemoryMap } from '../../domain/memory';
 import { ICON_PILL_BUTTON, PANEL, WindowBar } from '../chrome';
@@ -84,19 +85,62 @@ export function LogoWorkspace({ active, initialGraph, runtimeOptions }: LogoWork
 
   const running = status.mode !== 'STOP';
 
-  const exportDiagram = useCallback(() => downloadText('logo-program.fbd.json', serializeFbd(fbd.graph), 'application/json'), [fbd.graph]);
+  const exportDiagram = useCallback(() => {
+    downloadText('logo-program.fbd.json', serializeFbd(fbd.graph), 'application/json');
+    toast.success('Diagram exported');
+  }, [fbd.graph]);
+
   const importFile = useCallback(
     async (file: File): Promise<void> => {
       const result = parseFbd(await file.text());
       if (!result.ok) {
         setImportError(`${file.name}: ${result.reason}`);
+        toast.error('Import failed');
         return;
       }
       setImportError(null);
       fbd.actions.load(result.graph);
+      toast.success(`Imported ${file.name}`);
     },
     [fbd.actions],
   );
+
+  const handleCopy = useCallback(() => {
+    const json = serializeFbd(fbd.graph);
+    void navigator.clipboard.writeText(json);
+    toast.success('Copied diagram to clipboard');
+  }, [fbd.graph]);
+
+  const handlePaste = useCallback(async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (!text.trim()) return;
+      const result = parseFbd(text);
+      if (!result.ok) {
+        toast.error('Clipboard content is not a valid FBD diagram');
+        return;
+      }
+      fbd.actions.load(result.graph);
+      toast.success('Pasted diagram from clipboard');
+    } catch {
+      toast.error('Clipboard permission required to paste');
+    }
+  }, [fbd.actions]);
+
+  const handleDelete = useCallback(() => {
+    if (fbd.selection.blockId !== null || fbd.selection.linkId !== null) {
+      fbd.actions.deleteSelection();
+      toast.info('Deleted selection');
+    } else {
+      fbd.actions.load({ blocks: [], links: [] });
+      toast.info('Cleared diagram');
+    }
+  }, [fbd.selection, fbd.actions]);
+
+  const handleReset = useCallback(() => {
+    host.reset();
+    toast.info('PLC state reset');
+  }, [host]);
 
   const issues = compiled.diagnostics.map((d) => ({ severity: d.severity, message: d.message }));
 
@@ -109,7 +153,15 @@ export function LogoWorkspace({ active, initialGraph, runtimeOptions }: LogoWork
         onRun={() => void host.run()}
         onPause={host.pause}
         onStop={host.stop}
+        onReset={handleReset}
         onStep={host.step}
+        onUndo={fbd.actions.undo}
+        canUndo={fbd.canUndo && !running}
+        onRedo={fbd.actions.redo}
+        canRedo={fbd.canRedo && !running}
+        onCopy={handleCopy}
+        onPaste={handlePaste}
+        onDelete={handleDelete}
         frame={session.frame}
         readMetrics={host.readMetrics}
         onExport={exportDiagram}
@@ -144,7 +196,9 @@ export function LogoWorkspace({ active, initialGraph, runtimeOptions }: LogoWork
               <Redo2 className="h-3.5 w-3.5" aria-hidden="true" />
             </button>
             {running && (
-              <span className="rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-300">Simulation running: editing is locked</span>
+              <span className="rounded-full border border-slate-200 bg-slate-100 px-2.5 py-0.5 text-[11px] font-medium text-slate-600 dark:border-[#222731] dark:bg-[#13161c] dark:text-slate-400">
+                Simulation active · Editing locked
+              </span>
             )}
           </div>
 

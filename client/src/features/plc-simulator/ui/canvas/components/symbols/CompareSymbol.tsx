@@ -13,6 +13,7 @@ export interface CompareSymbolProps {
   rhs: string;
   flowIn: boolean;
   flowOut: boolean;
+  selected?: boolean;
 }
 
 /** Micro/WIN type letters for LAD comparison boxes: `>=I`, `==R`. */
@@ -23,8 +24,11 @@ const BOX_WIDTH = CELL_WIDTH - 2 * BOX_INSET;
 const BOX_HALF_HEIGHT = 15;
 
 /** Compact comparison contact: one row tall, operands above and below the box. */
-export function CompareSymbol({ nodeId, x, y, op, dataType, lhs, rhs, flowIn, flowOut }: CompareSymbolProps) {
+export function CompareSymbol({ nodeId, x, y, op, dataType, lhs, rhs, flowIn, flowOut, selected = false }: CompareSymbolProps) {
   const x0 = x + BOX_INSET;
+  const border = selected
+    ? 'stroke-indigo-600 dark:stroke-sky-400 [filter:drop-shadow(0_0_3px_rgba(99,102,241,0.5))]'
+    : `${wireClass(flowOut)} transition-colors group-hover:stroke-indigo-500 dark:group-hover:stroke-sky-400`;
   return (
     <g data-symbol={`compare-${op}`}>
       <g fill="none" strokeWidth={2} shapeRendering="crispEdges">
@@ -39,7 +43,7 @@ export function CompareSymbol({ nodeId, x, y, op, dataType, lhs, rhs, flowIn, fl
         rx={2}
         strokeWidth={2}
         shapeRendering="crispEdges"
-        className={`${flowOut ? BOX_FILL_LIVE : BOX_FILL} ${wireClass(flowOut)}`}
+        className={`${flowOut ? BOX_FILL_LIVE : BOX_FILL} ${border}`}
       />
       <text
         x={x + CELL_WIDTH / 2}

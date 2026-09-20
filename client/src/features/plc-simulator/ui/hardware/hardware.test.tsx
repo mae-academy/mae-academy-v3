@@ -36,18 +36,6 @@ describe('S7200Hardware', () => {
     expect(b.container.querySelectorAll('[data-bank^="Q"] [role="img"]').length).toBe(32);
   });
 
-  it('lights RUN, STOP and SF according to the controller state', () => {
-    const stopped = setup(S7_200_CPU224, { mode: 'STOP' });
-    expect(within(stopped.container).getByRole('img', { name: 'STOP on' })).toBeDefined();
-    expect(within(stopped.container).getByRole('img', { name: 'RUN off' })).toBeDefined();
-    stopped.unmount();
-
-    const running = setup(S7_200_CPU224, { mode: 'RUN', fault: true });
-    expect(within(running.container).getByRole('img', { name: 'RUN on' })).toBeDefined();
-    expect(within(running.container).getByRole('img', { name: 'STOP off' })).toBeDefined();
-    expect(within(running.container).getByRole('img', { name: 'SF / system fault on' })).toBeDefined();
-  });
-
   it('latches ON and OFF from the three-way switch and reflects it on the terminal LED', () => {
     const { field, container } = setup();
     fireEvent.click(screen.getByRole('button', { name: 'I0.3 ON' }));
@@ -81,18 +69,9 @@ describe('S7200Hardware', () => {
     expect(field.getInput(0)).toBe(false);
   });
 
-  it('reports the mode switch position and is operable as a radio group', () => {
-    const { onSwitch } = setup();
-    expect(screen.getByRole('radio', { name: 'TERM' }).getAttribute('aria-checked')).toBe('true');
-    fireEvent.click(screen.getByRole('radio', { name: 'RUN' }));
-    expect(onSwitch).toHaveBeenLastCalledWith('RUN');
-    fireEvent.keyDown(screen.getByRole('radiogroup', { name: 'Mode switch' }), { key: 'ArrowRight' });
-    expect(onSwitch).toHaveBeenLastCalledWith('STOP');
-  });
-
   it('shows the process image, not the terminal, on the output bank', () => {
     const { memory, container } = setup();
-    expect(ledsOn(container)).toBe(1); // only STOP
+    expect(ledsOn(container)).toBe(0);
     act(() => memory.writeBit('Q1.1', true));
     expect(within(container).getByRole('img', { name: 'Q1.1 on' })).toBeDefined();
   });

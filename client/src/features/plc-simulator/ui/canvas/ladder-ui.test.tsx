@@ -101,11 +101,10 @@ describe('PlcEditor interactions', () => {
   const palette = (name: RegExp) =>
     within(screen.getByRole('navigation', { name: 'Instruction palette' })).getByRole('button', { name });
 
-  it('places an armed palette entry with a cell click', () => {
+  it('places into a selected cell with a palette click', () => {
     const { container } = render(<PlcEditor profile={profile} />);
-    fireEvent.click(palette(/Normally open contact/));
-    expect(screen.getByRole('status').textContent).toBeDefined();
     fireEvent.click(cell(container, 0, 1));
+    fireEvent.click(palette(/Normally open contact/));
     expect(container.querySelector('[data-layer="nodes"] [data-symbol="contact-NO"]')).not.toBeNull();
     expect(screen.getByRole('button', { name: /Normally open contact I0\.0/ })).toBeDefined();
   });
@@ -139,16 +138,24 @@ describe('PlcEditor interactions', () => {
 
   it('refuses an occupied cell and explains why', () => {
     const { container } = render(<PlcEditor profile={profile} initialNetworks={[seal]} />);
-    fireEvent.click(palette(/Normally closed contact/));
     // the seal-in coil is anchored to the right rail (column 8 of 8), so that cell is taken
-    fireEvent.click(cell(container, 0, 7));
+    const dataTransfer = {
+      types: [PALETTE_DRAG_TYPE],
+      getData: () => 'contact-nc',
+      setData: () => {},
+      dropEffect: 'none',
+      effectAllowed: 'all',
+    };
+    fireEvent.dragStart(palette(/Normally closed contact/), { dataTransfer });
+    fireEvent.dragOver(cell(container, 0, 7), { dataTransfer });
+    fireEvent.drop(cell(container, 0, 7), { dataTransfer });
     expect(screen.getByRole('alert').textContent).toContain('already occupied');
   });
 
   it('refuses a row the engine never evaluates', () => {
     const { container } = render(<PlcEditor profile={profile} initialNetworks={[seal]} />);
-    fireEvent.click(palette(/Normally open contact/));
     fireEvent.click(cell(container, 1, 4));
+    fireEvent.click(palette(/Normally open contact/));
     expect(screen.getByRole('alert').textContent).toContain('branch');
   });
 
@@ -173,9 +180,9 @@ describe('PlcEditor interactions', () => {
 
   it('undoes and redoes with the keyboard', () => {
     const { container } = render(<PlcEditor profile={profile} initialNetworks={[seal]} />);
-    fireEvent.click(palette(/Output coil/));
     // dropped under the existing coil: forks a parallel output branch on the right rail
     fireEvent.click(cell(container, 1, 3));
+    fireEvent.click(palette(/Output coil/));
     expect(container.querySelectorAll('[data-layer="nodes"] [data-symbol="coil-OUT"]').length).toBe(2);
 
     fireEvent.keyDown(container.firstElementChild as Element, { key: 'z', ctrlKey: true });
@@ -197,7 +204,7 @@ describe('PlcEditor interactions', () => {
 
   it('switches LAD -> STL -> LAD, rebuilding the ladder from edited text', () => {
     const { container } = render(<PlcEditor profile={profile} initialNetworks={[seal]} />);
-    fireEvent.click(screen.getByRole('tab', { name: 'STL / IL' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'IL' }));
 
     const area = screen.getByLabelText(/Instruction list/) as HTMLTextAreaElement;
     expect(area.value).toContain('LD     I0.0');
@@ -214,7 +221,7 @@ describe('PlcEditor interactions', () => {
 
   it('stays in STL with diagnostics when the text is invalid', () => {
     render(<PlcEditor profile={profile} initialNetworks={[seal]} />);
-    fireEvent.click(screen.getByRole('tab', { name: 'STL / IL' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'IL' }));
     fireEvent.change(screen.getByLabelText(/Instruction list/), { target: { value: 'LD I0.0\nA I1.6\n= Q0.0' } });
     fireEvent.click(screen.getByRole('tab', { name: 'LAD' }));
 
@@ -222,6 +229,26 @@ describe('PlcEditor interactions', () => {
     expect(screen.getByRole('list', { name: 'STL diagnostics' }).textContent).toContain('I1.6');
     fireEvent.click(screen.getByRole('button', { name: 'Discard changes' }));
     expect(screen.queryByLabelText(/Instruction list/)).toBeNull();
+  });
+
+  it('renders notice banner with brand red palette', () => {
+    const { container } = render(<PlcEditor profile={profile} initialNetworks={[seal]} />);
+    
+    // the seal-in coil is anchored to the right rail (column 8 of 8), so that cell is taken
+    const dataTransfer = {
+      types: [PALETTE_DRAG_TYPE],
+      getData: () => 'contact-nc',
+      setData: () => {},
+      dropEffect: 'none',
+      effectAllowed: 'all',
+    };
+    fireEvent.dragStart(palette(/Normally closed contact/), { dataTransfer });
+    fireEvent.dragOver(cell(container, 0, 7), { dataTransfer });
+    fireEvent.drop(cell(container, 0, 7), { dataTransfer });
+
+    const alert = screen.getByRole('alert');
+    expect(alert.className).toContain('border-red-500/30');
+    expect(alert.className).toContain('bg-red-500/10');
   });
 });
 
@@ -246,7 +273,7 @@ describe('live power flow', () => {
     );
   }
 
-  const LIVE = 'stroke-[#2E7D32]';
+  const LIVE = 'stroke-[#6366f1]';
   const isLive = (el: Element | null): boolean => (el?.getAttribute('class') ?? '').includes(LIVE);
 
   it('energises exactly the wires and symbols power reaches, and follows the inputs', () => {

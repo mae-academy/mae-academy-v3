@@ -66,6 +66,8 @@ export const anchorsToRail = (item: PaletteItemId): boolean => RAIL_ITEMS.has(it
 export interface PlacementContext {
   /** Timer / counter instances already claimed by the program, upper-case. */
   readonly usedInstances: ReadonlySet<string>;
+  /** Bit addresses already claimed by the program, upper-case. */
+  readonly usedAddresses?: ReadonlySet<string>;
 }
 
 export interface PaletteItem {
@@ -84,6 +86,18 @@ export interface PaletteCategory {
 }
 
 // ---- defaults ----------------------------------------------------------------------------------
+
+/** First unused bit address in prefix 'I' or 'Q', e.g. I0.0, I0.1, I0.2... */
+function freeBitAddress(prefix: 'I' | 'Q', used?: ReadonlySet<string>): PlcAddress {
+  if (!used) return `${prefix}0.0`;
+  for (let byte = 0; byte < 8; byte++) {
+    for (let bit = 0; bit < 8; bit++) {
+      const addr = `${prefix}${byte}.${bit}`;
+      if (!used.has(addr)) return addr;
+    }
+  }
+  return `${prefix}0.0`;
+}
 
 /** First unused instance in the listed inclusive ranges, e.g. T37..T63. */
 function freeInstance(prefix: 'T' | 'C', ranges: readonly (readonly [number, number])[], used: ReadonlySet<string>): PlcAddress {
@@ -171,29 +185,32 @@ const wordLogic = (fn: 'W_AND' | 'W_OR' | 'W_XOR') =>
   });
 
 const contact = (variant: 'NO' | 'NC' | 'P' | 'N') =>
-  (id: NodeId, at: GridPlacement): LadNode => ({
+  (id: NodeId, at: GridPlacement, ctx: PlacementContext): LadNode => ({
     id,
     type: 'contact',
     variant,
-    operand: 'I0.0',
+    operand: freeBitAddress('I', ctx.usedAddresses),
+    symbol: '',
     layout: placement(at, 1),
   });
 
-const outCoil = (id: NodeId, at: GridPlacement): LadNode => ({
+const outCoil = (id: NodeId, at: GridPlacement, ctx: PlacementContext): LadNode => ({
   id,
   type: 'coil',
   variant: 'OUT',
-  target: 'Q0.0',
+  target: freeBitAddress('Q', ctx.usedAddresses),
+  symbol: '',
   layout: placement(at, 1),
 });
 
 const setReset = (variant: 'SET' | 'RESET') =>
-  (id: NodeId, at: GridPlacement): LadNode => ({
+  (id: NodeId, at: GridPlacement, ctx: PlacementContext): LadNode => ({
     id,
     type: 'coil',
     variant,
-    target: 'Q0.0',
+    target: freeBitAddress('Q', ctx.usedAddresses),
     count: 1,
+    symbol: '',
     layout: placement(at, 1),
   });
 

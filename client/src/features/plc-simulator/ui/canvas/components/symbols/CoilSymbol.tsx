@@ -12,6 +12,7 @@ export interface CoilSymbolProps {
   flowOut: boolean;
   /** The coil is energised. */
   active: boolean;
+  selected?: boolean;
 }
 
 /**
@@ -24,8 +25,10 @@ const RIGHT_LEAD_START = 67;
 const ARC_HALF = 14;
 const ARC_RADIUS = 17.5;
 
-export function CoilSymbol({ x, y, variant, glyph, flowIn, flowOut, active }: CoilSymbolProps) {
-  const body = wireClass(active);
+export function CoilSymbol({ x, y, variant, glyph, flowIn, flowOut, active, selected = false }: CoilSymbolProps) {
+  const body = selected
+    ? 'stroke-indigo-600 dark:stroke-sky-400 [filter:drop-shadow(0_0_3px_rgba(99,102,241,0.5))]'
+    : `${wireClass(active)} transition-colors group-hover:stroke-indigo-500 dark:group-hover:stroke-sky-400`;
   return (
     <g fill="none" strokeWidth={2} data-symbol={`coil-${variant}`}>
       <g shapeRendering="crispEdges">

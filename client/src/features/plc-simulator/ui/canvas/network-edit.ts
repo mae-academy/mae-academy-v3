@@ -10,7 +10,7 @@ import {
 } from '../../domain/ast';
 import type { ProgramLimits } from '../../domain/hardware';
 import { buildNetworkTree, inletCount } from '../../engine/compiler';
-import { createNode, type PaletteItemId, type PlacementContext } from '../palette/catalog';
+import { anchorsToRail, createNode, type PaletteItemId, type PlacementContext } from '../palette/catalog';
 import { readSlot, slotsOf, writeSlot } from './operand-slots';
 import { planWiring } from './wiring';
 
@@ -29,8 +29,9 @@ export type EditResult =
 const fail = (reason: string): EditResult => ({ ok: false, reason });
 
 export const MIN_COLS = 8;
+export const FIXED_GRID_COLS = 8;
 
-export const createEmptyNetwork = (id: string, cols = MIN_COLS): Network => ({
+export const createEmptyNetwork = (id: string, cols = FIXED_GRID_COLS): Network => ({
   id,
   grid: { rows: 1, cols },
   nodes: [],
@@ -168,6 +169,84 @@ export interface PlaceRequest {
   readonly col: number;
 }
 
+/**
+ * Shifts series nodes rightward on the specified row if there is room before the right-rail coil or branch merge.
+ */
+export function shiftRowRight(
+  network: Network,
+  row: number,
+  col: number,
+  limits: ProgramLimits,
+): Network | null {
+  const branchId = resolveBranch(network, row, col);
+  if (branchId !== null) {
+    const branch = network.branches.find((b) => b.id === branchId);
+    if (!branch) return null;
+    const siblings = network.nodes.filter(
+      (n) => n.layout.branchId === branchId && n.layout.row === row && n.layout.col >= col,
+    );
+    if (siblings.length === 0) return network;
+    let prepNetwork = network;
+    const rightmost = Math.max(...siblings.map((s) => s.layout.col + s.layout.colSpan - 1));
+    if (rightmost + 1 > branch.mergeCol) {
+      const ext = extendBranchRight(prepNetwork, branchId, limits);
+      if (ext.ok) prepNetwork = ext.network;
+      else return null;
+    }
+    const otherNodes = prepNetwork.nodes.filter(
+      (n) => n.layout.row === row && !siblings.some((s) => s.id === n.id),
+    );
+    const canShift = !siblings.some((s) =>
+      otherNodes.some((o) => covers(o, row, s.layout.col + 1)),
+    );
+    if (!canShift) return null;
+    return {
+      ...prepNetwork,
+      nodes: prepNetwork.nodes.map((n) =>
+        siblings.some((s) => s.id === n.id)
+          ? { ...n, layout: { ...n.layout, col: n.layout.col + 1 } }
+          : n,
+      ),
+    };
+  }
+
+  if (row === 0) {
+    const railCoils = network.nodes.filter(
+      (n) => n.layout.row === 0 && (n.type === 'coil' || n.layout.col === network.grid.cols - 1),
+    );
+    const railCol = railCoils.length > 0 ? Math.min(...railCoils.map((n) => n.layout.col)) : network.grid.cols - 1;
+    const siblings = network.nodes.filter(
+      (n) =>
+        n.layout.branchId === null &&
+        n.layout.row === 0 &&
+        n.layout.col >= col &&
+        n.type !== 'coil' &&
+        n.layout.col < railCol,
+    );
+    if (siblings.length === 0) return network;
+    const rightmost = Math.max(...siblings.map((s) => s.layout.col + s.layout.colSpan - 1));
+    if (rightmost + 1 >= railCol) {
+      return null;
+    }
+    const branchesOnRow = network.branches.filter((b) => b.rowStart === 0);
+    const collidesWithBranch = siblings.some((s) =>
+      branchesOnRow.some((b) => s.layout.col + 1 >= b.splitCol && s.layout.col + 1 <= b.mergeCol),
+    );
+    if (collidesWithBranch) return null;
+
+    return {
+      ...network,
+      nodes: network.nodes.map((n) =>
+        siblings.some((s) => s.id === n.id)
+          ? { ...n, layout: { ...n.layout, col: n.layout.col + 1 } }
+          : n,
+      ),
+    };
+  }
+
+  return null;
+}
+
 /** Palette placement: the owning branch is resolved from the cell, then `placeNode` validates. */
 export function placeItem(
   network: Network,
@@ -182,7 +261,14 @@ export function placeItem(
     { row: request.row, col: request.col, rowSpan: 1, colSpan: 1, branchId },
     ctx,
   );
-  return placeNode(network, node, limits);
+  let placed = placeNode(network, node, limits);
+  if (!placed.ok && !anchorsToRail(request.itemId)) {
+    const shifted = shiftRowRight(network, request.row, request.col, limits);
+    if (shifted !== null && shifted !== network) {
+      placed = placeNode(shifted, node, limits);
+    }
+  }
+  return placed;
 }
 
 // ---- removal -----------------------------------------------------------------------------------
@@ -202,6 +288,19 @@ export function tidy(network: Network): Network {
     for (const branch of ordered) {
       const live = branchById(current, branch.id);
       if (!live) continue;
+
+      const hasAnyOccupant =
+        current.nodes.some((n) => n.layout.branchId === live.id) ||
+        current.branches.some((c) => c.parentId === live.id);
+
+      if (!hasAnyOccupant) {
+        current = {
+          ...current,
+          branches: current.branches.filter((b) => b.id !== live.id),
+        };
+        changed = true;
+        break;
+      }
 
       const occupied = (row: number): boolean =>
         current.nodes.some((n) => n.layout.branchId === live.id && covers(n, row, n.layout.col)) ||
@@ -252,7 +351,13 @@ export function moveNode(
   const without: Network = { ...network, nodes: network.nodes.filter((n) => n.id !== nodeId) };
   const branchId = resolveBranch(without, row, col);
   const moved: LadNode = { ...node, layout: { ...node.layout, row, col, branchId } };
-  const placed = placeNode(without, moved, limits);
+  let placed = placeNode(without, moved, limits);
+  if (!placed.ok && node.type !== 'coil' && node.type !== 'timer' && node.type !== 'counter') {
+    const shifted = shiftRowRight(without, row, col, limits);
+    if (shifted !== null && shifted !== without) {
+      placed = placeNode(shifted, moved, limits);
+    }
+  }
   return placed.ok ? { ok: true, network: tidy(placed.network), nodeId } : placed;
 }
 
@@ -341,6 +446,252 @@ export function addLane(network: Network, branchId: BranchId, limits: ProgramLim
   };
 }
 
+/** Expands a branch's merge drop-wire one column to the right. */
+export function extendBranchRight(
+  network: Network,
+  branchId: BranchId,
+  limits: ProgramLimits,
+): EditResult {
+  const branch = branchById(network, branchId);
+  if (!branch) return fail('That branch no longer exists');
+
+  const newMergeCol = branch.mergeCol + 1;
+  if (newMergeCol >= limits.maxGridCols) {
+    return fail(`The editor grid is limited to ${limits.maxGridCols} columns`);
+  }
+
+  // Find the limit on the right rail
+  const railNodes = network.nodes.filter((n) => n.layout.row === 0 && (n.type === 'coil' || n.type === 'timer' || n.type === 'counter' || n.layout.col === limits.maxGridCols - 1));
+  const rightRailLimit = railNodes.length > 0 ? Math.min(...railNodes.map((n) => n.layout.col)) : limits.maxGridCols;
+
+  if (newMergeCol >= rightRailLimit) {
+    return fail('Not enough room before the right rail');
+  }
+
+  // Check if any shifted node will hit the rail
+  const nodesToShift = network.nodes.filter((n) => n.layout.col >= newMergeCol && !railNodes.includes(n));
+  for (const n of nodesToShift) {
+    if (n.layout.col + 1 + n.layout.colSpan - 1 >= rightRailLimit) {
+      return fail('Not enough room before the right rail');
+    }
+  }
+
+  const chain = ancestors(network, branchId);
+  const parentGrown = new Set(chain.filter((p) => p.mergeCol < newMergeCol).map((p) => p.id));
+
+  const updatedBranches = network.branches.map((b) => {
+    if (b.id === branchId || parentGrown.has(b.id)) {
+      // Grows right
+      return { ...b, mergeCol: Math.max(b.mergeCol, newMergeCol) };
+    }
+    if (b.splitCol >= newMergeCol) {
+      // Shifts right
+      return { ...b, splitCol: b.splitCol + 1, mergeCol: b.mergeCol + 1 };
+    }
+    return b;
+  });
+
+  const updatedNodes = network.nodes.map((n) => {
+    if (n.layout.col >= newMergeCol && !railNodes.includes(n)) {
+      return { ...n, layout: { ...n.layout, col: n.layout.col + 1 } };
+    }
+    return n;
+  });
+
+  const next = withGrid({
+    ...network,
+    branches: updatedBranches,
+    nodes: updatedNodes,
+  });
+
+  const issue = validateNetworkLayout(next)[0];
+  return issue ? fail(PROBLEMS[issue.code]) : { ok: true, network: next };
+}
+
+/** Expands a branch's split drop-wire one column to the left. */
+export function extendBranchLeft(
+  network: Network,
+  branchId: BranchId,
+  limits: ProgramLimits,
+): EditResult {
+  const branch = branchById(network, branchId);
+  if (!branch) return fail('That branch no longer exists');
+
+  if (branch.splitCol <= 0) {
+    return fail('Cannot extend branch further left');
+  }
+
+  const newSplitCol = branch.splitCol - 1;
+
+  const chain = ancestors(network, branchId);
+  const parentGrown = new Set(chain.filter((p) => p.splitCol > newSplitCol).map((p) => p.id));
+
+  const updatedBranches = network.branches.map((b) => {
+    if (b.id === branchId || parentGrown.has(b.id)) {
+      return { ...b, splitCol: Math.min(b.splitCol, newSplitCol) };
+    }
+    return b;
+  });
+
+  const updatedNodes = network.nodes.map((n) => {
+    const l = n.layout;
+    if (
+      l.col === newSplitCol &&
+      l.row >= branch.rowStart &&
+      l.row <= branch.rowEnd &&
+      (l.branchId === branch.parentId || l.branchId === null)
+    ) {
+      return { ...n, layout: { ...n.layout, branchId } };
+    }
+    return n;
+  });
+
+  const next = withGrid({
+    ...network,
+    branches: updatedBranches,
+    nodes: updatedNodes,
+  });
+
+  const issue = validateNetworkLayout(next)[0];
+  return issue ? fail(PROBLEMS[issue.code]) : { ok: true, network: next };
+}
+
+/** Shrinks a branch's merge drop-wire one column to the left. */
+export function shrinkBranchRight(
+  network: Network,
+  branchId: BranchId,
+  _limits: ProgramLimits,
+): EditResult {
+  const branch = branchById(network, branchId);
+  if (!branch) return fail('That branch no longer exists');
+
+  if (branch.mergeCol <= branch.splitCol) {
+    return fail('Cannot shrink branch further: minimum width is 1 column');
+  }
+
+  const targetCol = branch.mergeCol;
+  const newMergeCol = branch.mergeCol - 1;
+
+  const occupying = network.nodes.filter(
+    (n) => n.layout.branchId === branchId && n.layout.col + n.layout.colSpan - 1 >= targetCol,
+  );
+
+  let updatedNodes = network.nodes;
+  if (occupying.length > 0) {
+    const canCompact = occupying.every((n) => {
+      const leftCol = n.layout.col - 1;
+      if (leftCol < branch.splitCol) return false;
+      return !network.nodes.some(
+        (other) => other.id !== n.id && covers(other, n.layout.row, leftCol),
+      );
+    });
+
+    if (!canCompact) {
+      return fail('Cannot shrink branch right: column has elements');
+    }
+
+    updatedNodes = network.nodes.map((n) =>
+      occupying.some((occ) => occ.id === n.id)
+        ? { ...n, layout: { ...n.layout, col: n.layout.col - 1 } }
+        : n,
+    );
+  }
+
+  const childConflict = network.branches.some(
+    (b) => b.parentId === branchId && b.mergeCol >= targetCol && b.mergeCol <= b.splitCol,
+  );
+  if (childConflict) {
+    return fail('Cannot shrink branch right: nested branch occupies this column');
+  }
+
+  const updatedBranches = network.branches.map((b) => {
+    if (b.id === branchId) {
+      return { ...b, mergeCol: newMergeCol };
+    }
+    if (b.parentId === branchId && b.mergeCol >= targetCol) {
+      return { ...b, mergeCol: Math.min(b.mergeCol, newMergeCol) };
+    }
+    return b;
+  });
+
+  const next = withGrid({
+    ...network,
+    branches: updatedBranches,
+    nodes: updatedNodes,
+  });
+
+  const issue = validateNetworkLayout(next)[0];
+  return issue ? fail(PROBLEMS[issue.code]) : { ok: true, network: next };
+}
+
+/** Shrinks a branch's split drop-wire one column to the right. */
+export function shrinkBranchLeft(
+  network: Network,
+  branchId: BranchId,
+  _limits: ProgramLimits,
+): EditResult {
+  const branch = branchById(network, branchId);
+  if (!branch) return fail('That branch no longer exists');
+
+  if (branch.splitCol >= branch.mergeCol) {
+    return fail('Cannot shrink branch further: minimum width is 1 column');
+  }
+
+  const targetCol = branch.splitCol;
+  const newSplitCol = branch.splitCol + 1;
+
+  const occupying = network.nodes.filter(
+    (n) => n.layout.branchId === branchId && n.layout.col <= targetCol,
+  );
+
+  let updatedNodes = network.nodes;
+  if (occupying.length > 0) {
+    const canCompact = occupying.every((n) => {
+      const rightCol = n.layout.col + 1;
+      if (rightCol > branch.mergeCol) return false;
+      return !network.nodes.some(
+        (other) => other.id !== n.id && covers(other, n.layout.row, rightCol),
+      );
+    });
+
+    if (!canCompact) {
+      return fail('Cannot shrink branch left: column has elements');
+    }
+
+    updatedNodes = network.nodes.map((n) =>
+      occupying.some((occ) => occ.id === n.id)
+        ? { ...n, layout: { ...n.layout, col: n.layout.col + 1 } }
+        : n,
+    );
+  }
+
+  const childConflict = network.branches.some(
+    (b) => b.parentId === branchId && b.splitCol <= targetCol && b.splitCol >= b.mergeCol,
+  );
+  if (childConflict) {
+    return fail('Cannot shrink branch left: nested branch occupies this column');
+  }
+
+  const updatedBranches = network.branches.map((b) => {
+    if (b.id === branchId) {
+      return { ...b, splitCol: newSplitCol };
+    }
+    if (b.parentId === branchId && b.splitCol <= targetCol) {
+      return { ...b, splitCol: Math.max(b.splitCol, newSplitCol) };
+    }
+    return b;
+  });
+
+  const next = withGrid({
+    ...network,
+    branches: updatedBranches,
+    nodes: updatedNodes,
+  });
+
+  const issue = validateNetworkLayout(next)[0];
+  return issue ? fail(PROBLEMS[issue.code]) : { ok: true, network: next };
+}
+
 // ---- node edits --------------------------------------------------------------------------------
 
 export function updateNode(network: Network, nodeId: NodeId, change: (node: LadNode) => LadNode): Network {
@@ -386,9 +737,13 @@ export function resizeGrid(network: Network, cols: number, limits: ProgramLimits
     : { ok: true, network: { ...network, grid: { ...network.grid, cols: next } } };
 }
 
-/** Pads a freshly-parsed network so there is room to keep editing it. */
+/**
+ * Ensures the network conforms to the standard fixed 8-column ladder grid,
+ * locking the geometry between the Left Power Rail and Right Neutral Rail.
+ */
 export function padNetwork(network: Network, limits: ProgramLimits): Network {
-  const cols = Math.min(limits.maxGridCols, Math.max(network.grid.cols + 1, MIN_COLS));
+  const needed = withGrid({ ...network, grid: { rows: network.grid.rows, cols: 1 } }).grid.cols;
+  const cols = Math.min(limits.maxGridCols, Math.max(needed, FIXED_GRID_COLS));
   return { ...network, grid: { ...network.grid, cols } };
 }
 
@@ -398,6 +753,18 @@ export function usedInstances(networks: readonly Network[]): ReadonlySet<string>
   for (const network of networks) {
     for (const node of network.nodes) {
       if (node.type === 'timer' || node.type === 'counter') used.add(node.instance.toUpperCase());
+    }
+  }
+  return used;
+}
+
+/** Bit addresses claimed anywhere in the program, for default-address selection. */
+export function usedAddresses(networks: readonly Network[]): ReadonlySet<string> {
+  const used = new Set<string>();
+  for (const network of networks) {
+    for (const node of network.nodes) {
+      if (node.type === 'contact') used.add(node.operand.toUpperCase());
+      if (node.type === 'coil' && node.variant !== 'MASTER') used.add(node.target.toUpperCase());
     }
   }
   return used;

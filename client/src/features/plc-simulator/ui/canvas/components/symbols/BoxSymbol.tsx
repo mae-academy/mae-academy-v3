@@ -16,6 +16,7 @@ export interface BoxSymbolProps {
   flowOut: boolean;
   /** Live value for `spec.live`, or null when not simulating. */
   liveValue: number | null;
+  selected?: boolean;
 }
 
 const INSET = 12;
@@ -54,10 +55,13 @@ export function layoutBox(spec: BoxSpec, x: number, row: number): BoxGeometry {
 }
 
 /** Timer, counter, math and word-logic blocks: header, pins on both edges, operand lines. */
-export function BoxSymbol({ nodeId, spec, x, row, pinFlows, flowOut, liveValue }: BoxSymbolProps) {
+export function BoxSymbol({ nodeId, spec, x, row, pinFlows, flowOut, liveValue, selected = false }: BoxSymbolProps) {
   const g = layoutBox(spec, x, row);
   const right = g.x0 + g.width;
   const energised = flowOut;
+  const border = selected
+    ? 'stroke-indigo-600 dark:stroke-sky-400 [filter:drop-shadow(0_0_3px_rgba(99,102,241,0.5))]'
+    : `${wireClass(energised)} transition-colors group-hover:stroke-indigo-500 dark:group-hover:stroke-sky-400`;
 
   const rows: { label: string; text: string; slot?: BoxSpec['lines'][number]['slot']; live?: boolean }[] = spec.lines.map(
     (line) => ({ ...line }),
@@ -76,7 +80,7 @@ export function BoxSymbol({ nodeId, spec, x, row, pinFlows, flowOut, liveValue }
         rx={2}
         strokeWidth={2}
         shapeRendering="crispEdges"
-        className={`${energised ? BOX_FILL_LIVE : BOX_FILL} ${wireClass(energised)}`}
+        className={`${energised ? BOX_FILL_LIVE : BOX_FILL} ${border}`}
       />
       <path
         d={`M ${g.x0} ${g.top + HEADER_HEIGHT} H ${right}`}

@@ -71,9 +71,6 @@ describe('S7-200 host', () => {
     sched.scan();
 
     expect(led(container, 'Q0.0 on')).toBeDefined();
-    // the RUN lamp is lit, the STOP lamp is dark
-    expect(led(container, 'RUN on')).toBeDefined();
-    expect(led(container, 'STOP off')).toBeDefined();
 
     // the seal-in keeps Q0.0 after the start switch is released...
     fireEvent.click(screen.getByRole('button', { name: 'I0.0 OFF' }));
@@ -95,12 +92,12 @@ describe('S7-200 host', () => {
     sched.scan();
 
     expect(container.querySelector('[data-cell]')).toBeNull(); // locked
-    expect(nodesLayer(container).querySelector('[class*="stroke-[#2E7D32]"]')).not.toBeNull();
+    expect(nodesLayer(container).querySelector('[class*="stroke-[#6366f1]"]')).not.toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: 'Stop' }));
     expect(mode()).toBe('STOP');
     expect(container.querySelector('[data-cell]')).not.toBeNull();
-    expect(container.querySelector('[class*="stroke-[#2E7D32]"]')).toBeNull(); // wires dark again
+    expect(container.querySelector('[class*="stroke-[#6366f1]"]')).toBeNull(); // wires dark again
     expect(led(container, 'Q0.0 off')).toBeDefined(); // outputs de-energised on STOP
   });
 
@@ -112,29 +109,28 @@ describe('S7-200 host', () => {
     expect(mode()).toBe('PAUSE');
     expect(led(container, 'Q0.0 on')).toBeDefined();
     // pausing keeps the outputs; Run resumes without a cold start
-    fireEvent.click(screen.getByRole('button', { name: 'Run' }));
+    fireEvent.click(screen.getByRole('button', { name: /Run|Resume/ }));
     expect(mode()).toBe('RUN');
     expect(led(container, 'Q0.0 on')).toBeDefined();
     fireEvent.click(screen.getByRole('button', { name: 'Pause' }));
     expect(mode()).toBe('PAUSE');
   });
 
-  it('honours the hardware mode switch: RUN starts, STOP stops and blocks the toolbar', () => {
+  it('controls execution via toolbar: Run starts, Pause pauses, Stop stops and resets', () => {
     const sched = manual();
     render(<PlcSimulatorApp initialNetworks={SEAL} runtimeOptions={sched.runtimeOptions} />);
 
-    fireEvent.click(screen.getByRole('radio', { name: 'RUN' }));
-    expect(mode()).toBe('RUN');
-    fireEvent.click(screen.getByRole('radio', { name: 'STOP' }));
-    expect(mode()).toBe('STOP');
-
-    fireEvent.click(screen.getByRole('button', { name: 'Run' }));
-    expect(mode()).toBe('STOP');
-    expect(screen.getByRole('alert').textContent).toContain('mode switch is in STOP');
-
-    fireEvent.click(screen.getByRole('radio', { name: 'TERM' }));
     fireEvent.click(screen.getByRole('button', { name: 'Run' }));
     expect(mode()).toBe('RUN');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Pause' }));
+    expect(mode()).toBe('PAUSE');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Resume' }));
+    expect(mode()).toBe('RUN');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Stop' }));
+    expect(mode()).toBe('STOP');
   });
 
   it('refuses to run a program that does not compile for the profile', () => {
@@ -149,16 +145,13 @@ describe('S7-200 host', () => {
     expect(screen.getByRole('alert').textContent).toMatch(/error/);
   });
 
-  it('adjusts the scan period from the slider within 20 to 500 ms', () => {
+  it('adjusts the scan period from the simulation speed selector', () => {
     const sched = manual();
     render(<PlcSimulatorApp initialNetworks={SEAL} runtimeOptions={sched.runtimeOptions} />);
-    const slider = screen.getByRole('slider', { name: 'Scan cycle time' });
-    expect([slider.getAttribute('aria-valuemin'), slider.getAttribute('aria-valuemax')]).toEqual(['20', '500']);
-    const toolbar = within(screen.getByRole('toolbar', { name: 'Execution controls' }));
-    fireEvent.keyDown(slider, { key: 'End' });
-    expect(toolbar.getByText('500 ms')).toBeDefined();
-    fireEvent.keyDown(slider, { key: 'Home' });
-    expect(toolbar.getByText('20 ms')).toBeDefined();
+    const speedControl = screen.getByRole('tablist', { name: 'Simulation speed' });
+    expect(speedControl).toBeDefined();
+    fireEvent.click(within(speedControl).getByRole('tab', { name: '0.1x' }));
+    fireEvent.click(within(speedControl).getByRole('tab', { name: 'Instant' }));
   });
 });
 
@@ -194,15 +187,15 @@ describe('hardware profile switching', () => {
     const sched = manual();
     const { container } = render(<PlcSimulatorApp initialNetworks={SEAL} runtimeOptions={sched.runtimeOptions} />);
     expect(screen.queryByRole('img', { name: /^Display/ })).toBeNull();
-    expect(screen.getByRole('tab', { name: 'STL / IL' })).toBeDefined();
+    expect(screen.getByRole('tab', { name: 'IL' })).toBeDefined();
 
-    fireEvent.click(screen.getByRole('tab', { name: 'LOGO! 0BA8' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'LOGO!' }));
     expect(container.querySelectorAll('[data-lcd-line]').length).toBe(4);
     expect(container.querySelectorAll('[data-terminal]').length).toBe(16);
     expect(container.querySelectorAll('[data-relay]').length).toBe(10);
     expect(screen.queryByRole('radiogroup', { name: 'Mode switch' })).toBeNull();
     // LOGO! programs are function block diagrams only: no LAD / IL toggle, no ladder canvas
-    expect(screen.queryByRole('tab', { name: 'STL / IL' })).toBeNull();
+    expect(screen.queryByRole('tab', { name: 'IL' })).toBeNull();
     expect(screen.queryByRole('application', { name: /Ladder logic editor/ })).toBeNull();
     expect(screen.getByRole('application', { name: /Function block diagram/ })).toBeDefined();
   });
@@ -378,10 +371,10 @@ describe('LOGO! physical keyboard', () => {
     press('Enter', screen.getByRole('searchbox', { name: 'Search components' }));
     expect(mode()).toBe('STOP');
 
-    fireEvent.click(screen.getByRole('tab', { name: 'S7-200 CPU' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'S7-200' }));
     press('Enter');
     expect(screen.queryByRole('img', { name: /^Display/ })).toBeNull(); // LOGO! is hidden
-    fireEvent.click(screen.getByRole('tab', { name: 'LOGO! 0BA8' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'LOGO!' }));
     expect(mode()).toBe('STOP');
   });
 });

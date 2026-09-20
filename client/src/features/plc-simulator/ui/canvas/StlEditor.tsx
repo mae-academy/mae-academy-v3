@@ -12,6 +12,7 @@ export interface StlEditorProps {
   notice: string | null;
   onChange: (text: string) => void;
   onDiscard: () => void;
+  trailing?: ReactNode;
 }
 
 /** Offset of the start of 1-based `line` within `text`. */
@@ -62,15 +63,15 @@ function highlightStl(source: string): ReactNode {
     }
     if (last < line.length) parts.push(line.slice(last));
     return (
-      <div key={index} className="block min-h-7 border-s-2 border-transparent px-3 font-normal text-slate-800 dark:text-slate-200">
-        {parts.length > 0 ? parts : ' '}
+      <div key={index} className="h-7 whitespace-pre pe-3 font-mono text-[12px] leading-7">
+        {parts.length === 0 ? '\u00A0' : parts}
       </div>
     );
   });
 }
 
 /** STL / IL source in the Code Studio window: traffic-light bar, line gutter, syntax colours. */
-export function StlEditor({ text, diagnostics, dirty, notice, onChange, onDiscard }: StlEditorProps) {
+export function StlEditor({ text, diagnostics, dirty, notice, onChange, onDiscard, trailing }: StlEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null);
   const textareaId = useId();
 
@@ -97,10 +98,21 @@ export function StlEditor({ text, diagnostics, dirty, notice, onChange, onDiscar
 
   return (
     <section className={`${PANEL} h-full min-h-[320px]`}>
-      <WindowBar icon={<Code className="h-3.5 w-3.5" />} title="program.awl" trailing={`${lineCount} lines`} />
+      <WindowBar
+        icon={<Code className="h-3.5 w-3.5" />}
+        title="program.awl"
+        trailing={
+          <div className="flex items-center gap-2">
+            {trailing}
+            <span className="hidden text-xs text-slate-500 sm:inline dark:text-slate-400">
+              {lineCount} lines
+            </span>
+          </div>
+        }
+      />
 
       {notice !== null && (
-        <div role="alert" className="shrink-0 border-b border-rose-500/30 bg-rose-500/10 px-3 py-1.5 font-mono text-[11.5px] text-rose-700 dark:text-rose-200">
+        <div role="alert" className="shrink-0 border-b border-red-500/30 bg-red-500/10 px-3 py-1.5 font-mono text-[11.5px] text-red-700 dark:text-red-400">
           {notice}
         </div>
       )}

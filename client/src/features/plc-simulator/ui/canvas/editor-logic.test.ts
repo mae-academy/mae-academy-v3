@@ -403,5 +403,91 @@ describe('editor reducer', () => {
       expect(s.present[0]?.branches).toHaveLength(1);
       expect(s.present[0]?.nodes.map((n) => n.type).sort()).toEqual(['coil', 'contact', 'contact']);
     });
+
+    it('extends a branch to the right and left', () => {
+      let s = fresh();
+      const id = netId(s);
+      s = run(s, { type: 'placeItem', networkId: id, itemId: 'contact-no', row: 0, col: 1 });
+      s = run(s, { type: 'addBranch', networkId: id, nodeId: s.present[0]?.nodes[0]?.id ?? '' });
+      const branchId = s.present[0]?.branches[0]?.id ?? '';
+      expect(s.present[0]?.branches[0]?.splitCol).toBe(1);
+      expect(s.present[0]?.branches[0]?.mergeCol).toBe(1);
+
+      // Extend right
+      s = run(s, { type: 'extendBranchRight', networkId: id, branchId });
+      expect(s.present[0]?.branches[0]?.mergeCol).toBe(2);
+
+      // Extend left
+      s = run(s, { type: 'extendBranchLeft', networkId: id, branchId });
+      expect(s.present[0]?.branches[0]?.splitCol).toBe(0);
+      expect(s.present[0]?.branches[0]?.mergeCol).toBe(2);
+
+      // Now place an element in series inside the extended lane
+      s = run(s, { type: 'placeItem', networkId: id, itemId: 'contact-no', row: 1, col: 2 });
+      expect(s.present[0]?.nodes.find((n) => n.layout.row === 1 && n.layout.col === 2)?.layout.branchId).toBe(branchId);
+    });
+
+    it('shrinks branches bi-directionally with shrinkBranchRight and shrinkBranchLeft', () => {
+      let s = fresh();
+      const id = netId(s);
+      s = run(s, { type: 'resizeGrid', networkId: id, cols: 8 });
+      s = run(s, { type: 'placeItem', networkId: id, itemId: 'contact-no', row: 0, col: 2 });
+      s = run(s, { type: 'addBranch', networkId: id, nodeId: s.present[0]?.nodes[0]?.id ?? '' });
+      const branchId = s.present[0]?.branches[0]?.id ?? '';
+      expect(s.present[0]?.branches[0]?.splitCol).toBe(2);
+      expect(s.present[0]?.branches[0]?.mergeCol).toBe(2);
+
+      // Extend right to col 4
+      s = run(s, { type: 'extendBranchRight', networkId: id, branchId });
+      s = run(s, { type: 'extendBranchRight', networkId: id, branchId });
+      expect(s.present[0]?.branches[0]?.mergeCol).toBe(4);
+
+      // Shrink right back to col 3
+      s = run(s, { type: 'shrinkBranchRight', networkId: id, branchId });
+      expect(s.present[0]?.branches[0]?.mergeCol).toBe(3);
+
+      // Extend left to col 1
+      s = run(s, { type: 'extendBranchLeft', networkId: id, branchId });
+      expect(s.present[0]?.branches[0]?.splitCol).toBe(1);
+
+      // Shrink left back to col 2
+      s = run(s, { type: 'shrinkBranchLeft', networkId: id, branchId });
+      expect(s.present[0]?.branches[0]?.splitCol).toBe(2);
+    });
+
+    it('shifts occupied elements rightward when placing onto an occupied cell on the main rung', () => {
+      let s = fresh();
+      const id = netId(s);
+      s = run(s, { type: 'resizeGrid', networkId: id, cols: 8 });
+      // Place initial contact at col 0 and coil at col 7
+      s = run(s, { type: 'placeItem', networkId: id, itemId: 'contact-no', row: 0, col: 0 });
+      s = run(s, { type: 'placeItem', networkId: id, itemId: 'coil-out', row: 0, col: 7 });
+      const firstId = s.present[0]?.nodes[0]?.id;
+
+      // Place new contact directly onto occupied col 0
+      s = run(s, { type: 'placeSmart', networkId: id, itemId: 'contact-nc', row: 0, col: 0 });
+      expect(s.present[0]?.nodes.length).toBe(3);
+
+      // The original contact was pushed to col 1, new contact is at col 0, coil stays at col 7
+      const pushed = s.present[0]?.nodes.find((n) => n.id === firstId);
+      expect(pushed?.layout.col).toBe(1);
+
+      const placed = s.present[0]?.nodes.find((n) => n.layout.col === 0);
+      expect(placed?.type).toBe('contact');
+      expect((placed as unknown as { variant: string })?.variant).toBe('NC');
+    });
+
+    it('updates node symbol via setNodeSymbol', () => {
+      let s = fresh();
+      const id = netId(s);
+      s = run(s, { type: 'placeItem', networkId: id, itemId: 'contact-no', row: 0, col: 0 });
+      const nodeId = s.present[0]?.nodes[0]?.id ?? '';
+
+      s = run(s, { type: 'setNodeSymbol', networkId: id, nodeId, symbol: 'Start_PB' });
+      expect(s.present[0]?.nodes[0]?.symbol).toBe('Start_PB');
+
+      s = run(s, { type: 'setNodeSymbol', networkId: id, nodeId, symbol: '' });
+      expect(s.present[0]?.nodes[0]?.symbol).toBe('');
+    });
   });
 });

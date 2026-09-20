@@ -1,8 +1,10 @@
 import { BookOpen, ChevronDown } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import type { Network } from '../../domain/ast';
 import { getProfile, listProfiles, S7_200_CPU224 } from '../../domain/hardware';
 import { ilToLad, type SymbolMap } from '../../transpiler';
+import { createEmptyNetwork } from '../canvas/network-edit';
 import { PlcEditorView } from '../canvas/PlcEditor';
 import { S7200Hardware } from '../hardware/S7200Hardware';
 import { SimulationProvider } from '../canvas/simulation';
@@ -42,14 +44,49 @@ export function S7Workspace({ active, profileId, initialNetworks, symbols, runti
     async (file: File): Promise<void> => {
       const result = ilToLad(await file.text(), profile);
       if (!result.ok || result.value === null) {
-        setImportError(`${file.name}: ${result.diagnostics.find((d) => d.severity === 'error')?.message ?? 'not a valid STL program'}`);
+        const msg = `${file.name}: ${result.diagnostics.find((d) => d.severity === 'error')?.message ?? 'not a valid STL program'}`;
+        setImportError(msg);
+        toast.error('Import failed');
         return;
       }
       setImportError(null);
       host.editor.actions.loadNetworks(result.value);
+      toast.success(`Imported ${file.name}`);
     },
     [profile, host.editor.actions],
   );
+
+  const handleCopy = useCallback(() => {
+    const code = host.exportMicroWin().content;
+    void navigator.clipboard.writeText(code);
+    toast.success('Copied program to clipboard');
+  }, [host]);
+
+  const handlePaste = useCallback(async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (!text.trim()) return;
+      const result = ilToLad(text, profile);
+      if (!result.ok || result.value === null) {
+        toast.error('Clipboard content is not valid STL/MicroWIN');
+        return;
+      }
+      host.editor.actions.loadNetworks(result.value);
+      toast.success('Pasted program from clipboard');
+    } catch {
+      toast.error('Clipboard permission required to paste');
+    }
+  }, [profile, host.editor.actions]);
+
+  const handleDelete = useCallback(() => {
+    host.editor.actions.loadNetworks([createEmptyNetwork('network-1')]);
+    toast.info('Cleared ladder program');
+  }, [host.editor.actions]);
+
+  const handleReset = useCallback(() => {
+    host.reset();
+    toast.info('PLC state reset');
+  }, [host]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2.5">
@@ -60,7 +97,15 @@ export function S7Workspace({ active, profileId, initialNetworks, symbols, runti
         onRun={() => void host.run()}
         onPause={host.pause}
         onStop={host.stop}
+        onReset={handleReset}
         onStep={host.step}
+        onUndo={host.editor.actions.undo}
+        canUndo={host.editor.canUndo}
+        onRedo={host.editor.actions.redo}
+        canRedo={host.editor.canRedo}
+        onCopy={handleCopy}
+        onPaste={handlePaste}
+        onDelete={handleDelete}
         frame={session.frame}
         readMetrics={host.readMetrics}
         onExport={() => setExporting(true)}

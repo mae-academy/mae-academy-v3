@@ -12,6 +12,7 @@ export interface ContactSymbolProps {
   flowOut: boolean;
   /** The contact is currently passing power (bars are drawn energised). */
   closed: boolean;
+  selected?: boolean;
 }
 
 /** Bar positions inside the 100 px cell; the leads run from each cell edge to the bars. */
@@ -23,8 +24,10 @@ const BAR_HALF = 14;
  * `--[ ]--`, `--[/]--`, `--[P]--`, `--[N]--`. Pure geometry: both leads reach the cell edges, so a
  * contact bridges column boundaries `c` and `c + 1` without any help from the wire layer.
  */
-export function ContactSymbol({ x, y, variant, flowIn, flowOut, closed }: ContactSymbolProps) {
-  const bar = wireClass(closed);
+export function ContactSymbol({ x, y, variant, flowIn, flowOut, closed, selected = false }: ContactSymbolProps) {
+  const bar = selected
+    ? 'stroke-indigo-600 dark:stroke-sky-400 [filter:drop-shadow(0_0_3px_rgba(99,102,241,0.5))]'
+    : `${wireClass(closed)} transition-colors group-hover:stroke-indigo-500 dark:group-hover:stroke-sky-400`;
   return (
     <g fill="none" strokeWidth={2} shapeRendering="crispEdges" data-symbol={`contact-${variant}`}>
       <path d={`M ${x} ${y} H ${x + LEFT_BAR}`} className={wireClass(flowIn)} />
