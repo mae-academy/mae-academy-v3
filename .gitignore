@@ -121,3 +121,6 @@ client/src/simulators/circuit-engine/engine/spice/mnaValidationSuite.ac.report.m
 # Playwright MCP browser-automation cache (page snapshots, console logs) — verification
 # artifacts from interactive testing, not source.
 .playwright-mcp/
+
+# Generated thumbnail / featured-list cache
+.cache/

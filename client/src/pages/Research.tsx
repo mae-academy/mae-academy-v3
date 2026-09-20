@@ -14,7 +14,6 @@ import {
 import { useLocale } from "@/contexts/LocaleContext";
 import { fetchOpenAlexPapers, ResearchPaper, ResearchSort } from "@/lib/openalex";
 import ResearchPaperCard from "@/components/ResearchPaperCard";
-import ResearchPaperModal from "@/components/ResearchPaperModal";
 
 const containerVariants: Variants = {
   hidden: {},
@@ -87,7 +86,6 @@ export default function Research() {
   const [isLoading,  setIsLoading]  = useState(true);
   const [error,      setError]      = useState<string | null>(null);
   const [retryTick,  setRetryTick]  = useState(0);
-  const [selectedPaper, setSelectedPaper] = useState<ResearchPaper | null>(null);
 
   // Dropdowns
   const [openDropdown, setOpenDropdown] = useState<"category" | "language" | null>(null);
@@ -489,7 +487,6 @@ export default function Research() {
               key={paper.id}
               paper={paper}
               itemVariants={itemVariants}
-              onReadMore={setSelectedPaper}
             />
           ))}
         </motion.div>
@@ -574,12 +571,6 @@ export default function Research() {
         </div>
       )}
 
-      {/* ── Modal ── */}
-      <ResearchPaperModal
-        isOpen={!!selectedPaper}
-        onClose={() => setSelectedPaper(null)}
-        paper={selectedPaper}
-      />
     </motion.section>
   );
 }

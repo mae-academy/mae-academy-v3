@@ -11,6 +11,7 @@ import ErrorBoundary from "@/components/ui/ErrorBoundary";
 import MainLayout from "./components/MainLayout";
 import Home from "./pages/Home";
 import Research from "./pages/Research";
+import ResearchDetail from "./pages/ResearchDetail";
 import Courses from "./pages/Courses";
 import Simulations from "./pages/Simulations";
 import SimulationDetail from "./pages/SimulationDetail";
@@ -48,6 +49,7 @@ function AnimatedRoutes() {
         <Switch location={location}>
           <Route path="/" component={Home} />
           <Route path="/research" component={Research} />
+          <Route path="/research/:id" component={ResearchDetail} />
           <Route path="/courses" component={Courses} />
           <Route path="/code/:lang" component={SimulationDetail} />
           <Route path="/code" component={SimulationDetail} />

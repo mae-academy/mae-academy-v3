@@ -5,22 +5,20 @@ import type { ResearchPaper } from "@/lib/openalex";
 
 interface ResearchPaperCardProps {
   paper: ResearchPaper;
-  onReadMore: (paper: ResearchPaper) => void;
   itemVariants: Variants;
 }
 
 export default function ResearchPaperCard({
   paper,
-  onReadMore,
   itemVariants,
 }: ResearchPaperCardProps) {
   // Track the exact URL that failed so a new paper never inherits a stale error flag.
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
 
   // Thumbnail derives strictly from THIS paper's pdfUrl.
-  const thumbnailSrc = paper.pdfUrl
-    ? `https://images.weserv.nl/?url=${encodeURIComponent(paper.pdfUrl)}&page=1&w=800&fit=contain&q=90`
-    : null;
+  const thumbnailSrc =
+    paper.thumbUrl ??
+    (paper.pdfUrl ? `https://images.weserv.nl/?url=${encodeURIComponent(paper.pdfUrl)}&page=1&w=800&fit=contain&q=90` : null);
 
   const showThumbnail = thumbnailSrc !== null && failedSrc !== thumbnailSrc;
 
@@ -122,13 +120,15 @@ export default function ResearchPaperCard({
 
         {/* Footer action */}
         <div className="mt-auto flex items-center justify-end border-t border-slate-100 pt-3 dark:border-white/[0.05]">
-          <button
-            onClick={() => onReadMore(paper)}
+          <a
+            href={`/research/${paper.id.replace('https://openalex.org/', '')}`}
+            target="_blank"
+            rel="noopener noreferrer"
             className="group/btn flex items-center gap-1 text-xs font-semibold text-violet-600 transition-colors hover:text-violet-700 dark:text-violet-400 dark:hover:text-violet-300"
           >
             Details
             <ArrowRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover/btn:translate-x-0.5" />
-          </button>
+          </a>
         </div>
       </div>
     </motion.article>

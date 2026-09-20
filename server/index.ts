@@ -4,6 +4,9 @@ import path from "path";
 import { fileURLToPath } from "url";
 import "dotenv/config";
 import { generateCircuitAnalysis } from "./aiService";
+import { featuredHandler, isFeaturedUrl, warmFeatured } from "./featured";
+import { createThumbHandler } from "./pdfThumb";
+import { pdfCheckHandler, pdfDownloadHandler, pdfProxyHandler } from "./pdfProxy";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -28,6 +31,17 @@ async function startServer() {
     }
   });
 
+  app.get("/api/pdf-proxy", pdfProxyHandler);
+  app.get("/api/pdf-download", pdfDownloadHandler);
+  app.post("/api/check-pdfs", pdfCheckHandler);
+  app.get("/api/research/featured", featuredHandler);
+  app.get("/api/pdf-thumb", createThumbHandler(isFeaturedUrl));
+
+  // Unknown API routes must never fall through to the SPA index.html (renders <NotFound /> inside iframes).
+  app.use("/api", (_req, res) => {
+    res.status(404).json({ error: "Not found" });
+  });
+
   // Serve static files from dist/public in production
   const staticPath =
     process.env.NODE_ENV === "production"
@@ -41,10 +55,11 @@ async function startServer() {
     res.sendFile(path.join(staticPath, "index.html"));
   });
 
-  const port = process.env.PORT || 3000;
+  const port = process.env.PORT || 5000;
 
   server.listen(port, () => {
     console.log(`Server running on http://localhost:${port}/`);
+    void warmFeatured();
   });
 }
 

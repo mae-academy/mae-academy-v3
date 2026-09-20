@@ -201,3 +201,7 @@ export const linearAlgebraToolMeta: Record<Locale, Array<{ slug: string; label: 
     { slug: "e", label: "Análisis espectral" },
   ],
 };
+
+/** A nav item is active on its own page and on every nested page (e.g. /research/W123); "/" only matches exactly. */
+export const isRouteActive = (location: string, href: string): boolean =>
+  href === "/" ? location === "/" : location === href || location.startsWith(`${href}/`);
