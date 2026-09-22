@@ -1,4 +1,5 @@
 import {
+  BookOpen,
   Check,
   Clipboard,
   Copy,
@@ -30,7 +31,7 @@ export interface ExecutiveToolbarProps {
   onStep?: () => void;
   frame?: FrameStore;
   readMetrics?: () => ScanMetrics | null;
-  /** Left-most slot, e.g. the hardware / CPU selector. */
+  /** Left-most slot, e.g. the hardware / CPU selector and examples dropdown. */
   leading?: ReactNode;
   onUndo?: () => void;
   canUndo?: boolean;

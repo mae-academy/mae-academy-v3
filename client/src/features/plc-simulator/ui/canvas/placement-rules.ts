@@ -1,7 +1,7 @@
 import { validateNetworkLayout, type BranchId, type LadNode, type Network, type NodeId } from '../../domain/ast';
 import type { ProgramLimits } from '../../domain/hardware';
 import { inletCount } from '../../engine/compiler';
-import { anchorsToRail, type PaletteItemId, type PlacementContext } from '../palette/catalog';
+import { anchorsToRail, getPaletteItem, type PaletteItemId, type PlacementContext } from '../palette/catalog';
 import type { Cell } from './geometry';
 import {
   addLane,
@@ -124,18 +124,22 @@ export function planPlacement(
 
   if (cell.row === 0) return { ok: false, cell, reason: direct.reason };
 
+  // A multi-row box (timer, counter, math...) needs that many rows inside the branch, not just the
+  // one row its top-left cell lands on, or its lower rows would hang outside the branch's bounds.
+  const rowSpan = getPaletteItem(request.itemId).rowSpan;
+
   // Below the main rung a cell only carries power inside a branch, so grow one under what is above.
   const branch = resolveBranch(network, cell.row - 1, cell.col);
   const branchOf = branch === null ? undefined : network.branches.find((entry) => entry.id === branch);
   if (branchOf !== undefined && branchOf.rowEnd === cell.row - 1) {
-    const grown = addLane(network, branchOf.id, limits);
+    const grown = addLane(network, branchOf.id, limits, rowSpan);
     if (!grown.ok) return { ok: false, cell, reason: grown.reason };
     return finish(placeItem(grown.network, snapped, ctx, limits), cell, 'lane', { branchId: branchOf.id });
   }
 
   const above = network.nodes.find((node) => covers(node, cell.row - 1, cell.col));
   if (above !== undefined && above.layout.row + above.layout.rowSpan === cell.row && inletCount(above) <= 1) {
-    const forked = addParallelBranch(network, above.id, limits, branchId);
+    const forked = addParallelBranch(network, above.id, limits, branchId, rowSpan);
     if (!forked.ok) return { ok: false, cell, reason: forked.reason };
     return finish(placeItem(forked.network, snapped, ctx, limits), cell, 'parallel', { anchorId: above.id });
   }

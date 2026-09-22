@@ -439,26 +439,34 @@ export function pushRowsDown(
   return { ok: true, network: withGrid({ ...network, nodes, branches }) };
 }
 
+/**
+ * Wraps `nodeId` in a new parallel branch, with `laneRows` empty rows in the new lane below it
+ * (one, unless a multi-row box is about to be dropped there — `planPlacement` passes the box's own
+ * `rowSpan` so it lands fully inside the branch instead of hanging half out of it).
+ */
 export function addParallelBranch(
   network: Network,
   nodeId: NodeId,
   limits: ProgramLimits,
   branchId: BranchId,
+  laneRows = 1,
 ): EditResult {
   const node = findNode(network, nodeId);
   if (!node) return fail('That element no longer exists');
   if (inletCount(node) > 1) return fail('Counters cannot be wired in parallel from the canvas');
+  if (laneRows < 1) return fail('Invalid lane count');
 
   const l = node.layout;
   const lane = l.row + l.rowSpan;
-  if (lane >= limits.maxGridRows) return fail(`The editor grid is limited to ${limits.maxGridRows} rows`);
+  const rowEnd = lane + laneRows - 1;
+  if (rowEnd >= limits.maxGridRows) return fail(`The editor grid is limited to ${limits.maxGridRows} rows`);
 
   const owner = l.branchId;
   const chain = ancestors(network, owner);
   const ignore = new Set(chain.map((b) => b.id));
 
-  // Every span that has to be clear on the new lane: the element's own columns, plus the full
-  // width of each ancestor group that still has to reach down to it.
+  // Every span that has to be clear across the new lane's rows: the element's own columns, plus
+  // the full width of each ancestor group that still has to reach down to it.
   const spans: (readonly [number, number])[] = [];
   for (const ancestor of chain) {
     if (ancestor.rowEnd >= lane) break;
@@ -466,12 +474,15 @@ export function addParallelBranch(
   }
   spans.push([l.col, l.col + l.colSpan - 1]);
 
-  // Occupied? Open a row instead of refusing: rows below slide down and the grid grows.
+  // Occupied? Open the rows instead of refusing: rows below slide down and the grid grows.
   let base = network;
-  if (spans.some(([from, to]) => !rowFree(base, lane, from, to, ignore))) {
-    const pushed = pushRowsDown(base, lane, 1, limits);
-    if (!pushed.ok) return pushed;
-    base = pushed.network;
+  outer: for (let row = lane; row <= rowEnd; row++) {
+    if (spans.some(([from, to]) => !rowFree(base, row, from, to, ignore))) {
+      const pushed = pushRowsDown(base, row, rowEnd - row + 1, limits);
+      if (!pushed.ok) return pushed;
+      base = pushed.network; // the push clears every remaining row of the new lane too
+      break outer;
+    }
   }
 
   const created: Branch = {
@@ -480,14 +491,14 @@ export function addParallelBranch(
     splitCol: l.col,
     mergeCol: l.col + l.colSpan - 1,
     rowStart: l.row,
-    rowEnd: lane,
+    rowEnd,
   };
 
-  const grown = new Set(chain.filter((b) => b.rowEnd < lane).map((b) => b.id));
+  const grown = new Set(chain.filter((b) => b.rowEnd < rowEnd).map((b) => b.id));
   const next: Network = withGrid({
     ...base,
     branches: [
-      ...base.branches.map((b) => (grown.has(b.id) ? { ...b, rowEnd: lane } : b)),
+      ...base.branches.map((b) => (grown.has(b.id) ? { ...b, rowEnd } : b)),
       created,
     ],
     nodes: base.nodes.map((n) => (n.id === nodeId ? { ...n, layout: { ...n.layout, branchId } } : n)),
@@ -497,27 +508,35 @@ export function addParallelBranch(
   return issue ? fail(PROBLEMS[issue.code]) : { ok: true, network: next };
 }
 
-/** Appends one more empty lane to an existing branch (and any ancestor that has to grow with it). */
-export function addLane(network: Network, branchId: BranchId, limits: ProgramLimits): EditResult {
+/**
+ * Appends `rows` more empty lanes (one, unless a multi-row box is about to be dropped into them —
+ * `planPlacement` passes the box's own `rowSpan` so the whole thing lands inside the branch instead
+ * of hanging half out of it).
+ */
+export function addLane(network: Network, branchId: BranchId, limits: ProgramLimits, rows = 1): EditResult {
   const branch = branchById(network, branchId);
   if (!branch) return fail('That branch no longer exists');
+  if (rows < 1) return fail('Invalid lane count');
 
-  const lane = branch.rowEnd + 1;
+  const lane = branch.rowEnd + rows;
   if (lane >= limits.maxGridRows) return fail(`The editor grid is limited to ${limits.maxGridRows} rows`);
 
   const chain = ancestors(network, branchId);
   const ignore = new Set(chain.map((b) => b.id));
 
-  // Same rule as `addParallelBranch`: if the lane below is taken, make room rather than refuse.
-  // `chain` starts with the branch itself, so this covers its own width as well as its ancestors'.
+  // Same rule as `addParallelBranch`: if any of the new lanes are taken, make room rather than
+  // refuse. `chain` starts with the branch itself, so this covers its own width as well as its
+  // ancestors'.
   let base = network;
-  for (const ancestor of chain) {
+  outer: for (const ancestor of chain) {
     if (ancestor.rowEnd >= lane) break;
-    if (!rowFree(base, lane, ancestor.splitCol, ancestor.mergeCol, ignore)) {
-      const pushed = pushRowsDown(base, lane, 1, limits);
-      if (!pushed.ok) return pushed;
-      base = pushed.network; // the push clears the whole lane, so the rest of the chain is free too
-      break;
+    for (let row = ancestor.rowEnd + 1; row <= lane; row++) {
+      if (!rowFree(base, row, ancestor.splitCol, ancestor.mergeCol, ignore)) {
+        const pushed = pushRowsDown(base, row, lane - row + 1, limits);
+        if (!pushed.ok) return pushed;
+        base = pushed.network; // the push clears every remaining new lane too
+        break outer;
+      }
     }
   }
 

@@ -70,23 +70,32 @@ export function BranchAdjustHandle({
       data-handle={actionType}
       transform={`translate(${x} ${y})`}
       className="group cursor-pointer outline-none"
-      // A bare click never resizes a branch: the handle must be dragged past the threshold in its own direction.
+      // Single clicks and directional drags trigger the branch handle adjustment.
       onPointerDown={(event) => {
         event.stopPropagation();
+        event.preventDefault();
         event.currentTarget.setPointerCapture?.(event.pointerId);
         dragStartX.current = event.clientX;
       }}
       onPointerUp={(event) => {
         event.stopPropagation();
+        event.preventDefault();
         const start = dragStartX.current;
         dragStartX.current = null;
         if (start === null) return;
-        if ((event.clientX - start) * DRAG_SIGN[actionType] >= HANDLE_DRAG_THRESHOLD_PX) onActivate();
+        const delta = event.clientX - start;
+        if (delta * DRAG_SIGN[actionType] < -HANDLE_DRAG_THRESHOLD_PX) return;
+        onActivate();
       }}
-      onPointerCancel={() => {
+      onPointerCancel={(event) => {
+        event.stopPropagation();
+        event.preventDefault();
         dragStartX.current = null;
       }}
-      onClick={(event) => event.stopPropagation()}
+      onClick={(event) => {
+        event.stopPropagation();
+        event.preventDefault();
+      }}
       onKeyDown={(event) => {
         if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault();

@@ -277,6 +277,49 @@ describe('PlcEditor interactions', () => {
     expect(alert.className).toContain('border-red-500/30');
     expect(alert.className).toContain('bg-red-500/10');
   });
+
+  it('drops a second TON into a freshly-forked parallel branch lane under the first TON', () => {
+    const timerWithFn = (id: string, row: number, col: number): LadNode => ({
+      id,
+      type: 'timer',
+      fn: 'TON',
+      instance: 'T37',
+      timeBaseMs: 100,
+      inputs: { IN: { kind: 'flow' }, PT: { kind: 'constant', value: 50 } },
+      outputs: {},
+      layout: at(row, col),
+    });
+    const timerNetwork: Network = {
+      id: 'net_2',
+      title: 'Timer',
+      grid: { rows: 4, cols: 8 },
+      nodes: [contact('gate', 'I0.0', 0, 0), { ...timerWithFn('ton1', 0, 7), layout: { row: 0, col: 7, rowSpan: 2, colSpan: 1, branchId: null } }],
+      branches: [],
+    };
+    const { container } = render(<PlcEditor profile={profile} initialNetworks={[timerNetwork]} />);
+
+    // Fork a parallel branch under the timer (the handle sits past its two-row height).
+    fireEvent.click(container.querySelector('[data-node-id="ton1"]') as Element);
+    const handle = container.querySelector('[data-handle="Add parallel branch"]') as Element;
+    fireEvent.click(handle);
+
+    // Drag a second TON from the palette onto the new lane, directly under the first (row 2, its
+    // rail column): the lane is only 1 row deep so far, but the timer needs 2.
+    const dataTransfer = {
+      types: [PALETTE_DRAG_TYPE],
+      getData: () => 'timer-ton',
+      setData: () => {},
+      dropEffect: 'none',
+      effectAllowed: 'all',
+    };
+    fireEvent.dragStart(palette(/On-delay timer/), { dataTransfer });
+    fireEvent.dragOver(cell(container, 2, 7), { dataTransfer });
+    fireEvent.drop(cell(container, 2, 7), { dataTransfer });
+
+    // No rejection banner, and a second timer box is now on the canvas.
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(container.querySelectorAll('[data-symbol="box-TON"]').length).toBe(2);
+  });
 });
 
 // ---- live simulation ---------------------------------------------------------------------------

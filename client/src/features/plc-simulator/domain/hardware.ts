@@ -105,6 +105,26 @@ export const S7_200_CPU224 = defineProfile({
   limits: { maxNetworks: 256, maxNodesPerNetwork: 64, maxGridRows: 16, maxGridCols: 8 },
 });
 
+/** S7-200 CPU 226: 24 DI (I0.0-I2.7), 16 DO (Q0.0-Q1.7), 10 KB V-memory. */
+export const S7_200_CPU226 = defineProfile({
+  id: 'S7_200_CPU226',
+  vendor: 'Siemens',
+  family: 'S7-200',
+  model: 'S7-200 CPU 226',
+  class: 'medium',
+  io: { digitalInputs: { min: 24, max: 24 }, digitalOutputs: { min: 16, max: 16 } },
+  display: { lcd: false, rows: 0, cols: 0 },
+  memory: {
+    I: { kind: 'bytes', bitCount: 24, widths: ALL_WIDTHS },
+    Q: { kind: 'bytes', bitCount: 16, widths: ALL_WIDTHS },
+    M: { kind: 'bytes', bitCount: 32 * 8, widths: ALL_WIDTHS },
+    V: { kind: 'bytes', bitCount: 10240 * 8, widths: ALL_WIDTHS },
+    T: { kind: 'indexed', ranges: range(0, 255) },
+    C: { kind: 'indexed', ranges: range(0, 255) },
+  },
+  limits: { maxNetworks: 384, maxNodesPerNetwork: 96, maxGridRows: 24, maxGridCols: 8 },
+});
+
 /** S7-200 CPU 226 + expansion modules: 40 DI (I0.0-I4.7), 32 DO (Q0.0-Q3.7), 10 KB V-memory. */
 export const S7_200_CPU226_EXP = defineProfile({
   id: 'S7_200_CPU226_EXP',
@@ -134,4 +154,4 @@ export function registerProfile(profile: HardwareProfile): void {
 export const getProfile = (id: string): HardwareProfile | undefined => registry.get(id);
 export const listProfiles = (): readonly HardwareProfile[] => Array.from(registry.values());
 
-[LOGO_0BA8, S7_200_CPU224, S7_200_CPU226_EXP].forEach(registerProfile);
+[LOGO_0BA8, S7_200_CPU224, S7_200_CPU226, S7_200_CPU226_EXP].forEach(registerProfile);

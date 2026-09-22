@@ -1,8 +1,7 @@
-import { BookOpen, ChevronDown } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import type { Network } from '../../domain/ast';
-import { getProfile, listProfiles, S7_200_CPU224 } from '../../domain/hardware';
+import { getProfile, listProfiles, S7_200_CPU224, S7_200_CPU226, S7_200_CPU226_EXP } from '../../domain/hardware';
 import { ilToLad, type SymbolMap } from '../../transpiler';
 import { createEmptyNetwork } from '../canvas/network-edit';
 import { PlcEditorView } from '../canvas/PlcEditor';
@@ -11,6 +10,8 @@ import { SimulationProvider } from '../canvas/simulation';
 import { IssueBanner, NoticeBanner } from './Banners';
 import { ExecutiveToolbar } from './ExecutiveToolbar';
 import { ExportDialog } from './ExportDialog';
+import { PlcExamplesDropdown } from './PlcExamplesDropdown';
+import type { PlcExample } from './plcExamples';
 import { usePlcHost, type PlcHostOptions } from './usePlcHost';
 
 export interface S7WorkspaceProps {
@@ -26,11 +27,18 @@ export interface S7WorkspaceProps {
 
 const CPU_PROFILES = listProfiles().filter((profile) => profile.family === 'S7-200');
 
+const CPU_OPTIONS = [
+  { label: 'CPU 224', value: S7_200_CPU224.id },
+  { label: 'CPU 226', value: S7_200_CPU226.id },
+  { label: 'CPU 226 + Exp.', value: S7_200_CPU226_EXP.id },
+] as const;
+
 /** STEP 7-Micro/WIN style environment: ladder / IL editing plus the S7-200 rack. Remounted per CPU. */
 export function S7Workspace({ active, profileId, initialNetworks, symbols, runtimeOptions, onProfileChange, onNetworks }: S7WorkspaceProps) {
   const profile = getProfile(profileId) ?? S7_200_CPU224;
   const host = usePlcHost(profile, initialNetworks, { symbols, runtimeOptions });
   const [exporting, setExporting] = useState(false);
+  const [currentExampleId, setCurrentExampleId] = useState<string | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const { session, status, stop } = host;
 
@@ -51,10 +59,22 @@ export function S7Workspace({ active, profileId, initialNetworks, symbols, runti
       }
       setImportError(null);
       host.editor.actions.loadNetworks(result.value);
+      setCurrentExampleId(null);
       toast.success(`Imported ${file.name}`);
     },
     [profile, host.editor.actions],
   );
+
+  const handleSelectExample = useCallback((example: PlcExample) => {
+    const result = ilToLad(example.stl, profile);
+    if (result.ok && result.value) {
+      host.editor.actions.loadNetworks(result.value);
+      setCurrentExampleId(example.id);
+      toast.success(`Loaded "${example.title}"`);
+    } else {
+      toast.error('Failed to parse example program');
+    }
+  }, [profile, host.editor.actions]);
 
   const handleCopy = useCallback(() => {
     const code = host.exportMicroWin().content;
@@ -72,6 +92,7 @@ export function S7Workspace({ active, profileId, initialNetworks, symbols, runti
         return;
       }
       host.editor.actions.loadNetworks(result.value);
+      setCurrentExampleId(null);
       toast.success('Pasted program from clipboard');
     } catch {
       toast.error('Clipboard permission required to paste');
@@ -80,6 +101,7 @@ export function S7Workspace({ active, profileId, initialNetworks, symbols, runti
 
   const handleDelete = useCallback(() => {
     host.editor.actions.loadNetworks([createEmptyNetwork('network-1')]);
+    setCurrentExampleId(null);
     toast.info('Cleared ladder program');
   }, [host.editor.actions]);
 
@@ -114,18 +136,38 @@ export function S7Workspace({ active, profileId, initialNetworks, symbols, runti
         importTitle="Import STL program (.awl, .txt)"
         importAccept=".awl,.txt"
         leading={
-          <div
-            className="relative inline-flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-slate-200/80 bg-slate-200/60 px-3 text-xs font-medium text-slate-700 transition hover:bg-slate-300/50 dark:border-[#1a1d24] dark:bg-[#13161c] dark:text-slate-300 dark:hover:bg-[#1a1d24]"
-            title="Switch CPU"
-          >
-            <BookOpen aria-hidden="true" className="pointer-events-none h-3.5 w-3.5 shrink-0 text-violet-600 dark:text-violet-400" />
-            <span className="pointer-events-none text-xs font-semibold text-slate-800 dark:text-slate-200">{profile.model}</span>
-            <ChevronDown aria-hidden="true" className="pointer-events-none h-3 w-3 text-slate-400" />
+          <div className="flex items-center gap-1.5 shrink-0">
+            <div
+              role="tablist"
+              aria-label="CPU Selection"
+              className="inline-flex items-center p-1 rounded-full bg-slate-100/80 dark:bg-slate-800/50 backdrop-blur-sm border border-slate-200/60 dark:border-slate-700/50"
+            >
+              {CPU_OPTIONS.map((opt) => {
+                const isActive = opt.value === profile.id;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    role="tab"
+                    aria-selected={isActive}
+                    onClick={() => onProfileChange(opt.value)}
+                    className={`cursor-pointer select-none whitespace-nowrap ${
+                      isActive
+                        ? 'rounded-full bg-gradient-to-br from-[#2563EB] via-[#7C3AED] to-[#E11D48] text-white font-semibold shadow-sm px-4 py-1 text-xs'
+                        : 'rounded-full px-4 py-1 text-xs font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-all'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
             <select
               aria-label="Hardware profile"
               value={profile.id}
               onChange={(event) => onProfileChange(event.target.value)}
-              className="absolute inset-0 h-full w-full cursor-pointer text-xs opacity-0"
+              className="sr-only"
+              tabIndex={-1}
             >
               {CPU_PROFILES.map((entry) => (
                 <option key={entry.id} value={entry.id}>
@@ -133,6 +175,11 @@ export function S7Workspace({ active, profileId, initialNetworks, symbols, runti
                 </option>
               ))}
             </select>
+
+            <PlcExamplesDropdown
+              currentExampleId={currentExampleId}
+              onSelectExample={handleSelectExample}
+            />
           </div>
         }
       />
