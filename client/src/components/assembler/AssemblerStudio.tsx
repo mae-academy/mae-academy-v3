@@ -10,6 +10,8 @@
  * - High-contrast, legible subregister labels (AH, AL, BH, BL, etc.)
  */
 import {
+  Activity,
+  BookOpen,
   Clock,
   Code,
   CornerDownLeft,
@@ -20,8 +22,10 @@ import {
   Terminal,
   Trash2,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Editor from "react-simple-code-editor";
+import { prewarmRemote } from "@/features/code-studio/executionCache";
+import { TerminalSurface } from "@/features/code-studio/components/Terminal";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
 import {
@@ -30,6 +34,11 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "@/components/ui/resizable";
 import SegmentedControl from "@/components/ui/SegmentedControl";
 import {
   AssemblerToolbar,
@@ -111,6 +120,27 @@ function MacWindowDots() {
   );
 }
 
+import {
+  MASM_TEMPLATE_GROUPS,
+  MASM_EXAMPLE_SOURCES,
+  DEFAULT_MASM_TEMPLATE,
+} from "@/components/assembler/masmExamples";
+import {
+  PYTHON_TEMPLATE_GROUPS,
+  PYTHON_EXAMPLE_SOURCES,
+  DEFAULT_PYTHON_TEMPLATE,
+} from "@/features/code-studio/pythonExamples";
+import {
+  CPP_TEMPLATE_GROUPS,
+  CPP_EXAMPLE_SOURCES,
+  DEFAULT_CPP_TEMPLATE,
+} from "@/features/code-studio/cppExamples";
+import {
+  C_TEMPLATE_GROUPS,
+  C_EXAMPLE_SOURCES,
+  DEFAULT_C_TEMPLATE,
+} from "@/features/code-studio/cExamples";
+
 // ---------------------------------------------------------------------------
 // Language definitions & starter code
 // ---------------------------------------------------------------------------
@@ -122,87 +152,17 @@ interface LanguageDefinition {
   defaultTemplate: string;
 }
 
-const MASM_GROUPS: AssemblerTemplateGroup[] = [
-  { label: "Basics", items: ["Basic Math & Flags", "Negative Hex & Exchange"] },
-  { label: "Logic & Shift", items: ["Shift & Rotate", "Loop & Logic"] },
-  {
-    label: "Memory & Stack",
-    items: ["Stack (Call & Return)", "PUSH & POP", "LEA & Memory mapping"],
-  },
-  {
-    label: "Algorithms",
-    items: [
-      "Palindrome Checker",
-      "Array Min/Max Search",
-      "BCD/ASCII Arithmetic",
-    ],
-  },
-];
+const MASM_GROUPS: AssemblerTemplateGroup[] = MASM_TEMPLATE_GROUPS;
+const MASM_SOURCES: Record<string, string> = MASM_EXAMPLE_SOURCES;
 
-const MASM_PROGRAM = [
-  "; Basic Math & Flags",
-  ".model small",
-  ".stack 100h",
-  ".data",
-  "message db 'Welcome to MAE Academy!', 0",
-  ".code",
-  "main proc",
-  "  mov ax, @data",
-  "  mov ds, ax",
-  "  mov dx, offset message",
-  "  mov ah, 09h",
-  "  int 21h",
-  "  mov ax, 0005h",
-  "  mov bx, 0003h",
-  "  add ax, bx",
-  "  push ax",
-  "  pop cx",
-  "  mov ax, 4C00h",
-  "  int 21h",
-  "main endp",
-].join("\n");
+const PYTHON_GROUPS: AssemblerTemplateGroup[] = PYTHON_TEMPLATE_GROUPS;
+const PYTHON_SOURCES: Record<string, string> = PYTHON_EXAMPLE_SOURCES;
 
-const MASM_SOURCES: Record<string, string> = Object.fromEntries(
-  MASM_GROUPS.flatMap(group => group.items).map(item => [item, MASM_PROGRAM])
-);
+const CPP_GROUPS: AssemblerTemplateGroup[] = CPP_TEMPLATE_GROUPS;
+const CPP_SOURCES: Record<string, string> = CPP_EXAMPLE_SOURCES;
 
-const PYTHON_GROUPS: AssemblerTemplateGroup[] = [
-  { label: "Basics", items: ["Hello World", "Variables & Loops"] },
-  { label: "Functions", items: ["Function Call"] },
-];
-
-const PYTHON_SOURCES: Record<string, string> = {
-  "Hello World": 'print("Welcome to MAE Academy!")\n',
-  "Variables & Loops":
-    "total = 0\nfor i in range(5):\n    total += i\nprint(total)\n",
-  "Function Call":
-    "def add(a, b):\n    result = a + b\n    return result\n\nx = 3\ny = 4\nz = add(x, y)\nprint(z)\n",
-};
-
-const CPP_GROUPS: AssemblerTemplateGroup[] = [
-  { label: "Basics", items: ["Hello World", "Loop Sum"] },
-  { label: "Functions", items: ["Function Call"] },
-];
-
-const CPP_SOURCES: Record<string, string> = {
-  "Hello World":
-    '#include <iostream>\nusing namespace std;\nint main() {\n    cout << "Welcome to MAE Academy!" << endl;\n    return 0;\n}\n',
-  "Loop Sum":
-    "#include <iostream>\nusing namespace std;\nint main() {\n    int total = 0;\n    for (int i = 0; i < 5; i++) {\n        total += i;\n    }\n    cout << total << endl;\n    return 0;\n}\n",
-  "Function Call":
-    "#include <iostream>\nusing namespace std;\nint add(int a, int b) {\n    int result = a + b;\n    return result;\n}\nint main() {\n    int x = 3;\n    int y = 4;\n    int z = add(x, y);\n    cout << z << endl;\n    return 0;\n}\n",
-};
-
-const C_GROUPS: AssemblerTemplateGroup[] = [
-  { label: "Basics", items: ["Hello World", "Loop Sum"] },
-];
-
-const C_SOURCES: Record<string, string> = {
-  "Hello World":
-    '#include <stdio.h>\nint main() {\n    printf("Welcome to MAE Academy!");\n    return 0;\n}\n',
-  "Loop Sum":
-    '#include <stdio.h>\nint main() {\n    int total = 0;\n    for (int i = 0; i < 5; i++) {\n        total += i;\n    }\n    printf("%d\\n", total);\n    return 0;\n}\n',
-};
+const C_GROUPS: AssemblerTemplateGroup[] = C_TEMPLATE_GROUPS;
+const C_SOURCES: Record<string, string> = C_EXAMPLE_SOURCES;
 
 const LANGUAGE_DEFINITIONS: Record<SupportedLanguage, LanguageDefinition> = {
   masm8086: {
@@ -210,28 +170,28 @@ const LANGUAGE_DEFINITIONS: Record<SupportedLanguage, LanguageDefinition> = {
     filename: "program.asm",
     groups: MASM_GROUPS,
     sources: MASM_SOURCES,
-    defaultTemplate: "Basic Math & Flags",
+    defaultTemplate: DEFAULT_MASM_TEMPLATE,
   },
   python: {
     label: "Python",
     filename: "script.py",
     groups: PYTHON_GROUPS,
     sources: PYTHON_SOURCES,
-    defaultTemplate: "Hello World",
+    defaultTemplate: DEFAULT_PYTHON_TEMPLATE,
   },
   cpp: {
     label: "C++",
     filename: "main.cpp",
     groups: CPP_GROUPS,
     sources: CPP_SOURCES,
-    defaultTemplate: "Hello World",
+    defaultTemplate: DEFAULT_CPP_TEMPLATE,
   },
   c: {
     label: "C",
     filename: "main.c",
     groups: C_GROUPS,
     sources: C_SOURCES,
-    defaultTemplate: "Hello World",
+    defaultTemplate: DEFAULT_C_TEMPLATE,
   },
 };
 
@@ -623,89 +583,130 @@ function SourceEditor({
   const lines = code.split("\n");
   const lineAt = (offset: number) => code.slice(0, offset).split("\n").length;
   const lineAtCursor = (target: EventTarget | null) =>
-    lineAt(target instanceof HTMLTextAreaElement ? target.selectionStart : 0);
+    lineAt(target instanceof HTMLTextAreaElement ? target.value.slice(0, target.selectionStart).split("\n").length : 1);
+
+  useEffect(() => {
+    if (typeof document !== "undefined" && "fonts" in document) {
+      document.fonts.ready.then(() => {
+        // Font metrics loaded and ready
+      });
+    }
+  }, []);
 
   return (
     <div
       className="relative flex-1 min-h-0 overflow-auto bg-[#f8fbff] dark:bg-[#07080a] select-text"
       dir="ltr"
     >
-      {/* Code Gutter (Line numbers & Breakpoint triggers) */}
-      <div className="absolute start-0 top-0 z-20 w-13 py-2 font-mono text-[12px] leading-7 bg-slate-100/80 dark:bg-[#090a0d]/90 border-r border-slate-200 dark:border-[#1a1d24] select-none pointer-events-auto">
-        {lines.map((_, index) => {
-          const line = index + 1;
-          const isCurrent = activeLine === line;
-          const hasBp = breakpoints.includes(line);
-          return (
-            <div
-              key={line}
-              className={`grid grid-cols-[18px_1fr] items-center px-1 text-slate-400 dark:text-slate-500 h-7 ${isCurrent
-                ? "bg-violet-500/20 text-violet-700 dark:text-violet-300 font-medium"
-                : "font-normal"
-                }`}
-            >
-              <button
-                type="button"
-                aria-label={`Toggle breakpoint on line ${line}`}
-                onClick={() => onToggleBreakpoint(line)}
-                className="flex items-center justify-center cursor-pointer"
+      <div className="flex min-h-full min-w-max">
+        {/* Code Gutter (Line numbers & Breakpoint triggers) */}
+        <div className="sticky start-0 z-10 w-13 shrink-0 select-none border-e border-slate-200 bg-slate-100/80 py-3 font-mono text-[12px] leading-[22px] dark:border-[#1a1d24] dark:bg-[#090a0d]/90">
+          {lines.map((_, index) => {
+            const line = index + 1;
+            const isCurrent = activeLine === line;
+            const hasBp = breakpoints.includes(line);
+            return (
+              <div
+                key={line}
+                className={`grid grid-cols-[18px_1fr] items-center px-1 text-slate-400 dark:text-slate-500 h-[22px] leading-[22px] tabular-nums ${isCurrent
+                  ? "bg-violet-500/20 text-violet-700 dark:text-violet-300 font-medium"
+                  : "font-normal"
+                  }`}
               >
-                {hasBp ? (
-                  <span className="block h-2.5 w-2.5 rounded-full bg-rose-500 shadow-xs" />
-                ) : (
-                  <span className="block h-2.5 w-2.5 rounded-full border border-transparent hover:border-slate-400 dark:hover:border-slate-500" />
-                )}
-              </button>
-              <span className="text-end pe-1.5 tabular-nums font-normal">
-                {line.toString().padStart(2, "0")}
-              </span>
-            </div>
-          );
-        })}
-      </div>
+                <button
+                  type="button"
+                  aria-label={`Toggle breakpoint on line ${line}`}
+                  onClick={() => onToggleBreakpoint(line)}
+                  className="flex items-center justify-center cursor-pointer"
+                >
+                  {hasBp ? (
+                    <span className="block h-2 w-2 rounded-full bg-rose-500 shadow-xs" />
+                  ) : (
+                    <span className="block h-2 w-2 rounded-full border border-transparent hover:border-slate-400 dark:hover:border-slate-500" />
+                  )}
+                </button>
+                <span className="text-end pe-1.5 tabular-nums font-normal">
+                  {line.toString().padStart(2, "0")}
+                </span>
+              </div>
+            );
+          })}
+        </div>
 
-      {/* Editor Surface */}
-      <div className="ps-13">
-        <Editor
-          value={code}
-          onValueChange={onChange}
-          highlight={(source: string) => (
-            <>
-              {source.split("\n").map((line: string, index: number) => {
-                const isCurrent = activeLine === index + 1;
-                return (
-                  <div
-                    key={`${index}-${line}`}
-                    className={`block min-h-7 px-3 font-normal ${isCurrent
-                      ? "border-s-2 border-violet-500 bg-violet-100/40 dark:bg-violet-500/15 text-slate-900 dark:text-white font-normal"
-                      : "border-s-2 border-transparent text-slate-800 dark:text-slate-200 font-normal"
-                      }`}
-                  >
-                    <SyntaxLine text={line || " "} language={language} />
-                  </div>
-                );
-              })}
-            </>
-          )}
-          padding={8}
-          onClick={event => onActiveLine(lineAtCursor(event.target))}
-          onKeyUp={event => onActiveLine(lineAtCursor(event.target))}
-          style={{
-            minHeight: "100%",
-            fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-            fontSize: 12.5,
-            lineHeight: "1.75rem",
-            whiteSpace: "pre",
-            position: "relative",
-            zIndex: 1,
-            fontWeight: 400,
-          }}
-          textareaClassName="!ps-3 !outline-none !caret-violet-500 !font-normal"
-        />
+        {/* Editor Surface */}
+        <div className="relative min-w-0 flex-1">
+          <Editor
+            value={code}
+            onValueChange={onChange}
+            highlight={(source: string) => (
+              <>
+                {source.split("\n").map((line: string, index: number) => {
+                  const isCurrent = activeLine === index + 1;
+                  return (
+                    <div
+                      key={`${index}-${line}`}
+                      className={`block h-[22px] leading-[22px] font-normal ${isCurrent
+                        ? "bg-violet-100/40 dark:bg-violet-500/15 text-slate-900 dark:text-white"
+                        : "text-slate-800 dark:text-slate-200"
+                        }`}
+                    >
+                      <SyntaxLine text={line || " "} language={language} />
+                    </div>
+                  );
+                })}
+              </>
+            )}
+            padding={12}
+            tabSize={2}
+            onClick={event => onActiveLine(lineAtCursor(event.target))}
+            onKeyUp={event => onActiveLine(lineAtCursor(event.target))}
+            style={{
+              minHeight: "100%",
+              fontFamily: "'JetBrains Mono', 'Fira Code', Menlo, Monaco, 'Courier New', monospace",
+              fontSize: 14,
+              lineHeight: "22px",
+              letterSpacing: 0,
+              fontVariantLigatures: "none",
+              whiteSpace: "pre",
+              position: "relative",
+              zIndex: 1,
+              fontWeight: 400,
+            }}
+            textareaClassName="!outline-none !caret-violet-500 !font-normal"
+          />
+        </div>
       </div>
     </div>
   );
 }
+
+const CPP_REFERENCE: [string, string][] = [
+  ["%d / %i", "signed int"],
+  ["%f", "float / double"],
+  ["%s", "C string (char *)"],
+  ["%c", "single char"],
+  ["%p", "pointer address"],
+  ["*p", "dereference pointer"],
+  ["&x", "address of x"],
+  ["<stdio.h>", "printf, scanf"],
+  ["<stdlib.h>", "malloc, free, atoi"],
+  ["<string.h>", "strlen, strcpy, strcmp"],
+];
+
+const QUICK_REFERENCE: Partial<Record<SupportedLanguage, [string, string][]>> = {
+  python: [
+    ["len(x)", "length of a sequence"],
+    [".append(v)", "add item to end of list"],
+    [".pop(i)", "remove & return item (last by default)"],
+    ["x[::-1]", "reversed slice"],
+    ["x[a:b:s]", "slice start:stop:step"],
+    ["int() float() str()", "type conversions"],
+    ["list() tuple() set()", "collection conversions"],
+    ["range(n)", "0..n-1 iterator"],
+  ],
+  c: CPP_REFERENCE,
+  cpp: [...CPP_REFERENCE, ["<iostream>", "std::cout, std::cin"], ["<vector>", "std::vector<T>"]],
+};
 
 // ---------------------------------------------------------------------------
 // Main Studio Component (4-Quadrant IDE Viewport Split)
@@ -730,7 +731,7 @@ export function AssemblerStudio() {
   const [language, setLanguage] = useState<SupportedLanguage>(initialLang);
   const initialDef = LANGUAGE_DEFINITIONS[initialLang];
   const [template, setTemplate] = useState(initialDef.defaultTemplate);
-  const initialCode = initialDef.sources[initialDef.defaultTemplate] ?? MASM_PROGRAM;
+  const initialCode = initialDef.sources[initialDef.defaultTemplate] ?? MASM_EXAMPLE_SOURCES[DEFAULT_MASM_TEMPLATE];
   const [code, setCode] = useState(initialCode);
   const [codeHistory, setCodeHistory] = useState<string[]>([initialCode]);
   const [historyIndex, setHistoryIndex] = useState<number>(0);
@@ -761,9 +762,23 @@ export function AssemblerStudio() {
   const [engineReady, setEngineReady] = useState(true);
   const [engineError, setEngineError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string>("state");
+  const [isDesktop, setIsDesktop] = useState(
+    () => typeof window !== "undefined" && window.innerWidth >= 1024
+  );
+
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const update = () => setIsDesktop(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
 
   const compiledKeyRef = useRef<string | null>(null);
-  const pendingActionRef = useRef<"run" | "step" | "instant" | null>(null);
+  const pendingActionRef = useRef<"run" | "step" | "instant" | "resume" | null>(null);
+  /** Cumulative stdin fed to the last run; a resume replays it plus the new keystrokes. */
+  const consumedStdinRef = useRef("");
+  const resumeFromStepRef = useRef(0);
   const terminalScrollRef = useRef<HTMLDivElement>(null);
 
   const computeKey = () => `${language}::${code}`;
@@ -779,6 +794,37 @@ export function AssemblerStudio() {
   const combinedError = engineError ?? result?.error ?? null;
   const isMasm = language === "masm8086";
   const totalSteps = result?.steps.length ?? 0;
+
+  // Wall-clock duration of the last run, measured on busy -> idle transitions.
+  const runStartRef = useRef<number | null>(null);
+  const [runTimeMs, setRunTimeMs] = useState<number | null>(null);
+  useEffect(() => {
+    if (engineBusy) {
+      runStartRef.current = performance.now();
+    } else if (runStartRef.current !== null) {
+      setRunTimeMs(Math.round(performance.now() - runStartRef.current));
+      runStartRef.current = null;
+    }
+  }, [engineBusy]);
+
+  // Inspector tabs depend on the active language; low-level tabs are MASM-only.
+  const inspectorTabs: { label: string; value: string; icon: ReactNode }[] = isMasm
+    ? [
+        { label: "Registers & Flags", value: "state", icon: <Cpu className="h-4 w-4" /> },
+        { label: "Execution Trace", value: "trace", icon: <ListOrdered className="h-4 w-4" /> },
+        { label: "Stack", value: "stack", icon: <Layers className="h-4 w-4" /> },
+        { label: "Main Memory", value: "memory", icon: <Database className="h-4 w-4" /> },
+      ]
+    : [
+        { label: "Variables View", value: "state", icon: <Cpu className="h-4 w-4" /> },
+        { label: "Execution Trace", value: "trace", icon: <ListOrdered className="h-4 w-4" /> },
+        { label: "Telemetry & Insights", value: "telemetry", icon: <Activity className="h-4 w-4" /> },
+        { label: "Quick Reference", value: "reference", icon: <BookOpen className="h-4 w-4" /> },
+      ];
+  // Reset to the first tab if the active one is not offered for this language.
+  useEffect(() => {
+    if (!inspectorTabs.some(t => t.value === activeTab)) setActiveTab("state");
+  }, [inspectorTabs, activeTab]);
 
   // Code change handler with undo/redo history tracking
   const handleCodeChange = (newCode: string) => {
@@ -874,6 +920,10 @@ export function AssemblerStudio() {
     if (action === "instant" || speed === "instant") {
       setCurrentStepIndex(result.steps.length - 1);
       setIsPlaying(false);
+    } else if (action === "resume") {
+      // Continue right after the last step of the blocked run instead of restarting playback.
+      setCurrentStepIndex(Math.min(resumeFromStepRef.current, result.steps.length - 1));
+      setIsPlaying(true);
     } else if (action === "run") {
       setCurrentStepIndex(0);
       setIsPlaying(true);
@@ -930,6 +980,7 @@ export function AssemblerStudio() {
   const applyLanguage = (next: SupportedLanguage, updateUrl: boolean = true) => {
     if (next === language) return;
     setLanguage(next);
+    setActiveTab("state");
     setIsPlaying(false);
     resetEngine();
     compiledKeyRef.current = null;
@@ -942,6 +993,7 @@ export function AssemblerStudio() {
     setCode(src);
     setCodeHistory([src]);
     setHistoryIndex(0);
+    prewarmRemote(next, src);
     if (updateUrl) {
       setLocation(`/simulations/code/${next}`, { replace: true });
     }
@@ -958,15 +1010,11 @@ export function AssemblerStudio() {
     resetEngine();
     compiledKeyRef.current = null;
     setCurrentStepIndex(-1);
-    let nextSrc = "";
-    if (language === "masm8086") {
-      nextSrc = code.replace(/^;.*$/m, `; ${next}`);
-    } else {
-      nextSrc = LANGUAGE_DEFINITIONS[language].sources[next] ?? "";
-    }
+    const nextSrc = LANGUAGE_DEFINITIONS[language]?.sources[next] ?? "";
     setCode(nextSrc);
     setCodeHistory(prev => [...prev, nextSrc]);
     setHistoryIndex(prev => prev + 1);
+    prewarmRemote(language, nextSrc);
     toast.success(`Loaded example: ${next}`);
   };
 
@@ -974,8 +1022,29 @@ export function AssemblerStudio() {
     pendingActionRef.current = isInstant ? "instant" : "run";
     compiledKeyRef.current = computeKey();
     const consumedStdin = stdinQueue;
+    consumedStdinRef.current = consumedStdin;
     setStdinQueue("");
     await runCode(language, code, { stdin: consumedStdin });
+  };
+
+  const awaitingInput =
+    isMasm &&
+    !!result?.awaitingInput &&
+    currentStepIndex >= (result?.steps.length ?? 0) - 1;
+
+  /** Queues keystrokes; if the CPU is blocked on input, resumes it from the paused INT. */
+  const submitStdin = (text: string) => {
+    if (!text) return;
+    if (awaitingInput && result && !engineBusy) {
+      const cumulative = consumedStdinRef.current + stdinQueue + text;
+      consumedStdinRef.current = cumulative;
+      resumeFromStepRef.current = result.steps.length;
+      pendingActionRef.current = "resume";
+      setStdinQueue("");
+      void runCode(language, code, { stdin: cumulative });
+      return;
+    }
+    setStdinQueue(buffer => `${buffer}${text}`);
   };
 
   const onRun = () => {
@@ -1027,6 +1096,7 @@ export function AssemblerStudio() {
     pendingActionRef.current = "step";
     compiledKeyRef.current = key;
     const consumedStdin = stdinQueue;
+    consumedStdinRef.current = consumedStdin;
     setStdinQueue("");
     void runCode(language, code, { stdin: consumedStdin });
   };
@@ -1161,195 +1231,211 @@ export function AssemblerStudio() {
         onDelete={handleDelete}
       />
 
-      {/* ===================================================================== */}
-      {/* 2. 4-QUADRANT IDE SPLIT                                               */}
-      {/* ===================================================================== */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-2.5 flex-1 min-h-0 overflow-hidden">
-        {/* ================================================================= */}
-        {/* QUADRANT 1 (Left Half): Code Editor (macOS Window Frame)          */}
-        {/* ================================================================= */}
-        <section className="flex flex-col h-full min-h-0 rounded-xl border border-slate-200 bg-white dark:border-[#1a1d24] dark:bg-[#0d0f12] overflow-hidden shadow-xs">
-          {/* macOS Title Bar Header */}
-          <div className="flex items-center justify-between px-3 py-2 border-b border-slate-200 dark:border-[#1a1d24] bg-slate-50 dark:bg-[#0d0f12] shrink-0">
-            <div className="flex items-center gap-1.5">
-              <MacWindowDots />
-              <Code className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400 ms-0.5" />
-              <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 font-mono">
-                {LANGUAGE_DEFINITIONS[language].filename}
-              </span>
-            </div>
-
-            {/* Clean Right Metadata */}
-            <div className="flex items-center gap-2 font-mono text-[11px] text-slate-400 dark:text-slate-500">
-              <span>{code.split("\n").length} lines</span>
-            </div>
-          </div>
-
-          {/* Source Editor Body */}
-          <SourceEditor
-            code={code}
-            onChange={handleCodeChange}
-            language={language}
-            activeLine={activeLine}
-            onActiveLine={setActiveLine}
-            breakpoints={breakpoints}
-            onToggleBreakpoint={toggleBreakpoint}
-          />
-        </section>
-
-        {/* ================================================================= */}
-        {/* Right Half: Quadrants 2 & 3 (45% / 55% Split)                     */}
-        {/* ================================================================= */}
-        <div className="flex flex-col gap-2.5 h-full min-h-0 overflow-hidden">
-          {/* =============================================================== */}
-          {/* QUADRANT 2 (Top Right): Terminal Window (Height: 45%)            */}
-          {/* =============================================================== */}
-          <section className="h-[45%] shrink-0 flex flex-col rounded-xl border border-slate-200 bg-white dark:border-[#1a1d24] dark:bg-[#0d0f12] overflow-hidden shadow-xs">
-            {/* macOS Title Bar Header */}
-            <div className="flex items-center justify-between px-3 py-2 border-b border-slate-200 dark:border-[#1a1d24] bg-slate-50 dark:bg-[#0d0f12] shrink-0">
-              <div className="flex items-center gap-1.5">
-                <MacWindowDots />
-                <Terminal className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400 ms-0.5" />
-                <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 tracking-wider font-mono">
-                  terminal.out
-                </span>
-              </div>
-
-              <div className="flex items-center gap-2">
-                {stdinQueue && (
-                  <span className="rounded-md bg-violet-950/60 border border-violet-800/40 px-2 py-0.5 text-[10px] font-mono text-violet-300">
-                    stdin queued
+      <div className="min-h-0 flex-1 overflow-hidden">
+        <ResizablePanelGroup direction={isDesktop ? "horizontal" : "vertical"} className="gap-2.5">
+          {/* ================================================================= */}
+          {/* QUADRANT 1 (Left Panel): Code Editor (Full Vertical Height)       */}
+          {/* ================================================================= */}
+          <ResizablePanel defaultSize={50} minSize={30} className="flex h-full min-h-0 flex-col overflow-hidden">
+            <section className="flex flex-col h-full min-h-0 rounded-xl border border-slate-200 bg-white dark:border-[#1a1d24] dark:bg-[#0d0f12] overflow-hidden shadow-xs">
+              {/* macOS Title Bar Header */}
+              <div className="flex items-center justify-between px-3 py-2 border-b border-slate-200 dark:border-[#1a1d24] bg-slate-50 dark:bg-[#0d0f12] shrink-0">
+                <div className="flex items-center gap-1.5">
+                  <MacWindowDots />
+                  <Code className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400 ms-0.5" />
+                  <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 font-mono">
+                    {LANGUAGE_DEFINITIONS[language].filename}
                   </span>
-                )}
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (currentStep) currentStep.stdout = "";
-                    setStdinQueue("");
-                  }}
-                  title="Clear terminal"
-                  className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-0.5 cursor-pointer"
-                >
-                  <Trash2 size={12} />
-                </button>
-              </div>
-            </div>
+                </div>
 
-            {/* Deep Black Monospace Output Screen */}
-            <div
-              ref={terminalScrollRef}
-              className="flex-1 min-h-0 overflow-y-auto p-3 font-mono text-xs text-slate-100 leading-relaxed bg-[#050608] select-text"
-            >
-              <div className="text-slate-600 mb-2 select-none text-[11px]">
-                [Runtime: {LANGUAGE_DEFINITIONS[language].label} // stdout]
+                {/* Clean Right Metadata */}
+                <div className="flex items-center gap-2 font-mono text-[11px] text-slate-400 dark:text-slate-500">
+                  <span>{code.split("\n").length} lines</span>
+                </div>
               </div>
-              {engineBusy ? (
-                <div className="text-violet-400 italic flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-violet-500 animate-ping" />
-                  Executing program...
-                </div>
-              ) : currentStep?.stdout ? (
-                <p className="whitespace-pre-wrap text-slate-100 font-mono">
-                  {currentStep.stdout}
-                </p>
-              ) : combinedError ? (
-                <div className="text-[#F43F5E] italic font-sans text-xs">
-                  Execution stopped. Check diagnostics below.
-                </div>
-              ) : (
-                <div className="text-slate-600 italic">
-                  Output console ready. Click &apos;Run&apos; to execute.
-                </div>
-              )}
-              {!combinedError && (
-                <span className="inline-block h-3.5 w-2 bg-violet-400 animate-pulse ms-1 align-middle" />
-              )}
-            </div>
 
-            {/* Interactive Keyboard Input Bar */}
-            <form
-              onSubmit={event => {
-                event.preventDefault();
-                const entry = stdinInput.trim();
-                if (entry) {
-                  setStdinQueue(buffer => `${buffer}${entry}\n`);
-                  setStdinInput("");
-                  toast.success(`Queued stdin: "${entry}"`);
-                }
-              }}
-              className="flex items-center gap-1.5 p-1.5 border-t border-[#1a1d24] bg-[#090a0d] shrink-0"
-            >
-              <span className="font-mono text-xs font-bold text-violet-400 ps-2">
-                &gt;
-              </span>
-              <input
-                aria-label="Terminal keyboard entry"
-                value={stdinInput}
-                onChange={event => setStdinInput(event.target.value)}
-                placeholder="Keyboard entry (stdin buffer)…"
-                className="flex-1 min-w-0 bg-transparent px-2 py-1 font-mono text-xs text-slate-100 placeholder-slate-600 outline-none"
+              {/* Source Editor Body */}
+              <SourceEditor
+                code={code}
+                onChange={handleCodeChange}
+                language={language}
+                activeLine={activeLine}
+                onActiveLine={setActiveLine}
+                breakpoints={breakpoints}
+                onToggleBreakpoint={toggleBreakpoint}
               />
-              <button
-                type="submit"
-                className="inline-flex items-center gap-1 rounded-md bg-[#13161c] border border-[#1a1d24] px-2.5 py-1 text-xs font-medium text-slate-300 hover:bg-[#1b2028] hover:text-white transition cursor-pointer"
-              >
-                <CornerDownLeft className="h-3 w-3" />
-                <span>Queue</span>
-              </button>
-            </form>
-          </section>
+            </section>
+          </ResizablePanel>
 
-          {/* =============================================================== */}
-          {/* PERSISTENT ERROR DIAGNOSTICS BANNER (Between Terminal & Tabs)    */}
-          {/* =============================================================== */}
-          {combinedError && (
-            <div className="shrink-0 rounded-xl border border-[#F43F5E]/30 bg-rose-500/10 p-3 text-xs flex items-start gap-2.5 shadow-xs font-sans">
-              <span className="h-2 w-2 rounded-full bg-[#F43F5E] shrink-0 mt-1" />
-              <div className="flex-1 min-w-0 font-sans">
-                <span className="font-bold uppercase tracking-wider text-[10.5px] text-[#F43F5E] block mb-1 font-sans">
-                  DIAGNOSTICS / EXECUTION ERROR
-                </span>
-                <div className="font-mono text-[11.5px] leading-relaxed break-words whitespace-pre-wrap text-rose-900 dark:text-rose-200 font-normal">
-                  {formatDiagnostic(combinedError)}
-                </div>
-              </div>
-            </div>
-          )}
+          <ResizableHandle withHandle className="bg-transparent hover:bg-slate-300/60 dark:hover:bg-slate-700/60 transition-colors" />
 
-          {/* =============================================================== */}
-          {/* QUADRANT 3 (Bottom Right): State Inspector Tabs                 */}
-          {/* =============================================================== */}
-          <section className="flex-1 min-h-0 flex flex-col rounded-xl border border-slate-200/90 bg-white/90 dark:border-white/[0.08] dark:bg-[#08080A] overflow-hidden shadow-xs">
-            <Tabs
-              value={activeTab}
-              onValueChange={setActiveTab}
-              className="h-full flex flex-col min-h-0"
-            >
-              {/* Tab Header with Full-Width Inspector Tabs */}
-              <div className="w-full px-2 py-1.5 border-b border-slate-200/90 dark:border-white/[0.08] bg-slate-50/80 dark:bg-[#08080A] shrink-0">
+          {/* ================================================================= */}
+          {/* Right Panel (Nested Vertical Group): Terminal Top + Inspectors Bottom */}
+          {/* ================================================================= */}
+          <ResizablePanel defaultSize={50} minSize={30} className="flex h-full min-h-0 flex-col overflow-hidden">
+            <ResizablePanelGroup direction="vertical" className="h-full w-full gap-2.5">
+              {/* =============================================================== */}
+              {/* QUADRANT 2 (Top Right): Terminal Window                         */}
+              {/* =============================================================== */}
+              <ResizablePanel defaultSize={45} minSize={20} className="flex h-full min-h-0 flex-col overflow-hidden">
+                <section className="flex flex-col h-full min-h-0 rounded-xl border border-slate-200 bg-white dark:border-[#1a1d24] dark:bg-[#0d0f12] overflow-hidden shadow-xs">
+                  {/* macOS Title Bar Header */}
+                  <div className="flex items-center justify-between px-3 py-2 border-b border-slate-200 dark:border-[#1a1d24] bg-slate-50 dark:bg-[#0d0f12] shrink-0">
+                    <div className="flex items-center gap-1.5">
+                      <MacWindowDots />
+                      <Terminal className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400 ms-0.5" />
+                      <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 tracking-wider font-mono">
+                        terminal.out
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {stdinQueue && (
+                        <span className="rounded-md bg-violet-950/60 border border-violet-800/40 px-2 py-0.5 text-[10px] font-mono text-violet-300">
+                          stdin queued
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (currentStep) currentStep.stdout = "";
+                          setStdinQueue("");
+                        }}
+                        title="Clear terminal"
+                        className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-0.5 cursor-pointer"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Terminal surface: VRAM grid for MASM, plain console text otherwise */}
+                  {engineBusy ? (
+                    <div className="flex-1 min-h-0 p-3 font-mono text-xs bg-[#050608] text-violet-400 italic flex items-start gap-2">
+                      <span className="h-2 w-2 mt-1 rounded-full bg-violet-500 animate-ping" />
+                      {language === "c" || language === "cpp"
+                        ? "[Compiling & Linking...]"
+                        : "Executing program..."}
+                    </div>
+                  ) : combinedError && !currentStep?.stdout && !currentStep?.video ? (
+                    <div className="flex-1 min-h-0 p-3 bg-[#050608] text-[#F43F5E] italic font-sans text-xs">
+                      Execution stopped. Check diagnostics below.
+                    </div>
+                  ) : (
+                    <TerminalSurface
+                      scrollRef={terminalScrollRef}
+                      stdout={currentStep?.stdout}
+                      video={isMasm ? (currentStep?.video ?? null) : null}
+                      awaitingInput={awaitingInput}
+                      active={!combinedError}
+                      emptyLabel="Output console ready. Click 'Run' to execute."
+                    />
+                  )}
+
+                  {/* Interactive Keyboard Input Bar */}
+                  <form
+                    onSubmit={event => {
+                      event.preventDefault();
+                      const entry = stdinInput.trim();
+                      if (entry) {
+                        submitStdin(`${entry}\n`);
+                        setStdinInput("");
+                        if (!awaitingInput) toast.success(`Queued stdin: "${entry}"`);
+                      }
+                    }}
+                    className={`flex shrink-0 items-center gap-1.5 border-t p-1.5 ${
+                      awaitingInput
+                        ? "border-violet-500 bg-violet-500/10 ring-1 ring-inset ring-violet-500/60 animate-pulse"
+                        : "border-slate-200 bg-slate-50 dark:border-[#1a1d24] dark:bg-[#090a0d]"
+                    }`}
+                  >
+                    <span className="font-mono text-xs font-bold text-violet-500 dark:text-violet-400 ps-2">
+                      &gt;
+                    </span>
+                    <input
+                      aria-label="Terminal keyboard entry"
+                      value={stdinInput}
+                      onChange={event => setStdinInput(event.target.value)}
+                      autoFocus={awaitingInput}
+                      placeholder={
+                        awaitingInput
+                          ? "Waiting for input — type a key…"
+                          : "Keyboard entry (stdin buffer)…"
+                      }
+                      onKeyDown={event => {
+                        // Blocked program: a bare keystroke is delivered immediately.
+                        if (
+                          awaitingInput &&
+                          !stdinInput &&
+                          event.key.length === 1 &&
+                          !event.ctrlKey &&
+                          !event.metaKey
+                        ) {
+                          event.preventDefault();
+                          submitStdin(event.key);
+                        }
+                      }}
+                      className="min-w-0 flex-1 bg-transparent px-2 py-1 font-mono text-xs text-slate-800 placeholder:text-slate-400 outline-none dark:text-slate-100 dark:placeholder:text-slate-600"
+                    />
+                    <button
+                      type="submit"
+                      className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 transition hover:bg-slate-100 dark:border-[#1a1d24] dark:bg-[#13161c] dark:text-slate-300 dark:hover:bg-[#1b2028] dark:hover:text-white"
+                    >
+                      <CornerDownLeft className="h-3 w-3" />
+                      <span>Queue</span>
+                    </button>
+                  </form>
+
+                  {/* PERSISTENT ERROR DIAGNOSTICS BANNER */}
+                  {combinedError && (
+                    <div className="shrink-0 border-t border-[#F43F5E]/30 bg-rose-500/10 p-2.5 text-xs flex items-start gap-2.5 shadow-xs font-sans">
+                      <span className="h-2 w-2 rounded-full bg-[#F43F5E] shrink-0 mt-1" />
+                      <div className="flex-1 min-w-0 font-sans">
+                        <span className="font-bold uppercase tracking-wider text-[10.5px] text-[#F43F5E] block mb-0.5 font-sans">
+                          DIAGNOSTICS / EXECUTION ERROR
+                        </span>
+                        <div className="font-mono text-[11.5px] leading-relaxed break-words whitespace-pre-wrap text-rose-900 dark:text-rose-200 font-normal">
+                          {formatDiagnostic(combinedError)}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </section>
+              </ResizablePanel>
+
+              <ResizableHandle withHandle className="bg-transparent hover:bg-slate-300/60 dark:hover:bg-slate-700/60 transition-colors" />
+
+              {/* =============================================================== */}
+              {/* QUADRANT 3 (Bottom Right): State Inspector Tabs                 */}
+              {/* =============================================================== */}
+              <ResizablePanel defaultSize={55} minSize={35} className="flex h-full min-h-0 flex-col overflow-hidden">
+                <section className="flex flex-col h-full min-h-0 rounded-xl border border-slate-200 bg-white dark:border-[#1a1d24] dark:bg-[#0d0f12] overflow-hidden shadow-xs">
+                  {/* macOS Title Bar Header */}
+                  <div className="flex items-center justify-between px-3 py-2 border-b border-slate-200 dark:border-[#1a1d24] bg-slate-50 dark:bg-[#0d0f12] shrink-0">
+                    <div className="flex items-center gap-1.5">
+                      <MacWindowDots />
+                      <Cpu className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400 ms-0.5" />
+                      <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 tracking-wider font-mono">
+                        inspector.exe
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2 font-mono text-[11px] text-slate-400 dark:text-slate-500">
+                      <span className="text-[10.5px] uppercase tracking-wider">
+                        {isMasm ? "8086 CPU" : LANGUAGE_DEFINITIONS[language].label}
+                      </span>
+                    </div>
+                  </div>
+
+                  <Tabs
+                    value={activeTab}
+                    onValueChange={setActiveTab}
+                    className="h-full flex flex-col min-h-0"
+                  >
+                    {/* Tab Header with Full-Width Inspector Tabs */}
+                    <div className="w-full px-2 py-1.5 border-b border-slate-200 dark:border-[#1a1d24] bg-slate-50/60 dark:bg-[#090a0d] shrink-0">
                 <SegmentedControl
-                  options={[
-                    {
-                      label: isMasm ? "Registers & Flags" : "Variables View",
-                      value: "state",
-                      icon: <Cpu className="h-4 w-4" />,
-                    },
-                    {
-                      label: "Execution Trace",
-                      value: "trace",
-                      icon: <ListOrdered className="h-4 w-4" />,
-                    },
-                    {
-                      label: "Stack",
-                      value: "stack",
-                      icon: <Layers className="h-4 w-4" />,
-                    },
-                    {
-                      label: "Main Memory",
-                      value: "memory",
-                      icon: <Database className="h-4 w-4" />,
-                    },
-                  ]}
+                  options={inspectorTabs}
                   value={activeTab}
                   onChange={setActiveTab}
                   size="md"
@@ -1660,6 +1746,39 @@ export function AssemblerStudio() {
                 </div>
               </TabsContent>
 
+              <TabsContent
+                value="telemetry"
+                className="flex-1 min-h-0 overflow-y-auto p-3 m-0 outline-hidden"
+              >
+                <div className="rounded-lg border border-slate-200 dark:border-[#1a1d24] divide-y divide-slate-200 dark:divide-[#1a1d24] font-mono text-xs">
+                  {[
+                    ["Exit Status", !result ? "—" : combinedError ? "Error" : "Code 0 (OK)"],
+                    ["Execution Time", runTimeMs === null ? "—" : `~${runTimeMs} ms`],
+                    ["Steps Executed", String(totalSteps)],
+                    ["Active Variables", String(Object.keys(currentStep?.variables ?? {}).length)],
+                  ].map(([k, v]) => (
+                    <div key={k} className="flex items-center justify-between px-3 py-2">
+                      <span className="text-slate-500 dark:text-slate-400">{k}</span>
+                      <span className="font-semibold text-slate-800 dark:text-slate-200">{v}</span>
+                    </div>
+                  ))}
+                </div>
+              </TabsContent>
+
+              <TabsContent
+                value="reference"
+                className="flex-1 min-h-0 overflow-y-auto p-3 m-0 outline-hidden"
+              >
+                <div className="rounded-lg border border-slate-200 dark:border-[#1a1d24] divide-y divide-slate-200 dark:divide-[#1a1d24] font-mono text-xs">
+                  {(QUICK_REFERENCE[language] ?? []).map(([k, v]) => (
+                    <div key={k} className="grid grid-cols-[9rem_1fr] gap-2 px-3 py-1.5">
+                      <code className="font-semibold text-slate-800 dark:text-slate-200">{k}</code>
+                      <span className="text-slate-500 dark:text-slate-400">{v}</span>
+                    </div>
+                  ))}
+                </div>
+              </TabsContent>
+
               {/* ----------------------------------------------------------- */}
               {/* TAB 4: Main Memory (Searchable RAM Grid)                    */}
               {/* ----------------------------------------------------------- */}
@@ -1722,8 +1841,11 @@ export function AssemblerStudio() {
               </TabsContent>
             </Tabs>
           </section>
-        </div>
-      </div>
+        </ResizablePanel>
+      </ResizablePanelGroup>
+    </ResizablePanel>
+  </ResizablePanelGroup>
+</div>
     </div>
   );
 }

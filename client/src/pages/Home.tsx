@@ -77,7 +77,7 @@ export default function Home() {
                 </Link>
 
                 <Link
-                  href="/courses"
+                  href="/library"
                   className="btn-brand-subtle px-5 sm:px-7 md:px-8 py-2.5 sm:py-3.5 text-xs sm:text-sm md:text-base font-semibold shadow-xs hover:shadow-sm shrink-0 gap-2"
                 >
                   {home.ctaSecondary}

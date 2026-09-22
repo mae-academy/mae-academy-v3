@@ -149,9 +149,10 @@ interface Props {
   onToggleCollapsed: () => void;
   onSend: (text: string) => void;
   onClear: () => void;
+  className?: string;
 }
 
-export function SerialConsole({ serial, baud, collapsed, onToggleCollapsed, onSend, onClear }: Props) {
+export function SerialConsole({ serial, baud, collapsed, onToggleCollapsed, onSend, onClear, className }: Props) {
   const [input, setInput] = useState("");
   const [autoscroll, setAutoscroll] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -170,7 +171,7 @@ export function SerialConsole({ serial, baud, collapsed, onToggleCollapsed, onSe
   };
 
   return (
-    <section className={`flex min-h-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs dark:border-[#1a1d24] dark:bg-[#0d0f12] ${collapsed ? "shrink-0" : "h-[42%] shrink-0"}`}>
+    <section className={`flex h-full w-full min-h-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs dark:border-[#1a1d24] dark:bg-[#0d0f12] ${className ?? ""}`}>
       <div className="flex shrink-0 items-center justify-between border-b border-slate-200 bg-slate-50 px-3 py-2 dark:border-[#1a1d24] dark:bg-[#0d0f12]">
         <button type="button" onClick={onToggleCollapsed} aria-expanded={!collapsed} className="flex cursor-pointer items-center gap-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300">
           <div className="me-1 flex items-center gap-1.5">

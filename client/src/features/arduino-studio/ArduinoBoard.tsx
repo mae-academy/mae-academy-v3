@@ -2,7 +2,7 @@
  * Interactive Arduino UNO canvas. The board SVG is inlined into the DOM; a same-viewBox overlay layer renders
  * pin glow and LED state, and a pixel-space layer draws flat-vector peripherals wired directly to the headers.
  */
-import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useLayoutEffect, useRef, useState } from "react";
 import unoRaw from "./arduinoUno.svg?raw";
 import { ANALOG_HEADER_Y, DIGITAL_HEADER_Y, HEADER_PINS, LEDS, VIEW_H, VIEW_W, analogPinX, digitalPinX, pinName } from "./arduinoBoardGeometry";
 import type { PinUsage } from "./arduinoCompiler";
@@ -17,21 +17,38 @@ export function prepareUnoSvg(raw: string): string {
 }
 const UNO_SVG = prepareUnoSvg(unoRaw);
 
-const RATIO = VIEW_W / VIEW_H;
+const CANVAS_W = 800;
+const CANVAS_H = 600;
 
-/** Peripheral footprints (px, before fit-scaling). Components are drawn inside these local frames. */
+/** Board scaling and coordinates within the 800x600 canvas */
+const S_BOARD = 1.75;
+const BOARD_W = VIEW_W * S_BOARD; // 499.1
+const BOARD_H = VIEW_H * S_BOARD; // 365.75
+const BOARD_X = 142;
+const BOARD_Y = 120;
+
+/** Peripheral footprints (px). Components are drawn inside these local frames. */
 const OUT_C = { w: 150, h: 86, ledX: 12, ledY: 4, resX: 44, resY: 64, resS: 0.8 };
 const IN_C = { w: 132, h: 72, btnX: 8, btnY: 8, btnS: 46 / BTN_W };
 const AN_C = { w: 270, h: 88, potX: 196, potY: 12, potS: 0.72 };
-const GAP_TOP = 40;
-const GAP_BOTTOM = 44;
+const GAP_TOP = 24;
+const GAP_BOTTOM = 18;
 const MOD_SPACING = 14;
-const CABLE_MARGIN = 120;
 const WIRE = { signalIn: "#06B6D4", signalOut: "#7C3AED", vcc: "#DC2626", series: "#F59E0B" } as const;
 const TOP_GND = { x: 125.75, y: 19.05 };
 const V5 = { x: 167.25, y: 190.05 };
 const BOTTOM_GND = { x: 176.25, y: 190.05 };
+/** Port faces on the Uno SVG (viewBox units): USB-B jack and DC barrel jack both open toward the left edge. */
 const USB_JACK = { left: 10.2, cy: 64, h: 40.6 };
+const DC_JACK = { left: 26.2, cy: 171.35, h: 31.9 };
+const USB_COLOR = "#1976D2";
+const CABLE_W = 10; // heavy-gauge cable stroke (canvas units, scaled with the board)
+const CABLE_TRANSITION = "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease";
+const USB_INSERT = 14;
+const USB_RETRACT = 22;
+const DC_INSERT = 12;
+const DC_RETRACT = 28;
+const CABLE_EXTENT = 600; // cables run this far past the canvas edge so they always reach the pane boundary
 
 function useFlash(count: number, ms = 110): boolean {
   const [on, setOn] = useState(false);
@@ -58,7 +75,15 @@ function useElementSize<T extends HTMLElement>(): [React.RefObject<T | null>, { 
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const ro = new ResizeObserver(([entry]) => setSize({ w: entry.contentRect.width, h: entry.contentRect.height }));
+    const rect = el.getBoundingClientRect();
+    if (rect.width > 0 && rect.height > 0) {
+      setSize({ w: rect.width, h: rect.height });
+    }
+    const ro = new ResizeObserver(([entry]) => {
+      if (entry) {
+        setSize({ w: entry.contentRect.width, h: entry.contentRect.height });
+      }
+    });
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
@@ -88,6 +113,14 @@ function Wire({ from, to, color, label, ground = false }: { from: Pt; to: Pt; co
   );
 }
 
+export const LED_COLOR_OPTIONS = [
+  { label: "Red", color: "#EF4444" },
+  { label: "Green", color: "#22C55E" },
+  { label: "Blue", color: "#3B82F6" },
+  { label: "Yellow", color: "#EAB308" },
+  { label: "White", color: "#F8FAFC" },
+] as const;
+
 interface Props {
   snapshot: HardwareSnapshot;
   onDigitalInput: (pin: number, level: 0 | 1) => void;
@@ -96,6 +129,8 @@ interface Props {
   layout?: PinUsage;
   /** External LED colours keyed by digital pin (default red). */
   ledColors?: Record<number, string>;
+  /** Callback when user changes an LED's color via the popover. */
+  onLedColorChange?: (pin: number, color: string) => void;
 }
 
 const EMPTY_LAYOUT: PinUsage = { digitalInputs: [], pullups: [], analogInputs: [], outputs: [] };
@@ -103,8 +138,26 @@ const uniqSorted = (xs: number[]): number[] => Array.from(new Set(xs)).sort((a, 
 
 type TopModule = { kind: "in" | "out"; pin: number };
 
-export function ArduinoBoard({ snapshot, onDigitalInput, onAnalogInput, layout = EMPTY_LAYOUT, ledColors = {} }: Props) {
+export function ArduinoBoard({ snapshot, onDigitalInput, onAnalogInput, layout = EMPTY_LAYOUT, ledColors = {}, onLedColorChange }: Props) {
   const [boxRef, box] = useElementSize<HTMLDivElement>();
+  const [internalLedColors, setInternalLedColors] = useState<Record<number, string>>({});
+  const [openPickerPin, setOpenPickerPin] = useState<number | null>(null);
+
+  const activeLedColors = { ...ledColors, ...internalLedColors };
+
+  useEffect(() => {
+    if (openPickerPin === null) return;
+    const handleClickOutside = () => setOpenPickerPin(null);
+    window.addEventListener("click", handleClickOutside);
+    return () => window.removeEventListener("click", handleClickOutside);
+  }, [openPickerPin]);
+
+  const handleSelectColor = (pin: number, color: string) => {
+    setInternalLedColors(prev => ({ ...prev, [pin]: color }));
+    onLedColorChange?.(pin, color);
+    setOpenPickerPin(null);
+  };
+
   const tx = useFlash(snapshot.txCount);
   const rx = useFlash(snapshot.rxCount);
 
@@ -117,29 +170,28 @@ export function ArduinoBoard({ snapshot, onDigitalInput, onAnalogInput, layout =
   const analogInputs = uniqSorted([...layout.analogInputs, ...snapshot.analogInputs]);
   const topModules: TopModule[] = [...digitalInputs.map((pin): TopModule => ({ kind: "in", pin })), ...outputs.map((pin): TopModule => ({ kind: "out", pin }))].sort((a, b) => digitalPinX(a.pin) - digitalPinX(b.pin));
 
-  const topPad = topModules.length > 0 ? GAP_TOP + OUT_C.h + 14 : 16;
-  const bottomPad = analogInputs.length > 0 ? GAP_BOTTOM + AN_C.h + 16 : 16;
-
-  const width = useMemo(() => {
-    if (!box.w || !box.h) return 640;
-    const byHeight = (box.h - topPad - bottomPad) * RATIO;
-    return Math.max(340, Math.min(box.w - CABLE_MARGIN - 24, byHeight, 980));
-  }, [box.w, box.h, topPad, bottomPad]);
-
-  const s = width / VIEW_W;
-  const boardH = width / RATIO;
+  const s = S_BOARD;
+  const boardH = BOARD_H;
   const P = (x: number, y: number): Pt => ({ x: x * s, y: y * s });
 
   const pin13 = snapshot.pins[13];
   const lBrightness = pin13.mode === "OUTPUT" ? (pin13.pwm !== null ? pin13.pwm / 255 : pin13.level) : 0;
   const ledLevel: Record<string, number> = { L: lBrightness, TX: tx ? 1 : 0, RX: rx ? 1 : 0, ON: 1 };
-  const usbConnected = snapshot.status !== "idle";
+  
+  // 3-State Cable Logic:
+  // State 1 (Stopped/Idle): USB connected (1.0), DC unplugged (0.35)
+  // State 2 (Running): USB unplugged (0.35), DC connected (1.0)
+  // State 3 (Paused): USB connected (1.0), DC connected (1.0)
+  const isRunning = snapshot.status === "running";
+  const isPaused = snapshot.status === "paused";
+  const usbPlugged = !isRunning || isPaused;
+  const dcPlugged = isRunning || isPaused;
 
-  // Peripheral rows may extend past the board but never past the pane; oversized rows are scaled down to fit.
-  const boardLeft = Math.max(0, (box.w - (width + CABLE_MARGIN)) / 2) + CABLE_MARGIN;
-  const minX = box.w ? -(boardLeft - 10) : 0;
-  const maxX = box.w ? box.w - boardLeft - 10 : width;
-  const fitScale = (total: number): number => (total > 0 ? Math.min(1, (maxX - minX) / total) : 1);
+  // Peripheral rows are bounded within the canvas (with 12px margin from canvas edges)
+  const minX = -(BOARD_X - 12);
+  const maxX = CANVAS_W - BOARD_X - 12;
+  const maxRowWidth = maxX - minX;
+  const fitScale = (total: number): number => (total > maxRowWidth ? maxRowWidth / total : 1);
   const placeRow = (total: number, anchorX: number): number => Math.max(minX, Math.min(maxX - total, anchorX - total / 2));
   const modW = (m: TopModule): number => (m.kind === "in" ? IN_C.w : OUT_C.w);
   const modH = (m: TopModule): number => (m.kind === "in" ? IN_C.h : OUT_C.h);
@@ -159,12 +211,13 @@ export function ArduinoBoard({ snapshot, onDigitalInput, onAnalogInput, layout =
   const aStep = (AN_C.w + MOD_SPACING) * kA;
   const aY = boardH + GAP_BOTTOM;
 
-  // USB-B cable: flush plug on the jack's left face, then a straight horizontal run off the left edge.
-  const jack = P(USB_JACK.left, USB_JACK.cy);
-  const plugH = USB_JACK.h * s * 0.5;
-  const plugLen = 26;
-  const bootLen = 12;
-  const cableEnd = -(boardLeft + 80);
+  // Cables: each plug sits flush on its jack face, then runs horizontally to (and past) the canvas left edge.
+  const cableEnd = -BOARD_X - CABLE_EXTENT;
+  const usb = P(USB_JACK.left, USB_JACK.cy);
+  const usbPlugH = USB_JACK.h * s * 0.5;
+  const dc = P(DC_JACK.left, DC_JACK.cy);
+  const dcPlugH = DC_JACK.h * s * 0.46;
+  const bootLen = 16;
 
   // Wires are collected per layer: ground returns at the bottom, then power/series, then signals.
   const gnd: React.ReactNode[] = [];
@@ -186,17 +239,81 @@ export function ArduinoBoard({ snapshot, onDigitalInput, onAnalogInput, layout =
       const cathode = at(OUT_C.ledX + 24, OUT_C.ledY + 52);
       const resL = at(OUT_C.resX, OUT_C.resY + 12 * OUT_C.resS);
       const resR = at(OUT_C.resX + RES_W * OUT_C.resS, OUT_C.resY + 12 * OUT_C.resS);
+      const currentColor = activeLedColors[m.pin] ?? "#EF4444";
       signal.push(<Wire key={`o${m.pin}s`} label={`D${m.pin}-signal`} from={pinPt} to={anode} color={WIRE.signalOut} />);
       mid.push(<Wire key={`o${m.pin}m`} label={`D${m.pin}-series`} from={cathode} to={resL} color={WIRE.series} />);
       gnd.push(<Wire key={`o${m.pin}g`} label={`D${m.pin}-gnd`} from={resR} to={gndPt} ground />);
       art.push(
-        <g key={`oa${m.pin}`} data-module={`O${m.pin}`} data-lit={lit ? "1" : "0"} transform={xf}>
-          <VectorLed x={OUT_C.ledX} y={OUT_C.ledY} width={LED_W} height={LED_H} state={brightness} color={ledColors[m.pin] ?? "#EF4444"} />
+        <g key={`oa${m.pin}`} data-module={`O${m.pin}`} data-lit={lit ? "1" : "0"} transform={xf} className="cursor-pointer">
+          <VectorLed x={OUT_C.ledX} y={OUT_C.ledY} width={LED_W} height={LED_H} state={brightness} color={currentColor} />
           <VectorResistor x={OUT_C.resX} y={OUT_C.resY} width={RES_W * OUT_C.resS} height={RES_H * OUT_C.resS} value={220} />
           <text x={OUT_C.resX + (RES_W * OUT_C.resS) / 2} y={OUT_C.resY - 3} textAnchor="middle" fontSize={8} fontFamily="ui-monospace, monospace" className="fill-slate-500 dark:fill-slate-400">220Ω</text>
           <text x={62} y={16} fontSize={9} fontWeight={700} className="fill-slate-700 dark:fill-slate-200">Digital Output</text>
           <text x={62} y={28} fontSize={8.5} fontFamily="ui-monospace, monospace" className="fill-slate-500 dark:fill-slate-400">{pinName(m.pin)}{lit ? " · HIGH" : " · LOW"}</text>
         </g>,
+      );
+      overlays.push(
+        <div key={`led-overlay-${m.pin}`}>
+          {/* Interactive Trigger Button overlay over the LED */}
+          <button
+            type="button"
+            data-testid={`led-trigger-${m.pin}`}
+            aria-label={`Customize LED color for ${pinName(m.pin)}`}
+            title={`${pinName(m.pin)} LED — click to select color`}
+            onClick={(e) => {
+              e.stopPropagation();
+              setOpenPickerPin(prev => prev === m.pin ? null : m.pin);
+            }}
+            className="absolute cursor-pointer rounded-full group focus:outline-none"
+            style={{
+              left: at(OUT_C.ledX + 2, 0).x,
+              top: at(0, OUT_C.ledY + 2).y,
+              width: 32 * m.k,
+              height: 32 * m.k,
+            }}
+          >
+            <span className="absolute inset-0 rounded-full border-2 border-transparent group-hover:border-violet-400/80 group-hover:shadow-[0_0_8px_rgba(167,139,250,0.6)] group-focus:border-violet-500 transition-all pointer-events-none" />
+          </button>
+
+          {/* Floating Color Palette Popover */}
+          {openPickerPin === m.pin && (
+            <div
+              data-testid={`led-color-picker-${m.pin}`}
+              role="dialog"
+              aria-label={`Color palette for ${pinName(m.pin)} LED`}
+              className="absolute z-50 flex items-center gap-1.5 rounded-xl border border-slate-700/80 bg-slate-900/95 p-1.5 shadow-xl backdrop-blur-md animate-in fade-in zoom-in-95 duration-100"
+              style={{
+                left: at(OUT_C.ledX + 18, 0).x,
+                top: at(0, OUT_C.ledY).y - 38 * m.k,
+                transform: "translateX(-50%)",
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {LED_COLOR_OPTIONS.map((opt) => {
+                const isActive = currentColor.toLowerCase() === opt.color.toLowerCase();
+                return (
+                  <button
+                    key={opt.color}
+                    type="button"
+                    title={`${opt.label} (${opt.color})`}
+                    aria-label={`Select ${opt.label} color`}
+                    data-color={opt.color}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleSelectColor(m.pin, opt.color);
+                    }}
+                    className={`h-5 w-5 rounded-full border border-white/20 cursor-pointer transition-all hover:scale-125 active:scale-95 focus:outline-none ${
+                      isActive
+                        ? "ring-2 ring-white scale-110 shadow-md"
+                        : "opacity-80 hover:opacity-100 hover:ring-1 hover:ring-white/60"
+                    }`}
+                    style={{ backgroundColor: opt.color }}
+                  />
+                );
+              })}
+            </div>
+          )}
+        </div>,
       );
     } else {
       const pullup = layout.pullups.includes(m.pin) || snapshot.pins[m.pin].mode === "INPUT_PULLUP";
@@ -269,10 +386,33 @@ export function ArduinoBoard({ snapshot, onDigitalInput, onAnalogInput, layout =
     );
   });
 
+  const scale = box.w > 0 && box.h > 0
+    ? Math.min(box.w / CANVAS_W, box.h / CANVAS_H) * 0.95
+    : 1;
+
   return (
-    <div ref={boxRef} className="relative flex h-full w-full items-center justify-center overflow-auto">
-      <div className="relative shrink-0" style={{ width, marginTop: topPad, marginBottom: bottomPad, marginLeft: CABLE_MARGIN }}>
-        <div className="relative w-full" style={{ aspectRatio: `${VIEW_W} / ${VIEW_H}` }}>
+    <div
+      ref={boxRef}
+      className="relative flex h-full w-full items-center justify-center overflow-hidden select-none"
+    >
+      <div
+        className="relative shrink-0"
+        style={{
+          width: CANVAS_W,
+          height: CANVAS_H,
+          transform: `scale(${scale})`,
+          transformOrigin: "center center",
+        }}
+      >
+        <div
+          className="absolute"
+          style={{
+            left: BOARD_X,
+            top: BOARD_Y,
+            width: BOARD_W,
+            height: BOARD_H,
+          }}
+        >
           <StaticBoardSvg />
 
           <svg viewBox={`0 0 ${VIEW_W} ${VIEW_H}`} className="absolute inset-0 h-full w-full overflow-visible" aria-hidden={false}>
@@ -329,14 +469,45 @@ export function ArduinoBoard({ snapshot, onDigitalInput, onAnalogInput, layout =
           </svg>
 
           {/* Pixel-space layer: flat-vector USB cable, peripherals and wires. */}
-          <svg className="pointer-events-none absolute left-0 top-0 overflow-visible" width={width} height={boardH} viewBox={`0 0 ${width} ${boardH}`} aria-hidden data-layer="wiring">
-            {usbConnected && (
-              <g data-usb="connected">
-                <line x1={cableEnd} y1={jack.y} x2={jack.x - plugLen - bootLen} y2={jack.y} stroke="#2563EB" strokeWidth={9} />
-                <rect data-usb-boot x={jack.x - plugLen - bootLen} y={jack.y - plugH / 2 - 3} width={bootLen} height={plugH + 6} rx={2} fill="#1E3A8A" />
-                <rect data-usb-plug x={jack.x - plugLen} y={jack.y - plugH / 2} width={plugLen} height={plugH} fill="#CBD5E1" />
+          <svg className="pointer-events-none absolute left-0 top-0 overflow-visible" width={BOARD_W} height={BOARD_H} viewBox={`0 0 ${BOARD_W} ${BOARD_H}`} aria-hidden data-layer="wiring">
+            <defs>
+              {/* Anything right of a jack's outer face is hidden, so inserted metal tips vanish inside the housing. */}
+              <clipPath id="arduino-usb-clip">
+                <rect x={cableEnd - 20} y={usb.y - 200} width={usb.x - cableEnd + 20} height={400} />
+              </clipPath>
+              <clipPath id="arduino-dc-clip">
+                <rect x={cableEnd - 20} y={dc.y - 200} width={dc.x - cableEnd + 20} height={400} />
+              </clipPath>
+            </defs>
+
+            {/* USB-B serial cable: plugged while stopped/paused (tip inside the jack, boot flush), pulled back and dimmed while running. */}
+            <g clipPath="url(#arduino-usb-clip)">
+              <g
+                data-usb={usbPlugged ? "plugged" : "retracted"}
+                style={{ transform: `translateX(${usbPlugged ? USB_INSERT : -USB_RETRACT}px)`, opacity: usbPlugged ? 1.0 : 0.35, transition: CABLE_TRANSITION }}
+              >
+                <line x1={cableEnd - USB_INSERT} y1={usb.y} x2={usb.x - 42} y2={usb.y} stroke={USB_COLOR} strokeWidth={CABLE_W} strokeLinecap="round" strokeLinejoin="round" />
+                <rect data-usb-boot x={usb.x - 44} y={usb.y - usbPlugH / 2 - 4} width={30} height={usbPlugH + 8} rx={5} fill="#263238" stroke="#0F172A" strokeWidth={1} strokeLinejoin="round" />
+                <rect x={usb.x - 40} y={usb.y - usbPlugH / 2 - 1} width={22} height={3} rx={1.5} fill="#455A64" />
+                <rect data-usb-plug x={usb.x - 14} y={usb.y - usbPlugH * 0.4} width={14} height={usbPlugH * 0.8} rx={1.5} fill="#CBD5E1" stroke="#94A3B8" strokeWidth={1} strokeLinejoin="round" />
+                <rect x={usb.x - 10} y={usb.y - usbPlugH * 0.22} width={3} height={usbPlugH * 0.44} rx={1} fill="#64748B" />
               </g>
-            )}
+            </g>
+
+            {/* DC barrel-jack power cable: withdrawn and faint while stopped, sleeve flush against the jack with ring and tip inside when running/paused. */}
+            <g clipPath="url(#arduino-dc-clip)">
+              <g
+                data-dc={dcPlugged ? "plugged" : "unplugged"}
+                style={{ transform: `translateX(${dcPlugged ? DC_INSERT : -DC_RETRACT}px)`, opacity: dcPlugged ? 1.0 : 0.35, transition: CABLE_TRANSITION }}
+              >
+                <line x1={cableEnd - DC_INSERT} y1={dc.y} x2={dc.x - 54} y2={dc.y} stroke="#1E293B" strokeWidth={CABLE_W} strokeLinecap="round" strokeLinejoin="round" />
+                <rect x={dc.x - 58} y={dc.y - CABLE_W / 2 - 3} width={16} height={CABLE_W + 6} rx={4} fill="#0F172A" />
+                <rect data-dc-plug x={dc.x - 44} y={dc.y - dcPlugH / 2} width={32} height={dcPlugH} rx={dcPlugH * 0.3} fill="#0B1220" />
+                <rect x={dc.x - 40} y={dc.y - dcPlugH / 2 + 2} width={24} height={3} rx={1.5} fill="#334155" />
+                <rect x={dc.x - 12} y={dc.y - dcPlugH / 2 - 1.5} width={4} height={dcPlugH + 3} rx={1.5} fill="#CBD5E1" />
+                <rect data-dc-tip x={dc.x - 8} y={dc.y - dcPlugH * 0.2} width={8} height={dcPlugH * 0.4} rx={1} fill="#94A3B8" />
+              </g>
+            </g>
             {gnd}
             {mid}
             {art}

@@ -11,7 +11,7 @@ export type PlatformRoute = {
 };
 
 export const platformRoutes: PlatformRoute[] = [
-  { href: "/", index: "00" }, { href: "/research", index: "01" }, { href: "/courses", index: "02" }, { href: "/simulations", index: "03" }, { href: "/about", index: "04" },
+  { href: "/", index: "00" }, { href: "/research", index: "01" }, { href: "/library", index: "02" }, { href: "/simulations", index: "03" }, { href: "/about", index: "04" },
 ];
 
 export type HomeGatewayMeta = {
@@ -24,7 +24,7 @@ export type HomeGatewayMeta = {
 
 export const homeGatewayMeta: HomeGatewayMeta[] = [
   { href: "/research", index: "01", type: "research", visualVariant: 0, accent: "from-indigo-600 via-purple-600 to-violet-600" },
-  { href: "/courses", index: "02", type: "courses", visualVariant: 4, accent: "from-indigo-600 via-violet-600 to-purple-600" },
+  { href: "/library", index: "02", type: "courses", visualVariant: 4, accent: "from-indigo-600 via-violet-600 to-purple-600" },
   { href: "/simulations", index: "03", type: "simulations", visualVariant: 5, accent: "from-indigo-600 via-cyan-500 to-violet-600" },
 ];
 

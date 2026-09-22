@@ -97,11 +97,11 @@ export default function MainLayout({ children }: MainLayoutProps) {
                 <span className="font-medium">{copy.footer.research}</span>
               </Link>
               <Link
-                href="/courses"
+                href="/library"
                 className="group inline-flex items-center gap-2.5 text-slate-600 transition-colors hover:text-violet-600 dark:text-slate-400 dark:hover:text-violet-300"
               >
                 <BookOpen className="h-4 w-4 text-slate-400 transition-colors group-hover:text-violet-600 dark:text-slate-500 dark:group-hover:text-violet-300" />
-                <span className="font-medium">{copy.footer.courses}</span>
+                <span className="font-medium">{copy.footer.library || copy.footer.courses}</span>
               </Link>
               <Link
                 href="/simulations"

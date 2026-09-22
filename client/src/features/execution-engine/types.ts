@@ -1,3 +1,5 @@
+import type { VideoState } from "@/features/emulator/videoMemory";
+
 /** Unified trace contract every language adapter (Python, C/C++, MASM) must emit. */
 
 export type SupportedLanguage = "python" | "cpp" | "c" | "masm8086";
@@ -22,6 +24,8 @@ export interface TraceStep {
   /** Optional instruction text executed at this step (e.g. MASM disasm or source line). */
   instruction?: string;
   stdout?: string;
+  /** MASM only: 80x25 text-mode VRAM snapshot after this step (rows shared between steps). */
+  video?: VideoState;
 }
 
 export interface ExecutionResult {
@@ -29,6 +33,8 @@ export interface ExecutionResult {
   error?: string;
   steps: TraceStep[];
   totalSteps: number;
+  /** MASM only: execution is paused on a blocking keyboard INT with an empty stdin queue. */
+  awaitingInput?: boolean;
 }
 
 export interface ExecutionOptions {

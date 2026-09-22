@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
-import { useCallback, useEffect, useRef, type KeyboardEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
+import { registerUnifiedMonacoThemes } from '@/lib/monacoTheme';
 import { PANEL, WindowBar } from '../chrome';
 import type { Network } from '../../domain/ast';
 import type { HardwareProfile } from '../../domain/hardware';
@@ -73,6 +74,19 @@ export function PlcEditorView({ editor, profile, symbols, simulation = null, rig
   const { state, actions, selection } = editor;
   const simulating = simulation !== null;
   const draggedFromPalette = useRef(false);
+
+  const [isDark, setIsDark] = useState<boolean>(() =>
+    typeof document !== 'undefined' ? document.documentElement.classList.contains('dark') : true,
+  );
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const observer = new MutationObserver(() => {
+      setIsDark(document.documentElement.classList.contains('dark'));
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
 
   const onActivate = useCallback(
     (item: PaletteItemId) => {
@@ -157,6 +171,8 @@ export function PlcEditorView({ editor, profile, symbols, simulation = null, rig
                 notice={state.notice}
                 onChange={actions.editStl}
                 onDiscard={actions.discardStl}
+                theme={isDark ? 'mae-dark' : 'mae-light'}
+                beforeMount={registerUnifiedMonacoThemes}
                 trailing={
                   <SegmentedControl<EditorView>
                     aria-label="Program view"

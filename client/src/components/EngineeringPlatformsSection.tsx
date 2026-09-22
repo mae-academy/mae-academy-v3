@@ -2,7 +2,7 @@
  * MAE Academy - Core Engineering Platforms Section
  * Vertical feature showcase (Z-pattern / alternating 50-50 columns) with:
  * 1. Practical Simulations: Image slot + Active module links (Control, Circuits, Power, Assembly)
- * 2. Academic Courses: Inverted order (Content + Curricula links + Image slot)
+ * 2. Academic Library: Inverted order (Content + Reference links + Image slot)
  * 3. Academic Research: Image slot + Mathematical modeling content
  */
 import { Link } from "wouter";
@@ -133,7 +133,7 @@ export default function EngineeringPlatformsSection() {
           </motion.div>
 
           {/* ============================================================ */}
-          {/* FEATURE ROW 2: Academic Courses (Content Left 5 / Visual Right 7) */}
+          {/* FEATURE ROW 2: Academic Library (Content Left 5 / Visual Right 7) */}
           {/* ============================================================ */}
           <motion.div
             variants={itemVariants}
@@ -143,29 +143,29 @@ export default function EngineeringPlatformsSection() {
             <div className="lg:col-span-5 flex flex-col justify-center space-y-6 order-2 lg:order-1">
               <div>
                 <h3 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">
-                  Rigorous Engineering Courses
+                  Open Textbooks & Engineering Manuals
                 </h3>
 
                 <p className="mt-3 text-base text-slate-600 dark:text-zinc-400 leading-relaxed">
-                  Concept-first lecture series and structured study tracks covering foundational and advanced engineering topics with mathematical rigor and intuitive visual breakdowns.
+                  Open textbooks, technical manuals, and foundational references in engineering, computing, mathematics, and physics, readable in the browser straight from open archives.
                 </p>
               </div>
 
               {/* Clean Navigational Links (Text-First, No Icons) */}
               <div className="space-y-1">
                 {[
-                  "Classical Control Theory",
-                  "Modern State Space",
-                  "Signal Processing & Filter Design",
-                  "Embedded Systems",
-                ].map((track) => (
+                  "Electrical & Electronics",
+                  "Computer Science",
+                  "Robotics & Control",
+                  "Mechanical & Structural",
+                ].map((category) => (
                   <Link
-                    key={track}
-                    href="/courses"
+                    key={category}
+                    href="/library"
                     className="group flex items-center justify-between px-3.5 py-3.5 -mx-3.5 rounded-lg hover:bg-slate-50 dark:hover:bg-white/[0.04] transition-colors"
                   >
                     <span className="text-base md:text-lg font-medium text-slate-800 transition-colors group-hover:text-violet-600 dark:text-zinc-300 dark:group-hover:text-white">
-                      {track}
+                      {category}
                     </span>
                     <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-violet-600 group-hover:translate-x-1 transition-all dark:text-zinc-500 dark:group-hover:text-white" />
                   </Link>
@@ -175,10 +175,10 @@ export default function EngineeringPlatformsSection() {
               {/* CTA 2: Unified diagonal brand gradient */}
               <div className="pt-2">
                 <Link
-                  href="/courses"
+                  href="/library"
                   className="btn-brand-primary px-7 py-3.5 text-base font-semibold gap-2"
                 >
-                  Browse Course Catalog
+                  Explore Academic Library
                   <ArrowRight className="h-4 w-4" />
                 </Link>
               </div>

@@ -36,7 +36,9 @@ describe("useExecutionEngine Integration for C/C++", () => {
     expect(result.current.result?.success).toBe(true);
     expect(result.current.result?.error).toBeUndefined();
     expect(result.current.result?.steps.length).toBe(1);
-    expect(result.current.result?.steps[0].stdout).toBe("Hello C++ 20\n");
+    expect(result.current.result?.steps.at(-1)?.stdout).toBe(
+      "Hello C++ 20\n[Process exited with code 0]"
+    );
 
     spy.mockRestore();
   });

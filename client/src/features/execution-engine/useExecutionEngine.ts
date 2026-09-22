@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import * as masmEngine from "@/features/execution-engine/masmEngine";
-import { executeRemoteC, executeRemoteCpp } from "@/features/execution-engine/remoteCppEngine";
+import { toTraceSteps } from "@/features/code-studio/services/cppTrace";
+import { runRemoteCached } from "@/features/code-studio/executionCache";
 import type {
   ExecutionRequest,
   ExecutionResponse,
@@ -126,10 +127,9 @@ export function useExecutionEngine(): UseExecutionEngineReturn {
       }
 
       if (language === "cpp" || language === "c") {
-        const executor = language === "cpp" ? executeRemoteCpp : executeRemoteC;
         const stdin = options?.stdin ?? "";
 
-        return executor(code, stdin)
+        return runRemoteCached(language, code, stdin)
           .then(remoteOutcome => {
             if (!mountedRef.current || id !== latestIdRef.current) return;
             setIsRunning(false);
@@ -143,15 +143,19 @@ export function useExecutionEngine(): UseExecutionEngineReturn {
               ? (remoteOutcome.stdout ? `${remoteOutcome.stdout}\n${remoteOutcome.stderr}` : remoteOutcome.stderr)
               : remoteOutcome.stdout;
 
-            const steps: TraceStep[] = [
-              {
-                stepIndex: 0,
-                line: 1,
-                callStack: ["main"],
-                variables: {},
-                stdout: terminalOutput,
-              },
-            ];
+            // Successful builds are replayed as a per-statement trace of main(); failures keep
+            // the single frame so the compiler diagnostics show immediately.
+            const steps: TraceStep[] = isSuccess
+              ? toTraceSteps(code, remoteOutcome)
+              : [
+                  {
+                    stepIndex: 0,
+                    line: 1,
+                    callStack: ["main"],
+                    variables: {},
+                    stdout: terminalOutput,
+                  },
+                ];
 
             setResult({
               success: isSuccess,

@@ -1,7 +1,13 @@
 import { ExternalLink, FileX } from "lucide-react";
 
 /** Shown whenever the in-page PDF preview cannot be produced. Deliberately links to the publisher, never the raw PDF. */
-export default function PdfPreviewFallback({ landingPageUrl }: { landingPageUrl: string }) {
+interface PdfPreviewFallbackProps {
+  landingPageUrl: string;
+  /** Wording for the outbound link and message; defaults to the research-paper flow. */
+  landingLabel?: string;
+}
+
+export default function PdfPreviewFallback({ landingPageUrl, landingLabel = "Publisher Page" }: PdfPreviewFallbackProps) {
   return (
     <div
       role="status"
@@ -13,7 +19,7 @@ export default function PdfPreviewFallback({ landingPageUrl }: { landingPageUrl:
       <div>
         <h3 className="mb-1 text-lg font-bold text-slate-800 dark:text-zinc-200">Preview Not Available</h3>
         <p className="mx-auto max-w-sm text-sm text-slate-500 dark:text-zinc-400">
-          We could not load an in-page preview of this document. Please use the publisher's page to read it.
+          We could not load an in-page preview of this document. Please use the {landingLabel === "Publisher Page" ? "publisher's page" : landingLabel} to read it.
         </p>
       </div>
       {landingPageUrl && (
@@ -23,7 +29,7 @@ export default function PdfPreviewFallback({ landingPageUrl }: { landingPageUrl:
           rel="noopener noreferrer"
           className="inline-flex items-center gap-2 rounded-full bg-violet-600 px-6 py-2 text-sm font-semibold text-white transition-colors hover:bg-violet-700"
         >
-          Publisher Page <ExternalLink className="h-4 w-4" />
+          {landingLabel} <ExternalLink className="h-4 w-4" />
         </a>
       )}
     </div>

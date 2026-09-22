@@ -90,13 +90,18 @@ function parseInteger(raw: string): number | null {
   if (charMatch) {
     return charMatch[1].charCodeAt(0);
   }
-  const lowered = source.toLowerCase();
+  const isNeg = source.startsWith("-");
+  const isPos = source.startsWith("+");
+  const unsigned = isNeg || isPos ? source.slice(1).trim() : source;
+  const lowered = unsigned.toLowerCase();
   const normalized = lowered.replace(/^0x/, "").replace(/h$/, "");
   if (!/^[0-9a-f]+$/i.test(normalized)) return null;
-  return Number.parseInt(
+  const val = Number.parseInt(
     normalized,
     lowered.endsWith("h") || lowered.startsWith("0x") ? 16 : 10
   );
+  if (Number.isNaN(val)) return null;
+  return isNeg ? -val : val;
 }
 
 function bracketSymbol(raw: string) {
@@ -126,18 +131,23 @@ function resolve(raw: string, symbols: Map<string, number>): number | null {
   return literal ?? symbols.get(lowered) ?? null;
 }
 
-function parseDup(operand: string): { count: number; inner: string } | null {
-  const match = operand.trim().match(/^(\d+)\s+dup\s*\(([\s\S]*)\)$/i);
+function parseDup(operand: string, symbols?: Map<string, number>): { count: number; inner: string } | null {
+  const match = operand.trim().match(/^([a-z_][\w$]*|\d+)\s+dup\s*\(([\s\S]*)\)$/i);
   if (!match) return null;
-  return { count: Number.parseInt(match[1], 10), inner: match[2].trim() };
+  let count = Number.parseInt(match[1], 10);
+  if (Number.isNaN(count) && symbols) {
+    count = symbols.get(key(match[1])) ?? NaN;
+  }
+  if (Number.isNaN(count)) return null;
+  return { count, inner: match[2].trim() };
 }
 
-function dataSize(operands: string[], width: DataWidth): number {
+function dataSize(operands: string[], width: DataWidth, symbols?: Map<string, number>): number {
   return operands.reduce((size, operand) => {
-    const dup = parseDup(operand);
+    const dup = parseDup(operand, symbols);
     if (dup) {
       const innerOps = splitOperands(dup.inner);
-      return size + dup.count * dataSize(innerOps, width);
+      return size + dup.count * dataSize(innerOps, width, symbols);
     }
     const quoted = operand.match(/^'(.*)'$/);
     return size + (quoted ? Array.from(quoted[1]).length * width : width);
@@ -153,7 +163,7 @@ function encodeData(
 ): number[] {
   const bytes: number[] = [];
   for (const operand of operands) {
-    const dup = parseDup(operand);
+    const dup = parseDup(operand, symbols);
     if (dup) {
       const innerOps = splitOperands(dup.inner);
       const chunk = encodeData(innerOps, width, symbols, statement, diagnostics);
@@ -198,6 +208,12 @@ export interface MemorySpec {
   explicitWidth?: DataWidth;
 }
 
+/**
+ * Names declared with EQU in the source being compiled. A bare EQU name is an immediate,
+ * never a memory operand. Reset by parseSource(); assembly is synchronous so this is safe.
+ */
+let constantNames = new Set<string>();
+
 export function parseMemoryOperand(
   raw?: string,
   symbols?: Map<string, number>
@@ -219,12 +235,18 @@ export function parseMemoryOperand(
     inside = arrayForm[2].trim() ? `${arrayForm[1]} + ${arrayForm[2]}` : arrayForm[1];
   } else if (
     inside === null &&
-    symbols &&
-    symbols.has(key(text)) &&
     !isReg16(text) &&
-    !isReg8(text)
+    !isReg8(text) &&
+    parseInteger(text) === null &&
+    !/^offset\s+/i.test(text)
   ) {
-    inside = text;
+    // If it's a bare identifier without brackets: check if it's an arithmetic expression first
+    const isArithmeticExpr = /^[a-z_][\w$]*\s*[-+]\s*[a-z0-9_$]+/i.test(text);
+    if (!isArithmeticExpr && !constantNames.has(key(text))) {
+      if (symbols ? symbols.has(key(text)) : true) {
+        inside = text;
+      }
+    }
   }
 
   if (inside === null) return null;
@@ -317,7 +339,7 @@ function instructionSize(mnemonic: string, operands: string[]): number | null {
   const destination = operands[0];
   const source = operands[1];
 
-  if (["nop", "hlt", "ret", "pushf", "popf", "cld", "std"].includes(op)) return 1;
+  if (["nop", "hlt", "ret", "pushf", "popf", "cld", "std", "stc", "clc", "cmc", "cbw", "cwd"].includes(op)) return 1;
   if (STRING_OPS.includes(op as (typeof STRING_OPS)[number])) return 1;
   if (STRING_PREFIXES.includes(op as (typeof STRING_PREFIXES)[number])) {
     return operands.length > 0 ? 2 : 1;
@@ -434,11 +456,10 @@ function instructionSize(mnemonic: string, operands: string[]): number | null {
     const s8 = isReg8(source);
 
     if ((d16 && s16) || (d8 && s8)) return 2;
-    if (op !== "xchg" && d16 && !s16 && !isMemory(source)) return 4;
-    if (op !== "xchg" && d8 && !s8 && !isMemory(source)) return 3;
-
     const memDest = parseMemoryOperand(destination);
     const memSrc = parseMemoryOperand(source);
+    if (op !== "xchg" && d16 && !s16 && !memSrc) return 4;
+    if (op !== "xchg" && d8 && !s8 && !memSrc) return 3;
 
     if ((d16 && memSrc) || (memDest && s16) || (d8 && memSrc) || (memDest && s8)) {
       const mem = memDest ?? memSrc;
@@ -477,6 +498,11 @@ function encodeInstruction(
   if (mnemonic === "popf") return [0x9d];
   if (mnemonic === "cld") return [0xfc];
   if (mnemonic === "std") return [0xfd];
+  if (mnemonic === "stc") return [0xf9];
+  if (mnemonic === "clc") return [0xf8];
+  if (mnemonic === "cmc") return [0xf5];
+  if (mnemonic === "cbw") return [0x98];
+  if (mnemonic === "cwd") return [0x99];
 
   if (STRING_OPS.includes(mnemonic as (typeof STRING_OPS)[number])) {
     return [{
@@ -625,8 +651,8 @@ function encodeInstruction(
     const s16 = registerIndex16(source);
     const d8 = registerIndex8(destination);
     const s8 = registerIndex8(source);
-    const segmentDest = SEGMENT[destination];
-    const segmentSrc = SEGMENT[source];
+    const segmentDest = SEGMENT[key(destination ?? "")];
+    const segmentSrc = SEGMENT[key(source ?? "")];
     const memDest = parseMemoryOperand(operands[0] ?? "", symbols);
     const memSrc = parseMemoryOperand(operands[1] ?? "", symbols);
 
@@ -722,6 +748,7 @@ function parseSource(source: string, diagnostics: AssemblerDiagnostic[]) {
   const lines = source.replace(/\r/g, "").split("\n");
   const statements: Statement[] = [];
   const symbols = new Map<string, number>();
+  constantNames = new Set<string>();
   let origin = COM_ORIGIN;
   let lc = origin;
   let emitted = false;
@@ -747,6 +774,22 @@ function parseSource(source: string, diagnostics: AssemblerDiagnostic[]) {
         ...sourceLines.filter((record) => record.section === "data"),
       ]
     : sourceLines;
+
+  // Pre-scan constant numeric EQU directives (independent of location counter $)
+  for (const record of sourceLines) {
+    const rest = stripComment(record.text);
+    const equMatch = rest.match(/^([a-z_][\w$]*)\s+equ\s+(.+)$/i);
+    if (equMatch) {
+      constantNames.add(key(equMatch[1]));
+      const equValStr = equMatch[2].trim();
+      if (!equValStr.includes("$")) {
+        const val = resolve(equValStr, symbols);
+        if (val !== null) {
+          symbols.set(key(equMatch[1]), val);
+        }
+      }
+    }
+  }
 
   const define = (name: string, line: number, text: string) => {
     const symbol = key(name);
@@ -817,6 +860,29 @@ function parseSource(source: string, diagnostics: AssemblerDiagnostic[]) {
       continue;
     }
 
+    const equMatch = rest.match(/^([a-z_][\w$]*)\s+equ\s+(.+)$/i);
+    if (equMatch) {
+      const equName = equMatch[1];
+      const equValStr = equMatch[2].trim();
+      let val: number | null = null;
+      if (equValStr.startsWith("$")) {
+        const diff = equValStr.match(/^\$\s*-\s*([a-z_][\w$]*)$/i);
+        if (diff) {
+          const baseSym = symbols.get(key(diff[1]));
+          if (baseSym !== undefined) val = lc - baseSym;
+        }
+      } else {
+        val = resolve(equValStr, symbols);
+      }
+      if (val !== null) {
+        symbols.set(key(equName), val);
+      } else {
+        diagnostics.push({ line, message: `Unable to evaluate EQU expression: ${equValStr}`, source: text });
+      }
+      statements.push({ line, text, kind: "ignore", operands: [] });
+      continue;
+    }
+
     const namedData = rest.match(/^([a-z_][\w$]*)\s+(db|dw)\s+(.+)$/i);
     if (namedData) {
       define(namedData[1], line, text);
@@ -824,7 +890,7 @@ function parseSource(source: string, diagnostics: AssemblerDiagnostic[]) {
       const operands = splitOperands(namedData[3]);
       emit(
         { line, text, kind: "data", label: key(namedData[1]), width, operands },
-        dataSize(operands, width)
+        dataSize(operands, width, symbols)
       );
       continue;
     }
@@ -833,7 +899,7 @@ function parseSource(source: string, diagnostics: AssemblerDiagnostic[]) {
     if (bareData) {
       const width: DataWidth = key(bareData[1]) === "db" ? 1 : 2;
       const operands = splitOperands(bareData[2]);
-      emit({ line, text, kind: "data", width, operands }, dataSize(operands, width));
+      emit({ line, text, kind: "data", width, operands }, dataSize(operands, width, symbols));
       continue;
     }
 

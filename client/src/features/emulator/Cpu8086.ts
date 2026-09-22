@@ -5,6 +5,7 @@
  * program the assembler accepts, this can execute, entirely in-process and synchronously.
  */
 import type { AssembledProgram } from "./types";
+import { VideoMemory } from "./videoMemory";
 
 const REG16 = ["ax", "cx", "dx", "bx", "sp", "bp", "si", "di"] as const;
 type Reg16Name = (typeof REG16)[number];
@@ -96,6 +97,9 @@ export class Cpu8086 {
   callStack: string[] = ["_start"];
 
   private readonly stdin: number[] = [];
+  /** True while a blocking keyboard INT has no input; cleared by queueInput(). */
+  waitingForInput = false;
+  readonly video = new VideoMemory();
 
   constructor(
     private readonly program: AssembledProgram,
@@ -108,6 +112,7 @@ export class Cpu8086 {
   queueInput(text: string): void {
     for (const character of text)
       this.stdin.push(character.charCodeAt(0) & 0xff);
+    if (this.stdin.length) this.waitingForInput = false;
   }
 
   readMemory(address: number, length: number): Uint8Array {
@@ -122,6 +127,7 @@ export class Cpu8086 {
   /** Executes exactly one instruction. Returns null once halted or if IP leaves the mapped program. */
   step(): StepResult | null {
     if (this.halted) return null;
+    if (this.waitingForInput) return null;
     if (!this.program.executableOffsets.has(this.ip)) {
       this.halted = true;
       this.error = "Execution entered an unmapped data region";
@@ -133,6 +139,11 @@ export class Cpu8086 {
       : "";
     const startIp = this.ip;
     this.execute();
+    if (this.waitingForInput) {
+      // Blocked on input: rewind to the INT so it re-executes on resume; not a completed step.
+      this.ip = startIp;
+      return null;
+    }
     if (this.program.haltOffsets.has(startIp)) this.halted = true;
     return { line, instruction };
   }
@@ -485,28 +496,132 @@ export class Cpu8086 {
     )?.[0];
   }
 
+  private hasLineTerminator(): boolean {
+    return this.stdin.some(key => key === 0x0d || key === 0x0a);
+  }
+
+  /** Echo/print a byte through the VRAM teletype (DOS output uses the cell's existing attribute). */
+  private print(char: string, attr?: number): void {
+    this.video.teletype(char, attr);
+    this.events.onOutput?.(char);
+  }
+
+  /**
+   * Blocking keyboard services. Returns false (leaving all registers untouched) when the
+   * request cannot be satisfied yet; step() then rewinds IP so the INT re-executes on resume.
+   */
+  private handleKeyboard(interrupt: number, ah: number, dl: number): boolean {
+    const isBiosRead = interrupt === 0x16 && (ah === 0x00 || ah === 0x10);
+    const isDosRead =
+      interrupt === 0x21 &&
+      (ah === 0x01 ||
+        ah === 0x07 ||
+        ah === 0x08 ||
+        // AH=06h DL=FFh is a non-blocking poll on real DOS; blocked here so tight poll loops
+        // wait for input instead of burning the step budget.
+        (ah === 0x06 && dl === 0xff));
+    if (isBiosRead || isDosRead) {
+      const key = this.stdin.shift();
+      if (key === undefined) {
+        this.waitingForInput = true;
+        return false;
+      }
+      this.reg.ax = (this.reg.ax & 0xff00) | key;
+      if (interrupt === 0x21 && ah === 0x06) this.flags.zf = false;
+      if (interrupt === 0x21 && ah === 0x01) this.print(String.fromCharCode(key));
+      return true;
+    }
+    if (interrupt === 0x21 && ah === 0x0a) {
+      if (!this.hasLineTerminator()) {
+        this.waitingForInput = true;
+        return false;
+      }
+      // DS:DX -> [max length][actual length][characters...CR]
+      const base = word(this.reg.dx);
+      const max = Math.max(1, this.readByte(base));
+      let length = 0;
+      for (;;) {
+        const key = this.stdin.shift();
+        if (key === undefined || key === 0x0d || key === 0x0a) break;
+        if (length < max - 1) {
+          this.writeByte(word(base + 2 + length), key);
+          length++;
+          this.print(String.fromCharCode(key));
+        }
+      }
+      this.writeByte(word(base + 1), length);
+      this.writeByte(word(base + 2 + length), 0x0d);
+      return true;
+    }
+    return true;
+  }
+
   private handleInterrupt(interrupt: number): void {
     const ah = (this.reg.ax >> 8) & 0xff;
     const al = this.reg.ax & 0xff;
+    const bl = this.reg.bx & 0xff;
+    const bh = (this.reg.bx >> 8) & 0xff;
+    const ch = (this.reg.cx >> 8) & 0xff;
+    const cl = this.reg.cx & 0xff;
+    const dh = (this.reg.dx >> 8) & 0xff;
     const dl = this.reg.dx & 0xff;
-    if (interrupt === 0x10 && ah === 0x0e) {
-      this.events.onOutput?.(String.fromCharCode(al));
-    } else if (interrupt === 0x21 && ah === 0x02) {
-      this.events.onOutput?.(String.fromCharCode(dl));
-    } else if (interrupt === 0x21 && (ah === 0x01 || ah === 0x08)) {
-      const key = this.stdin.shift() ?? 0;
-      this.reg.ax = (this.reg.ax & 0xff00) | key;
-      if (ah === 0x01 && key) this.events.onOutput?.(String.fromCharCode(key));
-    } else if (interrupt === 0x21 && ah === 0x09) {
-      const characters: string[] = [];
-      for (let index = 0; index < MAX_ASCIIZ_SCAN; index++) {
-        const byte = this.readByte(word(this.reg.dx + index));
-        if (byte === 0x24) break;
-        characters.push(String.fromCharCode(byte));
+    const count = this.reg.cx;
+    const video = this.video;
+
+    if (interrupt === 0x10) {
+      if (ah === 0x00) {
+        // INT 10h AH=00h: Set Video Mode (clears to 07h and homes the cursor)
+        video.reset(al & 0x7f);
+      } else if (ah === 0x02) {
+        // INT 10h AH=02h: Set Cursor Position (DH = Row, DL = Column)
+        video.setCursor(dh, dl);
+      } else if (ah === 0x03) {
+        // INT 10h AH=03h: Get Cursor Position (DH = Row, DL = Column, CX = scan lines)
+        this.reg.dx = ((video.cursorRow & 0xff) << 8) | (video.cursorCol & 0xff);
+        this.reg.cx = 0x0607;
+      } else if (ah === 0x06 || ah === 0x07) {
+        // INT 10h AH=06h/07h: Scroll window up/down; AL = lines (0 = clear), BH = blank attribute
+        video.scrollWindow(al, bh, ch, cl, dh, dl, ah === 0x06 ? "up" : "down");
+      } else if (ah === 0x09) {
+        // INT 10h AH=09h: Write char + attribute (BL) CX times at cursor, cursor does not move
+        const repeat = Math.max(1, count);
+        for (let index = 0; index < repeat; index++) {
+          const col = video.cursorCol + index;
+          if (col >= 80) break;
+          video.putCell(video.cursorRow, col, String.fromCharCode(al), bl);
+        }
+        this.events.onOutput?.(String.fromCharCode(al).repeat(repeat));
+      } else if (ah === 0x0c) {
+        // INT 10h AH=0Ch: Write graphics pixel (AL = color, CX = X, DX = Y), mode 13h
+        video.plotPixel(this.reg.cx, this.reg.dx, al);
+      } else if (ah === 0x0d) {
+        // INT 10h AH=0Dh: Read graphics pixel (CX = X, DX = Y) -> AL
+        this.reg.ax = (this.reg.ax & 0xff00) | video.readPixel(this.reg.cx, this.reg.dx);
+      } else if (ah === 0x0e) {
+        // INT 10h AH=0Eh: Teletype. A non-zero BL low nibble sets the foreground over the
+        // cell's existing background; BL = 0 keeps the cell's current attribute.
+        const cellAttr = video.cellAt(video.cursorRow, video.cursorCol).attr;
+        const attr = bl & 0x0f ? (cellAttr & 0xf0) | (bl & 0x0f) : cellAttr;
+        this.print(String.fromCharCode(al), attr);
       }
-      this.events.onOutput?.(characters.join(""));
-    } else if (interrupt === 0x21 && ah === 0x4c) {
-      this.halted = true;
+    } else if (interrupt === 0x16 || interrupt === 0x21) {
+      if (!this.handleKeyboard(interrupt, ah, dl)) return;
+      if (interrupt === 0x21 && ah === 0x02) {
+        this.print(String.fromCharCode(dl));
+      } else if (interrupt === 0x21 && ah === 0x06 && dl !== 0xff) {
+        this.print(String.fromCharCode(dl));
+      } else if (interrupt === 0x21 && ah === 0x09) {
+        const characters: string[] = [];
+        for (let index = 0; index < MAX_ASCIIZ_SCAN; index++) {
+          const byte = this.readByte(word(this.reg.dx + index));
+          if (byte === 0x24) break;
+          characters.push(String.fromCharCode(byte));
+        }
+        for (const character of characters) video.teletype(character);
+        this.events.onOutput?.(characters.join(""));
+      } else if (interrupt === 0x21 && ah === 0x4c) {
+        this.halted = true;
+      }
     }
   }
 
@@ -549,6 +664,29 @@ export class Cpu8086 {
     }
     if (opcode === 0xfd) {
       this.flags.df = true;
+      return;
+    }
+    if (opcode === 0xf8) {
+      this.flags.cf = false;
+      return;
+    }
+    if (opcode === 0xf9) {
+      this.flags.cf = true;
+      return;
+    }
+    if (opcode === 0xf5) {
+      this.flags.cf = !this.flags.cf;
+      return;
+    }
+    if (opcode === 0x98) {
+      // CBW: Convert Byte to Word (sign-extend AL into AX)
+      const al = this.reg.ax & 0xff;
+      this.reg.ax = al < 0x80 ? al : (0xff00 | al);
+      return;
+    }
+    if (opcode === 0x99) {
+      // CWD: Convert Word to Doubleword (sign-extend AX into DX:AX)
+      this.reg.dx = (this.reg.ax & 0x8000) ? 0xffff : 0x0000;
       return;
     }
 

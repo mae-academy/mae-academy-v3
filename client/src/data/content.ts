@@ -23,7 +23,7 @@ export type LocaleContent = {
     station: string;
   };
   languageNames: Record<Locale, string>;
-  footer: { description: string; research: string; courses: string; simulations: string };
+  footer: { description: string; research: string; courses: string; library?: string; simulations: string };
   home: {
     headlinePrimary: string;
     headlineSecondary: string;
@@ -100,17 +100,17 @@ const blueprintPaths = {
 };
 
 const en: LocaleContent = {
-  navigation: { "00": "Home", "01": "Academic Research", "02": "Academic Courses", "03": "Practical Simulations", "04": "About" },
+  navigation: { "00": "Home", "01": "Academic Research", "02": "Academic Library", "03": "Practical Simulations", "04": "About" },
   controls: { home: "MAE Academy home", language: "Language", languageOptions: "Language options", themeToLight: "Switch to light theme", themeToDark: "Switch to dark theme", platformNavigation: "Platform navigation", navigationItem: "Navigation item", previousSlide: "Previous navigation item", nextSlide: "Next navigation item", explore: "Explore", station: "Station" },
   languageNames: { en: "English", ar: "Arabic", es: "Spanish" },
-  footer: { description: "A global platform for rigorous engineering learning and applied systems thinking.", research: "Research", courses: "Courses", simulations: "Simulations" },
+  footer: { description: "A global platform for rigorous engineering learning and applied systems thinking.", research: "Research", courses: "Courses", library: "Library", simulations: "Simulations" },
   home: {
-    headlinePrimary: "Welcome to MAE Academy", headlineSecondary: "Model-Analyze-Engineering", description: "Interactive labs for control systems, power electronics, and signal analysis — build intuition by running the model, not just reading about it.", ctaPrimary: "Launch a Simulation", ctaSecondary: "Browse Courses",
+    headlinePrimary: "Welcome to MAE Academy", headlineSecondary: "Model-Analyze-Engineering", description: "Interactive labs for control systems, power electronics, and signal analysis — build intuition by running the model, not just reading about it.", ctaPrimary: "Launch a Simulation", ctaSecondary: "Explore Library",
     stats: [{ value: "12+", label: "Interactive Simulations" }, { value: "40+", label: "Course Modules" }, { value: "100%", label: "Client-Side Engine" }],
     fieldTitle: "Choose a station. Follow the signal.",
     gateways: [
       { title: "Academic Research", description: "Trace a question through evidence maps, systems logic, and emerging engineering directions.", action: "Enter Research Field" },
-      { title: "Academic Courses", description: "Structured, rigorous curricula in control systems, electronics, and embedded systems.", action: "Open Course Paths" },
+      { title: "Academic Library", description: "Open textbooks, technical manuals, and foundational references across engineering disciplines.", action: "Open Academic Library" },
       { title: "Practical Simulations", description: "Tune a PID loop, probe a circuit, or drive a pneumatic system — and read the response live.", action: "Launch Simulation" },
     ],
     platformsTitle: "Core Engineering Platforms",
@@ -177,17 +177,17 @@ const en: LocaleContent = {
 };
 
 const ar: LocaleContent = {
-  navigation: { "00": "الرئيسية", "01": "البحث الأكاديمي", "02": "الدورات الأكاديمية", "03": "المحاكاة العملية", "04": "عن الأكاديمية" },
+  navigation: { "00": "الرئيسية", "01": "البحث الأكاديمي", "02": "المكتبة الأكاديمية", "03": "المحاكاة العملية", "04": "عن الأكاديمية" },
   controls: { home: "الصفحة الرئيسية لأكاديمية MAE", language: "اللغة", languageOptions: "خيارات اللغة", themeToLight: "التحويل إلى الوضع الفاتح", themeToDark: "التحويل إلى الوضع الداكن", platformNavigation: "تنقل المنصة", navigationItem: "عنصر التنقل", previousSlide: "عنصر التنقل السابق", nextSlide: "عنصر التنقل التالي", explore: "استكشف", station: "محطة" },
   languageNames: { en: "الإنجليزية", ar: "العربية", es: "الإسبانية" },
-  footer: { description: "نمذجة. تحليل. هندسة. منصة عالمية لتعلّم الهندسة بعمق والتفكير في الأنظمة التطبيقية.", research: "البحث", courses: "الدورات", simulations: "المحاكاة" },
+  footer: { description: "نمذجة. تحليل. هندسة. منصة عالمية لتعلّم الهندسة بعمق والتفكير في الأنظمة التطبيقية.", research: "البحث", courses: "الدورات", library: "المكتبة", simulations: "المحاكاة" },
   home: {
-    headlinePrimary: "أهلاً بك في أكاديمية MAE", headlineSecondary: "هندسة تُحاكى في الزمن الحقيقي.", description: "معامل تفاعلية لأنظمة التحكم، الإلكترونيات القدرية، وتحليل الإشارات — ابنِ فهمك بتشغيل النموذج، لا بقراءته فقط.", ctaPrimary: "ابدأ محاكاة", ctaSecondary: "تصفح المقررات",
+    headlinePrimary: "أهلاً بك في أكاديمية MAE", headlineSecondary: "هندسة تُحاكى في الزمن الحقيقي.", description: "معامل تفاعلية لأنظمة التحكم، الإلكترونيات القدرية، وتحليل الإشارات — ابنِ فهمك بتشغيل النموذج، لا بقراءته فقط.", ctaPrimary: "ابدأ محاكاة", ctaSecondary: "تصفح المكتبة",
     stats: [{ value: "12+", label: "محاكاة تفاعلية" }, { value: "40+", label: "وحدة دراسية" }, { value: "100%", label: "محرك يعمل بالكامل على المتصفح" }],
     fieldTitle: "اختر محطتك. اتبع الإشارة.",
     gateways: [
       { title: "البحث الأكاديمي", description: "تتبّع سؤالاً عبر خرائط الأدلة، والمنطق الهندسي للأنظمة، والاتجاهات الهندسية الناشئة.", action: "ادخل مجال البحث" },
-      { title: "المقررات الأكاديمية", description: "مناهج هندسية منظمة ودقيقة في أنظمة التحكم والإلكترونيات والأنظمة المدمجة.", action: "افتح المسارات الدراسية" },
+      { title: "المكتبة الأكاديمية", description: "كتب ومراجع هندسية مفتوحة ومناهج تقنية عبر مختلف تخصصات الهندسة والعلوم.", action: "افتح المكتبة الأكاديمية" },
       { title: "المحاكاة التطبيقية", description: "اضبط حلقة PID، افحص دارة كهربائية، أو شغّل نظاماً هوائياً — واقرأ الاستجابة لحظياً.", action: "ابدأ المحاكاة" },
     ],
     platformsTitle: "منصات الهندسة الأساسية",
@@ -254,17 +254,17 @@ const ar: LocaleContent = {
 };
 
 const es: LocaleContent = {
-  navigation: { "00": "Inicio", "01": "Investigación académica", "02": "Cursos académicos", "03": "Simulaciones prácticas", "04": "Acerca de" },
+  navigation: { "00": "Inicio", "01": "Investigación académica", "02": "Biblioteca académica", "03": "Simulaciones prácticas", "04": "Acerca de" },
   controls: { home: "Inicio de MAE Academy", language: "Idioma", languageOptions: "Opciones de idioma", themeToLight: "Cambiar al tema claro", themeToDark: "Cambiar al tema oscuro", platformNavigation: "Navegación de la plataforma", navigationItem: "Elemento de navegación", previousSlide: "Elemento anterior de navegación", nextSlide: "Elemento siguiente de navegación", explore: "Explorar", station: "Estación" },
   languageNames: { en: "Inglés", ar: "Árabe", es: "Español" },
-  footer: { description: "Modelar. Analizar. Ingeniería. Una plataforma global para el aprendizaje riguroso de ingeniería y el pensamiento aplicado de sistemas.", research: "Investigación", courses: "Cursos", simulations: "Simulaciones" },
+  footer: { description: "Modelar. Analizar. Ingeniería. Una plataforma global para el aprendizaje riguroso de ingeniería y el pensamiento aplicado de sistemas.", research: "Investigación", courses: "Cursos", library: "Biblioteca", simulations: "Simulaciones" },
   home: {
-    headlinePrimary: "Bienvenido a MAE Academy", headlineSecondary: "Ingeniería, simulada en tiempo real.", description: "Laboratorios interactivos de sistemas de control, electrónica de potencia y análisis de señales — construye intuición ejecutando el modelo, no solo leyendo sobre él.", ctaPrimary: "Iniciar una Simulación", ctaSecondary: "Explorar Cursos",
+    headlinePrimary: "Bienvenido a MAE Academy", headlineSecondary: "Ingeniería, simulada en tiempo real.", description: "Laboratorios interactivos de sistemas de control, electrónica de potencia y análisis de señales — construye intuición ejecutando el modelo, no solo leyendo sobre él.", ctaPrimary: "Iniciar una Simulación", ctaSecondary: "Explorar Biblioteca",
     stats: [{ value: "12+", label: "Simulaciones Interactivas" }, { value: "40+", label: "Módulos de Curso" }, { value: "100%", label: "Motor 100% en el Cliente" }],
     fieldTitle: "Elige una estación. Sigue la señal.",
     gateways: [
       { title: "Investigación Académica", description: "Recorre una pregunta a través de mapas de evidencia, lógica de sistemas y direcciones de ingeniería emergentes.", action: "Entrar a Investigación" },
-      { title: "Cursos Académicos", description: "Currículos rigurosos y estructurados en sistemas de control, electrónica y sistemas embebidos.", action: "Ver Rutas de Curso" },
+      { title: "Biblioteca Académica", description: "Libros de texto abiertos, manuales técnicos y referencias fundamentales en ingeniería.", action: "Abrir Biblioteca Académica" },
       { title: "Simulaciones Prácticas", description: "Ajusta un lazo PID, analiza un circuito o controla un sistema neumático — y observa la respuesta en vivo.", action: "Lanzar Simulación" },
     ],
     platformsTitle: "Plataformas Principales de Ingeniería",

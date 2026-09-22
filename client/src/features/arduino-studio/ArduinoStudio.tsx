@@ -3,10 +3,11 @@
  * Layout mirrors the Code Studio split panes: ribbon on top, sketch editor left, board canvas + serial monitor right.
  */
 import { BookOpen, Check, ChevronDown, Clipboard, Code, Copy, Cpu, Download, Pause, Play, Redo2, RotateCcw, Trash2, Undo2, Upload } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import Editor from "react-simple-code-editor";
 import SegmentedControl from "@/components/ui/SegmentedControl";
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ArduinoBoard } from "./ArduinoBoard";
 import { analyzeSketch, type PinUsage } from "./arduinoCompiler";
 import { ARDUINO_EXAMPLES, DEFAULT_SKETCH } from "./arduinoExamples";
@@ -70,7 +71,7 @@ function highlightCpp(source: string, activeLine: number): React.ReactNode {
     return (
       <div
         key={index}
-        className={`block min-h-7 border-s-2 px-3 font-normal ${isCurrent ? "border-violet-500 bg-violet-100/40 text-slate-900 dark:bg-violet-500/15 dark:text-white" : "border-transparent text-slate-800 dark:text-slate-200"}`}
+        className={`block h-[22px] leading-[22px] font-normal ${isCurrent ? "bg-violet-100/40 text-slate-900 dark:bg-violet-500/15 dark:text-white" : "text-slate-800 dark:text-slate-200"}`}
       >
         {res.tokens.map((t, i) => (
           <span key={i} className={t.cls}>
@@ -97,16 +98,25 @@ function SketchEditor({
 }) {
   const lineCount = code.split("\n").length;
   const lineAtCursor = (target: EventTarget | null) => (target instanceof HTMLTextAreaElement ? target.value.slice(0, target.selectionStart).split("\n").length : 1);
+
+  useEffect(() => {
+    if (typeof document !== "undefined" && "fonts" in document) {
+      document.fonts.ready.then(() => {
+        // Font metrics loaded and ready
+      });
+    }
+  }, []);
+
   return (
     <div className="relative min-h-0 flex-1 select-text overflow-auto bg-[#f8fbff] dark:bg-[#07080a]" dir="ltr">
       <div className="flex min-h-full min-w-max">
-        <div className="sticky start-0 z-10 w-13 shrink-0 select-none border-e border-slate-200 bg-slate-100/80 py-2 font-mono text-[12px] leading-7 dark:border-[#1a1d24] dark:bg-[#090a0d]/90" aria-hidden>
+        <div className="sticky start-0 z-10 w-13 shrink-0 select-none border-e border-slate-200 bg-slate-100/80 py-3 font-mono text-[12px] leading-[22px] dark:border-[#1a1d24] dark:bg-[#090a0d]/90" aria-hidden>
           {Array.from({ length: lineCount }, (_, i) => {
             const line = i + 1;
             return (
               <div
                 key={i}
-                className={`h-7 pe-2.5 text-end tabular-nums ${errorLine === line ? "bg-rose-500/20 font-medium text-rose-600 dark:text-rose-300" : activeLine === line ? "bg-violet-500/20 font-medium text-violet-700 dark:text-violet-300" : "text-slate-400 dark:text-slate-500"}`}
+                className={`h-[22px] leading-[22px] pe-2.5 text-end tabular-nums ${errorLine === line ? "bg-rose-500/20 font-medium text-rose-600 dark:text-rose-300" : activeLine === line ? "bg-violet-500/20 font-medium text-violet-700 dark:text-violet-300" : "text-slate-400 dark:text-slate-500"}`}
               >
                 {String(line).padStart(2, "0")}
               </div>
@@ -118,12 +128,23 @@ function SketchEditor({
             value={code}
             onValueChange={onChange}
             highlight={source => highlightCpp(source, activeLine)}
-            padding={8}
+            padding={12}
             tabSize={2}
             onClick={e => onActiveLine(lineAtCursor(e.target))}
             onKeyUp={e => onActiveLine(lineAtCursor(e.target))}
-            style={{ minHeight: "100%", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 12.5, lineHeight: "1.75rem", whiteSpace: "pre", position: "relative", zIndex: 1, fontWeight: 400 }}
-            textareaClassName="!ps-3 !outline-none !caret-violet-500 !font-normal"
+            style={{
+              minHeight: "100%",
+              fontFamily: "'JetBrains Mono', 'Fira Code', Menlo, Monaco, 'Courier New', monospace",
+              fontSize: 14,
+              lineHeight: "22px",
+              letterSpacing: 0,
+              fontVariantLigatures: "none",
+              whiteSpace: "pre",
+              position: "relative",
+              zIndex: 1,
+              fontWeight: 400,
+            }}
+            textareaClassName="!outline-none !caret-violet-500 !font-normal"
             textareaId="arduino-sketch"
           />
         </div>
@@ -170,6 +191,15 @@ export function ArduinoStudio() {
   const [historyIndex, setHistoryIndex] = useState(0);
   const [copied, setCopied] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isDesktop, setIsDesktop] = useState(() => typeof window !== "undefined" && window.innerWidth >= 1024);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const update = () => setIsDesktop(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
 
   const { status } = rt.snapshot;
   const running = status === "running";
@@ -357,65 +387,81 @@ export function ArduinoStudio() {
         </header>
       </section>
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-2.5 overflow-hidden lg:grid-cols-2">
-        {/* -------------------------------------------------------------- */}
-        {/* Left: sketch editor                                             */}
-        {/* -------------------------------------------------------------- */}
-        <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs dark:border-[#1a1d24] dark:bg-[#0d0f12]">
-          <div className="flex shrink-0 items-center justify-between border-b border-slate-200 bg-slate-50 px-3 py-2 dark:border-[#1a1d24] dark:bg-[#0d0f12]">
-            <div className="flex items-center gap-1.5">
-              <div className="me-2 flex shrink-0 items-center gap-1.5">
-                <span className="h-2.5 w-2.5 rounded-full border border-[#E0443E]/40 bg-[#FF5F56]" />
-                <span className="h-2.5 w-2.5 rounded-full border border-[#DEA123]/40 bg-[#FFBD2E]" />
-                <span className="h-2.5 w-2.5 rounded-full border border-[#1AAB29]/40 bg-[#27C93F]" />
-              </div>
-              <Code className="ms-0.5 h-3.5 w-3.5 text-slate-500 dark:text-slate-400" />
-              <span className="font-mono text-xs font-semibold text-slate-700 dark:text-slate-300">sketch.ino</span>
-            </div>
-            <span className="font-mono text-[11px] text-slate-400 dark:text-slate-500">{lines} lines</span>
-          </div>
-          <SketchEditor code={code} onChange={editSketch} errorLine={rt.diagnostic?.line ?? null} activeLine={activeLine} onActiveLine={setActiveLine} />
-          {errorMessage && (
-            <div className="flex shrink-0 items-start gap-2 border-t border-rose-500/30 bg-rose-500/10 px-3 py-2 font-mono text-[11.5px] text-rose-700 dark:text-rose-200" role="alert">
-              <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-rose-500" />
-              <span className="select-text break-words whitespace-pre-wrap">{errorMessage}</span>
-            </div>
-          )}
-        </section>
-
-        {/* -------------------------------------------------------------- */}
-        {/* Right: hardware canvas (top) + serial monitor (bottom)          */}
-        {/* -------------------------------------------------------------- */}
-        <div className="flex h-full min-h-0 flex-col gap-2.5 overflow-hidden">
-          <section className="flex min-h-[180px] flex-1 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs dark:border-[#1a1d24] dark:bg-[#0d0f12]">
-            <div className="flex shrink-0 items-center justify-between border-b border-slate-200 bg-slate-50 px-3 py-2 dark:border-[#1a1d24] dark:bg-[#0d0f12]">
-              <div className="flex items-center gap-1.5">
-                <div className="me-2 flex shrink-0 items-center gap-1.5">
-                  <span className="h-2.5 w-2.5 rounded-full border border-[#E0443E]/40 bg-[#FF5F56]" />
-                  <span className="h-2.5 w-2.5 rounded-full border border-[#DEA123]/40 bg-[#FFBD2E]" />
-                  <span className="h-2.5 w-2.5 rounded-full border border-[#1AAB29]/40 bg-[#27C93F]" />
+      <div className="min-h-0 flex-1 overflow-hidden">
+        <ResizablePanelGroup direction={isDesktop ? "horizontal" : "vertical"} className="gap-2.5">
+          {/* -------------------------------------------------------------- */}
+          {/* Left: Code Editor (sketch.ino) takes full vertical height      */}
+          {/* -------------------------------------------------------------- */}
+          <ResizablePanel defaultSize={50} minSize={30} className="flex h-full min-h-0 flex-col overflow-hidden">
+            <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs dark:border-[#1a1d24] dark:bg-[#0d0f12]">
+              <div className="flex shrink-0 items-center justify-between border-b border-slate-200 bg-slate-50 px-3 py-2 dark:border-[#1a1d24] dark:bg-[#0d0f12]">
+                <div className="flex items-center gap-1.5">
+                  <div className="me-2 flex shrink-0 items-center gap-1.5">
+                    <span className="h-2.5 w-2.5 rounded-full border border-[#E0443E]/40 bg-[#FF5F56]" />
+                    <span className="h-2.5 w-2.5 rounded-full border border-[#DEA123]/40 bg-[#FFBD2E]" />
+                    <span className="h-2.5 w-2.5 rounded-full border border-[#1AAB29]/40 bg-[#27C93F]" />
+                  </div>
+                  <Code className="ms-0.5 h-3.5 w-3.5 text-slate-500 dark:text-slate-400" />
+                  <span className="font-mono text-xs font-semibold text-slate-700 dark:text-slate-300">sketch.ino</span>
                 </div>
-                <Cpu className="ms-0.5 h-3.5 w-3.5 text-slate-500 dark:text-slate-400" />
-                <span className="font-mono text-xs font-semibold tracking-wider text-slate-700 dark:text-slate-300">board.uno</span>
+                <span className="font-mono text-[11px] text-slate-400 dark:text-slate-500">{lines} lines</span>
               </div>
-            </div>
-            <div
-              className="min-h-0 flex-1 bg-slate-50 dark:bg-[#07080a]"
-              style={{ backgroundImage: "radial-gradient(circle, rgba(148,163,184,.25) 1px, transparent 1px)", backgroundSize: "20px 20px" }}
-            >
-              <ArduinoBoard snapshot={rt.snapshot} onDigitalInput={rt.setDigitalInput} onAnalogInput={rt.setAnalogInput} layout={layout} ledColors={ARDUINO_EXAMPLES.find(e => e.id === exampleId)?.ledColors} />
-            </div>
-          </section>
+              <SketchEditor code={code} onChange={editSketch} errorLine={rt.diagnostic?.line ?? null} activeLine={activeLine} onActiveLine={setActiveLine} />
+              {errorMessage && (
+                <div className="flex shrink-0 items-start gap-2 border-t border-rose-500/30 bg-rose-500/10 px-3 py-2 font-mono text-[11.5px] text-rose-700 dark:text-rose-200" role="alert">
+                  <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-rose-500" />
+                  <span className="select-text break-words whitespace-pre-wrap">{errorMessage}</span>
+                </div>
+              )}
+            </section>
+          </ResizablePanel>
 
-          <SerialConsole
-            serial={rt.serial}
-            baud={rt.snapshot.baud}
-            collapsed={serialCollapsed}
-            onToggleCollapsed={() => setSerialCollapsed(c => !c)}
-            onSend={rt.sendSerial}
-            onClear={rt.clearSerial}
-          />
-        </div>
+          <ResizableHandle withHandle className="bg-transparent hover:bg-slate-300/60 dark:hover:bg-slate-700/60 transition-colors" />
+
+          {/* -------------------------------------------------------------- */}
+          {/* Right: Nested vertical group (Board Top + Serial Monitor Bottom) */}
+          {/* -------------------------------------------------------------- */}
+          <ResizablePanel defaultSize={50} minSize={30} className="flex h-full min-h-0 flex-col overflow-hidden">
+            <ResizablePanelGroup direction="vertical" className="h-full w-full gap-2.5">
+              {/* Top: Hardware canvas (board.uno) */}
+              <ResizablePanel defaultSize={70} minSize={30} className="flex h-full min-h-0 flex-col overflow-hidden">
+                <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs dark:border-[#1a1d24] dark:bg-[#0d0f12]">
+                  <div className="flex shrink-0 items-center justify-between border-b border-slate-200 bg-slate-50 px-3 py-2 dark:border-[#1a1d24] dark:bg-[#0d0f12]">
+                    <div className="flex items-center gap-1.5">
+                      <div className="me-2 flex shrink-0 items-center gap-1.5">
+                        <span className="h-2.5 w-2.5 rounded-full border border-[#E0443E]/40 bg-[#FF5F56]" />
+                        <span className="h-2.5 w-2.5 rounded-full border border-[#DEA123]/40 bg-[#FFBD2E]" />
+                        <span className="h-2.5 w-2.5 rounded-full border border-[#1AAB29]/40 bg-[#27C93F]" />
+                      </div>
+                      <Cpu className="ms-0.5 h-3.5 w-3.5 text-slate-500 dark:text-slate-400" />
+                      <span className="font-mono text-xs font-semibold tracking-wider text-slate-700 dark:text-slate-300">board.uno</span>
+                    </div>
+                  </div>
+                  <div
+                    className="relative min-h-0 flex-1 overflow-hidden bg-slate-50 dark:bg-[#07080a]"
+                    style={{ backgroundImage: "radial-gradient(circle, rgba(148,163,184,.25) 1px, transparent 1px)", backgroundSize: "20px 20px" }}
+                  >
+                    <ArduinoBoard snapshot={rt.snapshot} onDigitalInput={rt.setDigitalInput} onAnalogInput={rt.setAnalogInput} layout={layout} ledColors={ARDUINO_EXAMPLES.find(e => e.id === exampleId)?.ledColors} />
+                  </div>
+                </section>
+              </ResizablePanel>
+
+              <ResizableHandle withHandle className="bg-transparent hover:bg-slate-300/60 dark:hover:bg-slate-700/60 transition-colors" />
+
+              {/* Bottom: Serial Monitor (terminal + real-time plotter) */}
+              <ResizablePanel defaultSize={30} minSize={25} className="flex h-full min-h-0 flex-col overflow-hidden">
+                <SerialConsole
+                  serial={rt.serial}
+                  baud={rt.snapshot.baud}
+                  collapsed={serialCollapsed}
+                  onToggleCollapsed={() => setSerialCollapsed(c => !c)}
+                  onSend={rt.sendSerial}
+                  onClear={rt.clearSerial}
+                />
+              </ResizablePanel>
+            </ResizablePanelGroup>
+          </ResizablePanel>
+        </ResizablePanelGroup>
       </div>
     </div>
   );

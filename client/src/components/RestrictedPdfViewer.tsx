@@ -19,6 +19,8 @@ interface RestrictedPdfViewerProps {
   title: string;
   /** Publisher landing page, offered when the preview cannot be rendered. */
   landingPageUrl: string;
+  /** Label of the fallback link (defaults to "Publisher Page"). */
+  landingLabel?: string;
 }
 
 type FitMode = "width" | "page" | null;
@@ -39,7 +41,7 @@ const toolButton =
  * No download / print / open controls, no text or link layers, context menu disabled, hidden when printing.
  * The document is always fetched through the same-origin /api/pdf-proxy so publisher CORS / framing rules never apply.
  */
-export default function RestrictedPdfViewer({ pdfUrl, title, landingPageUrl }: RestrictedPdfViewerProps) {
+export default function RestrictedPdfViewer({ pdfUrl, title, landingPageUrl, landingLabel }: RestrictedPdfViewerProps) {
   const [numPages, setNumPages] = useState(0);
   const [pageNumber, setPageNumber] = useState(1);
   const [pageInput, setPageInput] = useState("1");
@@ -102,7 +104,7 @@ export default function RestrictedPdfViewer({ pdfUrl, title, landingPageUrl }: R
     if (e.key === "ArrowLeft" || e.key === "PageUp") goTo(pageNumber - 1);
   };
 
-  if (failed) return <PdfPreviewFallback landingPageUrl={landingPageUrl} />;
+  if (failed) return <PdfPreviewFallback landingPageUrl={landingPageUrl} landingLabel={landingLabel} />;
 
   return (
     <div

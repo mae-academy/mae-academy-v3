@@ -13,6 +13,8 @@ import Home from "./pages/Home";
 import Research from "./pages/Research";
 import ResearchDetail from "./pages/ResearchDetail";
 import Courses from "./pages/Courses";
+import AcademicLibrary from "./pages/AcademicLibrary";
+import LibraryDetail from "./pages/LibraryDetail";
 import Simulations from "./pages/Simulations";
 import SimulationDetail from "./pages/SimulationDetail";
 import About from "./pages/About";
@@ -50,6 +52,8 @@ function AnimatedRoutes() {
           <Route path="/" component={Home} />
           <Route path="/research" component={Research} />
           <Route path="/research/:id" component={ResearchDetail} />
+          <Route path="/library" component={AcademicLibrary} />
+          <Route path="/library/:id" component={LibraryDetail} />
           <Route path="/courses" component={Courses} />
           <Route path="/code/:lang" component={SimulationDetail} />
           <Route path="/code" component={SimulationDetail} />

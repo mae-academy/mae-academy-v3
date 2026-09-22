@@ -1,6 +1,7 @@
 import { Code } from 'lucide-react';
-import { useId, useMemo, useRef, type ReactNode } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import Editor from 'react-simple-code-editor';
+import { registerUnifiedMonacoThemes, UNIFIED_EDITOR_COLORS } from '@/lib/monacoTheme';
 import type { TranspileDiagnostic } from '../../transpiler';
 import { PANEL, WindowBar } from '../chrome';
 
@@ -13,6 +14,8 @@ export interface StlEditorProps {
   onChange: (text: string) => void;
   onDiscard: () => void;
   trailing?: ReactNode;
+  theme?: string;
+  beforeMount?: (monaco: any) => void;
 }
 
 /** Offset of the start of 1-based `line` within `text`. */
@@ -36,8 +39,9 @@ const MNEMONICS = new Set([
 ]);
 
 /** Line-by-line tokenizer; each line keeps a fixed height so the gutter never drifts out of step. */
-function highlightStl(source: string): ReactNode {
+function highlightStl(source: string, activeLine: number = 1): ReactNode {
   return source.split('\n').map((line, index) => {
+    const isCurrent = activeLine === index + 1;
     const re = new RegExp(TOKEN_RE.source, 'g');
     const parts: ReactNode[] = [];
     let last = 0;
@@ -63,7 +67,14 @@ function highlightStl(source: string): ReactNode {
     }
     if (last < line.length) parts.push(line.slice(last));
     return (
-      <div key={index} className="h-7 whitespace-pre pe-3 font-mono text-[12px] leading-7">
+      <div
+        key={index}
+        className={`h-[22px] leading-[22px] whitespace-pre font-normal ${
+          isCurrent
+            ? UNIFIED_EDITOR_COLORS.activeLineCodeClass
+            : UNIFIED_EDITOR_COLORS.normalLineCodeClass
+        }`}
+      >
         {parts.length === 0 ? '\u00A0' : parts}
       </div>
     );
@@ -71,9 +82,24 @@ function highlightStl(source: string): ReactNode {
 }
 
 /** STL / IL source in the Code Studio window: traffic-light bar, line gutter, syntax colours. */
-export function StlEditor({ text, diagnostics, dirty, notice, onChange, onDiscard, trailing }: StlEditorProps) {
+export function StlEditor({
+  text,
+  diagnostics,
+  dirty,
+  notice,
+  onChange,
+  onDiscard,
+  trailing,
+  theme,
+  beforeMount,
+}: StlEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null);
   const textareaId = useId();
+  const [activeLine, setActiveLine] = useState<number>(1);
+  const lineAtCursor = (target: EventTarget | null) =>
+    target instanceof HTMLTextAreaElement
+      ? target.value.slice(0, target.selectionStart).split('\n').length
+      : 1;
 
   const lineCount = useMemo(() => text.split('\n').length, [text]);
   const severityByLine = useMemo(() => {
@@ -87,6 +113,18 @@ export function StlEditor({ text, diagnostics, dirty, notice, onChange, onDiscar
 
   const errors = diagnostics.filter((d) => d.severity === 'error').length;
 
+  useEffect(() => {
+    if (typeof window !== 'undefined' && (window as any).monaco) {
+      registerUnifiedMonacoThemes((window as any).monaco);
+      beforeMount?.((window as any).monaco);
+    }
+    if (typeof document !== 'undefined' && 'fonts' in document) {
+      document.fonts.ready.then(() => {
+        // Font metrics loaded and ready
+      });
+    }
+  }, [beforeMount]);
+
   const jumpTo = (d: TranspileDiagnostic): void => {
     const area = editorRef.current?.querySelector('textarea');
     if (!area || d.line === undefined) return;
@@ -94,6 +132,7 @@ export function StlEditor({ text, diagnostics, dirty, notice, onChange, onDiscar
     const end = text.indexOf('\n', start);
     area.focus();
     area.setSelectionRange(start, end === -1 ? text.length : end);
+    setActiveLine(d.line);
   };
 
   return (
@@ -124,22 +163,26 @@ export function StlEditor({ text, diagnostics, dirty, notice, onChange, onDiscar
         <div className="flex min-h-full min-w-max">
           <div
             aria-hidden="true"
-            className="sticky start-0 z-10 w-13 shrink-0 select-none border-e border-slate-200 bg-slate-100/80 py-2 font-mono text-[12px] leading-7 dark:border-[#1a1d24] dark:bg-[#090a0d]/90"
+            className="sticky start-0 z-10 w-13 shrink-0 select-none border-e border-slate-200 bg-slate-100/80 py-3 font-mono text-[12px] leading-[22px] dark:border-[#1a1d24] dark:bg-[#090a0d]/90"
           >
             {Array.from({ length: lineCount }, (_, i) => {
-              const severity = severityByLine.get(i + 1);
+              const line = i + 1;
+              const severity = severityByLine.get(line);
+              const isCurrent = activeLine === line;
               return (
                 <div
                   key={i}
-                  className={`h-7 pe-2.5 text-end tabular-nums ${
+                  className={`h-[22px] leading-[22px] pe-2.5 text-end tabular-nums ${
                     severity === 'error'
                       ? 'bg-rose-500/20 font-medium text-rose-600 dark:text-rose-300'
-                      : severity === 'warning'
-                        ? 'bg-amber-500/20 font-medium text-amber-700 dark:text-amber-300'
-                        : 'text-slate-400 dark:text-slate-500'
+                      : isCurrent
+                        ? UNIFIED_EDITOR_COLORS.activeLineNumberClass
+                        : severity === 'warning'
+                          ? 'bg-amber-500/20 font-medium text-amber-700 dark:text-amber-300'
+                          : UNIFIED_EDITOR_COLORS.normalLineNumberClass
                   }`}
                 >
-                  {String(i + 1).padStart(2, '0')}
+                  {String(line).padStart(2, '0')}
                 </div>
               );
             })}
@@ -148,21 +191,25 @@ export function StlEditor({ text, diagnostics, dirty, notice, onChange, onDiscar
             <Editor
               value={text}
               onValueChange={onChange}
-              highlight={highlightStl}
-              padding={8}
+              highlight={(src) => highlightStl(src, activeLine)}
+              onClick={(e) => setActiveLine(lineAtCursor(e.target))}
+              onKeyUp={(e) => setActiveLine(lineAtCursor(e.target))}
+              padding={12}
               tabSize={2}
               textareaId={textareaId}
               style={{
                 minHeight: '100%',
-                fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-                fontSize: 12.5,
-                lineHeight: '1.75rem',
+                fontFamily: "'JetBrains Mono', 'Fira Code', Menlo, Monaco, 'Courier New', monospace",
+                fontSize: 14,
+                lineHeight: '22px',
+                letterSpacing: 0,
+                fontVariantLigatures: 'none',
                 whiteSpace: 'pre',
                 position: 'relative',
                 zIndex: 1,
                 fontWeight: 400,
               }}
-              textareaClassName="!ps-3 !outline-none !caret-violet-500 !font-normal"
+              textareaClassName="!outline-none !caret-violet-500 !font-normal"
             />
           </div>
         </div>

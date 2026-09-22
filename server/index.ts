@@ -4,6 +4,9 @@ import path from "path";
 import { fileURLToPath } from "url";
 import "dotenv/config";
 import { generateCircuitAnalysis } from "./aiService";
+import { libraryCoverHandler } from "./libraryCover";
+import { libraryDoabHandler, libraryDoabItemHandler } from "./libraryDoab";
+import { libraryResolveHandler } from "./libraryResolve";
 import { featuredHandler, isFeaturedUrl, warmFeatured } from "./featured";
 import { createThumbHandler } from "./pdfThumb";
 import { pdfCheckHandler, pdfDownloadHandler, pdfProxyHandler } from "./pdfProxy";
@@ -35,6 +38,10 @@ async function startServer() {
   app.get("/api/pdf-download", pdfDownloadHandler);
   app.post("/api/check-pdfs", pdfCheckHandler);
   app.get("/api/research/featured", featuredHandler);
+  app.post("/api/library/resolve-pdfs", libraryResolveHandler);
+  app.get("/api/library/cover", libraryCoverHandler);
+  app.get("/api/library/doab", libraryDoabHandler);
+  app.get("/api/library/doab-item", libraryDoabItemHandler);
   app.get("/api/pdf-thumb", createThumbHandler(isFeaturedUrl));
 
   // Unknown API routes must never fall through to the SPA index.html (renders <NotFound /> inside iframes).

@@ -122,10 +122,13 @@ export async function run(
         flags: formatFlags(cpu),
         memory: captureStackWindow(cpu),
         stdout: stdoutBuffer,
+        video: cpu.video.snapshot(),
       });
       if (steps.length % YIELD_EVERY === 0) await wait(0);
     }
-    if (cpu.error) {
+    if (cpu.waitingForInput) {
+      // Blocked on keyboard input: neither an error nor a step-budget overrun.
+    } else if (cpu.error) {
       runtimeError = cpu.error;
     } else if (steps.length >= maxSteps && !cpu.halted) {
       runtimeError = `Execution halted after ${maxSteps} steps (possible infinite loop).`;
@@ -139,5 +142,6 @@ export async function run(
     error: runtimeError,
     steps,
     totalSteps: steps.length,
+    awaitingInput: cpu.waitingForInput && !runtimeError,
   };
 }

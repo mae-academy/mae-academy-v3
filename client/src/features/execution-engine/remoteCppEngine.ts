@@ -18,7 +18,7 @@ export async function executeRemoteCpp(
         compiler: "gcc-head",
         code: code,
         stdin: stdin,
-        "compiler-option-raw": "-std=c++20\n-O2",
+        "compiler-option-raw": "-std=c++17\n-O0",
       }),
     });
 
@@ -60,7 +60,7 @@ export async function executeRemoteC(
         compiler: "gcc-head-c",
         code: code,
         stdin: stdin,
-        "compiler-option-raw": "-std=c17\n-O2",
+        "compiler-option-raw": "-std=c11\n-O0",
       }),
     });
 

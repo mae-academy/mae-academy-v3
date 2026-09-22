@@ -4,7 +4,8 @@ import { isIP } from "node:net";
 
 const MAX_REDIRECTS = 5;
 const MAX_BYTES = 60 * 1024 * 1024;
-const TIMEOUT_MS = 20_000;
+const MAX_DOWNLOAD_BYTES = 1024 * 1024 * 1024; // books can be 100+ MB; downloads are streamed, never buffered
+const TIMEOUT_MS = 20_000; // time to first byte only; a long transfer must not be cut off mid-stream
 export const PDF_MAGIC = Buffer.from("%PDF");
 
 class ProxyError extends Error {
@@ -53,20 +54,38 @@ async function assertPublicHttpUrl(raw: string): Promise<URL> {
   return url;
 }
 
+const UPSTREAM_ATTEMPTS = 3;
+const RETRY_DELAY_MS = 250;
+const isTransientStatus = (status: number): boolean => status === 429 || status === 502 || status === 503 || status === 504;
+
+/** One upstream GET, retried on network errors and transient 429 / 502 / 503 / 504 answers (never on an abort). */
+async function fetchUpstreamWithRetry(url: URL, signal: AbortSignal, range?: string): Promise<globalThis.Response> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      const upstream = await fetch(url, {
+        redirect: "manual",
+        signal,
+        headers: {
+          Accept: "application/pdf,*/*;q=0.8",
+          "User-Agent": "MAEAcademy-PdfProxy/1.0",
+          ...(range ? { Range: range } : {}),
+        },
+      });
+      if (!isTransientStatus(upstream.status) || attempt >= UPSTREAM_ATTEMPTS) return upstream;
+      await upstream.body?.cancel();
+    } catch (error) {
+      if (signal.aborted || attempt >= UPSTREAM_ATTEMPTS) throw error;
+    }
+    await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS * attempt));
+  }
+}
+
 /** Follows redirects manually so every hop is re-validated against the SSRF rules. */
 export async function fetchWithValidatedRedirects(start: string, signal: AbortSignal, range?: string): Promise<globalThis.Response> {
   let current = start;
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
     const url = await assertPublicHttpUrl(current);
-    const upstream = await fetch(url, {
-      redirect: "manual",
-      signal,
-      headers: {
-        Accept: "application/pdf,*/*;q=0.8",
-        "User-Agent": "MAEAcademy-PdfProxy/1.0",
-        ...(range ? { Range: range } : {}),
-      },
-    });
+    const upstream = await fetchUpstreamWithRetry(url, signal, range);
     if (upstream.status >= 300 && upstream.status < 400) {
       const location = upstream.headers.get("location");
       if (!location) throw new ProxyError(502, "Redirect without location");
@@ -131,6 +150,7 @@ async function streamPdf(req: Request, res: Response, disposition: Disposition):
 
     const reader = upstream.body.getReader();
     const first = await reader.read();
+    clearTimeout(timer); // headers + first chunk arrived: from here only client disconnects abort the transfer
     // Only the first byte range of a document carries the %PDF header.
     if (startsAtZero) {
       const head = first.value ? Buffer.from(first.value.subarray(0, 1024)) : Buffer.alloc(0);
@@ -156,11 +176,12 @@ async function streamPdf(req: Request, res: Response, disposition: Disposition):
     if (partial && contentRange) res.setHeader("Content-Range", contentRange);
     if (length && !encoded) res.setHeader("Content-Length", length);
 
+    const maxBytes = disposition === "attachment" ? MAX_DOWNLOAD_BYTES : MAX_BYTES;
     let sent = 0;
     let chunk = first;
     while (!chunk.done) {
       sent += chunk.value.byteLength;
-      if (sent > MAX_BYTES) {
+      if (sent > maxBytes) {
         await reader.cancel();
         res.destroy(); // headers already flushed; abort rather than serve a truncated file as complete
         return;
