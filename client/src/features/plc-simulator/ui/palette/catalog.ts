@@ -44,9 +44,14 @@ export type PaletteItemId =
   | 'math-div'
   | 'math-sqr'
   | 'math-sin'
+  | 'math-cos'
+  | 'math-exp'
+  | 'math-ln'
+  | 'math-abs'
   | 'wl-and'
   | 'wl-or'
-  | 'wl-xor';
+  | 'wl-xor'
+  | 'wl-not';
 
 const RAIL_ITEMS: ReadonlySet<PaletteItemId> = new Set<PaletteItemId>([
   'coil-out',
@@ -161,7 +166,7 @@ const binaryMath = (fn: 'ADD' | 'SUB' | 'MUL' | 'DIV') =>
     layout: placement(at, 2),
   });
 
-const unaryMath = (fn: 'SQR' | 'SIN') =>
+const unaryMath = (fn: 'SQR' | 'SIN' | 'COS' | 'EXP' | 'LN') =>
   (id: NodeId, at: GridPlacement): LadNode => ({
     id,
     type: 'math',
@@ -171,6 +176,17 @@ const unaryMath = (fn: 'SQR' | 'SIN') =>
     out: 'VD4',
     layout: placement(at, 2),
   });
+
+/** ABS is native to INT/DINT/REAL (no BYTE), unlike the REAL-only trig/exponential boxes. */
+const absMath = (id: NodeId, at: GridPlacement): LadNode => ({
+  id,
+  type: 'math',
+  fn: 'ABS',
+  dataType: 'INT',
+  in: { kind: 'address', address: 'VW0' },
+  out: 'VW2',
+  layout: placement(at, 2),
+});
 
 const wordLogic = (fn: 'W_AND' | 'W_OR' | 'W_XOR') =>
   (id: NodeId, at: GridPlacement): LadNode => ({
@@ -183,6 +199,16 @@ const wordLogic = (fn: 'W_AND' | 'W_OR' | 'W_XOR') =>
     out: 'VW2',
     layout: placement(at, 2),
   });
+
+const wordNot = (id: NodeId, at: GridPlacement): LadNode => ({
+  id,
+  type: 'wordLogic',
+  fn: 'W_NOT',
+  width: 'WORD',
+  in: { kind: 'address', address: 'VW0' },
+  out: 'VW2',
+  layout: placement(at, 2),
+});
 
 const contact = (variant: 'NO' | 'NC' | 'P' | 'N') =>
   (id: NodeId, at: GridPlacement, ctx: PlacementContext): LadNode => ({
@@ -273,9 +299,14 @@ export const PALETTE_CATEGORIES: readonly PaletteCategory[] = [
       item('math-div', 'mathLogic', 'DIV', 'Divide', 2, binaryMath('DIV')),
       item('math-sqr', 'mathLogic', 'SQR', 'Square root (REAL)', 2, unaryMath('SQR')),
       item('math-sin', 'mathLogic', 'SIN', 'Sine (REAL, radians)', 2, unaryMath('SIN')),
+      item('math-cos', 'mathLogic', 'COS', 'Cosine (REAL, radians)', 2, unaryMath('COS')),
+      item('math-exp', 'mathLogic', 'EXP', 'Natural exponential (REAL)', 2, unaryMath('EXP')),
+      item('math-ln', 'mathLogic', 'LN', 'Natural logarithm (REAL, x > 0)', 2, unaryMath('LN')),
+      item('math-abs', 'mathLogic', 'ABS', 'Absolute value (INT/DINT/REAL)', 2, absMath),
       item('wl-and', 'mathLogic', 'W-AND', 'Bitwise AND', 2, wordLogic('W_AND')),
       item('wl-or', 'mathLogic', 'W-OR', 'Bitwise OR', 2, wordLogic('W_OR')),
       item('wl-xor', 'mathLogic', 'W-XOR', 'Bitwise XOR', 2, wordLogic('W_XOR')),
+      item('wl-not', 'mathLogic', 'NOT', "Bitwise inversion (one's complement)", 2, wordNot),
     ],
   },
 ];

@@ -149,23 +149,34 @@ export interface BinaryMathNode extends BoxBase {
   readonly in1: Operand;
   readonly in2: Operand;
 }
-/** SQR = square root (S7 SQRT); SIN operates in radians on REAL. */
+/**
+ * SQR = square root (S7 SQRT); SIN/COS operate in radians on REAL; EXP/LN are also REAL-only.
+ * ABS is the one unary box that is not REAL-only: it accepts INT, DINT and REAL.
+ */
 export interface UnaryMathNode extends BoxBase {
   readonly type: 'math';
-  readonly fn: 'SQR' | 'SIN';
+  readonly fn: 'SQR' | 'SIN' | 'COS' | 'EXP' | 'LN' | 'ABS';
   readonly in: Operand;
 }
 export type MathNode = BinaryMathNode | UnaryMathNode;
 
-export interface WordLogicNode extends NodeBase {
+interface WordLogicBase extends NodeBase {
   readonly type: 'wordLogic';
-  readonly fn: 'W_AND' | 'W_OR' | 'W_XOR';
   readonly width: LogicWidth;
-  readonly in1: Operand;
-  readonly in2: Operand;
   readonly out: PlcAddress;
   readonly eno?: PlcAddress;
 }
+export interface BinaryWordLogicNode extends WordLogicBase {
+  readonly fn: 'W_AND' | 'W_OR' | 'W_XOR';
+  readonly in1: Operand;
+  readonly in2: Operand;
+}
+/** One's-complement bitwise inversion (NOT / INV). */
+export interface UnaryWordLogicNode extends WordLogicBase {
+  readonly fn: 'W_NOT';
+  readonly in: Operand;
+}
+export type WordLogicNode = BinaryWordLogicNode | UnaryWordLogicNode;
 
 export type LadNode =
   | ContactNode

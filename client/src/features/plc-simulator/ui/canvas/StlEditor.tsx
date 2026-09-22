@@ -71,8 +71,8 @@ function highlightStl(source: string, activeLine: number = 1): ReactNode {
         key={index}
         className={`h-[22px] leading-[22px] whitespace-pre font-normal ${
           isCurrent
-            ? UNIFIED_EDITOR_COLORS.activeLineCodeClass
-            : UNIFIED_EDITOR_COLORS.normalLineCodeClass
+            ? 'border-l-2 border-primary bg-slate-100 text-slate-900 dark:bg-slate-800/60 dark:text-white'
+            : `border-l-2 border-transparent ${UNIFIED_EDITOR_COLORS.normalLineCodeClass}`
         }`}
       >
         {parts.length === 0 ? '\u00A0' : parts}
@@ -178,7 +178,8 @@ export function StlEditor({
                       : isCurrent
                         ? UNIFIED_EDITOR_COLORS.activeLineNumberClass
                         : severity === 'warning'
-                          ? 'bg-amber-500/20 font-medium text-amber-700 dark:text-amber-300'
+                          ? // Slate/primary palette, not yellow/amber: a plain text tint, no gutter box.
+                            'font-medium text-sky-600 dark:text-sky-400'
                           : UNIFIED_EDITOR_COLORS.normalLineNumberClass
                   }`}
                 >
@@ -240,7 +241,7 @@ export function StlEditor({
                 disabled={d.line === undefined}
                 className="flex w-full items-baseline gap-2 px-3 py-1 text-left hover:bg-slate-100 disabled:cursor-default dark:hover:bg-[#13161c]"
               >
-                <span className={d.severity === 'error' ? 'font-semibold text-rose-600' : 'font-semibold text-amber-600'}>{d.severity}</span>
+                <span className={d.severity === 'error' ? 'font-semibold text-rose-600' : 'font-semibold text-sky-600 dark:text-sky-400'}>{d.severity}</span>
                 {d.line !== undefined && (
                   <span className="font-mono text-slate-500">
                     {d.line}:{d.column ?? 1}

@@ -1,5 +1,5 @@
-import { useCallback, useMemo, useReducer } from 'react';
-import type { BranchId, Network, NetworkId, NodeId, NumericType } from '../../domain/ast';
+import { useCallback, useEffect, useId, useMemo, useReducer } from 'react';
+import type { BranchId, LogicWidth, Network, NetworkId, NodeId, NumericType } from '../../domain/ast';
 import type { HardwareProfile } from '../../domain/hardware';
 import type { PaletteItemId } from '../palette/catalog';
 import {
@@ -29,6 +29,7 @@ export interface PlcEditorActions {
   setSlot(networkId: NetworkId, nodeId: NodeId, slot: SlotKey, text: string): void;
   setNodeSymbol(networkId: NetworkId, nodeId: NodeId, symbol: string): void;
   retype(networkId: NetworkId, nodeId: NodeId, dataType: NumericType): void;
+  retypeWordLogic(networkId: NetworkId, nodeId: NodeId, width: LogicWidth): void;
   addBranch(networkId: NetworkId, nodeId: NodeId): void;
   addLane(networkId: NetworkId, branchId: BranchId): void;
   extendBranchLeft(networkId: NetworkId, branchId: BranchId): void;
@@ -61,6 +62,29 @@ export interface PlcEditor {
   previewCell(networkId: NetworkId, item: PaletteItemId, row: number, col: number): PlacementPlan;
 }
 
+/** Dev-only: every mounted editor, so the console shorthands can pick the one in use. */
+const DEBUG_EDITORS = new Map<string, EditorState>();
+
+/**
+ * Publishes `__PLC_NETWORKS__` / `__PLC_NETWORK__` for the editor the user is working in — the one
+ * holding a selection — so a hidden second workspace can never shadow the visible one.
+ */
+function publishDebugState(): void {
+  if (typeof window === 'undefined') return;
+  const entries = Array.from(DEBUG_EDITORS.values());
+  const active = entries.find((entry) => entry.selection.networkId !== null) ?? entries[0];
+  const debugWindow = window as Window & {
+    __PLC_NETWORK__?: Network;
+    __PLC_NETWORKS__?: readonly Network[];
+    __PLC_EDITORS__?: readonly (readonly Network[])[];
+  };
+  debugWindow.__PLC_EDITORS__ = entries.map((entry) => entry.present);
+  debugWindow.__PLC_NETWORKS__ = active?.present ?? [];
+  debugWindow.__PLC_NETWORK__ = active
+    ? (active.present.find((n) => n.id === active.selection.networkId) ?? active.present[0])
+    : undefined;
+}
+
 /**
  * Editor state for the ladder canvas: network list, selection, undo/redo history and the
  * LAD <-> STL switch. Every operation is a dispatch into the pure reducer, so the action object is
@@ -69,6 +93,21 @@ export interface PlcEditor {
 export function usePlcEditorState(profile: HardwareProfile, initial: readonly Network[] = []): PlcEditor {
   const reducer = useMemo(() => createEditorReducer(profile), [profile]);
   const [state, dispatch] = useReducer(reducer, undefined, () => createInitialState(initial, profile));
+
+  // Dev-only debug hook: dump the selected (else first) network from the DevTools console.
+  // Several editors are mounted at once (the S7 workspace and the LOGO!/FBD one), so each
+  // registers itself rather than overwriting a single global: whichever editor currently holds a
+  // selection is the one the user is working in, and that is the one the shorthands point at.
+  const debugId = useId();
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    DEBUG_EDITORS.set(debugId, state);
+    publishDebugState();
+    return () => {
+      DEBUG_EDITORS.delete(debugId);
+      publishDebugState();
+    };
+  }, [debugId, state]);
 
   const actions = useMemo<PlcEditorActions>(
     () => ({
@@ -85,6 +124,7 @@ export function usePlcEditorState(profile: HardwareProfile, initial: readonly Ne
       setSlot: (networkId, nodeId, slot, text) => dispatch({ type: 'setSlot', networkId, nodeId, slot, text }),
       setNodeSymbol: (networkId, nodeId, symbol) => dispatch({ type: 'setNodeSymbol', networkId, nodeId, symbol }),
       retype: (networkId, nodeId, dataType) => dispatch({ type: 'retype', networkId, nodeId, dataType }),
+      retypeWordLogic: (networkId, nodeId, width) => dispatch({ type: 'retypeWordLogic', networkId, nodeId, width }),
       addBranch: (networkId, nodeId) => dispatch({ type: 'addBranch', networkId, nodeId }),
       addLane: (networkId, branchId) => dispatch({ type: 'addLane', networkId, branchId }),
       extendBranchLeft: (networkId, branchId) => dispatch({ type: 'extendBranchLeft', networkId, branchId }),

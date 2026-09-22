@@ -393,8 +393,12 @@ function checkNode(
 
     case 'wordLogic': {
       const width = LOGIC_WIDTHS[node.width];
-      checkOperand(node.in1, width, profile, node.id, add);
-      checkOperand(node.in2, width, profile, node.id, add);
+      if ('in1' in node) {
+        checkOperand(node.in1, width, profile, node.id, add);
+        checkOperand(node.in2, width, profile, node.id, add);
+      } else {
+        checkOperand(node.in, width, profile, node.id, add);
+      }
       checkAddress(node.out, width, profile, node.id, add);
       if (node.eno) checkAddress(node.eno, BIT_OR_INSTANCE, profile, node.id, add);
       return;

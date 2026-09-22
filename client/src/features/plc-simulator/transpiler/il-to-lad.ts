@@ -165,6 +165,15 @@ const instanceNumber = (address: string): number => Number(address.replace(/^[A-
 const COMPARE_RE = /^(LD|A|O)([BWDR])(==|<>|>=|<=|>|<)$/;
 const MATH_RE = /^([+\-*/])([IDR])$/;
 const WORD_LOGIC_RE = /^(WAND|WOR|WXOR)_(B|W|DW)$/;
+const WORD_NOT_RE = /^WNOT_(B|W|DW)$/;
+const ABS_RE = /^ABS([IDR])$/;
+const UNARY_MATH_FN: Readonly<Record<string, 'SQR' | 'SIN' | 'COS' | 'EXP' | 'LN'>> = {
+  SQRT: 'SQR',
+  SIN: 'SIN',
+  COS: 'COS',
+  EXP: 'EXP',
+  LN: 'LN',
+};
 
 const COMPARE_TYPE: Readonly<Record<string, NumericType>> = { B: 'BYTE', W: 'INT', D: 'DINT', R: 'REAL' };
 const MATH_TYPE: Readonly<Record<string, NumericType>> = { I: 'INT', D: 'DINT', R: 'REAL' };
@@ -195,6 +204,12 @@ interface PendingMove {
 
 function parseNetwork(block: NetworkBlock, ctx: ParseContext): Network {
   const stack: Logic[] = [];
+  // Parallel to `stack`, one flag per level: has this level ever driven an output (via `gate()`)
+  // while it was on top? A bare `LD` legitimately restarts a fresh, independent output block
+  // within the same network (the S7-200 stack is reset on the next scan either way), so a level
+  // that *was* used is not a bug; only a level that got buried by a later `LD` without ever
+  // driving anything indicates a genuinely missing ALD/OLD/LPP.
+  const usedMask: boolean[] = [];
   const sinks: Sink[] = [];
   let pendingMove: PendingMove | null = null;
 
@@ -213,6 +228,7 @@ function parseNetwork(block: NetworkBlock, ctx: ParseContext): Network {
 
   const pushLogic = (logic: Logic, token: Token): void => {
     stack.push(logic);
+    usedMask.push(false);
     if (stack.length > LOGIC_STACK_DEPTH) {
       ctx.report(
         'STACK_OVERFLOW',
@@ -302,12 +318,17 @@ function parseNetwork(block: NetworkBlock, ctx: ParseContext): Network {
     if (opcode === 'ALD' || opcode === 'OLD') {
       flushPendingMove();
       const right = stack.pop();
+      usedMask.pop();
       const left = stack.pop();
+      usedMask.pop();
       if (right === undefined || left === undefined) {
         ctx.report('STACK_UNDERFLOW', 'error', `"${opcode}" needs two logic levels on the stack`, token);
         continue;
       }
+      // ALD/OLD is exactly the balancing act the check below looks for, so the folded level starts
+      // fresh (its own later use, if any, is what will mark it used).
       stack.push(opcode === 'ALD' ? andWith(left, right) : orWith(left, right));
+      usedMask.push(false);
       continue;
     }
 
@@ -329,7 +350,9 @@ function parseNetwork(block: NetworkBlock, ctx: ParseContext): Network {
     }
     if (opcode === 'LPP') {
       flushPendingMove();
-      if (stack.pop() === undefined) {
+      const popped = stack.pop();
+      usedMask.pop();
+      if (popped === undefined) {
         ctx.report('STACK_UNDERFLOW', 'error', '"LPP" on an empty logic stack', token);
       }
       continue;
@@ -372,7 +395,10 @@ function parseNetwork(block: NetworkBlock, ctx: ParseContext): Network {
     }
 
     // ---- output instructions -----------------------------------------------------------
-    const gate = (): Logic => stack[stack.length - 1] ?? ALWAYS;
+    const gate = (): Logic => {
+      if (stack.length > 0) usedMask[stack.length - 1] = true;
+      return stack[stack.length - 1] ?? ALWAYS;
+    };
 
     if (opcode === '=') {
       flushPendingMove();
@@ -486,6 +512,7 @@ function parseNetwork(block: NetworkBlock, ctx: ParseContext): Network {
       const pins: Logic[] = [];
       for (let i = 0; i < pinCount; i++) {
         const value = stack.pop();
+        usedMask.pop();
         if (value === undefined) {
           ctx.report('STACK_UNDERFLOW', 'error', `"${opcode}" needs ${pinCount} logic levels for its pins`, token);
           break;
@@ -560,7 +587,7 @@ function parseNetwork(block: NetworkBlock, ctx: ParseContext): Network {
       continue;
     }
 
-    if (opcode === 'SQRT' || opcode === 'SIN') {
+    if (opcode === 'SQRT' || opcode === 'SIN' || opcode === 'COS' || opcode === 'EXP' || opcode === 'LN') {
       flushPendingMove();
       const inText = token.operands[0];
       const outText = token.operands[1];
@@ -575,7 +602,7 @@ function parseNetwork(block: NetworkBlock, ctx: ParseContext): Network {
         proto: {
           id: ctx.nextNodeId(),
           type: 'math',
-          fn: opcode === 'SQRT' ? 'SQR' : 'SIN',
+          fn: UNARY_MATH_FN[opcode] ?? 'SQR',
           dataType: 'REAL',
           in: input,
           out,
@@ -585,7 +612,47 @@ function parseNetwork(block: NetworkBlock, ctx: ParseContext): Network {
       continue;
     }
 
+    const abs = ABS_RE.exec(opcode);
+    if (abs) {
+      flushPendingMove();
+      const dataType = MATH_TYPE[abs[1] ?? 'I'] ?? 'INT';
+      const inText = token.operands[0];
+      const outText = token.operands[1];
+      if (inText === undefined || outText === undefined) {
+        ctx.report('OPERAND_COUNT', 'error', `"${opcode}" requires a source and a destination`, token);
+        continue;
+      }
+      const input = parseOperand(inText, ctx, token);
+      const out = parseAddress(outText, ctx, token);
+      if (!input || out === null) continue;
+      sinks.push({
+        proto: { id: ctx.nextNodeId(), type: 'math', fn: 'ABS', dataType, in: input, out },
+        pins: [gate()],
+      });
+      continue;
+    }
+
     // ---- word logic --------------------------------------------------------------------
+    const wordNot = WORD_NOT_RE.exec(opcode);
+    if (wordNot) {
+      flushPendingMove();
+      const width = LOGIC_WIDTH_BY_SUFFIX[wordNot[1] ?? 'W'] ?? 'WORD';
+      const inText = token.operands[0];
+      const outText = token.operands[1];
+      if (inText === undefined || outText === undefined) {
+        ctx.report('OPERAND_COUNT', 'error', `"${opcode}" requires a source and a destination`, token);
+        continue;
+      }
+      const input = parseOperand(inText, ctx, token);
+      const out = parseAddress(outText, ctx, token);
+      if (!input || out === null) continue;
+      sinks.push({
+        proto: { id: ctx.nextNodeId(), type: 'wordLogic', fn: 'W_NOT', width, in: input, out },
+        pins: [gate()],
+      });
+      continue;
+    }
+
     const wordLogic = WORD_LOGIC_RE.exec(opcode);
     if (wordLogic) {
       const stem = wordLogic[1] ?? 'WAND';
@@ -635,11 +702,15 @@ function parseNetwork(block: NetworkBlock, ctx: ParseContext): Network {
       block.tokens[0] ? { line: block.tokens[0].line, column: block.tokens[0].column } : undefined,
     );
   }
-  if (stack.length > 1) {
+  // A leftover level is only a bug if it never drove anything: several independent `LD ... =`
+  // blocks in one network are ordinary STL (the CPU's logic stack resets on the next scan), so
+  // a level that reached an output before being buried by the next `LD` is not unbalanced.
+  const strandedLevels = stack.length - usedMask.filter(Boolean).length;
+  if (strandedLevels > 0) {
     ctx.report(
       'UNBALANCED_STACK',
       'warning',
-      `${stack.length} logic levels are still open at the end of the network; a missing ALD/OLD/LPP`,
+      `${strandedLevels} logic level${strandedLevels === 1 ? '' : 's'} loaded but never combined or output; a missing ALD/OLD/LPP`,
       block.tokens[0] ? { line: block.tokens[0].line, column: block.tokens[0].column } : undefined,
     );
   }

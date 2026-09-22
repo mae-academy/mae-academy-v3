@@ -1,4 +1,4 @@
-import { memo } from 'react';
+import { memo, useRef } from 'react';
 import type { Branch, BranchId } from '../../domain/ast';
 import { JUNCTION_RADIUS, boundaryX, rowY } from './geometry';
 import { useFlow } from './simulation';
@@ -35,6 +35,16 @@ const Dot = memo(function Dot({ junction }: { junction: Junction }) {
   );
 });
 
+const HANDLE_DRAG_THRESHOLD_PX = 14;
+
+/** Horizontal drag direction (+1 right, -1 left) that triggers each handle action. */
+const DRAG_SIGN = {
+  'extend-branch-right': 1,
+  'shrink-branch-left': 1,
+  'extend-branch-left': -1,
+  'shrink-branch-right': -1,
+} as const;
+
 /** Directional adjustment handle for expanding or shrinking a parallel branch. */
 export function BranchAdjustHandle({
   x,
@@ -51,6 +61,7 @@ export function BranchAdjustHandle({
   label: string;
   onActivate: () => void;
 }) {
+  const dragStartX = useRef<number | null>(null);
   return (
     <g
       role="button"
@@ -59,10 +70,23 @@ export function BranchAdjustHandle({
       data-handle={actionType}
       transform={`translate(${x} ${y})`}
       className="group cursor-pointer outline-none"
-      onClick={(event) => {
+      // A bare click never resizes a branch: the handle must be dragged past the threshold in its own direction.
+      onPointerDown={(event) => {
         event.stopPropagation();
-        onActivate();
+        event.currentTarget.setPointerCapture?.(event.pointerId);
+        dragStartX.current = event.clientX;
       }}
+      onPointerUp={(event) => {
+        event.stopPropagation();
+        const start = dragStartX.current;
+        dragStartX.current = null;
+        if (start === null) return;
+        if ((event.clientX - start) * DRAG_SIGN[actionType] >= HANDLE_DRAG_THRESHOLD_PX) onActivate();
+      }}
+      onPointerCancel={() => {
+        dragStartX.current = null;
+      }}
+      onClick={(event) => event.stopPropagation()}
       onKeyDown={(event) => {
         if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault();

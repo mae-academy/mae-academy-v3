@@ -191,6 +191,33 @@ describe('PlcEditor interactions', () => {
     expect(container.querySelectorAll('[data-layer="nodes"] [data-symbol="coil-OUT"]').length).toBe(2);
   });
 
+  it('moves the selected node one column on Alt+ArrowRight / Alt+ArrowLeft and re-renders it there', () => {
+    let captured: EditorHandle | null = null;
+    function Harness() {
+      const editor = usePlcEditorState(profile, [seal]);
+      captured = editor;
+      return <LadderCanvas editor={editor} profile={profile} />;
+    }
+    const { container } = render(<Harness />);
+    const colOf = (id: string) => (captured as EditorHandle | null)?.networks[0]?.nodes.find((n) => n.id === id)?.layout.col;
+
+    // I0.1 (NC, "stop") sits at row 0, col 1, with col 2 free ahead of it.
+    expect(colOf('stop')).toBe(1);
+    fireEvent.click(container.querySelector('[data-node-id="stop"]') as Element);
+    const app = screen.getByRole('application');
+
+    fireEvent.keyDown(app, { key: 'ArrowRight', altKey: true });
+    expect(colOf('stop')).toBe(2);
+    // The node re-renders at the new geometry: still on screen, one grid cell (100px) further right.
+    const afterRight = container.querySelector('[data-node-id="stop"]') as SVGGElement;
+    expect(afterRight).not.toBeNull();
+
+    fireEvent.keyDown(app, { key: 'ArrowLeft', altKey: true });
+    expect(colOf('stop')).toBe(1);
+    const afterLeft = container.querySelector('[data-node-id="stop"]') as SVGGElement;
+    expect(afterLeft).not.toBeNull();
+  });
+
   it('deletes the selected element with the keyboard and tidies its branch', () => {
     const { container } = render(<PlcEditor profile={profile} initialNetworks={[seal]} />);
     const holdNode = container.querySelector('[data-node-id="hold"]') as Element;

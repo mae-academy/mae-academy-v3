@@ -536,6 +536,18 @@ describe('ilToLad', () => {
       expect(out.value).not.toBeNull();
     });
 
+    it('does not report UNBALANCED_STACK for independent LD ... = blocks sharing one network', () => {
+      // Ordinary STL: the CPU's logic stack resets on the next scan, so several unrelated
+      // load-then-output sequences in one network are not a missing ALD/OLD/LPP.
+      const out = ilToLad(['LD I0.0', '= Q0.0', 'LD I0.1', '= Q0.1'].join('\n'), profile);
+      expect(out.diagnostics.some((d) => d.code === 'UNBALANCED_STACK')).toBe(false);
+    });
+
+    it('still reports UNBALANCED_STACK when a loaded level is buried without ever driving an output', () => {
+      const out = ilToLad(['LD I0.0', 'LD I0.1', 'AN I0.2', '= Q0.0'].join('\n'), profile);
+      expect(out.diagnostics.some((d) => d.code === 'UNBALANCED_STACK')).toBe(true);
+    });
+
     it('reports an output with no preceding load', () => {
       const out = ilToLad(['= Q0.0'].join('\n'), profile);
       expect(out.value?.[0]?.nodes).toHaveLength(1);
@@ -596,8 +608,15 @@ describe('round trip', () => {
     ['math', 'LD     I0.0\nMOVW   VW0, VW2\n+I     5, VW2'],
     ['accumulate', 'LD     I0.0\n+I     1, VW2'],
     ['real math', 'LD     I0.0\nSQRT   VD4, VD8'],
+    ['cosine', 'LD     I0.0\nCOS    VD4, VD8'],
+    ['exponential', 'LD     I0.0\nEXP    VD4, VD8'],
+    ['natural log', 'LD     I0.0\nLN     VD4, VD8'],
+    ['absolute value (INT)', 'LD     I0.0\nABSI   VW0, VW2'],
+    ['absolute value (DINT)', 'LD     I0.0\nABSD   VD0, VD4'],
+    ['absolute value (REAL)', 'LD     I0.0\nABSR   VD0, VD4'],
     ['compare', 'LDW>=  VW0, 100\nAR<>   VD4, 1.5\n=      Q0.0'],
     ['word logic', 'LD     I0.0\nMOVW   VW0, VW2\nWAND_W 255, VW2'],
+    ['bitwise NOT', 'LD     I0.0\nWNOT_W VW0, VW2'],
     ['edge', 'LD     I0.0\nEU\n=      Q0.0'],
     ['rail-fed coil', 'LD     SM0.0\n=      Q0.0'],
   ];

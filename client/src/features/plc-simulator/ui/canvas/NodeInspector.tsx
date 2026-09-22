@@ -1,8 +1,8 @@
 import { useId, useState } from 'react';
-import type { LadNode, NetworkId, NumericType } from '../../domain/ast';
+import type { LadNode, LogicWidth, NetworkId, NumericType } from '../../domain/ast';
 import type { HardwareProfile } from '../../domain/hardware';
 import type { SymbolMap } from '../../transpiler';
-import { Trash2, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Trash2, X } from 'lucide-react';
 import { FIELD_INPUT, PANEL, PANEL_TITLE } from '../chrome';
 import { describeNode } from './components/symbols/NodeView';
 import { findNode } from './network-edit';
@@ -10,6 +10,8 @@ import { readSlot, slotsOf, validateSlot, type SlotKey } from './operand-slots';
 import type { PlcEditor } from './usePlcEditorState';
 
 const TYPES: readonly NumericType[] = ['BYTE', 'INT', 'DINT', 'REAL'];
+const LOGIC_WIDTHS: readonly LogicWidth[] = ['BYTE', 'WORD', 'DWORD'];
+const WIDTH_LABEL: Readonly<Record<LogicWidth, string>> = { BYTE: 'Byte', WORD: 'Word', DWORD: 'DWord' };
 
 interface SlotFieldProps {
   label: string;
@@ -144,8 +146,33 @@ export function NodeInspector({
         <div className="flex min-h-0 flex-col gap-3 overflow-y-auto p-3">
           <div className="text-xs">
             <div className="text-sm font-bold text-slate-800 dark:text-slate-100">{describeNode(node)}</div>
-            <div className="text-slate-500 dark:text-slate-400">
-              row {node.layout.row + 1}, column {node.layout.col + 1}
+            <div className="mt-1 flex items-center justify-between gap-2">
+              <span className="text-slate-500 dark:text-slate-400">
+                row {node.layout.row + 1}, column {node.layout.col + 1}
+              </span>
+              {node.type === 'coil' || node.type === 'timer' || node.type === 'counter' ? (
+                <span className="text-[10px] text-slate-400 dark:text-slate-500">Anchored to output rail</span>
+              ) : (
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    aria-label="Shift element left"
+                    disabled={node.layout.col <= 0}
+                    onClick={() => actions.moveNode(networkId, node.id, node.layout.row, node.layout.col - 1)}
+                    className="flex h-6 w-6 items-center justify-center rounded border border-slate-200 text-slate-600 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-30 dark:border-[#1a1d24] dark:text-slate-300 dark:hover:bg-[#13161c]"
+                  >
+                    <ChevronLeft size={14} aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Shift element right"
+                    onClick={() => actions.moveNode(networkId, node.id, node.layout.row, node.layout.col + 1)}
+                    className="flex h-6 w-6 items-center justify-center rounded border border-slate-200 text-slate-600 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-30 dark:border-[#1a1d24] dark:text-slate-300 dark:hover:bg-[#13161c]"
+                  >
+                    <ChevronRight size={14} aria-hidden="true" />
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
@@ -181,14 +208,39 @@ export function NodeInspector({
           {(node.type === 'compare' || node.type === 'math') && (
             <label className="grid grid-cols-[5.5rem_minmax(0,1fr)] items-center gap-x-2 text-xs">
               <span className="mae-panel-field-label">Data type</span>
+              {/* SQRT/SIN/COS/EXP/LN are REAL-only on the S7-200; ABS, the comparators and the
+                  destructive ADD/SUB/MUL/DIV boxes switch freely across BYTE/INT/DINT/REAL. */}
+              {node.type === 'math' && !('in1' in node) && node.fn !== 'ABS' ? (
+                <select value="REAL" disabled className={FIELD_INPUT}>
+                  <option value="REAL">REAL</option>
+                </select>
+              ) : (
+                <select
+                  value={node.dataType}
+                  onChange={(event) => actions.retype(networkId, node.id, event.target.value as NumericType)}
+                  className={FIELD_INPUT}
+                >
+                  {TYPES.map((type) => (
+                    <option key={type} value={type}>
+                      {type}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </label>
+          )}
+
+          {node.type === 'wordLogic' && (
+            <label className="grid grid-cols-[5.5rem_minmax(0,1fr)] items-center gap-x-2 text-xs">
+              <span className="mae-panel-field-label">Width</span>
               <select
-                value={node.dataType}
-                onChange={(event) => actions.retype(networkId, node.id, event.target.value as NumericType)}
+                value={node.width}
+                onChange={(event) => actions.retypeWordLogic(networkId, node.id, event.target.value as LogicWidth)}
                 className={FIELD_INPUT}
               >
-                {TYPES.map((type) => (
-                  <option key={type} value={type}>
-                    {type}
+                {LOGIC_WIDTHS.map((width) => (
+                  <option key={width} value={width}>
+                    {WIDTH_LABEL[width]}
                   </option>
                 ))}
               </select>

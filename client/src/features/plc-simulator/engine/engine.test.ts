@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Branch, LadNode, LadderProgram, Network } from '../domain/ast';
 import { S7_200_CPU224 } from '../domain/hardware';
 import { MemoryMap } from '../domain/memory';
+import { readNumeric } from './numeric';
 import { PlcRuntime } from './plc-runtime';
 import type { FieldIoAdapter, Scheduler } from './types';
 
@@ -529,6 +530,75 @@ describe('box instructions', () => {
     h.runtime.step();
     expect(h.memory.read('VW2')).toBe(0x00cd);
   });
+
+  it('inverts a dword bit pattern (one\'s complement)', () => {
+    const h = harness([
+      network('n1', [
+        {
+          id: 'not',
+          type: 'wordLogic',
+          fn: 'W_NOT',
+          width: 'DWORD',
+          in: { kind: 'constant', value: 0x00000000 },
+          out: 'VD0',
+          layout: at(0, 0),
+        },
+      ]),
+    ]);
+    h.runtime.step();
+    expect(h.memory.read('VD0')).toBe(0xffffffff);
+  });
+
+  it('computes COS(0) == 1.0', () => {
+    const h = harness([
+      network('n1', [
+        { id: 'cos', type: 'math', fn: 'COS', dataType: 'REAL', in: { kind: 'constant', value: 0 }, out: 'VD4', layout: at(0, 0) },
+      ]),
+    ]);
+    h.runtime.step();
+    expect(readNumeric(h.memory, { kind: 'address', address: 'VD4' }, 'REAL')).toBeCloseTo(1.0, 6);
+  });
+
+  it('computes EXP(1) ~= 2.71828', () => {
+    const h = harness([
+      network('n1', [
+        { id: 'exp', type: 'math', fn: 'EXP', dataType: 'REAL', in: { kind: 'constant', value: 1 }, out: 'VD4', layout: at(0, 0) },
+      ]),
+    ]);
+    h.runtime.step();
+    expect(readNumeric(h.memory, { kind: 'address', address: 'VD4' }, 'REAL')).toBeCloseTo(Math.E, 5);
+  });
+
+  it('computes LN(e) ~= 1.0', () => {
+    const h = harness([
+      network('n1', [
+        { id: 'ln', type: 'math', fn: 'LN', dataType: 'REAL', in: { kind: 'constant', value: Math.E }, out: 'VD4', layout: at(0, 0) },
+      ]),
+    ]);
+    h.runtime.step();
+    expect(readNumeric(h.memory, { kind: 'address', address: 'VD4' }, 'REAL')).toBeCloseTo(1.0, 5);
+  });
+
+  it('drops ENO instead of producing NaN when LN is given a non-positive operand', () => {
+    const h = harness([
+      network('n1', [
+        { id: 'ln', type: 'math', fn: 'LN', dataType: 'REAL', in: { kind: 'constant', value: -1 }, out: 'VD4', eno: 'M0.0', layout: at(0, 0) },
+      ]),
+    ]);
+    const report = h.runtime.step();
+    expect(h.memory.readBit('M0.0')).toBe(false);
+    expect(report?.diagnostics.some((d) => d.code === 'ARITHMETIC_OVERFLOW')).toBe(true);
+  });
+
+  it('computes ABS(-42) == 42', () => {
+    const h = harness([
+      network('n1', [
+        { id: 'abs', type: 'math', fn: 'ABS', dataType: 'DINT', in: { kind: 'constant', value: -42 }, out: 'VD0', layout: at(0, 0) },
+      ]),
+    ]);
+    h.runtime.step();
+    expect(h.memory.readSigned('VD0')).toBe(42);
+  });
 });
 
 describe('master control relay', () => {
@@ -569,6 +639,30 @@ describe('master control relay', () => {
 
 describe('mode machine', () => {
   const simple = () => harness([network('n1', [contact('c', 'I0.0', 0, 0), coil('q', 'Q0.0', 0, 2)])]);
+
+  it('retains forced data memory across RUN and repeated scans (cold reset is the only clear)', () => {
+    const h = simple();
+    h.memory.write('VW10', 1250, 'io');
+    h.memory.write('VD100', 987654, 'io');
+    h.memory.write('MW0', 4242, 'io');
+
+    h.runtime.run();
+    for (let i = 0; i < 10; i++) h.runtime.step();
+
+    // Ten scan cycles must not touch the data table.
+    expect(h.memory.readSigned('VW10')).toBe(1250);
+    expect(h.memory.readSigned('VD100')).toBe(987654);
+    expect(h.memory.readSigned('MW0')).toBe(4242);
+
+    // A STOP/RUN cycle retains it too: RUN is a warm start for the data table.
+    h.runtime.stop();
+    h.runtime.run();
+    expect(h.memory.readSigned('VW10')).toBe(1250);
+
+    // Only an explicit cold reset clears it.
+    h.runtime.reset();
+    expect(h.memory.readSigned('VW10')).toBe(0);
+  });
 
   it('scans only while in RUN and de-energises outputs on STOP', () => {
     const h = simple();

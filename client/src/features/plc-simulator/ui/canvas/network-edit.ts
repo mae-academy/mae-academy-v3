@@ -4,6 +4,7 @@ import {
   type BranchId,
   type LadNode,
   type LayoutIssue,
+  type LogicWidth,
   type Network,
   type NodeId,
   type NumericType,
@@ -182,9 +183,9 @@ export function shiftRowRight(
   if (branchId !== null) {
     const branch = network.branches.find((b) => b.id === branchId);
     if (!branch) return null;
-    const siblings = network.nodes.filter(
-      (n) => n.layout.branchId === branchId && n.layout.row === row && n.layout.col >= col,
-    );
+    // Every lane of the branch shares one column range, so a column pushed open on one lane opens
+    // on all of them; otherwise the lanes drift out of alignment with each other.
+    const siblings = network.nodes.filter((n) => n.layout.branchId === branchId && n.layout.col >= col);
     if (siblings.length === 0) return network;
     let prepNetwork = network;
     const rightmost = Math.max(...siblings.map((s) => s.layout.col + s.layout.colSpan - 1));
@@ -194,10 +195,10 @@ export function shiftRowRight(
       else return null;
     }
     const otherNodes = prepNetwork.nodes.filter(
-      (n) => n.layout.row === row && !siblings.some((s) => s.id === n.id),
+      (n) => n.layout.branchId === branchId && !siblings.some((s) => s.id === n.id),
     );
     const canShift = !siblings.some((s) =>
-      otherNodes.some((o) => covers(o, row, s.layout.col + 1)),
+      otherNodes.some((o) => covers(o, s.layout.row, s.layout.col + 1)),
     );
     if (!canShift) return null;
     return {
@@ -215,22 +216,38 @@ export function shiftRowRight(
       (n) => n.layout.row === 0 && (n.type === 'coil' || n.layout.col === network.grid.cols - 1),
     );
     const railCol = railCoils.length > 0 ? Math.min(...railCoils.map((n) => n.layout.col)) : network.grid.cols - 1;
+    // Branches that start at or right of the insertion column travel with the series nodes as one
+    // unit (split + merge + every node they own), so their span never grows to swallow a contact.
+    const movingBranches = network.branches.filter((b) => b.splitCol >= col && b.rowStart === 0);
+    const movingIds = new Set(movingBranches.map((b) => b.id));
+    const isMoving = (id: BranchId | null): boolean => {
+      for (let cursor = id, guard = 0; cursor !== null && guard < 64; guard++) {
+        if (movingIds.has(cursor)) return true;
+        cursor = network.branches.find((b) => b.id === cursor)?.parentId ?? null;
+      }
+      return false;
+    };
     const siblings = network.nodes.filter(
       (n) =>
-        n.layout.branchId === null &&
-        n.layout.row === 0 &&
-        n.layout.col >= col &&
-        n.type !== 'coil' &&
-        n.layout.col < railCol,
+        isMoving(n.layout.branchId) ||
+        (n.layout.branchId === null &&
+          n.layout.row === 0 &&
+          n.layout.col >= col &&
+          n.type !== 'coil' &&
+          n.layout.col < railCol),
     );
     if (siblings.length === 0) return network;
-    const rightmost = Math.max(...siblings.map((s) => s.layout.col + s.layout.colSpan - 1));
+    const rightmost = Math.max(
+      ...siblings.map((s) => s.layout.col + s.layout.colSpan - 1),
+      ...movingBranches.map((b) => b.mergeCol),
+    );
     if (rightmost + 1 >= railCol) {
       return null;
     }
-    const branchesOnRow = network.branches.filter((b) => b.rowStart === 0);
+    const staticBranches = network.branches.filter((b) => b.rowStart === 0 && !isMoving(b.id));
     const collidesWithBranch = siblings.some((s) =>
-      branchesOnRow.some((b) => s.layout.col + 1 >= b.splitCol && s.layout.col + 1 <= b.mergeCol),
+      s.layout.branchId === null &&
+      staticBranches.some((b) => s.layout.col + 1 >= b.splitCol && s.layout.col + 1 <= b.mergeCol),
     );
     if (collidesWithBranch) return null;
 
@@ -240,6 +257,11 @@ export function shiftRowRight(
         siblings.some((s) => s.id === n.id)
           ? { ...n, layout: { ...n.layout, col: n.layout.col + 1 } }
           : n,
+      ),
+      branches: network.branches.map((br) =>
+        movingIds.has(br.id) || isMoving(br.id)
+          ? { ...br, splitCol: br.splitCol + 1, mergeCol: br.mergeCol + 1 }
+          : br,
       ),
     };
   }
@@ -367,6 +389,56 @@ export function moveNode(
  * Adds a parallel lane beside `nodeId`: a new branch whose top lane holds the element and whose
  * new bottom lane is empty, ready to receive contacts. Nests when the element is already in a lane.
  */
+/**
+ * Opens `offset` blank rows at `fromRow`: everything starting at or below it moves down, and a
+ * branch straddling the line grows to keep containing the lanes that moved. This is what lets a
+ * parallel lane be added under a two-row timer box even when the rows below are already in use —
+ * the canvas makes room instead of refusing the edit.
+ */
+export function pushRowsDown(
+  network: Network,
+  fromRow: number,
+  offset: number,
+  limits: ProgramLimits,
+): EditResult {
+  if (offset <= 0) return { ok: true, network };
+
+  // A multi-row box sitting across the insertion line cannot be split in half, and teleporting it
+  // would silently detach it from its rung; that case is still refused, with a reason that says so.
+  const straddler = network.nodes.find(
+    (n) => n.layout.row < fromRow && n.layout.row + n.layout.rowSpan - 1 >= fromRow,
+  );
+  if (straddler) {
+    return fail(`${straddler.id} spans that row; move or delete it before making room here`);
+  }
+
+  let deepest = 0;
+  for (const node of network.nodes) {
+    if (node.layout.row < fromRow) continue;
+    deepest = Math.max(deepest, node.layout.row + node.layout.rowSpan - 1 + offset);
+  }
+  for (const branch of network.branches) {
+    if (branch.rowEnd < fromRow) continue;
+    deepest = Math.max(deepest, branch.rowEnd + offset);
+  }
+  if (deepest >= limits.maxGridRows) {
+    return fail(`The editor grid is limited to ${limits.maxGridRows} rows`);
+  }
+
+  const nodes = network.nodes.map((node) =>
+    node.layout.row >= fromRow ? { ...node, layout: { ...node.layout, row: node.layout.row + offset } } : node,
+  );
+  const branches = network.branches.map((branch) => {
+    if (branch.rowStart >= fromRow) {
+      return { ...branch, rowStart: branch.rowStart + offset, rowEnd: branch.rowEnd + offset };
+    }
+    // Starts above the line but reaches past it: its lower lanes moved, so the group grows with them.
+    return branch.rowEnd >= fromRow ? { ...branch, rowEnd: branch.rowEnd + offset } : branch;
+  });
+
+  return { ok: true, network: withGrid({ ...network, nodes, branches }) };
+}
+
 export function addParallelBranch(
   network: Network,
   nodeId: NodeId,
@@ -385,15 +457,21 @@ export function addParallelBranch(
   const chain = ancestors(network, owner);
   const ignore = new Set(chain.map((b) => b.id));
 
-  // Ancestors must reach down to the new lane, which means their whole width must be free there.
+  // Every span that has to be clear on the new lane: the element's own columns, plus the full
+  // width of each ancestor group that still has to reach down to it.
+  const spans: (readonly [number, number])[] = [];
   for (const ancestor of chain) {
     if (ancestor.rowEnd >= lane) break;
-    if (!rowFree(network, lane, ancestor.splitCol, ancestor.mergeCol, ignore)) {
-      return fail('Not enough room below: move or delete the elements beneath first');
-    }
+    spans.push([ancestor.splitCol, ancestor.mergeCol]);
   }
-  if (!rowFree(network, lane, l.col, l.col + l.colSpan - 1, ignore)) {
-    return fail('Not enough room below: move or delete the elements beneath first');
+  spans.push([l.col, l.col + l.colSpan - 1]);
+
+  // Occupied? Open a row instead of refusing: rows below slide down and the grid grows.
+  let base = network;
+  if (spans.some(([from, to]) => !rowFree(base, lane, from, to, ignore))) {
+    const pushed = pushRowsDown(base, lane, 1, limits);
+    if (!pushed.ok) return pushed;
+    base = pushed.network;
   }
 
   const created: Branch = {
@@ -407,12 +485,12 @@ export function addParallelBranch(
 
   const grown = new Set(chain.filter((b) => b.rowEnd < lane).map((b) => b.id));
   const next: Network = withGrid({
-    ...network,
+    ...base,
     branches: [
-      ...network.branches.map((b) => (grown.has(b.id) ? { ...b, rowEnd: lane } : b)),
+      ...base.branches.map((b) => (grown.has(b.id) ? { ...b, rowEnd: lane } : b)),
       created,
     ],
-    nodes: network.nodes.map((n) => (n.id === nodeId ? { ...n, layout: { ...n.layout, branchId } } : n)),
+    nodes: base.nodes.map((n) => (n.id === nodeId ? { ...n, layout: { ...n.layout, branchId } } : n)),
   });
 
   const issue = validateNetworkLayout(next)[0];
@@ -429,10 +507,17 @@ export function addLane(network: Network, branchId: BranchId, limits: ProgramLim
 
   const chain = ancestors(network, branchId);
   const ignore = new Set(chain.map((b) => b.id));
+
+  // Same rule as `addParallelBranch`: if the lane below is taken, make room rather than refuse.
+  // `chain` starts with the branch itself, so this covers its own width as well as its ancestors'.
+  let base = network;
   for (const ancestor of chain) {
     if (ancestor.rowEnd >= lane) break;
-    if (!rowFree(network, lane, ancestor.splitCol, ancestor.mergeCol, ignore)) {
-      return fail('Not enough room below: move or delete the elements beneath first');
+    if (!rowFree(base, lane, ancestor.splitCol, ancestor.mergeCol, ignore)) {
+      const pushed = pushRowsDown(base, lane, 1, limits);
+      if (!pushed.ok) return pushed;
+      base = pushed.network; // the push clears the whole lane, so the rest of the chain is free too
+      break;
     }
   }
 
@@ -440,8 +525,8 @@ export function addLane(network: Network, branchId: BranchId, limits: ProgramLim
   return {
     ok: true,
     network: withGrid({
-      ...network,
-      branches: network.branches.map((b) => (grown.has(b.id) ? { ...b, rowEnd: lane } : b)),
+      ...base,
+      branches: base.branches.map((b) => (grown.has(b.id) ? { ...b, rowEnd: lane } : b)),
     }),
   };
 }
@@ -724,6 +809,32 @@ export function retype(network: Network, nodeId: NodeId, type: NumericType): Net
       const isConstant = /^[+-]?[\d.]/.test(text);
       if (!isConstant) next = writeSlot(next, slot.key, DEFAULT_ADDRESS[type].replace(/\d+$/, String(offset)));
       offset += type === 'BYTE' ? 1 : type === 'INT' ? 2 : 4;
+    }
+    return next;
+  });
+}
+
+const DEFAULT_LOGIC_ADDRESS: Readonly<Record<LogicWidth, string>> = {
+  BYTE: 'VB0',
+  WORD: 'VW0',
+  DWORD: 'VD0',
+};
+
+/** Changes the bit width of a word-logic box (AND/OR/XOR/NOT), resetting its address operands. */
+export function retypeWordLogic(network: Network, nodeId: NodeId, width: LogicWidth): Network {
+  return updateNode(network, nodeId, (node) => {
+    if (node.type !== 'wordLogic') return node;
+    let next: LadNode = { ...node, width };
+    let offset = 0;
+    for (const slot of slotsOf(next)) {
+      if (slot.key === 'out') {
+        next = writeSlot(next, 'out', DEFAULT_LOGIC_ADDRESS[width].replace(/\d+$/, String(offset + 8)));
+        continue;
+      }
+      const text = readSlot(next, slot.key);
+      const isConstant = /^[+-]?[\d.]/.test(text);
+      if (!isConstant) next = writeSlot(next, slot.key, DEFAULT_LOGIC_ADDRESS[width].replace(/\d+$/, String(offset)));
+      offset += width === 'BYTE' ? 1 : width === 'WORD' ? 2 : 4;
     }
     return next;
   });

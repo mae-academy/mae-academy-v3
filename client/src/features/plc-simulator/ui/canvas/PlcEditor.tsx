@@ -5,12 +5,14 @@ import { registerUnifiedMonacoThemes } from '@/lib/monacoTheme';
 import { PANEL, WindowBar } from '../chrome';
 import type { Network } from '../../domain/ast';
 import type { HardwareProfile } from '../../domain/hardware';
+import type { MemoryMap } from '../../domain/memory';
 import type { SymbolMap } from '../../transpiler';
 import { getPaletteItem, type PaletteItemId } from '../palette/catalog';
 import { Toolbox } from '../palette/Toolbox';
 import type { EditorView } from './editor-reducer';
 import { LadderCanvas } from './LadderCanvas';
 import { NodeInspector } from './NodeInspector';
+import { RegisterMonitor } from './RegisterMonitor';
 import { SimulationProvider, type SimulationStore } from './simulation';
 import { StlEditor } from './StlEditor';
 import { usePlcEditorState, type PlcEditor as PlcEditorHandle } from './usePlcEditorState';
@@ -66,11 +68,13 @@ export interface PlcEditorViewProps {
   simulation?: SimulationStore | null;
   /** Hardware rack (or any panel) shown above the node inspector in the right column. */
   rightPanel?: ReactNode;
+  /** The host session's VM memory, live in both RUN and STOP; shows the register monitor below `rightPanel` when given. */
+  memory?: MemoryMap;
   className?: string;
 }
 
 /** The editor UI over externally-owned state. `PlcEditor` is this plus its own state. */
-export function PlcEditorView({ editor, profile, symbols, simulation = null, rightPanel, className = '' }: PlcEditorViewProps) {
+export function PlcEditorView({ editor, profile, symbols, simulation = null, rightPanel, memory, className = '' }: PlcEditorViewProps) {
   const { state, actions, selection } = editor;
   const simulating = simulation !== null;
   const draggedFromPalette = useRef(false);
@@ -112,7 +116,7 @@ export function PlcEditorView({ editor, profile, symbols, simulation = null, rig
     }
   };
 
-  const hasRight = rightPanel !== undefined || !simulating;
+  const hasRight = rightPanel !== undefined || memory !== undefined || !simulating;
 
   return (
     <SimulationProvider store={simulation}>
@@ -192,6 +196,9 @@ export function PlcEditorView({ editor, profile, symbols, simulation = null, rig
         {hasRight && (
           <div className="flex min-h-0 min-w-0 flex-col gap-2.5 overflow-y-auto lg:col-span-2 xl:col-span-1">
             {rightPanel}
+            {memory && (
+              <RegisterMonitor networks={editor.networks} profile={profile} memory={memory} className="shrink-0" />
+            )}
             {!simulating && state.view === 'LAD' && <NodeInspector editor={editor} profile={profile} symbols={symbols} className="shrink-0" />}
           </div>
         )}

@@ -4,12 +4,12 @@ import { readNumeric, toFloat32, writeNumeric } from '../numeric';
 import { mirrorBit } from './shared';
 
 /**
- * ADD / SUB / MUL / DIV / SQR / SIN.
+ * ADD / SUB / MUL / DIV / SQR / SIN / COS / EXP / LN / ABS.
  *
  * EN is the rung's power flow: the box computes only while energised. ENO drops on any arithmetic
- * fault (overflow, non-finite REAL, division by zero) so the rest of the rung can react to it.
- * On a division by zero the destination is left untouched, matching the S7-200, and SM1.3 is raised
- * on the runtime status flags.
+ * fault (overflow, non-finite REAL, division by zero, LN of a non-positive operand) so the rest of
+ * the rung can react to it. On a division by zero the destination is left untouched, matching the
+ * S7-200, and SM1.3 is raised on the runtime status flags.
  */
 export function executeMath(node: MathNode, ctx: ExecContext, powerIn: boolean): boolean {
   if (!powerIn || !ctx.energised) return false;
@@ -40,6 +40,22 @@ export function executeMath(node: MathNode, ctx: ExecContext, powerIn: boolean):
     }
     case 'SIN':
       result = Math.sin(read(node.in)); // radians, per the S7 convention
+      break;
+    case 'COS':
+      result = Math.cos(read(node.in)); // radians, per the S7 convention
+      break;
+    case 'EXP':
+      result = Math.exp(read(node.in));
+      break;
+    case 'LN': {
+      const input = read(node.in);
+      // LN is undefined at and below zero; the S7-200 drops ENO rather than producing NaN/-Infinity.
+      if (input <= 0) return fault('ARITHMETIC_OVERFLOW', `LN of a non-positive operand in ${node.id}`);
+      result = Math.log(input);
+      break;
+    }
+    case 'ABS':
+      result = Math.abs(read(node.in));
       break;
     case 'ADD':
       result = read(node.in1) + read(node.in2);

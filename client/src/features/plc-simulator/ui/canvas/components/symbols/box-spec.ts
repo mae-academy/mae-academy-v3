@@ -36,6 +36,9 @@ export interface BoxSpec {
 
 const TYPE_SUFFIX = { BYTE: 'I', INT: 'I', DINT: 'D', REAL: 'R' } as const;
 
+/** REAL-only unary math boxes display their bare S7 mnemonic; ABS gets a type suffix instead (above). */
+const UNARY_MATH_TITLE = { SQR: 'SQRT', SIN: 'SIN', COS: 'COS', EXP: 'EXP', LN: 'LN' } as const;
+
 const COUNTER_PINS = {
   CTU: ['CU', 'R'],
   CTD: ['CD', 'LD'],
@@ -75,9 +78,9 @@ export function boxSpecFor(node: LadNode): BoxSpec | null {
       const binary = 'in1' in node;
       const title = binary
         ? `${node.fn}_${TYPE_SUFFIX[node.dataType]}`
-        : node.fn === 'SQR'
-          ? 'SQRT'
-          : 'SIN';
+        : node.fn === 'ABS'
+          ? `ABS${TYPE_SUFFIX[node.dataType]}`
+          : UNARY_MATH_TITLE[node.fn];
       return {
         title,
         rowSpan,
@@ -90,13 +93,17 @@ export function boxSpecFor(node: LadNode): BoxSpec | null {
     }
 
     case 'wordLogic': {
-      const stem = node.fn === 'W_AND' ? 'WAND' : node.fn === 'W_OR' ? 'WOR' : 'WXOR';
+      const stem =
+        node.fn === 'W_AND' ? 'WAND' : node.fn === 'W_OR' ? 'WOR' : node.fn === 'W_XOR' ? 'WXOR' : 'WNOT';
+      const binary = 'in1' in node;
       return {
         title: `${stem}_${LOGIC_SUFFIX[node.width]}`,
         rowSpan,
         left: [{ row: 0, label: 'EN', flow: 'pin', pinIndex: 0 }],
         right: [enoOut],
-        lines: [line(node, 'IN1', 'in1'), line(node, 'IN2', 'in2'), line(node, 'OUT', 'out')],
+        lines: binary
+          ? [line(node, 'IN1', 'in1'), line(node, 'IN2', 'in2'), line(node, 'OUT', 'out')]
+          : [line(node, 'IN', 'in'), line(node, 'OUT', 'out')],
       };
     }
 

@@ -203,10 +203,18 @@ describe('network edits', () => {
     }
   });
 
-  it('refuses a branch when the row below is occupied', () => {
+  it('makes room instead of refusing when the row below is occupied', () => {
     const base = start();
     const blocked: Network = { ...base, nodes: [...base.nodes, contact('x', 'I0.5', 1, 0, null)] };
-    expect(addParallelBranch(blocked, 'a', limits, 'br').ok).toBe(false);
+    const result = addParallelBranch(blocked, 'a', limits, 'br');
+
+    // Previously this refused with "Not enough room below". The canvas now opens a row: the
+    // blocking element slides down and the new lane takes its place.
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.network.nodes.find((n) => n.id === 'x')?.layout.row).toBe(2);
+    expect(result.network.branches.find((b) => b.id === 'br')?.rowEnd).toBe(1);
+    expect(validateNetworkLayout(result.network)).toEqual([]);
   });
 
   it('adds a lane to an existing branch', () => {
@@ -489,5 +497,110 @@ describe('editor reducer', () => {
       s = run(s, { type: 'setNodeSymbol', networkId: id, nodeId, symbol: '' });
       expect(s.present[0]?.nodes[0]?.symbol).toBe('');
     });
+  });
+});
+
+describe('series insertion left of a parallel branch', () => {
+  it('shifts the branch as one unit instead of widening it over the next contact', () => {
+    const branch: Branch = { id: 'b', parentId: null, splitCol: 0, mergeCol: 0, rowStart: 0, rowEnd: 1 };
+    const result = placeItem(
+      net([contact('a', 'I0.0', 0, 0, 'b'), contact('h', 'Q0.0', 1, 0, 'b'), contact('s', 'I0.1', 0, 1), coil('q', 'Q0.0', 0, 7)],
+        [{ ...branch, splitCol: 0, mergeCol: 0 }]),
+      { itemId: 'contact-no', nodeId: 'x', row: 0, col: 1 },
+      ctx,
+      limits,
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const b = result.network.branches[0];
+    expect([b?.splitCol, b?.mergeCol]).toEqual([0, 0]);
+    expect(result.network.nodes.find((n) => n.id === 's')?.layout.branchId).toBeNull();
+  });
+});
+
+describe('series insertion before a branch', () => {
+  it('carries the branch (split, merge and owned nodes) one column right', () => {
+    const branch: Branch = { id: 'b', parentId: null, splitCol: 1, mergeCol: 1, rowStart: 0, rowEnd: 1 };
+    const result = placeItem(
+      net([contact('p', 'I0.5', 0, 0), contact('a', 'I0.0', 0, 1, 'b'), contact('h', 'Q0.0', 1, 1, 'b'), contact('s', 'I0.1', 0, 2), coil('q', 'Q0.0', 0, 7)], [branch]),
+      { itemId: 'contact-no', nodeId: 'x', row: 0, col: 0 },
+      ctx,
+      limits,
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const b = result.network.branches[0];
+    expect([b?.splitCol, b?.mergeCol]).toEqual([2, 2]);
+    expect(result.network.nodes.find((n) => n.id === 'a')?.layout.col).toBe(2);
+    expect(result.network.nodes.find((n) => n.id === 's')?.layout.col).toBe(3);
+  });
+});
+
+// ---- vertical room: branches under multi-row boxes ---------------------------------------------
+
+describe('auto push-down when a lane is needed under a box', () => {
+  const timer = (id: string, row: number, col: number): LadNode => ({
+    id,
+    type: 'timer',
+    fn: 'TON',
+    instance: 'T37',
+    timeBaseMs: 100,
+    inputs: { IN: { kind: 'flow' }, PT: { kind: 'constant', value: 50 } },
+    outputs: {},
+    layout: { row, col, rowSpan: 2, colSpan: 1, branchId: null },
+  });
+
+  it('adds a parallel lane under a two-row TON, pushing the occupied row below down', () => {
+    const network = net(
+      [contact('a', 'I0.0', 0, 0), timer('ton', 0, 1), contact('below', 'I0.1', 2, 1)],
+      [],
+    );
+    const result = addParallelBranch(network, 'ton', limits, 'b1');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    // The new lane sits directly under the timer's own two rows...
+    const branch = result.network.branches.find((b) => b.id === 'b1');
+    expect([branch?.rowStart, branch?.rowEnd]).toEqual([0, 2]);
+    // ...and what used to sit on that row moved down instead of blocking the edit.
+    expect(result.network.nodes.find((n) => n.id === 'below')?.layout.row).toBe(3);
+    expect(result.network.nodes.find((n) => n.id === 'ton')?.layout.row).toBe(0);
+    expect(validateNetworkLayout(result.network)).toEqual([]);
+  });
+
+  it('grows a group that straddles the insertion row so it still contains its pushed lanes', () => {
+    // Mirrors the demo's alarm network: an outer group holding two rung lines, the timer on the
+    // first, and a second line directly under it — so the lane the branch needs is taken.
+    const outer: Branch = { id: 'outer', parentId: null, splitCol: 0, mergeCol: 7, rowStart: 0, rowEnd: 2 };
+    const network: Network = {
+      id: 'n',
+      grid: { rows: 3, cols: 8 },
+      nodes: [
+        { ...contact('a', 'I0.0', 0, 0), layout: at(0, 0, 'outer') },
+        { ...timer('ton', 0, 7), layout: { row: 0, col: 7, rowSpan: 2, colSpan: 1, branchId: 'outer' } },
+        { ...contact('lower', 'I0.1', 2, 7), layout: at(2, 7, 'outer') },
+      ],
+      branches: [outer],
+    };
+
+    const result = addParallelBranch(network, 'ton', limits, 'b2');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.network.branches.find((b) => b.id === 'outer')?.rowEnd).toBe(3);
+    expect(result.network.nodes.find((n) => n.id === 'lower')?.layout.row).toBe(3);
+    expect(validateNetworkLayout(result.network)).toEqual([]);
+  });
+
+  it('still refuses when the push would run past the CPU grid height', () => {
+    const tall = { ...limits, maxGridRows: 3 };
+    const network = net(
+      [contact('a', 'I0.0', 0, 0), timer('ton', 0, 1), contact('below', 'I0.1', 2, 1)],
+      [],
+    );
+    const result = addParallelBranch(network, 'ton', tall, 'b1');
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.reason).toContain('3 rows');
   });
 });

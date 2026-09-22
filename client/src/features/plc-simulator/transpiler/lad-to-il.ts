@@ -417,16 +417,44 @@ function emitCounter(node: CounterNode, inlets: readonly EvalTree[], emitter: Em
   emitter.pop(inlets.length, node.id);
 }
 
+/** REAL-only unary math boxes: bare mnemonic, `IN, OUT`. */
+const UNARY_MATH_MNEMONIC: Readonly<Record<'SQR' | 'SIN' | 'COS' | 'EXP' | 'LN', string>> = {
+  SQR: 'SQRT',
+  SIN: 'SIN',
+  COS: 'COS',
+  EXP: 'EXP',
+  LN: 'LN',
+};
+
+/** Type letter for ABS, which (unlike SQRT/SIN/...) is native to INT/DINT/REAL, not REAL-only. */
+const ABS_TYPE_LETTER: Readonly<Record<NumericType, 'I' | 'D' | 'R'>> = {
+  BYTE: 'I', // no native byte arithmetic on the S7-200; emitted as INT, like +I/-I/*I//I
+  INT: 'I',
+  DINT: 'D',
+  REAL: 'R',
+};
+
 function emitMath(node: MathNode, emitter: Emitter): void {
   const out = address(node.out);
 
   if (!('in1' in node)) {
+    // ABS is the one unary box native to INT/DINT/REAL; the rest (SQRT, SIN, COS, EXP, LN) are
+    // REAL-only on the S7-200.
+    if (node.fn === 'ABS') {
+      if (node.dataType === 'BYTE') {
+        emitter.report('UNREPRESENTABLE_NODE', 'warning', `${node.id}: the S7-200 has no BYTE arithmetic; INT is emitted`, {
+          nodeId: node.id,
+        });
+      }
+      emitter.emit(`ABS${ABS_TYPE_LETTER[node.dataType]}`, [operand(node.in, node.dataType), out], node.id);
+      return;
+    }
     if (node.dataType !== 'REAL') {
       emitter.report('UNREPRESENTABLE_NODE', 'warning', `${node.fn} is a REAL instruction on the S7-200`, {
         nodeId: node.id,
       });
     }
-    emitter.emit(node.fn === 'SQR' ? 'SQRT' : 'SIN', [operand(node.in, node.dataType), out], node.id);
+    emitter.emit(UNARY_MATH_MNEMONIC[node.fn], [operand(node.in, node.dataType), out], node.id);
     return;
   }
 
@@ -445,6 +473,13 @@ function emitMath(node: MathNode, emitter: Emitter): void {
 function emitWordLogic(node: WordLogicNode, emitter: Emitter): void {
   const out = address(node.out);
   const type: NumericType = node.width === 'BYTE' ? 'BYTE' : node.width === 'WORD' ? 'INT' : 'DINT';
+
+  if (node.fn === 'W_NOT') {
+    // Non-destructive: NOT reads its own operand and writes OUT in one step, no MOVx priming needed.
+    emitter.emit(`WNOT_${LOGIC_SUFFIX[node.width]}`, [operand(node.in, type), out], node.id);
+    return;
+  }
+
   const in1 = operand(node.in1, type);
   if (in1 !== out) emitter.emit(MOVE_MNEMONIC[type], [in1, out], node.id);
 

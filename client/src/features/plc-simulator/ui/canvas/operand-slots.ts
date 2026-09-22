@@ -73,11 +73,9 @@ export function slotsOf(node: LadNode): readonly SlotDescriptor[] {
     }
     case 'wordLogic': {
       const width = LOGIC_WIDTHS[node.width];
-      return [
-        slot('in1', 'IN1', width, true),
-        slot('in2', 'IN2', width, true),
-        slot('out', 'OUT', width),
-      ];
+      return 'in1' in node
+        ? [slot('in1', 'IN1', width, true), slot('in2', 'IN2', width, true), slot('out', 'OUT', width)]
+        : [slot('in', 'IN', width, true), slot('out', 'OUT', width)];
     }
     default: {
       const exhaustive: never = node;
@@ -108,7 +106,9 @@ export function readSlot(node: LadNode, key: SlotKey): string {
       if ('in1' in node) return key === 'in1' ? asText(node.in1) : key === 'in2' ? asText(node.in2) : '';
       return key === 'in' ? asText(node.in) : '';
     case 'wordLogic':
-      return key === 'in1' ? asText(node.in1) : key === 'in2' ? asText(node.in2) : key === 'out' ? node.out : '';
+      if (key === 'out') return node.out;
+      if ('in1' in node) return key === 'in1' ? asText(node.in1) : key === 'in2' ? asText(node.in2) : '';
+      return key === 'in' ? asText(node.in) : '';
     default:
       return '';
   }
@@ -200,9 +200,12 @@ export function writeSlot(node: LadNode, key: SlotKey, text: string): LadNode {
       }
       return key === 'in' ? { ...node, in: toOperand(text.trim()) } : node;
     case 'wordLogic':
-      if (key === 'in1') return { ...node, in1: toOperand(text.trim()) };
-      if (key === 'in2') return { ...node, in2: toOperand(text.trim()) };
-      return key === 'out' ? { ...node, out: value } : node;
+      if (key === 'out') return { ...node, out: value };
+      if ('in1' in node) {
+        if (key === 'in1') return { ...node, in1: toOperand(text.trim()) };
+        return key === 'in2' ? { ...node, in2: toOperand(text.trim()) } : node;
+      }
+      return key === 'in' ? { ...node, in: toOperand(text.trim()) } : node;
     default:
       return node;
   }

@@ -443,7 +443,10 @@ function LadderRungImpl({
         <g data-layer="handles">
           <BranchHandle
             x={boundaryX(selectedNode.layout.col) + (selectedNode.layout.colSpan * CELL_WIDTH) / 2}
-            y={rowY(selectedNode.layout.row) + 24}
+            // Anchored to the box's last occupied row, not its first: a single-row contact and a
+            // two-row timer/counter box both get the handle just past their own bottom edge, right
+            // above where the new parallel lane actually starts.
+            y={rowY(selectedNode.layout.row + selectedNode.layout.rowSpan - 1) + 24}
             label="Add parallel branch"
             onActivate={() => onAddBranch(network.id, selectedNode.id)}
           />

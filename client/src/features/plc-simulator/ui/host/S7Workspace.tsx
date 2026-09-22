@@ -145,6 +145,7 @@ export function S7Workspace({ active, profileId, initialNetworks, symbols, runti
         profile={profile}
         symbols={symbols}
         simulation={host.simulation}
+        memory={session.memory}
         className="min-h-0 flex-1"
         rightPanel={
           <SimulationProvider store={session.store}>

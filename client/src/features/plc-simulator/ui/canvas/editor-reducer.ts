@@ -1,4 +1,4 @@
-import type { BranchId, Network, NetworkId, NodeId, NumericType } from '../../domain/ast';
+import type { BranchId, LogicWidth, Network, NetworkId, NodeId, NumericType } from '../../domain/ast';
 import type { HardwareProfile } from '../../domain/hardware';
 import { ilToLad, ladToIl, type TranspileDiagnostic } from '../../transpiler';
 import type { PaletteItemId } from '../palette/catalog';
@@ -15,6 +15,7 @@ import {
   removeNodes,
   resizeGrid,
   retype,
+  retypeWordLogic,
   setSlot,
   shrinkBranchLeft,
   shrinkBranchRight,
@@ -72,6 +73,7 @@ export type EditorAction =
   | { readonly type: 'setSlot'; readonly networkId: NetworkId; readonly nodeId: NodeId; readonly slot: SlotKey; readonly text: string }
   | { readonly type: 'setNodeSymbol'; readonly networkId: NetworkId; readonly nodeId: NodeId; readonly symbol: string }
   | { readonly type: 'retype'; readonly networkId: NetworkId; readonly nodeId: NodeId; readonly dataType: NumericType }
+  | { readonly type: 'retypeWordLogic'; readonly networkId: NetworkId; readonly nodeId: NodeId; readonly width: LogicWidth }
   | { readonly type: 'addBranch'; readonly networkId: NetworkId; readonly nodeId: NodeId }
   | { readonly type: 'addLane'; readonly networkId: NetworkId; readonly branchId: BranchId }
   | { readonly type: 'extendBranchLeft'; readonly networkId: NetworkId; readonly branchId: BranchId }
@@ -351,6 +353,14 @@ export function createEditorReducer(profile: HardwareProfile) {
           state,
           action.networkId,
           (network) => ({ ok: true, network: retype(network, action.nodeId, action.dataType) }),
+          state.idCounter,
+        );
+
+      case 'retypeWordLogic':
+        return applyEdit(
+          state,
+          action.networkId,
+          (network) => ({ ok: true, network: retypeWordLogic(network, action.nodeId, action.width) }),
           state.idCounter,
         );
 
