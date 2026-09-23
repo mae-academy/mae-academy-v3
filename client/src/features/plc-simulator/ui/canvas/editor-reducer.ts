@@ -6,13 +6,16 @@ import type { Cell } from './geometry';
 import {
   addLane,
   addParallelBranch,
+  addRung,
   createEmptyNetwork,
   extendBranchLeft,
   extendBranchRight,
+  findNode,
   moveNode,
   padNetwork,
   placeItem,
   removeNodes,
+  replaceNode,
   resizeGrid,
   retype,
   retypeWordLogic,
@@ -69,6 +72,7 @@ export type EditorAction =
   /** Replaces the whole program (file import), as one undoable step. */
   | { readonly type: 'loadNetworks'; readonly networks: readonly Network[] }
   | { readonly type: 'moveNode'; readonly networkId: NetworkId; readonly nodeId: NodeId; readonly row: number; readonly col: number }
+  | { readonly type: 'replaceNode'; readonly networkId: NetworkId; readonly nodeId: NodeId; readonly newItemId: PaletteItemId }
   | { readonly type: 'deleteSelection' }
   | { readonly type: 'setSlot'; readonly networkId: NetworkId; readonly nodeId: NodeId; readonly slot: SlotKey; readonly text: string }
   | { readonly type: 'setNodeSymbol'; readonly networkId: NetworkId; readonly nodeId: NodeId; readonly symbol: string }
@@ -76,6 +80,7 @@ export type EditorAction =
   | { readonly type: 'retypeWordLogic'; readonly networkId: NetworkId; readonly nodeId: NodeId; readonly width: LogicWidth }
   | { readonly type: 'addBranch'; readonly networkId: NetworkId; readonly nodeId: NodeId }
   | { readonly type: 'addLane'; readonly networkId: NetworkId; readonly branchId: BranchId }
+  | { readonly type: 'addRung'; readonly networkId: NetworkId }
   | { readonly type: 'extendBranchLeft'; readonly networkId: NetworkId; readonly branchId: BranchId }
   | { readonly type: 'extendBranchRight'; readonly networkId: NetworkId; readonly branchId: BranchId }
   | { readonly type: 'shrinkBranchLeft'; readonly networkId: NetworkId; readonly branchId: BranchId }
@@ -314,6 +319,34 @@ export function createEditorReducer(profile: HardwareProfile) {
           }),
         );
 
+      case 'replaceNode':
+        return applyEdit(
+          state,
+          action.networkId,
+          (network) =>
+            replaceNode(
+              network,
+              action.nodeId,
+              action.newItemId,
+              limits,
+              {
+                usedInstances: usedInstances(state.present),
+                usedAddresses: usedAddresses(state.present),
+              },
+            ),
+          state.idCounter,
+          (result) => {
+            const placed = result.nodeId ? findNode(result.network, result.nodeId) : undefined;
+            return {
+              selection: {
+                networkId: action.networkId,
+                nodeId: result.nodeId ?? null,
+                cell: placed ? { row: placed.layout.row, col: placed.layout.col } : null,
+              },
+            };
+          },
+        );
+
       case 'deleteSelection': {
         const { networkId, nodeId } = state.selection;
         if (networkId === null || nodeId === null) return state;
@@ -380,6 +413,21 @@ export function createEditorReducer(profile: HardwareProfile) {
           action.networkId,
           (network) => addLane(network, action.branchId, limits),
           state.idCounter,
+        );
+
+      case 'addRung':
+        return applyEdit(
+          state,
+          action.networkId,
+          (network) => addRung(network, limits),
+          state.idCounter,
+          (result) => ({
+            selection: {
+              networkId: action.networkId,
+              nodeId: null,
+              cell: { row: result.network.grid.rows - 1, col: 0 },
+            },
+          }),
         );
 
       case 'extendBranchLeft':

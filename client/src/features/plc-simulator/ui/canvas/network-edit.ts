@@ -11,7 +11,7 @@ import {
 } from '../../domain/ast';
 import type { ProgramLimits } from '../../domain/hardware';
 import { buildNetworkTree, inletCount } from '../../engine/compiler';
-import { anchorsToRail, createNode, type PaletteItemId, type PlacementContext } from '../palette/catalog';
+import { anchorsToRail, createNode, getPaletteItem, type PaletteItemId, type PlacementContext } from '../palette/catalog';
 import { readSlot, slotsOf, writeSlot } from './operand-slots';
 import { planWiring } from './wiring';
 
@@ -865,6 +865,177 @@ export function resizeGrid(network: Network, cols: number, limits: ProgramLimits
   return next === network.grid.cols
     ? fail('The grid is already at that width')
     : { ok: true, network: { ...network, grid: { ...network.grid, cols: next } } };
+}
+
+/**
+ * Adds a new empty rung (a new row starting with a through-wire connecting the left and right rails)
+ * inside the network by incrementing rowCount, respecting CPU grid limits.
+ */
+export function addRung(network: Network, limits: ProgramLimits): EditResult {
+  const currentRows = network.grid.rows;
+  if (currentRows >= limits.maxGridRows) {
+    return fail(`The editor grid is limited to ${limits.maxGridRows} rows`);
+  }
+  return {
+    ok: true,
+    network: {
+      ...network,
+      grid: {
+        ...network.grid,
+        rows: currentRows + 1,
+      },
+    },
+  };
+}
+
+/**
+ * Replaces a component with another compatible definition while preserving:
+ * - position (row, col)
+ * - symbol tag
+ * - address/target/instance where applicable
+ */
+export function replaceNode(
+  network: Network,
+  nodeId: NodeId,
+  newItemId: PaletteItemId,
+  limits: ProgramLimits,
+  ctx: PlacementContext,
+): EditResult {
+  const oldNode = findNode(network, nodeId);
+  if (!oldNode) return fail('That element no longer exists');
+
+  const oldItem = getPaletteItem(newItemId);
+  const neededRowSpan = oldItem.rowSpan;
+  const rowDiff = neededRowSpan - oldNode.layout.rowSpan;
+
+  let baseNetwork = network;
+
+  if (rowDiff > 0) {
+    const fromRow = oldNode.layout.row + oldNode.layout.rowSpan;
+    const pushed = pushRowsDown(baseNetwork, fromRow, rowDiff, limits);
+    if (!pushed.ok) return pushed;
+    baseNetwork = pushed.network;
+  }
+
+  // Refresh oldNode position in case baseNetwork adjusted
+  const freshOldNode = findNode(baseNetwork, nodeId) ?? oldNode;
+
+  // Create template for the new component at the same grid placement
+  const template = createNode(
+    newItemId,
+    nodeId,
+    {
+      row: freshOldNode.layout.row,
+      col: freshOldNode.layout.col,
+      branchId: freshOldNode.layout.branchId,
+      rowSpan: freshOldNode.layout.rowSpan,
+      colSpan: freshOldNode.layout.colSpan,
+    },
+    ctx,
+  );
+
+  let replaced: LadNode = {
+    ...template,
+    symbol: freshOldNode.symbol ?? '',
+  };
+
+  // Transfer specific properties across compatible types
+  if (freshOldNode.type === 'contact' && replaced.type === 'contact') {
+    replaced = { ...replaced, operand: freshOldNode.operand };
+  } else if (freshOldNode.type === 'coil' && replaced.type === 'coil') {
+    if (replaced.variant !== 'MASTER') {
+      const target = 'target' in freshOldNode ? freshOldNode.target : ('Q0.0' as const);
+      if (replaced.variant === 'SET' || replaced.variant === 'RESET') {
+        const count = 'count' in freshOldNode ? freshOldNode.count : 1;
+        replaced = { ...replaced, target, count };
+      } else {
+        replaced = { ...replaced, target };
+      }
+    }
+  } else if (freshOldNode.type === 'timer' && replaced.type === 'timer') {
+    replaced = {
+      ...replaced,
+      instance: freshOldNode.instance,
+      timeBaseMs: freshOldNode.timeBaseMs,
+      inputs: {
+        ...replaced.inputs,
+        PT: freshOldNode.inputs.PT,
+      },
+    };
+  } else if (freshOldNode.type === 'counter' && replaced.type === 'counter') {
+    replaced = {
+      ...replaced,
+      instance: freshOldNode.instance,
+      inputs: {
+        ...replaced.inputs,
+        PV: freshOldNode.inputs.PV,
+      },
+    } as LadNode;
+  } else if (freshOldNode.type === 'timer' && replaced.type === 'counter') {
+    // Preserve preset if applicable
+    if ('PT' in freshOldNode.inputs) {
+      replaced = {
+        ...replaced,
+        inputs: {
+          ...replaced.inputs,
+          PV: freshOldNode.inputs.PT,
+        },
+      } as LadNode;
+    }
+  } else if (freshOldNode.type === 'counter' && replaced.type === 'timer') {
+    if ('PV' in freshOldNode.inputs) {
+      replaced = {
+        ...replaced,
+        inputs: {
+          ...replaced.inputs,
+          PT: freshOldNode.inputs.PV,
+        },
+      };
+    }
+  } else if (freshOldNode.type === 'compare' && replaced.type === 'compare') {
+    replaced = {
+      ...replaced,
+      dataType: freshOldNode.dataType,
+      lhs: freshOldNode.lhs,
+      rhs: freshOldNode.rhs,
+    };
+  } else if (
+    (freshOldNode.type === 'math' || freshOldNode.type === 'wordLogic') &&
+    (replaced.type === 'math' || replaced.type === 'wordLogic')
+  ) {
+    if ('dataType' in freshOldNode && 'dataType' in replaced) {
+      replaced = { ...replaced, dataType: freshOldNode.dataType };
+    }
+    if ('out' in freshOldNode && 'out' in replaced) {
+      replaced = { ...replaced, out: freshOldNode.out };
+    }
+    if ('in1' in freshOldNode && 'in1' in replaced) {
+      replaced = { ...replaced, in1: freshOldNode.in1 };
+    }
+    if ('in2' in freshOldNode && 'in2' in replaced) {
+      replaced = { ...replaced, in2: freshOldNode.in2 };
+    }
+    if ('in' in freshOldNode && 'in' in replaced) {
+      replaced = { ...replaced, in: freshOldNode.in };
+    }
+  }
+
+  const nextNodes = baseNetwork.nodes.map((n) => (n.id === nodeId ? replaced : n));
+  const nextNetwork = withGrid({
+    ...baseNetwork,
+    grid: {
+      ...baseNetwork.grid,
+      rows: Math.max(baseNetwork.grid.rows, replaced.layout.row + replaced.layout.rowSpan),
+      cols: Math.max(baseNetwork.grid.cols, replaced.layout.col + replaced.layout.colSpan),
+    },
+    nodes: nextNodes,
+  });
+
+  const issues = validateNetworkLayout(nextNetwork);
+  const nodeIssue = issues.find((issue) => issue.nodeId === nodeId);
+  if (nodeIssue) return fail(PROBLEMS[nodeIssue.code]);
+
+  return { ok: true, network: nextNetwork, nodeId: replaced.id };
 }
 
 /**

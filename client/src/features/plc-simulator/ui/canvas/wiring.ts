@@ -113,6 +113,25 @@ export function planWiring(network: Network, root: EvalTree): WiringPlan {
 
   planLane(root, 0, 0, state.cols, flowIn(root), state);
 
+  // Plan continuous base through-wires for any additional top-level rungs (row > 0) that have no nodes/branches
+  for (let r = 1; r < network.grid.rows; r++) {
+    const hasAnyNode = network.nodes.some(
+      (n) => r >= n.layout.row && r < n.layout.row + n.layout.rowSpan,
+    );
+    const hasAnyBranch = network.branches.some(
+      (b) => r >= b.rowStart && r <= b.rowEnd,
+    );
+    if (!hasAnyNode && !hasAnyBranch) {
+      state.h.push({
+        key: key(state, 'h'),
+        row: r,
+        from: 0,
+        to: state.cols,
+        flow: state.rail,
+      });
+    }
+  }
+
   const reached = new Set(state.leaves.map((leaf) => leaf.node.id));
   const orphanIds = new Set<NodeId>();
   for (const node of network.nodes) if (!reached.has(node.id)) orphanIds.add(node.id);

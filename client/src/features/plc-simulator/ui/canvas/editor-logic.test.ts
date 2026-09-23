@@ -6,7 +6,7 @@ import { ilToLad } from '../../transpiler';
 import { PALETTE_CATEGORIES } from '../palette/catalog';
 import { checkPlacement, createEditorReducer, createInitialState, type EditorAction, type EditorState } from './editor-reducer';
 import { CELL_WIDTH, RAIL_X, boundaryX, cellFromPoint, rowY } from './geometry';
-import { addLane, addParallelBranch, createEmptyNetwork, placeItem, removeNodes, resolveBranch } from './network-edit';
+import { addLane, addParallelBranch, addRung, createEmptyNetwork, placeItem, removeNodes, replaceNode, resolveBranch } from './network-edit';
 import { slotsOf, validateSlot, writeSlot } from './operand-slots';
 import { planWiring } from './wiring';
 
@@ -603,4 +603,75 @@ describe('auto push-down when a lane is needed under a box', () => {
     if (result.ok) return;
     expect(result.reason).toContain('3 rows');
   });
+
+  it('replaces a contact retaining its address, symbol tag and position', () => {
+    let network = createEmptyNetwork('n');
+    const placed = placeItem(network, { itemId: 'contact-no', nodeId: 'c1', row: 0, col: 0 }, ctx, limits);
+    expect(placed.ok).toBe(true);
+    if (!placed.ok) return;
+    network = {
+      ...placed.network,
+      nodes: placed.network.nodes.map((n) => (n.id === 'c1' ? { ...n, operand: 'I0.5', symbol: 'Emergency_Stop' } : n)),
+    };
+
+    const replaced = replaceNode(network, 'c1', 'contact-nc', limits, ctx);
+    expect(replaced.ok).toBe(true);
+    if (!replaced.ok) return;
+
+    const node = replaced.network.nodes.find((n) => n.id === 'c1');
+    expect(node?.type).toBe('contact');
+    if (node?.type === 'contact') {
+      expect(node.variant).toBe('NC');
+      expect(node.operand).toBe('I0.5');
+      expect(node.symbol).toBe('Emergency_Stop');
+      expect(node.layout.row).toBe(0);
+      expect(node.layout.col).toBe(0);
+    }
+  });
+
+  it('replaces a timer with another timer variant preserving instance and preset', () => {
+    let network = createEmptyNetwork('n');
+    const placed = placeItem(network, { itemId: 'timer-ton', nodeId: 't1', row: 0, col: 0 }, ctx, limits);
+    expect(placed.ok).toBe(true);
+    if (!placed.ok) return;
+    network = {
+      ...placed.network,
+      nodes: placed.network.nodes.map((n) =>
+        n.id === 't1' && n.type === 'timer'
+          ? { ...n, instance: 'T40', inputs: { ...n.inputs, PT: { kind: 'constant', value: 120 } } }
+          : n,
+      ),
+    };
+
+    const replaced = replaceNode(network, 't1', 'timer-tof', limits, ctx);
+    expect(replaced.ok).toBe(true);
+    if (!replaced.ok) return;
+
+    const node = replaced.network.nodes.find((n) => n.id === 't1');
+    expect(node?.type).toBe('timer');
+    if (node?.type === 'timer') {
+      expect(node.fn).toBe('TOF');
+      expect(node.instance).toBe('T40');
+      expect(node.inputs.PT).toEqual({ kind: 'constant', value: 120 });
+    }
+  });
+
+  it('adds a new rung to the network and routes a through-wire on the new row', () => {
+    const network = createEmptyNetwork('n');
+    expect(network.grid.rows).toBe(1);
+
+    const added = addRung(network, limits);
+    expect(added.ok).toBe(true);
+    if (!added.ok) return;
+
+    expect(added.network.grid.rows).toBe(2);
+    const p = planWiring(added.network, buildNetworkTree(added.network));
+    expect(p.rows).toBe(2);
+    // Wire on row 1 connects from rail 0 to 8
+    const row1Wire = p.hSegments.find((s) => s.row === 1);
+    expect(row1Wire).toBeDefined();
+    expect(row1Wire?.from).toBe(0);
+    expect(row1Wire?.to).toBe(8);
+  });
 });
+

@@ -25,6 +25,7 @@ export interface PlcEditorActions {
   /** Replaces the whole program in one undoable step. */
   loadNetworks(networks: readonly Network[]): void;
   moveNode(networkId: NetworkId, nodeId: NodeId, row: number, col: number): void;
+  replaceNode(networkId: NetworkId, nodeId: NodeId, newItemId: PaletteItemId): void;
   deleteSelection(): void;
   setSlot(networkId: NetworkId, nodeId: NodeId, slot: SlotKey, text: string): void;
   setNodeSymbol(networkId: NetworkId, nodeId: NodeId, symbol: string): void;
@@ -32,6 +33,7 @@ export interface PlcEditorActions {
   retypeWordLogic(networkId: NetworkId, nodeId: NodeId, width: LogicWidth): void;
   addBranch(networkId: NetworkId, nodeId: NodeId): void;
   addLane(networkId: NetworkId, branchId: BranchId): void;
+  addRung(networkId: NetworkId): void;
   extendBranchLeft(networkId: NetworkId, branchId: BranchId): void;
   extendBranchRight(networkId: NetworkId, branchId: BranchId): void;
   shrinkBranchLeft(networkId: NetworkId, branchId: BranchId): void;
@@ -120,6 +122,7 @@ export function usePlcEditorState(profile: HardwareProfile, initial: readonly Ne
       placeItem: (networkId, itemId, row, col) => dispatch({ type: 'placeSmart', networkId, itemId, row, col }),
       loadNetworks: (loaded) => dispatch({ type: 'loadNetworks', networks: loaded }),
       moveNode: (networkId, nodeId, row, col) => dispatch({ type: 'moveNode', networkId, nodeId, row, col }),
+      replaceNode: (networkId, nodeId, newItemId) => dispatch({ type: 'replaceNode', networkId, nodeId, newItemId }),
       deleteSelection: () => dispatch({ type: 'deleteSelection' }),
       setSlot: (networkId, nodeId, slot, text) => dispatch({ type: 'setSlot', networkId, nodeId, slot, text }),
       setNodeSymbol: (networkId, nodeId, symbol) => dispatch({ type: 'setNodeSymbol', networkId, nodeId, symbol }),
@@ -127,6 +130,7 @@ export function usePlcEditorState(profile: HardwareProfile, initial: readonly Ne
       retypeWordLogic: (networkId, nodeId, width) => dispatch({ type: 'retypeWordLogic', networkId, nodeId, width }),
       addBranch: (networkId, nodeId) => dispatch({ type: 'addBranch', networkId, nodeId }),
       addLane: (networkId, branchId) => dispatch({ type: 'addLane', networkId, branchId }),
+      addRung: (networkId) => dispatch({ type: 'addRung', networkId }),
       extendBranchLeft: (networkId, branchId) => dispatch({ type: 'extendBranchLeft', networkId, branchId }),
       extendBranchRight: (networkId, branchId) => dispatch({ type: 'extendBranchRight', networkId, branchId }),
       shrinkBranchLeft: (networkId, branchId) => dispatch({ type: 'shrinkBranchLeft', networkId, branchId }),

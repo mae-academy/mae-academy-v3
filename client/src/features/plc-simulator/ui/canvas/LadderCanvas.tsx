@@ -248,6 +248,14 @@ export function LadderCanvas({ editor, profile, symbols = NO_SYMBOLS, readOnly =
                   <span className="ml-auto flex items-center gap-1">
                     <button
                       type="button"
+                      aria-label={`Add a rung inside network ${index + 1}`}
+                      onClick={() => actions.addRung(network.id)}
+                      className="inline-flex h-6 items-center gap-1 rounded px-1.5 hover:bg-slate-200 dark:hover:bg-slate-700"
+                    >
+                      <Plus className="h-3 w-3" aria-hidden="true" /> rung
+                    </button>
+                    <button
+                      type="button"
                       aria-label={`Add a network below network ${index + 1}`}
                       onClick={() => actions.addNetwork(network.id)}
                       className="inline-flex h-6 items-center gap-1 rounded px-1.5 hover:bg-slate-200 dark:hover:bg-slate-700"

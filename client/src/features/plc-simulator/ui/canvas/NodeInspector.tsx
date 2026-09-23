@@ -1,17 +1,226 @@
-import { useId, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { LadNode, LogicWidth, NetworkId, NumericType } from '../../domain/ast';
 import type { HardwareProfile } from '../../domain/hardware';
 import type { SymbolMap } from '../../transpiler';
-import { ChevronLeft, ChevronRight, Trash2, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, RefreshCw, Trash2, X } from 'lucide-react';
 import { FIELD_INPUT, PANEL, PANEL_TITLE } from '../chrome';
 import { describeNode } from './components/symbols/NodeView';
 import { findNode } from './network-edit';
 import { readSlot, slotsOf, validateSlot, type SlotKey } from './operand-slots';
 import type { PlcEditor } from './usePlcEditorState';
+import {
+  PALETTE_CATEGORIES,
+  getPaletteItem,
+  type PaletteCategory,
+  type PaletteItem,
+  type PaletteItemId,
+} from '../palette/catalog';
 
 const TYPES: readonly NumericType[] = ['BYTE', 'INT', 'DINT', 'REAL'];
 const LOGIC_WIDTHS: readonly LogicWidth[] = ['BYTE', 'WORD', 'DWORD'];
 const WIDTH_LABEL: Readonly<Record<LogicWidth, string>> = { BYTE: 'Byte', WORD: 'Word', DWORD: 'DWord' };
+
+/** Maps an AST node to its corresponding or representative PaletteItemId */
+function nodeToPaletteItemId(node: LadNode): PaletteItemId {
+  switch (node.type) {
+    case 'contact':
+      switch (node.variant) {
+        case 'NO': return 'contact-no';
+        case 'NC': return 'contact-nc';
+        case 'P': return 'contact-p';
+        case 'N': return 'contact-n';
+      }
+    case 'coil':
+      switch (node.variant) {
+        case 'SET': return 'coil-set';
+        case 'RESET': return 'coil-reset';
+        default: return 'coil-out';
+      }
+    case 'timer':
+      switch (node.fn) {
+        case 'TOF': return 'timer-tof';
+        case 'TONR': return 'timer-tonr';
+        default: return 'timer-ton';
+      }
+    case 'counter':
+      switch (node.fn) {
+        case 'CTD': return 'counter-ctd';
+        case 'CTUD': return 'counter-ctud';
+        default: return 'counter-ctu';
+      }
+    case 'compare':
+      switch (node.op) {
+        case '<>': return 'cmp-ne';
+        case '>=': return 'cmp-ge';
+        case '<=': return 'cmp-le';
+        case '>': return 'cmp-gt';
+        case '<': return 'cmp-lt';
+        default: return 'cmp-eq';
+      }
+    case 'math':
+      switch (node.fn) {
+        case 'SUB': return 'math-sub';
+        case 'MUL': return 'math-mul';
+        case 'DIV': return 'math-div';
+        case 'SQR': return 'math-sqr';
+        case 'SIN': return 'math-sin';
+        case 'COS': return 'math-cos';
+        case 'EXP': return 'math-exp';
+        case 'LN': return 'math-ln';
+        case 'ABS': return 'math-abs';
+        default: return 'math-add';
+      }
+    case 'wordLogic':
+      switch (node.fn) {
+        case 'W_OR': return 'wl-or';
+        case 'W_XOR': return 'wl-xor';
+        case 'W_NOT': return 'wl-not';
+        default: return 'wl-and';
+      }
+  }
+}
+
+/** Determines compatible palette replacement categories/items for a given node */
+function getCompatibleCategories(node: LadNode): readonly PaletteCategory[] {
+  if (node.type === 'contact') {
+    const bitCat = PALETTE_CATEGORIES.find((c) => c.id === 'bit');
+    if (!bitCat) return [];
+    return [{
+      ...bitCat,
+      items: bitCat.items.filter((item) => item.id.startsWith('contact-')),
+    }];
+  }
+  if (node.type === 'coil') {
+    const bitCat = PALETTE_CATEGORIES.find((c) => c.id === 'bit');
+    if (!bitCat) return [];
+    return [{
+      ...bitCat,
+      items: bitCat.items.filter((item) => item.id.startsWith('coil-')),
+    }];
+  }
+  if (node.type === 'timer' || node.type === 'counter') {
+    const tcCat = PALETTE_CATEGORIES.find((c) => c.id === 'timerCounter');
+    return tcCat ? [tcCat] : [];
+  }
+  if (node.type === 'compare') {
+    const cmpCat = PALETTE_CATEGORIES.find((c) => c.id === 'compare');
+    return cmpCat ? [cmpCat] : [];
+  }
+  if (node.type === 'math' || node.type === 'wordLogic') {
+    const mlCat = PALETTE_CATEGORIES.find((c) => c.id === 'mathLogic');
+    return mlCat ? [mlCat] : [];
+  }
+  return PALETTE_CATEGORIES;
+}
+
+interface ReplaceComponentControlProps {
+  node: LadNode;
+  onReplace: (newItemId: PaletteItemId) => void;
+}
+
+/** Floating popover mirroring electrical-circuits ReplaceComponentControl */
+function ReplaceComponentControl({ node, onReplace }: ReplaceComponentControlProps) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const containerRef = useRef<HTMLDivElement>(null);
+  const currentItemId = nodeToPaletteItemId(node);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const handlePointerDown = (event: PointerEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('pointerdown', handlePointerDown);
+    return () => document.removeEventListener('pointerdown', handlePointerDown);
+  }, [open]);
+
+  const categories = useMemo(() => {
+    if (!open) return [];
+    const trimmed = query.trim().toLowerCase();
+    const available = getCompatibleCategories(node);
+
+    return available
+      .map((category) => ({
+        ...category,
+        items: category.items.filter(
+          (item) =>
+            !trimmed ||
+            item.label.toLowerCase().includes(trimmed) ||
+            item.description.toLowerCase().includes(trimmed),
+        ),
+      }))
+      .filter((category) => category.items.length > 0);
+  }, [open, query, node]);
+
+  return (
+    <div ref={containerRef} className="relative w-full">
+      <button
+        type="button"
+        onClick={() => setOpen((prev) => !prev)}
+        title="Replace selected component with compatible instruction"
+        className="inline-flex h-8 w-full items-center justify-start gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-medium text-slate-800 shadow-sm transition-colors hover:border-sky-400 hover:bg-slate-100 dark:border-[#1a1d24] dark:bg-[#13161c] dark:text-slate-200 dark:hover:border-sky-500 dark:hover:bg-[#181c24]"
+      >
+        <RefreshCw size={13} className="shrink-0 text-slate-400 dark:text-slate-500" aria-hidden="true" />
+        <span>Replace</span>
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-full z-50 mt-1.5 max-h-[360px] w-72 overflow-y-auto rounded-xl border border-slate-200 bg-white p-2.5 shadow-2xl dark:border-[#1a1d24] dark:bg-[#0d0f14]">
+          <input
+            autoFocus
+            placeholder="Search replacement..."
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            className="mb-2 w-full rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs text-slate-900 placeholder-slate-400 outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 dark:border-[#1a1d24] dark:bg-[#13161c] dark:text-slate-100 dark:placeholder-slate-500"
+          />
+          <div className="flex flex-col gap-2">
+            {categories.map((category) => (
+              <div key={category.id} className="space-y-1">
+                <div className="px-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                  {category.label}
+                </div>
+                {category.items.map((item) => {
+                  const isCurrent = item.id === currentItemId;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => {
+                        onReplace(item.id);
+                        setOpen(false);
+                        setQuery('');
+                      }}
+                      className={`flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-xs transition-colors ${
+                        isCurrent
+                          ? 'bg-slate-100 font-semibold text-slate-900 dark:bg-slate-800 dark:text-white'
+                          : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800/60'
+                      }`}
+                    >
+                      <div className="flex flex-col">
+                        <span className="font-mono text-xs font-medium">{item.label}</span>
+                        <span className="text-[10px] text-slate-400 dark:text-slate-500">{item.description}</span>
+                      </div>
+                      {isCurrent && (
+                        <span className="text-[10px] font-bold text-sky-600 dark:text-sky-400">Current</span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            ))}
+            {categories.length === 0 && (
+              <div className="p-3 text-center text-xs text-slate-400 dark:text-slate-500">
+                No compatible replacements found
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface SlotFieldProps {
   label: string;
@@ -175,6 +384,11 @@ export function NodeInspector({
               )}
             </div>
           </div>
+
+          <ReplaceComponentControl
+            node={node}
+            onReplace={(newItemId) => actions.replaceNode(networkId, node.id, newItemId)}
+          />
 
           {slotsOf(node).map((slot) => {
             const isAddressSlot = slot.key === 'operand' || slot.key === 'target' || slot.key === 'instance';

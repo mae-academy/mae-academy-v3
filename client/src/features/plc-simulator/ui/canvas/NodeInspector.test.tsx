@@ -137,3 +137,65 @@ describe('parallel branch handle on multi-row boxes', () => {
     expect(branch.rowEnd).toBe(2); // one row past the timer's own two rows: the new parallel lane
   });
 });
+
+describe('NodeInspector Replace button and network + rung', () => {
+  it('opens replace menu and allows replacing a contact retaining address and symbol', () => {
+    let captured: EditorHandle | null = null;
+    const network: Network = {
+      id: 'n1',
+      grid: { rows: 2, cols: 8 },
+      nodes: [{ ...contact('c1', 'I0.7', 0, 0), symbol: 'Pump_Run' }],
+      branches: [],
+    };
+    const { container } = render(<Harness network={network} capture={(e) => (captured = e)} />);
+
+    // Select node
+    fireEvent.click(container.querySelector('[data-node-id="c1"]') as Element);
+
+    // Verify Replace button is present
+    const replaceBtn = screen.getByTitle('Replace selected component with compatible instruction');
+    expect(replaceBtn).toBeDefined();
+
+    // Click Replace button to open popover
+    fireEvent.click(replaceBtn);
+
+    // Look for replacement options in popover
+    expect(screen.getByText('Normally closed contact')).toBeDefined();
+    expect(screen.getByText('Positive edge contact')).toBeDefined();
+
+    // Click NC replacement
+    fireEvent.click(screen.getByText('Normally closed contact'));
+
+    // Check that editor state replaced the node
+    const updated = (captured as EditorHandle | null)?.networks[0]?.nodes.find((n) => n.id === 'c1');
+    expect(updated).toBeDefined();
+    expect(updated?.type).toBe('contact');
+    if (updated?.type === 'contact') {
+      expect(updated.variant).toBe('NC');
+      expect(updated.operand).toBe('I0.7');
+      expect(updated.symbol).toBe('Pump_Run');
+      expect(updated.layout.row).toBe(0);
+      expect(updated.layout.col).toBe(0);
+    }
+  });
+
+  it('clicking + rung in the network header increments rowCount and creates a new rung', () => {
+    let captured: EditorHandle | null = null;
+    const network: Network = {
+      id: 'n1',
+      grid: { rows: 1, cols: 8 },
+      nodes: [contact('c1', 'I0.0', 0, 0)],
+      branches: [],
+    };
+    render(<Harness network={network} capture={(e) => (captured = e)} />);
+
+    const addRungBtn = screen.getByRole('button', { name: 'Add a rung inside network 1' });
+    expect(addRungBtn).toBeDefined();
+
+    fireEvent.click(addRungBtn);
+
+    const netAfter = (captured as EditorHandle | null)?.networks[0];
+    expect(netAfter?.grid.rows).toBe(2);
+  });
+});
+
