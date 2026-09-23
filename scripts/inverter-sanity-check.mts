@@ -2,7 +2,7 @@ import {
   defaultInverterParameters,
   simulateInverter,
   type InverterParameters,
-} from "../client/src/lib/inverterMath.ts";
+} from "../client/src/features/power-electronics/inverterMath.ts";
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);

@@ -2,7 +2,7 @@ import type { NodeId } from '../../../../domain/ast';
 import { CELL_HEIGHT, CELL_WIDTH, cellTop, rowY } from '../../geometry';
 import type { BoxSpec } from './box-spec';
 import { SymbolLabel } from './SymbolLabel';
-import { BOX_FILL, BOX_FILL_LIVE, TEXT_LIVE, TEXT_PIN, wireClass } from './theme';
+import { BOX_FILL, BOX_FILL_LIVE, CANVAS_FONT_FAMILY, TEXT_LIVE, TEXT_PIN, wireClass } from './theme';
 
 export interface BoxSymbolProps {
   nodeId: NodeId;
@@ -93,9 +93,10 @@ export function BoxSymbol({ nodeId, spec, x, row, pinFlows, flowOut, liveValue, 
         x={g.x0 + g.width / 2}
         y={g.top + 13}
         textAnchor="middle"
+        fontFamily={CANVAS_FONT_FAMILY}
         fontSize={11}
-        fontWeight={700}
-        className={`font-mono select-none ${energised ? TEXT_LIVE : 'fill-slate-900 dark:fill-slate-100'}`}
+        fontWeight={600}
+        className={`font-sans select-none ${energised ? TEXT_LIVE : 'fill-slate-900 dark:fill-slate-100'}`}
       >
         {spec.title}
       </text>
@@ -133,9 +134,10 @@ export function BoxSymbol({ nodeId, spec, x, row, pinFlows, flowOut, liveValue, 
           key={`ll${pin.row}${pin.label}`}
           x={g.x0 + 5}
           y={rowY(row + pin.row) + 4}
+          fontFamily={CANVAS_FONT_FAMILY}
           fontSize={10}
           fontWeight={500}
-          className={`font-mono select-none ${TEXT_PIN}`}
+          className={`font-sans select-none ${TEXT_PIN}`}
         >
           {pin.label}
         </text>
@@ -146,9 +148,10 @@ export function BoxSymbol({ nodeId, spec, x, row, pinFlows, flowOut, liveValue, 
           x={right - 5}
           y={rowY(row + pin.row) + 4}
           textAnchor="end"
+          fontFamily={CANVAS_FONT_FAMILY}
           fontSize={10}
           fontWeight={500}
-          className={`font-mono select-none ${TEXT_PIN}`}
+          className={`font-sans select-none ${TEXT_PIN}`}
         >
           {pin.label}
         </text>
@@ -158,7 +161,7 @@ export function BoxSymbol({ nodeId, spec, x, row, pinFlows, flowOut, liveValue, 
         const y = (g.lineYs[index] ?? g.top) + 0;
         return (
           <g key={`${line.label}${index}`}>
-            <text x={g.x0 + 5} y={y} fontSize={10} className={`font-mono select-none ${TEXT_PIN}`}>
+            <text x={g.x0 + 5} y={y} fontFamily={CANVAS_FONT_FAMILY} fontSize={10} className={`font-sans select-none ${TEXT_PIN}`}>
               {line.label}
             </text>
             <SymbolLabel
@@ -174,7 +177,7 @@ export function BoxSymbol({ nodeId, spec, x, row, pinFlows, flowOut, liveValue, 
         );
       })}
       {truncated && (
-        <text x={right - 5} y={g.top + g.height - 3} textAnchor="end" fontSize={10} className={`select-none ${TEXT_PIN}`}>
+        <text x={right - 5} y={g.top + g.height - 3} textAnchor="end" fontFamily={CANVAS_FONT_FAMILY} fontSize={10} className={`font-sans select-none ${TEXT_PIN}`}>
           <title>Increase the box height to show every operand</title>
           …
         </text>

@@ -122,7 +122,7 @@ const InputTerminal = memo(function InputTerminal({
       >
         {label}
       </button>
-      <span className="font-mono text-[8px] text-slate-500">{address}</span>
+      <span className="font-sans text-[8px] font-semibold text-slate-500">{address}</span>
     </div>
   );
 });
@@ -131,7 +131,7 @@ const OutputRelay = memo(function OutputRelay({ memory, index }: { memory: Memor
   const address = bitAddress('Q', index);
   return (
     <div className="flex w-9 flex-col items-center gap-1" data-relay={`Q${index + 1}`}>
-      <span className="font-mono text-[8px] text-slate-500">{address}</span>
+      <span className="font-sans text-[8px] font-semibold text-slate-500">{address}</span>
       <div className="flex h-6 w-7 items-center justify-center rounded-sm border border-slate-500 bg-slate-300 text-[10px] font-bold text-slate-700">
         {`Q${index + 1}`}
       </div>
@@ -273,7 +273,7 @@ export function LogoHardware({ profile, memory, field, mode, frame, getSnapshot,
         <div
           role="note"
           aria-label="Keyboard shortcuts"
-          className="mb-3 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 rounded-md bg-slate-400/25 px-2 py-1 font-mono text-[10px] text-slate-600"
+          className="mb-3 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 rounded-md bg-slate-400/25 px-2 py-1 font-sans text-[10px] font-medium text-slate-600"
         >
           <span>[▲▼◄► Nav]</span>
           <span>[Enter: OK]</span>

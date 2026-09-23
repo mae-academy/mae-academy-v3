@@ -27,7 +27,7 @@ export const MathLiveSignalInput = forwardRef<MathLiveSignalInputHandle, Props>(
   useEffect(() => {
     const host = hostRef.current; if (!host) return;
     const field = document.createElement("math-field") as MathfieldElement;
-    field.className = "mae-mathlive-field block min-h-12 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-lg text-slate-900 shadow-inner outline-none transition focus-within:border-violet-400 focus-within:ring-2 focus-within:ring-violet-400/20 dark:border-slate-700 dark:bg-slate-950 dark:text-white";
+    field.className = "mae-mathlive-field block min-h-14 w-full rounded-2xl border border-slate-200 bg-white/80 px-4 py-4 text-2xl text-slate-900 shadow-sm backdrop-blur outline-none transition focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-900/70 dark:text-white";
     field.setAttribute("aria-labelledby", labelledBy);
     field.setAttribute("math-virtual-keyboard-policy", "manual");
     field.setAttribute("smart-fence", "on");
@@ -43,14 +43,21 @@ export const MathLiveSignalInput = forwardRef<MathLiveSignalInputHandle, Props>(
     const handleInput = () => latestChange.current(field.value);
     field.addEventListener("input", handleInput);
     host.replaceChildren(field); fieldRef.current = field;
-    return () => { field.removeEventListener("input", handleInput); field.remove(); fieldRef.current = null; };
+    // Strip the Desmos-style chrome once mounted: no context menu, no virtual-keyboard toggle.
+    field.menuItems = [];
+    const stripToggles = () => field.shadowRoot?.querySelector(".ML__toggles")?.remove();
+    stripToggles();
+    const toggles = new MutationObserver(stripToggles);
+    if (field.shadowRoot) toggles.observe(field.shadowRoot, { childList: true, subtree: true });
+    return () => { toggles.disconnect(); field.removeEventListener("input", handleInput); field.remove(); fieldRef.current = null; };
   }, [labelledBy]);
 
   useEffect(() => { const field = fieldRef.current; if (field && field.value !== value) field.value = value; }, [value]);
 
   useImperativeHandle(ref, () => ({
     focus: () => fieldRef.current?.focus(),
-    insert: (latex, selectionMode = "placeholder") => { const field = fieldRef.current; if (!field) return; field.insert(latex, { format: "latex", focus: true, selectionMode, scrollIntoView: true }); },
+    // An unfocused field still holds a full-document selection, so pill insertions append instead of replacing.
+    insert: (latex, selectionMode = "placeholder") => { const field = fieldRef.current; if (!field) return; const appending = document.activeElement !== field; field.focus(); if (appending) field.position = field.lastOffset; field.insert(latex, { format: "latex", focus: true, selectionMode, scrollIntoView: true }); },
     backspace: () => { const field = fieldRef.current; if (!field) return; field.focus(); field.executeCommand("deleteBackward"); },
     setValue: (latex) => { const field = fieldRef.current; if (field) field.value = latex; },
   }), []);

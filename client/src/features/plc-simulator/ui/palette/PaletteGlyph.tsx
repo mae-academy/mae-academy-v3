@@ -2,7 +2,7 @@ import type { PaletteItem } from './catalog';
 import { CoilSymbol } from '../canvas/components/symbols/CoilSymbol';
 import { CompareSymbol } from '../canvas/components/symbols/CompareSymbol';
 import { ContactSymbol } from '../canvas/components/symbols/ContactSymbol';
-import { BOX_FILL, TEXT_ADDRESS, WIRE_IDLE } from '../canvas/components/symbols/theme';
+import { BOX_FILL, CANVAS_FONT_FAMILY, TEXT_ADDRESS, WIRE_IDLE } from '../canvas/components/symbols/theme';
 
 /** Miniature of what an item looks like once placed, drawn by the same symbol components. */
 export function PaletteGlyph({ item }: { item: PaletteItem }) {
@@ -56,7 +56,15 @@ export function PaletteGlyph({ item }: { item: PaletteItem }) {
         ) : (
           <g>
             <rect x={14} y={6} width={72} height={32} rx={2} strokeWidth={2} className={`${BOX_FILL} ${WIRE_IDLE}`} />
-            <text x={50} y={26} textAnchor="middle" fontSize={11} fontWeight={700} className={`font-mono ${TEXT_ADDRESS}`}>
+            <text
+              x={50}
+              y={26}
+              textAnchor="middle"
+              fontFamily={CANVAS_FONT_FAMILY}
+              fontSize={11}
+              fontWeight={600}
+              className={`font-sans ${TEXT_ADDRESS}`}
+            >
               {item.label}
             </text>
           </g>

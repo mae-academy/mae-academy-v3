@@ -6,6 +6,20 @@
  * It deliberately contains no React, DOM, Canvas, or SVG concerns.
  */
 
+/** Dirac calculus (definite integrals, sifting, δ⁽ⁿ⁾ rules) lives in its own core and is re-exported here. */
+export {
+  evaluateDefiniteIntegral,
+  parseDefiniteIntegral,
+  parseExpression,
+  differentiate,
+  evaluateNode,
+  siftProduct,
+  DomainError,
+  type MathNode,
+  type DefiniteIntegral,
+  type IntegralEvaluation,
+} from "@/features/signals/engines/diracIntegral";
+
 export type BasicSignalKind = "step" | "ramp" | "rect" | "tri" | "sinc" | "sa" | "signum" | "sine" | "cosine" | "dirac";
 export type SignalClassification = "Energy Signal" | "Power Signal" | "Neither" | "Symbolic Distribution";
 

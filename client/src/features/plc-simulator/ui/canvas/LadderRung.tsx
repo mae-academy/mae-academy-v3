@@ -7,6 +7,7 @@ import { resolveBranch } from './network-edit';
 import { anchorsToRail, type PlacementPlan } from './placement-rules';
 import { NodeView } from './components/symbols/NodeView';
 import {
+  CANVAS_FONT_FAMILY,
   CELL_HOVER_BAD,
   CELL_HOVER_OK,
   RAIL_LIVE,
@@ -246,7 +247,7 @@ function LadderRungImpl({
       width={size.width}
       height={size.height}
       viewBox={`0 0 ${size.width} ${size.height}`}
-      className="block max-w-none select-none"
+      className="block max-w-none select-none plc-ladder-canvas font-sans"
       data-network={network.id}
       onDragLeave={(event) => {
         if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setHover(null);
@@ -256,7 +257,14 @@ function LadderRungImpl({
       onPointerCancel={handlePointerCancel}
       onPointerLeave={handlePointerCancel}
     >
-      <text x={8} y={rowY(0) + 4} fontSize={11} className="fill-slate-400 font-mono dark:fill-slate-500">
+      <text
+        x={8}
+        y={rowY(0) + 4}
+        fontFamily={CANVAS_FONT_FAMILY}
+        fontSize={11}
+        fontWeight={500}
+        className="fill-slate-400 font-sans dark:fill-slate-500"
+      >
         {index + 1}
       </text>
 
@@ -360,9 +368,10 @@ function LadderRungImpl({
             x={(CELL_WIDTH - 8) / 2}
             y={(ghostRows * CELL_HEIGHT - 8) / 2 + 4}
             textAnchor="middle"
+            fontFamily={CANVAS_FONT_FAMILY}
             fontSize={12}
-            fontWeight={700}
-            className="fill-indigo-600 font-mono dark:fill-indigo-400"
+            fontWeight={600}
+            className="fill-indigo-600 font-sans dark:fill-indigo-400"
           >
             {armedItem.label}
           </text>

@@ -1,4 +1,4 @@
-import { defaultAcVoltageControllerParameters, simulateAcVoltageController, solveExtinctionAngle, type AcVoltageControllerParameters } from "../client/src/lib/acVoltageControllerMath.ts";
+import { defaultAcVoltageControllerParameters, simulateAcVoltageController, solveExtinctionAngle, type AcVoltageControllerParameters } from "../client/src/features/power-electronics/acVoltageControllerMath.ts";
 
 function assert(condition: unknown, message: string): asserts condition { if (!condition) throw new Error(message); }
 function close(value: number, expected: number, tolerance: number, message: string) { assert(Math.abs(value - expected) <= tolerance, `${message}: received ${value}, expected ${expected} ± ${tolerance}`); }

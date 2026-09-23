@@ -143,7 +143,7 @@ export function PlcEditorView({ editor, profile, symbols, simulation = null, rig
           {state.view === 'LAD' ? (
             <section className={`${PANEL} min-h-0 flex-1`}>
               <WindowBar
-                icon={<span className="font-mono text-[10px] font-bold">LAD</span>}
+                icon={<span className="font-sans text-[10px] font-bold tracking-tight">LAD</span>}
                 title="ladder.lad"
                 trailing={
                   <div className="flex items-center gap-2">

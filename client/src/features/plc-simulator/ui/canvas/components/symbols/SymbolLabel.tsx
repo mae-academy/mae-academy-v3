@@ -2,15 +2,15 @@ import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import type { NodeId } from '../../../../domain/ast';
 import { useLadderEnv } from '../../env';
 import type { SlotKey } from '../../operand-slots';
-import { TEXT_ADDRESS, TEXT_LIVE, TEXT_PIN, TEXT_TAG } from './theme';
+import { CANVAS_FONT_FAMILY, TEXT_ADDRESS, TEXT_LIVE, TEXT_PIN, TEXT_TAG } from './theme';
 
 export type LabelTone = 'address' | 'tag' | 'pin' | 'value';
 
 const TONE: Readonly<Record<LabelTone, { className: string; size: number; weight: number }>> = {
-  address: { className: `font-mono ${TEXT_ADDRESS}`, size: 12, weight: 600 },
+  address: { className: `font-sans ${TEXT_ADDRESS}`, size: 12, weight: 600 },
   tag: { className: `font-sans ${TEXT_TAG}`, size: 10, weight: 400 },
-  pin: { className: `font-mono ${TEXT_PIN}`, size: 10, weight: 500 },
-  value: { className: `font-mono ${TEXT_LIVE}`, size: 10, weight: 600 },
+  pin: { className: `font-sans ${TEXT_PIN}`, size: 10, weight: 500 },
+  value: { className: `font-sans ${TEXT_LIVE}`, size: 10, weight: 600 },
 };
 
 export interface SymbolLabelProps {
@@ -52,6 +52,7 @@ export function SymbolLabel({ nodeId, slot, x, y, text, tone, anchor = 'middle' 
       x={x}
       y={y}
       textAnchor={anchor}
+      fontFamily={CANVAS_FONT_FAMILY}
       fontSize={style.size}
       fontWeight={style.weight}
       className={`${style.className} select-none ${editable ? 'cursor-text' : ''}`}
@@ -121,7 +122,7 @@ function AddressEditor({ initial, validate, onCommit, onCancel }: AddressEditorP
         aria-describedby={error !== null ? errorId : undefined}
         spellCheck={false}
         autoComplete="off"
-        className={`h-6 w-full rounded border px-1.5 font-mono text-xs outline-none bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100 ${
+        className={`h-6 w-full rounded border px-1.5 font-sans text-xs outline-none bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100 ${
           error === null ? 'border-sky-500 focus:ring-1 focus:ring-sky-500' : 'border-red-500 focus:ring-1 focus:ring-red-500'
         }`}
       />

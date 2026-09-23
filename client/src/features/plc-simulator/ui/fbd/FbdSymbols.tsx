@@ -1,4 +1,5 @@
 import { BLOCK_W, HEADER_H, PIN_PITCH, blockHeight, type FbdKind } from './model';
+import { CANVAS_FONT_FAMILY } from '../canvas/components/symbols/theme';
 
 /** IEC 61131-3 function-block markings. */
 export const SYMBOL: Readonly<Record<FbdKind, string>> = {
@@ -38,9 +39,10 @@ export function BlockGlyph({ kind }: { kind: FbdKind }) {
         x={BLOCK_W / 2}
         y={h / 2 + 8}
         textAnchor="middle"
+        fontFamily={CANVAS_FONT_FAMILY}
         fontSize={kind === 'input' || kind === 'output' ? 26 : 30}
-        fontWeight={700}
-        className="fill-slate-800 font-mono dark:fill-slate-100"
+        fontWeight={600}
+        className="fill-slate-800 font-sans dark:fill-slate-100"
       >
         {kind === 'input' ? 'I' : kind === 'output' ? 'Q' : SYMBOL[kind]}
       </text>

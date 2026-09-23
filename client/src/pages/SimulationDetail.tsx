@@ -67,11 +67,11 @@ export default function SimulationDetail() {
   const circuitTabs = circuitTabCopy[locale];
   const tools = isControlSystems ? controlSystemToolMeta[locale]
     : isPowerElectronics ? powerElectronicsToolMeta
-        : isSignalsAndSystems ? signalsAndSystemsToolMeta
-          : isLinearAlgebra ? linearAlgebraToolMeta[locale]
-            : isCircuitLab ? [{ slug: "workspace", label: circuitTabs.canvas }]
-              : isDigitalLogicDesign ? [{ slug: "workspace", label: simulation.title }]
-                : isCodeStudio ? [{ slug: "", label: simulation.title }]
+      : isSignalsAndSystems ? signalsAndSystemsToolMeta
+        : isLinearAlgebra ? linearAlgebraToolMeta[locale]
+          : isCircuitLab ? [{ slug: "workspace", label: circuitTabs.canvas }]
+            : isDigitalLogicDesign ? [{ slug: "workspace", label: simulation.title }]
+              : isCodeStudio ? [{ slug: "", label: simulation.title }]
                 : circuitLabClone ? [{ slug: "a", label: simulation.title }]
                   : ["A", "B", "C", "D", "E"].map((label) => ({ slug: label.toLowerCase(), label }));
   const defaultTool = tools[0].slug;

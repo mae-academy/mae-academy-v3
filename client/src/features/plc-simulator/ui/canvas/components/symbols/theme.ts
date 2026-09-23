@@ -34,4 +34,6 @@ export const CELL_HOVER_OK = 'fill-indigo-500/15 stroke-indigo-500';
 export const CELL_HOVER_BAD = 'fill-red-500/10 stroke-red-500';
 export const CELL_SELECTED = 'fill-transparent stroke-none opacity-0';
 
-export const FONT_MONO = 'font-mono';
+export const CANVAS_FONT_FAMILY = 'inherit';
+export const FONT_SANS = 'font-sans';
+export const FONT_MONO = 'font-sans';

@@ -37,7 +37,7 @@ function PresetField({ block, onCommit }: { block: FbdBlock; onCommit: (ticks: n
           if (event.key === 'Enter') commit();
           if (event.key === 'Escape') setDraft(String(ticks / 10));
         }}
-        className={`${FIELD_INPUT} font-mono ${valid ? '' : '!border-red-500'}`}
+        className={`${FIELD_INPUT} font-sans ${valid ? '' : '!border-red-500'}`}
       />
     </label>
   );
@@ -71,7 +71,7 @@ export function FbdInspector({ editor, profile, diagnostics, className = '' }: F
         <div className="flex flex-col gap-3 p-3">
           <div className="text-xs">
             <div className="text-sm font-bold text-slate-800 dark:text-slate-100">{KINDS[block.kind].description}</div>
-            <div className="font-mono text-slate-500 dark:text-slate-400">
+            <div className="font-sans text-slate-500 dark:text-slate-400">
               {blockCaption(block)}
               {(block.kind === 'ton' || block.kind === 'tof') && ` · ${timerInstances(graph).get(block.id)}`}
               {block.kind === 'sr' && ` · M${markerIndices(graph).get(block.id) ?? 0}.0`}

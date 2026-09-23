@@ -58,7 +58,7 @@ export function Toolbox({ armed, onActivate, onDragStart, onDragEnd, disabled = 
             className={tileClass(isArmed)}
           >
             <PaletteGlyph item={item} />
-            <span className="font-mono">{item.label}</span>
+            <span className="font-sans font-medium text-[11px]">{item.label}</span>
           </button>
         );
       }}

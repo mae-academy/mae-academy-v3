@@ -3,6 +3,7 @@
  * Technical editorial surfaces, signal violet accents, and SVG-friendly background texture.
  */
 @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap');
+@import "katex/dist/katex.min.css";
 @import "tailwindcss";
 @import "tw-animate-css";
 
@@ -252,17 +253,31 @@
   .mae-wave-grid { position: relative; }
   .mae-wave-grid::before { content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none; background-image: radial-gradient(rgb(148 163 184 / .35) 1px, transparent 1px); background-size: 26px 26px; mask-image: radial-gradient(circle at center, black 55%, transparent 90%); }
   .dark .mae-wave-grid::before { background-image: radial-gradient(rgb(255 255 255 / .12) 1px, transparent 1px); }
+  /* Prevent parent Tailwind fonts from bleeding into KaTeX */
+  .katex-html {
+    font-family: KaTeX_Main, serif !important;
+  }
+  .katex-html .mathnormal,
+  .katex-html .mord.mathnormal {
+    font-family: KaTeX_Math !important;
+    font-style: italic !important;
+  }
+  .katex-html .mathrm {
+    font-family: KaTeX_Main !important;
+    font-style: normal !important;
+  }
+
   /* Universal Platform Signature Pill */
   .brand-pill-active,
   .tab-brand-gradient[data-state=active],
   [data-state=active].tab-brand-gradient,
   [data-state=active].brand-pill-tab {
-    background: linear-gradient(135deg, #2563eb 0%, #7c3aed 50%, #f43f5e 100%) !important;
+    background: linear-gradient(135deg, #2563EB 0%, #7C3AED 50%, #E11D48 100%) !important;
     color: #ffffff !important;
     border-radius: 9999px !important; /* rounded-full */
     box-shadow: 0 2px 8px -1px rgba(124, 58, 237, 0.35) !important;
     border: 1px solid transparent !important;
-    font-weight: 500;
+    font-weight: 600;
     transition: all 0.15s ease-in-out;
   }
 
@@ -579,6 +594,13 @@
     background: linear-gradient(135deg, #2563eb 0%, #9333ea 50%, #e11d48 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
+  }
+
+  /* PLC Simulator: Standardized clean modern sans-serif typography across SVG canvas */
+  svg.plc-ladder-canvas text,
+  .plc-ladder-canvas text,
+  .plc-canvas text {
+    font-family: inherit;
   }
 }
 

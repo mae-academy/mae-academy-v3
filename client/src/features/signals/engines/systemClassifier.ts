@@ -3,14 +3,18 @@
  * Source normalization, semantic classification, numerical evaluation, and
  * graph sample generation are deliberately separate from React and Canvas.
  */
+import { evaluateDefiniteIntegral } from "./diracIntegral";
 
 export type AffineTime = { slope: number; offset: number };
 export type Coefficient = { constant: number; timeSlope: number };
+/** Canonical independent test signals injectable from the SIGNAL ENGINE pills. */
+export type SignalKind = "u" | "r" | "rect" | "tri" | "sinc" | "sgn" | "sin" | "cos" | "delta";
 export type SystemTerm =
   | { kind: "input-sample"; coefficient: Coefficient; argument: AffineTime; power: number }
+  | { kind: "signal"; signal: SignalKind; argument: AffineTime; scale: number }
   | { kind: "constant"; value: number }
   | { kind: "integral" }
-  | { kind: "derivative" };
+  | { kind: "derivative"; order: number };
 export type SystemSemantic = { source: string; normalized: string; rawRhs: string; terms: SystemTerm[] };
 export type ParsedSystem = { ok: true; system: SystemSemantic } | { ok: false; error: string };
 export type Verdict = "Linear" | "Non-Linear" | "Time-Invariant" | "Time-Variant" | "Causal" | "Non-Causal" | "Memoryless" | "Dynamic" | "BIBO Stable" | "Unstable";
@@ -20,12 +24,26 @@ export type ClassificationReport = { pillars: Pillar[] };
 export type TestSample = { t: number; left: number; right: number; difference: number };
 
 const EPSILON = 1e-8;
+/** \omega collapses to a concrete rad/s rate so sin(\omega t) stays inside the affine grammar. */
+const OMEGA = 6.28319;
 const near = (value: number, target = 0) => Math.abs(value - target) < EPSILON;
 const texNumber = (value: number) => Number(value.toFixed(5)).toString();
 
+/** Collapses every prime spelling (\prime, ′, ″, superscripted or bare) to repeated ASCII quotes. */
+function normalizePrimes(value: string) {
+  return value
+    .replaceAll("\\prime", "'").replaceAll("′", "'").replaceAll("″", "''").replaceAll("’", "'")
+    .replace(/\^\{('+)\}/g, "$1")
+    .replace(/\^('+)/g, "$1");
+}
+
 function normalizeSystemSource(source: string) {
-  return source
+  return normalizePrimes(source)
     .replaceAll("\\left", "").replaceAll("\\right", "").replaceAll("\\!", "").replaceAll("\\,", "")
+    // Canonical signal tokens are flattened to bare identifiers before term parsing.
+    .replace(/\\(?:text|operatorname|mathrm)\{\s*(sinc|sgn|rect|tri)\s*\}/g, "$1")
+    .replaceAll("\\Lambda", "tri").replaceAll("\\delta", "delta").replaceAll("\\sin", "sin").replaceAll("\\cos", "cos")
+    .replaceAll("\\omega", `${OMEGA}`)
     .replaceAll("\\operatorname{", "").replaceAll("\\cdot", "*").replaceAll("\\times", "*")
     .replaceAll("\\infty", "infty").replaceAll("\\tau", "tau").replaceAll("\\pi", "pi")
     .replaceAll("−", "-").replaceAll("×", "*").replaceAll("τ", "tau").replaceAll(/\s+/g, "")
@@ -53,12 +71,56 @@ function affineTime(source: string): AffineTime | null {
 
 function coefficient(source: string): Coefficient | null { if (!source) return { constant: 1, timeSlope: 0 }; const form = affineTime(source); return form ? { constant: form.offset, timeSlope: form.slope } : null; }
 function isIntegral(source: string) { return source.startsWith("\\int_") && source.includes("x(tau)") && source.includes("tau"); }
-function isDerivative(source: string) { return source.startsWith("\\frac{d}{dt}") || source.startsWith("derivative"); }
+/** Leibniz (\frac{d^{n}}{dt^{n}}x(t)) and Lagrange (x'(t), x''(t)) notations share one derivative term. */
+function derivativeOrder(source: string): number | null {
+  if (source.startsWith("derivative")) return 1;
+  const leibniz = source.match(/^\\frac\{d(?:\^\{?(\d+)\}?)?\}\{dt(?:\^\{?\d+\}?)?\}/);
+  if (leibniz) return leibniz[1] ? Number(leibniz[1]) : 1;
+  const lagrange = source.match(/^(?:[xy])('+)\((.+)\)$/);
+  if (lagrange && affineTime(lagrange[2])) return lagrange[1].length;
+  return null;
+}
 
-function parseTerm(text: string, sign: number): SystemTerm | null {
+const SIGNAL_PATTERN = /^(\d+(?:\.\d+)?)?\*?(sinc|rect|tri|sgn|sin|cos|delta|u|r)\((.+)\)$/;
+/** Independent canonical signals: bounded except the ramp, and never a function of x. */
+const UNBOUNDED_SIGNALS: readonly SignalKind[] = ["r"];
+
+export function evaluateCanonicalSignal(kind: SignalKind, time: number): number {
+  switch (kind) {
+    case "u": return time >= 0 ? 1 : 0;
+    case "r": return time >= 0 ? time : 0;
+    case "rect": return Math.abs(time) <= 0.5 ? 1 : 0;
+    case "tri": return Math.max(0, 1 - Math.abs(time));
+    case "sinc": return near(time) ? 1 : Math.sin(Math.PI * time) / (Math.PI * time);
+    case "sgn": return time > 0 ? 1 : time < 0 ? -1 : 0;
+    case "sin": return Math.sin(time);
+    case "cos": return Math.cos(time);
+    case "delta": return Math.abs(time) < 0.01 ? 50 : 0;
+  }
+}
+
+/** A definite integral collapses to a number (Dirac rules included) and enters the system as a constant source. */
+function parseDefiniteIntegralTerm(rawText: string | undefined, sign: number): SystemTerm | ParsedSystem | null {
+  if (!rawText) return null;
+  const evaluated = evaluateDefiniteIntegral(rawText);
+  if (evaluated.kind === "value") return { kind: "constant", value: sign * evaluated.value };
+  if (evaluated.kind === "undefined") return { ok: false, error: evaluated.reason };
+  if (evaluated.kind === "divergent") return { ok: false, error: "That integral diverges, so the system has no finite constant term." };
+  return null;
+}
+
+function parseTerm(source: string, sign: number, rawText?: string): SystemTerm | ParsedSystem | null {
+  const text = source.startsWith("+") ? source.slice(1) : source; // Pill injections may carry a redundant leading plus.
   if (isIntegral(text)) return { kind: "integral" };
-  if (isDerivative(text)) return { kind: "derivative" };
+  if (text.startsWith("\\int")) return parseDefiniteIntegralTerm(rawText?.replace(/^\+/, ""), sign);
+  const order = derivativeOrder(text);
+  if (order !== null) return { kind: "derivative", order };
   if (/^\d+(?:\.\d+)?$/.test(text)) return { kind: "constant", value: sign * Number(text) };
+  const signal = text.match(SIGNAL_PATTERN);
+  if (signal) {
+    const argument = affineTime(signal[3]); if (!argument) return null;
+    return { kind: "signal", signal: signal[2] as SignalKind, argument, scale: sign * (signal[1] ? Number(signal[1]) : 1) };
+  }
   const match = text.match(/^(.*?)(?:\*)?x(?:\^(\d+(?:\.\d+)?))?\((.+)\)$/); if (!match) return null;
   const factor = coefficient(match[1]); const argument = affineTime(match[3]); if (!factor || !argument) return null;
   return { kind: "input-sample", coefficient: { constant: sign * factor.constant, timeSlope: sign * factor.timeSlope }, argument, power: match[2] ? Number(match[2]) : 1 };
@@ -70,7 +132,16 @@ export function parseSystemExpression(source: string): ParsedSystem {
   if (normalized.slice(0, equality) !== "y(t)") return { ok: false, error: "The output must be written as y(t)=…" };
   const rhs = normalized.slice(equality + 1); if (!rhs) return { ok: false, error: "Complete the right-hand side of y(t)=…" };
   const terms: SystemTerm[] = [];
-  for (const part of splitTopLevelSum(rhs)) { const term = parseTerm(part.text, part.sign); if (!term) return { ok: false, error: `The term “${part.text}” is outside the current System Classification grammar.` }; terms.push(term); }
+  // The raw split runs in parallel so definite integrals reach the Dirac core with their LaTeX intact.
+  const rawParts = splitTopLevelSum(source.slice(source.indexOf("=") + 1));
+  const normalizedParts = splitTopLevelSum(rhs);
+  for (let index = 0; index < normalizedParts.length; index += 1) {
+    const part = normalizedParts[index];
+    const term = parseTerm(part.text, part.sign, rawParts.length === normalizedParts.length ? rawParts[index].text : undefined);
+    if (!term) return { ok: false, error: `The term “${part.text}” is outside the current System Classification grammar.` };
+    if ("ok" in term) return term;
+    terms.push(term);
+  }
   return { ok: true, system: { source, normalized, rawRhs: rhs, terms } };
 }
 
@@ -78,39 +149,65 @@ const coefficientAt = (value: Coefficient, time: number) => value.constant + val
 export function evaluateSystem(system: SystemSemantic, input: (time: number) => number, time: number): number {
   return system.terms.reduce((total, term) => {
     if (term.kind === "constant") return total + term.value;
+    if (term.kind === "signal") return total + term.scale * evaluateCanonicalSignal(term.signal, term.argument.slope * time + term.argument.offset);
     if (term.kind === "input-sample") return total + coefficientAt(term.coefficient, time) * Math.pow(input(term.argument.slope * time + term.argument.offset), term.power);
     if (term.kind === "integral") {
       const lower = -20; const intervals = 1200; const step = (time - lower) / intervals; let sum = 0;
       for (let index = 0; index <= intervals; index += 1) { const value = input(lower + index * step); sum += (index === 0 || index === intervals ? 0.5 : 1) * value; }
       return total + sum * step;
     }
-    const step = 1e-3; return total + (input(time + step) - input(time - step)) / (2 * step);
+    // Central differences: first order for x'(t), second order for x''(t), repeated beyond that.
+    const step = 1e-3;
+    let derivative = (at: number) => input(at);
+    for (let order = 0; order < term.order; order += 1) { const previous = derivative; derivative = (at: number) => (previous(at + step) - previous(at - step)) / (2 * step); }
+    return total + derivative(time);
   }, 0);
 }
 
+const SIGNAL_TEX: Record<SignalKind, string> = { u: "u", r: "r", rect: "\\text{rect}", tri: "\\Lambda", sinc: "\\text{sinc}", sgn: "\\text{sgn}", sin: "\\sin", cos: "\\cos", delta: "\\delta" };
+const signalTex = (term: Extract<SystemTerm, { kind: "signal" }>) => {
+  const slope = near(term.argument.slope, 1) ? "" : near(term.argument.slope, -1) ? "-" : texNumber(term.argument.slope);
+  const offset = near(term.argument.offset) ? "" : `${term.argument.offset > 0 ? "+" : ""}${texNumber(term.argument.offset)}`;
+  return `${SIGNAL_TEX[term.signal]}\\!\\left(${slope}t${offset}\\right)`;
+};
 const inputTerms = (system: SystemSemantic) => system.terms.filter((term): term is Extract<SystemTerm, { kind: "input-sample" }> => term.kind === "input-sample");
 const signedAffine = (term?: Extract<SystemTerm, { kind: "input-sample" }>) => `${texNumber(term?.argument.slope ?? 2)}t_1${(term?.argument.offset ?? 0) >= 0 ? "+" : ""}${texNumber(term?.argument.offset ?? 0)}`;
+
+/** Static pillar shells so the proof section stays mounted while the equation is invalid. */
+export const PILLAR_OUTLINE: ReadonlyArray<{ id: PillarId; title: string; visualLead: string }> = [
+  { id: "linearity", title: "Linearity — Additivity & Homogeneity", visualLead: "Compare T{a x₁+b x₂} with aT{x₁}+bT{x₂}." },
+  { id: "time", title: "Time Invariance — Shift Test", visualLead: "Compare T{x(t−t₀)} with y(t−t₀)." },
+  { id: "causality", title: "Causality — Present vs Future Input", visualLead: "Locate the input sample required at the selected output instant." },
+  { id: "memory", title: "Memory — Instantaneous vs Dynamic", visualLead: "Inspect whether the output needs an input value away from t." },
+  { id: "stability", title: "BIBO Stability — Bounded Input, Bounded Output", visualLead: "Apply a bounded unit-step input and inspect the output envelope." },
+];
+const outline = (id: PillarId) => PILLAR_OUTLINE.find((entry) => entry.id === id) ?? PILLAR_OUTLINE[0];
 
 export function classifySystem(system: SystemSemantic): ClassificationReport {
   const sampled = inputTerms(system); const hasIntegral = system.terms.some((term) => term.kind === "integral"); const hasDerivative = system.terms.some((term) => term.kind === "derivative");
   const constantOffset = system.terms.some((term) => term.kind === "constant" && !near(term.value));
+  const derivativeTerm = system.terms.find((term): term is Extract<SystemTerm, { kind: "derivative" }> => term.kind === "derivative");
+  const derivativeTex = derivativeTerm && derivativeTerm.order > 1 ? `\\frac{d^{${derivativeTerm.order}}x(t)}{dt^{${derivativeTerm.order}}}` : "\\frac{dx(t)}{dt}";
+  const signalTerms = system.terms.filter((term): term is Extract<SystemTerm, { kind: "signal" }> => term.kind === "signal");
+  const signalTerm = signalTerms[0];
+  const unboundedSignal = signalTerms.some((term) => UNBOUNDED_SIGNALS.includes(term.signal));
   const nonlinearTerm = sampled.find((term) => !near(term.power, 1));
   const variantTerm = sampled.find((term) => !near(term.coefficient.timeSlope) || !near(term.argument.slope, 1));
   const futureTerm = sampled.find((term) => !near(term.argument.slope, 1) || term.argument.offset > EPSILON);
   const delayedTerm = sampled.find((term) => !near(term.argument.slope, 1) || !near(term.argument.offset));
   const unboundedGain = sampled.find((term) => !near(term.coefficient.timeSlope));
-  const linear = !constantOffset && !nonlinearTerm;
-  const timeInvariant = !variantTerm;
+  const linear = !constantOffset && !nonlinearTerm && !signalTerm;
+  const timeInvariant = !variantTerm && !signalTerm;
   const causal = !hasDerivative && !futureTerm;
   const memoryless = !hasIntegral && !hasDerivative && !delayedTerm;
-  const stable = !hasIntegral && !hasDerivative && !unboundedGain;
+  const stable = !hasIntegral && !hasDerivative && !unboundedGain && !unboundedSignal;
 
   const pillars: Pillar[] = [
-    { id: "linearity", title: "Linearity — Additivity & Homogeneity", verdict: linear ? "Linear" : "Non-Linear", passed: linear, visualLead: "Compare T{a x₁+b x₂} with aT{x₁}+bT{x₂}.", proof: linear ? ["T\\!\\left\\{a x_1(t)+b x_2(t)\\right\\}=aT\\!\\left\\{x_1(t)\\right\\}+bT\\!\\left\\{x_2(t)\\right\\}", "\\therefore\\ \\text{the system is linear}"] : constantOffset ? ["T\\!\\left\\{a x_1+b x_2\\right\\}=a x_1+b x_2+5", "aT\\!\\left\\{x_1\\right\\}+bT\\!\\left\\{x_2\\right\\}=a x_1+b x_2+5a+5b", "\\therefore\\ T\\{a x_1+b x_2\\}\\ne aT\\{x_1\\}+bT\\{x_2\\}"] : [`T\\!\\left\\{a x_1+b x_2\\right\\}=\\left(a x_1+b x_2\\right)^{${texNumber(nonlinearTerm?.power ?? 2)}}`, "\\left(a x_1+b x_2\\right)^2\\ne a x_1^2+b x_2^2", "\\therefore\\ \\text{the system is nonlinear}"] },
-    { id: "time", title: "Time Invariance — Shift Test", verdict: timeInvariant ? "Time-Invariant" : "Time-Variant", passed: timeInvariant, visualLead: "Compare T{x(t−t₀)} with y(t−t₀).", proof: timeInvariant ? ["T\\!\\left\\{x(t-t_0)\\right\\}=y(t-t_0)", "\\therefore\\ \\text{the system is time-invariant}"] : !near(variantTerm?.coefficient.timeSlope ?? 0) ? ["T\\!\\left\\{x(t-t_0)\\right\\}=t\\,x(t-t_0)", "y(t-t_0)=(t-t_0)\\,x(t-t_0)", "\\therefore\\ T\\{x(t-t_0)\\}\\ne y(t-t_0)\\quad\\text{(time-variant)}"] : [`T\\!\\left\\{x(t-t_0)\\right\\}=x\\!\\left(${texNumber(variantTerm?.argument.slope ?? 2)}t-t_0\\right)`, `y(t-t_0)=x\\!\\left(${texNumber(variantTerm?.argument.slope ?? 2)}t-${texNumber(variantTerm?.argument.slope ?? 2)}t_0\\right)`, "\\therefore\\ T\\{x(t-t_0)\\}\\ne y(t-t_0)\\quad\\text{(time-variant)}"] },
-    { id: "causality", title: "Causality — Present vs Future Input", verdict: causal ? "Causal" : "Non-Causal", passed: causal, visualLead: "Locate the input sample required at the selected output instant.", proof: causal ? ["y(t_1)\\ \\text{depends only on}\\ x(\\tau),\\quad\\tau\\le t_1", "\\therefore\\ \\text{the system is causal}"] : [`y(t_1)\\ \\text{requires}\\ x\\!\\left(${signedAffine(futureTerm)}\\right)`, `${signedAffine(futureTerm)}>t_1\\quad\\text{for a valid counterexample}`, "\\therefore\\ \\text{the system is non-causal}"] },
-    { id: "memory", title: "Memory — Instantaneous vs Dynamic", verdict: memoryless ? "Memoryless" : "Dynamic", passed: memoryless, visualLead: "Inspect whether the output needs an input value away from t.", proof: memoryless ? ["y(t)\\ \\text{depends only on}\\ x(t)", "\\therefore\\ \\text{the system is memoryless}"] : hasIntegral ? ["y(t)=\\int_{-\\infty}^{t}x(\\tau)\\,d\\tau", "y(t)\\ \\text{depends on the input history}\\ x(\\tau),\\ \tau<t", "\\therefore\\ \\text{the system is dynamic}"] : [`y(t)\\ \\text{uses}\\ x\\!\\left(${signedAffine(delayedTerm).replace("_1", "")}\\right)`, "\\therefore\\ \\text{the system is dynamic}"] },
-    { id: "stability", title: "BIBO Stability — Bounded Input, Bounded Output", verdict: stable ? "BIBO Stable" : "Unstable", passed: stable, visualLead: "Apply a bounded unit-step input and inspect the output envelope.", proof: stable ? ["\\left|x(t)\\right|\\le M\\ \Longrightarrow\\ \\left|y(t)\\right|\\le C(M)<\\infty", "\\therefore\\ \\text{the system is BIBO stable}"] : hasIntegral ? ["x(t)=u(t),\\qquad y(t)=\\int_{-\\infty}^{t}u(\\tau)\\,d\\tau=t\\,u(t)", "\\lim_{t\\to\\infty}\\left|y(t)\\right|=\\infty", "\\therefore\\ \\text{the system is unstable}"] : ["x(t)=u(t),\\qquad y(t)=t\\,u(t)", "\\lim_{t\\to\\infty}\\left|t\\,u(t)\\right|=\\infty", "\\therefore\\ \\text{the system is unstable}"] },
+    { id: "linearity", title: outline("linearity").title, verdict: linear ? "Linear" : "Non-Linear", passed: linear, visualLead: outline("linearity").visualLead, proof: linear ? ["T\\!\\left\\{a x_1(t)+b x_2(t)\\right\\}=aT\\!\\left\\{x_1(t)\\right\\}+bT\\!\\left\\{x_2(t)\\right\\}", "\\therefore\\ \\text{the system is linear}"] : signalTerm ? [`T\\!\\left\\{0\\right\\}=${signalTex(signalTerm)}\\ne 0`, "\\text{a source independent of }x\\text{ breaks homogeneity}", "\\therefore\\ \\text{the system is nonlinear}"] : constantOffset ? ["T\\!\\left\\{a x_1+b x_2\\right\\}=a x_1+b x_2+5", "aT\\!\\left\\{x_1\\right\\}+bT\\!\\left\\{x_2\\right\\}=a x_1+b x_2+5a+5b", "\\therefore\\ T\\{a x_1+b x_2\\}\\ne aT\\{x_1\\}+bT\\{x_2\\}"] : [`T\\!\\left\\{a x_1+b x_2\\right\\}=\\left(a x_1+b x_2\\right)^{${texNumber(nonlinearTerm?.power ?? 2)}}`, "\\left(a x_1+b x_2\\right)^2\\ne a x_1^2+b x_2^2", "\\therefore\\ \\text{the system is nonlinear}"] },
+    { id: "time", title: outline("time").title, verdict: timeInvariant ? "Time-Invariant" : "Time-Variant", passed: timeInvariant, visualLead: outline("time").visualLead, proof: timeInvariant ? ["T\\!\\left\\{x(t-t_0)\\right\\}=y(t-t_0)", "\\therefore\\ \\text{the system is time-invariant}"] : !variantTerm && signalTerm ? [`T\\!\\left\\{x(t-t_0)\\right\\}\\ \\text{keeps}\\ ${signalTex(signalTerm)}\\ \\text{anchored at}\\ t`, `y(t-t_0)\\ \\text{shifts it to}\\ ${SIGNAL_TEX[signalTerm.signal]}\\!\\left(t-t_0\\right)`, "\\therefore\\ T\\{x(t-t_0)\\}\\ne y(t-t_0)\\quad\\text{(time-variant)}"] : !near(variantTerm?.coefficient.timeSlope ?? 0) ? ["T\\!\\left\\{x(t-t_0)\\right\\}=t\\,x(t-t_0)", "y(t-t_0)=(t-t_0)\\,x(t-t_0)", "\\therefore\\ T\\{x(t-t_0)\\}\\ne y(t-t_0)\\quad\\text{(time-variant)}"] : [`T\\!\\left\\{x(t-t_0)\\right\\}=x\\!\\left(${texNumber(variantTerm?.argument.slope ?? 2)}t-t_0\\right)`, `y(t-t_0)=x\\!\\left(${texNumber(variantTerm?.argument.slope ?? 2)}t-${texNumber(variantTerm?.argument.slope ?? 2)}t_0\\right)`, "\\therefore\\ T\\{x(t-t_0)\\}\\ne y(t-t_0)\\quad\\text{(time-variant)}"] },
+    { id: "causality", title: outline("causality").title, verdict: causal ? "Causal" : "Non-Causal", passed: causal, visualLead: outline("causality").visualLead, proof: causal ? ["y(t_1)\\ \\text{depends only on}\\ x(\\tau),\\quad\\tau\\le t_1", "\\therefore\\ \\text{the system is causal}"] : !futureTerm && derivativeTerm ? [`y(t)=${derivativeTex}=\\lim_{h\\to 0}\\frac{x(t+h)-x(t-h)}{2h}`, "\\text{the limit samples}\\ x(t+h)\\ \\text{with}\\ t+h>t", "\\therefore\\ \\text{the system is non-causal in real time}"] : [`y(t_1)\\ \\text{requires}\\ x\\!\\left(${signedAffine(futureTerm)}\\right)`, `${signedAffine(futureTerm)}>t_1\\quad\\text{for a valid counterexample}`, "\\therefore\\ \\text{the system is non-causal}"] },
+    { id: "memory", title: outline("memory").title, verdict: memoryless ? "Memoryless" : "Dynamic", passed: memoryless, visualLead: outline("memory").visualLead, proof: memoryless ? ["y(t)\\ \\text{depends only on}\\ x(t)", "\\therefore\\ \\text{the system is memoryless}"] : hasIntegral ? ["y(t)=\\int_{-\\infty}^{t}x(\\tau)\\,d\\tau", "y(t)\\ \\text{depends on the input history}\\ x(\\tau),\\ \tau<t", "\\therefore\\ \\text{the system is dynamic}"] : !delayedTerm && derivativeTerm ? [`y(t)=${derivativeTex}`, "\\text{the rate needs input values in a neighbourhood of}\\ t", "\\therefore\\ \\text{the system is dynamic}"] : [`y(t)\\ \\text{uses}\\ x\\!\\left(${signedAffine(delayedTerm).replace("_1", "")}\\right)`, "\\therefore\\ \\text{the system is dynamic}"] },
+    { id: "stability", title: outline("stability").title, verdict: stable ? "BIBO Stable" : "Unstable", passed: stable, visualLead: outline("stability").visualLead, proof: stable ? ["\\left|x(t)\\right|\\le M\\ \Longrightarrow\\ \\left|y(t)\\right|\\le C(M)<\\infty", "\\therefore\\ \\text{the system is BIBO stable}"] : unboundedSignal && !hasIntegral && !hasDerivative ? ["x(t)=u(t)\\ \\text{is bounded, yet}\\ r(t)=t\\,u(t)\\ \\text{is not}", "\\lim_{t\\to\\infty}\\left|y(t)\\right|=\\infty", "\\therefore\\ \\text{the system is unstable}"] : hasIntegral ? ["x(t)=u(t),\\qquad y(t)=\\int_{-\\infty}^{t}u(\\tau)\\,d\\tau=t\\,u(t)", "\\lim_{t\\to\\infty}\\left|y(t)\\right|=\\infty", "\\therefore\\ \\text{the system is unstable}"] : derivativeTerm ? [`x(t)=u(t)\\ \\text{is bounded, yet}\\ ${derivativeTex}=\\delta(t)`, "\\text{the impulse response is unbounded at}\\ t=0", "\\therefore\\ \\text{the system is unstable}"] : ["x(t)=u(t),\\qquad y(t)=t\\,u(t)", "\\lim_{t\\to\\infty}\\left|t\\,u(t)\\right|=\\infty", "\\therefore\\ \\text{the system is unstable}"] },
   ];
   return { pillars };
 }

@@ -61,7 +61,7 @@ const InputSwitch = memo(function InputSwitch({
 
   const cell = (active: boolean, tone: 'on' | 'off' | 'push'): string => {
     const base =
-      'h-4.5 w-full rounded text-[7.5px] font-bold leading-none outline-none transition-all focus-visible:ring-1 focus-visible:ring-violet-400 px-0.5';
+      'h-4.5 w-full rounded font-sans text-[7.5px] font-bold leading-none outline-none transition-all focus-visible:ring-1 focus-visible:ring-violet-400 px-0.5';
     if (!active) {
       return `${base} bg-slate-100 text-slate-600 hover:bg-slate-200/80 hover:text-slate-800 dark:bg-[#1a1d24] dark:text-slate-400 dark:hover:bg-[#222731] dark:hover:text-slate-200`;
     }
@@ -81,7 +81,7 @@ const InputSwitch = memo(function InputSwitch({
       className="flex w-full min-w-0 flex-col items-center gap-1.5"
       data-input={address}
     >
-      <span className="truncate font-mono text-[8.5px] font-bold text-slate-700 dark:text-slate-300">
+      <span className="truncate font-sans text-[8.5px] font-bold text-slate-700 dark:text-slate-300">
         {address}
       </span>
       <FieldLed
@@ -198,7 +198,7 @@ export function S7200Hardware({
     >
       <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-3 py-2 dark:border-[#1a1d24]">
         <div className={PANEL_TITLE}>I/O MODULE</div>
-        <span className="font-mono text-[10px] font-medium text-slate-400 dark:text-slate-500">
+        <span className="font-sans text-[10px] font-medium text-slate-400 dark:text-slate-500">
           {profile.model}
         </span>
       </div>
@@ -218,7 +218,7 @@ export function S7200Hardware({
                     key={index}
                     className="flex flex-col items-center gap-1.5 rounded border border-slate-200/80 bg-white py-1.5 px-0.5 shadow-2xs dark:border-[#222731] dark:bg-[#13161c]"
                   >
-                    <span className="truncate font-mono text-[8.5px] font-bold text-slate-700 dark:text-slate-300">
+                    <span className="truncate font-sans text-[8.5px] font-bold text-slate-700 dark:text-slate-300">
                       {address}
                     </span>
                     <MemoryLed

@@ -1,6 +1,6 @@
 import type { ContactVariant } from '../../../../domain/ast';
 import { CELL_WIDTH } from '../../geometry';
-import { TEXT_ADDRESS, textLive, wireClass } from './theme';
+import { CANVAS_FONT_FAMILY, TEXT_ADDRESS, textLive, wireClass } from './theme';
 
 export interface ContactSymbolProps {
   /** X of the cell's left edge. */
@@ -46,10 +46,11 @@ export function ContactSymbol({ x, y, variant, flowIn, flowOut, closed, selected
           x={x + CELL_WIDTH / 2}
           y={y + 4}
           textAnchor="middle"
+          fontFamily={CANVAS_FONT_FAMILY}
           fontSize={12}
-          fontWeight={700}
+          fontWeight={600}
           stroke="none"
-          className={`font-mono ${textLive(closed, TEXT_ADDRESS)}`}
+          className={`font-sans ${textLive(closed, TEXT_ADDRESS)}`}
         >
           {variant}
         </text>

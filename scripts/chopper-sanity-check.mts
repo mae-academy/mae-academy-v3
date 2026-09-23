@@ -1,4 +1,4 @@
-import { defaultChopperParameters, simulateChopper, type ChopperParameters } from "../client/src/lib/chopperMath.ts";
+import { defaultChopperParameters, simulateChopper, type ChopperParameters } from "../client/src/features/power-electronics/chopperMath.ts";
 
 function assert(condition: unknown, message: string): asserts condition { if (!condition) throw new Error(message); }
 function relativeError(value: number, expected: number) { return Math.abs(value - expected) / Math.max(Math.abs(expected), 1e-9); }

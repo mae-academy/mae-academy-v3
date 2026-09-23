@@ -205,7 +205,7 @@ export function LadderCanvas({ editor, profile, symbols = NO_SYMBOLS, readOnly =
         aria-label="Ladder logic editor. Arrow keys move between cells, Enter places the armed instruction or edits the selected one, Delete removes it."
         tabIndex={interactive ? 0 : -1}
         onKeyDown={onKeyDown}
-        className={`relative flex flex-col gap-4 overflow-auto rounded-lg bg-white dark:bg-[#090a0d] outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60 ${className}`}
+        className={`relative flex flex-col gap-4 overflow-auto rounded-lg bg-white dark:bg-[#090a0d] outline-none font-sans focus-visible:ring-2 focus-visible:ring-sky-500/60 ${className}`}
         data-armed={state.armed ?? undefined}
       >
         <div role="status" aria-live="polite" className="sr-only">
@@ -229,7 +229,7 @@ export function LadderCanvas({ editor, profile, symbols = NO_SYMBOLS, readOnly =
           if (!tree) return null;
           return (
             <section key={network.id} aria-label={`Network ${index + 1}`} className="min-w-max">
-              <header className="mb-1 flex items-center gap-2 px-2 text-xs text-slate-600 dark:text-slate-300">
+              <header className="mb-1 flex items-center gap-2 px-2 text-xs font-sans text-slate-600 dark:text-slate-300">
                 <span className="font-semibold tabular-nums">Network {index + 1}</span>
                 <input
                   key={`${network.id}:${network.title ?? ''}`}
@@ -242,7 +242,7 @@ export function LadderCanvas({ editor, profile, symbols = NO_SYMBOLS, readOnly =
                     event.stopPropagation();
                     if (event.key === 'Enter') event.currentTarget.blur();
                   }}
-                  className="h-6 w-56 rounded border border-transparent bg-transparent px-1.5 hover:border-slate-300 focus:border-sky-500 focus:outline-none dark:hover:border-slate-600"
+                  className="h-6 w-56 rounded border border-transparent bg-transparent px-1.5 font-sans text-xs hover:border-slate-300 focus:border-sky-500 focus:outline-none dark:hover:border-slate-600"
                 />
                 {interactive && (
                   <span className="ml-auto flex items-center gap-1">

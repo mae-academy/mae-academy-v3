@@ -65,7 +65,7 @@ function ScanReadout({ frame, readMetrics }: { frame: FrameStore; readMetrics: (
   const metrics = readMetrics();
   if (!metrics) return null;
   return (
-    <span aria-label="Scan statistics" className="hidden font-mono text-[11px] tabular-nums text-slate-500 lg:block dark:text-slate-400">
+    <span aria-label="Scan statistics" className="hidden font-sans text-[11px] font-medium tabular-nums text-slate-500 lg:block dark:text-slate-400">
       {`cycle ${metrics.cycle} · ${metrics.scanTimeMs.toFixed(2)} ms`}
     </span>
   );

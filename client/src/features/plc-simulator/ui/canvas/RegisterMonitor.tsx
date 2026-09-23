@@ -79,7 +79,7 @@ function RegisterRow({ reg, memory }: { reg: ReferencedRegister; memory: MemoryM
         <span className={`shrink-0 text-[10px] font-bold uppercase tracking-wide ${AREA_BADGE_CLASS[reg.area]}`}>
           {badgeOf(reg)}
         </span>
-        <span className="truncate font-mono text-xs font-semibold text-slate-800 dark:text-slate-100">{reg.address}</span>
+        <span className="truncate font-sans text-xs font-semibold text-slate-800 dark:text-slate-100">{reg.address}</span>
       </div>
 
       {editing ? (
@@ -93,7 +93,7 @@ function RegisterRow({ reg, memory }: { reg: ReferencedRegister; memory: MemoryM
             else if (event.key === 'Escape') setEditing(false);
           }}
           placeholder="dec or 0x.."
-          className="h-6 w-28 rounded border border-violet-400 bg-white px-1.5 font-mono text-[11px] text-slate-900 outline-none dark:bg-[#13161c] dark:text-slate-100"
+          className="h-6 w-28 rounded border border-violet-400 bg-white px-1.5 font-sans text-[11px] text-slate-900 outline-none dark:bg-[#13161c] dark:text-slate-100"
         />
       ) : (
         <button
@@ -103,7 +103,7 @@ function RegisterRow({ reg, memory }: { reg: ReferencedRegister; memory: MemoryM
             setEditing(true);
           }}
           title="Click to force a value"
-          className="flex shrink-0 items-center gap-1.5 rounded px-1.5 py-0.5 font-mono text-[11px] text-slate-600 transition hover:bg-white hover:text-slate-900 dark:text-slate-300 dark:hover:bg-[#13161c] dark:hover:text-slate-100"
+          className="flex shrink-0 items-center gap-1.5 rounded px-1.5 py-0.5 font-sans text-[11px] font-medium tabular-nums text-slate-600 transition hover:bg-white hover:text-slate-900 dark:text-slate-300 dark:hover:bg-[#13161c] dark:hover:text-slate-100"
         >
           <span>Dec: {value}</span>
           <span className="text-slate-300 dark:text-slate-600">|</span>
@@ -135,7 +135,7 @@ export function RegisterMonitor({ networks, profile, memory, className = '' }: R
           No VW/VD/VB, timer or counter operands in this program yet.
         </p>
       ) : (
-        <div className="flex max-h-64 flex-col gap-1.5 overflow-y-auto p-2 font-mono text-xs">
+        <div className="flex max-h-64 flex-col gap-1.5 overflow-y-auto p-2 font-sans text-xs">
           {registers.map((reg) => (
             <RegisterRow key={reg.address} reg={reg} memory={memory} />
           ))}

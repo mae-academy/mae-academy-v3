@@ -1,6 +1,6 @@
 import { useId, useMemo, useRef, useState, type DragEvent, type KeyboardEvent, type PointerEvent } from 'react';
 import { CANVAS_SURFACE } from '../chrome';
-import { dotClass, wireClass } from '../canvas/components/symbols/theme';
+import { CANVAS_FONT_FAMILY, dotClass, wireClass } from '../canvas/components/symbols/theme';
 import { FBD_DRAG_TYPE } from './FbdPalette';
 import { INVERTED, SYMBOL } from './FbdSymbols';
 import { routeLink, type Point } from './routing';
@@ -335,7 +335,15 @@ export function FbdCanvas({ editor, levels, locked, className = '' }: FbdCanvasP
         {ghost !== null && armed !== null && (
           <g pointerEvents="none" data-ghost="true" style={{ transform: `translate(${ghost.x}px, ${ghost.y}px)`, transition: 'transform 90ms cubic-bezier(0.2, 0, 0, 1)' }}>
             <rect width={BLOCK_W} height={blockHeight(armed)} rx={3} strokeWidth={1.5} strokeDasharray="5 3" className="fill-emerald-500/10 stroke-emerald-500" />
-            <text x={BLOCK_W / 2} y={blockHeight(armed) / 2 + 4} textAnchor="middle" fontSize={12} fontWeight={700} className="fill-emerald-600 font-mono dark:fill-emerald-400">
+            <text
+              x={BLOCK_W / 2}
+              y={blockHeight(armed) / 2 + 4}
+              textAnchor="middle"
+              fontFamily={CANVAS_FONT_FAMILY}
+              fontSize={12}
+              fontWeight={600}
+              className="fill-emerald-600 font-sans dark:fill-emerald-400"
+            >
               {KINDS[armed].label}
             </text>
           </g>
@@ -384,23 +392,54 @@ function BlockView({ block, selected, level, inputLevel, connected, snapPin, loc
           className={`${live && block.kind !== 'output' ? 'fill-emerald-50 dark:fill-emerald-950/40' : 'fill-white dark:fill-[#0d0f12]'} ${selected ? 'stroke-sky-500' : 'stroke-slate-500 dark:stroke-slate-400'}`}
         />
         <line x1={0} x2={BLOCK_W} y1={HEADER_H} y2={HEADER_H} strokeWidth={1} className="stroke-slate-300 dark:stroke-[#1a1d24]" />
-        <text x={BLOCK_W / 2} y={HEADER_H - 6} textAnchor="middle" fontSize={11} fontWeight={700} className="fill-slate-700 font-mono dark:fill-slate-200">
+        <text
+          x={BLOCK_W / 2}
+          y={HEADER_H - 6}
+          textAnchor="middle"
+          fontFamily={CANVAS_FONT_FAMILY}
+          fontSize={11}
+          fontWeight={600}
+          className="fill-slate-700 font-sans dark:fill-slate-200"
+        >
           {blockCaption(block)}
         </text>
 
         {spec.pins.map((label, pin) => (
-          <text key={pin} x={10} y={HEADER_H + pin * PIN_PITCH + PIN_PITCH / 2 + 4} fontSize={10} className="fill-slate-500 font-mono dark:fill-slate-400">
+          <text
+            key={pin}
+            x={10}
+            y={HEADER_H + pin * PIN_PITCH + PIN_PITCH / 2 + 4}
+            fontFamily={CANVAS_FONT_FAMILY}
+            fontSize={10}
+            className="fill-slate-500 font-sans dark:fill-slate-400"
+          >
             {label}
           </text>
         ))}
 
         {!io && (
-          <text x={BLOCK_W - 12} y={height / 2 + HEADER_H / 2 + 8} textAnchor="end" fontSize={block.kind === 'ton' || block.kind === 'tof' ? 14 : 20} fontWeight={700} className="fill-slate-400 font-mono dark:fill-slate-500">
+          <text
+            x={BLOCK_W - 12}
+            y={height / 2 + HEADER_H / 2 + 8}
+            textAnchor="end"
+            fontFamily={CANVAS_FONT_FAMILY}
+            fontSize={block.kind === 'ton' || block.kind === 'tof' ? 14 : 20}
+            fontWeight={600}
+            className="fill-slate-400 font-sans dark:fill-slate-500"
+          >
             {SYMBOL[block.kind]}
           </text>
         )}
         {io && (
-          <text x={BLOCK_W / 2} y={HEADER_H + PIN_PITCH / 2 + 4} textAnchor="middle" fontSize={12} fontWeight={700} className={live ? 'fill-[#2E7D32] font-mono dark:fill-[#00E676]' : 'fill-slate-400 font-mono dark:fill-slate-500'}>
+          <text
+            x={BLOCK_W / 2}
+            y={HEADER_H + PIN_PITCH / 2 + 4}
+            textAnchor="middle"
+            fontFamily={CANVAS_FONT_FAMILY}
+            fontSize={12}
+            fontWeight={600}
+            className={live ? 'fill-[#2E7D32] font-sans dark:fill-[#00E676]' : 'fill-slate-400 font-sans dark:fill-slate-500'}
+          >
             {level === null ? '·' : live ? '1' : '0'}
           </text>
         )}

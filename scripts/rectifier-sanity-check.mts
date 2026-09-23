@@ -2,7 +2,7 @@ import {
   defaultRectifierParameters,
   simulateControlledRectifier,
   type RectifierParameters,
-} from "../client/src/lib/rectifierMath.ts";
+} from "../client/src/features/power-electronics/rectifierMath.ts";
 
 function assert(condition: boolean, message: string) {
   if (!condition) throw new Error(message);

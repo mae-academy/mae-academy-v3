@@ -58,9 +58,9 @@ export function WindowBar({ icon, title, trailing }: WindowBarProps) {
       <div className="flex min-w-0 items-center gap-1.5">
         <MacDots />
         <span className="ms-0.5 text-slate-500 dark:text-slate-400">{icon}</span>
-        <span className="truncate font-mono text-xs font-semibold text-slate-700 dark:text-slate-300">{title}</span>
+        <span className="truncate font-sans text-xs font-semibold text-slate-700 dark:text-slate-300">{title}</span>
       </div>
-      {trailing !== undefined && <div className="shrink-0 font-mono text-[11px] text-slate-400 dark:text-slate-500">{trailing}</div>}
+      {trailing !== undefined && <div className="shrink-0 font-sans text-[11px] text-slate-400 dark:text-slate-500">{trailing}</div>}
     </div>
   );
 }

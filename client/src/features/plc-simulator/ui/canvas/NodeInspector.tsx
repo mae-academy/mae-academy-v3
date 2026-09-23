@@ -199,7 +199,7 @@ function ReplaceComponentControl({ node, onReplace }: ReplaceComponentControlPro
                       }`}
                     >
                       <div className="flex flex-col">
-                        <span className="font-mono text-xs font-medium">{item.label}</span>
+                        <span className="font-sans text-xs font-medium">{item.label}</span>
                         <span className="text-[10px] text-slate-400 dark:text-slate-500">{item.description}</span>
                       </div>
                       {isCurrent && (
@@ -260,7 +260,7 @@ function SlotField({ label, value, validate, onCommit }: SlotFieldProps) {
         aria-invalid={error !== null}
         aria-describedby={error !== null ? errorId : undefined}
         spellCheck={false}
-        className={`${FIELD_INPUT} font-mono ${error === null ? '' : '!border-red-500'}`}
+        className={`${FIELD_INPUT} font-sans ${error === null ? '' : '!border-red-500'}`}
       />
       {error !== null && (
         <span id={errorId} role="alert" className="col-start-2 text-[10px] leading-tight text-red-600 dark:text-red-400">
@@ -303,7 +303,7 @@ function SymbolField({ label, value, onCommit }: SymbolFieldProps) {
           }}
           placeholder="e.g. Start_PB, Motor"
           spellCheck={false}
-          className={`${FIELD_INPUT} font-mono pe-6`}
+          className={`${FIELD_INPUT} font-sans pe-6`}
         />
         {draft && (
           <button

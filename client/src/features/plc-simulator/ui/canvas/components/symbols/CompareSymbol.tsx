@@ -1,7 +1,7 @@
 import type { CompareOp, NodeId, NumericType } from '../../../../domain/ast';
 import { CELL_WIDTH } from '../../geometry';
 import { SymbolLabel } from './SymbolLabel';
-import { BOX_FILL, BOX_FILL_LIVE, TEXT_ADDRESS, textLive, wireClass } from './theme';
+import { BOX_FILL, BOX_FILL_LIVE, CANVAS_FONT_FAMILY, TEXT_ADDRESS, textLive, wireClass } from './theme';
 
 export interface CompareSymbolProps {
   nodeId: NodeId;
@@ -49,9 +49,10 @@ export function CompareSymbol({ nodeId, x, y, op, dataType, lhs, rhs, flowIn, fl
         x={x + CELL_WIDTH / 2}
         y={y + 4}
         textAnchor="middle"
+        fontFamily={CANVAS_FONT_FAMILY}
         fontSize={12}
-        fontWeight={700}
-        className={`font-mono select-none ${textLive(flowOut, TEXT_ADDRESS)}`}
+        fontWeight={600}
+        className={`font-sans select-none ${textLive(flowOut, TEXT_ADDRESS)}`}
       >
         {`${op}${TYPE_LETTER[dataType]}`}
       </text>

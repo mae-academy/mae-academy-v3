@@ -6,7 +6,7 @@ import {
   type RectifierPhase,
   type RectifierType,
   type VoltageFormat,
-} from "../client/src/lib/rectifierMath.ts";
+} from "../client/src/features/power-electronics/rectifierMath.ts";
 
 const EPSILON = 1e-6;
 const phaseModes: RectifierPhase[] = ["single", "three"];

@@ -1,6 +1,6 @@
 import type { CoilNode } from '../../../../domain/ast';
 import { CELL_WIDTH } from '../../geometry';
-import { TEXT_ADDRESS, textLive, wireClass } from './theme';
+import { CANVAS_FONT_FAMILY, TEXT_ADDRESS, textLive, wireClass } from './theme';
 
 export interface CoilSymbolProps {
   x: number;
@@ -48,10 +48,11 @@ export function CoilSymbol({ x, y, variant, glyph, flowIn, flowOut, active, sele
           x={x + CELL_WIDTH / 2}
           y={y + 4}
           textAnchor="middle"
+          fontFamily={CANVAS_FONT_FAMILY}
           fontSize={glyph.length > 1 ? 9 : 12}
-          fontWeight={700}
+          fontWeight={600}
           stroke="none"
-          className={`font-mono ${textLive(active, TEXT_ADDRESS)}`}
+          className={`font-sans ${textLive(active, TEXT_ADDRESS)}`}
         >
           {glyph}
         </text>

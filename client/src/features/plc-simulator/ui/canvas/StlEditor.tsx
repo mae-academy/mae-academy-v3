@@ -151,7 +151,7 @@ export function StlEditor({
       />
 
       {notice !== null && (
-        <div role="alert" className="shrink-0 border-b border-red-500/30 bg-red-500/10 px-3 py-1.5 font-mono text-[11.5px] text-red-700 dark:text-red-400">
+        <div role="alert" className="shrink-0 border-b border-red-500/30 bg-red-500/10 px-3 py-1.5 font-sans text-[11.5px] text-red-700 dark:text-red-400">
           {notice}
         </div>
       )}
@@ -163,7 +163,7 @@ export function StlEditor({
         <div className="flex min-h-full min-w-max">
           <div
             aria-hidden="true"
-            className="sticky start-0 z-10 w-13 shrink-0 select-none border-e border-slate-200 bg-slate-100/80 py-3 font-mono text-[12px] leading-[22px] dark:border-[#1a1d24] dark:bg-[#090a0d]/90"
+            className="sticky start-0 z-10 w-13 shrink-0 select-none border-e border-slate-200 bg-slate-100/80 py-3 font-sans tabular-nums text-[12px] leading-[22px] dark:border-[#1a1d24] dark:bg-[#090a0d]/90"
           >
             {Array.from({ length: lineCount }, (_, i) => {
               const line = i + 1;
@@ -243,7 +243,7 @@ export function StlEditor({
               >
                 <span className={d.severity === 'error' ? 'font-semibold text-rose-600' : 'font-semibold text-sky-600 dark:text-sky-400'}>{d.severity}</span>
                 {d.line !== undefined && (
-                  <span className="font-mono text-slate-500">
+                  <span className="font-sans tabular-nums text-slate-500">
                     {d.line}:{d.column ?? 1}
                   </span>
                 )}

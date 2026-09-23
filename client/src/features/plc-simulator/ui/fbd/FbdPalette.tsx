@@ -53,7 +53,7 @@ export function FbdPalette({ armed, onActivate, onDragStart, onDragEnd, disabled
             className={tileClass(isArmed)}
           >
             <BlockGlyph kind={kind} />
-            <span className="font-mono">{KINDS[kind].label}</span>
+            <span className="font-sans font-medium text-[11px]">{KINDS[kind].label}</span>
           </button>
         );
       }}

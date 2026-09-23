@@ -1,62 +1,517 @@
 import { useEffect, useMemo, useState } from "react";
 import { KatexMath } from "@/components/ui/KatexMath";
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { PowerSlider } from "./PowerSlider";
 import { PowerWarningAlert } from "./PowerWarningAlert";
 import { StudioErrorBoundary } from "./StudioErrorBoundary";
-import { defaultAcVoltageControllerParameters, simulateAcVoltageController, type AcControlMode, type AcLoad, type AcPhase, type AcTopology, type AcVoltageControllerParameters, type AcVoltageFormat, type ThreePhaseConnection } from "@/features/power-electronics/acVoltageControllerMath";
+import { PowerScopePlot, type ScopeSeries } from "./PowerScopePlot";
+import {
+  defaultAcVoltageControllerParameters,
+  simulateAcVoltageController,
+  type AcControlMode,
+  type AcLoad,
+  type AcPhase,
+  type AcTopology,
+  type AcVoltageControllerParameters,
+  type AcVoltageFormat,
+  type ThreePhaseConnection
+} from "@/features/power-electronics/acVoltageControllerMath";
 
 const tex = String.raw;
 const card = "rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900";
 const heading = "text-sm font-bold text-slate-800 dark:text-white";
 const field = "w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-center font-mono text-sm text-slate-900 outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-35 dark:border-slate-800 dark:bg-slate-950 dark:text-white";
-type Option<T extends string> = { value: T; label?: string; math?: string };
-const phaseOptions: Option<AcPhase>[] = [{ value: "single", label: "Single-Phase (1-Φ)" }, { value: "three", label: "Three-Phase (3-Φ)" }];
-const topologyOptions: Option<AcTopology>[] = [{ value: "unidirectional", label: "Unidirectional" }, { value: "bidirectional", label: "Bidirectional / TRIAC" }];
-const connectionOptions: Option<ThreePhaseConnection>[] = [{ value: "star-3w", label: "Star-3W" }, { value: "star-4w", label: "Star-4W" }, { value: "delta", label: "Delta" }];
-const modeOptions: Option<AcControlMode>[] = [{ value: "phase-angle", label: "Phase-Angle" }, { value: "integral-cycle", label: "Integral-Cycle" }];
-const formatOptions: Option<AcVoltageFormat>[] = [{ value: "rms", math: tex`V_{\mathrm{RMS}}` }, { value: "peak", math: "V_m" }];
-const loadOptions: Option<AcLoad>[] = [{ value: "R", math: "R" }, { value: "RL", math: "RL" }];
 
-function numberTex(value: number, digits = 2) { if (!Number.isFinite(value)) return "0"; const absolute = Math.abs(value); if (absolute !== 0 && (absolute >= 1000 || absolute < 0.01)) { const [m, e] = value.toExponential(2).split("e"); return `${m}\\times10^{${Number(e)}}`; } return Number(value.toFixed(digits)).toString(); }
-function Matrix<T extends string>({ value, options, onChange, columns = 2 }: { value: T; options: Option<T>[]; onChange: (value: T) => void; columns?: number }) { return <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>{options.map((option) => <button key={option.value} type="button" onClick={() => onChange(option.value)} className={`min-h-10 rounded-xl border px-2 py-2 text-xs font-bold transition-all ${value === option.value ? "bg-gradient-to-r from-[#2563eb] via-[#7c3aed] to-[#f43f5e] text-white border-transparent shadow-sm" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400 dark:hover:bg-slate-800"}`}>{option.math ? <KatexMath math={option.math} /> : option.label}</button>)}</div>; }
-function Field({ label, value, onChange, disabled = false, min = 0, max, step = "any" }: { label: string; value: number; onChange: (value: number) => void; disabled?: boolean; min?: number; max?: number; step?: number | "any" }) { const [editing, setEditing] = useState(false); return <label className="block"><KatexMath math={label} className="mb-1.5 block text-xs font-bold text-slate-500 dark:text-slate-400" /><div className="relative"><input aria-label={label} className={field} type="number" min={min} max={max} step={step} disabled={disabled} value={Number.isFinite(value) ? value : 0} onFocus={() => setEditing(true)} onBlur={() => setEditing(false)} onChange={(event) => onChange(Number(event.target.value) || 0)} style={editing ? undefined : { color: "transparent", WebkitTextFillColor: "transparent", caretColor: "transparent" }} /><span aria-hidden className={`pointer-events-none absolute inset-0 grid place-items-center ${editing ? "hidden" : ""} ${disabled ? "opacity-35" : ""}`}><KatexMath math={numberTex(value)} className="text-sm font-semibold text-slate-900 dark:text-white" /></span></div></label>; }
-function Metric({ label, value }: { label: string; value: string }) { return <div className="rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-2 dark:border-slate-800 dark:bg-slate-950"><KatexMath math={label} className="block text-[10px] text-slate-500 dark:text-slate-400" /><KatexMath math={value} className="mt-1 block overflow-x-auto text-xs font-bold text-slate-900 dark:text-white" /></div>; }
+const phaseOptions: Array<{ value: AcPhase; label: string }> = [
+  { value: "single", label: "Single-Phase (1-Φ)" },
+  { value: "three", label: "Three-Phase (3-Φ)" }
+];
 
-function AcScope({ samples, period, alpha, beta, phaseMode, phase, overlay }: { samples: ReturnType<typeof simulateAcVoltageController>["samples"]; period: number; alpha: number; beta: number; phaseMode: boolean; phase: AcPhase; overlay: "none" | "thyristor" | "gate" }) {
-  const drawn = samples.filter((_, index) => index % 3 === 0 || index === samples.length - 1);
-  const width = 760, height = 500, left = 62, right = 58, top = 22, bottom = 48, plotWidth = width - left - right, plotHeight = height - top - bottom;
-  const voltageMax = Math.max(1, ...drawn.flatMap((point) => [Math.abs(point.sourceVoltage), Math.abs(point.outputVoltage), Math.abs(point.phaseAOutput), Math.abs(point.phaseBOutput), Math.abs(point.phaseCOutput), overlay === "thyristor" ? Math.abs(point.thyristorVoltage) : 0, overlay === "gate" ? Math.abs(point.gatePulse) : 0]));
-  const currentMax = Math.max(1, ...drawn.map((point) => Math.abs(point.outputCurrent)));
-  const x = (index: number) => left + index / Math.max(drawn.length - 1, 1) * plotWidth;
-  const yVoltage = (value: number) => top + (voltageMax - value) / (2 * voltageMax) * plotHeight;
-  const yCurrent = (value: number) => top + (currentMax - value) / (2 * currentMax) * plotHeight;
-  const path = (key: "sourceVoltage" | "outputVoltage" | "phaseAOutput" | "phaseBOutput" | "phaseCOutput" | "outputCurrent" | "thyristorVoltage" | "gatePulse", scale: (value: number) => number, step = false) => drawn.map((point, index) => { const px = x(index), py = scale(point[key]); if (!index) return `M${px.toFixed(2)} ${py.toFixed(2)}`; return step ? `H${px.toFixed(2)}V${py.toFixed(2)}` : `L${px.toFixed(2)} ${py.toFixed(2)}`; }).join(" ");
-  const area = `M${x(0)} ${yVoltage(0)} ${path("outputVoltage", yVoltage, true).replace(/^M[^ ]+ [^ ]+/, "L")} L${x(drawn.length - 1)} ${yVoltage(0)} Z`;
-  const timeTicks = [0, 0.5, 1, 1.5, 2];
-  const grid = [-1, -0.5, 0, 0.5, 1];
-  const annotate = (angle: number, label: string, tone: string) => Array.from({ length: 2 }, (_, cycle) => { const ratio = (cycle + angle / 360) / 2; if (ratio > 1) return null; const px = left + ratio * plotWidth; return <g key={`${label}-${cycle}`}><line x1={px} x2={px} y1={top} y2={height - bottom} stroke={tone} strokeDasharray="5 5" strokeWidth="1.3" /><text x={px + 4} y={top + 14} fill={tone} fontSize="11">{label}</text></g>; });
-  return <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" className="h-full w-full" role="img" aria-label={phase === "three" ? "Three-phase AC voltage controller controlled Vout and Io scope" : "AC voltage controller waveform scope"}><defs><linearGradient id="ac-output-fill" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stopColor="#60a5fa" stopOpacity="0.34" /><stop offset="1" stopColor="#60a5fa" stopOpacity="0.03" /></linearGradient></defs><rect x={left} y={top} width={plotWidth} height={plotHeight} rx="12" fill="transparent" />{grid.map((ratio) => <g key={ratio}><line x1={left} x2={width - right} y1={yVoltage(ratio * voltageMax)} y2={yVoltage(ratio * voltageMax)} stroke="#64748b" strokeOpacity="0.22" strokeDasharray="3 5" /><text x={left - 10} y={yVoltage(ratio * voltageMax) + 4} textAnchor="end" fill="#60a5fa" fontSize="11">{Math.round(ratio * voltageMax)}</text><text x={width - right + 10} y={yCurrent(ratio * currentMax) + 4} fill="#c4b5fd" fontSize="11">{Number((ratio * currentMax).toFixed(1))}</text></g>)}{timeTicks.map((ratio) => <g key={ratio}><line x1={left + ratio * plotWidth} x2={left + ratio * plotWidth} y1={top} y2={height - bottom} stroke="#64748b" strokeOpacity="0.12" /><text x={left + ratio * plotWidth} y={height - 22} textAnchor="middle" fill="#94a3b8" fontSize="11">{Math.round(ratio * period * 2000)}</text></g>)}<path d={area} fill="url(#ac-output-fill)" /><line x1={left} x2={width - right} y1={yVoltage(0)} y2={yVoltage(0)} stroke="#94a3b8" strokeDasharray="4 4" /><text x={15} y={height / 2} fill="#60a5fa" fontSize="11" transform={`rotate(-90 15 ${height / 2})`}>Voltage [V]</text><text x={width - 15} y={height / 2} fill="#c4b5fd" fontSize="11" transform={`rotate(90 ${width - 15} ${height / 2})`}>Current [A]</text><text x={width / 2} y={height - 4} textAnchor="middle" fill="#94a3b8" fontSize="11">Time [ms]</text>{phaseMode && <>{annotate(alpha, "α", "#fbbf24")}{annotate(beta, "β", "#fb7185")}</>}{phase === "three" ? <><path d={path("outputVoltage", yVoltage, true)} fill="none" stroke="#60a5fa" strokeWidth="3.5" vectorEffect="non-scaling-stroke" /><path d={path("phaseBOutput", yVoltage, true)} fill="none" stroke="#fbbf24" strokeWidth="1.8" strokeDasharray="5 4" vectorEffect="non-scaling-stroke" /><path d={path("phaseCOutput", yVoltage, true)} fill="none" stroke="#fb7185" strokeWidth="1.8" strokeDasharray="5 4" vectorEffect="non-scaling-stroke" /><text x={left + 8} y={top + 18} fill="#e2e8f0" fontSize="11" fontWeight="700">THREE-PHASE CONTROLLED OUTPUT: Vout + Io</text></> : <><path d={path("sourceVoltage", yVoltage)} fill="none" stroke="#94a3b8" strokeWidth="1.5" strokeDasharray="6 5" vectorEffect="non-scaling-stroke" /><path d={path("outputVoltage", yVoltage, true)} fill="none" stroke="#60a5fa" strokeWidth="3" vectorEffect="non-scaling-stroke" /></>}<path d={path("outputCurrent", yCurrent)} fill="none" stroke="#a78bfa" strokeWidth="2.8" vectorEffect="non-scaling-stroke" />{overlay === "thyristor" && <path d={path("thyristorVoltage", yVoltage)} fill="none" stroke="#38bdf8" strokeOpacity="0.55" strokeWidth="1.4" strokeDasharray="3 4" />}{overlay === "gate" && <path d={path("gatePulse", yVoltage, true)} fill="none" stroke="#fbbf24" strokeOpacity="0.6" strokeWidth="1.5" strokeDasharray="3 3" />}</svg>;
+const topologyOptions: Array<{ value: AcTopology; label: string }> = [
+  { value: "unidirectional", label: "Unidirectional" },
+  { value: "bidirectional", label: "Bidirectional / TRIAC" }
+];
+
+const connectionOptions: Array<{ value: ThreePhaseConnection; label: string }> = [
+  { value: "star-3w", label: "Star-3W" },
+  { value: "star-4w", label: "Star-4W" },
+  { value: "delta", label: "Delta" }
+];
+
+const modeOptions: Array<{ value: AcControlMode; label: string }> = [
+  { value: "phase-angle", label: "Phase-Angle" },
+  { value: "integral-cycle", label: "Integral-Cycle" }
+];
+
+const formatOptions = [
+  { value: "rms" as AcVoltageFormat, label: <KatexMath math={tex`V_{\mathrm{RMS}}`} /> },
+  { value: "peak" as AcVoltageFormat, label: <KatexMath math="V_m" /> }
+];
+
+const loadOptions = [
+  { value: "R" as AcLoad, label: <KatexMath math="R" /> },
+  { value: "RL" as AcLoad, label: <KatexMath math="RL" /> }
+];
+
+const overlayOptions = [
+  { value: "none" as const, label: "Standard" },
+  { value: "thyristor" as const, label: <KatexMath math="V_T" /> },
+  { value: "gate" as const, label: "Gate" }
+];
+
+function numberTex(value: number, digits = 2) {
+  if (!Number.isFinite(value)) return "0";
+  const absolute = Math.abs(value);
+  if (absolute !== 0 && (absolute >= 1000 || absolute < 0.01)) {
+    const [m, e] = value.toExponential(2).split("e");
+    return `${m}\\times10^{${Number(e)}}`;
+  }
+  return Number(value.toFixed(digits)).toString();
 }
 
-function Circuit({ parameters }: { parameters: AcVoltageControllerParameters }) { const title = parameters.phase === "three" ? `3-Φ ${parameters.threePhaseConnection}` : parameters.topology === "bidirectional" ? "1-Φ Bidirectional TRIAC" : "1-Φ Unidirectional SCR"; return <section className={`${card} min-h-[340px]`}><div className="flex items-center justify-between gap-3"><h3 className={heading}>Circuit Diagram</h3><span className="text-xs font-bold text-violet-700 dark:text-violet-300">{parameters.controlMode === "phase-angle" ? "PHASE" : "INTEGRAL"}</span></div><div className="mt-4 grid min-h-60 place-items-center overflow-hidden rounded-2xl border border-dashed border-violet-300 bg-slate-50 p-4 text-center dark:border-violet-400/30 dark:bg-slate-950"><svg viewBox="0 0 340 120" className="h-28 w-full max-w-lg" fill="none" aria-label={title}><path d="M24 60h52m0 0 16-16v32L76 60m16 0h52m0 0 17-15v30l-17-15m17 0h36m0-30v60m-12-44h24m-24 18h24m-24 18h24M221 60h70" stroke="currentColor" strokeWidth="2" className="text-violet-500" /><circle cx="42" cy="60" r="18" stroke="currentColor" strokeWidth="1.5" className="text-slate-400 dark:text-slate-500" /><path d="M30 60c4-10 9-10 13 0s9 10 13 0M142 38v44m12-35-24 26m24 0-24-26" stroke="currentColor" strokeWidth="1.5" className="text-slate-400 dark:text-slate-500" /><path d="M292 36v48m-12-40h24m-24 16h24m-24 16h24" stroke="currentColor" strokeWidth="1.5" className="text-violet-500" /></svg><span className="mt-2 block text-[10px] font-bold tracking-[.06em] text-slate-400">{title}</span></div></section>; }
+function Field({
+  label,
+  value,
+  onChange,
+  disabled = false,
+  min = 0,
+  max,
+  step = "any"
+}: {
+  label: string;
+  value: number;
+  onChange: (value: number) => void;
+  disabled?: boolean;
+  min?: number;
+  max?: number;
+  step?: number | "any";
+}) {
+  const [editing, setEditing] = useState(false);
+  return (
+    <label className="block">
+      <KatexMath math={label} className="mb-1.5 block text-xs font-bold text-slate-500 dark:text-slate-400" />
+      <div className="relative">
+        <input
+          aria-label={label}
+          className={field}
+          type="number"
+          min={min}
+          max={max}
+          step={step}
+          disabled={disabled}
+          value={Number.isFinite(value) ? value : 0}
+          onFocus={() => setEditing(true)}
+          onBlur={() => setEditing(false)}
+          onChange={(event) => onChange(Number(event.target.value) || 0)}
+          style={editing ? undefined : { color: "transparent", WebkitTextFillColor: "transparent", caretColor: "transparent" }}
+        />
+        <span aria-hidden className={`pointer-events-none absolute inset-0 grid place-items-center ${editing ? "hidden" : ""} ${disabled ? "opacity-35" : ""}`}>
+          <KatexMath math={numberTex(value)} className="text-sm font-semibold text-slate-900 dark:text-white" />
+        </span>
+      </div>
+    </label>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-2 dark:border-slate-800 dark:bg-slate-950">
+      <KatexMath math={label} className="block text-[10px] text-slate-500 dark:text-slate-400" />
+      <KatexMath math={value} className="mt-1 block overflow-x-auto text-xs font-bold text-slate-900 dark:text-white" />
+    </div>
+  );
+}
+
+function Circuit({ parameters }: { parameters: AcVoltageControllerParameters }) {
+  const title = parameters.phase === "three"
+    ? `3-Φ ${parameters.threePhaseConnection.toUpperCase()}`
+    : parameters.topology === "bidirectional"
+    ? "1-Φ Bidirectional TRIAC"
+    : "1-Φ Unidirectional SCR";
+
+  return (
+    <section className={`${card} min-h-[340px]`}>
+      <div className="flex items-center justify-between gap-3">
+        <h3 className={heading}>Circuit Diagram</h3>
+        <span className="text-xs font-bold text-violet-700 dark:text-violet-300">
+          {parameters.controlMode === "phase-angle" ? "PHASE" : "INTEGRAL"}
+        </span>
+      </div>
+      <div className="mt-4 grid min-h-60 place-items-center overflow-hidden rounded-2xl border border-dashed border-violet-300 bg-slate-50 p-4 text-center dark:border-violet-400/30 dark:bg-slate-950">
+        <svg viewBox="0 0 340 120" className="h-28 w-full max-w-lg" fill="none" aria-label={title}>
+          <path d="M24 60h52m0 0 16-16v32L76 60m16 0h52m0 0 17-15v30l-17-15m17 0h36m0-30v60m-12-44h24m-24 18h24m-24 18h24M221 60h70" stroke="currentColor" strokeWidth="2" className="text-violet-500" />
+          <circle cx="42" cy="60" r="18" stroke="currentColor" strokeWidth="1.5" className="text-slate-400 dark:text-slate-500" />
+          <path d="M30 60c4-10 9-10 13 0s9 10 13 0M142 38v44m12-35-24 26m24 0-24-26" stroke="currentColor" strokeWidth="1.5" className="text-slate-400 dark:text-slate-500" />
+          <path d="M292 36v48m-12-40h24m-24 16h24m-24 16h24" stroke="currentColor" strokeWidth="1.5" className="text-violet-500" />
+        </svg>
+        <span className="mt-2 block text-[10px] font-bold tracking-[.06em] text-slate-400">{title}</span>
+      </div>
+    </section>
+  );
+}
 
 export function ACVoltageControllerStudio() {
   const [parameters, setParameters] = useState<AcVoltageControllerParameters>(defaultAcVoltageControllerParameters);
   const [overlay, setOverlay] = useState<"none" | "thyristor" | "gate">("none");
-  const [ready, setReady] = useState(false);
   const simulation = useMemo(() => simulateAcVoltageController(parameters), [parameters]);
   const metrics = simulation.metrics;
   const isPhase = parameters.controlMode === "phase-angle";
   const hasInductance = parameters.loadType === "RL";
-  const update = <K extends keyof AcVoltageControllerParameters>(key: K, value: AcVoltageControllerParameters[K]) => setParameters((current) => ({ ...current, [key]: value }));
-  useEffect(() => { const id = requestAnimationFrame(() => setReady(true)); return () => cancelAnimationFrame(id); }, []);
 
-  const topology = <section className={card}><h3 className={heading}>Topology Configuration</h3><div className="mt-4 space-y-4"><div><span className="mb-2 block text-xs font-bold text-slate-500 dark:text-slate-400">Phase</span><Matrix value={parameters.phase} options={phaseOptions} onChange={(phase) => update("phase", phase)} /></div><div><span className="mb-2 block text-xs font-bold text-slate-500 dark:text-slate-400">Topology Type</span><Matrix value={parameters.topology} options={topologyOptions} onChange={(topology) => update("topology", topology)} /></div>{parameters.phase === "three" && <div><span className="mb-2 block text-xs font-bold text-slate-500 dark:text-slate-400">3-Φ Connection</span><Matrix value={parameters.threePhaseConnection} options={connectionOptions} columns={3} onChange={(threePhaseConnection) => update("threePhaseConnection", threePhaseConnection)} /></div>}</div></section>;
-  const control = <section className={card}><h3 className={heading}>Control Technique</h3><div className="mt-4"><Matrix value={parameters.controlMode} options={modeOptions} onChange={(controlMode) => update("controlMode", controlMode)} /></div>{isPhase ? <div className="mt-4"><div className="mb-2 flex items-center justify-between"><KatexMath math={tex`\alpha\,[^\circ]`} className="text-xs font-bold text-slate-500 dark:text-slate-400" /><KatexMath math={tex`${numberTex(parameters.firingAngle, 0)}^\circ`} className="text-xs text-violet-700 dark:text-violet-300" /></div><PowerSlider aria-label="firing angle" min={0} max={180} step={1} value={parameters.firingAngle} onChange={(event) => update("firingAngle", Number(event.target.value))} /><div className="mt-3"><Field label={tex`\alpha\,[^\circ]`} value={parameters.firingAngle} min={0} max={180} step={1} onChange={(firingAngle) => update("firingAngle", firingAngle)} /></div></div> : <div className="mt-4 grid gap-3 sm:grid-cols-2"><Field label={tex`n_{\mathrm{ON}}`} value={parameters.onCycles} min={1} max={12} step={1} onChange={(onCycles) => update("onCycles", onCycles)} /><Field label={tex`m_{\mathrm{OFF}}`} value={parameters.offCycles} min={1} max={12} step={1} onChange={(offCycles) => update("offCycles", offCycles)} /><div className="sm:col-span-2 rounded-xl border border-violet-200 bg-violet-50 px-3 py-2 text-center dark:border-violet-400/30 dark:bg-violet-500/10"><KatexMath math={tex`k=\frac{n}{n+m}=${numberTex(metrics.controlValue, 3)}`} className="text-sm font-bold text-violet-700 dark:text-violet-200" /></div></div>}</section>;
-  const sourceLoad = <section className={card}><h3 className={heading}>Source &amp; Load Configuration</h3><div className="mt-4"><span className="mb-2 block text-xs font-bold text-slate-500 dark:text-slate-400">Voltage Format</span><Matrix value={parameters.voltageFormat} options={formatOptions} onChange={(voltageFormat) => update("voltageFormat", voltageFormat)} /></div><div className="mt-4 grid gap-3 sm:grid-cols-2"><Field label={tex`V_s\,[\mathrm{V}]`} value={parameters.inputVoltage} min={0} step={1} onChange={(inputVoltage) => update("inputVoltage", inputVoltage)} /><Field label={tex`f\,[\mathrm{Hz}]`} value={parameters.frequency} min={1} step={1} onChange={(frequency) => update("frequency", frequency)} /></div><div className="mt-4"><span className="mb-2 block text-xs font-bold text-slate-500 dark:text-slate-400">Load Set</span><Matrix value={parameters.loadType} options={loadOptions} onChange={(loadType) => update("loadType", loadType)} /></div><div className="mt-4 grid gap-3 sm:grid-cols-2"><Field label={tex`R\,[\Omega]`} value={parameters.resistance} min={0.05} step={0.1} onChange={(resistance) => update("resistance", resistance)} /><Field label={tex`L\,[\mathrm{mH}]`} value={parameters.inductanceMilliHenry} disabled={!hasInductance} min={0} step={1} onChange={(inductanceMilliHenry) => update("inductanceMilliHenry", inductanceMilliHenry)} /></div></section>;
-  const metricPanel = <section className={`${card} p-4`}><div><h3 className={heading}>Steady-State Metrics</h3><KatexMath math={tex`\frac{1}{T}\int_{0}^{T}(\cdot)\,dt`} className="mt-1 block text-xs text-slate-500 dark:text-slate-400" /></div><div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4"><Metric label={tex`V_{o\mathrm{rms}}`} value={tex`${numberTex(metrics.outputVoltageRms)}\,\mathrm{V}`} /><Metric label={tex`I_{o\mathrm{rms}}`} value={tex`${numberTex(metrics.outputCurrentRms)}\,\mathrm{A}`} /><Metric label="P" value={tex`${numberTex(metrics.activePower)}\,\mathrm{W}`} /><Metric label="S" value={tex`${numberTex(metrics.apparentPower)}\,\mathrm{VA}`} /><Metric label={tex`\mathrm{PF}`} value={numberTex(metrics.powerFactor, 3)} /><Metric label={tex`\alpha`} value={tex`${numberTex(metrics.firingAngle, 0)}^\circ`} /><Metric label={tex`\beta`} value={tex`${numberTex(metrics.extinctionAngle, 1)}^\circ`} /><Metric label={tex`\gamma`} value={tex`${numberTex(metrics.conductionAngle, 1)}^\circ`} /><Metric label={tex`\mathrm{THD}_v`} value={tex`${numberTex(metrics.voltageThd)}\%`} /><Metric label={tex`\mathrm{THD}_i`} value={tex`${numberTex(metrics.currentThd)}\%`} /><Metric label={tex`V_{s\mathrm{rms}}`} value={tex`${numberTex(metrics.sourceVoltageRms)}\,\mathrm{V}`} /><Metric label={isPhase ? tex`\mathrm{Mode}` : tex`k`} value={isPhase ? tex`\mathrm{Phase}` : numberTex(metrics.controlValue, 3)} /></div></section>;
-  const scope = <section className={card}><div className="mb-5 flex flex-wrap items-start justify-between gap-3"><div><h3 className={heading}>Output Scope</h3><KatexMath math={parameters.phase === "three" ? tex`V_{\mathrm{out}}(t),\ I_o(t)\quad[\,v_{o,b}(t),\ v_{o,c}(t)\ \mathrm{supporting}\,]` : tex`V_s(t),\ V_o(t),\ I_o(t)`} className="mt-1 block text-xs text-slate-500 dark:text-slate-400" /></div><div className="flex gap-2"><button type="button" onClick={() => setOverlay(overlay === "thyristor" ? "none" : "thyristor")} className={`rounded-full border px-3 py-1 text-xs font-bold transition ${overlay === "thyristor" ? "bg-gradient-to-r from-[#2563eb] via-[#7c3aed] to-[#f43f5e] text-white border-transparent shadow-sm" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400 dark:hover:bg-slate-800"}`}>V<sub>T</sub></button><button type="button" onClick={() => setOverlay(overlay === "gate" ? "none" : "gate")} className={`rounded-full border px-3 py-1 text-xs font-bold transition ${overlay === "gate" ? "bg-gradient-to-r from-[#2563eb] via-[#7c3aed] to-[#f43f5e] text-white border-transparent shadow-sm" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400 dark:hover:bg-slate-800"}`}>Gate Pulses</button></div></div><div className="rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-[#090a0d]"><div className="mb-3 flex flex-wrap items-center justify-between gap-3"><div><h4 className="text-xs font-bold text-slate-700 dark:text-slate-200">{parameters.phase === "three" ? "Three-Phase Controlled Vout & Io" : isPhase ? "Phase-Angle Controlled Output" : "Integral-Cycle Controlled Output"}</h4><KatexMath math={tex`T=\frac{1}{f}=${numberTex(simulation.period * 1000, 2)}\,\mathrm{ms}`} className="mt-1 block text-[11px] text-slate-500 dark:text-slate-400" /></div><div className="flex flex-wrap gap-3 text-[10px] text-slate-500 dark:text-slate-400">{parameters.phase === "three" ? <><span className="inline-flex items-center gap-1"><i className="h-0.5 w-4 bg-blue-400" /><KatexMath math="V_{\mathrm{out}}" /></span><span className="inline-flex items-center gap-1"><i className="h-0.5 w-4 bg-violet-400" /><KatexMath math="I_o" /></span><span className="inline-flex items-center gap-1"><i className="h-px w-4 border-t border-dashed border-amber-400" /><KatexMath math="v_{o,b}" /></span><span className="inline-flex items-center gap-1"><i className="h-px w-4 border-t border-dashed border-rose-400" /><KatexMath math="v_{o,c}" /></span></> : <><span className="inline-flex items-center gap-1"><i className="h-px w-4 border-t border-dashed border-slate-400" /><KatexMath math="V_s" /></span><span className="inline-flex items-center gap-1"><i className="h-0.5 w-4 bg-blue-400" /><KatexMath math="V_o" /></span><span className="inline-flex items-center gap-1"><i className="h-0.5 w-4 bg-violet-400" /><KatexMath math="I_o" /></span></>}</div></div><div className="h-[530px] w-full min-w-0">{ready && <AcScope samples={simulation.samples} period={simulation.period} alpha={metrics.firingAngle} beta={metrics.extinctionAngle} phaseMode={isPhase} phase={parameters.phase} overlay={overlay} />}</div></div></section>;
-  return <StudioErrorBoundary studioName="AC Voltage Controller"><div className="space-y-6"><PowerWarningAlert warnings={simulation.warnings} /><div className="grid gap-6 xl:grid-cols-2"><aside className="min-w-0 space-y-6">{topology}{control}{sourceLoad}{metricPanel}</aside><main className="min-w-0 w-full space-y-6">{scope}<Circuit parameters={parameters} /></main></div></div></StudioErrorBoundary>;
+  const update = <K extends keyof AcVoltageControllerParameters>(key: K, value: AcVoltageControllerParameters[K]) =>
+    setParameters((current) => ({ ...current, [key]: value }));
+
+  const series = useMemo((): ScopeSeries[] => {
+    const periodMs = simulation.period * 1000;
+    const drawn = simulation.samples.filter((_, index) => index % 3 === 0 || index === simulation.samples.length - 1);
+    const toPoints = (fn: (sample: typeof simulation.samples[number]) => number) =>
+      drawn.map((s) => ({ t: s.time * 1000, val: fn(s) }));
+
+    const list: ScopeSeries[] = [];
+
+    if (parameters.phase === "three") {
+      list.push({
+        id: "voa",
+        katexName: "V_{oA}(t)",
+        data: toPoints((s) => s.phaseAOutput),
+        color: "#E11D48",
+        axis: "voltage",
+        unit: "V",
+        strokeWidth: 2.8,
+      });
+      list.push({
+        id: "vob",
+        katexName: "V_{oB}(t)",
+        data: toPoints((s) => s.phaseBOutput),
+        color: "#EAB308",
+        axis: "voltage",
+        unit: "V",
+        dashArray: "5 4",
+        strokeWidth: 1.8,
+      });
+      list.push({
+        id: "voc",
+        katexName: "V_{oC}(t)",
+        data: toPoints((s) => s.phaseCOutput),
+        color: "#2563EB",
+        axis: "voltage",
+        unit: "V",
+        dashArray: "5 4",
+        strokeWidth: 1.8,
+      });
+      list.push({
+        id: "io",
+        katexName: "I_o(t)",
+        data: toPoints((s) => s.outputCurrent),
+        color: "#ec4899",
+        axis: "current",
+        unit: "A",
+        strokeWidth: 2.5,
+      });
+    } else {
+      list.push({
+        id: "vs",
+        katexName: "V_s(t)",
+        data: toPoints((s) => s.sourceVoltage),
+        color: "#94a3b8",
+        axis: "voltage",
+        unit: "V",
+        dashArray: "6 5",
+        strokeWidth: 1.5,
+      });
+      list.push({
+        id: "vo",
+        katexName: "V_o(t)",
+        data: toPoints((s) => s.outputVoltage),
+        color: "#2563eb",
+        axis: "voltage",
+        unit: "V",
+        strokeWidth: 2.8,
+      });
+      list.push({
+        id: "io",
+        katexName: "I_o(t)",
+        data: toPoints((s) => s.outputCurrent),
+        color: "#ec4899",
+        axis: "current",
+        unit: "A",
+        strokeWidth: 2.5,
+      });
+    }
+
+    if (overlay === "thyristor") {
+      list.push({
+        id: "vt",
+        katexName: "V_T(t)",
+        data: toPoints((s) => s.thyristorVoltage),
+        color: "#38bdf8",
+        axis: "voltage",
+        unit: "V",
+        dashArray: "4 4",
+        strokeWidth: 1.6,
+      });
+    }
+
+    if (overlay === "gate") {
+      list.push({
+        id: "gate",
+        katexName: "g(t)",
+        data: toPoints((s) => s.gatePulse),
+        color: "#10b981",
+        axis: "voltage",
+        unit: "",
+        stepped: true,
+        dashArray: "3 3",
+        strokeWidth: 1.5,
+      });
+    }
+
+    return list;
+  }, [simulation.samples, simulation.period, parameters.phase, overlay]);
+
+  const annotations = useMemo(() => {
+    if (!isPhase) return undefined;
+    const periodMs = simulation.period * 1000;
+    const maxTime = periodMs * 2;
+    const tAlpha1 = (metrics.firingAngle / 360) * periodMs;
+    const tBeta1 = (metrics.extinctionAngle / 360) * periodMs;
+    const tAlpha2 = (1 + metrics.firingAngle / 360) * periodMs;
+    const tBeta2 = (1 + metrics.extinctionAngle / 360) * periodMs;
+
+    return [
+      { timeMs: tAlpha1, label: "α", color: "#7C3AED" },
+      { timeMs: tBeta1, label: "β", color: "#9333EA" },
+      { timeMs: tAlpha2, label: "α", color: "#7C3AED" },
+      { timeMs: tBeta2, label: "β", color: "#9333EA" },
+    ].filter((a) => a.timeMs <= maxTime);
+  }, [isPhase, metrics.firingAngle, metrics.extinctionAngle, simulation.period]);
+
+  const topology = (
+    <section className={card}>
+      <h3 className={heading}>Topology Configuration</h3>
+      <div className="mt-4 space-y-4">
+        <div>
+          <span className="mb-2 block text-xs font-bold text-slate-500 dark:text-slate-400">Phase</span>
+          <SegmentedControl
+            value={parameters.phase}
+            options={phaseOptions}
+            onChange={(phase) => update("phase", phase)}
+            fullWidth
+          />
+        </div>
+        <div>
+          <span className="mb-2 block text-xs font-bold text-slate-500 dark:text-slate-400">Topology Type</span>
+          <SegmentedControl
+            value={parameters.topology}
+            options={topologyOptions}
+            onChange={(topology) => update("topology", topology)}
+            fullWidth
+          />
+        </div>
+        {parameters.phase === "three" && (
+          <div>
+            <span className="mb-2 block text-xs font-bold text-slate-500 dark:text-slate-400">3-Φ Connection</span>
+            <SegmentedControl
+              value={parameters.threePhaseConnection}
+              options={connectionOptions}
+              onChange={(threePhaseConnection) => update("threePhaseConnection", threePhaseConnection)}
+              fullWidth
+            />
+          </div>
+        )}
+      </div>
+    </section>
+  );
+
+  const control = (
+    <section className={card}>
+      <h3 className={heading}>Control Technique</h3>
+      <div className="mt-4">
+        <SegmentedControl
+          value={parameters.controlMode}
+          options={modeOptions}
+          onChange={(controlMode) => update("controlMode", controlMode)}
+          fullWidth
+        />
+      </div>
+      {isPhase ? (
+        <div className="mt-4">
+          <div className="mb-2 flex items-center justify-between">
+            <KatexMath math={tex`\alpha\,[^\circ]`} className="text-xs font-bold text-slate-500 dark:text-slate-400" />
+            <KatexMath math={tex`\alpha = ${numberTex(parameters.firingAngle, 0)}^\circ`} className="text-xs font-semibold text-violet-600 dark:text-violet-400" />
+          </div>
+          <PowerSlider
+            aria-label="firing angle"
+            min={0}
+            max={180}
+            step={1}
+            value={parameters.firingAngle}
+            onChange={(event) => update("firingAngle", Number(event.target.value))}
+          />
+          <div className="mt-3">
+            <Field
+              label={tex`\alpha\,[^\circ]`}
+              value={parameters.firingAngle}
+              min={0}
+              max={180}
+              step={1}
+              onChange={(firingAngle) => update("firingAngle", firingAngle)}
+            />
+          </div>
+        </div>
+      ) : (
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <Field
+            label={tex`n_{\mathrm{ON}}`}
+            value={parameters.onCycles}
+            min={1}
+            max={12}
+            step={1}
+            onChange={(onCycles) => update("onCycles", onCycles)}
+          />
+          <Field
+            label={tex`m_{\mathrm{OFF}}`}
+            value={parameters.offCycles}
+            min={1}
+            max={12}
+            step={1}
+            onChange={(offCycles) => update("offCycles", offCycles)}
+          />
+          <div className="sm:col-span-2 rounded-xl border border-violet-200 bg-violet-50 px-3 py-2 text-center dark:border-violet-400/30 dark:bg-violet-500/10">
+            <KatexMath
+              math={tex`k=\frac{n}{n+m}=${numberTex(metrics.controlValue, 3)}`}
+              className="text-sm font-bold text-violet-700 dark:text-violet-200"
+            />
+          </div>
+        </div>
+      )}
+    </section>
+  );
+
+  const sourceLoad = (
+    <section className={card}>
+      <h3 className={heading}>Source &amp; Load Configuration</h3>
+      <div className="mt-4">
+        <span className="mb-2 block text-xs font-bold text-slate-500 dark:text-slate-400">Voltage Format</span>
+        <SegmentedControl
+          value={parameters.voltageFormat}
+          options={formatOptions}
+          onChange={(voltageFormat) => update("voltageFormat", voltageFormat)}
+          fullWidth
+        />
+      </div>
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <Field
+          label={tex`V_s\,[\mathrm{V}]`}
+          value={parameters.inputVoltage}
+          min={0}
+          step={1}
+          onChange={(inputVoltage) => update("inputVoltage", inputVoltage)}
+        />
+        <Field
+          label={tex`f\,[\mathrm{Hz}]`}
+          value={parameters.frequency}
+          min={1}
+          step={1}
+          onChange={(frequency) => update("frequency", frequency)}
+        />
+      </div>
+      <div className="mt-4">
+        <span className="mb-2 block text-xs font-bold text-slate-500 dark:text-slate-400">Load Set</span>
+        <SegmentedControl
+          value={parameters.loadType}
+          options={loadOptions}
+          onChange={(loadType) => update("loadType", loadType)}
+          fullWidth
+        />
+      </div>
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <Field
+          label={tex`R\,[\Omega]`}
+          value={parameters.resistance}
+          min={0.05}
+          step={0.1}
+          onChange={(resistance) => update("resistance", resistance)}
+        />
+        <Field
+          label={tex`L\,[\mathrm{mH}]`}
+          value={parameters.inductanceMilliHenry}
+          disabled={!hasInductance}
+          min={0}
+          step={1}
+          onChange={(inductanceMilliHenry) => update("inductanceMilliHenry", inductanceMilliHenry)}
+        />
+      </div>
+    </section>
+  );
+
+  const metricPanel = (
+    <section className={`${card} p-4`}>
+      <div>
+        <h3 className={heading}>Steady-State Metrics</h3>
+        <KatexMath math={tex`\frac{1}{T}\int_{0}^{T}(\cdot)\,dt`} className="mt-1 block text-xs text-slate-500 dark:text-slate-400" />
+      </div>
+      <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <Metric label={tex`V_{o\mathrm{rms}}`} value={tex`${numberTex(metrics.outputVoltageRms)}\,\mathrm{V}`} />
+        <Metric label={tex`I_{o\mathrm{rms}}`} value={tex`${numberTex(metrics.outputCurrentRms)}\,\mathrm{A}`} />
+        <Metric label="P" value={tex`${numberTex(metrics.activePower)}\,\mathrm{W}`} />
+        <Metric label="S" value={tex`${numberTex(metrics.apparentPower)}\,\mathrm{VA}`} />
+        <Metric label={tex`\mathrm{PF}`} value={numberTex(metrics.powerFactor, 3)} />
+        <Metric label={tex`\alpha`} value={tex`${numberTex(metrics.firingAngle, 0)}^\circ`} />
+        <Metric label={tex`\beta`} value={tex`${numberTex(metrics.extinctionAngle, 1)}^\circ`} />
+        <Metric label={tex`\gamma`} value={tex`${numberTex(metrics.conductionAngle, 1)}^\circ`} />
+        <Metric label={tex`\mathrm{THD}_v`} value={tex`${numberTex(metrics.voltageThd)}\%`} />
+        <Metric label={tex`\mathrm{THD}_i`} value={tex`${numberTex(metrics.currentThd)}\%`} />
+        <Metric label={tex`V_{s\mathrm{rms}}`} value={tex`${numberTex(metrics.sourceVoltageRms)}\,\mathrm{V}`} />
+        <Metric
+          label={isPhase ? tex`\mathrm{Mode}` : tex`k`}
+          value={isPhase ? tex`\mathrm{Phase}` : numberTex(metrics.controlValue, 3)}
+        />
+      </div>
+    </section>
+  );
+
+  return (
+    <StudioErrorBoundary studioName="AC Voltage Controller">
+      <div className="space-y-6">
+        <PowerWarningAlert warnings={simulation.warnings} />
+        <div className="grid gap-6 xl:grid-cols-2">
+          <aside className="min-w-0 space-y-6">
+            {topology}
+            {control}
+            {sourceLoad}
+            {metricPanel}
+          </aside>
+          <main className="min-w-0 w-full space-y-6">
+            <PowerScopePlot
+              title={
+                parameters.phase === "three"
+                  ? "THREE-PHASE AC CONTROLLER OUTPUT SCOPE"
+                  : "SINGLE-PHASE AC CONTROLLER OUTPUT SCOPE"
+              }
+              subtitleLatex={
+                parameters.phase === "three"
+                  ? tex`V_{oA}(t),\ V_{oB}(t),\ V_{oC}(t),\ I_o(t)`
+                  : tex`V_s(t),\ V_o(t),\ I_o(t)`
+              }
+              series={series}
+              annotations={annotations}
+              headerRight={
+                <SegmentedControl
+                  size="sm"
+                  value={overlay}
+                  options={overlayOptions}
+                  onChange={setOverlay}
+                  aria-label="Scope Overlay Mode"
+                />
+              }
+            />
+            <Circuit parameters={parameters} />
+          </main>
+        </div>
+      </div>
+    </StudioErrorBoundary>
+  );
 }
 
 export default ACVoltageControllerStudio;
