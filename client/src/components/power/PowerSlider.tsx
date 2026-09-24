@@ -1,7 +1,5 @@
-import { BrandSlider, type BrandSliderProps } from "@/components/ui/BrandSlider";
+import { StudioSlider, type StudioSliderProps } from "@/components/common/templates";
 
-export type PowerSliderProps = BrandSliderProps;
-
-export const PowerSlider = BrandSlider;
-
+export type PowerSliderProps = StudioSliderProps;
+export const PowerSlider = StudioSlider;
 export default PowerSlider;

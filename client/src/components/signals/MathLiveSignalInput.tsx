@@ -36,6 +36,9 @@ export const MathLiveSignalInput = forwardRef<MathLiveSignalInputHandle, Props>(
     field.style.setProperty("--hue", "262");
     field.style.setProperty("--selection-background-color", "rgba(139, 92, 246, 0.25)");
     field.style.setProperty("--caret-color", "#a78bfa");
+    // MathLive's \text{...} (rect, sinc, sgn, …) renders via .ML__text, which defaults to a
+    // sans-serif CSS stack unlike math-mode content — force it onto the same KaTeX serif family.
+    field.style.setProperty("--text-font-family", "'KaTeX_Main', 'KaTeX_Math', 'Times New Roman', serif");
     field.value = value;
     field.smartFence = true;
     field.smartSuperscript = true;

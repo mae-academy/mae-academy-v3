@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { KatexMath } from "@/components/ui/KatexMath";
-import { SegmentedControl } from "@/components/ui/SegmentedControl";
-import { PowerSlider } from "./PowerSlider";
+import { SegmentedControl, StudioCard, StudioSlider, InnerBox } from "@/components/common/templates";
 import { PowerWarningAlert } from "./PowerWarningAlert";
 import { StudioErrorBoundary } from "./StudioErrorBoundary";
 import { PowerScopePlot, type ScopeSeries } from "./PowerScopePlot";
@@ -18,8 +17,6 @@ import {
 } from "@/features/power-electronics/acVoltageControllerMath";
 
 const tex = String.raw;
-const card = "rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900";
-const heading = "text-sm font-bold text-slate-800 dark:text-white";
 const field = "w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-center font-mono text-sm text-slate-900 outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-35 dark:border-slate-800 dark:bg-slate-950 dark:text-white";
 
 const phaseOptions: Array<{ value: AcPhase; label: string }> = [
@@ -115,10 +112,10 @@ function Field({
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-2 dark:border-slate-800 dark:bg-slate-950">
+    <InnerBox className="px-2.5 py-2">
       <KatexMath math={label} className="block text-[10px] text-slate-500 dark:text-slate-400" />
       <KatexMath math={value} className="mt-1 block overflow-x-auto text-xs font-bold text-slate-900 dark:text-white" />
-    </div>
+    </InnerBox>
   );
 }
 
@@ -130,14 +127,16 @@ function Circuit({ parameters }: { parameters: AcVoltageControllerParameters }) 
     : "1-Φ Unidirectional SCR";
 
   return (
-    <section className={`${card} min-h-[340px]`}>
-      <div className="flex items-center justify-between gap-3">
-        <h3 className={heading}>Circuit Diagram</h3>
+    <StudioCard
+      title="Circuit Diagram"
+      actionSlot={
         <span className="text-xs font-bold text-violet-700 dark:text-violet-300">
           {parameters.controlMode === "phase-angle" ? "PHASE" : "INTEGRAL"}
         </span>
-      </div>
-      <div className="mt-4 grid min-h-60 place-items-center overflow-hidden rounded-2xl border border-dashed border-violet-300 bg-slate-50 p-4 text-center dark:border-violet-400/30 dark:bg-slate-950">
+      }
+      className="min-h-[340px]"
+    >
+      <div className="grid min-h-60 place-items-center overflow-hidden rounded-2xl border border-dashed border-violet-300 bg-slate-50 p-4 text-center dark:border-violet-400/30 dark:bg-slate-950">
         <svg viewBox="0 0 340 120" className="h-28 w-full max-w-lg" fill="none" aria-label={title}>
           <path d="M24 60h52m0 0 16-16v32L76 60m16 0h52m0 0 17-15v30l-17-15m17 0h36m0-30v60m-12-44h24m-24 18h24m-24 18h24M221 60h70" stroke="currentColor" strokeWidth="2" className="text-violet-500" />
           <circle cx="42" cy="60" r="18" stroke="currentColor" strokeWidth="1.5" className="text-slate-400 dark:text-slate-500" />
@@ -146,7 +145,7 @@ function Circuit({ parameters }: { parameters: AcVoltageControllerParameters }) 
         </svg>
         <span className="mt-2 block text-[10px] font-bold tracking-[.06em] text-slate-400">{title}</span>
       </div>
-    </section>
+    </StudioCard>
   );
 }
 
@@ -287,8 +286,7 @@ export function ACVoltageControllerStudio() {
   }, [isPhase, metrics.firingAngle, metrics.extinctionAngle, simulation.period]);
 
   const topology = (
-    <section className={card}>
-      <h3 className={heading}>Topology Configuration</h3>
+    <StudioCard title="Topology Configuration">
       <div className="mt-4 space-y-4">
         <div>
           <span className="mb-2 block text-xs font-bold text-slate-500 dark:text-slate-400">Phase</span>
@@ -320,12 +318,11 @@ export function ACVoltageControllerStudio() {
           </div>
         )}
       </div>
-    </section>
+    </StudioCard>
   );
 
   const control = (
-    <section className={card}>
-      <h3 className={heading}>Control Technique</h3>
+    <StudioCard title="Control Technique">
       <div className="mt-4">
         <SegmentedControl
           value={parameters.controlMode}
@@ -340,13 +337,14 @@ export function ACVoltageControllerStudio() {
             <KatexMath math={tex`\alpha\,[^\circ]`} className="text-xs font-bold text-slate-500 dark:text-slate-400" />
             <KatexMath math={tex`\alpha = ${numberTex(parameters.firingAngle, 0)}^\circ`} className="text-xs font-semibold text-violet-600 dark:text-violet-400" />
           </div>
-          <PowerSlider
+          <StudioSlider
             aria-label="firing angle"
             min={0}
             max={180}
             step={1}
             value={parameters.firingAngle}
-            onChange={(event) => update("firingAngle", Number(event.target.value))}
+            onChange={(val) => update("firingAngle", val)}
+            showLimits
           />
           <div className="mt-3">
             <Field
@@ -385,12 +383,11 @@ export function ACVoltageControllerStudio() {
           </div>
         </div>
       )}
-    </section>
+    </StudioCard>
   );
 
   const sourceLoad = (
-    <section className={card}>
-      <h3 className={heading}>Source &amp; Load Configuration</h3>
+    <StudioCard title="Source & Load Configuration">
       <div className="mt-4">
         <span className="mb-2 block text-xs font-bold text-slate-500 dark:text-slate-400">Voltage Format</span>
         <SegmentedControl
@@ -442,15 +439,14 @@ export function ACVoltageControllerStudio() {
           onChange={(inductanceMilliHenry) => update("inductanceMilliHenry", inductanceMilliHenry)}
         />
       </div>
-    </section>
+    </StudioCard>
   );
 
   const metricPanel = (
-    <section className={`${card} p-4`}>
-      <div>
-        <h3 className={heading}>Steady-State Metrics</h3>
-        <KatexMath math={tex`\frac{1}{T}\int_{0}^{T}(\cdot)\,dt`} className="mt-1 block text-xs text-slate-500 dark:text-slate-400" />
-      </div>
+    <StudioCard
+      title="Steady-State Metrics"
+      actionSlot={<KatexMath math={tex`\frac{1}{T}\int_{0}^{T}(\cdot)\,dt`} className="text-xs text-slate-500 dark:text-slate-400" />}
+    >
       <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
         <Metric label={tex`V_{o\mathrm{rms}}`} value={tex`${numberTex(metrics.outputVoltageRms)}\,\mathrm{V}`} />
         <Metric label={tex`I_{o\mathrm{rms}}`} value={tex`${numberTex(metrics.outputCurrentRms)}\,\mathrm{A}`} />
@@ -468,7 +464,7 @@ export function ACVoltageControllerStudio() {
           value={isPhase ? tex`\mathrm{Phase}` : numberTex(metrics.controlValue, 3)}
         />
       </div>
-    </section>
+    </StudioCard>
   );
 
   return (

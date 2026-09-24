@@ -14,7 +14,7 @@ import {
   Upload,
 } from 'lucide-react';
 import { useRef, useState, type ChangeEvent, type ReactNode } from 'react';
-import { SegmentedControl } from '@/components/ui/SegmentedControl';
+import { SegmentedControl } from '@/components/common/templates';
 import type { ExecutionMode, ScanMetrics } from '../../engine/types';
 import { Divider, PANEL, PILL_BUTTON } from '../chrome';
 import type { FrameStore } from '../hardware/frame-store';

@@ -6,21 +6,21 @@
  */
 import { useMemo, useRef, useState } from "react";
 import { KatexMath } from "@/components/ui/KatexMath";
-import { SegmentedControl } from "@/components/ui/SegmentedControl";
+import { MathNumberInput, SegmentedControl, StudioCard, InnerBox, StatusBadge } from "@/components/common/templates";
 import { MathLiveSignalInput, type MathLiveSignalInputHandle } from "@/components/signals/MathLiveSignalInput";
 import { PiecewiseSignalScope, type ScopeModel } from "@/components/signals/PiecewiseSignalScope";
 import {
   analyzeCompositeSignal,
   createCompositeSignal,
+  integrateFromMinusInfinity,
   parseCompositeSignal,
   sampleCompositeSignal,
   type CompositeAnalysis,
   type CompositeSignalModel,
 } from "@/features/signals/engines/compositeSignal";
+import { differentiate, nodeToLatex, renameVariable } from "@/features/signals/engines/diracIntegral";
 
 const tex = String.raw;
-const panel = "rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900";
-const subpanel = "rounded-2xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-800 dark:bg-slate-950/75";
 const pill = "rounded-full px-2.5 py-1 text-xs font-medium border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-blue-500 transition-all cursor-pointer";
 
 const signalPills = [
@@ -56,6 +56,7 @@ export function SignalOperationsLab() {
   const [periodicOverride, setPeriodicOverride] = useState<"auto" | "periodic" | "aperiodic">("auto");
   const [windowStart, setWindowStart] = useState(-5);
   const [windowEnd, setWindowEnd] = useState(5);
+  const [operatorError, setOperatorError] = useState<string | null>(null);
   const editorRef = useRef<MathLiveSignalInputHandle>(null);
   const insert = (latex: string) => editorRef.current?.insert(latex, "after");
 
@@ -66,10 +67,32 @@ export function SignalOperationsLab() {
     [model, periodicOverride, windowStart, windowEnd],
   );
 
+  const applyDerivative = () => {
+    if (!model) return;
+    try { setExpression(`x(t)=${nodeToLatex(differentiate(model.node, "t"))}`); setOperatorError(null); }
+    catch (error) { setOperatorError(error instanceof Error ? error.message : "That expression could not be differentiated."); }
+  };
+  const applyRunningIntegral = () => {
+    if (!model) return;
+    try { setExpression(`x(t)=${nodeToLatex(integrateFromMinusInfinity(model.node))}`); setOperatorError(null); }
+    catch (error) { setOperatorError(error instanceof Error ? error.message : "That expression could not be integrated."); }
+  };
+  // Explicit syntax: wraps the current equation in the operator's own LaTeX notation instead of
+  // evaluating it, so the wrapper itself is what the user sees and edits — the grammar resolves it
+  // (symbolically for the derivative, numerically-per-sample for the running integral) on reparse.
+  const insertExplicitDerivative = () => { if (!model) return; setOperatorError(null); setExpression(`x(t)=\\frac{d}{dt}\\left[${nodeToLatex(model.node)}\\right]`); };
+  const insertExplicitRunningIntegral = () => {
+    if (!model) return;
+    setOperatorError(null);
+    const dummyIntegrand = nodeToLatex(renameVariable(model.node, "t", "tau"));
+    setExpression(`x(t)=\\int_{-\\infty}^{t}\\left[${dummyIntegrand}\\right]\\,d\\tau`);
+  };
+  const insertExplicitDefiniteIntegral = () => { setOperatorError(null); insert("+\\int_{0}^{2}e^{\\tau-2}\\delta(2\\tau-4)\\,d\\tau"); };
+
   return (
     <div className="space-y-6">
       {/* SIGNAL ENGINE input */}
-      <section className={`${panel} overflow-hidden`}>
+      <StudioCard className="overflow-hidden">
         <div className="flex flex-col gap-4 border-b border-slate-200 pb-5 dark:border-slate-800 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <h2 className="mt-1 text-xl font-black tracking-tight text-slate-900 dark:text-white">Signal Operations &amp; Properties</h2>
@@ -80,19 +103,20 @@ export function SignalOperationsLab() {
         </div>
 
         <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1.2fr)_minmax(18rem,0.8fr)]">
-          <div className={subpanel}>
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <h3 id="signal-mathfield-label" className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-white pb-2 border-b border-slate-100 dark:border-slate-800">
-                SIGNAL ENGINE
-              </h3>
-              <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${parsed.ok ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-200" : "bg-rose-100 text-rose-700 dark:bg-rose-400/10 dark:text-rose-200"}`}>
-                {parsed.ok ? "Semantic model ready" : "Check grammar"}
-              </span>
-            </div>
+          <InnerBox>
+            <h3 id="signal-mathfield-label" className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-white pb-2 border-b border-slate-100 dark:border-slate-800">
+              SIGNAL ENGINE
+            </h3>
             <div className="mt-4">
-              <MathLiveSignalInput ref={editorRef} value={expression} onChange={setExpression} labelledBy="signal-mathfield-label" />
+              <MathLiveSignalInput
+                ref={editorRef}
+                value={expression}
+                onChange={(next) => { setOperatorError(null); setExpression(next); }}
+                labelledBy="signal-mathfield-label"
+              />
             </div>
-            {!parsed.ok && <p className="mt-2 text-xs font-semibold leading-5 text-rose-600 dark:text-rose-300">{parsed.error}</p>}
+            {/* Minimalist error indication: a single subtle pill, never a blocking banner. */}
+            {!parsed.ok && <span className="mt-2 inline-block text-xs text-rose-500 font-medium">Syntax error: {parsed.error}</span>}
             <div className="mt-4 space-y-3">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-slate-500 dark:text-slate-400">Canonical signals</p>
@@ -114,31 +138,77 @@ export function SignalOperationsLab() {
                   ))}
                 </div>
               </div>
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-slate-500 dark:text-slate-400">Quick-action operators</p>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  <button
+                    type="button"
+                    onClick={applyDerivative}
+                    disabled={!model}
+                    className={`${pill} border-violet-200 bg-violet-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-violet-400/30 dark:bg-violet-500/10`}
+                  >
+                    <KatexMath math={tex`\frac{d}{dt}x(t)`} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={applyRunningIntegral}
+                    disabled={!model}
+                    className={`${pill} border-violet-200 bg-violet-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-violet-400/30 dark:bg-violet-500/10`}
+                  >
+                    <KatexMath math={tex`\int_{-\infty}^{t}x(\tau)\,d\tau`} />
+                  </button>
+                </div>
+              </div>
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-slate-500 dark:text-slate-400">Explicit operator syntax</p>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  <button
+                    type="button"
+                    onClick={insertExplicitDerivative}
+                    disabled={!model}
+                    className={`${pill} border-blue-200 bg-blue-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-blue-400/30 dark:bg-blue-500/10`}
+                  >
+                    <KatexMath math={tex`\frac{d}{dt}[\dots]`} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={insertExplicitRunningIntegral}
+                    disabled={!model}
+                    className={`${pill} border-blue-200 bg-blue-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-blue-400/30 dark:bg-blue-500/10`}
+                  >
+                    <KatexMath math={tex`\int_{-\infty}^{t}[\dots]\,d\tau`} />
+                  </button>
+                  <button type="button" onClick={insertExplicitDefiniteIntegral} className={`${pill} border-blue-200 bg-blue-50 dark:border-blue-400/30 dark:bg-blue-500/10`}>
+                    <KatexMath math={tex`\int_{a}^{b}[\dots]\,dt`} />
+                  </button>
+                </div>
+                {operatorError && <span className="mt-2 inline-block text-xs text-rose-500 font-medium">{operatorError}</span>}
+              </div>
             </div>
-          </div>
+          </InnerBox>
 
-          <div className={subpanel}>
+          <InnerBox>
             <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-slate-500 dark:text-slate-400">Academic test signals</p>
             <div className="mt-3 grid gap-2">
               {presets.map((preset) => (
                 <button
                   key={preset.latex}
                   type="button"
-                  onClick={() => setExpression(preset.latex)}
+                  onClick={() => { setOperatorError(null); setExpression(preset.latex); }}
                   className="flex min-h-10 items-center rounded-xl border border-slate-200 px-3 text-left text-xs font-bold text-slate-600 transition hover:border-violet-300 hover:text-violet-700 active:scale-[0.97] dark:border-slate-800 dark:text-slate-300 dark:hover:border-violet-500 dark:hover:text-violet-200"
                 >
                   <KatexMath math={preset.label} />
                 </button>
               ))}
             </div>
-          </div>
+          </InnerBox>
         </div>
-      </section>
+      </StudioCard>
 
       {/* Main Workspace Grid: Composite Signal View & Academic Analysis */}
       <div className="grid gap-6 2xl:grid-cols-[minmax(0,1.35fr)_minmax(21rem,0.65fr)]">
         {/* Left Scope: Composite Signal View */}
-        <section className={panel}>
+        <StudioCard>
           <h4 className="mb-4 text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-white">COMPOSITE SIGNAL VIEW</h4>
           {model ? (
             <PiecewiseSignalScope model={model} sample={scopeSample} yLabelKatex="x(t)" />
@@ -147,10 +217,10 @@ export function SignalOperationsLab() {
               <p className="text-xs font-bold text-slate-400 dark:text-slate-500">Awaiting a valid signal expression</p>
             </div>
           )}
-        </section>
+        </StudioCard>
 
         {/* Right Sidebar: Academic Analysis */}
-        <aside className={`${panel} space-y-4`}>
+        <StudioCard className="space-y-4">
           <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-white pb-2 border-b border-slate-100 dark:border-slate-800">
             ACADEMIC ANALYSIS
           </h3>
@@ -158,11 +228,17 @@ export function SignalOperationsLab() {
           {analysis && model ? (
             <>
               <div className="grid grid-cols-2 gap-3">
-                <div className={subpanel}>
+                <InnerBox>
                   <p className="text-[10px] font-bold uppercase tracking-[.13em] text-slate-500 dark:text-slate-400">Classification</p>
-                  <p className="mt-1 text-sm font-bold text-slate-900 dark:text-white">{analysisSubject(analysis)}</p>
-                </div>
-                <div className={subpanel}>
+                  <div className="mt-1.5">
+                    <StatusBadge
+                      variant={analysis.classification === "Energy Signal" ? "default" : analysis.classification === "Power Signal" ? "info" : "neutral"}
+                    >
+                      {analysisSubject(analysis)}
+                    </StatusBadge>
+                  </div>
+                </InnerBox>
+                <InnerBox>
                   <p className="text-[10px] font-bold uppercase tracking-[.13em] text-slate-500 dark:text-slate-400">Periodicity</p>
                   <div className="mt-1.5">
                     <SegmentedControl
@@ -176,46 +252,44 @@ export function SignalOperationsLab() {
                       aria-label="Periodicity override"
                     />
                   </div>
-                </div>
+                </InnerBox>
               </div>
 
               {analysis.fundamentalPeriod !== null ? (
-                <div className={subpanel}>
+                <InnerBox>
                   <p className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-white">Fundamental period</p>
                   <div className="mt-2.5 space-y-2">
                     <KatexMath math={tex`\omega_0 = \operatorname{GCD}(\omega_i) = ${fmt(analysis.fundamentalAngularFrequency)}\text{ rad/s}`} block className="text-sm text-violet-700 dark:text-violet-200" />
                     <KatexMath math={tex`T_0 = \frac{2\pi}{\omega_0} = ${fmt(analysis.fundamentalPeriod)}\text{ s}`} block className="text-sm text-violet-700 dark:text-violet-200" />
                   </div>
-                </div>
+                </InnerBox>
               ) : (
-                <div className={subpanel}>
+                <InnerBox>
                   <p className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-white">Observation window</p>
-                  <div className="mt-2.5 grid grid-cols-2 gap-3">
-                    <label className="grid gap-1 text-xs font-bold text-slate-600 dark:text-slate-300">
-                      <KatexMath math="t_1\text{ [s]}" />
-                      <input
-                        type="number"
+                  <div className="mt-2.5 flex flex-wrap items-center gap-3">
+                    <label className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+                      <KatexMath math="\left[t_1\right]" />
+                      <MathNumberInput
                         value={windowStart}
                         step={0.5}
                         onChange={(event) => setWindowStart(Number(event.target.value))}
-                        className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-center font-mono text-sm font-bold text-slate-900 outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-400/20 dark:border-slate-800 dark:bg-slate-950 dark:text-white"
+                        className="w-20"
                       />
                     </label>
-                    <label className="grid gap-1 text-xs font-bold text-slate-600 dark:text-slate-300">
-                      <KatexMath math="t_2\text{ [s]}" />
-                      <input
-                        type="number"
+                    <label className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+                      <KatexMath math="\left[t_2\right]" />
+                      <MathNumberInput
                         value={windowEnd}
                         step={0.5}
                         onChange={(event) => setWindowEnd(Number(event.target.value))}
-                        className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-center font-mono text-sm font-bold text-slate-900 outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-400/20 dark:border-slate-800 dark:bg-slate-950 dark:text-white"
+                        className="w-20"
                       />
                     </label>
                   </div>
-                </div>
+                </InnerBox>
               )}
 
-              <div className={subpanel}>
+              <InnerBox>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <KatexMath math={tex`E=\int_{t_1}^{t_2}|x(t)|^2dt`} className="text-xs text-slate-500 dark:text-slate-400 block" />
@@ -230,7 +304,7 @@ export function SignalOperationsLab() {
                     </div>
                   </div>
                 </div>
-              </div>
+              </InnerBox>
 
               {model.impulses.length > 0 && (
                 <div className="border-l-2 border-rose-400 bg-rose-50/70 px-3 py-2 dark:bg-rose-500/10 rounded-r-xl">
@@ -253,7 +327,7 @@ export function SignalOperationsLab() {
               <p className="mt-1 text-xs leading-5 text-slate-400 dark:text-slate-500">{!parsed.ok ? parsed.error : ""}</p>
             </div>
           )}
-        </aside>
+        </StudioCard>
       </div>
     </div>
   );

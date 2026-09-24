@@ -1,6 +1,7 @@
 import * as React from "react";
 import { KatexMath } from "../ui/KatexMath";
 import { Complex } from "@/features/control/controlMath";
+import { StudioCard, InnerBox, GradientButton } from "@/components/common/templates";
 
 interface RootLocusStepsPanelProps {
     openLoopZeros: Complex[];
@@ -37,25 +38,20 @@ export function RootLocusStepsPanel({
     const zStr = formatSet(openLoopZeros);
     const i = Math.abs(openLoopPoles.length - openLoopZeros.length);
 
-    const containerClass = "bg-slate-50 dark:bg-slate-950 p-3 rounded-xl border border-slate-100 dark:border-slate-800 transition-all duration-200";
-
     const renderShowButton = (stepKey: string) => {
         return (
-            <button
-                type="button"
+            <GradientButton
+                size="sm"
                 onClick={() => onHighlight(stepKey)}
-                className="cursor-pointer select-none whitespace-nowrap transition-all rounded-full bg-gradient-to-br from-[#2563EB] via-[#7C3AED] to-[#E11D48] text-white shadow-sm px-3 py-1 text-xs font-semibold hover:opacity-90 active:scale-95"
+                className="py-0.5 px-3 text-xs"
             >
                 Show
-            </button>
+            </GradientButton>
         );
     };
 
     return (
-        <div className="bg-slate-50/60 dark:bg-slate-900/60 backdrop-blur-sm border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
-            <h3 className="text-sm font-bold text-slate-800 dark:text-white uppercase tracking-wider mb-4 border-b border-slate-100 dark:border-slate-800 pb-2">
-                Root Locus Analytical Steps
-            </h3>
+        <StudioCard title="Root Locus Analytical Steps">
             <div className="space-y-6 text-sm text-slate-700 dark:text-slate-300">
 
                 {/* Step 1 */}
@@ -65,12 +61,12 @@ export function RootLocusStepsPanel({
                         {renderShowButton("poles_zeros")}
                     </div>
                     <p className="mb-2">Identify the finite open-loop poles and zeros.</p>
-                    <div className={containerClass}>
+                    <InnerBox>
                         <KatexMath math={`\\#p = ${openLoopPoles.length}`} displayMode={true} />
                         <KatexMath math={`\\#z = ${openLoopZeros.length}`} displayMode={true} />
                         <KatexMath math={`p = ${pStr}`} displayMode={true} />
                         <KatexMath math={`z = ${zStr}`} displayMode={true} />
-                    </div>
+                    </InnerBox>
                 </div>
 
                 {/* Step 2 */}
@@ -83,20 +79,20 @@ export function RootLocusStepsPanel({
                         The root locus exists on the real axis to the left of an odd number of total real poles and zeros.
                         This satisfies the angle condition <KatexMath math={`\\sum \\angle(s-z_i) - \\sum \\angle(s-p_j) = (2k+1)180^\\circ`} />.
                     </p>
-                    <div className={containerClass}>
+                    <InnerBox>
                         <div className="text-xs text-slate-600 dark:text-slate-400">
                             Odd count condition applies to all real poles & zeros from right to left along <KatexMath math="\sigma" />.
                         </div>
-                    </div>
+                    </InnerBox>
                 </div>
 
                 {/* Step 3 */}
                 <div>
                     <div className="font-bold text-slate-900 dark:text-white mb-2">Step 3: Infinite Roots</div>
                     <p className="mb-2">Count the branches that go to infinity.</p>
-                    <div className={containerClass}>
+                    <InnerBox>
                         <KatexMath math={`i = |\\#p - \\#z| = |${openLoopPoles.length} - ${openLoopZeros.length}| = ${i}`} displayMode={true} />
-                    </div>
+                    </InnerBox>
                 </div>
 
                 {/* Step 4 */}
@@ -108,11 +104,11 @@ export function RootLocusStepsPanel({
                     {i > 0 && asymptotes ? (
                         <>
                             <div className="mb-2">Calculate the centroid <KatexMath math="\sigma_a" /> and angles <KatexMath math="\psi" />.</div>
-                            <div className={containerClass}>
+                            <InnerBox>
                                 <KatexMath math={`\\sigma_a = \\frac{\\sum p - \\sum z}{i} = ${parseFloat(asymptotes.centroid.toFixed(4))}`} displayMode={true} />
                                 <div className="mt-2 text-center text-slate-500 text-xs">Angles (Degrees)</div>
                                 <KatexMath math={`\\psi = \\{${asymptotes.angles.map(a => (a * 180 / Math.PI).toFixed(1) + "^\\circ").join(", ")}\\}`} displayMode={true} />
-                            </div>
+                            </InnerBox>
                         </>
                     ) : (
                         <div className="italic text-slate-500">No asymptotes exist since <KatexMath math="i = 0" />.</div>
@@ -126,13 +122,13 @@ export function RootLocusStepsPanel({
                         {breakawayPoints.length > 0 && renderShowButton("breakaway")}
                     </div>
                     <div className="mb-2">Solve <KatexMath math="\frac{dK}{ds} = 0 \implies D'(s)N(s) - D(s)N'(s) = 0" /> for real roots on the locus.</div>
-                    <div className={containerClass}>
+                    <InnerBox>
                         {breakawayPoints.length > 0 ? (
                             <KatexMath math={`s_{break} = \\{${breakawayPoints.map(p => parseFloat(p.toFixed(4))).join(", ")}\\}`} displayMode={true} />
                         ) : (
                             <div className="text-center font-mono text-slate-500">None detected</div>
                         )}
-                    </div>
+                    </InnerBox>
                 </div>
 
                 {/* Step 6 */}
@@ -142,7 +138,7 @@ export function RootLocusStepsPanel({
                         {imagCrossings.length > 0 && renderShowButton("imag_crossings")}
                     </div>
                     <p className="mb-2">Found via Routh-Hurwitz array zero-row criteria and auxiliary polynomial roots.</p>
-                    <div className={containerClass}>
+                    <InnerBox>
                         {imagCrossings.length > 0 ? (
                             <div className="space-y-2">
                                 {imagCrossings.map((c, idx) => (
@@ -152,10 +148,10 @@ export function RootLocusStepsPanel({
                         ) : (
                             <div className="text-center font-mono text-slate-500">No stability boundary crossed</div>
                         )}
-                    </div>
+                    </InnerBox>
                 </div>
 
             </div>
-        </div>
+        </StudioCard>
     );
 }

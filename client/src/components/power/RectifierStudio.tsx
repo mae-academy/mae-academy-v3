@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { KatexMath } from "@/components/ui/KatexMath";
-import { SegmentedControl } from "@/components/ui/SegmentedControl";
-import { PowerSlider } from "./PowerSlider";
+import { SegmentedControl, StudioCard, StudioSlider, InnerBox } from "@/components/common/templates";
 import { PowerWarningAlert } from "./PowerWarningAlert";
 import { StudioErrorBoundary } from "./StudioErrorBoundary";
 import { PowerScopePlot, type ScopeSeries } from "./PowerScopePlot";
@@ -16,7 +15,7 @@ import {
   type VoltageFormat,
 } from "@/features/power-electronics/rectifierMath";
 
-const card = "rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900";
+const card = "rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white/70 dark:bg-slate-900/70 backdrop-blur-md shadow-sm p-5 md:p-6 transition-all";
 const heading = "text-sm font-bold text-slate-800 dark:text-white";
 const field = "w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-right font-mono text-sm text-slate-900 outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-35 dark:border-slate-800 dark:bg-slate-950 dark:text-white";
 const tex = String.raw;
@@ -257,11 +256,10 @@ export function RectifierStudio() {
   }, [data, parameters.phase]);
 
   const topologyPanel = (
-    <section className={card}>
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <h3 className={heading}>Topology Configuration</h3>
-        <KatexMath math={tex`\alpha = ${NumberValue(parameters.firingAngle, 0)}^\circ`} className="text-sm font-semibold text-violet-600 dark:text-violet-400" />
-      </div>
+    <StudioCard
+      title="Topology Configuration"
+      actionSlot={<KatexMath math={tex`\alpha = ${NumberValue(parameters.firingAngle, 0)}^\circ`} className="text-sm font-semibold text-violet-600 dark:text-violet-400" />}
+    >
       <div className="space-y-4">
         <div>
           <span className="mb-2 block text-xs font-bold text-slate-500 dark:text-slate-400">Phase</span>
@@ -321,17 +319,16 @@ export function RectifierStudio() {
                 <MathLabel math={tex`\alpha\,[^\circ]`} />
                 <KatexMath math={tex`\alpha = ${NumberValue(parameters.firingAngle, 0)}^\circ`} className="text-xs font-semibold text-violet-600 dark:text-violet-400" />
               </div>
-              <PowerSlider aria-label="firing angle slider" min={0} max={180} step={1} value={parameters.firingAngle} onChange={(event) => update("firingAngle", Number(event.target.value))} />
+              <StudioSlider aria-label="firing angle slider" min={0} max={180} step={1} value={parameters.firingAngle} onChange={(val) => update("firingAngle", val)} showLimits />
             </div>
           </div>
         </div>
       </div>
-    </section>
+    </StudioCard>
   );
 
   const loadPanel = (
-    <section className={card}>
-      <h3 className={heading}>Load Configuration</h3>
+    <StudioCard title="Load Configuration">
       <div className="mt-4">
         <span className="mb-2 block text-xs font-bold text-slate-500 dark:text-slate-400">Load Type</span>
         <SegmentedControl
@@ -360,7 +357,7 @@ export function RectifierStudio() {
         <NumberField label={tex`C\,[\mu\mathrm{F}]`} value={parameters.capacitanceMicroFarad} disabled={!hasCapacitance} min={0} step={1} onChange={(capacitanceMicroFarad) => update("capacitanceMicroFarad", capacitanceMicroFarad)} />
         <NumberField label={tex`E\,[\mathrm{V}]`} value={parameters.backEmfVoltage} disabled={!hasBackEmf} min={0} step={1} onChange={(backEmfVoltage) => update("backEmfVoltage", backEmfVoltage)} />
       </div>
-    </section>
+    </StudioCard>
   );
 
   const outputScope = (

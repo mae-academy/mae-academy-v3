@@ -9,8 +9,15 @@ import {
 import { TransferFunctionInput, TransferFunctionData } from "./TransferFunctionInput";
 import { RootLocusStepsPanel } from "./RootLocusStepsPanel";
 import { KatexMath } from "../ui/KatexMath";
-import { BrandSlider } from "@/components/ui/BrandSlider";
-import { StandardStepPlot, ComplexPlanePlot, type PlotSeries } from "@/features/control-systems/ui/plots";
+import {
+  StandardRootLocusPlot,
+  StandardStepPlot,
+  StudioCard,
+  StudioSlider,
+  InnerBox,
+  StatusBadge,
+  type PlotSeries,
+} from "@/components/common/templates";
 
 export function RootLocusStudio() {
   // Dual-mode transfer function state
@@ -426,7 +433,7 @@ export function RootLocusStudio() {
             className="w-full h-[580px] min-h-[580px]"
             style={plotHeights ? { height: plotHeights.splane, minHeight: plotHeights.splane } : undefined}
           >
-            <ComplexPlanePlot
+            <StandardRootLocusPlot
               poles={openLoopPoles}
               zeros={openLoopZeros}
               locusBranches={formattedBranches}
@@ -480,65 +487,21 @@ export function RootLocusStudio() {
         {/* Right Column (4 of 12 columns): */}
         <div ref={sidebarColRef} className="lg:col-span-4 space-y-6">
           {/* Prominent Gain Calibration Card matching PID Studio style */}
-          <div className="bg-slate-50/60 dark:bg-slate-900/60 backdrop-blur-sm border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
-            <h3 className="text-sm font-bold text-slate-800 dark:text-white uppercase tracking-wider mb-4">
-              Gain Calibration
-            </h3>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span
-                  style={{ fontFamily: "'KaTeX_Main', 'Times New Roman', serif" }}
-                  className="italic font-serif text-slate-800 text-lg tracking-wide dark:text-white"
-                >
-                  <KatexMath math="K =" />
-                </span>
-                <input
-                  type="number"
-                  value={Number(gainK.toFixed(4))}
-                  min={kMin}
-                  max={kMax}
-                  step={(kMax - kMin) / 1000}
-                  onChange={(e) => {
-                    const val = parseFloat(e.target.value);
-                    if (!isNaN(val) && val >= 0) setGainK(val);
-                  }}
-                  style={{ fontFamily: "'KaTeX_Main', 'Times New Roman', serif" }}
-                  className="h-8 w-24 rounded-md border border-slate-200 bg-slate-50 px-2 text-right text-slate-800 text-lg tracking-wide focus:outline-blue-500 dark:border-slate-800 dark:bg-slate-950 dark:text-white [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [-moz-appearance:textfield] m-0"
-                />
-              </div>
-
-              <div className="flex items-center gap-3">
-                <input
-                  type="number"
-                  value={kMin}
-                  onChange={(e) => {
-                    const v = parseFloat(e.target.value);
-                    if (!isNaN(v) && v < kMax) setKMin(v);
-                  }}
-                  style={{ fontFamily: "'KaTeX_Main', 'Times New Roman', serif" }}
-                  className="font-serif text-slate-800 text-lg tracking-wide bg-transparent border-none outline-none w-16 text-center [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [-moz-appearance:textfield] m-0 dark:text-white"
-                />
-                <BrandSlider
-                  min={kMin}
-                  max={kMax}
-                  step={(kMax - kMin) / 1000}
-                  value={gainK}
-                  onChange={(event) => setGainK(Number(event.target.value))}
-                  className="flex-1"
-                />
-                <input
-                  type="number"
-                  value={kMax}
-                  onChange={(e) => {
-                    const v = parseFloat(e.target.value);
-                    if (!isNaN(v) && v > kMin) setKMax(v);
-                  }}
-                  style={{ fontFamily: "'KaTeX_Main', 'Times New Roman', serif" }}
-                  className="font-serif text-slate-800 text-lg tracking-wide bg-transparent border-none outline-none w-16 text-center [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [-moz-appearance:textfield] m-0 dark:text-white"
-                />
-              </div>
-            </div>
-          </div>
+          <StudioCard title="Gain Calibration">
+            <StudioSlider
+              label={<KatexMath math="K =" />}
+              min={kMin}
+              max={kMax}
+              step={(kMax - kMin) / 1000}
+              value={gainK}
+              onChange={setGainK}
+              editableLimits
+              onMinChange={(v) => { if (v < kMax) setKMin(v); }}
+              onMaxChange={(v) => { if (v > kMin) setKMax(v); }}
+              editableValue
+              precision={4}
+            />
+          </StudioCard>
 
           {/* Analytical Steps Panel */}
           <RootLocusStepsPanel
@@ -557,102 +520,99 @@ export function RootLocusStudio() {
       {/* Bottom Full-Width Metrics Row (1:3 ratio / 1 quadrant for metrics, 3 quadrants for poles) */}
       <div className="w-full grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch mt-6">
         {/* RK4 Transient Metrics (1 quadrant = 3 of 12 columns) */}
-        <div className="lg:col-span-4 xl:col-span-3 w-full bg-slate-50/60 dark:bg-slate-900/60 backdrop-blur-sm border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm flex flex-col justify-between">
-          <div>
-            <h3 className="text-sm font-bold text-slate-800 dark:text-white uppercase tracking-wider mb-4 pb-1 border-b border-slate-100 dark:border-slate-800">
-              Transient Metrics
-            </h3>
-            <div className="space-y-3">
-              <div className="flex justify-between items-center pb-2 border-b border-slate-100 dark:border-slate-800">
-                <span className="text-xs font-bold text-slate-500">
-                  Overshoot (<KatexMath math="\%OS" />)
-                </span>
-                <span className="text-sm font-bold text-slate-900 dark:text-white">
-                  <KatexMath math={`${stepResponse?.overshootPercent.toFixed(2)}\\%`} />
-                </span>
-              </div>
-              <div className="flex justify-between items-center pb-2 border-b border-slate-100 dark:border-slate-800">
-                <span className="text-xs font-bold text-slate-500">
-                  Peak Time (<KatexMath math="T_p" />)
-                </span>
-                <span className="text-sm font-bold text-slate-900 dark:text-white">
-                  <KatexMath math={`${stepResponse?.peakTime.toFixed(3)}\\,\\text{s}`} />
-                </span>
-              </div>
-              <div className="flex justify-between items-center pb-2 border-b border-slate-100 dark:border-slate-800">
-                <span className="text-xs font-bold text-slate-500">
-                  Settling Time (<KatexMath math="T_s" />)
-                </span>
-                <span className="text-sm font-bold text-slate-900 dark:text-white">
-                  <KatexMath math={`${stepResponse?.settlingTime.toFixed(3)}\\,\\text{s}`} />
-                </span>
-              </div>
-              <div className="flex justify-between items-center pb-2 border-b border-slate-100 dark:border-slate-800">
-                <span className="text-xs font-bold text-slate-500">
-                  Rise Time (<KatexMath math="T_r" />)
-                </span>
-                <span className="text-sm font-bold text-slate-900 dark:text-white">
-                  <KatexMath math={`${stepResponse?.riseTime.toFixed(3)}\\,\\text{s}`} />
-                </span>
-              </div>
-              <div className="flex justify-between items-center pb-2 border-b border-slate-100 dark:border-slate-800">
-                <span className="text-xs font-bold text-slate-500">
-                  Delay Time (<KatexMath math="T_d" />)
-                </span>
-                <span className="text-sm font-bold text-slate-900 dark:text-white">
-                  <KatexMath math={`${stepResponse?.delayTime.toFixed(3)}\\,\\text{s}`} />
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-xs font-bold text-slate-500">
-                  Steady State (<KatexMath math="y_{ss}" />)
-                </span>
-                <span className="text-sm font-bold text-slate-900 dark:text-white">
-                  <KatexMath math={`${(stepResponse?.y[stepResponse.y.length - 1] ?? 0).toFixed(3)}`} />
-                </span>
-              </div>
+        <StudioCard
+          title="Transient Metrics"
+          className="lg:col-span-4 xl:col-span-3 w-full flex flex-col justify-between"
+        >
+          <div className="space-y-3">
+            <div className="flex justify-between items-center pb-2 border-b border-slate-100 dark:border-slate-800">
+              <span className="text-xs font-bold text-slate-500">
+                Overshoot (<KatexMath math="\%OS" />)
+              </span>
+              <span className="text-sm font-bold text-slate-900 dark:text-white">
+                <KatexMath math={`${stepResponse?.overshootPercent.toFixed(2)}\\%`} />
+              </span>
+            </div>
+            <div className="flex justify-between items-center pb-2 border-b border-slate-100 dark:border-slate-800">
+              <span className="text-xs font-bold text-slate-500">
+                Peak Time (<KatexMath math="T_p" />)
+              </span>
+              <span className="text-sm font-bold text-slate-900 dark:text-white">
+                <KatexMath math={`${stepResponse?.peakTime.toFixed(3)}\\,\\text{s}`} />
+              </span>
+            </div>
+            <div className="flex justify-between items-center pb-2 border-b border-slate-100 dark:border-slate-800">
+              <span className="text-xs font-bold text-slate-500">
+                Settling Time (<KatexMath math="T_s" />)
+              </span>
+              <span className="text-sm font-bold text-slate-900 dark:text-white">
+                <KatexMath math={`${stepResponse?.settlingTime.toFixed(3)}\\,\\text{s}`} />
+              </span>
+            </div>
+            <div className="flex justify-between items-center pb-2 border-b border-slate-100 dark:border-slate-800">
+              <span className="text-xs font-bold text-slate-500">
+                Rise Time (<KatexMath math="T_r" />)
+              </span>
+              <span className="text-sm font-bold text-slate-900 dark:text-white">
+                <KatexMath math={`${stepResponse?.riseTime.toFixed(3)}\\,\\text{s}`} />
+              </span>
+            </div>
+            <div className="flex justify-between items-center pb-2 border-b border-slate-100 dark:border-slate-800">
+              <span className="text-xs font-bold text-slate-500">
+                Delay Time (<KatexMath math="T_d" />)
+              </span>
+              <span className="text-sm font-bold text-slate-900 dark:text-white">
+                <KatexMath math={`${stepResponse?.delayTime.toFixed(3)}\\,\\text{s}`} />
+              </span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-xs font-bold text-slate-500">
+                Steady State (<KatexMath math="y_{ss}" />)
+              </span>
+              <span className="text-sm font-bold text-slate-900 dark:text-white">
+                <KatexMath math={`${(stepResponse?.y[stepResponse.y.length - 1] ?? 0).toFixed(3)}`} />
+              </span>
             </div>
           </div>
-        </div>
+        </StudioCard>
 
         {/* Closed-Loop Poles at Gain K (3 quadrants = 9 of 12 columns) */}
-        <div className="lg:col-span-8 xl:col-span-9 w-full bg-slate-50/60 dark:bg-slate-900/60 backdrop-blur-sm border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm flex flex-col justify-between">
-          <div>
-            <h3 className="text-sm font-bold text-slate-800 dark:text-white uppercase tracking-wider mb-4 pb-1 border-b border-slate-100 dark:border-slate-800">
-              Closed-Loop Poles (<KatexMath math={`K = ${Number(gainK.toFixed(4))}`} />)
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-              {formattedGroupedRoots.map((group, i) => (
-                <div
-                  key={i}
-                  className="p-3.5 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-100 dark:border-slate-800 text-xs flex flex-col justify-between"
-                >
-                  <div className="text-sm font-semibold text-violet-600 dark:text-violet-400 mb-2 pb-1.5 border-b border-slate-200/50 dark:border-slate-800/60">
-                    <KatexMath math={group.math} />
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 mt-1">
-                    <div className="text-slate-600 dark:text-slate-400">
-                      <KatexMath math={`\\omega_n = ${group.wn.toFixed(2)}\\,\\text{rad/s}`} />
-                    </div>
-                    <div className="text-slate-600 dark:text-slate-400">
-                      <KatexMath math={`\\zeta = ${group.zeta.toFixed(3)}`} />
-                    </div>
-                    {group.zeta > 0 && group.zeta < 1 && (
-                      <div className="col-span-2 text-blue-600 dark:text-blue-400 font-semibold">
-                        <KatexMath math={`\\%OS = ${group.os.toFixed(1)}\\%`} />
-                      </div>
-                    )}
-                    {group.unstable && (
-                      <div className="col-span-2 text-rose-600 dark:text-rose-400 font-bold uppercase text-[10px] tracking-wider">
-                        Unstable Region
-                      </div>
-                    )}
-                  </div>
+        <StudioCard
+          title="Closed-Loop Poles"
+          actionSlot={<KatexMath math={`K = ${Number(gainK.toFixed(4))}`} className="text-xs font-bold text-violet-600 dark:text-violet-400" />}
+          className="lg:col-span-8 xl:col-span-9 w-full flex flex-col justify-between"
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+            {formattedGroupedRoots.map((group, i) => (
+              <InnerBox
+                key={i}
+                className="text-xs flex flex-col justify-between"
+              >
+                <div className="text-sm font-semibold text-violet-600 dark:text-violet-400 mb-2 pb-1.5 border-b border-slate-200/50 dark:border-slate-800/60">
+                  <KatexMath math={group.math} />
                 </div>
-              ))}
-            </div>
+                <div className="grid grid-cols-2 gap-2 mt-1">
+                  <div className="text-slate-600 dark:text-slate-400">
+                    <KatexMath math={`\\omega_n = ${group.wn.toFixed(2)}\\,\\text{rad/s}`} />
+                  </div>
+                  <div className="text-slate-600 dark:text-slate-400">
+                    <KatexMath math={`\\zeta = ${group.zeta.toFixed(3)}`} />
+                  </div>
+                  {group.zeta > 0 && group.zeta < 1 && (
+                    <div className="col-span-2 text-blue-600 dark:text-blue-400 font-semibold">
+                      <KatexMath math={`\\%OS = ${group.os.toFixed(1)}\\%`} />
+                    </div>
+                  )}
+                  {group.unstable && (
+                    <div className="col-span-2 mt-1">
+                      <StatusBadge variant="danger">Unstable Region</StatusBadge>
+                    </div>
+                  )}
+                </div>
+              </InnerBox>
+            ))}
           </div>
-        </div>
+        </StudioCard>
       </div>
     </div>
   );

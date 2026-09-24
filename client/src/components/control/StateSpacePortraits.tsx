@@ -7,13 +7,11 @@ import { MousePointer2, Orbit } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocale } from "@/contexts/LocaleContext";
 import { KatexMath } from "@/components/ui/KatexMath";
-import SegmentedControl from "@/components/ui/SegmentedControl";
+import { SegmentedControl, StudioCard, InnerBox } from "@/components/common/templates";
 import { integrateStateRK4, type Matrix, type Vector } from "@/features/linear-algebra/matrixMath";
 
 type LocaleCode = "en" | "ar" | "es";
 type Props = { matrix: Matrix; closedLoopMatrix?: Matrix; order: 2 | 3 };
-const CARD = "rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900";
-const HEADING = "text-sm font-bold uppercase tracking-wider text-slate-800 dark:text-white";
 const FIELD = "rounded-xl border border-slate-200 bg-white text-slate-900 outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-blue-500 dark:border-slate-800 dark:bg-slate-950 dark:text-white";
 
 const copy: Record<LocaleCode, { title: string; initial: string; duration: string; dynamics: string; open: string; closed: string; plane: string; field: string; trajectory: string; space: string; rotate: string; drag: string }> = {
@@ -77,7 +75,21 @@ function PhasePlane({ matrix, initialState, duration }: { matrix: Matrix; initia
     render(); const observer = new ResizeObserver(render); observer.observe(canvas); return () => observer.disconnect();
   }, [matrix, trajectory]);
 
-  return <section className={CARD}><div className="flex flex-wrap items-center justify-between gap-2"><h3 className={HEADING}>{labels.plane}</h3><div className="flex items-center gap-3 text-[10px] font-bold text-slate-500 dark:text-slate-400"><span className="inline-flex items-center gap-1"><i className="h-px w-4 bg-blue-500" />{labels.trajectory}</span><span className="inline-flex items-center gap-1"><i className="h-px w-4 border-t border-dashed border-violet-500" />{labels.field}</span></div></div><div className="relative mt-4 min-h-72 overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-[#090a0d]" style={{ aspectRatio: "4 / 3" }}><canvas ref={canvasRef} className="absolute inset-0 h-full w-full" /></div></section>;
+  return (
+    <StudioCard
+      title={labels.plane}
+      actionSlot={
+        <div className="flex items-center gap-3 text-[10px] font-bold text-slate-500 dark:text-slate-400">
+          <span className="inline-flex items-center gap-1"><i className="h-px w-4 bg-blue-500" />{labels.trajectory}</span>
+          <span className="inline-flex items-center gap-1"><i className="h-px w-4 border-t border-dashed border-violet-500" />{labels.field}</span>
+        </div>
+      }
+    >
+      <div className="relative min-h-72 overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-[#090a0d]" style={{ aspectRatio: "4 / 3" }}>
+        <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
+      </div>
+    </StudioCard>
+  );
 }
 
 function StateSpace3D({ matrix, initialState, duration }: { matrix: Matrix; initialState: Vector; duration: number }) {
@@ -109,7 +121,25 @@ function StateSpace3D({ matrix, initialState, duration }: { matrix: Matrix; init
   const pointerMove = (event: React.PointerEvent<HTMLCanvasElement>) => { const pointer = pointerRef.current; if (!pointer || pointer.id !== event.pointerId) return; const dx = event.clientX - pointer.x; const dy = event.clientY - pointer.y; pointerRef.current = { ...pointer, x: event.clientX, y: event.clientY }; setRotation((current) => ({ yaw: current.yaw + dx * 0.012, pitch: Math.max(-1.35, Math.min(1.35, current.pitch + dy * 0.012)) })); };
   const pointerUp = () => { pointerRef.current = null; };
 
-  return <section className={CARD}><div className="flex flex-wrap items-center justify-between gap-2"><h3 className={HEADING}>{labels.space}</h3><span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-500 dark:text-slate-400"><Orbit className="h-3.5 w-3.5" />{labels.rotate}</span></div><div className="relative mt-4 min-h-72 overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-[#090a0d]" style={{ aspectRatio: "4 / 3" }}><canvas ref={canvasRef} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerCancel={pointerUp} className="absolute inset-0 h-full w-full touch-none cursor-grab active:cursor-grabbing" /></div><p className="mt-3 inline-flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400"><MousePointer2 className="h-3.5 w-3.5" />{labels.drag}</p></section>;
+  return (
+    <StudioCard
+      title={labels.space}
+      actionSlot={
+        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-500 dark:text-slate-400">
+          <Orbit className="h-3.5 w-3.5" />
+          {labels.rotate}
+        </span>
+      }
+    >
+      <div className="relative min-h-72 overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-[#090a0d]" style={{ aspectRatio: "4 / 3" }}>
+        <canvas ref={canvasRef} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerCancel={pointerUp} className="absolute inset-0 h-full w-full touch-none cursor-grab active:cursor-grabbing" />
+      </div>
+      <p className="mt-3 inline-flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+        <MousePointer2 className="h-3.5 w-3.5" />
+        {labels.drag}
+      </p>
+    </StudioCard>
+  );
 }
 
 export function StateSpacePortraits({ matrix, closedLoopMatrix, order }: Props) {
@@ -120,7 +150,43 @@ export function StateSpacePortraits({ matrix, closedLoopMatrix, order }: Props) 
   useEffect(() => { setInitialState(Array.from({ length: order }, (_, index) => index === 0 ? 1 : 0)); setMode("open"); }, [order]);
   const activeMatrix = mode === "closed" && closedLoopMatrix ? closedLoopMatrix : matrix;
   const inputClass = `mt-2 w-full px-2 py-1 text-slate-800 text-lg tracking-wide [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [-moz-appearance:textfield] m-0 ${FIELD}`;
-  return <section className={CARD}><div className="flex flex-col gap-3 border-b border-slate-200 pb-4 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between"><h2 className={HEADING}>{labels.title}</h2></div><div className="mt-5 grid gap-4 lg:grid-cols-[1.3fr_0.7fr]"><div className="grid grid-cols-2 gap-2 sm:grid-cols-4">{initialState.map((value, index) => <label key={index} className="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950"><KatexMath math={`x_{${index + 1}}(0)`} className="text-xs text-slate-500 dark:text-slate-400" /><input type="number" step="any" value={value} onChange={(event) => setInitialState((current) => current.map((state, position) => position === index ? Number(event.target.value) || 0 : state))} style={{ fontFamily: "'KaTeX_Main', 'Times New Roman', serif" }} className={inputClass} /></label>)}</div><div className="rounded-xl border border-slate-200 p-3 dark:border-slate-800"><p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">{labels.dynamics}</p><div className="mt-2"><SegmentedControl options={[{ label: labels.open, value: "open" }, { label: labels.closed, value: "closed", disabled: !closedLoopMatrix }]} value={mode} onChange={setMode} size="sm" fullWidth aria-label="Dynamics selector" /></div></div></div><div className="mt-5">{order === 2 ? <PhasePlane matrix={activeMatrix} initialState={initialState} duration={duration} /> : <StateSpace3D matrix={activeMatrix} initialState={initialState} duration={duration} />}</div></section>;
+
+  return (
+    <StudioCard title={labels.title}>
+      <div className="grid gap-4 lg:grid-cols-[1.3fr_0.7fr]">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {initialState.map((value, index) => (
+            <InnerBox key={index}>
+              <KatexMath math={`x_{${index + 1}}(0)`} className="text-xs text-slate-500 dark:text-slate-400" />
+              <input
+                type="number"
+                step="any"
+                value={value}
+                onChange={(event) => setInitialState((current) => current.map((state, position) => position === index ? Number(event.target.value) || 0 : state))}
+                style={{ fontFamily: "'KaTeX_Main', 'Times New Roman', serif" }}
+                className={inputClass}
+              />
+            </InnerBox>
+          ))}
+        </div>
+        <InnerBox title={labels.dynamics}>
+          <div className="mt-1">
+            <SegmentedControl
+              options={[{ label: labels.open, value: "open" }, { label: labels.closed, value: "closed", disabled: !closedLoopMatrix }]}
+              value={mode}
+              onChange={setMode}
+              size="sm"
+              fullWidth
+              aria-label="Dynamics selector"
+            />
+          </div>
+        </InnerBox>
+      </div>
+      <div className="mt-5">
+        {order === 2 ? <PhasePlane matrix={activeMatrix} initialState={initialState} duration={duration} /> : <StateSpace3D matrix={activeMatrix} initialState={initialState} duration={duration} />}
+      </div>
+    </StudioCard>
+  );
 }
 
 export default StateSpacePortraits;

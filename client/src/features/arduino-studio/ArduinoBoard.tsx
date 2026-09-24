@@ -8,6 +8,7 @@ import { ANALOG_HEADER_Y, DIGITAL_HEADER_Y, HEADER_PINS, LEDS, VIEW_H, VIEW_W, a
 import type { PinUsage } from "./arduinoCompiler";
 import { BTN_H, BTN_W, LED_H, LED_W, POT_H, POT_W, RES_H, RES_W, VectorLed, VectorPotentiometer, VectorPushButton, VectorResistor } from "./components/circuit";
 import type { HardwareSnapshot } from "./arduinoRuntime";
+import { StudioSlider } from "@/components/common/templates";
 
 /** Scopes the SVG's global `.stN` classes to the board so they cannot leak into the app stylesheet. */
 export function prepareUnoSvg(raw: string): string {
@@ -364,15 +365,15 @@ export function ArduinoBoard({ snapshot, onDigitalInput, onAnalogInput, layout =
         <div className="text-[10px] font-bold text-slate-700 dark:text-slate-200">
           Analog Input <span className="ms-1 font-mono font-medium text-slate-500 dark:text-slate-400">A{ch}</span>
         </div>
-        <input
-          type="range"
+        <StudioSlider
           min={0}
           max={1023}
           step={1}
           value={value}
           aria-label={`Analog input A${ch}`}
-          onChange={e => onAnalogInput(ch, Number(e.target.value))}
-          className="my-1.5 block h-1.5 w-full cursor-pointer accent-violet-600"
+          onChange={val => onAnalogInput(ch, val)}
+          hideHeader
+          className="my-1.5 w-full"
         />
         <div className="flex justify-between font-mono text-[8px] text-slate-400">
           <span>0</span>

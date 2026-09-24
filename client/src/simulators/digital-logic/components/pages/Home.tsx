@@ -36,7 +36,7 @@ import {
 import { nanoid } from 'nanoid';
 import { toast } from 'sonner';
 import { V3Math } from '@/components/ui/V3Math';
-import SegmentedControl from '@/components/ui/SegmentedControl';
+import { SegmentedControl, StudioSlider } from '@/components/common/templates';
 import { KATEX_EMBEDDED_FONT_CSS } from '@/simulators/digital-logic/models/katexSvgFonts';
 import { DigitalLogicAnalysisBox } from '@/simulators/digital-logic/components/ui-components/DigitalLogicAnalysisBox';
 import { ExportPreviewModal, svgToPngBlob, type ExportItem } from '@/simulators/circuit-engine/components/ui-components/ExportPreviewModal';
@@ -1247,15 +1247,15 @@ export function DigitalLogicSimulatorHome({
         </span>
         <ToolbarDivider colors={colors} />
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <input
+          <StudioSlider
             aria-label="Simulation speed"
-            type="range"
             min={0.25}
             max={4}
             step={0.25}
             value={simulationSpeed}
-            onChange={event => setSimulationSpeed(numeric(event.target.value, 1))}
-            className="h-1.5 w-24 cursor-pointer appearance-none rounded-full bg-brand-gradient [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-0 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:ring-2 [&::-webkit-slider-thumb]:ring-blue-500 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:shadow"
+            onChange={val => setSimulationSpeed(val)}
+            hideHeader
+            className="w-24"
           />
           <span className="text-sm font-medium text-slate-700 dark:text-slate-300" style={{ minWidth: 42, display: 'inline-flex', alignItems: 'center' }}>
             <V3Math math={`${simulationSpeed.toFixed(2)}\\times`} />

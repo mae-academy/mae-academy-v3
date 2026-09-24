@@ -4,6 +4,7 @@
  */
 import React, { useState, useRef, useEffect } from 'react';
 import { X, Minus, Plus } from 'lucide-react';
+import { StudioSlider } from '@/components/common/templates';
 
 interface OscilloscopeProps {
   isOpen: boolean;
@@ -118,10 +119,15 @@ export const Oscilloscope: React.FC<OscilloscopeProps> = ({ isOpen, onClose, cha
             <span style={{ color: '#aaa', fontSize: 10, minWidth: 40, textAlign: 'center' }}>{timeScale}ms</span>
             <button onClick={() => setTimeScale(t => Math.min(500, t * 2))} style={{ color: '#888', background: '#222', border: '1px solid #444', borderRadius: 3, padding: '1px 5px', cursor: 'pointer', fontSize: 10 }}><Plus size={10} /></button>
             <span style={{ color: '#666', fontSize: 9, marginLeft: 8 }}>TRIG</span>
-            <input
-              type="range" min={-5} max={5} step={0.1} value={triggerLevel}
-              onChange={e => setTriggerLevel(parseFloat(e.target.value))}
-              style={{ width: 60 }}
+            <StudioSlider
+              min={-5}
+              max={5}
+              step={0.1}
+              value={triggerLevel}
+              onChange={val => setTriggerLevel(val)}
+              aria-label="Trigger level"
+              hideHeader
+              className="w-[60px]"
             />
             <span style={{ color: '#ff4444', fontSize: 9 }}>{triggerLevel.toFixed(1)}V</span>
           </div>
@@ -153,10 +159,15 @@ export const Oscilloscope: React.FC<OscilloscopeProps> = ({ isOpen, onClose, cha
                   </div>
                   <div className="flex items-center gap-1">
                     <span style={{ color: '#555', fontSize: 8 }}>Pos</span>
-                    <input
-                      type="range" min={-4} max={4} step={0.1} value={vOffset[ci]}
-                      onChange={e => setVOffset(o => o.map((v, i) => i === ci ? parseFloat(e.target.value) : v))}
-                      style={{ width: 60 }}
+                    <StudioSlider
+                      min={-4}
+                      max={4}
+                      step={0.1}
+                      value={vOffset[ci]}
+                      onChange={val => setVOffset(o => o.map((v, i) => i === ci ? val : v))}
+                      aria-label={`${name} position offset`}
+                      hideHeader
+                      className="w-[60px]"
                     />
                   </div>
                   {/* Measurements */}

@@ -7,7 +7,14 @@ import { AlertTriangle, RotateCcw } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useLocale } from "@/contexts/LocaleContext";
 import { KatexMath } from "@/components/ui/KatexMath";
-import SegmentedControl from "@/components/ui/SegmentedControl";
+import {
+  SegmentedControl,
+  StudioCard,
+  InnerBox,
+  GradientButton,
+  FormulaBox,
+  StatusBadge,
+} from "@/components/common/templates";
 import { StateSpacePortraits } from "@/components/control/StateSpacePortraits";
 import {
   ackermannPolePlacement,
@@ -25,11 +32,6 @@ import {
 type SystemModel = { A: Matrix; B: Matrix; C: Matrix; D: Matrix };
 type Order = 2 | 3;
 type LocaleCode = "en" | "ar" | "es";
-const CARD = "rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900";
-const HEADING = "text-sm font-bold uppercase tracking-wider text-slate-800 dark:text-white";
-const TAB_BASE = "px-3 py-1.5 text-xs font-medium shadow-sm rounded-lg cursor-pointer";
-const TAB_ACTIVE = `${TAB_BASE} bg-brand-gradient text-white`;
-const TAB_INACTIVE = `${TAB_BASE} bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800`;
 const MATRIX_INPUT = "h-9 w-14 bg-transparent text-center text-slate-800 text-lg tracking-wide outline-none rounded focus:ring-1 focus:ring-blue-500 dark:text-slate-100 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [-moz-appearance:textfield] m-0";
 const MATRIX_BRACKETS = "border-l-2 border-r-2 border-slate-800 dark:border-slate-300 px-2 py-1.5";
 
@@ -75,11 +77,38 @@ function MatrixGrid({ name, matrix, onChange }: { name: string; matrix: Matrix; 
 }
 
 function LeoAlert({ messages, copy }: { messages: string[]; copy: typeof studioCopy.en }) {
-  return <aside className="rounded-3xl border border-rose-200 bg-rose-50 p-5 shadow-sm dark:border-rose-500/30 dark:bg-rose-500/10"><div className="flex gap-3"><div className="mt-0.5 rounded-full border border-rose-300 p-1.5 text-rose-600 dark:border-rose-400/50 dark:text-rose-300"><AlertTriangle className="h-4 w-4" /></div><div><h3 className="text-sm font-bold uppercase tracking-wider text-rose-700 dark:text-rose-200">{copy.leoTitle}</h3><KatexMath math={`\\text{${copy.leoText.replace(/[{}]/g, "")}}`} displayMode className="mt-2 block overflow-x-auto text-sm font-semibold text-slate-800 dark:text-white" /><p className="mt-2 text-xs leading-5 text-slate-600 dark:text-slate-300">{messages.join(" ")}</p></div></div></aside>;
+  return (
+    <aside className="rounded-2xl border border-rose-200/80 bg-rose-50/70 p-5 shadow-sm dark:border-rose-900/60 dark:bg-rose-950/20 backdrop-blur-sm">
+      <div className="flex gap-3">
+        <div className="mt-0.5 rounded-full border border-rose-300 p-1.5 text-rose-600 dark:border-rose-700 dark:text-rose-400">
+          <AlertTriangle className="h-4 w-4" />
+        </div>
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-bold uppercase tracking-wider text-rose-700 dark:text-rose-300">{copy.leoTitle}</h3>
+            <StatusBadge variant="danger" label="Deficient Rank" />
+          </div>
+          <KatexMath math={`\\text{${copy.leoText.replace(/[{}]/g, "")}}`} displayMode className="block overflow-x-auto text-sm font-semibold text-slate-800 dark:text-white" />
+          <p className="text-xs leading-5 text-slate-600 dark:text-slate-300">{messages.join(" ")}</p>
+        </div>
+      </div>
+    </aside>
+  );
 }
 
-function StatusCard({ title, symbol, matrix }: { title: string; symbol: string; matrix: Matrix }) {
-  return <section className={CARD}><h3 className={HEADING}>{title}</h3><KatexMath math={`${symbol}=${matrixToLatex(matrix)}`} displayMode className="mt-4 block overflow-x-auto rounded-xl border border-slate-200 bg-slate-50 px-3 py-4 text-center text-sm text-slate-950 dark:border-slate-800 dark:bg-slate-950 dark:text-white" /></section>;
+function StatusCard({ title, symbol, matrix, isFullRank }: { title: string; symbol: string; matrix: Matrix; isFullRank?: boolean }) {
+  return (
+    <StudioCard
+      title={title}
+      actionSlot={
+        isFullRank !== undefined ? (
+          <StatusBadge variant={isFullRank ? "success" : "danger"} label={isFullRank ? "Full Rank" : "Rank Deficient"} />
+        ) : undefined
+      }
+    >
+      <FormulaBox math={`${symbol}=${matrixToLatex(matrix)}`} />
+    </StudioCard>
+  );
 }
 
 export function StateSpaceStudio() {
@@ -109,23 +138,115 @@ export function StateSpaceStudio() {
   const changeOrder = (nextOrder: Order) => { setOrder(nextOrder); setSystem(initialSystem(nextOrder)); setDesiredPoles(initialPoles(nextOrder)); setPlacementRequested(true); };
   const reset = () => changeOrder(order);
 
-  const card = CARD;
   const messages = "controllable" in analysis ? [!analysis.controllable ? copy.leoControllability : "", !analysis.observable ? copy.leoObservability : ""].filter(Boolean) : [];
 
-  return <div className="space-y-6">
+  return (
+    <div className="space-y-6">
+      <StudioCard
+        title={copy.systemMatrices}
+        actionSlot={
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{copy.order}</span>
+            <SegmentedControl options={[{ label: <KatexMath math="n = 2" />, value: 2 }, { label: <KatexMath math="n = 3" />, value: 3 }]} value={order} onChange={changeOrder} size="sm" aria-label="System Order" />
+            <GradientButton variant="ghost" size="sm" onClick={reset}>
+              <RotateCcw className="h-3.5 w-3.5 mr-1" />
+              {copy.reset}
+            </GradientButton>
+          </div>
+        }
+      >
+        <div className="grid grid-cols-2 items-start gap-6 lg:grid-cols-4">
+          <MatrixGrid name="A" matrix={system.A} onChange={(row, column, value) => updateMatrix("A", row, column, value)} />
+          <MatrixGrid name="B" matrix={system.B} onChange={(row, column, value) => updateMatrix("B", row, column, value)} />
+          <MatrixGrid name="C" matrix={system.C} onChange={(row, column, value) => updateMatrix("C", row, column, value)} />
+          <MatrixGrid name="D" matrix={system.D} onChange={(row, column, value) => updateMatrix("D", row, column, value)} />
+        </div>
+      </StudioCard>
 
-    <section className={CARD}><div className="flex flex-col gap-3 border-b border-slate-200 pb-4 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between"><h3 className={HEADING}>{copy.systemMatrices}</h3><div className="flex flex-wrap items-center gap-2"><span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{copy.order}</span><SegmentedControl options={[{ label: <KatexMath math="n = 2" />, value: 2 }, { label: <KatexMath math="n = 3" />, value: 3 }]} value={order} onChange={changeOrder} size="sm" aria-label="System Order" /><button type="button" onClick={reset} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 shadow-sm hover:border-blue-400 hover:text-violet-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400 dark:hover:border-blue-400 dark:hover:text-violet-200"><RotateCcw className="h-3.5 w-3.5" />{copy.reset}</button></div></div><div className="mt-5 grid grid-cols-2 items-start gap-6 lg:grid-cols-4"><MatrixGrid name="A" matrix={system.A} onChange={(row, column, value) => updateMatrix("A", row, column, value)} /><MatrixGrid name="B" matrix={system.B} onChange={(row, column, value) => updateMatrix("B", row, column, value)} /><MatrixGrid name="C" matrix={system.C} onChange={(row, column, value) => updateMatrix("C", row, column, value)} /><MatrixGrid name="D" matrix={system.D} onChange={(row, column, value) => updateMatrix("D", row, column, value)} /></div></section>
+      {"error" in analysis ? (
+        <StudioCard title="Analysis Error">
+          <p className="text-sm text-rose-600 dark:text-rose-300">{analysis.error}</p>
+        </StudioCard>
+      ) : (
+        <>
+          <StudioCard title={copy.stateEquations}>
+            <div className="grid gap-4 lg:grid-cols-2">
+              <FormulaBox math={`\\dot{x}=(${matrixToLatex(system.A)})x+(${matrixToLatex(system.B)})u`} />
+              <FormulaBox math={`y=(${matrixToLatex(system.C)})x+(${matrixToLatex(system.D)})u`} />
+            </div>
+            <div className="mt-4 grid gap-4 lg:grid-cols-2">
+              <InnerBox title={copy.characteristic}>
+                <KatexMath math={`\\det(sI-A)=${analysis.characteristic.map((coefficient, index) => `${index === 0 ? "" : coefficient >= 0 ? "+" : ""}${formatNumber(coefficient)}${index === analysis.characteristic.length - 1 ? "" : index === analysis.characteristic.length - 2 ? "s" : `s^{${analysis.characteristic.length - index - 1}}`}`).join("")}`} displayMode className="mt-2 block w-full overflow-x-auto text-center text-sm" />
+              </InnerBox>
+              <InnerBox title={copy.openEigenvalues}>
+                <KatexMath math={`\\lambda(A)=\\left\\{${analysis.eigenvalues.map((value) => complexToLatex(value)).join(",\\;")}\\right\\}`} displayMode className="mt-2 block w-full overflow-x-auto text-center text-sm" />
+              </InnerBox>
+            </div>
+          </StudioCard>
 
-    {"error" in analysis ? <section className={card}><p className="text-sm text-rose-600 dark:text-rose-300">{analysis.error}</p></section> : <><section className={card}><h3 className={HEADING}>{copy.stateEquations}</h3><div className="mt-4 grid gap-4 lg:grid-cols-2"><div className="flex min-h-20 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 p-4 text-center dark:border-slate-800 dark:bg-slate-950"><KatexMath math={`\\dot{x}=(${matrixToLatex(system.A)})x+(${matrixToLatex(system.B)})u`} displayMode className="block overflow-x-auto text-base text-slate-950 dark:text-white" /></div><div className="flex min-h-20 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 p-4 text-center dark:border-slate-800 dark:bg-slate-950"><KatexMath math={`y=(${matrixToLatex(system.C)})x+(${matrixToLatex(system.D)})u`} displayMode className="block overflow-x-auto text-base text-slate-950 dark:text-white" /></div></div><div className="mt-4 grid gap-4 lg:grid-cols-2"><div className="flex min-h-28 flex-col items-center justify-center rounded-xl border border-slate-200 bg-slate-50 p-4 text-center dark:border-slate-800 dark:bg-slate-950"><p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">{copy.characteristic}</p><KatexMath math={`\\det(sI-A)=${analysis.characteristic.map((coefficient, index) => `${index === 0 ? "" : coefficient >= 0 ? "+" : ""}${formatNumber(coefficient)}${index === analysis.characteristic.length - 1 ? "" : index === analysis.characteristic.length - 2 ? "s" : `s^{${analysis.characteristic.length - index - 1}}`}`).join("")}`} displayMode className="mt-3 block w-full overflow-x-auto text-center text-sm" /></div><div className="flex min-h-28 flex-col items-center justify-center rounded-xl border border-slate-200 bg-slate-50 p-4 text-center dark:border-slate-800 dark:bg-slate-950"><p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">{copy.openEigenvalues}</p><KatexMath math={`\\lambda(A)=\\left\\{${analysis.eigenvalues.map((value) => complexToLatex(value)).join(",\\;")}\\right\\}`} displayMode className="mt-3 block w-full overflow-x-auto text-center text-sm" /></div></div></section>
+          <div className="grid gap-5 lg:grid-cols-2">
+            <StatusCard title={copy.controllability} symbol="\\mathcal{C}" matrix={analysis.controllability} isFullRank={analysis.controllable} />
+            <StatusCard title={copy.observability} symbol="\\mathcal{O}" matrix={analysis.observability} isFullRank={analysis.observable} />
+          </div>
 
-      <section className="grid gap-5 lg:grid-cols-2"><StatusCard title={copy.controllability} symbol="\mathcal{C}" matrix={analysis.controllability} /><StatusCard title={copy.observability} symbol="\mathcal{O}" matrix={analysis.observability} /></section>
+          {messages.length > 0 && <LeoAlert messages={messages} copy={copy} />}
 
-      {messages.length > 0 && <LeoAlert messages={messages} copy={copy} />}
+          <StudioCard
+            title={copy.desiredPoles}
+            subtitle={copy.poleHint}
+            actionSlot={
+              <GradientButton size="sm" onClick={() => setPlacementRequested(true)} disabled={!analysis.controllable}>
+                {copy.calculate}
+              </GradientButton>
+            }
+          >
+            <div className="flex items-stretch gap-4">
+              <div className="w-28 shrink-0 flex-col">
+                <p className="mb-2 text-center text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Poles</p>
+                <div className="flex flex-col gap-2">
+                  {desiredPoles.map((pole, index) => (
+                    <label key={index} className="flex items-center justify-between gap-1.5">
+                      <KatexMath math={`\\mu_{${index + 1}}`} className="text-xs text-slate-600 dark:text-slate-300" />
+                      <input
+                        type="number"
+                        step="any"
+                        value={pole}
+                        onChange={(event) => setDesiredPoles((current) => current.map((existing, position) => position === index ? Number(event.target.value) || 0 : existing))}
+                        style={{ fontFamily: "'KaTeX_Main', 'Times New Roman', serif" }}
+                        className="w-16 rounded-md border border-slate-200 bg-white px-1.5 py-1 text-center text-slate-800 text-base tracking-wide outline-none transition focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:text-white [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [-moz-appearance:textfield] m-0"
+                      />
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div className="min-w-0 flex-1">
+                {placementRequested && placement ? (
+                  <div className="grid h-full gap-3 sm:grid-cols-3">
+                    <InnerBox title={copy.feedback}>
+                      <KatexMath math={`K=${matrixToLatex([placement.gain])}`} displayMode className="mt-1 block overflow-x-auto text-center text-sm" />
+                    </InnerBox>
+                    <InnerBox title={copy.desiredCharacteristic}>
+                      <KatexMath math={`\\phi_d(s)=${placement.desiredPolynomial.map((coefficient, index) => `${index === 0 ? "" : coefficient >= 0 ? "+" : ""}${formatNumber(coefficient)}${index === placement.desiredPolynomial.length - 1 ? "" : index === placement.desiredPolynomial.length - 2 ? "s" : `s^{${placement.desiredPolynomial.length - index - 1}}`}`).join("")}`} displayMode className="mt-1 block overflow-x-auto text-center text-sm" />
+                    </InnerBox>
+                    <InnerBox title={copy.closedLoop}>
+                      <KatexMath math={`A_{cl}=A-BK=${matrixToLatex(placement.acl)}`} displayMode className="mt-1 block overflow-x-auto text-center text-sm" />
+                      <KatexMath math={`\\lambda(A_{cl})=\\left\\{${placement.closedLoopEigenvalues.map((value) => complexToLatex(value)).join(",\\;")}\\right\\}`} displayMode className="mt-1 block overflow-x-auto text-center text-xs" />
+                    </InnerBox>
+                  </div>
+                ) : (
+                  <div className="flex h-full items-center justify-center rounded-xl border border-dashed border-slate-300 p-4 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">
+                    {analysis.controllable ? copy.poleHint : copy.placeUnavailable}
+                  </div>
+                )}
+              </div>
+            </div>
+          </StudioCard>
 
-      <section className={card}><div className="flex flex-col gap-4 border-b border-slate-200 pb-4 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between"><div><h3 className={HEADING}>{copy.desiredPoles}</h3><p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{copy.poleHint}</p></div><button type="button" onClick={() => setPlacementRequested(true)} disabled={!analysis.controllable} className={`${analysis.controllable ? TAB_ACTIVE : TAB_INACTIVE} disabled:cursor-not-allowed disabled:opacity-40`}>{copy.calculate}</button></div><div className="mt-4 flex items-stretch gap-4"><div className="w-24 shrink-0 flex-col"><p className="mb-1.5 text-center text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Poles</p><div className="flex flex-col gap-1.5">{desiredPoles.map((pole, index) => <label key={index} className="flex items-center justify-between gap-1.5"><KatexMath math={`\\mu_{${index + 1}}`} className="text-xs text-slate-600 dark:text-slate-300" /><input type="number" step="any" value={pole} onChange={(event) => setDesiredPoles((current) => current.map((existing, position) => position === index ? Number(event.target.value) || 0 : existing))} style={{ fontFamily: "'KaTeX_Main', 'Times New Roman', serif" }} className="w-14 rounded-md border border-slate-200 bg-white px-1 py-1 text-center text-slate-800 text-lg tracking-wide outline-none transition focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:text-white [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [-moz-appearance:textfield] m-0" /></label>)}</div></div><div className="min-w-0 flex-1">{placementRequested && placement ? <div className="grid h-full gap-3 sm:grid-cols-3"><div className="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950"><p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">{copy.feedback}</p><KatexMath math={`K=${matrixToLatex([placement.gain])}`} displayMode className="mt-2 block overflow-x-auto text-center text-sm" /></div><div className="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950"><p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">{copy.desiredCharacteristic}</p><KatexMath math={`\\phi_d(s)=${placement.desiredPolynomial.map((coefficient, index) => `${index === 0 ? "" : coefficient >= 0 ? "+" : ""}${formatNumber(coefficient)}${index === placement.desiredPolynomial.length - 1 ? "" : index === placement.desiredPolynomial.length - 2 ? "s" : `s^{${placement.desiredPolynomial.length - index - 1}}`}`).join("")}`} displayMode className="mt-2 block overflow-x-auto text-center text-sm" /></div><div className="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950"><p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">{copy.closedLoop}</p><KatexMath math={`A_{cl}=A-BK=${matrixToLatex(placement.acl)}`} displayMode className="mt-2 block overflow-x-auto text-center text-sm" /><KatexMath math={`\\lambda(A_{cl})=\\left\\{${placement.closedLoopEigenvalues.map((value) => complexToLatex(value)).join(",\\;")}\\right\\}`} displayMode className="mt-2 block overflow-x-auto text-center text-sm" /></div></div> : <div className="rounded-xl border border-dashed border-slate-300 p-4 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">{analysis.controllable ? copy.poleHint : copy.placeUnavailable}</div>}</div></div></section>
-      <StateSpacePortraits matrix={system.A} closedLoopMatrix={placementRequested && placement ? placement.acl : undefined} order={order} />
-    </>}
-  </div>;
+          <StateSpacePortraits matrix={system.A} closedLoopMatrix={placementRequested && placement ? placement.acl : undefined} order={order} />
+        </>
+      )}
+    </div>
+  );
 }
 
 export default StateSpaceStudio;

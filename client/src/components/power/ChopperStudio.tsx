@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { KatexMath } from "@/components/ui/KatexMath";
-import { SegmentedControl } from "@/components/ui/SegmentedControl";
-import { PowerSlider } from "./PowerSlider";
+import { SegmentedControl, StudioCard, StudioSlider, InnerBox } from "@/components/common/templates";
 import { PowerWarningAlert } from "./PowerWarningAlert";
 import { StudioErrorBoundary } from "./StudioErrorBoundary";
 import { PowerScopePlot, type ScopeSeries } from "./PowerScopePlot";
@@ -16,7 +15,7 @@ import {
 } from "@/features/power-electronics/chopperMath";
 
 const tex = String.raw;
-const card = "rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900";
+const card = "rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white/70 dark:bg-slate-900/70 backdrop-blur-md shadow-sm p-5 md:p-6 transition-all";
 const heading = "text-sm font-bold text-slate-800 dark:text-white";
 const field = "w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-center font-mono text-sm text-slate-900 outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-35 dark:border-slate-800 dark:bg-slate-950 dark:text-white";
 
@@ -101,24 +100,26 @@ function Field({
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-2 dark:border-slate-800 dark:bg-slate-950">
+    <InnerBox className="px-2.5 py-2">
       <KatexMath math={label} className="block text-[10px] text-slate-500 dark:text-slate-400" />
       <KatexMath math={value} className="mt-1 block overflow-x-auto text-xs font-bold text-slate-900 dark:text-white" />
-    </div>
+    </InnerBox>
   );
 }
 
 function Circuit({ parameters }: { parameters: ChopperParameters }) {
   const title = `${parameters.topology === "buck" ? "Buck" : parameters.topology === "boost" ? "Boost" : "Buck-Boost"} · Class ${parameters.quadrantClass}`;
   return (
-    <section className={`${card} min-h-[340px]`}>
-      <div className="flex items-center justify-between gap-3">
-        <h3 className={heading}>Circuit Diagram</h3>
+    <StudioCard
+      title="Circuit Diagram"
+      actionSlot={
         <span className="text-xs font-bold text-violet-700 dark:text-violet-300">
           {parameters.control === "pwm" ? "PWM" : "FM"}
         </span>
-      </div>
-      <div className="mt-4 grid min-h-60 place-items-center overflow-hidden rounded-2xl border border-dashed border-violet-300 bg-slate-50 p-4 text-center dark:border-violet-400/30 dark:bg-slate-950">
+      }
+      className="min-h-[340px]"
+    >
+      <div className="grid min-h-60 place-items-center overflow-hidden rounded-2xl border border-dashed border-violet-300 bg-slate-50 p-4 text-center dark:border-violet-400/30 dark:bg-slate-950">
         <svg viewBox="0 0 340 120" className="h-28 w-full max-w-lg" fill="none" aria-label={title}>
           <path d="M24 60h52m0 0 16-16v32L76 60m16 0h42m0 0 16-16v32l-16-16m16 0h28m0-32v64m-12-48h24m-24 20h24m-24 20h24m30-28h54" stroke="currentColor" strokeWidth="2" className="text-violet-500" />
           <circle cx="42" cy="60" r="18" stroke="currentColor" strokeWidth="1.5" className="text-slate-400 dark:text-slate-500" />
@@ -126,7 +127,7 @@ function Circuit({ parameters }: { parameters: ChopperParameters }) {
         </svg>
         <span className="mt-2 block text-[10px] font-bold tracking-[.06em] text-slate-400">{title}</span>
       </div>
-    </section>
+    </StudioCard>
   );
 }
 
@@ -189,9 +190,8 @@ export function ChopperStudio() {
   }, [simulation.samples, metrics.conductionMode]);
 
   const topology = (
-    <section className={card}>
-      <h3 className={heading}>Topology Configuration</h3>
-      <div className="mt-4 space-y-4">
+    <StudioCard title="Topology Configuration">
+      <div className="space-y-4">
         <div>
           <span className="mb-2 block text-xs font-bold text-slate-500 dark:text-slate-400">Basic Topology</span>
           <SegmentedControl
@@ -211,13 +211,12 @@ export function ChopperStudio() {
           />
         </div>
       </div>
-    </section>
+    </StudioCard>
   );
 
   const control = (
-    <section className={card}>
-      <h3 className={heading}>Control Technique</h3>
-      <div className="mt-4">
+    <StudioCard title="Control Technique">
+      <div>
         <SegmentedControl
           value={parameters.control}
           options={controlOptions}
@@ -230,26 +229,26 @@ export function ChopperStudio() {
           <KatexMath math="D" className="text-xs font-bold text-slate-500 dark:text-slate-400" />
           <KatexMath math={tex`D = ${numberTex(parameters.dutyCycle, 2)}`} className="text-xs font-semibold text-violet-600 dark:text-violet-400" />
         </div>
-        <PowerSlider
+        <StudioSlider
           aria-label="duty cycle"
           min={0}
           max={1}
           step={0.01}
           value={parameters.dutyCycle}
-          onChange={(event) => update("dutyCycle", Number(event.target.value))}
+          onChange={(val) => update("dutyCycle", val)}
+          showLimits
         />
       </div>
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
         <Field label="D" value={parameters.dutyCycle} min={0} max={1} step={0.01} onChange={(dutyCycle) => update("dutyCycle", dutyCycle)} />
         <Field label={tex`f_s\,[\mathrm{Hz}]`} value={parameters.switchingFrequency} min={50} step={50} onChange={(switchingFrequency) => update("switchingFrequency", switchingFrequency)} />
       </div>
-    </section>
+    </StudioCard>
   );
 
   const sourceLoad = (
-    <section className={card}>
-      <h3 className={heading}>Source &amp; Load Configuration</h3>
-      <div className="mt-4">
+    <StudioCard title="Source & Load Configuration">
+      <div>
         <Field label={tex`V_s\,[\mathrm{V}]`} value={parameters.inputVoltage} min={1} step={1} onChange={(inputVoltage) => update("inputVoltage", inputVoltage)} />
       </div>
       <div className="mt-4">
@@ -266,16 +265,15 @@ export function ChopperStudio() {
         <Field label={tex`L\,[\mathrm{mH}]`} value={parameters.inductanceMilliHenry} disabled={!hasL} min={0} step={0.1} onChange={(inductanceMilliHenry) => update("inductanceMilliHenry", inductanceMilliHenry)} />
         <Field label={tex`E\,[\mathrm{V}]`} value={parameters.backEmfVoltage} disabled={!hasE} min={0} step={1} onChange={(backEmfVoltage) => update("backEmfVoltage", backEmfVoltage)} />
       </div>
-    </section>
+    </StudioCard>
   );
 
   const metricPanel = (
-    <section className={`${card} p-4`}>
-      <div>
-        <h3 className={heading}>Steady-State Metrics</h3>
-        <KatexMath math={tex`\frac{1}{T_s}\int_0^{T_s}(\cdot)\,dt`} className="mt-1 block text-xs text-slate-500 dark:text-slate-400" />
-      </div>
-      <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+    <StudioCard
+      title="Steady-State Metrics"
+      actionSlot={<KatexMath math={tex`\frac{1}{T_s}\int_0^{T_s}(\cdot)\,dt`} className="text-xs text-slate-500 dark:text-slate-400" />}
+    >
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <Metric label={tex`V_{dc}`} value={tex`${numberTex(metrics.outputVoltageDc)}\,\mathrm{V}`} />
         <Metric label={tex`V_{\mathrm{rms}}`} value={tex`${numberTex(metrics.outputVoltageRms)}\,\mathrm{V}`} />
         <Metric label={tex`I_{dc}`} value={tex`${numberTex(metrics.outputCurrentDc)}\,\mathrm{A}`} />
@@ -289,7 +287,7 @@ export function ChopperStudio() {
         <Metric label={tex`\eta`} value={tex`${numberTex(metrics.efficiency)}\%`} />
         <Metric label="D" value={numberTex(metrics.dutyCycle, 3)} />
       </div>
-    </section>
+    </StudioCard>
   );
 
   return (

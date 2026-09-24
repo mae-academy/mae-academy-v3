@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
-import { SegmentedControl } from '@/components/ui/SegmentedControl';
+import { SegmentedControl } from '@/components/common/templates';
 import type { Network } from '../../domain/ast';
 import { getProfile, LOGO_0BA8, S7_200_CPU224 } from '../../domain/hardware';
 import type { SymbolMap } from '../../transpiler';

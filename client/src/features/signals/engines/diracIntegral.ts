@@ -21,7 +21,10 @@ export type MathNode =
   | { kind: "div"; left: MathNode; right: MathNode }
   | { kind: "pow"; base: MathNode; exponent: MathNode }
   | { kind: "call"; name: FunctionName; argument: MathNode }
-  | { kind: "delta"; order: number; argument: MathNode };
+  | { kind: "delta"; order: number; argument: MathNode }
+  /** ∫₋∞ᵗ integrand(dummyVariable) d(dummyVariable) — an explicit running-integral wrapper typed
+   *  directly into the equation. Its value is only known dynamically, at each sampled `t`. */
+  | { kind: "runningIntegral"; integrand: MathNode; dummyVariable: string };
 
 /** integrandText is deferred, un-parsed: a symbolic (running-integral) bound short-circuits before the
  *  integrand grammar has to resolve placeholder amplitudes like a generic x(τ). */
@@ -40,7 +43,8 @@ export class DomainError extends Error {
   constructor(public readonly reason: string) { super(reason); this.name = "DomainError"; }
 }
 class ParseError extends Error {}
-class DifferentiationError extends Error {}
+/** Raised when a symbolic operator (derivative, running integral) hits a shape it cannot resolve in closed form. */
+export class DifferentiationError extends Error {}
 
 const NUMERIC_WINDOW = 400;
 const num = (value: number): MathNode => ({ kind: "num", value });
@@ -53,13 +57,15 @@ type Token =
   | { type: "number"; value: number }
   | { type: "ident"; value: string }
   | { type: "command"; value: string }
-  | { type: "op"; value: "+" | "-" | "*" | "/" | "^" | "(" | ")" | "{" | "}" | "|" | "," | "'" };
+  | { type: "op"; value: "+" | "-" | "*" | "/" | "^" | "_" | "(" | ")" | "{" | "}" | "[" | "]" | "|" | "," | "'" };
 
 /** Flattens LaTeX spacing/decoration so the lexer only sees structural tokens. */
 export function normalizeMathSource(source: string): string {
   return source
-    .replaceAll("\\left", "").replaceAll("\\right", "").replaceAll("\\!", "").replaceAll("\\,", "")
-    .replaceAll("\\;", "").replaceAll("\\:", "").replaceAll("\\ ", "").replaceAll("\\quad", "").replaceAll("\\qquad", "")
+    .replaceAll("\\left", "").replaceAll("\\right", "").replaceAll("\\!", "")
+    // Boundary markers, not deletion: "2\,3.14" must not glue into the single literal "23.14".
+    .replaceAll("\\,", "\u0001").replaceAll("\\;", "\u0001").replaceAll("\\:", "\u0001").replaceAll("\\ ", "\u0001")
+    .replaceAll("\\quad", "\u0001").replaceAll("\\qquad", "\u0001")
     .replaceAll("\\cdot", "*").replaceAll("\\times", "*").replaceAll("×", "*").replaceAll("·", "*")
     .replaceAll("−", "-").replaceAll("∞", "\\infty").replaceAll("π", "\\pi").replaceAll("τ", "\\tau")
     .replaceAll("δ", "\\delta").replaceAll("′", "'").replaceAll("″", "''").replaceAll("’", "'")
@@ -83,7 +89,7 @@ function tokenize(source: string): Token[] {
       tokens.push({ type: "number", value: Number(match[0]) }); index += match[0].length; continue;
     }
     if (/[a-zA-Z]/.test(char)) { tokens.push({ type: "ident", value: char }); index += 1; continue; }
-    if ("+-*/^(){}|,'".includes(char)) { tokens.push({ type: "op", value: char as Extract<Token, { type: "op" }>["value"] }); index += 1; continue; }
+    if ("+-*/^_(){}[]|,'".includes(char)) { tokens.push({ type: "op", value: char as Extract<Token, { type: "op" }>["value"] }); index += 1; continue; }
     throw new ParseError(`The character “${char}” is outside the signal grammar.`);
   }
   return tokens;
@@ -99,6 +105,8 @@ const NAMED_FUNCTIONS: Record<string, FunctionName> = { sin: "sin", cos: "cos", 
 
 class Parser {
   private position = 0;
+  /** >0 while parsing an ∫'s own integrand, so parseTerm knows to stop before consuming its "dτ". */
+  private integralDepth = 0;
   constructor(private readonly tokens: Token[], private readonly variable: string) {}
 
   private peek(offset = 0): Token | undefined { return this.tokens[this.position + offset]; }
@@ -106,6 +114,16 @@ class Parser {
   private eat(value: string): boolean { const token = this.peek(); if (token && token.type === "op" && token.value === value) { this.position += 1; return true; } return false; }
   private expect(value: string): void { if (!this.eat(value)) throw new ParseError(`Expected “${value}” in the expression.`); }
   atEnd(): boolean { return this.position >= this.tokens.length; }
+
+  /** True when the upcoming tokens are a differential marker: "d" followed by a dummy-variable name. */
+  private isDifferentialAhead(): boolean {
+    const first = this.peek();
+    if (!(first?.type === "ident" && first.value === "d")) return false;
+    const second = this.peek(1);
+    if (!second) return false;
+    if (second.type === "command" && (second.value === "tau" || second.value === "sigma" || second.value === "theta")) return true;
+    return second.type === "ident";
+  }
 
   parseExpression(): MathNode {
     let left = this.parseTerm();
@@ -121,6 +139,7 @@ class Parser {
     for (;;) {
       if (this.eat("*")) { left = { kind: "mul", left, right: this.parseUnary() }; continue; }
       if (this.eat("/")) { left = { kind: "div", left, right: this.parseUnary() }; continue; }
+      if (this.integralDepth > 0 && this.isDifferentialAhead()) return left; // stop before consuming the ∫'s own "dτ"
       if (this.startsPrimary()) { left = { kind: "mul", left, right: this.parseUnary() }; continue; } // implicit product: 2t, t^3\delta(t)
       return left;
     }
@@ -151,6 +170,61 @@ class Parser {
     if (this.eat("{")) { const inner = this.parseExpression(); this.expect("}"); return inner; }
     if (this.eat("(")) { const inner = this.parseExpression(); this.expect(")"); return inner; }
     return this.parsePrimary();
+  }
+
+  /** Like parseGroup, but also accepts \left[...\right] — the explicit-wrapper bracket syntax. */
+  private parseBracketGroup(): MathNode {
+    if (this.eat("[")) { const inner = this.parseExpression(); this.expect("]"); return inner; }
+    return this.parseGroup();
+  }
+
+  /** Non-consuming lookahead for `frac{d}{dt}`: numerator "d", denominator "d" + one variable letter. */
+  private isDerivativeFracAhead(): boolean {
+    const at = (offset: number, type: string, value?: string) => {
+      const token = this.peek(offset);
+      if (!token || token.type !== type) return false;
+      return value === undefined || (token as { value: unknown }).value === value;
+    };
+    return at(0, "op", "{") && at(1, "ident", "d") && at(2, "op", "}") && at(3, "op", "{") && at(4, "ident", "d") && at(5, "ident") && at(6, "op", "}");
+  }
+
+  /** Parses `\int_{lower}^{upper} integrand d(dummy)`, folding a numeric-bounds integral to a constant
+   *  and leaving a running integral (upper bound === this.variable) as a dynamic runningIntegral node. */
+  /** The optional [...] wrapper (the explicit-syntax pill's own notation) is just a grouping
+   *  convenience — with or without it, the integrand still extends up to the differential marker. */
+  private parseIntegrand(): MathNode {
+    if (this.eat("[")) { const inner = this.parseExpression(); this.expect("]"); return inner; }
+    return this.parseExpression();
+  }
+
+  private parseIntegral(): MathNode {
+    const lowerBound = this.eat("_") ? this.parseGroup() : null;
+    const upperBound = this.eat("^") ? this.parseGroup() : null;
+    if (!lowerBound || !upperBound) throw new ParseError("The integral needs both a lower and an upper bound, for example \\int_{-\\infty}^{t}.");
+    const isRunning = upperBound.kind === "var" && upperBound.name === this.variable;
+
+    this.integralDepth += 1;
+    const integrand = this.parseIntegrand();
+    this.integralDepth -= 1;
+
+    if (!this.isDifferentialAhead()) throw new ParseError("The integral must end with its differential, for example d\\tau or dt.");
+    this.next(); // "d"
+    const dummyToken = this.next() as { type: "command" | "ident"; value: string };
+    const dummyVariable = dummyToken.value;
+
+    if (isRunning) return { kind: "runningIntegral", integrand, dummyVariable };
+
+    const lowerValue = evaluateBoundNode(lowerBound);
+    const upperValue = evaluateBoundNode(upperBound);
+    if (lowerValue === "symbolic" || upperValue === "symbolic") {
+      throw new ParseError(`This integral's bounds must be either fully numeric or an upper bound of the bare variable ${this.variable} (a running integral).`);
+    }
+    const outcome = evaluateIntegralNode(integrand, dummyVariable, lowerValue, upperValue);
+    if (outcome.kind === "value") return num(outcome.value);
+    if (outcome.kind === "undefined") throw new ParseError(outcome.reason);
+    if (outcome.kind === "divergent") throw new ParseError("This definite integral diverges.");
+    if (outcome.kind === "error") throw new ParseError(outcome.message);
+    throw new ParseError("This integral could not be resolved to a number.");
   }
 
   /** Reads the braced literal name used by \operatorname{…} and \text{…}. */
@@ -213,7 +287,17 @@ class Parser {
     if (token.value === "tau" || token.value === "theta") return { kind: "var", name: token.value };
     if (token.value === "delta") { const order = this.readDeltaOrder(); return { kind: "delta", order, argument: this.parseGroup() }; }
     if (token.value === "Lambda") return { kind: "call", name: "tri", argument: this.parseGroup() };
-    if (token.value === "frac") { const numerator = this.parseGroup(); const denominator = this.parseGroup(); return { kind: "div", left: numerator, right: denominator }; }
+    if (token.value === "int") return this.parseIntegral();
+    if (token.value === "frac") {
+      if (this.isDerivativeFracAhead()) {
+        this.expect("{"); this.next(); this.expect("}"); // consume "d"
+        this.expect("{"); this.next(); const diffVarToken = this.next() as { value: string }; this.expect("}"); // consume "d" + var
+        const inner = this.parseBracketGroup();
+        try { return differentiate(inner, diffVarToken.value); }
+        catch (error) { throw new ParseError(error instanceof Error ? error.message : "That expression could not be differentiated."); }
+      }
+      const numerator = this.parseGroup(); const denominator = this.parseGroup(); return { kind: "div", left: numerator, right: denominator };
+    }
     if (token.value === "sqrt") { if (this.eat("[")) throw new ParseError("Only square roots are supported."); return { kind: "call", name: "sqrt", argument: this.parseGroup() }; }
     if (token.value === "operatorname" || token.value === "text" || token.value === "mathrm") {
       const name = this.readBracedName();
@@ -260,6 +344,13 @@ export function evaluateNode(node: MathNode, variable: string, at: number): numb
     }
     case "call": return evaluateCall(node.name, evaluateNode(node.argument, variable, at));
     case "delta": throw new DomainError("A Dirac impulse has no pointwise value; it is only defined under an integral.");
+    case "runningIntegral": {
+      const outcome = evaluateIntegralNode(node.integrand, node.dummyVariable, Number.NEGATIVE_INFINITY, at);
+      if (outcome.kind === "value") return outcome.value;
+      if (outcome.kind === "undefined") throw new DomainError(outcome.reason);
+      if (outcome.kind === "divergent") throw new DomainError("The running integral diverges at this instant.");
+      throw new DomainError(outcome.kind === "error" ? outcome.message : "The running integral could not be evaluated at this instant.");
+    }
   }
 }
 
@@ -294,12 +385,15 @@ function evaluateCall(name: FunctionName, value: number): number {
 
 // Constant folding keeps repeated differentiation exact: without it t^3 becomes t^{3-1-1…} and
 // the general (f^g)' branch would introduce a spurious ln of a negative base.
-const add = (left: MathNode, right: MathNode): MathNode =>
+/** Shared by differentiation, integration, and the composite-signal engine's own MathNode building. */
+export const add = (left: MathNode, right: MathNode): MathNode =>
   left.kind === "num" && right.kind === "num" ? num(left.value + right.value) : isZero(left) ? right : isZero(right) ? left : { kind: "add", left, right };
-const sub = (left: MathNode, right: MathNode): MathNode =>
+export const sub = (left: MathNode, right: MathNode): MathNode =>
   left.kind === "num" && right.kind === "num" ? num(left.value - right.value) : isZero(right) ? left : { kind: "sub", left, right };
-const mul = (left: MathNode, right: MathNode): MathNode =>
+export const mul = (left: MathNode, right: MathNode): MathNode =>
   left.kind === "num" && right.kind === "num" ? num(left.value * right.value) : isZero(left) || isZero(right) ? num(0) : isOne(left) ? right : isOne(right) ? left : { kind: "mul", left, right };
+const delta0 = (argument: MathNode): MathNode => ({ kind: "delta", order: 0, argument });
+const call = (name: FunctionName, argument: MathNode): MathNode => ({ kind: "call", name, argument });
 
 /** Exact derivative with respect to `variable`; the δ^(n) rule depends on it being symbolic, not numeric. */
 export function differentiate(node: MathNode, variable: string): MathNode {
@@ -320,6 +414,7 @@ export function differentiate(node: MathNode, variable: string): MathNode {
     }
     case "call": return mul(callDerivative(node.name, node.argument), differentiate(node.argument, variable));
     case "delta": throw new DifferentiationError("A Dirac impulse cannot appear inside the differentiated factor.");
+    case "runningIntegral": throw new DifferentiationError("A running integral cannot itself be symbolically differentiated in this engine.");
   }
 }
 
@@ -333,8 +428,73 @@ function callDerivative(name: FunctionName, argument: MathNode): MathNode {
     case "log": return { kind: "div", left: num(1), right: mul(argument, num(Math.LN10)) };
     case "sqrt": return { kind: "div", left: num(1), right: mul(num(2), { kind: "call", name: "sqrt", argument }) };
     case "abs": return { kind: "call", name: "sgn", argument };
+    // Generalized (distributional) derivatives: a jump in value synthesizes a δ of that jump's height;
+    // a jump only in slope (a corner) stays an ordinary, still-discontinuous function — no δ needed.
+    case "u": return delta0(argument); // d/dt u(t) = δ(t)
+    case "r": return call("u", argument); // d/dt r(t) = u(t): the ramp's kink, not a value jump
+    case "sgn": return mul(num(2), delta0(argument)); // sgn = 2u-1, so its derivative is 2δ(t)
+    case "rect": return sub(delta0(add(argument, num(0.5))), delta0(sub(argument, num(0.5)))); // rect = u(t+.5)-u(t-.5)
+    case "tri": return sub(add(call("u", add(argument, num(1))), mul(num(-2), call("u", argument))), call("u", sub(argument, num(1)))); // corners only, no δ
+    case "sinc": // sinc(t) = sin(πt)/(πt) ⇒ sinc'(t) = cos(πt)/t − sin(πt)/(πt²), via the quotient rule
+      return sub(
+        { kind: "div", left: { kind: "call", name: "cos", argument: mul(num(Math.PI), argument) }, right: argument },
+        { kind: "div", left: { kind: "call", name: "sin", argument: mul(num(Math.PI), argument) }, right: mul(num(Math.PI), { kind: "pow", base: argument, exponent: num(2) }) },
+      );
     default: throw new DifferentiationError(`${name} is not differentiable inside a δ⁽ⁿ⁾ integral; its derivative is itself a distribution.`);
   }
+}
+
+/* ─────────────────── AST → LaTeX ─────────────────── */
+
+/** Round-trips a MathNode back into LaTeX the grammar can re-parse — used to display the result of
+ *  a symbolic operator (derivative, running integral) back into the mathfield. */
+export function nodeToLatex(node: MathNode): string {
+  switch (node.kind) {
+    case "num": return formatNumber(node.value);
+    // A multi-letter name (τ parses to var("tau")) must round-trip as the LaTeX command, or the lexer
+    // would split it back into separate single-letter idents and silently multiply them together.
+    case "var": return node.name.length === 1 ? node.name : `\\${node.name}`;
+    case "neg": return `-${wrapAddSub(node.value)}`;
+    case "add": return `${nodeToLatex(node.left)}+${nodeToLatex(node.right)}`;
+    case "sub": return `${nodeToLatex(node.left)}-${wrapAddSub(node.right)}`;
+    case "mul":
+      if (node.left.kind === "num" && node.left.value === -1) return `-${wrapAddSub(node.right)}`;
+      return `${wrapAddSub(node.left)}\\,${wrapAddSub(node.right)}`;
+    case "div": return `\\frac{${nodeToLatex(node.left)}}{${nodeToLatex(node.right)}}`;
+    case "pow": return `${wrapPow(node.base)}^{${nodeToLatex(node.exponent)}}`;
+    case "call": return callToLatex(node.name, node.argument);
+    case "delta": return `\\delta${node.order > 0 ? `^{(${node.order})}` : ""}\\!\\left(${nodeToLatex(node.argument)}\\right)`;
+    case "runningIntegral": return `\\int_{-\\infty}^{t}${nodeToLatex(node.integrand)}\\,d${node.dummyVariable.length === 1 ? node.dummyVariable : `\\${node.dummyVariable}`}`;
+  }
+}
+function formatNumber(value: number): string { return Number(value.toFixed(6)).toString(); }
+function wrapAddSub(node: MathNode): string { const text = nodeToLatex(node); return node.kind === "add" || node.kind === "sub" ? `\\left(${text}\\right)` : text; }
+function wrapPow(node: MathNode): string { const text = nodeToLatex(node); return node.kind === "add" || node.kind === "sub" || node.kind === "mul" || node.kind === "div" || node.kind === "neg" ? `\\left(${text}\\right)` : text; }
+/** Renames every free occurrence of `from` to `to` — used to turn a `t`-based expression into the
+ *  dummy-variable form (τ) required inside an explicit running-integral wrapper. */
+export function renameVariable(node: MathNode, from: string, to: string): MathNode {
+  switch (node.kind) {
+    case "num": return node;
+    case "var": return node.name === from ? { kind: "var", name: to } : node;
+    case "neg": return { kind: "neg", value: renameVariable(node.value, from, to) };
+    case "add": return { kind: "add", left: renameVariable(node.left, from, to), right: renameVariable(node.right, from, to) };
+    case "sub": return { kind: "sub", left: renameVariable(node.left, from, to), right: renameVariable(node.right, from, to) };
+    case "mul": return { kind: "mul", left: renameVariable(node.left, from, to), right: renameVariable(node.right, from, to) };
+    case "div": return { kind: "div", left: renameVariable(node.left, from, to), right: renameVariable(node.right, from, to) };
+    case "pow": return { kind: "pow", base: renameVariable(node.base, from, to), exponent: renameVariable(node.exponent, from, to) };
+    case "call": return { kind: "call", name: node.name, argument: renameVariable(node.argument, from, to) };
+    case "delta": return { kind: "delta", order: node.order, argument: renameVariable(node.argument, from, to) };
+    case "runningIntegral": return { kind: "runningIntegral", integrand: renameVariable(node.integrand, from, to), dummyVariable: node.dummyVariable };
+  }
+}
+
+function callToLatex(name: FunctionName, argument: MathNode): string {
+  const inner = nodeToLatex(argument);
+  if (name === "sqrt") return `\\sqrt{${inner}}`;
+  if (name === "abs") return `\\left|${inner}\\right|`;
+  if (name === "sin" || name === "cos" || name === "tan" || name === "exp" || name === "ln" || name === "log") return `\\${name}\\!\\left(${inner}\\right)`;
+  const label = name.length === 1 ? name : `\\text{${name}}`;
+  return `${label}\\!\\left(${inner}\\right)`;
 }
 
 /* ─────────────────── Integral front end ─────────────────── */
@@ -447,6 +607,8 @@ export function containsVariable(node: MathNode, variable: string): boolean {
     case "pow": return containsVariable(node.base, variable) || containsVariable(node.exponent, variable);
     case "call": return containsVariable(node.argument, variable);
     case "delta": return containsVariable(node.argument, variable);
+    // A running integral is, by construction, evaluated dynamically at the outer variable — always t-dependent.
+    case "runningIntegral": return true;
   }
 }
 
@@ -484,10 +646,30 @@ function evaluateDeltaTerm(factors: Factorization, variable: string, lower: numb
   }
 }
 
-function numericIntegral(node: MathNode, variable: string, lower: number, upper: number): number {
-  const from = Number.isFinite(lower) ? lower : -NUMERIC_WINDOW;
-  const to = Number.isFinite(upper) ? upper : NUMERIC_WINDOW;
-  const intervals = 4096;
+/** Structural jump points of the step-family primitives, mapped through an affine argument. */
+const STEP_LIKE_BREAKPOINTS: Partial<Record<FunctionName, number[]>> = { u: [0], r: [0], sgn: [0], rect: [-0.5, 0.5], tri: [-1, 1] };
+
+/** Finds every structural discontinuity of `node` in `variable`, so quadrature never straddles one. */
+function collectStepBreakpoints(node: MathNode, variable: string, into: number[] = []): number[] {
+  switch (node.kind) {
+    case "call": {
+      const marks = STEP_LIKE_BREAKPOINTS[node.name];
+      if (marks) {
+        const affine = affineArgument(node.argument, variable);
+        if (affine && Math.abs(affine.slope) > 1e-12) for (const mark of marks) into.push((mark - affine.intercept) / affine.slope);
+      }
+      collectStepBreakpoints(node.argument, variable, into);
+      return into;
+    }
+    case "neg": return collectStepBreakpoints(node.value, variable, into);
+    case "add": case "sub": case "mul": case "div":
+      collectStepBreakpoints(node.left, variable, into); collectStepBreakpoints(node.right, variable, into); return into;
+    case "pow": collectStepBreakpoints(node.base, variable, into); collectStepBreakpoints(node.exponent, variable, into); return into;
+    default: return into; // num, var, delta (sifted exactly, not by quadrature), runningIntegral (opaque here)
+  }
+}
+
+function simpsonSlice(node: MathNode, variable: string, from: number, to: number, intervals: number): number {
   const step = (to - from) / intervals;
   let total = 0;
   for (let index = 0; index <= intervals; index += 1) {
@@ -500,13 +682,74 @@ function numericIntegral(node: MathNode, variable: string, lower: number, upper:
   return (total * step) / 3;
 }
 
+/**
+ * Simpson's rule, split at every structural breakpoint (u/r/rect/tri/sgn edges) so quadrature never
+ * straddles a jump — a single-grid Simpson pass at a discontinuity has an error that depends on the
+ * grid's step size, which made two differently-sized windows disagree enough to look "divergent".
+ */
+function numericIntegral(node: MathNode, variable: string, lower: number, upper: number): number {
+  const from = Number.isFinite(lower) ? lower : -NUMERIC_WINDOW;
+  const to = Number.isFinite(upper) ? upper : NUMERIC_WINDOW;
+  if (!(to > from)) return 0;
+  const breakpoints = collectStepBreakpoints(node, variable)
+    .filter((point) => Number.isFinite(point) && point > from + 1e-9 && point < to - 1e-9)
+    .sort((left, right) => left - right);
+  // Inset each internal breakpoint by ε on both sides: Simpson's own endpoint sample must never land
+  // exactly on a jump, or it silently picks up the post-jump value and adds a spurious step/3 sliver.
+  const inset = 1e-7;
+  const cuts = [from];
+  for (const point of breakpoints) cuts.push(point - inset, point + inset);
+  cuts.push(to);
+  let total = 0;
+  for (let index = 0; index < cuts.length; index += 2) {
+    const start = cuts[index]; const end = cuts[index + 1];
+    if (end > start) total += simpsonSlice(node, variable, start, end, 1024);
+  }
+  return total;
+}
+
 /** Bounds may be ±∞, numbers, or π-expressions; a free symbol keeps the integral symbolic. */
-function evaluateBound(source: string): number | "symbolic" {
+function evaluateBoundNode(node: MathNode): number | "symbolic" {
   try {
-    const node = parseExpression(source, "\u0000");
     const value = evaluateNode(node, "\u0000", 0);
     return Number.isNaN(value) ? "symbolic" : value;
   } catch { return "symbolic"; }
+}
+function evaluateBound(source: string): number | "symbolic" {
+  try { return evaluateBoundNode(parseExpression(source, "\u0000")); }
+  catch { return "symbolic"; }
+}
+
+/**
+ * Core Dirac-aware numeric integration, shared by the text-driven `evaluateDefiniteIntegral` and the
+ * dynamic per-sample evaluation of an explicit `runningIntegral` node.
+ */
+function evaluateIntegralNode(integrand: MathNode, variable: string, lower: number, upper: number): IntegralEvaluation {
+  const steps: string[] = [];
+  let total = 0;
+  let sawDelta = false;
+  for (const term of flattenSum(integrand)) {
+    const factors = factorize(term.node);
+    if (factors.deltaCount > 1) return { kind: "error", message: "A product of two Dirac impulses is not a defined distribution." };
+    if (!factors.delta) {
+      if (!Number.isFinite(lower) || !Number.isFinite(upper)) {
+        const inner = numericIntegral(term.node, variable, lower, upper);
+        const wider = numericIntegral(term.node, variable, Number.isFinite(lower) ? lower : -2 * NUMERIC_WINDOW, Number.isFinite(upper) ? upper : 2 * NUMERIC_WINDOW);
+        if (!Number.isFinite(inner) || Math.abs(wider - inner) > 1e-3 * Math.max(1, Math.abs(inner))) return { kind: "divergent", steps };
+        total += term.sign * inner;
+        continue;
+      }
+      total += term.sign * numericIntegral(term.node, variable, lower, upper);
+      continue;
+    }
+    sawDelta = true;
+    const outcome = evaluateDeltaTerm(factors, variable, lower, upper, steps);
+    if ("error" in outcome) return { kind: "error", message: outcome.error };
+    if ("undefinedReason" in outcome) return { kind: "undefined", reason: outcome.undefinedReason, steps };
+    total += term.sign * outcome.value;
+  }
+  const value = Number(total.toFixed(9));
+  return { kind: "value", value, method: sawDelta ? "dirac" : "numeric", steps };
 }
 
 /** Full pipeline: LaTeX definite integral → number, `undefined`, or an explained failure. */
@@ -523,32 +766,9 @@ export function evaluateDefiniteIntegral(source: string): IntegralEvaluation {
   try { integrand = parseExpression(parsed.integrandText, parsed.variable); }
   catch (error) { return { kind: "error", message: error instanceof Error ? error.message : "The integrand could not be parsed." }; }
 
-  const steps: string[] = [];
-  let total = 0;
-  let sawDelta = false;
-  for (const term of flattenSum(integrand)) {
-    const factors = factorize(term.node);
-    if (factors.deltaCount > 1) return { kind: "error", message: "A product of two Dirac impulses is not a defined distribution." };
-    if (!factors.delta) {
-      if (!Number.isFinite(lower) || !Number.isFinite(upper)) {
-        const inner = numericIntegral(term.node, parsed.variable, lower, upper);
-        const wider = numericIntegral(term.node, parsed.variable, Number.isFinite(lower) ? lower : -2 * NUMERIC_WINDOW, Number.isFinite(upper) ? upper : 2 * NUMERIC_WINDOW);
-        if (!Number.isFinite(inner) || Math.abs(wider - inner) > 1e-3 * Math.max(1, Math.abs(inner))) return { kind: "divergent", steps };
-        total += term.sign * inner;
-        continue;
-      }
-      total += term.sign * numericIntegral(term.node, parsed.variable, lower, upper);
-      continue;
-    }
-    sawDelta = true;
-    const outcome = evaluateDeltaTerm(factors, parsed.variable, lower, upper, steps);
-    if ("error" in outcome) return { kind: "error", message: outcome.error };
-    if ("undefinedReason" in outcome) return { kind: "undefined", reason: outcome.undefinedReason, steps };
-    total += term.sign * outcome.value;
-  }
-  const value = Number(total.toFixed(9));
-  steps.push(`\\int_{${parsed.lowerLatex}}^{${parsed.upperLatex}}\\ \\Rightarrow\\ ${texNumber(value)}`);
-  return { kind: "value", value, method: sawDelta ? "dirac" : "numeric", steps };
+  const outcome = evaluateIntegralNode(integrand, parsed.variable, lower, upper);
+  if (outcome.kind === "value") outcome.steps.push(`\\int_{${parsed.lowerLatex}}^{${parsed.upperLatex}}\\ \\Rightarrow\\ ${texNumber(outcome.value)}`);
+  return outcome;
 }
 
 /**

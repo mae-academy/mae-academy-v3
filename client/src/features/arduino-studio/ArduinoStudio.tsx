@@ -6,7 +6,7 @@ import { BookOpen, Check, ChevronDown, Clipboard, Code, Copy, Cpu, Download, Pau
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import Editor from "react-simple-code-editor";
-import SegmentedControl from "@/components/ui/SegmentedControl";
+import { SegmentedControl } from "@/components/common/templates";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ArduinoBoard } from "./ArduinoBoard";
 import { analyzeSketch, type PinUsage } from "./arduinoCompiler";

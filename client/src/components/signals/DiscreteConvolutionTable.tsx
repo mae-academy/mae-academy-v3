@@ -1,13 +1,85 @@
-/** MAE Academy / Signals & Systems — Tab C discrete tabular convolution proof. */
 import { useMemo, useState } from "react";
 import { KatexMath } from "@/components/ui/KatexMath";
-import { BrandSlider } from "@/components/ui/BrandSlider";
+import { StudioCard, StudioSlider, InnerBox } from "@/components/common/templates";
 import { discreteConvolution } from "@/features/signals/engines/convolutionEngine";
 
 function parseSequence(source: string) { const values = source.split(",").map((item) => Number(item.trim())).filter(Number.isFinite); return values.length ? values : [0]; }
 export function DiscreteConvolutionTable() {
   const [xSource, setXSource] = useState("1, 2, 1"); const [hSource, setHSource] = useState("1, -1, 2"); const [active, setActive] = useState(0);
   const x = useMemo(() => parseSequence(xSource), [xSource]); const h = useMemo(() => parseSequence(hSource), [hSource]); const result = useMemo(() => discreteConvolution(x, h), [x, h]); const index = Math.max(0, Math.min(active, result.values.length - 1)); const contributions = result.contributions[index];
-  return <div className="space-y-4"><div className="grid gap-3 sm:grid-cols-2"><label className="text-xs font-bold text-slate-600 dark:text-slate-300"><KatexMath math="x[n]" /> samples<input value={xSource} onChange={(event) => { setXSource(event.target.value); setActive(0); }} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 font-mono text-sm text-slate-900 outline-none focus:border-violet-400 dark:border-slate-800 dark:bg-slate-950 dark:text-white" /></label><label className="text-xs font-bold text-slate-600 dark:text-slate-300"><KatexMath math="h[n]" /> samples<input value={hSource} onChange={(event) => { setHSource(event.target.value); setActive(0); }} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 font-mono text-sm text-slate-900 outline-none focus:border-violet-400 dark:border-slate-800 dark:bg-slate-950 dark:text-white" /></label></div><div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950"><div className="flex flex-wrap items-center justify-between gap-3"><p className="text-xs font-black text-slate-800 dark:text-white">Reverse-diagonal product table</p><KatexMath math={`y[${index}]=${result.values[index]}`} className="text-sm font-black text-violet-600 dark:text-violet-300" /></div><BrandSlider min={0} max={result.values.length - 1} step={1} value={index} onChange={(event) => setActive(Number(event.target.value))} className="mt-3" /><div className="mt-4 overflow-x-auto"><table className="w-full min-w-[28rem] border-collapse text-center text-xs"><thead><tr><th className="border border-slate-200 bg-slate-100 p-2 text-left dark:border-slate-800 dark:bg-slate-900">xᵢ \ hⱼ</th>{h.map((value, hIndex) => <th key={hIndex} className="border border-slate-200 bg-slate-100 p-2 font-mono dark:border-slate-800 dark:bg-slate-900">{value}</th>)}</tr></thead><tbody>{x.map((xValue, xIndex) => <tr key={xIndex}><th className="border border-slate-200 bg-slate-100 p-2 font-mono dark:border-slate-800 dark:bg-slate-900">{xValue}</th>{h.map((hValue, hIndex) => { const isActive = xIndex + hIndex === index; return <td key={hIndex} className={`border p-2 font-mono transition-colors ${isActive ? "border-orange-400 bg-orange-100 text-orange-900 dark:border-orange-400/70 dark:bg-orange-500/20 dark:text-orange-100" : "border-slate-200 dark:border-slate-800"}`}>{xValue * hValue}</td>; })}</tr>)}</tbody></table></div><p className="mt-3 text-xs text-slate-500 dark:text-slate-400">Highlighted reverse diagonal: {contributions.map((item) => `${item.value}`).join(" + ")} = <strong className="text-slate-900 dark:text-white">{result.values[index]}</strong>.</p></div></div>;
+  return (
+    <div className="space-y-4">
+      <InnerBox className="grid gap-3 sm:grid-cols-2">
+        <label className="text-xs font-bold text-slate-600 dark:text-slate-300">
+          <KatexMath math="x[n]" /> samples
+          <input
+            value={xSource}
+            onChange={(event) => { setXSource(event.target.value); setActive(0); }}
+            className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 font-mono text-sm text-slate-900 outline-none focus:border-blue-500 dark:border-slate-800 dark:bg-slate-950 dark:text-white"
+          />
+        </label>
+        <label className="text-xs font-bold text-slate-600 dark:text-slate-300">
+          <KatexMath math="h[n]" /> samples
+          <input
+            value={hSource}
+            onChange={(event) => { setHSource(event.target.value); setActive(0); }}
+            className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 font-mono text-sm text-slate-900 outline-none focus:border-blue-500 dark:border-slate-800 dark:bg-slate-950 dark:text-white"
+          />
+        </label>
+      </InnerBox>
+      <StudioCard
+        title="REVERSE-DIAGONAL PRODUCT TABLE"
+        actionSlot={<KatexMath math={`y[${index}]=${result.values[index]}`} className="text-sm font-black text-blue-600 dark:text-blue-400" />}
+      >
+        <StudioSlider
+          label="Output sample"
+          mathLabel={<KatexMath math="n" />}
+          min={0}
+          max={result.values.length - 1}
+          step={1}
+          value={index}
+          onChange={setActive}
+          className="mt-3"
+        />
+        <div className="mt-4 overflow-x-auto">
+          <table className="w-full min-w-[28rem] border-collapse text-center text-xs">
+            <thead>
+              <tr>
+                <th className="border border-slate-200 bg-slate-100 p-2 text-left dark:border-slate-800 dark:bg-slate-900">xᵢ \ hⱼ</th>
+                {h.map((value, hIndex) => (
+                  <th key={hIndex} className="border border-slate-200 bg-slate-100 p-2 font-mono dark:border-slate-800 dark:bg-slate-900">{value}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {x.map((xValue, xIndex) => (
+                <tr key={xIndex}>
+                  <th className="border border-slate-200 bg-slate-100 p-2 font-mono dark:border-slate-800 dark:bg-slate-900">{xValue}</th>
+                  {h.map((hValue, hIndex) => {
+                    const isActive = xIndex + hIndex === index;
+                    return (
+                      <td
+                        key={hIndex}
+                        className={`border p-2 font-mono transition-colors ${
+                          isActive
+                            ? "border-orange-400 bg-orange-100 text-orange-900 dark:border-orange-400/70 dark:bg-orange-500/20 dark:text-orange-100 font-bold"
+                            : "border-slate-200 dark:border-slate-800"
+                        }`}
+                      >
+                        {xValue * hValue}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
+          Highlighted reverse diagonal: {contributions.map((item) => `${item.value}`).join(" + ")} = <strong className="text-slate-900 dark:text-white">{result.values[index]}</strong>.
+        </p>
+      </StudioCard>
+    </div>
+  );
 }
 export default DiscreteConvolutionTable;

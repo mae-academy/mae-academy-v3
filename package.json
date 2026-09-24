@@ -62,7 +62,6 @@
     "ogl": "^1.0.11",
     "openai": "^7.9.0",
     "pdfjs-dist": "6.3.289",
-    "plotly.js-gl3d-dist-min": "^4.1.1",
     "pyodide": "0.27.8",
     "react": "^19.2.1",
     "react-day-picker": "^9.11.1",

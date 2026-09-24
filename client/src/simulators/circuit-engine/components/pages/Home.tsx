@@ -44,7 +44,7 @@ import { toast } from 'sonner';
 import { V3Math } from '@/components/ui/V3Math';
 import { KATEX_EMBEDDED_FONT_CSS } from '@/simulators/circuit-engine/models/katexSvgFonts';
 import { AnalysisBox } from '@/simulators/circuit-engine/components/ui-components/AnalysisBox';
-import SegmentedControl from '@/components/ui/SegmentedControl';
+import { SegmentedControl, StudioSlider } from '@/components/common/templates';
 import { OscilloscopeTracePanel } from '@/simulators/circuit-engine/components/ui-components/OscilloscopeTracePanel';
 import { OscilloscopeComponentPanel } from '@/simulators/circuit-engine/components/inspector-panels/OscilloscopeComponentPanel';
 import { useOscilloscopeDisplaySettings, type OscilloscopeDisplaySettings } from '@/simulators/circuit-engine/components/ui-components/oscilloscopeDisplaySettings';
@@ -4192,7 +4192,16 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
             </span>
             <ToolbarDivider colors={colors} />
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <input aria-label="Simulation speed" type="range" min={.25} max={4} step={.25} value={simulationSpeed} onChange={event => setSimulationSpeed(numeric(event.target.value, 1))} className="h-1.5 w-24 cursor-pointer appearance-none rounded-full bg-brand-gradient [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-0 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:ring-2 [&::-webkit-slider-thumb]:ring-blue-500 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:shadow" />
+              <StudioSlider
+                aria-label="Simulation speed"
+                min={0.25}
+                max={4}
+                step={0.25}
+                value={simulationSpeed}
+                onChange={val => setSimulationSpeed(val)}
+                hideHeader
+                className="w-24"
+              />
               <span className="text-sm font-medium text-slate-700 dark:text-slate-300" style={{ minWidth: 42, display: 'inline-flex', alignItems: 'center' }}>
                 <V3Math math={`${simulationSpeed.toFixed(2)}\\times`} />
               </span>
@@ -5193,15 +5202,15 @@ function ComponentInspector({ colors, component, definition, allComponents, link
           return (
             <PropertyRow key={key} colors={colors} label={property.label ?? 'Wiper'}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
-                <input
+                <StudioSlider
                   aria-label="Wiper position percentage"
-                  type="range"
                   min={0}
                   max={100}
                   step={1}
                   value={percentVal}
-                  onChange={event => onPropertyChange('wiper', Number(event.target.value) / 100)}
-                  className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-brand-gradient [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-0 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:ring-2 [&::-webkit-slider-thumb]:ring-blue-500 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:shadow"
+                  onChange={val => onPropertyChange('wiper', val / 100)}
+                  hideHeader
+                  className="w-full"
                 />
                 <span
                   className="text-sm font-medium text-slate-700 dark:text-slate-300"

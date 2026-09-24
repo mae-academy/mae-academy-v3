@@ -1,6 +1,6 @@
 import { ArrowLeft } from "lucide-react";
 import { Link } from "wouter";
-import SegmentedControl from "@/components/ui/SegmentedControl";
+import { SegmentedControl } from "@/components/common/templates";
 
 /**
  * A single reusable tool-tab item for the MAE Academy simulator toolbar.

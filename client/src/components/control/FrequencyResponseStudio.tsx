@@ -10,19 +10,15 @@ import {
   logspace,
   type FrequencyFactor,
 } from "@/features/control/frequencyResponseMath";
+import { SegmentedControl, StandardStepPlot, StudioCard, InnerBox, StudioSlider } from "@/components/common/templates";
 import {
   BodePlot,
   NyquistPlot,
   NicholsPlot,
-  StandardStepPlot,
 } from "@/features/control-systems/ui/plots";
 import { TransferFunctionInput, type TransferFunctionData } from "./TransferFunctionInput";
 
 type PrimaryView = "bode" | "nyquist" | "nichols";
-
-const PANEL = "rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900";
-const HEADING = "text-sm font-bold uppercase tracking-wider text-slate-800 dark:text-white";
-const RANGE_TRACK = "h-1.5 cursor-pointer appearance-none rounded-full bg-gradient-to-r from-[#2563eb] via-[#7c3aed] to-[#f43f5e] [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white [&::-webkit-slider-thumb]:bg-[#2563eb] [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:cursor-pointer [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-white [&::-moz-range-thumb]:bg-[#2563eb] [&::-moz-range-thumb]:shadow-md [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-track]:h-1.5 [&::-moz-range-track]:rounded-full [&::-moz-range-track]:bg-transparent";
 
 const INITIAL_TF: TransferFunctionData = {
   mode: "polynomial",
@@ -120,64 +116,24 @@ export function FrequencyResponseStudio() {
       <TransferFunctionInput onUpdate={setTfData} defaultData={tfData} gainK={gain} />
 
       {/* Live Gain Compensation */}
-      <section className={`${PANEL} grid gap-6 lg:grid-cols-[1fr_auto] lg:items-end`}>
-        <div>
-          <h3 className={HEADING}>Live Gain Compensation</h3>
-          <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
-            <span
-              style={{ fontFamily: "'KaTeX_Main', 'Times New Roman', serif" }}
-              className="w-7 text-xl italic font-serif text-slate-800 dark:text-white"
-            >
-              K
-            </span>
-            <div className="flex items-center gap-3 w-full">
-              <input
-                type="number"
-                step="0.01"
-                value={gainMin}
-                onChange={(e) => {
-                  const v = parseFloat(e.target.value);
-                  if (!isNaN(v) && v >= 0 && v < gainMax) setGainMin(v);
-                }}
-                style={{ fontFamily: "'KaTeX_Main', 'Times New Roman', serif" }}
-                className="font-serif text-slate-800 text-lg tracking-wide bg-transparent border-none outline-none w-16 text-center [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [-moz-appearance:textfield] m-0 dark:text-white"
-              />
-              <input
-                aria-label="System gain K"
-                className={`${RANGE_TRACK} flex-1`}
-                type="range"
-                min={gainMin}
-                max={gainMax}
-                step={(gainMax - gainMin) / 1000}
-                value={gain}
-                onChange={(event) => setGain(Number(event.target.value))}
-              />
-              <input
-                type="number"
-                step="1"
-                value={gainMax}
-                onChange={(e) => {
-                  const v = parseFloat(e.target.value);
-                  if (!isNaN(v) && v > gainMin) setGainMax(v);
-                }}
-                style={{ fontFamily: "'KaTeX_Main', 'Times New Roman', serif" }}
-                className="font-serif text-slate-800 text-lg tracking-wide bg-transparent border-none outline-none w-16 text-center [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [-moz-appearance:textfield] m-0 dark:text-white"
-              />
-            </div>
-            <div className="min-w-24 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-center dark:border-slate-800 dark:bg-slate-950">
-              <input
-                type="number"
-                step="any"
-                value={Number(gain.toFixed(4))}
-                onChange={(event) => {
-                  const v = parseFloat(event.target.value);
-                  if (!isNaN(v) && v > 0) setGain(v);
-                }}
-                style={{ fontFamily: "'KaTeX_Main', 'Times New Roman', serif" }}
-                className="w-full bg-transparent text-center text-lg text-violet-700 dark:text-violet-300 outline-none border-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [-moz-appearance:textfield] m-0"
-              />
-            </div>
-          </div>
+      <StudioCard
+        title="Live Gain Compensation"
+        className="grid gap-6 lg:grid-cols-[1fr_auto] lg:items-end"
+      >
+        <div className="min-w-0">
+          <StudioSlider
+            label={<KatexMath math="K =" />}
+            min={gainMin}
+            max={gainMax}
+            step={(gainMax - gainMin) / 1000}
+            value={gain}
+            onChange={setGain}
+            editableLimits
+            onMinChange={(v) => { if (v >= 0 && v < gainMax) setGainMin(v); }}
+            onMaxChange={(v) => { if (v > gainMin) setGainMax(v); }}
+            editableValue
+            precision={4}
+          />
         </div>
         <div className="grid grid-cols-2 gap-2">
           <MetricTile
@@ -189,40 +145,20 @@ export function FrequencyResponseStudio() {
             value={margins.phaseCrossover ? `${formatEngineering(margins.phaseCrossover.gainMarginDb)}\\,\\mathrm{dB}` : "\\mathrm{N/A}"}
           />
         </div>
-      </section>
+      </StudioCard>
 
       {/* Main Plot Section */}
       <section className="w-full space-y-4">
-        <div
-          role="tablist"
-          aria-label="Frequency-domain plot selection"
-          className="inline-flex p-1 rounded-full bg-slate-100/80 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/50"
-        >
-          {(
-            [
-              ["bode", "Bode"],
-              ["nyquist", "Nyquist"],
-              ["nichols", "Nichols"],
-            ] as const
-          ).map(([view, label]) => {
-            const isActive = primaryView === view;
-            return (
-              <button
-                key={view}
-                type="button"
-                role="tab"
-                aria-selected={isActive}
-                onClick={() => setPrimaryView(view)}
-                className={`cursor-pointer ${
-                  isActive
-                    ? "bg-gradient-to-br from-[#2563EB] via-[#7C3AED] to-[#E11D48] text-white font-semibold rounded-full px-4 py-1.5 text-xs shadow-sm"
-                    : "rounded-full px-4 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all"
-                }`}
-              >
-                {label}
-              </button>
-            );
-          })}
+        <div>
+          <SegmentedControl
+            value={primaryView}
+            onChange={(val) => setPrimaryView(val as PrimaryView)}
+            options={[
+              { value: "bode", label: "Bode" },
+              { value: "nyquist", label: "Nyquist" },
+              { value: "nichols", label: "Nichols" },
+            ]}
+          />
         </div>
 
         {primaryView === "bode" && <BodePlot data={response} margins={margins} />}
@@ -258,39 +194,31 @@ export function FrequencyResponseStudio() {
               },
             ]}
             headerRight={
-              <label className="flex items-center gap-2">
-                <KatexMath math="t_{max}" className="text-xs text-slate-600 dark:text-slate-300" />
-                <input
-                  aria-label="Step response time horizon"
-                  className={`${RANGE_TRACK} w-28`}
-                  type="range"
+              <div className="w-52">
+                <StudioSlider
+                  label={<KatexMath math="t_{max}" />}
                   min={3}
                   max={30}
                   step={1}
+                  unit=" s"
                   value={timeHorizon}
-                  onChange={(event) => setTimeHorizon(Number(event.target.value))}
+                  onChange={setTimeHorizon}
+                  aria-label="Step response time horizon"
                 />
-                <span
-                  style={{ fontFamily: "'KaTeX_Main', 'Times New Roman', serif" }}
-                  className="w-12 text-sm text-violet-700 dark:text-violet-300"
-                >
-                  {timeHorizon} s
-                </span>
-              </label>
+              </div>
             }
           />
         </div>
 
         {/* Time-Domain Correlation */}
-        <section className={PANEL}>
-          <h3 className={HEADING}>Time-Domain Correlation</h3>
-          <div className="mt-4 grid grid-cols-2 gap-2">
+        <StudioCard title="Time-Domain Correlation">
+          <div className="grid grid-cols-2 gap-2">
             <MetricTile label="M_p" value={`${formatEngineering(stepResponse.overshootPercent)}\\%`} />
             <MetricTile label="t_r" value={`${formatEngineering(stepResponse.riseTime)}\\,\\mathrm{s}`} />
             <MetricTile label="t_s" value={`${formatEngineering(stepResponse.settlingTime)}\\,\\mathrm{s}`} />
             <MetricTile label="e_{ss}" value={formatEngineering(stepResponse.steadyStateError)} />
           </div>
-        </section>
+        </StudioCard>
       </section>
 
       {/* Step-by-Step Sketch Tutor */}
@@ -306,10 +234,10 @@ export function FrequencyResponseStudio() {
 
 function MetricTile({ label, value }: { label: string; value: string }) {
   return (
-    <div className="min-w-0 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 dark:border-slate-800 dark:bg-slate-950">
+    <InnerBox className="min-w-0 px-3 py-2.5">
       <KatexMath math={label} className="block text-[10px] text-slate-500 dark:text-slate-400" />
       <KatexMath math={value} className="mt-1 block overflow-x-auto text-sm text-slate-950 dark:text-white" />
-    </div>
+    </InnerBox>
   );
 }
 
@@ -326,10 +254,7 @@ function SketchTutorial({
 }) {
   let runningSlope = initialSlope;
   return (
-    <section className={PANEL}>
-      <div className="border-b border-slate-200 pb-4 dark:border-slate-800">
-        <h3 className={HEADING}>Step-by-Step Sketch Tutor</h3>
-      </div>
+    <StudioCard title="Step-by-Step Sketch Tutor">
       <div className="grid divide-y divide-slate-100 dark:divide-slate-800 xl:grid-cols-3 xl:divide-x xl:divide-y-0">
         <TutorialStep title="\mathrm{Anchor\ the\ DC\ gain}">
           <KatexMath math={`K_{DC}=${dcGain}`} displayMode className="text-lg text-violet-700 dark:text-violet-300" />
@@ -370,7 +295,7 @@ function SketchTutorial({
           })}
         </TutorialStep>
       </div>
-    </section>
+    </StudioCard>
   );
 }
 

@@ -160,9 +160,6 @@ importers:
       pdfjs-dist:
         specifier: 6.3.289
         version: 6.3.289
-      plotly.js-gl3d-dist-min:
-        specifier: ^4.1.1
-        version: 4.1.1
       pyodide:
         specifier: 0.27.8
         version: 0.27.8
@@ -3344,9 +3341,6 @@ packages:
     resolution: {integrity: sha512-0M+L3LAD8/nm554LOla9Ayx0j0tmFZ0FBcoQ7F1VuVHpM/XpiC8RcDzBQB8W5+hA8L22THxELzeF+2WcUzvcLg==}
     engines: {node: '>=20'}
     hasBin: true
-
-  plotly.js-gl3d-dist-min@4.1.1:
-    resolution: {integrity: sha512-HNdhOi/mVr29u6BbzJvz1kAjEzCxwfaZNLipjNCxg33JE3RmRHhPDUd0LCuQMDcRR5LLFFfaSMMdtOWl0bERZA==}
 
   pnpm@10.18.1:
     resolution: {integrity: sha512-d6iEoWXLui2NHBnjtIgO7m0vyr0Nh5Eh4oIZa4AEI1HV6zygk1+lmdodxRJlzGiBatK93Sot5eqf35KtvsfNNA==}
@@ -7343,8 +7337,6 @@ snapshots:
       playwright-core: 1.62.1
     optionalDependencies:
       fsevents: 2.3.2
-
-  plotly.js-gl3d-dist-min@4.1.1: {}
 
   pnpm@10.18.1: {}
 

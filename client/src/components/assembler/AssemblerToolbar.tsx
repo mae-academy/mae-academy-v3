@@ -30,7 +30,7 @@ import {
 } from "lucide-react";
 import { useRef, useState } from "react";
 import type { SupportedLanguage } from "@/features/execution-engine";
-import SegmentedControl from "@/components/ui/SegmentedControl";
+import { SegmentedControl } from "@/components/common/templates";
 
 export type AssemblerTemplateGroup = { label: string; items: string[] };
 export type AssemblerLanguageOption = {

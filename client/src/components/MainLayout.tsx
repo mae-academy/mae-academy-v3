@@ -10,7 +10,7 @@ import SocialLinks from "@/components/SocialLinks";
 import { LocaleProvider } from "@/contexts/LocaleContext";
 import { localizedContent } from "@/data/content";
 import LanguageTransition from "@/components/LanguageTransition";
-import SegmentedControl from "@/components/ui/SegmentedControl";
+import { SegmentedControl } from "@/components/common/templates";
 
 type MainLayoutProps = { children: ReactNode };
 

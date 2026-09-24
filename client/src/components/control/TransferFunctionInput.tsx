@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { KatexMath } from "../ui/KatexMath";
-import SegmentedControl from "../ui/SegmentedControl";
+import { SegmentedControl, StudioCard, FormulaBox } from "@/components/common/templates";
 import { rootsToPolynomial, parseRootsList, Complex } from "@/features/control/controlMath";
 
 export type TfInputMode = "polynomial" | "zpk";
@@ -190,11 +190,9 @@ export function TransferFunctionInput({ onUpdate, defaultData, gainK }: Transfer
   }, [mode, numStr, denStr, kStr, zStr, pStr]);
 
   return (
-    <div className="bg-white dark:bg-slate-900 border border-slate-200/80 shadow-sm rounded-2xl p-6">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <h3 className="text-sm font-bold uppercase tracking-wider text-slate-800 dark:text-white">Transfer Function Engine</h3>
-
-        {/* Toggle Mode */}
+    <StudioCard
+      title="Transfer Function Engine"
+      actionSlot={
         <SegmentedControl
           options={[
             { label: "Polynomial", value: "polynomial" },
@@ -205,8 +203,8 @@ export function TransferFunctionInput({ onUpdate, defaultData, gainK }: Transfer
           size="sm"
           aria-label="Transfer Function Input Mode"
         />
-      </div>
-
+      }
+    >
       <div className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-2">
         {/* Inputs */}
         <div className="space-y-4">
@@ -277,10 +275,10 @@ export function TransferFunctionInput({ onUpdate, defaultData, gainK }: Transfer
         </div>
 
         {/* Display */}
-        <div className="flex min-h-[180px] items-center justify-center overflow-x-auto rounded-2xl border border-slate-200 bg-white px-4 py-6 dark:border-slate-800 dark:bg-slate-950">
+        <FormulaBox className="flex min-h-[180px] items-center justify-center overflow-x-auto">
           <KatexMath math={renderedMath} displayMode={true} className="text-xl text-slate-900 dark:text-white" />
-        </div>
+        </FormulaBox>
       </div>
-    </div>
+    </StudioCard>
   );
 }

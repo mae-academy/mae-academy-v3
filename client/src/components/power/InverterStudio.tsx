@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { KatexMath } from "@/components/ui/KatexMath";
-import { SegmentedControl } from "@/components/ui/SegmentedControl";
-import { PowerSlider } from "./PowerSlider";
+import { SegmentedControl, StudioCard, StudioSlider, InnerBox } from "@/components/common/templates";
 import { PowerWarningAlert } from "./PowerWarningAlert";
 import { StudioErrorBoundary } from "./StudioErrorBoundary";
 import { PowerScopePlot, type ScopeSeries } from "./PowerScopePlot";
@@ -18,7 +17,7 @@ import {
 } from "@/features/power-electronics/inverterMath";
 
 const tex = String.raw;
-const card = "rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900";
+const card = "rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white/70 dark:bg-slate-900/70 backdrop-blur-md shadow-sm p-5 md:p-6 transition-all";
 const heading = "text-sm font-bold text-slate-800 dark:text-white";
 const field = "w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-center font-mono text-sm text-slate-900 outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-35 dark:border-slate-800 dark:bg-slate-950 dark:text-white";
 
@@ -287,11 +286,10 @@ export function InverterStudio() {
   }, [simulation.samples, simulation.period, metrics.voltageFundamentalRms, metrics.voltageThd, shootThroughFault]);
 
   const topology = (
-    <section className={card}>
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <h3 className={heading}>Topology Configuration</h3>
-        <KatexMath math={tex`V_{dc}=${numberTex(parameters.dcVoltage, 0)}\,\mathrm{V}`} className="text-sm text-violet-700 dark:text-violet-300" />
-      </div>
+    <StudioCard
+      title="Topology Configuration"
+      actionSlot={<KatexMath math={tex`V_{dc}=${numberTex(parameters.dcVoltage, 0)}\,\mathrm{V}`} className="text-sm text-violet-700 dark:text-violet-300" />}
+    >
       <div className="space-y-4">
         <div>
           <span className="mb-2 block text-xs font-bold text-slate-500 dark:text-slate-400">Phase</span>
@@ -327,12 +325,11 @@ export function InverterStudio() {
           </div>
         )}
       </div>
-    </section>
+    </StudioCard>
   );
 
   const control = (
-    <section className={card}>
-      <h3 className={heading}>Control Technique</h3>
+    <StudioCard title="Control Technique">
       <div className="mt-4">
         <SegmentedControl
           options={techniques}
@@ -352,7 +349,7 @@ export function InverterStudio() {
               <KatexMath math="m_a" className="text-xs font-bold text-slate-500 dark:text-slate-400" />
               <KatexMath math={numberTex(parameters.modulationIndex, 2)} className="text-xs text-violet-700 dark:text-violet-300" />
             </div>
-            <PowerSlider aria-label="modulation index" min={0} max={1.2} step={0.01} value={parameters.modulationIndex} onChange={(event) => update("modulationIndex", Number(event.target.value))} />
+            <StudioSlider aria-label="modulation index" min={0} max={1.2} step={0.01} value={parameters.modulationIndex} onChange={(val) => update("modulationIndex", val)} showLimits />
           </div>
         )}
       </div>
@@ -381,12 +378,11 @@ export function InverterStudio() {
           </button>
         </div>
       </div>
-    </section>
+    </StudioCard>
   );
 
   const sourceLoad = (
-    <section className={card}>
-      <h3 className={heading}>Source &amp; Load Configuration</h3>
+    <StudioCard title="Source & Load Configuration">
       <div className="mt-4">
         <Field label={tex`V_{dc}\,[\mathrm{V}]`} value={parameters.dcVoltage} min={1} step={1} setValue={(dcVoltage) => update("dcVoltage", dcVoltage)} />
       </div>
@@ -407,7 +403,7 @@ export function InverterStudio() {
         <Field label={tex`L\,[\mathrm{mH}]`} value={parameters.inductanceMilliHenry} disabled={!hasL} min={0} step={1} setValue={(inductanceMilliHenry) => update("inductanceMilliHenry", inductanceMilliHenry)} />
         <Field label={tex`E\,[\mathrm{V}]`} value={parameters.backEmfVoltage} disabled={!hasE} min={0} step={1} setValue={(backEmfVoltage) => update("backEmfVoltage", backEmfVoltage)} />
       </div>
-    </section>
+    </StudioCard>
   );
 
   const scopeHeaderRight = isPwm ? (

@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react';
-import { SegmentedControl } from '@/components/ui/SegmentedControl';
+import { SegmentedControl } from '@/components/common/templates';
 import { registerUnifiedMonacoThemes } from '@/lib/monacoTheme';
 import { PANEL, WindowBar } from '../chrome';
 import type { Network } from '../../domain/ast';

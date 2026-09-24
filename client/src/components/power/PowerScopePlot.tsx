@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { KatexMath } from "@/components/ui/KatexMath";
-import { SegmentedControl } from "@/components/ui/SegmentedControl";
+import { SegmentedControl } from "@/components/common/templates";
 
 export interface ScopePoint {
   t: number; // in milliseconds (or seconds if indicated)

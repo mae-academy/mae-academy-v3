@@ -7,7 +7,7 @@ import { StateMachineExplorer } from '@/simulators/digital-logic/components/page
 import { DiscreteEventLogicEngine } from '@/simulators/digital-logic/engine/desLogicCore';
 import { useState } from 'react';
 import SimulationPageHeader from '@/components/SimulationPageHeader';
-import SegmentedControl from '@/components/ui/SegmentedControl';
+import { SegmentedControl } from '@/components/common/templates';
 
 /**
  * Luminous Technical Atelier: Power Electronics-style white segmented controls;

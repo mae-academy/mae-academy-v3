@@ -39,7 +39,7 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
-import SegmentedControl from "@/components/ui/SegmentedControl";
+import { SegmentedControl } from "@/components/common/templates";
 import {
   AssemblerToolbar,
   type AssemblerLanguageOption,

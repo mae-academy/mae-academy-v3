@@ -10,6 +10,7 @@ import { calculateAutoscale } from '@/simulators/circuit-engine/components/ui-co
 import { OscilloscopeControlsGrid } from '@/simulators/circuit-engine/components/ui-components/OscilloscopeControlsGrid';
 import type { OscilloscopeDisplaySettings } from '@/simulators/circuit-engine/components/ui-components/oscilloscopeDisplaySettings';
 import { V3Math } from '@/components/ui/V3Math';
+import { StudioSlider } from '@/components/common/templates';
 
 type PanelColors = { line: string; subtle: string; muted: string };
 
@@ -221,7 +222,16 @@ function StepArrowRow({ colors, mathLabel, min, max, step, value, onChange, onRe
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
         <StepButton disabled={value <= min} onClick={() => onChange(Math.max(min, value - step))} label="Decrease">‹</StepButton>
-        <input aria-label={mathLabel} type="range" min={min} max={max} step={step} value={value} onChange={event => onChange(Number(event.target.value))} className={RANGE_INPUT_CLASS} />
+        <StudioSlider
+          aria-label={mathLabel}
+          min={min}
+          max={max}
+          step={step}
+          value={value}
+          onChange={val => onChange(val)}
+          hideHeader
+          className="flex-1"
+        />
         <StepButton disabled={value >= max} onClick={() => onChange(Math.min(max, value + step))} label="Increase">›</StepButton>
         {onReset && <StepButton disabled={false} onClick={onReset} label="Reset">↶</StepButton>}
       </div>
@@ -242,7 +252,17 @@ function PresetStepperRow({ colors, mathLabel, presets, value, maxIndex = preset
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
         <StepButton disabled={index === 0} onClick={() => step(-1)} label="Previous">‹</StepButton>
-        <input aria-label={mathLabel} type="range" min={0} max={maxIndex} step={1} value={index} onChange={event => onChange(presets[Number(event.target.value)])} className={RANGE_INPUT_CLASS} title={maxIndex < presets.length - 1 ? 'Limited by the simulated transient window — see the circuit\'s SPICE run length' : undefined} />
+        <StudioSlider
+          aria-label={mathLabel}
+          min={0}
+          max={maxIndex}
+          step={1}
+          value={index}
+          onChange={val => onChange(presets[val])}
+          title={maxIndex < presets.length - 1 ? 'Limited by the simulated transient window — see the circuit\'s SPICE run length' : undefined}
+          hideHeader
+          className="flex-1"
+        />
         <StepButton disabled={index === maxIndex} onClick={() => step(1)} label="Next">›</StepButton>
       </div>
     </div>
