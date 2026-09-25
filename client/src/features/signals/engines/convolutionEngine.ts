@@ -79,7 +79,7 @@ export function continuousConvolutionAt(x: SignalNode, h: SignalNode, t: number,
     return { t, value: finite(value) ? value : 0, overlap, points: [], usedDeltaShortcut: true, overlapLatex: `x(t)\\ast ${delta.latex}=x\\!\\left(t-${format(delta.at)}\\right)` };
   }
   if (isEmpty(overlap)) return { t, value: 0, overlap, points: [], usedDeltaShortcut: false, overlapLatex: "\\int_{\\varnothing}x(\\tau)h(t-\\tau)\\,d\\tau=0" };
-  const resolution = Math.min(0.01, Math.max(0.001, config.resolution)); const count = Math.max(2, Math.ceil((overlap.to - overlap.from) / resolution)); const step = (overlap.to - overlap.from) / count;
+  const resolution = Math.min(0.01, Math.max(0.001, config.resolution)); const rawCount = Math.ceil((overlap.to - overlap.from) / resolution); const count = Number.isFinite(rawCount) ? Math.min(4000, Math.max(2, rawCount)) : 2; /* hard cap prevents unbounded loops */ const step = (overlap.to - overlap.from) / count;
   let integral = 0; const points: ConvolutionPoint[] = [];
   for (let index = 0; index <= count; index += 1) { const tau = overlap.from + index * step; const xValue = evaluateSignal(x, tau); const hValue = evaluateSignal(h, t - tau); const product = finite(xValue) && finite(hValue) ? xValue * hValue : 0; points.push({ tau, x: finite(xValue) ? xValue : 0, shiftedH: finite(hValue) ? hValue : 0, product }); integral += (index === 0 || index === count ? 0.5 : 1) * product; }
   const overlapLatex = `y(${format(t)})=\\int_{${format(overlap.from)}}^{${format(overlap.to)}}\\!\\left(${toLatex(x, "\\tau")}\\right)\\left(${toLatex(h, ` ${format(t)}-\\tau`)}\\right)\\,d\\tau\\approx${format(integral * step)}`;

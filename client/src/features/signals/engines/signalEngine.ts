@@ -81,7 +81,10 @@ function expandLatexFractions(source: string): string {
 
 /** Normalizes visual MathLive LaTeX to the deliberately small, typed signal grammar. */
 function normalizeSource(source: string) {
+  // MathLive emits named signals as \text{rect}, \mathrm{u}, \Lambda(t) (triangle); fold them onto the plain grammar.
   const prepared = source
+    .replace(/\\(?:text|mathrm|operatorname)\{(rect|tri|sinc|sgn|u|r|Sa)\}/g, "$1")
+    .replaceAll("\\Lambda", "tri")
     .replaceAll("\\frac{\\mathrm{d}}{\\mathrm{d}t}", "derivative")
     .replaceAll("\\frac{d}{dt}", "derivative")
     .replaceAll("\\operatorname{rect}", "rect")

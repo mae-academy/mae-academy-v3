@@ -2,8 +2,8 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 export interface StudioCardProps {
-  title?: string;
-  subtitle?: string;
+  title?: ReactNode;
+  subtitle?: ReactNode;
   actionSlot?: ReactNode;
   className?: string;
   children?: ReactNode;
@@ -11,7 +11,7 @@ export interface StudioCardProps {
 
 export function StudioCard({ title, subtitle, actionSlot, className, children }: StudioCardProps) {
   return (
-    <section className={cn("rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white/70 dark:bg-slate-900/70 backdrop-blur-md shadow-sm p-5 md:p-6 transition-all", className)}>
+    <section className={cn("rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white/70 dark:bg-slate-900/70 backdrop-blur-md shadow-sm p-3.5 sm:p-4 lg:p-5 transition-all", className)}>
       {(title || subtitle || actionSlot) && (
         <header className="flex items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800/80 pb-3 mb-4">
           <div>

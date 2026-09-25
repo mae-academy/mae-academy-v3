@@ -134,13 +134,10 @@ describe("BodeMagnitudePlot", () => {
     expect(event.defaultPrevented).toBe(true);
   });
 
-  it("resets viewport on Reset button click", () => {
+  it("maintains locked viewport and does not render Reset button", () => {
     const { container } = render(<BodeMagnitudePlot data={samplePoints} />);
-    const resetBtn = screen.getByTitle("Reset View");
-    expect(resetBtn).toBeDefined();
-
-    fireEvent.click(resetBtn);
-    // After reset, svg path should remain valid
+    const resetBtn = screen.queryByTitle("Reset View");
+    expect(resetBtn).toBeNull();
     const path = container.querySelector("svg path");
     expect(path).not.toBeNull();
   });

@@ -60,7 +60,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
     <Header locale={locale} onLocaleChange={handleLocaleChange} isLocaleTransitioning={Boolean(languageTarget)} isDark={isDark} onThemeToggle={() => setIsDark((value) => !value)} />
     <main className="min-h-[calc(100svh-var(--mae-header-height))]">{children}</main>
     <footer className="border-t border-slate-200/80 bg-white/40 backdrop-blur-xs dark:border-white/[0.08] dark:bg-[#08080A]/80">
-      <div className="max-w-[1380px] mx-auto px-6 sm:px-8 lg:px-12 py-14 lg:py-16 w-full">
+      <div className="max-w-[1536px] mx-auto px-6 sm:px-8 lg:px-12 py-14 lg:py-16 w-full">
         <div className="grid gap-10 lg:grid-cols-[1.3fr_0.9fr_1fr] lg:gap-12">
           {/* Column 1: Brand & Mission */}
           <div className="flex flex-col justify-between">

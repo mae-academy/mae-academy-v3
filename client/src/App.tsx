@@ -22,6 +22,7 @@ import NotFound from "./pages/NotFound";
 const ArduinoStudioPage = lazy(() => import("./pages/ArduinoStudioPage"));
 const PlcSimulatorPage = lazy(() => import("./pages/PlcSimulatorPage"));
 import HiddenSymbolDesigner from "./simulators/circuit-engine/components/pages/HiddenSymbolDesigner";
+import ScrollToTop from "@/components/common/ScrollToTop";
 
 function AnimatedRoutes() {
   const [location] = useLocation();
@@ -88,4 +89,16 @@ function AnimatedRoutes() {
   );
 }
 
-export default function App() { return <ErrorBoundary><TooltipProvider><Toaster /><MainLayout><AnimatedRoutes /></MainLayout></TooltipProvider></ErrorBoundary>; }
+export default function App() {
+  return (
+    <ErrorBoundary>
+      <TooltipProvider>
+        <Toaster />
+        <ScrollToTop />
+        <MainLayout>
+          <AnimatedRoutes />
+        </MainLayout>
+      </TooltipProvider>
+    </ErrorBoundary>
+  );
+}

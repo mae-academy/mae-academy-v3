@@ -10,3 +10,4 @@ export * from './StudioButton';
 export * from './StandardRootLocusPlot';
 export * from './StandardStepPlot';
 
+export * from './StudioLayout';

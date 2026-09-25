@@ -168,7 +168,7 @@ const WALL_EPSILON = 1e-6;
 export function sampleCompositeSignal(model: CompositeSignalModel, minimum: number, maximum: number, maxSamples = 3000): CompositeSegment[] {
   if (!(maximum > minimum)) return [];
   const totalSpan = maximum - minimum;
-  const targetCount = Math.min(maxSamples, Math.max(400, Math.ceil(totalSpan / 0.001)));
+  const targetCount = Math.min(Math.max(maxSamples, 1000), Math.max(1000, Math.ceil(totalSpan / 0.0005)));
   const interiorBreakpoints = model.breakpoints.filter((point) => point > minimum + EPSILON && point < maximum - EPSILON).sort((left, right) => left - right);
 
   const runs: Array<[number, number]> = [];

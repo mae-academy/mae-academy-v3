@@ -1,9 +1,121 @@
-/** Tab E direct Canvas frequency and impulse-response traces. */
-import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
-import { frequencyResponse, impulseResponse, type FrequencyPoint, type TransferFunction } from "@/features/signals/engines/laplaceEngine";
+/**
+ * MAE Academy / Signals & Systems — Tab E Frequency and Impulse-Response Scopes.
+ * Canonical vector SVG implementation consuming StandardStepPlot template.
+ */
+import React, { forwardRef, useEffect, useImperativeHandle, useState, useMemo } from "react";
+import {
+  frequencyResponse,
+  impulseResponse,
+  type TransferFunction,
+} from "@/features/signals/engines/laplaceEngine";
+import { StandardStepPlot } from "@/components/common/templates/StandardStepPlot";
 
-function graph(canvas: HTMLCanvasElement, values: Array<{ x: number; y: number }>, title: string, color: string, yFloor?: number) { const context = canvas.getContext("2d"); if (!context) return; const rect = canvas.getBoundingClientRect(); const ratio = devicePixelRatio || 1; canvas.width = Math.floor(rect.width * ratio); canvas.height = Math.floor(rect.height * ratio); context.setTransform(ratio, 0, 0, ratio, 0, 0); const dark = document.documentElement.classList.contains("dark"); context.fillStyle = dark ? "#07101e" : "#fff"; context.fillRect(0, 0, rect.width, rect.height); const minX = Math.min(...values.map((value) => value.x)); const maxX = Math.max(...values.map((value) => value.x)); const minY = yFloor ?? Math.min(0, ...values.map((value) => value.y)); const maxY = Math.max(minY + .1, ...values.map((value) => value.y)); const mapX = (value: number) => (value - minX) / Math.max(.001, maxX - minX) * rect.width; const mapY = (value: number) => rect.height - (value - minY) / Math.max(.001, maxY - minY) * rect.height; context.strokeStyle = dark ? "rgba(148,163,184,.2)" : "rgba(100,116,139,.2)"; context.lineWidth = 1; context.setLineDash([2, 5]); for (let index = 1; index < 5; index += 1) { const y = index * rect.height / 5; context.beginPath(); context.moveTo(0, y); context.lineTo(rect.width, y); context.stroke(); } context.setLineDash([]); context.strokeStyle = color; context.lineWidth = 2.3; context.lineJoin = "round"; context.lineCap = "round"; context.beginPath(); values.forEach((value, index) => { if (index === 0) context.moveTo(mapX(value.x), mapY(value.y)); else context.lineTo(mapX(value.x), mapY(value.y)); }); context.stroke(); context.fillStyle = dark ? "#cbd5e1" : "#334155"; context.font = "600 10px ui-monospace, monospace"; context.fillText(title, 10, 14); }
+export function FrequencyResponseCanvases({ system }: { system: TransferFunction }) {
+  const data = useMemo(() => frequencyResponse(system), [system]);
 
-export function FrequencyResponseCanvases({ system }: { system: TransferFunction }) { const magnitude = useRef<HTMLCanvasElement>(null); const phase = useRef<HTMLCanvasElement>(null); useEffect(() => { let frame = 0; const draw = () => { const data = frequencyResponse(system); if (magnitude.current) graph(magnitude.current, data.map((item) => ({ x: item.omega, y: Math.min(40, 20 * Math.log10(Math.max(1e-5, item.magnitude)))})), "Magnitude (dB)", "#60a5fa"); if (phase.current) graph(phase.current, data.map((item) => ({ x: item.omega, y: item.phase })), "Phase (rad)", "#fb7185", -Math.PI); }; frame = requestAnimationFrame(draw); const observer = new ResizeObserver(() => { cancelAnimationFrame(frame); frame = requestAnimationFrame(draw); }); if (magnitude.current) observer.observe(magnitude.current); if (phase.current) observer.observe(phase.current); return () => { cancelAnimationFrame(frame); observer.disconnect(); }; }, [system]); return <div className="space-y-3"><canvas ref={magnitude} className="h-40 w-full rounded-xl border border-blue-300/50 bg-white dark:border-blue-400/25 dark:bg-[#07101e]" /><canvas ref={phase} className="h-36 w-full rounded-xl border border-rose-300/50 bg-white dark:border-rose-400/25 dark:bg-[#07101e]" /></div>; }
+  const magPoints = useMemo(() => {
+    return data.map((item) => ({
+      x: item.omega,
+      y: Math.min(40, Math.max(-80, 20 * Math.log10(Math.max(1e-5, item.magnitude)))),
+    }));
+  }, [data]);
+
+  const phasePoints = useMemo(() => {
+    return data.map((item) => ({
+      x: item.omega,
+      y: item.phase,
+    }));
+  }, [data]);
+
+  return (
+    <div className="space-y-4">
+      <StandardStepPlot
+        title="Bode Magnitude |H(jω)|"
+        series={[
+          {
+            id: "magnitude",
+            katexName: "|H(j\\omega)|\\text{ (dB)}",
+            data: magPoints,
+            color: "#2563EB",
+          },
+        ]}
+        height={180}
+        xLabelKatex="\omega\text{ (rad/s)}"
+        yLabelKatex="|H(j\omega)|\text{ (dB)}"
+        forceBipolar
+        showLegend={false}
+      />
+      <StandardStepPlot
+        title="Bode Phase ∠H(jω)"
+        series={[
+          {
+            id: "phase",
+            katexName: "\\angle H(j\\omega)\\text{ (rad)}",
+            data: phasePoints,
+            color: "#E11D48",
+          },
+        ]}
+        height={180}
+        xLabelKatex="\omega\text{ (rad/s)}"
+        yLabelKatex="\angle H(j\omega)\text{ (rad)}"
+        forceBipolar
+        showLegend={false}
+      />
+    </div>
+  );
+}
+
 export type ImpulseResponseCanvasHandle = { drawSystem: (system: TransferFunction) => void };
-export const ImpulseResponseCanvas = forwardRef<ImpulseResponseCanvasHandle, { system: TransferFunction }>(function ImpulseResponseCanvas({ system }, ref) { const canvas = useRef<HTMLCanvasElement>(null); const current = useRef(system); const render = () => { if (!canvas.current) return; const response = impulseResponse(current.current); graph(canvas.current, response.length ? response.map((item) => ({ x: item.time, y: item.value })) : [{ x: 0, y: 0 }, { x: 1, y: 0 }], response.length ? "Impulse response h(t)" : "h(t): simple-pole Laplace preview", "#a78bfa"); }; useEffect(() => { current.current = system; const frame = requestAnimationFrame(render); const observer = new ResizeObserver(render); if (canvas.current) observer.observe(canvas.current); return () => { cancelAnimationFrame(frame); observer.disconnect(); }; }, [system]); useImperativeHandle(ref, () => ({ drawSystem: (next) => { current.current = next; render(); } }), []); return <canvas ref={canvas} className="h-40 w-full rounded-xl border border-violet-300/50 bg-white dark:border-violet-400/25 dark:bg-[#07101e]" />; });
+
+export const ImpulseResponseCanvas = forwardRef<ImpulseResponseCanvasHandle, { system: TransferFunction }>(
+  function ImpulseResponseCanvas({ system }, ref) {
+    const [currentSystem, setCurrentSystem] = useState<TransferFunction>(system);
+
+    useEffect(() => {
+      setCurrentSystem(system);
+    }, [system]);
+
+    useImperativeHandle(
+      ref,
+      () => ({
+        drawSystem: (next) => {
+          setCurrentSystem(next);
+        },
+      }),
+      []
+    );
+
+    const points = useMemo(() => {
+      const response = impulseResponse(currentSystem);
+      if (!response.length) {
+        return [
+          { x: 0, y: 0 },
+          { x: 1, y: 0 },
+        ];
+      }
+      return response.map((item) => ({ x: item.time, y: item.value }));
+    }, [currentSystem]);
+
+    return (
+      <StandardStepPlot
+        title="Impulse Response h(t)"
+        series={[
+          {
+            id: "impulse-response",
+            katexName: "h(t)",
+            data: points,
+            color: "#8B5CF6", // Brand violet
+            unit: "",
+          },
+        ]}
+        height={180}
+        xLabelKatex="t\text{ (s)}"
+        yLabelKatex="h(t)"
+        forceBipolar
+        showLegend={false}
+      />
+    );
+  }
+);
+
+export default ImpulseResponseCanvas;

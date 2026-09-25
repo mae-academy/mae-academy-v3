@@ -42,7 +42,7 @@ export function LaplaceZPlaneLab() {
           ]}
         />
       </div>
-      <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1.16fr)_minmax(19rem,.84fr)]">
+      <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1.16fr)_minmax(19rem,.84fr)]">
         <InnerBox>
           <h3 id="laplace-field-label" className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-white pb-2 border-b border-slate-100 dark:border-slate-800">
             TRANSFER FUNCTION
@@ -87,7 +87,7 @@ export function LaplaceZPlaneLab() {
       </div>
     </StudioCard>
     {system && roc && <>
-      <div className="grid gap-6 2xl:grid-cols-[minmax(0,1.18fr)_minmax(19rem,.82fr)]">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1.18fr)_minmax(19rem,.82fr)]">
         <StudioCard>
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-white pb-2 border-b border-slate-100 dark:border-slate-800">

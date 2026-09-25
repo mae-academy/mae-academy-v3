@@ -47,7 +47,7 @@ function timeDomainLatex(signal: SignalState) {
   return `R(t) = ${amplitude}\\cos(${parameter}t)u(t)`;
 }
 
-function GainControl({ label, value, onChange, min = 0, max = 100, step = 0.01 }: { label: string; value: number; onChange: (next: number) => void; min?: number; max?: number; step?: number }) {
+function GainControl({ label, value, onChange, min = 0, max = 10, step = 0.1 }: { label: string; value: number; onChange: (next: number) => void; min?: number; max?: number; step?: number }) {
   const [limitMin, setLimitMin] = useState(min);
   const [limitMax, setLimitMax] = useState(max);
 

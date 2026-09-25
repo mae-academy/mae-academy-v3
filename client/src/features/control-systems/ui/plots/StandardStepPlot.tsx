@@ -109,36 +109,40 @@ export function StandardStepPlot({
     return series.filter((s) => !hiddenSeries[s.id]);
   }, [series, hiddenSeries]);
 
-  // Layout Paddings
+  // Layout Paddings with generous breathing room
   const padding = {
-    top: 24,
-    right: 24,
-    bottom: 38,
-    left: 48,
+    top: 28,
+    right: 32,
+    bottom: 44,
+    left: 54,
   };
 
   const plotWidth = Math.max(10, containerSize.width - padding.left - padding.right);
   const plotHeight = Math.max(10, containerSize.height - padding.top - padding.bottom);
 
-  // Dynamic 1-Quadrant vs. 2-Quadrant Bounds Evaluation
-  const { xMin, xMax, yMin, yMax, isBipolar } = useMemo(() => {
-    let minT = 0;
-    let maxT = 1;
+  // Dynamic 1-Quadrant vs. Symmetrical 4-Quadrant Bounds Evaluation
+  const { xMin, xMax, yMin, yMax, isBipolar, hasNegativeTime } = useMemo(() => {
+    let minT = Infinity;
+    let maxT = -Infinity;
     let minVal = Infinity;
     let maxVal = -Infinity;
 
     for (const s of visibleSeries) {
       for (const p of s.data) {
+        if (p.x < minT) minT = p.x;
         if (p.x > maxT) maxT = p.x;
         if (p.y < minVal) minVal = p.y;
         if (p.y > maxVal) maxVal = p.y;
       }
     }
 
+    if (minT === Infinity || maxT === -Infinity) {
+      minT = 0;
+      maxT = 10;
+    }
     if (minVal === Infinity || maxVal === -Infinity) {
       minVal = 0;
       maxVal = 1.2;
-      maxT = 10;
     }
 
     if (steadyStateValue !== undefined && showSteadyState) {
@@ -146,7 +150,8 @@ export function StandardStepPlot({
       if (steadyStateValue < minVal) minVal = steadyStateValue;
     }
 
-    // Determine 1-Quadrant vs. 2-Quadrant
+    // Determine 1-Quadrant vs. Symmetrical 4-Quadrant
+    const hasNegativeTime = minT < -0.001;
     const hasUndershoot = minVal < -0.001;
     const bipolar = forceBipolar || hasUndershoot;
 
@@ -154,15 +159,12 @@ export function StandardStepPlot({
     let computedYMax = 1;
 
     if (bipolar) {
-      // 2-Quadrant Mode: Extend below zero with margin
-      const margin = Math.max(0.1, (maxVal - Math.min(0, minVal)) * 0.15);
-      if (minVal < -0.001) {
-        computedYMin = minVal - margin;
-      } else {
-        // forceBipolar with positive-only signals: allocate lower quadrant
-        computedYMin = -Math.max(0.25, maxVal * 0.3);
-      }
-      computedYMax = Math.max(0.1, maxVal + margin);
+      // Symmetrical 4-Quadrant vertical span centered at y = 0
+      const maxAbsY = Math.max(Math.abs(maxVal), Math.abs(minVal), 0.1);
+      const margin = Math.max(0.1, maxAbsY * 0.15);
+      const yBound = maxAbsY + margin;
+      computedYMin = -yBound;
+      computedYMax = yBound;
     } else {
       // 1-Quadrant Mode: Strictly pinned at y = 0
       computedYMin = 0;
@@ -170,12 +172,28 @@ export function StandardStepPlot({
       computedYMax = maxVal <= 0 ? 1 : maxVal + margin;
     }
 
+    let computedXMin = 0;
+    let computedXMax = 10;
+
+    if (hasNegativeTime) {
+      // Symmetrical bilateral time domain centered at t = 0
+      const maxAbsX = Math.max(Math.abs(maxT), Math.abs(minT), 0.5);
+      const margin = maxAbsX * 0.08;
+      const xBound = maxAbsX + margin;
+      computedXMin = -xBound;
+      computedXMax = xBound;
+    } else {
+      computedXMin = 0;
+      computedXMax = maxT <= 0 ? 1 : maxT;
+    }
+
     return {
-      xMin: 0,
-      xMax: maxT <= 0 ? 1 : maxT,
+      xMin: computedXMin,
+      xMax: computedXMax,
       yMin: computedYMin,
       yMax: computedYMax,
       isBipolar: bipolar,
+      hasNegativeTime,
     };
   }, [visibleSeries, forceBipolar, steadyStateValue, showSteadyState]);
 
@@ -291,7 +309,7 @@ export function StandardStepPlot({
 
   return (
     <div
-      className={`relative flex flex-col w-full h-full min-h-0 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/60 backdrop-blur-sm shadow-sm p-4 ${className}`}
+      className={`relative flex flex-col w-full h-full min-h-[320px] md:min-h-[360px] rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/60 backdrop-blur-sm shadow-sm p-4 ${className}`}
       style={height !== undefined ? { height: typeof height === "number" ? `${height}px` : height } : undefined}
     >
       {/* Header Bar: Title + Legend Badges */}
@@ -393,14 +411,26 @@ export function StandardStepPlot({
             })}
           </g>
 
-          {/* Prominent Zero-Crossing Line (Bipolar / Undershoot mode) */}
+          {/* Prominent Horizontal Zero-Crossing Axis Line (Bipolar / Undershoot / 4-Quadrant Mode) */}
           {isBipolar && (
             <line
               x1={padding.left}
               y1={zeroY}
               x2={padding.left + plotWidth}
               y2={zeroY}
-              className="stroke-slate-400/70 dark:stroke-slate-500/70"
+              className="stroke-slate-400 dark:stroke-slate-500"
+              strokeWidth="1.5"
+            />
+          )}
+
+          {/* Prominent Vertical Zero-Crossing Axis Line (Bilateral / 4-Quadrant Mode) */}
+          {hasNegativeTime && (
+            <line
+              x1={toX(0)}
+              y1={padding.top}
+              x2={toX(0)}
+              y2={padding.top + plotHeight}
+              className="stroke-slate-400 dark:stroke-slate-500"
               strokeWidth="1.5"
             />
           )}
@@ -421,15 +451,17 @@ export function StandardStepPlot({
 
           {/* Axes Lines (Rails) */}
           <g className="axes-rails" aria-hidden="true">
-            {/* Left Y-axis rail */}
-            <line
-              x1={padding.left}
-              y1={padding.top}
-              x2={padding.left}
-              y2={padding.top + plotHeight}
-              className="stroke-slate-400 dark:stroke-slate-600"
-              strokeWidth="1.5"
-            />
+            {/* Left Y-axis rail (when not 4-quadrant centered) */}
+            {!hasNegativeTime && (
+              <line
+                x1={padding.left}
+                y1={padding.top}
+                x2={padding.left}
+                y2={padding.top + plotHeight}
+                className="stroke-slate-400 dark:stroke-slate-600"
+                strokeWidth="1.5"
+              />
+            )}
 
             {/* Bottom X-axis baseline rail (or zero line in 1-quadrant mode) */}
             <line
@@ -451,12 +483,12 @@ export function StandardStepPlot({
                 <text
                   key={`lbl-x-${tick}`}
                   x={xPos}
-                  y={padding.top + plotHeight + 16}
+                  y={padding.top + plotHeight + 18}
                   textAnchor="middle"
                   style={{ fontFamily: "'KaTeX_Main', 'KaTeX_Math', 'Times New Roman', serif" }}
                   className="fill-slate-600 dark:fill-slate-300 text-[11px] font-medium"
                 >
-                  {tick.toFixed(tick < 1 ? 2 : 1)}
+                  {Math.abs(tick) < 1e-9 ? "0" : Number(tick.toFixed(Math.abs(tick) < 1 ? 2 : 1)).toString()}
                 </text>
               );
             })}
@@ -467,13 +499,13 @@ export function StandardStepPlot({
               return (
                 <text
                   key={`lbl-y-${tick}`}
-                  x={padding.left - 6}
+                  x={padding.left - 8}
                   y={yPos + 4}
                   textAnchor="end"
                   style={{ fontFamily: "'KaTeX_Main', 'KaTeX_Math', 'Times New Roman', serif" }}
                   className="fill-slate-600 dark:fill-slate-300 text-[11px] font-medium"
                 >
-                  {tick.toFixed(2)}
+                  {Math.abs(tick) < 1e-9 ? "0" : Number(tick.toFixed(2)).toString()}
                 </text>
               );
             })}

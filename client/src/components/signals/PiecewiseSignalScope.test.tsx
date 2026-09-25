@@ -105,6 +105,110 @@ describe("PiecewiseSignalScope", () => {
     const crosshair = container.querySelector(".crosshair-indicator");
     expect(crosshair).toBeTruthy();
   });
+
+  it("applies domain headroom and positions Y-axis ticks with end-anchor, central-baseline, and margin clearance", () => {
+    const model = createPiecewiseSignal({
+      primary: { kind: "sine", frequencyHz: 1 },
+      transform: { amplitude: 2, timeScale: 1, timeShift: 0 },
+    });
+
+    const { container } = render(<PiecewiseSignalScope model={model} height={420} />);
+    const svg = container.querySelector("svg");
+    expect(svg).toBeTruthy();
+    expect(svg?.classList.contains("overflow-visible")).toBe(true);
+
+    // Margin configuration: left = 48, so Y-axis labels must be positioned at x = 48 - 10 = 38
+    const yTickLabels = Array.from(container.querySelectorAll(".ticks-text text")).filter((el) => {
+      return el.getAttribute("x") === "38";
+    });
+    expect(yTickLabels.length).toBeGreaterThan(0);
+
+    // Each Y tick label must have text-anchor="end" and dominant-baseline="central"
+    for (const label of yTickLabels) {
+      expect(label.getAttribute("text-anchor")).toBe("end");
+      expect(label.getAttribute("dominant-baseline")).toBe("central");
+    }
+
+    // Check that -2 tick exists and its y position is strictly inside height - margin.bottom (420 - 44 = 376)
+    const minusTwoTick = yTickLabels.find((el) => el.textContent?.trim() === "-2");
+    expect(minusTwoTick).toBeTruthy();
+    const minusTwoY = parseFloat(minusTwoTick?.getAttribute("y") || "0");
+    const heightMinusMarginBottom = 420 - 44; // 376
+    // yScale(-2) + textHeight (11px) must be strictly inside height - margin.bottom
+    expect(minusTwoY + 11).toBeLessThan(heightMinusMarginBottom);
+  });
+
+  it("dynamically auto-scales time axis to 3 full periods for periodic signals", () => {
+    // Model with T0 = 1s
+    const model = createPiecewiseSignal({
+      primary: { kind: "sine", frequencyHz: 1 },
+      transform: { amplitude: 1, timeScale: 1, timeShift: 0 },
+    });
+
+    const { container } = render(<PiecewiseSignalScope model={model} fundamentalPeriod={1} />);
+    // For T0 = 1, tRange = (1 * 3) / 2 = 1.5. xTicks step = 0.5s -> [-1.5, -1, -0.5, 0, 0.5, 1, 1.5]
+    const xLabels = Array.from(container.querySelectorAll(".ticks-text text"))
+      .filter((el) => el.getAttribute("x") !== "38")
+      .map((el) => el.textContent?.trim());
+
+    expect(xLabels).toContain("0");
+    expect(xLabels).toContain("-1.5");
+    expect(xLabels).toContain("1.5");
+    expect(xLabels).toContain("-1");
+    expect(xLabels).toContain("1");
+  });
+
+  it("clamps time axis for ultra-high frequencies and uses 0.25s adaptive ticks", () => {
+    // Model with T0 = 0.2s (e.g. 5 Hz / sin(10pi t))
+    const model = createPiecewiseSignal({
+      primary: { kind: "sine", frequencyHz: 5 },
+      transform: { amplitude: 1, timeScale: 1, timeShift: 0 },
+    });
+
+    const { container } = render(<PiecewiseSignalScope model={model} fundamentalPeriod={0.2} />);
+    // For T0 = 0.2, (0.2 * 3) / 2 = 0.3 clamped to min 0.5. tRange = 0.5. xTicks step = 0.25s -> [-0.5, -0.25, 0, 0.25, 0.5]
+    const xLabels = Array.from(container.querySelectorAll(".ticks-text text"))
+      .filter((el) => el.getAttribute("x") !== "38")
+      .map((el) => el.textContent?.trim());
+
+    expect(xLabels).toEqual(["-0.5", "-0.25", "0", "0.25", "0.5"]);
+  });
+
+  it("expands time axis for low frequencies and uses 2s adaptive ticks", () => {
+    // Model with T0 = 4s (e.g. 0.25 Hz / sin(0.5pi t))
+    const model = createPiecewiseSignal({
+      primary: { kind: "sine", frequencyHz: 0.25 },
+      transform: { amplitude: 1, timeScale: 1, timeShift: 0 },
+    });
+
+    const { container } = render(<PiecewiseSignalScope model={model} fundamentalPeriod={4} />);
+    // For T0 = 4, tRange = (4 * 3) / 2 = 6s. xTicks step = 2s -> [-6, -4, -2, 0, 2, 4, 6]
+    const xLabels = Array.from(container.querySelectorAll(".ticks-text text"))
+      .filter((el) => el.getAttribute("x") !== "38")
+      .map((el) => el.textContent?.trim());
+
+    expect(xLabels).toEqual(["-6", "-4", "-2", "0", "2", "4", "6"]);
+  });
+
+  it("auto-scales aperiodic pulse signals with 50% symmetric margin around pulse width", () => {
+    // Rect pulse centered at t=0 with width 1 (breakpoints at -0.5 and 0.5)
+    const model = createPiecewiseSignal({
+      primary: { kind: "rect" },
+      transform: { amplitude: 1, timeScale: 1, timeShift: 0 },
+    });
+
+    const { container } = render(<PiecewiseSignalScope model={model} fundamentalPeriod={null} />);
+    // Active width = 1, marginSide = 0.5 -> tRange = 1.0. xTicks step = 0.5s -> [-1, -0.5, 0, 0.5, 1]
+    const xLabels = Array.from(container.querySelectorAll(".ticks-text text"))
+      .filter((el) => el.getAttribute("x") !== "38")
+      .map((el) => el.textContent?.trim());
+
+    expect(xLabels).toContain("0");
+    expect(xLabels).toContain("-1");
+    expect(xLabels).toContain("1");
+    expect(xLabels).toContain("-0.5");
+    expect(xLabels).toContain("0.5");
+  });
 });
 
 describe("SignalOperationsLab", () => {
@@ -138,7 +242,7 @@ describe("SignalOperationsLab", () => {
 
   it("classifies the default commensurate sin+cos composition as periodic with a Power Signal readout", () => {
     render(<SignalOperationsLab />);
-    expect(screen.getByText("Power Signal")).toBeTruthy();
+    expect(screen.getAllByText("Power Signal").length).toBeGreaterThan(0);
     expect(screen.getByText("Periodic")).toBeTruthy();
   });
 
@@ -151,6 +255,6 @@ describe("SignalOperationsLab", () => {
     const rectPreset = rectMatches.at(-1);
     expect(rectPreset).toBeTruthy();
     fireEvent.click(rectPreset!);
-    expect(screen.getByText("Energy Signal")).toBeTruthy();
+    expect(screen.getAllByText("Energy Signal").length).toBeGreaterThan(0);
   });
 });

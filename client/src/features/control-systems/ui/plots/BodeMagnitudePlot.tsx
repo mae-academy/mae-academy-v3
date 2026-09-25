@@ -1,6 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { KatexMath } from "@/components/ui/KatexMath";
-import { RotateCcw } from "lucide-react";
 import type { FrequencyPoint, StabilityMargins } from "@/features/control/frequencyResponseMath";
 
 export interface BodeMagnitudePlotProps {
@@ -18,7 +17,7 @@ export interface BodeMagnitudePlotProps {
 export function BodeMagnitudePlot({
   data,
   margins,
-  height = 300,
+  height = 340,
   className = "",
   title = "Bode Magnitude",
   showAsymptote = true,
@@ -36,13 +35,6 @@ export function BodeMagnitudePlot({
   const activeHoverOmega = hoverOmega !== undefined ? hoverOmega : internalHoverOmega;
   const [isDirectHovered, setIsDirectHovered] = useState(false);
 
-  const [viewport, setViewport] = useState<{ scaleX: number; scaleY: number; offsetX: number; offsetY: number }>({
-    scaleX: 1,
-    scaleY: 1,
-    offsetX: 0,
-    offsetY: 0,
-  });
-
   // ResizeObserver for dynamic SVG responsiveness
   useEffect(() => {
     const el = containerRef.current;
@@ -59,8 +51,8 @@ export function BodeMagnitudePlot({
     return () => observer.disconnect();
   }, []);
 
-  // Safe padding
-  const padding = { top: 24, right: 24, bottom: 36, left: 48 };
+  // Safe padding with generous clearances
+  const padding = { top: 28, right: 30, bottom: 44, left: 52 };
   const plotWidth = Math.max(10, containerSize.width - padding.left - padding.right);
   const plotHeight = Math.max(10, containerSize.height - padding.top - padding.bottom);
 
@@ -117,62 +109,29 @@ export function BodeMagnitudePlot({
     (w: number) => {
       if (w <= 0) return padding.left;
       const ratio = (Math.log10(w) - logMinOmega) / logSpan;
-      const baseX = padding.left + ratio * plotWidth;
-      return baseX * viewport.scaleX + viewport.offsetX;
+      return padding.left + ratio * plotWidth;
     },
-    [logMinOmega, logSpan, padding.left, plotWidth, viewport.scaleX, viewport.offsetX]
+    [logMinOmega, logSpan, padding.left, plotWidth]
   );
 
   const dbToScreenY = useCallback(
     (db: number) => {
       const ratio = (db - minDb) / (maxDb - minDb || 1);
-      const baseY = padding.top + (1 - ratio) * plotHeight;
-      return baseY * viewport.scaleY + viewport.offsetY;
+      return padding.top + (1 - ratio) * plotHeight;
     },
-    [minDb, maxDb, padding.top, plotHeight, viewport.scaleY, viewport.offsetY]
+    [minDb, maxDb, padding.top, plotHeight]
   );
 
   const screenXToOmega = useCallback(
     (sx: number) => {
-      const unscaledX = (sx - viewport.offsetX) / viewport.scaleX;
-      const ratio = (unscaledX - padding.left) / (plotWidth || 1);
+      const ratio = (sx - padding.left) / (plotWidth || 1);
       const logW = logMinOmega + ratio * logSpan;
       return Math.pow(10, logW);
     },
-    [viewport.offsetX, viewport.scaleX, padding.left, plotWidth, logMinOmega, logSpan]
+    [padding.left, plotWidth, logMinOmega, logSpan]
   );
 
-  // Wheel zoom listener (non-passive, preventing window scroll)
-  useEffect(() => {
-    if (!interactive) return;
-    const el = containerRef.current;
-    if (!el) return;
-
-    const handleNativeWheel = (e: WheelEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-
-      const rect = el.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
-
-      const zoomFactor = e.deltaY < 0 ? 1.08 : 0.92;
-      setViewport((prev) => {
-        const nextScaleX = Math.min(20, Math.max(0.2, prev.scaleX * zoomFactor));
-        const nextScaleY = Math.min(20, Math.max(0.2, prev.scaleY * zoomFactor));
-        const ratioX = nextScaleX / prev.scaleX;
-        const ratioY = nextScaleY / prev.scaleY;
-        const nextOffsetX = mouseX - (mouseX - prev.offsetX) * ratioX;
-        const nextOffsetY = mouseY - (mouseY - prev.offsetY) * ratioY;
-        return { scaleX: nextScaleX, scaleY: nextScaleY, offsetX: nextOffsetX, offsetY: nextOffsetY };
-      });
-    };
-
-    el.addEventListener("wheel", handleNativeWheel, { passive: false });
-    return () => el.removeEventListener("wheel", handleNativeWheel);
-  }, [interactive]);
-
-  // Pointer hover tracking (drag panning disabled to maintain solid locked framing)
+  // Pointer hover tracking (drag panning and wheel zooming disabled to maintain locked viewport)
   const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return;
@@ -180,10 +139,6 @@ export function BodeMagnitudePlot({
     const w = screenXToOmega(sx);
     if (onHoverOmegaChange) onHoverOmegaChange(w);
     else setInternalHoverOmega(w);
-  };
-
-  const resetView = () => {
-    setViewport({ scaleX: 1, scaleY: 1, offsetX: 0, offsetY: 0 });
   };
 
   // Build SVG paths for exact curve and asymptote
@@ -272,7 +227,7 @@ export function BodeMagnitudePlot({
 
   return (
     <div
-      className={`relative flex flex-col w-full h-full min-h-0 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/60 backdrop-blur-sm shadow-sm p-4 ${className}`}
+      className={`relative flex flex-col w-full h-full min-h-[320px] md:min-h-[360px] rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/60 backdrop-blur-sm shadow-sm p-4 ${className}`}
       style={height !== undefined ? { height: typeof height === "number" ? `${height}px` : height } : undefined}
     >
       {/* Header Bar */}
@@ -308,19 +263,6 @@ export function BodeMagnitudePlot({
               </span>
             )}
           </div>
-
-          {interactive && (
-            <button
-              type="button"
-              onClick={resetView}
-              title="Reset View"
-              aria-label="Reset zoom and pan"
-              className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium border border-slate-200/60 dark:border-slate-700/50 bg-slate-100/80 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 hover:bg-slate-200/80 dark:hover:bg-slate-700 transition-colors"
-            >
-              <RotateCcw className="h-3 w-3" />
-              <span>Reset</span>
-            </button>
-          )}
         </div>
       </div>
 
@@ -390,7 +332,7 @@ export function BodeMagnitudePlot({
                 y1={t.y}
                 x2={padding.left + plotWidth}
                 y2={t.y}
-                className={t.db === 0 ? "stroke-slate-400 dark:stroke-slate-600" : "stroke-slate-200 dark:stroke-slate-800"}
+                className={t.db === 0 ? "stroke-slate-400 dark:stroke-slate-500" : "stroke-slate-200/60 dark:stroke-slate-800/60"}
                 strokeWidth={t.db === 0 ? "1.5" : "1"}
                 strokeDasharray={t.db === 0 ? "4,4" : undefined}
               />
@@ -510,38 +452,38 @@ export function BodeMagnitudePlot({
         {/* Floating HUD Tooltip */}
         {isDirectHovered && hoverPoint && (
           <div
-            className="absolute pointer-events-none z-20 backdrop-blur-md bg-white/95 text-slate-900 border border-slate-200/80 shadow-xl shadow-slate-900/10 dark:bg-slate-900/90 dark:text-slate-100 dark:border-slate-700/60 dark:shadow-2xl rounded-xl p-3 text-xs min-w-44"
+            className="absolute pointer-events-none z-20 backdrop-blur-md bg-slate-900/90 text-white rounded-lg p-2.5 shadow-xl border border-slate-700/50 text-xs min-w-44"
             style={{
               left: Math.min(containerSize.width - 190, Math.max(10, hoverPoint.sx + 14)),
               top: Math.min(containerSize.height - 110, Math.max(10, hoverPoint.sy - 30)),
             }}
           >
-            <div className="flex items-center justify-between border-b border-slate-200/80 dark:border-slate-700/60 pb-1.5 mb-2 font-mono text-[11px]">
-              <span className="font-semibold text-slate-700 dark:text-slate-200">
+            <div className="flex items-center justify-between border-b border-slate-700/60 pb-1.5 mb-2 font-mono text-[11px]">
+              <span className="font-semibold text-slate-200">
                 <KatexMath math={`\\omega = ${hoverPoint.omega.toFixed(2)}\\text{ rad/s}`} />
               </span>
             </div>
             <div className="space-y-1.5 text-[11px]">
               <div className="flex items-center justify-between gap-2">
-                <span className="inline-flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
-                  <span className="h-2 w-2 rounded-full bg-[#2563EB]" />
+                <span className="inline-flex items-center gap-1.5 text-slate-400">
+                  <span className="h-2 w-2 rounded-full bg-[#3B82F6]" />
                   <KatexMath math="|G(j\omega)|" />
                 </span>
-                <span className="font-bold text-slate-800 dark:text-white">
+                <span className="font-bold text-white">
                   <KatexMath math={`|G(j\\omega)| = ${hoverPoint.magnitudeDb.toFixed(2)}\\text{ dB}`} />
                 </span>
               </div>
-              <div className="flex items-center justify-between gap-2 text-slate-500 dark:text-slate-400">
+              <div className="flex items-center justify-between gap-2 text-slate-400">
                 <span className="inline-flex items-center gap-1.5">
-                  <span className="h-2 w-2 rounded-full bg-[#7C3AED]" />
+                  <span className="h-2 w-2 rounded-full bg-[#A855F7]" />
                   <KatexMath math="\angle G(j\omega)" />
                 </span>
-                <span className="font-medium text-slate-800 dark:text-slate-200">
+                <span className="font-medium text-slate-200">
                   <KatexMath math={`\\angle G(j\\omega) = ${hoverPoint.phaseUnwrappedDeg.toFixed(1)}^\\circ`} />
                 </span>
               </div>
               {showAsymptote && Number.isFinite(hoverPoint.asymMagnitudeDb) && (
-                <div className="flex items-center justify-between gap-2 text-rose-500 text-[10px] pt-1 border-t border-slate-100 dark:border-slate-800">
+                <div className="flex items-center justify-between gap-2 text-rose-400 text-[10px] pt-1 border-t border-slate-800">
                   <KatexMath math="\text{Asymptote}" />
                   <KatexMath math={`${hoverPoint.asymMagnitudeDb.toFixed(1)}\\text{ dB}`} />
                 </div>

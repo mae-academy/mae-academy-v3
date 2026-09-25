@@ -10,7 +10,7 @@ import {
   logspace,
   type FrequencyFactor,
 } from "@/features/control/frequencyResponseMath";
-import { SegmentedControl, StandardStepPlot, StudioCard, InnerBox, StudioSlider } from "@/components/common/templates";
+import { SegmentedControl, StandardStepPlot, StudioCard, InnerBox, StudioSlider, MathNumberInput } from "@/components/common/templates";
 import {
   BodePlot,
   NyquistPlot,
@@ -55,8 +55,6 @@ function algebraicDcGain(numerator: number[], denominator: number[]) {
 export function FrequencyResponseStudio() {
   const [tfData, setTfData] = useState<TransferFunctionData>(INITIAL_TF);
   const [gain, setGain] = useState(1);
-  const [gainMin, setGainMin] = useState(0.05);
-  const [gainMax, setGainMax] = useState(20);
   const [selectedFactorIds, setSelectedFactorIds] = useState<string[]>([]);
   const [primaryView, setPrimaryView] = useState<PrimaryView>("bode");
   const [timeHorizon, setTimeHorizon] = useState(12);
@@ -115,38 +113,6 @@ export function FrequencyResponseStudio() {
     <div className="space-y-6">
       <TransferFunctionInput onUpdate={setTfData} defaultData={tfData} gainK={gain} />
 
-      {/* Live Gain Compensation */}
-      <StudioCard
-        title="Live Gain Compensation"
-        className="grid gap-6 lg:grid-cols-[1fr_auto] lg:items-end"
-      >
-        <div className="min-w-0">
-          <StudioSlider
-            label={<KatexMath math="K =" />}
-            min={gainMin}
-            max={gainMax}
-            step={(gainMax - gainMin) / 1000}
-            value={gain}
-            onChange={setGain}
-            editableLimits
-            onMinChange={(v) => { if (v >= 0 && v < gainMax) setGainMin(v); }}
-            onMaxChange={(v) => { if (v > gainMin) setGainMax(v); }}
-            editableValue
-            precision={4}
-          />
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          <MetricTile
-            label="\mathrm{PM}"
-            value={margins.gainCrossover ? `${formatEngineering(margins.gainCrossover.phaseMarginDeg)}^\circ` : "\\mathrm{N/A}"}
-          />
-          <MetricTile
-            label="\mathrm{GM}"
-            value={margins.phaseCrossover ? `${formatEngineering(margins.phaseCrossover.gainMarginDb)}\\,\\mathrm{dB}` : "\\mathrm{N/A}"}
-          />
-        </div>
-      </StudioCard>
-
       {/* Main Plot Section */}
       <section className="w-full space-y-4">
         <div>
@@ -166,14 +132,57 @@ export function FrequencyResponseStudio() {
         {primaryView === "nichols" && <NicholsPlot data={nicholsData} height={560} />}
       </section>
 
-      {/* Closed-Loop Step Response & Time-Domain Metrics */}
-      <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_330px]">
-        <div className="min-w-0">
+      {/* Row A: Gain Compensation Panel + Step Response Scope */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+        {/* Left Column: Compact Control Panel */}
+        <div className="col-span-12 lg:col-span-4 flex flex-col">
+          <StudioCard title="Live Gain Compensation" className="h-full flex flex-col justify-between">
+            <div className="space-y-5">
+              <StudioSlider
+                label={<span className="text-xs font-semibold text-slate-700 dark:text-slate-300">Gain Compensation</span>}
+                mathLabel={<KatexMath math="K" />}
+                min={0.01}
+                max={10}
+                step={0.01}
+                value={gain}
+                onChange={(newK) => setGain(newK)}
+                editableLimits
+                editableValue
+              />
+              <div className="grid grid-cols-2 gap-2.5 pt-1">
+                <InnerBox className="min-w-0 px-3 py-2.5">
+                  <span className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400">PM</span>
+                  <div className="mt-1 overflow-x-auto text-sm font-semibold text-slate-950 dark:text-white">
+                    {margins.gainCrossover ? (
+                      <KatexMath math={`\\text{PM} = ${margins.gainCrossover.phaseMarginDeg.toFixed(1)}^\\circ`} />
+                    ) : (
+                      <span className="text-slate-400 font-mono text-xs font-medium">N/A</span>
+                    )}
+                  </div>
+                </InnerBox>
+                <InnerBox className="min-w-0 px-3 py-2.5">
+                  <span className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400">GM</span>
+                  <div className="mt-1 overflow-x-auto text-sm font-semibold text-slate-950 dark:text-white">
+                    {margins.phaseCrossover !== undefined && Number.isFinite(margins.phaseCrossover.gainMarginDb) ? (
+                      <KatexMath math={`${margins.phaseCrossover.gainMarginDb.toFixed(1)}\\text{ dB}`} />
+                    ) : (
+                      <span className="text-sm font-semibold text-slate-600 dark:text-slate-300">N/A</span>
+                    )}
+                  </div>
+                </InnerBox>
+              </div>
+            </div>
+          </StudioCard>
+        </div>
+
+        {/* Right Column: Step Response Scope */}
+        <div className="col-span-12 lg:col-span-8 min-w-0 flex flex-col">
           <StandardStepPlot
             title="Closed-Loop Step Response"
             xLabelKatex="t \text{ (s)}"
             yLabelKatex="y(t)"
             height={320}
+            className="!bg-white/70 dark:!bg-slate-900/70 border-slate-200/80 dark:border-slate-800 backdrop-blur-md shadow-sm p-3.5 sm:p-4 lg:p-5"
             showSteadyState={true}
             steadyStateValue={1}
             series={[
@@ -194,49 +203,62 @@ export function FrequencyResponseStudio() {
               },
             ]}
             headerRight={
-              <div className="w-52">
-                <StudioSlider
-                  label={<KatexMath math="t_{max}" />}
-                  min={3}
-                  max={30}
-                  step={1}
-                  unit=" s"
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-slate-500 font-serif">
+                  <KatexMath math="t_{\max}" />
+                </span>
+                <MathNumberInput
                   value={timeHorizon}
-                  onChange={setTimeHorizon}
-                  aria-label="Step response time horizon"
+                  onChange={(e) => {
+                    const val = Number(e.target.value);
+                    if (!isNaN(val) && val > 0) setTimeHorizon(val);
+                  }}
+                  min={1}
+                  max={100}
+                  step={1}
+                  className="w-12 h-7"
                 />
+                <span className="text-xs text-slate-500 font-serif">s</span>
               </div>
             }
           />
         </div>
+      </div>
 
-        {/* Time-Domain Correlation */}
-        <StudioCard title="Time-Domain Correlation">
-          <div className="grid grid-cols-2 gap-2">
-            <MetricTile label="M_p" value={`${formatEngineering(stepResponse.overshootPercent)}\\%`} />
-            <MetricTile label="t_r" value={`${formatEngineering(stepResponse.riseTime)}\\,\\mathrm{s}`} />
-            <MetricTile label="t_s" value={`${formatEngineering(stepResponse.settlingTime)}\\,\\mathrm{s}`} />
-            <MetricTile label="e_{ss}" value={formatEngineering(stepResponse.steadyStateError)} />
-          </div>
-        </StudioCard>
-      </section>
+      {/* Row B: Time-Domain Correlation + Sketch Tutor in a Single Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+        {/* Left Column: Time-Domain Correlation */}
+        <div className="col-span-12 lg:col-span-5 flex flex-col">
+          <StudioCard title="Time-Domain Correlation" className="h-full flex flex-col justify-between">
+            <div className="grid grid-cols-2 gap-2.5 h-full content-between">
+              <MetricTile label="M_p" value={`${formatEngineering(stepResponse.overshootPercent)}\\%`} />
+              <MetricTile label="t_r" value={`${formatEngineering(stepResponse.riseTime)}\\,\\mathrm{s}`} />
+              <MetricTile label="t_s" value={`${formatEngineering(stepResponse.settlingTime)}\\,\\mathrm{s}`} />
+              <MetricTile label="e_{ss}" value={formatEngineering(stepResponse.steadyStateError)} />
+            </div>
+          </StudioCard>
+        </div>
 
-      {/* Step-by-Step Sketch Tutor */}
-      <SketchTutorial
-        dcGain={dcGain}
-        factors={factors.filter((factor) => selectedFactorIds.includes(factor.id))}
-        initialSlope={slopeLogic.initialSlopeDbPerDecade}
-        events={slopeLogic.events}
-      />
+        {/* Right Column: Step-by-Step Sketch Tutor */}
+        <div className="col-span-12 lg:col-span-7 flex flex-col">
+          <SketchTutorial
+            dcGain={dcGain}
+            factors={factors.filter((factor) => selectedFactorIds.includes(factor.id))}
+            initialSlope={slopeLogic.initialSlopeDbPerDecade}
+            events={slopeLogic.events}
+            className="h-full"
+          />
+        </div>
+      </div>
     </div>
   );
 }
 
 function MetricTile({ label, value }: { label: string; value: string }) {
   return (
-    <InnerBox className="min-w-0 px-3 py-2.5">
-      <KatexMath math={label} className="block text-[10px] text-slate-500 dark:text-slate-400" />
-      <KatexMath math={value} className="mt-1 block overflow-x-auto text-sm text-slate-950 dark:text-white" />
+    <InnerBox className="min-w-0 px-3.5 py-3 flex flex-col justify-center">
+      <KatexMath math={label} className="block text-[11px] font-semibold text-slate-500 dark:text-slate-400" />
+      <KatexMath math={value} className="mt-1.5 block overflow-x-auto text-base font-semibold text-slate-950 dark:text-white" />
     </InnerBox>
   );
 }
@@ -246,15 +268,17 @@ function SketchTutorial({
   factors,
   initialSlope,
   events,
+  className,
 }: {
   dcGain: string;
   factors: FrequencyFactor[];
   initialSlope: number;
   events: Array<{ omega: number; deltaDbPerDecade: number; label: string }>;
+  className?: string;
 }) {
   let runningSlope = initialSlope;
   return (
-    <StudioCard title="Step-by-Step Sketch Tutor">
+    <StudioCard title="Step-by-Step Sketch Tutor" className={className}>
       <div className="grid divide-y divide-slate-100 dark:divide-slate-800 xl:grid-cols-3 xl:divide-x xl:divide-y-0">
         <TutorialStep title="\mathrm{Anchor\ the\ DC\ gain}">
           <KatexMath math={`K_{DC}=${dcGain}`} displayMode className="text-lg text-violet-700 dark:text-violet-300" />

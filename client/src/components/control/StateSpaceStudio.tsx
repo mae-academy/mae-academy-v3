@@ -32,7 +32,7 @@ import {
 type SystemModel = { A: Matrix; B: Matrix; C: Matrix; D: Matrix };
 type Order = 2 | 3;
 type LocaleCode = "en" | "ar" | "es";
-const MATRIX_INPUT = "h-9 w-14 bg-transparent text-center text-slate-800 text-lg tracking-wide outline-none rounded focus:ring-1 focus:ring-blue-500 dark:text-slate-100 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [-moz-appearance:textfield] m-0";
+const MATRIX_INPUT = "w-12 h-9 text-center font-serif text-sm bg-slate-100/70 dark:bg-slate-800/70 hover:bg-slate-200/60 dark:hover:bg-slate-700/60 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 border-none text-slate-800 dark:text-slate-100 transition-colors [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [-moz-appearance:textfield] m-0";
 const MATRIX_BRACKETS = "border-l-2 border-r-2 border-slate-800 dark:border-slate-300 px-2 py-1.5";
 
 const initialSystem = (order: Order): SystemModel => order === 2
@@ -73,7 +73,7 @@ const studioCopy: Record<LocaleCode, {
 function MatrixGrid({ name, matrix, onChange }: { name: string; matrix: Matrix; onChange: (row: number, column: number, value: number) => void }) {
   const columns = matrix[0].length;
   const rows = matrix.length;
-  return <div className="flex w-full flex-col items-center"><div className="flex items-center justify-between w-full gap-3 pr-0.5"><KatexMath math={`${name} =`} className="text-base font-bold text-slate-800 dark:text-white" /><span className="font-mono text-[10px] text-slate-500 dark:text-slate-400">{rows} × {columns}</span></div><div className={`${MATRIX_BRACKETS} mt-2 flex justify-center`}><div className="inline-grid" style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>{matrix.map((row, rowIndex) => row.map((value, columnIndex) => <input key={`${name}-${rowIndex}-${columnIndex}`} aria-label={`${name} ${rowIndex + 1}, ${columnIndex + 1}`} inputMode="decimal" type="number" step="any" value={Number.isFinite(value) ? value : 0} onChange={(event) => onChange(rowIndex, columnIndex, Number(event.target.value) || 0)} style={{ fontFamily: "'KaTeX_Main', 'Times New Roman', serif" }} className={MATRIX_INPUT} />))}</div></div></div>;
+  return <div className="flex w-full flex-col items-center"><div className="flex items-center justify-between w-full gap-3 pr-0.5"><KatexMath math={`${name} =`} className="text-base font-bold text-slate-800 dark:text-white" /><span className="font-mono text-[10px] text-slate-500 dark:text-slate-400">{rows} × {columns}</span></div><div className={`${MATRIX_BRACKETS} mt-2 flex justify-center`}><div className="inline-grid gap-1.5" style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>{matrix.map((row, rowIndex) => row.map((value, columnIndex) => <input key={`${name}-${rowIndex}-${columnIndex}`} aria-label={`${name} ${rowIndex + 1}, ${columnIndex + 1}`} inputMode="decimal" type="number" step="any" value={Number.isFinite(value) ? value : 0} onChange={(event) => onChange(rowIndex, columnIndex, Number(event.target.value) || 0)} style={{ fontFamily: "'KaTeX_Main', 'Times New Roman', serif" }} className={MATRIX_INPUT} />))}</div></div></div>;
 }
 
 function LeoAlert({ messages, copy }: { messages: string[]; copy: typeof studioCopy.en }) {
@@ -99,10 +99,15 @@ function LeoAlert({ messages, copy }: { messages: string[]; copy: typeof studioC
 function StatusCard({ title, symbol, matrix, isFullRank }: { title: string; symbol: string; matrix: Matrix; isFullRank?: boolean }) {
   return (
     <StudioCard
-      title={title}
+      title={
+        <div className="flex items-center gap-1.5">
+          <KatexMath math={`${symbol} =`} className="text-xs font-bold text-slate-800 dark:text-white" />
+          <span>{title}</span>
+        </div>
+      }
       actionSlot={
-        isFullRank !== undefined ? (
-          <StatusBadge variant={isFullRank ? "success" : "danger"} label={isFullRank ? "Full Rank" : "Rank Deficient"} />
+        isFullRank === false ? (
+          <StatusBadge variant="danger" label="Rank Deficient" />
         ) : undefined
       }
     >

@@ -96,36 +96,29 @@ export function ComplexPlanePlot({
     // Always include origin (0, 0)
     pzPoints.push({ re: 0, im: 0 });
 
-    const minPzRe = Math.min(...pzPoints.map((p) => p.re));
-    const maxPzRe = Math.max(...pzPoints.map((p) => p.re));
-    const maxPzIm = Math.max(1.0, ...pzPoints.map((p) => Math.abs(p.im)));
+    const maxAbsRe = Math.max(1.5, ...pzPoints.map((p) => Math.abs(p.re)));
+    const maxAbsIm = Math.max(1.5, ...pzPoints.map((p) => Math.abs(p.im)));
 
-    const pzWidth = Math.max(1.5, maxPzRe - minPzRe);
-    const pzHeight = Math.max(1.5, 2 * maxPzIm);
-    const pzCenterRe = (maxPzRe + minPzRe) / 2;
+    // Symmetrical 4-quadrant math span centered squarely at (0, 0)
+    const baseSpan = Math.max(maxAbsRe, maxAbsIm) * 1.45;
 
-    // Extend by ~1.5x of the pole-zero/breakaway bounding box
-    const extensionFactor = 1.5;
-    const spanReRaw = pzWidth * extensionFactor;
-    const spanImRaw = pzHeight * extensionFactor;
-
-    // Reconcile with canvas aspect ratio so 1 unit Re === 1 unit Im in pixels (1:1 round circles)
+    // Strict 1:1 aspect ratio mapping so Re unit === Im unit in pixels
     const aspect = plotWidth / (plotHeight || 1);
-    let finalSpanRe = spanReRaw;
-    let finalSpanIm = spanImRaw;
+    let finalSpanRe = baseSpan;
+    let finalSpanIm = baseSpan;
 
-    if (spanReRaw / spanImRaw < aspect) {
-      // Container is wider than math span: expand Re to preserve 1:1 aspect
-      finalSpanRe = spanImRaw * aspect;
+    if (aspect >= 1) {
+      finalSpanRe = baseSpan * aspect;
+      finalSpanIm = baseSpan;
     } else {
-      // Container is taller than math span: expand Im to preserve 1:1 aspect
-      finalSpanIm = spanReRaw / aspect;
+      finalSpanRe = baseSpan;
+      finalSpanIm = baseSpan / aspect;
     }
 
-    const xMin = pzCenterRe - finalSpanRe / 2;
-    const xMax = pzCenterRe + finalSpanRe / 2;
-    const yMax = finalSpanIm / 2;
-    const yMin = -yMax;
+    const xMin = -finalSpanRe;
+    const xMax = finalSpanRe;
+    const yMax = finalSpanIm;
+    const yMin = -finalSpanIm;
 
     return { xMin, xMax, yMin, yMax };
   }, [poles, zeros, breakawayPoints, plotWidth, plotHeight]);

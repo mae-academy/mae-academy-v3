@@ -24,12 +24,12 @@ export interface SegmentedControlProps<T extends string | number | boolean = str
 const sizeStyles = {
   sm: {
     container: "p-0.5 gap-0.5",
-    pill: "h-6 px-2.5 text-[11px]",
+    pill: "h-6 px-2.5 py-1 text-[11px]",
     icon: "h-3 w-3",
   },
   md: {
     container: "p-1 gap-1",
-    pill: "h-7.5 px-3.5 text-xs",
+    pill: "h-7.5 px-2.5 sm:px-3.5 py-1 text-[11px] sm:text-xs",
     icon: "h-3.5 w-3.5",
   },
   lg: {
@@ -57,7 +57,7 @@ export function SegmentedControl<T extends string | number | boolean = string>({
       role="tablist"
       aria-label={ariaLabel}
       className={cn(
-        "inline-flex items-center rounded-full bg-slate-100/90 dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 backdrop-blur-md shadow-inner",
+        "inline-flex max-w-full overflow-x-auto no-scrollbar items-center rounded-full bg-slate-100/90 dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 backdrop-blur-md shadow-inner",
         currentSize.container,
         fullWidth && "w-full flex",
         className

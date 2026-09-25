@@ -49,7 +49,8 @@ function analysisSubject(analysis: CompositeAnalysis) {
   return analysis.classification === "Energy Signal" ? "Energy Signal" : analysis.classification === "Power Signal" ? "Power Signal" : "Neither";
 }
 
-const scopeSample = (model: ScopeModel, from: number, to: number) => sampleCompositeSignal(model as CompositeSignalModel, from, to);
+const scopeSample = (model: ScopeModel, from: number, to: number, sampleCount?: number) =>
+  sampleCompositeSignal(model as CompositeSignalModel, from, to, sampleCount ?? 3000);
 
 export function SignalOperationsLab() {
   const [expression, setExpression] = useState(tex`x(t)=\sin(2\pi t)+\cos(4\pi t)`);
@@ -102,7 +103,7 @@ export function SignalOperationsLab() {
           </div>
         </div>
 
-        <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1.2fr)_minmax(18rem,0.8fr)]">
+        <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1.2fr)_minmax(18rem,0.8fr)]">
           <InnerBox>
             <h3 id="signal-mathfield-label" className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-white pb-2 border-b border-slate-100 dark:border-slate-800">
               SIGNAL ENGINE
@@ -206,12 +207,17 @@ export function SignalOperationsLab() {
       </StudioCard>
 
       {/* Main Workspace Grid: Composite Signal View & Academic Analysis */}
-      <div className="grid gap-6 2xl:grid-cols-[minmax(0,1.35fr)_minmax(21rem,0.65fr)]">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(21rem,0.65fr)]">
         {/* Left Scope: Composite Signal View */}
         <StudioCard>
           <h4 className="mb-4 text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-white">COMPOSITE SIGNAL VIEW</h4>
           {model ? (
-            <PiecewiseSignalScope model={model} sample={scopeSample} yLabelKatex="x(t)" />
+            <PiecewiseSignalScope
+              model={model}
+              sample={scopeSample}
+              yLabelKatex="x(t)"
+              fundamentalPeriod={analysis?.fundamentalPeriod}
+            />
           ) : (
             <div className="flex min-h-[420px] items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50/60 dark:border-slate-700 dark:bg-slate-950/40">
               <p className="text-xs font-bold text-slate-400 dark:text-slate-500">Awaiting a valid signal expression</p>
@@ -229,13 +235,25 @@ export function SignalOperationsLab() {
             <>
               <div className="grid grid-cols-2 gap-3">
                 <InnerBox>
-                  <p className="text-[10px] font-bold uppercase tracking-[.13em] text-slate-500 dark:text-slate-400">Classification</p>
-                  <div className="mt-1.5">
-                    <StatusBadge
-                      variant={analysis.classification === "Energy Signal" ? "default" : analysis.classification === "Power Signal" ? "info" : "neutral"}
-                    >
-                      {analysisSubject(analysis)}
-                    </StatusBadge>
+                  <div className="flex flex-col items-start gap-1">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                      Classification
+                    </span>
+                    <div className="text-base font-semibold">
+                      {analysis.classification === "Power Signal" ? (
+                        <span className="text-blue-600 dark:text-blue-400 font-serif tracking-wide text-base">
+                          <KatexMath math="\text{Power Signal}" />
+                        </span>
+                      ) : analysis.classification === "Energy Signal" ? (
+                        <span className="text-purple-600 dark:text-purple-400 font-serif tracking-wide text-base">
+                          <KatexMath math="\text{Energy Signal}" />
+                        </span>
+                      ) : (
+                        <span className="text-slate-500 dark:text-slate-400 font-serif text-base">
+                          <KatexMath math="\text{Neither}" />
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </InnerBox>
                 <InnerBox>

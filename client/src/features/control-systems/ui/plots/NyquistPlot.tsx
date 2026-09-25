@@ -72,7 +72,7 @@ export function NyquistPlot({
     return () => observer.disconnect();
   }, []);
 
-  const padding = { top: 24, right: 24, bottom: 24, left: 24 };
+  const padding = { top: 28, right: 30, bottom: 44, left: 52 };
   const plotWidth = Math.max(10, containerSize.width - padding.left - padding.right);
   const plotHeight = Math.max(10, containerSize.height - padding.top - padding.bottom);
 
@@ -94,29 +94,27 @@ export function NyquistPlot({
       imVals.push(-clampedIm);
     }
 
-    const minRe = Math.min(...reVals);
-    const maxRe = Math.max(...reVals);
-    const maxAbsIm = Math.max(1.2, ...imVals.map(Math.abs));
+    const maxAbsRe = Math.max(1.5, ...reVals.map(Math.abs));
+    const maxAbsIm = Math.max(1.5, ...imVals.map(Math.abs));
 
-    const widthRaw = Math.max(2.4, maxRe - minRe);
-    const heightRaw = Math.max(2.4, 2 * maxAbsIm);
-    const centerRe = (maxRe + minRe) / 2;
-    const centerIm = 0;
-
-    const extension = 1.25;
-    let spanRe = widthRaw * extension;
-    let spanIm = heightRaw * extension;
+    // Symmetrical 4-quadrant math span centered squarely at (0, 0)
+    const baseSpan = Math.max(maxAbsRe, maxAbsIm) * 1.45;
 
     const aspect = plotWidth / (plotHeight || 1);
-    if (spanRe / spanIm < aspect) {
-      spanRe = spanIm * aspect;
+    let spanRe = baseSpan * 2;
+    let spanIm = baseSpan * 2;
+
+    if (aspect >= 1) {
+      spanRe = baseSpan * 2 * aspect;
+      spanIm = baseSpan * 2;
     } else {
-      spanIm = spanRe / aspect;
+      spanRe = baseSpan * 2;
+      spanIm = (baseSpan * 2) / aspect;
     }
 
     return {
-      centerRe,
-      centerIm,
+      centerRe: 0,
+      centerIm: 0,
       spanRe,
       spanIm,
     };
@@ -327,7 +325,7 @@ export function NyquistPlot({
 
   return (
     <div
-      className={`relative flex flex-col w-full h-full min-h-0 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/60 backdrop-blur-sm shadow-sm p-4 ${className}`}
+      className={`relative flex flex-col w-full h-full min-h-[380px] md:min-h-[440px] rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/60 backdrop-blur-sm shadow-sm p-4 ${className}`}
       style={height !== undefined ? { height: typeof height === "number" ? `${height}px` : height } : undefined}
     >
       {/* Header Bar */}
@@ -436,7 +434,8 @@ export function NyquistPlot({
                 y1={padding.top}
                 x2={t.x}
                 y2={padding.top + plotHeight}
-                className={Math.abs(t.val) < 1e-6 ? "stroke-slate-400 dark:stroke-slate-500" : "stroke-slate-200 dark:stroke-slate-800"}
+                className={Math.abs(t.val) < 1e-6 ? "stroke-slate-400 dark:stroke-slate-500" : "stroke-slate-200/60 dark:stroke-slate-800/60"}
+                strokeDasharray={Math.abs(t.val) < 1e-6 ? undefined : "2 2"}
                 strokeWidth={Math.abs(t.val) < 1e-6 ? "1.5" : "1"}
               />
             ))}
@@ -451,7 +450,8 @@ export function NyquistPlot({
                 y1={t.y}
                 x2={padding.left + plotWidth}
                 y2={t.y}
-                className={Math.abs(t.val) < 1e-6 ? "stroke-slate-400 dark:stroke-slate-500" : "stroke-slate-200 dark:stroke-slate-800"}
+                className={Math.abs(t.val) < 1e-6 ? "stroke-slate-400 dark:stroke-slate-500" : "stroke-slate-200/60 dark:stroke-slate-800/60"}
+                strokeDasharray={Math.abs(t.val) < 1e-6 ? undefined : "2 2"}
                 strokeWidth={Math.abs(t.val) < 1e-6 ? "1.5" : "1"}
               />
             ))}
@@ -645,21 +645,15 @@ export function NyquistPlot({
         {/* Floating HUD Tooltip */}
         {hoverState && (
           <div
-            className="absolute pointer-events-none z-20 backdrop-blur-md bg-white/95 text-slate-900 border border-slate-200/80 shadow-xl shadow-slate-900/10 dark:bg-slate-900/90 dark:text-slate-100 dark:border-slate-700/60 dark:shadow-2xl rounded-xl p-3 text-xs min-w-44"
+            className="absolute pointer-events-none z-20 backdrop-blur-md bg-slate-900/90 text-white rounded-lg p-2.5 shadow-xl border border-slate-700/50 text-xs min-w-48"
             style={{
               left: Math.min(containerSize.width - 200, Math.max(10, hoverState.sx + 14)),
               top: Math.min(containerSize.height - 120, Math.max(10, hoverState.sy - 30)),
             }}
           >
-            <div className="flex items-center justify-between border-b border-slate-200/80 dark:border-slate-700/60 pb-1.5 mb-2 font-mono text-[11px]">
-              <span className="font-semibold text-slate-700 dark:text-slate-200">
-                {hoverState.point.omega !== undefined ? (
-                  <KatexMath
-                    math={`\\omega = ${hoverState.branch === "negative" ? "-" : ""}${hoverState.point.omega.toFixed(2)}\\text{ rad/s}`}
-                  />
-                ) : (
-                  <span>Point</span>
-                )}
+            <div className="flex items-center justify-between border-b border-slate-700/60 pb-1.5 mb-2 font-mono text-[11px]">
+              <span className="font-semibold text-slate-200">
+                <KatexMath math={hoverState.point.omega !== undefined ? `\\omega = ${hoverState.branch === "negative" ? "-" : ""}${hoverState.point.omega.toFixed(2)}\\text{ rad/s}` : "\\text{Point}"} />
               </span>
               <span
                 className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${

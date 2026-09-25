@@ -41,7 +41,7 @@ export function FourierAnalysisLab() {
           ]}
         />
       </div>
-      <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1.2fr)_minmax(18rem,.8fr)]">
+      <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1.2fr)_minmax(18rem,.8fr)]">
         <InnerBox>
           <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-white pb-2 border-b border-slate-100 dark:border-slate-800">TIME-DOMAIN SIGNAL</h3>
           <KatexMath math={`x(t)=${expression}`} className="mt-2 block min-h-7 overflow-x-auto text-lg font-black text-slate-900 dark:text-white" />
@@ -65,7 +65,7 @@ export function FourierAnalysisLab() {
       </div>
     </StudioCard>
     {parsed.ok && <>
-      <div className="grid gap-6 2xl:grid-cols-[minmax(0,1.35fr)_minmax(19rem,.65fr)]">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(19rem,.65fr)]">
         <StudioCard>
           <div className="mb-4">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-white pb-2 border-b border-slate-100 dark:border-slate-800">

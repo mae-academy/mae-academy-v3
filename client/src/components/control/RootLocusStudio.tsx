@@ -31,7 +31,7 @@ export function RootLocusStudio() {
 
   const [gainK, setGainK] = useState(1);
   const [kMin, setKMin] = useState(0.01);
-  const [kMax, setKMax] = useState(100);
+  const [kMax, setKMax] = useState(10);
   const [maxTime, setMaxTime] = useState(10.0);
   const [gridMode, setGridMode] = useState<"cartesian" | "polar">("cartesian");
   const [highlightedStep, setHighlightedStep] = useState<string | null>(null);
@@ -522,7 +522,7 @@ export function RootLocusStudio() {
         {/* RK4 Transient Metrics (1 quadrant = 3 of 12 columns) */}
         <StudioCard
           title="Transient Metrics"
-          className="lg:col-span-4 xl:col-span-3 w-full flex flex-col justify-between"
+          className="lg:col-span-5 w-full flex flex-col justify-between"
         >
           <div className="space-y-3">
             <div className="flex justify-between items-center pb-2 border-b border-slate-100 dark:border-slate-800">
@@ -580,7 +580,7 @@ export function RootLocusStudio() {
         <StudioCard
           title="Closed-Loop Poles"
           actionSlot={<KatexMath math={`K = ${Number(gainK.toFixed(4))}`} className="text-xs font-bold text-violet-600 dark:text-violet-400" />}
-          className="lg:col-span-8 xl:col-span-9 w-full flex flex-col justify-between"
+          className="lg:col-span-7 w-full flex flex-col justify-between"
         >
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
             {formattedGroupedRoots.map((group, i) => (

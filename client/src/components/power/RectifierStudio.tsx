@@ -401,7 +401,7 @@ export function RectifierStudio() {
     <StudioErrorBoundary studioName="Rectifier">
       <div className="space-y-6">
         <PowerWarningAlert warnings={simulation.warnings} />
-        <div className="grid gap-6 xl:grid-cols-2">
+        <div className="grid gap-4 lg:gap-5 lg:grid-cols-2 items-start">
           <aside className="space-y-6">
             {topologyPanel}
             {loadPanel}

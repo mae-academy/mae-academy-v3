@@ -477,7 +477,7 @@ export function InverterStudio() {
     <StudioErrorBoundary studioName="Inverter">
       <div className="space-y-6">
         <PowerWarningAlert warnings={displayWarnings} />
-        <div className="grid gap-6 xl:grid-cols-2">
+        <div className="grid gap-4 lg:gap-5 lg:grid-cols-2 items-start">
           <aside className="min-w-0 space-y-6">
             {topology}
             {control}

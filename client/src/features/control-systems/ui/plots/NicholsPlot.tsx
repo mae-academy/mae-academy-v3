@@ -58,7 +58,7 @@ export function NicholsPlot({
     return () => observer.disconnect();
   }, []);
 
-  const padding = { top: 24, right: 24, bottom: 36, left: 48 };
+  const padding = { top: 28, right: 30, bottom: 44, left: 52 };
   const plotWidth = Math.max(10, containerSize.width - padding.left - padding.right);
   const plotHeight = Math.max(10, containerSize.height - padding.top - padding.bottom);
 
@@ -251,7 +251,7 @@ export function NicholsPlot({
 
   return (
     <div
-      className={`relative flex flex-col w-full h-full min-h-0 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/60 backdrop-blur-sm shadow-sm p-4 ${className}`}
+      className={`relative flex flex-col w-full h-full min-h-[380px] md:min-h-[440px] rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/60 backdrop-blur-sm shadow-sm p-4 ${className}`}
       style={height !== undefined ? { height: typeof height === "number" ? `${height}px` : height } : undefined}
     >
       {/* Header Bar */}
@@ -327,7 +327,7 @@ export function NicholsPlot({
                 y1={padding.top}
                 x2={t.x}
                 y2={padding.top + plotHeight}
-                className={t.ph === -180 ? "stroke-rose-400/80 dark:stroke-rose-600/80" : "stroke-slate-200 dark:stroke-slate-800"}
+                className={t.ph === -180 ? "stroke-slate-400 dark:stroke-slate-500" : "stroke-slate-200/60 dark:stroke-slate-800/60"}
                 strokeWidth={t.ph === -180 ? "1.5" : "1"}
                 strokeDasharray={t.ph === -180 ? "4,4" : undefined}
               />
@@ -343,7 +343,7 @@ export function NicholsPlot({
                 y1={t.y}
                 x2={padding.left + plotWidth}
                 y2={t.y}
-                className={t.db === 0 ? "stroke-slate-400 dark:stroke-slate-500" : "stroke-slate-200 dark:stroke-slate-800"}
+                className={t.db === 0 ? "stroke-slate-400 dark:stroke-slate-500" : "stroke-slate-200/60 dark:stroke-slate-800/60"}
                 strokeWidth={t.db === 0 ? "1.5" : "1"}
                 strokeDasharray={t.db === 0 ? "4,4" : undefined}
               />
@@ -449,14 +449,14 @@ export function NicholsPlot({
         {/* Floating HUD Tooltip */}
         {hoverPoint && (
           <div
-            className="absolute pointer-events-none z-20 backdrop-blur-md bg-white/95 text-slate-900 border border-slate-200/80 shadow-xl shadow-slate-900/10 dark:bg-slate-900/90 dark:text-slate-100 dark:border-slate-700/60 dark:shadow-2xl rounded-xl p-3 text-xs min-w-44"
+            className="absolute pointer-events-none z-20 backdrop-blur-md bg-slate-900/90 text-white rounded-lg p-2.5 shadow-xl border border-slate-700/50 text-xs min-w-44"
             style={{
               left: Math.min(containerSize.width - 190, Math.max(10, hoverPoint.sx + 14)),
               top: Math.min(containerSize.height - 110, Math.max(10, hoverPoint.sy - 30)),
             }}
           >
-            <div className="flex items-center justify-between border-b border-slate-200/80 dark:border-slate-700/60 pb-1.5 mb-2 font-mono text-[11px]">
-              <span className="font-semibold text-slate-700 dark:text-slate-200">
+            <div className="flex items-center justify-between border-b border-slate-700/60 pb-1.5 mb-2 font-mono text-[11px]">
+              <span className="font-semibold text-slate-200">
                 {hoverPoint.point.omega !== undefined ? (
                   <KatexMath math={`\\omega = ${hoverPoint.point.omega.toFixed(2)}\\text{ rad/s}`} />
                 ) : (
@@ -466,18 +466,18 @@ export function NicholsPlot({
             </div>
             <div className="space-y-1.5 text-[11px]">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-slate-500 dark:text-slate-400">
+                <span className="text-slate-400">
                   <KatexMath math="|G(j\omega)| \text{ (dB)}" />
                 </span>
-                <span className="font-bold text-slate-800 dark:text-white">
+                <span className="font-bold text-white">
                   <KatexMath math={`|G(j\\omega)| = ${hoverPoint.point.magnitude.toFixed(2)}\\text{ dB}`} />
                 </span>
               </div>
               <div className="flex items-center justify-between gap-2">
-                <span className="text-slate-500 dark:text-slate-400">
+                <span className="text-slate-400">
                   <KatexMath math="\angle G(j\omega) \text{ } (^\circ)" />
                 </span>
-                <span className="font-medium text-slate-800 dark:text-slate-200">
+                <span className="font-medium text-slate-200">
                   <KatexMath math={`\\angle G(j\\omega) = ${hoverPoint.point.phase.toFixed(1)}^\\circ`} />
                 </span>
               </div>
