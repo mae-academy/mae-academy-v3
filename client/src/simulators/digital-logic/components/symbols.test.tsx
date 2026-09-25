@@ -19,10 +19,10 @@ describe('Tab D SVG symbol language', () => {
       expect((gate.match(/x1="-50"/g) ?? [])).toHaveLength(8);
       expect(gate).not.toContain('INPUTS</text>');
     });
-    expect(andEight).toContain('A 23,205.5');
-    expect(orEight).toContain('M -26,-205.5');
-    expect(xorEight).toContain('M -32,-205.5');
-    expect(xnorEight).toContain('M -32,-205.5');
+    expect(andEight).toContain('A 23,112.5');
+    expect(orEight).toContain('M -26,-112.5');
+    expect(xorEight).toContain('M -32,-112.5');
+    expect(xnorEight).toContain('M -32,-112.5');
     [andEight, orEight, xorEight].forEach(gate => expect(gate).toContain('x1="25" y1="0" x2="50" y2="0"'));
     [nandEight, norEight, xnorEight].forEach(gate => expect(gate).toContain('x1="34" y1="0" x2="50" y2="0"'));
   });
@@ -30,8 +30,8 @@ describe('Tab D SVG symbol language', () => {
   it('uses one centered body and boundary-connected leads for a generic IC block', () => {
     const mux = markup('logic-block', { _blockLabel: 'Multiplexer (MUX)', _inputCount: 6, _outputCount: 1 });
     expect((mux.match(/<rect/g) ?? [])).toHaveLength(1);
-    expect(mux).toContain('x="-50" y="-175" width="100" height="350"');
-    expect(mux).toContain('x1="-50" y1="-125" x2="-75" y2="-125"');
+    expect(mux).toContain('x="-50" y="-100" width="100" height="200"');
+    expect(mux).toContain('x1="-50" y1="-75" x2="-75" y2="-75"');
     expect(mux).toContain('x1="50" y1="0" x2="75" y2="0"');
     expect(mux).not.toContain('DES / Δ');
   });
@@ -39,10 +39,10 @@ describe('Tab D SVG symbol language', () => {
   it('renders standard MUX/DEMUX trapezoids with selector leads on the bottom edge', () => {
     const mux = markup('logic-block', { _componentType: 'logic-mux', _blockLabel: 'Multiplexer (MUX)', _terminals: [{ id: 'd0', type: 'input' }, { id: 'd1', type: 'input' }, { id: 'd2', type: 'input' }, { id: 'd3', type: 'input' }, { id: 's0', type: 'input' }, { id: 's1', type: 'input' }, { id: 'y', type: 'output' }] });
     const demux = markup('logic-block', { _componentType: 'logic-demux', _blockLabel: 'DEMUX', _terminals: [{ id: 'd', type: 'input' }, { id: 's0', type: 'input' }, { id: 's1', type: 'input' }, { id: 'y0', type: 'output' }, { id: 'y1', type: 'output' }, { id: 'y2', type: 'output' }, { id: 'y3', type: 'output' }] });
-    expect(mux).toContain('M -75,-125 L 75,-77.5');
-    expect(demux).toContain('M -75,-77.5 L 75,-125');
-    expect((mux.match(/y2="150"/g) ?? [])).toHaveLength(2);
-    expect((demux.match(/y2="150"/g) ?? [])).toHaveLength(2);
+    expect(mux).toContain('M -50,-75 L 50,-46.5');
+    expect(demux).toContain('M -50,-46.5 L 50,-75');
+    expect((mux.match(/y2="100"/g) ?? [])).toHaveLength(2);
+    expect((demux.match(/y2="100"/g) ?? [])).toHaveLength(2);
   });
 
   it('renders ALU notch, carry routing, edge-clock marker, and 5% memory cell grid', () => {

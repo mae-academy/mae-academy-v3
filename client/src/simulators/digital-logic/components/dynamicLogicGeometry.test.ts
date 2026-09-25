@@ -8,11 +8,11 @@ const component = (type: string, inputCount: number): CircuitComponent => ({ id:
 const wire = (id: string, terminal: string): CircuitWire => ({ id, fromComp: 'source', fromTerm: 'out', toComp: 'gate', toTerm: terminal, routing: 'orthogonal', path: [[0, 0], [20, 0]] });
 
 describe('Dynamic multi-input gate geometry', () => {
-  it('uses a 50px (2x grid) pin pitch and a vertically extended standard-gate frame for every eight-input gate, with every pin an exact multiple of the 25px grid', () => {
+  it('uses a 25px (1x grid) pin pitch with a centre gap and a vertically extended standard-gate frame for every eight-input gate, with every pin an exact multiple of the 25px grid', () => {
     ['gate-and', 'gate-or', 'gate-nand', 'gate-nor', 'gate-xor', 'gate-xnor'].forEach(type => {
       const geometry = dynamicGateGeometryFor(type, 8);
-      expect(geometry).toMatchObject({ inputCount: 8, width: 100, height: 425, inputX: -50, outputX: 50 });
-      expect(geometry.inputY).toEqual([-175, -125, -75, -25, 25, 75, 125, 175]);
+      expect(geometry).toMatchObject({ inputCount: 8, width: 100, height: 275, bodyHeight: 225, inputX: -50, outputX: 50 });
+      expect(geometry.inputY).toEqual([-100, -75, -50, -25, 25, 50, 75, 100]);
       geometry.inputY.forEach(y => expect(y % 25 === 0).toBe(true));
     });
   });
@@ -24,21 +24,21 @@ describe('Dynamic multi-input gate geometry', () => {
       const terminals = getLogicComponentTerminals(gate, definition);
       expect(terminals.map(terminal => terminal.id)).toEqual(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'y']);
       expect(terminals.at(-1)).toMatchObject({ id: 'y', x: 50, y: 0 });
-      expect(getLogicComponentBounds(gate, definition)).toMatchObject({ width: 100, height: 425 });
+      expect(getLogicComponentBounds(gate, definition)).toMatchObject({ width: 100, height: 275 });
     });
   });
 
   it('places MUX data pins on the wide side and selector pins on the bottom axis, every pin an exact multiple of the 25px grid', () => {
     const mux = component('logic-mux', 2);
     const terminals = getLogicComponentTerminals(mux, getDef('logic-mux')!);
-    expect(terminals.find(terminal => terminal.id === 'd0')).toMatchObject({ x: -100, y: -75 });
-    expect(terminals.find(terminal => terminal.id === 'd3')).toMatchObject({ x: -100, y: 75 });
+    expect(terminals.find(terminal => terminal.id === 'd0')).toMatchObject({ x: -75, y: -50 });
+    expect(terminals.find(terminal => terminal.id === 'd3')).toMatchObject({ x: -75, y: 50 });
     expect(terminals.find(terminal => terminal.id === 's0')?.x).toBe(-25);
-    expect(terminals.find(terminal => terminal.id === 's0')?.y).toBe(150);
+    expect(terminals.find(terminal => terminal.id === 's0')?.y).toBe(100);
     expect(terminals.find(terminal => terminal.id === 's1')?.x).toBe(25);
-    expect(terminals.find(terminal => terminal.id === 's1')?.y).toBe(150);
-    expect(terminals.find(terminal => terminal.id === 'y')).toMatchObject({ x: 100, y: 0 });
-    expect(getLogicComponentBounds(mux, getDef('logic-mux')!).height).toBe(300);
+    expect(terminals.find(terminal => terminal.id === 's1')?.y).toBe(100);
+    expect(terminals.find(terminal => terminal.id === 'y')).toMatchObject({ x: 75, y: 0 });
+    expect(getLogicComponentBounds(mux, getDef('logic-mux')!).height).toBe(200);
     terminals.forEach(pin => {
       expect(pin.x % 25 === 0).toBe(true);
       expect(pin.y % 25 === 0).toBe(true);
@@ -56,7 +56,7 @@ describe('Dynamic multi-input gate geometry', () => {
     expect(getLogicComponentTerminals(mux, getDef('logic-mux')!)).toHaveLength(12);
     const layout = logicBlockLayoutFor('logic-mux', dataPinIdsFor(3).concat(selectorPinIdsFor(3)), ['y']);
     expect(layout.pins.filter(pin => pin.side === 'bottom').map(pin => pin.id)).toEqual(['s0', 's1', 's2']);
-    expect(getLogicComponentBounds(mux, getDef('logic-mux')!).height).toBe(500);
+    expect(getLogicComponentBounds(mux, getDef('logic-mux')!).height).toBe(300);
   });
 
   it('garbage-collects wires that target removed dynamic input pins without disturbing valid connections', () => {
@@ -76,6 +76,7 @@ describe('Dynamic multi-input gate geometry', () => {
     const aLead = aluLayout.pins.find(pin => pin.id === 'a2')!;
     const aluBoundary = logicBodyBoundaryForPin('logic-alu-4bit', aLead, aluLayout);
     expect(aluBoundary[1]).toBeCloseTo(aLead.y);
-    expect(aluBoundary[0]).toBeGreaterThan(-aluLayout.bodyHalfWidth);
+    // a2 sits on the straight left edge above the centre notch, so its lead starts exactly on the body edge.
+    expect(aluBoundary[0]).toBeCloseTo(-aluLayout.bodyHalfWidth);
   });
 });

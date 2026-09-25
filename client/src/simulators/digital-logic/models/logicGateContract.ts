@@ -19,7 +19,8 @@ export const getLogicComponentBounds = (component: CircuitComponent, definition:
 };
 
 export const getLogicComponentTerminals = (component: CircuitComponent, definition: ComponentDef): ComponentDef['terminals'] => {
-  if (component.type === 'digital-input' || component.type === 'digital-output') return definition.terminals;
+  // Fixed-lead parts keep their catalog pins, which sit exactly on the drawn lead ends.
+  if (component.type === 'digital-input' || component.type === 'digital-output' || component.type === 'gate-not') return definition.terminals;
   if (LOGIC_COMPONENT_TYPES.has(component.type) && !MULTI_INPUT_GATE_TYPES.has(component.type)) {
     const pins = logicPinsFor(component);
     if (pins.inputs.length || pins.outputs.length) {

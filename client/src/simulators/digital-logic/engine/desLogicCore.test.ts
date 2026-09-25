@@ -117,3 +117,30 @@ describe('DES directed topology', () => {
     expect(engine.getSnapshot().terminalVoltages['counter:q1']).toBe(1);
   });
 });
+
+describe('DES shared-canvas T-junction nets', () => {
+  it('fans one driver out through a junction-split wire to every receiver and colours every segment', () => {
+    const engine = new DiscreteEventLogicEngine();
+    // Canvas T-junction: a→o1 was split at junc_1, then a branch was drawn from o2 to the junction.
+    engine.setCircuit(
+      [component('a', 'digital-input', { state: 'HIGH' }), component('o1', 'digital-output'), component('o2', 'digital-output')],
+      [wire('head', 'a', 'out', 'junc_1', 'p'), wire('tail', 'junc_1', 'p', 'o1', 'in'), wire('branch', 'o2', 'in', 'junc_1', 'p')],
+    );
+    const snapshot = engine.getSnapshot();
+    expect(snapshot.terminalVoltages['o1:in']).toBe(1);
+    expect(snapshot.terminalVoltages['o2:in']).toBe(1);
+    for (const id of ['head', 'tail', 'branch']) {
+      expect(engine.getWireLogicState(id)).toBe(1);
+      expect(snapshot.wireCurrents[id]).toBe(1);
+    }
+  });
+
+  it('merges chained junctions into one net', () => {
+    const engine = new DiscreteEventLogicEngine();
+    engine.setCircuit(
+      [component('a', 'digital-input', { state: 'HIGH' }), component('o', 'digital-output')],
+      [wire('w1', 'a', 'out', 'junc_1', 'p'), wire('w2', 'junc_1', 'p', 'junc_2', 'p'), wire('w3', 'junc_2', 'p', 'o', 'in')],
+    );
+    expect(engine.getSnapshot().terminalVoltages['o:in']).toBe(1);
+  });
+});

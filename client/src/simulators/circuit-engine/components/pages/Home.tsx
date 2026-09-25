@@ -1,4 +1,7 @@
-import { UnifiedWorkspaceShell } from '@/simulators/shared/workspace/UnifiedWorkspaceShell';
+import { BaseSchematicCanvas } from '@/components/common/schematic/BaseSchematicCanvas';
+import { useSchematicCanvas } from '@/components/common/schematic/useSchematicCanvas';
+import { pointInComponentBox } from '@/components/common/schematic/schematicGeometry';
+import type { SchematicBounds, SchematicComponentLibrary, SchematicTerminal } from '@/components/common/schematic/schematicTypes';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 /* MAE Luminous Technical Atelier: Tab D keeps documented 25 px terminal geometry,
    direct electromechanical controls, and a quiet Control Systems-aligned inspector. */
@@ -239,94 +242,10 @@ function getComponentTerminalPosition(component: CircuitComponent, terminalId: s
   );
 }
 
-function currentWireEndpoints(wire: CircuitWire, components: CircuitComponent[]): { from: Point; to: Point; fromAxis: TabDTerminalAxis; toAxis: TabDTerminalAxis } | null {
-  const isJunc = (id: string) => id.startsWith('junc_') || id.startsWith('junction') || id === 'junc' || id === 'junction';
-  let from: Point | null = null;
-  let fromAxis: TabDTerminalAxis = 'horizontal';
-
-  if (isJunc(wire.fromComp)) {
-    from = wire.path?.[0] ?? wire.junctionPoint ?? null;
-    fromAxis = wire.path && wire.path.length > 1 && Math.abs(wire.path[1][0] - wire.path[0][0]) > Math.abs(wire.path[1][1] - wire.path[0][1]) ? 'horizontal' : 'vertical';
-  } else {
-    const fromComponent = components.find(component => component.id === wire.fromComp);
-    if (!fromComponent) return null;
-    from = getComponentTerminalPosition(fromComponent, wire.fromTerm);
-    fromAxis = from && Math.abs(from[0] - fromComponent.x) >= Math.abs(from[1] - fromComponent.y) ? 'horizontal' : 'vertical';
-  }
-
-  if (wire.junctionPoint) {
-    return from ? { from, to: wire.junctionPoint, fromAxis, toAxis: fromAxis } : null;
-  }
-
-  let to: Point | null = null;
-  let toAxis: TabDTerminalAxis = 'horizontal';
-  if (isJunc(wire.toComp)) {
-    to = wire.path?.[wire.path.length - 1] ?? wire.junctionPoint ?? null;
-    toAxis = wire.path && wire.path.length > 1 && Math.abs(wire.path[wire.path.length - 1][0] - wire.path[wire.path.length - 2][0]) > Math.abs(wire.path[wire.path.length - 1][1] - wire.path[wire.path.length - 2][1]) ? 'horizontal' : 'vertical';
-  } else {
-    const toComponent = components.find(component => component.id === wire.toComp);
-    if (!toComponent) return null;
-    to = getComponentTerminalPosition(toComponent, wire.toTerm);
-    toAxis = to && Math.abs(to[0] - toComponent.x) >= Math.abs(to[1] - toComponent.y) ? 'horizontal' : 'vertical';
-  }
-
-  return from && to ? { from, to, fromAxis, toAxis } : null;
-}
-
-function refreshWireEndpoints(wires: CircuitWire[], components: CircuitComponent[], draggedComponentId?: string): CircuitWire[] {
-  return wires.map(wire => {
-    const endpoints = currentWireEndpoints(wire, components);
-    if (!endpoints) return wire;
-    const isConnectedToDragged = Boolean(draggedComponentId && (wire.fromComp === draggedComponentId || wire.toComp === draggedComponentId));
-    if (isConnectedToDragged) {
-      if (wire.routing === 'manual') {
-        const updatedPath = reconnectPathEndpoints(wire.path, endpoints.from, endpoints.to, wire.routing, [], wire.waypoints, undefined, endpoints.fromAxis);
-        return {
-          ...wire,
-          path: updatedPath,
-          waypoints: updatedPath.length > 2 ? updatedPath.slice(1, -1) : wire.waypoints,
-        };
-      }
-      const excludeIds = new Set([wire.fromComp, wire.toComp, draggedComponentId].filter(Boolean) as string[]);
-      const newPath = calculateOrthogonalPath(
-        endpoints.from,
-        endpoints.to,
-        components,
-        25,
-        excludeIds,
-        endpoints.fromAxis,
-        endpoints.toAxis,
-      );
-      return {
-        ...wire,
-        routing: 'orthogonal' as const,
-        path: newPath,
-        waypoints: undefined,
-      };
-    }
-    if (
-      wire.path.length >= 2 &&
-      Math.abs(wire.path[0][0] - endpoints.from[0]) < 1e-3 &&
-      Math.abs(wire.path[0][1] - endpoints.from[1]) < 1e-3 &&
-      Math.abs(wire.path[wire.path.length - 1][0] - endpoints.to[0]) < 1e-3 &&
-      Math.abs(wire.path[wire.path.length - 1][1] - endpoints.to[1]) < 1e-3
-    ) {
-      return wire;
-    }
-    return { ...wire, path: reconnectPathEndpoints(wire.path, endpoints.from, endpoints.to, wire.routing, [], wire.waypoints, undefined, endpoints.fromAxis) };
-  });
-}
-
 function oneBendManhattanPath(from: Point, to: Point): Point[] {
   if (from[0] === to[0] || from[1] === to[1]) return [from, to];
   const corner: Point = Math.abs(to[0] - from[0]) >= Math.abs(to[1] - from[1]) ? [to[0], from[1]] : [from[0], to[1]];
   return [from, corner, to];
-}
-
-function sourcePointFromElement(element: SVGSVGElement | null, pan: Point, zoom: number): Point {
-  const rect = element?.getBoundingClientRect();
-  if (!rect) return [300, 220];
-  return [(rect.width / 2 - pan[0]) / zoom, (rect.height / 2 - pan[1]) / zoom];
 }
 
 /** Renders an explicit clockwise current reference at the geometrical bounding-box midpoint of one bounded mesh face. */
@@ -972,6 +891,84 @@ function TheveninTerminalOverlay({
   );
 }
 
+/** World-space pin position; `alignToGrid` applies the Tab D terminal-to-grid snap (exact CAD parts bypass it). */
+function analogTerminalPosition(component: CircuitComponent, terminalId: string, tabD: boolean, alignToGrid: boolean): Point | null {
+  const definition = getDef(component.type);
+  const terminal = definition?.terminals.find(item => item.id === terminalId);
+  if (!terminal) return null;
+  if (isExactCadComponent(component.type)) {
+    const exact = getExactTerminalOffset(component.type, terminal.id) ?? [terminal.x, terminal.y];
+    return getTerminalWorldPos(component.x, component.y, exact[0], exact[1], component.rotation, component.flipH, component.flipV);
+  }
+  const scale = tabD ? TAB_D_SYMBOL_SCALE : 1;
+  const raw = getTerminalWorldPos(component.x, component.y, terminal.x * scale, terminal.y * scale, component.rotation, component.flipH, component.flipV);
+  return alignToGrid && tabD ? alignTabDTerminalToGrid(raw, TAB_D_GRID_SIZE) : raw;
+}
+
+/** Symbol-accurate body extents for parts whose drawing is not centred on the catalog box. */
+function analogBodyExtents(component: CircuitComponent, definition: ComponentDef, scale: number): [number, number, number] {
+  const type = component.type;
+  if (type === 'sw-spdt') return [25, 12.5, 12.5];
+  if (type === 'sw-dpst') return [25, 12.5, -12.5];
+  if (type === 'sw-dpdt') return [25, 37.5, 12.5];
+  if (type === 'pb-no') return [25, 12.5, -10];
+  if (['pb-nc', 'sw-spst-no', 'sw-spst-nc', 'aux-contact-no', 'aux-contact-nc'].includes(type)) return [25, 12.5, -5];
+  if (['fuse-3phase', 'circuit-breaker-3phase', 'aux-contact-3phase'].includes(type)) return [20, 35, 0];
+  if (type === 'contactor') return [35, 72.5, 12.5];
+  if (['relay-spst', 'relay-spdt', 'relay-dpst'].includes(type)) return [35, 35, 0];
+  if (['transformer', 'transformer-ct', 'autotransformer'].includes(type)) return [25, 50, 0];
+  if (/voltage|current|meter|motor|lamp|source/.test(type)) return [33, 33, 0];
+  return [(definition.width * scale) / 2, (definition.height * scale) / 2, 0];
+}
+
+/** Electrical component library adapter: the only canvas-facing surface of this studio's catalog. */
+export function createAnalogCanvasLibrary(tabD: boolean): SchematicComponentLibrary<CircuitComponent> {
+  const scale = tabD ? TAB_D_SYMBOL_SCALE : 1;
+  const gridSize = tabD ? TAB_D_GRID_SIZE : GRID_SIZE;
+  return {
+    getTerminals: (component): SchematicTerminal[] => (getDef(component.type)?.terminals ?? []).flatMap(terminal => {
+      const position = analogTerminalPosition(component, terminal.id, tabD, true);
+      return position ? [{ id: terminal.id, position, label: component.type === 'oscilloscope' ? undefined : terminal.name }] : [];
+    }),
+    hitTest: (component, point) => {
+      const definition = getDef(component.type);
+      if (!definition) return false;
+      const [halfWidth, halfHeight, offsetY] = analogBodyExtents(component, definition, scale);
+      if (pointInComponentBox(component, point, halfWidth, halfHeight, offsetY)) return true;
+      // Reference and value captions are part of the part's grab area.
+      const [labelX, labelY] = componentLabelOffset(definition, component, scale);
+      const [valueX, valueY] = componentValueAnchor(definition, component, scale);
+      const labelWidth = Math.max(48, component.label.length * 9);
+      if (Math.abs(point[0] - (component.x + labelX)) <= labelWidth / 2 && Math.abs(point[1] - (component.y + labelY)) <= 14) return true;
+      return Math.abs(point[0] - (component.x + valueX)) <= 36 && Math.abs(point[1] - (component.y + valueY)) <= 14;
+    },
+    route: (from, to, components, excludeIds, fromAxis, toAxis) => calculateOrthogonalPath(from, to, components, gridSize, excludeIds, fromAxis, toAxis),
+    createComponent: (type, position, existing) => {
+      if (tabD && !isTabDComponentAvailable(type)) {
+        toast.error('This power semiconductor is unavailable in this mode');
+        return null;
+      }
+      const definition = getDef(type);
+      if (!definition) return null;
+      return {
+        id: nanoid(10),
+        type,
+        x: position[0],
+        y: position[1],
+        rotation: 0,
+        flipH: false,
+        flipV: false,
+        label: nextComponentLabel(type, existing),
+        props: defaultProps(definition),
+      };
+    },
+    nextLabel: nextComponentLabel,
+    cloneForPaste: copyComponentForPaste,
+    validatePaste: components => (tabD && components.some(component => !isTabDComponentAvailable(component.type)) ? 'Some power semiconductors are unavailable in this mode' : null),
+    symbolScale: component => (isExactCadComponent(component.type) ? 1 : scale),
+  };
+}
+
 export interface V3HomeProps {
   /** Creates an isolated runtime while retaining the exact Tab B presentation contract. */
   createSimulationEngine?: () => SimulationEngine;
@@ -982,22 +979,30 @@ export interface V3HomeProps {
 }
 
 export function V3Home({ createSimulationEngine = () => new SimulationEngine(), createStaticMna, tabDUiRefinement = false }: V3HomeProps) {
-  const [components, setComponents] = useState<CircuitComponent[]>([]);
-  const [wires, setWires] = useState<CircuitWire[]>([]);
-  const [texts, setTexts] = useState<WorkspaceText[]>([]);
-  const [selection, setSelection] = useState<Selection>(null);
-  const [marqueeIds, setMarqueeIds] = useState<string[]>([]);
-  const [clipboard, setClipboard] = useState<{ components: CircuitComponent[], wires: CircuitWire[], texts: WorkspaceText[] } | null>(null);
-  const [pan, setPan] = useState<Point>([0, 0]);
-  const [zoom, setZoom] = useState(1);
-  const [gridVisible, setGridVisible] = useState(true);
-  const [tabDGridMode, setTabDGridMode] = useState<'dots' | 'cartesian' | 'hidden'>('dots');
-  const [snapEnabled, setSnapEnabled] = useState(true);
-  const [wiring, setWiring] = useState<WiringState>({});
-  const [dragState, setDragState] = useState<DragState>(null);
-  const [cursor, setCursor] = useState<Point>([0, 0]);
-  const [search, setSearch] = useState('');
-  const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
+  const gridSize = tabDUiRefinement ? TAB_D_GRID_SIZE : GRID_SIZE;
+  const visualSymbolScale = tabDUiRefinement ? TAB_D_SYMBOL_SCALE : 1;
+  const [darkPreview, setDarkPreview] = useState(() => typeof document !== 'undefined' && document.documentElement.classList.contains('dark'));
+  // Viewport, grid, wiring, selection, history, clipboard and shortcuts come from the shared schematic canvas.
+  const canvasLibrary = useMemo(() => createAnalogCanvasLibrary(tabDUiRefinement), [tabDUiRefinement]);
+  const componentPressRef = useRef<(component: CircuitComponent) => boolean>(() => false);
+  const componentClickRef = useRef<(component: CircuitComponent) => void>(() => undefined);
+  const pointerReleaseRef = useRef<() => void>(() => undefined);
+  const contentBoundsRef = useRef<() => SchematicBounds | null>(() => null);
+  const canvas = useSchematicCanvas<CircuitComponent>({
+    library: canvasLibrary,
+    gridSize,
+    isDark: darkPreview,
+    onComponentPress: component => componentPressRef.current(component),
+    onComponentClick: component => componentClickRef.current(component),
+    onPointerRelease: () => pointerReleaseRef.current(),
+    getContentBounds: () => contentBoundsRef.current(),
+  });
+  const { components, wires, texts, selectedComponent, selectedWire, selectedText, cursor } = canvas;
+  const { setComponents, setWires, setSelection, setMarqueeIds, commit: commitSnapshot, componentsRef: componentRef, wiresRef } = canvas.document;
+  const { svgRef, pan, zoom } = canvas.viewport;
+  const gridVisible = canvas.gridMode !== 'hidden';
+  const tabDGridMode = canvas.gridMode;
+  const snapEnabled = canvas.snapEnabled;
   const [simulationRunning, setSimulationRunning] = useState(false);
   // Academic mode removed: Practical mode is permanently active for accurate SPICE simulation.
   const [simulationMode] = useState<SimulationMode>('practical');
@@ -1012,26 +1017,11 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
   const hasStartedSimulation = useRef(false);
   const [snapshot, setSnapshot] = useState<SimulationSnapshot>(EMPTY_SNAPSHOT);
   const [animationTime, setAnimationTime] = useState(0);
-  const [darkPreview, setDarkPreview] = useState(() => typeof document !== 'undefined' && document.documentElement.classList.contains('dark'));
-  const [hoveredComponentId, setHoveredComponentId] = useState<string | null>(null);
-  const gridSize = tabDUiRefinement ? TAB_D_GRID_SIZE : GRID_SIZE;
-  const visualSymbolScale = tabDUiRefinement ? TAB_D_SYMBOL_SCALE : 1;
   const normalizedGraph = useMemo(() => NormalizedCircuitGraph.fromCanvas(components, wires), [components, wires]);
   const tabBMna = useSimulation(components, wires, normalizedGraph);
   const dcMna = useMemo(() => createStaticMna ? createStaticMna(components, wires, normalizedGraph) : tabBMna, [components, createStaticMna, normalizedGraph, tabBMna, wires]);
   const meshGeometry = useMemo(() => compileMeshGeometry(components, wires, normalizedGraph), [components, wires, normalizedGraph]);
   const nodalGeometry = useMemo(() => compileNodalGeometry(components, wires, normalizedGraph), [components, wires, normalizedGraph]);
-
-  // Phase 2: compute all H×V wire-crossing intersections once per render.
-  // Used to inject jump-arc SVG paths (cross-net) and junction dots (same-net).
-  const wireIntersectionList = useMemo(
-    () => calculateWireIntersections(wires, w => normalizedGraph.netForTerminal(w.fromComp, w.fromTerm)),
-    [wires, normalizedGraph],
-  );
-  const junctionDots = useMemo(
-    () => junctionDotPositions(wireIntersectionList, wires, w => normalizedGraph.netForTerminal(w.fromComp, w.fromTerm)),
-    [wireIntersectionList, wires, normalizedGraph],
-  );
 
   const [analysisTraces, setAnalysisTraces] = useState<Partial<Record<AnalysisMethod, AnalysisTrace>>>({});
   const [activeAnalysisTrace, setActiveAnalysisTrace] = useState<AnalysisTrace | null>(null);
@@ -1070,16 +1060,12 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     return () => observer.disconnect();
   }, []);
 
-  const svgRef = useRef<SVGSVGElement>(null);
   const nadInputRef = useRef<HTMLInputElement>(null);
   const simulation = useRef<SimulationEngine>(createSimulationEngine());
   const animationFrame = useRef<number | null>(null);
   // Read inside the rAF loop below instead of a dependency, so a burnout write-back (which changes
   // `effectiveCircuitComponents`) never tears down and restarts the loop mid-run.
   const liveComponentsRef = useRef<CircuitComponent[]>([]);
-  const componentRef = useRef(components);
-  const wiresRef = useRef(wires);
-  const textsRef = useRef(texts);
   const tabDUiRefinementRef = useRef(tabDUiRefinement);
   const activeMomentaryControlRef = useRef<string | null>(null);
   // Set by every switch/pushbutton/relay-force toggle (see updateComponentProperty and
@@ -1090,85 +1076,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
   const requestEagerSpiceRun = useCallback(() => {
     spiceEagerRef.current = true;
   }, []);
-  componentRef.current = components;
-  wiresRef.current = wires;
-  textsRef.current = texts;
   tabDUiRefinementRef.current = tabDUiRefinement;
-
-  const history = useHistory<CanvasSnapshot>(
-    () => ({
-      components: [],
-      wires: [],
-      texts: [],
-    }),
-    { areEqual: areSnapshotsEqual },
-  );
-  const dragStartSnapshotRef = useRef<CanvasSnapshot | null>(null);
-  // Armed when a latching control (a standard switch) is pressed on the canvas — never a relay or
-  // contactor body, whose contacts stay strictly coil-driven — and
-  // cleared as soon as the pointer moves far enough to be a drag — so the mouse-up below toggles a
-  // click but never a drag.
-  const latchingClickRef = useRef<{ id: string; origin: Point } | null>(null);
-
-  const commitSnapshot = useCallback((patch?: Partial<CanvasSnapshot>) => {
-    const currentSnapshot: CanvasSnapshot = {
-      components: patch?.components ?? componentRef.current,
-      wires: patch?.wires ?? wiresRef.current,
-      texts: patch?.texts ?? textsRef.current,
-    };
-    history.set(cloneSnapshot(currentSnapshot));
-  }, [history]);
-
-  const handleUndo = useCallback(() => {
-    if (!history.canUndo) return;
-    const previous = history.undo();
-    if (!previous) return;
-    setComponents(previous.components);
-    setWires(previous.wires);
-    setTexts(previous.texts);
-    setSelection(null);
-    setMarqueeIds([]);
-    setWiring({});
-  }, [history]);
-
-  const handleRedo = useCallback(() => {
-    if (!history.canRedo) return;
-    const next = history.redo();
-    if (!next) return;
-    setComponents(next.components);
-    setWires(next.wires);
-    setTexts(next.texts);
-    setSelection(null);
-    setMarqueeIds([]);
-    setWiring({});
-  }, [history]);
-
-  useEffect(() => {
-    const canvas = svgRef.current;
-    if (!canvas) return;
-    const handleNativeWheel = (event: WheelEvent) => {
-      event.preventDefault();
-      const rect = canvas.getBoundingClientRect();
-      if (!rect) return;
-      if (event.shiftKey || (Math.abs(event.deltaX) > Math.abs(event.deltaY) && !event.ctrlKey)) {
-        setPan((previous) => [previous[0] - event.deltaX, previous[1] - event.deltaY]);
-        return;
-      }
-      // Tab B retains its established response; Tab D uses a pixel-normalized gentle response.
-      const factor = tabDUiRefinementRef.current
-        ? tabDGentleWheelZoomFactor(event.deltaY)
-        : event.deltaY < 0 ? 1.12 : 0.9;
-      const mouseX = event.clientX - rect.left;
-      const mouseY = event.clientY - rect.top;
-      setZoom((current) => {
-        const next = Math.max(0.2, Math.min(3, current * factor));
-        setPan((previous) => [mouseX - (mouseX - previous[0]) * (next / current), mouseY - (mouseY - previous[1]) * (next / current)]);
-        return next;
-      });
-    };
-    canvas.addEventListener('wheel', handleNativeWheel, { passive: false });
-    return () => canvas.removeEventListener('wheel', handleNativeWheel);
-  }, []);
 
   const colors = darkPreview
     ? {
@@ -1221,38 +1129,8 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [components.length, wires.length]);
 
-  const selectedComponent = selection?.kind === 'component'
-    ? components.find(component => component.id === selection.id)
-    : undefined;
-  const selectedWire = selection?.kind === 'wire'
-    ? wires.find(wire => wire.id === selection.id)
-    : undefined;
-  const selectedText = selection?.kind === 'text'
-    ? texts.find(text => text.id === selection.id)
-    : undefined;
-
-  const clientToWorld = useCallback((clientX: number, clientY: number): Point => {
-    const rect = svgRef.current?.getBoundingClientRect();
-    if (!rect) return [0, 0];
-    return [(clientX - rect.left - pan[0]) / zoom, (clientY - rect.top - pan[1]) / zoom];
-  }, [pan, zoom]);
-
-  const getRawCanvasTerminalPosition = useCallback((component: CircuitComponent, terminalId: string): Point | null => {
-    const definition = getDef(component.type);
-    const terminal = definition?.terminals.find(item => item.id === terminalId);
-    if (!terminal) return null;
-    if (isExactCadComponent(component.type)) {
-      const exact = getExactTerminalOffset(component.type, terminal.id) ?? [terminal.x, terminal.y];
-      return getTerminalWorldPos(component.x, component.y, exact[0], exact[1], component.rotation, component.flipH, component.flipV);
-    }
-    return getTerminalWorldPos(component.x, component.y, terminal.x * visualSymbolScale, terminal.y * visualSymbolScale, component.rotation, component.flipH, component.flipV);
-  }, [visualSymbolScale]);
-
-  const getCanvasTerminalPosition = useCallback((component: CircuitComponent, terminalId: string): Point | null => {
-    const raw = getRawCanvasTerminalPosition(component, terminalId);
-    if (isExactCadComponent(component.type)) return raw; // strict sub-grid bypass
-    return raw && tabDUiRefinement ? alignTabDTerminalToGrid(raw, gridSize) : raw;
-  }, [getRawCanvasTerminalPosition, gridSize, tabDUiRefinement]);
+  const getCanvasTerminalPosition = useCallback((component: CircuitComponent, terminalId: string): Point | null =>
+    analogTerminalPosition(component, terminalId, tabDUiRefinement, true), [tabDUiRefinement]);
 
   const isTheveninActive = activeAnalysisMethod === 'thevenin' || activeAnalysisMethod === 'transform';
   const theveninTargetId = isTheveninActive ? activeTheveninTrace?.targetId : null;
@@ -1324,103 +1202,9 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     return { posA, posB };
   }, [isSuperpositionActive, superpositionTargetComp, getCanvasTerminalPosition]);
 
-  const canvasWireEndpoints = useCallback((wire: CircuitWire, documentComponents: CircuitComponent[]): { from: Point; to: Point; fromAxis: TabDTerminalAxis; toAxis: TabDTerminalAxis } | null => {
-    let from: Point | null = null;
-    let fromAxis: TabDTerminalAxis = 'horizontal';
-
-    const isJunc = (id: string) => id.startsWith('junc_') || id.startsWith('junction') || id === 'junc' || id === 'junction';
-
-    if (isJunc(wire.fromComp)) {
-      from = wire.path?.[0] ?? wire.junctionPoint ?? null;
-      fromAxis = wire.path && wire.path.length > 1 && Math.abs(wire.path[1][0] - wire.path[0][0]) > Math.abs(wire.path[1][1] - wire.path[0][1]) ? 'horizontal' : 'vertical';
-    } else {
-      const fromComponent = documentComponents.find(component => component.id === wire.fromComp);
-      if (!fromComponent) return null;
-      from = getCanvasTerminalPosition(fromComponent, wire.fromTerm);
-      if (from) {
-        fromAxis = Math.abs(from[0] - fromComponent.x) >= Math.abs(from[1] - fromComponent.y) ? 'horizontal' : 'vertical';
-      }
-    }
-
-    if (wire.junctionPoint) {
-      return from ? { from, to: wire.junctionPoint, fromAxis, toAxis: fromAxis } : null;
-    }
-
-    let to: Point | null = null;
-    let toAxis: TabDTerminalAxis = 'horizontal';
-    if (isJunc(wire.toComp)) {
-      to = wire.path?.[wire.path.length - 1] ?? wire.junctionPoint ?? null;
-      toAxis = wire.path && wire.path.length > 1 && Math.abs(wire.path[wire.path.length - 1][0] - wire.path[wire.path.length - 2][0]) > Math.abs(wire.path[wire.path.length - 1][1] - wire.path[wire.path.length - 2][1]) ? 'horizontal' : 'vertical';
-    } else {
-      const toComponent = documentComponents.find(component => component.id === wire.toComp);
-      if (!toComponent) return null;
-      to = getCanvasTerminalPosition(toComponent, wire.toTerm);
-      if (to) {
-        toAxis = Math.abs(to[0] - toComponent.x) >= Math.abs(to[1] - toComponent.y) ? 'horizontal' : 'vertical';
-      }
-    }
-
-    return from && to ? { from, to, fromAxis, toAxis } : null;
-  }, [getCanvasTerminalPosition]);
-
-  const refreshCanvasWireEndpoints = useCallback((
-    documentWires: CircuitWire[],
-    documentComponents: CircuitComponent[],
-    draggedComponentId?: string,
-  ) => {
-    if (!tabDUiRefinement) return refreshWireEndpoints(documentWires, documentComponents, draggedComponentId);
-
-    const activeDraggedId = draggedComponentId ?? (dragState?.kind === 'component' ? dragState.id : undefined);
-
-    return documentWires.map(wire => {
-      const endpoints = canvasWireEndpoints(wire, documentComponents);
-      if (!endpoints) return wire;
-
-      const isConnectedToDragged = Boolean(activeDraggedId && (wire.fromComp === activeDraggedId || wire.toComp === activeDraggedId));
-
-      if (isConnectedToDragged) {
-        if (wire.routing === 'manual') {
-          const updatedPath = reconnectPathEndpoints(wire.path, endpoints.from, endpoints.to, wire.routing, [], wire.waypoints, gridSize, endpoints.fromAxis);
-          return {
-            ...wire,
-            path: updatedPath,
-            waypoints: updatedPath.length > 2 ? updatedPath.slice(1, -1) : wire.waypoints,
-          };
-        }
-        // Force complete recalculation of the entire path for all wires connected to its pins.
-        // Intercept connected wires, purge old intermediate waypoints, and call routing engine.
-        // Dragged component itself and connection partner are excluded from obstacle collision.
-        const excludeIds = new Set([wire.fromComp, wire.toComp, activeDraggedId].filter(Boolean) as string[]);
-        const newPath = calculateOrthogonalPath(
-          endpoints.from,
-          endpoints.to,
-          documentComponents,
-          gridSize,
-          excludeIds,
-          endpoints.fromAxis,
-          endpoints.toAxis,
-        );
-        return {
-          ...wire,
-          routing: 'orthogonal' as const,
-          path: newPath,
-          waypoints: undefined,
-        };
-      }
-
-      if (
-        dragState?.kind !== 'component' &&
-        wire.path.length >= 2 &&
-        Math.abs(wire.path[0][0] - endpoints.from[0]) < 1e-3 &&
-        Math.abs(wire.path[0][1] - endpoints.from[1]) < 1e-3 &&
-        Math.abs(wire.path[wire.path.length - 1][0] - endpoints.to[0]) < 1e-3 &&
-        Math.abs(wire.path[wire.path.length - 1][1] - endpoints.to[1]) < 1e-3
-      ) {
-        return wire;
-      }
-      return { ...wire, path: reconnectPathEndpoints(wire.path, endpoints.from, endpoints.to, wire.routing, [], wire.waypoints, gridSize, endpoints.fromAxis) };
-    });
-  }, [canvasWireEndpoints, tabDUiRefinement, gridSize, dragState]);
+  const canvasWireEndpoints = canvas.wireEndpoints;
+  const refreshCanvasWireEndpoints = useCallback((documentWires: CircuitWire[], documentComponents: CircuitComponent[], movedComponentId?: string) =>
+    canvas.refreshWires(documentWires, documentComponents, movedComponentId ? new Set([movedComponentId]) : undefined), [canvas]);
 
   const recalculateAllOrthogonalPaths = useCallback((
     documentWires: CircuitWire[],
@@ -1504,245 +1288,6 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     });
   }, [canvasWireEndpoints, gridSize]);
 
-  const findTerminalAt = useCallback((point: Point): { componentId: string; terminalId: string; position: Point; axis: TabDTerminalAxis } | null => {
-    for (const component of [...componentRef.current].reverse()) {
-      const definition = getDef(component.type);
-      if (!definition) continue;
-      for (const terminal of definition.terminals) {
-        const position = getCanvasTerminalPosition(component, terminal.id);
-        if (position && isNearTerminal(point[0], point[1], position[0], position[1], TERMINAL_HIT_RADIUS)) {
-          const axis: TabDTerminalAxis = Math.abs(position[0] - component.x) >= Math.abs(position[1] - component.y) ? 'horizontal' : 'vertical';
-          return { componentId: component.id, terminalId: terminal.id, position, axis };
-        }
-      }
-    }
-    return null;
-  }, [getCanvasTerminalPosition]);
-
-  const findComponentAt = useCallback((point: Point): CircuitComponent | null => {
-    for (const component of [...componentRef.current].reverse()) {
-      const definition = getDef(component.type);
-      if (!definition) continue;
-      const dx = point[0] - component.x;
-      const dy = point[1] - component.y;
-      const radians = (-component.rotation * Math.PI) / 180;
-      const localX = dx * Math.cos(radians) - dy * Math.sin(radians);
-      const localY = dx * Math.sin(radians) + dy * Math.cos(radians);
-      const flippedX = component.flipH ? -localX : localX;
-      const flippedY = component.flipV ? -localY : localY;
-
-      let actualHalfW = (definition.width * visualSymbolScale) / 2;
-      let actualHalfH = (definition.height * visualSymbolScale) / 2;
-      let offsetY = 0;
-
-      if (component.type === 'sw-spdt') {
-        actualHalfW = 25; actualHalfH = 12.5; offsetY = 12.5;
-      } else if (component.type === 'sw-dpst') {
-        actualHalfW = 25; actualHalfH = 12.5; offsetY = -12.5;
-      } else if (component.type === 'sw-dpdt') {
-        actualHalfW = 25; actualHalfH = 37.5; offsetY = 12.5;
-      } else if (component.type === 'pb-no') {
-        actualHalfW = 25; actualHalfH = 12.5; offsetY = -10;
-      } else if (['pb-nc', 'sw-spst-no', 'sw-spst-nc', 'aux-contact-no', 'aux-contact-nc'].includes(component.type)) {
-        actualHalfW = 25; actualHalfH = 12.5; offsetY = -5;
-      } else if (['fuse-3phase', 'circuit-breaker-3phase', 'aux-contact-3phase'].includes(component.type)) {
-        actualHalfW = 20; actualHalfH = 35; offsetY = 0;
-      } else if (component.type === 'contactor') {
-        actualHalfW = 35; actualHalfH = 72.5; offsetY = 12.5;
-      } else if (['relay-spst', 'relay-spdt', 'relay-dpst'].includes(component.type)) {
-        actualHalfW = 35; actualHalfH = 35; offsetY = 0;
-      } else if (['transformer', 'transformer-ct', 'autotransformer'].includes(component.type)) {
-        actualHalfW = 25; actualHalfH = 50; offsetY = 0;
-      } else if (/voltage|current|meter|motor|lamp|source/.test(component.type)) {
-        actualHalfW = 33; actualHalfH = 33; offsetY = 0;
-      }
-
-      if (Math.abs(flippedX) <= actualHalfW + 10 && Math.abs(flippedY - offsetY) <= actualHalfH + 10) return component;
-      const [labelX, labelY] = componentLabelOffset(definition, component, visualSymbolScale);
-      const [valX, valY] = componentValueAnchor(definition, component, visualSymbolScale);
-      const labelWidth = Math.max(48, component.label.length * 9);
-      if (Math.abs(point[0] - (component.x + labelX)) <= labelWidth / 2 && Math.abs(point[1] - (component.y + labelY)) <= 14) return component;
-      if (Math.abs(point[0] - (component.x + valX)) <= 36 && Math.abs(point[1] - (component.y + valY)) <= 14) return component;
-    }
-    return null;
-  }, [visualSymbolScale]);
-
-  const addComponent = useCallback((type: string, x?: number, y?: number) => {
-    if (tabDUiRefinement && !isTabDComponentAvailable(type)) {
-      toast.error('This power semiconductor is unavailable in this mode');
-      return;
-    }
-    const definition = getDef(type);
-    if (!definition) return;
-    const origin = sourcePointFromElement(svgRef.current, pan, zoom);
-    const targetX = x ?? origin[0];
-    const targetY = y ?? origin[1];
-    const position = snapEnabled ? snapPointToGrid([targetX, targetY], gridSize) : [targetX, targetY];
-    const component: CircuitComponent = {
-      id: nanoid(10),
-      type,
-      x: position[0],
-      y: position[1],
-      rotation: 0,
-      flipH: false,
-      flipV: false,
-      label: nextComponentLabel(type, components),
-      props: defaultProps(definition),
-    };
-    const nextComponents = [...components, component];
-    setComponents(nextComponents);
-    commitSnapshot({ components: nextComponents });
-    setSelection({ kind: 'component', id: component.id });
-    toast.success(`${component.label} added`);
-  }, [commitSnapshot, components, gridSize, pan, snapEnabled, tabDUiRefinement, zoom]);
-
-  const addText = useCallback(() => {
-    const origin = sourcePointFromElement(svgRef.current, pan, zoom);
-    const text: WorkspaceText = {
-      id: nanoid(10),
-      x: snapEnabled ? snapToGrid(origin[0], gridSize) : origin[0],
-      y: snapEnabled ? snapToGrid(origin[1], gridSize) : origin[1],
-      text: 'Text label',
-      fontSize: 16,
-      color: darkPreview ? '#e2e8f0' : '#172033',
-      rotation: 0,
-    };
-    const nextTexts = [...texts, text];
-    setTexts(nextTexts);
-    commitSnapshot({ texts: nextTexts });
-    setSelection({ kind: 'text', id: text.id });
-  }, [commitSnapshot, darkPreview, gridSize, pan, snapEnabled, texts, zoom]);
-
-  const removeSelection = useCallback(() => {
-    if (marqueeIds.length > 0) {
-      const nextC = components.filter(c => !marqueeIds.includes(c.id));
-      const nextW = wires.filter(w => !marqueeIds.includes(w.id) && !marqueeIds.includes(w.fromComp) && !marqueeIds.includes(w.toComp));
-      const nextT = texts.filter(t => !marqueeIds.includes(t.id));
-      setComponents(nextC);
-      setWires(nextW);
-      setTexts(nextT);
-      commitSnapshot({ components: nextC, wires: nextW, texts: nextT });
-      setSelection(null);
-      setMarqueeIds([]);
-      return;
-    }
-    if (!selection) return;
-    let nextC = components;
-    let nextW = wires;
-    let nextT = texts;
-    if (selection.kind === 'component') {
-      nextC = components.filter(component => component.id !== selection.id);
-      nextW = wires.filter(wire => wire.fromComp !== selection.id && wire.toComp !== selection.id);
-    }
-    if (selection.kind === 'wire') {
-      nextW = wires.filter(wire => wire.id !== selection.id && wire.junctionWireId !== selection.id);
-    }
-    if (selection.kind === 'text') {
-      nextT = texts.filter(text => text.id !== selection.id);
-    }
-    setComponents(nextC);
-    setWires(nextW);
-    setTexts(nextT);
-    commitSnapshot({ components: nextC, wires: nextW, texts: nextT });
-    setSelection(null);
-  }, [commitSnapshot, components, marqueeIds, selection, texts, wires]);
-
-  const copySelection = useCallback(() => {
-    if (marqueeIds.length > 0) {
-      const copiedComponents = components.filter(c => marqueeIds.includes(c.id));
-      const copiedWires = wires.filter(w => marqueeIds.includes(w.id) || (marqueeIds.includes(w.fromComp) && marqueeIds.includes(w.toComp)));
-      const copiedTexts = texts.filter(t => marqueeIds.includes(t.id));
-      setClipboard(structuredClone({ components: copiedComponents, wires: copiedWires, texts: copiedTexts }));
-      toast.success(`${copiedComponents.length + copiedWires.length + copiedTexts.length} items copied`);
-      return;
-    }
-    if (!selectedComponent) return;
-    setClipboard(structuredClone({ components: [selectedComponent], wires: [], texts: [] }));
-    toast.success(`${selectedComponent.label} copied`);
-  }, [selectedComponent, marqueeIds, components, wires, texts]);
-
-  const cutSelection = useCallback(() => {
-    copySelection();
-    removeSelection();
-  }, [removeSelection, copySelection]);
-
-  const pasteClipboard = useCallback(() => {
-    if (!clipboard || (clipboard.components.length === 0 && clipboard.texts.length === 0 && clipboard.wires.length === 0)) return;
-    if (tabDUiRefinement && clipboard.components.some(c => !isTabDComponentAvailable(c.type))) {
-      toast.error('Some power semiconductors are unavailable in this mode');
-      return;
-    }
-    const origin = sourcePointFromElement(svgRef.current, pan, zoom);
-
-    // Find bounding box top-left of clipboard items
-    let minX = Infinity; let minY = Infinity;
-    clipboard.components.forEach(c => { minX = Math.min(minX, c.x); minY = Math.min(minY, c.y); });
-    clipboard.texts.forEach(t => { minX = Math.min(minX, t.x); minY = Math.min(minY, t.y); });
-    if (minX === Infinity) { minX = 0; minY = 0; }
-
-    const targetX = snapEnabled ? snapToGrid(origin[0] + gridSize * 2, gridSize) : origin[0] + gridSize * 2;
-    const targetY = snapEnabled ? snapToGrid(origin[1] + gridSize * 2, gridSize) : origin[1] + gridSize * 2;
-    const dx = targetX - minX;
-    const dy = targetY - minY;
-
-    const idMap = new Map<string, string>();
-    const nextComponents = [...components];
-
-    const pastedComponents = clipboard.components.map(c => {
-      const newId = nanoid(10);
-      idMap.set(c.id, newId);
-      const pasted = copyComponentForPaste(c, newId, nextComponentLabel(c.type, nextComponents), c.x + dx, c.y + dy);
-      nextComponents.push(pasted);
-      return pasted;
-    });
-
-    const pastedTexts = clipboard.texts.map(t => ({
-      ...t,
-      id: nanoid(10),
-      x: t.x + dx,
-      y: t.y + dy
-    }));
-
-    // Map any junction IDs in clipboard wires to new unique junction IDs
-    for (const w of clipboard.wires) {
-      if (w.fromComp.startsWith('junc_') && !idMap.has(w.fromComp)) {
-        idMap.set(w.fromComp, `junc_${nanoid(10)}`);
-      }
-      if (w.toComp.startsWith('junc_') && !idMap.has(w.toComp)) {
-        idMap.set(w.toComp, `junc_${nanoid(10)}`);
-      }
-    }
-
-    const pastedWires = clipboard.wires.map(w => ({
-      ...w,
-      id: nanoid(10),
-      fromComp: idMap.get(w.fromComp) ?? w.fromComp,
-      toComp: idMap.get(w.toComp) ?? w.toComp,
-      path: w.path.map(p => [p[0] + dx, p[1] + dy] as Point),
-      waypoints: w.waypoints ? w.waypoints.map(p => [p[0] + dx, p[1] + dy] as Point) : undefined,
-      junctionPoint: w.junctionPoint ? [w.junctionPoint[0] + dx, w.junctionPoint[1] + dy] as Point : undefined,
-    }));
-
-    const nextPastedComponents = [...components, ...pastedComponents];
-    const nextPastedTexts = [...texts, ...pastedTexts];
-    const nextPastedWires = [...wires, ...pastedWires];
-
-    setComponents(nextPastedComponents);
-    setTexts(nextPastedTexts);
-    setWires(nextPastedWires);
-    commitSnapshot({ components: nextPastedComponents, wires: nextPastedWires, texts: nextPastedTexts });
-
-    const newIds = [...pastedComponents.map(c => c.id), ...pastedTexts.map(t => t.id), ...pastedWires.map(w => w.id)];
-    if (newIds.length === 1 && pastedComponents.length === 1) {
-      setSelection({ kind: 'component', id: pastedComponents[0].id });
-      setMarqueeIds([]);
-    } else {
-      setSelection(null);
-      setMarqueeIds(newIds);
-    }
-    toast.success(`${newIds.length} items pasted`);
-  }, [clipboard, commitSnapshot, components, gridSize, pan, snapEnabled, tabDUiRefinement, texts, wires, zoom]);
-
   const exportNad = useCallback(() => {
     const document = createNadDocument({ components, wires, texts, viewport: { pan, zoom }, workspace: { gridVisible, snapEnabled } });
     const href = URL.createObjectURL(new Blob([serializeNad(document)], { type: 'application/x-mae-nad+json' }));
@@ -1801,22 +1346,11 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
 
     const refreshedWires = recalculateAllOrthogonalPaths(importedWires, importedComponents);
 
-    setComponents(importedComponents);
-    setWires(refreshedWires);
-    setTexts(document.texts || []);
-    history.reset(cloneSnapshot({
-      components: importedComponents,
-      wires: refreshedWires,
-      texts: document.texts || [],
-    }));
-    setPan(document.viewport.pan);
-    setZoom(document.viewport.zoom);
-    setGridVisible(document.workspace.gridVisible);
-    setSnapEnabled(document.workspace.snapEnabled);
-    setSelection(null);
-    setMarqueeIds([]);
-    setWiring({});
-    setDragState(null);
+    canvas.loadDocument({ components: importedComponents, wires: refreshedWires, texts: document.texts || [] }, { resetHistory: true });
+    canvas.viewport.setView({ zoom: document.viewport.zoom, pan: document.viewport.pan });
+    if (!document.workspace.gridVisible) canvas.setGridMode('hidden');
+    else if (canvas.gridMode === 'hidden') canvas.setGridMode('dots');
+    canvas.setSnapEnabled(document.workspace.snapEnabled);
 
     // Re-snap all wires to exact live pin locations after layout settles
     requestAnimationFrame(() => {
@@ -1827,7 +1361,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     }, 60);
 
     return { importedComponents, importedWires: refreshedWires };
-  }, [history, recalculateAllOrthogonalPaths, tabDUiRefinement]);
+  }, [canvas, recalculateAllOrthogonalPaths, tabDUiRefinement]);
 
   const importNad = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -1947,6 +1481,10 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
       centerY: (minY + maxY) / 2,
     };
   }, [components, getCanvasTerminalPosition, texts, visualSymbolScale, wires]);
+  contentBoundsRef.current = () => {
+    const bounds = getCircuitBoundingBox();
+    return bounds ? { centerX: bounds.centerX, centerY: bounds.centerY, width: bounds.circuitWidth, height: bounds.circuitHeight } : null;
+  };
 
   const generateCircuitSnapshot = useCallback((): string | null => {
     const liveSvg = svgRef.current;
@@ -2024,98 +1562,6 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     // Open internal ShareProjectModal
     setShareModalOpen(true);
   }, [components, generateCircuitSnapshot, gridVisible, pan, snapEnabled, texts, wires, zoom]);
-
-  const zoomToFit = useCallback(() => {
-    if (components.length === 0 && texts.length === 0) {
-      setZoom(1);
-      setPan([0, 0]);
-      return;
-    }
-
-    const bounds = getCircuitBoundingBox();
-    if (!bounds) {
-      setZoom(1);
-      setPan([0, 0]);
-      return;
-    }
-
-    const rect = svgRef.current?.getBoundingClientRect();
-    const width = rect?.width || 800;
-    const height = rect?.height || 600;
-    const pad = 60;
-
-    const availWidth = Math.max(20, width - pad * 2);
-    const availHeight = Math.max(20, height - pad * 2);
-    const newZoom = Math.max(0.2, Math.min(2.5, Math.min(availWidth / bounds.circuitWidth, availHeight / bounds.circuitHeight)));
-
-    const newPan: Point = [
-      width / 2 - bounds.centerX * newZoom,
-      height / 2 - bounds.centerY * newZoom,
-    ];
-
-    setZoom(newZoom);
-    setPan(newPan);
-    toast.success('Centered circuit to fit viewport');
-  }, [components.length, getCircuitBoundingBox, texts.length]);
-
-  const moveSelected = useCallback((dx: number, dy: number) => {
-    if (selectedComponent) {
-      const nextComponents = components.map(component => {
-        if (component.id !== selectedComponent.id) return component;
-        const next = snapEnabled
-          ? snapPointToGrid([component.x + dx, component.y + dy], gridSize)
-          : [component.x + dx, component.y + dy];
-        return { ...component, x: next[0], y: next[1] };
-      });
-      const nextWires = refreshCanvasWireEndpoints(wires, nextComponents, selectedComponent.id);
-      setComponents(nextComponents);
-      setWires(nextWires);
-      commitSnapshot({ components: nextComponents, wires: nextWires });
-      return;
-    }
-    if (selectedText) {
-      const nextTexts = texts.map(text => text.id === selectedText.id
-        ? { ...text, x: text.x + dx, y: text.y + dy }
-        : text);
-      setTexts(nextTexts);
-      commitSnapshot({ texts: nextTexts });
-    }
-  }, [commitSnapshot, components, gridSize, refreshCanvasWireEndpoints, selectedComponent, selectedText, snapEnabled, texts, wires]);
-
-  const rotateSelected = useCallback((degrees: number) => {
-    if (!selectedComponent) return;
-    // Enforce strict 90-degree increments (0, 90, 180, 270)
-    const step = Math.round(degrees / 90) * 90 || 90;
-    const nextComponents = components.map(component => component.id === selectedComponent.id
-      ? { ...component, rotation: ((Math.round((component.rotation + step) / 90) * 90) % 360 + 360) % 360 }
-      : component);
-    const nextWires = refreshCanvasWireEndpoints(wires, nextComponents, selectedComponent.id);
-    setComponents(nextComponents);
-    setWires(nextWires);
-    commitSnapshot({ components: nextComponents, wires: nextWires });
-  }, [commitSnapshot, components, refreshCanvasWireEndpoints, selectedComponent, wires]);
-
-  const flipSelected = useCallback((axis: 'h' | 'v') => {
-    if (!selectedComponent) return;
-    const nextComponents = components.map(component => component.id === selectedComponent.id
-      ? { ...component, flipH: axis === 'h' ? !component.flipH : component.flipH, flipV: axis === 'v' ? !component.flipV : component.flipV }
-      : component);
-    const nextWires = refreshCanvasWireEndpoints(wires, nextComponents, selectedComponent.id);
-    setComponents(nextComponents);
-    setWires(nextWires);
-    commitSnapshot({ components: nextComponents, wires: nextWires });
-  }, [commitSnapshot, components, refreshCanvasWireEndpoints, selectedComponent, wires]);
-
-  const updateComponent = useCallback((id: string, update: Partial<CircuitComponent>) => {
-    const nextComponents = components.map(component => component.id === id ? { ...component, ...update } : component);
-    setComponents(nextComponents);
-    let nextWires = wires;
-    if ('rotation' in update || 'flipH' in update || 'flipV' in update || 'x' in update || 'y' in update) {
-      nextWires = refreshCanvasWireEndpoints(wires, nextComponents, id);
-      setWires(nextWires);
-    }
-    commitSnapshot({ components: nextComponents, wires: nextWires });
-  }, [commitSnapshot, components, refreshCanvasWireEndpoints, wires]);
 
   const updateComponentProperty = useCallback((key: string, value: unknown) => {
     if (!selectedComponent) return;
@@ -2230,398 +1676,19 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     };
   }, [releaseMomentaryControl]);
 
-  const updateText = useCallback((update: Partial<WorkspaceText>) => {
-    if (!selectedText) return;
-    const nextTexts = texts.map(text => text.id === selectedText.id ? { ...text, ...update } : text);
-    setTexts(nextTexts);
-    commitSnapshot({ texts: nextTexts });
-  }, [commitSnapshot, selectedText, texts]);
-
-  const addWireBetween = useCallback((from: WiringState['from'], target: { componentId: string; terminalId: string; position: Point; axis: TabDTerminalAxis }, lockedCorners: Point[] = []) => {
-    if (!from) return;
-    if (from.componentId === target.componentId && from.terminalId === target.terminalId) return;
-    const duplicate = wires.some(wire => (
-      wire.fromComp === from.componentId && wire.fromTerm === from.terminalId && wire.toComp === target.componentId && wire.toTerm === target.terminalId
-    ) || (
-        wire.fromComp === target.componentId && wire.fromTerm === target.terminalId && wire.toComp === from.componentId && wire.toTerm === from.terminalId
-      ));
-    if (duplicate) {
-      toast.message('These terminals are already connected');
-      setWiring({});
-      return;
-    }
-    const routing = lockedCorners.length ? 'manual' : 'orthogonal';
-
-    // Build the set of component IDs to exclude from the obstacle grid so the
-    // router can enter / exit the source and target component bodies freely.
-    const excludeIds = new Set([from.componentId, target.componentId]);
-
-    // Legacy ObstacleBox list kept for any remaining call-sites that still use
-    // the old obstacle-aware path helpers (e.g. rubber-band drag).
-    const obstacles: ObstacleBox[] = components
-      .filter(c => c.id !== from.componentId && c.id !== target.componentId)
-      .map(c => {
-        const def = getDef(c.type);
-        const w = (def ? def.width : 40) * visualSymbolScale;
-        const h = (def ? def.height : 40) * visualSymbolScale;
-        const margin = 4;
-        return {
-          xMin: c.x - w / 2 - margin,
-          xMax: c.x + w / 2 + margin,
-          yMin: c.y - h / 2 - margin,
-          yMax: c.y + h / 2 + margin,
-        };
-      });
-
-    // Route via A* (automatic) or via locked-corner draft (manual).
-    // Pass the full components array and gridSize so the A* router can build
-    // its obstacle grid; pass excludeIds so source/target stay freely accessible.
-    const path = tabDTerminalOrthogonalPath(
-      from.position,
-      target.position,
-      from.axis,
-      target.axis,
-      gridSize,
-      lockedCorners,
-      obstacles,
-      components,
-      excludeIds,
-    );
-
-    // Persist interior corners as waypoints.
-    // For A*-routed wires (routing === 'orthogonal') we also save the interior
-    // waypoints so that reconnectPathEndpoints can replay them when a component
-    // is later dragged.  For manual wires the locked corners are already the
-    // canonical waypoints.
-    const waypoints = path.length > 2 ? path.slice(1, -1) : undefined;
-
-    const wire: CircuitWire = {
-      id: nanoid(10),
-      fromComp: from.componentId,
-      fromTerm: from.terminalId,
-      toComp: target.componentId,
-      toTerm: target.terminalId,
-      routing,
-      path,
-      waypoints,
-    };
-    const nextWires = [...wires, wire];
-    setWires(nextWires);
-    commitSnapshot({ wires: nextWires });
-    setSelection({ kind: 'wire', id: wire.id });
-    setWiring({});
-    toast.success('Wire connected');
-  }, [commitSnapshot, components, gridSize, visualSymbolScale, wires]);
-
-  const findWireNearPoint = useCallback((point: Point, threshold = 14): { wire: CircuitWire; projection: NonNullable<ReturnType<typeof projectPointOntoWire>> } | null => {
-    let bestMatch: { wire: CircuitWire; projection: NonNullable<ReturnType<typeof projectPointOntoWire>> } | null = null;
-    for (const wire of wires) {
-      const proj = projectPointOntoWire(point, wire.path, gridSize);
-      if (proj && proj.distance <= threshold) {
-        if (!bestMatch || proj.distance < bestMatch.projection.distance) {
-          bestMatch = { wire, projection: proj };
-        }
-      }
-    }
-    return bestMatch;
-  }, [gridSize, wires]);
-
-  const connectWireToExistingWire = useCallback((
-    from: NonNullable<WiringState['from']>,
-    targetWire: CircuitWire,
-    targetPoint: Point,
-    lockedCorners: Point[] = [],
-  ) => {
-    const proj = projectPointOntoWire(targetPoint, targetWire.path, gridSize);
-    if (!proj) return;
-
-    const junctionPoint = proj.point;
-    const targetAxis = proj.axis;
-
-    if (
-      (from.componentId === targetWire.fromComp && from.terminalId === targetWire.fromTerm) ||
-      (from.componentId === targetWire.toComp && from.terminalId === targetWire.toTerm)
-    ) {
-      toast.message('Already connected to this wire');
-      setWiring({});
-      return;
-    }
-
-    const newPath = routeTJunctionPath(from.position, junctionPoint, targetAxis, lockedCorners, from.axis);
-    const waypoints = newPath.length > 2 ? newPath.slice(1, -1) : undefined;
-    const junctionId = `junc_${nanoid(10)}`;
-
-    const incomingWire: CircuitWire = {
-      id: nanoid(10),
-      fromComp: from.componentId,
-      fromTerm: from.terminalId,
-      toComp: junctionId,
-      toTerm: 'p',
-      routing: lockedCorners.length ? 'manual' : 'orthogonal',
-      path: newPath,
-      waypoints,
-    };
-
-    const splitPath1 = simplifyOrthogonalPath([...targetWire.path.slice(0, proj.segmentIndex + 1), junctionPoint]);
-    const splitPath2 = simplifyOrthogonalPath([junctionPoint, ...targetWire.path.slice(proj.segmentIndex + 1)]);
-
-    const wire1: CircuitWire = {
-      ...targetWire,
-      toComp: junctionId,
-      toTerm: 'p',
-      path: splitPath1,
-      waypoints: splitPath1.length > 2 ? splitPath1.slice(1, -1) : undefined,
-    };
-
-    const wire2: CircuitWire = {
-      ...targetWire,
-      id: nanoid(10),
-      fromComp: junctionId,
-      fromTerm: 'p',
-      path: splitPath2,
-      waypoints: splitPath2.length > 2 ? splitPath2.slice(1, -1) : undefined,
-    };
-
-    const nextWires = [
-      ...wires.map(w => w.id === targetWire.id ? wire1 : w),
-      wire2,
-      incomingWire,
-    ];
-    setWires(nextWires);
-    commitSnapshot({ wires: nextWires });
-
-    setSelection({ kind: 'wire', id: incomingWire.id });
-    setWiring({});
-    toast.success('Wire connected and split at junction');
-  }, [commitSnapshot, gridSize, wires]);
-
-  const handleCanvasMouseDown = useCallback((event: React.MouseEvent<SVGSVGElement>) => {
-    const point = clientToWorld(event.clientX, event.clientY);
-    setCursor(point);
-    if (event.button === 1 || event.button === 2 || event.altKey) {
-      event.preventDefault();
-      setDragState({ kind: 'pan', client: [event.clientX, event.clientY] });
-      return;
-    }
-    if (event.button !== 0) return;
-
-    const terminal = findTerminalAt(point);
-    if (terminal) {
-      if (!wiring.from) setWiring({ from: terminal, lockedCorners: [] });
-      else addWireBetween(wiring.from, terminal, wiring.lockedCorners);
-      return;
-    }
-
-    if (wiring.from) {
-      const hitWire = findWireNearPoint(point);
-      if (hitWire) {
-        connectWireToExistingWire(wiring.from, hitWire.wire, hitWire.projection.point, wiring.lockedCorners);
-        return;
-      }
-
-      const snapped = snapEnabled ? snapPointToGrid(point, gridSize) : point;
-      const anchor = wiring.lockedCorners?.at(-1) ?? wiring.from.position;
-      let corner = anchor;
-      if (wiring.lockedCorners && wiring.lockedCorners.length > 0) {
-        corner = lockTabDWireCorner(anchor, snapped);
-      } else if (wiring.from.axis === 'horizontal') {
-        corner = [snapped[0], anchor[1]];
-      } else if (wiring.from.axis === 'vertical') {
-        corner = [anchor[0], snapped[1]];
-      } else {
-        corner = lockTabDWireCorner(anchor, snapped);
-      }
-      if (corner[0] !== anchor[0] || corner[1] !== anchor[1]) {
-        setWiring(current => current.from ? { ...current, lockedCorners: [...(current.lockedCorners ?? []), corner] } : current);
-      }
-      return;
-    }
-
-    const component = findComponentAt(point);
-    if (component) {
-      setSelection({ kind: 'component', id: component.id });
-      setMarqueeIds([component.id]);
-      const control = tabDUiRefinement ? directControlKind(component.type) : null;
-      if (control === 'momentary') {
-        activeMomentaryControlRef.current = component.id;
-        updateComponentPropsById(component.id, momentaryControlProps(true));
-        return;
-      }
-      // A latching control still sets up the drag below; the mouse-up decides between the two.
-      if (control === 'latching') {
-        latchingClickRef.current = { id: component.id, origin: point };
-      }
-      dragStartSnapshotRef.current = cloneSnapshot({
-        components: componentRef.current,
-        wires: wiresRef.current,
-        texts: textsRef.current,
-      });
-      setDragState({ kind: 'component', id: component.id, offset: [point[0] - component.x, point[1] - component.y] });
-      return;
-    }
-
-    const hitWire = findWireNearPoint(point);
-    if (hitWire) {
-      setMarqueeIds([]);
-      setSelection({ kind: 'wire', id: hitWire.wire.id });
-      return;
-    }
-
-    setSelection(null);
-    setMarqueeIds([]);
-    setDragState({ kind: 'marquee', start: point, end: point });
-  }, [addWireBetween, clientToWorld, connectWireToExistingWire, findComponentAt, findTerminalAt, findWireNearPoint, gridSize, snapEnabled, tabDUiRefinement, updateComponentPropsById, wiring.from, wiring.lockedCorners]);
-
-  const handleCanvasMouseMove = useCallback((event: React.MouseEvent<SVGSVGElement>) => {
-    const point = clientToWorld(event.clientX, event.clientY);
-    setCursor(point);
-    if (!dragState) return;
-    const pendingClick = latchingClickRef.current;
-    if (pendingClick && Math.hypot(point[0] - pendingClick.origin[0], point[1] - pendingClick.origin[1]) > CLICK_DRAG_TOLERANCE) {
-      latchingClickRef.current = null;
-    }
-    if (dragState.kind === 'pan') {
-      const dx = event.clientX - dragState.client[0];
-      const dy = event.clientY - dragState.client[1];
-      setPan(previous => [previous[0] + dx, previous[1] + dy]);
-      setDragState({ kind: 'pan', client: [event.clientX, event.clientY] });
-      return;
-    }
-    if (dragState.kind === 'marquee') {
-      setDragState({ ...dragState, end: point });
-      return;
-    }
-    if (dragState.kind === 'component') {
-      const position = snapEnabled
-        ? snapPointToGrid([point[0] - dragState.offset[0], point[1] - dragState.offset[1]], gridSize)
-        : [point[0] - dragState.offset[0], point[1] - dragState.offset[1]];
-      const nextComponents = componentRef.current.map(component => component.id === dragState.id
-        ? { ...component, x: position[0], y: position[1] }
-        : component);
-      setComponents(nextComponents);
-      setWires(previous => refreshCanvasWireEndpoints(previous, nextComponents, dragState.id));
-      return;
-    }
-    if (dragState.kind === 'text') {
-      const position = snapEnabled
-        ? snapPointToGrid([point[0] - dragState.offset[0], point[1] - dragState.offset[1]], gridSize)
-        : [point[0] - dragState.offset[0], point[1] - dragState.offset[1]];
-      setTexts(previous => previous.map(text => text.id === dragState.id ? { ...text, x: position[0], y: position[1] } : text));
-      return;
-    }
-    if (dragState.kind === 'wireCorner') {
-      const position = snapEnabled ? snapPointToGrid(point, gridSize) : point;
-      setWires(previous => previous.map(wire => {
-        if (wire.id !== dragState.id) return wire;
-        const newPath = moveTabDOrthogonalLane(wire.path, dragState.corner, position, gridSize);
-        const simplified = simplifyOrthogonalPath(newPath);
-        return {
-          ...wire,
-          routing: 'manual',
-          path: simplified,
-          waypoints: simplified.length > 2 ? simplified.slice(1, -1) : undefined,
-        };
-      }));
-    }
-  }, [clientToWorld, dragState, gridSize, refreshCanvasWireEndpoints, snapEnabled]);
-
-  const handleCanvasMouseUp = useCallback(() => {
-    releaseMomentaryControl();
-    // A press that never became a drag toggles the contact. updateComponentPropsById marks the next
-    // SPICE solve eager, so the DMM follows the click with no debounce, running or not.
-    const pendingClick = latchingClickRef.current;
-    latchingClickRef.current = null;
-    if (pendingClick) {
-      const clicked = componentRef.current.find(component => component.id === pendingClick.id);
-      if (clicked) updateComponentPropsById(clicked.id, nextLatchingControlProps(clicked));
-    }
-    if (dragStartSnapshotRef.current) {
-      const currentSnapshot: CanvasSnapshot = {
-        components: componentRef.current,
-        wires: wiresRef.current,
-        texts: textsRef.current,
-      };
-      if (!areSnapshotsEqual(dragStartSnapshotRef.current, currentSnapshot)) {
-        commitSnapshot(currentSnapshot);
-      }
-      dragStartSnapshotRef.current = null;
-    }
-    if (dragState?.kind === 'marquee') {
-      const [left, right] = [dragState.start[0], dragState.end[0]].sort((a, b) => a - b);
-      const [top, bottom] = [dragState.start[1], dragState.end[1]].sort((a, b) => a - b);
-      const compIds = componentRef.current.filter((component) => component.x >= left && component.x <= right && component.y >= top && component.y <= bottom).map((component) => component.id);
-      const wireIds = wiresRef.current.filter((wire) => wire.path.some(p => p[0] >= left && p[0] <= right && p[1] >= top && p[1] <= bottom)).map(wire => wire.id);
-      const textIds = textsRef.current.filter((text) => text.x >= left && text.x <= right && text.y >= top && text.y <= bottom).map(text => text.id);
-      const ids = [...compIds, ...wireIds, ...textIds];
-      setMarqueeIds(ids);
-      setSelection(ids.length === 1 && compIds.length === 1 ? { kind: 'component', id: compIds[0] } : null);
-    }
-    setDragState(null);
-  }, [commitSnapshot, dragState, releaseMomentaryControl]);
-
-  const handleWireMouseDown = useCallback((event: React.MouseEvent<SVGPathElement>, wire: CircuitWire) => {
-    event.stopPropagation();
-    if (wiring.from) {
-      const point = clientToWorld(event.clientX, event.clientY);
-      connectWireToExistingWire(wiring.from, wire, point, wiring.lockedCorners);
-      return;
-    }
-    setMarqueeIds([]);
-    setSelection({ kind: 'wire', id: wire.id });
-  }, [clientToWorld, connectWireToExistingWire, wiring.from, wiring.lockedCorners]);
-
-  const handleWireDoubleClick = useCallback((event: React.MouseEvent<SVGPathElement>, wire: CircuitWire) => {
-    event.stopPropagation();
-    const rawPoint = clientToWorld(event.clientX, event.clientY);
-    const proj = projectPointOntoWire(rawPoint, wire.path, gridSize);
-    if (!proj) return;
-    const newPath = insertPointIntoWirePath(wire.path, proj.point, proj.segmentIndex);
-    const nextWires = wires.map(current => {
-      if (current.id !== wire.id) return current;
-      return {
-        ...current,
-        routing: 'manual' as const,
-        path: newPath,
-        waypoints: newPath.length > 2 ? newPath.slice(1, -1) : undefined,
-      };
-    });
-    setWires(nextWires);
-    commitSnapshot({ wires: nextWires });
-    setMarqueeIds([]);
-    setSelection({ kind: 'wire', id: wire.id });
-  }, [clientToWorld, commitSnapshot, gridSize, wires]);
-
-  const handleTextMouseDown = useCallback((event: React.MouseEvent<HTMLElement | SVGElement>, text: WorkspaceText) => {
-    event.stopPropagation();
-    const point = clientToWorld(event.clientX, event.clientY);
-    setMarqueeIds([]);
-    setSelection({ kind: 'text', id: text.id });
-    dragStartSnapshotRef.current = cloneSnapshot({
-      components: componentRef.current,
-      wires: wiresRef.current,
-      texts: textsRef.current,
-    });
-    setDragState({ kind: 'text', id: text.id, offset: [point[0] - text.x, point[1] - text.y] });
-  }, [clientToWorld]);
-
-  const handleDrop = useCallback((event: React.DragEvent<SVGSVGElement>) => {
-    event.preventDefault();
-    const type = event.dataTransfer.getData('application/electrolab-component');
-    if (!type) return;
-    const position = clientToWorld(event.clientX, event.clientY);
-    addComponent(type, position[0], position[1]);
-  }, [addComponent, clientToWorld]);
-
-  const updateWireRouting = useCallback((routing: CircuitWire['routing']) => {
-    if (!selectedWire) return;
-    const endpoints = currentWireEndpoints(selectedWire, components);
-    if (!endpoints) return;
-    const nextWires = wires.map(wire => wire.id === selectedWire.id
-      ? { ...wire, routing, path: routePath(endpoints.from, endpoints.to, routing) }
-      : wire);
-    setWires(nextWires);
-    commitSnapshot({ wires: nextWires });
-  }, [commitSnapshot, components, selectedWire, wires]);
+  // Direct controls owned by this component library: momentary pushbuttons act on press; latching
+  // switches toggle on a press that never became a drag (relay/contactor bodies stay coil-driven).
+  // updateComponentPropsById marks the next SPICE solve eager, so the DMM follows immediately.
+  componentPressRef.current = (component: CircuitComponent) => {
+    if (!tabDUiRefinement || directControlKind(component.type) !== 'momentary') return false;
+    activeMomentaryControlRef.current = component.id;
+    updateComponentPropsById(component.id, momentaryControlProps(true));
+    return true;
+  };
+  componentClickRef.current = (component: CircuitComponent) => {
+    if (tabDUiRefinement && directControlKind(component.type) === 'latching') updateComponentPropsById(component.id, nextLatchingControlProps(component));
+  };
+  pointerReleaseRef.current = releaseMomentaryControl;
 
   const addSelectedWireCorner = useCallback(() => {
     if (!selectedWire) return;
@@ -3914,111 +2981,26 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     };
   }, [requestEagerSpiceRun]);
 
-  useEffect(() => {
-    const handler = (event: KeyboardEvent) => {
-      const target = event.target as HTMLElement | null;
-      if (target && ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) return;
-      const modifier = event.ctrlKey || event.metaKey;
-      if (modifier && event.key.toLowerCase() === 'z') {
-        event.preventDefault();
-        if (event.shiftKey) {
-          handleRedo();
-        } else {
-          handleUndo();
-        }
-        return;
-      }
-      if (modifier && event.key.toLowerCase() === 'y') {
-        event.preventDefault();
-        handleRedo();
-        return;
-      }
-      if (modifier && event.key.toLowerCase() === 'c') {
-        event.preventDefault();
-        copySelection();
-        return;
-      }
-      if (modifier && event.key.toLowerCase() === 'x') {
-        event.preventDefault();
-        cutSelection();
-        return;
-      }
-      if (modifier && event.key.toLowerCase() === 'v') {
-        event.preventDefault();
-        pasteClipboard();
-        return;
-      }
-      if (event.key === 'Delete' || event.key === 'Backspace') {
-        event.preventDefault();
-        removeSelection();
-        return;
-      }
-      if (event.key === 'Escape') {
-        setWiring({});
-        setSelection(null);
-        return;
-      }
-      if (event.key.toLowerCase() === 'w') {
-        setWiring(previous => previous.from ? {} : previous);
-        toast.message('Click a terminal to start wiring');
-        return;
-      }
-      if (event.key.toLowerCase() === 't') {
-        addText();
-        return;
-      }
-      if (event.key === ' ' && selectedComponent) {
-        event.preventDefault();
-        rotateSelected(90);
-        return;
-      }
-      if (event.key.toLowerCase() === 'r' && selectedComponent) {
-        rotateSelected(90);
-        return;
-      }
-      const movement = event.shiftKey ? gridSize * 5 : (snapEnabled ? gridSize : 1);
-      const directions: Record<string, Point> = {
-        ArrowLeft: [-movement, 0],
-        ArrowRight: [movement, 0],
-        ArrowUp: [0, -movement],
-        ArrowDown: [0, movement],
-      };
-      if (directions[event.key]) {
-        event.preventDefault();
-        moveSelected(directions[event.key][0], directions[event.key][1]);
-      }
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [addText, copySelection, cutSelection, gridSize, handleRedo, handleUndo, moveSelected, pasteClipboard, removeSelection, rotateSelected, selectedComponent, snapEnabled]);
-
-  const filteredCategories = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    return CATEGORIES.reduce<Record<string, ComponentDef[]>>((all, category) => {
-      if (category === 'Classic Control') return all;
-      let categoryItems = getComponentsByCategory(category).filter(item => !item.hidden);
-      if (tabDUiRefinement && category === 'Passive') {
-        categoryItems = [...categoryItems, ...['star-resistor-pack', 'delta-resistor-pack'].map(getDef).filter((item): item is ComponentDef => Boolean(item))];
-      }
-      if (tabDUiRefinement && category === 'Controlled Sources') {
-        categoryItems = categoryItems.filter(item => !['star-resistor-pack', 'delta-resistor-pack'].includes(item.id));
-      }
-      if (tabDUiRefinement && category === 'Diodes') {
-        categoryItems = categoryItems.filter(item => !['diode-ideal', 'diode-silicon', 'diode-germanium', 'diode-gaas'].includes(item.id));
-      }
-      if (tabDUiRefinement) categoryItems = filterTabDCatalog(categoryItems);
-      if (!tabDUiRefinement && category === 'Diodes') {
-        categoryItems = categoryItems.filter(item => item.id !== 'diode');
-      }
-      const items = categoryItems
-        .filter(item => !item.hidden)
-        .filter(item => !query
-          || item.name.toLowerCase().includes(query)
-          || item.description.toLowerCase().includes(query));
-      if (items.length) all[category] = items;
-      return all;
-    }, {});
-  }, [search, tabDUiRefinement]);
+  const libraryCategories = useMemo(() => CATEGORIES.reduce<Record<string, ComponentDef[]>>((all, category) => {
+    if (category === 'Classic Control') return all;
+    let categoryItems = getComponentsByCategory(category).filter(item => !item.hidden);
+    if (tabDUiRefinement && category === 'Passive') {
+      categoryItems = [...categoryItems, ...['star-resistor-pack', 'delta-resistor-pack'].map(getDef).filter((item): item is ComponentDef => Boolean(item))];
+    }
+    if (tabDUiRefinement && category === 'Controlled Sources') {
+      categoryItems = categoryItems.filter(item => !['star-resistor-pack', 'delta-resistor-pack'].includes(item.id));
+    }
+    if (tabDUiRefinement && category === 'Diodes') {
+      categoryItems = categoryItems.filter(item => !['diode-ideal', 'diode-silicon', 'diode-germanium', 'diode-gaas'].includes(item.id));
+    }
+    if (tabDUiRefinement) categoryItems = filterTabDCatalog(categoryItems);
+    if (!tabDUiRefinement && category === 'Diodes') {
+      categoryItems = categoryItems.filter(item => item.id !== 'diode');
+    }
+    const items = categoryItems.filter(item => !item.hidden);
+    if (items.length) all[category] = items;
+    return all;
+  }, {}), [tabDUiRefinement]);
 
   const linkedCoils = components.filter(component => ['coil', 'contactor', 'relay-spst', 'relay-spdt', 'relay-dpst'].includes(component.type));
 
@@ -4033,134 +3015,392 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     return set;
   }, [components]);
 
-  const wireSnapProjection = useMemo(() => {
-    if (wiring.from && dragState?.kind !== 'pan') {
-      const hitWire = findWireNearPoint(cursor, 10);
-      return hitWire?.projection || null;
-    }
-    return null;
-  }, [cursor, dragState?.kind, findWireNearPoint, wiring.from]);
-
-  // Phase 3: orthogonal rubber-band preview path.
-  // When the user is drawing a new wire and has NOT yet locked any corners,
-  // we route from the start pin to the cursor via A* so the preview shows
-  // exactly how the finished wire will avoid component bodies.
-  // Once the user has locked corners (manual mode), we switch back to the
-  // classic draft path that honours those corners.
-  const previewTarget = wireSnapProjection?.point ?? cursor;
-  const wireDraftPreviewPath = useMemo(() => {
-    if (!wiring.from) return null;
-    if (wiring.lockedCorners && wiring.lockedCorners.length > 0) {
-      // Manual draft: honour the user-placed corners.
-      return tabDOrthogonalDraftPath(wiring.from.position, previewTarget, wiring.lockedCorners, wiring.from.axis);
-    }
-    // Automatic A* preview: exclude the source component so the router can
-    // leave its terminal body freely.  The target is the live cursor so
-    // no target component is known yet — we leave the grid fully open there.
-    const excludeIds = new Set([wiring.from.componentId]);
-    return calculateOrthogonalPath(
-      wiring.from.position,
-      previewTarget,
-      components,
-      gridSize,
-      excludeIds,
-    );
-  }, [wiring.from, wiring.lockedCorners, previewTarget, components, gridSize]);
-
   const activeComponentsForWires = liveComponentsRef.current.length > 0 ? liveComponentsRef.current : components;
   const brokenWireIdsForRender = getBrokenWireIds(activeComponentsForWires, wires);
-  const wireRenderData = wires.map(wire => {
-    const selected = selection?.kind === 'wire' && selection.id === wire.id;
-    const isBroken = brokenWireIdsForRender.has(wire.id);
-    const phase = isBroken ? 0 : (snapshot.wirePhases?.[wire.id] ?? 0);
-    const wireCurrent = isBroken ? 0 : Math.abs(snapshot.wireCurrents?.[wire.id] ?? 0);
-    const isCurrentFlowing = !isBroken && wireCurrent >= 1e-7 && snapshot.wirePhases?.[wire.id] !== undefined;
+  const netOf = useCallback((wire: CircuitWire) => normalizedGraph.netForTerminal(wire.fromComp, wire.fromTerm), [normalizedGraph]);
 
-    const endpoints = canvasWireEndpoints(wire, activeComponentsForWires);
-    let path = getWirePoints(wire);
-    if (endpoints && path.length >= 2) {
-      if (
-        Math.abs(path[0][0] - endpoints.from[0]) > 0.5 ||
-        Math.abs(path[0][1] - endpoints.from[1]) > 0.5 ||
-        Math.abs(path[path.length - 1][0] - endpoints.to[0]) > 0.5 ||
-        Math.abs(path[path.length - 1][1] - endpoints.to[1]) > 0.5
-      ) {
-        path = reconnectPathEndpoints(
-          path,
-          endpoints.from,
-          endpoints.to,
-          wire.routing,
-          [],
-          wire.waypoints,
-          gridSize,
-          endpoints.fromAxis,
-        );
+  const isIndependentSourceType = (type: string) => type === 'voltage' || type === 'current' || type === 'dc-voltage' || type === 'dc-current' || type === 'ac-voltage' || type === 'ac-current';
+  const superpositionRole = (component: CircuitComponent) => {
+    const dimmed = Boolean(isSuperpositionActive && superpositionActiveSourceId && isIndependentSourceType(component.type) && component.id !== superpositionActiveSourceId);
+    return {
+      dimmed,
+      active: Boolean(isSuperpositionActive && superpositionActiveSourceId && component.id === superpositionActiveSourceId),
+      deactivatedVoltage: dimmed && (component.type === 'voltage' || component.type === 'dc-voltage' || component.type === 'ac-voltage'),
+      deactivatedCurrent: dimmed && (component.type === 'current' || component.type === 'dc-current' || component.type === 'ac-current'),
+    };
+  };
+  const componentCanvasOpacity = (component: CircuitComponent) => {
+    const role = superpositionRole(component);
+    // Deactivated sources (wire short / open gap) render with full opacity so the wire looks like real circuit wire
+    if (isTheveninActive && theveninTargetId === component.id) return 0.45;
+    if (role.deactivatedVoltage || role.deactivatedCurrent) return 1;
+    return role.dimmed ? 0.28 : 1;
+  };
+
+  const renderCanvasComponent = (component: CircuitComponent, isSelected: boolean, symbolTransform: string): React.ReactNode => {
+    const definition = getDef(component.type);
+    if (!definition) return null;
+    let powered = Boolean(snapshot.componentPowered[component.id]);
+    if (component.type === 'coil') {
+      const vPos = snapshot.terminalVoltages[`${component.id}:pos`];
+      const vNeg = snapshot.terminalVoltages[`${component.id}:neg`];
+      if (vPos !== undefined && vNeg !== undefined) {
+        const vCoil = Math.abs(vPos - vNeg);
+        const threshold = Math.max(0.1, Number(component.props?.activationThreshold ?? 5));
+        if (vCoil >= threshold * 0.6) {
+          powered = true;
+        }
+      }
+    } else if (['relay-spst', 'relay-spdt', 'relay-dpst', 'contactor'].includes(component.type)) {
+      const manual = component.props?.manualState;
+      if (manual === 'closed') {
+        powered = true;
+      } else if (manual === 'open') {
+        powered = false;
+      } else {
+        const vPos = snapshot.terminalVoltages[`${component.id}:coil+`];
+        const vNeg = snapshot.terminalVoltages[`${component.id}:coil-`];
+        if (vPos !== undefined && vNeg !== undefined) {
+          const vCoil = Math.abs(vPos - vNeg);
+          const rated = Math.max(0.1, Number(component.props?.coilVoltage ?? (component.type === 'contactor' ? 24 : 12)));
+          if (vCoil >= rated * 0.7) {
+            powered = true;
+          }
+        }
+      }
+    } else if (['aux-contact-no', 'aux-contact-nc', 'aux-contact-3phase'].includes(component.type) && (component.props?.linkedTo || component.props?.controlSourceId)) {
+      const linkedRef = String(component.props?.linkedTo || component.props?.controlSourceId || '');
+      const linkedCoil = components.find(c => ['coil', 'contactor', 'relay-spst', 'relay-spdt', 'relay-dpst'].includes(c.type) && (c.label === linkedRef || c.id === linkedRef));
+      if (linkedCoil) {
+        if (linkedCoil.type === 'coil') {
+          let coilEnergized = Boolean(snapshot.componentPowered[linkedCoil.id]);
+          const vPos = snapshot.terminalVoltages[`${linkedCoil.id}:pos`];
+          const vNeg = snapshot.terminalVoltages[`${linkedCoil.id}:neg`];
+          if (vPos !== undefined && vNeg !== undefined) {
+            const vCoil = Math.abs(vPos - vNeg);
+            const threshold = Math.max(0.1, Number(linkedCoil.props?.activationThreshold ?? 5));
+            if (vCoil >= threshold * 0.6) {
+              coilEnergized = true;
+            }
+          }
+          powered = coilEnergized;
+        } else {
+          const manual = linkedCoil.props?.manualState;
+          if (manual === 'closed') {
+            powered = true;
+          } else if (manual === 'open') {
+            powered = false;
+          } else {
+            let coilEnergized = Boolean(snapshot.componentPowered[linkedCoil.id]);
+            const vPos = snapshot.terminalVoltages[`${linkedCoil.id}:coil+`];
+            const vNeg = snapshot.terminalVoltages[`${linkedCoil.id}:coil-`];
+            if (vPos !== undefined && vNeg !== undefined) {
+              const vCoil = Math.abs(vPos - vNeg);
+              const rated = Math.max(0.1, Number(linkedCoil.props?.coilVoltage ?? (linkedCoil.type === 'contactor' ? 24 : 12)));
+              if (vCoil >= rated * 0.7) {
+                coilEnergized = true;
+              }
+            }
+            powered = coilEnergized;
+          }
+        }
       }
     }
-
-    const hitPath = pointsToPath(path);
-    const renderPath = buildJumpArcPath(path, wireIntersectionList, wire.id, 4);
-    const len = pathLength(path);
-    const numDots = Math.max(1, Math.round(len / 36));
-    const dots = isCurrentFlowing ? getDotsOnPath(path, numDots, phase) : [];
-    const isSensingWire = false;
-    const strokeColor = selected ? colors.selection : (wire.color ?? colors.text);
-    const strokeWidth = selected ? 2 : 1.5;
-
-    return {
-      wire,
-      selected,
-      path,
-      hitPath,
-      renderPath,
-      dots,
-      isSensingWire,
-      strokeColor,
-      strokeWidth,
-      isCurrentFlowing,
+    let motorVEff: number | undefined;
+    if (component.type === 'motor-dc') {
+      const vPos = snapshot.terminalVoltages[terminalKey(component.id, 'pos')];
+      const vNeg = snapshot.terminalVoltages[terminalKey(component.id, 'neg')];
+      if (vPos !== undefined && vNeg !== undefined) {
+        const vEff = Math.abs(vPos - vNeg);
+        motorVEff = vEff;
+        powered = vEff >= 0.5;
+      }
+    } else if (component.type === 'motor-3phase') {
+      const vu = snapshot.terminalVoltages[terminalKey(component.id, 'u')];
+      const vv = snapshot.terminalVoltages[terminalKey(component.id, 'v')];
+      const vw = snapshot.terminalVoltages[terminalKey(component.id, 'w')];
+      if (vu !== undefined && vv !== undefined && vw !== undefined) {
+        const vuv = Math.abs(vu - vv);
+        const vvw = Math.abs(vv - vw);
+        const vwu = Math.abs(vw - vu);
+        const vEff = Math.sqrt((vuv ** 2 + vvw ** 2 + vwu ** 2) / 3);
+        motorVEff = vEff;
+        powered = vEff >= 0.5;
+      }
+    }
+    const intensity = snapshot.componentIntensity[component.id] ?? 0;
+    const reading = effectiveSnapshot.instrumentReadings[component.id];
+    // Live KaTeX-styled reading inside the circular Voltmeter/Ammeter face, synced with
+    // effectiveSnapshot (SPICE-verified when available, the legacy engine otherwise). A component
+    // with no reading yet or an unwired meter falls back to the plain "V"/"A" glyph inside the symbol.
+    const meterUnit = component.type === 'voltmeter' ? 'V' : component.type === 'ammeter' ? 'A' : null;
+    let dmmDisplayValue: string | undefined = undefined;
+    if (component.type === 'dmm') {
+      const mode = String(component.props?.mode ?? 'DCV');
+      if (reading) {
+        const isOhmMode = mode === 'OHM' || mode === 'CONT' || reading.unit === 'Ω' || reading.unit === 'Ohm';
+        if (reading.status === 'open' || (isOhmMode && (!Number.isFinite(reading.value) || Math.abs(reading.value) >= 1e7))) {
+          dmmDisplayValue = 'O.L';
+        } else if (reading.status === 'ready') {
+          dmmDisplayValue = formatEngineering(reading.value, reading.unit, 1);
+        }
+      }
+    }
+    const meterDisplayValue = (meterUnit && reading?.status === 'ready')
+      ? formatMeterReading(reading.value, meterUnit)
+      : dmmDisplayValue;
+    const role = superpositionRole(component);
+    const symbolProps = (superpositionActive: boolean) => ({
+      ...component.props,
+      label: component.label,
+      selected: isSelected,
+      _isSelected: isSelected,
+      isDark: darkPreview,
+      _isDark: darkPreview,
+      isEnergized: powered,
+      isConflicted: conflictedCoilIds.has(component.id),
+      _intensity: intensity,
+      _isBurned: Boolean(component.state?.isBurned),
+      _superpositionActive: superpositionActive,
+      ...(motorVEff !== undefined ? { _vEff: motorVEff } : {}),
+      _documentedStyle: tabDUiRefinement,
+      ...(meterDisplayValue !== undefined ? { displayValue: meterDisplayValue } : {}),
+    });
+    const terminalOffsets = (): [number, number, number, number] => {
+      const t0 = getCanvasTerminalPosition(component, definition.terminals[0]?.id);
+      const t1 = getCanvasTerminalPosition(component, definition.terminals[1]?.id);
+      return [t0 ? t0[0] - component.x : 0, t0 ? t0[1] - component.y : -50, t1 ? t1[0] - component.x : 0, t1 ? t1[1] - component.y : 50];
     };
-  });
+
+    return (
+      <>
+        {component.state?.isBurned && <title>COMPONENT DESTROYED - Exceeded maximum ratings</title>}
+        {role.deactivatedVoltage ? (() => {
+          /* Deactivated Voltage Source (Short Circuit): ghosted source with a solid wire from pin1 to pin2 */
+          const [x1, y1, x2, y2] = terminalOffsets();
+          return (
+            <g>
+              <g transform={symbolTransform} opacity={0.25}>{renderSymbol(definition.symbol, powered, symbolProps(false), animationTime)}</g>
+              <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={colors.text} strokeWidth={1.5} strokeLinecap="round" />
+            </g>
+          );
+        })() : role.deactivatedCurrent ? (() => {
+          /* Deactivated Current Source (Open Circuit): ghosted source with an open terminal gap */
+          const [x1, y1, x2, y2] = terminalOffsets();
+          const stubLen = 14;
+          const d0 = Math.hypot(x1, y1) || 1;
+          const d1 = Math.hypot(x2, y2) || 1;
+          return (
+            <g>
+              <g transform={symbolTransform} opacity={0.25}>{renderSymbol(definition.symbol, powered, symbolProps(false), animationTime)}</g>
+              <line x1={x1} y1={y1} x2={x1 - (x1 / d0) * stubLen} y2={y1 - (y1 / d0) * stubLen} stroke={colors.text} strokeWidth={1.5} strokeLinecap="round" />
+              <line x1={x2} y1={y2} x2={x2 - (x2 / d1) * stubLen} y2={y2 - (y2 / d1) * stubLen} stroke={colors.text} strokeWidth={1.5} strokeLinecap="round" />
+            </g>
+          );
+        })() : (
+          /* Active or standard component graphic with solid purple highlight during Superposition */
+          <g transform={symbolTransform} color={isSelected ? colors.selection : role.active ? '#A855F7' : undefined}>
+            {renderSymbol(definition.symbol, powered, symbolProps(role.active), animationTime)}
+          </g>
+        )}
+      </>
+    );
+  };
+
+  const renderDependentSourceLink = (component: CircuitComponent, isSelected: boolean): React.ReactNode => {
+    if (!isSelected || !(component.type === 'cccs' || component.type === 'ccvs' || component.type === 'vcvs' || component.type === 'vccs')) return null;
+    const targetRef = String(component.props.targetId || component.props.controlSourceId || '');
+    if (!targetRef) return null;
+    const sensedComponent = components.find(c => c.id === targetRef || c.label === targetRef);
+    if (!sensedComponent) return null;
+    return <line x1={0} y1={0} x2={sensedComponent.x - component.x} y2={sensedComponent.y - component.y} stroke={colors.selection} strokeWidth={1} strokeDasharray="3 3" opacity={0.45} pointerEvents="none" />;
+  };
 
   return (
-    <UnifiedWorkspaceShell
+    <BaseSchematicCanvas
+      canvas={canvas}
       colors={colors}
-      isDark={darkPreview}
-      toolbarRow1={<>
-        <ToolbarButton colors={colors} label="−" title="Zoom out" onClick={() => setZoom(value => Math.max(.2, value / 1.15))} />
-        <span style={{ color: colors.muted, fontSize: 11, minWidth: 42, textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>{Math.round(zoom * 100)}%</span>
-        <ToolbarButton colors={colors} label="+" title="Zoom in" onClick={() => setZoom(value => Math.min(3, value * 1.15))} />
-        <ToolbarDivider colors={colors} />
-        <ToolbarButton colors={colors} icon={<Undo2 size={14} />} title="Undo (Ctrl/Cmd+Z)" onClick={handleUndo} disabled={!history.canUndo} />
-        <ToolbarButton colors={colors} icon={<Redo2 size={14} />} title="Redo (Ctrl/Cmd+Shift+Z)" onClick={handleRedo} disabled={!history.canRedo} />
-        <ToolbarButton colors={colors} icon={<Maximize2 size={14} />} title="Auto-scale / Center circuit" onClick={zoomToFit} />
-        <ToolbarButton colors={colors} icon={<Scissors size={14} />} title="Cut (Ctrl/Cmd+X)" onClick={cutSelection} disabled={!selectedComponent && marqueeIds.length === 0} />
-        <ToolbarButton colors={colors} icon={<Copy size={14} />} title="Copy (Ctrl/Cmd+C)" onClick={copySelection} disabled={!selectedComponent && marqueeIds.length === 0} />
-        <ToolbarButton colors={colors} icon={<Clipboard size={14} />} title="Paste (Ctrl/Cmd+V)" onClick={pasteClipboard} disabled={!clipboard || (clipboard.components.length === 0 && clipboard.wires.length === 0 && clipboard.texts.length === 0)} />
-        <ToolbarButton colors={colors} icon={<Trash2 size={14} />} title="Delete (Del/Backspace)" onClick={removeSelection} disabled={!selectedComponent && !selectedWire && !selectedText && marqueeIds.length === 0} />
-        <ToolbarDivider colors={colors} />
-        <div className="flex items-center gap-2">
-          <SegmentedControl
-            options={[
-              { label: "Dotted", value: "dots" },
-              { label: "Cartesian", value: "cartesian" },
-              { label: "Hidden", value: "hidden" },
-            ]}
-            value={gridVisible ? tabDGridMode : "hidden"}
-            onChange={(val) => {
-              if (val === "hidden") {
-                setGridVisible(false);
-                setTabDGridMode("hidden");
-              } else {
-                setGridVisible(true);
-                setTabDGridMode(val as "dots" | "cartesian");
-              }
-            }}
-            size="sm"
-            aria-label="Grid Style"
-          />
-          <ToolbarButton colors={colors} icon={<Type size={14} />} label="Text" title="Add editable workspace text (T)" onClick={addText} />
-        </div>
-        {tabDUiRefinement && <><ToolbarDivider colors={colors} /><ToolbarButton colors={colors} icon={<RotateCw size={14} />} label="90°" title="Rotate selected component 90°" onClick={() => rotateSelected(90)} disabled={!selectedComponent} /><ToolbarButton colors={colors} icon={<FlipHorizontal size={14} />} label="Flip X" title="Reflect selected component horizontally" onClick={() => flipSelected('h')} disabled={!selectedComponent} /><ToolbarButton colors={colors} icon={<FlipVertical size={14} />} label="Flip Y" title="Reflect selected component vertically" onClick={() => flipSelected('v')} disabled={!selectedComponent} /></>}
+      libraryCategories={libraryCategories}
+      renderLibraryIcon={item => <ComponentPaletteIcon definition={item} colors={colors} documented={tabDUiRefinement} isDark={darkPreview} />}
+      wireColor={colors.text}
+      netOf={netOf}
+      wireAppearance={(wire, path) => {
+        const isBroken = brokenWireIdsForRender.has(wire.id);
+        const wireCurrent = isBroken ? 0 : Math.abs(snapshot.wireCurrents?.[wire.id] ?? 0);
+        const isCurrentFlowing = !isBroken && wireCurrent >= 1e-7 && snapshot.wirePhases?.[wire.id] !== undefined;
+        const phase = isBroken ? 0 : (snapshot.wirePhases?.[wire.id] ?? 0);
+        return {
+          flowDots: showElectrons && isCurrentFlowing ? getDotsOnPath(path, Math.max(1, Math.round(pathLength(path) / 36)), phase) : [],
+        };
+      }}
+      componentOpacity={componentCanvasOpacity}
+      terminalFill={(component, terminalId) => (Math.abs(snapshot.terminalVoltages[terminalKey(component.id, terminalId)] ?? 0) > 0.05 ? colors.powered : undefined)}
+      renderComponent={(component, { selected, symbolTransform }) => renderCanvasComponent(component, selected, symbolTransform)}
+      renderComponentOverlay={(component, { selected }) => renderDependentSourceLink(component, selected)}
+      canvasDefs={<>
+        {activeMeshTrace?.meshCycles?.map((cycle) => <marker key={cycle.index} id={`mesh-arrow-${cycle.index}`} markerWidth="7" markerHeight="7" refX="5.5" refY="3.5" orient="auto"><path d="M 0,1 L 6,3.5 L 0,6 Z" fill={MESH_LOOP_COLORS[cycle.index % MESH_LOOP_COLORS.length]} /></marker>)}
+      </>}
+      canvasUnderlay={activeMeshTrace?.meshCycles?.map((cycle) => <MeshLoopOverlay key={`mesh-cycle-${cycle.index}`} cycle={cycle} tabDUiRefinement={tabDUiRefinement} components={components} scale={visualSymbolScale} wires={wires} />)}
+      labelsLayer={components.map(component => {
+        /* Component labels world overlay (0° upright orientation, never upside-down / rotated). */
+        if (component.type === 'dmm') return null; // Completely hide DMM canvas label
+        const definition = getDef(component.type);
+        if (!definition) return null;
+
+        const hideLabel = component.props._hideLabel === true;
+        const hideValue = component.props._hideValue === true;
+
+        const anchors = componentLabelAnchors(definition, component, visualSymbolScale);
+        const isHorizontal = anchors.isHorizontal;
+        const refTextAnchor = anchors.refTextAnchor ?? (isHorizontal ? 'middle' : 'start');
+        const valTextAnchor = anchors.valTextAnchor ?? (isHorizontal ? 'middle' : 'start');
+        const refX = component.x + anchors.reference[0];
+        const refY = component.y + anchors.reference[1];
+        const valX = component.x + anchors.value[0];
+        const valY = component.y + anchors.value[1];
+        const isGround = component.type === 'ground' || /^GND\d*$/i.test(component.label);
+        const refFill = darkPreview ? '#f1f5f9' : '#1e293b';
+        const valFill = darkPreview ? '#94a3b8' : '#64748b';
+
+        // During Superposition, deactivated sources (short/open) hide their labels completely
+        if (superpositionRole(component).dimmed) return null;
+        const labelOpacity = isTheveninActive && theveninTargetId === component.id ? 0.45 : 1;
+        const isDependentSource = component.type === 'vcvs' || component.type === 'vccs' || component.type === 'ccvs' || component.type === 'cccs';
+
+        return (
+          <g key={`labels-${component.id}`} opacity={labelOpacity} style={{ transition: 'opacity 0.25s ease' }}>
+            {!hideLabel && (
+              <text
+                x={refX}
+                y={refY}
+                textAnchor={refTextAnchor}
+                dominantBaseline="central"
+                fontFamily="'KaTeX_Main', 'KaTeX_Math', serif"
+                style={{
+                  fontFamily: "'KaTeX_Main', 'KaTeX_Math', serif",
+                  fontSize: 13,
+                  fontWeight: 400,
+                  fill: refFill,
+                  paintOrder: 'stroke fill',
+                  stroke: colors.canvas,
+                  strokeWidth: 3.5,
+                  strokeLinejoin: 'round',
+                  strokeLinecap: 'round',
+                }}
+              >
+                {renderComponentCanvasLabel(component.label, isGround)}
+              </text>
+            )}
+
+            {!hideValue && isDependentSource && (() => {
+              const targetRef = String(component.props.targetId || component.props.controlSourceId || '');
+              const targetComp = components.find(c => c.id === targetRef || c.label === targetRef);
+              const targetLabel = targetComp ? targetComp.label : '';
+              const gain = Number(component.props.gain ?? 1);
+              const mathStr = formatDependentSourceMath(component.type, gain, targetLabel);
+              return (
+                <g>
+                  {/* High-fidelity KaTeX HTML/MathML rendering on live canvas */}
+                  <foreignObject
+                    x={valTextAnchor === 'end' ? valX - 90 : valTextAnchor === 'middle' ? valX - 45 : valX}
+                    y={valY - 14}
+                    width={90}
+                    height={28}
+                    style={{ overflow: 'visible' }}
+                  >
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: valTextAnchor === 'end' ? 'flex-end' : valTextAnchor === 'middle' ? 'center' : 'flex-start',
+                        width: '100%',
+                        height: '100%',
+                        color: valFill,
+                        fontSize: 11,
+                        lineHeight: 1,
+                        whiteSpace: 'nowrap',
+                        filter: `drop-shadow(0 0 2px ${colors.canvas}) drop-shadow(0 0 2px ${colors.canvas})`,
+                      }}
+                    >
+                      <V3Math math={mathStr} />
+                    </div>
+                  </foreignObject>
+                  {/* Fallback SVG text with KaTeX fonts for pure SVG export / print */}
+                  <text
+                    className="v3-export-math-fallback"
+                    x={valX}
+                    y={valY}
+                    textAnchor={valTextAnchor}
+                    dominantBaseline="central"
+                    fontFamily="'KaTeX_Main', 'KaTeX_Math', serif"
+                    data-math={mathStr}
+                    style={{
+                      display: 'none',
+                      fontFamily: "'KaTeX_Main', 'KaTeX_Math', serif",
+                      fontSize: 11,
+                      fontWeight: 400,
+                      fill: valFill,
+                      paintOrder: 'stroke fill',
+                      stroke: colors.canvas,
+                      strokeWidth: 3,
+                      strokeLinejoin: 'round',
+                      strokeLinecap: 'round',
+                    }}
+                  >
+                    {renderDependentSourceValueTspans(component.type, gain, targetLabel)}
+                  </text>
+                </g>
+              );
+            })()}
+
+            {!hideValue && !isDependentSource && (() => {
+              const value = componentDisplayValue(definition, component);
+              if (!value) return null;
+              return (
+                <text
+                  x={valX}
+                  y={valY}
+                  textAnchor={valTextAnchor}
+                  dominantBaseline="central"
+                  fontFamily="'KaTeX_Main', 'KaTeX_Math', serif"
+                  style={{
+                    fontFamily: "'KaTeX_Main', 'KaTeX_Math', serif",
+                    fontSize: 11,
+                    fontWeight: 400,
+                    fill: valFill,
+                    paintOrder: 'stroke fill',
+                    stroke: colors.canvas,
+                    strokeWidth: 3,
+                    strokeLinejoin: 'round',
+                    strokeLinecap: 'round',
+                  }}
+                >
+                  {renderFormattedValueTspans(value)}
+                </text>
+              );
+            })()}
+          </g>
+        );
+      })}
+      canvasOverlay={<>
+        {/* V_i labels deliberately render last: readable above grid, wires, symbols, and workspace text. Strictly active in Nodal mode. */}
+        {activeAnalysisMethod === 'nodal' && activeNodalTrace?.nodalNodes?.filter((node) => node.centroid[0] !== 0 || node.centroid[1] !== 0).map((node) => <NodalNodeOverlay key={`nodal-node-${node.node}`} node={node} colors={colors} />)}
+
+        {/* Thévenin / Norton / Max Power Terminal Pair A–B Overlays */}
+        {isTheveninActive && theveninTerminals && (
+          <g className="v3-thevenin-terminals-layer" pointerEvents="none">
+            <TheveninTerminalOverlay position={theveninTerminals.posA} label="A" colors={colors} darkPreview={darkPreview} />
+            <TheveninTerminalOverlay position={theveninTerminals.posB} label="B" colors={colors} darkPreview={darkPreview} />
+          </g>
+        )}
+
+        {/* Superposition Target Load Terminal Pair A–B Overlays */}
+        {isSuperpositionActive && superpositionTerminals && (
+          <g className="v3-superposition-terminals-layer" pointerEvents="none">
+            <TheveninTerminalOverlay position={superpositionTerminals.posA} label="A" colors={colors} darkPreview={darkPreview} />
+            <TheveninTerminalOverlay position={superpositionTerminals.posB} label="B" colors={colors} darkPreview={darkPreview} />
+          </g>
+        )}
       </>}
       toolbarRow2={<>
         <ToolbarButton colors={colors} icon={<Download size={14} />} label="Export" title="Export circuit as NAD netlist" onClick={exportNad} />
@@ -4206,627 +3446,15 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
           </span>
         </div>
       </>}
-      librarySearchValue={search}
-      onLibrarySearchChange={(value: string) => setSearch(value)}
-      libraryContent={<>
-        {Object.entries(filteredCategories).map(([category, items]) => {
-          const collapsed = collapsedCategories.has(category);
-          return (
-            <section key={category} style={{ marginBottom: 3 }}>
-              <button onClick={() => setCollapsedCategories(previous => {
-                const next = new Set(previous);
-                if (next.has(category)) next.delete(category); else next.add(category);
-                return next;
-              })} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: 'none', background: 'transparent', color: colors.text, cursor: 'pointer', padding: '8px 5px', fontSize: 11, fontWeight: 750 }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>{collapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}{category}</span>
-                <span style={{ color: colors.subtle, fontWeight: 600 }}>{items.length}</span>
-              </button>
-              {!collapsed && <div className={tabDUiRefinement ? 'grid grid-cols-2 gap-2 px-1 pb-3' : undefined}>{items.map(item => (
-                <button
-                  key={item.id}
-                  draggable
-                  onDragStart={event => {
-                    event.dataTransfer.setData('application/electrolab-component', item.id);
-                    event.dataTransfer.effectAllowed = 'copy';
-                  }}
-                  onClick={() => addComponent(item.id)}
-                  className={tabDUiRefinement ? 'flex h-[110px] flex-col overflow-hidden rounded-md border transition-all active:scale-[.97]' : undefined}
-                  style={tabDUiRefinement ? { borderColor: colors.line, background: colors.panel, cursor: 'grab' } : { width: '100%', textAlign: 'left', border: 'none', background: 'transparent', color: colors.muted, cursor: 'grab', borderRadius: 6, padding: '7px 8px', fontSize: 11, display: 'flex', flexDirection: 'column', gap: 2 }}
-                  onMouseEnter={event => { event.currentTarget.style.background = colors.panelAlt; if (!tabDUiRefinement) event.currentTarget.style.color = colors.text; }}
-                  onMouseLeave={event => { event.currentTarget.style.background = tabDUiRefinement ? colors.panel : 'transparent'; if (!tabDUiRefinement) event.currentTarget.style.color = colors.muted; }}
-                >
-                  {tabDUiRefinement ? (
-                    <>
-                      {/* Top Section: Scaled & Centered Canvas */}
-                      <div className="flex flex-1 min-h-0 w-full items-center justify-center p-2">
-                        <ComponentPaletteIcon definition={item} colors={colors} documented={tabDUiRefinement} isDark={darkPreview} />
-                      </div>
-                      {/* Bottom Section: Fixed height banner with clear readable component names */}
-                      <div className="flex h-7 w-full shrink-0 items-center justify-center border-t px-1.5" style={{ borderColor: colors.line, background: `${colors.line}15` }}>
-                        <span className="flex items-center justify-center text-[11px] font-medium text-slate-800 dark:text-slate-200 tracking-tight text-center leading-tight truncate w-full" title={item.name}>
-                          <ElectricalLabel label={item.name} />
-                        </span>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <span className="text-[12px] font-normal text-slate-800 dark:text-slate-200"><ElectricalLabel label={item.name} /></span>
-                      <span style={{ color: colors.subtle, fontSize: 9, lineHeight: 1.25 }}>{item.description}</span>
-                    </>
-                  )}
-                </button>
-              ))}</div>}
-            </section>
-          );
-        })}
-      </>}
       canvasTitle="Interactive Circuit Schematic Canvas"
-      componentCount={components.length}
-      netCount={wires.length}
+      emptyHint="Drag and drop components from the library to begin circuit design."
       simulationRunning={simulationRunning}
-      onZoomReset={() => setZoom(1)}
       canvasStatusExtra={<>
         {spiceStatus.kind === 'running' && <span style={{ fontWeight: 750 }}>SPICE ACCURACY PASS…</span>}
         {spiceStatus.kind === 'ready' && <span style={{ color: colors.accent, fontWeight: 750 }}>SPICE-VERIFIED</span>}
         {spiceStatus.kind === 'unsupported' && <span title={spiceStatus.reason} style={{ fontWeight: 750 }}>SPICE UNAVAILABLE · LIVE ENGINE</span>}
         {!snapshot.converged && <span style={{ color: colors.danger, fontWeight: 750 }}>CHECK CIRCUIT WARNINGS</span>}
       </>}
-      svgRef={svgRef}
-      zoom={zoom}
-      pan={pan}
-      gridMode={gridVisible && (!tabDUiRefinement || tabDGridMode !== 'hidden') ? (tabDUiRefinement ? tabDGridMode : 'cartesian') : 'hidden'}
-      gridSize={gridSize}
-      canvasCursor={dragState?.kind === 'pan' ? 'grabbing' : wiring.from ? 'crosshair' : 'default'}
-      onCanvasMouseDown={handleCanvasMouseDown}
-      onCanvasMouseMove={handleCanvasMouseMove}
-      onCanvasMouseUp={handleCanvasMouseUp}
-      onCanvasDrop={handleDrop}
-      canvasDefs={<>
-        {activeMeshTrace?.meshCycles?.map((cycle) => <marker key={cycle.index} id={`mesh-arrow-${cycle.index}`} markerWidth="7" markerHeight="7" refX="5.5" refY="3.5" orient="auto"><path d="M 0,1 L 6,3.5 L 0,6 Z" fill={MESH_LOOP_COLORS[cycle.index % MESH_LOOP_COLORS.length]} /></marker>)}
-      </>}
-      canvasContent={<>
-        {dragState?.kind === 'marquee' && <rect x={Math.min(dragState.start[0], dragState.end[0])} y={Math.min(dragState.start[1], dragState.end[1])} width={Math.abs(dragState.end[0] - dragState.start[0])} height={Math.abs(dragState.end[1] - dragState.start[1])} fill={`${colors.selection}18`} stroke={colors.selection} strokeWidth={1.2} strokeDasharray="5 4" pointerEvents="none" />}
-
-        {activeMeshTrace?.meshCycles?.map((cycle) => <MeshLoopOverlay key={`mesh-cycle-${cycle.index}`} cycle={cycle} tabDUiRefinement={tabDUiRefinement} components={components} scale={visualSymbolScale} wires={wires} />)}
-
-        {/* Dedicated layer containing ONLY components, wires, labels, and texts for tight export bounding box */}
-        <g id="circuit-elements-layer">
-          {wireRenderData.map(({ wire, selected, path, hitPath, renderPath, isSensingWire, strokeColor, strokeWidth }) => (
-            <g key={wire.id}>
-              {/* Wide transparent hitbox — uses plain polyline for reliable click detection */}
-              <path d={hitPath} fill="none" stroke="transparent" strokeWidth={17} strokeLinecap="round" strokeLinejoin="round" onMouseDown={event => handleWireMouseDown(event, wire)} onDoubleClick={event => handleWireDoubleClick(event, wire)} style={{ cursor: 'pointer' }} />
-              {/* Visible stroke with jump-arc splices at cross-net crossings */}
-              <path d={renderPath} fill="none" stroke={strokeColor} strokeWidth={strokeWidth} strokeDasharray={isSensingWire ? "3 3" : undefined} strokeLinecap="round" strokeLinejoin="round" pointerEvents="none" />
-              {selected && path.length > 2 && path.slice(1, -1).map((corner, index) => {
-                const cornerIndex = index + 1;
-                return <circle key={`${wire.id}-${cornerIndex}`} cx={corner[0]} cy={corner[1]} r={6} fill={colors.panel} stroke={colors.selection} strokeWidth={2} onMouseDown={event => {
-                  event.stopPropagation();
-                  dragStartSnapshotRef.current = cloneSnapshot({ components: componentRef.current, wires: wiresRef.current, texts: textsRef.current });
-                  setDragState({ kind: 'wireCorner', id: wire.id, corner: cornerIndex });
-                }} style={{ cursor: 'move' }} />;
-              })}
-            </g>
-          ))}
-
-          {/* Phase 2: same-net junction dots for interior crossing points, T-junctions, and cross-junctions */}
-          {junctionDots.map(([jx, jy]) => (
-            <circle key={`jdot-${jx}-${jy}`} cx={jx} cy={jy} r={3} fill="currentColor" color={colors.text} pointerEvents="none" />
-          ))}
-
-          {/* Phase 3: orthogonal rubber-band wire preview */}
-          {wiring.from && wireDraftPreviewPath && <path d={pointsToPath(wireDraftPreviewPath)} fill="none" stroke={colors.accent} strokeDasharray="6 4" strokeWidth={1.6} opacity={.75} strokeLinecap="round" strokeLinejoin="round" pointerEvents="none" />}
-          {wireSnapProjection && <circle cx={wireSnapProjection.point[0]} cy={wireSnapProjection.point[1]} r={6} fill="none" stroke={colors.accent} strokeWidth={2} pointerEvents="none" />}
-          {wiring.lockedCorners?.map((corner, index) => (
-            <circle key={`corner-${index}`} cx={corner[0]} cy={corner[1]} r={3} fill={colors.panel} stroke={colors.accent} strokeWidth={1.2} pointerEvents="none" />
-          ))}
-
-          {components.map(component => {
-            const definition = getDef(component.type);
-            if (!definition) return null;
-            const isSelected = (selection?.kind === 'component' && selection.id === component.id) || marqueeIds.includes(component.id);
-            let powered = Boolean(snapshot.componentPowered[component.id]);
-            if (component.type === 'coil') {
-              const vPos = snapshot.terminalVoltages[`${component.id}:pos`];
-              const vNeg = snapshot.terminalVoltages[`${component.id}:neg`];
-              if (vPos !== undefined && vNeg !== undefined) {
-                const vCoil = Math.abs(vPos - vNeg);
-                const threshold = Math.max(0.1, Number(component.props?.activationThreshold ?? 5));
-                if (vCoil >= threshold * 0.6) {
-                  powered = true;
-                }
-              }
-            } else if (['relay-spst', 'relay-spdt', 'relay-dpst', 'contactor'].includes(component.type)) {
-              const manual = component.props?.manualState;
-              if (manual === 'closed') {
-                powered = true;
-              } else if (manual === 'open') {
-                powered = false;
-              } else {
-                const vPos = snapshot.terminalVoltages[`${component.id}:coil+`];
-                const vNeg = snapshot.terminalVoltages[`${component.id}:coil-`];
-                if (vPos !== undefined && vNeg !== undefined) {
-                  const vCoil = Math.abs(vPos - vNeg);
-                  const rated = Math.max(0.1, Number(component.props?.coilVoltage ?? (component.type === 'contactor' ? 24 : 12)));
-                  if (vCoil >= rated * 0.7) {
-                    powered = true;
-                  }
-                }
-              }
-            } else if (['aux-contact-no', 'aux-contact-nc', 'aux-contact-3phase'].includes(component.type) && (component.props?.linkedTo || component.props?.controlSourceId)) {
-              const linkedRef = String(component.props?.linkedTo || component.props?.controlSourceId || '');
-              const linkedCoil = components.find(c => ['coil', 'contactor', 'relay-spst', 'relay-spdt', 'relay-dpst'].includes(c.type) && (c.label === linkedRef || c.id === linkedRef));
-              if (linkedCoil) {
-                if (linkedCoil.type === 'coil') {
-                  let coilEnergized = Boolean(snapshot.componentPowered[linkedCoil.id]);
-                  const vPos = snapshot.terminalVoltages[`${linkedCoil.id}:pos`];
-                  const vNeg = snapshot.terminalVoltages[`${linkedCoil.id}:neg`];
-                  if (vPos !== undefined && vNeg !== undefined) {
-                    const vCoil = Math.abs(vPos - vNeg);
-                    const threshold = Math.max(0.1, Number(linkedCoil.props?.activationThreshold ?? 5));
-                    if (vCoil >= threshold * 0.6) {
-                      coilEnergized = true;
-                    }
-                  }
-                  powered = coilEnergized;
-                } else {
-                  const manual = linkedCoil.props?.manualState;
-                  if (manual === 'closed') {
-                    powered = true;
-                  } else if (manual === 'open') {
-                    powered = false;
-                  } else {
-                    let coilEnergized = Boolean(snapshot.componentPowered[linkedCoil.id]);
-                    const vPos = snapshot.terminalVoltages[`${linkedCoil.id}:coil+`];
-                    const vNeg = snapshot.terminalVoltages[`${linkedCoil.id}:coil-`];
-                    if (vPos !== undefined && vNeg !== undefined) {
-                      const vCoil = Math.abs(vPos - vNeg);
-                      const rated = Math.max(0.1, Number(linkedCoil.props?.coilVoltage ?? (linkedCoil.type === 'contactor' ? 24 : 12)));
-                      if (vCoil >= rated * 0.7) {
-                        coilEnergized = true;
-                      }
-                    }
-                    powered = coilEnergized;
-                  }
-                }
-              }
-            }
-            let motorVEff: number | undefined;
-            if (component.type === 'motor-dc') {
-              const vPos = snapshot.terminalVoltages[terminalKey(component.id, 'pos')];
-              const vNeg = snapshot.terminalVoltages[terminalKey(component.id, 'neg')];
-              if (vPos !== undefined && vNeg !== undefined) {
-                const vEff = Math.abs(vPos - vNeg);
-                motorVEff = vEff;
-                powered = vEff >= 0.5;
-              }
-            } else if (component.type === 'motor-3phase') {
-              const vu = snapshot.terminalVoltages[terminalKey(component.id, 'u')];
-              const vv = snapshot.terminalVoltages[terminalKey(component.id, 'v')];
-              const vw = snapshot.terminalVoltages[terminalKey(component.id, 'w')];
-              if (vu !== undefined && vv !== undefined && vw !== undefined) {
-                const vuv = Math.abs(vu - vv);
-                const vvw = Math.abs(vv - vw);
-                const vwu = Math.abs(vw - vu);
-                const vEff = Math.sqrt((vuv ** 2 + vvw ** 2 + vwu ** 2) / 3);
-                motorVEff = vEff;
-                powered = vEff >= 0.5;
-              }
-            }
-            const intensity = snapshot.componentIntensity[component.id] ?? 0;
-            const reading = effectiveSnapshot.instrumentReadings[component.id];
-            // Live KaTeX-styled reading inside the circular Voltmeter/Ammeter face, synced with
-            // effectiveSnapshot (SPICE-verified when available, the legacy engine otherwise) so it
-            // follows Run mode with no extra lag beyond the snapshot itself. A component with no
-            // reading yet (never simulated) or an unwired meter falls back to the plain "V"/"A"
-            // glyph inside the symbol, unchanged.
-            const meterUnit = component.type === 'voltmeter' ? 'V' : component.type === 'ammeter' ? 'A' : null;
-            let dmmDisplayValue: string | undefined = undefined;
-            if (component.type === 'dmm') {
-              const mode = String(component.props?.mode ?? 'DCV');
-              if (reading) {
-                const isOhmMode = mode === 'OHM' || mode === 'CONT' || reading.unit === 'Ω' || reading.unit === 'Ohm';
-                if (reading.status === 'open' || (isOhmMode && (!Number.isFinite(reading.value) || Math.abs(reading.value) >= 1e7))) {
-                  dmmDisplayValue = 'O.L';
-                } else if (reading.status === 'ready') {
-                  dmmDisplayValue = formatEngineering(reading.value, reading.unit, 1);
-                }
-              }
-            }
-            const meterDisplayValue = (meterUnit && reading?.status === 'ready')
-              ? formatMeterReading(reading.value, meterUnit)
-              : dmmDisplayValue;
-            const transform = `translate(${component.x},${component.y})`;
-            const symbolTransform = `rotate(${component.rotation}) scale(${component.flipH ? -1 : 1},${component.flipV ? -1 : 1}) scale(${isExactCadComponent(component.type) ? 1 : visualSymbolScale})`;
-            const isTheveninRemovedLoad = isTheveninActive && theveninTargetId === component.id;
-            const isIndependentSource = component.type === 'voltage' || component.type === 'current' || component.type === 'dc-voltage' || component.type === 'dc-current' || component.type === 'ac-voltage' || component.type === 'ac-current';
-            const isSuperpositionDimmedSource = isSuperpositionActive && superpositionActiveSourceId && isIndependentSource && component.id !== superpositionActiveSourceId;
-            const isSuperpositionActiveSource = isSuperpositionActive && superpositionActiveSourceId && component.id === superpositionActiveSourceId;
-            const isSuperpositionDeactivatedVoltage = isSuperpositionDimmedSource && (component.type === 'voltage' || component.type === 'dc-voltage' || component.type === 'ac-voltage');
-            const isSuperpositionDeactivatedCurrent = isSuperpositionDimmedSource && (component.type === 'current' || component.type === 'dc-current' || component.type === 'ac-current');
-            // Deactivated sources (wire short / open gap) render with full opacity so the wire looks like real circuit wire
-            const componentCanvasOpacity = isTheveninRemovedLoad ? 0.45 : (isSuperpositionDeactivatedVoltage || isSuperpositionDeactivatedCurrent) ? 1 : isSuperpositionDimmedSource ? 0.28 : 1;
-
-            return (
-              <g
-                key={component.id}
-                transform={transform}
-                opacity={componentCanvasOpacity}
-                style={{ transition: 'opacity 0.25s ease' }}
-                onPointerEnter={() => setHoveredComponentId(component.id)}
-                onPointerLeave={() => setHoveredComponentId(null)}
-              >
-                {component.state?.isBurned && <title>COMPONENT DESTROYED - Exceeded maximum ratings</title>}
-                {isSuperpositionDeactivatedVoltage ? (
-                  /* Deactivated Voltage Source (Short Circuit): ghosted original source with solid wire overlay connecting pin1 to pin2 matching circuit wire stroke width */
-                  (() => {
-                    const t0 = getCanvasTerminalPosition(component, definition.terminals[0]?.id);
-                    const t1 = getCanvasTerminalPosition(component, definition.terminals[1]?.id);
-                    const x1 = t0 ? t0[0] - component.x : 0;
-                    const y1 = t0 ? t0[1] - component.y : -50;
-                    const x2 = t1 ? t1[0] - component.x : 0;
-                    const y2 = t1 ? t1[1] - component.y : 50;
-                    return (
-                      <g>
-                        <g transform={symbolTransform} opacity={0.25}>
-                          {renderSymbol(
-                            definition.symbol,
-                            powered,
-                            {
-                              ...component.props,
-                              label: component.label,
-                              selected: isSelected,
-                              _isSelected: isSelected,
-                              isDark: darkPreview,
-                              _isDark: darkPreview,
-                              isEnergized: powered,
-                              isConflicted: conflictedCoilIds.has(component.id),
-                              _intensity: intensity,
-                              _isBurned: Boolean(component.state?.isBurned),
-                              _superpositionActive: false,
-                              ...(motorVEff !== undefined ? { _vEff: motorVEff } : {}),
-                              _documentedStyle: tabDUiRefinement,
-                              ...(meterDisplayValue !== undefined ? { displayValue: meterDisplayValue } : {}),
-                            },
-                            animationTime,
-                          )}
-                        </g>
-                        <line
-                          x1={x1}
-                          y1={y1}
-                          x2={x2}
-                          y2={y2}
-                          stroke={colors.text}
-                          strokeWidth={1.5}
-                          strokeLinecap="round"
-                        />
-                      </g>
-                    );
-                  })()
-                ) : isSuperpositionDeactivatedCurrent ? (
-                  /* Deactivated Current Source (Open Circuit): ghosted original source (opacity 0.25) with open visual terminal gap */
-                  (() => {
-                    const t0 = getCanvasTerminalPosition(component, definition.terminals[0]?.id);
-                    const t1 = getCanvasTerminalPosition(component, definition.terminals[1]?.id);
-                    const x1 = t0 ? t0[0] - component.x : 0;
-                    const y1 = t0 ? t0[1] - component.y : -50;
-                    const x2 = t1 ? t1[0] - component.x : 0;
-                    const y2 = t1 ? t1[1] - component.y : 50;
-                    const stubLen = 14;
-                    const d0 = Math.hypot(x1, y1) || 1;
-                    const s0x = x1 - (x1 / d0) * stubLen;
-                    const s0y = y1 - (y1 / d0) * stubLen;
-                    const d1 = Math.hypot(x2, y2) || 1;
-                    const s1x = x2 - (x2 / d1) * stubLen;
-                    const s1y = y2 - (y2 / d1) * stubLen;
-                    return (
-                      <g>
-                        <g transform={symbolTransform} opacity={0.25}>
-                          {renderSymbol(
-                            definition.symbol,
-                            powered,
-                            {
-                              ...component.props,
-                              label: component.label,
-                              selected: isSelected,
-                              _isSelected: isSelected,
-                              isDark: darkPreview,
-                              _isDark: darkPreview,
-                              isEnergized: powered,
-                              isConflicted: conflictedCoilIds.has(component.id),
-                              _intensity: intensity,
-                              _isBurned: Boolean(component.state?.isBurned),
-                              _superpositionActive: false,
-                              ...(motorVEff !== undefined ? { _vEff: motorVEff } : {}),
-                              _documentedStyle: tabDUiRefinement,
-                              ...(meterDisplayValue !== undefined ? { displayValue: meterDisplayValue } : {}),
-                            },
-                            animationTime,
-                          )}
-                        </g>
-                        <line x1={x1} y1={y1} x2={s0x} y2={s0y} stroke={colors.text} strokeWidth={1.5} strokeLinecap="round" />
-                        <line x1={x2} y1={y2} x2={s1x} y2={s1y} stroke={colors.text} strokeWidth={1.5} strokeLinecap="round" />
-                      </g>
-                    );
-                  })()
-                ) : (
-                  /* Active or standard component graphic with solid purple highlight (no glow/drop-shadow) during Superposition */
-                  <g
-                    transform={symbolTransform}
-                    color={isSelected ? colors.selection : isSuperpositionActiveSource ? '#A855F7' : undefined}
-                  >
-                    {renderSymbol(
-                      definition.symbol,
-                      powered,
-                      {
-                        ...component.props,
-                        label: component.label,
-                        selected: isSelected,
-                        _isSelected: isSelected,
-                        isDark: darkPreview,
-                        _isDark: darkPreview,
-                        isEnergized: powered,
-                        isConflicted: conflictedCoilIds.has(component.id),
-                        _intensity: intensity,
-                        _isBurned: Boolean(component.state?.isBurned),
-                        _superpositionActive: isSuperpositionActiveSource,
-                        ...(motorVEff !== undefined ? { _vEff: motorVEff } : {}),
-                        _documentedStyle: tabDUiRefinement,
-                        ...(meterDisplayValue !== undefined ? { displayValue: meterDisplayValue } : {}),
-                      },
-                      animationTime,
-                    )}
-                  </g>
-                )}
-                {definition.terminals.map(terminal => {
-                  const snappedWorld = getCanvasTerminalPosition(component, terminal.id);
-                  const rawWorld = getRawCanvasTerminalPosition(component, terminal.id);
-                  if (!snappedWorld || !rawWorld) return null;
-                  const terminalX = snappedWorld[0] - component.x;
-                  const terminalY = snappedWorld[1] - component.y;
-                  const starting = wiring.from?.componentId === component.id && wiring.from.terminalId === terminal.id;
-                  const terminalVoltage = snapshot.terminalVoltages[terminalKey(component.id, terminal.id)] ?? 0;
-                  const energized = Math.abs(terminalVoltage) > .05;
-                  const showTerminals = isSelected || hoveredComponentId === component.id || Boolean(wiring.from);
-                  return <g key={terminal.id}>
-                    <circle cx={terminalX} cy={terminalY} r={TERMINAL_HIT_RADIUS} fill="transparent" />
-                    <g style={{ opacity: showTerminals ? 1 : 0, transition: 'opacity 0.2s ease-in-out' }} pointerEvents="none">
-                      <circle cx={terminalX} cy={terminalY} r={TERMINAL_RADIUS} fill={starting ? colors.accent : energized ? colors.powered : colors.panel} stroke={wiring.from ? colors.primary : colors.muted} strokeWidth={1.4} />
-                      {terminal.name && component.type !== 'oscilloscope' && <text x={terminalX} y={terminalY - 8} textAnchor="middle" fontSize={7} fontWeight={400} fill={colors.muted}>{terminal.name}</text>}
-                    </g>
-                  </g>;
-                })}
-                {isSelected && (component.type === 'cccs' || component.type === 'ccvs' || component.type === 'vcvs' || component.type === 'vccs') && (() => {
-                  const targetRef = String(component.props.targetId || component.props.controlSourceId || '');
-                  if (!targetRef) return null;
-                  const sensedComponent = components.find(c => c.id === targetRef || c.label === targetRef);
-                  if (!sensedComponent) return null;
-                  const dx = sensedComponent.x - component.x;
-                  const dy = sensedComponent.y - component.y;
-                  return <line x1={0} y1={0} x2={dx} y2={dy} stroke={colors.selection} strokeWidth={1} strokeDasharray="3 3" opacity={0.45} pointerEvents="none" />;
-                })()}
-              </g>
-            );
-          })}
-
-          {/* Dedicated Component Labels World Overlay Layer (0° Upright Orientation, No Upside Down / Rotated Labels) */}
-          <g className="v3-component-labels-layer" pointerEvents="none" style={{ userSelect: 'none' }}>
-            {components.map(component => {
-              if (component.type === 'dmm') return null; // Completely hide DMM canvas label
-              const definition = getDef(component.type);
-              if (!definition) return null;
-
-              // Read the display visibility flags
-              const hideLabel = component.props._hideLabel === true;
-              const hideValue = component.props._hideValue === true;
-
-              const anchors = componentLabelAnchors(definition, component, visualSymbolScale);
-              const isHorizontal = anchors.isHorizontal;
-              const refTextAnchor = anchors.refTextAnchor ?? (isHorizontal ? 'middle' : 'start');
-              const valTextAnchor = anchors.valTextAnchor ?? (isHorizontal ? 'middle' : 'start');
-              const refX = component.x + anchors.reference[0];
-              const refY = component.y + anchors.reference[1];
-              const valX = component.x + anchors.value[0];
-              const valY = component.y + anchors.value[1];
-              const isGround = component.type === 'ground' || /^GND\d*$/i.test(component.label);
-              const refFill = darkPreview ? '#f1f5f9' : '#1e293b';
-              const valFill = darkPreview ? '#94a3b8' : '#64748b';
-
-              const isTheveninRemovedLoad = isTheveninActive && theveninTargetId === component.id;
-              const isIndependentSource = component.type === 'voltage' || component.type === 'current' || component.type === 'dc-voltage' || component.type === 'dc-current' || component.type === 'ac-voltage' || component.type === 'ac-current';
-              const isSuperpositionDimmedSource = isSuperpositionActive && superpositionActiveSourceId && isIndependentSource && component.id !== superpositionActiveSourceId;
-              // During Superposition, deactivated sources (short/open) hide their labels completely
-              if (isSuperpositionDimmedSource) return null;
-              const labelOpacity = isTheveninRemovedLoad ? 0.45 : 1;
-
-              const isDependentSource = component.type === 'vcvs' || component.type === 'vccs' || component.type === 'ccvs' || component.type === 'cccs';
-
-              return (
-                <g key={`labels-${component.id}`} opacity={labelOpacity} style={{ transition: 'opacity 0.25s ease' }}>
-                  {/* Component Reference Label */}
-                  {!hideLabel && (
-                    <text
-                      x={refX}
-                      y={refY}
-                      textAnchor={refTextAnchor}
-                      dominantBaseline="central"
-                      fontFamily="'KaTeX_Main', 'KaTeX_Math', serif"
-                      style={{
-                        fontFamily: "'KaTeX_Main', 'KaTeX_Math', serif",
-                        fontSize: 13,
-                        fontWeight: 400,
-                        fill: refFill,
-                        paintOrder: 'stroke fill',
-                        stroke: colors.canvas,
-                        strokeWidth: 3.5,
-                        strokeLinejoin: 'round',
-                        strokeLinecap: 'round',
-                      }}
-                    >
-                      {renderComponentCanvasLabel(component.label, isGround)}
-                    </text>
-                  )}
-
-                  {/* Component Value Label */}
-                  {!hideValue && isDependentSource && (() => {
-                    const targetRef = String(component.props.targetId || component.props.controlSourceId || '');
-                    const targetComp = components.find(c => c.id === targetRef || c.label === targetRef);
-                    const targetLabel = targetComp ? targetComp.label : '';
-                    const gain = Number(component.props.gain ?? 1);
-                    const mathStr = formatDependentSourceMath(component.type, gain, targetLabel);
-                    return (
-                      <g>
-                        {/* High-fidelity KaTeX HTML/MathML rendering on live canvas */}
-                        <foreignObject
-                          x={valTextAnchor === 'end' ? valX - 90 : valTextAnchor === 'middle' ? valX - 45 : valX}
-                          y={valY - 14}
-                          width={90}
-                          height={28}
-                          style={{ overflow: 'visible' }}
-                        >
-                          <div
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: valTextAnchor === 'end' ? 'flex-end' : valTextAnchor === 'middle' ? 'center' : 'flex-start',
-                              width: '100%',
-                              height: '100%',
-                              color: valFill,
-                              fontSize: 11,
-                              lineHeight: 1,
-                              whiteSpace: 'nowrap',
-                              filter: `drop-shadow(0 0 2px ${colors.canvas}) drop-shadow(0 0 2px ${colors.canvas})`,
-                            }}
-                          >
-                            <V3Math math={mathStr} />
-                          </div>
-                        </foreignObject>
-                        {/* Fallback SVG text with KaTeX fonts for pure SVG export / print */}
-                        <text
-                          className="v3-export-math-fallback"
-                          x={valX}
-                          y={valY}
-                          textAnchor={valTextAnchor}
-                          dominantBaseline="central"
-                          fontFamily="'KaTeX_Main', 'KaTeX_Math', serif"
-                          data-math={mathStr}
-                          style={{
-                            display: 'none',
-                            fontFamily: "'KaTeX_Main', 'KaTeX_Math', serif",
-                            fontSize: 11,
-                            fontWeight: 400,
-                            fill: valFill,
-                            paintOrder: 'stroke fill',
-                            stroke: colors.canvas,
-                            strokeWidth: 3,
-                            strokeLinejoin: 'round',
-                            strokeLinecap: 'round',
-                          }}
-                        >
-                          {renderDependentSourceValueTspans(component.type, gain, targetLabel)}
-                        </text>
-                      </g>
-                    );
-                  })()}
-
-                  {!hideValue && !isDependentSource && (() => {
-                    const value = componentDisplayValue(definition, component);
-                    if (!value) return null;
-                    return (
-                      <text
-                        x={valX}
-                        y={valY}
-                        textAnchor={valTextAnchor}
-                        dominantBaseline="central"
-                        fontFamily="'KaTeX_Main', 'KaTeX_Math', serif"
-                        style={{
-                          fontFamily: "'KaTeX_Main', 'KaTeX_Math', serif",
-                          fontSize: 11,
-                          fontWeight: 400,
-                          fill: valFill,
-                          paintOrder: 'stroke fill',
-                          stroke: colors.canvas,
-                          strokeWidth: 3,
-                          strokeLinejoin: 'round',
-                          strokeLinecap: 'round',
-                        }}
-                      >
-                        {renderFormattedValueTspans(value)}
-                      </text>
-                    );
-                  })()}
-                </g>
-              );
-            })}
-
-            {/* Electron Flow Particles Layer (renders strictly on top of wire paths and component bodies) */}
-            {showElectrons && (
-              <g className="electron-particles" pointerEvents="none">
-                {wireRenderData.map(({ wire, dots, isCurrentFlowing }) =>
-                  isCurrentFlowing ? dots.map((dot, index) => (
-                    <circle
-                      key={`${wire.id}-particle-${index}`}
-                      cx={dot[0]}
-                      cy={dot[1]}
-                      r={3}
-                      fill={colors.powered}
-                      pointerEvents="none"
-                    />
-                  )) : null
-                )}
-              </g>
-            )}
-          </g>
-
-          {texts.map(text => (
-            <g
-              key={text.id}
-              data-text-id={text.id}
-              transform={`translate(${text.x},${text.y}) rotate(${text.rotation})`}
-              onMouseDown={event => handleTextMouseDown(event, text)}
-              style={{ cursor: 'move' }}
-            >
-              <foreignObject x={0} y={0} width={1} height={1} style={{ overflow: 'visible', pointerEvents: 'auto' }}>
-                <div style={{ width: 'max-content', color: text.color, fontSize: text.fontSize, fontWeight: 400, userSelect: 'none', display: 'flex', border: selection?.kind === 'text' && selection.id === text.id ? `1px dashed ${colors.selection}` : 'none', padding: 4, transform: 'translate(-4px, -4px)' }}>
-                  <V3Math math={text.text} />
-                </div>
-              </foreignObject>
-            </g>
-          ))}
-        </g>
-
-        {/* V_i labels deliberately render last: they remain readable above grid, wires, symbols, and workspace text. Strictly active in Nodal mode. */}
-        {activeAnalysisMethod === 'nodal' && activeNodalTrace?.nodalNodes?.filter((node) => node.centroid[0] !== 0 || node.centroid[1] !== 0).map((node) => <NodalNodeOverlay key={`nodal-node-${node.node}`} node={node} colors={colors} />)}
-
-        {/* Thévenin / Norton / Max Power Terminal Pair A–B Overlays */}
-        {isTheveninActive && theveninTerminals && (
-          <g className="v3-thevenin-terminals-layer" pointerEvents="none">
-            <TheveninTerminalOverlay position={theveninTerminals.posA} label="A" colors={colors} darkPreview={darkPreview} />
-            <TheveninTerminalOverlay position={theveninTerminals.posB} label="B" colors={colors} darkPreview={darkPreview} />
-          </g>
-        )}
-
-        {/* Superposition Target Load Terminal Pair A–B Overlays */}
-        {isSuperpositionActive && superpositionTerminals && (
-          <g className="v3-superposition-terminals-layer" pointerEvents="none">
-            <TheveninTerminalOverlay position={superpositionTerminals.posA} label="A" colors={colors} darkPreview={darkPreview} />
-            <TheveninTerminalOverlay position={superpositionTerminals.posB} label="B" colors={colors} darkPreview={darkPreview} />
-          </g>
-        )}
-      </>}
-      canvasEmptyOverlay={components.length === 0 && (
-        <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', pointerEvents: 'none' }}>
-          <div className="flex flex-col items-center justify-center pointer-events-none select-none">
-            <div className="px-6 py-2.5 bg-white border border-slate-100 rounded-2xl shadow-sm mb-3 dark:bg-[#0d0f12] dark:border-[#1a1d24]">
-              <span className="text-base font-semibold text-slate-900 tracking-tight dark:text-white">
-                Canvas Ready
-              </span>
-            </div>
-            <p className="text-xs text-slate-400 font-normal">
-              Drag and drop components from the library to begin circuit design.
-            </p>
-          </div>
-        </div>
-      )}
       analysisTitle="Academic Analysis Workspace"
       analysisContent={<AnalysisBox elements={dcMna.elements} geometry={meshGeometry} nodalNodes={nodalGeometry} colors={colors} standalone onTraceChange={handleAnalysisTrace} components={components} />}
       inspectorTop={<>
@@ -4834,11 +3462,11 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
       <PersistentDmmPanel colors={colors} dmms={components.filter(c => c.type === 'dmm')} snapshot={effectiveSnapshot} darkPreview={darkPreview} />
       </>}
       inspectorContent={selectedComponent ? (
-        <ComponentInspector colors={colors} component={selectedComponent} definition={getDef(selectedComponent.type)!} allComponents={components} linkedCoils={linkedCoils} reading={effectiveSnapshot.instrumentReadings[selectedComponent.id]} snapshot={effectiveSnapshot} tabDUiRefinement={tabDUiRefinement} oscilloscopeDisplaySettings={oscilloscopeDisplaySettings} onOscilloscopeDisplaySettingsChange={setOscilloscopeDisplaySettings} onLabelChange={label => updateComponent(selectedComponent.id, { label })} onPropertyChange={updateComponentProperty} onPropertiesChange={updateComponentProperties} onDelete={removeSelection} onReplace={replaceSelectedComponent} />
+        <ComponentInspector colors={colors} component={selectedComponent} definition={getDef(selectedComponent.type)!} allComponents={components} linkedCoils={linkedCoils} reading={effectiveSnapshot.instrumentReadings[selectedComponent.id]} snapshot={effectiveSnapshot} tabDUiRefinement={tabDUiRefinement} oscilloscopeDisplaySettings={oscilloscopeDisplaySettings} onOscilloscopeDisplaySettingsChange={setOscilloscopeDisplaySettings} onLabelChange={label => canvas.updateComponent(selectedComponent.id, { label })} onPropertyChange={updateComponentProperty} onPropertiesChange={updateComponentProperties} onDelete={canvas.clipboard.removeSelection} onReplace={replaceSelectedComponent} />
       ) : selectedWire ? (
-        <WireInspector colors={colors} wire={selectedWire} tabDUiRefinement={tabDUiRefinement} onRouting={updateWireRouting} onAddCorner={addSelectedWireCorner} onNudge={nudgeSelectedWire} onDelete={removeSelection} />
+        <WireInspector colors={colors} wire={selectedWire} tabDUiRefinement={tabDUiRefinement} onRouting={canvas.setWireRouting} onAddCorner={addSelectedWireCorner} onNudge={nudgeSelectedWire} onDelete={canvas.clipboard.removeSelection} />
       ) : selectedText ? (
-        <TextInspector colors={colors} text={selectedText} onUpdate={updateText} onMove={moveSelected} onDelete={removeSelection} />
+        <TextInspector colors={colors} text={selectedText} onUpdate={canvas.updateText} onMove={canvas.moveSelected} onDelete={canvas.clipboard.removeSelection} />
       ) : null}
       inspectorFooter={<>
       <div className="p-5 border-t border-slate-200 bg-white dark:border-[#1a1d24] dark:bg-[#0d0f12]">
@@ -4895,7 +3523,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
       onClose={() => setExamplesModalOpen(false)}
       onLoad={handleLoadExample}
     />
-    </UnifiedWorkspaceShell>
+    </BaseSchematicCanvas>
   );
 }
 

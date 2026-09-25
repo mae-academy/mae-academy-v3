@@ -14,6 +14,8 @@ describe('DigitalLogicSimulatorHome (UnifiedWorkspaceShell wiring)', () => {
     expect(markup).toContain('Digital Logic Lab');
     expect(markup).toContain('Workspace Shortcuts');
     expect(markup).toContain('Rotate');
+    expect(markup).toContain('Space');
     expect(markup).toContain('Delete');
+    expect(markup).toContain('KaTeX_Math');
   });
 });

@@ -89,6 +89,7 @@ describe('UnifiedWorkspaceShell bottom bar and HUD', () => {
     const markup = renderToStaticMarkup(<UnifiedWorkspaceShell {...baseProps} inspectorContent={null} zoom={1.5} />);
     expect(markup).toContain('(X: 0, Y: 0)');
     expect(markup).toContain('Rotate');
+    expect(markup).toContain('Space');
     expect(markup).toContain('Ctrl/Cmd + Z');
     expect(markup).toContain('150%');
     expect(markup).toContain('3 CMP');

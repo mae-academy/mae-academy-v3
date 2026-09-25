@@ -14,8 +14,9 @@ describe('Part 1: Classic Control Components Hidden (UI Only)', () => {
     const classicComponents = getComponentsByCategory('Classic Control');
     expect(classicComponents.length).toBe(0);
 
+    // The contactor was deliberately restored to the visible Protection catalog (d72e966); only Classic Control stays hidden.
     const protectionComponents = getComponentsByCategory('Protection');
-    expect(protectionComponents.some(c => c.id === 'contactor')).toBe(false);
+    expect(protectionComponents.every(c => !c.hidden)).toBe(true);
   });
 
   it('still preserves definition and SPICE model logic via getDef', () => {
@@ -160,8 +161,10 @@ describe('Part 3: ExportPreviewModal Component', () => {
     );
 
     // Should render toggle buttons for both PNG and SVG
-    expect(markup).toContain('>PNG</button>');
-    expect(markup).toContain('>SVG</button>');
+    expect(markup).toMatch(/role="tab"[^>]*>(<[^>]+>)*PNG<\/span><\/button>/);
+    expect(markup).toMatch(/role="tab"[^>]*>(<[^>]+>)*SVG<\/span><\/button>/);
+    // One global format switch plus one per preview item.
+    expect(markup.match(/aria-label="[^"]*[Ee]xport [Ff]ormat"/g)).toHaveLength(2);
   });
 });
 

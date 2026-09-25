@@ -15,7 +15,7 @@ export interface WorkspaceShortcut {
 
 /** Canonical workspace shortcuts list; every binding listed is implemented by both studios. */
 export const WORKSPACE_SHORTCUTS: ReadonlyArray<WorkspaceShortcut> = [
-  { key: 'R', label: 'Rotate' },
+  { key: 'Space', label: 'Rotate' },
   { key: 'Del', label: 'Delete' },
   { key: 'Alt + Drag', label: 'Pan' },
   { key: 'Ctrl/Cmd + Z', label: 'Undo' },

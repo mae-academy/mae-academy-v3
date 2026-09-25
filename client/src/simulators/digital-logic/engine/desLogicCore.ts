@@ -229,11 +229,39 @@ const createLogicComponent = (component: CircuitComponent): LogicComponent => {
   return new BehavioralLogicComponent(component.id, component.type, pins, delay, component.props);
 };
 
-interface DirectedConnection { wire: CircuitWire; driver: string; driverPin: string; receiver: string; receiverPin: string; }
+/** `wireIds` lists every drawn segment carrying this signal (several when routed through T-junctions). */
+interface DirectedConnection { wire: CircuitWire; wireIds: string[]; driver: string; driverPin: string; receiver: string; receiverPin: string; }
 const resolveConnection = (wire: CircuitWire, pins: Map<string, LogicPinMap>): DirectedConnection | null => {
   const from = pins.get(wire.fromComp); const to = pins.get(wire.toComp); if (!from || !to) return null;
   const fromOutput = from.outputs.includes(wire.fromTerm); const toOutput = to.outputs.includes(wire.toTerm); if (fromOutput === toOutput) return null;
-  return fromOutput ? { wire, driver: wire.fromComp, driverPin: wire.fromTerm, receiver: wire.toComp, receiverPin: wire.toTerm } : { wire, driver: wire.toComp, driverPin: wire.toTerm, receiver: wire.fromComp, receiverPin: wire.fromTerm };
+  return fromOutput ? { wire, wireIds: [wire.id], driver: wire.fromComp, driverPin: wire.fromTerm, receiver: wire.toComp, receiverPin: wire.toTerm } : { wire, wireIds: [wire.id], driver: wire.toComp, driverPin: wire.toTerm, receiver: wire.fromComp, receiverPin: wire.fromTerm };
+};
+const isJunctionNode = (id: string) => id.startsWith('junc_') || id.startsWith('junction') || id === 'junc';
+/** Flattens junction-split nets (canvas T-junctions) into driver→receiver connections. */
+const resolveJunctionConnections = (wires: CircuitWire[], pins: Map<string, LogicPinMap>): DirectedConnection[] => {
+  const parent = new Map<string, string>();
+  const find = (id: string): string => { let root = id; while (parent.get(root) !== root) root = parent.get(root) as string; parent.set(id, root); return root; };
+  const junctionWires = wires.filter(wire => isJunctionNode(wire.fromComp) || isJunctionNode(wire.toComp));
+  junctionWires.forEach(wire => [wire.fromComp, wire.toComp].filter(isJunctionNode).forEach(id => { if (!parent.has(id)) parent.set(id, id); }));
+  junctionWires.forEach(wire => { if (isJunctionNode(wire.fromComp) && isJunctionNode(wire.toComp)) { const a = find(wire.fromComp); const b = find(wire.toComp); if (a !== b) parent.set(a, b); } });
+  const nets = new Map<string, { wires: CircuitWire[]; endpoints: { wire: CircuitWire; component: string; pin: string }[] }>();
+  junctionWires.forEach(wire => {
+    const junction = isJunctionNode(wire.fromComp) ? wire.fromComp : wire.toComp;
+    const net = nets.get(find(junction)) ?? { wires: [], endpoints: [] };
+    net.wires.push(wire);
+    if (!isJunctionNode(wire.fromComp)) net.endpoints.push({ wire, component: wire.fromComp, pin: wire.fromTerm });
+    if (!isJunctionNode(wire.toComp)) net.endpoints.push({ wire, component: wire.toComp, pin: wire.toTerm });
+    nets.set(find(junction), net);
+  });
+  const connections: DirectedConnection[] = [];
+  nets.forEach(net => {
+    const wireIds = net.wires.map(wire => wire.id);
+    const isOutput = (endpoint: { component: string; pin: string }) => Boolean(pins.get(endpoint.component)?.outputs.includes(endpoint.pin));
+    const isInput = (endpoint: { component: string; pin: string }) => Boolean(pins.get(endpoint.component)?.inputs.includes(endpoint.pin));
+    const drivers = net.endpoints.filter(isOutput);
+    net.endpoints.filter(isInput).forEach(receiver => drivers.forEach(driver => connections.push({ wire: receiver.wire, wireIds, driver: driver.component, driverPin: driver.pin, receiver: receiver.component, receiverPin: receiver.pin })));
+  });
+  return connections;
 };
 
 export class DiscreteEventLogicEngine extends SimulationEngine {
@@ -255,7 +283,7 @@ export class DiscreteEventLogicEngine extends SimulationEngine {
     this.logicComponents = components.filter(component => LOGIC_COMPONENT_TYPES.has(component.type)).map(component => ({ ...component, props: { ...component.props } }));
     this.runtimes = new Map(this.logicComponents.map(component => [component.id, createLogicComponent(component)]));
     const pins = new Map(this.logicComponents.map(component => [component.id, logicPinsFor(component)]));
-    this.connections = wires.map(wire => resolveConnection(wire, pins)).filter((wire): wire is DirectedConnection => Boolean(wire));
+    this.connections = [...wires.map(wire => resolveConnection(wire, pins)).filter((wire): wire is DirectedConnection => Boolean(wire)), ...resolveJunctionConnections(wires, pins)];
     this.events = []; this.sequence = 0; this.nowNs = 0; this.nextClockEdgeNs.clear(); this.eventBudgetReached = false;
     this.logicComponents.forEach(component => { if (component.type === 'digital-input') this.runtimes.get(component.id)?.setInput('state', asLogicState(component.props.state)); this.schedule(component.id, 0, 'evaluate'); });
     this.flush(this.initialSettleNs);
@@ -273,7 +301,7 @@ export class DiscreteEventLogicEngine extends SimulationEngine {
     return runtime.pinMap.outputs.includes(pin) ? runtime.getOutput(pin) : runtime.inputs.get(pin) ?? 'X';
   }
   getWireLogicState(wireId: string): LogicState {
-    const conn = this.connections.find(c => c.wire.id === wireId);
+    const conn = this.connections.find(c => c.wireIds.includes(wireId));
     if (!conn) return 'X';
     return this.runtimes.get(conn.driver)?.getOutput(conn.driverPin) ?? 'X';
   }
@@ -343,11 +371,11 @@ export class DiscreteEventLogicEngine extends SimulationEngine {
     });
     valuesByReceiverPin.forEach((values, pin) => runtime.setInput(pin, resolveLogicDrivers(values)));
   }
-  private propagate(driverId: string, driverPin: string, value: LogicState) { this.connections.filter(connection => connection.driver === driverId && connection.driverPin === driverPin).forEach(connection => { this.subscribers.get(connection.wire.id)?.forEach(listener => listener(value, this.nowNs)); this.schedule(connection.receiver, 0, 'evaluate'); }); }
+  private propagate(driverId: string, driverPin: string, value: LogicState) { this.connections.filter(connection => connection.driver === driverId && connection.driverPin === driverPin).forEach(connection => { connection.wireIds.forEach(wireId => this.subscribers.get(wireId)?.forEach(listener => listener(value, this.nowNs))); this.schedule(connection.receiver, 0, 'evaluate'); }); }
   private makeLogicSnapshot(): SimulationSnapshot { return { time: 0, nodeVoltages: {}, terminalVoltages: {}, branchCurrents: {}, wireCurrents: {}, componentPowered: {}, componentIntensity: {}, nodeHistory: {}, branchHistory: {}, instrumentReadings: {}, warnings: [], converged: true }; }
   private createSnapshot() { const terminalVoltages: Record<string, number> = {}; const componentPowered: Record<string, boolean> = {}; const wireCurrents: Record<string, number> = {}; const warnings: SimulationWarning[] = [];
     this.runtimes.forEach((runtime, id) => runtime.pinMap.outputs.forEach(pin => { const value = runtime.getOutput(pin); terminalVoltages[terminalKey(id, pin)] = value === 1 ? 1 : 0; componentPowered[id] = componentPowered[id] || value === 1; }));
-    this.connections.forEach(connection => { const value = this.runtimes.get(connection.driver)?.getOutput(connection.driverPin) ?? 'X'; wireCurrents[connection.wire.id] = value === 1 ? 1 : 0; terminalVoltages[terminalKey(connection.receiver, connection.receiverPin)] = value === 1 ? 1 : 0; if (value === 'X') warnings.push({ code: 'logic-unknown', message: `Unknown logic state on ${connection.wire.id}` }); });
+    this.connections.forEach(connection => { const value = this.runtimes.get(connection.driver)?.getOutput(connection.driverPin) ?? 'X'; connection.wireIds.forEach(wireId => { wireCurrents[wireId] = value === 1 ? 1 : 0; }); terminalVoltages[terminalKey(connection.receiver, connection.receiverPin)] = value === 1 ? 1 : 0; if (value === 'X') warnings.push({ code: 'logic-unknown', message: `Unknown logic state on ${connection.wire.id}` }); });
     const driversByReceiverPin = new Map<string, LogicState[]>();
     this.connections.forEach(connection => { const key = terminalKey(connection.receiver, connection.receiverPin); const values = driversByReceiverPin.get(key) ?? []; values.push(this.runtimes.get(connection.driver)?.getOutput(connection.driverPin) ?? 'X'); driversByReceiverPin.set(key, values); });
     driversByReceiverPin.forEach((values, pin) => { if (values.length > 1 && resolveLogicDrivers(values) === 'X') warnings.push({ code: 'logic-driver-conflict', message: `Conflicting logic drivers at ${pin}` }); });

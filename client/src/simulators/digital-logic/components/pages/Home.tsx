@@ -1,34 +1,20 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 /* MAE Luminous Technical Atelier: Digital Logic Simulator UI
-   Flawlessly transplanted 1:1 from the Analog Circuit Simulator layout, styling,
-   toolbar, and canvas interaction, powered by the discrete-event digital logic engine. */
+   Canvas, wiring, selection, history and shortcuts come from the shared BaseSchematicCanvas;
+   this studio supplies only the logic component library and the discrete-event engine. */
 import {
   ArrowDown,
   ArrowLeft,
   ArrowRight,
   ArrowUp,
-  ChevronDown,
-  ChevronRight,
-  Clipboard,
-  Copy,
   Download,
-  FlipHorizontal,
-  FlipVertical,
-  Maximize2,
-  Minus,
   Move,
   Pause,
   Play,
-  Plus,
   RefreshCw,
   RotateCcw,
-  RotateCw,
-  Scissors,
   Share2,
   Trash2,
-  Type,
-  Undo2,
-  Redo2,
   Upload,
   Zap,
   Cpu,
@@ -37,15 +23,11 @@ import {
 import { nanoid } from 'nanoid';
 import { toast } from 'sonner';
 import { V3Math } from '@/components/ui/V3Math';
-import { SegmentedControl, StudioSlider } from '@/components/common/templates';
-import { KATEX_EMBEDDED_FONT_CSS } from '@/simulators/digital-logic/models/katexSvgFonts';
+import { StudioSlider } from '@/components/common/templates';
 import { DigitalLogicAnalysisBox } from '@/simulators/digital-logic/components/ui-components/DigitalLogicAnalysisBox';
-import { ExportPreviewModal, svgToPngBlob, type ExportItem } from '@/simulators/circuit-engine/components/ui-components/ExportPreviewModal';
+import { ExportPreviewModal, type ExportItem } from '@/simulators/circuit-engine/components/ui-components/ExportPreviewModal';
 import { ShareProjectModal } from '@/simulators/circuit-engine/components/ui-components/ShareProjectModal';
 import {
-  COMPONENT_DEFS,
-  CATEGORIES,
-  getComponentsByCategory,
   getDef,
   type ComponentDef,
   type PropertyDef,
@@ -53,95 +35,28 @@ import {
 import {
   componentPrefix,
   copyComponentForPaste,
-  formatEngineering,
   nextComponentLabel,
   replaceComponent,
-  terminalKey,
   type CircuitComponent,
   type CircuitWire,
-  type InstrumentReading,
-  type SamplePoint,
-  type Selection,
   type SimulationSnapshot,
   type WireRouting,
   type WorkspaceText,
 } from '@/simulators/digital-logic/models/circuitTypes';
 import {
   DIGITAL_LOGIC_CATEGORIES,
-  DIGITAL_LOGIC_CATEGORY_MAP,
-  getDigitalLogicCategory,
   getDigitalLogicComponentsByCategory,
-  getAllDigitalLogicComponentDefs,
 } from '@/simulators/digital-logic/models/digitalLogicCatalog';
-import { DiscreteEventLogicEngine, LOGIC_COMPONENT_TYPES, type LogicState } from '@/simulators/digital-logic/engine/desLogicCore';
-import {
-  dynamicScaleConfigFor,
-  logicBlockGeometryFor,
-  logicBlockLayoutFor,
-  normalizeDynamicScaleValue,
-  pruneWiresForTerminalSet,
-} from '@/simulators/digital-logic/components/dynamicLogicGeometry';
-import {
-  defaultInputShortcut,
-  findInputByShortcut,
-  inputShortcut,
-  logicIoLabel,
-  normalizeDefaultLogicLabel,
-} from '@/simulators/digital-logic/models/logicInputBindings';
+import { DiscreteEventLogicEngine, type LogicState } from '@/simulators/digital-logic/engine/desLogicCore';
+import { dynamicScaleConfigFor } from '@/simulators/digital-logic/components/dynamicLogicGeometry';
+import { defaultInputShortcut, findInputByShortcut } from '@/simulators/digital-logic/models/logicInputBindings';
 import { getLogicComponentBounds, getLogicComponentTerminals } from '@/simulators/digital-logic/models/logicGateContract';
 import { renderSymbol } from '@/simulators/digital-logic/components/symbols';
-import {
-  alignTabDTerminalToGrid,
-  dynamicRubberBandPath,
-  lockTabDWireCorner,
-  moveTabDOrthogonalLane,
-  tabDGentleWheelZoomFactor,
-  tabDOrthogonalDraftPath,
-  tabDTerminalOrthogonalPath,
-  type TabDTerminalAxis,
-} from '@/simulators/digital-logic/components/digitalLogicCanvasGeometry';
-import {
-  addWireCorner,
-  getDotsOnPath,
-  getTerminalWorldPos,
-  insertPointIntoWirePath,
-  isNearTerminal,
-  moveWireCorner,
-  nearestWireCorner,
-  pathLength,
-  pointsToPath,
-  projectPointOntoWire,
-  reconnectPathEndpoints,
-  reversedPath,
-  routePath,
-  routeTJunctionPath,
-  simplifyOrthogonalPath,
-  snapPointToGrid,
-  snapToGrid,
-  type Point,
-} from '@/simulators/digital-logic/models/wiring';
-import { buildJumpArcPath, calculateWireIntersections, getWirePoints, junctionDotPositions } from '@/simulators/digital-logic/models/wireIntersections';
+import { getDotsOnPath, getTerminalWorldPos, pathLength, type Point } from '@/simulators/digital-logic/models/wiring';
 import { calculateOrthogonalPath } from '@/simulators/digital-logic/models/wireRouter';
 import { createNadDocument, parseNad, serializeNad } from '@/simulators/digital-logic/models/nadFormat';
-import {
-  useHistory,
-  areSnapshotsEqual,
-  cloneSnapshot,
-  type CanvasSnapshot,
-} from '@/simulators/digital-logic/components/hooks/useHistory';
-
-import {
-  GRID_SIZE,
-  TAB_D_GRID_SIZE,
-  TAB_D_SYMBOL_SCALE,
-  TERMINAL_HIT_RADIUS,
-  TERMINAL_RADIUS,
-  ZOOM_STEP,
-  clampZoom,
-  computeTerminalVisibility,
-} from '@/simulators/shared/workspace/workspaceCanvasMechanics';
+import { TAB_D_GRID_SIZE } from '@/simulators/shared/workspace/workspaceCanvasMechanics';
 import type { Palette } from '@/simulators/shared/workspace/workspaceTheme';
-import { UnifiedWorkspaceShell } from '@/simulators/shared/workspace/UnifiedWorkspaceShell';
 import {
   TAB_GRADIENT,
   TAB_ACTIVE_SHADOW,
@@ -153,135 +68,68 @@ import {
   PropertyRow,
   ElectricalLabel,
 } from '@/simulators/shared/workspace/workspaceChrome';
+import { BaseSchematicCanvas } from '@/components/common/schematic/BaseSchematicCanvas';
+import { useSchematicCanvas } from '@/components/common/schematic/useSchematicCanvas';
+import { renderComponentCanvasLabel } from '@/components/common/schematic/schematicLabel';
+import { KATEX_EMBEDDED_FONT_CSS } from '@/simulators/digital-logic/models/katexSvgFonts';
+import { pointInComponentBox } from '@/components/common/schematic/schematicGeometry';
+import type { SchematicComponentLibrary, SchematicTerminal } from '@/components/common/schematic/schematicTypes';
 
 /* Reversed variant used only by the Run/Pause pill after a session has started; not part of the shared chrome contract. */
 const TAB_GRADIENT_REV = 'linear-gradient(135deg, #E11D48 0%, #7C3AED 50%, #2563EB 100%)';
-
-const EMPTY_SNAPSHOT: SimulationSnapshot = {
-  time: 0,
-  nodeVoltages: {},
-  terminalVoltages: {},
-  branchCurrents: {},
-  wireCurrents: {},
-  componentPowered: {},
-  componentIntensity: {},
-  nodeHistory: {},
-  branchHistory: {},
-  instrumentReadings: {},
-  warnings: [],
-  converged: true,
-};
-
-type DragState =
-  | { kind: 'component'; id: string; offset: Point }
-  | { kind: 'text'; id: string; offset: Point }
-  | { kind: 'wireCorner'; id: string; corner: number }
-  | { kind: 'pan'; client: Point }
-  | { kind: 'marquee'; start: Point; end: Point }
-  | null;
-
-interface WiringState {
-  from?: { componentId: string; terminalId: string; position: Point; axis: TabDTerminalAxis };
-  lockedCorners?: Point[];
-}
 
 function numeric(value: unknown, fallback = 0): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-const ENGINEERING_PREFIXES = [
-  { key: 'p', symbol: 'p', factor: 1e-12 },
-  { key: 'n', symbol: 'n', factor: 1e-9 },
-  { key: 'µ', symbol: 'µ', factor: 1e-6 },
-  { key: 'm', symbol: 'm', factor: 1e-3 },
-  { key: '', symbol: '', factor: 1 },
-  { key: 'k', symbol: 'k', factor: 1e3 },
-  { key: 'M', symbol: 'M', factor: 1e6 },
-  { key: 'G', symbol: 'G', factor: 1e9 },
-] as const;
-const PREFIXABLE_UNITS = new Set(['Ω', 'F', 'H', 'V', 'A', 'Hz', 's', 'ns']);
-
-function prefixStateKey(propertyKey: string) { return `__mae_prefix_${propertyKey}`; }
-function engineeringFactor(prefix: string): number { return ENGINEERING_PREFIXES.find(item => item.key === prefix)?.factor ?? 1; }
-function engineeringPrefixFor(value: number): string {
-  const absolute = Math.abs(value);
-  if (absolute === 0) return '';
-  return ENGINEERING_PREFIXES.reduce((candidate, prefix) => Math.abs(Math.log10(absolute / prefix.factor)) < Math.abs(Math.log10(absolute / candidate.factor)) ? prefix : candidate, ENGINEERING_PREFIXES[4]).key;
-}
-
 function defaultProps(definition: ComponentDef): Record<string, unknown> {
   return Object.fromEntries(Object.entries(definition.properties).map(([key, propDef]) => [key, propDef.value]));
 }
 
-function getComponentTerminalPosition(component: CircuitComponent, terminalId: string): Point | null {
+function logicTerminals(component: CircuitComponent): ComponentDef['terminals'] {
   const definition = getDef(component.type);
-  if (!definition) return null;
-  const terminals = getLogicComponentTerminals(component, definition) ?? definition.terminals;
-  const terminal = terminals.find(item => item.id === terminalId);
-  if (!terminal) return null;
-  return getTerminalWorldPos(
-    component.x,
-    component.y,
-    terminal.x,
-    terminal.y,
-    component.rotation,
-    component.flipH,
-    component.flipV,
-  );
+  if (!definition) return [];
+  return getLogicComponentTerminals(component, definition) ?? definition.terminals;
 }
 
-function currentWireEndpoints(wire: CircuitWire, components: CircuitComponent[]): { from: Point; to: Point; fromAxis: TabDTerminalAxis; toAxis: TabDTerminalAxis } | null {
-  let from: Point | null = null;
-  let fromAxis: TabDTerminalAxis = 'horizontal';
+/** Digital component library adapter: the only canvas-facing surface of this studio's catalog. */
+export const DIGITAL_LOGIC_LIBRARY: SchematicComponentLibrary<CircuitComponent> = {
+  getTerminals: (component): SchematicTerminal[] => logicTerminals(component).map(terminal => ({
+    id: terminal.id,
+    position: getTerminalWorldPos(component.x, component.y, terminal.x, terminal.y, component.rotation, component.flipH, component.flipV),
+  })),
+  hitTest: (component, point) => {
+    const definition = getDef(component.type);
+    if (!definition) return false;
+    const bounds = getLogicComponentBounds(component, definition);
+    return pointInComponentBox(component, point, bounds.width / 2, bounds.height / 2);
+  },
+  route: (from, to, components, excludeIds, fromAxis, toAxis) => calculateOrthogonalPath(from, to, components, TAB_D_GRID_SIZE, excludeIds, fromAxis, toAxis),
+  createComponent: (type, position, existing) => {
+    const definition = getDef(type);
+    if (!definition) return null;
+    return {
+      id: nanoid(10),
+      type,
+      x: position[0],
+      y: position[1],
+      rotation: 0,
+      flipH: false,
+      flipV: false,
+      label: nextComponentLabel(type, existing),
+      props: defaultProps(definition),
+    };
+  },
+  nextLabel: nextComponentLabel,
+  cloneForPaste: copyComponentForPaste,
+};
 
-  if (wire.fromComp.startsWith('junc_')) {
-    from = wire.path[0];
-    fromAxis = wire.path.length > 1 && Math.abs(wire.path[1][0] - wire.path[0][0]) > Math.abs(wire.path[1][1] - wire.path[0][1]) ? 'horizontal' : 'vertical';
-  } else {
-    const fromComponent = components.find(c => c.id === wire.fromComp);
-    if (!fromComponent) return null;
-    from = getComponentTerminalPosition(fromComponent, wire.fromTerm);
-    if (from) {
-      fromAxis = Math.abs(from[0] - fromComponent.x) >= Math.abs(from[1] - fromComponent.y) ? 'horizontal' : 'vertical';
-    }
-  }
-
-  if (wire.junctionPoint) {
-    return from ? { from, to: wire.junctionPoint, fromAxis, toAxis: fromAxis } : null;
-  }
-
-  let to: Point | null = null;
-  let toAxis: TabDTerminalAxis = 'horizontal';
-  if (wire.toComp.startsWith('junc_')) {
-    to = wire.path[wire.path.length - 1];
-    toAxis = wire.path.length > 1 && Math.abs(wire.path[wire.path.length - 1][0] - wire.path[wire.path.length - 2][0]) > Math.abs(wire.path[wire.path.length - 1][1] - wire.path[wire.path.length - 2][1]) ? 'horizontal' : 'vertical';
-  } else {
-    const toComponent = components.find(c => c.id === wire.toComp);
-    if (!toComponent) return null;
-    to = getComponentTerminalPosition(toComponent, wire.toTerm);
-    if (to) {
-      toAxis = Math.abs(to[0] - toComponent.x) >= Math.abs(to[1] - toComponent.y) ? 'horizontal' : 'vertical';
-    }
-  }
-
-  return from && to ? { from, to, fromAxis, toAxis } : null;
-}
-
-function refreshCanvasWireEndpoints(wires: CircuitWire[], components: CircuitComponent[], targetComponentId?: string): CircuitWire[] {
-  return wires.map(wire => {
-    if (targetComponentId && wire.fromComp !== targetComponentId && wire.toComp !== targetComponentId) {
-      return wire;
-    }
-    const endpoints = currentWireEndpoints(wire, components);
-    if (!endpoints) return wire;
-    if (wire.routing === 'straight') {
-      return { ...wire, path: [endpoints.from, endpoints.to] };
-    }
-    const nextPath = calculateOrthogonalPath(endpoints.from, endpoints.to, components, TAB_D_GRID_SIZE);
-    return { ...wire, path: nextPath };
-  });
-}
+const DIGITAL_LIBRARY_CATEGORIES: Record<string, ComponentDef[]> = DIGITAL_LOGIC_CATEGORIES.reduce<Record<string, ComponentDef[]>>((all, category) => {
+  const items = getDigitalLogicComponentsByCategory(category);
+  if (items.length) all[category] = items;
+  return all;
+}, {});
 
 function ComponentPaletteIcon({ definition, colors, documented, isDark }: { definition: ComponentDef; colors: Palette; documented: boolean; isDark?: boolean }) {
   const padding = 24;
@@ -339,22 +187,9 @@ export interface DigitalLogicSimulatorHomeProps {
 export function DigitalLogicSimulatorHome({
   createSimulationEngine = () => new DiscreteEventLogicEngine(),
   tabDUiRefinement = true,
-  digitalLogicOnly = true,
 }: DigitalLogicSimulatorHomeProps) {
-  const [components, setComponents] = useState<CircuitComponent[]>([]);
-  const [wires, setWires] = useState<CircuitWire[]>([]);
-  const [texts, setTexts] = useState<WorkspaceText[]>([]);
-  const [selection, setSelection] = useState<Selection>(null);
-  const [hoveredComponentId, setHoveredComponentId] = useState<string | null>(null);
-  const [marqueeIds, setMarqueeIds] = useState<string[]>([]);
-  const [zoom, setZoom] = useState(1);
-  const [pan, setPan] = useState<Point>([0, 0]);
-  const [dragState, setDragState] = useState<DragState>(null);
-  const [wiring, setWiring] = useState<WiringState>({});
-  const [mousePos, setMousePos] = useState<Point>([0, 0]);
   const [simulationRunning, setSimulationRunning] = useState(false);
   const [simulationSpeed, setSimulationSpeed] = useState(1);
-  const [snapshot, setSnapshot] = useState<SimulationSnapshot>(EMPTY_SNAPSHOT);
   const [showElectrons, setShowElectrons] = useState<boolean>(() => {
     try {
       return localStorage.getItem('mae-show-electrons') !== 'false';
@@ -362,70 +197,27 @@ export function DigitalLogicSimulatorHome({
       return true;
     }
   });
-  const [gridVisible, setGridVisible] = useState(true);
-  const [tabDGridMode, setTabDGridMode] = useState<'dots' | 'cartesian' | 'hidden'>('dots');
-  const [search, setSearch] = useState('');
-  const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
-  const [clipboard, setClipboard] = useState<{ components: CircuitComponent[]; wires: CircuitWire[]; texts: WorkspaceText[] } | null>(null);
   const [darkPreview, setDarkPreview] = useState(false);
 
   const hasStartedSimulation = useRef(false);
-  const svgRef = useRef<SVGSVGElement>(null);
   const nadInputRef = useRef<HTMLInputElement>(null);
   const simulation = useRef<DiscreteEventLogicEngine>(createSimulationEngine());
+  const [snapshot, setSnapshot] = useState<SimulationSnapshot>(() => simulation.current.getSnapshot());
   const animationFrame = useRef<number | null>(null);
   const wirePathRefs = useRef<Map<string, SVGPathElement>>(new Map());
-  const liveComponentsRef = useRef<CircuitComponent[]>([]);
-  const componentRef = useRef(components);
-  const wiresRef = useRef(wires);
-  const textsRef = useRef(texts);
+  const componentClickRef = useRef<(component: CircuitComponent) => void>(() => undefined);
+  const unhandledKeyRef = useRef<(event: KeyboardEvent) => void>(() => undefined);
 
-  componentRef.current = components;
-  wiresRef.current = wires;
-  textsRef.current = texts;
-
-  // History system
-  const history = useHistory<CanvasSnapshot>(
-    () => ({
-      components: [],
-      wires: [],
-      texts: [],
-    }),
-    { areEqual: areSnapshotsEqual },
-  );
-
-  const commitSnapshot = useCallback((patch?: Partial<CanvasSnapshot>) => {
-    const currentSnapshot: CanvasSnapshot = {
-      components: patch?.components ?? componentRef.current,
-      wires: patch?.wires ?? wiresRef.current,
-      texts: patch?.texts ?? textsRef.current,
-    };
-    history.set(cloneSnapshot(currentSnapshot));
-  }, [history]);
-
-  const handleUndo = useCallback(() => {
-    if (!history.canUndo) return;
-    const previous = history.undo();
-    if (!previous) return;
-    setComponents(previous.components);
-    setWires(previous.wires);
-    setTexts(previous.texts);
-    setSelection(null);
-    setMarqueeIds([]);
-    setWiring({});
-  }, [history]);
-
-  const handleRedo = useCallback(() => {
-    if (!history.canRedo) return;
-    const next = history.redo();
-    if (!next) return;
-    setComponents(next.components);
-    setWires(next.wires);
-    setTexts(next.texts);
-    setSelection(null);
-    setMarqueeIds([]);
-    setWiring({});
-  }, [history]);
+  const canvas = useSchematicCanvas<CircuitComponent>({
+    library: DIGITAL_LOGIC_LIBRARY,
+    gridSize: TAB_D_GRID_SIZE,
+    isDark: darkPreview,
+    defaultText: 'Logic Note',
+    onComponentClick: component => componentClickRef.current(component),
+    onUnhandledKey: event => unhandledKeyRef.current(event),
+  });
+  const { components, wires, texts, selectedComponent, selectedWire, selectedText, viewport } = canvas;
+  const { setComponents, setWires, setSelection, commit } = canvas.document;
 
   // Dark mode synchronization
   useEffect(() => {
@@ -435,31 +227,6 @@ export function DigitalLogicSimulatorHome({
     const observer = new MutationObserver(syncTheme);
     observer.observe(root, { attributes: true, attributeFilter: ['class'] });
     return () => observer.disconnect();
-  }, []);
-
-  // Wheel zoom handling
-  useEffect(() => {
-    const canvas = svgRef.current;
-    if (!canvas) return;
-    const handleNativeWheel = (event: WheelEvent) => {
-      event.preventDefault();
-      const rect = canvas.getBoundingClientRect();
-      if (!rect) return;
-      if (event.shiftKey || (Math.abs(event.deltaX) > Math.abs(event.deltaY) && !event.ctrlKey)) {
-        setPan(prev => [prev[0] - event.deltaX, prev[1] - event.deltaY]);
-        return;
-      }
-      const factor = tabDGentleWheelZoomFactor(event.deltaY);
-      const mouseX = event.clientX - rect.left;
-      const mouseY = event.clientY - rect.top;
-      setZoom(current => {
-        const next = clampZoom(current * factor);
-        setPan(prev => [mouseX - (mouseX - prev[0]) * (next / current), mouseY - (mouseY - prev[1]) * (next / current)]);
-        return next;
-      });
-    };
-    canvas.addEventListener('wheel', handleNativeWheel, { passive: false });
-    return () => canvas.removeEventListener('wheel', handleNativeWheel);
   }, []);
 
   const colors: Palette = useMemo(() => darkPreview
@@ -472,13 +239,13 @@ export function DigitalLogicSimulatorHome({
       text: '#f8fafc',
       muted: '#94a3b8',
       subtle: '#64748b',
-      primary: '#8b5cf6',
+      primary: '#38bdf8',
       accent: '#a855f7',
       danger: '#f43f5e',
-      selection: '#a855f7',
+      selection: '#38bdf8',
       grid: '#181b22',
-      wire: '#a855f7',
-      powered: '#c084fc',
+      wire: '#f8fafc',
+      powered: '#38bdf8',
       input: '#13161c',
       shadow: '0 12px 28px rgba(0,0,0,0.45)',
     }
@@ -496,29 +263,11 @@ export function DigitalLogicSimulatorHome({
       danger: '#be123c',
       selection: '#2563eb',
       grid: '#dbe7f3',
-      wire: '#2563eb',
-      powered: '#8b5cf6',
+      wire: '#0f172a',
+      powered: '#2563eb',
       input: '#ffffff',
       shadow: '0 12px 28px rgba(15,23,42,0.10)',
     }, [darkPreview]);
-
-  const gridSize = TAB_D_GRID_SIZE;
-
-  // Selected item references
-  const selectedComponent = useMemo(() => {
-    if (selection?.kind !== 'component') return null;
-    return components.find(c => c.id === selection.id) ?? null;
-  }, [components, selection]);
-
-  const selectedWire = useMemo(() => {
-    if (selection?.kind !== 'wire') return null;
-    return wires.find(w => w.id === selection.id) ?? null;
-  }, [wires, selection]);
-
-  const selectedText = useMemo(() => {
-    if (selection?.kind !== 'text') return null;
-    return texts.find(t => t.id === selection.id) ?? null;
-  }, [texts, selection]);
 
   // Update simulation when circuit topology changes
   useEffect(() => {
@@ -533,7 +282,7 @@ export function DigitalLogicSimulatorHome({
       const pathEl = wirePathRefs.current.get(wireId);
       if (pathEl) {
         pathEl.style.stroke = state === 1 ? colors.powered : state === 'X' ? colors.danger : colors.wire;
-        pathEl.style.opacity = state === 1 ? '1' : state === 'X' ? '0.95' : '0.85';
+        pathEl.style.opacity = state === 1 ? '1' : state === 'X' ? '0.95' : '1';
       }
     };
     const unsub = wires.map(w => engine.subscribeToWire(w.id, state => updateWireColor(w.id, state)));
@@ -566,34 +315,22 @@ export function DigitalLogicSimulatorHome({
     setSnapshot(simulation.current.getSnapshot());
   }, [components, wires]);
 
-  // Component manipulation
-  const updateComponent = useCallback((id: string, patch: Partial<CircuitComponent>) => {
-    const nextComponents = components.map(c => (c.id === id ? { ...c, ...patch } : c));
-    const nextWires = refreshCanvasWireEndpoints(wires, nextComponents, id);
-    setComponents(nextComponents);
-    setWires(nextWires);
-    commitSnapshot({ components: nextComponents, wires: nextWires });
-  }, [commitSnapshot, components, wires]);
-
   const updateComponentProperty = useCallback((key: string, value: unknown) => {
     if (!selectedComponent) return;
-    const nextProps = { ...selectedComponent.props, [key]: value };
-    updateComponent(selectedComponent.id, { props: nextProps });
-  }, [selectedComponent, updateComponent]);
+    canvas.updateComponent(selectedComponent.id, { props: { ...selectedComponent.props, [key]: value } });
+  }, [canvas, selectedComponent]);
 
   const updateComponentProperties = useCallback((updates: Record<string, unknown>) => {
     if (!selectedComponent) return;
-    const nextProps = { ...selectedComponent.props, ...updates };
-    updateComponent(selectedComponent.id, { props: nextProps });
-  }, [selectedComponent, updateComponent]);
+    canvas.updateComponent(selectedComponent.id, { props: { ...selectedComponent.props, ...updates } });
+  }, [canvas, selectedComponent]);
 
   const replaceSelectedComponent = useCallback((newType: string) => {
     if (!selectedComponent) return;
     const newDefinition = getDef(newType);
     if (!newDefinition) return;
-    const oldDefinition = getDef(selectedComponent.type);
-    const oldTerminalIds = (getLogicComponentTerminals(selectedComponent, oldDefinition!) ?? oldDefinition?.terminals ?? []).map(t => t.id);
-    const newTerminalIds = (getLogicComponentTerminals({ ...selectedComponent, type: newType, props: defaultProps(newDefinition) }, newDefinition) ?? newDefinition.terminals).map(t => t.id);
+    const oldTerminalIds = logicTerminals(selectedComponent).map(t => t.id);
+    const newTerminalIds = logicTerminals({ ...selectedComponent, type: newType, props: defaultProps(newDefinition) }).map(t => t.id);
     const newId = nanoid(10);
     const outcome = replaceComponent(components, wires, selectedComponent.id, oldTerminalIds, newTerminalIds, {
       id: newId,
@@ -602,460 +339,40 @@ export function DigitalLogicSimulatorHome({
       props: defaultProps(newDefinition),
     });
     if (!outcome) return;
-    const nextWires = refreshCanvasWireEndpoints(outcome.wires, outcome.components, newId);
+    const nextWires = canvas.refreshWires(outcome.wires, outcome.components, new Set([newId]));
     setComponents(outcome.components);
     setWires(nextWires);
-    commitSnapshot({ components: outcome.components, wires: nextWires });
+    commit({ components: outcome.components, wires: nextWires });
     setSelection({ kind: 'component', id: newId });
     toast.success(`Replaced with ${newDefinition.name}`);
-  }, [commitSnapshot, components, selectedComponent, wires]);
+  }, [canvas, commit, components, selectedComponent, setComponents, setSelection, setWires, wires]);
 
-  const rotateSelected = useCallback((degrees = 90) => {
-    if (!selectedComponent) return;
-    const newRotation = (((selectedComponent.rotation + degrees) % 360) + 360) % 360;
-    updateComponent(selectedComponent.id, { rotation: newRotation });
-  }, [selectedComponent, updateComponent]);
-
-  const flipSelected = useCallback((axis: 'h' | 'v') => {
-    if (!selectedComponent) return;
-    if (axis === 'h') {
-      updateComponent(selectedComponent.id, { flipH: !selectedComponent.flipH });
-    } else {
-      updateComponent(selectedComponent.id, { flipV: !selectedComponent.flipV });
-    }
-  }, [selectedComponent, updateComponent]);
-
-  const removeSelection = useCallback(() => {
-    if (marqueeIds.length > 0) {
-      const removeSet = new Set(marqueeIds);
-      const nextComponents = components.filter(c => !removeSet.has(c.id));
-      const nextWires = wires.filter(w => !removeSet.has(w.id) && !removeSet.has(w.fromComp) && !removeSet.has(w.toComp));
-      const nextTexts = texts.filter(t => !removeSet.has(t.id));
-      setComponents(nextComponents);
-      setWires(nextWires);
-      setTexts(nextTexts);
-      setMarqueeIds([]);
-      setSelection(null);
-      commitSnapshot({ components: nextComponents, wires: nextWires, texts: nextTexts });
-      return;
-    }
-    if (selectedComponent) {
-      const id = selectedComponent.id;
-      const nextComponents = components.filter(c => c.id !== id);
-      const nextWires = wires.filter(w => w.fromComp !== id && w.toComp !== id);
-      setComponents(nextComponents);
-      setWires(nextWires);
-      setSelection(null);
-      commitSnapshot({ components: nextComponents, wires: nextWires });
-    } else if (selectedWire) {
-      const id = selectedWire.id;
-      const nextWires = wires.filter(w => w.id !== id);
-      setWires(nextWires);
-      setSelection(null);
-      commitSnapshot({ wires: nextWires });
-    } else if (selectedText) {
-      const id = selectedText.id;
-      const nextTexts = texts.filter(t => t.id !== id);
-      setTexts(nextTexts);
-      setSelection(null);
-      commitSnapshot({ texts: nextTexts });
-    }
-  }, [commitSnapshot, components, marqueeIds, selectedComponent, selectedText, selectedWire, texts, wires]);
-
-  const copySelection = useCallback(() => {
-    const ids = marqueeIds.length > 0 ? marqueeIds : selectedComponent ? [selectedComponent.id] : [];
-    if (ids.length === 0) return;
-    const idSet = new Set(ids);
-    const copiedComponents = components.filter(c => idSet.has(c.id));
-    const copiedWires = wires.filter(w => idSet.has(w.fromComp) && idSet.has(w.toComp));
-    const copiedTexts = texts.filter(t => idSet.has(t.id));
-    setClipboard({ components: copiedComponents, wires: copiedWires, texts: copiedTexts });
-    toast.success(`Copied ${copiedComponents.length} items`);
-  }, [components, marqueeIds, selectedComponent, texts, wires]);
-
-  const cutSelection = useCallback(() => {
-    copySelection();
-    removeSelection();
-  }, [copySelection, removeSelection]);
-
-  const pasteClipboard = useCallback(() => {
-    if (!clipboard) return;
-    const idMap = new Map<string, string>();
-    const offset = 40;
-    const nextComponents = [
-      ...components,
-      ...clipboard.components.map(c => {
-        const newId = nanoid(10);
-        idMap.set(c.id, newId);
-        return {
-          ...c,
-          id: newId,
-          label: nextComponentLabel(c.type, components),
-          x: c.x + offset,
-          y: c.y + offset,
-        };
-      }),
-    ];
-    const nextWires = [
-      ...wires,
-      ...clipboard.wires.map(w => {
-        const newFrom = idMap.get(w.fromComp) ?? w.fromComp;
-        const newTo = idMap.get(w.toComp) ?? w.toComp;
-        return {
-          ...w,
-          id: nanoid(10),
-          fromComp: newFrom,
-          toComp: newTo,
-          path: w.path.map(p => [p[0] + offset, p[1] + offset] as Point),
-        };
-      }),
-    ];
-    setComponents(nextComponents);
-    setWires(nextWires);
-    commitSnapshot({ components: nextComponents, wires: nextWires });
-    toast.success('Pasted from clipboard');
-  }, [clipboard, commitSnapshot, components, wires]);
-
-  const addText = useCallback(() => {
-    const newText: WorkspaceText = {
-      id: nanoid(10),
-      x: snapToGrid(-pan[0] + 200, gridSize),
-      y: snapToGrid(-pan[1] + 150, gridSize),
-      text: 'Logic Note',
-      fontSize: 16,
-      color: darkPreview ? '#f8fafc' : '#1e293b',
-      rotation: 0,
-    };
-    const nextTexts = [...texts, newText];
-    setTexts(nextTexts);
-    setSelection({ kind: 'text', id: newText.id });
-    commitSnapshot({ texts: nextTexts });
-  }, [commitSnapshot, darkPreview, gridSize, pan, texts]);
-
-  const updateText = useCallback((patch: Partial<WorkspaceText>) => {
-    if (!selectedText) return;
-    const nextTexts = texts.map(t => (t.id === selectedText.id ? { ...t, ...patch } : t));
-    setTexts(nextTexts);
-    commitSnapshot({ texts: nextTexts });
-  }, [commitSnapshot, selectedText, texts]);
-
-  const moveSelected = useCallback((dx: number, dy: number) => {
-    if (selectedComponent) {
-      updateComponent(selectedComponent.id, { x: selectedComponent.x + dx, y: selectedComponent.y + dy });
-    } else if (selectedText) {
-      updateText({ x: selectedText.x + dx, y: selectedText.y + dy });
-    }
-  }, [selectedComponent, selectedText, updateComponent, updateText]);
-
-  const updateWireRouting = useCallback((routing: WireRouting) => {
-    if (!selectedWire) return;
-    const nextWires = wires.map(w => (w.id === selectedWire.id ? { ...w, routing } : w));
-    setWires(nextWires);
-    commitSnapshot({ wires: nextWires });
-  }, [commitSnapshot, selectedWire, wires]);
-
-  // Zoom to fit
-  const zoomToFit = useCallback(() => {
-    if (components.length === 0) {
-      setPan([0, 0]);
-      setZoom(1);
-      return;
-    }
-    const xs = components.map(c => c.x);
-    const ys = components.map(c => c.y);
-    const minX = Math.min(...xs) - 60;
-    const maxX = Math.max(...xs) + 60;
-    const minY = Math.min(...ys) - 60;
-    const maxY = Math.max(...ys) + 60;
-    const width = maxX - minX || 400;
-    const height = maxY - minY || 300;
-
-    const canvas = svgRef.current;
-    if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = rect.width / width;
-    const scaleY = rect.height / height;
-    const nextZoom = Math.max(0.3, Math.min(2, Math.min(scaleX, scaleY) * 0.85));
-    const centerX = (minX + maxX) / 2;
-    const centerY = (minY + maxY) / 2;
-    setZoom(nextZoom);
-    setPan([rect.width / 2 - centerX * nextZoom, rect.height / 2 - centerY * nextZoom]);
-  }, [components]);
-
-  // Canvas Mouse Events
-  const screenToWorld = useCallback((clientX: number, clientY: number): Point => {
-    const canvas = svgRef.current;
-    if (!canvas) return [0, 0];
-    const rect = canvas.getBoundingClientRect();
-    const sx = clientX - rect.left;
-    const sy = clientY - rect.top;
-    return [(sx - pan[0]) / zoom, (sy - pan[1]) / zoom];
-  }, [pan, zoom]);
-
-  const handleCanvasMouseDown = useCallback((event: React.MouseEvent<SVGSVGElement>) => {
-    if (event.button === 1 || event.altKey) {
-      // Middle click or Alt+click pans
-      setDragState({ kind: 'pan', client: [event.clientX, event.clientY] });
-      return;
-    }
-    if (event.button !== 0) return;
-
-    const [wx, wy] = screenToWorld(event.clientX, event.clientY);
-
-    // If wiring is in progress, click adds a waypoint or completes wire
-    if (wiring.from) {
-      const locked = wiring.lockedCorners ? [...wiring.lockedCorners, [wx, wy] as Point] : [[wx, wy] as Point];
-      setWiring(prev => ({ ...prev, lockedCorners: locked }));
-      return;
-    }
-
-    // Otherwise start marquee selection
-    setSelection(null);
-    setMarqueeIds([]);
-    setDragState({ kind: 'marquee', start: [wx, wy], end: [wx, wy] });
-  }, [screenToWorld, wiring.from, wiring.lockedCorners]);
-
-  const handleCanvasMouseMove = useCallback((event: React.MouseEvent<SVGSVGElement>) => {
-    const [wx, wy] = screenToWorld(event.clientX, event.clientY);
-    setMousePos([wx, wy]);
-
-    if (!dragState) return;
-
-    if (dragState.kind === 'pan') {
-      const dx = event.clientX - dragState.client[0];
-      const dy = event.clientY - dragState.client[1];
-      setPan(prev => [prev[0] + dx, prev[1] + dy]);
-      setDragState({ kind: 'pan', client: [event.clientX, event.clientY] });
-      return;
-    }
-
-    if (dragState.kind === 'component') {
-      const newX = snapToGrid(wx - dragState.offset[0], gridSize);
-      const newY = snapToGrid(wy - dragState.offset[1], gridSize);
-      setComponents(prev => prev.map(c => (c.id === dragState.id ? { ...c, x: newX, y: newY } : c)));
-      return;
-    }
-
-    if (dragState.kind === 'text') {
-      const newX = snapToGrid(wx - dragState.offset[0], gridSize);
-      const newY = snapToGrid(wy - dragState.offset[1], gridSize);
-      setTexts(prev => prev.map(t => (t.id === dragState.id ? { ...t, x: newX, y: newY } : t)));
-      return;
-    }
-
-    if (dragState.kind === 'marquee') {
-      setDragState({ ...dragState, end: [wx, wy] });
-      const xMin = Math.min(dragState.start[0], wx);
-      const xMax = Math.max(dragState.start[0], wx);
-      const yMin = Math.min(dragState.start[1], wy);
-      const yMax = Math.max(dragState.start[1], wy);
-      const ids = components.filter(c => c.x >= xMin && c.x <= xMax && c.y >= yMin && c.y <= yMax).map(c => c.id);
-      setMarqueeIds(ids);
-    }
-  }, [dragState, gridSize, screenToWorld, components]);
-
-  const handleCanvasMouseUp = useCallback(() => {
-    if (!dragState) return;
-    if (dragState.kind === 'component' || dragState.kind === 'text') {
-      const nextWires = refreshCanvasWireEndpoints(wires, components);
-      setWires(nextWires);
-      commitSnapshot({ components, wires: nextWires, texts });
-    }
-    setDragState(null);
-  }, [commitSnapshot, components, dragState, texts, wires]);
-
-  // Terminal wiring interactions
-  const handleTerminalMouseDown = useCallback((
-    event: React.MouseEvent,
-    component: CircuitComponent,
-    terminalId: string,
-    axis: TabDTerminalAxis = 'horizontal',
-  ) => {
-    event.stopPropagation();
-    const pos = getComponentTerminalPosition(component, terminalId);
-    if (!pos) return;
-
-    if (!wiring.from) {
-      // Start wiring
-      setWiring({ from: { componentId: component.id, terminalId, position: pos, axis }, lockedCorners: [] });
-    } else {
-      // Complete wiring to this terminal
-      const from = wiring.from;
-      if (from.componentId === component.id && from.terminalId === terminalId) {
-        setWiring({});
-        return;
-      }
-      const existing = wires.some(w =>
-        (w.fromComp === from.componentId && w.fromTerm === from.terminalId && w.toComp === component.id && w.toTerm === terminalId) ||
-        (w.fromComp === component.id && w.fromTerm === terminalId && w.toComp === from.componentId && w.toTerm === from.terminalId)
-      );
-      if (existing) {
-        toast.info('Terminals are already connected');
-        setWiring({});
-        return;
-      }
-
-      const path = calculateOrthogonalPath(from.position, pos, components, gridSize);
-      const newWire: CircuitWire = {
-        id: nanoid(10),
-        fromComp: from.componentId,
-        fromTerm: from.terminalId,
-        toComp: component.id,
-        toTerm: terminalId,
-        path,
-        routing: 'orthogonal',
-      };
-      const nextWires = [...wires, newWire];
-      setWires(nextWires);
-      setWiring({});
-      commitSnapshot({ wires: nextWires });
-    }
-  }, [commitSnapshot, components, gridSize, wires, wiring.from]);
-
-  // Direct toggle on digital-input click
-  const handleComponentClick = useCallback((component: CircuitComponent) => {
-    if (component.type === 'digital-input') {
-      simulation.current.toggleDigitalInput(component.id);
-      const currentVal = component.props.state;
-      const nextVal = currentVal === 'HIGH' ? 'LOW' : 'HIGH';
-      updateComponentProperty('state', nextVal);
-      setSnapshot(simulation.current.getSnapshot());
-    }
-  }, [updateComponentProperty]);
-
-  // Library drag-drop
-  const addComponent = useCallback((type: string) => {
-    const def = getDef(type);
-    if (!def) return;
-    const [cx, cy] = snapPointToGrid([-pan[0] + 300, -pan[1] + 240], gridSize);
-    const newComponent: CircuitComponent = {
-      id: nanoid(10),
-      type,
-      x: cx,
-      y: cy,
-      rotation: 0,
-      flipH: false,
-      flipV: false,
-      label: nextComponentLabel(type, components),
-      props: defaultProps(def),
-    };
-    const nextComponents = [...components, newComponent];
-    setComponents(nextComponents);
-    setSelection({ kind: 'component', id: newComponent.id });
-    commitSnapshot({ components: nextComponents });
-  }, [commitSnapshot, components, gridSize, pan]);
-
-  const handleDrop = useCallback((event: React.DragEvent<SVGSVGElement>) => {
+  // Engine-side interaction: logic inputs toggle on click or on their bound hotkey.
+  componentClickRef.current = (component: CircuitComponent) => {
+    if (component.type !== 'digital-input') return;
+    simulation.current.toggleDigitalInput(component.id);
+    canvas.updateComponent(component.id, { props: { ...component.props, state: component.props.state === 'HIGH' ? 'LOW' : 'HIGH' } });
+    setSnapshot(simulation.current.getSnapshot());
+  };
+  unhandledKeyRef.current = (event: KeyboardEvent) => {
+    if (event.ctrlKey || event.metaKey || event.altKey) return;
+    const input = findInputByShortcut(components, event.key);
+    if (!input) return;
     event.preventDefault();
-    const type = event.dataTransfer.getData('application/electrolab-component');
-    if (!type) return;
-    const def = getDef(type);
-    if (!def) return;
-    const [wx, wy] = screenToWorld(event.clientX, event.clientY);
-    const [snapX, snapY] = snapPointToGrid([wx, wy], gridSize);
-    const newComponent: CircuitComponent = {
-      id: nanoid(10),
-      type,
-      x: snapX,
-      y: snapY,
-      rotation: 0,
-      flipH: false,
-      flipV: false,
-      label: nextComponentLabel(type, components),
-      props: defaultProps(def),
-    };
-    const nextComponents = [...components, newComponent];
-    setComponents(nextComponents);
-    setSelection({ kind: 'component', id: newComponent.id });
-    commitSnapshot({ components: nextComponents });
-  }, [commitSnapshot, components, gridSize, screenToWorld]);
+    componentClickRef.current(input);
+  };
 
-  // Keyboard shortcuts
-  useEffect(() => {
-    const handler = (event: KeyboardEvent) => {
-      const target = event.target as HTMLElement | null;
-      if (target && ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) return;
-      const mod = event.ctrlKey || event.metaKey;
-
-      if (mod && event.key.toLowerCase() === 'z') {
-        event.preventDefault();
-        if (event.shiftKey) handleRedo(); else handleUndo();
-        return;
-      }
-      if (mod && event.key.toLowerCase() === 'y') {
-        event.preventDefault();
-        handleRedo();
-        return;
-      }
-      if (mod && event.key.toLowerCase() === 'c') {
-        event.preventDefault();
-        copySelection();
-        return;
-      }
-      if (mod && event.key.toLowerCase() === 'x') {
-        event.preventDefault();
-        cutSelection();
-        return;
-      }
-      if (mod && event.key.toLowerCase() === 'v') {
-        event.preventDefault();
-        pasteClipboard();
-        return;
-      }
-      if (event.key === 'Delete' || event.key === 'Backspace') {
-        event.preventDefault();
-        removeSelection();
-        return;
-      }
-      if (event.key.toLowerCase() === 'r' && !mod) {
-        event.preventDefault();
-        rotateSelected(90);
-        return;
-      }
-      if (event.key.toLowerCase() === 'h' && !mod) {
-        event.preventDefault();
-        flipSelected('h');
-        return;
-      }
-      if (event.key.toLowerCase() === 'v' && !mod) {
-        event.preventDefault();
-        flipSelected('v');
-        return;
-      }
-      if (event.key.toLowerCase() === 't' && !mod) {
-        event.preventDefault();
-        addText();
-        return;
-      }
-      if (event.key === 'Escape') {
-        setWiring({});
-        setSelection(null);
-        setMarqueeIds([]);
-        return;
-      }
-
-      // Check input hotkey shortcut
-      const input = findInputByShortcut(components, event.key);
-      if (input) {
-        event.preventDefault();
-        handleComponentClick(input);
-      }
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [addText, components, copySelection, cutSelection, flipSelected, handleComponentClick, handleRedo, handleUndo, pasteClipboard, removeSelection, rotateSelected]);
+  const nadDocument = useCallback(() => createNadDocument({
+    components,
+    wires,
+    texts,
+    viewport: { pan: viewport.pan, zoom: viewport.zoom },
+    workspace: { gridVisible: canvas.gridMode !== 'hidden', snapEnabled: canvas.snapEnabled },
+  }), [canvas.gridMode, canvas.snapEnabled, components, texts, viewport.pan, viewport.zoom, wires]);
 
   // Export / Import NAD netlist
   const exportNad = useCallback(() => {
-    const doc = createNadDocument({
-      components,
-      wires,
-      texts,
-      viewport: { pan, zoom },
-      workspace: { gridVisible, snapEnabled: true },
-    });
-    const json = serializeNad(doc);
-    const blob = new Blob([json], { type: 'application/json' });
+    const blob = new Blob([serializeNad(nadDocument())], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -1063,7 +380,7 @@ export function DigitalLogicSimulatorHome({
     a.click();
     URL.revokeObjectURL(url);
     toast.success('Netlist exported successfully');
-  }, [components, gridVisible, pan, texts, wires, zoom]);
+  }, [nadDocument]);
 
   const importNad = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -1071,34 +388,28 @@ export function DigitalLogicSimulatorHome({
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
-        const text = e.target?.result as string;
-        const parsed = parseNad(text);
-        setComponents(parsed.components);
-        setWires(parsed.wires);
-        setTexts(parsed.texts ?? []);
-        if (parsed.viewport?.pan) setPan(parsed.viewport.pan);
-        if (parsed.viewport?.zoom) setZoom(parsed.viewport.zoom);
-        commitSnapshot({ components: parsed.components, wires: parsed.wires, texts: parsed.texts ?? [] });
-        setSelection(null);
+        const parsed = parseNad(String(e.target?.result ?? ''));
+        canvas.loadDocument({ components: parsed.components, wires: parsed.wires, texts: parsed.texts ?? [] });
+        if (parsed.viewport?.pan && parsed.viewport.zoom) viewport.setView({ zoom: parsed.viewport.zoom, pan: parsed.viewport.pan });
         toast.success('Netlist imported successfully');
-      } catch (err: any) {
-        toast.error(`Failed to import netlist: ${err?.message ?? 'Invalid format'}`);
+      } catch (err: unknown) {
+        toast.error(`Failed to import netlist: ${err instanceof Error ? err.message : 'Invalid format'}`);
       }
     };
     reader.readAsText(file);
     event.target.value = '';
-  }, [commitSnapshot]);
+  }, [canvas, viewport]);
 
   // Export Schematics / Modal
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const [exportItems, setExportItems] = useState<ExportItem[]>([]);
-  const [exportFormat, setExportFormat] = useState<'png' | 'svg'>('png');
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [shareUrl, setShareUrl] = useState('');
 
   const handleOpenSaveImage = useCallback(() => {
-    if (!svgRef.current) return;
-    const cloned = svgRef.current.cloneNode(true) as SVGSVGElement;
+    const svg = viewport.svgRef.current;
+    if (!svg) return;
+    const cloned = svg.cloneNode(true) as SVGSVGElement;
     cloned.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
     const svgData = new XMLSerializer().serializeToString(cloned);
     const blob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
@@ -1115,90 +426,73 @@ export function DigitalLogicSimulatorHome({
       },
     ]);
     setExportModalOpen(true);
-  }, []);
+  }, [viewport.svgRef]);
 
   const handleShareProject = useCallback(() => {
-    const doc = createNadDocument({
-      components,
-      wires,
-      texts,
-      viewport: { pan, zoom },
-      workspace: { gridVisible, snapEnabled: true },
-    });
-    const serialized = encodeURIComponent(serializeNad(doc));
-    const url = `${window.location.origin}${window.location.pathname}?project=${serialized}`;
-    setShareUrl(url);
+    const serialized = encodeURIComponent(serializeNad(nadDocument()));
+    setShareUrl(`${window.location.origin}${window.location.pathname}?project=${serialized}`);
     setShareModalOpen(true);
-  }, [components, gridVisible, pan, texts, wires, zoom]);
-
-  // Filtered categories for Component Library sidebar
-  const filteredCategories = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return DIGITAL_LOGIC_CATEGORIES.reduce<Record<string, ComponentDef[]>>((acc, cat) => {
-      let items = getDigitalLogicComponentsByCategory(cat);
-      items = items.filter(
-        item => !q || item.name.toLowerCase().includes(q) || item.description.toLowerCase().includes(q),
-      );
-      if (items.length) acc[cat] = items;
-      return acc;
-    }, {});
-  }, [search]);
-
-  // Wire intersection jump-arcs calculation
-  const wireIntersections = useMemo(() => {
-    return calculateWireIntersections(wires);
-  }, [wires]);
-
-  const junctionDots = useMemo(() => {
-    return junctionDotPositions(wireIntersections, wires);
-  }, [wireIntersections, wires]);
+  }, [nadDocument]);
 
   return (
-    <UnifiedWorkspaceShell
+    <BaseSchematicCanvas
+      canvas={canvas}
       colors={colors}
-      isDark={darkPreview}
-      toolbarRow1={<>
-        <ToolbarButton colors={colors} label="−" title="Zoom out" onClick={() => setZoom(v => clampZoom(v / ZOOM_STEP))} />
-        <span style={{ color: colors.muted, fontSize: 11, minWidth: 42, textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>
-          {Math.round(zoom * 100)}%
-        </span>
-        <ToolbarButton colors={colors} label="+" title="Zoom in" onClick={() => setZoom(v => clampZoom(v * ZOOM_STEP))} />
-        <ToolbarDivider colors={colors} />
-        <ToolbarButton colors={colors} icon={<Undo2 size={14} />} title="Undo (Ctrl/Cmd+Z)" onClick={handleUndo} disabled={!history.canUndo} />
-        <ToolbarButton colors={colors} icon={<Redo2 size={14} />} title="Redo (Ctrl/Cmd+Shift+Z)" onClick={handleRedo} disabled={!history.canRedo} />
-        <ToolbarButton colors={colors} icon={<Maximize2 size={14} />} title="Auto-scale / Center circuit" onClick={zoomToFit} />
-        <ToolbarButton colors={colors} icon={<Scissors size={14} />} title="Cut (Ctrl/Cmd+X)" onClick={cutSelection} disabled={!selectedComponent && marqueeIds.length === 0} />
-        <ToolbarButton colors={colors} icon={<Copy size={14} />} title="Copy (Ctrl/Cmd+C)" onClick={copySelection} disabled={!selectedComponent && marqueeIds.length === 0} />
-        <ToolbarButton colors={colors} icon={<Clipboard size={14} />} title="Paste (Ctrl/Cmd+V)" onClick={pasteClipboard} disabled={!clipboard} />
-        <ToolbarButton colors={colors} icon={<Trash2 size={14} />} title="Delete (Del/Backspace)" onClick={removeSelection} disabled={!selectedComponent && !selectedWire && !selectedText && marqueeIds.length === 0} />
-        <ToolbarDivider colors={colors} />
-        <div className="flex items-center gap-2">
-          <SegmentedControl
-            options={[
-              { label: "Dotted", value: "dots" },
-              { label: "Cartesian", value: "cartesian" },
-              { label: "Hidden", value: "hidden" },
-            ]}
-            value={gridVisible ? tabDGridMode : "hidden"}
-            onChange={(val) => {
-              if (val === "hidden") {
-                setGridVisible(false);
-                setTabDGridMode("hidden");
-              } else {
-                setGridVisible(true);
-                setTabDGridMode(val as "dots" | "cartesian");
-              }
-            }}
-            size="sm"
-            aria-label="Grid Style"
-          />
-          <ToolbarButton colors={colors} icon={<Type size={14} />} label="Text" title="Add editable workspace text (T)" onClick={addText} />
-        </div>
-        <ToolbarDivider colors={colors} />
-        <ToolbarButton colors={colors} icon={<RotateCw size={14} />} label="90°" title="Rotate selected component 90°" onClick={() => rotateSelected(90)} disabled={!selectedComponent} />
-        <ToolbarButton colors={colors} icon={<FlipHorizontal size={14} />} label="Flip X" title="Reflect selected component horizontally" onClick={() => flipSelected('h')} disabled={!selectedComponent} />
-        <ToolbarButton colors={colors} icon={<FlipVertical size={14} />} label="Flip Y" title="Reflect selected component vertically" onClick={() => flipSelected('v')} disabled={!selectedComponent} />
-      </>}
+      canvasDefs={<style>{KATEX_EMBEDDED_FONT_CSS}</style>}
+      libraryCategories={DIGITAL_LIBRARY_CATEGORIES}
+      renderLibraryIcon={item => <ComponentPaletteIcon definition={item} colors={colors} documented={tabDUiRefinement} isDark={darkPreview} />}
+      wireColor={colors.wire}
+      wirePathRef={(wireId, element) => {
+        if (element) wirePathRefs.current.set(wireId, element);
+        else wirePathRefs.current.delete(wireId);
+      }}
+      wireAppearance={(wire, path) => {
+        const isHigh = simulation.current.getWireLogicState(wire.id) === 1;
+        return {
+          stroke: isHigh ? colors.powered : colors.wire,
+          flowDots: showElectrons && isHigh ? getDotsOnPath(path, Math.max(1, Math.round(pathLength(path) / 36)), snapshot.time * 2) : [],
+        };
+      }}
+      renderComponent={(component, { selected, symbolTransform }) => {
+        const def = getDef(component.type);
+        if (!def) return null;
+        const inputHigh = component.type === 'digital-input' && component.props.state === 'HIGH';
+        const outputHigh = component.type === 'digital-output' && (snapshot.terminalVoltages[`${component.id}:in`] ?? 0) === 1;
+        const shouldShowLabel = !component.props._hideLabel && ['digital-input', 'digital-output', 'logic-clock'].includes(component.type);
+        return (
+          <>
+            <g transform={symbolTransform} style={{ color: selected ? colors.selection : colors.text, cursor: component.type === 'digital-input' ? 'pointer' : 'move' }}>
+              {renderSymbol(
+                def.symbol,
+                inputHigh || outputHigh,
+                {
+                  ...component.props,
+                  _componentType: component.type,
+                  _blockLabel: def.name ?? component.label,
+                  _terminals: logicTerminals(component),
+                  isDark: darkPreview,
+                },
+                snapshot.time
+              )}
+            </g>
+            {shouldShowLabel && (
+              <text
+                x={0}
+                y={def.height / 2 + 16}
+                textAnchor="middle"
+                fontSize={11}
+                fontFamily="'KaTeX_Math', 'KaTeX_Main', serif"
+                fontStyle="italic"
+                fontWeight={400}
+                fill={colors.text}
+                pointerEvents="none"
+              >
+                {renderComponentCanvasLabel(component.label)}
+              </text>
+            )}
+          </>
+        );
+      }}
       toolbarRow2={<>
         <ToolbarButton colors={colors} icon={<Download size={14} />} label="Export" title="Export circuit as NAD netlist" onClick={exportNad} />
         <ToolbarButton colors={colors} icon={<Upload size={14} />} label="Import" title="Import circuit from NAD netlist" onClick={() => nadInputRef.current?.click()} />
@@ -1237,7 +531,7 @@ export function DigitalLogicSimulatorHome({
           title="Show / Hide signal flow"
           onClick={() => setShowElectrons(v => {
             const next = !v;
-            try { localStorage.setItem('mae-show-electrons', String(next)); } catch { }
+            try { localStorage.setItem('mae-show-electrons', String(next)); } catch { /* storage unavailable */ }
             return next;
           })}
           active={showElectrons}
@@ -1263,316 +557,9 @@ export function DigitalLogicSimulatorHome({
           </span>
         </div>
       </>}
-      librarySearchValue={search}
-      onLibrarySearchChange={(value: string) => setSearch(value)}
-      libraryContent={<>
-        {Object.entries(filteredCategories).map(([category, items]) => {
-          const collapsed = collapsedCategories.has(category);
-          return (
-            <section key={category} style={{ marginBottom: 3 }}>
-              <button
-                onClick={() => setCollapsedCategories(prev => {
-                  const next = new Set(prev);
-                  if (next.has(category)) next.delete(category); else next.add(category);
-                  return next;
-                })}
-                style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: 'none', background: 'transparent', color: colors.text, cursor: 'pointer', padding: '8px 5px', fontSize: 11, fontWeight: 750 }}
-              >
-                <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                  {collapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}{category}
-                </span>
-                <span style={{ color: colors.subtle, fontWeight: 600 }}>{items.length}</span>
-              </button>
-              {!collapsed && (
-                <div className="grid grid-cols-2 gap-2 px-1 pb-3">
-                  {items.map(item => (
-                    <button
-                      key={item.id}
-                      draggable
-                      onDragStart={event => {
-                        event.dataTransfer.setData('application/electrolab-component', item.id);
-                        event.dataTransfer.effectAllowed = 'copy';
-                      }}
-                      onClick={() => addComponent(item.id)}
-                      className="flex h-[110px] flex-col overflow-hidden rounded-md border transition-all active:scale-[.97]"
-                      style={{ borderColor: colors.line, background: colors.panel, cursor: 'grab' }}
-                      onMouseEnter={event => { event.currentTarget.style.background = colors.panelAlt; }}
-                      onMouseLeave={event => { event.currentTarget.style.background = colors.panel; }}
-                    >
-                      <div className="flex flex-1 min-h-0 w-full items-center justify-center p-2">
-                        <ComponentPaletteIcon definition={item} colors={colors} documented={tabDUiRefinement} isDark={darkPreview} />
-                      </div>
-                      <div className="flex h-7 w-full shrink-0 items-center justify-center border-t px-1.5" style={{ borderColor: colors.line, background: `${colors.line}15` }}>
-                        <span className="flex items-center justify-center text-[11px] font-medium text-slate-800 dark:text-slate-200 tracking-tight text-center leading-tight truncate w-full" title={item.name}>
-                          <ElectricalLabel label={item.name} />
-                        </span>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </section>
-          );
-        })}
-      </>}
       canvasTitle="Interactive Digital Logic Canvas"
-      componentCount={components.length}
-      netCount={wires.length}
+      emptyHint="Drag and drop logic gates, inputs, and components from the library to begin."
       simulationRunning={simulationRunning}
-      onZoomReset={() => setZoom(1)}
-      svgRef={svgRef}
-      zoom={zoom}
-      pan={pan}
-      gridMode={gridVisible ? tabDGridMode : 'hidden'}
-      gridSize={gridSize}
-      canvasCursor={dragState?.kind === 'pan' ? 'grabbing' : wiring.from ? 'crosshair' : 'default'}
-      onCanvasMouseDown={handleCanvasMouseDown}
-      onCanvasMouseMove={handleCanvasMouseMove}
-      onCanvasMouseUp={handleCanvasMouseUp}
-      onCanvasDrop={handleDrop}
-      canvasContent={<>
-        {dragState?.kind === 'marquee' && (
-          <rect
-            x={Math.min(dragState.start[0], dragState.end[0])}
-            y={Math.min(dragState.start[1], dragState.end[1])}
-            width={Math.abs(dragState.end[0] - dragState.start[0])}
-            height={Math.abs(dragState.end[1] - dragState.start[1])}
-            fill={`${colors.selection}18`}
-            stroke={colors.selection}
-            strokeWidth={1.2}
-            strokeDasharray="5 4"
-            pointerEvents="none"
-          />
-        )}
-
-        <g id="circuit-elements-layer">
-          {/* Wires */}
-          {wires.map(wire => {
-            const selected = selection?.kind === 'wire' && selection.id === wire.id;
-            const wireState = simulation.current.getWireLogicState(wire.id);
-            const isHigh = wireState === 1;
-            const strokeColor = selected ? colors.selection : isHigh ? colors.powered : colors.wire;
-            const strokeWidth = selected ? 2 : 1.5;
-            const hitPath = pointsToPath(wire.path);
-            const renderPath = buildJumpArcPath(wire.path, wireIntersections, wire.id, 4);
-            const len = pathLength(wire.path);
-            const numDots = Math.max(1, Math.round(len / 36));
-            const dots = showElectrons && isHigh ? getDotsOnPath(wire.path, numDots, snapshot.time * 2) : [];
-
-            return (
-              <g key={wire.id}>
-                <path
-                  d={hitPath}
-                  fill="none"
-                  stroke="transparent"
-                  strokeWidth={17}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  onMouseDown={event => {
-                    event.stopPropagation();
-                    setSelection({ kind: 'wire', id: wire.id });
-                  }}
-                  style={{ cursor: 'pointer' }}
-                />
-                <path
-                  ref={el => {
-                    if (el) wirePathRefs.current.set(wire.id, el);
-                    else wirePathRefs.current.delete(wire.id);
-                  }}
-                  d={renderPath}
-                  fill="none"
-                  stroke={strokeColor}
-                  strokeWidth={strokeWidth}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  pointerEvents="none"
-                />
-                {dots.map((dot, idx) => (
-                  <circle
-                    key={idx}
-                    cx={dot[0]}
-                    cy={dot[1]}
-                    r={3}
-                    fill={colors.powered}
-                    opacity={0.9}
-                    pointerEvents="none"
-                  />
-                ))}
-              </g>
-            );
-          })}
-
-          {/* Junction dots */}
-          {junctionDots.map((dot, idx) => (
-            <circle
-              key={`junc-${idx}`}
-              cx={dot[0]}
-              cy={dot[1]}
-              r={3.5}
-              fill={colors.wire}
-              pointerEvents="none"
-            />
-          ))}
-
-          {/* Components */}
-          {components.map(component => {
-            const def = getDef(component.type);
-            if (!def) return null;
-            const selected = selection?.kind === 'component' && selection.id === component.id;
-            const inMarquee = marqueeIds.includes(component.id);
-            const isHighlighted = selected || inMarquee;
-            const terminals = getLogicComponentTerminals(component, def) ?? def.terminals;
-            const isInput = component.type === 'digital-input';
-            const isOutput = component.type === 'digital-output';
-            const inputVal = isInput ? (component.props.state === 'HIGH' ? 1 : 0) : 0;
-            const outputState = isOutput ? (snapshot.terminalVoltages[`${component.id}:in`] ?? 0) : 0;
-
-            return (
-              <g
-                key={component.id}
-                transform={`translate(${component.x},${component.y}) rotate(${component.rotation}) scale(${component.flipH ? -1 : 1}, ${component.flipV ? -1 : 1})`}
-                onMouseDown={event => {
-                  event.stopPropagation();
-                  if (wiring.from) return;
-                  setSelection({ kind: 'component', id: component.id });
-                  setDragState({
-                    kind: 'component',
-                    id: component.id,
-                    offset: [mousePos[0] - component.x, mousePos[1] - component.y],
-                  });
-                }}
-                onClick={() => handleComponentClick(component)}
-                onMouseEnter={() => setHoveredComponentId(component.id)}
-                onMouseLeave={() => setHoveredComponentId(prev => (prev === component.id ? null : prev))}
-                style={{ cursor: isInput ? 'pointer' : 'move' }}
-              >
-                {/* Render logic symbol — selection overrides stroke/color instead of a bounding box */}
-                <g style={{ color: isHighlighted ? colors.selection : colors.text }}>
-                  {renderSymbol(
-                    def.symbol,
-                    inputVal === 1 || outputState === 1,
-                    {
-                      ...component.props,
-                      _componentType: component.type,
-                      _blockLabel: def.name ?? component.label,
-                      _terminals: terminals,
-                      isDark: darkPreview,
-                    },
-                    snapshot.time
-                  )}
-                </g>
-
-                {/* Terminals — hidden unless hovered, selected, or an active wire is being drawn */}
-                {terminals.map(term => {
-                  const termAxis = Math.abs(term.x) >= Math.abs(term.y) ? 'horizontal' : 'vertical';
-                  const showTerminals = computeTerminalVisibility({
-                    isSelectedOrHighlighted: isHighlighted,
-                    hoveredComponentId,
-                    componentId: component.id,
-                    wiringInProgress: Boolean(wiring.from),
-                  });
-                  return (
-                    <g key={term.id} transform={`translate(${term.x}, ${term.y})`}>
-                      <circle
-                        r={TERMINAL_HIT_RADIUS}
-                        fill="transparent"
-                        onMouseDown={event => handleTerminalMouseDown(event, component, term.id, termAxis)}
-                        style={{ cursor: 'crosshair' }}
-                      />
-                      <g style={{ opacity: showTerminals ? 1 : 0, transition: 'opacity 0.2s ease-in-out' }} pointerEvents="none">
-                        <circle
-                          r={TERMINAL_RADIUS}
-                          fill={colors.panel}
-                          stroke={colors.line}
-                          strokeWidth={1.5}
-                        />
-                      </g>
-                    </g>
-                  );
-                })}
-
-                {/* Component label */}
-                {!component.props._hideLabel && (
-                  <text
-                    x={0}
-                    y={def.height / 2 + 16}
-                    textAnchor="middle"
-                    fontSize={11}
-                    fontFamily="'KaTeX_Math', 'KaTeX_Main', serif"
-                    fontWeight={700}
-                    fill={colors.text}
-                    pointerEvents="none"
-                    transform={`scale(${component.flipH ? -1 : 1}, ${component.flipV ? -1 : 1}) rotate(${-component.rotation})`}
-                  >
-                    {component.label}
-                  </text>
-                )}
-              </g>
-            );
-          })}
-
-          {/* Active wiring line preview */}
-          {wiring.from && (
-            <path
-              d={pointsToPath(
-                calculateOrthogonalPath(
-                  wiring.from.position,
-                  snapPointToGrid(mousePos, gridSize),
-                  components,
-                  gridSize,
-                ),
-              )}
-              fill="none"
-              stroke={colors.accent}
-              strokeWidth={2}
-              strokeDasharray="5 4"
-              pointerEvents="none"
-            />
-          )}
-
-          {/* Texts */}
-          {texts.map(text => (
-            <g
-              key={text.id}
-              transform={`translate(${text.x}, ${text.y})`}
-              onMouseDown={event => {
-                event.stopPropagation();
-                setSelection({ kind: 'text', id: text.id });
-                setDragState({
-                  kind: 'text',
-                  id: text.id,
-                  offset: [mousePos[0] - text.x, mousePos[1] - text.y],
-                });
-              }}
-              style={{ cursor: 'move' }}
-            >
-              <text
-                fontSize={text.fontSize}
-                fill={text.color}
-                fontFamily="'KaTeX_Main', 'KaTeX_Math', serif"
-                fontWeight={600}
-                dominantBaseline="hanging"
-              >
-                {text.text}
-              </text>
-            </g>
-          ))}
-        </g>
-      </>}
-      canvasEmptyOverlay={components.length === 0 && (
-        <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', pointerEvents: 'none' }}>
-          <div className="flex flex-col items-center justify-center select-none">
-            <div className="px-6 py-2.5 bg-white border border-slate-100 rounded-2xl shadow-sm mb-3 dark:bg-slate-900 dark:border-slate-800">
-              <span className="text-base font-semibold text-slate-900 tracking-tight dark:text-white">
-                Canvas Ready
-              </span>
-            </div>
-            <p className="text-xs text-slate-400 font-normal">
-              Drag and drop logic gates, inputs, and components from the library to begin.
-            </p>
-          </div>
-        </div>
-      )}
       analysisTitle="Logic Analysis Workspace"
       analysisContent={<DigitalLogicAnalysisBox colors={colors} standalone components={components} wires={wires} snapshot={snapshot} />}
       inspectorContent={selectedComponent ? (
@@ -1582,45 +569,45 @@ export function DigitalLogicSimulatorHome({
           definition={getDef(selectedComponent.type)!}
           allComponents={components}
           snapshot={snapshot}
-          onLabelChange={label => updateComponent(selectedComponent.id, { label })}
+          onLabelChange={label => canvas.updateComponent(selectedComponent.id, { label })}
           onPropertyChange={updateComponentProperty}
           onPropertiesChange={updateComponentProperties}
-          onDelete={removeSelection}
+          onDelete={canvas.clipboard.removeSelection}
           onReplace={replaceSelectedComponent}
         />
       ) : selectedWire ? (
         <WireInspector
           colors={colors}
           wire={selectedWire}
-          onRouting={updateWireRouting}
-          onDelete={removeSelection}
+          onRouting={canvas.setWireRouting}
+          onDelete={canvas.clipboard.removeSelection}
         />
       ) : selectedText ? (
         <TextInspector
           colors={colors}
           text={selectedText}
-          onUpdate={updateText}
-          onMove={moveSelected}
-          onDelete={removeSelection}
+          onUpdate={canvas.updateText}
+          onMove={canvas.moveSelected}
+          onDelete={canvas.clipboard.removeSelection}
         />
       ) : null}
-      inspectorFooter={<>
-      <div className="p-5 border-t border-slate-200 bg-white dark:border-[#1a1d24] dark:bg-[#0d0f12]">
-        <h3 className="text-sm font-bold tracking-wider text-slate-900 dark:text-white mb-3 uppercase flex items-center gap-2">
-          <Cpu size={16} className="text-blue-600 dark:text-blue-400 shrink-0" />
-          Digital Logic Lab
-        </h3>
-        <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-          The engine simulates real-time propagation delay, gate level logic, truth-table generation, Karnaugh mapping, and sequential timing waveforms. Place discrete gates, configure clock signals, and analyze combinational and sequential networks.
-        </p>
-      </div>
-      </>}
+      inspectorFooter={
+        <div className="p-5 border-t border-slate-200 bg-white dark:border-[#1a1d24] dark:bg-[#0d0f12]">
+          <h3 className="text-sm font-bold tracking-wider text-slate-900 dark:text-white mb-3 uppercase flex items-center gap-2">
+            <Cpu size={16} className="text-blue-600 dark:text-blue-400 shrink-0" />
+            Digital Logic Lab
+          </h3>
+          <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+            The engine simulates real-time propagation delay, gate level logic, truth-table generation, Karnaugh mapping, and sequential timing waveforms. Place discrete gates, configure clock signals, and analyze combinational and sequential networks.
+          </p>
+        </div>
+      }
     >
       <ExportPreviewModal
         isOpen={exportModalOpen}
         onClose={() => setExportModalOpen(false)}
         items={exportItems}
-        format={exportFormat}
+        format="png"
         onItemDownloaded={() => { }}
         onAllDownloaded={() => { }}
       />
@@ -1632,7 +619,7 @@ export function DigitalLogicSimulatorHome({
         wireCount={wires.length}
         previewUrl={null}
       />
-    </UnifiedWorkspaceShell>
+    </BaseSchematicCanvas>
   );
 }
 
@@ -2160,11 +1147,19 @@ function PropertyEditorField({ colors, label, definition, value, onChange }: { c
 
 function componentLabelToLatex(label: string): string {
   const normalized = label.trim();
-  const match = normalized.match(/^([A-Za-z]+)(\d+)$/);
   const safe = (val: string) => val.replace(/([\\{}#$%&_~^])/g, '\\$1');
+  const subMatch = normalized.match(/^([A-Za-z]+)_\{?(\d+)\}?$/);
+  if (subMatch) {
+    const prefix = subMatch[1].length === 1 ? subMatch[1] : `\\mathrm{${safe(subMatch[1])}}`;
+    return `${prefix}_{${subMatch[2]}}`;
+  }
+  const match = normalized.match(/^([A-Za-z]+)(\d+)$/);
   if (match) {
     const prefix = match[1].length === 1 ? match[1] : `\\mathrm{${safe(match[1])}}`;
     return `${prefix}_{${match[2]}}`;
+  }
+  if (/^[A-Za-z]$/.test(normalized)) {
+    return normalized;
   }
   return `\\mathrm{${safe(normalized || 'component')}}`;
 }

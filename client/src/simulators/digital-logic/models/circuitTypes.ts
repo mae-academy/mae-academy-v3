@@ -140,6 +140,7 @@ const PREFIXES: Record<string, string> = {
   ammeter: 'AM',
   dmm: 'DMM',
   oscilloscope: 'OSC',
+  'logic-clock': 'CLK',
 };
 
 export function componentPrefix(type: string): string {
@@ -147,6 +148,47 @@ export function componentPrefix(type: string): string {
 }
 
 export function nextComponentLabel(type: string, components: CircuitComponent[]): string {
+  if (type === 'digital-input') {
+    const usedLetters = new Set(
+      components
+        .filter(c => c.type === 'digital-input')
+        .map(c => c.label.trim().toUpperCase())
+    );
+    for (let i = 0; i < 26; i++) {
+      const letter = String.fromCharCode(65 + i);
+      if (!usedLetters.has(letter)) {
+        return letter;
+      }
+    }
+    let suffix = 1;
+    while (true) {
+      for (let i = 0; i < 26; i++) {
+        const candidate = `${String.fromCharCode(65 + i)}${suffix}`;
+        if (!usedLetters.has(candidate)) {
+          return candidate;
+        }
+      }
+      suffix++;
+    }
+  }
+
+  if (type === 'digital-output') {
+    const usedNumbers = new Set(
+      components
+        .filter(c => c.type === 'digital-output')
+        .map(c => {
+          const match = c.label.trim().match(/^F_?(\d+)$/i);
+          return match ? parseInt(match[1], 10) : null;
+        })
+        .filter((n): n is number => n !== null && n > 0)
+    );
+    let next = 1;
+    while (usedNumbers.has(next)) {
+      next++;
+    }
+    return `F_${next}`;
+  }
+
   const prefix = componentPrefix(type);
   const expression = new RegExp(`^${prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\d+)$`, 'i');
   const next = components.reduce((max, component) => {

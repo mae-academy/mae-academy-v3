@@ -82,10 +82,10 @@ function ShortcutItemBadge({ shortcut, colors }: ShortcutItemBadgeProps) {
     color: colors.text,
   };
 
-  if (shortcut.key === 'R') {
+  if (shortcut.key === 'Space' || shortcut.key === 'R') {
     return (
       <div className="flex items-center gap-1.5 min-w-0">
-        <kbd className="rounded border px-1.5 py-0.5 font-mono text-[10px] font-semibold shadow-xs shrink-0" style={kbdStyle}>R</kbd>
+        <kbd className="rounded border px-1.5 py-0.5 font-mono text-[10px] font-semibold shadow-xs shrink-0" style={kbdStyle}>Space</kbd>
         <span className="truncate text-slate-700 dark:text-slate-300">{shortcut.label}</span>
       </div>
     );
