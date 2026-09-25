@@ -7,7 +7,7 @@
  * Deliberately free of React, DOM, and Canvas concerns.
  */
 
-export type FunctionName = "sin" | "cos" | "tan" | "exp" | "ln" | "log" | "sqrt" | "abs" | "u" | "r" | "sgn" | "rect" | "tri" | "sinc";
+export type FunctionName = "sin" | "cos" | "tan" | "exp" | "ln" | "log" | "sqrt" | "abs" | "u" | "r" | "sgn" | "rect" | "tri" | "sinc" | "Sa";
 /** The default rate a bare \omega collapses to (1 Hz), matching the systemClassifier convention. */
 export const DEFAULT_OMEGA = 6.28319;
 
@@ -22,6 +22,8 @@ export type MathNode =
   | { kind: "pow"; base: MathNode; exponent: MathNode }
   | { kind: "call"; name: FunctionName; argument: MathNode }
   | { kind: "delta"; order: number; argument: MathNode }
+  /** x⁽ⁿ⁾(argument): the system's symbolic input signal. Differentiable, never numerically evaluable. */
+  | { kind: "input"; order: number; argument: MathNode }
   /** ∫₋∞ᵗ integrand(dummyVariable) d(dummyVariable) — an explicit running-integral wrapper typed
    *  directly into the equation. Its value is only known dynamically, at each sampled `t`. */
   | { kind: "runningIntegral"; integrand: MathNode; dummyVariable: string };
@@ -62,11 +64,12 @@ type Token =
 /** Flattens LaTeX spacing/decoration so the lexer only sees structural tokens. */
 export function normalizeMathSource(source: string): string {
   return source
-    .replaceAll("\\left", "").replaceAll("\\right", "").replaceAll("\\!", "")
+    .replaceAll("\\left", "").replaceAll("\\right", "").replaceAll("\\!", "").replaceAll("\\prime", "'")
     // Boundary markers, not deletion: "2\,3.14" must not glue into the single literal "23.14".
     .replaceAll("\\,", "\u0001").replaceAll("\\;", "\u0001").replaceAll("\\:", "\u0001").replaceAll("\\ ", "\u0001")
     .replaceAll("\\quad", "\u0001").replaceAll("\\qquad", "\u0001")
     .replaceAll("\\cdot", "*").replaceAll("\\times", "*").replaceAll("×", "*").replaceAll("·", "*")
+    .replaceAll("\\div", "/").replaceAll("÷", "/")
     .replaceAll("−", "-").replaceAll("∞", "\\infty").replaceAll("π", "\\pi").replaceAll("τ", "\\tau")
     .replaceAll("δ", "\\delta").replaceAll("′", "'").replaceAll("″", "''").replaceAll("’", "'")
     // A boundary marker, not deletion: "\pi t" must not glue into the single command "\pit".
@@ -101,7 +104,7 @@ const FUNCTION_COMMANDS: Record<string, FunctionName> = {
   sin: "sin", cos: "cos", tan: "tan", exp: "exp", ln: "ln", log: "log", sqrt: "sqrt",
   operatorname: "sinc", text: "sinc", // resolved by the braced name that follows
 };
-const NAMED_FUNCTIONS: Record<string, FunctionName> = { sin: "sin", cos: "cos", tan: "tan", exp: "exp", ln: "ln", log: "log", sqrt: "sqrt", abs: "abs", u: "u", r: "r", sgn: "sgn", rect: "rect", tri: "tri", sinc: "sinc" };
+const NAMED_FUNCTIONS: Record<string, FunctionName> = { sin: "sin", cos: "cos", tan: "tan", exp: "exp", ln: "ln", log: "log", sqrt: "sqrt", abs: "abs", u: "u", r: "r", sgn: "sgn", rect: "rect", tri: "tri", sinc: "sinc", Sa: "Sa" };
 
 class Parser {
   private position = 0;
@@ -241,6 +244,22 @@ class Parser {
     }
   }
 
+  /** x'(t), x''(t), x^{'}(t): reads only prime marks, then requires "(" — x^{2}(t) stays a power. */
+  private readInputOrder(): number | null {
+    const save = this.position;
+    let order = 0;
+    const isOp = (value: string) => { const token = this.peek(); return token?.type === "op" && token.value === value; };
+    while (isOp("'")) { this.position += 1; order += 1; }
+    if (order === 0 && isOp("^") && this.peek(1)?.type === "op" && (this.peek(1) as { value: string }).value === "{" && (this.peek(2) as { value?: string } | undefined)?.value === "'") {
+      this.position += 2;
+      while (isOp("'")) { this.position += 1; order += 1; }
+      if (!this.eat("}")) { this.position = save; return null; }
+    }
+    if (isOp("(")) return order;
+    this.position = save;
+    return null;
+  }
+
   /** Counts primes and \delta^{(n)} superscripts into a derivative order. */
   private readDeltaOrder(): number {
     let order = 0;
@@ -273,6 +292,10 @@ class Parser {
     }
     if (token.type === "ident") {
       if (token.value === "e") { if (this.eat("^")) return { kind: "call", name: "exp", argument: this.parseGroup() }; return num(Math.E); }
+      if (token.value === "x" && this.variable !== "x") {
+        const order = this.readInputOrder();
+        if (order !== null) return { kind: "input", order, argument: this.parseGroup() };
+      }
       const functional = NAMED_FUNCTIONS[token.value];
       const calledLikeFunction = this.peek()?.type === "op" && (this.peek() as { value: string }).value === "(";
       if (functional && calledLikeFunction) return { kind: "call", name: functional, argument: this.parseGroup() };
@@ -344,6 +367,7 @@ export function evaluateNode(node: MathNode, variable: string, at: number): numb
     }
     case "call": return evaluateCall(node.name, evaluateNode(node.argument, variable, at));
     case "delta": throw new DomainError("A Dirac impulse has no pointwise value; it is only defined under an integral.");
+    case "input": throw new DomainError("The input signal x(t) is symbolic and has no numeric value.");
     case "runningIntegral": {
       const outcome = evaluateIntegralNode(node.integrand, node.dummyVariable, Number.NEGATIVE_INFINITY, at);
       if (outcome.kind === "value") return outcome.value;
@@ -378,6 +402,7 @@ function evaluateCall(name: FunctionName, value: number): number {
     case "rect": return Math.abs(value) <= 0.5 ? 1 : 0;
     case "tri": return Math.max(0, 1 - Math.abs(value));
     case "sinc": return Math.abs(value) < 1e-12 ? 1 : Math.sin(Math.PI * value) / (Math.PI * value);
+    case "Sa": return Math.abs(value) < 1e-12 ? 1 : Math.sin(value) / value;
   }
 }
 
@@ -414,6 +439,7 @@ export function differentiate(node: MathNode, variable: string): MathNode {
     }
     case "call": return mul(callDerivative(node.name, node.argument), differentiate(node.argument, variable));
     case "delta": throw new DifferentiationError("A Dirac impulse cannot appear inside the differentiated factor.");
+    case "input": return mul({ kind: "input", order: node.order + 1, argument: node.argument }, differentiate(node.argument, variable));
     case "runningIntegral": throw new DifferentiationError("A running integral cannot itself be symbolically differentiated in this engine.");
   }
 }
@@ -434,12 +460,14 @@ function callDerivative(name: FunctionName, argument: MathNode): MathNode {
     case "r": return call("u", argument); // d/dt r(t) = u(t): the ramp's kink, not a value jump
     case "sgn": return mul(num(2), delta0(argument)); // sgn = 2u-1, so its derivative is 2δ(t)
     case "rect": return sub(delta0(add(argument, num(0.5))), delta0(sub(argument, num(0.5)))); // rect = u(t+.5)-u(t-.5)
-    case "tri": return sub(add(call("u", add(argument, num(1))), mul(num(-2), call("u", argument))), call("u", sub(argument, num(1)))); // corners only, no δ
+    case "tri": return add(add(call("u", add(argument, num(1))), mul(num(-2), call("u", argument))), call("u", sub(argument, num(1)))); // tri′ = u(x+1) − 2u(x) + u(x−1): slope +1 on (−1,0), −1 on (0,1), corners only, no δ
     case "sinc": // sinc(t) = sin(πt)/(πt) ⇒ sinc'(t) = cos(πt)/t − sin(πt)/(πt²), via the quotient rule
       return sub(
         { kind: "div", left: { kind: "call", name: "cos", argument: mul(num(Math.PI), argument) }, right: argument },
         { kind: "div", left: { kind: "call", name: "sin", argument: mul(num(Math.PI), argument) }, right: mul(num(Math.PI), { kind: "pow", base: argument, exponent: num(2) }) },
       );
+    case "Sa": // Sa(t) = sin(t)/t ⇒ Sa'(t) = cos(t)/t − sin(t)/t²
+      return sub({ kind: "div", left: { kind: "call", name: "cos", argument }, right: argument }, { kind: "div", left: { kind: "call", name: "sin", argument }, right: { kind: "pow", base: argument, exponent: num(2) } });
     default: throw new DifferentiationError(`${name} is not differentiable inside a δ⁽ⁿ⁾ integral; its derivative is itself a distribution.`);
   }
 }
@@ -459,15 +487,18 @@ export function nodeToLatex(node: MathNode): string {
     case "sub": return `${nodeToLatex(node.left)}-${wrapAddSub(node.right)}`;
     case "mul":
       if (node.left.kind === "num" && node.left.value === -1) return `-${wrapAddSub(node.right)}`;
-      return `${wrapAddSub(node.left)}\\,${wrapAddSub(node.right)}`;
+      // A right factor that starts with "−" must be parenthesized, or "a\\,-b" re-parses as a subtraction.
+      return `${wrapAddSub(node.left)}\\,${wrapFactor(node.right)}`;
     case "div": return `\\frac{${nodeToLatex(node.left)}}{${nodeToLatex(node.right)}}`;
     case "pow": return `${wrapPow(node.base)}^{${nodeToLatex(node.exponent)}}`;
     case "call": return callToLatex(node.name, node.argument);
+    case "input": return `x${node.order > 0 ? `^{${node.order <= 2 ? "\\prime".repeat(node.order) : `(${node.order})`}}` : ""}\\!\\left(${nodeToLatex(node.argument)}\\right)`;
     case "delta": return `\\delta${node.order > 0 ? `^{(${node.order})}` : ""}\\!\\left(${nodeToLatex(node.argument)}\\right)`;
     case "runningIntegral": return `\\int_{-\\infty}^{t}${nodeToLatex(node.integrand)}\\,d${node.dummyVariable.length === 1 ? node.dummyVariable : `\\${node.dummyVariable}`}`;
   }
 }
 function formatNumber(value: number): string { return Number(value.toFixed(6)).toString(); }
+function wrapFactor(node: MathNode): string { const text = nodeToLatex(node); return node.kind === "add" || node.kind === "sub" || text.startsWith("-") ? `\\left(${text}\\right)` : text; }
 function wrapAddSub(node: MathNode): string { const text = nodeToLatex(node); return node.kind === "add" || node.kind === "sub" ? `\\left(${text}\\right)` : text; }
 function wrapPow(node: MathNode): string { const text = nodeToLatex(node); return node.kind === "add" || node.kind === "sub" || node.kind === "mul" || node.kind === "div" || node.kind === "neg" ? `\\left(${text}\\right)` : text; }
 /** Renames every free occurrence of `from` to `to` — used to turn a `t`-based expression into the
@@ -484,6 +515,7 @@ export function renameVariable(node: MathNode, from: string, to: string): MathNo
     case "pow": return { kind: "pow", base: renameVariable(node.base, from, to), exponent: renameVariable(node.exponent, from, to) };
     case "call": return { kind: "call", name: node.name, argument: renameVariable(node.argument, from, to) };
     case "delta": return { kind: "delta", order: node.order, argument: renameVariable(node.argument, from, to) };
+    case "input": return { kind: "input", order: node.order, argument: renameVariable(node.argument, from, to) };
     case "runningIntegral": return { kind: "runningIntegral", integrand: renameVariable(node.integrand, from, to), dummyVariable: node.dummyVariable };
   }
 }
@@ -606,7 +638,7 @@ export function containsVariable(node: MathNode, variable: string): boolean {
     case "add": case "sub": case "mul": case "div": return containsVariable(node.left, variable) || containsVariable(node.right, variable);
     case "pow": return containsVariable(node.base, variable) || containsVariable(node.exponent, variable);
     case "call": return containsVariable(node.argument, variable);
-    case "delta": return containsVariable(node.argument, variable);
+    case "delta": case "input": return containsVariable(node.argument, variable);
     // A running integral is, by construction, evaluated dynamically at the outer variable — always t-dependent.
     case "runningIntegral": return true;
   }

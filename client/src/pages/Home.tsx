@@ -54,7 +54,7 @@ export default function Home() {
 
               <motion.h2
                 variants={itemVariants}
-                className="font-extrabold text-xl sm:text-2xl md:text-3xl lg:text-5xl whitespace-nowrap text-brand-gradient"
+                className="font-semibold text-xl sm:text-2xl md:text-3xl lg:text-5xl whitespace-nowrap text-brand-gradient leading-normal"
               >
                 {home.headlineSecondary}
               </motion.h2>

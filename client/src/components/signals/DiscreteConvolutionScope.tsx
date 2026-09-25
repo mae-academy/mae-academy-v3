@@ -5,6 +5,8 @@
  * 2. Element-wise Product: Discrete stems for x[k] * h[n - k] with active product heads highlighted
  * 3. Output Accumulation: Discrete output sequence y[n] = sum_k x[k]h[n - k] accumulating as shift n increments
  */
+import { symmetricYBound } from "@/lib/plotAutoScale";
+import { SvgKatexTick } from "@/components/common/templates/SvgKatexTick";
 import React, { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { Play, Pause, StepForward, Rewind, RotateCcw } from "lucide-react";
 import { KatexMath } from "@/components/ui/KatexMath";
@@ -34,7 +36,7 @@ const COLORS = {
   h: "#E11D48",
   product: "#7C3AED",
   productHighlight: "#9333EA",
-  output: "#7C3AED",
+  output: "#2563EB",
   dimmed: "#94A3B8",
 };
 
@@ -191,15 +193,7 @@ function StemScopeTier({
                 strokeWidth={isZero ? "1.25" : "1"}
               />
               {!isZero && (
-                <text
-                  x={PAD.left - 10}
-                  y={sy}
-                  textAnchor="end"
-                  dominantBaseline="central"
-                  className="fill-slate-500 font-mono text-[11px] font-medium dark:fill-slate-400"
-                >
-                  {val}
-                </text>
+                <SvgKatexTick x={PAD.left - 10} y={sy} anchor="end">{val}</SvgKatexTick>
               )}
             </g>
           );
@@ -227,19 +221,7 @@ function StemScopeTier({
 
         {/* Horizontal Axis Numbers */}
         {xTicks.map((k) => (
-          <text
-            key={`tick-num-${k}`}
-            x={mapX(k)}
-            y={size.height - PAD.bottom + 18}
-            textAnchor="middle"
-            className={`font-mono text-[11px] font-medium ${
-              k === activeMarkerX
-                ? "fill-blue-600 font-bold dark:fill-blue-400"
-                : "fill-slate-500 dark:fill-slate-400"
-            }`}
-          >
-            {k}
-          </text>
+          <SvgKatexTick x={mapX(k)} y={size.height - PAD.bottom + 18} anchor="middle" baseline active={k === activeMarkerX}>{k}</SvgKatexTick>
         ))}
 
         {/* Stems & Waveform Content */}
@@ -265,7 +247,7 @@ function StemScopeTier({
       </div>
 
       {/* Bottom-right Axis KaTeX Symbol */}
-      <div className="pointer-events-none absolute bottom-2 right-3 rounded-md bg-white/90 px-1.5 py-0.5 text-xs font-bold text-slate-600 backdrop-blur-sm dark:bg-slate-900/90 dark:text-slate-400">
+      <div className="pointer-events-none absolute bottom-0.5 right-2 rounded-md bg-white/90 px-1.5 py-0.5 text-xs font-bold text-slate-600 backdrop-blur-sm dark:bg-slate-900/90 dark:text-slate-400">
         <KatexMath math={xLabelKatex} />
       </div>
 
@@ -324,21 +306,24 @@ export function DiscreteConvolutionScope({
     // Over all n in [0, maxN], min k is -(Nh - 1) and max k is Nx + Nh - 2.
     const minReach = Math.min(0, -(Nh - 1));
     const maxReach = Math.max(Nx - 1, Nx + Nh - 2);
-    const spanBound = Math.max(Math.abs(minReach), Math.abs(maxReach), 4) + 1;
-    const kBound = Math.max(5, spanBound);
+    // Finite support of x[k], h[n-k] and y[n], padded by one sample so stems never touch the frame edge.
+    const spanBound = Math.max(Math.abs(minReach), Math.abs(maxReach)) + 1;
+    // n ∈ [min − 1, max + 1]: the full finite support plus one sample of clearance on each side (k = 0 stays on-screen).
+    const kLo = Math.min(0, minReach) - 1;
+    const kHi = Math.max(maxReach, spanBound - 1) + 1;
 
     // Amplitude peak across x, h, products, and y
     const maxVal = Math.max(
-      2,
+      0,
       ...x.map(Math.abs),
       ...h.map(Math.abs),
       ...convResult.values.map(Math.abs)
     );
-    const ampBound = Math.ceil(maxVal * 1.25);
+    const ampBound = symmetricYBound(maxVal);
 
     return {
-      kMin: -kBound,
-      kMax: kBound,
+      kMin: kLo,
+      kMax: kHi,
       ampMax: ampBound,
     };
   }, [x, h, convResult.values]);
@@ -669,14 +654,7 @@ export function DiscreteConvolutionScope({
                     />
 
                     {/* Numerical Value Badge */}
-                    <text
-                      x={sx}
-                      y={product > 0 ? sy - 7 : sy + 14}
-                      textAnchor="middle"
-                      className="fill-purple-600 font-mono text-[9px] font-bold dark:fill-purple-400"
-                    >
-                      {product}
-                    </text>
+                    <SvgKatexTick x={sx} y={product > 0 ? sy - 7 : sy + 14} anchor="middle" baseline>{product}</SvgKatexTick>
                   </g>
                 );
               }
@@ -733,7 +711,7 @@ export function DiscreteConvolutionScope({
                     <div className="font-serif text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
                       <KatexMath math={`n = ${idx}`} />
                     </div>
-                    <div className="font-serif text-purple-600 dark:text-purple-400 font-semibold flex items-center gap-1.5">
+                    <div className="font-serif text-blue-600 dark:text-blue-400 font-semibold flex items-center gap-1.5">
                       <KatexMath math={`y[${idx}] = ${val}`} />
                     </div>
                   </>
@@ -791,7 +769,7 @@ export function DiscreteConvolutionScope({
                         x={sx}
                         y={val > 0 ? sy - 8 : sy + 15}
                         textAnchor="middle"
-                        className="fill-purple-600 font-mono text-[10px] font-bold dark:fill-purple-400"
+                        className="fill-blue-600 font-mono text-[10px] font-bold dark:fill-blue-400"
                       >
                         y[{m}]={val}
                       </text>
@@ -808,15 +786,15 @@ export function DiscreteConvolutionScope({
                         x2={sx}
                         y2={sy}
                         stroke={COLORS.output}
-                        strokeWidth={2}
+                        strokeWidth={1}
                       />
                       <circle
                         cx={sx}
                         cy={sy}
-                        r={4.5}
-                        fill="#FFFFFF"
-                        stroke={COLORS.output}
-                        strokeWidth={2}
+                        r={4}
+                        fill={COLORS.output}
+                        stroke="#FFFFFF"
+                        strokeWidth={1.5}
                       />
                     </g>
                   );

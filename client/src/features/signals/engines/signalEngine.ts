@@ -13,7 +13,7 @@ export type SignalNode =
   | { kind: "binary"; operator: "+" | "-" | "*" | "/" | "^"; left: SignalNode; right: SignalNode }
   | { kind: "function"; name: SignalFunction; argument: SignalNode };
 
-export type SignalFunction = "u" | "r" | "delta" | "rect" | "tri" | "sinc" | "Sa" | "sin" | "cos" | "exp" | "sgn" | "int" | "derivative";
+export type SignalFunction = "u" | "r" | "delta" | "rect" | "tri" | "sinc" | "Sa" | "sin" | "cos" | "tan" | "exp" | "ln" | "log" | "abs" | "sqrt" | "sgn" | "int" | "runint" | "derivative";
 export type PeriodMode = "periodic" | "aperiodic";
 export type Classification = "Energy" | "Power" | "Neither";
 export type SignalWindow = { from: number; to: number };
@@ -45,7 +45,7 @@ type TokenKind = "number" | "identifier" | "operator" | "leftParen" | "rightPare
 type Token = { kind: TokenKind; value: string; index: number };
 type LinearForm = { slope: number; offset: number };
 
-const KNOWN_FUNCTIONS = new Set<SignalFunction>(["u", "r", "delta", "rect", "tri", "sinc", "Sa", "sin", "cos", "exp", "sgn", "int", "derivative"]);
+const KNOWN_FUNCTIONS = new Set<SignalFunction>(["u", "r", "delta", "rect", "tri", "sinc", "Sa", "sin", "cos", "tan", "exp", "ln", "log", "abs", "sqrt", "sgn", "int", "runint", "derivative"]);
 const EPSILON = 1e-9;
 const DEFAULT_WINDOW: SignalWindow = { from: -6, to: 6 };
 
@@ -192,6 +192,30 @@ export function integrateTrapezoidal(fn: (time: number) => number, from: number,
   return sum * step;
 }
 
+/** ∫₋∞ᵗ lookup: cumulative midpoint sum (Δt = 0.005) plus exact δ steps, built once per integrand node. */
+const RUNNING_INTEGRAL_SPAN = { from: -40, to: 40, step: 0.005 } as const;
+const runningIntegralTables = new WeakMap<SignalNode, { table: Float64Array; impulses: ImpulseMarker[] }>();
+function runningIntegralAt(integrand: SignalNode, time: number): number {
+  const { from, to, step } = RUNNING_INTEGRAL_SPAN;
+  let cached = runningIntegralTables.get(integrand);
+  if (!cached) {
+    const count = Math.round((to - from) / step);
+    const table = new Float64Array(count + 1);
+    // Midpoint rule: exact across step-family jumps that fall on the grid (u, rect, tri edges).
+    for (let index = 1; index <= count; index += 1) {
+      const value = evaluateSignal(integrand, from + (index - 0.5) * step);
+      table[index] = table[index - 1] + (Number.isFinite(value) ? value : 0) * step;
+    }
+    cached = { table, impulses: extractImpulseMarkers(integrand) };
+    runningIntegralTables.set(integrand, cached);
+  }
+  const { table, impulses } = cached;
+  const position = (Math.min(to, Math.max(from, time)) - from) / step; const lower = Math.floor(position); const upper = Math.min(table.length - 1, lower + 1);
+  // δ areas are added as exact unit steps so the jump stays a vertical wall at any sampling density.
+  const jumps = impulses.reduce((total, impulse) => (time >= impulse.at ? total + impulse.area : total), 0);
+  return table[lower] + (table[upper] - table[lower]) * (position - lower) + jumps;
+}
+
 export function evaluateSignal(node: SignalNode, time: number): number {
   switch (node.kind) {
     case "number": return node.value;
@@ -217,6 +241,12 @@ export function evaluateSignal(node: SignalNode, time: number): number {
       if (node.name === "sin") return Math.sin(value);
       if (node.name === "cos") return Math.cos(value);
       if (node.name === "exp") return Math.exp(value);
+      if (node.name === "tan") return Math.tan(value);
+      if (node.name === "ln") return value > 0 ? Math.log(value) : Number.NaN;
+      if (node.name === "log") return value > 0 ? Math.log10(value) : Number.NaN;
+      if (node.name === "abs") return Math.abs(value);
+      if (node.name === "sqrt") return value >= 0 ? Math.sqrt(value) : Number.NaN;
+      if (node.name === "runint") return runningIntegralAt(node.argument, time);
       if (node.name === "int") return integrateTrapezoidal((tau) => evaluateSignal(node.argument, tau), 0, time, 384);
       if (node.name === "derivative") { const step = Math.max(1e-5, Math.abs(time) * 1e-5); return (evaluateSignal(node.argument, time + step) - evaluateSignal(node.argument, time - step)) / (2 * step); }
       return Math.sign(value);
@@ -246,10 +276,13 @@ export function toLatex(node: SignalNode, timeSymbol = "t"): string {
     }
     case "function": {
       if (node.name === "int") return `\\int_{0}^{${timeSymbol}}\\!\\left(${toLatex(node.argument, "\\tau")}\\right)\\,d\\tau`;
+      if (node.name === "runint") return `\\int_{-\\infty}^{${timeSymbol}}\\!\\left(${toLatex(node.argument, "\\tau")}\\right)\\,d\\tau`;
+      if (node.name === "abs") return `\\left|${toLatex(node.argument, timeSymbol)}\\right|`;
+      if (node.name === "sqrt") return `\\sqrt{${toLatex(node.argument, timeSymbol)}}`;
       if (node.name === "derivative") return `\\frac{d}{d${timeSymbol}}\\!\\left(${toLatex(node.argument, timeSymbol)}\\right)`;
       const argument = toLatex(node.argument, timeSymbol);
       if (node.name === "exp") return `e^{${argument}}`;
-      const name = node.name === "delta" ? "\\delta" : node.name === "rect" ? "\\operatorname{rect}" : node.name === "tri" ? "\\operatorname{tri}" : node.name === "sinc" ? "\\operatorname{sinc}" : node.name === "sgn" ? "\\operatorname{sgn}" : node.name;
+      const name = node.name === "delta" ? "\\delta" : node.name === "rect" ? "\\operatorname{rect}" : node.name === "tri" ? "\\operatorname{tri}" : node.name === "sinc" ? "\\operatorname{sinc}" : node.name === "sgn" ? "\\operatorname{sgn}" : node.name === "Sa" ? "\\operatorname{Sa}" : node.name === "sin" || node.name === "cos" || node.name === "tan" || node.name === "ln" ? `\\${node.name}` : node.name === "log" ? "\\log_{10}" : node.name;
       return `${name}\\!\\left(${argument}\\right)`;
     }
   }

@@ -81,7 +81,7 @@ const SOURCES: Record<string, ComponentDef> = {
     description: 'AC voltage source with configurable waveform',
   },
   'three-phase-source': {
-    id: 'three-phase-source', name: '3-Phase Voltage Source', category: 'Sources',
+    id: 'three-phase-source', name: '3-Phase Source', category: 'Sources',
     width: 80, height: 90, symbol: 'three-phase-source',
     terminals: [
       { id: 'l1', name: 'L1', x: 40, y: -15, type: 'output' },
@@ -99,7 +99,7 @@ const SOURCES: Record<string, ComponentDef> = {
     description: 'Balanced three-phase source with L1, L2, L3 and neutral',
   },
   'three-phase-rail': {
-    id: 'three-phase-rail', name: '3-Phase Power Rail', category: 'Sources',
+    id: 'three-phase-rail', name: '3-Phase Rail', category: 'Sources',
     width: 90, height: 90, symbol: 'three-phase-rail',
     terminals: [
       { id: 'l1', name: 'L1', x: -40, y: -30, type: 'output' },
@@ -114,7 +114,7 @@ const SOURCES: Record<string, ComponentDef> = {
       connection: { type: 'select', value: 'Y', options: ['Y', 'Δ'], label: 'Rail Connection' },
       internalR: { type: 'number', value: 0.05, unit: 'Ω', min: 0.001, max: 1000, label: 'Internal R / phase' },
     },
-    description: 'Compact labelled 3-phase power rail for control and motor circuits',
+    description: 'Compact labelled 3-phase rail for control and motor circuits',
   },
   'dc-current': {
     id: 'dc-current', name: 'DC Current Source', category: 'Sources',

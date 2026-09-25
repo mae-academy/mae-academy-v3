@@ -8,7 +8,7 @@ import { evaluateDefiniteIntegral } from "./diracIntegral";
 export type AffineTime = { slope: number; offset: number };
 export type Coefficient = { constant: number; timeSlope: number };
 /** Canonical independent test signals injectable from the SIGNAL ENGINE pills. */
-export type SignalKind = "u" | "r" | "rect" | "tri" | "sinc" | "sgn" | "sin" | "cos" | "delta";
+export type SignalKind = "u" | "r" | "rect" | "tri" | "sinc" | "Sa" | "sgn" | "sin" | "cos" | "delta";
 export type SystemTerm =
   | { kind: "input-sample"; coefficient: Coefficient; argument: AffineTime; power: number }
   | { kind: "signal"; signal: SignalKind; argument: AffineTime; scale: number }
@@ -41,7 +41,7 @@ function normalizeSystemSource(source: string) {
   return normalizePrimes(source)
     .replaceAll("\\left", "").replaceAll("\\right", "").replaceAll("\\!", "").replaceAll("\\,", "")
     // Canonical signal tokens are flattened to bare identifiers before term parsing.
-    .replace(/\\(?:text|operatorname|mathrm)\{\s*(sinc|sgn|rect|tri)\s*\}/g, "$1")
+    .replace(/\\(?:text|operatorname|mathrm)\{\s*(sinc|sgn|rect|tri|Sa)\s*\}/g, "$1")
     .replaceAll("\\Lambda", "tri").replaceAll("\\delta", "delta").replaceAll("\\sin", "sin").replaceAll("\\cos", "cos")
     .replaceAll("\\omega", `${OMEGA}`)
     .replaceAll("\\operatorname{", "").replaceAll("\\cdot", "*").replaceAll("\\times", "*")
@@ -81,7 +81,7 @@ function derivativeOrder(source: string): number | null {
   return null;
 }
 
-const SIGNAL_PATTERN = /^(\d+(?:\.\d+)?)?\*?(sinc|rect|tri|sgn|sin|cos|delta|u|r)\((.+)\)$/;
+const SIGNAL_PATTERN = /^(\d+(?:\.\d+)?)?\*?(sinc|rect|tri|Sa|sgn|sin|cos|delta|u|r)\((.+)\)$/;
 /** Independent canonical signals: bounded except the ramp, and never a function of x. */
 const UNBOUNDED_SIGNALS: readonly SignalKind[] = ["r"];
 
@@ -92,6 +92,7 @@ export function evaluateCanonicalSignal(kind: SignalKind, time: number): number 
     case "rect": return Math.abs(time) <= 0.5 ? 1 : 0;
     case "tri": return Math.max(0, 1 - Math.abs(time));
     case "sinc": return near(time) ? 1 : Math.sin(Math.PI * time) / (Math.PI * time);
+    case "Sa": return near(time) ? 1 : Math.sin(time) / time;
     case "sgn": return time > 0 ? 1 : time < 0 ? -1 : 0;
     case "sin": return Math.sin(time);
     case "cos": return Math.cos(time);
@@ -164,7 +165,7 @@ export function evaluateSystem(system: SystemSemantic, input: (time: number) => 
   }, 0);
 }
 
-const SIGNAL_TEX: Record<SignalKind, string> = { u: "u", r: "r", rect: "\\text{rect}", tri: "\\Lambda", sinc: "\\text{sinc}", sgn: "\\text{sgn}", sin: "\\sin", cos: "\\cos", delta: "\\delta" };
+const SIGNAL_TEX: Record<SignalKind, string> = { u: "u", r: "r", rect: "\\text{rect}", tri: "\\text{tri}", sinc: "\\text{sinc}", Sa: "\\text{Sa}", sgn: "\\text{sgn}", sin: "\\sin", cos: "\\cos", delta: "\\delta" };
 const signalTex = (term: Extract<SystemTerm, { kind: "signal" }>) => {
   const slope = near(term.argument.slope, 1) ? "" : near(term.argument.slope, -1) ? "-" : texNumber(term.argument.slope);
   const offset = near(term.argument.offset) ? "" : `${term.argument.offset > 0 ? "+" : ""}${texNumber(term.argument.offset)}`;

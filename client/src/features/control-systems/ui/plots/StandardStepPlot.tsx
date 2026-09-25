@@ -66,6 +66,11 @@ export function StandardStepPlot({
   headerRight,
   steadyStateValue,
   showSteadyState = false,
+  xDomain,
+  yDomain,
+  yTickLabels,
+  cursorKatex = "t",
+  cursorUnitKatex = "\\text{ s}",
 }: StandardStepPlotProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerSize, setContainerSize] = useState<{ width: number; height: number }>({
@@ -187,15 +192,17 @@ export function StandardStepPlot({
       computedXMax = maxT <= 0 ? 1 : maxT;
     }
 
+    if (xDomain) { computedXMin = xDomain[0]; computedXMax = xDomain[1]; }
+    if (yDomain) { computedYMin = yDomain[0]; computedYMax = yDomain[1]; }
     return {
       xMin: computedXMin,
       xMax: computedXMax,
       yMin: computedYMin,
       yMax: computedYMax,
-      isBipolar: bipolar,
-      hasNegativeTime,
+      isBipolar: yDomain ? yDomain[0] < 0 : bipolar,
+      hasNegativeTime: xDomain ? xDomain[0] < 0 : hasNegativeTime,
     };
-  }, [visibleSeries, forceBipolar, steadyStateValue, showSteadyState]);
+  }, [visibleSeries, forceBipolar, steadyStateValue, showSteadyState, xDomain, yDomain]);
 
   // Coordinate transforms
   const toX = useCallback(
@@ -225,7 +232,7 @@ export function StandardStepPlot({
 
   // Ticks
   const xTicks = useMemo(() => getNiceTicks(xMin, xMax, 5), [xMin, xMax]);
-  const yTicks = useMemo(() => getNiceTicks(yMin, yMax, 6), [yMin, yMax]);
+  const yTicks = useMemo(() => (yTickLabels ? yTickLabels.map((tick) => tick.value) : getNiceTicks(yMin, yMax, 6)), [yMin, yMax, yTickLabels]);
 
   // Zero-crossing Y coordinate
   const zeroY = toY(0);
@@ -316,7 +323,7 @@ export function StandardStepPlot({
       <div className="flex flex-wrap items-center justify-between gap-2 pb-2">
         <div className="flex items-center gap-2">
           {title && (
-            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-white">
+            <h4 className={`text-xs font-bold tracking-wider text-slate-800 dark:text-white ${typeof title === "string" ? "uppercase" : "normal-case"}`}>
               {title}
             </h4>
           )}
@@ -493,8 +500,15 @@ export function StandardStepPlot({
               );
             })}
 
-            {/* Y-axis tick labels */}
-            {yTicks.map((tick) => {
+            {/* Y-axis tick labels (KaTeX when custom labels are supplied) */}
+            {yTickLabels && yTickLabels.map((tick) => (
+              <foreignObject key={`lbl-yk-${tick.value}`} x={padding.left - 52} y={toY(tick.value) - 10} width={46} height={20} pointerEvents="none" overflow="visible">
+                <div className="flex h-full items-center justify-end text-[11px] leading-none text-slate-600 dark:text-slate-300">
+                  <KatexMath math={tick.katex} />
+                </div>
+              </foreignObject>
+            ))}
+            {!yTickLabels && yTicks.map((tick) => {
               const yPos = toY(tick);
               return (
                 <text
@@ -572,7 +586,7 @@ export function StandardStepPlot({
             {/* Header: Time t in KaTeX */}
             <div className="flex items-center justify-between border-b border-slate-200/80 dark:border-slate-700/60 pb-1.5 mb-2 font-mono text-[11px]">
               <span className="font-semibold text-slate-700 dark:text-slate-200">
-                <KatexMath math={`t = ${hoverState.t.toFixed(2)}\\text{ s}`} />
+                <KatexMath math={`${cursorKatex} = ${hoverState.t.toFixed(2)}${cursorUnitKatex}`} />
               </span>
             </div>
 

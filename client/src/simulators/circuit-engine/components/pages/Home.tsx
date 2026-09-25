@@ -1,3 +1,4 @@
+import { UnifiedWorkspaceShell } from '@/simulators/shared/workspace/UnifiedWorkspaceShell';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 /* MAE Luminous Technical Atelier: Tab D keeps documented 25 px terminal geometry,
    direct electromechanical controls, and a quiet Control Systems-aligned inspector. */
@@ -37,6 +38,7 @@ import {
   Redo2,
   Upload,
   Zap,
+  CircuitBoard,
   Image as ImageIcon,
 } from 'lucide-react';
 import { nanoid } from 'nanoid';
@@ -4120,857 +4122,780 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
   });
 
   return (
-    <div className="v3-mae-layout font-sans text-slate-900 dark:text-slate-100" style={{ minHeight: 760, color: colors.text }}>
-      <section className="mb-4 overflow-x-auto rounded-xl border border-slate-200 bg-white dark:border-[#1a1d24] dark:bg-[#0d0f12]" style={{ borderColor: colors.line, background: colors.panel }}>
-        <header className="min-w-max" style={{ background: colors.panel, zIndex: 5 }}>
-          {/* Row 1: Workspace navigation, history, clipboard, grids, text, component transformation */}
-          <div className="flex flex-nowrap items-center gap-1.5 px-2 pt-2" style={{ minHeight: 36 }}>
-            <ToolbarButton colors={colors} label="−" title="Zoom out" onClick={() => setZoom(value => Math.max(.2, value / 1.15))} />
-            <span style={{ color: colors.muted, fontSize: 11, minWidth: 42, textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>{Math.round(zoom * 100)}%</span>
-            <ToolbarButton colors={colors} label="+" title="Zoom in" onClick={() => setZoom(value => Math.min(3, value * 1.15))} />
-            <ToolbarDivider colors={colors} />
-            <ToolbarButton colors={colors} icon={<Undo2 size={14} />} title="Undo (Ctrl/Cmd+Z)" onClick={handleUndo} disabled={!history.canUndo} />
-            <ToolbarButton colors={colors} icon={<Redo2 size={14} />} title="Redo (Ctrl/Cmd+Shift+Z)" onClick={handleRedo} disabled={!history.canRedo} />
-            <ToolbarButton colors={colors} icon={<Maximize2 size={14} />} title="Auto-scale / Center circuit" onClick={zoomToFit} />
-            <ToolbarButton colors={colors} icon={<Scissors size={14} />} title="Cut (Ctrl/Cmd+X)" onClick={cutSelection} disabled={!selectedComponent && marqueeIds.length === 0} />
-            <ToolbarButton colors={colors} icon={<Copy size={14} />} title="Copy (Ctrl/Cmd+C)" onClick={copySelection} disabled={!selectedComponent && marqueeIds.length === 0} />
-            <ToolbarButton colors={colors} icon={<Clipboard size={14} />} title="Paste (Ctrl/Cmd+V)" onClick={pasteClipboard} disabled={!clipboard || (clipboard.components.length === 0 && clipboard.wires.length === 0 && clipboard.texts.length === 0)} />
-            <ToolbarButton colors={colors} icon={<Trash2 size={14} />} title="Delete (Del/Backspace)" onClick={removeSelection} disabled={!selectedComponent && !selectedWire && !selectedText && marqueeIds.length === 0} />
-            <ToolbarDivider colors={colors} />
-            <div className="flex items-center gap-2">
-              <SegmentedControl
-                options={[
-                  { label: "Dotted", value: "dots" },
-                  { label: "Cartesian", value: "cartesian" },
-                  { label: "Hidden", value: "hidden" },
-                ]}
-                value={gridVisible ? tabDGridMode : "hidden"}
-                onChange={(val) => {
-                  if (val === "hidden") {
-                    setGridVisible(false);
-                    setTabDGridMode("hidden");
-                  } else {
-                    setGridVisible(true);
-                    setTabDGridMode(val as "dots" | "cartesian");
-                  }
-                }}
-                size="sm"
-                aria-label="Grid Style"
-              />
-              <ToolbarButton colors={colors} icon={<Type size={14} />} label="Text" title="Add editable workspace text (T)" onClick={addText} />
-            </div>
-            {tabDUiRefinement && <><ToolbarDivider colors={colors} /><ToolbarButton colors={colors} icon={<RotateCw size={14} />} label="90°" title="Rotate selected component 90°" onClick={() => rotateSelected(90)} disabled={!selectedComponent} /><ToolbarButton colors={colors} icon={<FlipHorizontal size={14} />} label="Flip X" title="Reflect selected component horizontally" onClick={() => flipSelected('h')} disabled={!selectedComponent} /><ToolbarButton colors={colors} icon={<FlipVertical size={14} />} label="Flip Y" title="Reflect selected component vertically" onClick={() => flipSelected('v')} disabled={!selectedComponent} /></>}
-          </div>
-
-          {/* Row 2: Export, Import, Save Image, Share, Simulation, Speed (Clean row without divider line) */}
-          <div className="flex flex-nowrap items-center gap-1.5 px-2 pb-2 pt-1" style={{ minHeight: 36 }}>
-            <ToolbarButton colors={colors} icon={<Download size={14} />} label="Export" title="Export circuit as NAD netlist" onClick={exportNad} />
-            <ToolbarButton colors={colors} icon={<Upload size={14} />} label="Import" title="Import circuit from NAD netlist" onClick={() => nadInputRef.current?.click()} />
-            <input ref={nadInputRef} type="file" accept=".nad,application/x-mae-nad+json,application/json" onChange={importNad} style={{ display: 'none' }} />
-            <ToolbarDivider colors={colors} />
-            <ToolbarButton colors={colors} icon={<ImageIcon size={14} />} label="Save Image" title="Save circuit as image (PNG or SVG)" onClick={handleOpenSaveImage} />
-            <ToolbarButton colors={colors} icon={<Share2 size={14} />} label="Share Project" title="Share circuit via Web Share API or deep link" onClick={handleShareProject} />
-            <ToolbarDivider colors={colors} />
-            {/* Examples button hidden for final launch UI polish */}
-            {/* <ToolbarButton colors={colors} icon={<Library size={14} />} label="Examples" title="Browse the Interactive Examples Library" onClick={() => setExamplesModalOpen(true)} /> */}
-            <button
-              onClick={() => { hasStartedSimulation.current = true; setSimulationRunning(value => !value); }}
-              title={simulationRunning ? 'Pause simulation' : 'Run simulation'}
-              className={`h-8 inline-flex items-center justify-center gap-1.5 px-3.5 text-xs font-semibold cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 whitespace-nowrap shrink-0 ${
-                !simulationRunning && hasStartedSimulation.current
-                  ? "brand-pill-active-rev"
-                  : "brand-pill-active"
-              }`}
-            >
-              {simulationRunning ? <Pause size={14} /> : <Play size={14} />}
-              <span>{simulationRunning ? 'Pause' : 'Run'}</span>
-            </button>
-            <ToolbarButton colors={colors} icon={<Zap size={14} />} title="Show / Hide electron flow" onClick={() => setShowElectrons(v => { const next = !v; try { localStorage.setItem('mae-show-electrons', String(next)); } catch { } return next; })} active={showElectrons} />
-            <ToolbarButton colors={colors} icon={<RotateCcw size={14} />} title="Reset simulation" onClick={resetSimulation} />
-            <span className="text-sm font-medium text-slate-700 dark:text-slate-300" style={{ minWidth: 65, textAlign: 'center', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-              <V3Math math={`${snapshot.time.toFixed(3)}\\,\\mathrm{s}`} />
-            </span>
-            <ToolbarDivider colors={colors} />
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <StudioSlider
-                aria-label="Simulation speed"
-                min={0.25}
-                max={4}
-                step={0.25}
-                value={simulationSpeed}
-                onChange={val => setSimulationSpeed(val)}
-                hideHeader
-                className="w-24"
-              />
-              <span className="text-sm font-medium text-slate-700 dark:text-slate-300" style={{ minWidth: 42, display: 'inline-flex', alignItems: 'center' }}>
-                <V3Math math={`${simulationSpeed.toFixed(2)}\\times`} />
-              </span>
-            </div>
-          </div>
-        </header>
-      </section>
-
-      <div className="flex flex-col xl:flex-row gap-4 items-start w-full">
-        {/* Left Column (flex-1 min-w-0 flex flex-col gap-4) */}
-        <div className="flex-1 min-w-0 flex flex-col gap-4 w-full">
-          {/* Top Row (flex gap-4 items-start) */}
-          <div className="flex flex-col md:flex-row gap-4 items-start w-full">
-            <aside className="w-full md:w-56 shrink-0 min-h-0 overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-[#1a1d24] dark:bg-[#0d0f12]" style={{ background: colors.panel, borderColor: colors.line, display: 'flex', flexDirection: 'column', height: '700px' }}>
-              <div className="border-b px-3 py-2" style={{ borderColor: colors.line }}><div className={CONTROL_SYSTEMS_HEADING}>Component Library</div></div>
-              <div style={{ padding: 10, borderBottom: `1px solid ${colors.line}` }}>
-                <div style={{ position: 'relative' }}>
-                  <Search size={14} style={{ position: 'absolute', left: 9, top: 9, color: colors.subtle }} />
-                  <input value={search} onChange={event => setSearch(event.target.value)} placeholder="Search components" style={{ width: '100%', boxSizing: 'border-box', border: `1px solid ${colors.line}`, outline: 'none', background: colors.input, color: colors.text, borderRadius: 7, padding: '8px 9px 8px 29px', fontSize: 11 }} />
-                </div>
-              </div>
-              <div style={{ overflowY: 'auto', padding: '6px 6px 14px' }}>
-                {Object.entries(filteredCategories).map(([category, items]) => {
-                  const collapsed = collapsedCategories.has(category);
-                  return (
-                    <section key={category} style={{ marginBottom: 3 }}>
-                      <button onClick={() => setCollapsedCategories(previous => {
-                        const next = new Set(previous);
-                        if (next.has(category)) next.delete(category); else next.add(category);
-                        return next;
-                      })} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: 'none', background: 'transparent', color: colors.text, cursor: 'pointer', padding: '8px 5px', fontSize: 11, fontWeight: 750 }}>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>{collapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}{category}</span>
-                        <span style={{ color: colors.subtle, fontWeight: 600 }}>{items.length}</span>
-                      </button>
-                      {!collapsed && <div className={tabDUiRefinement ? 'grid grid-cols-2 gap-2 px-1 pb-3' : undefined}>{items.map(item => (
-                        <button
-                          key={item.id}
-                          draggable
-                          onDragStart={event => {
-                            event.dataTransfer.setData('application/electrolab-component', item.id);
-                            event.dataTransfer.effectAllowed = 'copy';
-                          }}
-                          onClick={() => addComponent(item.id)}
-                          className={tabDUiRefinement ? 'flex h-[110px] flex-col overflow-hidden rounded-md border transition-all active:scale-[.97]' : undefined}
-                          style={tabDUiRefinement ? { borderColor: colors.line, background: colors.panel, cursor: 'grab' } : { width: '100%', textAlign: 'left', border: 'none', background: 'transparent', color: colors.muted, cursor: 'grab', borderRadius: 6, padding: '7px 8px', fontSize: 11, display: 'flex', flexDirection: 'column', gap: 2 }}
-                          onMouseEnter={event => { event.currentTarget.style.background = colors.panelAlt; if (!tabDUiRefinement) event.currentTarget.style.color = colors.text; }}
-                          onMouseLeave={event => { event.currentTarget.style.background = tabDUiRefinement ? colors.panel : 'transparent'; if (!tabDUiRefinement) event.currentTarget.style.color = colors.muted; }}
-                        >
-                          {tabDUiRefinement ? (
-                            <>
-                              {/* Top Section: Scaled & Centered Canvas */}
-                              <div className="flex flex-1 min-h-0 w-full items-center justify-center p-2">
-                                <ComponentPaletteIcon definition={item} colors={colors} documented={tabDUiRefinement} isDark={darkPreview} />
-                              </div>
-                              {/* Bottom Section: Fixed height banner with clear readable component names */}
-                              <div className="flex h-7 w-full shrink-0 items-center justify-center border-t px-1.5" style={{ borderColor: colors.line, background: `${colors.line}15` }}>
-                                <span className="flex items-center justify-center text-[11px] font-medium text-slate-800 dark:text-slate-200 tracking-tight text-center leading-tight truncate w-full" title={item.name}>
-                                  <ElectricalLabel label={item.name} />
-                                </span>
-                              </div>
-                            </>
-                          ) : (
-                            <>
-                              <span className="text-[12px] font-normal text-slate-800 dark:text-slate-200"><ElectricalLabel label={item.name} /></span>
-                              <span style={{ color: colors.subtle, fontSize: 9, lineHeight: 1.25 }}>{item.description}</span>
-                            </>
-                          )}
-                        </button>
-                      ))}</div>}
-                    </section>
-                  );
-                })}
-              </div>
-            </aside>
-
-            <main className="relative flex-1 min-w-0 h-[700px] overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-[#1a1d24] dark:bg-[#07080a]" style={{ background: colors.canvas, borderColor: colors.line }}>
-              <div className="flex items-start justify-between border-b px-4 py-2" style={{ borderColor: colors.line }}><div><div className={CONTROL_SYSTEMS_HEADING}>Interactive Electrical Canvas</div></div><div className="flex items-center gap-2 font-mono text-[10px]" style={{ color: colors.muted }}>{components.length} CMP · {wires.length} NET</div></div>
-              <svg ref={svgRef} onMouseDown={handleCanvasMouseDown} onMouseMove={handleCanvasMouseMove} onMouseUp={handleCanvasMouseUp} onMouseLeave={handleCanvasMouseUp} onContextMenu={event => event.preventDefault()} onDragOver={event => event.preventDefault()} onDrop={handleDrop} style={{ width: '100%', height: '100%', display: 'block', cursor: dragState?.kind === 'pan' ? 'grabbing' : wiring.from ? 'crosshair' : 'default', touchAction: 'none' }}>
-                <defs>
-                  <marker id="arrow" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M 0,0 L 6,3 L 0,6 Z" fill="#64748b" /></marker>
-                  {activeMeshTrace?.meshCycles?.map((cycle) => <marker key={cycle.index} id={`mesh-arrow-${cycle.index}`} markerWidth="7" markerHeight="7" refX="5.5" refY="3.5" orient="auto"><path d="M 0,1 L 6,3.5 L 0,6 Z" fill={MESH_LOOP_COLORS[cycle.index % MESH_LOOP_COLORS.length]} /></marker>)}
-                  {tabDUiRefinement && tabDGridMode === 'dots' ? (
-                    <pattern
-                      key="grid-pattern-dots"
-                      id="workspace-grid-dots"
-                      width={gridSize}
-                      height={gridSize}
-                      patternUnits="userSpaceOnUse"
-                      patternTransform={`translate(${-gridSize / 2}, ${-gridSize / 2})`}
-                    >
-                      <circle
-                        cx={gridSize / 2}
-                        cy={gridSize / 2}
-                        r={1.65}
-                        fill={darkPreview ? '#222630' : '#7a93b1'}
-                        fillOpacity={0.9}
-                      />
-                    </pattern>
+    <UnifiedWorkspaceShell
+      colors={colors}
+      isDark={darkPreview}
+      toolbarRow1={<>
+        <ToolbarButton colors={colors} label="−" title="Zoom out" onClick={() => setZoom(value => Math.max(.2, value / 1.15))} />
+        <span style={{ color: colors.muted, fontSize: 11, minWidth: 42, textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>{Math.round(zoom * 100)}%</span>
+        <ToolbarButton colors={colors} label="+" title="Zoom in" onClick={() => setZoom(value => Math.min(3, value * 1.15))} />
+        <ToolbarDivider colors={colors} />
+        <ToolbarButton colors={colors} icon={<Undo2 size={14} />} title="Undo (Ctrl/Cmd+Z)" onClick={handleUndo} disabled={!history.canUndo} />
+        <ToolbarButton colors={colors} icon={<Redo2 size={14} />} title="Redo (Ctrl/Cmd+Shift+Z)" onClick={handleRedo} disabled={!history.canRedo} />
+        <ToolbarButton colors={colors} icon={<Maximize2 size={14} />} title="Auto-scale / Center circuit" onClick={zoomToFit} />
+        <ToolbarButton colors={colors} icon={<Scissors size={14} />} title="Cut (Ctrl/Cmd+X)" onClick={cutSelection} disabled={!selectedComponent && marqueeIds.length === 0} />
+        <ToolbarButton colors={colors} icon={<Copy size={14} />} title="Copy (Ctrl/Cmd+C)" onClick={copySelection} disabled={!selectedComponent && marqueeIds.length === 0} />
+        <ToolbarButton colors={colors} icon={<Clipboard size={14} />} title="Paste (Ctrl/Cmd+V)" onClick={pasteClipboard} disabled={!clipboard || (clipboard.components.length === 0 && clipboard.wires.length === 0 && clipboard.texts.length === 0)} />
+        <ToolbarButton colors={colors} icon={<Trash2 size={14} />} title="Delete (Del/Backspace)" onClick={removeSelection} disabled={!selectedComponent && !selectedWire && !selectedText && marqueeIds.length === 0} />
+        <ToolbarDivider colors={colors} />
+        <div className="flex items-center gap-2">
+          <SegmentedControl
+            options={[
+              { label: "Dotted", value: "dots" },
+              { label: "Cartesian", value: "cartesian" },
+              { label: "Hidden", value: "hidden" },
+            ]}
+            value={gridVisible ? tabDGridMode : "hidden"}
+            onChange={(val) => {
+              if (val === "hidden") {
+                setGridVisible(false);
+                setTabDGridMode("hidden");
+              } else {
+                setGridVisible(true);
+                setTabDGridMode(val as "dots" | "cartesian");
+              }
+            }}
+            size="sm"
+            aria-label="Grid Style"
+          />
+          <ToolbarButton colors={colors} icon={<Type size={14} />} label="Text" title="Add editable workspace text (T)" onClick={addText} />
+        </div>
+        {tabDUiRefinement && <><ToolbarDivider colors={colors} /><ToolbarButton colors={colors} icon={<RotateCw size={14} />} label="90°" title="Rotate selected component 90°" onClick={() => rotateSelected(90)} disabled={!selectedComponent} /><ToolbarButton colors={colors} icon={<FlipHorizontal size={14} />} label="Flip X" title="Reflect selected component horizontally" onClick={() => flipSelected('h')} disabled={!selectedComponent} /><ToolbarButton colors={colors} icon={<FlipVertical size={14} />} label="Flip Y" title="Reflect selected component vertically" onClick={() => flipSelected('v')} disabled={!selectedComponent} /></>}
+      </>}
+      toolbarRow2={<>
+        <ToolbarButton colors={colors} icon={<Download size={14} />} label="Export" title="Export circuit as NAD netlist" onClick={exportNad} />
+        <ToolbarButton colors={colors} icon={<Upload size={14} />} label="Import" title="Import circuit from NAD netlist" onClick={() => nadInputRef.current?.click()} />
+        <input ref={nadInputRef} type="file" accept=".nad,application/x-mae-nad+json,application/json" onChange={importNad} style={{ display: 'none' }} />
+        <ToolbarDivider colors={colors} />
+        <ToolbarButton colors={colors} icon={<ImageIcon size={14} />} label="Save Image" title="Save circuit as image (PNG or SVG)" onClick={handleOpenSaveImage} />
+        <ToolbarButton colors={colors} icon={<Share2 size={14} />} label="Share Project" title="Share circuit via Web Share API or deep link" onClick={handleShareProject} />
+        <ToolbarDivider colors={colors} />
+        {/* Examples button hidden for final launch UI polish */}
+        {/* <ToolbarButton colors={colors} icon={<Library size={14} />} label="Examples" title="Browse the Interactive Examples Library" onClick={() => setExamplesModalOpen(true)} /> */}
+        <button
+          onClick={() => { hasStartedSimulation.current = true; setSimulationRunning(value => !value); }}
+          title={simulationRunning ? 'Pause simulation' : 'Run simulation'}
+          className={`h-8 inline-flex items-center justify-center gap-1.5 px-3.5 text-xs font-semibold cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 whitespace-nowrap shrink-0 ${
+            !simulationRunning && hasStartedSimulation.current
+              ? "brand-pill-active-rev"
+              : "brand-pill-active"
+          }`}
+        >
+          {simulationRunning ? <Pause size={14} /> : <Play size={14} />}
+          <span>{simulationRunning ? 'Pause' : 'Run'}</span>
+        </button>
+        <ToolbarButton colors={colors} icon={<Zap size={14} />} title="Show / Hide electron flow" onClick={() => setShowElectrons(v => { const next = !v; try { localStorage.setItem('mae-show-electrons', String(next)); } catch { } return next; })} active={showElectrons} />
+        <ToolbarButton colors={colors} icon={<RotateCcw size={14} />} title="Reset simulation" onClick={resetSimulation} />
+        <span className="text-sm font-medium text-slate-700 dark:text-slate-300" style={{ minWidth: 65, textAlign: 'center', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+          <V3Math math={`${snapshot.time.toFixed(3)}\\,\\mathrm{s}`} />
+        </span>
+        <ToolbarDivider colors={colors} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <StudioSlider
+            aria-label="Simulation speed"
+            min={0.25}
+            max={4}
+            step={0.25}
+            value={simulationSpeed}
+            onChange={val => setSimulationSpeed(val)}
+            hideHeader
+            className="w-24"
+          />
+          <span className="text-sm font-medium text-slate-700 dark:text-slate-300" style={{ minWidth: 42, display: 'inline-flex', alignItems: 'center' }}>
+            <V3Math math={`${simulationSpeed.toFixed(2)}\\times`} />
+          </span>
+        </div>
+      </>}
+      librarySearchValue={search}
+      onLibrarySearchChange={(value: string) => setSearch(value)}
+      libraryContent={<>
+        {Object.entries(filteredCategories).map(([category, items]) => {
+          const collapsed = collapsedCategories.has(category);
+          return (
+            <section key={category} style={{ marginBottom: 3 }}>
+              <button onClick={() => setCollapsedCategories(previous => {
+                const next = new Set(previous);
+                if (next.has(category)) next.delete(category); else next.add(category);
+                return next;
+              })} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: 'none', background: 'transparent', color: colors.text, cursor: 'pointer', padding: '8px 5px', fontSize: 11, fontWeight: 750 }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>{collapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}{category}</span>
+                <span style={{ color: colors.subtle, fontWeight: 600 }}>{items.length}</span>
+              </button>
+              {!collapsed && <div className={tabDUiRefinement ? 'grid grid-cols-2 gap-2 px-1 pb-3' : undefined}>{items.map(item => (
+                <button
+                  key={item.id}
+                  draggable
+                  onDragStart={event => {
+                    event.dataTransfer.setData('application/electrolab-component', item.id);
+                    event.dataTransfer.effectAllowed = 'copy';
+                  }}
+                  onClick={() => addComponent(item.id)}
+                  className={tabDUiRefinement ? 'flex h-[110px] flex-col overflow-hidden rounded-md border transition-all active:scale-[.97]' : undefined}
+                  style={tabDUiRefinement ? { borderColor: colors.line, background: colors.panel, cursor: 'grab' } : { width: '100%', textAlign: 'left', border: 'none', background: 'transparent', color: colors.muted, cursor: 'grab', borderRadius: 6, padding: '7px 8px', fontSize: 11, display: 'flex', flexDirection: 'column', gap: 2 }}
+                  onMouseEnter={event => { event.currentTarget.style.background = colors.panelAlt; if (!tabDUiRefinement) event.currentTarget.style.color = colors.text; }}
+                  onMouseLeave={event => { event.currentTarget.style.background = tabDUiRefinement ? colors.panel : 'transparent'; if (!tabDUiRefinement) event.currentTarget.style.color = colors.muted; }}
+                >
+                  {tabDUiRefinement ? (
+                    <>
+                      {/* Top Section: Scaled & Centered Canvas */}
+                      <div className="flex flex-1 min-h-0 w-full items-center justify-center p-2">
+                        <ComponentPaletteIcon definition={item} colors={colors} documented={tabDUiRefinement} isDark={darkPreview} />
+                      </div>
+                      {/* Bottom Section: Fixed height banner with clear readable component names */}
+                      <div className="flex h-7 w-full shrink-0 items-center justify-center border-t px-1.5" style={{ borderColor: colors.line, background: `${colors.line}15` }}>
+                        <span className="flex items-center justify-center text-[11px] font-medium text-slate-800 dark:text-slate-200 tracking-tight text-center leading-tight truncate w-full" title={item.name}>
+                          <ElectricalLabel label={item.name} />
+                        </span>
+                      </div>
+                    </>
                   ) : (
-                    <pattern
-                      key={`grid-pattern-${tabDUiRefinement ? tabDGridMode : 'base'}`}
-                      id={`workspace-grid-${tabDUiRefinement ? tabDGridMode : 'base'}`}
-                      width={gridSize}
-                      height={gridSize}
-                      patternUnits="userSpaceOnUse"
-                    >
-                      <path
-                        d={`M ${gridSize} 0 L 0 0 0 ${gridSize}`}
-                        fill="none"
-                        stroke={tabDUiRefinement ? (darkPreview ? '#1a1d24' : '#a8b8cc') : colors.grid}
-                        strokeWidth={tabDUiRefinement ? 1.15 : 1}
-                        strokeOpacity={tabDUiRefinement ? 0.85 : 1}
-                      />
-                    </pattern>
+                    <>
+                      <span className="text-[12px] font-normal text-slate-800 dark:text-slate-200"><ElectricalLabel label={item.name} /></span>
+                      <span style={{ color: colors.subtle, fontSize: 9, lineHeight: 1.25 }}>{item.description}</span>
+                    </>
                   )}
-                </defs>
-                <g transform={`translate(${pan[0]},${pan[1]}) scale(${zoom})`}>
-                  {gridVisible && (!tabDUiRefinement || tabDGridMode !== 'hidden') && <rect key={`grid-surface-${tabDUiRefinement ? tabDGridMode : 'base'}`} x={-5000} y={-5000} width={10000} height={10000} fill={`url(#workspace-grid-${tabDUiRefinement ? tabDGridMode : 'base'})`} />}
-                  {dragState?.kind === 'marquee' && <rect x={Math.min(dragState.start[0], dragState.end[0])} y={Math.min(dragState.start[1], dragState.end[1])} width={Math.abs(dragState.end[0] - dragState.start[0])} height={Math.abs(dragState.end[1] - dragState.start[1])} fill={`${colors.selection}18`} stroke={colors.selection} strokeWidth={1.2} strokeDasharray="5 4" pointerEvents="none" />}
+                </button>
+              ))}</div>}
+            </section>
+          );
+        })}
+      </>}
+      canvasTitle="Interactive Circuit Schematic Canvas"
+      componentCount={components.length}
+      netCount={wires.length}
+      simulationRunning={simulationRunning}
+      onZoomReset={() => setZoom(1)}
+      canvasStatusExtra={<>
+        {spiceStatus.kind === 'running' && <span style={{ fontWeight: 750 }}>SPICE ACCURACY PASS…</span>}
+        {spiceStatus.kind === 'ready' && <span style={{ color: colors.accent, fontWeight: 750 }}>SPICE-VERIFIED</span>}
+        {spiceStatus.kind === 'unsupported' && <span title={spiceStatus.reason} style={{ fontWeight: 750 }}>SPICE UNAVAILABLE · LIVE ENGINE</span>}
+        {!snapshot.converged && <span style={{ color: colors.danger, fontWeight: 750 }}>CHECK CIRCUIT WARNINGS</span>}
+      </>}
+      svgRef={svgRef}
+      zoom={zoom}
+      pan={pan}
+      gridMode={gridVisible && (!tabDUiRefinement || tabDGridMode !== 'hidden') ? (tabDUiRefinement ? tabDGridMode : 'cartesian') : 'hidden'}
+      gridSize={gridSize}
+      canvasCursor={dragState?.kind === 'pan' ? 'grabbing' : wiring.from ? 'crosshair' : 'default'}
+      onCanvasMouseDown={handleCanvasMouseDown}
+      onCanvasMouseMove={handleCanvasMouseMove}
+      onCanvasMouseUp={handleCanvasMouseUp}
+      onCanvasDrop={handleDrop}
+      canvasDefs={<>
+        {activeMeshTrace?.meshCycles?.map((cycle) => <marker key={cycle.index} id={`mesh-arrow-${cycle.index}`} markerWidth="7" markerHeight="7" refX="5.5" refY="3.5" orient="auto"><path d="M 0,1 L 6,3.5 L 0,6 Z" fill={MESH_LOOP_COLORS[cycle.index % MESH_LOOP_COLORS.length]} /></marker>)}
+      </>}
+      canvasContent={<>
+        {dragState?.kind === 'marquee' && <rect x={Math.min(dragState.start[0], dragState.end[0])} y={Math.min(dragState.start[1], dragState.end[1])} width={Math.abs(dragState.end[0] - dragState.start[0])} height={Math.abs(dragState.end[1] - dragState.start[1])} fill={`${colors.selection}18`} stroke={colors.selection} strokeWidth={1.2} strokeDasharray="5 4" pointerEvents="none" />}
 
-                  {activeMeshTrace?.meshCycles?.map((cycle) => <MeshLoopOverlay key={`mesh-cycle-${cycle.index}`} cycle={cycle} tabDUiRefinement={tabDUiRefinement} components={components} scale={visualSymbolScale} wires={wires} />)}
+        {activeMeshTrace?.meshCycles?.map((cycle) => <MeshLoopOverlay key={`mesh-cycle-${cycle.index}`} cycle={cycle} tabDUiRefinement={tabDUiRefinement} components={components} scale={visualSymbolScale} wires={wires} />)}
 
-                  {/* Dedicated layer containing ONLY components, wires, labels, and texts for tight export bounding box */}
-                  <g id="circuit-elements-layer">
-                    {wireRenderData.map(({ wire, selected, path, hitPath, renderPath, isSensingWire, strokeColor, strokeWidth }) => (
-                      <g key={wire.id}>
-                        {/* Wide transparent hitbox — uses plain polyline for reliable click detection */}
-                        <path d={hitPath} fill="none" stroke="transparent" strokeWidth={17} strokeLinecap="round" strokeLinejoin="round" onMouseDown={event => handleWireMouseDown(event, wire)} onDoubleClick={event => handleWireDoubleClick(event, wire)} style={{ cursor: 'pointer' }} />
-                        {/* Visible stroke with jump-arc splices at cross-net crossings */}
-                        <path d={renderPath} fill="none" stroke={strokeColor} strokeWidth={strokeWidth} strokeDasharray={isSensingWire ? "3 3" : undefined} strokeLinecap="round" strokeLinejoin="round" pointerEvents="none" />
-                        {selected && path.length > 2 && path.slice(1, -1).map((corner, index) => {
-                          const cornerIndex = index + 1;
-                          return <circle key={`${wire.id}-${cornerIndex}`} cx={corner[0]} cy={corner[1]} r={6} fill={colors.panel} stroke={colors.selection} strokeWidth={2} onMouseDown={event => {
-                            event.stopPropagation();
-                            dragStartSnapshotRef.current = cloneSnapshot({ components: componentRef.current, wires: wiresRef.current, texts: textsRef.current });
-                            setDragState({ kind: 'wireCorner', id: wire.id, corner: cornerIndex });
-                          }} style={{ cursor: 'move' }} />;
-                        })}
+        {/* Dedicated layer containing ONLY components, wires, labels, and texts for tight export bounding box */}
+        <g id="circuit-elements-layer">
+          {wireRenderData.map(({ wire, selected, path, hitPath, renderPath, isSensingWire, strokeColor, strokeWidth }) => (
+            <g key={wire.id}>
+              {/* Wide transparent hitbox — uses plain polyline for reliable click detection */}
+              <path d={hitPath} fill="none" stroke="transparent" strokeWidth={17} strokeLinecap="round" strokeLinejoin="round" onMouseDown={event => handleWireMouseDown(event, wire)} onDoubleClick={event => handleWireDoubleClick(event, wire)} style={{ cursor: 'pointer' }} />
+              {/* Visible stroke with jump-arc splices at cross-net crossings */}
+              <path d={renderPath} fill="none" stroke={strokeColor} strokeWidth={strokeWidth} strokeDasharray={isSensingWire ? "3 3" : undefined} strokeLinecap="round" strokeLinejoin="round" pointerEvents="none" />
+              {selected && path.length > 2 && path.slice(1, -1).map((corner, index) => {
+                const cornerIndex = index + 1;
+                return <circle key={`${wire.id}-${cornerIndex}`} cx={corner[0]} cy={corner[1]} r={6} fill={colors.panel} stroke={colors.selection} strokeWidth={2} onMouseDown={event => {
+                  event.stopPropagation();
+                  dragStartSnapshotRef.current = cloneSnapshot({ components: componentRef.current, wires: wiresRef.current, texts: textsRef.current });
+                  setDragState({ kind: 'wireCorner', id: wire.id, corner: cornerIndex });
+                }} style={{ cursor: 'move' }} />;
+              })}
+            </g>
+          ))}
+
+          {/* Phase 2: same-net junction dots for interior crossing points, T-junctions, and cross-junctions */}
+          {junctionDots.map(([jx, jy]) => (
+            <circle key={`jdot-${jx}-${jy}`} cx={jx} cy={jy} r={3} fill="currentColor" color={colors.text} pointerEvents="none" />
+          ))}
+
+          {/* Phase 3: orthogonal rubber-band wire preview */}
+          {wiring.from && wireDraftPreviewPath && <path d={pointsToPath(wireDraftPreviewPath)} fill="none" stroke={colors.accent} strokeDasharray="6 4" strokeWidth={1.6} opacity={.75} strokeLinecap="round" strokeLinejoin="round" pointerEvents="none" />}
+          {wireSnapProjection && <circle cx={wireSnapProjection.point[0]} cy={wireSnapProjection.point[1]} r={6} fill="none" stroke={colors.accent} strokeWidth={2} pointerEvents="none" />}
+          {wiring.lockedCorners?.map((corner, index) => (
+            <circle key={`corner-${index}`} cx={corner[0]} cy={corner[1]} r={3} fill={colors.panel} stroke={colors.accent} strokeWidth={1.2} pointerEvents="none" />
+          ))}
+
+          {components.map(component => {
+            const definition = getDef(component.type);
+            if (!definition) return null;
+            const isSelected = (selection?.kind === 'component' && selection.id === component.id) || marqueeIds.includes(component.id);
+            let powered = Boolean(snapshot.componentPowered[component.id]);
+            if (component.type === 'coil') {
+              const vPos = snapshot.terminalVoltages[`${component.id}:pos`];
+              const vNeg = snapshot.terminalVoltages[`${component.id}:neg`];
+              if (vPos !== undefined && vNeg !== undefined) {
+                const vCoil = Math.abs(vPos - vNeg);
+                const threshold = Math.max(0.1, Number(component.props?.activationThreshold ?? 5));
+                if (vCoil >= threshold * 0.6) {
+                  powered = true;
+                }
+              }
+            } else if (['relay-spst', 'relay-spdt', 'relay-dpst', 'contactor'].includes(component.type)) {
+              const manual = component.props?.manualState;
+              if (manual === 'closed') {
+                powered = true;
+              } else if (manual === 'open') {
+                powered = false;
+              } else {
+                const vPos = snapshot.terminalVoltages[`${component.id}:coil+`];
+                const vNeg = snapshot.terminalVoltages[`${component.id}:coil-`];
+                if (vPos !== undefined && vNeg !== undefined) {
+                  const vCoil = Math.abs(vPos - vNeg);
+                  const rated = Math.max(0.1, Number(component.props?.coilVoltage ?? (component.type === 'contactor' ? 24 : 12)));
+                  if (vCoil >= rated * 0.7) {
+                    powered = true;
+                  }
+                }
+              }
+            } else if (['aux-contact-no', 'aux-contact-nc', 'aux-contact-3phase'].includes(component.type) && (component.props?.linkedTo || component.props?.controlSourceId)) {
+              const linkedRef = String(component.props?.linkedTo || component.props?.controlSourceId || '');
+              const linkedCoil = components.find(c => ['coil', 'contactor', 'relay-spst', 'relay-spdt', 'relay-dpst'].includes(c.type) && (c.label === linkedRef || c.id === linkedRef));
+              if (linkedCoil) {
+                if (linkedCoil.type === 'coil') {
+                  let coilEnergized = Boolean(snapshot.componentPowered[linkedCoil.id]);
+                  const vPos = snapshot.terminalVoltages[`${linkedCoil.id}:pos`];
+                  const vNeg = snapshot.terminalVoltages[`${linkedCoil.id}:neg`];
+                  if (vPos !== undefined && vNeg !== undefined) {
+                    const vCoil = Math.abs(vPos - vNeg);
+                    const threshold = Math.max(0.1, Number(linkedCoil.props?.activationThreshold ?? 5));
+                    if (vCoil >= threshold * 0.6) {
+                      coilEnergized = true;
+                    }
+                  }
+                  powered = coilEnergized;
+                } else {
+                  const manual = linkedCoil.props?.manualState;
+                  if (manual === 'closed') {
+                    powered = true;
+                  } else if (manual === 'open') {
+                    powered = false;
+                  } else {
+                    let coilEnergized = Boolean(snapshot.componentPowered[linkedCoil.id]);
+                    const vPos = snapshot.terminalVoltages[`${linkedCoil.id}:coil+`];
+                    const vNeg = snapshot.terminalVoltages[`${linkedCoil.id}:coil-`];
+                    if (vPos !== undefined && vNeg !== undefined) {
+                      const vCoil = Math.abs(vPos - vNeg);
+                      const rated = Math.max(0.1, Number(linkedCoil.props?.coilVoltage ?? (linkedCoil.type === 'contactor' ? 24 : 12)));
+                      if (vCoil >= rated * 0.7) {
+                        coilEnergized = true;
+                      }
+                    }
+                    powered = coilEnergized;
+                  }
+                }
+              }
+            }
+            let motorVEff: number | undefined;
+            if (component.type === 'motor-dc') {
+              const vPos = snapshot.terminalVoltages[terminalKey(component.id, 'pos')];
+              const vNeg = snapshot.terminalVoltages[terminalKey(component.id, 'neg')];
+              if (vPos !== undefined && vNeg !== undefined) {
+                const vEff = Math.abs(vPos - vNeg);
+                motorVEff = vEff;
+                powered = vEff >= 0.5;
+              }
+            } else if (component.type === 'motor-3phase') {
+              const vu = snapshot.terminalVoltages[terminalKey(component.id, 'u')];
+              const vv = snapshot.terminalVoltages[terminalKey(component.id, 'v')];
+              const vw = snapshot.terminalVoltages[terminalKey(component.id, 'w')];
+              if (vu !== undefined && vv !== undefined && vw !== undefined) {
+                const vuv = Math.abs(vu - vv);
+                const vvw = Math.abs(vv - vw);
+                const vwu = Math.abs(vw - vu);
+                const vEff = Math.sqrt((vuv ** 2 + vvw ** 2 + vwu ** 2) / 3);
+                motorVEff = vEff;
+                powered = vEff >= 0.5;
+              }
+            }
+            const intensity = snapshot.componentIntensity[component.id] ?? 0;
+            const reading = effectiveSnapshot.instrumentReadings[component.id];
+            // Live KaTeX-styled reading inside the circular Voltmeter/Ammeter face, synced with
+            // effectiveSnapshot (SPICE-verified when available, the legacy engine otherwise) so it
+            // follows Run mode with no extra lag beyond the snapshot itself. A component with no
+            // reading yet (never simulated) or an unwired meter falls back to the plain "V"/"A"
+            // glyph inside the symbol, unchanged.
+            const meterUnit = component.type === 'voltmeter' ? 'V' : component.type === 'ammeter' ? 'A' : null;
+            let dmmDisplayValue: string | undefined = undefined;
+            if (component.type === 'dmm') {
+              const mode = String(component.props?.mode ?? 'DCV');
+              if (reading) {
+                const isOhmMode = mode === 'OHM' || mode === 'CONT' || reading.unit === 'Ω' || reading.unit === 'Ohm';
+                if (reading.status === 'open' || (isOhmMode && (!Number.isFinite(reading.value) || Math.abs(reading.value) >= 1e7))) {
+                  dmmDisplayValue = 'O.L';
+                } else if (reading.status === 'ready') {
+                  dmmDisplayValue = formatEngineering(reading.value, reading.unit, 1);
+                }
+              }
+            }
+            const meterDisplayValue = (meterUnit && reading?.status === 'ready')
+              ? formatMeterReading(reading.value, meterUnit)
+              : dmmDisplayValue;
+            const transform = `translate(${component.x},${component.y})`;
+            const symbolTransform = `rotate(${component.rotation}) scale(${component.flipH ? -1 : 1},${component.flipV ? -1 : 1}) scale(${isExactCadComponent(component.type) ? 1 : visualSymbolScale})`;
+            const isTheveninRemovedLoad = isTheveninActive && theveninTargetId === component.id;
+            const isIndependentSource = component.type === 'voltage' || component.type === 'current' || component.type === 'dc-voltage' || component.type === 'dc-current' || component.type === 'ac-voltage' || component.type === 'ac-current';
+            const isSuperpositionDimmedSource = isSuperpositionActive && superpositionActiveSourceId && isIndependentSource && component.id !== superpositionActiveSourceId;
+            const isSuperpositionActiveSource = isSuperpositionActive && superpositionActiveSourceId && component.id === superpositionActiveSourceId;
+            const isSuperpositionDeactivatedVoltage = isSuperpositionDimmedSource && (component.type === 'voltage' || component.type === 'dc-voltage' || component.type === 'ac-voltage');
+            const isSuperpositionDeactivatedCurrent = isSuperpositionDimmedSource && (component.type === 'current' || component.type === 'dc-current' || component.type === 'ac-current');
+            // Deactivated sources (wire short / open gap) render with full opacity so the wire looks like real circuit wire
+            const componentCanvasOpacity = isTheveninRemovedLoad ? 0.45 : (isSuperpositionDeactivatedVoltage || isSuperpositionDeactivatedCurrent) ? 1 : isSuperpositionDimmedSource ? 0.28 : 1;
+
+            return (
+              <g
+                key={component.id}
+                transform={transform}
+                opacity={componentCanvasOpacity}
+                style={{ transition: 'opacity 0.25s ease' }}
+                onPointerEnter={() => setHoveredComponentId(component.id)}
+                onPointerLeave={() => setHoveredComponentId(null)}
+              >
+                {component.state?.isBurned && <title>COMPONENT DESTROYED - Exceeded maximum ratings</title>}
+                {isSuperpositionDeactivatedVoltage ? (
+                  /* Deactivated Voltage Source (Short Circuit): ghosted original source with solid wire overlay connecting pin1 to pin2 matching circuit wire stroke width */
+                  (() => {
+                    const t0 = getCanvasTerminalPosition(component, definition.terminals[0]?.id);
+                    const t1 = getCanvasTerminalPosition(component, definition.terminals[1]?.id);
+                    const x1 = t0 ? t0[0] - component.x : 0;
+                    const y1 = t0 ? t0[1] - component.y : -50;
+                    const x2 = t1 ? t1[0] - component.x : 0;
+                    const y2 = t1 ? t1[1] - component.y : 50;
+                    return (
+                      <g>
+                        <g transform={symbolTransform} opacity={0.25}>
+                          {renderSymbol(
+                            definition.symbol,
+                            powered,
+                            {
+                              ...component.props,
+                              label: component.label,
+                              selected: isSelected,
+                              _isSelected: isSelected,
+                              isDark: darkPreview,
+                              _isDark: darkPreview,
+                              isEnergized: powered,
+                              isConflicted: conflictedCoilIds.has(component.id),
+                              _intensity: intensity,
+                              _isBurned: Boolean(component.state?.isBurned),
+                              _superpositionActive: false,
+                              ...(motorVEff !== undefined ? { _vEff: motorVEff } : {}),
+                              _documentedStyle: tabDUiRefinement,
+                              ...(meterDisplayValue !== undefined ? { displayValue: meterDisplayValue } : {}),
+                            },
+                            animationTime,
+                          )}
+                        </g>
+                        <line
+                          x1={x1}
+                          y1={y1}
+                          x2={x2}
+                          y2={y2}
+                          stroke={colors.text}
+                          strokeWidth={1.5}
+                          strokeLinecap="round"
+                        />
                       </g>
-                    ))}
-
-                    {/* Phase 2: same-net junction dots for interior crossing points, T-junctions, and cross-junctions */}
-                    {junctionDots.map(([jx, jy]) => (
-                      <circle key={`jdot-${jx}-${jy}`} cx={jx} cy={jy} r={3} fill="currentColor" color={colors.text} pointerEvents="none" />
-                    ))}
-
-                    {/* Phase 3: orthogonal rubber-band wire preview */}
-                    {wiring.from && wireDraftPreviewPath && <path d={pointsToPath(wireDraftPreviewPath)} fill="none" stroke={colors.accent} strokeDasharray="6 4" strokeWidth={1.6} opacity={.75} strokeLinecap="round" strokeLinejoin="round" pointerEvents="none" />}
-                    {wireSnapProjection && <circle cx={wireSnapProjection.point[0]} cy={wireSnapProjection.point[1]} r={6} fill="none" stroke={colors.accent} strokeWidth={2} pointerEvents="none" />}
-                    {wiring.lockedCorners?.map((corner, index) => (
-                      <circle key={`corner-${index}`} cx={corner[0]} cy={corner[1]} r={3} fill={colors.panel} stroke={colors.accent} strokeWidth={1.2} pointerEvents="none" />
-                    ))}
-
-                    {components.map(component => {
-                      const definition = getDef(component.type);
-                      if (!definition) return null;
-                      const isSelected = (selection?.kind === 'component' && selection.id === component.id) || marqueeIds.includes(component.id);
-                      let powered = Boolean(snapshot.componentPowered[component.id]);
-                      if (component.type === 'coil') {
-                        const vPos = snapshot.terminalVoltages[`${component.id}:pos`];
-                        const vNeg = snapshot.terminalVoltages[`${component.id}:neg`];
-                        if (vPos !== undefined && vNeg !== undefined) {
-                          const vCoil = Math.abs(vPos - vNeg);
-                          const threshold = Math.max(0.1, Number(component.props?.activationThreshold ?? 5));
-                          if (vCoil >= threshold * 0.6) {
-                            powered = true;
-                          }
-                        }
-                      } else if (['relay-spst', 'relay-spdt', 'relay-dpst', 'contactor'].includes(component.type)) {
-                        const manual = component.props?.manualState;
-                        if (manual === 'closed') {
-                          powered = true;
-                        } else if (manual === 'open') {
-                          powered = false;
-                        } else {
-                          const vPos = snapshot.terminalVoltages[`${component.id}:coil+`];
-                          const vNeg = snapshot.terminalVoltages[`${component.id}:coil-`];
-                          if (vPos !== undefined && vNeg !== undefined) {
-                            const vCoil = Math.abs(vPos - vNeg);
-                            const rated = Math.max(0.1, Number(component.props?.coilVoltage ?? (component.type === 'contactor' ? 24 : 12)));
-                            if (vCoil >= rated * 0.7) {
-                              powered = true;
-                            }
-                          }
-                        }
-                      } else if (['aux-contact-no', 'aux-contact-nc', 'aux-contact-3phase'].includes(component.type) && (component.props?.linkedTo || component.props?.controlSourceId)) {
-                        const linkedRef = String(component.props?.linkedTo || component.props?.controlSourceId || '');
-                        const linkedCoil = components.find(c => ['coil', 'contactor', 'relay-spst', 'relay-spdt', 'relay-dpst'].includes(c.type) && (c.label === linkedRef || c.id === linkedRef));
-                        if (linkedCoil) {
-                          if (linkedCoil.type === 'coil') {
-                            let coilEnergized = Boolean(snapshot.componentPowered[linkedCoil.id]);
-                            const vPos = snapshot.terminalVoltages[`${linkedCoil.id}:pos`];
-                            const vNeg = snapshot.terminalVoltages[`${linkedCoil.id}:neg`];
-                            if (vPos !== undefined && vNeg !== undefined) {
-                              const vCoil = Math.abs(vPos - vNeg);
-                              const threshold = Math.max(0.1, Number(linkedCoil.props?.activationThreshold ?? 5));
-                              if (vCoil >= threshold * 0.6) {
-                                coilEnergized = true;
-                              }
-                            }
-                            powered = coilEnergized;
-                          } else {
-                            const manual = linkedCoil.props?.manualState;
-                            if (manual === 'closed') {
-                              powered = true;
-                            } else if (manual === 'open') {
-                              powered = false;
-                            } else {
-                              let coilEnergized = Boolean(snapshot.componentPowered[linkedCoil.id]);
-                              const vPos = snapshot.terminalVoltages[`${linkedCoil.id}:coil+`];
-                              const vNeg = snapshot.terminalVoltages[`${linkedCoil.id}:coil-`];
-                              if (vPos !== undefined && vNeg !== undefined) {
-                                const vCoil = Math.abs(vPos - vNeg);
-                                const rated = Math.max(0.1, Number(linkedCoil.props?.coilVoltage ?? (linkedCoil.type === 'contactor' ? 24 : 12)));
-                                if (vCoil >= rated * 0.7) {
-                                  coilEnergized = true;
-                                }
-                              }
-                              powered = coilEnergized;
-                            }
-                          }
-                        }
-                      }
-                      let motorVEff: number | undefined;
-                      if (component.type === 'motor-dc') {
-                        const vPos = snapshot.terminalVoltages[terminalKey(component.id, 'pos')];
-                        const vNeg = snapshot.terminalVoltages[terminalKey(component.id, 'neg')];
-                        if (vPos !== undefined && vNeg !== undefined) {
-                          const vEff = Math.abs(vPos - vNeg);
-                          motorVEff = vEff;
-                          powered = vEff >= 0.5;
-                        }
-                      } else if (component.type === 'motor-3phase') {
-                        const vu = snapshot.terminalVoltages[terminalKey(component.id, 'u')];
-                        const vv = snapshot.terminalVoltages[terminalKey(component.id, 'v')];
-                        const vw = snapshot.terminalVoltages[terminalKey(component.id, 'w')];
-                        if (vu !== undefined && vv !== undefined && vw !== undefined) {
-                          const vuv = Math.abs(vu - vv);
-                          const vvw = Math.abs(vv - vw);
-                          const vwu = Math.abs(vw - vu);
-                          const vEff = Math.sqrt((vuv ** 2 + vvw ** 2 + vwu ** 2) / 3);
-                          motorVEff = vEff;
-                          powered = vEff >= 0.5;
-                        }
-                      }
-                      const intensity = snapshot.componentIntensity[component.id] ?? 0;
-                      const reading = effectiveSnapshot.instrumentReadings[component.id];
-                      // Live KaTeX-styled reading inside the circular Voltmeter/Ammeter face, synced with
-                      // effectiveSnapshot (SPICE-verified when available, the legacy engine otherwise) so it
-                      // follows Run mode with no extra lag beyond the snapshot itself. A component with no
-                      // reading yet (never simulated) or an unwired meter falls back to the plain "V"/"A"
-                      // glyph inside the symbol, unchanged.
-                      const meterUnit = component.type === 'voltmeter' ? 'V' : component.type === 'ammeter' ? 'A' : null;
-                      let dmmDisplayValue: string | undefined = undefined;
-                      if (component.type === 'dmm') {
-                        const mode = String(component.props?.mode ?? 'DCV');
-                        if (reading) {
-                          const isOhmMode = mode === 'OHM' || mode === 'CONT' || reading.unit === 'Ω' || reading.unit === 'Ohm';
-                          if (reading.status === 'open' || (isOhmMode && (!Number.isFinite(reading.value) || Math.abs(reading.value) >= 1e7))) {
-                            dmmDisplayValue = 'O.L';
-                          } else if (reading.status === 'ready') {
-                            dmmDisplayValue = formatEngineering(reading.value, reading.unit, 1);
-                          }
-                        }
-                      }
-                      const meterDisplayValue = (meterUnit && reading?.status === 'ready')
-                        ? formatMeterReading(reading.value, meterUnit)
-                        : dmmDisplayValue;
-                      const transform = `translate(${component.x},${component.y})`;
-                      const symbolTransform = `rotate(${component.rotation}) scale(${component.flipH ? -1 : 1},${component.flipV ? -1 : 1}) scale(${isExactCadComponent(component.type) ? 1 : visualSymbolScale})`;
-                      const isTheveninRemovedLoad = isTheveninActive && theveninTargetId === component.id;
-                      const isIndependentSource = component.type === 'voltage' || component.type === 'current' || component.type === 'dc-voltage' || component.type === 'dc-current' || component.type === 'ac-voltage' || component.type === 'ac-current';
-                      const isSuperpositionDimmedSource = isSuperpositionActive && superpositionActiveSourceId && isIndependentSource && component.id !== superpositionActiveSourceId;
-                      const isSuperpositionActiveSource = isSuperpositionActive && superpositionActiveSourceId && component.id === superpositionActiveSourceId;
-                      const isSuperpositionDeactivatedVoltage = isSuperpositionDimmedSource && (component.type === 'voltage' || component.type === 'dc-voltage' || component.type === 'ac-voltage');
-                      const isSuperpositionDeactivatedCurrent = isSuperpositionDimmedSource && (component.type === 'current' || component.type === 'dc-current' || component.type === 'ac-current');
-                      // Deactivated sources (wire short / open gap) render with full opacity so the wire looks like real circuit wire
-                      const componentCanvasOpacity = isTheveninRemovedLoad ? 0.45 : (isSuperpositionDeactivatedVoltage || isSuperpositionDeactivatedCurrent) ? 1 : isSuperpositionDimmedSource ? 0.28 : 1;
-
-                      return (
-                        <g
-                          key={component.id}
-                          transform={transform}
-                          opacity={componentCanvasOpacity}
-                          style={{ transition: 'opacity 0.25s ease' }}
-                          onPointerEnter={() => setHoveredComponentId(component.id)}
-                          onPointerLeave={() => setHoveredComponentId(null)}
-                        >
-                          {component.state?.isBurned && <title>COMPONENT DESTROYED - Exceeded maximum ratings</title>}
-                          {isSuperpositionDeactivatedVoltage ? (
-                            /* Deactivated Voltage Source (Short Circuit): ghosted original source with solid wire overlay connecting pin1 to pin2 matching circuit wire stroke width */
-                            (() => {
-                              const t0 = getCanvasTerminalPosition(component, definition.terminals[0]?.id);
-                              const t1 = getCanvasTerminalPosition(component, definition.terminals[1]?.id);
-                              const x1 = t0 ? t0[0] - component.x : 0;
-                              const y1 = t0 ? t0[1] - component.y : -50;
-                              const x2 = t1 ? t1[0] - component.x : 0;
-                              const y2 = t1 ? t1[1] - component.y : 50;
-                              return (
-                                <g>
-                                  <g transform={symbolTransform} opacity={0.25}>
-                                    {renderSymbol(
-                                      definition.symbol,
-                                      powered,
-                                      {
-                                        ...component.props,
-                                        label: component.label,
-                                        selected: isSelected,
-                                        _isSelected: isSelected,
-                                        isDark: darkPreview,
-                                        _isDark: darkPreview,
-                                        isEnergized: powered,
-                                        isConflicted: conflictedCoilIds.has(component.id),
-                                        _intensity: intensity,
-                                        _isBurned: Boolean(component.state?.isBurned),
-                                        _superpositionActive: false,
-                                        ...(motorVEff !== undefined ? { _vEff: motorVEff } : {}),
-                                        _documentedStyle: tabDUiRefinement,
-                                        ...(meterDisplayValue !== undefined ? { displayValue: meterDisplayValue } : {}),
-                                      },
-                                      animationTime,
-                                    )}
-                                  </g>
-                                  <line
-                                    x1={x1}
-                                    y1={y1}
-                                    x2={x2}
-                                    y2={y2}
-                                    stroke={colors.text}
-                                    strokeWidth={1.5}
-                                    strokeLinecap="round"
-                                  />
-                                </g>
-                              );
-                            })()
-                          ) : isSuperpositionDeactivatedCurrent ? (
-                            /* Deactivated Current Source (Open Circuit): ghosted original source (opacity 0.25) with open visual terminal gap */
-                            (() => {
-                              const t0 = getCanvasTerminalPosition(component, definition.terminals[0]?.id);
-                              const t1 = getCanvasTerminalPosition(component, definition.terminals[1]?.id);
-                              const x1 = t0 ? t0[0] - component.x : 0;
-                              const y1 = t0 ? t0[1] - component.y : -50;
-                              const x2 = t1 ? t1[0] - component.x : 0;
-                              const y2 = t1 ? t1[1] - component.y : 50;
-                              const stubLen = 14;
-                              const d0 = Math.hypot(x1, y1) || 1;
-                              const s0x = x1 - (x1 / d0) * stubLen;
-                              const s0y = y1 - (y1 / d0) * stubLen;
-                              const d1 = Math.hypot(x2, y2) || 1;
-                              const s1x = x2 - (x2 / d1) * stubLen;
-                              const s1y = y2 - (y2 / d1) * stubLen;
-                              return (
-                                <g>
-                                  <g transform={symbolTransform} opacity={0.25}>
-                                    {renderSymbol(
-                                      definition.symbol,
-                                      powered,
-                                      {
-                                        ...component.props,
-                                        label: component.label,
-                                        selected: isSelected,
-                                        _isSelected: isSelected,
-                                        isDark: darkPreview,
-                                        _isDark: darkPreview,
-                                        isEnergized: powered,
-                                        isConflicted: conflictedCoilIds.has(component.id),
-                                        _intensity: intensity,
-                                        _isBurned: Boolean(component.state?.isBurned),
-                                        _superpositionActive: false,
-                                        ...(motorVEff !== undefined ? { _vEff: motorVEff } : {}),
-                                        _documentedStyle: tabDUiRefinement,
-                                        ...(meterDisplayValue !== undefined ? { displayValue: meterDisplayValue } : {}),
-                                      },
-                                      animationTime,
-                                    )}
-                                  </g>
-                                  <line x1={x1} y1={y1} x2={s0x} y2={s0y} stroke={colors.text} strokeWidth={1.5} strokeLinecap="round" />
-                                  <line x1={x2} y1={y2} x2={s1x} y2={s1y} stroke={colors.text} strokeWidth={1.5} strokeLinecap="round" />
-                                </g>
-                              );
-                            })()
-                          ) : (
-                            /* Active or standard component graphic with solid purple highlight (no glow/drop-shadow) during Superposition */
-                            <g
-                              transform={symbolTransform}
-                              color={isSelected ? colors.selection : isSuperpositionActiveSource ? '#A855F7' : undefined}
-                            >
-                              {renderSymbol(
-                                definition.symbol,
-                                powered,
-                                {
-                                  ...component.props,
-                                  label: component.label,
-                                  selected: isSelected,
-                                  _isSelected: isSelected,
-                                  isDark: darkPreview,
-                                  _isDark: darkPreview,
-                                  isEnergized: powered,
-                                  isConflicted: conflictedCoilIds.has(component.id),
-                                  _intensity: intensity,
-                                  _isBurned: Boolean(component.state?.isBurned),
-                                  _superpositionActive: isSuperpositionActiveSource,
-                                  ...(motorVEff !== undefined ? { _vEff: motorVEff } : {}),
-                                  _documentedStyle: tabDUiRefinement,
-                                  ...(meterDisplayValue !== undefined ? { displayValue: meterDisplayValue } : {}),
-                                },
-                                animationTime,
-                              )}
-                            </g>
-                          )}
-                          {definition.terminals.map(terminal => {
-                            const snappedWorld = getCanvasTerminalPosition(component, terminal.id);
-                            const rawWorld = getRawCanvasTerminalPosition(component, terminal.id);
-                            if (!snappedWorld || !rawWorld) return null;
-                            const terminalX = snappedWorld[0] - component.x;
-                            const terminalY = snappedWorld[1] - component.y;
-                            const starting = wiring.from?.componentId === component.id && wiring.from.terminalId === terminal.id;
-                            const terminalVoltage = snapshot.terminalVoltages[terminalKey(component.id, terminal.id)] ?? 0;
-                            const energized = Math.abs(terminalVoltage) > .05;
-                            const showTerminals = isSelected || hoveredComponentId === component.id || Boolean(wiring.from);
-                            return <g key={terminal.id}>
-                              <circle cx={terminalX} cy={terminalY} r={TERMINAL_HIT_RADIUS} fill="transparent" />
-                              <g style={{ opacity: showTerminals ? 1 : 0, transition: 'opacity 0.2s ease-in-out' }} pointerEvents="none">
-                                <circle cx={terminalX} cy={terminalY} r={TERMINAL_RADIUS} fill={starting ? colors.accent : energized ? colors.powered : colors.panel} stroke={wiring.from ? colors.primary : colors.muted} strokeWidth={1.4} />
-                                {terminal.name && component.type !== 'oscilloscope' && <text x={terminalX} y={terminalY - 8} textAnchor="middle" fontSize={7} fontWeight={400} fill={colors.muted}>{terminal.name}</text>}
-                              </g>
-                            </g>;
-                          })}
-                          {isSelected && (component.type === 'cccs' || component.type === 'ccvs' || component.type === 'vcvs' || component.type === 'vccs') && (() => {
-                            const targetRef = String(component.props.targetId || component.props.controlSourceId || '');
-                            if (!targetRef) return null;
-                            const sensedComponent = components.find(c => c.id === targetRef || c.label === targetRef);
-                            if (!sensedComponent) return null;
-                            const dx = sensedComponent.x - component.x;
-                            const dy = sensedComponent.y - component.y;
-                            return <line x1={0} y1={0} x2={dx} y2={dy} stroke={colors.selection} strokeWidth={1} strokeDasharray="3 3" opacity={0.45} pointerEvents="none" />;
-                          })()}
-                        </g>
-                      );
-                    })}
-
-                    {/* Dedicated Component Labels World Overlay Layer (0° Upright Orientation, No Upside Down / Rotated Labels) */}
-                    <g className="v3-component-labels-layer" pointerEvents="none" style={{ userSelect: 'none' }}>
-                      {components.map(component => {
-                        if (component.type === 'dmm') return null; // Completely hide DMM canvas label
-                        const definition = getDef(component.type);
-                        if (!definition) return null;
-
-                        // Read the display visibility flags
-                        const hideLabel = component.props._hideLabel === true;
-                        const hideValue = component.props._hideValue === true;
-
-                        const anchors = componentLabelAnchors(definition, component, visualSymbolScale);
-                        const isHorizontal = anchors.isHorizontal;
-                        const refTextAnchor = anchors.refTextAnchor ?? (isHorizontal ? 'middle' : 'start');
-                        const valTextAnchor = anchors.valTextAnchor ?? (isHorizontal ? 'middle' : 'start');
-                        const refX = component.x + anchors.reference[0];
-                        const refY = component.y + anchors.reference[1];
-                        const valX = component.x + anchors.value[0];
-                        const valY = component.y + anchors.value[1];
-                        const isGround = component.type === 'ground' || /^GND\d*$/i.test(component.label);
-                        const refFill = darkPreview ? '#f1f5f9' : '#1e293b';
-                        const valFill = darkPreview ? '#94a3b8' : '#64748b';
-
-                        const isTheveninRemovedLoad = isTheveninActive && theveninTargetId === component.id;
-                        const isIndependentSource = component.type === 'voltage' || component.type === 'current' || component.type === 'dc-voltage' || component.type === 'dc-current' || component.type === 'ac-voltage' || component.type === 'ac-current';
-                        const isSuperpositionDimmedSource = isSuperpositionActive && superpositionActiveSourceId && isIndependentSource && component.id !== superpositionActiveSourceId;
-                        // During Superposition, deactivated sources (short/open) hide their labels completely
-                        if (isSuperpositionDimmedSource) return null;
-                        const labelOpacity = isTheveninRemovedLoad ? 0.45 : 1;
-
-                        const isDependentSource = component.type === 'vcvs' || component.type === 'vccs' || component.type === 'ccvs' || component.type === 'cccs';
-
-                        return (
-                          <g key={`labels-${component.id}`} opacity={labelOpacity} style={{ transition: 'opacity 0.25s ease' }}>
-                            {/* Component Reference Label */}
-                            {!hideLabel && (
-                              <text
-                                x={refX}
-                                y={refY}
-                                textAnchor={refTextAnchor}
-                                dominantBaseline="central"
-                                fontFamily="'KaTeX_Main', 'KaTeX_Math', serif"
-                                style={{
-                                  fontFamily: "'KaTeX_Main', 'KaTeX_Math', serif",
-                                  fontSize: 13,
-                                  fontWeight: 400,
-                                  fill: refFill,
-                                  paintOrder: 'stroke fill',
-                                  stroke: colors.canvas,
-                                  strokeWidth: 3.5,
-                                  strokeLinejoin: 'round',
-                                  strokeLinecap: 'round',
-                                }}
-                              >
-                                {renderComponentCanvasLabel(component.label, isGround)}
-                              </text>
-                            )}
-
-                            {/* Component Value Label */}
-                            {!hideValue && isDependentSource && (() => {
-                              const targetRef = String(component.props.targetId || component.props.controlSourceId || '');
-                              const targetComp = components.find(c => c.id === targetRef || c.label === targetRef);
-                              const targetLabel = targetComp ? targetComp.label : '';
-                              const gain = Number(component.props.gain ?? 1);
-                              const mathStr = formatDependentSourceMath(component.type, gain, targetLabel);
-                              return (
-                                <g>
-                                  {/* High-fidelity KaTeX HTML/MathML rendering on live canvas */}
-                                  <foreignObject
-                                    x={valTextAnchor === 'end' ? valX - 90 : valTextAnchor === 'middle' ? valX - 45 : valX}
-                                    y={valY - 14}
-                                    width={90}
-                                    height={28}
-                                    style={{ overflow: 'visible' }}
-                                  >
-                                    <div
-                                      style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: valTextAnchor === 'end' ? 'flex-end' : valTextAnchor === 'middle' ? 'center' : 'flex-start',
-                                        width: '100%',
-                                        height: '100%',
-                                        color: valFill,
-                                        fontSize: 11,
-                                        lineHeight: 1,
-                                        whiteSpace: 'nowrap',
-                                        filter: `drop-shadow(0 0 2px ${colors.canvas}) drop-shadow(0 0 2px ${colors.canvas})`,
-                                      }}
-                                    >
-                                      <V3Math math={mathStr} />
-                                    </div>
-                                  </foreignObject>
-                                  {/* Fallback SVG text with KaTeX fonts for pure SVG export / print */}
-                                  <text
-                                    className="v3-export-math-fallback"
-                                    x={valX}
-                                    y={valY}
-                                    textAnchor={valTextAnchor}
-                                    dominantBaseline="central"
-                                    fontFamily="'KaTeX_Main', 'KaTeX_Math', serif"
-                                    data-math={mathStr}
-                                    style={{
-                                      display: 'none',
-                                      fontFamily: "'KaTeX_Main', 'KaTeX_Math', serif",
-                                      fontSize: 11,
-                                      fontWeight: 400,
-                                      fill: valFill,
-                                      paintOrder: 'stroke fill',
-                                      stroke: colors.canvas,
-                                      strokeWidth: 3,
-                                      strokeLinejoin: 'round',
-                                      strokeLinecap: 'round',
-                                    }}
-                                  >
-                                    {renderDependentSourceValueTspans(component.type, gain, targetLabel)}
-                                  </text>
-                                </g>
-                              );
-                            })()}
-
-                            {!hideValue && !isDependentSource && (() => {
-                              const value = componentDisplayValue(definition, component);
-                              if (!value) return null;
-                              return (
-                                <text
-                                  x={valX}
-                                  y={valY}
-                                  textAnchor={valTextAnchor}
-                                  dominantBaseline="central"
-                                  fontFamily="'KaTeX_Main', 'KaTeX_Math', serif"
-                                  style={{
-                                    fontFamily: "'KaTeX_Main', 'KaTeX_Math', serif",
-                                    fontSize: 11,
-                                    fontWeight: 400,
-                                    fill: valFill,
-                                    paintOrder: 'stroke fill',
-                                    stroke: colors.canvas,
-                                    strokeWidth: 3,
-                                    strokeLinejoin: 'round',
-                                    strokeLinecap: 'round',
-                                  }}
-                                >
-                                  {renderFormattedValueTspans(value)}
-                                </text>
-                              );
-                            })()}
-                          </g>
-                        );
-                      })}
-
-                      {/* Electron Flow Particles Layer (renders strictly on top of wire paths and component bodies) */}
-                      {showElectrons && (
-                        <g className="electron-particles" pointerEvents="none">
-                          {wireRenderData.map(({ wire, dots, isCurrentFlowing }) =>
-                            isCurrentFlowing ? dots.map((dot, index) => (
-                              <circle
-                                key={`${wire.id}-particle-${index}`}
-                                cx={dot[0]}
-                                cy={dot[1]}
-                                r={3}
-                                fill={colors.powered}
-                                pointerEvents="none"
-                              />
-                            )) : null
+                    );
+                  })()
+                ) : isSuperpositionDeactivatedCurrent ? (
+                  /* Deactivated Current Source (Open Circuit): ghosted original source (opacity 0.25) with open visual terminal gap */
+                  (() => {
+                    const t0 = getCanvasTerminalPosition(component, definition.terminals[0]?.id);
+                    const t1 = getCanvasTerminalPosition(component, definition.terminals[1]?.id);
+                    const x1 = t0 ? t0[0] - component.x : 0;
+                    const y1 = t0 ? t0[1] - component.y : -50;
+                    const x2 = t1 ? t1[0] - component.x : 0;
+                    const y2 = t1 ? t1[1] - component.y : 50;
+                    const stubLen = 14;
+                    const d0 = Math.hypot(x1, y1) || 1;
+                    const s0x = x1 - (x1 / d0) * stubLen;
+                    const s0y = y1 - (y1 / d0) * stubLen;
+                    const d1 = Math.hypot(x2, y2) || 1;
+                    const s1x = x2 - (x2 / d1) * stubLen;
+                    const s1y = y2 - (y2 / d1) * stubLen;
+                    return (
+                      <g>
+                        <g transform={symbolTransform} opacity={0.25}>
+                          {renderSymbol(
+                            definition.symbol,
+                            powered,
+                            {
+                              ...component.props,
+                              label: component.label,
+                              selected: isSelected,
+                              _isSelected: isSelected,
+                              isDark: darkPreview,
+                              _isDark: darkPreview,
+                              isEnergized: powered,
+                              isConflicted: conflictedCoilIds.has(component.id),
+                              _intensity: intensity,
+                              _isBurned: Boolean(component.state?.isBurned),
+                              _superpositionActive: false,
+                              ...(motorVEff !== undefined ? { _vEff: motorVEff } : {}),
+                              _documentedStyle: tabDUiRefinement,
+                              ...(meterDisplayValue !== undefined ? { displayValue: meterDisplayValue } : {}),
+                            },
+                            animationTime,
                           )}
                         </g>
-                      )}
+                        <line x1={x1} y1={y1} x2={s0x} y2={s0y} stroke={colors.text} strokeWidth={1.5} strokeLinecap="round" />
+                        <line x1={x2} y1={y2} x2={s1x} y2={s1y} stroke={colors.text} strokeWidth={1.5} strokeLinecap="round" />
+                      </g>
+                    );
+                  })()
+                ) : (
+                  /* Active or standard component graphic with solid purple highlight (no glow/drop-shadow) during Superposition */
+                  <g
+                    transform={symbolTransform}
+                    color={isSelected ? colors.selection : isSuperpositionActiveSource ? '#A855F7' : undefined}
+                  >
+                    {renderSymbol(
+                      definition.symbol,
+                      powered,
+                      {
+                        ...component.props,
+                        label: component.label,
+                        selected: isSelected,
+                        _isSelected: isSelected,
+                        isDark: darkPreview,
+                        _isDark: darkPreview,
+                        isEnergized: powered,
+                        isConflicted: conflictedCoilIds.has(component.id),
+                        _intensity: intensity,
+                        _isBurned: Boolean(component.state?.isBurned),
+                        _superpositionActive: isSuperpositionActiveSource,
+                        ...(motorVEff !== undefined ? { _vEff: motorVEff } : {}),
+                        _documentedStyle: tabDUiRefinement,
+                        ...(meterDisplayValue !== undefined ? { displayValue: meterDisplayValue } : {}),
+                      },
+                      animationTime,
+                    )}
+                  </g>
+                )}
+                {definition.terminals.map(terminal => {
+                  const snappedWorld = getCanvasTerminalPosition(component, terminal.id);
+                  const rawWorld = getRawCanvasTerminalPosition(component, terminal.id);
+                  if (!snappedWorld || !rawWorld) return null;
+                  const terminalX = snappedWorld[0] - component.x;
+                  const terminalY = snappedWorld[1] - component.y;
+                  const starting = wiring.from?.componentId === component.id && wiring.from.terminalId === terminal.id;
+                  const terminalVoltage = snapshot.terminalVoltages[terminalKey(component.id, terminal.id)] ?? 0;
+                  const energized = Math.abs(terminalVoltage) > .05;
+                  const showTerminals = isSelected || hoveredComponentId === component.id || Boolean(wiring.from);
+                  return <g key={terminal.id}>
+                    <circle cx={terminalX} cy={terminalY} r={TERMINAL_HIT_RADIUS} fill="transparent" />
+                    <g style={{ opacity: showTerminals ? 1 : 0, transition: 'opacity 0.2s ease-in-out' }} pointerEvents="none">
+                      <circle cx={terminalX} cy={terminalY} r={TERMINAL_RADIUS} fill={starting ? colors.accent : energized ? colors.powered : colors.panel} stroke={wiring.from ? colors.primary : colors.muted} strokeWidth={1.4} />
+                      {terminal.name && component.type !== 'oscilloscope' && <text x={terminalX} y={terminalY - 8} textAnchor="middle" fontSize={7} fontWeight={400} fill={colors.muted}>{terminal.name}</text>}
                     </g>
+                  </g>;
+                })}
+                {isSelected && (component.type === 'cccs' || component.type === 'ccvs' || component.type === 'vcvs' || component.type === 'vccs') && (() => {
+                  const targetRef = String(component.props.targetId || component.props.controlSourceId || '');
+                  if (!targetRef) return null;
+                  const sensedComponent = components.find(c => c.id === targetRef || c.label === targetRef);
+                  if (!sensedComponent) return null;
+                  const dx = sensedComponent.x - component.x;
+                  const dy = sensedComponent.y - component.y;
+                  return <line x1={0} y1={0} x2={dx} y2={dy} stroke={colors.selection} strokeWidth={1} strokeDasharray="3 3" opacity={0.45} pointerEvents="none" />;
+                })()}
+              </g>
+            );
+          })}
 
-                    {texts.map(text => (
-                      <g
-                        key={text.id}
-                        data-text-id={text.id}
-                        transform={`translate(${text.x},${text.y}) rotate(${text.rotation})`}
-                        onMouseDown={event => handleTextMouseDown(event, text)}
-                        style={{ cursor: 'move' }}
-                      >
-                        <foreignObject x={0} y={0} width={1} height={1} style={{ overflow: 'visible', pointerEvents: 'auto' }}>
-                          <div style={{ width: 'max-content', color: text.color, fontSize: text.fontSize, fontWeight: 400, userSelect: 'none', display: 'flex', border: selection?.kind === 'text' && selection.id === text.id ? `1px dashed ${colors.selection}` : 'none', padding: 4, transform: 'translate(-4px, -4px)' }}>
-                            <V3Math math={text.text} />
+          {/* Dedicated Component Labels World Overlay Layer (0° Upright Orientation, No Upside Down / Rotated Labels) */}
+          <g className="v3-component-labels-layer" pointerEvents="none" style={{ userSelect: 'none' }}>
+            {components.map(component => {
+              if (component.type === 'dmm') return null; // Completely hide DMM canvas label
+              const definition = getDef(component.type);
+              if (!definition) return null;
+
+              // Read the display visibility flags
+              const hideLabel = component.props._hideLabel === true;
+              const hideValue = component.props._hideValue === true;
+
+              const anchors = componentLabelAnchors(definition, component, visualSymbolScale);
+              const isHorizontal = anchors.isHorizontal;
+              const refTextAnchor = anchors.refTextAnchor ?? (isHorizontal ? 'middle' : 'start');
+              const valTextAnchor = anchors.valTextAnchor ?? (isHorizontal ? 'middle' : 'start');
+              const refX = component.x + anchors.reference[0];
+              const refY = component.y + anchors.reference[1];
+              const valX = component.x + anchors.value[0];
+              const valY = component.y + anchors.value[1];
+              const isGround = component.type === 'ground' || /^GND\d*$/i.test(component.label);
+              const refFill = darkPreview ? '#f1f5f9' : '#1e293b';
+              const valFill = darkPreview ? '#94a3b8' : '#64748b';
+
+              const isTheveninRemovedLoad = isTheveninActive && theveninTargetId === component.id;
+              const isIndependentSource = component.type === 'voltage' || component.type === 'current' || component.type === 'dc-voltage' || component.type === 'dc-current' || component.type === 'ac-voltage' || component.type === 'ac-current';
+              const isSuperpositionDimmedSource = isSuperpositionActive && superpositionActiveSourceId && isIndependentSource && component.id !== superpositionActiveSourceId;
+              // During Superposition, deactivated sources (short/open) hide their labels completely
+              if (isSuperpositionDimmedSource) return null;
+              const labelOpacity = isTheveninRemovedLoad ? 0.45 : 1;
+
+              const isDependentSource = component.type === 'vcvs' || component.type === 'vccs' || component.type === 'ccvs' || component.type === 'cccs';
+
+              return (
+                <g key={`labels-${component.id}`} opacity={labelOpacity} style={{ transition: 'opacity 0.25s ease' }}>
+                  {/* Component Reference Label */}
+                  {!hideLabel && (
+                    <text
+                      x={refX}
+                      y={refY}
+                      textAnchor={refTextAnchor}
+                      dominantBaseline="central"
+                      fontFamily="'KaTeX_Main', 'KaTeX_Math', serif"
+                      style={{
+                        fontFamily: "'KaTeX_Main', 'KaTeX_Math', serif",
+                        fontSize: 13,
+                        fontWeight: 400,
+                        fill: refFill,
+                        paintOrder: 'stroke fill',
+                        stroke: colors.canvas,
+                        strokeWidth: 3.5,
+                        strokeLinejoin: 'round',
+                        strokeLinecap: 'round',
+                      }}
+                    >
+                      {renderComponentCanvasLabel(component.label, isGround)}
+                    </text>
+                  )}
+
+                  {/* Component Value Label */}
+                  {!hideValue && isDependentSource && (() => {
+                    const targetRef = String(component.props.targetId || component.props.controlSourceId || '');
+                    const targetComp = components.find(c => c.id === targetRef || c.label === targetRef);
+                    const targetLabel = targetComp ? targetComp.label : '';
+                    const gain = Number(component.props.gain ?? 1);
+                    const mathStr = formatDependentSourceMath(component.type, gain, targetLabel);
+                    return (
+                      <g>
+                        {/* High-fidelity KaTeX HTML/MathML rendering on live canvas */}
+                        <foreignObject
+                          x={valTextAnchor === 'end' ? valX - 90 : valTextAnchor === 'middle' ? valX - 45 : valX}
+                          y={valY - 14}
+                          width={90}
+                          height={28}
+                          style={{ overflow: 'visible' }}
+                        >
+                          <div
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: valTextAnchor === 'end' ? 'flex-end' : valTextAnchor === 'middle' ? 'center' : 'flex-start',
+                              width: '100%',
+                              height: '100%',
+                              color: valFill,
+                              fontSize: 11,
+                              lineHeight: 1,
+                              whiteSpace: 'nowrap',
+                              filter: `drop-shadow(0 0 2px ${colors.canvas}) drop-shadow(0 0 2px ${colors.canvas})`,
+                            }}
+                          >
+                            <V3Math math={mathStr} />
                           </div>
                         </foreignObject>
+                        {/* Fallback SVG text with KaTeX fonts for pure SVG export / print */}
+                        <text
+                          className="v3-export-math-fallback"
+                          x={valX}
+                          y={valY}
+                          textAnchor={valTextAnchor}
+                          dominantBaseline="central"
+                          fontFamily="'KaTeX_Main', 'KaTeX_Math', serif"
+                          data-math={mathStr}
+                          style={{
+                            display: 'none',
+                            fontFamily: "'KaTeX_Main', 'KaTeX_Math', serif",
+                            fontSize: 11,
+                            fontWeight: 400,
+                            fill: valFill,
+                            paintOrder: 'stroke fill',
+                            stroke: colors.canvas,
+                            strokeWidth: 3,
+                            strokeLinejoin: 'round',
+                            strokeLinecap: 'round',
+                          }}
+                        >
+                          {renderDependentSourceValueTspans(component.type, gain, targetLabel)}
+                        </text>
                       </g>
-                    ))}
-                  </g>
+                    );
+                  })()}
 
-                  {/* V_i labels deliberately render last: they remain readable above grid, wires, symbols, and workspace text. Strictly active in Nodal mode. */}
-                  {activeAnalysisMethod === 'nodal' && activeNodalTrace?.nodalNodes?.filter((node) => node.centroid[0] !== 0 || node.centroid[1] !== 0).map((node) => <NodalNodeOverlay key={`nodal-node-${node.node}`} node={node} colors={colors} />)}
-
-                  {/* Thévenin / Norton / Max Power Terminal Pair A–B Overlays */}
-                  {isTheveninActive && theveninTerminals && (
-                    <g className="v3-thevenin-terminals-layer" pointerEvents="none">
-                      <TheveninTerminalOverlay position={theveninTerminals.posA} label="A" colors={colors} darkPreview={darkPreview} />
-                      <TheveninTerminalOverlay position={theveninTerminals.posB} label="B" colors={colors} darkPreview={darkPreview} />
-                    </g>
-                  )}
-
-                  {/* Superposition Target Load Terminal Pair A–B Overlays */}
-                  {isSuperpositionActive && superpositionTerminals && (
-                    <g className="v3-superposition-terminals-layer" pointerEvents="none">
-                      <TheveninTerminalOverlay position={superpositionTerminals.posA} label="A" colors={colors} darkPreview={darkPreview} />
-                      <TheveninTerminalOverlay position={superpositionTerminals.posB} label="B" colors={colors} darkPreview={darkPreview} />
-                    </g>
-                  )}
+                  {!hideValue && !isDependentSource && (() => {
+                    const value = componentDisplayValue(definition, component);
+                    if (!value) return null;
+                    return (
+                      <text
+                        x={valX}
+                        y={valY}
+                        textAnchor={valTextAnchor}
+                        dominantBaseline="central"
+                        fontFamily="'KaTeX_Main', 'KaTeX_Math', serif"
+                        style={{
+                          fontFamily: "'KaTeX_Main', 'KaTeX_Math', serif",
+                          fontSize: 11,
+                          fontWeight: 400,
+                          fill: valFill,
+                          paintOrder: 'stroke fill',
+                          stroke: colors.canvas,
+                          strokeWidth: 3,
+                          strokeLinejoin: 'round',
+                          strokeLinecap: 'round',
+                        }}
+                      >
+                        {renderFormattedValueTspans(value)}
+                      </text>
+                    );
+                  })()}
                 </g>
-              </svg>
+              );
+            })}
 
-              {components.length === 0 && (
-                <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', pointerEvents: 'none' }}>
-                  <div className="flex flex-col items-center justify-center pointer-events-none select-none">
-                    <div className="px-6 py-2.5 bg-white border border-slate-100 rounded-2xl shadow-sm mb-3 dark:bg-[#0d0f12] dark:border-[#1a1d24]">
-                      <span className="text-base font-semibold text-slate-900 tracking-tight dark:text-white">
-                        Canvas Ready
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-400 font-normal">
-                      Drag and drop components from the library to begin circuit design.
-                    </p>
-                  </div>
+            {/* Electron Flow Particles Layer (renders strictly on top of wire paths and component bodies) */}
+            {showElectrons && (
+              <g className="electron-particles" pointerEvents="none">
+                {wireRenderData.map(({ wire, dots, isCurrentFlowing }) =>
+                  isCurrentFlowing ? dots.map((dot, index) => (
+                    <circle
+                      key={`${wire.id}-particle-${index}`}
+                      cx={dot[0]}
+                      cy={dot[1]}
+                      r={3}
+                      fill={colors.powered}
+                      pointerEvents="none"
+                    />
+                  )) : null
+                )}
+              </g>
+            )}
+          </g>
+
+          {texts.map(text => (
+            <g
+              key={text.id}
+              data-text-id={text.id}
+              transform={`translate(${text.x},${text.y}) rotate(${text.rotation})`}
+              onMouseDown={event => handleTextMouseDown(event, text)}
+              style={{ cursor: 'move' }}
+            >
+              <foreignObject x={0} y={0} width={1} height={1} style={{ overflow: 'visible', pointerEvents: 'auto' }}>
+                <div style={{ width: 'max-content', color: text.color, fontSize: text.fontSize, fontWeight: 400, userSelect: 'none', display: 'flex', border: selection?.kind === 'text' && selection.id === text.id ? `1px dashed ${colors.selection}` : 'none', padding: 4, transform: 'translate(-4px, -4px)' }}>
+                  <V3Math math={text.text} />
                 </div>
-              )}
+              </foreignObject>
+            </g>
+          ))}
+        </g>
 
-              <div style={{ position: 'absolute', bottom: 10, left: 10, right: 10, display: 'flex', alignItems: 'center', gap: 10, padding: '7px 10px', background: `${colors.panel}e8`, border: `1px solid ${colors.line}`, color: colors.muted, borderRadius: 8, fontSize: 10, boxShadow: 'none', pointerEvents: 'none' }}>
-                <span>{components.length} components</span><span>•</span><span>{wires.length} wires</span>
-                {simulationRunning && <span style={{ marginLeft: 'auto', color: colors.accent, fontWeight: 750 }}>SIMULATION RUNNING</span>}
-                {spiceStatus.kind === 'running' && <span style={{ color: colors.muted, fontWeight: 750 }}>SPICE ACCURACY PASS…</span>}
-                {spiceStatus.kind === 'ready' && <span style={{ color: colors.accent, fontWeight: 750 }}>SPICE-VERIFIED</span>}
-                {spiceStatus.kind === 'unsupported' && <span title={spiceStatus.reason} style={{ color: colors.muted, fontWeight: 750 }}>SPICE UNAVAILABLE · LIVE ENGINE</span>}
-                {!snapshot.converged && <span style={{ marginLeft: 'auto', color: colors.danger, fontWeight: 750 }}>CHECK CIRCUIT WARNINGS</span>}
-              </div>
-            </main>
+        {/* V_i labels deliberately render last: they remain readable above grid, wires, symbols, and workspace text. Strictly active in Nodal mode. */}
+        {activeAnalysisMethod === 'nodal' && activeNodalTrace?.nodalNodes?.filter((node) => node.centroid[0] !== 0 || node.centroid[1] !== 0).map((node) => <NodalNodeOverlay key={`nodal-node-${node.node}`} node={node} colors={colors} />)}
+
+        {/* Thévenin / Norton / Max Power Terminal Pair A–B Overlays */}
+        {isTheveninActive && theveninTerminals && (
+          <g className="v3-thevenin-terminals-layer" pointerEvents="none">
+            <TheveninTerminalOverlay position={theveninTerminals.posA} label="A" colors={colors} darkPreview={darkPreview} />
+            <TheveninTerminalOverlay position={theveninTerminals.posB} label="B" colors={colors} darkPreview={darkPreview} />
+          </g>
+        )}
+
+        {/* Superposition Target Load Terminal Pair A–B Overlays */}
+        {isSuperpositionActive && superpositionTerminals && (
+          <g className="v3-superposition-terminals-layer" pointerEvents="none">
+            <TheveninTerminalOverlay position={superpositionTerminals.posA} label="A" colors={colors} darkPreview={darkPreview} />
+            <TheveninTerminalOverlay position={superpositionTerminals.posB} label="B" colors={colors} darkPreview={darkPreview} />
+          </g>
+        )}
+      </>}
+      canvasEmptyOverlay={components.length === 0 && (
+        <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', pointerEvents: 'none' }}>
+          <div className="flex flex-col items-center justify-center pointer-events-none select-none">
+            <div className="px-6 py-2.5 bg-white border border-slate-100 rounded-2xl shadow-sm mb-3 dark:bg-[#0d0f12] dark:border-[#1a1d24]">
+              <span className="text-base font-semibold text-slate-900 tracking-tight dark:text-white">
+                Canvas Ready
+              </span>
+            </div>
+            <p className="text-xs text-slate-400 font-normal">
+              Drag and drop components from the library to begin circuit design.
+            </p>
           </div>
-
-          {/* Bottom Row: Academic Analysis Workspace spanning strictly across the bottom of the Left Column */}
-          <section className="w-full overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-[#1a1d24] dark:bg-[#0d0f12]" style={{ background: colors.panel, borderColor: colors.line }}>
-            <div className="border-b px-5 py-3" style={{ borderColor: colors.line }}><div className={CONTROL_SYSTEMS_HEADING}>Academic Analysis Workspace</div></div>
-            <AnalysisBox elements={dcMna.elements} geometry={meshGeometry} nodalNodes={nodalGeometry} colors={colors} standalone onTraceChange={handleAnalysisTrace} components={components} />
-          </section>
         </div>
-
-        {/* Right Column (w-80 flex-shrink-0 flex flex-col gap-4): anchors Live Oscilloscopes / DMM at top, and Active Element & Properties below. The lower space remains an unobstructed vertical void extending down to the footer. */}
-        <div className="w-full xl:w-80 shrink-0 flex flex-col gap-4">
-          <aside className="w-full min-h-0 overflow-y-auto rounded-xl border border-slate-200 bg-white dark:border-[#1a1d24] dark:bg-[#0d0f12]" style={{ background: colors.panel, borderColor: colors.line, display: 'flex', flexDirection: 'column' }}>
-            {/* Top Section: Live Oscilloscope (OSC) and Digital Multimeter (DMM) display screens */}
-            <OscilloscopeTracePanel colors={colors} scopes={components.filter(c => c.type === 'oscilloscope')} instrumentReadings={effectiveSnapshot.instrumentReadings} displaySettings={oscilloscopeDisplaySettings} />
-            <PersistentDmmPanel colors={colors} dmms={components.filter(c => c.type === 'dmm')} snapshot={effectiveSnapshot} darkPreview={darkPreview} />
-
-            {/* Below Instruments: ACTIVE ELEMENT & PROPERTIES inspector */}
-            <div className="border-b px-3 py-2" style={{ borderColor: colors.line }}><div className={CONTROL_SYSTEMS_HEADING}>Active Element &amp; Properties</div></div>
-            {selectedComponent ? (
-              <ComponentInspector colors={colors} component={selectedComponent} definition={getDef(selectedComponent.type)!} allComponents={components} linkedCoils={linkedCoils} reading={effectiveSnapshot.instrumentReadings[selectedComponent.id]} snapshot={effectiveSnapshot} tabDUiRefinement={tabDUiRefinement} oscilloscopeDisplaySettings={oscilloscopeDisplaySettings} onOscilloscopeDisplaySettingsChange={setOscilloscopeDisplaySettings} onLabelChange={label => updateComponent(selectedComponent.id, { label })} onPropertyChange={updateComponentProperty} onPropertiesChange={updateComponentProperties} onDelete={removeSelection} onReplace={replaceSelectedComponent} />
-            ) : selectedWire ? (
-              <WireInspector colors={colors} wire={selectedWire} tabDUiRefinement={tabDUiRefinement} onRouting={updateWireRouting} onAddCorner={addSelectedWireCorner} onNudge={nudgeSelectedWire} onDelete={removeSelection} />
-            ) : selectedText ? (
-              <TextInspector colors={colors} text={selectedText} onUpdate={updateText} onMove={moveSelected} onDelete={removeSelection} />
-            ) : null}
-
-            {/* Electrical Circuit Lab Informational Card */}
-            <div className="p-5 border-t border-slate-200 bg-white dark:border-[#1a1d24] dark:bg-[#0d0f12]">
-              <h3 className="text-sm font-bold tracking-wider text-slate-900 dark:text-white mb-3 uppercase">
-                Electrical Circuit Lab
-              </h3>
-              <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-                The engine models continuous-time electrical behavior using Modified Nodal Analysis (MNA) and SPICE algorithms. Build circuits, run the simulation, and interact with components like switches or potentiometers in real-time.
-              </p>
-            </div>
-
-            {/* Keyboard Shortcuts Card */}
-            <div className="p-5 border-t border-slate-200 bg-white dark:border-[#1a1d24] dark:bg-[#0d0f12]">
-              <h3 className="text-sm font-bold tracking-wider text-slate-900 dark:text-white mb-3 uppercase">
-                Keyboard Shortcuts
-              </h3>
-              <div className="text-sm text-slate-600 dark:text-slate-400 space-y-2">
-                <div><span className="font-semibold text-slate-700 dark:text-slate-300">Arrows</span>: move selection</div>
-                <div><span className="font-semibold text-slate-700 dark:text-slate-300">Shift + arrows</span>: 5-grid move</div>
-                <div><span className="font-semibold text-slate-700 dark:text-slate-300">Ctrl/Cmd+Z</span>: undo &middot; <span className="font-semibold text-slate-700 dark:text-slate-300">Ctrl/Cmd+Shift+Z</span>: redo</div>
-                <div><span className="font-semibold text-slate-700 dark:text-slate-300">Ctrl/Cmd+C / X / V</span>: copy, cut, paste items</div>
-                <div><span className="font-semibold text-slate-700 dark:text-slate-300">Del / Backspace</span>: delete</div>
-                <div><span className="font-semibold text-slate-700 dark:text-slate-300">Space</span>: rotate 90&deg; &middot; <span className="font-semibold text-slate-700 dark:text-slate-300">T</span>: add text</div>
-              </div>
-            </div>
-          </aside>
-        </div>
+      )}
+      analysisTitle="Academic Analysis Workspace"
+      analysisContent={<AnalysisBox elements={dcMna.elements} geometry={meshGeometry} nodalNodes={nodalGeometry} colors={colors} standalone onTraceChange={handleAnalysisTrace} components={components} />}
+      inspectorTop={<>
+      <OscilloscopeTracePanel colors={colors} scopes={components.filter(c => c.type === 'oscilloscope')} instrumentReadings={effectiveSnapshot.instrumentReadings} displaySettings={oscilloscopeDisplaySettings} />
+      <PersistentDmmPanel colors={colors} dmms={components.filter(c => c.type === 'dmm')} snapshot={effectiveSnapshot} darkPreview={darkPreview} />
+      </>}
+      inspectorContent={selectedComponent ? (
+        <ComponentInspector colors={colors} component={selectedComponent} definition={getDef(selectedComponent.type)!} allComponents={components} linkedCoils={linkedCoils} reading={effectiveSnapshot.instrumentReadings[selectedComponent.id]} snapshot={effectiveSnapshot} tabDUiRefinement={tabDUiRefinement} oscilloscopeDisplaySettings={oscilloscopeDisplaySettings} onOscilloscopeDisplaySettingsChange={setOscilloscopeDisplaySettings} onLabelChange={label => updateComponent(selectedComponent.id, { label })} onPropertyChange={updateComponentProperty} onPropertiesChange={updateComponentProperties} onDelete={removeSelection} onReplace={replaceSelectedComponent} />
+      ) : selectedWire ? (
+        <WireInspector colors={colors} wire={selectedWire} tabDUiRefinement={tabDUiRefinement} onRouting={updateWireRouting} onAddCorner={addSelectedWireCorner} onNudge={nudgeSelectedWire} onDelete={removeSelection} />
+      ) : selectedText ? (
+        <TextInspector colors={colors} text={selectedText} onUpdate={updateText} onMove={moveSelected} onDelete={removeSelection} />
+      ) : null}
+      inspectorFooter={<>
+      <div className="p-5 border-t border-slate-200 bg-white dark:border-[#1a1d24] dark:bg-[#0d0f12]">
+        <h3 className="text-sm font-bold tracking-wider text-slate-900 dark:text-white mb-3 uppercase flex items-center gap-2">
+          <CircuitBoard size={16} className="text-blue-600 dark:text-blue-400 shrink-0" />
+          Electrical Circuit Lab
+        </h3>
+        <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+          The engine models continuous-time electrical behavior using Modified Nodal Analysis (MNA) and SPICE algorithms. Build circuits, run the simulation, and interact with components like switches or potentiometers in real-time.
+        </p>
       </div>
-      {(() => {
-        const handleItemDownloaded = (item: ExportItem) => {
-          const type = item.type ?? (item.id.startsWith('circuit') ? 'circuit' : item.id.startsWith('scope') ? 'oscilloscope' : 'multimeter');
+      </>}
+    >
+    {(() => {
+      const handleItemDownloaded = (item: ExportItem) => {
+        const type = item.type ?? (item.id.startsWith('circuit') ? 'circuit' : item.id.startsWith('scope') ? 'oscilloscope' : 'multimeter');
+        exportCounters.current[type] += 1;
+      };
+
+      const handleAllDownloaded = (downloadedItems: ExportItem[]) => {
+        const seen = new Set<'circuit' | 'oscilloscope' | 'multimeter'>();
+        downloadedItems.forEach(it => {
+          const type = it.type ?? (it.id.startsWith('circuit') ? 'circuit' : it.id.startsWith('scope') ? 'oscilloscope' : 'multimeter');
+          seen.add(type);
+        });
+        seen.forEach(type => {
           exportCounters.current[type] += 1;
-        };
+        });
+      };
 
-        const handleAllDownloaded = (downloadedItems: ExportItem[]) => {
-          const seen = new Set<'circuit' | 'oscilloscope' | 'multimeter'>();
-          downloadedItems.forEach(it => {
-            const type = it.type ?? (it.id.startsWith('circuit') ? 'circuit' : it.id.startsWith('scope') ? 'oscilloscope' : 'multimeter');
-            seen.add(type);
-          });
-          seen.forEach(type => {
-            exportCounters.current[type] += 1;
-          });
-        };
-
-        return (
-          <>
-            <ExportPreviewModal
-              isOpen={exportModalOpen}
-              onClose={() => setExportModalOpen(false)}
-              items={exportItems}
-              format={exportFormat}
-              onItemDownloaded={handleItemDownloaded}
-              onAllDownloaded={handleAllDownloaded}
-            />
-            <ShareProjectModal
-              isOpen={shareModalOpen}
-              onClose={() => setShareModalOpen(false)}
-              shareUrl={shareUrl}
-              componentCount={components.length}
-              wireCount={wires.length}
-              previewUrl={sharePreviewUrl}
-            />
-          </>
-        );
-      })()}
-      <LoadExampleModal
-        isOpen={examplesModalOpen}
-        onClose={() => setExamplesModalOpen(false)}
-        onLoad={handleLoadExample}
-      />
-    </div>
+      return (
+        <>
+          <ExportPreviewModal
+            isOpen={exportModalOpen}
+            onClose={() => setExportModalOpen(false)}
+            items={exportItems}
+            format={exportFormat}
+            onItemDownloaded={handleItemDownloaded}
+            onAllDownloaded={handleAllDownloaded}
+          />
+          <ShareProjectModal
+            isOpen={shareModalOpen}
+            onClose={() => setShareModalOpen(false)}
+            shareUrl={shareUrl}
+            componentCount={components.length}
+            wireCount={wires.length}
+            previewUrl={sharePreviewUrl}
+          />
+        </>
+      );
+    })()}
+    <LoadExampleModal
+      isOpen={examplesModalOpen}
+      onClose={() => setExamplesModalOpen(false)}
+      onLoad={handleLoadExample}
+    />
+    </UnifiedWorkspaceShell>
   );
 }
 

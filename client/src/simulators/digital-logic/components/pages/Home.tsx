@@ -31,6 +31,7 @@ import {
   Redo2,
   Upload,
   Zap,
+  Cpu,
   Image as ImageIcon,
 } from 'lucide-react';
 import { nanoid } from 'nanoid';
@@ -1315,7 +1316,10 @@ export function DigitalLogicSimulatorHome({
         })}
       </>}
       canvasTitle="Interactive Digital Logic Canvas"
-      canvasStats={`${components.length} CMP · ${wires.length} NET`}
+      componentCount={components.length}
+      netCount={wires.length}
+      simulationRunning={simulationRunning}
+      onZoomReset={() => setZoom(1)}
       svgRef={svgRef}
       zoom={zoom}
       pan={pan}
@@ -1600,6 +1604,17 @@ export function DigitalLogicSimulatorHome({
           onDelete={removeSelection}
         />
       ) : null}
+      inspectorFooter={<>
+      <div className="p-5 border-t border-slate-200 bg-white dark:border-[#1a1d24] dark:bg-[#0d0f12]">
+        <h3 className="text-sm font-bold tracking-wider text-slate-900 dark:text-white mb-3 uppercase flex items-center gap-2">
+          <Cpu size={16} className="text-blue-600 dark:text-blue-400 shrink-0" />
+          Digital Logic Lab
+        </h3>
+        <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+          The engine simulates real-time propagation delay, gate level logic, truth-table generation, Karnaugh mapping, and sequential timing waveforms. Place discrete gates, configure clock signals, and analyze combinational and sequential networks.
+        </p>
+      </div>
+      </>}
     >
       <ExportPreviewModal
         isOpen={exportModalOpen}

@@ -22,7 +22,11 @@ function trapezoidComplex(sample: (time: number) => number, from: number, to: nu
 
 export function fourierSeries(node: SignalNode, period: number, harmonics = 18, intervals = 2400): FourierSeriesResult {
   const safePeriod = clampPositive(period); const omega0 = (2 * Math.PI) / safePeriod; const coefficients: ComplexCoefficient[] = [];
-  for (let harmonic = -harmonics; harmonic <= harmonics; harmonic += 1) { const result = trapezoidComplex((time) => evaluateSignal(node, time), -safePeriod / 2, safePeriod / 2, intervals, harmonic * omega0); const real = result.real / safePeriod; const imaginary = result.imaginary / safePeriod; coefficients.push({ harmonic, real, imaginary, magnitude: Math.hypot(real, imaginary), phase: Math.hypot(real, imaginary) < EPSILON ? 0 : Math.atan2(imaginary, real) }); }
+  // Sample x(t) once on the trapezoid grid; every coefficient reuses the same samples.
+  const from = -safePeriod / 2; const step = safePeriod / intervals;
+  const samples = Float64Array.from({ length: intervals + 1 }, (_, index) => evaluateSignal(node, from + index * step));
+  const sampled = (time: number) => samples[Math.round((time - from) / step)];
+  for (let harmonic = -harmonics; harmonic <= harmonics; harmonic += 1) { const result = trapezoidComplex(sampled, from, safePeriod / 2, intervals, harmonic * omega0); const real = result.real / safePeriod; const imaginary = result.imaginary / safePeriod; coefficients.push({ harmonic, real, imaginary, magnitude: Math.hypot(real, imaginary), phase: Math.hypot(real, imaginary) < EPSILON ? 0 : Math.atan2(imaginary, real) }); }
   return { period: safePeriod, omega0, coefficients, derivation: ["\\omega_0=\\frac{2\\pi}{T_0}", "c_k=\\frac{1}{T_0}\\int_{-T_0/2}^{T_0/2}x(t)e^{-jk\\omega_0t}\\,dt", `T_0=${format(safePeriod)},\\qquad\\omega_0=${format(omega0)}`] };
 }
 

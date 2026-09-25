@@ -22,6 +22,8 @@ import {
   type FunctionName,
   type MathNode,
 } from "./diracIntegral";
+import { evaluateSignal, type SignalNode } from "./signalEngine";
+import { toSignalNode } from "@/lib/signals/unifiedSignalParser";
 
 /** Raised when the ∫₋∞ᵗ quick action meets a term it cannot resolve to a closed-form antiderivative. */
 export class SymbolicOperatorError extends Error {}
@@ -131,6 +133,21 @@ function collectBreakpoints(node: MathNode): number[] {
   return roots.filter(Number.isFinite).sort((left, right) => left - right).filter((value, index, values) => !index || Math.abs(value - values[index - 1]) > EPSILON);
 }
 
+function containsRunningIntegral(node: MathNode): boolean {
+  switch (node.kind) {
+    case "runningIntegral": return true;
+    case "neg": return containsRunningIntegral(node.value);
+    case "add": case "sub": case "mul": case "div": return containsRunningIntegral(node.left) || containsRunningIntegral(node.right);
+    case "pow": return containsRunningIntegral(node.base) || containsRunningIntegral(node.exponent);
+    case "call": case "delta": return containsRunningIntegral(node.argument);
+    default: return false;
+  }
+}
+
+function bridgeOrNull(node: MathNode): SignalNode | null {
+  try { return toSignalNode(node, VARIABLE); } catch { return null; }
+}
+
 /** A δ-bearing term contributes no ordinary sample; it is drawn separately as an arrow. */
 function termHasDelta(node: MathNode): boolean {
   return factorize(node).delta !== null;
@@ -144,8 +161,11 @@ export function createCompositeSignal(node: MathNode, latex: string): CompositeS
     const signed = term.sign < 0 ? ({ kind: "neg", value: term.node } as MathNode) : term.node;
     return acc ? { kind: "add", left: acc, right: signed } : signed;
   }, null);
+  // Running integrals sample from a cached cumulative table (Δt = 0.005) instead of a per-sample quadrature.
+  const sampled = ordinaryNode && containsRunningIntegral(ordinaryNode) ? bridgeOrNull(ordinaryNode) : null;
   const valueAt = (time: number): number => {
     if (!ordinaryNode) return 0;
+    if (sampled) { const value = evaluateSignal(sampled, time); return Number.isFinite(value) ? value : Number.NaN; }
     try { const value = evaluateNode(ordinaryNode, VARIABLE, time); return Number.isFinite(value) ? value : Number.NaN; }
     catch { return Number.NaN; }
   };

@@ -6,6 +6,7 @@
  * 2. Overlap area: shaded integrand product x(tau)*h(t - tau)
  * 3. t-domain: accumulated output y(t) = integral x(tau)*h(t - tau) dtau
  */
+import { SvgKatexTick } from "@/components/common/templates/SvgKatexTick";
 import React, {
   forwardRef,
   useEffect,
@@ -20,6 +21,7 @@ import {
   continuousConvolutionAt,
   type ContinuousConvolutionResult,
 } from "@/features/signals/engines/convolutionEngine";
+import { convolutionWindow, niceTicks, symmetricYBound } from "@/lib/plotAutoScale";
 import {
   evaluateSignal,
   extractImpulseMarkers,
@@ -31,6 +33,8 @@ type Props = {
   h: SignalNode;
   isPlaying: boolean;
   speed: number;
+  /** Symmetric interaction window; auto-derived from the signal supports when omitted. */
+  range?: { from: number; to: number };
   onFrame: (result: ContinuousConvolutionResult) => void;
   onManualReadout: (result: ContinuousConvolutionResult) => void;
 };
@@ -43,23 +47,13 @@ export type ConvolutionCanvasHandle = {
 
 type Point = { time: number; value: number };
 
-const RANGE = { from: -3, to: 3 };
 const PAD = { top: 24, right: 28, bottom: 44, left: 48 };
 const TICK_FONT = "'KaTeX_Main', 'KaTeX_Math', 'Times New Roman', serif";
 const SCOPE_HEIGHT = 240;
 
-/** Golden autoscale (SignalOperationsLab): symmetric about zero with 25% headroom so peaks never touch the border. */
-function goldenYLimit(peak: number): number { return Math.min(20, Math.ceil(Math.max(peak, 1) * 1.25)); }
+/** Symmetric autoscale with 20% headroom; snaps to clean bounds so peaks never touch the frame. */
+function goldenYLimit(peak: number): number { return symmetricYBound(peak); }
 
-/** Golden round tick generator (PiecewiseSignalScope.getNiceTicks). */
-function getNiceTicks(min: number, max: number, maxTicks = 6): number[] {
-  const span = max - min; if (span <= 0) return [min];
-  const roughStep = span / maxTicks; const power = Math.pow(10, Math.floor(Math.log10(roughStep))); const norm = roughStep / power;
-  const step = norm < 1.5 ? power : norm < 3.5 ? 2 * power : norm < 7.5 ? 5 * power : 10 * power;
-  const ticks: number[] = [];
-  for (let val = Math.ceil((min - 1e-9) / step) * step; val <= max + step * 0.001; val += step) ticks.push(Math.abs(val) < 1e-9 ? 0 : Number(val.toFixed(6)));
-  return ticks;
-}
 
 /** Golden frosted-glass pill tooltip shared by every tier. */
 function HudPill({ left, top, children }: { left: number; top: number; children: React.ReactNode }) {
@@ -72,7 +66,7 @@ function HudPill({ left, top, children }: { left: number; top: number; children:
     </div>
   );
 }
-const COLORS = { x: "#2563EB", h: "#E11D48", product: "#7C3AED", output: "#7C3AED" };
+const COLORS = { x: "#2563EB", h: "#E11D48", product: "#7C3AED", output: "#2563EB" };
 
 /** Splits continuous points into disconnected segments across sharp discontinuities */
 function splitDiscontinuities(points: Point[], jumpThreshold = 1.35): Point[][] {
@@ -133,6 +127,7 @@ interface SvgScopeProps {
   titleKatex: string;
   xLabelKatex: string;
   amplitude: number;
+  range: { from: number; to: number };
   height?: number;
   badge?: React.ReactNode;
   hudContent?: (
@@ -153,6 +148,7 @@ function SvgScopeTier({
   titleKatex,
   xLabelKatex,
   amplitude,
+  range,
   height = SCOPE_HEIGHT,
   badge,
   hudContent,
@@ -185,24 +181,18 @@ function SvgScopeTier({
   const plotH = Math.max(10, size.height - PAD.top - PAD.bottom);
 
   const mapX = useCallback(
-    (t: number) => PAD.left + ((t - RANGE.from) / (RANGE.to - RANGE.from)) * plotW,
-    [plotW]
+    (t: number) => PAD.left + ((t - range.from) / (range.to - range.from)) * plotW,
+    [plotW, range]
   );
   const mapY = useCallback(
     (v: number) => PAD.top + (1 - (v + amplitude) / (2 * amplitude)) * plotH,
     [amplitude, plotH]
   );
   const zeroY = mapY(0);
-  const yTicks = useMemo(() => getNiceTicks(-amplitude, amplitude, 6), [amplitude]);
+  const yTicks = useMemo(() => niceTicks(-amplitude, amplitude, 6), [amplitude]);
 
-  // Time grid ticks [-3, -2, -1, 0, 1, 2, 3]
-  const timeTicks = useMemo(() => {
-    const ticks: number[] = [];
-    for (let t = RANGE.from; t <= RANGE.to; t += 1) {
-      ticks.push(t);
-    }
-    return ticks;
-  }, []);
+  // Clean time ticks (1/2/5 × 10^k) across the active window
+  const timeTicks = useMemo(() => niceTicks(range.from, range.to, Math.max(4, Math.floor(plotW / 70))), [range, plotW]);
 
   const handlePointer = (e: React.PointerEvent<SVGSVGElement>) => {
     const svgRect = e.currentTarget.getBoundingClientRect();
@@ -217,11 +207,11 @@ function SvgScopeTier({
       setHoverState(null);
       return;
     }
-    const domainT = RANGE.from + ((relX - PAD.left) / plotW) * (RANGE.to - RANGE.from);
+    const domainT = range.from + ((relX - PAD.left) / plotW) * (range.to - range.from);
     setHoverState({
       relX,
       relY,
-      domainT: Math.max(RANGE.from, Math.min(RANGE.to, domainT)),
+      domainT: Math.max(range.from, Math.min(range.to, domainT)),
     });
   };
 
@@ -280,16 +270,7 @@ function SvgScopeTier({
                 strokeWidth={isZero ? "1.5" : "1"}
               />
               {!isZero && (
-                <text
-                  x={PAD.left - 10}
-                  y={sy}
-                  textAnchor="end"
-                  dominantBaseline="central"
-                  style={{ fontFamily: TICK_FONT }}
-                  className="fill-slate-600 dark:fill-slate-300 text-[11px] font-medium"
-                >
-                  {val.toFixed(val % 1 === 0 ? 0 : 1)}
-                </text>
+                <SvgKatexTick x={PAD.left - 10} y={sy} anchor="end">{val.toFixed(val % 1 === 0 ? 0 : 1)}</SvgKatexTick>
               )}
             </g>
           );
@@ -317,16 +298,7 @@ function SvgScopeTier({
 
         {/* Time Axis numbers */}
         {timeTicks.map((t) => (
-          <text
-            key={`tick-num-${t}`}
-            x={mapX(t)}
-            y={size.height - PAD.bottom + 16}
-            textAnchor="middle"
-            style={{ fontFamily: TICK_FONT }}
-            className="fill-slate-600 dark:fill-slate-300 text-[11px] font-medium"
-          >
-            {t}
-          </text>
+          <SvgKatexTick x={mapX(t)} y={size.height - PAD.bottom + 16} anchor="middle" baseline>{t}</SvgKatexTick>
         ))}
 
         {/* Active pointer guideline */}
@@ -366,7 +338,7 @@ function SvgScopeTier({
       )}
 
       {/* Bottom-right Axis KaTeX Symbol */}
-      <div className="pointer-events-none absolute bottom-2 right-3 rounded-md bg-white/90 px-1.5 py-0.5 text-xs font-bold text-slate-600 backdrop-blur-sm dark:bg-slate-900/90 dark:text-slate-400">
+      <div className="pointer-events-none absolute bottom-0.5 right-2 rounded-md bg-white/90 px-1.5 py-0.5 text-xs font-bold text-slate-600 backdrop-blur-sm dark:bg-slate-900/90 dark:text-slate-400">
         <KatexMath math={xLabelKatex} />
       </div>
 
@@ -377,7 +349,12 @@ function SvgScopeTier({
 }
 
 export const ConvolutionCanvas = forwardRef<ConvolutionCanvasHandle, Props>(
-  function ConvolutionCanvas({ x, h, isPlaying, speed, onFrame, onManualReadout }, ref) {
+  function ConvolutionCanvas({ x, h, isPlaying, speed, range: rangeProp, onFrame, onManualReadout }, ref) {
+    const autoRange = useMemo(
+      () => convolutionWindow((t) => evaluateSignal(x, t), (t) => evaluateSignal(h, t)),
+      [x, h],
+    );
+    const range = rangeProp ?? autoRange;
     const [currentTime, setCurrentTime] = useState(0);
     const timeRef = useRef(0);
     const historyRef = useRef<Point[]>([]);
@@ -414,8 +391,8 @@ export const ConvolutionCanvas = forwardRef<ConvolutionCanvasHandle, Props>(
         lastAnimTimeRef.current = now;
 
         timeRef.current += dt * speed;
-        if (timeRef.current > RANGE.to) {
-          timeRef.current = RANGE.from;
+        if (timeRef.current > range.to) {
+          timeRef.current = range.from;
           historyRef.current = [];
         }
 
@@ -435,14 +412,14 @@ export const ConvolutionCanvas = forwardRef<ConvolutionCanvasHandle, Props>(
         cancelAnimationFrame(animFrameRef.current);
         lastAnimTimeRef.current = 0;
       };
-    }, [isPlaying, speed, x, h]);
+    }, [isPlaying, speed, x, h, range]);
 
     // External imperative handle
     useImperativeHandle(
       ref,
       () => ({
         setTime: (t) => {
-          const clamped = Math.max(RANGE.from, Math.min(RANGE.to, t));
+          const clamped = Math.max(range.from, Math.min(range.to, t));
           timeRef.current = clamped;
           setCurrentTime(clamped);
           const res = continuousConvolutionAt(x, h, clamped);
@@ -451,7 +428,7 @@ export const ConvolutionCanvas = forwardRef<ConvolutionCanvasHandle, Props>(
           onManualRef.current(res);
         },
         nudge: (delta) => {
-          const next = Math.max(RANGE.from, Math.min(RANGE.to, timeRef.current + delta));
+          const next = Math.max(range.from, Math.min(range.to, timeRef.current + delta));
           timeRef.current = next;
           setCurrentTime(next);
           const res = continuousConvolutionAt(x, h, next);
@@ -461,7 +438,7 @@ export const ConvolutionCanvas = forwardRef<ConvolutionCanvasHandle, Props>(
         },
         currentTime: () => timeRef.current,
       }),
-      [x, h]
+      [x, h, range]
     );
 
     // Compute active points for current time
@@ -475,7 +452,7 @@ export const ConvolutionCanvas = forwardRef<ConvolutionCanvasHandle, Props>(
       const pts: Array<{ time: number; x: number; h: number }> = [];
       const samples = 480;
       for (let i = 0; i <= samples; i++) {
-        const tau = RANGE.from + ((RANGE.to - RANGE.from) * i) / samples;
+        const tau = range.from + ((range.to - range.from) * i) / samples;
         pts.push({
           time: tau,
           x: evaluateSignal(x, tau),
@@ -483,28 +460,32 @@ export const ConvolutionCanvas = forwardRef<ConvolutionCanvasHandle, Props>(
         });
       }
       return pts;
-    }, [currentTime, h, x]);
+    }, [currentTime, h, x, range]);
 
     // Peak amplitude for scaling
     const peakAmp = useMemo(() => {
-      const maxVal = Math.max(
-        1,
-        ...tauPoints.map((p) => Math.abs(p.x)),
-        ...tauPoints.map((p) => Math.abs(p.h)),
-        ...result.points.map((p) => Math.abs(p.product))
-      );
-      return goldenYLimit(maxVal);
-    }, [tauPoints, result.points]);
+      let xPeak = 0;
+      let hPeak = 0;
+      const samples = 480;
+      for (let i = 0; i <= samples; i++) {
+        const tau = range.from + ((range.to - range.from) * i) / samples;
+        xPeak = Math.max(xPeak, Math.abs(evaluateSignal(x, tau)));
+        hPeak = Math.max(hPeak, Math.abs(evaluateSignal(h, tau)));
+      }
+      // Product tier shares the scale: |x·h| <= max|x|·max|h| (attained when the pulses align).
+      return goldenYLimit(Math.max(xPeak, hPeak, xPeak * hPeak));
+    }, [x, h, range]);
 
-    // Output y(t) peak amplitude
+    // Output y(t) peak over the whole window (stable scale while the shift animates)
     const outputPeakAmp = useMemo(() => {
-      const maxVal = Math.max(
-        1,
-        ...historyRef.current.map((p) => Math.abs(p.value)),
-        Math.abs(result.value)
-      );
+      let maxVal = 0;
+      const samples = 96;
+      for (let i = 0; i <= samples; i++) {
+        const t = range.from + ((range.to - range.from) * i) / samples;
+        maxVal = Math.max(maxVal, Math.abs(continuousConvolutionAt(x, h, t).value));
+      }
       return goldenYLimit(maxVal);
-    }, [result.value]);
+    }, [x, h, range]);
 
     // Segments for smooth curves
     const xSegments = useMemo(
@@ -536,6 +517,7 @@ export const ConvolutionCanvas = forwardRef<ConvolutionCanvasHandle, Props>(
           titleKatex="\tau\text{-domain: } x(\tau) \text{ [blue] and } h(t-\tau) \text{ [red]}"
           xLabelKatex="\tau\text{ (s)}"
           amplitude={peakAmp}
+          range={range}
           height={SCOPE_HEIGHT}
           hudContent={({ relX, relY, domainT }, size) => {
             const valX = evaluateSignal(x, domainT);
@@ -600,6 +582,7 @@ export const ConvolutionCanvas = forwardRef<ConvolutionCanvasHandle, Props>(
           titleKatex="\text{Product \& Overlap Area: } x(\tau)h(t-\tau)"
           xLabelKatex="\tau\text{ (s)}"
           amplitude={peakAmp}
+          range={range}
           height={SCOPE_HEIGHT}
           hudContent={({ relX, relY, domainT }, size) => {
             const valX = evaluateSignal(x, domainT);
@@ -644,6 +627,7 @@ export const ConvolutionCanvas = forwardRef<ConvolutionCanvasHandle, Props>(
           titleKatex="t\text{-domain Output: } y(t) = \int_{-\infty}^\infty x(\tau)h(t-\tau)\,d\tau"
           xLabelKatex="t\text{ (s)}"
           amplitude={outputPeakAmp}
+          range={range}
           height={SCOPE_HEIGHT}
           badge={
             <KatexMath
@@ -660,7 +644,7 @@ export const ConvolutionCanvas = forwardRef<ConvolutionCanvasHandle, Props>(
                 <div className="font-serif text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
                   <KatexMath math={`t = ${domainT.toFixed(2)}\\text{ s}`} />
                 </div>
-                <div className="font-serif text-purple-600 dark:text-purple-400 font-semibold flex items-center gap-1.5">
+                <div className="font-serif text-blue-600 dark:text-blue-400 font-semibold flex items-center gap-1.5">
                   <KatexMath math={`y(t) = ${yVal.toFixed(3)}`} />
                 </div>
               </HudPill>

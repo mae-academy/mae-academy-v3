@@ -10,8 +10,8 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  --font-sans: "Apple Gothic", "Apple SD Gothic Neo", "Avenir Next", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Apple SD Gothic Neo", "Apple Gothic", "Helvetica Neue", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Poppins", system-ui, sans-serif;
+  --font-display: "Poppins", system-ui, sans-serif;
   --font-arabic: "Tajawal", ui-sans-serif, system-ui, sans-serif;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -103,7 +103,7 @@
   }
   * { @apply border-border outline-ring/50; }
   html { min-width: 320px; scroll-behavior: smooth; }
-  body { @apply m-0 bg-background text-foreground; font-family: var(--font-sans); }
+  body { @apply m-0 bg-background text-foreground; font-family: 'Poppins', var(--font-sans, sans-serif); }
   html[lang="ar"] body { font-family: var(--font-arabic); }
   button:not(:disabled), a[href], select:not(:disabled) { @apply cursor-pointer; }
   ::selection { background: rgb(139 92 246 / .25); color: inherit; }
@@ -593,7 +593,11 @@
   .text-brand-gradient {
     background: linear-gradient(135deg, #2563eb 0%, #9333ea 50%, #e11d48 100%);
     -webkit-background-clip: text;
+    background-clip: text;
     -webkit-text-fill-color: transparent;
+    display: inline-block;
+    padding-bottom: 0.18em;
+    margin-bottom: -0.18em;
   }
 
   /* PLC Simulator: Standardized clean modern sans-serif typography across SVG canvas */

@@ -8,6 +8,20 @@ export const TAB_ACTIVE_SHADOW = '0 1px 3px rgba(2, 6, 23, 0.18)';
 
 export const CONTROL_SYSTEMS_HEADING = 'text-sm font-bold uppercase tracking-wider text-slate-800 dark:text-white';
 
+export interface WorkspaceShortcut {
+  key: string;
+  label: string;
+}
+
+/** Canonical workspace shortcuts list; every binding listed is implemented by both studios. */
+export const WORKSPACE_SHORTCUTS: ReadonlyArray<WorkspaceShortcut> = [
+  { key: 'R', label: 'Rotate' },
+  { key: 'Del', label: 'Delete' },
+  { key: 'Alt + Drag', label: 'Pan' },
+  { key: 'Ctrl/Cmd + Z', label: 'Undo' },
+  { key: 'Ctrl/Cmd + C/V', label: 'Copy/Paste' },
+];
+
 export interface ToolbarButtonProps {
   colors: Palette;
   icon?: React.ReactNode;

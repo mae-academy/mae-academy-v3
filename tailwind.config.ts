@@ -5,6 +5,9 @@ export default {
   content: ["./client/index.html", "./client/src/**/*.{js,ts,jsx,tsx}"],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ['Poppins', 'system-ui', 'sans-serif'],
+      },
       colors: {
         dark: {
           background: "#000000",       // Pure true black for the deepest layer

@@ -11,5 +11,9 @@ describe('DigitalLogicSimulatorHome (UnifiedWorkspaceShell wiring)', () => {
     expect(markup).toContain('Active Element');
     expect(markup).toContain('Select an element to inspect its properties.');
     expect(markup).toContain('Canvas Ready');
+    expect(markup).toContain('Digital Logic Lab');
+    expect(markup).toContain('Workspace Shortcuts');
+    expect(markup).toContain('Rotate');
+    expect(markup).toContain('Delete');
   });
 });

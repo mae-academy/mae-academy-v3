@@ -125,7 +125,8 @@ describe("ConvolutionLab Mode Switching", () => {
     // Check for discrete title and sequence inputs
     expect(screen.getByText(/THREE-TIER DISCRETE STEM CANVAS/i)).toBeDefined();
     expect(screen.getByText(/DISCRETE CONVOLUTION MATRIX/i)).toBeDefined();
-    expect(screen.getByText(/SEQUENCE A/i)).toBeDefined();
-    expect(screen.getByText(/SEQUENCE B/i)).toBeDefined();
+    expect(screen.getByLabelText("x[n]=")).toBeDefined();
+    expect(screen.getByLabelText("h[n]=")).toBeDefined();
+    expect(screen.queryByText(/SEQUENCE [AB]/i)).toBeNull();
   });
 });

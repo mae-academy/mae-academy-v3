@@ -1,18 +1,15 @@
 /**
- * MAE Academy / Signals & Systems — Tab E S/Z-plane Vector Scope.
- * Vector SVG implementation consuming the unified architecture of StandardRootLocusPlot.
- * Supports interactive pole/zero vector dragging with conjugate symmetry,
- * KaTeX axis typography, Region of Convergence (ROC) vector fills,
- * and canonical floating HUD readout.
+ * MAE Academy / Signals & Systems — Tab E S/Z-plane vector scope.
+ * Follows the StandardRootLocusPlot aesthetic: 4-quadrant axes through (0, 0), KaTeX tick labels,
+ * rose × poles and blue ○ zeros, violet ROC shading. The view is auto-scaled (no wheel zoom / pan):
+ * Span = max(2.5, 1.3·max|Re|,|Im| over poles, zeros, and ROC boundaries), eased between systems.
+ * Roots drag with conjugate symmetry; the dragged draft is committed on release.
  */
-import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { KatexMath } from "@/components/ui/KatexMath";
-import {
-  type Complex,
-  type RocResult,
-  type TransferFunction,
-  withMovedRoot,
-} from "@/features/signals/engines/laplaceEngine";
+import { SvgKatexTick } from "@/components/common/templates/SvgKatexTick";
+import { niceTicks } from "@/lib/plotAutoScale";
+import { type Complex, type RocResult, type TransferFunction, withMovedRoot } from "@/features/signals/engines/laplaceEngine";
 
 type Props = {
   system: TransferFunction;
@@ -22,567 +19,216 @@ type Props = {
   onCommit: (system: TransferFunction) => void;
 };
 
-type View = { x: number; y: number; unit: number };
-type Drag =
-  | { type: "pan"; startX: number; startY: number; initViewX: number; initViewY: number }
-  | { type: "root"; family: "poles" | "zeros"; index: number }
-  | null;
+type Drag = { family: "poles" | "zeros"; index: number } | null;
+type Hover = { family: "pole" | "zero"; root: Complex; index: number; screenX: number; screenY: number } | null;
 
-const makePoint = (x: number, y: number): Complex => ({ re: x, im: y });
+const POLE = "#E11D48";
+const ZERO = "#2563EB";
+const VIOLET = "#7C3AED";
+const ROC_FILL = "rgba(124, 58, 237, 0.12)";
+const MIN_SPAN = 2.5;
+const HEADROOM = 1.3;
+const EASE_MS = 260;
+
+/** Symmetric half-width that keeps every root and ROC boundary visible with 30% headroom. */
+export function autoSpan(system: TransferFunction, roc: RocResult | null): number {
+  const extents = [...system.poles, ...system.zeros].flatMap((root) => [Math.abs(root.re), Math.abs(root.im)]);
+  if (roc) extents.push(Math.abs(roc.boundary), Math.abs(roc.innerBoundary ?? 0));
+  if (system.mode === "z") extents.push(1);
+  const finite = extents.filter(Number.isFinite);
+  return Math.max(MIN_SPAN, HEADROOM * (finite.length ? Math.max(...finite) : 0));
+}
 
 export function SZPlaneCanvas({ system, roc, extractSlice, onPreview, onCommit }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 600, height: 460 });
-
-  // View state: (x, y) center and math units per screen pixel
-  const [view, setView] = useState<View>({ x: 0, y: 0, unit: 0.025 });
-  const viewRef = useRef(view);
-  viewRef.current = view;
-
-  // Active drag state
+  const [draft, setDraft] = useState<TransferFunction | null>(null);
   const dragRef = useRef<Drag>(null);
-  const [isDragging, setIsDragging] = useState(false);
+  const [hover, setHover] = useState<Hover>(null);
+  const shown = draft ?? system;
 
-  // Active hover data for Apple-style HUD
-  const [hoverData, setHoverData] = useState<{
-    screenX: number;
-    screenY: number;
-    family: "pole" | "zero";
-    root: Complex;
-    index: number;
-  } | null>(null);
-
-  // Measure container dimensions
   useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const update = () => {
-      const rect = el.getBoundingClientRect();
-      if (rect.width > 0 && rect.height > 0) {
-        setSize({ width: rect.width, height: rect.height });
-      }
-    };
+    const el = containerRef.current; if (!el) return;
+    const update = () => { const rect = el.getBoundingClientRect(); if (rect.width > 0 && rect.height > 0) setSize({ width: rect.width, height: rect.height }); };
     update();
-    const observer = new ResizeObserver(update);
-    observer.observe(el);
+    const observer = new ResizeObserver(update); observer.observe(el);
     return () => observer.disconnect();
   }, []);
 
-  // Coordinate mappers
-  const mx = useCallback(
-    (value: number) => size.width / 2 + (value - view.x) / view.unit,
-    [size.width, view.x, view.unit]
-  );
-  const my = useCallback(
-    (value: number) => size.height / 2 - (value - view.y) / view.unit,
-    [size.height, view.y, view.unit]
-  );
-  const inv = useCallback(
-    (screenX: number, screenY: number): Complex =>
-      makePoint(
-        view.x + (screenX - size.width / 2) * view.unit,
-        view.y - (screenY - size.height / 2) * view.unit
-      ),
-    [size.width, size.height, view.x, view.y, view.unit]
-  );
-
-  // Wheel zoom with passive: false to prevent scrolling parent container
+  // Auto-scale: the target follows the committed system (frozen mid-drag so the cursor stays on its root).
+  const targetSpan = useMemo(() => autoSpan(system, roc), [system, roc]);
+  const [span, setSpan] = useState(targetSpan);
+  const spanRef = useRef(span); spanRef.current = span;
   useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-
-    const handleWheel = (e: WheelEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-
-      const rect = el.getBoundingClientRect();
-      const mouseScreenX = e.clientX - rect.left;
-      const mouseScreenY = e.clientY - rect.top;
-
-      const currentView = viewRef.current;
-      const mathBefore = {
-        re: currentView.x + (mouseScreenX - rect.width / 2) * currentView.unit,
-        im: currentView.y - (mouseScreenY - rect.height / 2) * currentView.unit,
-      };
-
-      const factor = e.deltaY > 0 ? 1.12 : 0.89;
-      const nextUnit = Math.max(0.003, Math.min(0.18, currentView.unit * factor));
-
-      const nextX = mathBefore.re - (mouseScreenX - rect.width / 2) * nextUnit;
-      const nextY = mathBefore.im + (mouseScreenY - rect.height / 2) * nextUnit;
-
-      setView({ x: nextX, y: nextY, unit: nextUnit });
+    const from = spanRef.current; if (Math.abs(from - targetSpan) < 1e-9) return;
+    let frame = 0; const start = performance.now();
+    const step = (now: number) => {
+      const progress = Math.min(1, (now - start) / EASE_MS); const eased = 1 - Math.pow(1 - progress, 3);
+      setSpan(from + (targetSpan - from) * eased);
+      if (progress < 1) frame = requestAnimationFrame(step);
     };
+    frame = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(frame);
+  }, [targetSpan]);
 
-    el.addEventListener("wheel", handleWheel, { passive: false });
-    return () => el.removeEventListener("wheel", handleWheel);
-  }, []);
+  // Math units per pixel: the ±Span square fits the shorter side; the longer side shows extra plane.
+  const unit = Math.max((2 * span) / size.width, (2 * span) / size.height);
+  const mx = useCallback((value: number) => size.width / 2 + value / unit, [size.width, unit]);
+  const my = useCallback((value: number) => size.height / 2 - value / unit, [size.height, unit]);
+  const inv = useCallback((screenX: number, screenY: number): Complex => ({ re: (screenX - size.width / 2) * unit, im: -(screenY - size.height / 2) * unit }), [size.width, size.height, unit]);
+  const halfX = (size.width / 2) * unit; const halfY = (size.height / 2) * unit;
 
-  // Pointer interactions
-  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
-    const clickCoord = inv(mouseX, mouseY);
-    const hitThreshold = 14 * view.unit;
-
-    // Check hit test against poles and zeros
+  const hitRoot = (coord: Complex, radiusPx: number) => {
     for (const family of ["poles", "zeros"] as const) {
-      const idx = system[family].findIndex(
-        (root) => Math.hypot(root.re - clickCoord.re, root.im - clickCoord.im) < hitThreshold
-      );
-      if (idx >= 0) {
-        dragRef.current = { type: "root", family, index: idx };
-        setIsDragging(true);
-        e.currentTarget.setPointerCapture(e.pointerId);
-        return;
-      }
+      const index = shown[family].findIndex((root) => Math.hypot(root.re - coord.re, root.im - coord.im) < radiusPx * unit);
+      if (index >= 0) return { family, index };
     }
+    return null;
+  };
+  const local = (event: React.PointerEvent<HTMLDivElement>) => { const rect = event.currentTarget.getBoundingClientRect(); return { x: event.clientX - rect.left, y: event.clientY - rect.top }; };
 
-    // Otherwise pan the plane
-    dragRef.current = {
-      type: "pan",
-      startX: e.clientX,
-      startY: e.clientY,
-      initViewX: view.x,
-      initViewY: view.y,
-    };
-    setIsDragging(true);
-    e.currentTarget.setPointerCapture(e.pointerId);
+  const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    const point = local(event); const hit = hitRoot(inv(point.x, point.y), 14);
+    if (!hit) return;
+    dragRef.current = hit;
+    event.currentTarget.setPointerCapture(event.pointerId);
   };
 
-  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    const currentDrag = dragRef.current;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
-
-    if (currentDrag) {
-      if (currentDrag.type === "pan") {
-        const dx = e.clientX - currentDrag.startX;
-        const dy = e.clientY - currentDrag.startY;
-        setView((prev) => ({
-          ...prev,
-          x: currentDrag.initViewX - dx * prev.unit,
-          y: currentDrag.initViewY + dy * prev.unit,
-        }));
-        return;
-      }
-
-      if (currentDrag.type === "root") {
-        const targetMath = inv(mouseX, mouseY);
-        const next = withMovedRoot(system, currentDrag.family, currentDrag.index, targetMath);
-        onPreview(next);
-
-        const currentRoot = next[currentDrag.family][currentDrag.index];
-        if (currentRoot) {
-          setHoverData({
-            screenX: mouseX,
-            screenY: mouseY,
-            family: currentDrag.family === "poles" ? "pole" : "zero",
-            root: currentRoot,
-            index: currentDrag.index,
-          });
-        }
-        return;
-      }
+  const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    const point = local(event); const drag = dragRef.current;
+    if (drag) {
+      const target = inv(point.x, point.y);
+      // A real root has no conjugate partner, so it stays on the real axis (real coefficients).
+      if (Math.abs(system[drag.family][drag.index]?.im ?? 0) < 1e-9) target.im = 0;
+      let next: TransferFunction;
+      try { next = withMovedRoot(system, drag.family, drag.index, target); } catch { return; }
+      setDraft(next); onPreview(next);
+      const root = next[drag.family][drag.index];
+      if (root) setHover({ family: drag.family === "poles" ? "pole" : "zero", root, index: drag.index, screenX: point.x, screenY: point.y });
+      return;
     }
-
-    // Hover detection when not dragging
-    const hitThreshold = 12 * view.unit;
-    const currentCoord = inv(mouseX, mouseY);
-    let found = false;
-
-    for (const family of ["poles", "zeros"] as const) {
-      const idx = system[family].findIndex(
-        (root) => Math.hypot(root.re - currentCoord.re, root.im - currentCoord.im) < hitThreshold
-      );
-      if (idx >= 0) {
-        const root = system[family][idx];
-        setHoverData({
-          screenX: mx(root.re),
-          screenY: my(root.im),
-          family: family === "poles" ? "pole" : "zero",
-          root,
-          index: idx,
-        });
-        found = true;
-        break;
-      }
-    }
-    if (!found && !dragRef.current) {
-      setHoverData(null);
-    }
+    const hit = hitRoot(inv(point.x, point.y), 12);
+    if (!hit) { setHover(null); return; }
+    const root = shown[hit.family][hit.index];
+    setHover({ family: hit.family === "poles" ? "pole" : "zero", root, index: hit.index, screenX: mx(root.re), screenY: my(root.im) });
   };
 
   const handlePointerUp = () => {
-    if (dragRef.current?.type === "root") {
-      onCommit(system);
-    }
-    dragRef.current = null;
-    setIsDragging(false);
+    if (dragRef.current && draft) onCommit(draft);
+    dragRef.current = null; setDraft(null);
   };
 
-  // Generate grid lines
-  const gridElements = useMemo(() => {
-    const lines: React.ReactNode[] = [];
-    const leftMath = inv(0, 0).re;
-    const rightMath = inv(size.width, 0).re;
-    const bottomMath = inv(0, size.height).im;
-    const topMath = inv(0, 0).im;
+  const ticks = useMemo(() => ({
+    x: niceTicks(-halfX, halfX, Math.max(4, Math.round(size.width / 90))),
+    y: niceTicks(-halfY, halfY, Math.max(4, Math.round(size.height / 70))),
+  }), [halfX, halfY, size.width, size.height]);
 
-    if (system.mode === "s") {
-      const step = Math.pow(10, Math.floor(Math.log10(Math.max(view.unit * 95, 0.1))));
-      const xStart = Math.floor(leftMath / step) * step;
-      for (let xVal = xStart; xVal <= rightMath; xVal += step) {
-        const sx = mx(xVal);
-        lines.push(
-          <line
-            key={`s-grid-x-${xVal}`}
-            x1={sx}
-            y1={0}
-            x2={sx}
-            y2={size.height}
-            stroke="currentColor"
-            strokeDasharray="2 4"
-            className="text-slate-300 dark:text-slate-700/60"
-            strokeWidth={1}
-          />
-        );
-      }
-      const yStart = Math.floor(bottomMath / step) * step;
-      for (let yVal = yStart; yVal <= topMath; yVal += step) {
-        const sy = my(yVal);
-        lines.push(
-          <line
-            key={`s-grid-y-${yVal}`}
-            x1={0}
-            y1={sy}
-            x2={size.width}
-            y2={sy}
-            stroke="currentColor"
-            strokeDasharray="2 4"
-            className="text-slate-300 dark:text-slate-700/60"
-            strokeWidth={1}
-          />
-        );
-      }
-    } else {
-      // Discrete Z-Plane polar concentric rings and spokes
-      const centerSx = mx(0);
-      const centerSy = my(0);
-      const radiusPixel = 1 / view.unit;
+  const originX = mx(0); const originY = my(0);
+  // Tick labels hug the axes but stay inside the frame when an axis scrolls off-centre.
+  const labelY = Math.min(size.height - 6, Math.max(18, originY + 16));
+  const labelX = Math.min(size.width - 8, Math.max(40, originX - 6));
 
-      for (let ring = 1; ring <= 4; ring++) {
-        const r = (radiusPixel * ring) / 2;
-        lines.push(
-          <circle
-            key={`z-ring-${ring}`}
-            cx={centerSx}
-            cy={centerSy}
-            r={r}
-            fill="none"
-            stroke="currentColor"
-            strokeDasharray="2 4"
-            className="text-slate-300 dark:text-slate-700/60"
-            strokeWidth={1}
-          />
-        );
-      }
-
-      for (let angleDeg = 0; angleDeg < 360; angleDeg += 30) {
-        const rad = (angleDeg * Math.PI) / 180;
-        const maxR = radiusPixel * 2.5;
-        lines.push(
-          <line
-            key={`z-spoke-${angleDeg}`}
-            x1={centerSx}
-            y1={centerSy}
-            x2={centerSx + Math.cos(rad) * maxR}
-            y2={centerSy - Math.sin(rad) * maxR}
-            stroke="currentColor"
-            strokeDasharray="2 4"
-            className="text-slate-300 dark:text-slate-700/50"
-            strokeWidth={1}
-          />
-        );
-      }
+  const rocShape = (() => {
+    if (shown.mode === "s") {
+      const boundary = mx(roc.boundary); const inner = mx(roc.innerBoundary ?? 0);
+      const [x, w] = roc.kind === "right" ? [boundary, size.width - boundary] : roc.kind === "left" ? [0, boundary] : [Math.min(inner, boundary), Math.abs(boundary - inner)];
+      const edges = roc.kind === "two-sided" ? [inner, boundary] : [boundary];
+      return <>
+        <rect x={x} y={0} width={Math.max(0, w)} height={size.height} fill={ROC_FILL} />
+        {edges.map((edge) => <line key={edge} x1={edge} y1={0} x2={edge} y2={size.height} stroke={VIOLET} strokeWidth={1.25} strokeDasharray="6 4" opacity={0.7} />)}
+      </>;
     }
-
-    return lines;
-  }, [system.mode, inv, size.width, size.height, view.unit, mx, my]);
-
-  // Generate Region of Convergence (ROC) SVG geometry
-  const rocSvg = useMemo(() => {
-    if (!roc) return null;
-    const boundarySx = mx(roc.boundary);
-
-    if (system.mode === "s") {
-      let rectX = 0;
-      let rectW = 0;
-      if (roc.kind === "right") {
-        rectX = boundarySx;
-        rectW = Math.max(0, size.width - boundarySx);
-      } else if (roc.kind === "left") {
-        rectX = 0;
-        rectW = Math.max(0, boundarySx);
-      } else {
-        const innerSx = mx(roc.innerBoundary ?? 0);
-        rectX = Math.min(innerSx, boundarySx);
-        rectW = Math.abs(boundarySx - innerSx);
-      }
-      return (
-        <rect
-          x={rectX}
-          y={0}
-          width={rectW}
-          height={size.height}
-          fill="rgba(139, 92, 246, 0.14)"
-          className="transition-all duration-150"
-        />
-      );
-    }
-
-    // Z-Plane polar ROC
-    const centerSx = mx(0);
-    const centerSy = my(0);
-    const outerR = Math.abs(roc.boundary / view.unit);
-    const innerR = Math.abs((roc.innerBoundary ?? 0) / view.unit);
-
-    if (roc.kind === "right") {
-      // Outside boundary disk
-      return (
-        <path
-          d={`M 0,0 L ${size.width},0 L ${size.width},${size.height} L 0,${size.height} Z M ${centerSx},${centerSy} m -${outerR},0 a ${outerR},${outerR} 0 1,0 ${outerR * 2},0 a ${outerR},${outerR} 0 1,0 -${outerR * 2},0`}
-          fill="rgba(139, 92, 246, 0.14)"
-          fillRule="evenodd"
-        />
-      );
-    } else if (roc.kind === "left") {
-      // Inside boundary disk
-      return (
-        <circle
-          cx={centerSx}
-          cy={centerSy}
-          r={outerR}
-          fill="rgba(139, 92, 246, 0.14)"
-        />
-      );
-    } else {
-      // Annular ring between innerR and outerR
-      return (
-        <path
-          d={`M ${centerSx},${centerSy} m -${outerR},0 a ${outerR},${outerR} 0 1,0 ${outerR * 2},0 a ${outerR},${outerR} 0 1,0 -${outerR * 2},0 M ${centerSx},${centerSy} m -${innerR},0 a ${innerR},${innerR} 0 1,0 ${innerR * 2},0 a ${innerR},${innerR} 0 1,0 -${innerR * 2},0`}
-          fill="rgba(139, 92, 246, 0.14)"
-          fillRule="evenodd"
-        />
-      );
-    }
-  }, [roc, system.mode, mx, size.width, size.height, my, view.unit]);
-
-  const zeroSx = mx(0);
-  const zeroSy = my(0);
-  const unitCircleRadius = 1 / view.unit;
+    const outer = Math.abs(roc.boundary / unit); const inner = Math.abs((roc.innerBoundary ?? 0) / unit);
+    const ring = (r: number) => `M ${originX},${originY} m -${r},0 a ${r},${r} 0 1,0 ${r * 2},0 a ${r},${r} 0 1,0 -${r * 2},0`;
+    if (roc.kind === "right") return <path d={`M 0,0 L ${size.width},0 L ${size.width},${size.height} L 0,${size.height} Z ${ring(outer)}`} fill={ROC_FILL} fillRule="evenodd" />;
+    if (roc.kind === "left") return <circle cx={originX} cy={originY} r={outer} fill={ROC_FILL} />;
+    return <path d={`${ring(outer)} ${ring(inner)}`} fill={ROC_FILL} fillRule="evenodd" />;
+  })();
 
   return (
     <div
       ref={containerRef}
+      data-testid="sz-plane"
+      data-span={span.toFixed(4)}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerUp}
-      className={`relative h-[460px] w-full select-none overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-inner dark:border-slate-800 dark:bg-[#07101e] ${
-        isDragging ? "cursor-grabbing" : "cursor-crosshair"
-      }`}
-      aria-label="Interactive pole-zero complex vector plane: drag poles and zeros, pan and scroll zoom."
+      onPointerLeave={() => { if (!dragRef.current) setHover(null); }}
+      className={`relative h-[460px] w-full select-none overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-inner dark:border-slate-800 dark:bg-[#07101e] ${dragRef.current ? "cursor-grabbing" : hover ? "cursor-grab" : "cursor-default"}`}
+      aria-label="Auto-scaled pole-zero plane: drag poles and zeros to reshape the transfer function."
     >
-      <svg className="absolute inset-0 h-full w-full pointer-events-none">
-        {/* Background Grid */}
-        <g>{gridElements}</g>
-
-        {/* Region of Convergence (ROC) Vector Fill */}
-        {rocSvg}
-
-        {/* Zero-Crossing Axes */}
-        <g className="stroke-slate-400 dark:stroke-slate-500">
-          {/* Real Axis */}
-          <line
-            x1={0}
-            y1={zeroSy}
-            x2={size.width}
-            y2={zeroSy}
-            stroke="currentColor"
-            strokeWidth={1.5}
-          />
-          {/* Imaginary Axis */}
-          <line
-            x1={zeroSx}
-            y1={0}
-            x2={zeroSx}
-            y2={size.height}
-            stroke="currentColor"
-            strokeWidth={1.5}
-          />
+      <svg className="pointer-events-none absolute inset-0 h-full w-full">
+        {/* Cartesian grid at the tick positions (both planes), plus |z| rings in the Z-plane. */}
+        <g className="text-slate-200 dark:text-slate-800" stroke="currentColor" strokeWidth={1}>
+          {ticks.x.map((value) => <line key={`gx${value}`} x1={mx(value)} y1={0} x2={mx(value)} y2={size.height} strokeDasharray="2 4" />)}
+          {ticks.y.map((value) => <line key={`gy${value}`} x1={0} y1={my(value)} x2={size.width} y2={my(value)} strokeDasharray="2 4" />)}
+          {shown.mode === "z" && [0.5, 1.5, 2].map((radius) => <circle key={radius} cx={originX} cy={originY} r={radius / unit} fill="none" strokeDasharray="2 4" />)}
         </g>
 
-        {/* Highlighted frequency slice or Unit Circle */}
-        {system.mode === "z" ? (
-          <circle
-            cx={zeroSx}
-            cy={zeroSy}
-            r={unitCircleRadius}
-            fill="none"
-            stroke={extractSlice ? "#F59E0B" : "#3B82F6"}
-            strokeWidth={extractSlice ? 2.8 : 2}
-            className="transition-colors duration-200"
-          />
-        ) : (
-          extractSlice && (
-            <line
-              x1={zeroSx}
-              y1={0}
-              x2={zeroSx}
-              y2={size.height}
-              stroke="#F59E0B"
-              strokeWidth={3}
-            />
-          )
-        )}
+        {rocShape}
 
-        {/* Zeros (circles) */}
-        {system.zeros.map((root, index) => {
-          const sx = mx(root.re);
-          const sy = my(root.im);
-          const isSelected =
-            hoverData?.family === "zero" && hoverData.index === index;
-          return (
-            <g key={`zero-${index}-${root.re}-${root.im}`} className="transition-transform">
-              <circle
-                cx={sx}
-                cy={sy}
-                r={isSelected ? 8.5 : 7}
-                fill="none"
-                stroke="#2563EB"
-                strokeWidth={isSelected ? 3 : 2.5}
-                className="cursor-pointer"
-              />
-              <text
-                x={sx + 10}
-                y={sy - 10}
-                fill="#2563EB"
-                className="font-mono text-[10px] font-bold"
-              >
-                z{index + 1}
-              </text>
-            </g>
-          );
+        {/* Hairline axes through the origin. */}
+        <g className="text-slate-400 dark:text-slate-500" stroke="currentColor" strokeWidth={1.25}>
+          <line x1={0} y1={originY} x2={size.width} y2={originY} />
+          <line x1={originX} y1={0} x2={originX} y2={size.height} />
+        </g>
+
+        {/* KaTeX tick labels (origin labelled once). */}
+        <g aria-hidden="true">
+          {ticks.x.filter((value) => value !== 0).map((value) => <SvgKatexTick key={`tx${value}`} x={mx(value)} y={labelY} baseline>{String(value)}</SvgKatexTick>)}
+          {ticks.y.filter((value) => value !== 0).map((value) => <SvgKatexTick key={`ty${value}`} x={labelX} y={my(value)} anchor="end">{String(value)}</SvgKatexTick>)}
+          <SvgKatexTick x={labelX} y={labelY} anchor="end" baseline>0</SvgKatexTick>
+        </g>
+
+        {/* Frequency slice: jω axis or unit circle. */}
+        {shown.mode === "z"
+          ? <circle cx={originX} cy={originY} r={1 / unit} fill="none" stroke={extractSlice ? VIOLET : ZERO} strokeWidth={extractSlice ? 2.8 : 1.8} className="transition-colors duration-200" />
+          : extractSlice && <line x1={originX} y1={0} x2={originX} y2={size.height} stroke={VIOLET} strokeWidth={3} />}
+
+        {shown.zeros.map((root, index) => {
+          const selected = hover?.family === "zero" && hover.index === index;
+          return <g key={`zero-${index}`}>
+            <circle cx={mx(root.re)} cy={my(root.im)} r={selected ? 8.5 : 7} fill="white" className="dark:fill-[#07101e]" stroke={ZERO} strokeWidth={selected ? 3.5 : 3} />
+            <text x={mx(root.re) + 11} y={my(root.im) - 10} fill={ZERO} fontSize={12} fontStyle="italic" style={{ fontFamily: "'KaTeX_Math', 'Times New Roman', serif" }}>z<tspan fontSize={9} dy={3}>{index + 1}</tspan></text>
+          </g>;
         })}
 
-        {/* Poles (crosses) */}
-        {system.poles.map((root, index) => {
-          const sx = mx(root.re);
-          const sy = my(root.im);
-          const isSelected =
-            hoverData?.family === "pole" && hoverData.index === index;
-          const arm = isSelected ? 8.5 : 7;
-          return (
-            <g key={`pole-${index}-${root.re}-${root.im}`} className="transition-transform">
-              <line
-                x1={sx - arm}
-                y1={sy - arm}
-                x2={sx + arm}
-                y2={sy + arm}
-                stroke="#EF4444"
-                strokeWidth={isSelected ? 3.2 : 2.5}
-                strokeLinecap="round"
-                className="cursor-pointer"
-              />
-              <line
-                x1={sx + arm}
-                y1={sy - arm}
-                x2={sx - arm}
-                y2={sy + arm}
-                stroke="#EF4444"
-                strokeWidth={isSelected ? 3.2 : 2.5}
-                strokeLinecap="round"
-                className="cursor-pointer"
-              />
-              <text
-                x={sx + 10}
-                y={sy - 10}
-                fill="#EF4444"
-                className="font-mono text-[10px] font-bold"
-              >
-                p{index + 1}
-              </text>
-            </g>
-          );
+        {shown.poles.map((root, index) => {
+          const selected = hover?.family === "pole" && hover.index === index; const arm = selected ? 8.5 : 7;
+          const x = mx(root.re); const y = my(root.im);
+          return <g key={`pole-${index}`}>
+            <line x1={x - arm} y1={y - arm} x2={x + arm} y2={y + arm} stroke={POLE} strokeWidth={selected ? 3.4 : 2.8} strokeLinecap="round" />
+            <line x1={x + arm} y1={y - arm} x2={x - arm} y2={y + arm} stroke={POLE} strokeWidth={selected ? 3.4 : 2.8} strokeLinecap="round" />
+            <text x={x + 11} y={y - 10} fill={POLE} fontSize={12} fontStyle="italic" style={{ fontFamily: "'KaTeX_Math', 'Times New Roman', serif" }}>p<tspan fontSize={9} dy={3}>{index + 1}</tspan></text>
+          </g>;
         })}
       </svg>
 
-      {/* Axis KaTeX Badges */}
-      <div className="pointer-events-none absolute right-3 top-3 rounded-lg border border-slate-200/80 bg-white/80 px-2.5 py-1 text-xs font-bold text-slate-700 backdrop-blur-md dark:border-slate-800/80 dark:bg-slate-900/80 dark:text-slate-300">
-        <KatexMath
-          math={
-            system.mode === "s"
-              ? "\\text{Im}(s) \\text{ } (j\\omega)"
-              : "\\text{Im}(z)"
-          }
-        />
+      <div className="pointer-events-none absolute right-3 top-3 rounded-lg border border-slate-200/80 bg-white/80 px-2.5 py-1 text-xs text-slate-700 backdrop-blur-md dark:border-slate-800/80 dark:bg-slate-900/80 dark:text-slate-300">
+        <KatexMath math={shown.mode === "s" ? String.raw`\operatorname{Im}(s)\;(j\omega)` : String.raw`\operatorname{Im}(z)`} />
       </div>
-      <div className="pointer-events-none absolute bottom-3 right-3 rounded-lg border border-slate-200/80 bg-white/80 px-2.5 py-1 text-xs font-bold text-slate-700 backdrop-blur-md dark:border-slate-800/80 dark:bg-slate-900/80 dark:text-slate-300">
-        <KatexMath
-          math={
-            system.mode === "s"
-              ? "\\text{Re}(s) \\text{ } (\\sigma)"
-              : "\\text{Re}(z)"
-          }
-        />
+      <div className="pointer-events-none absolute bottom-3 right-3 rounded-lg border border-slate-200/80 bg-white/80 px-2.5 py-1 text-xs text-slate-700 backdrop-blur-md dark:border-slate-800/80 dark:bg-slate-900/80 dark:text-slate-300">
+        <KatexMath math={shown.mode === "s" ? String.raw`\operatorname{Re}(s)\;(\sigma)` : String.raw`\operatorname{Re}(z)`} />
       </div>
-
-      {/* ROC status pill */}
       <div className="pointer-events-none absolute left-3 top-3 rounded-lg border border-violet-200/80 bg-violet-50/90 px-3 py-1.5 text-xs font-bold text-violet-900 shadow-sm backdrop-blur-md dark:border-violet-900/60 dark:bg-violet-950/80 dark:text-violet-200">
         <span>{roc.kind === "right" ? "ROC →" : roc.kind === "left" ? "← ROC" : "ROC Band"}</span>
         <span className="mx-2 text-slate-400">•</span>
-        <span className={roc.stable ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}>
-          {roc.stable ? "BIBO Stable" : "Unstable"}
-        </span>
+        <span className={roc.stable ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}>{roc.stable ? "BIBO Stable" : "Unstable"}</span>
       </div>
 
-      {/* Floating Apple-Style HUD Tooltip */}
-      {hoverData && (
+      {hover && (
         <div
-          style={{
-            left: `${Math.min(size.width - 190, Math.max(12, hoverData.screenX + 16))}px`,
-            top: `${Math.min(size.height - 110, Math.max(12, hoverData.screenY - 70))}px`,
-          }}
+          style={{ left: `${Math.min(size.width - 190, Math.max(12, hover.screenX + 16))}px`, top: `${Math.min(size.height - 110, Math.max(12, hover.screenY - 70))}px` }}
           className="pointer-events-none absolute z-30 rounded-xl border border-slate-200/90 bg-white/95 p-3 text-xs shadow-xl backdrop-blur-md dark:border-slate-700/80 dark:bg-slate-900/95"
         >
-          <div className="flex items-center gap-2 font-mono font-bold">
-            <span
-              className={`h-2 w-2 rounded-full ${
-                hoverData.family === "pole" ? "bg-rose-500" : "bg-blue-500"
-              }`}
-            />
-            <span className="text-slate-900 dark:text-white uppercase">
-              {hoverData.family} {hoverData.index + 1}
-            </span>
+          <div className="flex items-center gap-2 font-bold">
+            <span className={`h-2 w-2 rounded-full ${hover.family === "pole" ? "bg-rose-600" : "bg-blue-600"}`} />
+            <KatexMath math={`${hover.family === "pole" ? "p" : "z"}_{${hover.index + 1}}`} />
           </div>
-          <div className="mt-1.5 space-y-1 font-mono text-[11px] text-slate-600 dark:text-slate-300">
-            <div>
-              Coord:{" "}
-              <span className="font-semibold text-slate-900 dark:text-white">
-                {hoverData.root.re.toFixed(3)}{" "}
-                {hoverData.root.im >= 0 ? "+" : "-"}{" "}
-                {Math.abs(hoverData.root.im).toFixed(3)}j
-              </span>
-            </div>
-            <div>
-              |s|:{" "}
-              <span className="font-semibold text-slate-900 dark:text-white">
-                {Math.hypot(hoverData.root.re, hoverData.root.im).toFixed(3)}
-              </span>
-            </div>
+          <div className="mt-1.5 space-y-1 text-[11px] tabular-nums text-slate-600 dark:text-slate-300">
+            <KatexMath math={`${hover.root.re.toFixed(3)}${hover.root.im >= 0 ? "+" : "-"}j${Math.abs(hover.root.im).toFixed(3)}`} className="block" />
+            <KatexMath math={`|${shown.mode}|=${Math.hypot(hover.root.re, hover.root.im).toFixed(3)}`} className="block" />
           </div>
         </div>
       )}

@@ -19,7 +19,7 @@ const SPAN = 4;
 const CEILING = 14;
 // A wireframe (unlike a shaded, filled surface) has no ambient/specular fill to keep the valleys
 // visible, so every stop stays bright enough to read on the dark canvas — even the "low" end.
-const SURFACE_RAMP = ["#1e3a8a", "#4c1d95", "#7c3aed", "#ec4899", "#fbbf24"] as const;
+const SURFACE_RAMP = ["#1e3a8a", "#2563eb", "#7c3aed", "#c026d3", "#f43f5e"] as const;
 
 /** Normalizes the |H| height field and the frequency-response slice into the ±1 unit cube. */
 function buildScene(system: TransferFunction): Scene {
@@ -119,7 +119,7 @@ export function LaplaceLandscape3D({ system }: { system: TransferFunction }) {
 
       // The highlighted frequency-response slice (jω axis or unit circle) drawn last, on top.
       const path = scene.path.map(project);
-      context.strokeStyle = "#fbbf24";
+      context.strokeStyle = "#10b981";
       context.lineWidth = 2.5;
       context.beginPath();
       path.forEach((point, index) => (index === 0 ? context.moveTo(point.u, point.v) : context.lineTo(point.u, point.v)));

@@ -20,6 +20,10 @@ const baseProps = {
   onLibrarySearchChange: () => {},
   libraryContent: <div>catalog items</div>,
   canvasTitle: 'Interactive Canvas',
+  componentCount: 3,
+  netCount: 2,
+  simulationRunning: false,
+  onZoomReset: () => {},
   zoom: 1,
   pan: [0, 0] as [number, number],
   gridMode: 'dots' as const,
@@ -77,6 +81,28 @@ describe('UnifiedWorkspaceShell', () => {
   it('applies the pan/zoom transform to the canvas content group', () => {
     const markup = renderToStaticMarkup(<UnifiedWorkspaceShell {...baseProps} inspectorContent={null} zoom={1.5} pan={[10, -5]} />);
     expect(markup).toContain('translate(10,-5) scale(1.5)');
+  });
+});
+
+describe('UnifiedWorkspaceShell bottom bar and HUD', () => {
+  it('always renders coordinates, shortcut strip, zoom pill and diagnostics chips', () => {
+    const markup = renderToStaticMarkup(<UnifiedWorkspaceShell {...baseProps} inspectorContent={null} zoom={1.5} />);
+    expect(markup).toContain('(X: 0, Y: 0)');
+    expect(markup).toContain('Rotate');
+    expect(markup).toContain('Ctrl/Cmd + Z');
+    expect(markup).toContain('150%');
+    expect(markup).toContain('3 CMP');
+    expect(markup).toContain('2 NET');
+    expect(markup).toContain('IDLE');
+    expect(markup).toContain('md:w-64');
+    expect(markup).toContain('xl:w-72');
+    expect(markup).toContain('data-testid="workspace-shortcuts-card"');
+    expect(markup).toContain('Workspace Shortcuts');
+  });
+
+  it('shows RUNNING when the simulation is active', () => {
+    const markup = renderToStaticMarkup(<UnifiedWorkspaceShell {...baseProps} inspectorContent={null} simulationRunning />);
+    expect(markup).toContain('RUNNING');
   });
 });
 

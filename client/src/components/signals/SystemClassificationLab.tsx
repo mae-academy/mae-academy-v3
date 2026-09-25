@@ -1,14 +1,15 @@
 /**
  * MAE Academy / Signals & Systems — Tab B System Classification laboratory.
- * The shared MathLive editor feeds a pure classifier; each accordion presents
+ * The unified Signal Engine terminal feeds a pure classifier; each accordion presents
  * a traceable KaTeX proof plus an imperative visual counterexample or proof.
  */
 import { Activity, Braces, CheckCircle2, ChevronRight, CircleAlert, FunctionSquare, Sigma, Timer, Waves } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { KatexMath } from "@/components/ui/KatexMath";
 import { StatusBadge, StudioSlider, StudioCard, InnerBox } from "@/components/common/templates";
-import { MathLiveSignalInput, type MathLiveSignalInputHandle } from "@/components/signals/MathLiveSignalInput";
+import { UnifiedSignalEngineTerminal } from "@/components/signals/common/UnifiedSignalEngineTerminal";
+import type { SignalToken } from "@/lib/signals/unifiedSignalParser";
 import SystemProofCanvas from "@/components/signals/SystemProofCanvas";
 import { classifySystem, parseSystemExpression, PILLAR_OUTLINE, type Pillar, type PillarId } from "@/features/signals/engines/systemClassifier";
 
@@ -20,20 +21,18 @@ const presets = [
   { label: tex`y(t)=x^2(t)`, latex: "y(t)=x^2(t)" }, { label: tex`y(t)=\int_{-\infty}^{t}x(\tau)\,d\tau`, latex: "y(t)=\\int_{-\\infty}^{t}x(\\tau)\\,d\\tau" },
 ] as const;
 
-// Canonical test signals injected verbatim into the mathfield; the classifier grammar parses each one.
-const signalPills = [
-  { label: tex`u(t)`, latex: "u(t)" }, { label: tex`r(t)`, latex: "r(t)" }, { label: tex`\text{rect}(t)`, latex: "\\text{rect}(t)" },
-  { label: tex`\Lambda(t)`, latex: "\\Lambda(t)" }, { label: tex`\text{sinc}(t)`, latex: "\\text{sinc}(t)" }, { label: tex`\text{sgn}(t)`, latex: "\\text{sgn}(t)" },
-  { label: tex`\sin(\omega t)`, latex: "\\sin(\\omega t)" }, { label: tex`\cos(\omega t)`, latex: "\\cos(\\omega t)" }, { label: tex`\delta(t)`, latex: "\\delta(t)" },
-] as const;
-
-const tokenPills = [
-  { label: tex`x(t)`, latex: "x(t)" }, { label: tex`y(t)`, latex: "y(t)=" }, { label: tex`x(2t)`, latex: "x(2t)" }, { label: tex`t\,x(t)`, latex: "t\\,x(t)" },
-  { label: tex`x^2(t)`, latex: "x^{2}(t)" }, { label: tex`\int_{-\infty}^{t}d\tau`, latex: "\\int_{-\\infty}^{t}x(\\tau)\\,d\\tau" }, { label: tex`\int_{-\infty}^{\infty}dt`, latex: "\\int_{-\\infty}^{\\infty}x(t)\\,dt" }, { label: tex`\infty`, latex: "\\infty" }, { label: tex`-\infty`, latex: "-\\infty" }, { label: tex`\frac{d}{dt}`, latex: "\\frac{d}{dt}x(t)" }, { label: tex`x'(t)`, latex: "x^{\\prime}(t)" }, { label: tex`x''(t)`, latex: "x^{\\prime\\prime}(t)" },
-  { label: tex`+1`, latex: "+1" }, { label: tex`+5`, latex: "+5" }, { label: tex`-5`, latex: "-5" },
-] as const;
-
-const pill = "rounded-full px-2.5 py-1 text-xs font-medium border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-blue-500 transition-all cursor-pointer";
+// System-specific input/operator tokens appended to the unified keypad (the classifier grammar is x(t)-based).
+const systemTokens: readonly SignalToken[] = [
+  { id: "x", label: tex`x(t)`, insert: "x(t)", mode: "after", ariaLabel: "Input x of t" },
+  { id: "x2t", label: tex`x(2t)`, insert: "x(2t)", mode: "after", ariaLabel: "Time-scaled input" },
+  { id: "tx", label: tex`t\,x(t)`, insert: "t\\,x(t)", mode: "after", ariaLabel: "Time-weighted input" },
+  { id: "xsq", label: tex`x^2(t)`, insert: "x^{2}(t)", mode: "after", ariaLabel: "Squared input" },
+  { id: "runint", label: tex`\int_{-\infty}^{t}x(\tau)\,d\tau`, insert: "\\int_{-\\infty}^{t}x(\\tau)\\,d\\tau", mode: "after", ariaLabel: "Running integral of the input" },
+  { id: "defint", label: tex`\int_{-\infty}^{\infty}x(t)\,dt`, insert: "\\int_{-\\infty}^{\\infty}x(t)\\,dt", mode: "after", ariaLabel: "Definite integral of the input" },
+  { id: "ddt", label: tex`\frac{d}{dt}x(t)`, insert: "\\frac{d}{dt}x(t)", mode: "after", ariaLabel: "Derivative of the input" },
+  { id: "xp", label: tex`x'(t)`, insert: "x^{\\prime}(t)", mode: "after", ariaLabel: "First derivative of the input" },
+  { id: "xpp", label: tex`x''(t)`, insert: "x^{\\prime\\prime}(t)", mode: "after", ariaLabel: "Second derivative of the input" },
+];
 
 function PillarIcon({ id }: { id: PillarId }) { const icons = { linearity: FunctionSquare, time: Timer, causality: ChevronRight, memory: Braces, stability: Activity }; const Icon = icons[id]; return <Icon className="h-4 w-4" />; }
 function Slider({ label, value, onChange, min, max, step = 0.1 }: { label: string; value: number; onChange: (next: number) => void; min: number; max: number; step?: number }) { return <StudioSlider label={<KatexMath math={label} />} value={value} onChange={onChange} min={min} max={max} step={step} />; }
@@ -62,10 +61,8 @@ function VerdictBadge({ pillar }: { pillar: Pillar }) {
 export function SystemClassificationLab() {
   const [expression, setExpression] = useState(tex`y(t)=x(2t)`);
   const [a, setA] = useState(1.2); const [b, setB] = useState(-0.7); const [t0, setT0] = useState(0.6);
-  const editorRef = useRef<MathLiveSignalInputHandle>(null);
   const parsed = useMemo(() => parseSystemExpression(expression), [expression]);
   const report = useMemo(() => parsed.ok ? classifySystem(parsed.system) : null, [parsed]);
-  const insert = (latex: string) => editorRef.current?.insert(latex, "after");
 
   return <div className="space-y-6">
     <StudioCard className="overflow-hidden">
@@ -75,18 +72,13 @@ export function SystemClassificationLab() {
           <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500 dark:text-slate-400">Enter a system in terms of its input <KatexMath math="x(t)" />.</p>
         </div>
       </div>
-      <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1.2fr)_minmax(18rem,0.8fr)]">
-        <InnerBox>
-          <h3 id="system-mathfield-label" className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-white pb-2 border-b border-slate-100 dark:border-slate-800">SIGNAL ENGINE</h3>
-          {/* The mathfield itself is the single canonical KaTeX-typeset equation surface — no mirrored preview. */}
-          <div className="mt-4"><MathLiveSignalInput ref={editorRef} value={expression} onChange={setExpression} labelledBy="system-mathfield-label" /></div>
-          {!parsed.ok && <p className="mt-2 text-xs font-semibold leading-5 text-rose-600 dark:text-rose-300">{parsed.error}</p>}
-          <div className="mt-4 space-y-3">
-            <div><p className="text-[10px] font-bold uppercase tracking-[0.17em] text-slate-500 dark:text-slate-400">Canonical signals</p><div className="mt-2 flex flex-wrap gap-1.5">{signalPills.map((item) => <button key={item.latex} type="button" onClick={() => insert(`+${item.latex}`)} className={pill}><KatexMath math={item.label} /></button>)}</div></div>
-            <div><p className="text-[10px] font-bold uppercase tracking-[0.17em] text-slate-500 dark:text-slate-400">Variables &amp; operators</p><div className="mt-2 flex flex-wrap gap-1.5">{tokenPills.map((item) => <button key={item.latex} type="button" onClick={() => insert(item.latex)} className={pill}><KatexMath math={item.label} /></button>)}</div></div>
-          </div>
-        </InnerBox>
-        <InnerBox>
+      <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1fr)_18rem]">
+        <UnifiedSignalEngineTerminal
+          channels={[{ id: "y", lhs: "y(t)", value: expression, onChange: (rhs) => setExpression(`y(t)=${rhs}`), error: parsed.ok ? null : parsed.error }]}
+          extraTokens={systemTokens}
+          extraTokensLabel="System operators"
+        />
+        <InnerBox className="self-start">
           <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-white pb-2 border-b border-slate-100 dark:border-slate-800">ACADEMIC TEST SYSTEMS</h3>
           <div className="mt-3 grid gap-2">{presets.map((preset) => <button key={preset.label} type="button" onClick={() => setExpression(preset.latex)} className={`flex min-h-10 items-center rounded-xl border px-3 text-left text-xs font-bold transition active:scale-[0.97] ${idle}`}><KatexMath math={preset.label} /></button>)}</div>
         </InnerBox>

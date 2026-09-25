@@ -6,6 +6,7 @@
  * zero-crossing hairline axes, authentic TeX typography ticks, vector Dirac impulses,
  * and an Apple-style floating HUD tooltip.
  */
+import { symmetricYBound } from "@/lib/plotAutoScale";
 import React, { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { KatexMath } from "@/components/ui/KatexMath";
 import {
@@ -218,9 +219,9 @@ export function PiecewiseSignalScope({
       maxVal = 1;
     }
 
-    // Domain headroom: Ensure the vertical bounds aren't clamped exactly at extreme waveform values
-    const maxAbsY = Math.max(Math.abs(maxVal), Math.abs(minVal), 1);
-    const yDomainLimit = Math.ceil(maxAbsY * 1.25); // Adds clean headroom (e.g. [-3, 3] for peak 2)
+    // Proportional headroom (20%) snapped to a clean bound: 0.1·sin(t) and 15·cos(2t) both fill the frame without clipping.
+    const maxAbsY = Math.max(Math.abs(maxVal), Math.abs(minVal));
+    const yDomainLimit = symmetricYBound(maxAbsY);
 
     return {
       yMin: -yDomainLimit,
@@ -426,7 +427,7 @@ export function PiecewiseSignalScope({
                   style={{ fontFamily: "'KaTeX_Main', 'KaTeX_Math', 'Times New Roman', serif" }}
                   className="fill-slate-600 dark:fill-slate-300 text-[11px] font-medium"
                 >
-                  {tick.toFixed(tick % 1 === 0 ? 0 : 1)}
+                  {Number(tick.toPrecision(3)).toString()}
                 </text>
               );
             })}

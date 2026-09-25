@@ -27,10 +27,19 @@ export interface StandardStepPlotProps {
   forceBipolar?: boolean; // Forces 2-quadrant display
   showLegend?: boolean;
   className?: string;
-  title?: string;
+  title?: React.ReactNode;
   headerRight?: React.ReactNode;
   steadyStateValue?: number;
   showSteadyState?: boolean;
+  /** Explicit x-range; overrides auto-scaling (e.g. a symmetric ω window). */
+  xDomain?: [number, number];
+  /** Explicit y-range; overrides auto-scaling (e.g. phase fixed to ±π). */
+  yDomain?: [number, number];
+  /** Custom y-axis ticks with KaTeX labels (e.g. −π, −π/2, 0, π/2, π). */
+  yTickLabels?: { value: number; katex: string }[];
+  /** Tooltip header variable and unit; defaults to t and "\text{ s}". */
+  cursorKatex?: string;
+  cursorUnitKatex?: string;
 }
 
 export interface ComplexCoordinate {

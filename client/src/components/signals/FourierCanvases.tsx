@@ -1,29 +1,52 @@
 /**
  * MAE Academy / Signals & Systems — Tab D Spectral Vector Scope.
- * Vector SVG implementation consuming canonical StandardStepPlot architecture.
- * Renders:
- * 1. Magnitude Spectrum: Discrete stems for Fourier Series |c_k|, continuous curve for Fourier Transform |X(jω)|
- * 2. Phase Spectrum: Discrete stems for Fourier Series ∠c_k, continuous curve for Fourier Transform ∠X(jω)
- * 3. Harmonic Builder / Time Scaling: Canonical StandardStepPlot displaying x(t) and reconstructed partial sum x_N(t)
+ * Canonical StandardStepPlot / stem-plot rendering for:
+ * 1. Magnitude spectrum — stems |c_n| (series) or |X(jω)| with impulse lines drawn at height = area.
+ * 2. Phase spectrum — fixed to [−π, π] with KaTeX π ticks.
+ * 3. Time trace — harmonic builder x_N(t), the time-scaled x(at), or the synthesized 𝓕⁻¹ waveform.
+ * All ranges auto-scale (ω window from the spectrum's 1% bandwidth + 20% headroom); there is no zoom.
  */
+import { niceTicks, symmetricYBound } from "@/lib/plotAutoScale";
+import { SvgKatexTick } from "@/components/common/templates/SvgKatexTick";
 import React, { useMemo, useRef, useState, useEffect, useCallback } from "react";
 import { KatexMath } from "@/components/ui/KatexMath";
 import { StandardStepPlot } from "@/components/common/templates/StandardStepPlot";
-import {
-  partialSum,
-  type FourierSeriesResult,
-  type FourierTransformResult,
-} from "@/features/signals/engines/fourierEngine";
-import { evaluateSignal, type SignalNode } from "@/features/signals/engines/signalEngine";
+import { partialSum, type FourierSeriesResult } from "@/features/signals/engines/fourierEngine";
+import type { Impulse } from "@/features/signals/engines/fourierAnalytic";
+
+export type SpectrumSample = { omega: number; magnitude: number; phase: number };
+export type TimeTrace = { katexName: string; data: Array<{ x: number; y: number }> };
 
 type Props = {
   mode: "fs" | "ft";
   series: FourierSeriesResult | null;
-  transform: FourierTransformResult | null;
-  node: SignalNode;
+  /** Continuous spectrum samples on [−bandwidth, bandwidth]. */
+  spectrum: SpectrumSample[] | null;
+  impulses: Impulse[];
+  bandwidth: number;
+  /** Time-domain trace for FT/inverse modes; FS mode builds the partial sum itself. */
+  trace: TimeTrace | null;
+  /** One period of x(t) for the FS harmonic builder. */
+  periodic?: (time: number) => number;
   harmonics: number;
-  scale: number;
+  /** FS observation window [t_start, t_end] (s), shared with the 3D waterfall; defaults to [−T₀, T₀]. */
+  timeWindow?: { start: number; end: number };
 };
+
+const MAGNITUDE = "#2563EB";
+const IMPULSE = "#7C3AED";
+const PHASE = "#E11D48";
+const PARTIAL = "#7C3AED";
+
+/** Phase axis ticks: −π … π labelled in KaTeX. */
+export const PI_TICKS = [
+  { value: -Math.PI, katex: "-\\pi" },
+  { value: -Math.PI / 2, katex: "-\\frac{\\pi}{2}" },
+  { value: 0, katex: "0" },
+  { value: Math.PI / 2, katex: "\\frac{\\pi}{2}" },
+  { value: Math.PI, katex: "\\pi" },
+];
+const PHASE_DOMAIN: [number, number] = [-Math.PI * 1.15, Math.PI * 1.15];
 
 interface SvgStemPlotProps {
   titleKatex: string;
@@ -31,37 +54,24 @@ interface SvgStemPlotProps {
   yLabelKatex: string;
   stems: Array<{ x: number; y: number }>;
   color: string;
+  omega0: number;
   height?: number;
-  forceBipolar?: boolean;
+  phase?: boolean;
 }
 
-const STEM_PAD = { top: 24, bottom: 28, left: 48, right: 24 };
+const STEM_PAD = { top: 30, bottom: 30, left: 52, right: 24 };
 
-/** Canonical discrete stem plot for Fourier Series harmonic coefficients */
-function SvgStemPlot({
-  titleKatex,
-  xLabelKatex,
-  yLabelKatex,
-  stems,
-  color,
-  height = 180,
-  forceBipolar = false,
-}: SvgStemPlotProps) {
+/** Canonical discrete stem plot for Fourier-series coefficients (hairline axes, KaTeX ticks, frosted HUD). */
+function SvgStemPlot({ titleKatex, xLabelKatex, yLabelKatex, stems, color, omega0, height = 190, phase = false }: SvgStemPlotProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 500, height });
+  const [hover, setHover] = useState<{ x: number; y: number; stem: { x: number; y: number } } | null>(null);
 
   useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const update = () => {
-      const rect = el.getBoundingClientRect();
-      if (rect.width > 0 && rect.height > 0) {
-        setSize({ width: rect.width, height: rect.height });
-      }
-    };
+    const el = containerRef.current; if (!el) return;
+    const update = () => { const rect = el.getBoundingClientRect(); if (rect.width > 0 && rect.height > 0) setSize({ width: rect.width, height: rect.height }); };
     update();
-    const observer = new ResizeObserver(update);
-    observer.observe(el);
+    const observer = new ResizeObserver(update); observer.observe(el);
     return () => observer.disconnect();
   }, []);
 
@@ -69,288 +79,174 @@ function SvgStemPlot({
   const plotH = Math.max(10, size.height - STEM_PAD.top - STEM_PAD.bottom);
 
   const { xMin, xMax, yMin, yMax } = useMemo(() => {
-    if (!stems.length) return { xMin: -6, xMax: 6, yMin: -1, yMax: 1 };
-    const maxK = Math.max(5, ...stems.map((s) => Math.abs(s.x)));
-    const maxYVal = Math.max(0.2, ...stems.map((s) => Math.abs(s.y)));
-    const yTop = maxYVal * 1.2;
-    const yBottom = forceBipolar ? -yTop : 0;
-    return { xMin: -maxK, xMax: maxK, yMin: yBottom, yMax: yTop };
-  }, [stems, forceBipolar]);
+    if (!stems.length) return { xMin: -6, xMax: 6, yMin: phase ? PHASE_DOMAIN[0] : 0, yMax: phase ? PHASE_DOMAIN[1] : 1 };
+    const maxN = Math.max(5, ...stems.map((stem) => Math.abs(stem.x))) + 1; // one harmonic of clearance at the frame
+    if (phase) return { xMin: -maxN, xMax: maxN, yMin: PHASE_DOMAIN[0], yMax: PHASE_DOMAIN[1] };
+    return { xMin: -maxN, xMax: maxN, yMin: 0, yMax: symmetricYBound(Math.max(...stems.map((stem) => Math.abs(stem.y)))) };
+  }, [stems, phase]);
 
-  const mapX = useCallback(
-    (x: number) => STEM_PAD.left + ((x - xMin) / (xMax - xMin)) * plotW,
-    [plotW, xMax, xMin]
-  );
-  const mapY = useCallback(
-    (y: number) => STEM_PAD.top + plotH - ((y - yMin) / (yMax - yMin)) * plotH,
-    [plotH, yMax, yMin]
-  );
+  const mapX = useCallback((x: number) => STEM_PAD.left + ((x - xMin) / (xMax - xMin)) * plotW, [plotW, xMax, xMin]);
+  const mapY = useCallback((y: number) => STEM_PAD.top + plotH - ((y - yMin) / (yMax - yMin)) * plotH, [plotH, yMax, yMin]);
   const zeroY = mapY(0);
+  const xTicks = useMemo(() => niceTicks(xMin, xMax, 10).filter((n) => Number.isInteger(n)), [xMax, xMin]);
+  const yTicks = phase ? PI_TICKS : niceTicks(yMin, yMax, 5).map((value) => ({ value, katex: String(Number(value.toPrecision(3))) }));
 
-  // Generate integer harmonic ticks
-  const xTicks = useMemo(() => {
-    const ticks: number[] = [];
-    const step = Math.max(1, Math.round((xMax - xMin) / 10));
-    for (let k = Math.ceil(xMin); k <= xMax; k += step) {
-      ticks.push(k);
-    }
-    return ticks;
-  }, [xMax, xMin]);
+  const handleMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect(); const x = event.clientX - rect.left; const y = event.clientY - rect.top;
+    const nearest = stems.reduce<{ stem: { x: number; y: number }; distance: number } | null>((best, stem) => { const distance = Math.abs(mapX(stem.x) - x); return !best || distance < best.distance ? { stem, distance } : best; }, null);
+    setHover(nearest && nearest.distance < 14 ? { x: mapX(nearest.stem.x), y, stem: nearest.stem } : null);
+  };
 
   return (
-    <div
-      ref={containerRef}
-      className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-inner dark:border-slate-800 dark:bg-[#07101e]"
-      style={{ height }}
-    >
-      <svg className="absolute inset-0 h-full w-full pointer-events-none select-none">
-        {/* Vertical Harmonic Grid */}
-        {xTicks.map((k) => (
-          <line
-            key={`x-grid-${k}`}
-            x1={mapX(k)}
-            y1={STEM_PAD.top}
-            x2={mapX(k)}
-            y2={size.height - STEM_PAD.bottom}
-            stroke="currentColor"
-            strokeDasharray="2 4"
-            className="text-slate-200 dark:text-slate-800"
-            strokeWidth={1}
-          />
-        ))}
-
-        {/* Horizontal Ticks */}
-        {[yMin, (yMin + yMax) / 2, yMax].map((yVal, idx) => {
-          const sy = mapY(yVal);
-          return (
-            <g key={`y-grid-${idx}`}>
-              <line
-                x1={STEM_PAD.left}
-                y1={sy}
-                x2={size.width - STEM_PAD.right}
-                y2={sy}
-                stroke="currentColor"
-                strokeDasharray={Math.abs(yVal) < 1e-4 ? undefined : "2 4"}
-                className={
-                  Math.abs(yVal) < 1e-4
-                    ? "text-violet-400/60 dark:text-violet-500/60"
-                    : "text-slate-200 dark:text-slate-800"
-                }
-                strokeWidth={Math.abs(yVal) < 1e-4 ? 1.5 : 1}
-              />
-              <text
-                x={STEM_PAD.left - 8}
-                y={sy + 3.5}
-                textAnchor="end"
-                className="fill-slate-400 font-mono text-[9px] dark:fill-slate-500"
-              >
-                {yVal.toFixed(1)}
-              </text>
+    <div className="relative flex flex-col rounded-2xl border border-slate-200 bg-slate-50/60 p-4 shadow-sm backdrop-blur-sm dark:border-slate-800 dark:bg-slate-900/60" style={{ height }}>
+      <div className="pb-1 text-xs font-bold tracking-wider text-slate-800 dark:text-white"><KatexMath math={titleKatex} /></div>
+      <div ref={containerRef} onPointerMove={handleMove} onPointerLeave={() => setHover(null)} className="relative min-h-0 flex-1 cursor-crosshair select-none overflow-hidden">
+        <div className="pointer-events-none absolute left-2 top-1 z-10 text-[11px] font-medium text-slate-500 dark:text-slate-400"><KatexMath math={yLabelKatex} /></div>
+        <div className="pointer-events-none absolute bottom-1 right-2 z-10 text-[11px] font-medium text-slate-500 dark:text-slate-400"><KatexMath math={xLabelKatex} /></div>
+        <svg className="pointer-events-none absolute inset-0 h-full w-full">
+          {xTicks.map((n) => <line key={`gx${n}`} x1={mapX(n)} y1={STEM_PAD.top} x2={mapX(n)} y2={size.height - STEM_PAD.bottom} className="stroke-slate-300/40 dark:stroke-slate-700/40" strokeDasharray="3,3" strokeWidth={1} />)}
+          {yTicks.map((tick) => <line key={`gy${tick.value}`} x1={STEM_PAD.left} y1={mapY(tick.value)} x2={size.width - STEM_PAD.right} y2={mapY(tick.value)} className="stroke-slate-300/40 dark:stroke-slate-700/40" strokeDasharray="3,3" strokeWidth={1} />)}
+          {/* Hairline centre axes. */}
+          <line x1={STEM_PAD.left} y1={zeroY} x2={size.width - STEM_PAD.right} y2={zeroY} className="stroke-slate-400 dark:stroke-slate-600" strokeWidth={1.25} />
+          <line x1={mapX(0)} y1={STEM_PAD.top} x2={mapX(0)} y2={size.height - STEM_PAD.bottom} className="stroke-slate-400 dark:stroke-slate-600" strokeWidth={1.25} />
+          {yTicks.map((tick) => <SvgKatexTick key={`ty${tick.value}`} x={STEM_PAD.left - 8} y={mapY(tick.value)} anchor="end">{tick.katex}</SvgKatexTick>)}
+          {xTicks.map((n) => <SvgKatexTick key={`tx${n}`} x={mapX(n)} y={size.height - STEM_PAD.bottom + 16} baseline>{String(n)}</SvgKatexTick>)}
+          {stems.map((stem) => (
+            <g key={`stem-${stem.x}`} stroke={color} fill={color}>
+              <line x1={mapX(stem.x)} y1={zeroY} x2={mapX(stem.x)} y2={mapY(stem.y)} strokeWidth={hover?.stem.x === stem.x ? 3.2 : 2.4} />
+              <circle cx={mapX(stem.x)} cy={mapY(stem.y)} r={hover?.stem.x === stem.x ? 4.5 : 3.5} className="stroke-white dark:stroke-slate-900" strokeWidth={1.25} />
             </g>
-          );
-        })}
-
-        {/* Zero Axis */}
-        <line
-          x1={mapX(0)}
-          y1={STEM_PAD.top}
-          x2={mapX(0)}
-          y2={size.height - STEM_PAD.bottom}
-          stroke="currentColor"
-          strokeWidth={1.5}
-          className="text-violet-400/60 dark:text-violet-500/60"
-        />
-
-        {/* Harmonic Number Ticks */}
-        {xTicks.map((k) => (
-          <text
-            key={`k-tick-${k}`}
-            x={mapX(k)}
-            y={size.height - STEM_PAD.bottom + 14}
-            textAnchor="middle"
-            className="fill-slate-500 font-mono text-[10px] dark:fill-slate-400"
+          ))}
+        </svg>
+        {hover && (
+          <div
+            className="pointer-events-none absolute z-20 min-w-36 rounded-xl border border-slate-200/80 bg-white/95 p-3 text-xs text-slate-900 shadow-xl shadow-slate-900/10 backdrop-blur-md dark:border-slate-700/60 dark:bg-slate-900/90 dark:text-slate-100"
+            style={{ left: Math.min(size.width - 170, Math.max(8, hover.x + 12)), top: Math.max(8, Math.min(size.height - 80, hover.y - 30)) }}
           >
-            {k}
-          </text>
-        ))}
-
-        {/* Stems */}
-        {stems.map((stem, idx) => {
-          const sx = mapX(stem.x);
-          const sy = mapY(stem.y);
-          return (
-            <g key={`stem-${idx}`} stroke={color} fill={color}>
-              <line x1={sx} y1={zeroY} x2={sx} y2={sy} strokeWidth={2.4} />
-              <circle cx={sx} cy={sy} r={3.5} stroke="#FFFFFF" strokeWidth={1} />
-            </g>
-          );
-        })}
-      </svg>
-
-      {/* Header KaTeX Title */}
-      <div className="pointer-events-none absolute left-3 top-2 flex items-center gap-2 rounded-md bg-white/80 px-2 py-0.5 text-xs font-bold text-slate-800 backdrop-blur-sm dark:bg-slate-900/80 dark:text-slate-200">
-        <KatexMath math={titleKatex} />
-      </div>
-
-      {/* Axis KaTeX Label */}
-      <div className="pointer-events-none absolute bottom-2 right-3 rounded-md bg-white/80 px-1.5 py-0.5 text-xs font-bold text-slate-600 backdrop-blur-sm dark:bg-slate-900/80 dark:text-slate-400">
-        <KatexMath math={xLabelKatex} />
+            <div className="mb-1.5 border-b border-slate-200/80 pb-1.5 text-[11px] font-semibold dark:border-slate-700/60">
+              <KatexMath math={`n=${hover.stem.x},\\;\\omega=${Number((hover.stem.x * omega0).toFixed(3))}\\text{ rad/s}`} />
+            </div>
+            <KatexMath math={`${phase ? "\\angle c_{n}" : "|c_{n}|"}=${hover.stem.y.toFixed(4)}${phase ? "\\text{ rad}" : ""}`} className="text-[11px]" />
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-export function FourierCanvases({
-  mode,
-  series,
-  transform,
-  node,
-  harmonics,
-  scale,
-}: Props) {
-  // Harmonic Builder / Time Scaling Data
-  const builderSeries = useMemo(() => {
-    if (mode === "fs" && series) {
-      const T0 = series.period;
-      const count = 300;
-      const original: Array<{ x: number; y: number }> = [];
-      const sum: Array<{ x: number; y: number }> = [];
+/** Impulse lines as spikes of height |area| on a shared polyline (baseline runs along the ω axis). */
+function impulseSpikes(impulses: Impulse[], bandwidth: number) {
+  const visible = impulses.filter((impulse) => Math.abs(impulse.omega) <= bandwidth && Math.hypot(impulse.area.re, impulse.area.im) > 1e-9).sort((a, b) => a.omega - b.omega);
+  if (!visible.length) return null;
+  const data: Array<{ x: number; y: number }> = [{ x: -bandwidth, y: 0 }];
+  visible.forEach((impulse) => { const height = Math.hypot(impulse.area.re, impulse.area.im); data.push({ x: impulse.omega, y: 0 }, { x: impulse.omega, y: height }, { x: impulse.omega, y: 0 }); });
+  data.push({ x: bandwidth, y: 0 });
+  return data;
+}
 
-      for (let i = 0; i <= count; i++) {
-        const t = -T0 + (2 * T0 * i) / count;
-        const localT = (((t + T0 / 2) % T0) + T0) % T0 - T0 / 2;
-        original.push({ x: t, y: evaluateSignal(node, localT) });
-        sum.push({ x: t, y: partialSum(series, t, harmonics) });
-      }
+export function FourierCanvases({ mode, series, spectrum, impulses, bandwidth, trace, periodic, harmonics, timeWindow }: Props) {
+  // FS stems trimmed to the last harmonic above 1% of the peak (+20%), and to the summed band |n| ≤ max(N, 10).
+  const stems = useMemo(() => {
+    if (!series) return { magnitude: [], phase: [] };
+    const peak = Math.max(...series.coefficients.map((item) => item.magnitude), 1e-12);
+    const last = Math.max(0, ...series.coefficients.filter((item) => item.magnitude > 0.01 * peak).map((item) => Math.abs(item.harmonic)));
+    const limit = Math.max(5, Math.min(Math.ceil(last * 1.2), Math.max(harmonics, 10)));
+    const kept = series.coefficients.filter((item) => Math.abs(item.harmonic) <= limit);
+    return {
+      magnitude: kept.map((item) => ({ x: item.harmonic, y: item.magnitude })),
+      phase: kept.filter((item) => item.magnitude > 1e-3 * peak).map((item) => ({ x: item.harmonic, y: item.phase })),
+    };
+  }, [series, harmonics]);
 
-      return {
-        xLabel: "t\\text{ (s)}",
-        yLabel: "x(t)",
-        title: `Harmonic Builder: x_N(t) \\text{ with } N=${harmonics}`,
-        seriesList: [
-          {
-            id: "original",
-            katexName: "x(t)",
-            data: original,
-            color: "#64748B",
-            dashArray: "5 5",
-          },
-          {
-            id: "partial-sum",
-            katexName: `x_{${harmonics}}(t)`,
-            data: sum,
-            color: "#8B5CF6", // Brand violet
-          },
-        ],
-      };
+  const builder = useMemo(() => {
+    if (mode !== "fs" || !series || !periodic) return null;
+    const T0 = series.period;
+    const start = timeWindow?.start ?? -T0; const span = (timeWindow?.end ?? T0) - start;
+    // ≥ 40 samples per cycle of the highest harmonic so flat tops and jump edges resolve cleanly.
+    const count = Math.min(8000, Math.max(600, Math.ceil((40 * Math.max(1, harmonics) * span) / T0)));
+    const original: Array<{ x: number; y: number }> = []; const sum: Array<{ x: number; y: number }> = [];
+    for (let i = 0; i <= count; i += 1) {
+      const t = start + (span * i) / count;
+      const local = ((((t + T0 / 2) % T0) + T0) % T0) - T0 / 2;
+      original.push({ x: t, y: periodic(local) }); sum.push({ x: t, y: partialSum(series, t, harmonics) });
     }
+    return [
+      { id: "original", katexName: "x(t)", data: original, color: "#64748B", dashArray: "5 5" },
+      { id: "partial-sum", katexName: `x_{${harmonics}}(t)`, data: sum, color: PARTIAL },
+    ];
+  }, [harmonics, mode, periodic, series, timeWindow?.start, timeWindow?.end]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    if (mode === "ft") {
-      const count = 300;
-      const scaled: Array<{ x: number; y: number }> = [];
-      for (let i = 0; i <= count; i++) {
-        const t = -3 + (6 * i) / count;
-        scaled.push({ x: t, y: evaluateSignal(node, scale * t) });
-      }
+  const magnitudeSeries = useMemo(() => {
+    if (!spectrum) return [];
+    const list = [{ id: "ft-mag", katexName: "|X(j\\omega)|", data: spectrum.map((point) => ({ x: point.omega, y: point.magnitude })), color: MAGNITUDE }];
+    const spikes = impulseSpikes(impulses, bandwidth);
+    if (spikes) list.push({ id: "ft-impulses", katexName: "\\text{impulse area}", data: spikes, color: IMPULSE });
+    return list;
+  }, [bandwidth, impulses, spectrum]);
 
-      return {
-        xLabel: "t\\text{ (s)}",
-        yLabel: `x(${scale.toFixed(2)}t)`,
-        title: `Time Scaling Property: x(${scale.toFixed(2)}t)`,
-        seriesList: [
-          {
-            id: "scaled",
-            katexName: `x(${scale.toFixed(2)}t)`,
-            data: scaled,
-            color: "#8B5CF6",
-          },
-        ],
-      };
-    }
-
-    return null;
-  }, [harmonics, mode, node, scale, series]);
+  const omegaDomain: [number, number] = [-bandwidth, bandwidth];
+  // Magnitude ceiling = 118% of the tallest curve or impulse spike, so peaks never touch the frame.
+  const magnitudePeak = Math.max(0, ...magnitudeSeries.flatMap((entry) => entry.data.map((point) => point.y)));
+  const magnitudeDomain: [number, number] = [0, magnitudePeak > 1e-9 ? magnitudePeak * 1.18 : 1];
+  const omegaCursor = { cursorKatex: "\\omega", cursorUnitKatex: "\\text{ rad/s}" };
 
   return (
     <div className="space-y-4">
-      {/* 1. Magnitude Spectrum */}
       {mode === "fs" && series ? (
-        <SvgStemPlot
-          titleKatex="\text{Magnitude Spectrum } |c_k|"
-          xLabelKatex="k"
-          yLabelKatex="|c_k|"
-          stems={series.coefficients.map((item) => ({
-            x: item.harmonic,
-            y: item.magnitude,
-          }))}
-          color="#2563EB"
-          height={180}
-        />
-      ) : transform ? (
+        <SvgStemPlot titleKatex="\text{Magnitude spectrum } |c_{n}|" xLabelKatex="n\;(\omega=n\omega_0)" yLabelKatex="|c_{n}|" stems={stems.magnitude} color={MAGNITUDE} omega0={series.omega0} />
+      ) : spectrum ? (
         <StandardStepPlot
-          title="Magnitude Spectrum |X(jω)|"
-          series={[
-            {
-              id: "ft-mag",
-              katexName: "|X(j\\omega)|",
-              data: transform.spectrum.map((pt) => ({ x: pt.omega, y: pt.magnitude })),
-              color: "#2563EB",
-            },
-          ]}
-          height={180}
+          title={<KatexMath math="\text{Magnitude spectrum } |X(j\omega)|" />}
+          series={magnitudeSeries}
+          height={200}
           xLabelKatex="\omega\text{ (rad/s)}"
           yLabelKatex="|X(j\omega)|"
-          showLegend={false}
+          xDomain={omegaDomain}
+          yDomain={magnitudeDomain}
+          showLegend={magnitudeSeries.length > 1}
+          {...omegaCursor}
         />
       ) : null}
 
-      {/* 2. Phase Spectrum */}
       {mode === "fs" && series ? (
-        <SvgStemPlot
-          titleKatex="\text{Phase Spectrum } \angle c_k\text{ (rad)}"
-          xLabelKatex="k"
-          yLabelKatex="\angle c_k"
-          stems={series.coefficients
-            .filter((item) => item.magnitude > 1e-3)
-            .map((item) => ({
-              x: item.harmonic,
-              y: item.phase,
-            }))}
-          color="#E11D48"
-          height={180}
-          forceBipolar
-        />
-      ) : transform ? (
+        <SvgStemPlot titleKatex="\text{Phase spectrum } \angle c_{n}\text{ (rad)}" xLabelKatex="n\;(\omega=n\omega_0)" yLabelKatex="\angle c_{n}" stems={stems.phase} color={PHASE} omega0={series.omega0} phase />
+      ) : spectrum ? (
         <StandardStepPlot
-          title="Phase Spectrum ∠X(jω)"
-          series={[
-            {
-              id: "ft-phase",
-              katexName: "\\angle X(j\\omega)",
-              data: transform.spectrum.map((pt) => ({ x: pt.omega, y: pt.phase })),
-              color: "#E11D48",
-            },
-          ]}
-          height={180}
+          title={<KatexMath math="\text{Phase spectrum } \angle X(j\omega)" />}
+          series={[{ id: "ft-phase", katexName: "\\angle X(j\\omega)", data: spectrum.map((point) => ({ x: point.omega, y: point.phase })), color: PHASE, unit: "rad" }]}
+          height={200}
           xLabelKatex="\omega\text{ (rad/s)}"
           yLabelKatex="\angle X(j\omega)\text{ (rad)}"
+          xDomain={omegaDomain}
+          yDomain={PHASE_DOMAIN}
+          yTickLabels={PI_TICKS}
+          showLegend={false}
+          {...omegaCursor}
+        />
+      ) : null}
+
+      {builder ? (
+        <StandardStepPlot
+          title={<KatexMath math={`x_N(t) = a_0 + \\sum_{n=1}^{N} \\left( a_n \\cos(n\\omega_0 t) + b_n \\sin(n\\omega_0 t) \\right),\\; N=${harmonics}`} />}
+          series={builder}
+          xDomain={timeWindow ? [timeWindow.start, timeWindow.end] : undefined}
+          height={220}
+          xLabelKatex="t\text{ (s)}"
+          yLabelKatex="x(t)"
+          forceBipolar
+          showLegend
+        />
+      ) : trace ? (
+        <StandardStepPlot
+          title={<KatexMath math={trace.katexName} />}
+          series={[{ id: "trace", katexName: trace.katexName, data: trace.data, color: PARTIAL }]}
+          height={220}
+          xLabelKatex="t\text{ (s)}"
+          yLabelKatex={trace.katexName}
           forceBipolar
           showLegend={false}
         />
       ) : null}
-
-      {/* 3. Harmonic Builder / Time Scaling Plot */}
-      {builderSeries && (
-        <StandardStepPlot
-          title={builderSeries.title}
-          series={builderSeries.seriesList}
-          height={210}
-          xLabelKatex={builderSeries.xLabel}
-          yLabelKatex={builderSeries.yLabel}
-          forceBipolar
-          showLegend={builderSeries.seriesList.length > 1}
-        />
-      )}
     </div>
   );
 }
