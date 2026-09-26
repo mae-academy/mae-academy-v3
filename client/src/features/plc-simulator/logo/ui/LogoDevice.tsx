@@ -242,7 +242,7 @@ export function LogoDevice({ spec, powered, runLed, frame, inputVolts, supplyVol
         return (
           <g key={index} data-relay={`Q${index + 1}`} data-terminal-id={`Q${index + 1}`} data-closed={closed}>
             <rect x={x1 - 16} y={402} width={x2 - x1 + 32} height={82} rx={4} className="fill-slate-50 stroke-slate-300 dark:fill-slate-900 dark:stroke-slate-700" />
-            <PortLabel x={cx} y={414} name={`Q${index + 1}`} size={11} target={[cx, 446]} />
+            <PortLabel x={cx} y={414} name={`Q${index + 1}`} size={11} target={[cx, 446]} pair={false} />
             {[x1, x2].map((px) => (
               <circle key={px} cx={px} cy={446} r={3.5} className={closed ? 'fill-(--lb-live)' : 'fill-slate-400 dark:fill-slate-500'} />
             ))}

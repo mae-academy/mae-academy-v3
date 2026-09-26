@@ -20,15 +20,22 @@ export interface PortLabelProps {
   readonly size?: number;
   /** The terminal this label names (user units); checked at runtime by `usePortLabelAudit`. */
   readonly target?: readonly [number, number];
+  /**
+   * Take part in the `data-terminal-id` / `data-label-id` pairing audit (default true). Turn off for a
+   * repeated name (the rail and supply-box copies of L1 / N) or a label that sits inside a larger anchor
+   * (Q inside its relay window); those are still range-checked through `target`.
+   */
+  readonly pair?: boolean;
 }
 
 const BOX_W = 44;
 const BOX_H = 18;
 
 /** Port designation typeset by KaTeX: in a LabelCanvas overlay, or (outside one) inside an SVG <foreignObject>. */
-export function PortLabel({ x, y, name, anchor = 'middle', className = 'text-slate-700 dark:text-slate-300', size = 11, target }: PortLabelProps) {
+export function PortLabel({ x, y, name, anchor = 'middle', className = 'text-slate-700 dark:text-slate-300', size = 11, target, pair = true }: PortLabelProps) {
   const canvas = useLabelLayer();
   const targetAttr = target ? `${target[0]},${target[1]}` : undefined;
+  const pairId = pair ? name : undefined;
   if (canvas) {
     // Inside a LabelCanvas: percent of the aspect-locked wrapper and a container-width font size, i.e. the
     // very same scale as the SVG at every viewport. No foreignObject, so nothing for an engine to mis-scale.
@@ -37,7 +44,7 @@ export function PortLabel({ x, y, name, anchor = 'middle', className = 'text-sla
     return createPortal(
       <div
         data-port={name}
-        data-label-id={name}
+        data-label-id={pairId}
         data-target={targetAttr}
         className={`absolute whitespace-nowrap font-semibold leading-none ${className}`}
         style={{ left: `${(x / canvas.width) * 100}%`, top: `${(y / canvas.height) * 100}%`, transform: `translate(${shift})`, fontSize: `${(size / canvas.width) * 100}cqw` }}
@@ -50,7 +57,7 @@ export function PortLabel({ x, y, name, anchor = 'middle', className = 'text-sla
   const left = anchor === 'end' ? x - BOX_W : anchor === 'start' ? x : x - BOX_W / 2;
   const justify = anchor === 'end' ? 'flex-end' : anchor === 'start' ? 'flex-start' : 'center';
   return (
-    <foreignObject x={left} y={y - BOX_H / 2} width={BOX_W} height={BOX_H} pointerEvents="none" overflow="visible" data-port={name} data-label-id={name} data-target={targetAttr}>
+    <foreignObject x={left} y={y - BOX_H / 2} width={BOX_W} height={BOX_H} pointerEvents="none" overflow="visible" data-port={name} data-label-id={pairId} data-target={targetAttr}>
       <div className={`flex h-full items-center font-semibold leading-none ${className}`} style={{ justifyContent: justify, fontSize: size }}>
         <KatexMath math={toMath(name)} />
       </div>

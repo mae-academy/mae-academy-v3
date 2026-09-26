@@ -128,8 +128,8 @@ export function LogoBench({ controller, active }: LogoBenchProps) {
         <text x={SUPPLY.x + 10} y={SUPPLY.y + 20} fontSize={11} fontWeight={800} className="fill-slate-900 dark:fill-slate-100">
           {ac ? '230 V ~ 50 Hz' : '24 V ⎓ DC'}
         </text>
-        <PortLabel x={SUPPLY.x + 10} y={SUPPLY.y + 36} name={spec.supply.hot} anchor="start" size={10} className="text-slate-500 dark:text-slate-400" />
-        <PortLabel x={SUPPLY.x + 34} y={SUPPLY.y + 36} name={spec.supply.ret} anchor="start" size={10} className="text-slate-500 dark:text-slate-400" />
+        <PortLabel x={SUPPLY.x + 10} y={SUPPLY.y + 36} name={spec.supply.hot} anchor="start" size={10} pair={false} className="text-slate-500 dark:text-slate-400" />
+        <PortLabel x={SUPPLY.x + 34} y={SUPPLY.y + 36} name={spec.supply.ret} anchor="start" size={10} pair={false} className="text-slate-500 dark:text-slate-400" />
         <text x={SUPPLY.x + 10} y={SUPPLY.y + 58} fontSize={9} fontWeight={700} className={powered ? 'fill-red-600 dark:fill-red-400' : 'fill-slate-500'}>
           {powered ? 'MAINS ON' : 'MAINS OFF'}
         </text>
@@ -171,8 +171,8 @@ export function LogoBench({ controller, active }: LogoBenchProps) {
       {neutralBranches(wiredOutputs).map(([x, y], index) => (
         <circle key={`n${index}`} cx={x} cy={y} r={3} className={powered ? 'fill-(--lb-ret)' : 'fill-slate-400 dark:fill-slate-700'} />
       ))}
-      <PortLabel x={RAIL.hotX + 6} y={HOT_LANE_Y + 12} name={spec.supply.hot} anchor="start" target={[RAIL.hotX, HOT_LANE_Y]} className={powered ? toneText('hot') : 'text-slate-500'} />
-      <PortLabel x={RAIL.retX - 8} y={RAIL.retY - 12} name={spec.supply.ret} anchor="end" target={[RAIL.retX, RAIL.retY]} className={powered ? toneText('ret') : 'text-slate-500'} />
+      <PortLabel x={RAIL.hotX + 6} y={HOT_LANE_Y + 12} name={spec.supply.hot} anchor="start" target={[RAIL.hotX, HOT_LANE_Y]} pair={false} className={powered ? toneText('hot') : 'text-slate-500'} />
+      <PortLabel x={RAIL.retX - 8} y={RAIL.retY - 12} name={spec.supply.ret} anchor="end" target={[RAIL.retX, RAIL.retY]} pair={false} className={powered ? toneText('ret') : 'text-slate-500'} />
 
       {/* ---- field devices on I1..I8 ---- */}
       {inputs.map((input, index) => (
