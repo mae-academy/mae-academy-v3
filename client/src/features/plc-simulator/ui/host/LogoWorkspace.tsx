@@ -181,7 +181,7 @@ export function LogoWorkspace({ active, initialScenario = 'stairway', initialDev
       >
         <LogoBench controller={controller} active={active} />
         <p role="note" aria-label="Keyboard shortcuts" className="mt-3 text-center text-[11px] font-medium text-slate-500 dark:text-slate-400">
-          [▲▼◄► Nav] [Enter: OK] [Esc: Back]
+          [▲▼◀▶ Nav] [Enter: OK] [Esc: Back]
         </p>
       </StudioCard>
 
