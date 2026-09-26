@@ -7,6 +7,7 @@ export interface SegmentedOption<T extends string | number | boolean = string> {
   disabled?: boolean;
   badge?: ReactNode;
   icon?: ReactNode;
+  "aria-label"?: string;
 }
 
 export interface SegmentedControlProps<T extends string | number | boolean = string> {
@@ -74,6 +75,7 @@ export function SegmentedControl<T extends string | number | boolean = string>({
             role="tab"
             disabled={isDisabled}
             aria-selected={isActive}
+            aria-label={option["aria-label"]}
             onClick={() => {
               if (!isDisabled && !isActive) {
                 onChange(option.value);

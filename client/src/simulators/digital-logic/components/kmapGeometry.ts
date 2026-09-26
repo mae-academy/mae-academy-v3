@@ -73,7 +73,8 @@ const positionKey = (map: number, row: number, column: number) => `${map}:${row}
 export const grayCodeForBits = (bitCount: 1 | 2): string[] => bitCount === 1 ? [...GRAY_1] : [...GRAY_2];
 
 export const createKMapTopology = (variableCount: KMapVariableCount): KMapTopology => {
-  const rowBits = variableCount === 2 ? 1 : 2;
+  // 2-var: 2×2, 3-var: 2×4 (A / BC), 4-var: 4×4, 5-var: two 4×4 planes.
+  const rowBits = variableCount <= 3 ? 1 : 2;
   const columnBits = variableCount === 2 ? 1 : 2;
   const mapBits = variableCount === 5 ? 1 : 0;
   const rows = 2 ** rowBits;

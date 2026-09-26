@@ -20,6 +20,8 @@ export interface KMapImplicant {
   sourceTerms: number[];
   literalCount: number;
   latex: string;
+  /** Formula-bar ASCII product, e.g. `A'BC`. */
+  expression: string;
 }
 
 export interface KMapHardwareCost {
@@ -38,6 +40,8 @@ export interface KMapSolution {
   minimumCoverings: KMapImplicant[][];
   uncoveredMinterms: number[];
   latex: string;
+  /** Formula-bar ASCII Sum of Products, e.g. `A'B + CD` (never LaTeX). */
+  expression: string;
   hardwareCost: KMapHardwareCost;
 }
 
@@ -67,13 +71,12 @@ const assertVariableList = (variables: readonly string[]): KMapVariableCount => 
 
 const normalizeProblem = (problem: KMapProblem): NormalizedProblem => {
   const width = assertVariableList(problem.variables);
+  // Transient UI state (e.g. mid variable-count switch) may carry stale indices: clamp to
+  // [0, 2^n - 1] by discarding them instead of throwing; a required minterm outranks a don't-care.
   const upperBound = 2 ** width;
-  const minterms = uniqueNumbers(problem.minterms);
-  const dontCares = uniqueNumbers(problem.dontCares ?? []);
-  const invalid = [...minterms, ...dontCares].find(term => !Number.isInteger(term) || term < 0 || term >= upperBound);
-  if (invalid !== undefined) throw new Error(`Minterm ${invalid} is outside the ${width}-variable K-Map range.`);
-  const overlap = minterms.find(term => dontCares.includes(term));
-  if (overlap !== undefined) throw new Error(`Minterm ${overlap} cannot also be marked as a don't-care.`);
+  const inRange = (term: number) => Number.isInteger(term) && term >= 0 && term < upperBound;
+  const minterms = uniqueNumbers(problem.minterms).filter(inRange);
+  const dontCares = uniqueNumbers(problem.dontCares ?? []).filter(term => inRange(term) && !minterms.includes(term));
   return { variables: [...problem.variables], minterms, dontCares, width };
 };
 
@@ -139,12 +142,18 @@ const implicantLatex = (pattern: string, variables: readonly string[]) => {
   return literals.length ? literals.join(' \\cdot ') : '1';
 };
 
+const implicantExpression = (pattern: string, variables: readonly string[]) => {
+  const literals = Array.from(pattern).flatMap((bit, index) => (bit === '-' ? [] : [bit === '1' ? variables[index] : `${variables[index]}'`]));
+  return literals.length ? literals.join('') : '1';
+};
+
 const asPublicImplicant = (raw: RawImplicant, minterms: readonly number[], variables: readonly string[]): KMapImplicant => ({
   pattern: raw.pattern,
   coveredMinterms: minterms.filter(term => patternCovers(raw.pattern, term)),
   sourceTerms: uniqueNumbers(raw.sourceTerms),
   literalCount: countLiterals(raw.pattern),
   latex: implicantLatex(raw.pattern, variables),
+  expression: implicantExpression(raw.pattern, variables),
 });
 
 const compareImplicants = (left: KMapImplicant, right: KMapImplicant) =>
@@ -214,6 +223,7 @@ export const solveKMap = (problem: KMapProblem): KMapSolution => {
       minimumCoverings: [[]],
       uncoveredMinterms: [],
       latex: '0',
+      expression: '0',
       hardwareCost: { terms: 0, literals: 0 },
     };
   }
@@ -234,6 +244,7 @@ export const solveKMap = (problem: KMapProblem): KMapSolution => {
     minimumCoverings: selection.minimumCoverings.map(covering => Array.from(covering).map(index => primeImplicants[index]).sort(compareImplicants)),
     uncoveredMinterms: normalized.minterms.filter(term => !covered.has(term)),
     latex: selectedPrimeImplicants.map(implicant => implicant.latex).join(' + '),
+    expression: selectedPrimeImplicants.map(implicant => implicant.expression).join(' + '),
     hardwareCost: productCost(selection.selectedIds, primeImplicants),
   };
 };

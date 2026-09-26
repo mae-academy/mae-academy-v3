@@ -1,17 +1,30 @@
-/** Advanced FSM Explorer — native SVG editor plus pure FSM/K-Map/HDL derivation workspace. */
-import { BlockMath, InlineMath } from 'react-katex';
-import 'katex/dist/katex.min.css';
-import { useEffect, useMemo, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
-import { createDefaultFSM, generateExcitationTable, generateStateAssignments, generateStateTable, generateVerilog, minimizeExcitationEquations, type FSMDefinition, type FSMEncoding, type FSMKind, type FSMState, type FSMTransition, type FlipFlopKind } from '../../engine/fsmEngine';
+/** Advanced FSM Explorer — native SVG editor plus pure FSM/K-Map derivation workspace. */
+import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
+import { ArrowRight, Plus, RotateCcw, Trash2, ZoomIn, ZoomOut } from 'lucide-react';
+import { KatexMath } from '@/components/ui/KatexMath';
+import { SegmentedControl, StatusBadge, StudioButton, StudioCard, type SegmentedOption } from '@/components/common/templates';
+import {
+  createDefaultFSM,
+  generateExcitationTable,
+  generateStateAssignments,
+  generateStateTable,
+  minimizeExcitationEquations,
+  type FSMDefinition,
+  type FSMEncoding,
+  type FSMKind,
+  type FSMState,
+  type FSMTransition,
+  type FlipFlopKind,
+} from '../../engine/fsmEngine';
 
 const NODE_RADIUS = 31;
-const PANEL_BORDER = '1px solid #e2e8f0';
 const latexSignal = (signal: string) => signal.replace(/([A-Z])(\d+)/, '$1_{$2}');
-const transitionLabel = (machine: FSMDefinition, transition: FSMTransition) => `${machine.inputName}=${transition.input}${machine.kind === 'Mealy' ? ` / ${machine.outputName}=${transition.output ?? '0'}` : ''}`;
-const inputStyle = { background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: 7, color: '#0f172a', display: 'block', fontSize: 12, marginTop: 6, padding: 8, width: '100%' } as const;
-const fieldLabelStyle = { color: '#64748b', display: 'block', fontSize: 10, fontWeight: 850, letterSpacing: '.08em', textTransform: 'uppercase' } as const;
+const transitionMath = (machine: FSMDefinition, transition: FSMTransition) =>
+  machine.kind === 'Mealy'
+    ? `${machine.inputName}=${transition.input}\\;/\\;${transition.output ?? '0'}`
+    : `${machine.inputName}=${transition.input}`;
 
-/** Uses the first vacant state name rather than the array length, so deletion cannot recreate a duplicate React key. */
+/** Uses the first vacant state name rather than array length to prevent key collision. */
 export const nextAvailableStateId = (states: readonly Pick<FSMState, 'id'>[]) => {
   const occupied = new Set(states.map(state => state.id));
   let index = 0;
@@ -26,146 +39,728 @@ const nextAvailableTransitionId = (transitions: readonly Pick<FSMTransition, 'id
   return `t${index}`;
 };
 
-function StateDiagram({ machine, selectedStateId, onMoveState, onSelectState }: { machine: FSMDefinition; selectedStateId: string | null; onMoveState: (stateId: string, x: number, y: number) => void; onSelectState: (stateId: string) => void }) {
+function StateDiagram({
+  machine,
+  selectedStateId,
+  onMoveState,
+  onSelectState,
+}: {
+  machine: FSMDefinition;
+  selectedStateId: string | null;
+  onMoveState: (stateId: string, x: number, y: number) => void;
+  onSelectState: (stateId: string) => void;
+}) {
   const [dragging, setDragging] = useState<string | null>(null);
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [panning, setPanning] = useState(false);
+  const panStartRef = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
+  const svgRef = useRef<SVGSVGElement | null>(null);
+
   const stateById = useMemo(() => new Map(machine.states.map(state => [state.id, state])), [machine.states]);
+
   const transitionPath = (transition: FSMTransition) => {
-    const from = stateById.get(transition.from); const to = stateById.get(transition.to);
+    const from = stateById.get(transition.from);
+    const to = stateById.get(transition.to);
     if (!from || !to) return null;
-    if (from.id === to.id) return { d: `M ${from.x - 17} ${from.y - 24} C ${from.x - 52} ${from.y - 84}, ${from.x + 52} ${from.y - 84}, ${from.x + 17} ${from.y - 24}`, labelX: from.x, labelY: from.y - 71 };
-    const dx = to.x - from.x; const dy = to.y - from.y; const distance = Math.hypot(dx, dy) || 1;
-    const ux = dx / distance; const uy = dy / distance;
-    const startX = from.x + ux * NODE_RADIUS; const startY = from.y + uy * NODE_RADIUS;
-    const endX = to.x - ux * NODE_RADIUS; const endY = to.y - uy * NODE_RADIUS;
-    const reciprocal = machine.transitions.some(other => other.from === to.id && other.to === from.id);
-    if (!reciprocal) return { d: `M ${startX} ${startY} L ${endX} ${endY}`, labelX: (startX + endX) / 2, labelY: (startY + endY) / 2 - 9 };
-    const direction = from.id.localeCompare(to.id) < 0 ? 1 : -1;
-    const controlX = (startX + endX) / 2 - uy * 42 * direction;
-    const controlY = (startY + endY) / 2 + ux * 42 * direction;
-    return { d: `M ${startX} ${startY} Q ${controlX} ${controlY} ${endX} ${endY}`, labelX: controlX, labelY: controlY - 8 * direction };
+
+    // Self-loops: disperse anchors by loop index to eliminate overlaps
+    if (from.id === to.id) {
+      const selfLoops = machine.transitions.filter(t => t.from === from.id && t.to === from.id);
+      const selfIndex = selfLoops.findIndex(t => t.id === transition.id);
+      if (selfIndex === 0) {
+        return {
+          d: `M ${from.x - 16} ${from.y - 25} C ${from.x - 46} ${from.y - 82}, ${from.x + 46} ${from.y - 82}, ${from.x + 16} ${from.y - 25}`,
+          labelX: from.x,
+          labelY: from.y - 68,
+        };
+      }
+      if (selfIndex === 1) {
+        return {
+          d: `M ${from.x - 16} ${from.y + 25} C ${from.x - 46} ${from.y + 82}, ${from.x + 46} ${from.y + 82}, ${from.x + 16} ${from.y + 25}`,
+          labelX: from.x,
+          labelY: from.y + 68,
+        };
+      }
+      if (selfIndex === 2) {
+        return {
+          d: `M ${from.x - 25} ${from.y - 16} C ${from.x - 82} ${from.y - 46}, ${from.x - 82} ${from.y + 46}, ${from.x - 25} ${from.y + 16}`,
+          labelX: from.x - 70,
+          labelY: from.y,
+        };
+      }
+      return {
+        d: `M ${from.x + 25} ${from.y - 16} C ${from.x + 82} ${from.y - 46}, ${from.x + 82} ${from.y + 46}, ${from.x + 25} ${from.y + 16}`,
+        labelX: from.x + 70,
+        labelY: from.y,
+      };
+    }
+
+    const sameDirection = machine.transitions.filter(t => t.from === from.id && t.to === to.id);
+    const sameIndex = sameDirection.findIndex(t => t.id === transition.id);
+    const hasReverse = machine.transitions.some(t => t.from === to.id && t.to === from.id);
+
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const distance = Math.hypot(dx, dy) || 1;
+    const ux = dx / distance;
+    const uy = dy / distance;
+    // Normal vector perpendicular to the travel direction
+    const nx = -uy;
+    const ny = ux;
+
+    if (sameDirection.length === 1 && !hasReverse) {
+      const startX = from.x + ux * NODE_RADIUS;
+      const startY = from.y + uy * NODE_RADIUS;
+      const endX = to.x - ux * NODE_RADIUS;
+      const endY = to.y - uy * NODE_RADIUS;
+      return {
+        d: `M ${startX} ${startY} L ${endX} ${endY}`,
+        labelX: (startX + endX) / 2 + nx * 16,
+        labelY: (startY + endY) / 2 + ny * 16,
+      };
+    }
+
+    // Curved edge: offset depends on whether there are multiple parallel transitions
+    const curvature = 36 + sameIndex * 42;
+    const controlX = (from.x + to.x) / 2 + nx * curvature;
+    const controlY = (from.y + to.y) / 2 + ny * curvature;
+
+    const cStartDx = controlX - from.x;
+    const cStartDy = controlY - from.y;
+    const cStartDist = Math.hypot(cStartDx, cStartDy) || 1;
+    const startX = from.x + (cStartDx / cStartDist) * NODE_RADIUS;
+    const startY = from.y + (cStartDy / cStartDist) * NODE_RADIUS;
+
+    const cEndDx = controlX - to.x;
+    const cEndDy = controlY - to.y;
+    const cEndDist = Math.hypot(cEndDx, cEndDy) || 1;
+    const endX = to.x + (cEndDx / cEndDist) * NODE_RADIUS;
+    const endY = to.y + (cEndDy / cEndDist) * NODE_RADIUS;
+
+    const midX = 0.25 * startX + 0.5 * controlX + 0.25 * endX;
+    const midY = 0.25 * startY + 0.5 * controlY + 0.25 * endY;
+
+    return {
+      d: `M ${startX} ${startY} Q ${controlX} ${controlY} ${endX} ${endY}`,
+      labelX: midX + nx * (16 + sameIndex * 8),
+      labelY: midY + ny * (16 + sameIndex * 8),
+    };
   };
+
+  const onBackgroundPointerDown = (event: ReactPointerEvent<SVGSVGElement>) => {
+    if ((event.target as HTMLElement).tagName === 'circle' || (event.target as HTMLElement).tagName === 'text') {
+      return;
+    }
+    setPanning(true);
+    panStartRef.current = {
+      x: event.clientX,
+      y: event.clientY,
+      panX: pan.x,
+      panY: pan.y,
+    };
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+  };
+
   const onPointerMove = (event: ReactPointerEvent<SVGSVGElement>) => {
-    if (!dragging) return;
-    const bounds = event.currentTarget.getBoundingClientRect();
-    onMoveState(dragging, Math.max(NODE_RADIUS + 10, Math.min(550, event.clientX - bounds.left)), Math.max(NODE_RADIUS + 16, Math.min(330, event.clientY - bounds.top)));
+    if (panning) {
+      const dx = event.clientX - panStartRef.current.x;
+      const dy = event.clientY - panStartRef.current.y;
+      setPan({
+        x: panStartRef.current.panX + dx,
+        y: panStartRef.current.panY + dy,
+      });
+      return;
+    }
+    if (!dragging || !svgRef.current) return;
+    const bounds = svgRef.current.getBoundingClientRect();
+    const scaleX = 680 / bounds.width;
+    const scaleY = 370 / bounds.height;
+    const svgX = (event.clientX - bounds.left) * scaleX;
+    const svgY = (event.clientY - bounds.top) * scaleY;
+    const localX = (svgX - pan.x) / zoom;
+    const localY = (svgY - pan.y) / zoom;
+    onMoveState(
+      dragging,
+      Math.round(Math.max(NODE_RADIUS + 5, Math.min(675 - NODE_RADIUS, localX))),
+      Math.round(Math.max(NODE_RADIUS + 5, Math.min(360 - NODE_RADIUS, localY))),
+    );
   };
-  return <svg role="img" aria-label="Interactive FSM state diagram" viewBox="0 0 590 370" onPointerMove={onPointerMove} onPointerUp={() => setDragging(null)} onPointerLeave={() => setDragging(null)} style={{ background: '#fbfdff', border: PANEL_BORDER, borderRadius: 10, display: 'block', height: 'auto', minHeight: 330, touchAction: 'none', width: '100%' }}>
-    <defs><marker id="fsm-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M 0,0 L 8,4 L 0,8 Z" fill="#475569" /></marker><pattern id="fsm-grid" width="20" height="20" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r=".8" fill="#cbd5e1" opacity=".58" /></pattern></defs>
-    <rect width="590" height="370" fill="url(#fsm-grid)" />
-    {machine.transitions.map(transition => {
-      const path = transitionPath(transition);
-      return path && <g key={transition.id}><path d={path.d} fill="none" stroke="#475569" strokeWidth="1.6" markerEnd="url(#fsm-arrow)" /><rect x={path.labelX - 27} y={path.labelY - 10} width="54" height="18" rx="4" fill="#ffffff" stroke="#e2e8f0" /><text x={path.labelX} y={path.labelY + 3} textAnchor="middle" fontFamily="ui-monospace, SFMono-Regular, Menlo, monospace" fontSize="8" fontWeight="700" fill="#334155">{transitionLabel(machine, transition)}</text></g>;
-    })}
-    {machine.states.map(state => {
-      const selected = state.id === selectedStateId;
-      return <g key={state.id} transform={`translate(${state.x} ${state.y})`} onPointerDown={event => { event.stopPropagation(); event.currentTarget.setPointerCapture?.(event.pointerId); onSelectState(state.id); setDragging(state.id); }} style={{ cursor: 'grab' }}>
-        {selected && <circle r={NODE_RADIUS + 7} fill="#dbeafe" opacity=".9" />}
-        <circle r={NODE_RADIUS} fill="#ffffff" stroke={selected ? '#2563eb' : '#1a2744'} strokeWidth={selected ? '3' : '2'} /><circle r={NODE_RADIUS - 5} fill="none" stroke={selected ? '#93c5fd' : '#dbeafe'} strokeWidth="1" />
-        <text y="-2" textAnchor="middle" fill="#0f172a" fontSize="12" fontWeight="850">{state.name}</text>
-        {machine.kind === 'Moore' && <text y="13" textAnchor="middle" fill="#2563eb" fontFamily="ui-monospace, SFMono-Regular, Menlo, monospace" fontSize="10" fontWeight="800">{machine.outputName}={state.output}</text>}
-      </g>;
-    })}
-    <text x="14" y="356" fill="#64748b" fontFamily="ui-monospace, SFMono-Regular, Menlo, monospace" fontSize="9">SELECT A STATE · DRAG NODES · BEZIER FOR RECIPROCAL PATHS · SELF-LOOP ROUTING</text>
-  </svg>;
+
+  const onPointerUp = () => {
+    setPanning(false);
+    setDragging(null);
+  };
+
+  const resetView = () => {
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+  };
+
+  const zoomIn = () => setZoom(prev => Math.min(2.5, Number((prev + 0.15).toFixed(2))));
+  const zoomOut = () => setZoom(prev => Math.max(0.5, Number((prev - 0.15).toFixed(2))));
+
+  return (
+    <div className="relative">
+      {/* Floating HUD Viewport Controls */}
+      <div className="absolute top-3 right-3 z-10 flex items-center gap-1 rounded-lg border border-slate-200/80 bg-white/90 p-1 shadow-xs backdrop-blur-xs dark:border-slate-800 dark:bg-slate-900/90">
+        <button
+          type="button"
+          onClick={zoomOut}
+          className="rounded p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
+          title="Zoom Out"
+          aria-label="Zoom Out"
+        >
+          <ZoomOut className="w-3.5 h-3.5" />
+        </button>
+        <button
+          type="button"
+          onClick={resetView}
+          className="px-1.5 py-0.5 font-mono text-[10px] font-bold text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+          title="Reset View"
+          aria-label="Reset View"
+        >
+          {Math.round(zoom * 100)}%
+        </button>
+        <button
+          type="button"
+          onClick={zoomIn}
+          className="rounded p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
+          title="Zoom In"
+          aria-label="Zoom In"
+        >
+          <ZoomIn className="w-3.5 h-3.5" />
+        </button>
+        <button
+          type="button"
+          onClick={resetView}
+          className="rounded p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
+          title="Reset Pan and Zoom"
+          aria-label="Reset Pan and Zoom"
+        >
+          <RotateCcw className="w-3.5 h-3.5" />
+        </button>
+      </div>
+
+      <svg
+        ref={svgRef}
+        role="img"
+        aria-label="Interactive FSM state diagram"
+        viewBox="0 0 680 370"
+        onPointerDown={onBackgroundPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerLeave={onPointerUp}
+        className="block w-full min-h-[350px] overflow-hidden rounded-xl border border-slate-200/80 bg-white dark:border-slate-800/80 dark:bg-slate-950 touch-none select-none"
+        style={{ cursor: panning ? 'grabbing' : 'default' }}
+      >
+        <defs>
+          <marker id="fsm-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+            <path d="M 0,0 L 8,4 L 0,8 Z" className="fill-slate-500 dark:fill-slate-400" />
+          </marker>
+          <pattern
+            id="fsm-grid"
+            width={20 * zoom}
+            height={20 * zoom}
+            patternUnits="userSpaceOnUse"
+            patternTransform={`translate(${pan.x % (20 * zoom)}, ${pan.y % (20 * zoom)})`}
+          >
+            <circle cx="1" cy="1" r=".8" className="fill-slate-300 dark:fill-slate-700" opacity=".58" />
+          </pattern>
+        </defs>
+        <rect width="100%" height="100%" fill="url(#fsm-grid)" />
+
+        <g transform={`translate(${pan.x}, ${pan.y}) scale(${zoom})`}>
+          {(() => {
+            // Relax label anchors so condition badges never overlap each other.
+            const LABEL_W = 62;
+            const LABEL_H = 22;
+            const anchors = machine.transitions.map(transition => transitionPath(transition));
+            const pts = anchors.map(a => (a ? { x: a.labelX, y: a.labelY } : { x: 0, y: 0 }));
+            for (let iter = 0; iter < 24; iter++) {
+              for (let i = 0; i < pts.length; i++) {
+                for (let j = i + 1; j < pts.length; j++) {
+                  if (!anchors[i] || !anchors[j]) continue;
+                  const ox = LABEL_W - Math.abs(pts[i].x - pts[j].x);
+                  const oy = LABEL_H - Math.abs(pts[i].y - pts[j].y);
+                  if (ox <= 0 || oy <= 0) continue;
+                  if (oy <= ox) {
+                    const dir = pts[i].y <= pts[j].y ? -1 : 1;
+                    pts[i].y += (dir * oy) / 2;
+                    pts[j].y -= (dir * oy) / 2;
+                  } else {
+                    const dir = pts[i].x <= pts[j].x ? -1 : 1;
+                    pts[i].x += (dir * ox) / 2;
+                    pts[j].x -= (dir * ox) / 2;
+                  }
+                }
+              }
+            }
+            return machine.transitions.map((transition, idx) => {
+            const base = anchors[idx];
+            const path = base && { ...base, labelX: pts[idx].x, labelY: pts[idx].y };
+            return (
+              path && (
+                <g key={transition.id}>
+                  <path d={path.d} fill="none" className="stroke-slate-500 dark:stroke-slate-400" strokeWidth="1.6" markerEnd="url(#fsm-arrow)" />
+                  <foreignObject
+                    x={path.labelX - 45}
+                    y={path.labelY - 14}
+                    width="90"
+                    height="28"
+                    className="overflow-visible pointer-events-none"
+                  >
+                    <div className="flex h-full w-full items-center justify-center">
+                      <span className="inline-flex items-center rounded border border-slate-200/90 bg-white/95 px-1.5 py-0.5 text-[9px] shadow-2xs backdrop-blur-xs dark:border-slate-700/90 dark:bg-slate-900/95 text-slate-800 dark:text-slate-200 select-none">
+                        <KatexMath math={transitionMath(machine, transition)} />
+                      </span>
+                    </div>
+                  </foreignObject>
+                </g>
+              )
+            );
+            });
+          })()}
+          {machine.states.map(state => {
+            const selected = state.id === selectedStateId;
+            return (
+              <g
+                key={state.id}
+                transform={`translate(${state.x} ${state.y})`}
+                onPointerDown={event => {
+                  event.stopPropagation();
+                  event.currentTarget.setPointerCapture?.(event.pointerId);
+                  onSelectState(state.id);
+                  setDragging(state.id);
+                }}
+                style={{ cursor: 'grab' }}
+              >
+                {selected && <circle r={NODE_RADIUS + 7} className="fill-blue-200/60 dark:fill-blue-900/50" />}
+                <circle
+                  r={NODE_RADIUS}
+                  className={`${
+                    selected
+                      ? 'fill-white stroke-blue-600 dark:fill-slate-900 dark:stroke-blue-400'
+                      : 'fill-white stroke-slate-700 dark:fill-slate-800 dark:stroke-slate-400'
+                  }`}
+                  strokeWidth={selected ? '2.5' : '1.8'}
+                />
+                <circle r={NODE_RADIUS - 5} fill="none" className={selected ? 'stroke-blue-300 dark:stroke-blue-700' : 'stroke-slate-200 dark:stroke-slate-700'} strokeWidth="1" />
+                <text y="-2" textAnchor="middle" className="fill-slate-900 text-xs font-bold dark:fill-white font-serif italic">
+                  <tspan>{state.name[0]}</tspan>
+                  <tspan dy="3" fontSize="8">{state.name.slice(1)}</tspan>
+                </text>
+                {machine.kind === 'Moore' && (
+                  <text y="14" textAnchor="middle" className="fill-blue-600 font-mono text-[10px] font-bold dark:fill-blue-400">
+                    {machine.outputName}={state.output}
+                  </text>
+                )}
+              </g>
+            );
+          })}
+        </g>
+      </svg>
+      <div className="absolute bottom-2.5 left-3 text-[10px] text-slate-400 dark:text-slate-500 font-sans pointer-events-none select-none">
+        Drag nodes to reposition · Drag canvas to pan · Scroll to zoom
+      </div>
+    </div>
+  );
 }
 
-function CompactTable({ label, children }: { label: string; children: ReactNode }) { return <section aria-label={label} style={{ border: PANEL_BORDER, borderRadius: 10, minWidth: 0, overflow: 'auto' }}>{children}</section>; }
-
-function DerivationSteps({ equations, flipFlop }: { equations: ReturnType<typeof minimizeExcitationEquations>; flipFlop: FlipFlopKind }) {
-  return <section aria-label="Derivation Steps" style={{ borderTop: PANEL_BORDER, marginTop: 17, paddingTop: 15 }}>
-    <div style={{ color: '#334155', fontSize: 10, fontWeight: 850, letterSpacing: '.1em', textTransform: 'uppercase' }}>Derivation Steps</div>
-    <div style={{ color: '#64748b', fontSize: 10, lineHeight: 1.45, margin: '7px 0 10px' }}>Trace every {flipFlop} excitation column from the master table, through its minterms and don’t-cares, to the K-Map minimum.</div>
-    <div style={{ display: 'grid', gap: 8 }}>{equations.map((equation, index) => {
-      const minterms = equation.minterms.join(',') || '\\varnothing';
-      const dontCares = equation.dontCares.join(',') || '\\varnothing';
-      return <details key={equation.signal} open={index === 0} style={{ background: '#ffffff', border: '1px solid #dbeafe', borderRadius: 8, padding: '8px 10px' }}>
-        <summary style={{ color: '#1e3a8a', cursor: 'pointer', fontSize: 11, fontWeight: 850 }}>Derive <InlineMath math={latexSignal(equation.signal)} /></summary>
-        <div style={{ borderTop: '1px solid #eff6ff', color: '#475569', fontSize: 10, lineHeight: 1.5, marginTop: 8, paddingTop: 8 }}><b>1. Excitation analysis.</b> Read the <InlineMath math={latexSignal(equation.signal)} /> column in the excitation matrix.</div>
-        <div style={{ color: '#475569', fontSize: 10, lineHeight: 1.5, marginTop: 6 }}><b>2. Required cells.</b> Values of <InlineMath math="1" /> become minterms; values of <InlineMath math="X" /> become don’t-cares.</div>
-        <div style={{ overflowX: 'auto' }}><BlockMath math={`${latexSignal(equation.signal)} = \\Sigma m(${minterms}) + d(${dontCares})`} /></div>
-        <div style={{ color: '#475569', fontSize: 10, lineHeight: 1.5, marginTop: 2 }}><b>3. K-Map minimization.</b> Adjacent required and don’t-care cells are grouped by the existing QMC/Petrick minimizer.</div>
-        <div style={{ color: '#1e3a8a', fontSize: 10, fontWeight: 850, marginTop: 6 }}>4. Final equation</div>
-        <div style={{ overflowX: 'auto' }}><BlockMath math={equation.latex} /></div>
-      </details>;
-    })}</div>
-  </section>;
+function CompactTable({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <section aria-label={label} className="overflow-auto rounded-xl border border-slate-200/80 dark:border-slate-800/80">
+      {children}
+    </section>
+  );
 }
 
-/** Functional EDA workspace: click a state, edit its context, then observe every derived result update. */
+const MODEL_OPTIONS: SegmentedOption<FSMKind>[] = [
+  { value: 'Moore', label: 'Moore' },
+  { value: 'Mealy', label: 'Mealy' },
+];
+
+const FF_OPTIONS: SegmentedOption<FlipFlopKind>[] = [
+  { value: 'D', label: 'D' },
+  { value: 'T', label: 'T' },
+  { value: 'JK', label: 'JK' },
+  { value: 'SR', label: 'SR' },
+];
+
+const ENCODING_OPTIONS: SegmentedOption<FSMEncoding>[] = [
+  { value: 'Binary', label: 'Binary' },
+  { value: 'Gray', label: 'Gray' },
+  { value: 'One-Hot', label: 'One-Hot' },
+];
+
+/** Functional EDA workspace: click a state, edit context, observe derived results update. */
 export function StateMachineExplorer() {
   const [machine, setMachine] = useState<FSMDefinition>(createDefaultFSM);
   const [encoding, setEncoding] = useState<FSMEncoding>('Binary');
   const [flipFlop, setFlipFlop] = useState<FlipFlopKind>('D');
-  const [copied, setCopied] = useState(false);
   const [selectedStateId, setSelectedStateId] = useState<string | null>('S0');
-  const [transitionTargetId, setTransitionTargetId] = useState('S1');
   const [transitionInput, setTransitionInput] = useState<'0' | '1'>('0');
   const [transitionOutput, setTransitionOutput] = useState<'0' | '1'>('0');
+  const [transitionTargetId, setTransitionTargetId] = useState<string>('S0');
+
+  useEffect(() => {
+    if (!machine.states.some(state => state.id === selectedStateId)) {
+      setSelectedStateId(machine.states[0]?.id ?? null);
+    }
+  }, [machine.states, selectedStateId]);
+
   const assignments = useMemo(() => generateStateAssignments(machine.states, encoding), [machine.states, encoding]);
   const stateTable = useMemo(() => generateStateTable(machine, encoding), [machine, encoding]);
-  const excitationTable = useMemo(() => generateExcitationTable(stateTable, flipFlop), [flipFlop, stateTable]);
+  const excitationTable = useMemo(() => generateExcitationTable(stateTable, flipFlop), [stateTable, flipFlop]);
   const equations = useMemo(() => minimizeExcitationEquations(excitationTable, machine.inputName), [excitationTable, machine.inputName]);
-  const verilog = useMemo(() => generateVerilog(machine, encoding), [machine, encoding]);
-  const selectedState = machine.states.find(state => state.id === selectedStateId) ?? null;
-  const stateWidth = assignments[0]?.code.length ?? 0;
+
+  const selectedState = machine.states.find(state => state.id === selectedStateId);
+  const stateWidth = Math.max(1, assignments[0]?.code.length ?? 1);
+
   const updateMachine = (patch: Partial<FSMDefinition>) => setMachine(current => ({ ...current, ...patch }));
-  useEffect(() => {
-    if (!selectedStateId || !machine.states.some(state => state.id === selectedStateId)) setSelectedStateId(machine.states[0]?.id ?? null);
-    if (!machine.states.some(state => state.id === transitionTargetId)) setTransitionTargetId(machine.states.find(state => state.id !== selectedStateId)?.id ?? machine.states[0]?.id ?? '');
-  }, [machine.states, selectedStateId, transitionTargetId]);
   const addState = () => {
-    const id = nextAvailableStateId(machine.states); const index = Number(id.slice(1));
-    setMachine(current => ({ ...current, states: [...current.states, { id, name: id, output: '0', x: 100 + (index % 3) * 170, y: 85 + Math.floor(index / 3) * 160 }] }));
-    setSelectedStateId(id); setTransitionTargetId(id);
+    const nextId = nextAvailableStateId(machine.states);
+    const angle = (machine.states.length / 5) * Math.PI * 2;
+    const nextStateObj: FSMState = {
+      id: nextId,
+      name: nextId,
+      output: '0',
+      x: Math.round(340 + Math.cos(angle) * 160),
+      y: Math.round(185 + Math.sin(angle) * 110),
+    };
+    setMachine(current => ({ ...current, states: [...current.states, nextStateObj] }));
+    setSelectedStateId(nextId);
   };
   const deleteSelectedState = () => {
     if (!selectedState || machine.states.length <= 1) return;
     const remaining = machine.states.filter(state => state.id !== selectedState.id);
-    setMachine(current => ({ ...current, states: remaining, transitions: current.transitions.filter(transition => transition.from !== selectedState.id && transition.to !== selectedState.id) }));
-    setSelectedStateId(remaining[0]?.id ?? null); setTransitionTargetId(remaining[0]?.id ?? '');
+    setMachine(current => ({
+      ...current,
+      states: remaining,
+      transitions: current.transitions.filter(t => t.from !== selectedState.id && t.to !== selectedState.id),
+    }));
+    setSelectedStateId(remaining[0]?.id ?? null);
+    setTransitionTargetId(remaining[0]?.id ?? '');
   };
-  const updateSelectedState = (patch: Partial<FSMState>) => selectedState && setMachine(current => ({ ...current, states: current.states.map(state => state.id === selectedState.id ? { ...state, ...patch } : state) }));
+  const updateSelectedState = (patch: Partial<FSMState>) =>
+    selectedState &&
+    setMachine(current => ({
+      ...current,
+      states: current.states.map(state => (state.id === selectedState.id ? { ...state, ...patch } : state)),
+    }));
   const addTransitionFromSelected = () => {
     if (!selectedState || !transitionTargetId) return;
-    setMachine(current => ({ ...current, transitions: [...current.transitions.filter(transition => !(transition.from === selectedState.id && transition.input === transitionInput)), { id: nextAvailableTransitionId(current.transitions), from: selectedState.id, to: transitionTargetId, input: transitionInput, output: transitionOutput }] }));
+    setMachine(current => ({
+      ...current,
+      transitions: [
+        ...current.transitions.filter(t => !(t.from === selectedState.id && t.input === transitionInput)),
+        {
+          id: nextAvailableTransitionId(current.transitions),
+          from: selectedState.id,
+          to: transitionTargetId,
+          input: transitionInput,
+          output: transitionOutput,
+        },
+      ],
+    }));
   };
-  const moveState = (stateId: string, x: number, y: number) => setMachine(current => ({ ...current, states: current.states.map(state => state.id === stateId ? { ...state, x, y } : state) }));
-  const copyVerilog = () => { void navigator.clipboard?.writeText(verilog); setCopied(true); window.setTimeout(() => setCopied(false), 1500); };
-  const stateHeaders = [{ id: 'present-state', label: 'PS' }, { id: 'present-code', label: 'Code' }, { id: 'input', label: machine.inputName }, { id: 'next-state', label: 'NS' }, { id: 'next-code', label: 'Code' }, { id: 'output', label: machine.outputName }];
+  const moveState = (stateId: string, x: number, y: number) =>
+    setMachine(current => ({
+      ...current,
+      states: current.states.map(state => (state.id === stateId ? { ...state, x, y } : state)),
+    }));
 
-  return <section aria-label="Advanced FSM Explorer" style={{ background: '#ffffff', border: PANEL_BORDER, borderRadius: 14, color: '#0f172a', display: 'grid', gridTemplateColumns: '220px minmax(0, 1fr) minmax(290px, .78fr)', minHeight: 720, overflow: 'hidden' }}>
-    <aside style={{ background: '#f8fafc', borderRight: PANEL_BORDER, padding: 16 }}>
-      <div style={{ color: '#334155', fontSize: 10, fontWeight: 850, letterSpacing: '.1em', textTransform: 'uppercase' }}>EDA Controls</div>
-      <button type="button" onClick={addState} style={{ background: '#ffffff', border: '1px solid #bfdbfe', borderRadius: 7, color: '#1d4ed8', cursor: 'pointer', fontSize: 12, fontWeight: 850, marginTop: 14, padding: '9px 10px', width: '100%' }}>Add State</button>
-      {selectedState ? <div style={{ borderTop: PANEL_BORDER, marginTop: 16, paddingTop: 13 }}>
-        <div style={{ color: '#2563eb', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 10, fontWeight: 850, letterSpacing: '.08em' }}>SELECTED · {selectedState.name}</div>
-        <button type="button" onClick={deleteSelectedState} disabled={machine.states.length <= 1} style={{ background: machine.states.length <= 1 ? '#f1f5f9' : '#fff1f2', border: '1px solid #fecdd3', borderRadius: 7, color: machine.states.length <= 1 ? '#94a3b8' : '#be123c', cursor: machine.states.length <= 1 ? 'not-allowed' : 'pointer', fontSize: 11, fontWeight: 850, marginTop: 9, padding: '8px 9px', width: '100%' }}>Delete State</button>
-        {machine.kind === 'Moore' && <label style={{ ...fieldLabelStyle, marginTop: 12 }}>State output<select value={selectedState.output} onChange={event => updateSelectedState({ output: event.target.value as '0' | '1' | 'X' })} style={inputStyle}><option value="0">0</option><option value="1">1</option></select></label>}
-        <label style={{ ...fieldLabelStyle, marginTop: 12 }}>Add transition to<select value={transitionTargetId} onChange={event => setTransitionTargetId(event.target.value)} style={inputStyle}>{machine.states.map(state => <option key={state.id} value={state.id}>{state.name}</option>)}</select></label>
-        <div style={{ display: 'grid', gap: 6, gridTemplateColumns: machine.kind === 'Mealy' ? '1fr 1fr' : '1fr', marginTop: 8 }}><label style={{ ...fieldLabelStyle, fontSize: 9 }}>Input<select value={transitionInput} onChange={event => setTransitionInput(event.target.value as '0' | '1')} style={{ ...inputStyle, marginTop: 5, padding: 7 }}><option value="0">0</option><option value="1">1</option></select></label>{machine.kind === 'Mealy' && <label style={{ ...fieldLabelStyle, fontSize: 9 }}>Output<select value={transitionOutput} onChange={event => setTransitionOutput(event.target.value as '0' | '1')} style={{ ...inputStyle, marginTop: 5, padding: 7 }}><option value="0">0</option><option value="1">1</option></select></label>}</div>
-        <button type="button" onClick={addTransitionFromSelected} style={{ background: '#ffffff', border: '1px solid #dbe3ef', borderRadius: 7, color: '#475569', cursor: 'pointer', fontSize: 11, fontWeight: 850, marginTop: 9, padding: '8px 9px', width: '100%' }}>Add Transition To…</button>
-      </div> : <div style={{ color: '#64748b', fontSize: 11, lineHeight: 1.5, marginTop: 14 }}>Select a state node to configure its output and transitions.</div>}
-      <label style={{ ...fieldLabelStyle, marginTop: 20 }}>Machine model<select value={machine.kind} onChange={event => updateMachine({ kind: event.target.value as FSMKind })} style={inputStyle}><option>Moore</option><option>Mealy</option></select></label>
-      <label style={{ ...fieldLabelStyle, marginTop: 14 }}>Flip-flop<select value={flipFlop} onChange={event => setFlipFlop(event.target.value as FlipFlopKind)} style={inputStyle}><option>D</option><option>T</option><option>JK</option><option>SR</option></select></label>
-      <label style={{ ...fieldLabelStyle, marginTop: 14 }}>Encoding<select value={encoding} onChange={event => setEncoding(event.target.value as FSMEncoding)} style={inputStyle}><option>Binary</option><option>Gray</option><option>One-Hot</option></select></label>
-      <div style={{ borderTop: PANEL_BORDER, color: '#64748b', fontSize: 10, lineHeight: 1.55, marginTop: 18, paddingTop: 12 }}>State assignment uses <b>{stateWidth}</b> flip-flop{stateWidth === 1 ? '' : 's'}. Unassigned codes are routed as orange <b>X</b> don’t-cares into minimization.</div>
-    </aside>
-    <main style={{ minWidth: 0, padding: 17 }}>
-      <div style={{ alignItems: 'baseline', display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}><div style={{ color: '#334155', fontSize: 10, fontWeight: 850, letterSpacing: '.1em', textTransform: 'uppercase' }}>State diagram</div><div style={{ color: '#64748b', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 10 }}>{machine.kind.toUpperCase()} · {encoding.toUpperCase()}</div></div>
-      <StateDiagram machine={machine} selectedStateId={selectedStateId} onMoveState={moveState} onSelectState={setSelectedStateId} />
-      <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1.15fr)', marginTop: 14 }}>
-        <CompactTable label="FSM state table"><div style={{ borderBottom: PANEL_BORDER, color: '#334155', fontSize: 10, fontWeight: 850, letterSpacing: '.09em', padding: '10px 12px', textTransform: 'uppercase' }}>State table</div><table style={{ borderCollapse: 'collapse', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 10, width: '100%' }}><thead><tr>{stateHeaders.map(header => <th key={header.id} style={{ background: '#f8fafc', borderBottom: PANEL_BORDER, color: '#64748b', padding: 7, textAlign: 'left' }}>{header.label}</th>)}</tr></thead><tbody>{stateTable.map((row, index) => <tr key={`${row.presentCode}-${row.input}`} style={{ background: row.unused ? '#fff7ed' : index % 2 ? '#fbfdff' : '#ffffff', color: row.unused ? '#c2410c' : '#334155' }}><td style={{ padding: 7 }}>{row.presentState}</td><td style={{ padding: 7 }}>{row.presentCode}</td><td style={{ padding: 7 }}>{row.input}</td><td style={{ padding: 7 }}>{row.nextState}</td><td style={{ padding: 7 }}>{row.nextCode}</td><td style={{ padding: 7 }}>{row.output}</td></tr>)}</tbody></table></CompactTable>
-        <CompactTable label="FSM excitation table"><div style={{ borderBottom: PANEL_BORDER, color: '#334155', fontSize: 10, fontWeight: 850, letterSpacing: '.09em', padding: '10px 12px', textTransform: 'uppercase' }}>{flipFlop} excitation matrix</div><table style={{ borderCollapse: 'collapse', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 10, width: '100%' }}><thead><tr>{['PS', machine.inputName, ...Object.keys(excitationTable[0]?.signals ?? {})].map((header, index) => <th key={`excitation-${index}-${header}`} style={{ background: '#f8fafc', borderBottom: PANEL_BORDER, color: '#64748b', padding: 7, textAlign: 'left' }}>{header}</th>)}</tr></thead><tbody>{excitationTable.map((row, index) => <tr key={`${row.presentCode}-${row.input}`} style={{ background: row.unused ? '#fff7ed' : index % 2 ? '#fbfdff' : '#ffffff', color: row.unused ? '#c2410c' : '#334155' }}><td style={{ padding: 7 }}>{row.presentCode}</td><td style={{ padding: 7 }}>{row.input}</td>{Object.values(row.signals).map((value, signalIndex) => <td key={signalIndex} style={{ padding: 7 }}>{value}</td>)}</tr>)}</tbody></table></CompactTable>
+  const stateHeaders = [
+    { id: 'present-state', math: '\\text{PS}' },
+    { id: 'present-code', math: '\\text{Code}' },
+    { id: 'input', math: machine.inputName },
+    { id: 'next-state', math: '\\text{NS}' },
+    { id: 'next-code', math: '\\text{Code}' },
+    { id: 'output', math: machine.outputName },
+  ];
+
+  const selectClass = "w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200";
+
+  return (
+    <section
+      aria-label="Advanced FSM Explorer"
+      className="grid grid-cols-1 items-start gap-5 text-slate-900 dark:text-white lg:grid-cols-[220px_minmax(0,1fr)]"
+    >
+      <div className="flex flex-col gap-4">
+        <StudioCard title="EDA Controls">
+          <StudioButton
+            onClick={addState}
+            className="w-full justify-center flex items-center gap-1.5 bg-blue-600 text-white border-blue-600 hover:bg-blue-500 hover:text-white"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>Add State</span>
+          </StudioButton>
+
+          {selectedState ? (
+            <div className="mt-4 border-t border-slate-200 pt-3 dark:border-slate-800 space-y-3">
+              <div className="flex items-center justify-between">
+                <StatusBadge variant="info">Selected: {selectedState.name}</StatusBadge>
+                <KatexMath math={latexSignal(selectedState.name)} className="text-xs font-semibold text-blue-600 dark:text-blue-400" />
+              </div>
+              <StudioButton
+                onClick={deleteSelectedState}
+                disabled={machine.states.length <= 1}
+                className="w-full justify-center flex items-center gap-1.5 text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/30 border-rose-200 dark:border-rose-900/50 disabled:opacity-50"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Delete State</span>
+              </StudioButton>
+
+              {machine.kind === 'Moore' && (
+                <div>
+                  <label className="mb-1 block text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400">
+                    State Output (<KatexMath math={machine.outputName} />)
+                  </label>
+                  <SegmentedControl<'0' | '1'>
+                    value={selectedState.output === '1' ? '1' : '0'}
+                    onChange={val => updateSelectedState({ output: val })}
+                    options={[
+                      { value: '0', label: '0' },
+                      { value: '1', label: '1' },
+                    ]}
+                    size="sm"
+                  />
+                </div>
+              )}
+
+              <div>
+                <label className="mb-1 block text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400">
+                  Transition Target
+                </label>
+                <select
+                  value={transitionTargetId}
+                  onChange={e => setTransitionTargetId(e.target.value)}
+                  className={selectClass}
+                >
+                  {machine.states.map(state => (
+                    <option key={state.id} value={state.id}>{state.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="mb-1 block text-[9px] font-bold uppercase text-slate-500 dark:text-slate-400">
+                    Input (<KatexMath math={machine.inputName} />)
+                  </label>
+                  <SegmentedControl<'0' | '1'>
+                    value={transitionInput}
+                    onChange={setTransitionInput}
+                    options={[
+                      { value: '0', label: '0' },
+                      { value: '1', label: '1' },
+                    ]}
+                    size="sm"
+                  />
+                </div>
+                {machine.kind === 'Mealy' && (
+                  <div>
+                    <label className="mb-1 block text-[9px] font-bold uppercase text-slate-500 dark:text-slate-400">
+                      Output (<KatexMath math={machine.outputName} />)
+                    </label>
+                    <SegmentedControl<'0' | '1'>
+                      value={transitionOutput}
+                      onChange={setTransitionOutput}
+                      options={[
+                        { value: '0', label: '0' },
+                        { value: '1', label: '1' },
+                      ]}
+                      size="sm"
+                    />
+                  </div>
+                )}
+              </div>
+
+              <StudioButton
+                onClick={addTransitionFromSelected}
+                className="w-full justify-center flex items-center gap-1.5"
+              >
+                <ArrowRight className="w-3.5 h-3.5" />
+                <span>Add Transition To…</span>
+              </StudioButton>
+            </div>
+          ) : (
+            <div className="mt-3 text-xs text-slate-400">Select a state to configure.</div>
+          )}
+
+          <div className="mt-4 border-t border-slate-200 pt-3 dark:border-slate-800 space-y-3">
+            <div>
+              <label className="mb-1 block text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400">
+                Machine Model
+              </label>
+              <SegmentedControl<FSMKind>
+                options={MODEL_OPTIONS}
+                value={machine.kind}
+                onChange={kind => updateMachine({ kind })}
+                size="sm"
+              />
+            </div>
+
+            <div>
+              <label className="mb-1 block text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400">
+                Flip-Flop Type
+              </label>
+              <SegmentedControl<FlipFlopKind>
+                options={FF_OPTIONS}
+                value={flipFlop}
+                onChange={setFlipFlop}
+                size="sm"
+              />
+            </div>
+
+            <div>
+              <label className="mb-1 block text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400">
+                Encoding
+              </label>
+              <SegmentedControl<FSMEncoding>
+                options={ENCODING_OPTIONS}
+                value={encoding}
+                onChange={setEncoding}
+                size="sm"
+              />
+            </div>
+
+            <div className="border-t border-slate-200 pt-3 text-[11px] leading-relaxed text-slate-500 dark:border-slate-800 dark:text-slate-400">
+              State assignment uses <strong>{stateWidth}</strong> flip-flop{stateWidth === 1 ? '' : 's'}. Unassigned codes route as don’t-cares into minimization.
+            </div>
+          </div>
+        </StudioCard>
       </div>
-    </main>
-    <aside style={{ background: '#fbfdff', borderLeft: PANEL_BORDER, minWidth: 0, padding: 16 }}>
-      <div style={{ color: '#334155', fontSize: 10, fontWeight: 850, letterSpacing: '.1em', textTransform: 'uppercase' }}>Minimized equations</div>
-      <div style={{ color: '#64748b', fontSize: 10, lineHeight: 1.45, margin: '7px 0 12px' }}>Excitation rows are minimized through the K-Map engine; unused encodings remain don’t-cares.</div>
-      <div style={{ display: 'grid', gap: 7 }}>{equations.length ? equations.map(equation => <div key={equation.signal} style={{ background: '#ffffff', border: '1px solid #dbeafe', borderRadius: 8, fontSize: 13, overflowX: 'auto', padding: '4px 8px' }}><BlockMath math={equation.latex} /></div>) : <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8, color: '#92400e', fontSize: 11, lineHeight: 1.5, padding: 10 }}>The selected encoding exceeds the five-variable K-Map limit. Choose Binary or Gray encoding, or reduce the state count.</div>}</div>
-      {equations.length > 0 && <DerivationSteps equations={equations} flipFlop={flipFlop} />}
-      <div style={{ alignItems: 'center', display: 'flex', justifyContent: 'space-between', marginTop: 17 }}><div style={{ color: '#334155', fontSize: 10, fontWeight: 850, letterSpacing: '.1em', textTransform: 'uppercase' }}>Generated Verilog</div><button type="button" onClick={copyVerilog} style={{ background: '#ffffff', border: '1px solid #bfdbfe', borderRadius: 6, color: '#1d4ed8', cursor: 'pointer', fontSize: 10, fontWeight: 850, padding: '6px 8px' }}>{copied ? 'Copied' : 'Copy'}</button></div>
-      <pre aria-label="Generated Verilog" style={{ background: '#0f172a', borderRadius: 8, color: '#e2e8f0', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 10, lineHeight: 1.45, margin: '9px 0 0', maxHeight: 330, overflow: 'auto', padding: 11, whiteSpace: 'pre' }}><code>{verilog}</code></pre>
-      <div style={{ color: '#64748b', fontSize: 10, marginTop: 11 }}><InlineMath math="\\text{3 always blocks: state, next state, output}" /></div>
-    </aside>
-  </section>;
+
+      <div className="flex min-w-0 flex-col gap-5">
+        <StudioCard
+          title="Interactive State Diagram"
+          actionSlot={
+            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+              {machine.kind} · {encoding} · {flipFlop}-FF
+            </span>
+          }
+        >
+          <StateDiagram
+            machine={machine}
+            selectedStateId={selectedStateId}
+            onMoveState={moveState}
+            onSelectState={setSelectedStateId}
+          />
+        </StudioCard>
+
+        <div className="flex flex-col gap-4">
+          <StudioCard title="State table">
+            <CompactTable label="FSM state table">
+              <table className="w-full border-collapse text-xs">
+                <thead>
+                  <tr className="border-b border-slate-200 bg-slate-50/70 dark:border-slate-800 dark:bg-slate-950/50 text-slate-700 dark:text-slate-300">
+                    {stateHeaders.map(header => (
+                      <th key={header.id} className="p-2 text-center font-normal">
+                        <KatexMath math={header.math} />
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                  {stateTable.map((row) => (
+                    <tr
+                      key={`${row.presentCode}-${row.input}`}
+                      className={
+                        row.unused
+                          ? 'text-rose-500 font-mono bg-rose-50/50 dark:bg-rose-950/20 dark:text-rose-400'
+                          : 'text-slate-800 dark:text-slate-200'
+                      }
+                    >
+                      <td className="p-2 text-center font-semibold">
+                        {row.unused ? (
+                          <span className="font-mono text-[11px] text-rose-500 dark:text-rose-400">Unused</span>
+                        ) : (
+                          <KatexMath math={latexSignal(row.presentState)} />
+                        )}
+                      </td>
+                      <td className="p-2 text-center font-mono text-slate-500 dark:text-slate-400">{row.presentCode}</td>
+                      <td className="p-2 text-center"><KatexMath math={row.input} /></td>
+                      <td className="p-2 text-center font-semibold">
+                        {row.unused ? (
+                          <KatexMath math="X" />
+                        ) : (
+                          <KatexMath math={latexSignal(row.nextState)} />
+                        )}
+                      </td>
+                      <td className="p-2 text-center font-mono text-slate-500 dark:text-slate-400">{row.nextCode}</td>
+                      <td className="p-2 text-center">
+                        <KatexMath math={row.output === 'X' ? 'X' : row.output} />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </CompactTable>
+          </StudioCard>
+
+          <StudioCard title={`${flipFlop} excitation matrix`}>
+            <CompactTable label="FSM excitation table">
+              <table className="w-full border-collapse text-xs">
+                <thead>
+                  <tr className="border-b border-slate-200 bg-slate-50/70 dark:border-slate-800 dark:bg-slate-950/50 text-slate-700 dark:text-slate-300">
+                    {['\\text{PS}', machine.inputName, ...Object.keys(excitationTable[0]?.signals ?? {}).map(latexSignal)].map((headerMath, index) => (
+                      <th key={`excitation-${index}`} className="p-2 text-center font-normal">
+                        <KatexMath math={headerMath} />
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                  {excitationTable.map((row) => (
+                    <tr
+                      key={`${row.presentCode}-${row.input}`}
+                      className={
+                        row.unused
+                          ? 'text-rose-500 font-mono bg-rose-50/50 dark:bg-rose-950/20 dark:text-rose-400'
+                          : 'text-slate-800 dark:text-slate-200'
+                      }
+                    >
+                      <td className="p-2 text-center font-mono text-slate-500 dark:text-slate-400">{row.presentCode}</td>
+                      <td className="p-2 text-center"><KatexMath math={row.input} /></td>
+                      {Object.values(row.signals).map((value, signalIndex) => (
+                        <td key={signalIndex} className="p-2 text-center">
+                          <KatexMath math={value === 'X' ? 'X' : value} />
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </CompactTable>
+          </StudioCard>
+        </div>
+
+        <StudioCard title="Minimized equations">
+          <div className="mb-2 text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+            Excitation equations minimized through the K-Map solver.
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+            {equations.length ? (
+              equations.map(equation => (
+                <div
+                  key={equation.signal}
+                  className="overflow-x-auto rounded-lg border border-slate-200 bg-white p-2.5 text-xs font-semibold text-slate-900 dark:border-slate-800 dark:bg-slate-950 dark:text-white"
+                >
+                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                    <KatexMath math={latexSignal(equation.signal)} />
+                  </div>
+                  <KatexMath math={equation.latex} displayMode />
+                </div>
+              ))
+            ) : (
+              <div className="col-span-full rounded-lg border border-amber-200 bg-amber-50 p-2.5 text-xs text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300">
+                Selected encoding exceeds 5-variable K-Map limit.
+              </div>
+            )}
+          </div>
+        </StudioCard>
+      </div>
+    </section>
+  );
 }

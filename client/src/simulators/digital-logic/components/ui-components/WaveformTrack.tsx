@@ -38,8 +38,15 @@ export function WaveformTrack({ waveform, y, tickWidth, width, hazards = [], int
       <line x1={tick * tickWidth} y1={y} x2={(tick + 1) * tickWidth} y2={y} stroke="#dc2626" strokeWidth="1.1" strokeDasharray="3 2" />
       <text x={tick * tickWidth + tickWidth / 2} y={y + 4} textAnchor="middle" fill="#b91c1c" fontSize="10" fontWeight="800">{value}</text>
     </g> : null)}
-    {hazards.filter(hazard => hazard.tick < waveform.data.length).map(hazard => <rect key={`hazard-${hazard.tick}`} x={hazard.tick * tickWidth + 2} y={y - 18} width={Math.max(4, tickWidth - 4)} height="36" fill="#fef3c7" stroke="#d97706" strokeWidth="1" strokeDasharray="3 2" opacity=".9" />)}
-    <path d={squareWavePath(waveform.data, tickWidth, highY, lowY)} fill="none" stroke={waveform.type === 'output' ? '#2563eb' : waveform.type === 'clock' ? '#334155' : '#0f172a'} strokeLinecap="square" strokeLinejoin="miter" strokeWidth={waveform.type === 'output' ? 2.4 : 2} />
+    {hazards.filter(hazard => hazard.tick < waveform.data.length).map(hazard => <rect key={`hazard-${hazard.tick}`} x={hazard.tick * tickWidth + 2} y={y - 18} width={Math.max(4, tickWidth - 4)} height="36" fill="#f3e8ff" stroke="#7c3aed" strokeWidth="1" strokeDasharray="3 2" opacity=".9" />)}
+    <path
+      d={squareWavePath(waveform.data, tickWidth, highY, lowY)}
+      fill="none"
+      className={waveform.type === 'output' ? 'stroke-blue-600 dark:stroke-blue-400' : waveform.type === 'clock' ? 'stroke-slate-500 dark:stroke-slate-400' : 'stroke-slate-900 dark:stroke-slate-100'}
+      strokeLinecap="square"
+      strokeLinejoin="miter"
+      strokeWidth={waveform.type === 'output' ? 2.4 : 2}
+    />
     {interactive && waveform.data.map((_, tick) => <rect key={`hit-${tick}`} x={tick * tickWidth} y={y - trackHeight / 2} width={tickWidth} height={trackHeight} fill="transparent" role="button" aria-label={`Toggle ${waveform.name} at tick ${tick + 1}`} onClick={() => onToggleTick?.(tick)} style={{ cursor: 'pointer' }} />)}
   </g>;
 }

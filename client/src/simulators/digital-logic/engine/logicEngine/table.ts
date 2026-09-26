@@ -8,7 +8,8 @@ export interface TruthTableRow {
   value: boolean;
 }
 
-export const MAX_LOGIC_ANALYZER_VARIABLES = 6;
+/** 2^8 = 256 rows is the largest table the analyzer renders (inputs A–H). */
+export const MAX_LOGIC_ANALYZER_VARIABLES = 8;
 
 export const generateTruthTable = (ast: ASTNode, variables: string[]): TruthTableRow[] => {
   if (variables.length > MAX_LOGIC_ANALYZER_VARIABLES) throw new Error(`Logic Analyzer supports up to ${MAX_LOGIC_ANALYZER_VARIABLES} variables.`);

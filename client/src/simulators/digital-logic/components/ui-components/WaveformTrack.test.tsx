@@ -12,6 +12,6 @@ describe('WaveformTrack', () => {
     expect(markup).toContain('Toggle A at tick 1');
     expect(markup).toContain('Toggle A at tick 3');
     expect(markup).toContain('#fee2e2');
-    expect(markup).toContain('#fef3c7');
+    expect(markup).toContain('#f3e8ff');
   });
 });

@@ -221,6 +221,7 @@ const plugins = [
 export default defineConfig({
   plugins,
   resolve: {
+    dedupe: ["react", "react-dom"],
     alias: [
       {
         find: "@",

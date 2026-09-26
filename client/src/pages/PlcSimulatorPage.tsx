@@ -5,7 +5,7 @@ import { DEMO_SYMBOLS, createDemoNetworks } from "@/features/plc-simulator/ui/ho
 import { PlcSimulatorApp } from "@/features/plc-simulator/ui/host/PlcSimulatorApp";
 
 const TITLE = "PLC Simulator — Ladder Logic, Siemens LOGO! & S7-200 | MAE Academy";
-const DESCRIPTION = "Build ladder logic, watch power flow through the rung, and drive virtual Siemens LOGO! 0BA8 and S7-200 hardware with a real scan cycle, entirely in your browser.";
+const DESCRIPTION = "Build ladder logic, watch power flow through the rung, and drive virtual Siemens LOGO! 0BA4 and S7-200 hardware with a real scan cycle, entirely in your browser.";
 
 /** The starter program students see on first open; built once, since the app only reads it at mount. */
 const DEMO_NETWORKS = createDemoNetworks();

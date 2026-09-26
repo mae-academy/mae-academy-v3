@@ -1,18 +1,36 @@
-/** Timing Waveforms — tick-based interactive SVG viewer backed only by the pure timing engine. */
-import { BlockMath, InlineMath } from 'react-katex';
-import 'katex/dist/katex.min.css';
-import { useEffect, useMemo, useState } from 'react';
+/** Timing Waveforms — tick-based interactive SVG viewer backed by the timing engine. */
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Play, Pause, RotateCcw, Plus } from 'lucide-react';
+import { KatexMath } from '@/components/ui/KatexMath';
+import { StudioButton } from '@/components/common/templates';
 import { WaveformTrack } from '@/simulators/digital-logic/components/ui-components/WaveformTrack';
-import { createClockWaveform, evaluateTimingWaveforms, extendWaveform, type WaveformValue } from '../../engine/timingEngine';
+import {
+  createClockWaveform,
+  evaluateTimingWaveforms,
+  extendWaveform,
+  type WaveformValue,
+} from '../../engine/timingEngine';
 import { parseBooleanExpression } from '@/simulators/digital-logic/engine/logicEngine';
 
 const INITIAL_EXPRESSION = 'A ^ B';
 const INITIAL_TICKS = 12;
 const TICK_WIDTH = 48;
 const TRACK_HEIGHT = 48;
-const PLOT_TOP = 28;
+const PLOT_TOP = 52;
+const LABEL_WIDTH = 64;
 
-const inputValues = (variable: string, tickCount: number): WaveformValue[] => Array.from({ length: tickCount }, (_, tick) => variable === 'A' ? (tick === 3 || tick === 4 || tick === 8 ? 1 : 0) : variable === 'B' ? (tick === 5 || tick === 8 || tick === 9 ? 1 : 0) : 0);
+const inputValues = (variable: string, tickCount: number): WaveformValue[] =>
+  Array.from({ length: tickCount }, (_, tick) =>
+    variable === 'A'
+      ? tick === 3 || tick === 4 || tick === 8
+        ? 1
+        : 0
+      : variable === 'B'
+      ? tick === 5 || tick === 8 || tick === 9
+        ? 1
+        : 0
+      : 0,
+  );
 
 function useDebouncedValue<T>(value: T, delayMs: number) {
   const [debounced, setDebounced] = useState(value);
@@ -23,16 +41,41 @@ function useDebouncedValue<T>(value: T, delayMs: number) {
   return debounced;
 }
 
-interface ValidExpression { source: string; latex: string; variables: string[]; }
+interface ValidExpression {
+  source: string;
+  latex: string;
+  variables: string[];
+}
+
+/** Never throws: an unparsable shared expression (mid-edit or stale) falls back to the demo. */
+const initialValidExpression = (source: string | undefined): ValidExpression => {
+  for (const candidate of [source, INITIAL_EXPRESSION]) {
+    if (!candidate) continue;
+    try {
+      const parsed = parseBooleanExpression(candidate);
+      return { source: candidate, latex: parsed.latex, variables: parsed.variables };
+    } catch {
+      // try the next candidate
+    }
+  }
+  return { source: INITIAL_EXPRESSION, latex: 'A \\oplus B', variables: ['A', 'B'] };
+};
+
+const trackLabelMath = (name: string) => (name.length > 1 ? `\\mathrm{${name}}` : name);
+
+export interface TimingWaveformsProps {
+  expression?: string;
+  onExpressionChange?: (expression: string) => void;
+}
 
 /** Interactive input tracks and read-only propagated output for Boolean timing study. */
-export function TimingWaveforms() {
-  const [expression, setExpression] = useState(INITIAL_EXPRESSION);
-  const [lastValidExpression, setLastValidExpression] = useState<ValidExpression>(() => {
-    const parsed = parseBooleanExpression(INITIAL_EXPRESSION);
-    return { source: INITIAL_EXPRESSION, latex: parsed.latex, variables: parsed.variables };
-  });
-  const [inputData, setInputData] = useState<Record<string, WaveformValue[]>>(() => ({ A: inputValues('A', INITIAL_TICKS), B: inputValues('B', INITIAL_TICKS) }));
+export function TimingWaveforms({ expression: controlledExpr, onExpressionChange }: TimingWaveformsProps) {
+  const [expression, setExpression] = useState(controlledExpr ?? INITIAL_EXPRESSION);
+  const [lastValidExpression, setLastValidExpression] = useState<ValidExpression>(() => initialValidExpression(controlledExpr));
+  const [inputData, setInputData] = useState<Record<string, WaveformValue[]>>(() => ({
+    A: inputValues('A', INITIAL_TICKS),
+    B: inputValues('B', INITIAL_TICKS),
+  }));
   const [tickCount, setTickCount] = useState(INITIAL_TICKS);
   const [playhead, setPlayhead] = useState(0);
   const [playing, setPlaying] = useState(false);
@@ -40,11 +83,28 @@ export function TimingWaveforms() {
   const debouncedExpression = useDebouncedValue(expression, 300);
 
   useEffect(() => {
+    if (controlledExpr !== undefined && controlledExpr !== expression) {
+      setExpression(controlledExpr);
+    }
+  }, [controlledExpr]);
+
+  useEffect(() => {
     try {
       const parsed = parseBooleanExpression(debouncedExpression);
-      const next: ValidExpression = { source: debouncedExpression, latex: parsed.latex, variables: parsed.variables };
+      const next: ValidExpression = {
+        source: debouncedExpression,
+        latex: parsed.latex,
+        variables: parsed.variables,
+      };
       setLastValidExpression(next);
-      setInputData(current => Object.fromEntries(next.variables.map(variable => [variable, (current[variable] ?? inputValues(variable, tickCount)).slice(0, tickCount)])));
+      setInputData((current) =>
+        Object.fromEntries(
+          next.variables.map((variable) => [
+            variable,
+            (current[variable] ?? inputValues(variable, tickCount)).slice(0, tickCount),
+          ]),
+        ),
+      );
       setExpressionError(null);
     } catch (error) {
       setExpressionError(error instanceof Error ? error.message : 'Invalid timing expression.');
@@ -52,74 +112,273 @@ export function TimingWaveforms() {
   }, [debouncedExpression, tickCount]);
 
   useEffect(() => {
-    if (!playing) return;
-    const timer = window.setInterval(() => setPlayhead(current => (current + 1) % Math.max(1, tickCount)), 550);
-    return () => window.clearInterval(timer);
+    if (!playing) return undefined;
+    let animationFrameId: number;
+    let lastTime = performance.now();
+
+    const sweepSpeed = 1 / 0.55; // ticks per second (continuous sweep matching 550ms per tick)
+
+    const animate = (currentTime: number) => {
+      const deltaSeconds = Math.min(0.1, (currentTime - lastTime) / 1000);
+      lastTime = currentTime;
+      setPlayhead((current) => {
+        const next = current + deltaSeconds * sweepSpeed;
+        return next >= tickCount ? next % tickCount : next;
+      });
+      animationFrameId = requestAnimationFrame(animate);
+    };
+
+    animationFrameId = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(animationFrameId);
   }, [playing, tickCount]);
 
   const clock = useMemo(() => createClockWaveform(tickCount), [tickCount]);
-  const inputTracks = useMemo(() => lastValidExpression.variables.map(variable => ({ name: variable, type: 'input' as const, data: inputData[variable] ?? inputValues(variable, tickCount) })), [inputData, lastValidExpression.variables, tickCount]);
-  const timing = useMemo(() => evaluateTimingWaveforms(lastValidExpression.source, inputTracks, clock, { delayTicks: 1, outputName: 'F' }), [clock, inputTracks, lastValidExpression.source]);
-  const plotWidth = Math.max(560, tickCount * TICK_WIDTH);
+  const inputTracks = useMemo(
+    () =>
+      lastValidExpression.variables.map((variable) => ({
+        name: variable,
+        type: 'input' as const,
+        data: inputData[variable] ?? inputValues(variable, tickCount),
+      })),
+    [inputData, lastValidExpression.variables, tickCount],
+  );
+  const timing = useMemo(() => {
+    try {
+      return evaluateTimingWaveforms(lastValidExpression.source, inputTracks, clock, { delayTicks: 1, outputName: 'F' });
+    } catch {
+      // Input tracks lag one render behind a variable-set change; show a flat output meanwhile.
+      return { output: { name: 'F', type: 'output' as const, data: Array<WaveformValue>(tickCount).fill(0) }, risingEdges: [] as number[], hazards: [] };
+    }
+  }, [clock, inputTracks, lastValidExpression.source, tickCount]);
+  // Ticks stretch to fill the drawer width; they only fall back to horizontal scroll below TICK_WIDTH.
+  const canvasHostRef = useRef<HTMLDivElement>(null);
+  const [hostWidth, setHostWidth] = useState(0);
+  useEffect(() => {
+    const host = canvasHostRef.current;
+    if (!host || typeof ResizeObserver === 'undefined') return undefined;
+    const observer = new ResizeObserver(([entry]) => setHostWidth(entry.contentRect.width));
+    observer.observe(host);
+    return () => observer.disconnect();
+  }, []);
+  const tickWidth = Math.max(TICK_WIDTH, Math.floor((hostWidth - LABEL_WIDTH) / Math.max(1, tickCount)));
+  const plotWidth = tickCount * tickWidth;
+  const canvasWidth = LABEL_WIDTH + plotWidth;
   const plotHeight = PLOT_TOP + (inputTracks.length + 2) * TRACK_HEIGHT;
   const outputY = PLOT_TOP + (inputTracks.length + 1) * TRACK_HEIGHT;
 
-  const toggleInputTick = (variable: string, tick: number) => setInputData(current => ({
-    ...current,
-    [variable]: (current[variable] ?? inputValues(variable, tickCount)).map((value, index) => index === tick ? value === 0 ? 1 : 0 : value),
-  }));
+  const toggleInputTick = (variable: string, tick: number) =>
+    setInputData((current) => ({
+      ...current,
+      [variable]: (current[variable] ?? inputValues(variable, tickCount)).map((value, index) =>
+        index === tick ? (value === 0 ? 1 : 0) : value,
+      ),
+    }));
   const addCycle = () => {
-    setTickCount(current => current + 1);
-    setInputData(current => Object.fromEntries(Object.entries(current).map(([name, data]) => [name, extendWaveform({ name, type: 'input', data }).data])));
+    setTickCount((current) => current + 1);
+    setInputData((current) =>
+      Object.fromEntries(
+        Object.entries(current).map(([name, data]) => [
+          name,
+          extendWaveform({ name, type: 'input', data }).data,
+        ]),
+      ),
+    );
   };
   const reset = () => {
     setTickCount(INITIAL_TICKS);
     setPlayhead(0);
     setPlaying(false);
-    setInputData(Object.fromEntries(lastValidExpression.variables.map(variable => [variable, inputValues(variable, INITIAL_TICKS)])));
+    setInputData(
+      Object.fromEntries(
+        lastValidExpression.variables.map((variable) => [
+          variable,
+          inputValues(variable, INITIAL_TICKS),
+        ]),
+      ),
+    );
   };
 
-  return <section aria-label="Timing Waveforms" style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 14, boxShadow: '0 10px 28px rgba(15, 23, 42, .08)', color: '#0f172a', overflow: 'hidden' }}>
-    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(260px, .85fr)', gap: 18, padding: 22 }}>
-      <div>
-        <label htmlFor="timing-expression" style={{ color: '#334155', display: 'block', fontSize: 11, fontWeight: 800, letterSpacing: '.08em', marginBottom: 8, textTransform: 'uppercase' }}>Boolean expression</label>
-        <input id="timing-expression" value={expression} onChange={event => setExpression(event.target.value)} spellCheck={false} placeholder="e.g. A ^ B" aria-describedby="timing-expression-help timing-expression-error" style={{ background: expressionError ? '#fff8f8' : '#ffffff', border: `1px solid ${expressionError ? '#fda4af' : '#cbd5e1'}`, borderRadius: 10, boxSizing: 'border-box', color: '#0f172a', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 15, fontWeight: 700, outline: 'none', padding: '12px 13px', width: '100%' }} />
-        <p id="timing-expression-help" style={{ color: '#64748b', fontSize: 11, lineHeight: 1.5, margin: '8px 0 0' }}>Input tracks are generated from the variables in the expression. Click an input interval to toggle <InlineMath math={'0 \\leftrightarrow 1'} />; output <InlineMath math="F" /> is read-only and delayed by one tick.</p>
-        {expressionError && <p id="timing-expression-error" role="alert" style={{ color: '#be123c', fontSize: 12, fontWeight: 700, margin: '8px 0 0' }}>Invalid Timing Expression — {expressionError}</p>}
-        <div role="group" aria-label="Timing controls" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 13 }}>
-          <button type="button" onClick={() => setPlaying(current => !current)} style={{ background: playing ? '#eff6ff' : '#ffffff', border: '1px solid #bfdbfe', borderRadius: 7, color: '#1d4ed8', cursor: 'pointer', fontSize: 12, fontWeight: 850, padding: '8px 11px' }}>{playing ? 'Pause' : 'Play'}</button>
-          <button type="button" onClick={reset} style={{ background: '#ffffff', border: '1px solid #dbe3ef', borderRadius: 7, color: '#475569', cursor: 'pointer', fontSize: 12, fontWeight: 850, padding: '8px 11px' }}>Reset</button>
-          <button type="button" onClick={addCycle} style={{ background: '#ffffff', border: '1px solid #dbe3ef', borderRadius: 7, color: '#475569', cursor: 'pointer', fontSize: 12, fontWeight: 850, padding: '8px 11px' }}>Add Cycle</button>
-          <span style={{ alignItems: 'center', color: '#64748b', display: 'inline-flex', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 10, fontWeight: 800, padding: '0 4px' }}>{tickCount} TICKS · Δt = 1</span>
-        </div>
-      </div>
-      <div style={{ background: '#f8fbff', border: '1px solid #dbeafe', borderRadius: 10, minHeight: 143, overflowX: 'auto', padding: '9px 13px' }}>
-        <div style={{ color: '#2563eb', fontSize: 9, fontWeight: 850, letterSpacing: '.13em', textTransform: 'uppercase' }}>Timing definition → academic notation</div>
-        <div style={{ color: '#0f172a', fontSize: 16, marginTop: 1 }}><BlockMath math={`F = ${lastValidExpression.latex}`} /></div>
-        <div style={{ borderTop: '1px solid #dbeafe', color: '#64748b', fontSize: 10, lineHeight: 1.45, marginTop: 2, paddingTop: 8 }}>CLK samples regular tick intervals. Light dashed guides descend from each rising edge; output commits one cycle after its evaluated input state.</div>
-      </div>
-    </div>
+  const handleExpressionChange = (val: string) => {
+    setExpression(val);
+    onExpressionChange?.(val);
+  };
 
-    <div style={{ borderTop: '1px solid #eef2f7', padding: '17px 22px 22px' }}>
-      <div style={{ alignItems: 'center', display: 'flex', gap: 9, marginBottom: 12 }}><div style={{ background: 'linear-gradient(90deg, #2563eb, #8b5cf6, #f43f5e)', height: 2, width: 32 }} /><div style={{ color: '#334155', fontSize: 10, fontWeight: 850, letterSpacing: '.11em', textTransform: 'uppercase' }}>Tick waveform canvas</div></div>
-      <div style={{ border: '1px solid #e2e8f0', borderRadius: 12, display: 'grid', gridTemplateColumns: '94px minmax(0, 1fr)', minHeight: plotHeight + 22, overflow: 'hidden' }}>
-        <div aria-label="Waveform labels" style={{ background: '#f8fafc', borderRight: '1px solid #e2e8f0', paddingTop: PLOT_TOP + 1 }}>
-          {[clock, ...inputTracks, timing.output].map((track, index) => <div key={track.name} style={{ alignItems: 'center', borderBottom: index === inputTracks.length + 1 ? 'none' : '1px solid #eef2f7', color: track.type === 'output' ? '#1d4ed8' : '#475569', display: 'flex', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 12, fontWeight: 850, height: TRACK_HEIGHT, justifyContent: 'center' }}><InlineMath math={track.name} /></div>)}
+  const sweepX = playhead * tickWidth;
+  const currentTick = Math.min(tickCount - 1, Math.max(0, Math.floor(playhead)));
+
+  const handlePlotClick = (e: React.MouseEvent<SVGRectElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const clickedTick = Math.max(0, Math.min(tickCount - 1, Math.floor(clickX / tickWidth)));
+    setPlayhead(clickedTick);
+  };
+
+  return (
+    <section
+      aria-label="Timing Waveforms"
+      className="overflow-hidden rounded-xl border border-slate-200/80 bg-white/95 text-slate-900 shadow-sm dark:border-slate-800 dark:bg-slate-900/90 dark:text-white"
+    >
+      <div className="p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200/80 pb-4 dark:border-slate-800/80">
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mr-1">
+              Timing Controls
+            </span>
+            <div role="group" aria-label="Timing controls" className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setPlaying((current) => !current)}
+                aria-label={playing ? 'Pause timing simulation' : 'Play timing simulation'}
+                style={{
+                  background: 'linear-gradient(135deg, #7C3AED 0%, #2563EB 100%)',
+                  boxShadow: '0 2px 8px rgba(124, 58, 237, 0.35)',
+                }}
+                className="inline-flex items-center gap-1.5 px-4 py-1.5 text-xs font-medium text-white rounded-full transition-all hover:opacity-95 active:scale-95 cursor-pointer whitespace-nowrap"
+              >
+                {playing ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
+                <span>{playing ? 'Pause' : 'Play'}</span>
+              </button>
+              <StudioButton
+                onClick={reset}
+                title="Reset timing waveforms"
+                aria-label="Reset"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Reset</span>
+              </StudioButton>
+              <StudioButton
+                onClick={addCycle}
+                title="Add Cycle"
+                aria-label="Add Cycle"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                <span>Add Cycle</span>
+              </StudioButton>
+            </div>
+          </div>
         </div>
-        <div style={{ overflowX: 'auto', position: 'relative' }}>
-          <svg role="img" aria-label="Interactive timing waveform canvas" viewBox={`0 0 ${plotWidth} ${plotHeight + 18}`} style={{ display: 'block', height: plotHeight + 18, minWidth: plotWidth, width: plotWidth }}>
-            <defs><pattern id="timing-grid" width={TICK_WIDTH} height={TRACK_HEIGHT} patternUnits="userSpaceOnUse"><path d={`M ${TICK_WIDTH} 0 L 0 0 0 ${TRACK_HEIGHT}`} fill="none" stroke="#eef2f7" strokeWidth="1" /></pattern></defs>
-            <rect width={plotWidth} height={plotHeight + 18} fill="url(#timing-grid)" />
-            {Array.from({ length: tickCount + 1 }, (_, tick) => <text key={`tick-${tick}`} x={tick * TICK_WIDTH + 4} y="14" fill="#94a3b8" fontFamily="ui-monospace, SFMono-Regular, Menlo, monospace" fontSize="9">{tick}</text>)}
-            {timing.risingEdges.map(tick => <line key={`edge-${tick}`} x1={tick * TICK_WIDTH} y1="18" x2={tick * TICK_WIDTH} y2={plotHeight} stroke="#94a3b8" strokeDasharray="4 4" strokeWidth="1" />)}
-            <line x1={playhead * TICK_WIDTH + TICK_WIDTH / 2} y1="18" x2={playhead * TICK_WIDTH + TICK_WIDTH / 2} y2={plotHeight} stroke="#f43f5e" strokeWidth="1.5" />
-            <WaveformTrack waveform={clock} y={PLOT_TOP} tickWidth={TICK_WIDTH} width={plotWidth} />
-            {inputTracks.map((track, index) => <WaveformTrack key={track.name} waveform={track} y={PLOT_TOP + (index + 1) * TRACK_HEIGHT} tickWidth={TICK_WIDTH} width={plotWidth} interactive onToggleTick={tick => toggleInputTick(track.name, tick)} />)}
-            <WaveformTrack waveform={timing.output} y={outputY} tickWidth={TICK_WIDTH} width={plotWidth} hazards={timing.hazards} />
+        {expressionError && (
+          <p
+            id="timing-expression-error"
+            role="alert"
+            className="mt-3 text-xs font-bold text-rose-600 dark:text-rose-400"
+          >
+            Invalid Timing Expression — {expressionError}
+          </p>
+        )}
+      </div>
+
+      <div className="border-t border-slate-200 p-5 dark:border-slate-800">
+        <div className="mb-3 flex items-center gap-2">
+          <div className="h-0.5 w-8 bg-gradient-to-r from-blue-500 via-purple-500 to-rose-500" />
+          <div className="text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">
+            Tick Waveform Canvas
+          </div>
+        </div>
+        <div ref={canvasHostRef} className="w-full overflow-x-auto rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
+          <svg
+            role="img"
+            aria-label="Interactive timing waveform canvas"
+            viewBox={`0 0 ${canvasWidth} ${plotHeight + 18}`}
+            preserveAspectRatio="xMinYMin meet"
+            style={{ width: canvasWidth, height: plotHeight + 18 }}
+            className="block"
+          >
+            {[clock, ...inputTracks, timing.output].map((track, index) => (
+              <foreignObject key={`label-${track.name}`} x={0} y={PLOT_TOP + index * TRACK_HEIGHT - TRACK_HEIGHT / 2} width={LABEL_WIDTH} height={TRACK_HEIGHT}>
+                <div
+                  aria-label={`${track.name} track`}
+                  className={`flex h-full items-center justify-center text-sm ${track.type === 'output' ? 'text-blue-600 dark:text-blue-400' : 'text-slate-700 dark:text-slate-300'}`}
+                >
+                  <KatexMath math={trackLabelMath(track.name)} />
+                </div>
+              </foreignObject>
+            ))}
+            <line x1={LABEL_WIDTH} y1={0} x2={LABEL_WIDTH} y2={plotHeight + 18} className="stroke-slate-200 dark:stroke-slate-800" strokeWidth="1" />
+            <g transform={`translate(${LABEL_WIDTH}, 0)`}>
+              <defs>
+                <pattern id="timing-grid" width={tickWidth} height={TRACK_HEIGHT} patternUnits="userSpaceOnUse">
+                  <path d={`M ${tickWidth} 0 L 0 0 0 ${TRACK_HEIGHT}`} fill="none" className="stroke-slate-100 dark:stroke-slate-800/50" strokeWidth="1" />
+                </pattern>
+              </defs>
+              <rect
+                width={plotWidth}
+                height={plotHeight + 18}
+                fill="url(#timing-grid)"
+                className="cursor-crosshair"
+                onClick={handlePlotClick}
+              />
+              {Array.from({ length: tickCount + 1 }, (_, tick) => (
+                <text key={`tick-${tick}`} x={tick * tickWidth + 4} y="14" className="fill-slate-400 font-mono text-[9px]">
+                  {tick}
+                </text>
+              ))}
+              {timing.risingEdges.map((tick) => (
+                <line
+                  key={`edge-${tick}`}
+                  x1={tick * tickWidth}
+                  y1="18"
+                  x2={tick * tickWidth}
+                  y2={plotHeight}
+                  className="stroke-slate-300 dark:stroke-slate-700"
+                  strokeDasharray="4 4"
+                  strokeWidth="1"
+                />
+              ))}
+              {/* Continuous sweep line & active indicator */}
+              <g className="pointer-events-none">
+                <line
+                  x1={sweepX}
+                  y1="14"
+                  x2={sweepX}
+                  y2={plotHeight}
+                  className="stroke-rose-500 dark:stroke-rose-400"
+                  strokeWidth="2"
+                />
+                <polygon
+                  points={`${sweepX - 4},12 ${sweepX + 4},12 ${sweepX},18`}
+                  className="fill-rose-500 dark:fill-rose-400"
+                />
+              </g>
+              <WaveformTrack waveform={clock} y={PLOT_TOP} tickWidth={tickWidth} width={plotWidth} />
+              {inputTracks.map((track, index) => (
+                <WaveformTrack
+                  key={track.name}
+                  waveform={track}
+                  y={PLOT_TOP + (index + 1) * TRACK_HEIGHT}
+                  tickWidth={tickWidth}
+                  width={plotWidth}
+                  interactive
+                  onToggleTick={(tick) => toggleInputTick(track.name, tick)}
+                />
+              ))}
+              <WaveformTrack
+                waveform={timing.output}
+                y={outputY}
+                tickWidth={tickWidth}
+                width={plotWidth}
+                hazards={timing.hazards}
+              />
+            </g>
           </svg>
         </div>
+        <div className="mt-3 flex flex-wrap gap-4 text-xs text-slate-500 dark:text-slate-400">
+          <span>
+            <strong className="text-slate-700 dark:text-slate-200">CLK guides</strong> · rising edges
+          </span>
+          <span>
+            <strong className="text-blue-600 dark:text-blue-400">F</strong> · delayed output
+          </span>
+          <span>
+            <strong className="text-purple-600 dark:text-purple-400">purple region</strong> · hazard glitch
+          </span>
+          <span>
+            <strong className="text-rose-600 dark:text-rose-400">red region</strong> · high impedance
+          </span>
+        </div>
       </div>
-      <div style={{ color: '#64748b', display: 'flex', flexWrap: 'wrap', fontSize: 10, gap: 14, marginTop: 10 }}><span><b style={{ color: '#334155' }}>CLK guides</b> · rising edges</span><span><b style={{ color: '#1d4ed8' }}>F</b> · delayed output</span><span><b style={{ color: '#b45309' }}>amber region</b> · detected glitch</span><span><b style={{ color: '#b91c1c' }}>red region</b> · unknown / high impedance</span></div>
-    </div>
-  </section>;
+    </section>
+  );
 }

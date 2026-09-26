@@ -5,7 +5,6 @@ import { LOGO_0BA8, S7_200_CPU224, S7_200_CPU226_EXP } from '../../domain/hardwa
 import type { Network } from '../../domain/ast';
 import type { Scheduler } from '../../engine/types';
 import { ilToLad } from '../../transpiler';
-import type { FbdGraph } from '../fbd/model';
 import { PlcSimulatorApp } from './PlcSimulatorApp';
 
 // Radix Slider measures its thumb with ResizeObserver, which jsdom does not implement.
@@ -183,7 +182,7 @@ describe('hardware profile switching', () => {
     expect(mode()).toBe('STOP');
   });
 
-  it('keeps the LOGO! chassis in its own tab, apart from the S7-200 rack', () => {
+  it('keeps the LOGO! bench in its own tab, apart from the S7-200 rack', () => {
     const sched = manual();
     const { container } = render(<PlcSimulatorApp initialNetworks={SEAL} runtimeOptions={sched.runtimeOptions} />);
     expect(screen.queryByRole('img', { name: /^Display/ })).toBeNull();
@@ -191,13 +190,14 @@ describe('hardware profile switching', () => {
 
     fireEvent.click(screen.getByRole('tab', { name: 'LOGO!' }));
     expect(container.querySelectorAll('[data-lcd-line]').length).toBe(4);
-    expect(container.querySelectorAll('[data-terminal]').length).toBe(16);
-    expect(container.querySelectorAll('[data-relay]').length).toBe(10);
+    expect(container.querySelectorAll('[data-terminal^="I"]').length).toBe(8);
+    expect(container.querySelectorAll('[data-relay]').length).toBe(4);
     expect(screen.queryByRole('radiogroup', { name: 'Mode switch' })).toBeNull();
-    // LOGO! programs are function block diagrams only: no LAD / IL toggle, no ladder canvas
+    // No editor on the LOGO! side: no LAD / IL toggle, no canvas, no palette, no inspector
     expect(screen.queryByRole('tab', { name: 'IL' })).toBeNull();
     expect(screen.queryByRole('application', { name: /Ladder logic editor/ })).toBeNull();
-    expect(screen.getByRole('application', { name: /Function block diagram/ })).toBeDefined();
+    expect(screen.queryByRole('application', { name: /Function block diagram/ })).toBeNull();
+    expect(screen.queryByRole('searchbox', { name: 'Search components' })).toBeNull();
   });
 
   it('starts from a clean memory image after a switch', () => {
@@ -209,172 +209,6 @@ describe('hardware profile switching', () => {
 
     fireEvent.change(screen.getByRole('combobox', { name: 'Hardware profile' }), { target: { value: S7_200_CPU226_EXP.id } });
     expect(led(container, 'Q0.0 off')).toBeDefined();
-    expect(mode()).toBe('STOP');
-  });
-});
-
-/** I1 -> Q1, and optionally I1 -> TON(preset ticks). Blocks are laid out on the grid. */
-const wire = (preset?: number): FbdGraph => ({
-  blocks: [
-    { id: 'b1', kind: 'input', x: 40, y: 40, index: 0 },
-    { id: 'b2', kind: 'output', x: 300, y: 40, index: 0 },
-    ...(preset === undefined ? [] : [{ id: 'b3', kind: 'ton' as const, x: 300, y: 140, preset }]),
-  ],
-  links: [{ id: 'l1', from: 'b1', to: 'b2', pin: 0 }, ...(preset === undefined ? [] : [{ id: 'l2', from: 'b1', to: 'b3', pin: 0 }])],
-});
-
-describe('LOGO! front panel driving the controller', () => {
-  const display = () => screen.getByRole('img', { name: /^Display/ });
-  const key = (name: string) => fireEvent.click(screen.getByRole('button', { name }));
-
-  function startLogo(graph: FbdGraph = wire()) {
-    const sched = manual();
-    const view = render(<PlcSimulatorApp initialProfileId={LOGO_0BA8.id} initialLogoGraph={graph} runtimeOptions={sched.runtimeOptions} />);
-    return { sched, ...view };
-  }
-
-  it('starts the program from the menu, then shows the live I/O matrix', async () => {
-    const { sched, container } = startLogo();
-    expect(display().textContent).toContain('>▶ Start');
-
-    fireEvent.pointerDown(screen.getByRole('button', { name: /Input I1 \(I0\.0\)/ })); // I1 on
-    key('OK');
-    expect(mode()).toBe('RUN');
-    sched.scan();
-
-    expect(led(container, 'Relay Q1 (Q0.0) on')).toBeDefined();
-    await waitFor(() => expect(display().textContent).toContain('I0:10000000'));
-    expect(display().textContent).toContain('Q0:10000000');
-  });
-
-  it('confirms before stopping and halts the controller on Yes', async () => {
-    const { sched } = startLogo();
-    key('OK');
-    sched.scan();
-    await waitFor(() => expect(display().textContent).toContain('I0:'));
-
-    key('Escape');
-    expect(display().textContent).toContain('Program?');
-    key('OK'); // cursor starts on Yes
-    expect(mode()).toBe('STOP');
-    expect(display().textContent).toContain('>▶ Start');
-  });
-
-  it('keeps running when No is chosen', async () => {
-    const { sched } = startLogo();
-    key('OK');
-    sched.scan();
-    key('Escape');
-    key('Down');
-    key('OK');
-    expect(mode()).toBe('RUN');
-    await waitFor(() => expect(display().textContent).toContain('I0:'));
-  });
-
-  it('follows a stop issued from the toolbar', async () => {
-    const { sched } = startLogo();
-    key('OK');
-    sched.scan();
-    fireEvent.click(screen.getByRole('button', { name: 'Stop' }));
-    await waitFor(() => expect(display().textContent).toContain('>▶ Start'));
-  });
-
-  it('edits a timer preset from the keypad and writes it back into the diagram', async () => {
-    const { sched, container } = startLogo(wire(30));
-    key('OK'); // Start
-    sched.scan();
-
-    key('Down'); // I/O -> T37
-    await waitFor(() => expect(display().textContent).toContain('T37 100ms'));
-    expect(display().textContent).toContain('>PT 00030');
-    expect(container.textContent).toContain('TON 3.0s');
-
-    key('OK'); // enter edit mode on the last digit
-    key('Up');
-    key('Up'); // 30 -> 32
-    key('OK'); // commit
-    await waitFor(() => expect(display().textContent).toContain('>PT 00032'));
-    // the block on the diagram is the source of that value
-    expect(container.textContent).toContain('TON 3.2s');
-  });
-
-  it('cancels a preset edit with ESC and leaves the diagram untouched', async () => {
-    const { sched, container } = startLogo(wire(30));
-    key('OK');
-    sched.scan();
-    key('Down');
-    key('OK');
-    key('Up');
-    key('Up');
-    key('Escape');
-    await waitFor(() => expect(display().textContent).toContain('>PT 00030'));
-    expect(container.textContent).toContain('TON 3.0s');
-  });
-});
-
-describe('LOGO! physical keyboard', () => {
-  const display = () => screen.getByRole('img', { name: /^Display/ });
-  const press = (name: string, target: Element | Window = window) => fireEvent.keyDown(target, { key: name });
-
-  function startLogo(graph: FbdGraph = wire(30)) {
-    const sched = manual();
-    const view = render(<PlcSimulatorApp initialProfileId={LOGO_0BA8.id} initialLogoGraph={graph} runtimeOptions={sched.runtimeOptions} />);
-    return { sched, ...view };
-  }
-
-  it('shows the key hint bar', () => {
-    startLogo();
-    const hint = screen.getByRole('note', { name: 'Keyboard shortcuts' });
-    expect(hint.textContent).toContain('▲▼◄► Nav');
-    expect(hint.textContent).toContain('Enter: OK');
-    expect(hint.textContent).toContain('Esc: Back');
-  });
-
-  it('maps Enter to OK, arrows to navigation and Escape to the stop confirmation', async () => {
-    const { sched } = startLogo();
-    press('Enter'); // OK on "Start"
-    expect(mode()).toBe('RUN');
-    sched.scan();
-    await waitFor(() => expect(display().textContent).toContain('I0:'));
-
-    press('ArrowDown'); // next RUN page
-    await waitFor(() => expect(display().textContent).toContain('T37 100ms'));
-    press('ArrowUp');
-    await waitFor(() => expect(display().textContent).toContain('I0:'));
-
-    press('Escape');
-    expect(display().textContent).toContain('Program?');
-    press('ArrowDown'); // No
-    press('Enter');
-    expect(mode()).toBe('RUN');
-    press('Escape');
-    press('Enter'); // Yes
-    expect(mode()).toBe('STOP');
-  });
-
-  it('adjusts a value digit by digit with the arrow keys', async () => {
-    const { sched } = startLogo();
-    press('Enter');
-    sched.scan();
-    press('ArrowDown');
-    await waitFor(() => expect(display().textContent).toContain('>PT 00030'));
-    press('Enter'); // edit
-    press('ArrowLeft'); // tens digit
-    press('ArrowUp'); // 30 -> 40
-    press('Enter');
-    await waitFor(() => expect(display().textContent).toContain('>PT 00040'));
-  });
-
-  it('leaves keys alone while typing in a field or when the tab is hidden', () => {
-    startLogo();
-    fireEvent.change(screen.getByRole('searchbox', { name: 'Search components' }), { target: { value: 'and' } });
-    press('Enter', screen.getByRole('searchbox', { name: 'Search components' }));
-    expect(mode()).toBe('STOP');
-
-    fireEvent.click(screen.getByRole('tab', { name: 'S7-200' }));
-    press('Enter');
-    expect(screen.queryByRole('img', { name: /^Display/ })).toBeNull(); // LOGO! is hidden
-    fireEvent.click(screen.getByRole('tab', { name: 'LOGO!' }));
     expect(mode()).toBe('STOP');
   });
 });

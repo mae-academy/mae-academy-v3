@@ -29,6 +29,8 @@ export interface ExecutiveToolbarProps {
   onStop: () => void;
   onReset?: () => void;
   onStep?: () => void;
+  /** Hides Run / Pause and Single step (controllers that are started from their own panel). */
+  hideRunControls?: boolean;
   frame?: FrameStore;
   readMetrics?: () => ScanMetrics | null;
   /** Left-most slot, e.g. the hardware / CPU selector and examples dropdown. */
@@ -81,6 +83,7 @@ export function ExecutiveToolbar({
   onStop,
   onReset,
   onStep,
+  hideRunControls = false,
   frame,
   readMetrics,
   leading,
@@ -154,22 +157,24 @@ export function ExecutiveToolbar({
 
           {/* Dynamic Run/Pause & Reset Control */}
           <div className="flex shrink-0 items-center gap-1">
-            <button
-              type="button"
-              onClick={handleRunClick}
-              aria-label={running ? 'Pause' : paused ? 'Resume' : 'Run'}
-              title={running ? 'Pause execution' : paused ? 'Resume execution' : 'Run execution'}
-              className={`inline-flex h-9 shrink-0 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap px-3.5 text-xs font-semibold active:scale-[.98] ${
-                paused ? 'brand-pill-active-rev' : 'brand-pill-active'
-              }`}
-            >
-              {running ? (
-                <Pause className="h-3.5 w-3.5 fill-current" aria-hidden="true" />
-              ) : (
-                <Play className="h-3.5 w-3.5 fill-current" aria-hidden="true" />
-              )}
-              <span>{running ? 'Pause' : paused ? 'Resume' : 'Run'}</span>
-            </button>
+            {!hideRunControls && (
+              <button
+                type="button"
+                onClick={handleRunClick}
+                aria-label={running ? 'Pause' : paused ? 'Resume' : 'Run'}
+                title={running ? 'Pause execution' : paused ? 'Resume execution' : 'Run execution'}
+                className={`inline-flex h-9 shrink-0 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap px-3.5 text-xs font-semibold active:scale-[.98] ${
+                  paused ? 'brand-pill-active-rev' : 'brand-pill-active'
+                }`}
+              >
+                {running ? (
+                  <Pause className="h-3.5 w-3.5 fill-current" aria-hidden="true" />
+                ) : (
+                  <Play className="h-3.5 w-3.5 fill-current" aria-hidden="true" />
+                )}
+                <span>{running ? 'Pause' : paused ? 'Resume' : 'Run'}</span>
+              </button>
+            )}
 
             <button
               type="button"
@@ -181,7 +186,7 @@ export function ExecutiveToolbar({
               <RotateCcw className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" aria-hidden="true" />
             </button>
 
-            {onStep && (
+            {onStep && !hideRunControls && (
               <button
                 type="button"
                 onClick={onStep}
@@ -199,26 +204,30 @@ export function ExecutiveToolbar({
 
           {/* Centered Editor Tool Suite */}
           <div className="flex shrink-0 items-center gap-1">
-            <button
-              type="button"
-              title="Undo (Ctrl+Z)"
-              aria-label="Undo"
-              onClick={onUndo}
-              disabled={!canUndo || running}
-              className={`${PILL_BUTTON} w-9 px-0`}
-            >
-              <Undo2 size={13} aria-hidden="true" />
-            </button>
-            <button
-              type="button"
-              title="Redo (Ctrl+Shift+Z)"
-              aria-label="Redo"
-              onClick={onRedo}
-              disabled={!canRedo || running}
-              className={`${PILL_BUTTON} w-9 px-0`}
-            >
-              <Redo2 size={13} aria-hidden="true" />
-            </button>
+            {onUndo && (
+              <button
+                type="button"
+                title="Undo (Ctrl+Z)"
+                aria-label="Undo"
+                onClick={onUndo}
+                disabled={!canUndo || running}
+                className={`${PILL_BUTTON} w-9 px-0`}
+              >
+                <Undo2 size={13} aria-hidden="true" />
+              </button>
+            )}
+            {onRedo && (
+              <button
+                type="button"
+                title="Redo (Ctrl+Shift+Z)"
+                aria-label="Redo"
+                onClick={onRedo}
+                disabled={!canRedo || running}
+                className={`${PILL_BUTTON} w-9 px-0`}
+              >
+                <Redo2 size={13} aria-hidden="true" />
+              </button>
+            )}
             {onCopy && (
               <button
                 type="button"

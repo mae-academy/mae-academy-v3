@@ -171,11 +171,11 @@ export const powerElectronicsToolMeta = [
 ] as const;
 
 export const signalsAndSystemsToolMeta = [
-  { slug: "a", label: "Signal Operations & Properties" },
-  { slug: "b", label: "System Classification" },
-  { slug: "c", label: "Convolution Engine" },
-  { slug: "d", label: "3D Fourier Analysis" },
-  { slug: "e", label: "3D Laplace & S-Plane" },
+  { slug: "signal-operations-and-properties", label: "Signal Operations & Properties" },
+  { slug: "system-classification", label: "System Classification" },
+  { slug: "convolution-engine", label: "Convolution Engine" },
+  { slug: "fourier-analysis", label: "3D Fourier Analysis" },
+  { slug: "laplace-s-plane", label: "3D Laplace & S-Plane" },
 ] as const;
 
 export const linearAlgebraToolMeta: Record<Locale, Array<{ slug: string; label: string }>> = {

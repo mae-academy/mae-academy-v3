@@ -54,6 +54,7 @@ import { getLogicComponentBounds, getLogicComponentTerminals } from '@/simulator
 import { renderSymbol } from '@/simulators/digital-logic/components/symbols';
 import { getDotsOnPath, getTerminalWorldPos, pathLength, type Point } from '@/simulators/digital-logic/models/wiring';
 import { calculateOrthogonalPath } from '@/simulators/digital-logic/models/wireRouter';
+import { placeGeneratedCircuit } from '@/simulators/digital-logic/engine/circuitExpressionExtractor';
 import { createNadDocument, parseNad, serializeNad } from '@/simulators/digital-logic/models/nadFormat';
 import { TAB_D_GRID_SIZE } from '@/simulators/shared/workspace/workspaceCanvasMechanics';
 import type { Palette } from '@/simulators/shared/workspace/workspaceTheme';
@@ -72,7 +73,7 @@ import { BaseSchematicCanvas } from '@/components/common/schematic/BaseSchematic
 import { useSchematicCanvas } from '@/components/common/schematic/useSchematicCanvas';
 import { renderComponentCanvasLabel } from '@/components/common/schematic/schematicLabel';
 import { KATEX_EMBEDDED_FONT_CSS } from '@/simulators/digital-logic/models/katexSvgFonts';
-import { pointInComponentBox } from '@/components/common/schematic/schematicGeometry';
+import { pointInComponentBox, routeWires } from '@/components/common/schematic/schematicGeometry';
 import type { SchematicComponentLibrary, SchematicTerminal } from '@/components/common/schematic/schematicTypes';
 
 /* Reversed variant used only by the Run/Pause pill after a session has started; not part of the shared chrome contract. */
@@ -561,7 +562,24 @@ export function DigitalLogicSimulatorHome({
       emptyHint="Drag and drop logic gates, inputs, and components from the library to begin."
       simulationRunning={simulationRunning}
       analysisTitle="Logic Analysis Workspace"
-      analysisContent={<DigitalLogicAnalysisBox colors={colors} standalone components={components} wires={wires} snapshot={snapshot} />}
+      analysisContent={
+        <DigitalLogicAnalysisBox
+          colors={colors}
+          standalone
+          components={components}
+          wires={wires}
+          snapshot={snapshot}
+          onGenerateCircuit={(newComps, newWires, mode) => {
+            // One undoable step: Replace clears the schematic and centres on (0, 0); Append places the
+            // sub-circuit right of existing work. Wires then route around every part on the canvas.
+            const placed = placeGeneratedCircuit(components, { components: newComps, wires: newWires }, mode);
+            const nextComponents = mode === 'replace' ? placed.components : [...components, ...placed.components];
+            const nextWires = [...(mode === 'replace' ? [] : wires), ...routeWires(DIGITAL_LOGIC_LIBRARY, placed.wires, nextComponents)];
+            canvas.loadDocument({ components: nextComponents, wires: nextWires, texts: mode === 'replace' ? [] : texts });
+            requestAnimationFrame(() => canvas.zoomToFit());
+          }}
+        />
+      }
       inspectorContent={selectedComponent ? (
         <ComponentInspector
           colors={colors}

@@ -1,5 +1,7 @@
 /** Universal Synthesis — pure AST-driven pedagogical NAND/NOR derivation engine. */
-import { astToLatex, parseBooleanExpression, type ASTNode } from './logicEngine';
+import { astToOverlineLatex, parseBooleanExpression, type ASTNode } from './logicEngine';
+import { DYNAMIC_GATE_MAX_INPUTS } from '@/simulators/digital-logic/components/dynamicLogicGeometry';
+import { layoutNetlist, type GeneratedCircuit, type NetlistGate, type NetRef } from './circuitExpressionExtractor';
 
 export type SynthesisMode = 'NAND' | 'NOR';
 
@@ -66,15 +68,14 @@ const requirePos = (node: ASTNode) => {
   return clauses;
 };
 
-/** Logic Analyzer-compatible postfix complement: unmistakable in both KaTeX previews and compact equations. */
-const negate = (latex: string) => `(${latex})^{\\prime}`;
-const joinedLatex = (nodes: readonly ASTNode[], operation: 'AND' | 'OR') => nodes.map(astToLatex).join(operation === 'AND' ? ' \\cdot ' : ' + ');
+/** Textbook complement bar: every De Morgan step renders as a crisp KaTeX overline. */
+const negate = (latex: string) => `\\overline{${latex}}`;
+const joinedLatex = (nodes: readonly ASTNode[], operation: 'AND' | 'OR') => nodes.map(node => astToOverlineLatex(node, 3)).join(operation === 'AND' ? ' \\cdot ' : ' + ');
 
-/** Equivalent all-universal-gate equation in the Logic Analyzer postfix-prime convention. */
+/** Equivalent all-universal-gate equation: one bar per gate output. */
 const universalPrimeLatex = (terms: readonly ASTNode[], internalOperation: 'AND' | 'OR') => {
   const operation = internalOperation === 'AND' ? ' \\cdot ' : ' + ';
-  const primedTerms = terms.map(term => `(${joinedLatex(flatten(term, internalOperation), internalOperation)})^{\\prime}`);
-  return `(${primedTerms.join(operation)})^{\\prime}`;
+  return negate(terms.map(term => negate(joinedLatex(flatten(term, internalOperation), internalOperation))).join(operation));
 };
 
 const buildDiagram = (mode: SynthesisMode, terms: readonly ASTNode[], internalOperation: 'AND' | 'OR'): SynthesisDiagram => {
@@ -210,5 +211,33 @@ const deriveNor = (ast: ASTNode, originalLatex: string): SynthesisDerivation => 
 
 export const deriveUniversalSynthesis = (expression: string, mode: SynthesisMode): SynthesisDerivation => {
   const parsed = parseBooleanExpression(expression);
-  return mode === 'NAND' ? deriveNand(parsed.ast, parsed.latex) : deriveNor(parsed.ast, parsed.latex);
+  const originalLatex = astToOverlineLatex(parsed.ast);
+  return mode === 'NAND' ? deriveNand(parsed.ast, originalLatex) : deriveNor(parsed.ast, originalLatex);
+};
+
+/**
+ * Lowers a synthesized universal-gate diagram into the shared schematic netlist and lays it out with
+ * the same staged engine as Generate Circuit, using ONLY NAND (or NOR) gates. A single-operand
+ * universal gate is emitted with both inputs tied together so no pin floats.
+ */
+export const synthesisDiagramToCircuit = (diagram: SynthesisDiagram): GeneratedCircuit => {
+  const nodeById = new Map(diagram.nodes.map(node => [node.id, node]));
+  const refFor = (nodeId: string): NetRef => {
+    const node = nodeById.get(nodeId);
+    if (!node) throw new Error('Malformed synthesis diagram.');
+    if (node.kind === 'gate') return { kind: 'gate', id: node.id };
+    if (node.label === '0' || node.label === '1') return { kind: 'constant', value: node.label };
+    return { kind: 'input', name: node.label };
+  };
+  const gateType = diagram.mode === 'NAND' ? 'gate-nand' : 'gate-nor';
+  const gates: NetlistGate[] = diagram.nodes.filter(node => node.kind === 'gate').map(node => {
+    const inputs = diagram.wires.filter(wire => wire.to === node.id).map(wire => refFor(wire.from));
+    if (inputs.length > DYNAMIC_GATE_MAX_INPUTS) throw new Error(`A ${inputs.length}-input ${diagram.mode} exceeds the ${DYNAMIC_GATE_MAX_INPUTS}-input gate limit; minimize the expression first.`);
+    return { id: node.id, type: gateType, inputs: inputs.length === 1 ? [inputs[0], inputs[0]] : inputs };
+  });
+  const outputNode = diagram.nodes.find(node => node.kind === 'output');
+  const outputWire = diagram.wires.find(wire => wire.to === outputNode?.id);
+  if (!outputWire) throw new Error('Malformed synthesis diagram.');
+  const inputs = diagram.nodes.filter(node => node.kind === 'input' && node.label !== '0' && node.label !== '1').map(node => node.label).sort();
+  return layoutNetlist({ inputs, gates, output: refFor(outputWire.from) });
 };

@@ -1,13 +1,11 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { LOGO_0BA8, S7_200_CPU224, S7_200_CPU226_EXP } from '../../domain/hardware';
+import { S7_200_CPU224, S7_200_CPU226_EXP } from '../../domain/hardware';
 import { MemoryMap } from '../../domain/memory';
-import { createFrameStore } from './frame-store';
 import { LcdDisplay } from './LcdDisplay';
-import { LogoHardware } from './LogoHardware';
 import { S7200Hardware, levelOf } from './S7200Hardware';
-import { renderLcd, initialLcdState, type LcdEffect, type LcdSnapshot } from './lcd-fsm';
+import { renderLcd, initialLcdState, type LcdSnapshot } from './lcd-fsm';
 import { VirtualField } from './virtual-field';
 
 afterEach(cleanup);
@@ -78,93 +76,6 @@ describe('S7200Hardware', () => {
 
   it('maps switch modes to input levels', () => {
     expect([levelOf('ON'), levelOf('OFF'), levelOf('MOMENTARY_PUSH')]).toEqual([true, false, true]);
-  });
-});
-
-describe('LogoHardware', () => {
-  const idleFrame = createFrameStore(() => () => {});
-
-  function setup() {
-    const memory = new MemoryMap(LOGO_0BA8);
-    const field = new VirtualField(16, 10);
-    const effects: LcdEffect[] = [];
-    const snap: LcdSnapshot = {
-      mode: 'STOP',
-      inputs: Array<boolean>(16).fill(false),
-      outputs: Array<boolean>(10).fill(false),
-      params: [],
-      program: { networks: 1, blocks: 4 },
-      scanMs: 20,
-    };
-    const view = render(
-      <LogoHardware
-        profile={LOGO_0BA8}
-        memory={memory}
-        field={field}
-        mode="STOP"
-        frame={idleFrame}
-        getSnapshot={() => snap}
-        onEffect={(effect) => effects.push(effect)}
-      />,
-    );
-    return { memory, field, effects, ...view };
-  }
-
-  it('has 16 input terminals, 10 output relays, six keys and a 4-line display', () => {
-    const { container } = setup();
-    expect(container.querySelectorAll('[data-terminal]').length).toBe(16);
-    expect(container.querySelectorAll('[data-relay]').length).toBe(10);
-    for (const name of ['Up', 'Down', 'Left', 'Right', 'OK', 'Escape']) expect(screen.getByRole('button', { name })).toBeDefined();
-    expect(container.querySelectorAll('[data-lcd-line]').length).toBe(4);
-  });
-
-  it('toggles an input terminal (I1..I16 map onto I0.0..I1.7)', () => {
-    const { field } = setup();
-    fireEvent.pointerDown(screen.getByRole('button', { name: /Input I10 \(I1\.1\)/ }));
-    expect(field.getInput(9)).toBe(true);
-    fireEvent.pointerDown(screen.getByRole('button', { name: /Input I10 \(I1\.1\)/ }));
-    expect(field.getInput(9)).toBe(false);
-  });
-
-  it('acts as a pushbutton in push mode and with Shift-click', () => {
-    const { field } = setup();
-    fireEvent.click(screen.getByRole('switch'));
-    const button = screen.getByRole('button', { name: /Input I2 /});
-    fireEvent.pointerDown(button);
-    expect(field.getInput(1)).toBe(true);
-    fireEvent.pointerUp(button);
-    expect(field.getInput(1)).toBe(false);
-
-    fireEvent.click(screen.getByRole('switch')); // back to latch
-    fireEvent.pointerDown(button, { shiftKey: true });
-    expect(field.getInput(1)).toBe(true);
-    fireEvent.pointerUp(button);
-    expect(field.getInput(1)).toBe(false);
-  });
-
-  it('lights a relay LED from the memory image', () => {
-    const { memory, container } = setup();
-    act(() => memory.writeBit('Q0.2', true));
-    expect(within(container.querySelector('[data-relay="Q3"]') as HTMLElement).getByRole('img').getAttribute('data-on')).toBe('true');
-  });
-
-  it('drives the display from the firmware FSM and emits the run effect', () => {
-    const { effects } = setup();
-    const lines = () => screen.getByRole('img', { name: /^Display/ }).getAttribute('aria-label');
-    expect(lines()).toContain('▶ Start');
-
-    fireEvent.click(screen.getByRole('button', { name: 'Down' }));
-    expect(screen.getByRole('img', { name: /^Display/ }).textContent).toContain('>Program');
-
-    fireEvent.click(screen.getByRole('button', { name: 'Up' }));
-    fireEvent.click(screen.getByRole('button', { name: 'OK' }));
-    expect(effects).toEqual([{ type: 'run' }]);
-  });
-
-  it('accepts the arrow keys on the keypad', () => {
-    setup();
-    fireEvent.keyDown(screen.getByRole('group', { name: 'Keypad' }), { key: 'ArrowDown' });
-    expect(screen.getByRole('img', { name: /^Display/ }).textContent).toContain('>Program');
   });
 });
 

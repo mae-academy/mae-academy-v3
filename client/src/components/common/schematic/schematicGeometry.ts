@@ -285,3 +285,17 @@ export function defaultContentBounds(components: SchematicComponent[], texts: { 
   const maxY = Math.max(...ys) + 60;
   return { centerX: (minX + maxX) / 2, centerY: (minY + maxY) / 2, width: maxX - minX, height: maxY - minY };
 }
+
+/** Full obstacle-aware routing for freshly generated wires (only each wire's own endpoints are passable). */
+export function routeWires<C extends SchematicComponent>(
+  library: SchematicComponentLibrary<C>,
+  wires: SchematicWire[],
+  components: C[],
+): SchematicWire[] {
+  return wires.map(wire => {
+    const endpoints = resolveWireEndpoints(library, wire, components);
+    if (!endpoints) return wire;
+    const path = library.route(endpoints.from, endpoints.to, components, new Set([wire.fromComp, wire.toComp]), endpoints.fromAxis, endpoints.toAxis);
+    return { ...wire, routing: 'orthogonal' as const, path, waypoints: undefined };
+  });
+}

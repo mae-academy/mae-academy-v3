@@ -55,3 +55,43 @@ const latexWithGrouping = (node: ASTNode, parentPrecedence = 0): string => {
 };
 
 export const astToLatex = (node: ASTNode) => latexWithGrouping(node);
+
+export const astToOverlineLatex = (node: ASTNode, parentPrecedence = 0): string => {
+  if (node.type === 'VARIABLE' || node.type === 'CONSTANT') return node.value ?? '';
+  if (node.type === 'NOT') {
+    const child = requireChild(node, 'left');
+    const childLatex = astToOverlineLatex(child);
+    return `\\overline{${childLatex}}`;
+  }
+  const operator = node.type === 'AND' ? ' \\cdot ' : node.type === 'XOR' ? ' \\oplus ' : ' + ';
+  const expression = `${astToOverlineLatex(requireChild(node, 'left'), precedence(node))}${operator}${astToOverlineLatex(requireChild(node, 'right'), precedence(node))}`;
+  return precedence(node) < parentPrecedence ? `\\left(${expression}\\right)` : expression;
+};
+
+/**
+ * Canonical ASCII form used as the single source of truth in the formula bar.
+ * Round-trips through `parseBooleanExpression`; never emits LaTeX control sequences.
+ */
+export const astToAscii = (node: ASTNode, parentPrecedence = 0): string => {
+  if (node.type === 'VARIABLE' || node.type === 'CONSTANT') return node.value ?? '';
+  if (node.type === 'NOT') {
+    const child = requireChild(node, 'left');
+    const atomic = child.type === 'VARIABLE' || child.type === 'CONSTANT' || child.type === 'NOT';
+    return `${atomic ? astToAscii(child) : `(${astToAscii(child)})`}'`;
+  }
+  const operator = node.type === 'AND' ? ' . ' : node.type === 'XOR' ? ' ^ ' : ' + ';
+  const expression = `${astToAscii(requireChild(node, 'left'), precedence(node))}${operator}${astToAscii(requireChild(node, 'right'), precedence(node))}`;
+  return precedence(node) < parentPrecedence ? `(${expression})` : expression;
+};
+
+/**
+ * Strips raw LaTeX commands (e.g. \cdot, \overline) if typed or pasted,
+ * converting them into clean formula shorthand.
+ */
+export const sanitizeBooleanInput = (input: string): string => {
+  let cleaned = input;
+  cleaned = cleaned.replace(/\\cdot/g, ' . ').replace(/\\times/g, ' . ');
+  cleaned = cleaned.replace(/\\(?:overline|bar)\{([^{}]+)\}/g, "($1)'");
+  cleaned = cleaned.replace(/\\[a-zA-Z]+/g, ' ').replace(/\\/g, '');
+  return cleaned;
+};

@@ -92,8 +92,19 @@ export default function SimulationDetail() {
       }
       return;
     }
+    if (isSignalsAndSystems && ["a", "b", "c", "d", "e"].includes(tool)) {
+      const toolMap: Record<string, string> = {
+        a: "signal-operations-and-properties",
+        b: "system-classification",
+        c: "convolution-engine",
+        d: "fourier-analysis",
+        e: "laplace-s-plane",
+      };
+      setLocation(`/simulations/signals-and-systems/${toolMap[tool]}`, { replace: true });
+      return;
+    }
     if (!tool) setLocation(`/simulations/${meta.slug}/${defaultTool}`, { replace: true });
-  }, [defaultTool, isCodeStudio, location, meta.slug, setLocation, tool]);
+  }, [defaultTool, isCodeStudio, isSignalsAndSystems, location, meta.slug, setLocation, tool]);
 
   if (!tool && !isCodeStudio) return null;
 
@@ -112,7 +123,32 @@ export default function SimulationDetail() {
   const circuitToolContent = isCircuitLab
     ? <DigitalCircuitSimulator />
     : circuitLabClone ? <AnalogCircuitSimulator instanceId={meta.slug} label={simulation.title} /> : null;
-  const toolContent = circuitToolContent ?? (isSignalsAndSystems && tool === "a" ? <SignalOperationsLab /> : isSignalsAndSystems && tool === "b" ? <SystemClassificationLab /> : isSignalsAndSystems && tool === "c" ? <ConvolutionLab /> : isSignalsAndSystems && tool === "d" ? <FourierAnalysisLab /> : isSignalsAndSystems && tool === "e" ? <LaplaceZPlaneLab /> : isDigitalLogicWorkspace ? <DigitalLogicSimulator /> : isRootLocus ? <RootLocusStudio /> : isPidStudio ? <PIDStudio /> : isFrequencyResponse ? <FrequencyResponseStudio /> : isStateSpaceStudio ? <StateSpaceStudio /> : isBlockDiagram ? <BlockDiagramStudio /> : isRectifierStudio ? <RectifierStudio /> : isInverterStudio ? <InverterStudio /> : isAcVoltageControllerStudio ? <ACVoltageControllerStudio /> : isChopperStudio ? <ChopperStudio /> : isCodeStudioContent ? <AssemblerStudio /> : isLinearAlgebraStudio ? <LinearAlgebraStudio section={tool as "a" | "b" | "c" | "d" | "e"} /> : <SimulationToolWorkspace toolKey={`${meta.slug}-${tool}`} />);
+  const isSignalsOperations = isSignalsAndSystems && (tool === "signal-operations-and-properties" || tool === "a");
+  const isSystemClassification = isSignalsAndSystems && (tool === "system-classification" || tool === "b");
+  const isConvolutionEngine = isSignalsAndSystems && (tool === "convolution-engine" || tool === "c");
+  const isFourierAnalysis = isSignalsAndSystems && (tool === "fourier-analysis" || tool === "d");
+  const isLaplacePlane = isSignalsAndSystems && (tool === "laplace-s-plane" || tool === "e");
+
+  const toolContent = circuitToolContent ?? (
+    isSignalsOperations ? <SignalOperationsLab />
+      : isSystemClassification ? <SystemClassificationLab />
+        : isConvolutionEngine ? <ConvolutionLab />
+          : isFourierAnalysis ? <FourierAnalysisLab />
+            : isLaplacePlane ? <LaplaceZPlaneLab />
+              : isDigitalLogicWorkspace ? <DigitalLogicSimulator />
+                : isRootLocus ? <RootLocusStudio />
+                  : isPidStudio ? <PIDStudio />
+                    : isFrequencyResponse ? <FrequencyResponseStudio />
+                      : isStateSpaceStudio ? <StateSpaceStudio />
+                        : isBlockDiagram ? <BlockDiagramStudio />
+                          : isRectifierStudio ? <RectifierStudio />
+                            : isInverterStudio ? <InverterStudio />
+                              : isAcVoltageControllerStudio ? <ACVoltageControllerStudio />
+                                : isChopperStudio ? <ChopperStudio />
+                                  : isCodeStudioContent ? <AssemblerStudio />
+                                    : isLinearAlgebraStudio ? <LinearAlgebraStudio section={tool as "a" | "b" | "c" | "d" | "e"} />
+                                      : <SimulationToolWorkspace toolKey={`${meta.slug}-${tool}`} />
+  );
 
   return <motion.div variants={container} initial="hidden" animate="visible">
     <SimulatorLayout title={isDigitalLogicDesign ? "" : simulation.title} tabs={tools} activeTab={tool || ""} routePrefix={isDirectCode ? "/code" : `/simulations/${meta.slug}`} backLabel={copy.footer.simulations} isRtl={isRtl} hideToolNavigation={isDigitalLogicDesign || isCircuitLab || isCodeStudio}>

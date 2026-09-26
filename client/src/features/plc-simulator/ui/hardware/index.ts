@@ -1,4 +1,3 @@
-export { LogoHardware, type LogoHardwareProps } from './LogoHardware';
 export { S7200Hardware, levelOf, type InputMode, type ModeSwitchPosition, type S7200HardwareProps } from './S7200Hardware';
 export { LcdDisplay } from './LcdDisplay';
 export { Led, MemoryLed, FieldLed, type LedColor } from './Led';

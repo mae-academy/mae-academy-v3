@@ -1,16 +1,19 @@
 /**
- * Luminous Technical Atelier — a white academic analysis panel with blue/pink signals,
- * dense but breathable table rhythm, and KaTeX as the only formula-rendering surface.
+ * Luminous Technical Atelier — Logic Analyzer and Truth Table Explorer.
+ * Responsive dark/light theme adherence and KaTeX formula rendering.
  */
-import { BlockMath, InlineMath } from 'react-katex';
-import 'katex/dist/katex.min.css';
 import { useEffect, useMemo, useState } from 'react';
+import { KatexMath } from '@/components/ui/KatexMath';
+import { StatusBadge } from '@/components/common/templates';
 import type { ParsedLogicExpression, TruthTableRow } from '@/simulators/digital-logic/engine/logicEngine';
-import { canonicalSopFromRows, generateTruthTable, maxtermIndices, mintermIndices, parseBooleanExpression } from '@/simulators/digital-logic/engine/logicEngine';
+import {
+  generateTruthTable,
+  parseBooleanExpression,
+  MAX_LOGIC_ANALYZER_VARIABLES,
+} from '@/simulators/digital-logic/engine/logicEngine';
 
 const INITIAL_EXPRESSION = 'A*B+C';
 const parseInitial = () => parseBooleanExpression(INITIAL_EXPRESSION);
-const valueColor = (value: boolean) => value ? '#2563eb' : '#64748b';
 
 function useDebouncedValue<T>(value: T, delayMs: number) {
   const [debounced, setDebounced] = useState(value);
@@ -21,73 +24,164 @@ function useDebouncedValue<T>(value: T, delayMs: number) {
   return debounced;
 }
 
-const FormulaStat = ({ label, math }: { label: string; math: string }) => <div style={{ minWidth: 0, border: '1px solid #e2e8f0', borderRadius: 10, background: '#f8fafc', padding: '10px 12px' }}>
-  <div style={{ marginBottom: 4, color: '#64748b', fontSize: 9, fontWeight: 800, letterSpacing: '.12em', textTransform: 'uppercase' }}>{label}</div>
-  <div style={{ overflowX: 'auto', color: '#0f172a', fontSize: 14 }}><InlineMath math={math} /></div>
-</div>;
+export interface LogicAnalyzerProps {
+  expression?: string;
+  onExpressionChange?: (expression: string) => void;
+}
 
-/** React adapter around the pure compiler. Invalid source never replaces lastValid. */
-export function LogicAnalyzer() {
-  const [source, setSource] = useState(INITIAL_EXPRESSION);
-  const [lastValid, setLastValid] = useState<ParsedLogicExpression>(parseInitial);
-  const [parseError, setParseError] = useState<string | null>(null);
+/** Pure responsive truth-table view driven by the universal formula bar. */
+export function LogicAnalyzer({ expression, onExpressionChange }: LogicAnalyzerProps) {
+  const [source, setSource] = useState(expression ?? INITIAL_EXPRESSION);
+  const [lastValid, setLastValid] = useState<ParsedLogicExpression>(() => {
+    try {
+      return parseBooleanExpression(expression ?? INITIAL_EXPRESSION);
+    } catch {
+      return parseInitial();
+    }
+  });
   const [overrides, setOverrides] = useState<Record<number, boolean>>({});
   const debouncedSource = useDebouncedValue(source, 300);
+
+  useEffect(() => {
+    if (expression !== undefined && expression !== source) {
+      setSource(expression);
+    }
+  }, [expression]);
 
   useEffect(() => {
     try {
       const parsed = parseBooleanExpression(debouncedSource);
       setLastValid(parsed);
-      setParseError(null);
       setOverrides({});
-    } catch (error) {
-      setParseError(error instanceof Error ? error.message : 'Invalid expression.');
+    } catch {
+      // Retain lastValid expression when syntax is in-progress
     }
   }, [debouncedSource]);
 
-  const rows = useMemo(() => generateTruthTable(lastValid.ast, lastValid.variables).map(row => ({ ...row, value: overrides[row.index] ?? row.value })), [lastValid, overrides]);
-  const minterms = useMemo(() => mintermIndices(rows), [rows]);
-  const maxterms = useMemo(() => maxtermIndices(rows), [rows]);
-  const mintermMath = `\\Sigma m(${minterms.length ? minterms.join(', ') : '\\varnothing'})`;
-  const maxtermMath = `\\Pi M(${maxterms.length ? maxterms.join(', ') : '\\varnothing'})`;
+  const hasExceededVariables = lastValid.variables.length > MAX_LOGIC_ANALYZER_VARIABLES;
+  const activeVariables = useMemo(() => {
+    return hasExceededVariables
+      ? lastValid.variables.slice(0, MAX_LOGIC_ANALYZER_VARIABLES)
+      : lastValid.variables;
+  }, [hasExceededVariables, lastValid.variables]);
+
+  const rows = useMemo(() => {
+    try {
+      return generateTruthTable(lastValid.ast, activeVariables).map((row) => ({
+        ...row,
+        value: overrides[row.index] ?? row.value,
+      }));
+    } catch {
+      return [];
+    }
+  }, [lastValid.ast, activeVariables, overrides]);
 
   const toggleOutput = (row: TruthTableRow) => {
-    const nextRows = rows.map(current => current.index === row.index ? { ...current, value: !current.value } : current);
-    const sop = canonicalSopFromRows(lastValid.variables, nextRows);
+    const nextRows = rows.map((current) =>
+      current.index === row.index ? { ...current, value: !current.value } : current,
+    );
+    // Canonical SOP in formula-bar ASCII (A'B'C + …), never LaTeX.
+    const onRows = nextRows.filter((current) => current.value);
+    const sop = onRows.length
+      ? onRows.map((current) => activeVariables.map((variable) => (current.context[variable] ? variable : `${variable}'`)).join('')).join(' + ')
+      : '0';
     try {
       const parsed = parseBooleanExpression(sop);
       setSource(sop);
+      onExpressionChange?.(sop);
       setLastValid(parsed);
       setOverrides({});
-      setParseError(null);
-    } catch (error) {
-      setParseError(error instanceof Error ? error.message : 'Unable to reconstruct SOP.');
+    } catch {
+      // Ignore reconstruction error
     }
   };
 
-  return <section aria-label="Logic Analyzer" style={{ border: '1px solid #e2e8f0', borderRadius: 14, background: '#ffffff', color: '#0f172a', overflow: 'hidden', boxShadow: '0 10px 28px rgba(15, 23, 42, .08)' }}>
-    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.08fr) minmax(280px, .92fr)', gap: 18, padding: 22 }}>
-      <div>
-        <label htmlFor="logic-expression" style={{ display: 'block', marginBottom: 8, color: '#334155', fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase' }}>Boolean expression</label>
-        <input id="logic-expression" value={source} onChange={event => setSource(event.target.value)} spellCheck={false} aria-describedby="logic-expression-hint logic-expression-error" style={{ width: '100%', boxSizing: 'border-box', border: `1px solid ${parseError ? '#fda4af' : '#cbd5e1'}`, borderRadius: 10, outline: 'none', padding: '12px 13px', color: '#0f172a', background: parseError ? '#fff8f8' : '#ffffff', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 16, fontWeight: 700, transition: 'border-color 160ms ease' }} />
-        <p id="logic-expression-hint" style={{ margin: '7px 0 0', color: '#64748b', fontSize: 11, lineHeight: 1.5 }}>Use <strong>*, +, ^, ~, !</strong>, postfix <strong>'</strong> or <strong>′</strong>, and adjacent variables such as <strong>AB</strong>. Parsing is debounced by 300 ms.</p>
-        {parseError && <p id="logic-expression-error" role="alert" style={{ margin: '8px 0 0', color: '#be123c', fontSize: 12, fontWeight: 700 }}>Invalid Expression — {parseError}</p>}
-      </div>
-      <div style={{ minHeight: 96, border: '1px solid #dbeafe', borderRadius: 10, background: '#f8fbff', padding: '8px 12px', overflowX: 'auto' }}>
-        <div style={{ color: '#2563eb', fontSize: 9, fontWeight: 850, letterSpacing: '.13em', textTransform: 'uppercase' }}>AST → academic notation</div>
-        <div style={{ marginTop: 4, color: '#0f172a', fontSize: 17 }}><BlockMath math={`F = ${lastValid.latex}`} /></div>
-      </div>
-    </div>
+  return (
+    <section
+      aria-label="Logic Analyzer"
+      className="overflow-hidden rounded-xl border border-slate-200/80 bg-white/95 text-slate-900 shadow-sm dark:border-slate-800 dark:bg-slate-900/90 dark:text-white"
+    >
+      <div className="p-5">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+            Interactive Truth Table ({rows.length} rows)
+          </div>
+          {hasExceededVariables && (
+            <StatusBadge variant="warning">
+              Maximum 8 input variables (A–H) supported — table bounded to {activeVariables.join(', ')}
+            </StatusBadge>
+          )}
+        </div>
 
-    <div style={{ padding: '0 22px 22px' }}>
-      <div style={{ border: '1px solid #e2e8f0', borderRadius: 12, overflow: 'auto', maxHeight: 440 }}>
-        <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: 13 }}>
-          <thead><tr>{lastValid.variables.map(variable => <th key={variable} scope="col" style={{ position: 'sticky', top: 0, zIndex: 1, padding: '11px 14px', borderBottom: '1px solid #cbd5e1', background: '#f8fafc', color: '#475569', fontSize: 10, fontWeight: 850, letterSpacing: '.1em', textAlign: 'center' }}><InlineMath math={variable} /></th>)}<th scope="col" style={{ position: 'sticky', top: 0, zIndex: 1, minWidth: 124, padding: '11px 14px', borderBottom: '1px solid #cbd5e1', borderLeft: '1px solid #e2e8f0', background: '#eef6ff', color: '#1d4ed8', fontSize: 10, fontWeight: 850, letterSpacing: '.1em', textAlign: 'center' }}><InlineMath math="F" /> · click to edit</th></tr></thead>
-          <tbody>{rows.map(row => <tr key={row.index}>{lastValid.variables.map(variable => <td key={variable} style={{ padding: '8px 14px', borderBottom: '1px solid #f1f5f9', color: '#475569', fontWeight: 700, textAlign: 'center' }}><InlineMath math={row.context[variable] ? '1' : '0'} /></td>)}<td style={{ padding: 5, borderBottom: '1px solid #f1f5f9', borderLeft: '1px solid #f1f5f9', textAlign: 'center' }}><button type="button" onClick={() => toggleOutput(row)} aria-label={`Toggle output for minterm ${row.index}`} style={{ width: '100%', border: '1px solid #dbeafe', borderRadius: 7, padding: '5px 10px', color: valueColor(row.value), background: row.value ? '#eff6ff' : '#ffffff', fontWeight: 850 }}><InlineMath math={row.value ? '1' : '0'} /></button></td></tr>)}</tbody>
-        </table>
+        {/* Left-aligned compact table eliminating horizontal dead margins */}
+        <div className="flex justify-start">
+          <div className="max-h-[440px] overflow-auto rounded-xl border border-slate-200 dark:border-slate-800">
+            <table className="border-separate border-spacing-0 text-xs">
+              <thead>
+                <tr className="text-slate-700 dark:text-slate-300">
+                  <th
+                    scope="col"
+                    className="sticky top-0 z-10 w-16 border-b border-r border-slate-200 bg-slate-50 p-2 text-center text-xs font-normal text-slate-500 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-400"
+                    title="Decimal Row Index"
+                  >
+                    <KatexMath math="\text{Dec}" />
+                  </th>
+                  {activeVariables.map((variable) => (
+                    <th
+                      key={variable}
+                      scope="col"
+                      className="sticky top-0 z-10 w-16 border-b border-slate-200 bg-slate-50 p-2 text-center text-sm font-normal dark:border-slate-800 dark:bg-slate-950"
+                    >
+                      <KatexMath math={variable} />
+                    </th>
+                  ))}
+                  <th
+                    scope="col"
+                    className="sticky top-0 z-10 w-24 border-b border-l border-slate-200 bg-slate-50 p-2 text-center text-sm font-normal text-blue-600 dark:border-slate-800 dark:bg-slate-950 dark:text-blue-400"
+                  >
+                    <KatexMath math="F" />
+                    <span className="sr-only">click to edit</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="[&>tr>td]:border-b [&>tr>td]:border-slate-100 dark:[&>tr>td]:border-slate-800/60">
+                {rows.map((row) => (
+                  <tr
+                    key={row.index}
+                    className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30 transition-colors"
+                  >
+                    <td
+                      data-minterm-index={row.index}
+                      className="border-r border-slate-100 p-2 text-center text-xs tabular-nums text-slate-400 dark:border-slate-800/60 dark:text-slate-500"
+                    >
+                      <KatexMath math={String(row.index)} />
+                    </td>
+                    {activeVariables.map((variable) => (
+                      <td key={variable} className="p-2 text-center text-xs text-slate-700 dark:text-slate-300">
+                        <KatexMath math={row.context[variable] ? '1' : '0'} />
+                      </td>
+                    ))}
+                    <td className="border-l border-slate-100 p-1.5 text-center dark:border-slate-800/60">
+                      <button
+                        type="button"
+                        onClick={() => toggleOutput(row)}
+                        aria-label={`Toggle output for minterm ${row.index}`}
+                        className={`inline-flex items-center justify-center rounded-full px-2.5 py-0.5 text-xs font-mono font-bold tabular-nums transition-all duration-200 cursor-pointer ${
+                          row.value
+                            ? 'bg-blue-600 text-white shadow-xs hover:bg-blue-500 active:scale-95'
+                            : 'bg-slate-100 text-slate-500 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700 active:scale-95'
+                        }`}
+                      >
+                        {row.value ? '1' : '0'}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
-      <p style={{ margin: '9px 0 15px', color: '#64748b', fontSize: 11, lineHeight: 1.45 }}>Editing an output row reconstructs canonical SOP from all active minterms and reparses it through the same compiler.</p>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12 }}><FormulaStat label="Canonical SOP" math={mintermMath} /><FormulaStat label="Canonical POS" math={maxtermMath} /></div>
-    </div>
-  </section>;
+    </section>
+  );
 }
