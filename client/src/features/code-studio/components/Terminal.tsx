@@ -1,5 +1,4 @@
-import { useEffect, useRef, type RefObject } from "react";
-
+import { useEffect, useRef, memo, type RefObject } from "react";
 import {
   GFX_HEIGHT,
   GFX_WIDTH,
@@ -64,7 +63,7 @@ function GraphicsCanvas({ graphics }: { graphics: GraphicsSnapshot | null }) {
   );
 }
 
-export function TerminalSurface({
+export const TerminalSurface = memo(function TerminalSurface({
   stdout,
   video,
   awaitingInput = false,
@@ -158,4 +157,4 @@ export function TerminalSurface({
       </div>
     </div>
   );
-}
+});

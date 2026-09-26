@@ -5,7 +5,8 @@
 import { BookOpen, Check, ChevronDown, Clipboard, Code, Copy, Cpu, Download, Pause, Play, Redo2, RotateCcw, Trash2, Undo2, Upload } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import Editor from "react-simple-code-editor";
+import { cpp } from "@codemirror/lang-cpp";
+import { CodeEditor, type LineSeverity } from "@/components/code-editor/CodeEditor";
 import { SegmentedControl } from "@/components/common/templates";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ArduinoBoard } from "./ArduinoBoard";
@@ -15,73 +16,7 @@ import type { ArduinoSpeed } from "./arduinoRuntime";
 import { SerialConsole } from "./SerialConsole";
 import { useArduinoRuntime } from "./useArduinoRuntime";
 
-// ---------------------------------------------------------------------------
-// C++ / Arduino syntax highlighting (shares Code Studio's .syntax-* token classes)
-// ---------------------------------------------------------------------------
-const KEYWORDS = new Set(["if", "else", "for", "while", "do", "switch", "case", "default", "break", "continue", "return", "const", "static", "volatile", "enum", "sizeof", "true", "false"]);
-const TYPES = new Set(["void", "int", "long", "short", "char", "float", "double", "bool", "boolean", "byte", "word", "unsigned", "signed", "String", "size_t", "uint8_t", "int8_t", "uint16_t", "int16_t", "uint32_t", "int32_t"]);
-const BUILTINS = new Set([
-  "setup", "loop", "pinMode", "digitalWrite", "digitalRead", "analogWrite", "analogRead", "delay", "delayMicroseconds", "millis", "micros", "map", "constrain", "min", "max", "abs", "pow", "sqrt", "sin", "cos", "random", "randomSeed", "Serial", "F",
-  "HIGH", "LOW", "INPUT", "OUTPUT", "INPUT_PULLUP", "LED_BUILTIN", "A0", "A1", "A2", "A3", "A4", "A5", "PI", "TWO_PI", "HALF_PI", "DEC", "HEX", "OCT", "BIN",
-]);
-const LINE_TOKEN_RE = /(\/\/.*$)|(\/\*[\s\S]*?(?:\*\/|$))|("(?:\\.|[^"\\])*"?|'(?:\\.|[^'\\])*'?)|(\b\d[\w.]*)|([A-Za-z_]\w*)/g;
-
-interface Token {
-  text: string;
-  cls?: string;
-}
-
-/** Tokenizes one line; `inBlock` carries an unterminated /* comment across lines. */
-function tokenizeLine(line: string, inBlock: boolean): { tokens: Token[]; inBlock: boolean } {
-  if (inBlock) {
-    const end = line.indexOf("*/");
-    if (end < 0) return { tokens: [{ text: line || " ", cls: "syntax-comment" }], inBlock: true };
-    const rest = tokenizeLine(line.slice(end + 2), false);
-    return { tokens: [{ text: line.slice(0, end + 2), cls: "syntax-comment" }, ...rest.tokens], inBlock: rest.inBlock };
-  }
-  if (/^\s*#/.test(line)) return { tokens: [{ text: line, cls: "syntax-preprocessor" }], inBlock: false };
-  const tokens: Token[] = [];
-  const re = new RegExp(LINE_TOKEN_RE.source, "g");
-  let last = 0;
-  let block = false;
-  for (let m = re.exec(line); m !== null; m = re.exec(line)) {
-    if (m.index > last) tokens.push({ text: line.slice(last, m.index) });
-    const text = m[0];
-    let cls: string | undefined;
-    if (m[1] || m[2]) cls = "syntax-comment";
-    else if (m[3]) cls = "syntax-string";
-    else if (m[4]) cls = "syntax-literal-number";
-    else if (KEYWORDS.has(text)) cls = "syntax-control-flow";
-    else if (TYPES.has(text)) cls = "syntax-keyword-type";
-    else if (BUILTINS.has(text)) cls = "syntax-function";
-    if (m[2] && !text.endsWith("*/")) block = true;
-    tokens.push({ text, cls });
-    last = m.index + text.length;
-  }
-  if (last < line.length) tokens.push({ text: line.slice(last) });
-  return { tokens: tokens.length ? tokens : [{ text: " " }], inBlock: block };
-}
-
-function highlightCpp(source: string, activeLine: number): React.ReactNode {
-  let inBlock = false;
-  return source.split("\n").map((line, index) => {
-    const res = tokenizeLine(line, inBlock);
-    inBlock = res.inBlock;
-    const isCurrent = activeLine === index + 1;
-    return (
-      <div
-        key={index}
-        className={`block h-[22px] leading-[22px] font-normal ${isCurrent ? "bg-violet-100/40 text-slate-900 dark:bg-violet-500/15 dark:text-white" : "text-slate-800 dark:text-slate-200"}`}
-      >
-        {res.tokens.map((t, i) => (
-          <span key={i} className={t.cls}>
-            {t.text}
-          </span>
-        ))}
-      </div>
-    );
-  });
-}
+const CPP_LANGUAGE = cpp();
 
 function SketchEditor({
   code,
@@ -96,60 +31,20 @@ function SketchEditor({
   activeLine: number;
   onActiveLine: (line: number) => void;
 }) {
-  const lineCount = code.split("\n").length;
-  const lineAtCursor = (target: EventTarget | null) => (target instanceof HTMLTextAreaElement ? target.value.slice(0, target.selectionStart).split("\n").length : 1);
-
-  useEffect(() => {
-    if (typeof document !== "undefined" && "fonts" in document) {
-      document.fonts.ready.then(() => {
-        // Font metrics loaded and ready
-      });
-    }
-  }, []);
-
+  const lineSeverity = useMemo(
+    () => (errorLine === null ? undefined : new Map<number, LineSeverity>([[errorLine, "error"]])),
+    [errorLine]
+  );
   return (
-    <div className="relative min-h-0 flex-1 select-text overflow-auto bg-[#f8fbff] dark:bg-[#07080a]" dir="ltr">
-      <div className="flex min-h-full min-w-max">
-        <div className="sticky start-0 z-10 w-13 shrink-0 select-none border-e border-slate-200 bg-slate-100/80 py-3 font-mono text-[12px] leading-[22px] dark:border-[#1a1d24] dark:bg-[#090a0d]/90" aria-hidden>
-          {Array.from({ length: lineCount }, (_, i) => {
-            const line = i + 1;
-            return (
-              <div
-                key={i}
-                className={`h-[22px] leading-[22px] pe-2.5 text-end tabular-nums ${errorLine === line ? "bg-rose-500/20 font-medium text-rose-600 dark:text-rose-300" : activeLine === line ? "bg-violet-500/20 font-medium text-violet-700 dark:text-violet-300" : "text-slate-400 dark:text-slate-500"}`}
-              >
-                {String(line).padStart(2, "0")}
-              </div>
-            );
-          })}
-        </div>
-        <div className="relative min-w-0 flex-1">
-          <Editor
-            value={code}
-            onValueChange={onChange}
-            highlight={source => highlightCpp(source, activeLine)}
-            padding={12}
-            tabSize={2}
-            onClick={e => onActiveLine(lineAtCursor(e.target))}
-            onKeyUp={e => onActiveLine(lineAtCursor(e.target))}
-            style={{
-              minHeight: "100%",
-              fontFamily: "'JetBrains Mono', 'Fira Code', Menlo, Monaco, 'Courier New', monospace",
-              fontSize: 14,
-              lineHeight: "22px",
-              letterSpacing: 0,
-              fontVariantLigatures: "none",
-              whiteSpace: "pre",
-              position: "relative",
-              zIndex: 1,
-              fontWeight: 400,
-            }}
-            textareaClassName="!outline-none !caret-violet-500 !font-normal"
-            textareaId="arduino-sketch"
-          />
-        </div>
-      </div>
-    </div>
+    <CodeEditor
+      value={code}
+      onChange={onChange}
+      language={CPP_LANGUAGE}
+      activeLine={activeLine}
+      onCursorLine={onActiveLine}
+      lineSeverity={lineSeverity}
+      ariaLabel="Arduino sketch"
+    />
   );
 }
 

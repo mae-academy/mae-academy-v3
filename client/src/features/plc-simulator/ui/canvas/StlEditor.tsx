@@ -1,7 +1,8 @@
 import { Code } from 'lucide-react';
-import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
-import Editor from 'react-simple-code-editor';
-import { registerUnifiedMonacoThemes, UNIFIED_EDITOR_COLORS } from '@/lib/monacoTheme';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { CodeEditor, type CodeEditorHandle } from '@/components/code-editor/CodeEditor';
+import { stlLanguage } from '@/components/code-editor/languages';
+import { registerUnifiedMonacoThemes } from '@/lib/monacoTheme';
 import type { TranspileDiagnostic } from '../../transpiler';
 import { PANEL, WindowBar } from '../chrome';
 
@@ -18,69 +19,6 @@ export interface StlEditorProps {
   beforeMount?: (monaco: any) => void;
 }
 
-/** Offset of the start of 1-based `line` within `text`. */
-function lineOffset(text: string, line: number): number {
-  let offset = 0;
-  for (let i = 1; i < line; i++) {
-    const next = text.indexOf('\n', offset);
-    if (next === -1) return text.length;
-    offset = next + 1;
-  }
-  return offset;
-}
-
-// ---- highlighting (shares Code Studio's assembler-token-* classes) -----------------------------
-
-const TOKEN_RE = /(\/\/.*$)|(\b(?:NETWORK|TITLE|END_NETWORK)\b)|(\b[IQMVSTC]{1,2}[BWD]?\d+(?:\.\d+)?\b)|(\b\d[\w.#]*)|([A-Za-z_=][\w=]*)/g;
-const MNEMONICS = new Set([
-  'LD', 'LDN', 'A', 'AN', 'O', 'ON', 'ALD', 'OLD', 'LPS', 'LRD', 'LPP', 'NOT', 'EU', 'ED', 'S', 'R', 'SI', 'RI', 'TON', 'TOF', 'TONR',
-  'CTU', 'CTD', 'CTUD', 'MOVB', 'MOVW', 'MOVD', 'MOVR', '+I', '-I', '*I', '/I', '+D', '-D', '*D', '/D', '+R', '-R', '*R', '/R', 'SQRT', 'SIN',
-  'ANDW', 'ORW', 'XORW', 'LDB=', 'LDW=', 'LDD=', 'LDR=', 'AW=', 'OW=', 'MCR', 'MCRE', 'END', '=',
-]);
-
-/** Line-by-line tokenizer; each line keeps a fixed height so the gutter never drifts out of step. */
-function highlightStl(source: string, activeLine: number = 1): ReactNode {
-  return source.split('\n').map((line, index) => {
-    const isCurrent = activeLine === index + 1;
-    const re = new RegExp(TOKEN_RE.source, 'g');
-    const parts: ReactNode[] = [];
-    let last = 0;
-    for (let m = re.exec(line); m !== null; m = re.exec(line)) {
-      if (m.index > last) parts.push(line.slice(last, m.index));
-      const text = m[0];
-      let cls: string | undefined;
-      if (m[1]) cls = 'assembler-token-comment';
-      else if (m[2]) cls = 'assembler-token-directive';
-      else if (m[3]) cls = 'assembler-token-register';
-      else if (m[4]) cls = 'assembler-token-number';
-      else if (MNEMONICS.has(text.toUpperCase())) cls = 'assembler-token-instruction';
-      parts.push(
-        cls ? (
-          <span key={m.index} className={cls}>
-            {text}
-          </span>
-        ) : (
-          text
-        ),
-      );
-      last = m.index + text.length;
-    }
-    if (last < line.length) parts.push(line.slice(last));
-    return (
-      <div
-        key={index}
-        className={`h-[22px] leading-[22px] whitespace-pre font-normal ${
-          isCurrent
-            ? 'border-l-2 border-primary bg-slate-100 text-slate-900 dark:bg-slate-800/60 dark:text-white'
-            : `border-l-2 border-transparent ${UNIFIED_EDITOR_COLORS.normalLineCodeClass}`
-        }`}
-      >
-        {parts.length === 0 ? '\u00A0' : parts}
-      </div>
-    );
-  });
-}
-
 /** STL / IL source in the Code Studio window: traffic-light bar, line gutter, syntax colours. */
 export function StlEditor({
   text,
@@ -93,13 +31,8 @@ export function StlEditor({
   theme,
   beforeMount,
 }: StlEditorProps) {
-  const editorRef = useRef<HTMLDivElement>(null);
-  const textareaId = useId();
+  const editorRef = useRef<CodeEditorHandle>(null);
   const [activeLine, setActiveLine] = useState<number>(1);
-  const lineAtCursor = (target: EventTarget | null) =>
-    target instanceof HTMLTextAreaElement
-      ? target.value.slice(0, target.selectionStart).split('\n').length
-      : 1;
 
   const lineCount = useMemo(() => text.split('\n').length, [text]);
   const severityByLine = useMemo(() => {
@@ -120,18 +53,16 @@ export function StlEditor({
     }
     if (typeof document !== 'undefined' && 'fonts' in document) {
       document.fonts.ready.then(() => {
-        // Font metrics loaded and ready
+        if (typeof window !== 'undefined' && (window as any).monaco) {
+          (window as any).monaco.editor?.remeasureFonts();
+        }
       });
     }
   }, [beforeMount]);
 
   const jumpTo = (d: TranspileDiagnostic): void => {
-    const area = editorRef.current?.querySelector('textarea');
-    if (!area || d.line === undefined) return;
-    const start = lineOffset(text, d.line);
-    const end = text.indexOf('\n', start);
-    area.focus();
-    area.setSelectionRange(start, end === -1 ? text.length : end);
+    if (d.line === undefined) return;
+    editorRef.current?.focusLine(d.line);
     setActiveLine(d.line);
   };
 
@@ -156,65 +87,16 @@ export function StlEditor({
         </div>
       )}
 
-      <label htmlFor={textareaId} className="sr-only">
-        Instruction list (STL) source
-      </label>
-      <div ref={editorRef} dir="ltr" className="relative min-h-0 flex-1 select-text overflow-auto bg-[#f8fbff] dark:bg-[#07080a]">
-        <div className="flex min-h-full min-w-max">
-          <div
-            aria-hidden="true"
-            className="sticky start-0 z-10 w-13 shrink-0 select-none border-e border-slate-200 bg-slate-100/80 py-3 font-sans tabular-nums text-[12px] leading-[22px] dark:border-[#1a1d24] dark:bg-[#090a0d]/90"
-          >
-            {Array.from({ length: lineCount }, (_, i) => {
-              const line = i + 1;
-              const severity = severityByLine.get(line);
-              const isCurrent = activeLine === line;
-              return (
-                <div
-                  key={i}
-                  className={`h-[22px] leading-[22px] pe-2.5 text-end tabular-nums ${
-                    severity === 'error'
-                      ? 'bg-rose-500/20 font-medium text-rose-600 dark:text-rose-300'
-                      : isCurrent
-                        ? UNIFIED_EDITOR_COLORS.activeLineNumberClass
-                        : severity === 'warning'
-                          ? // Slate/primary palette, not yellow/amber: a plain text tint, no gutter box.
-                            'font-medium text-sky-600 dark:text-sky-400'
-                          : UNIFIED_EDITOR_COLORS.normalLineNumberClass
-                  }`}
-                >
-                  {String(line).padStart(2, '0')}
-                </div>
-              );
-            })}
-          </div>
-          <div className="relative min-w-0 flex-1">
-            <Editor
-              value={text}
-              onValueChange={onChange}
-              highlight={(src) => highlightStl(src, activeLine)}
-              onClick={(e) => setActiveLine(lineAtCursor(e.target))}
-              onKeyUp={(e) => setActiveLine(lineAtCursor(e.target))}
-              padding={12}
-              tabSize={2}
-              textareaId={textareaId}
-              style={{
-                minHeight: '100%',
-                fontFamily: "'JetBrains Mono', 'Fira Code', Menlo, Monaco, 'Courier New', monospace",
-                fontSize: 14,
-                lineHeight: '22px',
-                letterSpacing: 0,
-                fontVariantLigatures: 'none',
-                whiteSpace: 'pre',
-                position: 'relative',
-                zIndex: 1,
-                fontWeight: 400,
-              }}
-              textareaClassName="!outline-none !caret-violet-500 !font-normal"
-            />
-          </div>
-        </div>
-      </div>
+      <CodeEditor
+        ref={editorRef}
+        value={text}
+        onChange={onChange}
+        language={stlLanguage}
+        activeLine={activeLine}
+        onCursorLine={setActiveLine}
+        lineSeverity={severityByLine}
+        ariaLabel="Instruction list (STL) source"
+      />
 
       <div className="flex shrink-0 items-center justify-between border-t border-slate-200 bg-slate-50 px-3 py-1.5 text-[11.5px] text-slate-600 dark:border-[#1a1d24] dark:bg-[#0d0f12] dark:text-slate-300">
         <span aria-live="polite">

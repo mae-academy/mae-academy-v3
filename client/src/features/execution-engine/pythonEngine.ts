@@ -11,6 +11,13 @@ const PYODIDE_CDN_BASE = `https://cdn.jsdelivr.net/pyodide/v${PYODIDE_VERSION}/f
 const DEFAULT_MAX_STEPS = 20000;
 
 /**
+ * Hard ceiling on traced steps for the differential tracer.  Prevents browser
+ * tab freezes on 10 000-iteration loops that would generate millions of JSON
+ * deep-clone snapshots.
+ */
+const TRACE_STEP_CAP = 2000;
+
+/**
  * A frame's `sys.settrace` line callback fires even inside `while True: pass`, so counting
  * steps there is the only way to interrupt a runaway loop without losing the partial trace.
  *
@@ -97,6 +104,52 @@ json.dumps({"steps": __mae_steps, "error": __mae_error}, default=__mae_default)
 `;
 }
 
+/**
+ * Fast-run harness: no sys.settrace overhead.  Captures stdout and reports
+ * success/failure only.  This is an order of magnitude faster for programs
+ * with loops because it avoids serializing every local variable at every line.
+ */
+function buildFastHarness(sourceLiteral: string, maxSteps: number): string {
+  return `
+import sys, io, contextlib, traceback, json
+
+__mae_user_source__ = ${sourceLiteral}
+__mae_max_steps__ = ${maxSteps}
+
+class __MaeTraceLimit(Exception):
+    pass
+
+__mae_stdout = io.StringIO()
+__mae_step_count = 0
+
+def __mae_guard(frame, event, arg):
+    global __mae_step_count
+    if frame.f_code.co_filename != "<mae_user_code>":
+        return __mae_guard
+    if event == "line":
+        __mae_step_count += 1
+        if __mae_step_count > __mae_max_steps__:
+            raise __MaeTraceLimit(
+                f"Execution halted after {__mae_max_steps__} steps (possible infinite loop)."
+            )
+    return __mae_guard
+
+__mae_error = None
+sys.settrace(__mae_guard)
+try:
+    with contextlib.redirect_stdout(__mae_stdout):
+        exec(compile(__mae_user_source__, "<mae_user_code>", "exec"), {"__name__": "__main__"})
+except __MaeTraceLimit as limit_error:
+    __mae_error = str(limit_error)
+except BaseException as run_error:
+    __mae_error = "".join(traceback.format_exception_only(type(run_error), run_error)).strip()
+finally:
+    sys.settrace(None)
+
+json.dumps({"stdout": __mae_stdout.getvalue(), "error": __mae_error})
+`;
+}
+
 interface HarnessOutput {
   steps: Array<{
     stepIndex: number;
@@ -105,6 +158,11 @@ interface HarnessOutput {
     variables: Record<string, { value: unknown; type: string }>;
     stdout: string;
   }>;
+  error: string | null;
+}
+
+interface FastHarnessOutput {
+  stdout: string;
   error: string | null;
 }
 
@@ -122,11 +180,32 @@ async function getPyodide(): Promise<PyodideInterface> {
   return pyodidePromise;
 }
 
+/** Pre-warm Pyodide so the first run() is fast.  Never rejects. */
+export async function prewarm(): Promise<void> {
+  try {
+    await getPyodide();
+  } catch {
+    // Swallow — the actual run() will surface the error.
+  }
+}
+
 function describeError(cause: unknown): string {
   return cause instanceof Error ? cause.message : String(cause);
 }
 
-export async function run(
+function configureStdin(pyodide: PyodideInterface, raw: string): void {
+  const lines = raw.split("\n");
+  let cursor = 0;
+  pyodide.setStdin({
+    stdin: () => (cursor < lines.length ? lines[cursor++] : null),
+  });
+}
+
+/**
+ * Fast run mode: no per-line variable tracing. Only captures stdout and error.
+ * Used when the user clicks "Run" (not step-through debug).
+ */
+export async function runFast(
   code: string,
   options: ExecutionOptions = {}
 ): Promise<ExecutionResult> {
@@ -144,12 +223,66 @@ export async function run(
     };
   }
 
-  const stdinLines = (options.stdin ?? "").split("\n");
-  let stdinCursor = 0;
-  pyodide.setStdin({
-    stdin: () =>
-      stdinCursor < stdinLines.length ? stdinLines[stdinCursor++] : null,
-  });
+  configureStdin(pyodide, options.stdin ?? "");
+
+  try {
+    const harness = buildFastHarness(JSON.stringify(code), maxSteps);
+    const resultJson = await pyodide.runPythonAsync(harness);
+    const output = JSON.parse(String(resultJson)) as FastHarnessOutput;
+
+    // Produce a single summary step so the UI can display the stdout.
+    const steps = [
+      {
+        stepIndex: 0,
+        line: 1,
+        callStack: ["<module>"],
+        variables: {},
+        stdout: output.stdout,
+      },
+    ];
+
+    return {
+      success: output.error === null,
+      error: output.error ?? undefined,
+      steps,
+      totalSteps: 1,
+    };
+  } catch (cause) {
+    return {
+      success: false,
+      error: describeError(cause),
+      steps: [],
+      totalSteps: 0,
+    };
+  }
+}
+
+/**
+ * Full traced run: sys.settrace captures every line execution with locals.
+ * Used for step-by-step debugging.
+ */
+export async function run(
+  code: string,
+  options: ExecutionOptions = {}
+): Promise<ExecutionResult> {
+  const maxSteps = Math.min(
+    options.maxSteps ?? DEFAULT_MAX_STEPS,
+    TRACE_STEP_CAP
+  );
+
+  let pyodide: PyodideInterface;
+  try {
+    pyodide = await getPyodide();
+  } catch (cause) {
+    return {
+      success: false,
+      error: `Unable to load the Python runtime: ${describeError(cause)}`,
+      steps: [],
+      totalSteps: 0,
+    };
+  }
+
+  configureStdin(pyodide, options.stdin ?? "");
 
   try {
     const harness = buildHarness(JSON.stringify(code), maxSteps);

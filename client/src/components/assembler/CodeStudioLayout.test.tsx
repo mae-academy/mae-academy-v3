@@ -2,6 +2,7 @@
 import { render } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
 import { AssemblerStudio, CodeStudio } from "./AssemblerStudio";
+import { getEditorText } from "@/components/code-editor/testing";
 
 // Mock ResizeObserver
 class MockResizeObserver {
@@ -78,9 +79,9 @@ describe("Code Studio Nested IDE Split-Pane Layout", () => {
     const { fireEvent } = await import("@testing-library/react");
     fireEvent.change(select, { target: { value: targetExample } });
 
-    // The editor textarea or content should reflect the new example code
-    const textarea = container.querySelector("textarea") as HTMLTextAreaElement;
-    expect(textarea.value).toContain("array db 5, 2, 9, 1, 4");
-    expect(textarea.value).toContain("outer:");
+    // The editor content should reflect the new example code
+    const source = getEditorText(container.querySelector(".cm-content") as HTMLElement);
+    expect(source).toContain("array db 5, 2, 9, 1, 4");
+    expect(source).toContain("outer:");
   });
 });

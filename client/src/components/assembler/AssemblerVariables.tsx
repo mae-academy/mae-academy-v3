@@ -1,4 +1,5 @@
 /** MAE Assembler Studio: variables & call-stack view for interpreted languages (Python/C/C++). */
+import { memo } from "react";
 import type { TraceStep } from "@/features/execution-engine";
 
 type VariablesProps = {
@@ -30,7 +31,7 @@ function stringifyValue(value: unknown): string {
   }
 }
 
-export function AssemblerVariables({
+export const AssemblerVariables = memo(function AssemblerVariables({
   variables,
   previousVariables,
   callStack,
@@ -105,7 +106,16 @@ export function AssemblerVariables({
       )}
     </div>
   );
-}
+}, (prev, next) => {
+  // Check if variables are deeply equal (fast JSON check since they are plain objects from trace)
+  if (JSON.stringify(prev.variables) !== JSON.stringify(next.variables)) return false;
+  // Check if callStack is same length and contents
+  if (prev.callStack.length !== next.callStack.length) return false;
+  for (let i = 0; i < prev.callStack.length; i++) {
+    if (prev.callStack[i] !== next.callStack[i]) return false;
+  }
+  return true;
+});
 
 export default AssemblerVariables;
 

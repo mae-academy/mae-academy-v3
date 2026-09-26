@@ -8,6 +8,7 @@ import { MemoryMap } from '../../domain/memory';
 import { PlcRuntime } from '../../engine/plc-runtime';
 import type { FieldIoAdapter, Scheduler } from '../../engine/types';
 import { buildNetworkTree } from '../../engine/compiler';
+import { getEditorText, setEditorText } from '@/components/code-editor/testing';
 import { PALETTE_DRAG_TYPE } from '../palette/catalog';
 import { LadderCanvas } from './LadderCanvas';
 import { LadderRung } from './LadderRung';
@@ -233,12 +234,12 @@ describe('PlcEditor interactions', () => {
     const { container } = render(<PlcEditor profile={profile} initialNetworks={[seal]} />);
     fireEvent.click(screen.getByRole('tab', { name: 'IL' }));
 
-    const area = screen.getByLabelText(/Instruction list/) as HTMLTextAreaElement;
-    expect(area.value).toContain('LD     I0.0');
-    expect(area.value).toContain('O      Q0.0');
-    expect(area.value).toContain('ANI0.1'.replace('ANI', 'AN     I'));
+    const area = screen.getByLabelText(/Instruction list/);
+    expect(getEditorText(area)).toContain('LD     I0.0');
+    expect(getEditorText(area)).toContain('O      Q0.0');
+    expect(getEditorText(area)).toContain('ANI0.1'.replace('ANI', 'AN     I'));
 
-    fireEvent.change(area, { target: { value: 'NETWORK 1\nLD I0.2\n= Q0.3' } });
+    act(() => setEditorText(area, 'NETWORK 1\nLD I0.2\n= Q0.3'));
     fireEvent.click(screen.getByRole('tab', { name: 'LAD' }));
 
     expect(screen.queryByLabelText(/Instruction list/)).toBeNull();
@@ -249,7 +250,7 @@ describe('PlcEditor interactions', () => {
   it('stays in STL with diagnostics when the text is invalid', () => {
     render(<PlcEditor profile={profile} initialNetworks={[seal]} />);
     fireEvent.click(screen.getByRole('tab', { name: 'IL' }));
-    fireEvent.change(screen.getByLabelText(/Instruction list/), { target: { value: 'LD I0.0\nA I1.6\n= Q0.0' } });
+    act(() => setEditorText(screen.getByLabelText(/Instruction list/), 'LD I0.0\nA I1.6\n= Q0.0'));
     fireEvent.click(screen.getByRole('tab', { name: 'LAD' }));
 
     expect(screen.getByLabelText(/Instruction list/)).toBeDefined();

@@ -42,6 +42,12 @@ export interface ExecutionOptions {
   stdin?: string;
   /** Hard ceiling on trace steps; the only guard against an infinite loop in user code. */
   maxSteps?: number;
+  /**
+   * When true, Python uses RUN_FAST (stdout-only, no sys.settrace) for instant
+   * terminal dumps.  When false/absent, Python uses full per-line tracing so the
+   * speed-aware playback animation loop has real steps to step through.
+   */
+  instant?: boolean;
 }
 
 export interface LanguageEngine {

@@ -23,7 +23,11 @@ import {
   Trash2,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import Editor from "react-simple-code-editor";
+import { cpp } from "@codemirror/lang-cpp";
+import { python } from "@codemirror/lang-python";
+import type { Extension } from "@codemirror/state";
+import { CodeEditor } from "@/components/code-editor/CodeEditor";
+import { masmLanguage } from "@/components/code-editor/languages";
 import { prewarmRemote } from "@/features/code-studio/executionCache";
 import { TerminalSurface } from "@/features/code-studio/components/Terminal";
 import { toast } from "sonner";
@@ -316,249 +320,12 @@ const stringifyVariable = (value: unknown): string => {
   }
 };
 
-interface TokenPattern {
-  type: string;
-  regex: RegExp;
-}
-
-const MASM_PATTERNS: TokenPattern[] = [
-  { type: "comment", regex: /;.*/ },
-  { type: "string", regex: /'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*"/ },
-  {
-    type: "instruction",
-    regex:
-      /\b(?:MOV|ADD|SUB|PUSH|POP|INT|CMP|JMP|JZ|JNZ|JE|JNE|JG|JL|JGE|JLE|JA|JB|JAE|JBE|JC|JNC|JO|JNO|JS|JNS|LOOP|LOOPZ|LOOPNZ|LEA|CALL|RET|RETN|RETF|XCHG|HLT|INC|DEC|MUL|IMUL|DIV|IDIV|AND|OR|XOR|NOT|TEST|SHL|SHR|SAL|SAR|ROL|ROR|RCL|RCR|NOP|CLC|STC|CLI|STI)\b/i,
-  },
-  {
-    type: "register",
-    regex:
-      /\b(?:AX|AH|AL|BX|BH|BL|CX|CH|CL|DX|DH|DL|SI|DI|BP|SP|IP|CS|DS|ES|SS|FS|GS)\b/i,
-  },
-  {
-    type: "directive",
-    regex:
-      /(?:\.[A-Za-z]+|@[A-Za-z]+|\b(?:DB|DW|DD|DQ|DT|EQU|PROC|ENDP|ASSUME|SEGMENT|ENDS|OFFSET|PTR|MACRO|ENDM|ALIGN|ORG|INCLUDE)\b)/i,
-  },
-  { type: "number", regex: /\b(?:0x[0-9A-Fa-f]+|[0-9A-Fa-f]+h|\d+b?)\b/i },
-];
-
-const PYTHON_PATTERNS: TokenPattern[] = [
-  { type: "comment", regex: /#.*/ },
-  {
-    type: "string",
-    regex:
-      /"""[\s\S]*?"""|'''[\s\S]*?'''|f?"(?:\\.|[^"\\])*"|f?'(?:\\.|[^'\\])*'/,
-  },
-  {
-    type: "control-flow",
-    regex:
-      /\b(?:if|elif|else|for|while|try|except|finally|with|as|break|continue|pass|raise|yield|match|case|return)\b/,
-  },
-  {
-    type: "keyword-type",
-    regex:
-      /\b(?:def|class|import|from|lambda|async|await|global|nonlocal|assert|del|True|False|None|self|cls|int|float|str|bool|list|dict|set|tuple|bytes|object|type|in|is|not|and|or)\b/,
-  },
-  {
-    type: "function",
-    regex:
-      /\b(?:print|len|range|enumerate|zip|map|filter|sum|min|max|abs|round|open|input|isinstance|issubclass|super|all|any|sorted|reversed|id|hex|bin|oct|chr|ord)\b|\b[a-zA-Z_]\w*(?=\s*\()/,
-  },
-  {
-    type: "number",
-    regex:
-      /\b(?:0x[0-9a-fA-F]+|0b[01]+|0o[0-7]+|\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)\b/,
-  },
-];
-
-const CPP_PATTERNS: TokenPattern[] = [
-  { type: "comment", regex: /\/\/.*|\/\*[\s\S]*?\*\// },
-  {
-    type: "preprocessor",
-    regex:
-      /#\s*(?:include|define|undef|ifdef|ifndef|if|else|elif|endif|pragma)\b[^\r\n]*/,
-  },
-  { type: "string", regex: /"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'/ },
-  {
-    type: "control-flow",
-    regex:
-      /\b(?:if|else|for|while|do|switch|case|default|break|continue|return|goto|try|catch|throw)\b/,
-  },
-  {
-    type: "keyword-type",
-    regex:
-      /\b(?:int|float|double|char|void|bool|short|long|signed|unsigned|const|static|volatile|struct|enum|union|typedef|auto|class|public|private|protected|virtual|override|final|template|typename|namespace|using|new|delete|operator|sizeof|decltype|constexpr|inline|explicit|friend|nullptr|true|false|size_t|uint8_t|uint16_t|uint32_t|uint64_t|int8_t|int16_t|int32_t|int64_t)\b/,
-  },
-  {
-    type: "function",
-    regex:
-      /\b(?:std::cout|std::cin|std::endl|std::cerr|std::vector|std::string|std::map|std::set|std::pair|std::make_pair|printf|scanf|malloc|free|memcpy|memset|strlen|main)\b|\b[a-zA-Z_]\w*(?=\s*\()/,
-  },
-  {
-    type: "number",
-    regex:
-      /\b(?:0x[0-9a-fA-F]+[uUlL]*|0b[01]+[uUlL]*|\d+(?:\.\d+)?(?:[eE][+-]?\d+)?[fFuUlL]*)\b/,
-  },
-];
-
-const C_PATTERNS: TokenPattern[] = [
-  { type: "comment", regex: /\/\/.*|\/\*[\s\S]*?\*\// },
-  {
-    type: "preprocessor",
-    regex:
-      /#\s*(?:include|define|undef|ifdef|ifndef|if|else|elif|endif|pragma)\b[^\r\n]*/,
-  },
-  { type: "string", regex: /"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'/ },
-  {
-    type: "control-flow",
-    regex:
-      /\b(?:if|else|for|while|do|switch|case|default|break|continue|return|goto)\b/,
-  },
-  {
-    type: "keyword-type",
-    regex:
-      /\b(?:int|float|double|char|void|bool|short|long|signed|unsigned|const|static|volatile|struct|enum|union|typedef|auto|sizeof|extern|register|size_t|uint8_t|uint16_t|uint32_t|uint64_t|int8_t|int16_t|int32_t|int64_t|NULL|true|false)\b/,
-  },
-  {
-    type: "function",
-    regex:
-      /\b(?:printf|scanf|puts|gets|getchar|putchar|malloc|calloc|realloc|free|memcpy|memset|memmove|strcpy|strncpy|strcat|strlen|strcmp|atoi|atof|exit|main)\b|\b[a-zA-Z_]\w*(?=\s*\()/,
-  },
-  {
-    type: "number",
-    regex:
-      /\b(?:0x[0-9a-fA-F]+[uUlL]*|0b[01]+[uUlL]*|\d+(?:\.\d+)?(?:[eE][+-]?\d+)?[fFuUlL]*)\b/,
-  },
-];
-
-const COMPILED_LANGUAGES: Record<
-  SupportedLanguage,
-  { regex: RegExp; patterns: TokenPattern[] }
-> = {
-  masm8086: {
-    patterns: MASM_PATTERNS,
-    regex: new RegExp(
-      MASM_PATTERNS.map(p => `(${p.regex.source})`).join("|"),
-      "gi"
-    ),
-  },
-  python: {
-    patterns: PYTHON_PATTERNS,
-    regex: new RegExp(
-      PYTHON_PATTERNS.map(p => `(${p.regex.source})`).join("|"),
-      "g"
-    ),
-  },
-  cpp: {
-    patterns: CPP_PATTERNS,
-    regex: new RegExp(
-      CPP_PATTERNS.map(p => `(${p.regex.source})`).join("|"),
-      "g"
-    ),
-  },
-  c: {
-    patterns: C_PATTERNS,
-    regex: new RegExp(
-      C_PATTERNS.map(p => `(${p.regex.source})`).join("|"),
-      "g"
-    ),
-  },
+const LANGUAGE_EXTENSIONS: Record<SupportedLanguage, Extension> = {
+  masm8086: masmLanguage,
+  python: python(),
+  cpp: cpp(),
+  c: cpp(),
 };
-
-function getClassForTokenType(type: string): string {
-  switch (type) {
-    case "comment":
-      return "syntax-comment";
-    case "string":
-      return "syntax-string";
-    case "control-flow":
-    case "instruction":
-      return "syntax-control-flow";
-    case "keyword-type":
-    case "directive":
-      return "syntax-keyword-type";
-    case "register":
-    case "function":
-      return "syntax-function";
-    case "number":
-      return "syntax-literal-number";
-    case "preprocessor":
-      return "syntax-preprocessor";
-    default:
-      return "";
-  }
-}
-
-function tokenizeLine(
-  text: string,
-  language: SupportedLanguage
-): Array<{ text: string; className?: string }> {
-  if (!text) return [{ text: " " }];
-
-  const trimmed = text.trim();
-  if (language === "masm8086" && trimmed.startsWith(";")) {
-    return [{ text, className: "syntax-comment" }];
-  }
-  if (language === "python" && trimmed.startsWith("#")) {
-    return [{ text, className: "syntax-comment" }];
-  }
-  if ((language === "cpp" || language === "c") && trimmed.startsWith("//")) {
-    return [{ text, className: "syntax-comment" }];
-  }
-
-  const langConfig =
-    COMPILED_LANGUAGES[language] || COMPILED_LANGUAGES.masm8086;
-  const regex = new RegExp(langConfig.regex.source, langConfig.regex.flags);
-  const result: Array<{ text: string; className?: string }> = [];
-  let lastIndex = 0;
-  let match: RegExpExecArray | null;
-
-  while ((match = regex.exec(text)) !== null) {
-    if (match.index > lastIndex) {
-      result.push({ text: text.slice(lastIndex, match.index) });
-    }
-
-    let matchedType = "";
-    for (let i = 0; i < langConfig.patterns.length; i++) {
-      if (match[i + 1] !== undefined) {
-        matchedType = langConfig.patterns[i].type;
-        break;
-      }
-    }
-
-    result.push({
-      text: match[0],
-      className: matchedType ? getClassForTokenType(matchedType) : undefined,
-    });
-
-    lastIndex = match.index + match[0].length;
-  }
-
-  if (lastIndex < text.length) {
-    result.push({ text: text.slice(lastIndex) });
-  }
-
-  return result.length > 0 ? result : [{ text: " " }];
-}
-
-function SyntaxLine({
-  text,
-  language,
-}: {
-  text: string;
-  language: SupportedLanguage;
-}) {
-  const tokens = tokenizeLine(text, language);
-  return (
-    <>
-      {tokens.map((token, index) => (
-        <span key={index} className={token.className}>
-          {token.text}
-        </span>
-      ))}
-    </>
-  );
-}
 
 // ---------------------------------------------------------------------------
 // Source Editor Component (Area 1)
@@ -580,103 +347,17 @@ function SourceEditor({
   breakpoints: number[];
   onToggleBreakpoint: (line: number) => void;
 }) {
-  const lines = code.split("\n");
-  const lineAt = (offset: number) => code.slice(0, offset).split("\n").length;
-  const lineAtCursor = (target: EventTarget | null) =>
-    lineAt(target instanceof HTMLTextAreaElement ? target.value.slice(0, target.selectionStart).split("\n").length : 1);
-
-  useEffect(() => {
-    if (typeof document !== "undefined" && "fonts" in document) {
-      document.fonts.ready.then(() => {
-        // Font metrics loaded and ready
-      });
-    }
-  }, []);
-
   return (
-    <div
-      className="relative flex-1 min-h-0 overflow-auto bg-[#f8fbff] dark:bg-[#07080a] select-text"
-      dir="ltr"
-    >
-      <div className="flex min-h-full min-w-max">
-        {/* Code Gutter (Line numbers & Breakpoint triggers) */}
-        <div className="sticky start-0 z-10 w-13 shrink-0 select-none border-e border-slate-200 bg-slate-100/80 py-3 font-mono text-[12px] leading-[22px] dark:border-[#1a1d24] dark:bg-[#090a0d]/90">
-          {lines.map((_, index) => {
-            const line = index + 1;
-            const isCurrent = activeLine === line;
-            const hasBp = breakpoints.includes(line);
-            return (
-              <div
-                key={line}
-                className={`grid grid-cols-[18px_1fr] items-center px-1 text-slate-400 dark:text-slate-500 h-[22px] leading-[22px] tabular-nums ${isCurrent
-                  ? "bg-violet-500/20 text-violet-700 dark:text-violet-300 font-medium"
-                  : "font-normal"
-                  }`}
-              >
-                <button
-                  type="button"
-                  aria-label={`Toggle breakpoint on line ${line}`}
-                  onClick={() => onToggleBreakpoint(line)}
-                  className="flex items-center justify-center cursor-pointer"
-                >
-                  {hasBp ? (
-                    <span className="block h-2 w-2 rounded-full bg-rose-500 shadow-xs" />
-                  ) : (
-                    <span className="block h-2 w-2 rounded-full border border-transparent hover:border-slate-400 dark:hover:border-slate-500" />
-                  )}
-                </button>
-                <span className="text-end pe-1.5 tabular-nums font-normal">
-                  {line.toString().padStart(2, "0")}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Editor Surface */}
-        <div className="relative min-w-0 flex-1">
-          <Editor
-            value={code}
-            onValueChange={onChange}
-            highlight={(source: string) => (
-              <>
-                {source.split("\n").map((line: string, index: number) => {
-                  const isCurrent = activeLine === index + 1;
-                  return (
-                    <div
-                      key={`${index}-${line}`}
-                      className={`block h-[22px] leading-[22px] font-normal ${isCurrent
-                        ? "bg-violet-100/40 dark:bg-violet-500/15 text-slate-900 dark:text-white"
-                        : "text-slate-800 dark:text-slate-200"
-                        }`}
-                    >
-                      <SyntaxLine text={line || " "} language={language} />
-                    </div>
-                  );
-                })}
-              </>
-            )}
-            padding={12}
-            tabSize={2}
-            onClick={event => onActiveLine(lineAtCursor(event.target))}
-            onKeyUp={event => onActiveLine(lineAtCursor(event.target))}
-            style={{
-              minHeight: "100%",
-              fontFamily: "'JetBrains Mono', 'Fira Code', Menlo, Monaco, 'Courier New', monospace",
-              fontSize: 14,
-              lineHeight: "22px",
-              letterSpacing: 0,
-              fontVariantLigatures: "none",
-              whiteSpace: "pre",
-              position: "relative",
-              zIndex: 1,
-              fontWeight: 400,
-            }}
-            textareaClassName="!outline-none !caret-violet-500 !font-normal"
-          />
-        </div>
-      </div>
-    </div>
+    <CodeEditor
+      value={code}
+      onChange={onChange}
+      language={LANGUAGE_EXTENSIONS[language]}
+      activeLine={activeLine}
+      onCursorLine={onActiveLine}
+      breakpoints={breakpoints}
+      onToggleBreakpoint={onToggleBreakpoint}
+      ariaLabel="Source code editor"
+    />
   );
 }
 
@@ -791,6 +472,16 @@ export function AssemblerStudio() {
     result && currentStepIndex > 0
       ? (result.steps[currentStepIndex - 1] ?? null)
       : null;
+
+  const cumulativeStdout = useMemo(() => {
+    if (!result?.steps || currentStepIndex < 0) return "";
+    let out = "";
+    for (let i = 0; i <= currentStepIndex; i++) {
+      out += result.steps[i].stdout || "";
+    }
+    return out;
+  }, [result, currentStepIndex]);
+
   const combinedError = engineError ?? result?.error ?? null;
   const isMasm = language === "masm8086";
   const totalSteps = result?.steps.length ?? 0;
@@ -810,17 +501,17 @@ export function AssemblerStudio() {
   // Inspector tabs depend on the active language; low-level tabs are MASM-only.
   const inspectorTabs: { label: string; value: string; icon: ReactNode }[] = isMasm
     ? [
-        { label: "Registers & Flags", value: "state", icon: <Cpu className="h-4 w-4" /> },
-        { label: "Execution Trace", value: "trace", icon: <ListOrdered className="h-4 w-4" /> },
-        { label: "Stack", value: "stack", icon: <Layers className="h-4 w-4" /> },
-        { label: "Main Memory", value: "memory", icon: <Database className="h-4 w-4" /> },
-      ]
+      { label: "Registers & Flags", value: "state", icon: <Cpu className="h-4 w-4" /> },
+      { label: "Execution Trace", value: "trace", icon: <ListOrdered className="h-4 w-4" /> },
+      { label: "Stack", value: "stack", icon: <Layers className="h-4 w-4" /> },
+      { label: "Main Memory", value: "memory", icon: <Database className="h-4 w-4" /> },
+    ]
     : [
-        { label: "Variables View", value: "state", icon: <Cpu className="h-4 w-4" /> },
-        { label: "Execution Trace", value: "trace", icon: <ListOrdered className="h-4 w-4" /> },
-        { label: "Telemetry & Insights", value: "telemetry", icon: <Activity className="h-4 w-4" /> },
-        { label: "Quick Reference", value: "reference", icon: <BookOpen className="h-4 w-4" /> },
-      ];
+      { label: "Variables View", value: "state", icon: <Cpu className="h-4 w-4" /> },
+      { label: "Execution Trace", value: "trace", icon: <ListOrdered className="h-4 w-4" /> },
+      { label: "Telemetry & Insights", value: "telemetry", icon: <Activity className="h-4 w-4" /> },
+      { label: "Quick Reference", value: "reference", icon: <BookOpen className="h-4 w-4" /> },
+    ];
   // Reset to the first tab if the active one is not offered for this language.
   useEffect(() => {
     if (!inspectorTabs.some(t => t.value === activeTab)) setActiveTab("state");
@@ -951,23 +642,54 @@ export function AssemblerStudio() {
   useEffect(() => {
     if (!isPlaying || !result || speed === "instant") return;
     const multiplier = typeof speed === "number" ? speed : 1.0;
-    const intervalMs = Math.max(25, Math.round(BASE_PLAY_INTERVAL_MS / multiplier));
+    const stepInterval = Math.max(25, BASE_PLAY_INTERVAL_MS / multiplier);
 
-    const timer = window.setInterval(() => {
-      setCurrentStepIndex(index => {
-        const next = index + 1;
-        if (next >= result.steps.length) {
-          setIsPlaying(false);
-          return index;
-        }
-        if (breakpoints.includes(result.steps[next].line)) {
-          setIsPlaying(false);
-          toast.info(`Paused at breakpoint on line ${result.steps[next].line}`);
-        }
-        return next;
-      });
-    }, intervalMs);
-    return () => window.clearInterval(timer);
+    let animationFrameId: number;
+    let lastTime = performance.now();
+    let accumulator = 0;
+
+    const playbackTick = (now: number) => {
+      const delta = now - lastTime;
+      lastTime = now;
+      accumulator += delta;
+
+      if (accumulator >= stepInterval) {
+        const ticks = Math.floor(accumulator / stepInterval);
+        accumulator -= ticks * stepInterval;
+
+        setCurrentStepIndex(index => {
+          let next = index;
+          let hitBreakpoint = false;
+          let finished = false;
+
+          for (let i = 0; i < ticks; i++) {
+            next++;
+            if (next >= result.steps.length) {
+              finished = true;
+              next = result.steps.length - 1;
+              break;
+            }
+            if (breakpoints.includes(result.steps[next].line)) {
+              hitBreakpoint = true;
+              break;
+            }
+          }
+
+          if (finished || hitBreakpoint) {
+            setIsPlaying(false);
+            if (hitBreakpoint) {
+              toast.info(`Paused at breakpoint on line ${result.steps[next].line}`);
+            }
+          }
+          return next;
+        });
+      }
+
+      animationFrameId = requestAnimationFrame(playbackTick);
+    };
+
+    animationFrameId = requestAnimationFrame(playbackTick);
+    return () => cancelAnimationFrame(animationFrameId);
   }, [isPlaying, result, breakpoints, speed]);
 
   const toggleBreakpoint = (line: number) =>
@@ -1024,7 +746,7 @@ export function AssemblerStudio() {
     const consumedStdin = stdinQueue;
     consumedStdinRef.current = consumedStdin;
     setStdinQueue("");
-    await runCode(language, code, { stdin: consumedStdin });
+    await runCode(language, code, { stdin: consumedStdin, instant: isInstant });
   };
 
   const awaitingInput =
@@ -1041,7 +763,7 @@ export function AssemblerStudio() {
       resumeFromStepRef.current = result.steps.length;
       pendingActionRef.current = "resume";
       setStdinQueue("");
-      void runCode(language, code, { stdin: cumulative });
+      void runCode(language, code, { stdin: cumulative, instant: false });
       return;
     }
     setStdinQueue(buffer => `${buffer}${text}`);
@@ -1098,7 +820,8 @@ export function AssemblerStudio() {
     const consumedStdin = stdinQueue;
     consumedStdinRef.current = consumedStdin;
     setStdinQueue("");
-    void runCode(language, code, { stdin: consumedStdin });
+    // Step mode always wants full trace (never instant)
+    void runCode(language, code, { stdin: consumedStdin, instant: false });
   };
 
   const onStepBack = () => {
@@ -1324,7 +1047,7 @@ export function AssemblerStudio() {
                   ) : (
                     <TerminalSurface
                       scrollRef={terminalScrollRef}
-                      stdout={currentStep?.stdout}
+                      stdout={cumulativeStdout}
                       video={isMasm ? (currentStep?.video ?? null) : null}
                       awaitingInput={awaitingInput}
                       active={!combinedError}
@@ -1343,11 +1066,10 @@ export function AssemblerStudio() {
                         if (!awaitingInput) toast.success(`Queued stdin: "${entry}"`);
                       }
                     }}
-                    className={`flex shrink-0 items-center gap-1.5 border-t p-1.5 ${
-                      awaitingInput
-                        ? "border-violet-500 bg-violet-500/10 ring-1 ring-inset ring-violet-500/60 animate-pulse"
-                        : "border-slate-200 bg-slate-50 dark:border-[#1a1d24] dark:bg-[#090a0d]"
-                    }`}
+                    className={`flex shrink-0 items-center gap-1.5 border-t p-1.5 ${awaitingInput
+                      ? "border-violet-500 bg-violet-500/10 ring-1 ring-inset ring-violet-500/60 animate-pulse"
+                      : "border-slate-200 bg-slate-50 dark:border-[#1a1d24] dark:bg-[#090a0d]"
+                      }`}
                   >
                     <span className="font-mono text-xs font-bold text-violet-500 dark:text-violet-400 ps-2">
                       &gt;
@@ -1434,418 +1156,418 @@ export function AssemblerStudio() {
                   >
                     {/* Tab Header with Full-Width Inspector Tabs */}
                     <div className="w-full px-2 py-1.5 border-b border-slate-200 dark:border-[#1a1d24] bg-slate-50/60 dark:bg-[#090a0d] shrink-0">
-                <SegmentedControl
-                  options={inspectorTabs}
-                  value={activeTab}
-                  onChange={setActiveTab}
-                  size="md"
-                  fullWidth
-                  className="h-10 bg-slate-200/60 dark:bg-[#13161c] border-slate-200/80 dark:border-[#1a1d24]"
-                  aria-label="Inspector tabs"
-                />
-              </div>
+                      <SegmentedControl
+                        options={inspectorTabs}
+                        value={activeTab}
+                        onChange={setActiveTab}
+                        size="md"
+                        fullWidth
+                        className="h-10 bg-slate-200/60 dark:bg-[#13161c] border-slate-200/80 dark:border-[#1a1d24]"
+                        aria-label="Inspector tabs"
+                      />
+                    </div>
 
-              {/* ----------------------------------------------------------- */}
-              {/* TAB 1: Registers & Flags (MASM) OR Variables (High-Level)   */}
-              {/* ----------------------------------------------------------- */}
-              <TabsContent
-                value="state"
-                className="flex-1 min-h-0 overflow-y-auto p-3 m-0 outline-hidden space-y-3"
-              >
-                {isMasm ? (
-                  <>
-                    {/* General Purpose Registers with High-Contrast Subregisters & Platform Segmented Switcher */}
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                          General Purpose Registers
-                        </div>
-                        {/* Platform standard segmented pill control */}
-                        <SegmentedControl
-                          options={[
-                            { label: "HEX", value: "hex" },
-                            { label: "DEC", value: "decimal" },
-                            { label: "BIN", value: "binary" },
-                          ]}
-                          value={registerFormat}
-                          onChange={setRegisterFormat}
-                          size="sm"
-                          aria-label="Register format"
-                          className="border-slate-200/80 bg-slate-200/60 dark:border-[#1a1d24] dark:bg-[#13161c]"
+                    {/* ----------------------------------------------------------- */}
+                    {/* TAB 1: Registers & Flags (MASM) OR Variables (High-Level)   */}
+                    {/* ----------------------------------------------------------- */}
+                    <TabsContent
+                      value="state"
+                      className="flex-1 min-h-0 overflow-y-auto p-3 m-0 outline-hidden space-y-3"
+                    >
+                      {isMasm ? (
+                        <>
+                          {/* General Purpose Registers with High-Contrast Subregisters & Platform Segmented Switcher */}
+                          <div>
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                                General Purpose Registers
+                              </div>
+                              {/* Platform standard segmented pill control */}
+                              <SegmentedControl
+                                options={[
+                                  { label: "HEX", value: "hex" },
+                                  { label: "DEC", value: "decimal" },
+                                  { label: "BIN", value: "binary" },
+                                ]}
+                                value={registerFormat}
+                                onChange={setRegisterFormat}
+                                size="sm"
+                                aria-label="Register format"
+                                className="border-slate-200/80 bg-slate-200/60 dark:border-[#1a1d24] dark:bg-[#13161c]"
+                              />
+                            </div>
+
+                            {/* Split into a clean 2-row grid: Row 1: AX, BX | Row 2: CX, DX */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                              {(["AX", "BX", "CX", "DX"] as const).map(reg => {
+                                const val = registers[reg];
+                                const high = `${reg[0]}H`;
+                                const low = `${reg[0]}L`;
+                                return (
+                                  <div
+                                    key={reg}
+                                    className="rounded-xl border border-slate-200 bg-slate-50/80 p-2.5 dark:border-[#1a1d24] dark:bg-[#090a0d]"
+                                  >
+                                    <div className="flex items-center justify-between pb-1.5 border-b border-slate-200/60 dark:border-[#1a1d24]">
+                                      <span className="text-xs font-bold text-slate-800 dark:text-slate-100">
+                                        {reg}
+                                      </span>
+                                      <span className="font-mono text-xs font-normal text-violet-700 dark:text-violet-300">
+                                        {formatRegisterValue(val, registerFormat, 16)}
+                                      </span>
+                                    </div>
+                                    {/* High-contrast subregisters */}
+                                    <div className="mt-2 grid grid-cols-2 gap-2">
+                                      <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-2 py-1 dark:border-[#1a1d24] dark:bg-[#13161c] min-w-0">
+                                        <span className="text-[11px] font-bold text-violet-600 dark:text-violet-400 shrink-0 me-1">
+                                          {high}
+                                        </span>
+                                        <span className="font-mono text-xs font-normal text-slate-900 dark:text-slate-100 truncate">
+                                          {formatRegisterValue(val.slice(0, 2), registerFormat, 8)}
+                                        </span>
+                                      </div>
+                                      <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-2 py-1 dark:border-[#1a1d24] dark:bg-[#13161c] min-w-0">
+                                        <span className="text-[11px] font-bold text-violet-600 dark:text-violet-400 shrink-0 me-1">
+                                          {low}
+                                        </span>
+                                        <span className="font-mono text-xs font-normal text-slate-900 dark:text-slate-100 truncate">
+                                          {formatRegisterValue(val.slice(2), registerFormat, 8)}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          {/* Combined Single-Line Layout for Pointers, Indexes & Segments */}
+                          <div>
+                            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5 flex items-center justify-between">
+                              <span>Pointers, Indexes &amp; Segments</span>
+                            </div>
+                            <div className="grid grid-cols-4 sm:grid-cols-8 gap-1.5">
+                              {(["SP", "BP", "SI", "DI", "CS", "DS", "SS", "ES"] as const).map(reg => {
+                                const isSeg = ["CS", "DS", "SS", "ES"].includes(reg);
+                                return (
+                                  <div
+                                    key={reg}
+                                    className="rounded-lg border border-slate-200 bg-slate-50/80 px-2 py-1.5 dark:border-[#1a1d24] dark:bg-[#090a0d] min-w-0"
+                                  >
+                                    <span className={`block text-[10px] font-bold uppercase tracking-wide ${isSeg
+                                      ? "text-violet-600 dark:text-violet-400"
+                                      : "text-slate-600 dark:text-slate-300"
+                                      }`}>
+                                      {reg}
+                                    </span>
+                                    <span className={`font-mono text-xs font-semibold block truncate ${isSeg
+                                      ? "text-violet-700 dark:text-violet-300"
+                                      : "text-slate-900 dark:text-slate-100"
+                                      }`}>
+                                      {formatRegisterValue(registers[reg], registerFormat, 16)}
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          {/* Flags: Dedicated Balanced Row with Increased Size & High Contrast */}
+                          <div>
+                            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+                              Flags
+                            </div>
+                            <div className="grid grid-cols-4 sm:grid-cols-8 gap-1.5">
+                              {(["CF", "ZF", "SF", "OF", "PF", "AF", "IF", "DF"] as const).map(flag => {
+                                const active = flags[flag];
+                                return (
+                                  <div
+                                    key={flag}
+                                    className={`rounded-lg border px-2 py-1.5 text-center transition ${active
+                                      ? "border-violet-500 bg-violet-100/80 text-violet-950 dark:border-violet-400/60 dark:bg-violet-950/50 dark:text-violet-100 shadow-xs"
+                                      : "border-slate-200 bg-slate-50/60 text-slate-500 dark:border-[#1a1d24] dark:bg-[#090a0d] dark:text-slate-400"
+                                      }`}
+                                  >
+                                    <div className="flex items-center justify-center gap-1 mb-0.5">
+                                      <span
+                                        className={`h-2 w-2 rounded-full ${active
+                                          ? "bg-violet-600 shadow-[0_0_6px_rgba(124,58,237,0.7)]"
+                                          : "bg-slate-300 dark:bg-slate-700"
+                                          }`}
+                                      />
+                                      <span className={`font-mono text-xs font-bold ${active
+                                        ? "text-violet-950 dark:text-violet-100"
+                                        : "text-slate-700 dark:text-slate-300"
+                                        }`}>
+                                        {flag}
+                                      </span>
+                                    </div>
+                                    <span className={`font-mono text-xs font-bold block ${active
+                                      ? "text-violet-700 dark:text-violet-300"
+                                      : "text-slate-400 dark:text-slate-500"
+                                      }`}>
+                                      {active ? "1" : "0"}
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <AssemblerVariables
+                          variables={currentStep?.variables ?? {}}
+                          previousVariables={previousStep?.variables ?? null}
+                          callStack={currentStep?.callStack ?? []}
+                          copy={{
+                            variablesTitle: "Variables Inspector",
+                            callStackTitle: "Call Stack",
+                            empty: "No variables tracked at this step",
+                            name: "Name",
+                            type: "Type",
+                            value: "Value",
+                          }}
                         />
+                      )}
+                    </TabsContent>
+
+                    {/* ----------------------------------------------------------- */}
+                    {/* TAB 2: Execution Trace Log                                  */}
+                    {/* ----------------------------------------------------------- */}
+                    <TabsContent
+                      value="trace"
+                      className="flex-1 min-h-0 overflow-y-auto p-3 m-0 outline-hidden"
+                    >
+                      <div className="rounded-lg border border-slate-200 dark:border-[#1a1d24] overflow-hidden">
+                        <div className="grid grid-cols-[3.5rem_3.5rem_1fr_6rem] bg-slate-100 dark:bg-[#090a0d] px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-[#1a1d24]">
+                          <span>Step</span>
+                          <span>Line</span>
+                          <span>Instruction / Code</span>
+                          <span>State Update</span>
+                        </div>
+                        {result && result.steps.length > 0 ? (
+                          <div className="divide-y divide-slate-100 dark:divide-[#1a1d24]">
+                            {result.steps.map(step => {
+                              const isCurrent = step.stepIndex === currentStepIndex;
+                              const lineText =
+                                code.split("\n")[step.line - 1]?.trim() || `Line ${step.line}`;
+                              return (
+                                <button
+                                  key={step.stepIndex}
+                                  type="button"
+                                  onClick={() => onScrub(step.stepIndex)}
+                                  className={`grid w-full grid-cols-[3.5rem_3.5rem_1fr_6rem] px-3 py-1.5 text-start font-mono text-xs items-center cursor-pointer transition font-normal ${isCurrent
+                                    ? "bg-violet-100/60 dark:bg-violet-950/40 text-violet-900 dark:text-violet-200"
+                                    : "hover:bg-slate-50 dark:hover:bg-[#13161c]"
+                                    }`}
+                                >
+                                  <span className="text-slate-500 dark:text-slate-400 tabular-nums font-normal">
+                                    {step.stepIndex.toString().padStart(2, "0")}
+                                  </span>
+                                  <span className="text-violet-600 dark:text-violet-400 tabular-nums font-normal">
+                                    L{step.line}
+                                  </span>
+                                  <span className="truncate pe-2 font-normal">
+                                    {lineText}
+                                  </span>
+                                  <span className="truncate text-slate-600 dark:text-slate-300 text-[11px] font-normal">
+                                    {isMasm && step.registers
+                                      ? `AX=${step.registers.AX}`
+                                      : stringifyVariable(
+                                        Object.values(step.variables)[0]?.value
+                                      )}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="px-3 py-8 text-center text-xs text-slate-500 font-mono">
+                            No trace steps recorded. Run or step through the program.
+                          </div>
+                        )}
+                      </div>
+                    </TabsContent>
+
+                    {/* ----------------------------------------------------------- */}
+                    {/* TAB 3: Stack Visualizer                                     */}
+                    {/* ----------------------------------------------------------- */}
+                    <TabsContent
+                      value="stack"
+                      className="flex-1 min-h-0 p-3 m-0 outline-hidden space-y-3 h-full flex flex-col"
+                    >
+                      <div className="flex items-center justify-between max-w-xl shrink-0">
+                        <label className="flex items-center gap-2">
+                          <span className="text-xs font-medium text-slate-600 dark:text-slate-400">
+                            Stack Reference (SS:SP):
+                          </span>
+                          <input
+                            aria-label="Stack reference address"
+                            value={stackReference}
+                            onChange={e => setStackReference(e.target.value)}
+                            className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 font-mono text-xs font-normal text-slate-800 dark:border-[#1a1d24] dark:bg-[#090a0d] dark:text-slate-200 w-24 uppercase outline-none"
+                          />
+                        </label>
+                        {spDelta !== null && spDelta !== 0 && (
+                          <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${spDelta < 0
+                            ? "bg-rose-500/15 text-[#F43F5E] border border-rose-500/30"
+                            : "bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/30"
+                            }`}>
+                            {spDelta < 0 ? `${spDelta} (PUSH)` : `+${spDelta} (POP)`}
+                          </span>
+                        )}
                       </div>
 
-                      {/* Split into a clean 2-row grid: Row 1: AX, BX | Row 2: CX, DX */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                        {(["AX", "BX", "CX", "DX"] as const).map(reg => {
-                          const val = registers[reg];
-                          const high = `${reg[0]}H`;
-                          const low = `${reg[0]}L`;
-                          return (
+                      <div className="rounded-lg border border-slate-200 dark:border-[#1a1d24] overflow-hidden max-w-xl flex flex-col flex-1 min-h-0">
+                        <div className="grid grid-cols-[4.5rem_7rem_1fr_4.5rem] bg-slate-100 dark:bg-[#090a0d] px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-[#1a1d24] shrink-0">
+                          <span>Pointer</span>
+                          <span>Address</span>
+                          <span>Value (16-bit Word)</span>
+                          <span className="text-end">Delta</span>
+                        </div>
+                        <div className="divide-y divide-slate-100 dark:divide-[#1a1d24] overflow-y-auto flex-1">
+                          {stackRows.map(row => (
                             <div
-                              key={reg}
-                              className="rounded-xl border border-slate-200 bg-slate-50/80 p-2.5 dark:border-[#1a1d24] dark:bg-[#090a0d]"
-                            >
-                              <div className="flex items-center justify-between pb-1.5 border-b border-slate-200/60 dark:border-[#1a1d24]">
-                                <span className="text-xs font-bold text-slate-800 dark:text-slate-100">
-                                  {reg}
-                                </span>
-                                <span className="font-mono text-xs font-normal text-violet-700 dark:text-violet-300">
-                                  {formatRegisterValue(val, registerFormat, 16)}
-                                </span>
-                              </div>
-                              {/* High-contrast subregisters */}
-                              <div className="mt-2 grid grid-cols-2 gap-2">
-                                <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-2 py-1 dark:border-[#1a1d24] dark:bg-[#13161c] min-w-0">
-                                  <span className="text-[11px] font-bold text-violet-600 dark:text-violet-400 shrink-0 me-1">
-                                    {high}
-                                  </span>
-                                  <span className="font-mono text-xs font-normal text-slate-900 dark:text-slate-100 truncate">
-                                    {formatRegisterValue(val.slice(0, 2), registerFormat, 8)}
-                                  </span>
-                                </div>
-                                <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-2 py-1 dark:border-[#1a1d24] dark:bg-[#13161c] min-w-0">
-                                  <span className="text-[11px] font-bold text-violet-600 dark:text-violet-400 shrink-0 me-1">
-                                    {low}
-                                  </span>
-                                  <span className="font-mono text-xs font-normal text-slate-900 dark:text-slate-100 truncate">
-                                    {formatRegisterValue(val.slice(2), registerFormat, 8)}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    {/* Combined Single-Line Layout for Pointers, Indexes & Segments */}
-                    <div>
-                      <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5 flex items-center justify-between">
-                        <span>Pointers, Indexes &amp; Segments</span>
-                      </div>
-                      <div className="grid grid-cols-4 sm:grid-cols-8 gap-1.5">
-                        {(["SP", "BP", "SI", "DI", "CS", "DS", "SS", "ES"] as const).map(reg => {
-                          const isSeg = ["CS", "DS", "SS", "ES"].includes(reg);
-                          return (
-                            <div
-                              key={reg}
-                              className="rounded-lg border border-slate-200 bg-slate-50/80 px-2 py-1.5 dark:border-[#1a1d24] dark:bg-[#090a0d] min-w-0"
-                            >
-                              <span className={`block text-[10px] font-bold uppercase tracking-wide ${isSeg
-                                ? "text-violet-600 dark:text-violet-400"
-                                : "text-slate-600 dark:text-slate-300"
-                                }`}>
-                                {reg}
-                              </span>
-                              <span className={`font-mono text-xs font-semibold block truncate ${isSeg
-                                ? "text-violet-700 dark:text-violet-300"
-                                : "text-slate-900 dark:text-slate-100"
-                                }`}>
-                                {formatRegisterValue(registers[reg], registerFormat, 16)}
-                              </span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    {/* Flags: Dedicated Balanced Row with Increased Size & High Contrast */}
-                    <div>
-                      <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
-                        Flags
-                      </div>
-                      <div className="grid grid-cols-4 sm:grid-cols-8 gap-1.5">
-                        {(["CF", "ZF", "SF", "OF", "PF", "AF", "IF", "DF"] as const).map(flag => {
-                          const active = flags[flag];
-                          return (
-                            <div
-                              key={flag}
-                              className={`rounded-lg border px-2 py-1.5 text-center transition ${active
-                                ? "border-violet-500 bg-violet-100/80 text-violet-950 dark:border-violet-400/60 dark:bg-violet-950/50 dark:text-violet-100 shadow-xs"
-                                : "border-slate-200 bg-slate-50/60 text-slate-500 dark:border-[#1a1d24] dark:bg-[#090a0d] dark:text-slate-400"
+                              key={row.address}
+                              className={`grid grid-cols-[4.5rem_7rem_1fr_4.5rem] px-3 py-1 font-mono text-xs items-center font-normal ${row.isSp
+                                ? "bg-violet-50 dark:bg-violet-950/25 text-violet-900 dark:text-violet-200"
+                                : "text-slate-700 dark:text-slate-300"
                                 }`}
                             >
-                              <div className="flex items-center justify-center gap-1 mb-0.5">
-                                <span
-                                  className={`h-2 w-2 rounded-full ${active
-                                    ? "bg-violet-600 shadow-[0_0_6px_rgba(124,58,237,0.7)]"
-                                    : "bg-slate-300 dark:bg-slate-700"
-                                    }`}
-                                />
-                                <span className={`font-mono text-xs font-bold ${active
-                                  ? "text-violet-950 dark:text-violet-100"
-                                  : "text-slate-700 dark:text-slate-300"
-                                  }`}>
-                                  {flag}
-                                </span>
-                              </div>
-                              <span className={`font-mono text-xs font-bold block ${active
-                                ? "text-violet-700 dark:text-violet-300"
-                                : "text-slate-400 dark:text-slate-500"
-                                }`}>
-                                {active ? "1" : "0"}
+                              <span className="flex items-center gap-1.5">
+                                {row.isSp ? (
+                                  <span className="rounded bg-[#F43F5E] text-white text-[9px] px-1.5 py-0.5 font-bold tracking-wide">
+                                    SP
+                                  </span>
+                                ) : (
+                                  <span className="text-[10px] text-slate-400 dark:text-slate-500 font-normal">
+                                    {row.offset < 0 ? `SP${row.offset}` : `SP+${row.offset}`}
+                                  </span>
+                                )}
+                              </span>
+                              <span className="text-slate-600 dark:text-slate-400 font-normal">
+                                {row.address.toString(16).toUpperCase().padStart(4, "0")}h
+                              </span>
+                              <span className="font-normal text-slate-900 dark:text-slate-100">
+                                {row.value}
+                              </span>
+                              <span className="text-end text-[11px] tabular-nums font-normal">
+                                {row.isSp && spDelta !== null && spDelta !== 0 ? (
+                                  <span className={spDelta < 0 ? "text-[#F43F5E] font-bold" : "text-blue-500 font-bold"}>
+                                    {spDelta > 0 ? `+${spDelta}` : `${spDelta}`}
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-400 dark:text-slate-600 font-normal">
+                                    {row.offset > 0 ? `+${row.offset}` : row.offset === 0 ? "0" : `${row.offset}`}
+                                  </span>
+                                )}
                               </span>
                             </div>
-                          );
-                        })}
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  </>
-                ) : (
-                  <AssemblerVariables
-                    variables={currentStep?.variables ?? {}}
-                    previousVariables={previousStep?.variables ?? null}
-                    callStack={currentStep?.callStack ?? []}
-                    copy={{
-                      variablesTitle: "Variables Inspector",
-                      callStackTitle: "Call Stack",
-                      empty: "No variables tracked at this step",
-                      name: "Name",
-                      type: "Type",
-                      value: "Value",
-                    }}
-                  />
-                )}
-              </TabsContent>
+                    </TabsContent>
 
-              {/* ----------------------------------------------------------- */}
-              {/* TAB 2: Execution Trace Log                                  */}
-              {/* ----------------------------------------------------------- */}
-              <TabsContent
-                value="trace"
-                className="flex-1 min-h-0 overflow-y-auto p-3 m-0 outline-hidden"
-              >
-                <div className="rounded-lg border border-slate-200 dark:border-[#1a1d24] overflow-hidden">
-                  <div className="grid grid-cols-[3.5rem_3.5rem_1fr_6rem] bg-slate-100 dark:bg-[#090a0d] px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-[#1a1d24]">
-                    <span>Step</span>
-                    <span>Line</span>
-                    <span>Instruction / Code</span>
-                    <span>State Update</span>
-                  </div>
-                  {result && result.steps.length > 0 ? (
-                    <div className="divide-y divide-slate-100 dark:divide-[#1a1d24]">
-                      {result.steps.map(step => {
-                        const isCurrent = step.stepIndex === currentStepIndex;
-                        const lineText =
-                          code.split("\n")[step.line - 1]?.trim() || `Line ${step.line}`;
-                        return (
-                          <button
-                            key={step.stepIndex}
-                            type="button"
-                            onClick={() => onScrub(step.stepIndex)}
-                            className={`grid w-full grid-cols-[3.5rem_3.5rem_1fr_6rem] px-3 py-1.5 text-start font-mono text-xs items-center cursor-pointer transition font-normal ${isCurrent
-                              ? "bg-violet-100/60 dark:bg-violet-950/40 text-violet-900 dark:text-violet-200"
-                              : "hover:bg-slate-50 dark:hover:bg-[#13161c]"
-                              }`}
-                          >
-                            <span className="text-slate-500 dark:text-slate-400 tabular-nums font-normal">
-                              {step.stepIndex.toString().padStart(2, "0")}
-                            </span>
-                            <span className="text-violet-600 dark:text-violet-400 tabular-nums font-normal">
-                              L{step.line}
-                            </span>
-                            <span className="truncate pe-2 font-normal">
-                              {lineText}
-                            </span>
-                            <span className="truncate text-slate-600 dark:text-slate-300 text-[11px] font-normal">
-                              {isMasm && step.registers
-                                ? `AX=${step.registers.AX}`
-                                : stringifyVariable(
-                                  Object.values(step.variables)[0]?.value
-                                )}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="px-3 py-8 text-center text-xs text-slate-500 font-mono">
-                      No trace steps recorded. Run or step through the program.
-                    </div>
-                  )}
-                </div>
-              </TabsContent>
-
-              {/* ----------------------------------------------------------- */}
-              {/* TAB 3: Stack Visualizer                                     */}
-              {/* ----------------------------------------------------------- */}
-              <TabsContent
-                value="stack"
-                className="flex-1 min-h-0 p-3 m-0 outline-hidden space-y-3 h-full flex flex-col"
-              >
-                <div className="flex items-center justify-between max-w-xl shrink-0">
-                  <label className="flex items-center gap-2">
-                    <span className="text-xs font-medium text-slate-600 dark:text-slate-400">
-                      Stack Reference (SS:SP):
-                    </span>
-                    <input
-                      aria-label="Stack reference address"
-                      value={stackReference}
-                      onChange={e => setStackReference(e.target.value)}
-                      className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 font-mono text-xs font-normal text-slate-800 dark:border-[#1a1d24] dark:bg-[#090a0d] dark:text-slate-200 w-24 uppercase outline-none"
-                    />
-                  </label>
-                  {spDelta !== null && spDelta !== 0 && (
-                    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${spDelta < 0
-                      ? "bg-rose-500/15 text-[#F43F5E] border border-rose-500/30"
-                      : "bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/30"
-                      }`}>
-                      {spDelta < 0 ? `${spDelta} (PUSH)` : `+${spDelta} (POP)`}
-                    </span>
-                  )}
-                </div>
-
-                <div className="rounded-lg border border-slate-200 dark:border-[#1a1d24] overflow-hidden max-w-xl flex flex-col flex-1 min-h-0">
-                  <div className="grid grid-cols-[4.5rem_7rem_1fr_4.5rem] bg-slate-100 dark:bg-[#090a0d] px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-[#1a1d24] shrink-0">
-                    <span>Pointer</span>
-                    <span>Address</span>
-                    <span>Value (16-bit Word)</span>
-                    <span className="text-end">Delta</span>
-                  </div>
-                  <div className="divide-y divide-slate-100 dark:divide-[#1a1d24] overflow-y-auto flex-1">
-                    {stackRows.map(row => (
-                      <div
-                        key={row.address}
-                        className={`grid grid-cols-[4.5rem_7rem_1fr_4.5rem] px-3 py-1 font-mono text-xs items-center font-normal ${row.isSp
-                          ? "bg-violet-50 dark:bg-violet-950/25 text-violet-900 dark:text-violet-200"
-                          : "text-slate-700 dark:text-slate-300"
-                          }`}
-                      >
-                        <span className="flex items-center gap-1.5">
-                          {row.isSp ? (
-                            <span className="rounded bg-[#F43F5E] text-white text-[9px] px-1.5 py-0.5 font-bold tracking-wide">
-                              SP
-                            </span>
-                          ) : (
-                            <span className="text-[10px] text-slate-400 dark:text-slate-500 font-normal">
-                              {row.offset < 0 ? `SP${row.offset}` : `SP+${row.offset}`}
-                            </span>
-                          )}
-                        </span>
-                        <span className="text-slate-600 dark:text-slate-400 font-normal">
-                          {row.address.toString(16).toUpperCase().padStart(4, "0")}h
-                        </span>
-                        <span className="font-normal text-slate-900 dark:text-slate-100">
-                          {row.value}
-                        </span>
-                        <span className="text-end text-[11px] tabular-nums font-normal">
-                          {row.isSp && spDelta !== null && spDelta !== 0 ? (
-                            <span className={spDelta < 0 ? "text-[#F43F5E] font-bold" : "text-blue-500 font-bold"}>
-                              {spDelta > 0 ? `+${spDelta}` : `${spDelta}`}
-                            </span>
-                          ) : (
-                            <span className="text-slate-400 dark:text-slate-600 font-normal">
-                              {row.offset > 0 ? `+${row.offset}` : row.offset === 0 ? "0" : `${row.offset}`}
-                            </span>
-                          )}
-                        </span>
+                    <TabsContent
+                      value="telemetry"
+                      className="flex-1 min-h-0 overflow-y-auto p-3 m-0 outline-hidden"
+                    >
+                      <div className="rounded-lg border border-slate-200 dark:border-[#1a1d24] divide-y divide-slate-200 dark:divide-[#1a1d24] font-mono text-xs">
+                        {[
+                          ["Exit Status", !result ? "—" : combinedError ? "Error" : "Code 0 (OK)"],
+                          ["Execution Time", runTimeMs === null ? "—" : `~${runTimeMs} ms`],
+                          ["Steps Executed", String(totalSteps)],
+                          ["Active Variables", String(Object.keys(currentStep?.variables ?? {}).length)],
+                        ].map(([k, v]) => (
+                          <div key={k} className="flex items-center justify-between px-3 py-2">
+                            <span className="text-slate-500 dark:text-slate-400">{k}</span>
+                            <span className="font-semibold text-slate-800 dark:text-slate-200">{v}</span>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                </div>
-              </TabsContent>
+                    </TabsContent>
 
-              <TabsContent
-                value="telemetry"
-                className="flex-1 min-h-0 overflow-y-auto p-3 m-0 outline-hidden"
-              >
-                <div className="rounded-lg border border-slate-200 dark:border-[#1a1d24] divide-y divide-slate-200 dark:divide-[#1a1d24] font-mono text-xs">
-                  {[
-                    ["Exit Status", !result ? "—" : combinedError ? "Error" : "Code 0 (OK)"],
-                    ["Execution Time", runTimeMs === null ? "—" : `~${runTimeMs} ms`],
-                    ["Steps Executed", String(totalSteps)],
-                    ["Active Variables", String(Object.keys(currentStep?.variables ?? {}).length)],
-                  ].map(([k, v]) => (
-                    <div key={k} className="flex items-center justify-between px-3 py-2">
-                      <span className="text-slate-500 dark:text-slate-400">{k}</span>
-                      <span className="font-semibold text-slate-800 dark:text-slate-200">{v}</span>
-                    </div>
-                  ))}
-                </div>
-              </TabsContent>
-
-              <TabsContent
-                value="reference"
-                className="flex-1 min-h-0 overflow-y-auto p-3 m-0 outline-hidden"
-              >
-                <div className="rounded-lg border border-slate-200 dark:border-[#1a1d24] divide-y divide-slate-200 dark:divide-[#1a1d24] font-mono text-xs">
-                  {(QUICK_REFERENCE[language] ?? []).map(([k, v]) => (
-                    <div key={k} className="grid grid-cols-[9rem_1fr] gap-2 px-3 py-1.5">
-                      <code className="font-semibold text-slate-800 dark:text-slate-200">{k}</code>
-                      <span className="text-slate-500 dark:text-slate-400">{v}</span>
-                    </div>
-                  ))}
-                </div>
-              </TabsContent>
-
-              {/* ----------------------------------------------------------- */}
-              {/* TAB 4: Main Memory (Searchable RAM Grid)                    */}
-              {/* ----------------------------------------------------------- */}
-              <TabsContent
-                value="memory"
-                className="flex-1 min-h-0 p-3 m-0 outline-hidden space-y-3 h-full flex flex-col"
-              >
-                <div className="flex items-center justify-between gap-2 max-w-2xl shrink-0">
-                  <label className="flex items-center gap-2">
-                    <span className="text-xs font-medium text-slate-600 dark:text-slate-400">
-                      Base Address:
-                    </span>
-                    <input
-                      aria-label="Memory reference address"
-                      value={memoryReference}
-                      onChange={e => setMemoryReference(e.target.value)}
-                      onBlur={e =>
-                        setMemoryReference(
-                          formatAddress(parseAddress(e.target.value, memoryBase))
-                        )
-                      }
-                      className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 font-mono text-xs font-normal text-slate-800 dark:border-[#1a1d24] dark:bg-[#090a0d] dark:text-slate-200 w-24 uppercase outline-none"
-                    />
-                  </label>
-                </div>
-
-                <div className="rounded-lg border border-slate-200 dark:border-[#1a1d24] overflow-hidden max-w-2xl flex flex-col flex-1 min-h-0">
-                  <div className="grid grid-cols-[6.5rem_6.5rem_4.5rem_4.5rem_3.5rem] bg-slate-100 dark:bg-[#090a0d] px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-[#1a1d24] shrink-0">
-                    <span>Address</span>
-                    <span>Byte Value</span>
-                    <span>Hex</span>
-                    <span>Decimal</span>
-                    <span>ASCII</span>
-                  </div>
-                  <div className="divide-y divide-slate-100 dark:divide-[#1a1d24] overflow-y-auto flex-1">
-                    {memoryRows.map(row => (
-                      <div
-                        key={row.address}
-                        className="grid grid-cols-[6.5rem_6.5rem_4.5rem_4.5rem_3.5rem] px-3 py-1 font-mono text-xs items-center font-normal"
-                      >
-                        <span className="text-slate-600 dark:text-slate-400 font-normal">
-                          {formatAddress(row.address)}
-                        </span>
-                        <span className="text-slate-800 dark:text-slate-200 font-normal">
-                          {row.value.toString(2).padStart(8, "0")}b
-                        </span>
-                        <span className="text-violet-700 dark:text-violet-300 font-normal">
-                          {outputValue(row.value, "hex")}
-                        </span>
-                        <span className="text-slate-700 dark:text-slate-300 font-normal">
-                          {outputValue(row.value, "decimal")}
-                        </span>
-                        <span className="text-slate-500 dark:text-slate-400 font-normal">
-                          {outputValue(row.value, "ascii")}
-                        </span>
+                    <TabsContent
+                      value="reference"
+                      className="flex-1 min-h-0 overflow-y-auto p-3 m-0 outline-hidden"
+                    >
+                      <div className="rounded-lg border border-slate-200 dark:border-[#1a1d24] divide-y divide-slate-200 dark:divide-[#1a1d24] font-mono text-xs">
+                        {(QUICK_REFERENCE[language] ?? []).map(([k, v]) => (
+                          <div key={k} className="grid grid-cols-[9rem_1fr] gap-2 px-3 py-1.5">
+                            <code className="font-semibold text-slate-800 dark:text-slate-200">{k}</code>
+                            <span className="text-slate-500 dark:text-slate-400">{v}</span>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                </div>
-              </TabsContent>
-            </Tabs>
-          </section>
-        </ResizablePanel>
-      </ResizablePanelGroup>
-    </ResizablePanel>
-  </ResizablePanelGroup>
-</div>
+                    </TabsContent>
+
+                    {/* ----------------------------------------------------------- */}
+                    {/* TAB 4: Main Memory (Searchable RAM Grid)                    */}
+                    {/* ----------------------------------------------------------- */}
+                    <TabsContent
+                      value="memory"
+                      className="flex-1 min-h-0 p-3 m-0 outline-hidden space-y-3 h-full flex flex-col"
+                    >
+                      <div className="flex items-center justify-between gap-2 max-w-2xl shrink-0">
+                        <label className="flex items-center gap-2">
+                          <span className="text-xs font-medium text-slate-600 dark:text-slate-400">
+                            Base Address:
+                          </span>
+                          <input
+                            aria-label="Memory reference address"
+                            value={memoryReference}
+                            onChange={e => setMemoryReference(e.target.value)}
+                            onBlur={e =>
+                              setMemoryReference(
+                                formatAddress(parseAddress(e.target.value, memoryBase))
+                              )
+                            }
+                            className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 font-mono text-xs font-normal text-slate-800 dark:border-[#1a1d24] dark:bg-[#090a0d] dark:text-slate-200 w-24 uppercase outline-none"
+                          />
+                        </label>
+                      </div>
+
+                      <div className="rounded-lg border border-slate-200 dark:border-[#1a1d24] overflow-hidden max-w-2xl flex flex-col flex-1 min-h-0">
+                        <div className="grid grid-cols-[6.5rem_6.5rem_4.5rem_4.5rem_3.5rem] bg-slate-100 dark:bg-[#090a0d] px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-[#1a1d24] shrink-0">
+                          <span>Address</span>
+                          <span>Byte Value</span>
+                          <span>Hex</span>
+                          <span>Decimal</span>
+                          <span>ASCII</span>
+                        </div>
+                        <div className="divide-y divide-slate-100 dark:divide-[#1a1d24] overflow-y-auto flex-1">
+                          {memoryRows.map(row => (
+                            <div
+                              key={row.address}
+                              className="grid grid-cols-[6.5rem_6.5rem_4.5rem_4.5rem_3.5rem] px-3 py-1 font-mono text-xs items-center font-normal"
+                            >
+                              <span className="text-slate-600 dark:text-slate-400 font-normal">
+                                {formatAddress(row.address)}
+                              </span>
+                              <span className="text-slate-800 dark:text-slate-200 font-normal">
+                                {row.value.toString(2).padStart(8, "0")}b
+                              </span>
+                              <span className="text-violet-700 dark:text-violet-300 font-normal">
+                                {outputValue(row.value, "hex")}
+                              </span>
+                              <span className="text-slate-700 dark:text-slate-300 font-normal">
+                                {outputValue(row.value, "decimal")}
+                              </span>
+                              <span className="text-slate-500 dark:text-slate-400 font-normal">
+                                {outputValue(row.value, "ascii")}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </TabsContent>
+                  </Tabs>
+                </section>
+              </ResizablePanel>
+            </ResizablePanelGroup>
+          </ResizablePanel>
+        </ResizablePanelGroup>
+      </div>
     </div>
   );
 }

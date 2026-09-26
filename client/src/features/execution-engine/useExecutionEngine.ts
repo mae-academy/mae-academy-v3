@@ -46,6 +46,8 @@ export function useExecutionEngine(): UseExecutionEngineReturn {
   const latestIdRef = useRef<string | null>(null);
   const nextIdRef = useRef(0);
   const mountedRef = useRef(true);
+  /** Tracks whether the PREWARM message has already been sent to prevent double init. */
+  const prewarmedRef = useRef(false);
 
   const failAllPending = useCallback((message: string) => {
     const pending = pendingRef.current;
@@ -62,7 +64,6 @@ export function useExecutionEngine(): UseExecutionEngineReturn {
   const getWorker = useCallback((): Worker => {
     if (workerRef.current) return workerRef.current;
 
-    // Created lazily: a consumer that never runs Python should not pay for the Pyodide fetch.
     const worker = new Worker(
       new URL("./executionWorker.ts", import.meta.url),
       { type: "module" }
@@ -71,12 +72,24 @@ export function useExecutionEngine(): UseExecutionEngineReturn {
     worker.onmessage = (event: MessageEvent<ExecutionResponse>) => {
       const response = event.data;
       const id = response.id;
+
+      // PREWARM / READY responses have no id and no pending callback — discard silently.
+      if (response.type === "READY") return;
+
+      // Invoke any registered per-request callback (e.g. the Python path which
+      // post-processes incremental stdout and calls setResult itself).
+      // Track whether the callback existed so we don't double-commit state below.
+      const hadCallback = id !== undefined && pendingRef.current.has(id);
       if (id !== undefined) {
         pendingRef.current.get(id)?.(response);
         pendingRef.current.delete(id);
       }
 
-      // A slow earlier run must never overwrite the newest one's outcome.
+      // If the pending callback handled state updates, skip the generic path.
+      if (hadCallback) return;
+
+      // Generic fallback: direct commit for any path that has no dedicated callback
+      // (currently unused but kept as a safety net for future message types).
       if (!mountedRef.current || id !== latestIdRef.current) return;
       setIsRunning(false);
       setResult(response.payload);
@@ -85,6 +98,7 @@ export function useExecutionEngine(): UseExecutionEngineReturn {
     const handleFailure = (message: string) => {
       workerRef.current?.terminate();
       workerRef.current = null;
+      prewarmedRef.current = false;
       failAllPending(message);
       if (!mountedRef.current) return;
       setIsRunning(false);
@@ -101,6 +115,31 @@ export function useExecutionEngine(): UseExecutionEngineReturn {
     workerRef.current = worker;
     return worker;
   }, [failAllPending]);
+
+  /**
+   * Eagerly pre-warm the worker and its Pyodide runtime.
+   *
+   * By doing this on mount (instead of deferring until the first "Run" click),
+   * the Python cold-start penalty is absorbed during the page load idle time.
+   * The worker is kept alive as a warm singleton — only terminated on unmount
+   * or on a fatal crash.
+   */
+  const prewarmWorker = useCallback(() => {
+    if (prewarmedRef.current) return;
+    // Guard: Worker is unavailable in jsdom / SSR environments.
+    if (typeof Worker === "undefined") return;
+    prewarmedRef.current = true;
+    const worker = getWorker();
+    const request: ExecutionRequest = {
+      type: "PREWARM",
+      payload: { language: "python", code: "", options: {} },
+    };
+    try {
+      worker.postMessage(request);
+    } catch {
+      // Swallow — if the worker is busted it will surface on the real run.
+    }
+  }, [getWorker]);
 
   /** Never rejects — failures land in `result.error`, so callers do not need a try/catch. */
   const runCode = useCallback(
@@ -177,16 +216,21 @@ export function useExecutionEngine(): UseExecutionEngineReturn {
           });
       }
 
+      // ── Python path ──
+      // When instant===true → RUN_FAST (no sys.settrace, O(1) stdout dump).
+      // When paced (0.5×/1×/2×) → RUN (full sys.settrace trace), so the
+      // playback animation loop has real per-line steps to step through.
+      // The worker inspects options.instant to decide which harness to use.
+      const isInstant = options?.instant === true;
       const workerLanguage: "python" = language;
       const worker = getWorker();
 
       return new Promise<void>(resolve => {
-        // A tight synchronous loop in interpreted user code (JSCPP has no built-in yield point)
-        // can hang the worker's own message loop forever; Worker.terminate() is the only escape.
         const timeout = setTimeout(() => {
           pendingRef.current.delete(id);
           worker.terminate();
           workerRef.current = null;
+          prewarmedRef.current = false;
           if (mountedRef.current && id === latestIdRef.current) {
             setIsRunning(false);
             setResult(TIMED_OUT_RESULT);
@@ -194,15 +238,36 @@ export function useExecutionEngine(): UseExecutionEngineReturn {
           resolve();
         }, WORKER_TIMEOUT_MS);
 
-        pendingRef.current.set(id, () => {
+        pendingRef.current.set(id, (response) => {
           clearTimeout(timeout);
+          if (mountedRef.current && id === latestIdRef.current) {
+            // The Python tracer stores *cumulative* stdout at every step
+            // (each snapshot contains everything printed so far).  Convert
+            // to *incremental* per-step chunks so the terminal progressively
+            // appends output as the animation loop advances, matching C++/MASM.
+            const raw = response.payload;
+            if (!isInstant && raw.steps.length > 1) {
+              let prev = "";
+              const incremental = raw.steps.map(step => {
+                const chunk = (step.stdout ?? "").slice(prev.length);
+                prev = step.stdout ?? "";
+                return { ...step, stdout: chunk };
+              });
+              setResult({ ...raw, steps: incremental });
+            } else {
+              setResult(raw);
+            }
+            setIsRunning(false);
+          }
           resolve();
         });
 
         try {
           const request: ExecutionRequest = {
-            type: "RUN",
-            payload: { language: workerLanguage, code, options },
+            // Always send RUN_FAST so the worker receives the signal; it
+            // inspects options.instant internally to pick the right harness.
+            type: "RUN_FAST",
+            payload: { language: workerLanguage, code, options: { ...options, instant: isInstant } },
             id,
           };
           worker.postMessage(request);
@@ -233,16 +298,24 @@ export function useExecutionEngine(): UseExecutionEngineReturn {
 
   useEffect(() => {
     mountedRef.current = true;
+
+    // ── Background pre-warm ──
+    // Instantiate the web worker and load Pyodide silently upon mounting the
+    // Code Studio page — do NOT defer worker init until the first "Run" click.
+    // This eliminates the 2–10s cold-start penalty on the first Python run.
+    prewarmWorker();
+
     return () => {
       mountedRef.current = false;
       workerRef.current?.terminate();
       workerRef.current = null;
+      prewarmedRef.current = false;
       void masmEngine.dispose();
       failAllPending(
         "The execution engine was torn down before the run finished."
       );
     };
-  }, [failAllPending]);
+  }, [failAllPending, prewarmWorker]);
 
   return { isRunning, result, runCode, reset };
 }
