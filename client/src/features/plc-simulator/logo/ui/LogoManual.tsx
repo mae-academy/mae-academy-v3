@@ -145,10 +145,10 @@ function Panel() {
         <Table
           head={['Where', 'Keys', 'What happens']}
           rows={[
-            ['Main menu (STOP)', '▲ ▼ · OK', 'Program.. / Card.. / Clock.. / Start'],
+            ['Main menu (STOP)', '▲▼ · OK', 'Program.. / Card.. / Clock.. / Start'],
             ['Program..', 'OK', 'Edit.. · Edit Name · Memory? · Clear Prg · Password'],
-            ['Edit..', '▲ ▼', 'step through the outputs; an empty output shows “- [ Q1 ]”'],
-            ['on a connector', '◄ / ►', 'walk toward the inputs / back toward the output'],
+            ['Edit..', '▲▼', 'step through the outputs; an empty output shows “- [ Q1 ]”'],
+            ['on a connector', '◀ ▶', 'walk toward the inputs / back toward the output'],
             ['on a connector', 'OK', 'open the list: Co (connectors), GF, SF, BN (existing blocks)'],
             ['RUN', 'ESC', 'parameter menu: Stop · Set Param · Set Clock · Prg Name'],
           ]}
@@ -156,7 +156,7 @@ function Panel() {
       </Section>
       <Section heading="Wiring a block on the device">
         <p>
-          Programs are entered from the output backwards. On <M>{'Q_1'}</M> press ◄ then OK, pick <strong>GF → OR</strong>: block <M>{'B_1'}</M> is placed and
+          Programs are entered from the output backwards. On <M>{'Q_1'}</M> press ◄then OK, pick <strong>GF → OR</strong>: block <M>{'B_1'}</M> is placed and
           its output is wired to <M>{'Q_1'}</M>. The cursor moves to its first input; OK → <strong>Co</strong> → <M>{'I_1'}</M> wires the first pin. Pins
           you leave as <M>x</M> take the block’s neutral value (1 for AND, 0 for OR).
         </p>
