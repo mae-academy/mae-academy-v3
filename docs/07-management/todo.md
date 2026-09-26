@@ -196,11 +196,11 @@
 
 - [x] Show the PID input signal as compact R(t) and R(s) notation with trimmed numerical formatting.
 - [x] Remove Design by Specs expansion icons and keep its full specification controls visible at all times.
-- [x] Apply the PID Interactive RK4 Scope presentation style to the Root Locus Closed-Loop Step Response without changing its logic.
+- [x] Apply the PID INTERACTIVE SCOPE presentation style to the Root Locus Closed-Loop Step Response without changing its logic.
 - [x] Verify dual-domain notation, Design by Specs, and both scope presentations on desktop and mobile.
 
 - [x] Place Input Signal Generator and PID Parameters in a compact shared row.
-- [x] Place Controller Matrix beside Interactive RK4 Scope in the main PID Studio row.
+- [x] Place Controller Matrix beside INTERACTIVE SCOPE in the main PID Studio row.
 - [x] Place Design by Specs, Closed-Loop Construction, and Transient Metrics in the lower row.
 - [x] Update all simulation-tool active states to use a blue–violet–red gradient surface with a neutral gray lower rule.
 - [x] Verify the compact PID layout and shared active-tool styling on desktop and mobile.

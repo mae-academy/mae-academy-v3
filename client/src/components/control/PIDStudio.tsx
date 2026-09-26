@@ -240,7 +240,7 @@ export function PIDStudio() {
 
   const scopePanel = (
     <StudioCard
-      title="Interactive RK4 Scope"
+      title="INTERACTIVE SCOPE"
       actionSlot={
         <div className="flex items-center gap-2">
           <MathLabel math="t_{max}" />
@@ -283,7 +283,7 @@ export function PIDStudio() {
         </FormulaBox>
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
-            <label className="mb-1 block"><MathLabel math="\\zeta" /></label>
+            <label className="mb-1 block"><MathLabel math="\zeta" /></label>
             <input
               type="number"
               min="0.01"
@@ -296,7 +296,7 @@ export function PIDStudio() {
             />
           </div>
           <div>
-            <label className="mb-1 block"><MathLabel math="\\omega_n" /></label>
+            <label className="mb-1 block"><MathLabel math="\omega_{n}" /></label>
             <input
               type="number"
               min="0.01"
@@ -338,10 +338,10 @@ export function PIDStudio() {
   const metricsPanel = (
     <StudioCard title="Transient Metrics">
       <div className="divide-y divide-slate-100 dark:divide-slate-800">
-        <div className="flex items-center justify-between py-3"><MathLabel math="M_p"/><KatexMath math={`${scope.overshoot.toFixed(2)}\\%`} className="text-sm font-bold text-slate-900 dark:text-white" /></div>
-        <div className="flex items-center justify-between py-3"><MathLabel math="T_p"/><KatexMath math={`${scope.peakTime.toFixed(3)}\\,\\text{s}`} className="text-sm font-bold text-slate-900 dark:text-white" /></div>
-        <div className="flex items-center justify-between py-3"><MathLabel math="T_s"/><KatexMath math={`${scope.settlingTime.toFixed(3)}\\,\\text{s}`} className="text-sm font-bold text-slate-900 dark:text-white" /></div>
-        <div className="flex items-center justify-between py-3"><MathLabel math="e_{ss}"/><KatexMath math={`${scope.steadyStateError.toFixed(4)}`} className="text-sm font-bold text-slate-900 dark:text-white" /></div>
+        <div className="flex items-center justify-between py-3"><MathLabel math="M_p" /><KatexMath math={`${scope.overshoot.toFixed(2)}\\%`} className="text-sm font-bold text-slate-900 dark:text-white" /></div>
+        <div className="flex items-center justify-between py-3"><MathLabel math="T_p" /><KatexMath math={`${scope.peakTime.toFixed(3)}\\,\\text{s}`} className="text-sm font-bold text-slate-900 dark:text-white" /></div>
+        <div className="flex items-center justify-between py-3"><MathLabel math="T_s" /><KatexMath math={`${scope.settlingTime.toFixed(3)}\\,\\text{s}`} className="text-sm font-bold text-slate-900 dark:text-white" /></div>
+        <div className="flex items-center justify-between py-3"><MathLabel math="e_{ss}" /><KatexMath math={`${scope.steadyStateError.toFixed(4)}`} className="text-sm font-bold text-slate-900 dark:text-white" /></div>
       </div>
     </StudioCard>
   );

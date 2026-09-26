@@ -101,7 +101,7 @@ function StatusCard({ title, symbol, matrix, isFullRank }: { title: string; symb
     <StudioCard
       title={
         <div className="flex items-center gap-1.5">
-          <KatexMath math={`${symbol} =`} className="text-xs font-bold text-slate-800 dark:text-white" />
+          <KatexMath math={symbol + " ="} className="text-xs font-bold text-slate-800 dark:text-white" />
           <span>{title}</span>
         </div>
       }
@@ -111,7 +111,7 @@ function StatusCard({ title, symbol, matrix, isFullRank }: { title: string; symb
         ) : undefined
       }
     >
-      <FormulaBox math={`${symbol}=${matrixToLatex(matrix)}`} />
+      <FormulaBox math={symbol + "=" + matrixToLatex(matrix)} />
     </StudioCard>
   );
 }
@@ -190,8 +190,8 @@ export function StateSpaceStudio() {
           </StudioCard>
 
           <div className="grid gap-5 lg:grid-cols-2">
-            <StatusCard title={copy.controllability} symbol="\\mathcal{C}" matrix={analysis.controllability} isFullRank={analysis.controllable} />
-            <StatusCard title={copy.observability} symbol="\\mathcal{O}" matrix={analysis.observability} isFullRank={analysis.observable} />
+            <StatusCard title={copy.controllability} symbol="\mathcal{C}" matrix={analysis.controllability} isFullRank={analysis.controllable} />
+            <StatusCard title={copy.observability} symbol="\mathcal{O}" matrix={analysis.observability} isFullRank={analysis.observable} />
           </div>
 
           {messages.length > 0 && <LeoAlert messages={messages} copy={copy} />}

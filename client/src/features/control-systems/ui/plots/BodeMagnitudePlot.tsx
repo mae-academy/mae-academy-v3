@@ -452,38 +452,38 @@ export function BodeMagnitudePlot({
         {/* Floating HUD Tooltip */}
         {isDirectHovered && hoverPoint && (
           <div
-            className="absolute pointer-events-none z-20 backdrop-blur-md bg-slate-900/90 text-white rounded-lg p-2.5 shadow-xl border border-slate-700/50 text-xs min-w-44"
+            className="absolute pointer-events-none z-20 backdrop-blur-md bg-white/90 dark:bg-slate-900/90 text-slate-900 dark:text-white rounded-lg p-2.5 shadow-xl border border-slate-200/50 dark:border-slate-700/50 text-xs min-w-44"
             style={{
               left: Math.min(containerSize.width - 190, Math.max(10, hoverPoint.sx + 14)),
               top: Math.min(containerSize.height - 110, Math.max(10, hoverPoint.sy - 30)),
             }}
           >
-            <div className="flex items-center justify-between border-b border-slate-700/60 pb-1.5 mb-2 font-mono text-[11px]">
-              <span className="font-semibold text-slate-200">
+            <div className="flex items-center justify-between border-b border-slate-200/60 dark:border-slate-700/60 pb-1.5 mb-2 font-mono text-[11px]">
+              <span className="font-semibold text-slate-800 dark:text-slate-200">
                 <KatexMath math={`\\omega = ${hoverPoint.omega.toFixed(2)}\\text{ rad/s}`} />
               </span>
             </div>
             <div className="space-y-1.5 text-[11px]">
               <div className="flex items-center justify-between gap-2">
-                <span className="inline-flex items-center gap-1.5 text-slate-400">
+                <span className="inline-flex items-center gap-1.5 text-slate-600 dark:text-slate-400">
                   <span className="h-2 w-2 rounded-full bg-[#3B82F6]" />
                   <KatexMath math="|G(j\omega)|" />
                 </span>
-                <span className="font-bold text-white">
+                <span className="font-bold text-slate-900 dark:text-white">
                   <KatexMath math={`|G(j\\omega)| = ${hoverPoint.magnitudeDb.toFixed(2)}\\text{ dB}`} />
                 </span>
               </div>
-              <div className="flex items-center justify-between gap-2 text-slate-400">
+              <div className="flex items-center justify-between gap-2 text-slate-600 dark:text-slate-400">
                 <span className="inline-flex items-center gap-1.5">
                   <span className="h-2 w-2 rounded-full bg-[#A855F7]" />
                   <KatexMath math="\angle G(j\omega)" />
                 </span>
-                <span className="font-medium text-slate-200">
+                <span className="font-medium text-slate-800 dark:text-slate-200">
                   <KatexMath math={`\\angle G(j\\omega) = ${hoverPoint.phaseUnwrappedDeg.toFixed(1)}^\\circ`} />
                 </span>
               </div>
               {showAsymptote && Number.isFinite(hoverPoint.asymMagnitudeDb) && (
-                <div className="flex items-center justify-between gap-2 text-rose-400 text-[10px] pt-1 border-t border-slate-800">
+                <div className="flex items-center justify-between gap-2 text-rose-600 dark:text-rose-400 text-[10px] pt-1 border-t border-slate-200 dark:border-slate-800">
                   <KatexMath math="\text{Asymptote}" />
                   <KatexMath math={`${hoverPoint.asymMagnitudeDb.toFixed(1)}\\text{ dB}`} />
                 </div>
