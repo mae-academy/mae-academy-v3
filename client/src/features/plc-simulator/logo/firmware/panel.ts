@@ -67,6 +67,7 @@ export type Picker =
 export type PickerItem = { readonly kind: 'ref'; readonly ref: ConnectorRef } | { readonly kind: 'block'; readonly type: BlockType };
 
 export type PanelScreen =
+  | { readonly kind: 'boot' }
   | { readonly kind: 'noProgram' }
   | { readonly kind: 'main'; readonly cursor: number }
   | { readonly kind: 'programming'; readonly cursor: number }
@@ -100,6 +101,7 @@ export type PanelEffect =
   | { readonly type: 'stop' }
   | { readonly type: 'setParam'; readonly blockId: number; readonly key: NumericParamKey; readonly value: number }
   | { readonly type: 'rewire'; readonly target: WireTarget; readonly ref: ConnectorRef }
+  | { readonly type: 'setInvert'; readonly target: WireTarget; readonly invert: boolean }
   | { readonly type: 'placeBlock'; readonly target: WireTarget; readonly blockType: BlockType }
   | { readonly type: 'clearProgram' }
   | { readonly type: 'toCard' }
@@ -135,7 +137,7 @@ export interface PanelFrame {
 
 export const MAIN_MENU = ['Program..', 'Card..', 'Clock..', 'Start'] as const;
 export const PROGRAMMING_MENU = ['Edit..', 'Edit Name', 'Memory?', 'Clear Prg', 'Password'] as const;
-export const TRANSFER_MENU = ['→Card', 'Card→', 'CopyProtect'] as const;
+export const TRANSFER_MENU = ['►Card', 'Card►', 'CopyProtect'] as const;
 export const CLOCK_MENU = ['Set Clock', 'S/W Time', 'Sync'] as const;
 export const PARAM_MENU = ['Stop', 'Set Param', 'Set Clock', 'Prg Name'] as const;
 export const WEEKDAYS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'] as const;
@@ -287,6 +289,9 @@ export function panelReduce(screen: PanelScreen, event: PanelEvent, snap: PanelS
   const vertical = key === 'up' || key === 'down';
 
   switch (screen.kind) {
+    case 'boot':
+      return go(initialPanel(snap));
+
     case 'noProgram':
       return key === 'esc' ? go({ kind: 'main', cursor: 0 }) : go(screen);
 
@@ -355,7 +360,11 @@ export function panelReduce(screen: PanelScreen, event: PanelEvent, snap: PanelS
 
       const atSink = screen.path.length === 1;
       const node = step.node;
+      // A block's input pin (not a sink's output slot) carries `invert`, toggled on the pin itself.
+      const onInputPin = screen.onPin && row.target.kind === 'pin';
+
       if (vertical) {
+        if (onInputPin) return go(screen, { type: 'setInvert', target: row.target, invert: !row.wire.invert });
         if (atSink && node.kind === 'sink') {
           const slots = outputSlots(snap.program);
           const at = slots.findIndex((slot) => sinkName(slot) === sinkName(node.target));
@@ -366,18 +375,25 @@ export function panelReduce(screen: PanelScreen, event: PanelEvent, snap: PanelS
         return go({ ...screen, path: [...screen.path.slice(0, -1), { ...step, pin }] });
       }
       if (key === 'left') {
-        // Walk toward the inputs: into the block that drives the selected connector...
-        if (row.wire.ref.kind === 'block-output') {
+        // Root output: walk straight into the driving block (sinks carry no invert to focus on).
+        if (row.target.kind === 'output' && row.wire.ref.kind === 'block-output') {
           return go({ ...screen, path: [...screen.path, { node: { kind: 'block', id: row.wire.ref.blockId }, pin: 0 }] });
         }
-        // ...or, on an empty output, from the output name onto its connector.
-        return atSink ? go({ ...screen, onPin: true }) : go(screen);
+        // First left on a block's own input: move the underscore from the operand onto its pin.
+        if (!screen.onPin) return go({ ...screen, onPin: true });
+        // Already on the pin: walk further upstream into the block that drives it.
+        if (row.wire.ref.kind === 'block-output') {
+          return go({ ...screen, onPin: false, path: [...screen.path, { node: { kind: 'block', id: row.wire.ref.blockId }, pin: 0 }] });
+        }
+        return go(screen);
       }
       if (key === 'right' || key === 'esc') {
+        if (screen.onPin) return go({ ...screen, onPin: false });
         if (!atSink) return go({ ...screen, path: screen.path.slice(0, -1) });
-        return key === 'esc' ? go({ kind: 'programming', cursor: 0 }) : go({ ...screen, onPin: false });
+        return key === 'esc' ? go({ kind: 'programming', cursor: 0 }) : go(screen);
       }
-      // OK: open the Co / GF / SF / BN list on the current connector.
+      // OK: toggle inversion when focused on a pin, otherwise open the Co / GF / SF / BN list on the operand.
+      if (onInputPin) return go(screen, { type: 'setInvert', target: row.target, invert: !row.wire.invert });
       return go({ ...screen, picker: { stage: 'category', cursor: 0 } });
     }
 
@@ -403,13 +419,13 @@ export function panelReduce(screen: PanelScreen, event: PanelEvent, snap: PanelS
       const back: PanelScreen = screen;
       if (screen.cursor === 0) {
         return hasProgram(snap)
-          ? go({ kind: 'message', lines: ['Program', 'copied', 'LOGO! → Card'], back }, { type: 'toCard' })
+          ? go({ kind: 'message', lines: ['Program', 'copied', 'LOGO! ► Card'], back }, { type: 'toCard' })
           : go({ kind: 'message', lines: ['No Program'], back });
       }
       if (screen.cursor === 1) {
         if (!snap.card.program) return go({ kind: 'message', lines: ['No Program', 'on Card'], back });
         if (snap.card.protect) return go({ kind: 'message', lines: ['Card is', 'protected'], back });
-        return go({ kind: 'message', lines: ['Program', 'copied', 'Card → LOGO!'], back }, { type: 'fromCard' });
+        return go({ kind: 'message', lines: ['Program', 'copied', 'Card ► LOGO!'], back }, { type: 'fromCard' });
       }
       return go({ kind: 'message', lines: ['CopyProtect', snap.card.protect ? 'Off' : 'On'], back }, { type: 'toggleCopyProtect' });
     }
@@ -573,6 +589,8 @@ export function renderPanel(screen: PanelScreen, snap: PanelSnapshot): PanelFram
   if (!snap.powered) return { lines: Array.from({ length: LCD_ROWS }, () => fit('')), inverted: [], cursor: null, backlight: 'off' };
 
   switch (screen.kind) {
+    case 'boot':
+      return frame(snap, ['', '  SIEMENS', '   LOGO!', '']);
     case 'noProgram':
       return frame(snap, ['No Program', 'Press ESC']);
     case 'main':
@@ -672,7 +690,9 @@ export function renderPanel(screen: PanelScreen, snap: PanelSnapshot): PanelFram
         const prefix = `${start + offset === selected ? '>' : ' '}${row.name.padEnd(3)}=`;
         return `${prefix}${row.wire.invert ? '¬' : ''}${connectorName(row.wire.ref)}`;
       });
-      return frame(snap, [title, ...rows]);
+      // Blinking cursor sits on the pin (the invert marker column) once the underscore has moved past `=`.
+      const pinCursor = screen.onPin && node.kind === 'block' ? { line: 1 + (selected - start), col: 5 } : null;
+      return frame(snap, [title, ...rows], [], pinCursor);
     }
 
     default: {

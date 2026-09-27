@@ -133,12 +133,12 @@ describe('front-panel menu tree (spec §2.2)', () => {
   it('copies the program to the card and back', () => {
     const b = bench();
     b.keys('down', 'ok', 'ok');
-    expect(b.text()).toContain('LOGO! → Card');
+    expect(b.text()).toContain('LOGO! ► Card');
     expect(b.controller.cardHasProgram).toBe(true);
     b.keys('esc', 'esc', 'up', 'ok', 'down', 'down', 'down', 'ok', 'down', 'ok'); // Clear Prg -> Yes
     expect(b.controller.program.sinks).toHaveLength(0);
     b.keys('esc', 'down', 'ok', 'down', 'ok');
-    expect(b.text()).toContain('Card → LOGO!');
+    expect(b.text()).toContain('Card ► LOGO!');
     expect(b.controller.program.name).toBe('STAIRWAY');
   });
 
@@ -324,7 +324,7 @@ describe('bench electrical behaviour', () => {
     expect(b.controller.relayClosed(1)).toBe(true); // re-opening
   });
 
-  it('power cycle: relays drop, display goes dark, RUN resumes on power-up; retentive data only survives', () => {
+  it('power cycle: relays drop, display goes dark, power-up boots into STOP mode; retentive data only survives', () => {
     const b = bench();
     b.keys('down', 'down', 'down', 'ok');
     b.controller.actuate(0, true);
@@ -338,7 +338,7 @@ describe('bench electrical behaviour', () => {
     expect(b.controller.run()).toBe(false);
     b.controller.actuate(0, false);
     b.controller.setPower(true);
-    expect(b.controller.mode).toBe('RUN');
+    expect(b.controller.mode).toBe('STOP');
     b.scan();
     expect(b.controller.relayClosed(1)).toBe(false); // non-retentive stairway timer was cleared
   });

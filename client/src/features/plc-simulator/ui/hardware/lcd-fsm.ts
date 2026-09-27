@@ -230,7 +230,7 @@ export function renderLcd(state: LcdState, snap: LcdSnapshot): LcdFrame {
 
   switch (screen.kind) {
     case 'menu': {
-      const labels = ['▶ Start', 'Program', 'Setup', 'Network'];
+      const labels = ['► Start', 'Program', 'Setup', 'Network'];
       return finish(labels.map((label, index) => `${index === screen.cursor ? '>' : ' '}${label}`), snap);
     }
 

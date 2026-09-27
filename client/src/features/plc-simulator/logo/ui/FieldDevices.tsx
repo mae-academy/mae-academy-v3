@@ -123,21 +123,53 @@ function MechanicalSwitch({ y, device, actuated, closed, powered, live }: { y: n
   );
 }
 
-/** Unused input: two capped conductor ends and a label, mirroring the spare output. No wire runs to its terminal. */
+/** Unused input: clean minimalistic pin badge with muted styling. Clicking opens the menu to re-assign. */
 function SpareInput({ y, name, device, onOpenMenu, index }: { y: number; name: string; device: InputDevice; onOpenMenu: InputRowProps['onOpenMenu']; index: number }) {
   const cx = ACTUATOR.x + ACTUATOR.w / 2;
+  const terminalId = device.symbol || `X${index + 1}`;
+  const badgeW = 90;
+  const badgeH = 22;
+
+  const open = (): void => onOpenMenu(index, { x: cx - badgeW / 2, y: y + badgeH / 2 + 4 });
+
   return (
     <g data-input-row={name} data-spare="true">
-      <text x={ACTUATOR.x} y={y - 24} fontSize={11} fontWeight={700} className={TEXT}>
-        <tspan className={MUTED}>{device.symbol}</tspan> {truncate(device.tag, 15)}
-      </text>
-      <ConfigBadge x={ACTUATOR.x + 128} y={y - 37} id={name} code="SPARE" label={`Configure ${name} field device (${ACTUATOR_LABEL.spare}, ${device.contact})`} onOpen={(anchor) => onOpenMenu(index, anchor)} />
-      <g role="img" aria-label={`${name} ${device.symbol} ${device.tag} (${ACTUATOR_LABEL.spare})`}>
-        <circle cx={cx - 26} cy={y} r={4.5} fill="none" strokeWidth={2} className="stroke-slate-400 dark:stroke-slate-600" />
-        <circle cx={cx + 26} cy={y} r={4.5} fill="none" strokeWidth={2} className="stroke-slate-400 dark:stroke-slate-600" />
-        <text x={cx} y={y + 3.5} textAnchor="middle" fontSize={8.5} fontWeight={800} letterSpacing={1} className={MUTED}>
-          OPEN
-        </text>
+      <g
+        role="button"
+        tabIndex={0}
+        aria-haspopup="menu"
+        aria-label={`Configure ${name} field device (${ACTUATOR_LABEL.spare}, ${device.contact})`}
+        data-config={name}
+        onClick={open}
+        onKeyDown={(event: KeyboardEvent<SVGGElement>) => {
+          if (event.key !== ' ' && event.key !== 'Enter') return;
+          event.preventDefault();
+          event.stopPropagation();
+          open();
+        }}
+        className="group cursor-pointer outline-none"
+      >
+        <rect
+          x={cx - badgeW / 2}
+          y={y - badgeH / 2}
+          width={badgeW}
+          height={badgeH}
+          rx={badgeH / 2}
+          strokeWidth={1.25}
+          className="fill-slate-100/90 stroke-slate-300 transition-colors group-hover:border-slate-400 group-hover:stroke-slate-400 group-focus-visible:stroke-violet-500 dark:fill-[#0c121e] dark:stroke-slate-700/80 dark:group-hover:stroke-slate-600"
+        />
+        <g role="img" aria-label={`${name} ${device.symbol} ${device.tag} (${ACTUATOR_LABEL.spare})`}>
+          <text
+            x={cx}
+            y={y + 3.5}
+            textAnchor="middle"
+            fontSize={9.5}
+            fontWeight={600}
+            className="fill-slate-400 select-none tracking-wide transition-colors group-hover:fill-slate-600 dark:fill-slate-500 dark:group-hover:fill-slate-300"
+          >
+            {`${terminalId} · Spare`}
+          </text>
+        </g>
       </g>
     </g>
   );
@@ -342,16 +374,7 @@ function LoadGlyph({ load, on, y }: { load: OutputLoad; on: boolean; y: number }
         </g>
       );
     case 'none':
-      // Nothing across the contact: two capped conductor ends with a gap.
-      return (
-        <g>
-          <circle cx={x - 18} cy={y} r={4.5} fill="none" strokeWidth={2} className="stroke-slate-400 dark:stroke-slate-600" />
-          <circle cx={x + 18} cy={y} r={4.5} fill="none" strokeWidth={2} className="stroke-slate-400 dark:stroke-slate-600" />
-          <text x={x} y={y + 3.5} textAnchor="middle" fontSize={8.5} fontWeight={800} letterSpacing={1} className={MUTED}>
-            OPEN
-          </text>
-        </g>
-      );
+      return null;
     default: {
       const exhaustive: never = load.kind;
       return exhaustive;
@@ -362,6 +385,56 @@ function LoadGlyph({ load, on, y }: { load: OutputLoad; on: boolean; y: number }
 /** Load across a relay contact, drawn as a flat symbol; red accent while energised. */
 export function LoadView({ index, y, load, on, onOpenMenu }: LoadViewProps) {
   const name = `Q${index + 1}`;
+
+  if (load.kind === 'none') {
+    const terminalId = load.symbol || `X${index + 1}`;
+    const badgeW = 90;
+    const badgeH = 22;
+    const open = (): void => onOpenMenu(index, { x: LOAD_X - badgeW / 2, y: y + badgeH / 2 + 4 });
+
+    return (
+      <g data-load={name} data-spare="true">
+        <g
+          role="button"
+          tabIndex={0}
+          aria-haspopup="menu"
+          aria-label={`Configure ${name} load (${load.tag})`}
+          data-config={name}
+          onClick={open}
+          onKeyDown={(event: KeyboardEvent<SVGGElement>) => {
+            if (event.key !== ' ' && event.key !== 'Enter') return;
+            event.preventDefault();
+            event.stopPropagation();
+            open();
+          }}
+          className="group cursor-pointer outline-none"
+        >
+          <rect
+            x={LOAD_X - badgeW / 2}
+            y={y - badgeH / 2}
+            width={badgeW}
+            height={badgeH}
+            rx={badgeH / 2}
+            strokeWidth={1.25}
+            className="fill-slate-100/90 stroke-slate-300 transition-colors group-hover:border-slate-400 group-hover:stroke-slate-400 group-focus-visible:stroke-violet-500 dark:fill-[#0c121e] dark:stroke-slate-700/80 dark:group-hover:stroke-slate-600"
+          />
+          <g role="img" aria-label={`${name} ${load.tag}`}>
+            <text
+              x={LOAD_X}
+              y={y + 3.5}
+              textAnchor="middle"
+              fontSize={9.5}
+              fontWeight={600}
+              className="fill-slate-400 select-none tracking-wide transition-colors group-hover:fill-slate-600 dark:fill-slate-500 dark:group-hover:fill-slate-300"
+            >
+              {`${terminalId} · Spare`}
+            </text>
+          </g>
+        </g>
+      </g>
+    );
+  }
+
   return (
     <g data-load={name}>
       <text x={LOAD_X} y={y - 34} textAnchor="middle" fontSize={11} fontWeight={700} className={TEXT}>
@@ -369,8 +442,8 @@ export function LoadView({ index, y, load, on, onOpenMenu }: LoadViewProps) {
       </text>
       <g
         role="img"
-        aria-label={load.kind === 'none' ? `${name} ${load.tag}` : `${load.symbol} ${load.tag} ${on ? 'energized' : 'off'}`}
-        data-on={on && load.kind !== 'none'}
+        aria-label={`${load.symbol} ${load.tag} ${on ? 'energized' : 'off'}`}
+        data-on={on}
       >
         <LoadGlyph load={load} on={on} y={y} />
       </g>

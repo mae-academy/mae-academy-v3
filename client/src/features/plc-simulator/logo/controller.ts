@@ -1,5 +1,5 @@
 import { defaultClock, defaultScheduler, type MonotonicClock, type ScanMetrics, type Scheduler } from '../engine/types';
-import { compileProgram, placeBlock, rewire, withParam, type CompiledProgram, type LogoDiagnostic } from './engine/compile';
+import { compileProgram, placeBlock, rewire, setInvert, withParam, type CompiledProgram, type LogoDiagnostic } from './engine/compile';
 import { LogoCpu } from './engine/cpu';
 import type { BlockState } from './engine/blocks';
 import { ADDRESS_SPACE, EMPTY_PROGRAM, type Bit, type ConnectorRef, type LogoProgram } from './engine/types';
@@ -65,8 +65,6 @@ export class LogoBenchController {
   private loadsValue: readonly OutputLoad[] = [];
   private poweredValue = true;
   private hostMode: HostMode = 'STOP';
-  /** Operating state at power-off, restored at power-on (spec §1.4 rule 3). */
-  private resumeRun = false;
   private screen: PanelScreen;
   private card: { program: LogoProgram | null; protect: boolean } = { program: null, protect: false };
   private rtcOffsetMs = 0;
@@ -79,6 +77,22 @@ export class LogoBenchController {
   private simNow = 0;
   private lastClock: number | null = null;
   private lastScanWorkMs = 0;
+  private bootTimer: ReturnType<typeof setTimeout> | null = null;
+
+  private clearBootTimer(): void {
+    if (this.bootTimer !== null) {
+      clearTimeout(this.bootTimer);
+      this.bootTimer = null;
+    }
+  }
+
+  finishBoot(): void {
+    this.clearBootTimer();
+    if (this.screen.kind === 'boot') {
+      this.screen = initialPanel(this.snapshot());
+      this.emit();
+    }
+  }
 
   constructor(options: LogoControllerOptions = {}) {
     this.scheduler = options.scheduler ?? defaultScheduler;
@@ -322,38 +336,36 @@ export class LogoBenchController {
   // ---- supply ------------------------------------------------------------------------------
 
   /**
-   * Mains breaker. Power-off drops every relay and all non-retentive data; power-on follows the
-   * spec §1.4 start-up rules: a card program replaces a missing/different one, then the unit
-   * resumes the operating state it had at power-off.
+   * Mains breaker. Power-off drops every relay, cuts terminal/bus power, and clears non-retentive data.
+   * Power-on boots the controller safely in STOP mode at the root system menu.
    */
   setPower(on: boolean): void {
     if (on === this.poweredValue) return;
     if (!on) {
-      this.resumeRun = this.cpu.mode === 'RUN';
       this.cancel();
+      this.clearBootTimer();
       this.cpu.powerLoss();
       this.cpu.stop();
       this.hostMode = 'STOP';
       this.poweredValue = false;
       this.physicalInputs(); // terminals go dead
+      this.screen = initialPanel(this.snapshot());
       this.emit();
       return;
     }
     this.poweredValue = true;
+    this.hostMode = 'STOP';
+    this.cpu.stop();
     this.physicalInputs();
     if (this.card.program && JSON.stringify(this.card.program) !== JSON.stringify(this.programValue)) {
       this.install(this.card.program, false);
     }
-    const resume = this.resumeRun && this.compiledValue.ok && this.programValue.sinks.length > 0;
-    this.resumeRun = false;
-    if (resume) {
-      this.cpu.start();
-      this.lastClock = null;
-      this.hostMode = 'RUN';
-      this.schedule();
-    }
-    this.screen = initialPanel(this.snapshot());
+    this.screen = { kind: 'boot' };
     this.emit();
+    this.clearBootTimer();
+    this.bootTimer = setTimeout(() => {
+      this.finishBoot();
+    }, 1000);
   }
 
   // ---- bench configuration -----------------------------------------------------------------
@@ -437,6 +449,7 @@ export class LogoBenchController {
 
   press(key: PanelKey): void {
     if (!this.poweredValue) return;
+    this.clearBootTimer();
     const step = panelReduce(this.screen, { type: 'key', key }, this.snapshot());
     this.screen = step.screen;
     step.effects.forEach((effect) => this.perform(effect));
@@ -462,6 +475,9 @@ export class LogoBenchController {
         return;
       case 'rewire':
         this.edit(rewire(this.programValue, effect.target, effect.ref), 'Connection rejected');
+        return;
+      case 'setInvert':
+        this.edit(setInvert(this.programValue, effect.target, effect.invert), 'Invert rejected');
         return;
       case 'placeBlock':
         this.edit(placeBlock(this.programValue, effect.target, effect.blockType), 'Block rejected');

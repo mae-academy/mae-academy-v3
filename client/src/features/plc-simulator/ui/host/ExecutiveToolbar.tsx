@@ -142,7 +142,7 @@ export function ExecutiveToolbar({
   };
 
   return (
-    <section className={`${PANEL} w-full shrink-0 ${className}`}>
+    <section className={`${PANEL} w-full shrink-0 font-['Poppins',sans-serif] ${className}`}>
       <div
         role="toolbar"
         aria-label="Execution controls"
@@ -163,9 +163,8 @@ export function ExecutiveToolbar({
                 onClick={handleRunClick}
                 aria-label={running ? 'Pause' : paused ? 'Resume' : 'Run'}
                 title={running ? 'Pause execution' : paused ? 'Resume execution' : 'Run execution'}
-                className={`inline-flex h-9 shrink-0 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap px-3.5 text-xs font-semibold active:scale-[.98] ${
-                  paused ? 'brand-pill-active-rev' : 'brand-pill-active'
-                }`}
+                className={`inline-flex h-9 shrink-0 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap px-3.5 text-xs font-semibold active:scale-[.98] ${paused ? 'brand-pill-active-rev' : 'brand-pill-active'
+                  }`}
               >
                 {running ? (
                   <Pause className="h-3.5 w-3.5 fill-current" aria-hidden="true" />

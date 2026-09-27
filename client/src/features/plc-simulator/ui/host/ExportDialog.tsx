@@ -41,7 +41,7 @@ export function ExportDialog({ open, onOpenChange, build }: ExportDialogProps) {
         <DialogHeader>
           <DialogTitle>Export to STEP 7-Micro/WIN</DialogTitle>
           <DialogDescription>
-            Paste the source into the STL editor, or use File → Import. Not yet verified against a real Micro/WIN
+            Paste the source into the STL editor, or use File ► Import. Not yet verified against a real Micro/WIN
             install: confirm one import before relying on it.
           </DialogDescription>
         </DialogHeader>

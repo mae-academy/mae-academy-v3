@@ -9,9 +9,9 @@ import { PlcSimulatorApp } from './PlcSimulatorApp';
 
 // Radix Slider measures its thumb with ResizeObserver, which jsdom does not implement.
 globalThis.ResizeObserver ??= class {
-  observe(): void {}
-  unobserve(): void {}
-  disconnect(): void {}
+  observe(): void { }
+  unobserve(): void { }
+  disconnect(): void { }
 };
 
 afterEach(() => {
@@ -216,11 +216,11 @@ describe('hardware profile switching', () => {
 describe('Micro/WIN export', () => {
   it('previews, copies and downloads the generated .awl', async () => {
     const sched = manual();
-    const writeText = vi.fn(async () => {});
+    const writeText = vi.fn(async () => { });
     Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
     const createObjectURL = vi.fn(() => 'blob:mock');
     Object.assign(URL, { createObjectURL, revokeObjectURL: vi.fn() });
-    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => { });
 
     render(<PlcSimulatorApp initialNetworks={SEAL} runtimeOptions={sched.runtimeOptions} />);
     fireEvent.click(screen.getByRole('button', { name: 'Export' }));

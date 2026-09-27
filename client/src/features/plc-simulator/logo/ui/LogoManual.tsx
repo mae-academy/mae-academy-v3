@@ -4,6 +4,7 @@ import { SegmentedControl, StudioCard } from '@/components/common/templates';
 import { KatexMath } from '@/components/ui/KatexMath';
 import { INITIAL_BLOCK_STATE } from '../engine/blocks';
 import { SCENARIOS, type ScenarioId } from '../scenarios';
+import { TriangleGlyph } from '../../ui/TriangleGlyph';
 import { FbdViewer } from './FbdViewer';
 
 /** Inline math; every variable in the manual goes through KaTeX. */
@@ -23,17 +24,17 @@ const MODULES: readonly { readonly id: ModuleId; readonly label: string; readonl
 
 function Section({ heading, children }: { heading: string; children: ReactNode }) {
   return (
-    <section className="space-y-1.5">
-      <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-100">{heading}</h4>
-      <div className="space-y-1.5 text-[13px] leading-relaxed text-slate-600 dark:text-slate-300">{children}</div>
+    <section className="space-y-1.5 font-['Poppins',sans-serif]">
+      <h4 className="font-['Poppins',sans-serif] text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-100">{heading}</h4>
+      <div className="space-y-1.5 font-['Poppins',sans-serif] text-[13px] leading-relaxed text-slate-600 dark:text-slate-300">{children}</div>
     </section>
   );
 }
 
 function Try({ children }: { children: ReactNode }) {
   return (
-    <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] text-slate-700 dark:border-slate-800 dark:bg-[#020617] dark:text-slate-300">
-      <span className="font-bold text-red-600 dark:text-red-400">Try it · </span>
+    <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 font-['Poppins',sans-serif] text-xs text-slate-700 dark:border-slate-800 dark:bg-[#020617] dark:text-slate-300">
+      <span className="font-bold text-violet-600 dark:text-violet-400">Try it · </span>
       {children}
     </p>
   );
@@ -41,11 +42,11 @@ function Try({ children }: { children: ReactNode }) {
 
 const Table = ({ head, rows }: { head: readonly ReactNode[]; rows: readonly (readonly ReactNode[])[] }) => (
   <div className="overflow-x-auto">
-    <table className="w-full min-w-[420px] border-collapse text-[12px]">
+    <table className="w-full min-w-[420px] border-collapse font-['Poppins',sans-serif] text-xs">
       <thead>
         <tr>
           {head.map((cell, index) => (
-            <th key={index} className="border-b border-slate-200 px-2 py-1 text-left font-bold text-slate-800 dark:border-slate-800 dark:text-slate-100">
+            <th key={index} className="border-b border-slate-200 px-2 py-1 text-left font-semibold text-slate-800 dark:border-slate-800 dark:text-slate-100">
               {cell}
             </th>
           ))}
@@ -55,7 +56,7 @@ const Table = ({ head, rows }: { head: readonly ReactNode[]; rows: readonly (rea
         {rows.map((row, r) => (
           <tr key={r}>
             {row.map((cell, c) => (
-              <td key={c} className="border-b border-slate-100 px-2 py-1 align-top text-slate-600 dark:border-slate-800/70 dark:text-slate-300">
+              <td key={c} className="border-b border-slate-100 px-2 py-1 align-top font-medium text-slate-600 dark:border-slate-800/70 dark:text-slate-300">
                 {cell}
               </td>
             ))}
@@ -140,15 +141,42 @@ function Scan() {
 
 function Panel() {
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
+    <div className="grid gap-4 lg:grid-cols-2 font-['Poppins',sans-serif]">
       <Section heading="Menu hierarchy">
         <Table
           head={['Where', 'Keys', 'What happens']}
           rows={[
-            ['Main menu (STOP)', '▲▼ · OK', 'Program.. / Card.. / Clock.. / Start'],
+            [
+              'Main menu (STOP)',
+              <span key="main" className="inline-flex items-center gap-1">
+                <span className="inline-flex items-center gap-0.5">
+                  <TriangleGlyph direction="up" className="h-2.5 w-2.5" />
+                  <TriangleGlyph direction="down" className="h-2.5 w-2.5" />
+                </span>
+                <span className="sr-only">▲▼</span>
+                {' · OK'}
+              </span>,
+              'Program.. / Card.. / Clock.. / Start',
+            ],
             ['Program..', 'OK', 'Edit.. · Edit Name · Memory? · Clear Prg · Password'],
-            ['Edit..', '▲▼', 'step through the outputs; an empty output shows “- [ Q1 ]”'],
-            ['on a connector', '◀ ▶', 'walk toward the inputs / back toward the output'],
+            [
+              'Edit..',
+              <span key="edit" className="inline-flex items-center gap-0.5">
+                <TriangleGlyph direction="up" className="h-2.5 w-2.5" />
+                <TriangleGlyph direction="down" className="h-2.5 w-2.5" />
+                <span className="sr-only">▲▼</span>
+              </span>,
+              'step through the outputs; an empty output shows “- [ Q1 ]”',
+            ],
+            [
+              'on a connector',
+              <span key="conn" className="inline-flex items-center gap-1">
+                <TriangleGlyph direction="left" className="h-2.5 w-2.5" />
+                <TriangleGlyph direction="right" className="h-2.5 w-2.5" />
+                <span className="sr-only">◄ ►</span>
+              </span>,
+              'walk toward the inputs / back toward the output',
+            ],
             ['on a connector', 'OK', 'open the list: Co (connectors), GF, SF, BN (existing blocks)'],
             ['RUN', 'ESC', 'parameter menu: Stop · Set Param · Set Clock · Prg Name'],
           ]}
@@ -156,15 +184,17 @@ function Panel() {
       </Section>
       <Section heading="Wiring a block on the device">
         <p>
-          Programs are entered from the output backwards. On <M>{'Q_1'}</M> press ◄then OK, pick <strong>GF → OR</strong>: block <M>{'B_1'}</M> is placed and
-          its output is wired to <M>{'Q_1'}</M>. The cursor moves to its first input; OK → <strong>Co</strong> → <M>{'I_1'}</M> wires the first pin. Pins
+          Programs are entered from the output backwards. On <M>{'Q_1'}</M> press <span className="inline-flex items-center"><TriangleGlyph direction="left" className="h-2.5 w-2.5" /><span className="sr-only">◄</span></span> then OK, pick <strong>GF <span className="inline-flex items-center"><TriangleGlyph direction="right" className="h-2.5 w-2.5" /><span className="sr-only">►</span></span> OR</strong>: block <M>{'B_1'}</M> is placed and
+          its output is wired to <M>{'Q_1'}</M>. The cursor moves to its first input; OK <span className="inline-flex items-center"><TriangleGlyph direction="right" className="h-2.5 w-2.5" /><span className="sr-only">►</span></span> <strong>Co</strong> <span className="inline-flex items-center"><TriangleGlyph direction="right" className="h-2.5 w-2.5" /><span className="sr-only">►</span></span> <M>{'I_1'}</M> wires the first pin. Pins
           you leave as <M>x</M> take the block’s neutral value (1 for AND, 0 for OR).
         </p>
         <p>
           Connectors offered: <M>{'I_1\\ldots I_8'}</M>, <M>{'Q_1\\ldots Q_4'}</M> (read-back), flags <M>{'M_1\\ldots M_8'}</M>, <M>{'\\mathrm{hi}'}</M>{' '}
           and <M>{'\\mathrm{lo}'}</M>. Your physical keyboard works too: arrows, Enter = OK, Esc = ESC.
         </p>
-        <Try>Program.. → Clear Prg → Yes, then build Q1 = OR(I1, I2) from scratch and press Start.</Try>
+        <Try>
+          Program.. <span className="inline-flex items-center"><TriangleGlyph direction="right" className="h-2.5 w-2.5" /><span className="sr-only">►</span></span> Clear Prg <span className="inline-flex items-center"><TriangleGlyph direction="right" className="h-2.5 w-2.5" /><span className="sr-only">►</span></span> Yes, then build Q1 = OR(I1, I2) from scratch and press Start.
+        </Try>
       </Section>
     </div>
   );
@@ -172,7 +202,7 @@ function Panel() {
 
 function Library() {
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
+    <div className="grid gap-4 lg:grid-cols-2 font-['Poppins',sans-serif]">
       <Section heading="Basic functions (GF)">
         <Table
           head={['Block', 'Output', 'Open pin x']}
@@ -182,7 +212,13 @@ function Library() {
             ['NOT', <M key="3">{'Q = \\lnot I_1'}</M>, '—'],
             ['NAND / NOR', <M key="4">{'Q = \\lnot(\\ldots)'}</M>, '1 / 0'],
             ['XOR', <M key="5">{'Q = I_1 \\oplus I_2'}</M>, '0'],
-            ['AND ↑ / NAND ↓', 'one-cycle pulse on the edge', '1'],
+            [
+              <span key="edge" className="inline-flex items-center gap-1">
+                AND <TriangleGlyph direction="up" className="h-2.5 w-2.5" /><span className="sr-only">▲</span> / NAND <TriangleGlyph direction="down" className="h-2.5 w-2.5" /><span className="sr-only">▼</span>
+              </span>,
+              'one-cycle pulse on the edge',
+              '1',
+            ],
           ]}
         />
       </Section>
@@ -202,7 +238,7 @@ function Library() {
           ]}
         />
         <p>
-          Times are entered as <M>{'SS{:}hh'}</M> (10 ms), <M>{'MM{:}SS'}</M> or <M>{'HH{:}MM'}</M>. Change them live with ESC → Set Param without stopping the
+          Times are entered as <M>{'SS{:}hh'}</M> (10 ms), <M>{'MM{:}SS'}</M> or <M>{'HH{:}MM'}</M>. Change them live with ESC ► Set Param without stopping the
           program.
         </p>
       </Section>
@@ -226,7 +262,7 @@ function Commissioning() {
       </Section>
       <Section heading="RUN / STOP safely">
         <p>
-          STOP forces every relay open. From RUN: ESC → Stop → <strong>Yes</strong> (the prompt defaults to No). Editing the program is only possible in
+          STOP forces every relay open. From RUN: ESC ► Stop ► <strong>Yes</strong> (the prompt defaults to No). Editing the program is only possible in
           STOP; parameters may be changed in RUN.
         </p>
         <p>
@@ -253,7 +289,7 @@ function ProgramFigure({ id, caption, onLoad }: { id: ScenarioId; caption: strin
         <button
           type="button"
           onClick={() => onLoad(id)}
-          className="inline-flex h-7 items-center rounded-full border border-slate-200 bg-white px-3 text-[11px] font-semibold text-slate-700 hover:border-red-500 hover:text-red-600 dark:border-slate-800 dark:bg-[#0B0F17] dark:text-slate-200 dark:hover:text-red-400"
+          className="inline-flex h-7 items-center rounded-full border border-slate-200 bg-white px-3 font-['Poppins',sans-serif] text-[11px] font-semibold text-slate-700 transition hover:border-violet-500 hover:text-violet-600 dark:border-slate-800 dark:bg-[#0B0F17] dark:text-slate-200 dark:hover:border-violet-500 dark:hover:text-violet-400"
         >
           {`Load “${scenario.title}” on the bench`}
         </button>
@@ -264,7 +300,7 @@ function ProgramFigure({ id, caption, onLoad }: { id: ScenarioId; caption: strin
 
 function SealIn({ onLoad }: { onLoad: LoadScenario }) {
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
+    <div className="grid gap-4 lg:grid-cols-2 font-['Poppins',sans-serif]">
       <div className="space-y-4">
         <Section heading="Concept">
           <p>
@@ -272,7 +308,7 @@ function SealIn({ onLoad }: { onLoad: LoadScenario }) {
             it was started: it <strong>seals itself in</strong> by feeding its own output back to its input, and only a STOP command breaks the loop.
           </p>
           <p>
-            Behaviour: START pressed → <M>{'Q_1 = 1'}</M>; START released → <M>{'Q_1'}</M> stays 1; STOP pressed → <M>{'Q_1 = 0'}</M>. STOP always wins.
+            Behaviour: START pressed <span className="inline-flex items-center"><TriangleGlyph direction="right" className="h-2.5 w-2.5" /><span className="sr-only">►</span></span> <M>{'Q_1 = 1'}</M>; START released <span className="inline-flex items-center"><TriangleGlyph direction="right" className="h-2.5 w-2.5" /><span className="sr-only">►</span></span> <M>{'Q_1'}</M> stays 1; STOP pressed <span className="inline-flex items-center"><TriangleGlyph direction="right" className="h-2.5 w-2.5" /><span className="sr-only">►</span></span> <M>{'Q_1 = 0'}</M>. STOP always wins.
           </p>
         </Section>
         <Section heading="Wiring">
@@ -413,7 +449,7 @@ export function LogoManual({ onClose, onLoad }: { onClose: () => void; onLoad: (
         </button>
       }
     >
-      <div role="region" aria-label="LOGO! manual" className="space-y-4">
+      <div role="region" aria-label="LOGO! manual" className="space-y-4 font-['Poppins',sans-serif]">
         <div className="overflow-x-auto">
           <SegmentedControl<ModuleId>
             aria-label="Manual module"

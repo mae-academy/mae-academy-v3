@@ -127,7 +127,10 @@ describe('LOGO! 0BA4 bench', () => {
     expect(display().getAttribute('data-backlight')).toBe('off');
 
     fireEvent.click(screen.getByRole('switch', { name: 'Mains breaker' }));
-    expect(mode()).toBe('RUN'); // resumes the state it had at power-off
+    expect(mode()).toBe('STOP'); // authentic restart: boots safely in STOP mode
+    expect(display().textContent).toContain('SIEMENS');
+    expect(display().textContent).toContain('LOGO!');
+    await waitFor(() => expect(display().textContent).toContain('>Program..'), { timeout: 2500 });
   });
 
   it('loads a scenario, re-dressing the bench and the program', async () => {
@@ -428,6 +431,86 @@ describe('LOGO! physical keyboard', () => {
     press('ArrowDown');
     fireEvent.click(screen.getByRole('tab', { name: 'LOGO!' }));
     expect(display().textContent).toContain('>Program..');
+  });
+
+  it('supports WASD navigation and dynamic keybindings customization', () => {
+    const { sched } = startLogo();
+    // Toggle to WASD mode via quick toggle
+    fireEvent.click(screen.getByRole('button', { name: 'WASD keys navigation' }));
+    const hint = screen.getByRole('note', { name: 'Keyboard shortcuts' });
+    expect(hint.textContent).toContain('WASD Nav');
+
+    // Navigate with 's' (Down) and start with Enter
+    press('s');
+    press('s');
+    press('s');
+    press('Enter');
+    expect(mode()).toBe('RUN');
+    sched.scan();
+
+    // Navigate in RUN mode with 's'
+    press('s');
+    expect(display().textContent).toContain('I:');
+
+    // Record OK and Back keybindings via inline interactive recording pills
+    fireEvent.click(screen.getByRole('button', { name: 'Record OK key binding' }));
+    expect(hint.textContent).toContain('Press any key...');
+    fireEvent.keyDown(window, { key: ' ' });
+    expect(hint.textContent).toContain('Space: OK');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Record Back key binding' }));
+    expect(hint.textContent).toContain('Press any key...');
+    fireEvent.keyDown(window, { key: 'q' });
+    expect(hint.textContent).toContain('Q: Back');
+
+    // Press 'q' to open Stop Prg confirm
+    press('q');
+    expect(display().textContent).toContain('>Stop');
+    press(' '); // Space = OK
+    press('s'); // s = Down (Yes)
+    press(' '); // Space = OK
+    expect(mode()).toBe('STOP');
+  });
+
+  it('triggers inputs 1 through 8 with numeric hotkeys respecting momentary and toggle semantics', () => {
+    startLogo();
+    // Stairway scenario: I1 is pushbutton (momentary)
+    const i1Btn = screen.getByRole('button', { name: /^I1 S1 Stair buttons/ });
+    expect(i1Btn.getAttribute('aria-pressed')).toBe('false');
+
+    // Press down '1' -> momentary actuates
+    fireEvent.keyDown(window, { key: '1' });
+    expect(i1Btn.getAttribute('aria-pressed')).toBe('true');
+
+    // Key up '1' -> momentary releases
+    fireEvent.keyUp(window, { key: '1' });
+    expect(i1Btn.getAttribute('aria-pressed')).toBe('false');
+
+    // Reconfigure I2 to latching switch (toggle)
+    fireEvent.click(screen.getByRole('button', { name: /^Configure I2 field device/ }));
+    const menu = screen.getByRole('menu', { name: 'I2 field device' });
+    fireEvent.click(within(menu).getByRole('menuitemradio', { name: 'Latching switch · NO' }));
+
+    const i2Btn = screen.getByRole('button', { name: /^I2 S2 Corridor button/ });
+    expect(i2Btn.getAttribute('aria-pressed')).toBe('false');
+    fireEvent.keyDown(window, { key: '2' });
+    expect(i2Btn.getAttribute('aria-pressed')).toBe('true');
+    fireEvent.keyUp(window, { key: '2' });
+    expect(i2Btn.getAttribute('aria-pressed')).toBe('true');
+
+    // Press '2' again to toggle back off
+    fireEvent.keyDown(window, { key: '2' });
+    expect(i2Btn.getAttribute('aria-pressed')).toBe('false');
+    fireEvent.keyUp(window, { key: '2' });
+    expect(i2Btn.getAttribute('aria-pressed')).toBe('false');
+
+    // Suppressed when focused on an input element
+    const inputElement = document.createElement('input');
+    document.body.appendChild(inputElement);
+    inputElement.focus();
+    fireEvent.keyDown(inputElement, { key: '1' });
+    expect(i1Btn.getAttribute('aria-pressed')).toBe('false');
+    document.body.removeChild(inputElement);
   });
 });
 

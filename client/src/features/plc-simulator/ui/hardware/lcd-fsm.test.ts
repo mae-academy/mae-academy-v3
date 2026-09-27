@@ -77,7 +77,7 @@ describe('rendering contract', () => {
 
 describe('STOP mode menu', () => {
   it('shows the four root entries with the cursor on Start', () => {
-    expect(renderLcd(menu, stopped).lines.map((l) => l.trimEnd())).toEqual(['>▶ Start', ' Program', ' Setup', ' Network']);
+    expect(renderLcd(menu, stopped).lines.map((l) => l.trimEnd())).toEqual(['>► Start', ' Program', ' Setup', ' Network']);
   });
 
   it('moves the cursor with up / down and stops at the ends', () => {

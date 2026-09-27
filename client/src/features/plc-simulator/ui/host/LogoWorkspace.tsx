@@ -2,6 +2,13 @@ import { BookOpen, ChevronDown, Factory, Workflow } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { SegmentedControl, StudioCard } from '@/components/common/templates';
+import {
+  loadKeyBindings,
+  normalizeKey,
+  saveKeyBindings,
+  toggleNav,
+  type LogoKeyBindings,
+} from '../../logo/keybindings';
 import { MEMORY_LIMITS } from '../../logo/engine/memory';
 import type { DeviceClass } from '../../logo/hardware/devices';
 import { parseProgram, serializeProgram } from '../../logo/persist';
@@ -10,6 +17,7 @@ import { FbdViewer } from '../../logo/ui/FbdViewer';
 import { LogoManual } from '../../logo/ui/LogoManual';
 import { LogoBench } from '../../logo/ui/LogoBench';
 import { useLogoBench } from '../../logo/ui/useLogoBench';
+import { NavTriangles } from '../TriangleGlyph';
 import { PILL_BUTTON } from '../chrome';
 import { NoticeBanner } from './Banners';
 import { downloadText } from './download';
@@ -44,6 +52,40 @@ export function LogoWorkspace({ active, initialScenario = 'stairway', initialDev
   const [importError, setImportError] = useState<string | null>(null);
   const [manualOpen, setManualOpen] = useState(false);
   const [fbdOpen, setFbdOpen] = useState(true);
+  const [keybindings, setKeybindings] = useState<LogoKeyBindings>(() => loadKeyBindings());
+  const [recordingTarget, setRecordingTarget] = useState<'ok' | 'esc' | null>(null);
+
+  const updateKeybindings = useCallback((next: LogoKeyBindings): void => {
+    setKeybindings(next);
+    saveKeyBindings(next);
+  }, []);
+
+  const toggleNavScheme = (): void => {
+    updateKeybindings(toggleNav(keybindings));
+  };
+
+  useEffect(() => {
+    if (!recordingTarget) return;
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const normalized = normalizeKey(e.key);
+      if (!normalized) return;
+
+      updateKeybindings({
+        ...keybindings,
+        [recordingTarget]: normalized,
+      });
+      setRecordingTarget(null);
+    };
+
+    window.addEventListener('keydown', onKeyDown, { capture: true, once: true });
+    return () => {
+      window.removeEventListener('keydown', onKeyDown, { capture: true });
+    };
+  }, [recordingTarget, keybindings, updateKeybindings]);
 
   // A hidden tab must not keep scanning behind the user's back.
   useEffect(() => {
@@ -112,9 +154,12 @@ export function LogoWorkspace({ active, initialScenario = 'stairway', initialDev
               onChange={(device) => controller.setDevice(device)}
               className="border-slate-200/80 bg-slate-200/60 dark:border-[#1a1d24] dark:bg-[#13161c]"
             />
-            <div className="relative inline-flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-slate-200/80 bg-slate-200/60 px-3 text-xs font-medium text-slate-700 transition hover:bg-slate-300/50 dark:border-[#1a1d24] dark:bg-[#13161c] dark:text-slate-300 dark:hover:bg-[#1a1d24]">
-              <Factory className="pointer-events-none h-3.5 w-3.5 shrink-0 text-violet-600 dark:text-violet-400" aria-hidden="true" />
-              <span className="pointer-events-none text-xs font-semibold text-slate-800 dark:text-slate-200">{scenario.title}</span>
+            <div
+              className="relative inline-flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-slate-200/80 bg-slate-200/60 px-3 font-['Poppins',sans-serif] text-xs font-medium text-slate-700 transition hover:bg-slate-300/50 dark:border-[#1a1d24] dark:bg-[#13161c] dark:text-slate-300 dark:hover:bg-[#1a1d24]"
+              title={`Active: ${scenario.title} (Click to switch example)`}
+            >
+              <BookOpen className="pointer-events-none h-3.5 w-3.5 shrink-0 text-violet-600 dark:text-violet-400" aria-hidden="true" />
+              <span className="pointer-events-none font-['Poppins',sans-serif] text-xs font-semibold text-slate-800 dark:text-slate-200">Examples</span>
               <ChevronDown className="pointer-events-none h-3 w-3 text-slate-400" aria-hidden="true" />
               <select
                 aria-label="Application scenario"
@@ -131,7 +176,7 @@ export function LogoWorkspace({ active, initialScenario = 'stairway', initialDev
                 {SCENARIO_GROUPS.map((group) => (
                   <optgroup key={group.id} label={group.label}>
                     {SCENARIO_LIST.filter((entry) => entry.group === group.id).map((entry) => (
-                      <option key={entry.id} value={entry.id} className="bg-white font-sans text-slate-800 dark:bg-[#13161c] dark:text-slate-200">
+                      <option key={entry.id} value={entry.id} className="bg-white font-['Poppins',sans-serif] text-slate-800 dark:bg-[#13161c] dark:text-slate-200">
                         {`${entry.chapter} · ${entry.title}`}
                       </option>
                     ))}
@@ -145,9 +190,13 @@ export function LogoWorkspace({ active, initialScenario = 'stairway', initialDev
               aria-pressed={manualOpen}
               aria-label="Beginner's manual"
               title="LOGO! beginner's manual"
-              className={`${PILL_BUTTON} ${manualOpen ? '!border-red-500/60 !text-red-600 dark:!text-red-400' : ''}`}
+              className={`h-9 inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full px-3 py-1.5 font-['Poppins',sans-serif] text-xs font-medium transition active:scale-[.98] ${
+                manualOpen
+                  ? 'border border-violet-600 bg-violet-50 text-violet-700 dark:border-violet-500 dark:bg-violet-950/40 dark:text-violet-300'
+                  : 'border border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-slate-700 dark:hover:bg-[#13161c]'
+              }`}
             >
-              <BookOpen className="h-3.5 w-3.5" aria-hidden="true" />
+              <BookOpen className="h-3.5 w-3.5 text-violet-600 dark:text-violet-400" aria-hidden="true" />
               <span>Manual</span>
             </button>
           </div>
@@ -179,10 +228,72 @@ export function LogoWorkspace({ active, initialScenario = 'stairway', initialDev
           </span>
         }
       >
-        <LogoBench controller={controller} active={active} />
-        <p role="note" aria-label="Keyboard shortcuts" className="mt-3 text-center text-[11px] font-medium text-slate-500 dark:text-slate-400">
-          [▲▼◀▶ Nav] [Enter: OK] [Esc: Back]
-        </p>
+        <LogoBench controller={controller} active={active} keybindings={keybindings} />
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 px-1 font-['Poppins',sans-serif]">
+          <div
+            role="note"
+            aria-label="Keyboard shortcuts"
+            className="flex flex-wrap items-center gap-1.5 font-['Poppins',sans-serif] text-xs font-medium text-slate-500 dark:text-slate-400"
+          >
+            {/* Navigation Scheme Pill: Clicking toggles between Arrows and WASD */}
+            <button
+              type="button"
+              onClick={toggleNavScheme}
+              aria-label={keybindings.nav === 'arrows' ? 'WASD keys navigation' : 'Arrow keys navigation'}
+              title="Click to toggle navigation keys (Arrow keys ⇄ WASD)"
+              className="inline-flex items-center gap-1 rounded-full border border-slate-200/80 bg-slate-100/90 px-2.5 py-1 font-['Poppins',sans-serif] text-xs font-semibold text-slate-700 shadow-2xs transition hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-300 dark:hover:border-violet-600 dark:hover:bg-violet-950/40 dark:hover:text-violet-300"
+            >
+              <span>
+                [{keybindings.nav === 'arrows' ? (
+                  <span className="inline-flex items-center gap-1">
+                    <NavTriangles className="h-2.5 w-2.5" includeSpace />
+                    <span>Nav</span>
+                  </span>
+                ) : (
+                  'WASD Nav'
+                )}]
+              </span>
+            </button>
+
+            {/* Confirm (OK) Action Pill: Interactive key recording */}
+            <button
+              type="button"
+              onClick={() => setRecordingTarget((curr) => (curr === 'ok' ? null : 'ok'))}
+              aria-label={recordingTarget === 'ok' ? 'Listening for OK key press' : 'Record OK key binding'}
+              title={recordingTarget === 'ok' ? 'Press any key to bind to OK...' : 'Click to record OK key'}
+              className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 font-['Poppins',sans-serif] text-xs font-semibold transition ${
+                recordingTarget === 'ok'
+                  ? 'animate-pulse border border-violet-500 bg-violet-50 text-violet-700 ring-2 ring-violet-500/20 dark:border-violet-400 dark:bg-violet-950/60 dark:text-violet-300'
+                  : 'border border-slate-200/80 bg-slate-100/90 text-slate-700 shadow-2xs hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-300 dark:hover:border-violet-600 dark:hover:bg-violet-950/40 dark:hover:text-violet-300'
+              }`}
+            >
+              <span>{recordingTarget === 'ok' ? '[ Press any key... ]' : `[ ${normalizeKey(keybindings.ok)}: OK ]`}</span>
+            </button>
+
+            {/* Back (ESC) Action Pill: Interactive key recording */}
+            <button
+              type="button"
+              onClick={() => setRecordingTarget((curr) => (curr === 'esc' ? null : 'esc'))}
+              aria-label={recordingTarget === 'esc' ? 'Listening for Back key press' : 'Record Back key binding'}
+              title={recordingTarget === 'esc' ? 'Press any key to bind to Back...' : 'Click to record Back key'}
+              className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 font-['Poppins',sans-serif] text-xs font-semibold transition ${
+                recordingTarget === 'esc'
+                  ? 'animate-pulse border border-violet-500 bg-violet-50 text-violet-700 ring-2 ring-violet-500/20 dark:border-violet-400 dark:bg-violet-950/60 dark:text-violet-300'
+                  : 'border border-slate-200/80 bg-slate-100/90 text-slate-700 shadow-2xs hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-300 dark:hover:border-violet-600 dark:hover:bg-violet-950/40 dark:hover:text-violet-300'
+              }`}
+            >
+              <span>{recordingTarget === 'esc' ? '[ Press any key... ]' : `[ ${normalizeKey(keybindings.esc)}: Back ]`}</span>
+            </button>
+
+            {/* Numeric hotkeys info pill */}
+            <span
+              className="inline-flex items-center gap-1 rounded-full border border-slate-200/60 bg-slate-50 px-2.5 py-1 font-['Poppins',sans-serif] text-xs font-medium text-slate-500 dark:border-slate-800/60 dark:bg-slate-900/40 dark:text-slate-400"
+              title="Global hotkeys: press 1-8 to actuate inputs I1-I8"
+            >
+              [1-8: Inputs]
+            </span>
+          </div>
+        </div>
       </StudioCard>
 
       <StudioCard

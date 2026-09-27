@@ -201,6 +201,19 @@ export function rewire(program: LogoProgram, target: WireTarget, ref: ConnectorR
   return pruneOrphans({ ...program, blocks });
 }
 
+/** Toggles negation on one block pin (spec §2.3): connectivity is unchanged, so no pruning is needed. */
+export function setInvert(program: LogoProgram, target: WireTarget, invert: boolean): LogoProgram {
+  if (target.kind !== 'pin') return program;
+  const blocks = program.blocks.map((block) => {
+    if (block.id !== target.blockId) return block;
+    const current = block.inputs[target.pin];
+    if (!current) return block;
+    const wire: WireIn = { ...current, invert };
+    return { ...block, inputs: { ...block.inputs, [target.pin]: wire } };
+  });
+  return { ...program, blocks };
+}
+
 /** Writes one numeric parameter (range-checked by `compileProgram`). */
 export function withParam(program: LogoProgram, blockId: number, key: NumericParamKey, value: number): LogoProgram {
   const blocks = program.blocks.map((block) => {

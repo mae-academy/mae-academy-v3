@@ -1,32 +1,21 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import type { LogoBenchController } from '../controller';
 import type { PanelKey } from '../firmware/panel';
-import { INPUT_DEVICE_OPTIONS, LOAD_OPTIONS, type ActuatorKind, type ContactType, type LoadKind } from '../hardware/devices';
+import { INPUT_DEVICE_OPTIONS, isMomentary, LOAD_OPTIONS, type ActuatorKind, type ContactType, type LoadKind } from '../hardware/devices';
 import { InputRow, LoadView } from './FieldDevices';
 import { SvgMenu } from './SvgMenu';
 import { HOT_LANE_Y, hotBranches, hotRail, inputRoute, lineRoute, neutralBranches, neutralRail, neutralRoute, outputRoute, relayFeedRoute, returnRoute, toPath } from './routing';
 import { inputRowY, loadY, OUTPUT_TERMINAL_X, RAIL, SUPPLY, VIEW } from './geometry';
 import { usePortLabelAudit } from './label-audit';
+import { DEFAULT_KEYBINDINGS, matchKeybinding, type LogoKeyBindings } from '../keybindings';
 import { LabelCanvas } from './LabelCanvas';
 import { LogoDevice } from './LogoDevice';
 import { PortLabel } from './PortLabel';
 import { liveFill, supplyVars, toneText, wireClass, type Tone } from './wire';
 
-
-const KEYBOARD: Readonly<Record<string, PanelKey>> = {
-  ArrowUp: 'up',
-  ArrowDown: 'down',
-  ArrowLeft: 'left',
-  ArrowRight: 'right',
-  Enter: 'ok',
-  Escape: 'esc',
-};
-
 /** Elements that own arrows / Enter / Escape themselves: the keypad leaves every key alone there. */
 const KEY_OWNERS =
   'input, textarea, select, [contenteditable=""], [contenteditable="true"], [role="tab"], [role="slider"], [role="dialog"], [role="menu"], [role="listbox"]';
-/** Activatable controls: they own Enter, but arrows and Escape still reach the keypad. */
-const ACTIVATABLE = 'button, a[href], summary, [role="button"], [role="switch"]';
 
 function Wire({ d, live, tone = 'hot' }: { d: string; live: boolean; tone?: Tone }) {
   return <path d={d} fill="none" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={wireClass(live, tone)} />;
@@ -36,6 +25,7 @@ export interface LogoBenchProps {
   readonly controller: LogoBenchController;
   /** Route the physical keyboard to the keypad while this bench is the visible one. */
   readonly active: boolean;
+  readonly keybindings?: LogoKeyBindings;
 }
 
 /**
@@ -43,7 +33,7 @@ export interface LogoBenchProps {
  * field devices wired to I1..I8 and loads switched through the Q1..Q4 dry contacts. Conductors glow
  * when energised and animate while current flows through a closed loop.
  */
-export function LogoBench({ controller, active }: LogoBenchProps) {
+export function LogoBench({ controller, active, keybindings = DEFAULT_KEYBINDINGS }: LogoBenchProps) {
   const spec = controller.device;
   const powered = controller.powered;
   const ac = spec.supply.kind === 'AC';
@@ -83,26 +73,64 @@ export function LogoBench({ controller, active }: LogoBenchProps) {
 
   useEffect(() => {
     if (!active) return undefined;
-    const onWindowKey = (event: globalThis.KeyboardEvent): void => {
-      const key = KEYBOARD[event.key];
+
+    const onWindowKeyDown = (event: globalThis.KeyboardEvent): void => {
       if (menu !== null) return; // an open menu owns the keyboard
-      if (!key || event.defaultPrevented || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
+      if (event.defaultPrevented || event.ctrlKey || event.metaKey || event.altKey) return;
       const target = event.target;
-      if (target instanceof Element) {
-        if (target.closest(KEY_OWNERS) !== null) return;
-        if (key === 'ok' && target.closest(ACTIVATABLE) !== null) return;
+      if (target instanceof Element && target.closest(KEY_OWNERS) !== null) return;
+
+      // Numeric hotkeys 1-8 for inputs I1-I8
+      if (/^[1-8]$/.test(event.key)) {
+        const index = parseInt(event.key, 10) - 1;
+        const input = controller.benchInputs[index];
+        if (!input || input.device.kind === 'spare') return;
+        event.preventDefault();
+        if (event.repeat) return;
+        if (isMomentary(input.device)) {
+          controller.actuate(index, true);
+        } else {
+          controller.toggle(index);
+        }
+        return;
       }
+
+      const key = matchKeybinding(event.key, keybindings);
+      if (!key) return;
       event.preventDefault();
       press(key);
     };
-    window.addEventListener('keydown', onWindowKey);
-    return () => window.removeEventListener('keydown', onWindowKey);
-  }, [active, press, menu]);
+
+    const onWindowKeyUp = (event: globalThis.KeyboardEvent): void => {
+      if (menu !== null) return;
+      if (event.defaultPrevented || event.ctrlKey || event.metaKey || event.altKey) return;
+      const target = event.target;
+      if (target instanceof Element && target.closest(KEY_OWNERS) !== null) return;
+
+      if (/^[1-8]$/.test(event.key)) {
+        const index = parseInt(event.key, 10) - 1;
+        const input = controller.benchInputs[index];
+        if (!input || input.device.kind === 'spare') return;
+        if (isMomentary(input.device)) {
+          event.preventDefault();
+          controller.actuate(index, false);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', onWindowKeyDown);
+    window.addEventListener('keyup', onWindowKeyUp);
+    return () => {
+      window.removeEventListener('keydown', onWindowKeyDown);
+      window.removeEventListener('keyup', onWindowKeyUp);
+    };
+  }, [active, press, menu, keybindings, controller]);
 
   const onBreakerKey = (event: KeyboardEvent<SVGGElement>): void => {
     if (event.key !== ' ' && event.key !== 'Enter') return;
     event.preventDefault();
     event.stopPropagation();
+    (event.currentTarget as unknown as HTMLElement).blur?.();
     controller.setPower(!powered);
   };
 
@@ -138,7 +166,13 @@ export function LogoBench({ controller, active }: LogoBenchProps) {
           tabIndex={0}
           aria-checked={powered}
           aria-label="Mains breaker"
-          onClick={() => controller.setPower(!powered)}
+          onClick={(e) => {
+            (e.currentTarget as unknown as HTMLElement).blur?.();
+            controller.setPower(!powered);
+          }}
+          onPointerUp={(e) => {
+            (e.currentTarget as unknown as HTMLElement).blur?.();
+          }}
           onKeyDown={onBreakerKey}
           className="group cursor-pointer outline-none"
         >
