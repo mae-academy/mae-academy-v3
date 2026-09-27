@@ -36,6 +36,7 @@ export interface AcControllerSample {
 
 export interface AcControllerMetrics {
   outputVoltageRms: number;
+  outputVoltageAvg: number;
   outputCurrentRms: number;
   activePower: number;
   apparentPower: number;
@@ -49,7 +50,7 @@ export interface AcControllerMetrics {
   controlValue: number;
 }
 
-export type AcControllerWarningCode = "POOR_POWER_FACTOR" | "CONDUCTION_FAILURE" | "BIDIRECTIONAL_ASYMMETRY";
+export type AcControllerWarningCode = "POOR_POWER_FACTOR" | "CONDUCTION_FAILURE";
 export interface AcControllerWarning { code: AcControllerWarningCode; message: string; }
 
 export interface AcControllerSimulation {
@@ -151,6 +152,107 @@ function integralCycleEnabled(cycle: number, onCycles: number, offCycles: number
   return wrap(cycle, block) < Math.max(1, onCycles);
 }
 
+interface BranchState {
+  current: number;
+  conduction: boolean;
+  previousLocalHalfAngle: number;
+  previousGlobalHalfIndex: number;
+}
+
+function createBranchState(): BranchState {
+  return { current: 0, conduction: false, previousLocalHalfAngle: 0, previousGlobalHalfIndex: -1 };
+}
+
+/**
+ * One SCR/diode line modeled independently: fires the thyristor at alpha, and — for the
+ * unidirectional (diode-SCR pair) topology — hands off to the uncontrolled diode as soon as
+ * the thyristor's own current extinguishes past the source zero-crossing (beta may exceed pi).
+ * Used once for single-phase, and 3x for star-4w / delta, where each line has an independent
+ * return path so no phase-to-phase coupling exists.
+ */
+function stepBranch(
+  state: BranchState,
+  branchThetaAbsolute: number,
+  sourceValue: number,
+  alpha: number,
+  dt: number,
+  resistance: number,
+  inductance: number,
+  hasInductance: boolean,
+  topology: AcTopology,
+  controlMode: AcControlMode,
+  enabled: boolean,
+  gatePeak: number,
+): { outputVoltage: number; gatePulse: number } {
+  const globalHalfIndex = Math.floor(branchThetaAbsolute / Math.PI);
+  const localHalfAngle = branchThetaAbsolute - globalHalfIndex * Math.PI;
+  const signedHalf = globalHalfIndex % 2 === 0 ? 1 : -1;
+  const isNewHalf = globalHalfIndex !== state.previousGlobalHalfIndex;
+  const crossedFiringAngle = isNewHalf ? alpha <= 1e-9 : state.previousLocalHalfAngle < alpha && localHalfAngle >= alpha;
+  const firingNow = controlMode === "phase-angle" && enabled && crossedFiringAngle;
+  const positiveHalfAllowed = signedHalf > 0 || topology === "bidirectional";
+  const diodeEligible = topology === "unidirectional" && signedHalf < 0;
+  let gatePulse = 0;
+
+  // A resistive branch has no stored energy to carry a device's conduction past its own half
+  // (unlike RL, where conduction legitimately continues past pi until current naturally
+  // extinguishes at beta, detected below via the sign-flip check). Explicitly dropping
+  // conduction at the half boundary — rather than trying to catch it one sample early via a
+  // localHalfAngle threshold — avoids a floating-point coin-flip on whether that threshold
+  // check fires on the last sample of the half, which let conduction silently leak into the
+  // next half every period.
+  if (!hasInductance && isNewHalf && controlMode === "phase-angle") {
+    state.conduction = false;
+  }
+
+  if (controlMode === "integral-cycle") {
+    state.conduction = enabled && positiveHalfAllowed;
+  } else if (firingNow && positiveHalfAllowed) {
+    if (state.conduction && Math.abs(state.current) > 1e-6 && Math.sign(state.current) !== signedHalf) state.current = 0;
+    state.conduction = true;
+    gatePulse = signedHalf * gatePeak * 0.12;
+  } else if (diodeEligible && !state.conduction) {
+    state.conduction = true;
+  }
+
+  let outputVoltage = state.conduction ? sourceValue : 0;
+
+  if (!hasInductance) {
+    state.current = outputVoltage / resistance;
+  } else if (state.conduction) {
+    const derivative = (i: number) => (outputVoltage - resistance * i) / inductance;
+    const k1 = derivative(state.current);
+    const k2 = derivative(state.current + (dt * k1) / 2);
+    const k3 = derivative(state.current + (dt * k2) / 2);
+    const k4 = derivative(state.current + dt * k3);
+    const nextCurrent = state.current + (dt / 6) * (k1 + 2 * k2 + 2 * k3 + k4);
+    if (Math.sign(state.current || signedHalf) !== Math.sign(nextCurrent || signedHalf) && Math.abs(state.current) > 1e-8) {
+      state.current = 0;
+      state.conduction = false;
+      outputVoltage = 0;
+    } else {
+      state.current = nextCurrent;
+    }
+  } else {
+    state.current = 0;
+  }
+
+  state.previousLocalHalfAngle = localHalfAngle;
+  state.previousGlobalHalfIndex = globalHalfIndex;
+  return { outputVoltage, gatePulse };
+}
+
+/** Memoryless per-instant gating check used only for the isolated-neutral (star-3w) resistive
+ * pairing solve below: whether this line's own SCR window is active right now. */
+function phaseGatedNow(thetaAbsolutePhase: number, alpha: number, topology: AcTopology, ignoreAlphaGate: boolean) {
+  const theta = wrap(thetaAbsolutePhase, TWO_PI);
+  const half = Math.floor(theta / Math.PI);
+  const localAngle = theta - half * Math.PI;
+  const sign = half % 2 === 0 ? 1 : -1;
+  const allowed = sign > 0 || topology === "bidirectional";
+  return allowed && (ignoreAlphaGate || localAngle >= alpha);
+}
+
 export function simulateAcVoltageController(parameters: AcVoltageControllerParameters): AcControllerSimulation {
   const frequency = Math.max(parameters.frequency, 1);
   const period = 1 / frequency;
@@ -159,10 +261,10 @@ export function simulateAcVoltageController(parameters: AcVoltageControllerParam
   const resistance = Math.max(parameters.resistance, 0.05);
   const inductance = Math.max(parameters.inductanceMilliHenry, 0) / 1000;
   const hasInductance = parameters.loadType === "RL" && inductance > 0;
-  const rawFiringAngleDeg = clamp(parameters.firingAngle, 0, 180);
-  // Bidirectional (back-to-back thyristor) firing is symmetric about the half-cycle; α beyond
-  // 90° has no additional effect there and is capped rather than silently over-firing.
-  const firingAngleDeg = parameters.topology === "bidirectional" ? Math.min(rawFiringAngleDeg, 90) : rawFiringAngleDeg;
+  // Both topologies fire over the full alpha in [0deg, 180deg] (spec 2.1/2.2): the bidirectional
+  // R-load RMS formula continues to fall monotonically to 0 as alpha -> 180deg, and the 3-phase
+  // isolated-neutral conduction modes (spec 2.2) span up to 150deg, so there is no 90deg cutoff.
+  const firingAngleDeg = clamp(parameters.firingAngle, 0, 180);
   const alpha = firingAngleDeg * Math.PI / 180;
   const onCycles = clamp(Math.round(parameters.onCycles), 1, 12);
   const offCycles = clamp(Math.round(parameters.offCycles), 1, 12);
@@ -172,91 +274,120 @@ export function simulateAcVoltageController(parameters: AcVoltageControllerParam
   const captureStart = settleCycles * SAMPLES_PER_PERIOD;
   const dt = period / SAMPLES_PER_PERIOD;
   const samples: AcControllerSample[] = [];
-  let current = 0;
-  let conduction = false;
-  let lastExtinctionAngle = hasInductance ? solveExtinctionAngle(alpha, resistance, inductance, omega) : Math.PI;
-  // Threshold-crossing state for firing detection (see below): a fixed-width sample
-  // window around `alpha` can be skipped entirely by floating-point rounding once
-  // `thetaAbsolute` grows across many periods, silently dropping a firing pulse.
-  let previousLocalHalfAngle = 0;
-  let previousGlobalHalfIndex = -1;
+  const lastExtinctionAngle = hasInductance ? solveExtinctionAngle(alpha, resistance, inductance, omega) : Math.PI;
+
+  // Single-phase uses one line. Three-phase delta and star-4w/star-3w(RL) drive three
+  // independent lines (a neutral wire or a delta branch each give current its own return
+  // path, so there is no coupling between lines — this is exactly the single-phase model
+  // run three times at 120° apart). Isolated-neutral (star-3w) resistive loads are the one
+  // topology where lines couple (current must return through another line), so that case is
+  // solved per-instant below instead of through the stateful per-line model.
+  const mainBranch = createBranchState();
+  const branchA = createBranchState();
+  const branchB = createBranchState();
+  const branchC = createBranchState();
+  const isDelta = parameters.phase === "three" && parameters.threePhaseConnection === "delta";
+  const isIsolatedNeutralResistive = parameters.phase === "three" && parameters.threePhaseConnection === "star-3w" && !hasInductance;
 
   for (let step = 0; step <= totalSteps; step += 1) {
     const time = step * dt;
     const thetaAbsolute = omega * time;
     const theta = wrap(thetaAbsolute, TWO_PI);
     const cycle = Math.floor(thetaAbsolute / TWO_PI);
-    const phaseAngles = [theta, wrap(theta - TWO_PI / 3, TWO_PI), wrap(theta + TWO_PI / 3, TWO_PI)];
-    const sourcePhases = phaseAngles.map((phaseAngle) => inputPeak * Math.sin(phaseAngle));
-    const sourceVoltage = sourcePhases[0];
-    // Monotonic half-cycle index (unlike floor(theta/π), which wraps every period) so a new
-    // half can be detected unambiguously and the firing check below is a true edge-crossing
-    // test rather than a fragile one-sample bracket around alpha.
-    const globalHalfIndex = Math.floor(thetaAbsolute / Math.PI);
-    const localHalfAngle = thetaAbsolute - globalHalfIndex * Math.PI;
-    const signedHalf = globalHalfIndex % 2 === 0 ? 1 : -1;
-    const isNewHalf = globalHalfIndex !== previousGlobalHalfIndex;
     const enabled = parameters.controlMode === "integral-cycle" ? integralCycleEnabled(cycle, onCycles, offCycles) : true;
-    const crossedFiringAngle = isNewHalf ? alpha <= 1e-9 : previousLocalHalfAngle < alpha && localHalfAngle >= alpha;
-    const firingNow = parameters.controlMode === "phase-angle" && enabled && crossedFiringAngle;
-    const positiveHalfAllowed = signedHalf > 0 || parameters.topology === "bidirectional";
-    const gatePulse = firingNow && positiveHalfAllowed ? signedHalf * inputPeak * 0.12 : 0;
-    const threePhaseOutputs = phaseAngles.map((phaseAngle, index) => {
-      const phaseHalf = Math.floor(phaseAngle / Math.PI);
-      const phaseLocalAngle = phaseAngle - phaseHalf * Math.PI;
-      const phaseSign = phaseHalf % 2 === 0 ? 1 : -1;
-      const phaseAllowed = phaseSign > 0 || parameters.topology === "bidirectional";
-      const phaseEnabled = parameters.controlMode === "integral-cycle" ? integralCycleEnabled(cycle, onCycles, offCycles) : true;
-      const phaseConducts = phaseEnabled && phaseAllowed && (parameters.controlMode === "integral-cycle" || phaseLocalAngle >= alpha);
-      return parameters.phase === "three" && phaseConducts ? sourcePhases[index] : 0;
-    });
+    const ignoreAlphaGate = parameters.controlMode === "integral-cycle";
+    const sourceVoltage = inputPeak * Math.sin(theta);
 
-    if (parameters.controlMode === "integral-cycle") {
-      conduction = enabled && positiveHalfAllowed;
-    } else if (firingNow && positiveHalfAllowed) {
-      if (conduction && Math.abs(current) > 1e-6 && Math.sign(current) !== signedHalf) current = 0;
-      conduction = true;
-    }
+    let outputVoltage = 0;
+    let phaseAOutput = 0;
+    let phaseBOutput = 0;
+    let phaseCOutput = 0;
+    let outputCurrent = 0;
+    let gatePulse = 0;
+    let conducting = false;
 
-    let outputVoltage = parameters.phase === "three" ? threePhaseOutputs[0] : conduction ? sourceVoltage : 0;
-    if (parameters.phase !== "three" && parameters.topology === "unidirectional" && sourceVoltage < 0) outputVoltage = 0;
-    if (parameters.phase === "three") {
-      const phaseAConducts = Math.abs(outputVoltage) > 1e-9;
-      if (!hasInductance) {
-        current = outputVoltage / resistance;
-      } else if (phaseAConducts) {
-        const derivative = (i: number) => (outputVoltage - resistance * i) / inductance;
-        const k1 = derivative(current);
-        const k2 = derivative(current + dt * k1 / 2);
-        const k3 = derivative(current + dt * k2 / 2);
-        const k4 = derivative(current + dt * k3);
-        const nextCurrent = current + (dt / 6) * (k1 + 2 * k2 + 2 * k3 + k4);
-        current = Math.sign(current || outputVoltage) !== Math.sign(nextCurrent || outputVoltage) && Math.abs(current) > 1e-8 ? 0 : nextCurrent;
-      } else {
-        current = 0;
-      }
-    } else if (!hasInductance) {
-      current = outputVoltage / resistance;
-      if (parameters.controlMode === "phase-angle" && localHalfAngle >= Math.PI - omega * dt) conduction = false;
-    } else if (conduction) {
-      const derivative = (i: number) => (outputVoltage - resistance * i) / inductance;
-      const k1 = derivative(current);
-      const k2 = derivative(current + dt * k1 / 2);
-      const k3 = derivative(current + dt * k2 / 2);
-      const k4 = derivative(current + dt * k3);
-      const nextCurrent = current + (dt / 6) * (k1 + 2 * k2 + 2 * k3 + k4);
-      if (Math.sign(current || signedHalf) !== Math.sign(nextCurrent || signedHalf) && Math.abs(current) > 1e-8) {
-        current = 0;
-        conduction = false;
-        outputVoltage = 0;
-      } else current = nextCurrent;
+    if (parameters.phase !== "three") {
+      const result = stepBranch(mainBranch, thetaAbsolute, sourceVoltage, alpha, dt, resistance, inductance, hasInductance, parameters.topology, parameters.controlMode, enabled, inputPeak);
+      outputVoltage = result.outputVoltage;
+      phaseAOutput = outputVoltage;
+      gatePulse = result.gatePulse;
+      outputCurrent = mainBranch.current;
+      conducting = mainBranch.conduction;
+    } else if (isDelta) {
+      // Line voltages lead their same-letter phase voltage by 30° and are √3× the amplitude;
+      // each delta branch is fired and extinguished independently off its own line voltage.
+      const vA = sourceVoltage;
+      const vB = inputPeak * Math.sin(wrap(theta - TWO_PI / 3, TWO_PI));
+      const vC = inputPeak * Math.sin(wrap(theta + TWO_PI / 3, TWO_PI));
+      const vAB = vA - vB;
+      const vBC = vB - vC;
+      const vCA = vC - vA;
+      const gatePeak = inputPeak * Math.sqrt(3);
+      const resultAB = stepBranch(branchA, thetaAbsolute + Math.PI / 6, vAB, alpha, dt, resistance, inductance, hasInductance, parameters.topology, parameters.controlMode, enabled, gatePeak);
+      const resultBC = stepBranch(branchB, thetaAbsolute - TWO_PI / 3 + Math.PI / 6, vBC, alpha, dt, resistance, inductance, hasInductance, parameters.topology, parameters.controlMode, enabled, gatePeak);
+      const resultCA = stepBranch(branchC, thetaAbsolute + TWO_PI / 3 + Math.PI / 6, vCA, alpha, dt, resistance, inductance, hasInductance, parameters.topology, parameters.controlMode, enabled, gatePeak);
+      phaseAOutput = resultAB.outputVoltage;
+      phaseBOutput = resultBC.outputVoltage;
+      phaseCOutput = resultCA.outputVoltage;
+      outputVoltage = phaseAOutput;
+      gatePulse = resultAB.gatePulse;
+      conducting = branchA.conduction;
+      // KCL at line terminal A: line current is the difference of the two delta branch currents meeting there.
+      outputCurrent = branchA.current - branchC.current;
     } else {
-      current = 0;
+      const thetaB = thetaAbsolute - TWO_PI / 3;
+      const thetaC = thetaAbsolute + TWO_PI / 3;
+      const vA = sourceVoltage;
+      const vB = inputPeak * Math.sin(wrap(theta - TWO_PI / 3, TWO_PI));
+      const vC = inputPeak * Math.sin(wrap(theta + TWO_PI / 3, TWO_PI));
+
+      if (isIsolatedNeutralResistive) {
+        // With the neutral floating, a line can only carry current when at least one other
+        // line is simultaneously gated to complete the loop — this reproduces the qualitative
+        // 3-conducting / 2-conducting / 0-conducting regions of spec 2.2 from first principles
+        // instead of a hardcoded alpha threshold table, and the Mode-1 boundary (all-3-gated
+        // disappears past alpha=60deg) falls out exactly. Gating windows are still referenced
+        // to each line's own phase-voltage zero-crossing rather than the conducting pair's
+        // line-to-line zero-crossing, so the numeric alpha at which output fully collapses to
+        // zero comes out near 120deg here versus the textbook's 150deg for this same topology.
+        const gatedA = enabled && phaseGatedNow(thetaAbsolute, alpha, parameters.topology, ignoreAlphaGate);
+        const gatedB = enabled && phaseGatedNow(thetaB, alpha, parameters.topology, ignoreAlphaGate);
+        const gatedC = enabled && phaseGatedNow(thetaC, alpha, parameters.topology, ignoreAlphaGate);
+        const gatedCount = Number(gatedA) + Number(gatedB) + Number(gatedC);
+        let vAout = 0;
+        let vBout = 0;
+        let vCout = 0;
+        if (gatedCount === 3) {
+          vAout = vA; vBout = vB; vCout = vC;
+        } else if (gatedCount === 2) {
+          // The floating (ungated) line carries no current, so by Ohm's law its
+          // phase-to-neutral voltage is exactly zero; the two conducting lines split the
+          // instantaneous line-to-line voltage between them symmetrically.
+          if (gatedA && gatedB) { vAout = (vA - vB) / 2; vBout = -vAout; }
+          else if (gatedB && gatedC) { vBout = (vB - vC) / 2; vCout = -vBout; }
+          else { vCout = (vC - vA) / 2; vAout = -vCout; }
+        }
+        phaseAOutput = vAout;
+        phaseBOutput = vBout;
+        phaseCOutput = vCout;
+        outputVoltage = vAout;
+        outputCurrent = vAout / resistance;
+        conducting = gatedCount >= 2 && gatedA;
+      } else {
+        const resultA = stepBranch(branchA, thetaAbsolute, vA, alpha, dt, resistance, inductance, hasInductance, parameters.topology, parameters.controlMode, enabled, inputPeak);
+        const resultB = stepBranch(branchB, thetaB, vB, alpha, dt, resistance, inductance, hasInductance, parameters.topology, parameters.controlMode, enabled, inputPeak);
+        const resultC = stepBranch(branchC, thetaC, vC, alpha, dt, resistance, inductance, hasInductance, parameters.topology, parameters.controlMode, enabled, inputPeak);
+        phaseAOutput = resultA.outputVoltage;
+        phaseBOutput = resultB.outputVoltage;
+        phaseCOutput = resultC.outputVoltage;
+        outputVoltage = phaseAOutput;
+        gatePulse = resultA.gatePulse;
+        conducting = branchA.conduction;
+        outputCurrent = branchA.current;
+      }
     }
 
-    if (step >= captureStart) samples.push({ time: (step - captureStart) * dt, sourceVoltage, outputVoltage, phaseAOutput: parameters.phase === "three" ? threePhaseOutputs[0] : outputVoltage, phaseBOutput: parameters.phase === "three" ? threePhaseOutputs[1] : 0, phaseCOutput: parameters.phase === "three" ? threePhaseOutputs[2] : 0, outputCurrent: current, thyristorVoltage: sourceVoltage - outputVoltage, gatePulse, conducting: conduction });
-    previousLocalHalfAngle = localHalfAngle;
-    previousGlobalHalfIndex = globalHalfIndex;
+    if (step >= captureStart) samples.push({ time: (step - captureStart) * dt, sourceVoltage, outputVoltage, phaseAOutput, phaseBOutput, phaseCOutput, outputCurrent, thyristorVoltage: sourceVoltage - outputVoltage, gatePulse, conducting });
   }
 
   const analysis = samples.slice(-Math.min(samples.length, parameters.controlMode === "integral-cycle" ? totalCycles * SAMPLES_PER_PERIOD : SAMPLES_PER_PERIOD));
@@ -265,6 +396,7 @@ export function simulateAcVoltageController(parameters: AcVoltageControllerParam
   const currentValues = analysis.map((sample) => sample.outputCurrent);
   const sourceRms = rms(source);
   const outputVoltageRms = rms(voltage);
+  const outputVoltageAvg = mean(voltage);
   const outputCurrentRms = rms(currentValues);
   const voltageFundamental = fundamentalRms(voltage);
   const currentFundamental = fundamentalRms(currentValues);
@@ -276,9 +408,6 @@ export function simulateAcVoltageController(parameters: AcVoltageControllerParam
   const powerFactor = apparentPower > 1e-9 ? clamp(activePower / apparentPower, -1, 1) : 0;
 
   const warnings: AcControllerWarning[] = [];
-  if (parameters.topology === "bidirectional" && rawFiringAngleDeg > 90) {
-    warnings.push({ code: "BIDIRECTIONAL_ASYMMETRY", message: `Firing angle ${rawFiringAngleDeg.toFixed(0)}° exceeds 90° for bidirectional operation; capped to 90° to preserve half-cycle symmetry.` });
-  }
   if (parameters.loadType === "RL" && hasInductance) {
     const phiDeg = Math.atan2(omega * inductance, resistance) * 180 / Math.PI;
     if (firingAngleDeg + phiDeg > 180) {
@@ -295,6 +424,7 @@ export function simulateAcVoltageController(parameters: AcVoltageControllerParam
     samples,
     metrics: {
       outputVoltageRms,
+      outputVoltageAvg,
       outputCurrentRms,
       activePower,
       apparentPower,

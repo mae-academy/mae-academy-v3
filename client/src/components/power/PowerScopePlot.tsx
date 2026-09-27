@@ -514,7 +514,7 @@ export function PowerScopePlot({
             onPointerLeave={handlePointerLeave}
           >
             {/* DCM Discontinuous Window Background Highlight */}
-            {dcmWindowStartMs !== undefined && dcmWindowStartMs !== null && (
+            {typeof dcmWindowStartMs === "number" && Number.isFinite(dcmWindowStartMs) && dcmWindowStartMs >= 0 && toX(dcmWindowStartMs) < padding.left + plotWidth && (
               <rect
                 x={toX(dcmWindowStartMs)}
                 y={padding.top}
@@ -682,9 +682,8 @@ export function PowerScopePlot({
                     x={xPos + 4}
                     y={padding.top + 14}
                     fill={ann.color}
-                    style={{ fontFamily: "'KaTeX_Main', 'KaTeX_Math', 'Times New Roman', serif" }}
-                    fontSize="12"
-                    fontWeight="600"
+                    className="font-serif italic font-normal text-sm select-none"
+                    style={{ fontFamily: "'KaTeX_Math', 'KaTeX_Main', 'Times New Roman', serif", fontStyle: "italic", fontWeight: 400 }}
                   >
                     {ann.label}
                   </text>
@@ -693,7 +692,7 @@ export function PowerScopePlot({
             })}
 
             {/* DCM Extinction Marker */}
-            {dcmExtinctionTimeMs !== undefined && dcmExtinctionTimeMs !== null && dcmExtinctionTimeMs >= 0 && (
+            {typeof dcmExtinctionTimeMs === "number" && Number.isFinite(dcmExtinctionTimeMs) && dcmExtinctionTimeMs >= 0 && toX(dcmExtinctionTimeMs) <= padding.left + plotWidth && (
               <g className="dcm-marker">
                 <line
                   x1={toX(dcmExtinctionTimeMs)}

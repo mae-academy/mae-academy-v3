@@ -17,7 +17,8 @@ import {
 } from "@/features/power-electronics/acVoltageControllerMath";
 
 const tex = String.raw;
-const field = "w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-center font-mono text-sm text-slate-900 outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-35 dark:border-slate-800 dark:bg-slate-950 dark:text-white";
+const field =
+  "h-11 w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 text-slate-800 text-xl font-medium sm:text-2xl tracking-wide dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 dark:focus:ring-violet-400 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [-moz-appearance:textfield] m-0 text-center disabled:cursor-not-allowed disabled:opacity-35 transition";
 
 const phaseOptions: Array<{ value: AcPhase; label: string }> = [
   { value: "single", label: "Single-Phase (1-Φ)" },
@@ -83,29 +84,21 @@ function Field({
   max?: number;
   step?: number | "any";
 }) {
-  const [editing, setEditing] = useState(false);
   return (
     <label className="block">
       <KatexMath math={label} className="mb-1.5 block text-xs font-bold text-slate-500 dark:text-slate-400" />
-      <div className="relative">
-        <input
-          aria-label={label}
-          className={field}
-          type="number"
-          min={min}
-          max={max}
-          step={step}
-          disabled={disabled}
-          value={Number.isFinite(value) ? value : 0}
-          onFocus={() => setEditing(true)}
-          onBlur={() => setEditing(false)}
-          onChange={(event) => onChange(Number(event.target.value) || 0)}
-          style={editing ? undefined : { color: "transparent", WebkitTextFillColor: "transparent", caretColor: "transparent" }}
-        />
-        <span aria-hidden className={`pointer-events-none absolute inset-0 grid place-items-center ${editing ? "hidden" : ""} ${disabled ? "opacity-35" : ""}`}>
-          <KatexMath math={numberTex(value)} className="text-sm font-semibold text-slate-900 dark:text-white" />
-        </span>
-      </div>
+      <input
+        aria-label={label}
+        className={field}
+        type="number"
+        min={min}
+        max={max}
+        step={step}
+        disabled={disabled}
+        value={Number.isFinite(value) ? value : 0}
+        onChange={(event) => onChange(Number(event.target.value) || 0)}
+        style={{ fontFamily: "'KaTeX_Main', 'Times New Roman', serif" }}
+      />
     </label>
   );
 }
@@ -256,7 +249,7 @@ export function ACVoltageControllerStudio() {
         id: "gate",
         katexName: "g(t)",
         data: toPoints((s) => s.gatePulse),
-        color: "#10b981",
+        color: "#7c3aed",
         axis: "voltage",
         unit: "",
         stepped: true,
@@ -279,9 +272,9 @@ export function ACVoltageControllerStudio() {
 
     return [
       { timeMs: tAlpha1, label: "α", color: "#7C3AED" },
-      { timeMs: tBeta1, label: "β", color: "#9333EA" },
+      { timeMs: tBeta1, label: "β", color: "#7C3AED" },
       { timeMs: tAlpha2, label: "α", color: "#7C3AED" },
-      { timeMs: tBeta2, label: "β", color: "#9333EA" },
+      { timeMs: tBeta2, label: "β", color: "#7C3AED" },
     ].filter((a) => a.timeMs <= maxTime);
   }, [isPhase, metrics.firingAngle, metrics.extinctionAngle, simulation.period]);
 
@@ -335,13 +328,25 @@ export function ACVoltageControllerStudio() {
         <div className="mt-4">
           <div className="mb-2 flex items-center justify-between">
             <KatexMath math={tex`\alpha\,[^\circ]`} className="text-xs font-bold text-slate-500 dark:text-slate-400" />
-            <KatexMath math={tex`\alpha = ${numberTex(parameters.firingAngle, 0)}^\circ`} className="text-xs font-semibold text-violet-600 dark:text-violet-400" />
+            <div className="flex items-center gap-2.5">
+              <KatexMath
+                math={tex`\alpha = ${numberTex(parameters.firingAngle, 0)}^\circ`}
+                className="text-xs font-semibold text-violet-600 dark:text-violet-400"
+              />
+              <KatexMath
+                math={tex`\beta = ${metrics.extinctionAngle.toFixed(1)}^\circ`}
+                className="text-xs font-semibold text-violet-600 dark:text-violet-400"
+              />
+            </div>
           </div>
           <StudioSlider
             aria-label="firing angle"
             min={0}
             max={180}
             step={1}
+            unit="°"
+            minLabel={<KatexMath math="0^\circ" />}
+            maxLabel={<KatexMath math="180^\circ" />}
             value={parameters.firingAngle}
             onChange={(val) => update("firingAngle", val)}
             showLimits

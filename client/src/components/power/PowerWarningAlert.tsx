@@ -1,15 +1,89 @@
+import type { ReactNode } from "react";
+
 export type PowerWarningSeverity = "error" | "warning" | "info";
 export interface PowerWarning { code: string; message: string; }
 
-interface SeverityStyle { label: string; tone: string; role: "alert" | "status"; }
+export interface NoticeBadgeProps {
+  label: ReactNode;
+  tone?: "violet" | "amber" | "rose" | "sky" | "emerald" | "slate";
+  className?: string;
+}
+
+const BADGE_TONES = {
+  rose: "text-rose-600 dark:text-rose-400",
+  amber: "text-amber-600 dark:text-amber-400",
+  violet: "text-violet-600 dark:text-violet-400",
+  sky: "text-sky-600 dark:text-sky-400",
+  emerald: "text-emerald-600 dark:text-emerald-400",
+  slate: "text-slate-600 dark:text-slate-400",
+};
+
+export function NoticeBadge({ label, tone = "rose", className = "" }: NoticeBadgeProps) {
+  return (
+    <span
+      className={`font-sans text-xs sm:text-sm font-semibold tracking-wide uppercase ${BADGE_TONES[tone] ?? BADGE_TONES.rose} ${className}`}
+    >
+      {label}
+    </span>
+  );
+}
+
+export interface StudioAlertProps {
+  variant?: "info" | "warning" | "error" | "default";
+  badge?: ReactNode;
+  title?: ReactNode;
+  message?: ReactNode;
+  children?: ReactNode;
+  className?: string;
+  action?: ReactNode;
+}
+
+export function StudioAlert({
+  variant = "warning",
+  badge,
+  title,
+  message,
+  children,
+  className = "",
+  action,
+}: StudioAlertProps) {
+  const isViolet = variant === "info" || variant === "default";
+  return (
+    <div
+      role={variant === "error" ? "alert" : "status"}
+      className={`rounded-xl border bg-white dark:bg-slate-900 p-3 sm:p-3.5 shadow-sm transition-all ${
+        isViolet
+          ? "border-violet-200 dark:border-violet-900/60"
+          : "border-rose-200 dark:border-rose-900/60"
+      } ${className}`}
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          {badge && (
+            <NoticeBadge
+              label={badge}
+              tone={isViolet ? "violet" : "rose"}
+            />
+          )}
+          {title && (
+            <span className="font-sans text-xs sm:text-sm font-semibold text-slate-800 dark:text-slate-100">
+              {title}
+            </span>
+          )}
+        </div>
+        {action && <div>{action}</div>}
+      </div>
+      {(message || children) && (
+        <div className="mt-1 font-sans text-xs sm:text-sm font-normal leading-relaxed text-slate-600 dark:text-slate-400">
+          {message}
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
 
 const SEVERITY_ORDER: Record<PowerWarningSeverity, number> = { error: 0, warning: 1, info: 2 };
-
-const SEVERITY_STYLE: Record<PowerWarningSeverity, SeverityStyle> = {
-  error: { label: "FAULT / VALIDATION", tone: "border-rose-500 bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-300", role: "alert" },
-  warning: { label: "DESIGN WARNING", tone: "border-amber-400 bg-amber-50/70 dark:bg-amber-400/10 text-amber-700 dark:text-amber-300", role: "status" },
-  info: { label: "AUTO-CORRECTED", tone: "border-sky-400 bg-sky-50/70 dark:bg-sky-400/10 text-sky-700 dark:text-sky-300", role: "status" },
-};
 
 // Maps each engine's warning code to a severity; the human-readable text always
 // comes from the engine's own `message` (already parameterized with live values).
@@ -23,27 +97,35 @@ const WARNING_SEVERITY: Record<string, PowerWarningSeverity> = {
   BACK_EMF_EXCEEDED: "error",
   POOR_POWER_FACTOR: "warning",
   CONDUCTION_FAILURE: "error",
-  BIDIRECTIONAL_ASYMMETRY: "info",
   DUTY_CYCLE_HIGH: "warning",
   BACK_EMF_REVERSES_CURRENT: "error",
   CCM_DCM_BOUNDARY: "info",
 };
 
-/** Reusable warning strip for the 4 power-electronics Studios; matches the existing
- * left-border-strip idiom already used for the DCM/shoot-through flags in this folder. */
+const SEVERITY_CONFIG: Record<PowerWarningSeverity, { variant: "error" | "warning" | "info"; label: string }> = {
+  error: { variant: "error", label: "FAULT" },
+  warning: { variant: "warning", label: "DESIGN WARNING" },
+  info: { variant: "info", label: "SYSTEM NOTICE" },
+};
+
+/** Unified MAE-compliant warning/alert component for Power Electronics Studios */
 export function PowerWarningAlert({ warnings, className = "" }: { warnings: PowerWarning[]; className?: string }) {
   if (!warnings.length) return null;
-  const sorted = [...warnings].sort((a, b) => SEVERITY_ORDER[WARNING_SEVERITY[a.code] ?? "warning"] - SEVERITY_ORDER[WARNING_SEVERITY[b.code] ?? "warning"]);
+  const sorted = [...warnings].sort(
+    (a, b) => SEVERITY_ORDER[WARNING_SEVERITY[a.code] ?? "warning"] - SEVERITY_ORDER[WARNING_SEVERITY[b.code] ?? "warning"]
+  );
   return (
     <div className={`space-y-2 ${className}`}>
       {sorted.map((warning) => {
         const severity = WARNING_SEVERITY[warning.code] ?? "warning";
-        const style = SEVERITY_STYLE[severity];
+        const cfg = SEVERITY_CONFIG[severity];
         return (
-          <div key={warning.code} role={style.role} className={`border-l-2 px-3 py-2 ${style.tone}`}>
-            <div className="font-mono text-[9px] font-bold tracking-[.12em]">{style.label} · {warning.code}</div>
-            <p className="mt-1 text-xs leading-relaxed text-slate-600 dark:text-slate-300">{warning.message}</p>
-          </div>
+          <StudioAlert
+            key={warning.code}
+            variant={cfg.variant}
+            badge={`${cfg.label} · ${warning.code.replace(/_/g, " ")}`}
+            message={warning.message}
+          />
         );
       })}
     </div>

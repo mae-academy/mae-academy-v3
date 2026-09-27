@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { KatexMath } from "@/components/ui/KatexMath";
 import { SegmentedControl, StudioCard, StudioSlider, InnerBox } from "@/components/common/templates";
 import { PowerWarningAlert } from "./PowerWarningAlert";
@@ -17,7 +17,8 @@ import {
 const tex = String.raw;
 const card = "rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white/70 dark:bg-slate-900/70 backdrop-blur-md shadow-sm p-5 md:p-6 transition-all";
 const heading = "text-sm font-bold text-slate-800 dark:text-white";
-const field = "w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-center font-mono text-sm text-slate-900 outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-35 dark:border-slate-800 dark:bg-slate-950 dark:text-white";
+const field =
+  "h-11 w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 text-slate-800 text-xl font-medium sm:text-2xl tracking-wide dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 dark:focus:ring-violet-400 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [-moz-appearance:textfield] m-0 text-center disabled:cursor-not-allowed disabled:opacity-35 transition";
 
 const topologyOptions: Array<{ value: ChopperTopology; label: string }> = [
   { value: "buck", label: "Buck" },
@@ -25,12 +26,12 @@ const topologyOptions: Array<{ value: ChopperTopology; label: string }> = [
   { value: "buck-boost", label: "Buck-Boost" }
 ];
 
-const quadrantOptions: Array<{ value: QuadrantClass; label: string; badge?: string }> = [
-  { value: "A", label: "Class A", badge: "1st-Q" },
-  { value: "B", label: "Class B", badge: "2nd-Q" },
-  { value: "C", label: "Class C", badge: "2-Q A" },
-  { value: "D", label: "Class D", badge: "2-Q B" },
-  { value: "E", label: "Class E", badge: "4-Q" }
+const quadrantOptions: Array<{ value: QuadrantClass; label: string; badge?: ReactNode }> = [
+  { value: "A", label: "Class A", badge: <span className="font-['Poppins',sans-serif] text-[10px] sm:text-xs tracking-normal font-medium">1st-Q</span> },
+  { value: "B", label: "Class B", badge: <span className="font-['Poppins',sans-serif] text-[10px] sm:text-xs tracking-normal font-medium">2nd-Q</span> },
+  { value: "C", label: "Class C", badge: <span className="font-['Poppins',sans-serif] text-[10px] sm:text-xs tracking-normal font-medium">2-Q A</span> },
+  { value: "D", label: "Class D", badge: <span className="font-['Poppins',sans-serif] text-[10px] sm:text-xs tracking-normal font-medium">2-Q B</span> },
+  { value: "E", label: "Class E", badge: <span className="font-['Poppins',sans-serif] text-[10px] sm:text-xs tracking-normal font-medium">4-Q</span> }
 ];
 
 const controlOptions: Array<{ value: ChopperControl; label: string }> = [
@@ -71,29 +72,23 @@ function Field({
   max?: number;
   step?: number | "any";
 }) {
-  const [editing, setEditing] = useState(false);
   return (
     <label className="block">
       <KatexMath math={label} className="mb-1.5 block text-xs font-bold text-slate-500 dark:text-slate-400" />
-      <div className="relative">
-        <input
-          aria-label={label}
-          className={field}
-          type="number"
-          min={min}
-          max={max}
-          step={step}
-          disabled={disabled}
-          value={Number.isFinite(value) ? value : 0}
-          onFocus={() => setEditing(true)}
-          onBlur={() => setEditing(false)}
-          onChange={(event) => onChange(Number(event.target.value) || 0)}
-          style={editing ? undefined : { color: "transparent", WebkitTextFillColor: "transparent", caretColor: "transparent" }}
-        />
-        <span aria-hidden className={`pointer-events-none absolute inset-0 grid place-items-center ${editing ? "hidden" : ""} ${disabled ? "opacity-35" : ""}`}>
-          <KatexMath math={numberTex(value)} className="text-sm font-semibold text-slate-900 dark:text-white" />
-        </span>
-      </div>
+      <input
+        aria-label={label}
+        className={field}
+        type="number"
+        min={min}
+        max={max}
+        step={step}
+        disabled={disabled}
+        value={Number.isFinite(value) ? value : 0}
+        onChange={(event) => onChange(Number(event.target.value) || 0)}
+        style={{
+          fontFamily: "'KaTeX_Main', 'Times New Roman', serif"
+        }}
+      />
     </label>
   );
 }
@@ -103,6 +98,25 @@ function Metric({ label, value }: { label: string; value: string }) {
     <InnerBox className="px-2.5 py-2">
       <KatexMath math={label} className="block text-[10px] text-slate-500 dark:text-slate-400" />
       <KatexMath math={value} className="mt-1 block overflow-x-auto text-xs font-bold text-slate-900 dark:text-white" />
+    </InnerBox>
+  );
+}
+
+/** Conduction mode badge — emerald for CCM (healthy), amber for DCM (informational). */
+function ModeMetric({ mode }: { mode: "CCM" | "DCM" }) {
+  const isCcm = mode === "CCM";
+  return (
+    <InnerBox className="px-2.5 py-2">
+      <KatexMath math={String.raw`\mathrm{Mode}`} className="block text-[10px] text-slate-500 dark:text-slate-400" />
+      <span
+        className={`mt-1.5 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wide ${
+          isCcm
+            ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300"
+            : "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300"
+        }`}
+      >
+        {mode}
+      </span>
     </InnerBox>
   );
 }
@@ -170,7 +184,7 @@ export function ChopperStudio() {
         id: "gate",
         katexName: "g(t)",
         data: toPoints((s) => s.gatePulse),
-        color: "#10b981",
+        color: "#7c3aed",
         axis: "voltage",
         unit: "",
         stepped: true,
@@ -179,15 +193,6 @@ export function ChopperStudio() {
       },
     ];
   }, [simulation.samples]);
-
-  const dcmExtinctionTimeMs = useMemo(() => {
-    if (metrics.conductionMode !== "DCM") return null;
-    const samples = simulation.samples;
-    const startIdx = Math.floor(samples.length * 0.15);
-    const idx = samples.findIndex((point, index) => index > startIdx && Math.abs(point.outputCurrent) <= 1e-6);
-    if (idx >= 0) return samples[idx].time * 1000;
-    return null;
-  }, [simulation.samples, metrics.conductionMode]);
 
   const topology = (
     <StudioCard title="Topology Configuration">
@@ -206,7 +211,42 @@ export function ChopperStudio() {
           <SegmentedControl
             value={parameters.quadrantClass}
             options={quadrantOptions}
-            onChange={(quadrantClass) => update("quadrantClass", quadrantClass)}
+            onChange={(quadrantClass) => {
+              setParameters((current) => {
+                const base = { ...current, quadrantClass };
+                if (quadrantClass === "B") {
+                  // Class B requires active back-EMF load (RLE); default E = 60% Vs
+                  return {
+                    ...base,
+                    loadType: "RLE" as const,
+                    backEmfVoltage: current.backEmfVoltage > 0
+                      ? current.backEmfVoltage
+                      : Math.round(current.inputVoltage * 0.6),
+                  };
+                }
+                if (quadrantClass === "C") {
+                  // Class C: two-quadrant voltage-positive / current-bidirectional
+                  // RL load sufficient; back-EMF optional
+                  return { ...base, loadType: "RL" as const };
+                }
+                if (quadrantClass === "D") {
+                  // Class D: output voltage swings ±; current stays positive
+                  // RL load is typical (no back-EMF required)
+                  return { ...base, loadType: "RL" as const };
+                }
+                if (quadrantClass === "E") {
+                  // Class E: full four-quadrant; RLE with motor-like back-EMF
+                  return {
+                    ...base,
+                    loadType: "RLE" as const,
+                    backEmfVoltage: current.backEmfVoltage > 0
+                      ? current.backEmfVoltage
+                      : Math.round(current.inputVoltage * 0.3),
+                  };
+                }
+                return base; // Class A: no forced changes
+              });
+            }}
             fullWidth
           />
         </div>
@@ -237,6 +277,8 @@ export function ChopperStudio() {
           value={parameters.dutyCycle}
           onChange={(val) => update("dutyCycle", val)}
           showLimits
+          minLabel={<KatexMath math="0" />}
+          maxLabel={<KatexMath math="1" />}
         />
       </div>
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -281,7 +323,7 @@ export function ChopperStudio() {
         <Metric label={tex`I_{\max}`} value={tex`${numberTex(metrics.currentMax)}\,\mathrm{A}`} />
         <Metric label={tex`I_{\min}`} value={tex`${numberTex(metrics.currentMin)}\,\mathrm{A}`} />
         <Metric label={tex`L_c`} value={tex`${numberTex(metrics.criticalInductanceMilliHenry)}\,\mathrm{mH}`} />
-        <Metric label={tex`\mathrm{Mode}`} value={tex`\mathrm{${metrics.conductionMode}}`} />
+        <ModeMetric mode={metrics.conductionMode} />
         <Metric label={tex`P_{in}`} value={tex`${numberTex(metrics.inputPower)}\,\mathrm{W}`} />
         <Metric label={tex`P_{out}`} value={tex`${numberTex(metrics.outputPower)}\,\mathrm{W}`} />
         <Metric label={tex`\eta`} value={tex`${numberTex(metrics.efficiency)}\%`} />
@@ -302,23 +344,11 @@ export function ChopperStudio() {
             {metricPanel}
           </aside>
           <main className="min-w-0 w-full space-y-6">
-            {metrics.conductionMode === "DCM" && (
-              <div role="status" className="border-l-4 border-violet-500 bg-violet-500/10 px-4 py-3 rounded-r-2xl">
-                <div className="font-mono text-[10px] font-bold tracking-[.12em] text-violet-700 dark:text-violet-300">
-                  SCOPE FLAG / DISCONTINUOUS CONDUCTION
-                </div>
-                <p className="mt-1 text-xs leading-relaxed text-slate-600 dark:text-slate-300">
-                  Load current reaches <strong>0 A</strong> before the next switching interval; the violet field marks the zero-current window.
-                </p>
-              </div>
-            )}
+
             <PowerScopePlot
-              title={`${parameters.topology === "buck" ? "BUCK" : parameters.topology === "boost" ? "BOOST" : "BUCK-BOOST"} CHOPPER OUTPUT SCOPE`}
+              title={`CLASS ${parameters.quadrantClass} · ${parameters.topology === "buck" ? "BUCK" : parameters.topology === "boost" ? "BOOST" : "BUCK-BOOST"} CHOPPER OUTPUT SCOPE`}
               subtitleLatex={tex`T_s=\frac{1}{f_s}=${numberTex(simulation.period * 1000, 3)}\,\mathrm{ms}`}
               series={series}
-              dcmExtinctionTimeMs={dcmExtinctionTimeMs}
-              dcmWindowStartMs={dcmExtinctionTimeMs}
-              dcmExtinctionLabel="I_o = 0 · DCM"
             />
             <Circuit parameters={parameters} />
           </main>

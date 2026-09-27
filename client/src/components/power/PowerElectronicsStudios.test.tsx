@@ -104,6 +104,71 @@ describe("ACVoltageControllerStudio", () => {
     expect(container.textContent).toContain("V_{oC}(t)");
     expect(container.textContent).toContain("I_o(t)");
   });
+
+  it("renders alpha and beta annotations in KaTeX math italics and g(t) in violet", async () => {
+    const { container } = render(<ACVoltageControllerStudio />);
+
+    // Check angle annotations typography
+    const annotationTexts = Array.from(container.querySelectorAll("svg text")).filter(
+      (el) => el.textContent === "α" || el.textContent === "β"
+    );
+    expect(annotationTexts.length).toBeGreaterThan(0);
+    annotationTexts.forEach((el) => {
+      const cls = el.getAttribute("class") ?? "";
+      expect(cls).toContain("italic");
+      expect(cls).toContain("font-serif");
+      expect(el.getAttribute("font-weight")).toBeNull();
+      expect((el as HTMLElement).style.fontStyle).toBe("italic");
+    });
+
+    // Switch overlay to Gate Pulses
+    const buttons = Array.from(container.querySelectorAll("button"));
+    const gateBtn = buttons.find((b) => b.textContent?.includes("Gate"));
+    if (gateBtn) {
+      await act(async () => {
+        fireEvent.click(gateBtn);
+      });
+      const gateTrace = container.querySelector('path[stroke="#7c3aed"]');
+      expect(gateTrace).not.toBeNull();
+    }
+  });
+
+  it("displays computed beta alongside alpha as a read-only readout with parity on scope", async () => {
+    const { container } = render(<ACVoltageControllerStudio />);
+
+    // Confirm beta is displayed as a read-only math label alongside alpha
+    expect(container.textContent).toContain("α=");
+    expect(container.textContent).toContain("β=");
+    expect(container.textContent).toContain("\\alpha =");
+    expect(container.textContent).toContain("\\beta =");
+
+    // Ensure there is NO slider for beta (only firing angle slider exists)
+    const sliders = container.querySelectorAll('input[type="range"]');
+    expect(sliders.length).toBe(1);
+    expect(sliders[0].getAttribute("aria-label")).toBe("firing angle");
+
+    // Parity check on scope annotation text and lines
+    const alphaTexts = Array.from(container.querySelectorAll("svg text")).filter((el) => el.textContent === "α");
+    const betaTexts = Array.from(container.querySelectorAll("svg text")).filter((el) => el.textContent === "β");
+    expect(alphaTexts.length).toBeGreaterThan(0);
+    expect(betaTexts.length).toBeGreaterThan(0);
+
+    // Verify alpha and beta share identical fill color, font classes, and font styling
+    expect(betaTexts[0].getAttribute("fill")).toBe(alphaTexts[0].getAttribute("fill"));
+    expect(betaTexts[0].getAttribute("class")).toBe(alphaTexts[0].getAttribute("class"));
+    expect((betaTexts[0] as HTMLElement).style.fontFamily).toBe((alphaTexts[0] as HTMLElement).style.fontFamily);
+
+    // Verify input box values are styled with text-xl sm:text-2xl font-medium and KaTeX font
+    const numInputs = container.querySelectorAll('input[type="number"]');
+    expect(numInputs.length).toBeGreaterThan(0);
+    numInputs.forEach((input) => {
+      const cls = input.getAttribute("class") ?? "";
+      expect(cls).toContain("text-xl");
+      expect(cls).toContain("sm:text-2xl");
+      expect(cls).toContain("font-medium");
+      expect((input as HTMLElement).style.fontFamily).toContain("KaTeX_Main");
+    });
+  });
 });
 
 describe("ChopperStudio", () => {
@@ -137,4 +202,70 @@ describe("ChopperStudio", () => {
 
     expect(container.textContent).toContain("Boost");
   });
+
+  it("renders g(t) trace with violet stroke and swatch, and settles cleanly at zero duty cycle without dcm markers", async () => {
+    const { container } = render(<ChopperStudio />);
+
+    // Verify g(t) trace path or swatch uses violet #7c3aed
+    const gatePath = container.querySelector('path[stroke="#7c3aed"]');
+    expect(gatePath).not.toBeNull();
+
+    // Verify input fields have KaTeX font, text-xl/text-2xl sizing, and focus ring
+    const numberInputs = Array.from(container.querySelectorAll('input[type="number"]'));
+    expect(numberInputs.length).toBeGreaterThan(0);
+    numberInputs.forEach((input) => {
+      expect((input as HTMLElement).style.fontFamily).toContain("KaTeX_Main");
+      expect(input.className).toContain("text-xl");
+      expect(input.className).toContain("sm:text-2xl");
+      expect(input.className).toContain("focus:ring-violet-500");
+    });
+
+    // Set duty cycle to 0
+    const dutyInput = container.querySelector('input[aria-label="D"]');
+    expect(dutyInput).not.toBeNull();
+    if (dutyInput) {
+      await act(async () => {
+        fireEvent.change(dutyInput, { target: { value: "0" } });
+      });
+    }
+
+    // Verify there are no internal dcm-marker SVG elements
+    expect(container.querySelector(".dcm-marker")).toBeNull();
+  });
+
+  it("switches to Class B without triggering warnings and displays quadrant badges in Poppins", async () => {
+    const { container } = render(<ChopperStudio />);
+
+    // Verify quadrant badge uses Poppins styling
+    const badgeSpans = Array.from(container.querySelectorAll("button span"));
+    const badge2ndQ = badgeSpans.find((el) => el.textContent?.includes("2nd-Q"));
+    expect(badge2ndQ).toBeDefined();
+    expect(badge2ndQ?.className).toContain("Poppins");
+
+    // Switch to Class B
+    const buttons = Array.from(container.querySelectorAll("button"));
+    const classBBtn = buttons.find((b) => b.textContent?.includes("Class B"));
+    expect(classBBtn).toBeDefined();
+
+    if (classBBtn) {
+      await act(async () => {
+        fireEvent.click(classBBtn);
+      });
+    }
+
+    // Verify no warning or error alerts are triggered
+    expect(container.querySelector('[role="alert"]')).toBeNull();
+    expect(container.textContent).not.toContain("unidirectional chopper cannot sustain reverse current");
+  });
+
+  it("opens in CCM by default: no DCM banner text, mode badge shows CCM", async () => {
+    const { container } = render(<ChopperStudio />);
+    expect(container.textContent).not.toContain("DISCONTINUOUS CONDUCTION");
+    expect(container.textContent).not.toContain("Load current reaches 0 A");
+    const allSpans = Array.from(container.querySelectorAll("span"));
+    const ccmBadge = allSpans.find((el) => el.textContent?.trim() === "CCM");
+    expect(ccmBadge).toBeDefined();
+    expect(ccmBadge?.className).toContain("emerald");
+  });
 });
+

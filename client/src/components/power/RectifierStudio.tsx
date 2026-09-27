@@ -17,7 +17,8 @@ import {
 
 const card = "rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white/70 dark:bg-slate-900/70 backdrop-blur-md shadow-sm p-5 md:p-6 transition-all";
 const heading = "text-sm font-bold text-slate-800 dark:text-white";
-const field = "w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-right font-mono text-sm text-slate-900 outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-35 dark:border-slate-800 dark:bg-slate-950 dark:text-white";
+const field =
+  "h-11 w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 text-slate-800 text-xl font-medium sm:text-2xl tracking-wide dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 dark:focus:ring-violet-400 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [-moz-appearance:textfield] m-0 text-center disabled:cursor-not-allowed disabled:opacity-35 transition";
 const tex = String.raw;
 
 const phaseOptions = [
@@ -68,31 +69,22 @@ function MathLabel({ math }: { math: string }) {
 }
 
 function NumberField({ label, value, onChange, disabled = false, min = 0, step = "any" }: { label: string; value: number; onChange: (value: number) => void; disabled?: boolean; min?: number; step?: number | "any" }) {
-  const [editing, setEditing] = useState(false);
   return (
     <label className="block">
       <span className="mb-1.5 block"><MathLabel math={label} /></span>
-      <div className="relative">
-        <input
-          aria-label={label}
-          type="number"
-          min={min}
-          step={step}
-          disabled={disabled}
-          value={Number.isFinite(value) ? value : 0}
-          onFocus={() => setEditing(true)}
-          onBlur={() => setEditing(false)}
-          onChange={(event) => onChange(Number(event.target.value) || 0)}
-          style={editing ? undefined : { color: "transparent", WebkitTextFillColor: "transparent", caretColor: "transparent" }}
-          className={`${field} text-center`}
-        />
-        <span
-          aria-hidden
-          className={`pointer-events-none absolute inset-0 grid place-items-center ${editing ? "hidden" : ""} ${disabled ? "opacity-35" : ""}`}
-        >
-          <KatexMath math={NumberValue(value)} className="text-sm font-semibold text-slate-900 dark:text-white" />
-        </span>
-      </div>
+      <input
+        aria-label={label}
+        type="number"
+        min={min}
+        step={step}
+        disabled={disabled}
+        value={Number.isFinite(value) ? value : 0}
+        onChange={(event) => onChange(Number(event.target.value) || 0)}
+        style={{
+          fontFamily: "'KaTeX_Main', 'Times New Roman', serif"
+        }}
+        className={field}
+      />
     </label>
   );
 }
@@ -319,7 +311,18 @@ export function RectifierStudio() {
                 <MathLabel math={tex`\alpha\,[^\circ]`} />
                 <KatexMath math={tex`\alpha = ${NumberValue(parameters.firingAngle, 0)}^\circ`} className="text-xs font-semibold text-violet-600 dark:text-violet-400" />
               </div>
-              <StudioSlider aria-label="firing angle slider" min={0} max={180} step={1} value={parameters.firingAngle} onChange={(val) => update("firingAngle", val)} showLimits />
+              <StudioSlider
+                aria-label="firing angle slider"
+                min={0}
+                max={180}
+                step={1}
+                value={parameters.firingAngle}
+                onChange={(val) => update("firingAngle", val)}
+                showLimits
+                unit="°"
+                minLabel={<KatexMath math="0^\circ" />}
+                maxLabel={<KatexMath math="180^\circ" />}
+              />
             </div>
           </div>
         </div>

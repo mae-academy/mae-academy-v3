@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
+import { StudioAlert } from "./PowerWarningAlert";
 
 interface StudioErrorBoundaryProps {
   children: ReactNode;
@@ -29,15 +30,15 @@ export class StudioErrorBoundary extends Component<StudioErrorBoundaryProps, Stu
 
     return (
       <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        <div role="alert" className="border-l-2 border-rose-500 bg-rose-50 px-3 py-2 dark:bg-rose-500/10">
-          <div className="font-mono text-[9px] font-bold tracking-[.12em] text-rose-700 dark:text-rose-300">{this.props.studioName.toUpperCase()} STUDIO / RENDER ERROR</div>
-          <p className="mt-1 text-xs leading-relaxed text-slate-600 dark:text-slate-300">
-            The studio failed to render for the current parameter combination. Resetting to default values usually clears this.
-          </p>
+        <StudioAlert
+          variant="error"
+          badge={`${this.props.studioName.toUpperCase()} · RENDER ERROR`}
+          message="The studio failed to render for the current parameter combination. Resetting to default values usually clears this."
+        >
           {import.meta.env.DEV && (
             <pre className="mt-2 overflow-auto rounded-lg bg-rose-100 p-2 text-[10px] text-rose-800 dark:bg-rose-500/20 dark:text-rose-200">{error.message}</pre>
           )}
-        </div>
+        </StudioAlert>
         <button
           type="button"
           onClick={() => this.setState({ error: null })}

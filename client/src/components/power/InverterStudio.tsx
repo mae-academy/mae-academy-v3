@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { KatexMath } from "@/components/ui/KatexMath";
 import { SegmentedControl, StudioCard, StudioSlider, InnerBox } from "@/components/common/templates";
-import { PowerWarningAlert } from "./PowerWarningAlert";
+import { PowerWarningAlert, StudioAlert, NoticeBadge } from "./PowerWarningAlert";
 import { StudioErrorBoundary } from "./StudioErrorBoundary";
 import { PowerScopePlot, type ScopeSeries } from "./PowerScopePlot";
 import {
@@ -19,7 +19,8 @@ import {
 const tex = String.raw;
 const card = "rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white/70 dark:bg-slate-900/70 backdrop-blur-md shadow-sm p-5 md:p-6 transition-all";
 const heading = "text-sm font-bold text-slate-800 dark:text-white";
-const field = "w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-center font-mono text-sm text-slate-900 outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-35 dark:border-slate-800 dark:bg-slate-950 dark:text-white";
+const field =
+  "h-11 w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 text-slate-800 text-xl font-medium sm:text-2xl tracking-wide dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 dark:focus:ring-violet-400 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [-moz-appearance:textfield] m-0 text-center disabled:cursor-not-allowed disabled:opacity-35 transition";
 
 const phases = [
   { value: "single" as InverterPhase, label: "Single-Phase (1-Φ)" },
@@ -60,31 +61,22 @@ function numberTex(value: number, digits = 2) {
 }
 
 function Field({ label, value, setValue, disabled = false, min = 0, step = "any" }: { label: string; value: number; setValue: (value: number) => void; disabled?: boolean; min?: number; step?: number | "any" }) {
-  const [editing, setEditing] = useState(false);
   return (
     <label className="block">
       <KatexMath math={label} className="mb-1.5 block text-xs font-bold text-slate-500 dark:text-slate-400" />
-      <div className="relative">
-        <input
-          aria-label={label}
-          className={field}
-          type="number"
-          min={min}
-          step={step}
-          disabled={disabled}
-          value={Number.isFinite(value) ? value : 0}
-          onFocus={() => setEditing(true)}
-          onBlur={() => setEditing(false)}
-          onChange={(event) => setValue(Number(event.target.value) || 0)}
-          style={editing ? undefined : { color: "transparent", WebkitTextFillColor: "transparent", caretColor: "transparent" }}
-        />
-        <span
-          aria-hidden
-          className={`pointer-events-none absolute inset-0 grid place-items-center ${editing ? "hidden" : ""} ${disabled ? "opacity-35" : ""}`}
-        >
-          <KatexMath math={numberTex(value)} className="text-sm font-semibold text-slate-900 dark:text-white" />
-        </span>
-      </div>
+      <input
+        aria-label={label}
+        className={field}
+        type="number"
+        min={min}
+        step={step}
+        disabled={disabled}
+        value={Number.isFinite(value) ? value : 0}
+        onChange={(event) => setValue(Number(event.target.value) || 0)}
+        style={{
+          fontFamily: "'KaTeX_Main', 'Times New Roman', serif"
+        }}
+      />
     </label>
   );
 }
@@ -349,16 +341,36 @@ export function InverterStudio() {
               <KatexMath math="m_a" className="text-xs font-bold text-slate-500 dark:text-slate-400" />
               <KatexMath math={numberTex(parameters.modulationIndex, 2)} className="text-xs text-violet-700 dark:text-violet-300" />
             </div>
-            <StudioSlider aria-label="modulation index" min={0} max={1.2} step={0.01} value={parameters.modulationIndex} onChange={(val) => update("modulationIndex", val)} showLimits />
+            <StudioSlider
+              aria-label="modulation index"
+              min={0}
+              max={1.2}
+              step={0.01}
+              value={parameters.modulationIndex}
+              onChange={(val) => update("modulationIndex", val)}
+              showLimits
+              minLabel={<KatexMath math="0.0" />}
+              maxLabel={<KatexMath math="1.2" />}
+            />
           </div>
         )}
       </div>
 
-      <div className={`mt-4 border-l-2 px-3 py-2 ${shootThroughFault ? "border-rose-500 bg-rose-50 dark:bg-rose-500/10" : "border-slate-300 bg-slate-50 dark:border-slate-700 dark:bg-slate-950"}`}>
+      <div
+        className={`mt-4 rounded-xl border p-3 transition-all ${
+          shootThroughFault
+            ? "border-rose-200 bg-rose-50/80 dark:border-rose-800 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300"
+            : "border-slate-200 bg-slate-50/80 dark:border-slate-800 dark:bg-slate-950 text-slate-600 dark:text-slate-300"
+        }`}
+      >
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
-            <div className={`font-mono text-[9px] font-bold tracking-[.12em] ${shootThroughFault ? "text-rose-600 dark:text-rose-300" : "text-slate-500 dark:text-slate-400"}`}>
-              PROTECTION TEST / SAME-LEG COMMAND
+            <div className="flex items-center gap-2">
+              <NoticeBadge
+                label="PROTECTION TEST"
+                tone={shootThroughFault ? "rose" : "slate"}
+              />
+              <span className="text-xs font-semibold">Same-Leg Shoot-Through Command</span>
             </div>
             <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">
               Toggle the documented shoot-through condition. The solver inhibits output rather than presenting a normal waveform.
@@ -422,17 +434,13 @@ export function InverterStudio() {
   const scopeSection = (
     <div className="w-full">
       {shootThroughFault && (
-        <div role="alert" className="mb-4 rounded-2xl border-l-4 border-rose-500 bg-rose-50 p-4 dark:bg-rose-500/10">
-          <div className="font-mono text-[9px] font-bold tracking-[.12em] text-rose-700 dark:text-rose-300">
-            PROTECTION EVENT / DC LINK LEG
-          </div>
-          <p className="mt-1 text-sm font-bold text-rose-700 dark:text-rose-200">
-            Shoot-Through Fault Detected
-          </p>
-          <p className="mt-1 text-xs leading-relaxed text-slate-600 dark:text-slate-300">
-            The inverter output scope is inhibited. Short-circuit current cannot be modeled without a parasitic DC bus impedance.
-          </p>
-        </div>
+        <StudioAlert
+          variant="error"
+          badge="PROTECTION EVENT · DC LINK LEG"
+          title="Shoot-Through Fault Detected"
+          message="The inverter output scope is inhibited. Short-circuit current cannot be modeled without a parasitic DC bus impedance."
+          className="mb-4"
+        />
       )}
 
       <PowerScopePlot

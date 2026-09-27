@@ -1,5 +1,6 @@
 import { forwardRef, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { KatexMath } from "@/components/ui/KatexMath";
 
 export interface StudioSliderProps {
   label?: ReactNode;
@@ -27,6 +28,10 @@ export interface StudioSliderProps {
 
   /** When true, renders static labels/badges for min and max bounds */
   showLimits?: boolean;
+  /** Optional custom label for minimum limit */
+  minLabel?: ReactNode;
+  /** Optional custom label for maximum limit */
+  maxLabel?: ReactNode;
 
   /** When true, renders the current value as an editable number input */
   editableValue?: boolean;
@@ -65,6 +70,8 @@ export const StudioSlider = forwardRef<HTMLInputElement, StudioSliderProps>(
       onMinChange,
       onMaxChange,
       showLimits = false,
+      minLabel,
+      maxLabel,
       editableValue = false,
       precision,
       formatValue,
@@ -198,9 +205,29 @@ export const StudioSlider = forwardRef<HTMLInputElement, StudioSliderProps>(
           renderTrack()
         )}
         {showLimits && !editableLimits && (
-          <div className="flex items-center justify-between text-[10px] text-slate-400 font-mono">
-            <span>{min}</span>
-            <span>{max}</span>
+          <div className="flex items-center justify-between text-[11px] text-slate-400 dark:text-slate-500 px-0.5 mt-0.5 tracking-wide select-none">
+            <span className="flex items-center">
+              {minLabel !== undefined && minLabel !== null ? (
+                typeof minLabel === "string" || typeof minLabel === "number" ? (
+                  <KatexMath math={String(minLabel).replace(/°/g, "^\\circ")} className="text-[11px] text-slate-400 dark:text-slate-500" />
+                ) : (
+                  minLabel
+                )
+              ) : (
+                <KatexMath math={`${min}${unit ? (unit === "°" ? "^\\circ" : `\\ \\mathrm{${unit}}`) : ""}`} className="text-[11px] text-slate-400 dark:text-slate-500" />
+              )}
+            </span>
+            <span className="flex items-center">
+              {maxLabel !== undefined && maxLabel !== null ? (
+                typeof maxLabel === "string" || typeof maxLabel === "number" ? (
+                  <KatexMath math={String(maxLabel).replace(/°/g, "^\\circ")} className="text-[11px] text-slate-400 dark:text-slate-500" />
+                ) : (
+                  maxLabel
+                )
+              ) : (
+                <KatexMath math={`${max}${unit ? (unit === "°" ? "^\\circ" : `\\ \\mathrm{${unit}}`) : ""}`} className="text-[11px] text-slate-400 dark:text-slate-500" />
+              )}
+            </span>
           </div>
         )}
       </div>

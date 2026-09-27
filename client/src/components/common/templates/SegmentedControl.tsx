@@ -100,7 +100,7 @@ export function SegmentedControl<T extends string | number | boolean = string>({
             {option.badge && (
               <span
                 className={cn(
-                  "ml-1 rounded-full px-1.5 py-0.5 text-[9px] font-mono",
+                  "ml-1.5 rounded-full px-1.5 py-0.5 font-['Poppins',sans-serif] text-[10px] sm:text-xs tracking-normal font-medium",
                   isActive
                     ? "bg-white/20 text-white"
                     : "bg-slate-200/60 dark:bg-slate-800 text-slate-500 dark:text-slate-400"
