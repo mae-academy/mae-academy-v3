@@ -414,11 +414,20 @@ describe('scenarios and persistence', () => {
     }
   });
 
-  it('round-trips a program through the file format and rejects foreign files', () => {
+  it('round-trips a program through the proprietary encoded file format and rejects foreign files', () => {
     const program = SCENARIO_LIST[2]?.program;
     if (!program) throw new Error('missing scenario');
-    const parsed = parseProgram(serializeProgram(program));
+    const serialized = serializeProgram(program);
+    expect(serialized.startsWith('MAE_LOGO_BIN:')).toBe(true);
+    expect(serialized.includes('"blocks":')).toBe(false);
+
+    const parsed = parseProgram(serialized);
     expect(parsed).toEqual({ ok: true, program });
+
+    // Backward compatibility with raw JSON
+    const legacyRawJson = JSON.stringify({ format: 'mae-logo-0ba4', version: 1, program });
+    expect(parseProgram(legacyRawJson)).toEqual({ ok: true, program });
+
     expect(parseProgram('{"format":"other"}').ok).toBe(false);
     expect(parseProgram('nope').ok).toBe(false);
   });

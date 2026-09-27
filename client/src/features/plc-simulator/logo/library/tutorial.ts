@@ -69,7 +69,7 @@ export const TRAFFIC_LIGHT: LogoScenario = {
     sinks: [toQ(1, B(4)), toQ(2, B(5)), toQ(3, B(2))],
   },
   inputs: inputs8([dev('switch', 'NO', 'S1', 'Cycle enable')]),
-  loads: loads4([load('lamp', 'H1', 'Red'), load('lamp', 'H2', 'Yellow'), load('lamp', 'H3', 'Green')]),
+  loads: loads4([load('lamp', 'H1', 'Red lamp', 'red'), load('lamp', 'H2', 'Yellow lamp', 'yellow'), load('lamp', 'H3', 'Green lamp', 'green')]),
 };
 
 export const TUTORIAL_SUITE: readonly LogoScenario[] = [SEAL_IN_GATES, SEAL_IN_RS, TRAFFIC_LIGHT];

@@ -120,7 +120,6 @@ export function S7Workspace({ active, profileId, initialNetworks, symbols, runti
         onPause={host.pause}
         onStop={host.stop}
         onReset={handleReset}
-        onStep={host.step}
         onUndo={host.editor.actions.undo}
         canUndo={host.editor.canUndo}
         onRedo={host.editor.actions.redo}

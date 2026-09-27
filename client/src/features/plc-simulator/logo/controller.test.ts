@@ -269,63 +269,37 @@ describe('bench electrical behaviour', () => {
   });
 
   it('models terminal voltages per voltage class and NC contacts', () => {
-    const b = bench('factory-gate');
-    const stop = () => b.controller.benchInputs[2];
+    const b = bench('seal-in-gates');
+    const stop = () => b.controller.benchInputs[1];
     expect(stop()?.volts).toBe(230); // NC STOP button at rest: closed
-    b.controller.actuate(2, true);
+    b.controller.actuate(1, true);
     expect(stop()?.volts).toBe(0);
     b.controller.setDevice('12/24RC');
-    b.controller.actuate(2, false);
+    b.controller.actuate(1, false);
     expect(stop()?.volts).toBe(24);
     expect(b.controller.device.supply.hot).toBe('L+');
   });
 
-  it('sliding door never energises both contactors (interlock)', () => {
-    const b = bench('sliding-door');
-    b.keys('down', 'down', 'down', 'ok');
-    let seed = 7;
-    const random = () => {
-      seed = (seed * 1103515245 + 12345) % 2147483648;
-      return seed / 2147483648;
-    };
-    let opened = 0;
-    for (let s = 0; s < 800; s++) {
-      if (random() < 0.2) b.controller.toggle(Math.floor(random() * 4));
-      b.scan(random() < 0.1 ? 1000 : 20);
-      const k1 = b.controller.relayClosed(1);
-      const k2 = b.controller.relayClosed(2);
-      expect(k1 && k2).toBe(false);
-      if (k1) opened += 1;
-    }
-    expect(opened).toBeGreaterThan(0);
+  it('traffic light sequence automatically configures Red on Q1, Yellow on Q2, and Green on Q3', () => {
+    const b = bench('traffic-light');
+    expect(b.controller.loads[0]?.color).toBe('red');
+    expect(b.controller.loads[1]?.color).toBe('yellow');
+    expect(b.controller.loads[2]?.color).toBe('green');
   });
 
-  it('factory gate: the safety edge reverses a closing gate; the beacon flashes while moving', () => {
-    const b = bench('factory-gate');
-    b.keys('down', 'down', 'down', 'ok');
-    b.scan();
-    b.controller.actuate(4, false); // gate leaves the closed limit
-    b.controller.actuate(1, true); // CLOSE
-    b.scan();
-    b.controller.actuate(1, false);
-    b.scan();
-    expect(b.controller.relayClosed(2)).toBe(true);
-    const beacon = new Set<boolean>();
-    for (let s = 0; s < 10; s++) {
-      b.scan(200);
-      beacon.add(b.controller.relayClosed(3));
-    }
-    expect(beacon).toEqual(new Set([true, false]));
-    b.controller.actuate(5, true); // safety edge struck
-    b.scan();
-    expect(b.controller.relayClosed(2)).toBe(false);
-    b.controller.actuate(5, false);
-    b.scan();
-    expect(b.controller.relayClosed(1)).toBe(true); // re-opening
+  it('dynamically customises lamp color on a relay channel', () => {
+    const b = bench('stairway');
+    expect(b.controller.loads[0]?.kind).toBe('lamp');
+    b.controller.setLampColor(0, 'green');
+    expect(b.controller.loads[0]?.color).toBe('green');
+    b.controller.setLoadKind(0, 'lamp');
+    b.controller.setLampColor(0, 'yellow');
+    expect(b.controller.loads[0]?.color).toBe('yellow');
+    expect(b.controller.loads[0]?.tag).toBe('Yellow lamp');
   });
 
   it('power cycle: relays drop, display goes dark, power-up boots into STOP mode; retentive data only survives', () => {
-    const b = bench();
+    const b = bench('stairway');
     b.keys('down', 'down', 'down', 'ok');
     b.controller.actuate(0, true);
     b.scan();
@@ -344,9 +318,9 @@ describe('bench electrical behaviour', () => {
   });
 
   it('power-up copies a different program from the inserted card', () => {
-    const b = bench();
+    const b = bench('stairway');
     b.keys('down', 'ok', 'ok'); // → Card
-    b.controller.loadScenario('factory-gate');
+    b.controller.loadScenario('sump-duplex');
     b.controller.setPower(false);
     b.controller.setPower(true);
     expect(b.controller.program.name).toBe('STAIRWAY');

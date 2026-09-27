@@ -1,4 +1,4 @@
-import { BookOpen, ChevronDown, Factory, Workflow } from 'lucide-react';
+import { BookOpen, ChevronDown, Factory } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { SegmentedControl, StudioCard } from '@/components/common/templates';
@@ -18,7 +18,6 @@ import { LogoManual } from '../../logo/ui/LogoManual';
 import { LogoBench } from '../../logo/ui/LogoBench';
 import { useLogoBench } from '../../logo/ui/useLogoBench';
 import { NavTriangles } from '../TriangleGlyph';
-import { PILL_BUTTON } from '../chrome';
 import { NoticeBanner } from './Banners';
 import { downloadText } from './download';
 import { ExecutiveToolbar } from './ExecutiveToolbar';
@@ -42,7 +41,7 @@ const DEVICE_OPTIONS = [
  * program comes from the application picker (or an imported file) and is inspected / tuned on the
  * device itself, through its LCD and six-key keypad, exactly as on the real unit.
  */
-export function LogoWorkspace({ active, initialScenario = 'stairway', initialDevice, runtimeOptions }: LogoWorkspaceProps) {
+export function LogoWorkspace({ active, initialScenario = 'seal-in-gates', initialDevice, runtimeOptions }: LogoWorkspaceProps) {
   const { controller } = useLogoBench({
     scenario: initialScenario,
     device: initialDevice,
@@ -51,7 +50,6 @@ export function LogoWorkspace({ active, initialScenario = 'stairway', initialDev
   });
   const [importError, setImportError] = useState<string | null>(null);
   const [manualOpen, setManualOpen] = useState(false);
-  const [fbdOpen, setFbdOpen] = useState(true);
   const [keybindings, setKeybindings] = useState<LogoKeyBindings>(() => loadKeyBindings());
   const [recordingTarget, setRecordingTarget] = useState<'ok' | 'esc' | null>(null);
 
@@ -97,7 +95,7 @@ export function LogoWorkspace({ active, initialScenario = 'stairway', initialDev
   const program = controller.program;
 
   const exportProgram = useCallback(() => {
-    downloadText(`${(program.name || 'logo').toLowerCase()}.logo.json`, serializeProgram(program), 'application/json');
+    downloadText(`${(program.name || 'logo').toLowerCase()}.logo`, serializeProgram(program), 'application/octet-stream');
     toast.success('Circuit program exported');
   }, [program]);
 
@@ -140,10 +138,10 @@ export function LogoWorkspace({ active, initialScenario = 'stairway', initialDev
         onReset={handleReset}
         hideRunControls
         onExport={exportProgram}
-        exportTitle="Export circuit program (.logo.json)"
+        exportTitle="Export circuit program (.logo)"
         onImport={(file) => void importFile(file)}
-        importTitle="Load circuit program into LOGO! (.logo.json)"
-        importAccept=".json,application/json"
+        importTitle="Load circuit program into LOGO! (.logo, .lsc, .json)"
+        importAccept=".logo,.lsc,.json,application/json,application/octet-stream,text/plain"
         leading={
           <div className="flex shrink-0 items-center gap-1.5">
             <SegmentedControl<DeviceClass>
@@ -299,23 +297,15 @@ export function LogoWorkspace({ active, initialScenario = 'stairway', initialDev
       <StudioCard
         title="Function block diagram"
         subtitle={controller.running ? 'Live: wires carrying a 1 are highlighted; timers and counters show their accumulator.' : 'Start the program from the LCD to see live signal flow.'}
-        actionSlot={
-          <button type="button" onClick={() => setFbdOpen((open) => !open)} aria-expanded={fbdOpen} aria-controls="logo-fbd" className={PILL_BUTTON}>
-            <Workflow className="h-3.5 w-3.5" aria-hidden="true" />
-            <span>{fbdOpen ? 'Hide' : 'Show'}</span>
-          </button>
-        }
       >
-        <div id="logo-fbd" hidden={!fbdOpen}>
-          {fbdOpen && (
-            <FbdViewer
-              program={program}
-              ac={spec.supply.kind === 'AC'}
-              running={controller.running}
-              level={(ref) => controller.level(ref)}
-              blockState={(id) => controller.blockState(id)}
-            />
-          )}
+        <div id="logo-fbd">
+          <FbdViewer
+            program={program}
+            ac={spec.supply.kind === 'AC'}
+            running={controller.running}
+            level={(ref) => controller.level(ref)}
+            blockState={(id) => controller.blockState(id)}
+          />
         </div>
       </StudioCard>
     </div>

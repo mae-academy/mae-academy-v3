@@ -8,7 +8,12 @@ import { TriangleGlyph } from '../../ui/TriangleGlyph';
 import { FbdViewer } from './FbdViewer';
 
 /** Inline math; every variable in the manual goes through KaTeX. */
-const M = ({ children }: { children: string }) => <KatexMath math={children} />;
+const M = ({ children }: { children: string }) => {
+  const sanitized = typeof children === 'string'
+    ? children.replace(/\text\{/g, '\\text{').replace(/\t([a-zA-Z]+)/g, '\\text{$1}')
+    : children;
+  return <KatexMath math={sanitized} />;
+};
 
 type ModuleId = 'hardware' | 'scan' | 'panel' | 'library' | 'commissioning' | 'sealin' | 'traffic';
 
@@ -93,7 +98,7 @@ function Hardware() {
         </p>
         <p>
           Each relay output <M>{'Q_n'}</M> is a <em>floating dry contact</em> between terminals 1 and 2: it is not referenced to the supply. You close the
-          loop yourself: <M>{'L_1 \\to Q_n(1) \\to Q_n(2) \\to \\text{load} \\to N'}</M> (or <M>{'L{+} \\to \\ldots \\to M'}</M> on DC).
+          loop yourself: <M>{'L_1 \\to Q_n(1) \\to Q_n(2) \\to \\text{load} \\to N'}</M> (or <M>{'L^+ \\to \\dots \\to M'}</M> on DC).
         </p>
         <Try>Open the mains breaker: every contact drops, the inputs read 0 V, and on power-up the unit resumes the RUN/STOP state it had.</Try>
       </Section>
@@ -189,8 +194,8 @@ function Panel() {
           you leave as <M>x</M> take the block’s neutral value (1 for AND, 0 for OR).
         </p>
         <p>
-          Connectors offered: <M>{'I_1\\ldots I_8'}</M>, <M>{'Q_1\\ldots Q_4'}</M> (read-back), flags <M>{'M_1\\ldots M_8'}</M>, <M>{'\\mathrm{hi}'}</M>{' '}
-          and <M>{'\\mathrm{lo}'}</M>. Your physical keyboard works too: arrows, Enter = OK, Esc = ESC.
+          Connectors offered: <M>{'I_1\\dots I_8'}</M>, <M>{'Q_1\\dots Q_4'}</M> (read-back), flags <M>{'M_1\\dots M_8'}</M>, <M>{'\\text{hi}'}</M>{' '}
+          and <M>{'\\text{lo}'}</M>. Your physical keyboard works too: arrows, Enter = OK, Esc = ESC.
         </p>
         <Try>
           Program.. <span className="inline-flex items-center"><TriangleGlyph direction="right" className="h-2.5 w-2.5" /><span className="sr-only">►</span></span> Clear Prg <span className="inline-flex items-center"><TriangleGlyph direction="right" className="h-2.5 w-2.5" /><span className="sr-only">►</span></span> Yes, then build Q1 = OR(I1, I2) from scratch and press Start.
@@ -234,11 +239,11 @@ function Library() {
             ['Stairway', <>off after <M>T</M>, blinks <M>{'T_{!}'}</M> before</>, <M key="f">{'T,\\ T_{!},\\ T_{!L}'}</M>],
             ['Latching relay (RS)', 'S sets, R resets (R wins)', '—'],
             ['Pulse relay', 'Trg toggles; S/R priority RS or SR', 'Par'],
-            ['Up/down counter (CTUD)', <><M>Q</M> when <M>{'\\mathrm{Cnt} \\ge \\mathrm{On}'}</M></>, <M key="g">{'\\mathrm{On},\\ \\mathrm{Off}'}</M>],
+            ['Up/down counter (CTUD)', <><M>Q</M> when <M>{'\\text{Cnt} \\ge \\text{On}'}</M></>, <M key="g">{'\\text{On},\\ \\text{Off}'}</M>],
           ]}
         />
         <p>
-          Times are entered as <M>{'SS{:}hh'}</M> (10 ms), <M>{'MM{:}SS'}</M> or <M>{'HH{:}MM'}</M>. Change them live with ESC ► Set Param without stopping the
+          Times are entered as <M>{'\\text{SS:hh}'}</M> (10 ms), <M>{'\\text{MM:SS}'}</M> or <M>{'\\text{HH:MM}'}</M>. Change them live with ESC ► Set Param without stopping the
           program.
         </p>
       </Section>
@@ -252,9 +257,9 @@ function Commissioning() {
       <Section heading="Trace the signal">
         <ol className="list-decimal space-y-1 pl-5">
           <li>Check the terminal voltage printed under each input screw: 230 V / 24 V means the field contact is closed.</li>
-          <li>In RUN, ▼ on the start screen shows the <M>{'I{:}'}</M> screen: every input that reads 1 is shown inverted.</li>
+          <li>In RUN, ▼ on the start screen shows the <M>{'\\text{I:}'}</M> screen: every input that reads 1 is shown inverted.</li>
           <li>
-            ▼ again for <M>{'Q{:}'}</M> and <M>{'M{:}'}</M>. If <M>{'Q_n = 1'}</M> but the load stays dark, the fault is outside the PLC: supply to terminal
+            ▼ again for <M>{'\\text{Q:}'}</M> and <M>{'\\text{M:}'}</M>. If <M>{'Q_n = 1'}</M> but the load stays dark, the fault is outside the PLC: supply to terminal
             1, the load, or its return.
           </li>
           <li>The function block diagram shows which block input is holding an output off.</li>
@@ -327,13 +332,13 @@ function SealIn({ onLoad }: { onLoad: LoadScenario }) {
         <Section heading="Logic 1 — OR + AND gates">
           <ol className="list-decimal space-y-1 pl-5">
             <li>
-              <M>{'B_1 = \text{OR}(I_1,\ Q_1)'}</M> — START <em>or</em> the feedback from <M>{'Q_1'}</M>.
+              <M>{'B_1 = I_1 \\lor Q_1'}</M> — START <em>or</em> the feedback from <M>{'Q_1'}</M>.
             </li>
             <li>
-              <M>{'B_2 = \text{AND}(B_1,\ I_2)'}</M> — only while STOP is not pressed.
+              <M>{'B_2 = B_1 \\land I_2'}</M> — only while STOP is not pressed.
             </li>
             <li>
-              <M>{'Q_1 = B_2'}</M>, that is <M>{'Q_1 = (I_1 \lor Q_1) \land I_2'}</M>.
+              <M>{'Q_1 = B_2'}</M>, that is <M>{'Q_1 = (I_1 \\lor Q_1) \\land I_2'}</M>.
             </li>
           </ol>
           <p>
@@ -345,7 +350,7 @@ function SealIn({ onLoad }: { onLoad: LoadScenario }) {
         <ProgramFigure id="seal-in-gates" caption="Gate version: I1 and the Q1 read-back into OR, then AND with I2." onLoad={onLoad} />
         <Section heading="Logic 2 — the latching relay (RS) block">
           <p>
-            The same function is built into LOGO! as the <strong>Latching relay</strong>: <M>{'S = I_1'}</M> sets it, <M>{'R = \lnot I_2'}</M> resets it. The
+            The same function is built into LOGO! as the <strong>Latching relay</strong>: <M>{'S = I_1'}</M> sets it, <M>{'R = \\overline{I_2}'}</M> resets it. The
             NC button reads 1 at rest, so it is wired to R <em>inverted</em> (the small circle on the pin). R has priority over S, exactly like STOP over
             START.
           </p>
@@ -382,31 +387,31 @@ function Traffic({ onLoad }: { onLoad: LoadScenario }) {
           <Table
             head={['Block', 'Type', 'Inputs', 'Parameters']}
             rows={[
-              [<M key="1">{'B_1'}</M>, 'Off-delay (TOF)', <M key="1i">{'\mathrm{Trg} = I_1'}</M>, <M key="1p">{'T = 12\,\mathrm{s}'}</M>],
-              [<M key="2">{'B_2'}</M>, 'Async. pulse generator', <M key="2i">{'\mathrm{En} = B_1'}</M>, <M key="2p">{'T_H = 5\,\mathrm{s},\ T_L = 7\,\mathrm{s}'}</M>],
-              [<M key="3">{'B_3'}</M>, 'AND', <M key="3i">{'B_1,\ \lnot B_2'}</M>, '—'],
-              [<M key="4">{'B_4'}</M>, 'On-delay (TON)', <M key="4i">{'\mathrm{Trg} = B_3'}</M>, <M key="4p">{'T = 2\,\mathrm{s}'}</M>],
-              [<M key="5">{'B_5'}</M>, 'AND', <M key="5i">{'B_3,\ \lnot B_4'}</M>, '—'],
+              [<M key="1">{'B01'}</M>, 'Off-delay (TOF)', <M key="1i">{'\\text{TRG} = I_1'}</M>, <M key="1p">{'T = 12\\text{ s}'}</M>],
+              [<M key="2">{'B02'}</M>, 'Async. pulse generator', <M key="2i">{'\\text{EN} = B01'}</M>, <M key="2p">{'T_H = 5\\text{ s},\\ T_L = 7\\text{ s}'}</M>],
+              [<M key="3">{'B03'}</M>, 'AND', <M key="3i">{'B01 \\cdot \\overline{B02}'}</M>, '—'],
+              [<M key="4">{'B04'}</M>, 'On-delay (TON)', <M key="4i">{'\\text{TRG} = B03'}</M>, <M key="4p">{'T = 2\\text{ s}'}</M>],
+              [<M key="5">{'B05'}</M>, 'AND', <M key="5i">{'B03 \\cdot \\overline{B04}'}</M>, '—'],
             ]}
           />
         </Section>
         <Section heading="How the outputs are formed">
           <ul className="list-disc space-y-1 pl-5">
             <li>
-              <strong>Green</strong> <M>{'Q_3 = B_2'}</M> — the pulse generator’s high phase, 5 s.
+              <strong>Green:</strong> <M>{'Q_3 = B02'}</M> — the pulse generator’s high phase, <M>{'T_H = 5\\text{ s}'}</M>.
             </li>
             <li>
-              <strong>Low phase</strong> <M>{'B_3 = B_1 \land \lnot B_2'}</M> — the 7 s after the pulse.
+              <strong>Low phase:</strong> <M>{'B03 = B01 \\cdot \\overline{B02}'}</M> — the 7 s after the pulse.
             </li>
             <li>
-              <strong>Red</strong> <M>{'Q_1 = B_4'}</M> — the on-delay switches on 2 s into the low phase, leaving 5 s of red.
+              <strong>Red:</strong> <M>{'Q_1 = B04'}</M> — the on-delay switches on 2 s into the low phase, leaving 5 s of red (<M>{'T = 5\\text{ s}'}</M>).
             </li>
             <li>
-              <strong>Yellow</strong> <M>{'Q_2 = B_3 \land \lnot B_4'}</M> — the first 2 s of the low phase, before the timer has elapsed.
+              <strong>Yellow:</strong> <M>{'Q_2 = B03 \\cdot \\overline{B04}'}</M> — the first 2 s of the low phase, before the timer has elapsed (<M>{'T = 2\\text{ s}'}</M>).
             </li>
           </ul>
           <p>
-            Cycle: <M>{'5 + 2 + 5 = 12\,\mathrm{s}'}</M>. The off-delay <M>{'B_1'}</M> keeps the enable up for 12 s after the switch opens (a “run-out”), so the lights
+            Cycle: <M>{'5 + 2 + 5 = 12\\text{ s}'}</M>. The off-delay <M>{'B01'}</M> keeps the enable up for 12 s after the switch opens (a “run-out”), so the lights
             keep sequencing for one cycle length and then go dark instead of blanking mid-phase.
           </p>
         </Section>

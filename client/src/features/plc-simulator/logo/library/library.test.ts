@@ -44,9 +44,10 @@ function run(id: ScenarioId) {
 }
 
 describe('benchmark library', () => {
-  it('has 10 AC + 10 DC programs plus the two manual references, all valid within the memory budget', () => {
+  it('has 10 AC + 10 DC programs plus beginner tutorials, all valid within the memory budget', () => {
     expect(SCENARIO_LIST.filter((s) => s.group === 'ac')).toHaveLength(10);
     expect(SCENARIO_LIST.filter((s) => s.group === 'dc')).toHaveLength(10);
+    expect(SCENARIO_LIST.filter((s) => s.group === 'tutorial')).toHaveLength(3);
     expect(new Set(SCENARIO_LIST.map((s) => s.id)).size).toBe(SCENARIO_LIST.length);
     for (const scenario of SCENARIO_LIST) {
       const compiled = compileProgram(scenario.program);

@@ -8,7 +8,6 @@ import {
   Play,
   Redo2,
   RotateCcw,
-  StepForward,
   Trash2,
   Undo2,
   Upload,
@@ -28,8 +27,7 @@ export interface ExecutiveToolbarProps {
   onPause: () => void;
   onStop: () => void;
   onReset?: () => void;
-  onStep?: () => void;
-  /** Hides Run / Pause and Single step (controllers that are started from their own panel). */
+  /** Hides Run / Pause (controllers that are started from their own panel). */
   hideRunControls?: boolean;
   frame?: FrameStore;
   readMetrics?: () => ScanMetrics | null;
@@ -82,7 +80,6 @@ export function ExecutiveToolbar({
   onPause,
   onStop,
   onReset,
-  onStep,
   hideRunControls = false,
   frame,
   readMetrics,
@@ -184,19 +181,6 @@ export function ExecutiveToolbar({
             >
               <RotateCcw className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" aria-hidden="true" />
             </button>
-
-            {onStep && !hideRunControls && (
-              <button
-                type="button"
-                onClick={onStep}
-                disabled={running}
-                aria-label="Single step"
-                title="Execute single scan"
-                className={`${PILL_BUTTON} w-9 px-0`}
-              >
-                <StepForward className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" aria-hidden="true" />
-              </button>
-            )}
           </div>
 
           <Divider />

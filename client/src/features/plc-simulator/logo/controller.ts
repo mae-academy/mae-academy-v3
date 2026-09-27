@@ -16,6 +16,9 @@ import {
   type ActuatorKind,
   type ContactType,
   type InputDevice,
+  LAMP_COLOR_MAP,
+  LAMP_COLORS,
+  type LampColor,
   type LoadKind,
   type OutputLoad,
 } from './hardware/devices';
@@ -99,7 +102,7 @@ export class LogoBenchController {
     this.clock = options.clock ?? defaultClock;
     this.wallClock = options.wallClock ?? (() => Date.now());
     this.scanMsValue = options.scanMs ?? 20;
-    this.scenarioId = options.scenario ?? 'stairway';
+    this.scenarioId = options.scenario ?? 'seal-in-gates';
     const scenario = SCENARIOS[this.scenarioId];
     this.deviceClass = options.device ?? scenario.device;
     this.programValue = scenario.program;
@@ -433,10 +436,21 @@ export class LogoBenchController {
   }
 
   /** Swaps the load across a relay contact (lamp, contactor coil, beacon, or nothing). */
-  setLoadKind(index: number, kind: LoadKind): void {
+  setLoadKind(index: number, kind: LoadKind, color?: LampColor): void {
     const current = this.loadsValue[index];
-    if (!current || current.kind === kind) return;
-    this.loadsValue = this.loadsValue.map((load, i) => (i === index ? loadOf(kind, index + 1) : load));
+    if (!current || (current.kind === kind && (!color || current.color === color))) return;
+    this.loadsValue = this.loadsValue.map((load, i) => (i === index ? loadOf(kind, index + 1, color ?? (kind === 'lamp' ? 'red' : undefined)) : load));
+    this.emit();
+  }
+
+  /** Sets the indicator color for a pilot lamp on channel index. */
+  setLampColor(index: number, color: LampColor): void {
+    const current = this.loadsValue[index];
+    if (!current || current.kind !== 'lamp') return;
+    const colorLabel = LAMP_COLOR_MAP[color]?.label ?? 'Pilot';
+    this.loadsValue = this.loadsValue.map((load, i) =>
+      i === index ? { ...load, color, tag: `${colorLabel} lamp` } : load
+    );
     this.emit();
   }
 

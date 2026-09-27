@@ -264,9 +264,13 @@ export function LogoBench({ controller, active, keybindings = DEFAULT_KEYBINDING
           y={menu.y}
           title={`Q${menu.index + 1} load`}
           options={LOAD_OPTIONS.map((option) => ({ id: option.kind, label: option.label, active: controller.loads[menu.index]?.kind === option.kind }))}
+          lampColor={controller.loads[menu.index]?.kind === 'lamp' ? (controller.loads[menu.index]?.color ?? 'red') : undefined}
           onPick={(id) => {
             controller.setLoadKind(menu.index, id as LoadKind);
             closeMenu();
+          }}
+          onPickLampColor={(color) => {
+            controller.setLampColor(menu.index, color);
           }}
           onClose={closeMenu}
         />

@@ -1,6 +1,6 @@
 import { useRef, type KeyboardEvent, type PointerEvent } from 'react';
 import type { BenchInputState } from '../controller';
-import { ACTUATOR_LABEL, contactClosed, isMomentary, type InputDevice, type LoadKind, type OutputLoad } from '../hardware/devices';
+import { ACTUATOR_LABEL, contactClosed, isMomentary, LAMP_COLOR_MAP, type InputDevice, type LampColor, type LoadKind, type OutputLoad } from '../hardware/devices';
 import { ACTUATOR, BADGE, CONTACT, LOAD_X } from './geometry';
 import { liveFill, wireClass } from './wire';
 
@@ -55,25 +55,33 @@ export function ConfigBadge({ x, y, code, label, id, onOpen }: { x: number; y: n
 }
 
 /** Flat actuator symbols. Blue = closed / active (accent), red = break-contact cap, slate = at rest. */
-function ActuatorGlyph({ device, actuated, cy }: { device: InputDevice; actuated: boolean; cy: number }) {
-  const cx = ACTUATOR.x + 30;
+function ActuatorGlyph({ device, actuated, cy, powered, live }: { device: InputDevice; actuated: boolean; cy: number; powered: boolean; live: boolean }) {
+  const cx = ACTUATOR.x + ACTUATOR.w / 2;
+  const left = ACTUATOR.x + 10;
+  const right = ACTUATOR.x + 70;
   switch (device.kind) {
     case 'pushbutton':
     case 'switch':
-      return null; // drawn as the canonical mechanical switch by InputRow
     case 'limit':
-      return null; // drawn as a mechanical switch with roller lever by InputRow
     case 'spare':
-      return null; // open terminals, see SpareInput
+      return null; // drawn as mechanical switch by MechanicalSwitch or SpareInput
     case 'sensor':
       // Passive-infrared detector: dome on a base; waves while it sees motion.
       return (
         <g>
-          <rect x={cx - 14} y={cy + 4} width={28} height={6} rx={1.5} className="fill-slate-400 dark:fill-slate-600" />
-          <path d={`M ${cx - 12} ${cy + 4} A 12 12 0 0 1 ${cx + 12} ${cy + 4} Z`} strokeWidth={1.5} className={actuated ? 'fill-red-500/15 stroke-red-500' : OFF_BODY} />
+          {/* Terminal connection leads & snap point dots */}
+          <line x1={left} y1={cy} x2={cx - 14} y2={cy} strokeWidth={2} className={wireClass(powered)} />
+          <line x1={cx + 14} y1={cy} x2={right} y2={cy} strokeWidth={2} className={wireClass(live)} />
+          <circle cx={left} cy={cy} r={3} className={liveFill(powered)} />
+          <circle cx={right} cy={cy} r={3} className={liveFill(live)} />
+
+          {/* Sensor base: vertically centered at cy */}
+          <rect x={cx - 14} y={cy - 4} width={28} height={8} rx={2} className="fill-slate-400 dark:fill-slate-600" />
+          {/* Sensor dome: lifted symmetrically above base */}
+          <path d={`M ${cx - 12} ${cy - 4} A 12 12 0 0 1 ${cx + 12} ${cy - 4} Z`} strokeWidth={1.5} className={actuated ? 'fill-red-500/15 stroke-red-500' : OFF_BODY} />
           {actuated &&
             [16, 22].map((r) => (
-              <path key={r} d={`M ${cx - r * 0.7} ${cy - r * 0.35} A ${r} ${r} 0 0 1 ${cx + r * 0.7} ${cy - r * 0.35}`} fill="none" strokeWidth={1.5} className="stroke-red-500" />
+              <path key={r} d={`M ${cx - r * 0.7} ${cy - 4 - r * 0.35} A ${r} ${r} 0 0 1 ${cx + r * 0.7} ${cy - 4 - r * 0.35}`} fill="none" strokeWidth={1.5} className="stroke-red-500" />
             ))}
         </g>
       );
@@ -247,18 +255,9 @@ export function InputRow({ index, y, input, powered, onActuate, onToggle, onOpen
         onOpen={(anchor) => onOpenMenu(index, anchor)}
       />
 
-      {/* feed from the hot rail; the switch itself is the only thing between rail and route */}
-      {mechanical ? (
-        <>
-          <line x1={40} y1={y} x2={ACTUATOR.x + 10} y2={y} strokeWidth={2} className={wireClass(powered)} />
-          <line x1={ACTUATOR.x + 70} y1={y} x2={CONTACT.to} y2={y} strokeWidth={2} className={wireClass(live)} />
-        </>
-      ) : (
-        <>
-          <line x1={40} y1={y} x2={ACTUATOR.x} y2={y} strokeWidth={2} className={wireClass(powered)} />
-          <line x1={ACTUATOR.x + ACTUATOR.w} y1={y} x2={CONTACT.from} y2={y} strokeWidth={2} className={wireClass(powered)} />
-        </>
-      )}
+      {/* Feed from the hot rail into device, and straight wire from device to route */}
+      <line x1={40} y1={y} x2={ACTUATOR.x + 10} y2={y} strokeWidth={2} className={wireClass(powered)} />
+      <line x1={ACTUATOR.x + 70} y1={y} x2={CONTACT.to} y2={y} strokeWidth={2} className={wireClass(live)} />
 
       <g
         role="button"
@@ -282,27 +281,12 @@ export function InputRow({ index, y, input, powered, onActuate, onToggle, onOpen
           strokeWidth={1.5}
           className="fill-transparent stroke-transparent group-hover:stroke-red-500/60 group-focus-visible:stroke-red-500"
         />
-        {mechanical ? <MechanicalSwitch y={y} device={device} actuated={actuated} closed={closed} powered={powered} live={live} /> : <ActuatorGlyph device={device} actuated={actuated} cy={y} />}
+        {mechanical ? (
+          <MechanicalSwitch y={y} device={device} actuated={actuated} closed={closed} powered={powered} live={live} />
+        ) : (
+          <ActuatorGlyph device={device} actuated={actuated} cy={y} powered={powered} live={live} />
+        )}
       </g>
-
-      {/* limit switches and sensors keep a separate schematic contact after the device */}
-      {!mechanical && (
-        <>
-          <circle cx={CONTACT.from} cy={y} r={2.5} className={liveFill(powered)} />
-          <circle cx={CONTACT.to} cy={y} r={2.5} className={liveFill(live)} />
-          <line
-            x1={CONTACT.from}
-            y1={y}
-            x2={closed ? CONTACT.to : CONTACT.to - 6}
-            y2={closed ? y : y - 13}
-            strokeWidth={2}
-            strokeLinecap="round"
-            className={`transition-all duration-100 ${closed ? wireClass(powered) : 'stroke-slate-500 dark:stroke-slate-400'}`}
-          />
-          {device.contact === 'NC' && <line x1={CONTACT.to} y1={y - 9} x2={CONTACT.to} y2={y - 1} strokeWidth={1.5} className="stroke-slate-500 dark:stroke-slate-400" />}
-          <line x1={CONTACT.to} y1={y} x2={CONTACT.to + 1} y2={y} strokeWidth={2} className={wireClass(live)} />
-        </>
-      )}
     </g>
   );
 }
@@ -318,15 +302,61 @@ export interface LoadViewProps {
 function LoadGlyph({ load, on, y }: { load: OutputLoad; on: boolean; y: number }) {
   const x = LOAD_X;
   switch (load.kind) {
-    case 'lamp':
-      // Engineering schematic lamp: a circle crossed by an X.
+    case 'lamp': {
+      const color = load.color ?? 'red';
+      const config = LAMP_COLOR_MAP[color] ?? LAMP_COLOR_MAP.red;
       return (
-        <g strokeWidth={2} strokeLinecap="round" className={on ? 'stroke-red-500' : 'stroke-slate-400 dark:stroke-slate-600'}>
-          <circle cx={x} cy={y} r={14} className={on ? 'fill-red-500/15' : 'fill-transparent'} />
+        <g strokeWidth={2} strokeLinecap="round" className={on ? config.strokeClass : 'stroke-slate-400 dark:stroke-slate-600'}>
+          {/* Terminal connection leads from wiring to lamp socket */}
+          <line x1={x - 18} y1={y} x2={x - 14} y2={y} strokeWidth={2} className="stroke-slate-400 dark:stroke-slate-600" />
+          <line x1={x + 14} y1={y} x2={x + 18} y2={y} strokeWidth={2} className="stroke-slate-400 dark:stroke-slate-600" />
+
+          {/* Radial glow aura when energized: concentric center at (x, y) */}
+          {on && (
+            <>
+              <circle
+                cx={x}
+                cy={y}
+                r={19}
+                fill={config.hex}
+                fillOpacity={0.15}
+                stroke={config.hex}
+                strokeWidth={1.5}
+                strokeOpacity={0.35}
+                className="animate-pulse pointer-events-none"
+              />
+              <circle
+                cx={x}
+                cy={y}
+                r={16.5}
+                fill="none"
+                stroke={config.hex}
+                strokeWidth={1}
+                strokeOpacity={0.25}
+                className="pointer-events-none"
+              />
+            </>
+          )}
+
+          {/* Lamp outer socket / bezel ring: concentric at (x, y) */}
+          <circle
+            cx={x}
+            cy={y}
+            r={16.5}
+            fill="none"
+            strokeWidth={1.25}
+            className="stroke-slate-300/80 dark:stroke-slate-700/80 pointer-events-none"
+          />
+
+          {/* Inner illuminated bulb fill circle: concentric at (x, y) */}
+          <circle cx={x} cy={y} r={14} className={on ? config.fillClass : 'fill-transparent'} />
+
+          {/* Canonical crossed X lines: centered at (x, y) */}
           <line x1={x - 9.9} y1={y - 9.9} x2={x + 9.9} y2={y + 9.9} />
           <line x1={x - 9.9} y1={y + 9.9} x2={x + 9.9} y2={y - 9.9} />
         </g>
       );
+    }
     case 'contactor':
       // Contactor drive coil: block with A1/A2 terminals; the armature pulls in when energised.
       return (
@@ -353,24 +383,32 @@ function LoadGlyph({ load, on, y }: { load: OutputLoad; on: boolean; y: number }
         </g>
       );
     case 'motor':
-      // Motor: circle with M and a four-blade rotor that spins while the output is driven high.
+      // Motor: clean circle containing only the cross/plus (+) symbol with spinning rotor animation when energized
       return (
-        <g>
-          <circle cx={x} cy={y} r={17} strokeWidth={2} className={on ? 'fill-red-500/10 stroke-red-500' : 'fill-transparent stroke-slate-400 dark:stroke-slate-600'} />
+        <g strokeLinecap="round">
+          {/* Terminal connection leads from wiring to motor casing */}
+          <line x1={x - 18} y1={y} x2={x - 17} y2={y} strokeWidth={2} className="stroke-slate-400 dark:stroke-slate-600" />
+          <line x1={x + 17} y1={y} x2={x + 18} y2={y} strokeWidth={2} className="stroke-slate-400 dark:stroke-slate-600" />
+
+          {/* Clean outer circle casing */}
+          <circle
+            cx={x}
+            cy={y}
+            r={17}
+            strokeWidth={2}
+            className={on ? 'fill-red-500/10 stroke-red-500' : 'fill-transparent stroke-slate-400 dark:stroke-slate-600'}
+          />
+
+          {/* Clean plus (+) crosshairs rotor: spins when energized, no inner M or text */}
           <g
             data-rotor={on ? 'spinning' : 'idle'}
             strokeWidth={2.5}
-            strokeLinecap="round"
             className={`${on ? 'stroke-red-500 motion-safe:animate-[spin_0.7s_linear_infinite]' : 'stroke-slate-400 dark:stroke-slate-600'}`}
-            style={{ transformOrigin: `${x}px ${y}px` }}
+            style={{ transformOrigin: `${x}px ${y}px`, transformBox: 'view-box' }}
           >
-            <line x1={x - 12} y1={y} x2={x + 12} y2={y} />
-            <line x1={x} y1={y - 12} x2={x} y2={y + 12} />
+            <line x1={x - 11} y1={y} x2={x + 11} y2={y} />
+            <line x1={x} y1={y - 11} x2={x} y2={y + 11} />
           </g>
-          <circle cx={x} cy={y} r={6.5} strokeWidth={1.5} className="fill-slate-50 stroke-slate-300 dark:fill-[#020617] dark:stroke-slate-700" />
-          <text x={x} y={y + 3.6} textAnchor="middle" fontSize={10} fontWeight={800} className={TEXT}>
-            M
-          </text>
         </g>
       );
     case 'none':
@@ -444,6 +482,7 @@ export function LoadView({ index, y, load, on, onOpenMenu }: LoadViewProps) {
         role="img"
         aria-label={`${load.symbol} ${load.tag} ${on ? 'energized' : 'off'}`}
         data-on={on}
+        data-color={load.color ?? 'red'}
       >
         <LoadGlyph load={load} on={on} y={y} />
       </g>

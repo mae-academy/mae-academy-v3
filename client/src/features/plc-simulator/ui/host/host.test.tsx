@@ -100,19 +100,22 @@ describe('S7-200 host', () => {
     expect(led(container, 'Q0.0 off')).toBeDefined(); // outputs de-energised on STOP
   });
 
-  it('single-steps exactly one scan and pauses', () => {
+  it('runs, pauses, and resumes execution without single step button', () => {
     const sched = manual();
     const { container } = render(<PlcSimulatorApp initialNetworks={SEAL} runtimeOptions={sched.runtimeOptions} />);
+    expect(screen.queryByRole('button', { name: 'Single step' })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'I0.0 ON' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Single step' }));
-    expect(mode()).toBe('PAUSE');
+    fireEvent.click(screen.getByRole('button', { name: /Run|Resume/ }));
+    sched.scan();
+    expect(mode()).toBe('RUN');
     expect(led(container, 'Q0.0 on')).toBeDefined();
     // pausing keeps the outputs; Run resumes without a cold start
+    fireEvent.click(screen.getByRole('button', { name: 'Pause' }));
+    expect(mode()).toBe('PAUSE');
+    expect(led(container, 'Q0.0 on')).toBeDefined();
     fireEvent.click(screen.getByRole('button', { name: /Run|Resume/ }));
     expect(mode()).toBe('RUN');
     expect(led(container, 'Q0.0 on')).toBeDefined();
-    fireEvent.click(screen.getByRole('button', { name: 'Pause' }));
-    expect(mode()).toBe('PAUSE');
   });
 
   it('controls execution via toolbar: Run starts, Pause pauses, Stop stops and resets', () => {
@@ -204,7 +207,8 @@ describe('hardware profile switching', () => {
     const sched = manual();
     const { container } = render(<PlcSimulatorApp initialNetworks={SEAL} runtimeOptions={sched.runtimeOptions} />);
     fireEvent.click(screen.getByRole('button', { name: 'I0.0 ON' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Single step' }));
+    fireEvent.click(screen.getByRole('button', { name: /Run|Resume/ }));
+    sched.scan();
     expect(led(container, 'Q0.0 on')).toBeDefined();
 
     fireEvent.change(screen.getByRole('combobox', { name: 'Hardware profile' }), { target: { value: S7_200_CPU226_EXP.id } });

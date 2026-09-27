@@ -96,10 +96,33 @@ export const INPUT_DEVICE_OPTIONS: readonly { readonly kind: ActuatorKind; reado
 
 export type LoadKind = 'lamp' | 'contactor' | 'beacon' | 'motor' | 'none';
 
+export type LampColor = 'red' | 'yellow' | 'green' | 'blue' | 'white';
+
+export interface LampColorInfo {
+  readonly id: LampColor;
+  readonly label: string;
+  readonly hex: string;
+  readonly strokeClass: string;
+  readonly fillClass: string;
+}
+
+export const LAMP_COLORS: readonly LampColorInfo[] = [
+  { id: 'red', label: 'Red', hex: '#EF4444', strokeClass: 'stroke-red-500', fillClass: 'fill-red-500/20' },
+  { id: 'yellow', label: 'Yellow', hex: '#EAB308', strokeClass: 'stroke-yellow-500 dark:stroke-yellow-400', fillClass: 'fill-yellow-500/25' },
+  { id: 'green', label: 'Green', hex: '#22C55E', strokeClass: 'stroke-emerald-500 dark:stroke-emerald-400', fillClass: 'fill-emerald-500/25' },
+  { id: 'blue', label: 'Blue', hex: '#3B82F6', strokeClass: 'stroke-blue-500 dark:stroke-blue-400', fillClass: 'fill-blue-500/25' },
+  { id: 'white', label: 'White', hex: '#F8FAFC', strokeClass: 'stroke-slate-500 dark:stroke-slate-200', fillClass: 'fill-slate-100/90 dark:fill-white/35' },
+];
+
+export const LAMP_COLOR_MAP: Readonly<Record<LampColor, LampColorInfo>> = Object.fromEntries(
+  LAMP_COLORS.map((c) => [c.id, c])
+) as Record<LampColor, LampColorInfo>;
+
 export interface OutputLoad {
   readonly kind: LoadKind;
   readonly symbol: string;
   readonly tag: string;
+  readonly color?: LampColor;
 }
 
 export const ACTUATOR_LABEL: Readonly<Record<ActuatorKind, string>> = {
@@ -119,7 +142,13 @@ export const LOAD_OPTIONS: readonly { readonly kind: LoadKind; readonly label: s
   { kind: 'none', label: 'Spare · open circuit', prefix: 'X', tag: 'Open circuit' },
 ];
 
-export function loadOf(kind: LoadKind, channel: number): OutputLoad {
+export function loadOf(kind: LoadKind, channel: number, color?: LampColor): OutputLoad {
   const option = LOAD_OPTIONS.find((candidate) => candidate.kind === kind) ?? LOAD_OPTIONS[0];
-  return { kind: option?.kind ?? 'lamp', symbol: `${option?.prefix ?? 'H'}${channel}`, tag: option?.tag ?? 'Pilot lamp' };
+  const lampColor = kind === 'lamp' ? (color ?? 'red') : undefined;
+  return {
+    kind: option?.kind ?? 'lamp',
+    symbol: `${option?.prefix ?? 'H'}${channel}`,
+    tag: option?.tag ?? 'Pilot lamp',
+    ...(lampColor ? { color: lampColor } : {}),
+  };
 }

@@ -1,4 +1,4 @@
-import { loadOf, type ActuatorKind, type ContactType, type LoadKind, type OutputLoad } from '../hardware/devices';
+import { loadOf, type ActuatorKind, type ContactType, type LampColor, type LoadKind, type OutputLoad } from '../hardware/devices';
 import type { BlockParams, BlockType, ConnectorRef, LogoBlock, Sink, TimeValue, WireIn } from '../engine/types';
 import type { BenchInput } from '../scenarios';
 
@@ -34,7 +34,12 @@ export const dev = (kind: ActuatorKind, contact: ContactType, symbol: string, ta
 });
 export const spare = (index: number): BenchInput => dev('spare', 'NO', `X${index}`, 'Spare');
 
-export const load = (kind: LoadKind, symbol: string, tag: string): OutputLoad => ({ kind, symbol, tag });
+export const load = (kind: LoadKind, symbol: string, tag: string, color?: LampColor): OutputLoad => ({
+  kind,
+  symbol,
+  tag,
+  ...(color ? { color } : kind === 'lamp' ? { color: 'red' } : {}),
+});
 export const spareLoad = (index: number): OutputLoad => loadOf('none', index);
 
 /** Pads a partial I/O list to the Basic unit's 8 inputs / 4 outputs with spares. */

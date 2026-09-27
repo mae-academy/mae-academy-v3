@@ -2,7 +2,6 @@ import type { KeyboardEvent } from 'react';
 import type { PanelFrame, PanelKey } from '../firmware/panel';
 import type { DeviceSpec } from '../hardware/devices';
 import {
-  BARRIER_X,
   BOTTOM_SCREW_Y,
   DEVICE,
   INPUT_TERMINAL_X,
@@ -89,8 +88,6 @@ function LcdGlass({ frame }: { frame: PanelFrame }) {
     <g role="img" aria-label={`Display: ${label || 'blank'}`} data-backlight={frame.backlight}>
       <rect x={LCD.x - 8} y={LCD.y - 8} width={width + 16} height={height + 16} rx={4} className="fill-slate-200 stroke-slate-300 dark:fill-slate-800 dark:stroke-slate-700" />
       <rect x={LCD.x} y={LCD.y} width={width} height={height} rx={2} className={off ? 'fill-slate-300 dark:fill-slate-900' : 'fill-[#e0f2fe] stroke-[#bae6fd] dark:fill-[#082f49] dark:stroke-[#0369a1]'} />
-      {/* inset shadow: darker top and left edge of the glass */}
-      <path d={`M ${LCD.x} ${LCD.y + height} V ${LCD.y} H ${LCD.x + width}`} fill="none" strokeWidth={2} className="stroke-slate-900/20 dark:stroke-black/50" />
       {frame.inverted.map((run, index) => (
         <rect key={index} data-inverted="true" x={LCD.x + run.col * LCD.cellW} y={LCD.y + run.line * LCD.cellH + 2} width={run.length * LCD.cellW} height={LCD.cellH - 3} className={ink} />
       ))}
@@ -129,16 +126,10 @@ export function LogoDevice({ spec, powered, runLed, frame, inputVolts, supplyVol
 
   return (
     <g aria-label={`Siemens ${spec.model} controller`} role="group">
-      {/* housing */}
-      <rect x={x} y={y} width={w} height={h} rx={10} strokeWidth={1.5} className="fill-slate-200 stroke-slate-400 dark:fill-[#1e293b] dark:stroke-slate-600" />
+      {/* housing: clean rounded rectangle with seamless outline */}
+      <rect x={x} y={y} width={w} height={h} rx={16} ry={16} strokeWidth={1.5} className="fill-slate-200 stroke-slate-400 dark:fill-[#1e293b] dark:stroke-slate-600" />
       <rect x={x + 10} y={y + 6} width={w - 20} height={36} rx={4} className={flat} />
       <rect x={x + 10} y={BOTTOM_SCREW_Y - 20} width={w - 20} height={40} rx={4} className={flat} />
-
-      {/* expansion interface + coding pins (right edge) */}
-      <rect x={x + w - 6} y={250} width={6} height={100} className="fill-slate-300 dark:fill-slate-700" />
-      {[236, 362].map((py) => (
-        <rect key={py} x={x + w - 4} y={py} width={4} height={8} className="fill-slate-400 dark:fill-slate-600" />
-      ))}
 
       {/* top strip: supply, then I1..I8; the voltage present on each screw is printed under its name */}
       {SUPPLY_TERMINAL_X.map((tx, index) => (
@@ -156,9 +147,6 @@ export function LogoDevice({ spec, powered, runLed, frame, inputVolts, supplyVol
           </g>
         );
       })}
-      {/* isolation between supply and inputs; on the 230RC also between input groups I1-I4 / I5-I8 */}
-      <line x1={BARRIER_X.supply} y1={158} x2={BARRIER_X.supply} y2={210} strokeWidth={1.5} className="stroke-slate-400 dark:stroke-slate-700" />
-      {spec.inputGroups.length > 1 && <line x1={BARRIER_X.group} y1={158} x2={BARRIER_X.group} y2={210} strokeWidth={1.5} strokeDasharray="3 2" className="stroke-slate-400 dark:stroke-slate-700" />}
 
       {/* front plate */}
       <rect x={x + 14} y={214} width={w - 28} height={290} rx={6} className="fill-slate-100 stroke-slate-300 dark:fill-slate-900 dark:stroke-slate-700" />
@@ -273,9 +261,6 @@ export function LogoDevice({ spec, powered, runLed, frame, inputVolts, supplyVol
           </g>
         );
       })}
-
-      {/* slide interlock */}
-      <rect x={x + w - 40} y={y + h - 4} width={26} height={6} rx={2} className="fill-slate-400 dark:fill-slate-600" />
     </g>
   );
 }

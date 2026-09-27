@@ -15,7 +15,7 @@ export interface PlcSimulatorAppProps {
   initialProfileId?: string;
   /** Starting ladder program of the S7-200 tab. */
   initialNetworks?: readonly Network[];
-  /** Application preloaded into the LOGO! bench; defaults to the stairway lighting program. */
+  /** Application preloaded into the LOGO! bench; defaults to Tutorial A: seal-in circuit. */
   initialLogoScenario?: ScenarioId;
   symbols?: SymbolMap;
   /** Runtime overrides; tests inject a manual clock and scheduler here. */
@@ -37,7 +37,7 @@ const PLATFORM_OPTIONS = [
 export function PlcSimulatorApp({
   initialProfileId = S7_200_CPU224.id,
   initialNetworks = [],
-  initialLogoScenario,
+  initialLogoScenario = 'seal-in-gates',
   symbols,
   runtimeOptions,
   className = '',

@@ -11,14 +11,40 @@ import {
   type WireIn,
 } from './engine/types';
 
-/** File envelope of an exported LOGO! circuit program (`.logo.json`). */
+/** File envelope of an exported LOGO! circuit program (`.logo` / `.lsc`). */
 export const LOGO_FILE_FORMAT = 'mae-logo-0ba4';
+export const LOGO_MAGIC_HEADER = 'MAE_LOGO_BIN:';
 const VERSION = 1;
 
 export type ParseResult = { readonly ok: true; readonly program: LogoProgram } | { readonly ok: false; readonly reason: string };
 
+function encodeBase64(str: string): string {
+  if (typeof Buffer !== 'undefined') {
+    return Buffer.from(str, 'utf-8').toString('base64');
+  }
+  const bytes = new TextEncoder().encode(str);
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
+
+function decodeBase64(b64: string): string {
+  if (typeof Buffer !== 'undefined') {
+    return Buffer.from(b64, 'base64').toString('utf-8');
+  }
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return new TextDecoder().decode(bytes);
+}
+
 export function serializeProgram(program: LogoProgram): string {
-  return JSON.stringify({ format: LOGO_FILE_FORMAT, version: VERSION, program }, null, 2);
+  const rawJson = JSON.stringify({ format: LOGO_FILE_FORMAT, version: VERSION, program });
+  return `${LOGO_MAGIC_HEADER}${encodeBase64(rawJson)}`;
 }
 
 class ShapeError extends Error {}
@@ -110,11 +136,31 @@ function parseSink(value: unknown, index: number): Sink {
 
 /** Shape check only; wiring, loops and the memory budget are checked by `compileProgram`. */
 export function parseProgram(text: string): ParseResult {
+  let jsonText = text.trim();
+
+  if (jsonText.startsWith(LOGO_MAGIC_HEADER)) {
+    const payload = jsonText.slice(LOGO_MAGIC_HEADER.length).trim();
+    try {
+      jsonText = decodeBase64(payload);
+    } catch {
+      return { ok: false, reason: 'corrupted encoded payload' };
+    }
+  } else if (!jsonText.startsWith('{') && /^[A-Za-z0-9+/=\r\n]+$/.test(jsonText)) {
+    try {
+      const decoded = decodeBase64(jsonText);
+      if (decoded.trim().startsWith('{')) {
+        jsonText = decoded;
+      }
+    } catch {
+      // not base64, fall through to JSON.parse
+    }
+  }
+
   let root: unknown;
   try {
-    root = JSON.parse(text);
+    root = JSON.parse(jsonText);
   } catch {
-    return { ok: false, reason: 'not valid JSON' };
+    return { ok: false, reason: 'not valid program data' };
   }
   try {
     if (!isRecord(root) || root.format !== LOGO_FILE_FORMAT) throw new ShapeError(`not a ${LOGO_FILE_FORMAT} file`);

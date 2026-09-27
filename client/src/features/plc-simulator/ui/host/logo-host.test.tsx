@@ -5,6 +5,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { LOGO_0BA8 } from '../../domain/hardware';
 import type { Scheduler } from '../../engine/types';
+import type { ScenarioId } from '../../logo/scenarios';
 import { PlcSimulatorApp } from './PlcSimulatorApp';
 
 // Radix Slider measures its thumb with ResizeObserver, which jsdom does not implement.
@@ -52,9 +53,9 @@ describe('LOGO! 0BA4 bench', () => {
   const key = (name: string) => fireEvent.click(screen.getByRole('button', { name }));
   const input = (pattern: RegExp) => screen.getByRole('button', { name: pattern });
 
-  function startLogo() {
+  function startLogo(initialLogoScenario: ScenarioId = 'stairway') {
     const sched = manual();
-    const view = render(<PlcSimulatorApp initialProfileId={LOGO_0BA8.id} runtimeOptions={sched.runtimeOptions} />);
+    const view = render(<PlcSimulatorApp initialProfileId={LOGO_0BA8.id} initialLogoScenario={initialLogoScenario} runtimeOptions={sched.runtimeOptions} />);
     return { sched, ...view };
   }
 
@@ -135,18 +136,17 @@ describe('LOGO! 0BA4 bench', () => {
 
   it('loads a scenario, re-dressing the bench and the program', async () => {
     const { sched, container } = startLogo();
-    fireEvent.change(screen.getByRole('combobox', { name: 'Application scenario' }), { target: { value: 'sliding-door' } });
-    expect(input(/^I1 B1 Motion outside \(motion sensor, NO\)/)).toBeDefined();
-    expect(input(/^I3 S1 Door closed \(limit switch, NC\)/).getAttribute('aria-pressed')).toBe('true');
-    expect(led(container, 'K1 Open drive off')).toBeDefined();
+    fireEvent.change(screen.getByRole('combobox', { name: 'Application scenario' }), { target: { value: 'traffic-light' } });
+    expect(input(/^I1 S1 Cycle enable \(latching switch, NO\)/)).toBeDefined();
+    expect(led(container, 'H1 Red lamp off')).toBeDefined();
+    expect(led(container, 'H2 Yellow lamp off')).toBeDefined();
+    expect(led(container, 'H3 Green lamp off')).toBeDefined();
 
     ['Down', 'Down', 'Down', 'OK'].forEach(key);
-    fireEvent.pointerDown(input(/^I1 B1 Motion outside/)); // latching: sensor stays triggered
-    fireEvent.pointerDown(input(/^I3 S1 Door closed/)); // door leaves the closed position
+    fireEvent.pointerDown(input(/^I1 S1 Cycle enable/));
     sched.scan();
     sched.scan();
-    await waitFor(() => expect(led(container, 'K1 Open drive energized')).toBeDefined());
-    expect(led(container, 'K2 Close drive off')).toBeDefined();
+    await waitFor(() => expect(led(container, 'H3 Green lamp energized')).toBeDefined());
   });
 
   it('switches the bench between 230 V AC and 24 V DC', () => {
@@ -195,6 +195,9 @@ describe('LOGO! 0BA4 bench', () => {
     fireEvent.click(within(screen.getByRole('menu')).getByRole('menuitemradio', { name: 'Motor' }));
     const rotor = () => container.querySelector('[data-load="Q1"] [data-rotor]')?.getAttribute('data-rotor');
     expect(rotor()).toBe('idle');
+    const motorImg = container.querySelector('[data-load="Q1"] [role="img"]') as HTMLElement;
+    expect(within(motorImg).queryByText('M')).toBeNull();
+    expect(within(motorImg).queryByText('MOTOR')).toBeNull();
     fireEvent.pointerDown(input(/^I1 S1 Stair buttons/));
     sched.scan();
     await waitFor(() => expect(rotor()).toBe('spinning'));
@@ -276,26 +279,60 @@ describe('LOGO! 0BA4 bench', () => {
 });
 
 describe('LOGO! program library, FBD viewer and manual', () => {
-  function startLogo() {
+  function startLogo(initialLogoScenario: ScenarioId = 'stairway') {
     const sched = manual();
-    const view = render(<PlcSimulatorApp initialProfileId={LOGO_0BA8.id} runtimeOptions={sched.runtimeOptions} />);
+    const view = render(<PlcSimulatorApp initialProfileId={LOGO_0BA8.id} initialLogoScenario={initialLogoScenario} runtimeOptions={sched.runtimeOptions} />);
     return { sched, ...view };
   }
   const key = (name: string) => fireEvent.click(screen.getByRole('button', { name }));
 
-  it('offers 22 programs in three groups and switches the voltage class with the program', () => {
+  it('offers 23 programs in three groups and switches the voltage class with the program', () => {
     const { container } = startLogo();
     const picker = screen.getByRole('combobox', { name: 'Application scenario' });
-    expect(within(picker).getAllByRole('option')).toHaveLength(25);
+    expect(within(picker).getAllByRole('option')).toHaveLength(23);
     expect(Array.from(picker.querySelectorAll('optgroup')).map((g) => g.getAttribute('label'))).toEqual([
+      'Tutorials / Fundamentals',
       '230 V AC · building automation',
       '24 V DC · machine automation',
-      'Manual Ch. 8 references',
-      'Beginner tutorials',
     ]);
     fireEvent.change(picker, { target: { value: 'star-delta' } });
     expect(container.querySelector('[data-terminal="L+"]')).not.toBeNull();
     expect(container.querySelector('svg[data-supply="dc"]')).not.toBeNull();
+  });
+
+  it('loads Tutorial A: Seal-in circuit (OR + AND) by default when launched from scratch', () => {
+    const { container } = render(<PlcSimulatorApp initialProfileId={LOGO_0BA8.id} />);
+    const picker = screen.getByRole('combobox', { name: 'Application scenario' });
+    expect(picker).toHaveProperty('value', 'seal-in-gates');
+    expect(screen.getByRole('button', { name: /^I1 S1 START/ })).toBeDefined();
+    expect(screen.getByRole('button', { name: /^I2 S2 STOP/ })).toBeDefined();
+    expect(led(container, 'M1 Pump off')).toBeDefined();
+  });
+
+  it('allows picking a bulb color for pilot indicator lamps and maintains exact concentric alignment', () => {
+    const { container } = startLogo('traffic-light');
+    expect(container.querySelector('[data-load="Q1"] [data-color="red"]')).not.toBeNull();
+    expect(container.querySelector('[data-load="Q2"] [data-color="yellow"]')).not.toBeNull();
+    expect(container.querySelector('[data-load="Q3"] [data-color="green"]')).not.toBeNull();
+
+    // Verify all lamp circles share the exact same concentric center
+    const checkLampConcentricity = () => {
+      const circles = Array.from(container.querySelectorAll('[data-load="Q1"] [role="img"] circle'));
+      expect(circles.length).toBeGreaterThan(0);
+      const cxs = new Set(circles.map((c) => c.getAttribute('cx')));
+      const cys = new Set(circles.map((c) => c.getAttribute('cy')));
+      expect(cxs.size).toBe(1);
+      expect(cys.size).toBe(1);
+    };
+
+    checkLampConcentricity();
+
+    fireEvent.click(screen.getByRole('button', { name: /^Configure Q1 load/ }));
+    const menu = screen.getByRole('menu', { name: 'Q1 load' });
+    expect(screen.getByRole('button', { name: 'Select Blue lamp color' })).toBeDefined();
+    fireEvent.click(screen.getByRole('button', { name: 'Select Blue lamp color' }));
+    expect(container.querySelector('[data-load="Q1"] [data-color="blue"]')).not.toBeNull();
+    checkLampConcentricity();
   });
 
   it('locks label geometry to the viewBox: aspect-ratio wrapper, percent placement, container-width font size', () => {
@@ -346,8 +383,8 @@ describe('LOGO! program library, FBD viewer and manual', () => {
     await waitFor(() => expect(fbd().querySelector('path[data-net="I1"]')?.getAttribute('data-high')).toBe('false')); // released, sealed in via Q1
     expect(fbd().querySelector('[data-fbd-block="B2"]')?.getAttribute('data-high')).toBe('true');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Hide' }));
-    expect(container.querySelector('svg[data-fbd]')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Hide' })).toBeNull();
+    expect(container.querySelector('svg[data-fbd]')).not.toBeNull();
   });
 
   it('shows live timer accumulators in the FBD', async () => {
@@ -384,15 +421,28 @@ describe('LOGO! program library, FBD viewer and manual', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Close manual' }));
     expect(screen.queryByRole('region', { name: 'LOGO! manual' })).toBeNull();
   });
+
+  it('exports and imports circuit programs using the proprietary .logo format', () => {
+    startLogo();
+    const exportBtn = screen.getByRole('button', { name: 'Export' });
+    expect(exportBtn.getAttribute('title')).toBe('Export circuit program (.logo)');
+
+    const fileInputs = Array.from(document.querySelectorAll('input[type="file"]'));
+    const logoInput = fileInputs.find((input) => input.getAttribute('accept')?.includes('.logo'));
+    expect(logoInput).toBeDefined();
+    expect(logoInput?.getAttribute('accept')).toContain('.logo');
+    expect(logoInput?.getAttribute('accept')).toContain('.lsc');
+    expect(logoInput?.getAttribute('accept')).toContain('.json');
+  });
 });
 
 describe('LOGO! physical keyboard', () => {
   const display = () => screen.getByRole('img', { name: /^Display/ });
   const press = (name: string, target: Element | Window = window) => fireEvent.keyDown(target, { key: name });
 
-  function startLogo() {
+  function startLogo(initialLogoScenario: ScenarioId = 'stairway') {
     const sched = manual();
-    const view = render(<PlcSimulatorApp initialProfileId={LOGO_0BA8.id} runtimeOptions={sched.runtimeOptions} />);
+    const view = render(<PlcSimulatorApp initialProfileId={LOGO_0BA8.id} initialLogoScenario={initialLogoScenario} runtimeOptions={sched.runtimeOptions} />);
     return { sched, ...view };
   }
 
