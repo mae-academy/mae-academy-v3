@@ -42,6 +42,7 @@ export type CompositeAnalysis = {
   /** null when no sinusoidal component (or components are not commensurate). */
   fundamentalAngularFrequency: number | null;
   fundamentalPeriod: number | null;
+  components?: { omega: number; period: number }[];
   hasNonPeriodicTerm: boolean;
   warnings: string[];
 };
@@ -267,6 +268,10 @@ export function analyzeCompositeSignal(
 
   let fundamentalAngularFrequency: number | null = null;
   let fundamentalPeriod: number | null = null;
+  const components = omegas.map((omega) => ({
+    omega,
+    period: (2 * Math.PI) / omega,
+  }));
   if (periodic && omegas.length > 0) {
     const omega0 = omegas.reduce((left, right) => gcd(left, right));
     if (omega0 > EPSILON) { fundamentalAngularFrequency = omega0; fundamentalPeriod = (2 * Math.PI) / omega0; }
@@ -274,7 +279,7 @@ export function analyzeCompositeSignal(
 
   if (periodic && fundamentalPeriod !== null) {
     const power = integrate((time) => { const value = model.valueAt(time); return value * value; }, 0, fundamentalPeriod, 2048) / fundamentalPeriod;
-    return { classification: "Power Signal", energy: Number.POSITIVE_INFINITY, power, autoPeriodic, fundamentalAngularFrequency, fundamentalPeriod, hasNonPeriodicTerm, warnings };
+    return { classification: "Power Signal", energy: Number.POSITIVE_INFINITY, power, autoPeriodic, fundamentalAngularFrequency, fundamentalPeriod, components, hasNonPeriodicTerm, warnings };
   }
 
   const from = Math.min(options.windowStart, options.windowEnd);
@@ -283,7 +288,7 @@ export function analyzeCompositeSignal(
   const impulseEnergy = model.impulses.some((impulse) => impulse.time >= from && impulse.time <= to);
   if (impulseEnergy) warnings.push("A Dirac impulse in the observation window carries infinite energy; the numeric integral only reflects the ordinary part of x(t).");
   const classification: CompositeClassification = impulseEnergy ? "Neither" : energy > EPSILON ? "Energy Signal" : "Neither";
-  return { classification, energy: impulseEnergy ? Number.POSITIVE_INFINITY : energy, power: 0, autoPeriodic, fundamentalAngularFrequency: null, fundamentalPeriod: null, hasNonPeriodicTerm, warnings };
+  return { classification, energy: impulseEnergy ? Number.POSITIVE_INFINITY : energy, power: 0, autoPeriodic, fundamentalAngularFrequency: null, fundamentalPeriod: null, components, hasNonPeriodicTerm, warnings };
 }
 
 /* ─────────────────── Running integral (∫₋∞ᵗ) quick action ─────────────────── */

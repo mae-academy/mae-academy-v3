@@ -25,7 +25,7 @@ import { LinearAlgebraStudio } from "@/components/linearAlgebra/LinearAlgebraStu
 import { SignalOperationsLab } from "@/components/signals/SignalOperationsLab";
 import { SystemClassificationLab } from "@/components/signals/SystemClassificationLab";
 import { ConvolutionLab } from "@/components/signals/ConvolutionLab";
-import { FourierAnalysisLab } from "@/components/signals/FourierAnalysisLab";
+import { FourierStudio } from "@/features/signals/ui/FourierStudio";
 import { LaplaceZPlaneLab } from "@/components/signals/LaplaceZPlaneLab";
 import { useLocale } from "@/contexts/LocaleContext";
 import { controlSystemToolMeta, linearAlgebraToolMeta, powerElectronicsToolMeta, signalsAndSystemsToolMeta, simulationRouteMeta } from "@/data/platform";
@@ -133,7 +133,7 @@ export default function SimulationDetail() {
     isSignalsOperations ? <SignalOperationsLab />
       : isSystemClassification ? <SystemClassificationLab />
         : isConvolutionEngine ? <ConvolutionLab />
-          : isFourierAnalysis ? <FourierAnalysisLab />
+          : isFourierAnalysis ? <FourierStudio />
             : isLaplacePlane ? <LaplaceZPlaneLab />
               : isDigitalLogicWorkspace ? <DigitalLogicSimulator />
                 : isRootLocus ? <RootLocusStudio />

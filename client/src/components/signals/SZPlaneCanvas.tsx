@@ -177,7 +177,10 @@ export function SZPlaneCanvas({ system, roc, extractSlice, onPreview, onCommit }
         {/* KaTeX tick labels (origin labelled once). */}
         <g aria-hidden="true">
           {ticks.x.filter((value) => value !== 0).map((value) => <SvgKatexTick key={`tx${value}`} x={mx(value)} y={labelY} baseline>{String(value)}</SvgKatexTick>)}
-          {ticks.y.filter((value) => value !== 0).map((value) => <SvgKatexTick key={`ty${value}`} x={labelX} y={my(value)} anchor="end">{String(value)}</SvgKatexTick>)}
+          {ticks.y.filter((value) => value !== 0).map((value) => {
+            const formatted = value > 0 ? `+${value}j` : `${value}j`;
+            return <SvgKatexTick key={`ty${value}`} x={labelX} y={my(value)} anchor="end">{formatted}</SvgKatexTick>;
+          })}
           <SvgKatexTick x={labelX} y={labelY} anchor="end" baseline>0</SvgKatexTick>
         </g>
 
@@ -205,16 +208,37 @@ export function SZPlaneCanvas({ system, roc, extractSlice, onPreview, onCommit }
         })}
       </svg>
 
-      <div className="pointer-events-none absolute right-3 top-3 rounded-lg border border-slate-200/80 bg-white/80 px-2.5 py-1 text-xs text-slate-700 backdrop-blur-md dark:border-slate-800/80 dark:bg-slate-900/80 dark:text-slate-300">
-        <KatexMath math={shown.mode === "s" ? String.raw`\operatorname{Im}(s)\;(j\omega)` : String.raw`\operatorname{Im}(z)`} />
+      {/* Imaginary Axis Label: directly at the top of the vertical axis */}
+      <div
+        style={{
+          left: `${Math.max(100, Math.min(size.width - 100, originX))}px`,
+          top: "12px",
+          transform: "translateX(-50%)",
+        }}
+        className="pointer-events-none absolute rounded-lg border border-slate-200/80 bg-white/80 px-2.5 py-1 text-xs text-slate-700 backdrop-blur-md dark:border-slate-800/80 dark:bg-slate-900/80 dark:text-slate-300 shadow-sm"
+      >
+        <KatexMath math={shown.mode === "s" ? String.raw`\text{Im}(s)\ (j\omega)` : String.raw`\text{Im}(z)`} />
       </div>
-      <div className="pointer-events-none absolute bottom-3 right-3 rounded-lg border border-slate-200/80 bg-white/80 px-2.5 py-1 text-xs text-slate-700 backdrop-blur-md dark:border-slate-800/80 dark:bg-slate-900/80 dark:text-slate-300">
-        <KatexMath math={shown.mode === "s" ? String.raw`\operatorname{Re}(s)\;(\sigma)` : String.raw`\operatorname{Re}(z)`} />
+
+      {/* Real Axis Label: at the far right of the horizontal axis */}
+      <div
+        style={{
+          right: "12px",
+          top: `${Math.max(36, Math.min(size.height - 36, originY))}px`,
+          transform: "translateY(-50%)",
+        }}
+        className="pointer-events-none absolute rounded-lg border border-slate-200/80 bg-white/80 px-2.5 py-1 text-xs text-slate-700 backdrop-blur-md dark:border-slate-800/80 dark:bg-slate-900/80 dark:text-slate-300 shadow-sm"
+      >
+        <KatexMath math={shown.mode === "s" ? String.raw`\text{Re}(s)\ (\sigma)` : String.raw`\text{Re}(z)`} />
       </div>
-      <div className="pointer-events-none absolute left-3 top-3 rounded-lg border border-violet-200/80 bg-violet-50/90 px-3 py-1.5 text-xs font-bold text-violet-900 shadow-sm backdrop-blur-md dark:border-violet-900/60 dark:bg-violet-950/80 dark:text-violet-200">
-        <span>{roc.kind === "right" ? "ROC →" : roc.kind === "left" ? "← ROC" : "ROC Band"}</span>
+
+      {/* ROC status badge with BIBO Stable token */}
+      <div className="pointer-events-none absolute left-3 top-3 rounded-lg border border-slate-200/80 bg-white/80 px-2.5 py-1 text-xs font-semibold shadow-sm backdrop-blur-md dark:border-slate-800/80 dark:bg-slate-900/80">
+        <span className="text-slate-700 dark:text-slate-300">{roc.kind === "right" ? "ROC →" : roc.kind === "left" ? "← ROC" : "ROC Band"}</span>
         <span className="mx-2 text-slate-400">•</span>
-        <span className={roc.stable ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}>{roc.stable ? "BIBO Stable" : "Unstable"}</span>
+        <span className={roc.stable ? "rounded border px-1.5 py-0.5 font-bold bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-800" : "rounded border px-1.5 py-0.5 font-bold bg-rose-50 text-rose-600 border-rose-200 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-800"}>
+          {roc.stable ? "BIBO Stable" : "Unstable"}
+        </span>
       </div>
 
       {hover && (

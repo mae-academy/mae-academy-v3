@@ -56,4 +56,47 @@ describe("System Classification engine", () => {
     expect(parsed.ok).toBe(false);
     expect(!parsed.ok && parsed.error).toMatch(/square root/i);
   });
+
+  it("produces enriched step-by-step KaTeX derivation proofs for all 5 pillars", () => {
+    const report2t = classifySystem(system("y(t)=x(2t)"));
+    const lin2t = report2t.pillars.find((p) => p.id === "linearity")!;
+    expect(lin2t.proof.length).toBeGreaterThanOrEqual(3);
+    expect(lin2t.proof[0]).toContain("T\\{a\\,x_1(t) + b\\,x_2(t)\\} = a\\,x_1(2t) + b\\,x_2(2t)");
+    expect(lin2t.proof.at(-1)).toBe("\\therefore \\text{The system is Linear}");
+
+    const time2t = report2t.pillars.find((p) => p.id === "time")!;
+    expect(time2t.proof[0]).toContain("y_{\\text{shifted}}(t) = T\\{x(t - t_0)\\} = x\\left(2t - t_0\\right)");
+    expect(time2t.proof[1]).toContain("y(t - t_0) = x\\left(2(t - t_0)\\right) = x\\left(2t - 2t_0\\right)");
+    expect(time2t.proof.at(-1)).toBe("\\therefore \\text{The system is Time-Variant}");
+
+    const caus2t = report2t.pillars.find((p) => p.id === "causality")!;
+    expect(caus2t.proof[0]).toContain("t_1 = 1");
+    expect(caus2t.proof[1]).toContain("y(1) = x\\left(2 \\cdot (1)\\right) = x(2)");
+    expect(caus2t.proof.at(-1)).toBe("\\therefore \\text{The system is Non-Causal}");
+
+    const mem2t = report2t.pillars.find((p) => p.id === "memory")!;
+    expect(mem2t.proof[1]).toContain("y(2) = x(4) \\ne x(2)");
+    expect(mem2t.proof.at(-1)).toBe("\\therefore \\text{The system is Dynamic (Has Memory)}");
+
+    const stab2t = report2t.pillars.find((p) => p.id === "stability")!;
+    expect(stab2t.proof[0]).toContain("|x(t)| \\le M_x < \\infty");
+    expect(stab2t.proof.at(-1)).toBe("\\therefore \\text{The system is BIBO Stable}");
+  });
+
+  it("produces system-specific non-linear and time-variant derivation proofs", () => {
+    const reportSq = classifySystem(system("y(t)=x^2(t)"));
+    const linSq = reportSq.pillars.find((p) => p.id === "linearity")!;
+    expect(linSq.proof.some((step) => step.includes("2ab\\,x_1(t)x_2(t)"))).toBe(true);
+    expect(linSq.proof.at(-1)).toBe("\\therefore \\text{The system is Non-Linear}");
+
+    const reportTx = classifySystem(system("y(t)=t*x(t)"));
+    const timeTx = reportTx.pillars.find((p) => p.id === "time")!;
+    expect(timeTx.proof[0]).toContain("t\\,x(t - t_0)");
+    expect(timeTx.proof[1]).toContain("(t - t_0)\\,x(t - t_0)");
+    expect(timeTx.proof.at(-1)).toBe("\\therefore \\text{The system is Time-Variant}");
+
+    const stabTx = reportTx.pillars.find((p) => p.id === "stability")!;
+    expect(stabTx.proof.some((step) => step.includes("\\lim_{t \\to \\infty}"))).toBe(true);
+    expect(stabTx.proof.at(-1)).toBe("\\therefore \\text{The system is Unstable}");
+  });
 });

@@ -8,7 +8,8 @@
  */
 import { niceTicks, symmetricYBound } from "@/lib/plotAutoScale";
 import { SvgKatexTick } from "@/components/common/templates/SvgKatexTick";
-import React, { useMemo, useRef, useState, useEffect, useCallback } from "react";
+import React, { useMemo, useState, useEffect, useRef, useCallback } from "react";
+import { useElementSize } from "@/hooks/useElementSize";
 import { KatexMath } from "@/components/ui/KatexMath";
 import { StandardStepPlot } from "@/components/common/templates/StandardStepPlot";
 import { partialSum, type FourierSeriesResult } from "@/features/signals/engines/fourierEngine";
@@ -59,21 +60,13 @@ interface SvgStemPlotProps {
   phase?: boolean;
 }
 
-const STEM_PAD = { top: 30, bottom: 30, left: 52, right: 24 };
+const PLOT_HEIGHT = 288;
+const STEM_PAD = { top: 30, bottom: 30, left: 48, right: 48 };
 
 /** Canonical discrete stem plot for Fourier-series coefficients (hairline axes, KaTeX ticks, frosted HUD). */
-function SvgStemPlot({ titleKatex, xLabelKatex, yLabelKatex, stems, color, omega0, height = 190, phase = false }: SvgStemPlotProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [size, setSize] = useState({ width: 500, height });
+function SvgStemPlot({ titleKatex, xLabelKatex, yLabelKatex, stems, color, omega0, height = PLOT_HEIGHT, phase = false }: SvgStemPlotProps) {
+  const [containerRef, size] = useElementSize<HTMLDivElement>({ width: 500, height });
   const [hover, setHover] = useState<{ x: number; y: number; stem: { x: number; y: number } } | null>(null);
-
-  useEffect(() => {
-    const el = containerRef.current; if (!el) return;
-    const update = () => { const rect = el.getBoundingClientRect(); if (rect.width > 0 && rect.height > 0) setSize({ width: rect.width, height: rect.height }); };
-    update();
-    const observer = new ResizeObserver(update); observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
 
   const plotW = Math.max(10, size.width - STEM_PAD.left - STEM_PAD.right);
   const plotH = Math.max(10, size.height - STEM_PAD.top - STEM_PAD.bottom);
@@ -92,9 +85,13 @@ function SvgStemPlot({ titleKatex, xLabelKatex, yLabelKatex, stems, color, omega
   const yTicks = phase ? PI_TICKS : niceTicks(yMin, yMax, 5).map((value) => ({ value, katex: String(Number(value.toPrecision(3))) }));
 
   const handleMove = (event: React.PointerEvent<HTMLDivElement>) => {
-    const rect = event.currentTarget.getBoundingClientRect(); const x = event.clientX - rect.left; const y = event.clientY - rect.top;
-    const nearest = stems.reduce<{ stem: { x: number; y: number }; distance: number } | null>((best, stem) => { const distance = Math.abs(mapX(stem.x) - x); return !best || distance < best.distance ? { stem, distance } : best; }, null);
-    setHover(nearest && nearest.distance < 14 ? { x: mapX(nearest.stem.x), y, stem: nearest.stem } : null);
+    // Live rect + the same linear map as the drawn stems: the stem whose index is nearest the cursor tip is the hovered one.
+    const rect = event.currentTarget.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const innerWidth = Math.max(10, rect.width - STEM_PAD.left - STEM_PAD.right);
+    const position = xMin + ((x - STEM_PAD.left) / innerWidth) * (xMax - xMin);
+    const nearest = stems.reduce<{ stem: { x: number; y: number }; distance: number } | null>((best, stem) => { const distance = Math.abs(stem.x - position); return !best || distance < best.distance ? { stem, distance } : best; }, null);
+    setHover(nearest && nearest.distance <= 0.5 ? { x: mapX(nearest.stem.x), y: mapY(nearest.stem.y), stem: nearest.stem } : null);
   };
 
   return (
@@ -111,12 +108,19 @@ function SvgStemPlot({ titleKatex, xLabelKatex, yLabelKatex, stems, color, omega
           <line x1={mapX(0)} y1={STEM_PAD.top} x2={mapX(0)} y2={size.height - STEM_PAD.bottom} className="stroke-slate-400 dark:stroke-slate-600" strokeWidth={1.25} />
           {yTicks.map((tick) => <SvgKatexTick key={`ty${tick.value}`} x={STEM_PAD.left - 8} y={mapY(tick.value)} anchor="end">{tick.katex}</SvgKatexTick>)}
           {xTicks.map((n) => <SvgKatexTick key={`tx${n}`} x={mapX(n)} y={size.height - STEM_PAD.bottom + 16} baseline>{String(n)}</SvgKatexTick>)}
-          {stems.map((stem) => (
-            <g key={`stem-${stem.x}`} stroke={color} fill={color}>
-              <line x1={mapX(stem.x)} y1={zeroY} x2={mapX(stem.x)} y2={mapY(stem.y)} strokeWidth={hover?.stem.x === stem.x ? 3.2 : 2.4} />
-              <circle cx={mapX(stem.x)} cy={mapY(stem.y)} r={hover?.stem.x === stem.x ? 4.5 : 3.5} className="stroke-white dark:stroke-slate-900" strokeWidth={1.25} />
-            </g>
-          ))}
+          {hover && <line x1={hover.x} y1={STEM_PAD.top} x2={hover.x} y2={size.height - STEM_PAD.bottom} className="stroke-slate-400/80 dark:stroke-slate-500/80" strokeDasharray="2 2" strokeWidth={1} />}
+          {stems.map((stem) => {
+            const sx = mapX(stem.x);
+            const sy = mapY(stem.y);
+            const active = hover?.stem.x === stem.x;
+            return (
+              <g key={`stem-${stem.x}`} stroke={color} fill={color}>
+                {active && <circle cx={sx} cy={sy} r={9} fill={color} opacity={0.2} stroke="none" />}
+                <line x1={sx} y1={zeroY} x2={sx} y2={sy} strokeWidth={active ? 3 : 2} />
+                <circle cx={sx} cy={sy} r={active ? 4.5 : 3.5} className="stroke-white dark:stroke-slate-900" strokeWidth={1.25} />
+              </g>
+            );
+          })}
         </svg>
         {hover && (
           <div
@@ -192,45 +196,47 @@ export function FourierCanvases({ mode, series, spectrum, impulses, bandwidth, t
 
   return (
     <div className="space-y-4">
-      {mode === "fs" && series ? (
-        <SvgStemPlot titleKatex="\text{Magnitude spectrum } |c_{n}|" xLabelKatex="n\;(\omega=n\omega_0)" yLabelKatex="|c_{n}|" stems={stems.magnitude} color={MAGNITUDE} omega0={series.omega0} />
-      ) : spectrum ? (
-        <StandardStepPlot
-          title={<KatexMath math="\text{Magnitude spectrum } |X(j\omega)|" />}
-          series={magnitudeSeries}
-          height={200}
-          xLabelKatex="\omega\text{ (rad/s)}"
-          yLabelKatex="|X(j\omega)|"
-          xDomain={omegaDomain}
-          yDomain={magnitudeDomain}
-          showLegend={magnitudeSeries.length > 1}
-          {...omegaCursor}
-        />
-      ) : null}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 [&>*]:min-w-0">
+        {mode === "fs" && series ? (
+          <SvgStemPlot titleKatex="\text{Magnitude spectrum } |c_{n}|" xLabelKatex="n\;(\omega=n\omega_0)" yLabelKatex="|c_{n}|" stems={stems.magnitude} color={MAGNITUDE} omega0={series.omega0} />
+        ) : spectrum ? (
+          <StandardStepPlot
+            title={<KatexMath math="\text{Magnitude spectrum } |X(j\omega)|" />}
+            series={magnitudeSeries}
+            height={PLOT_HEIGHT}
+            xLabelKatex="\omega\text{ (rad/s)}"
+            yLabelKatex="|X(j\omega)|"
+            xDomain={omegaDomain}
+            yDomain={magnitudeDomain}
+            showLegend={magnitudeSeries.length > 1}
+            {...omegaCursor}
+          />
+        ) : null}
 
-      {mode === "fs" && series ? (
-        <SvgStemPlot titleKatex="\text{Phase spectrum } \angle c_{n}\text{ (rad)}" xLabelKatex="n\;(\omega=n\omega_0)" yLabelKatex="\angle c_{n}" stems={stems.phase} color={PHASE} omega0={series.omega0} phase />
-      ) : spectrum ? (
-        <StandardStepPlot
-          title={<KatexMath math="\text{Phase spectrum } \angle X(j\omega)" />}
-          series={[{ id: "ft-phase", katexName: "\\angle X(j\\omega)", data: spectrum.map((point) => ({ x: point.omega, y: point.phase })), color: PHASE, unit: "rad" }]}
-          height={200}
-          xLabelKatex="\omega\text{ (rad/s)}"
-          yLabelKatex="\angle X(j\omega)\text{ (rad)}"
-          xDomain={omegaDomain}
-          yDomain={PHASE_DOMAIN}
-          yTickLabels={PI_TICKS}
-          showLegend={false}
-          {...omegaCursor}
-        />
-      ) : null}
+        {mode === "fs" && series ? (
+          <SvgStemPlot titleKatex="\text{Phase spectrum } \angle c_{n}\text{ (rad)}" xLabelKatex="n\;(\omega=n\omega_0)" yLabelKatex="\angle c_{n}" stems={stems.phase} color={PHASE} omega0={series.omega0} phase />
+        ) : spectrum ? (
+          <StandardStepPlot
+            title={<KatexMath math="\text{Phase spectrum } \angle X(j\omega)" />}
+            series={[{ id: "ft-phase", katexName: "\\angle X(j\\omega)", data: spectrum.map((point) => ({ x: point.omega, y: point.phase })), color: PHASE, unit: "rad" }]}
+            height={PLOT_HEIGHT}
+            xLabelKatex="\omega\text{ (rad/s)}"
+            yLabelKatex="\angle X(j\omega)\text{ (rad)}"
+            xDomain={omegaDomain}
+            yDomain={PHASE_DOMAIN}
+            yTickLabels={PI_TICKS}
+            showLegend={false}
+            {...omegaCursor}
+          />
+        ) : null}
+      </div>
 
       {builder ? (
         <StandardStepPlot
           title={<KatexMath math={`x_N(t) = a_0 + \\sum_{n=1}^{N} \\left( a_n \\cos(n\\omega_0 t) + b_n \\sin(n\\omega_0 t) \\right),\\; N=${harmonics}`} />}
           series={builder}
           xDomain={timeWindow ? [timeWindow.start, timeWindow.end] : undefined}
-          height={220}
+          height={PLOT_HEIGHT}
           xLabelKatex="t\text{ (s)}"
           yLabelKatex="x(t)"
           forceBipolar
@@ -240,7 +246,7 @@ export function FourierCanvases({ mode, series, spectrum, impulses, bandwidth, t
         <StandardStepPlot
           title={<KatexMath math={trace.katexName} />}
           series={[{ id: "trace", katexName: trace.katexName, data: trace.data, color: PARTIAL }]}
-          height={220}
+          height={PLOT_HEIGHT}
           xLabelKatex="t\text{ (s)}"
           yLabelKatex={trace.katexName}
           forceBipolar

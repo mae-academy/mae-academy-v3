@@ -184,6 +184,399 @@ export const PILLAR_OUTLINE: ReadonlyArray<{ id: PillarId; title: string; visual
 ];
 const outline = (id: PillarId) => PILLAR_OUTLINE.find((entry) => entry.id === id) ?? PILLAR_OUTLINE[0];
 
+function formatAffineArg(slope: number, offset: number, varName = "t"): string {
+  if (near(slope, 1) && near(offset)) return varName;
+  if (near(slope, -1) && near(offset)) return `-${varName}`;
+  if (near(offset)) {
+    const s = near(slope, 1) ? "" : near(slope, -1) ? "-" : texNumber(slope);
+    return `${s}${varName}`;
+  }
+  const s = near(slope, 1) ? "" : near(slope, -1) ? "-" : texNumber(slope);
+  const sign = offset > 0 ? "+" : "-";
+  return `${s}${varName} ${sign} ${texNumber(Math.abs(offset))}`;
+}
+
+function formatCoeff(coeff: Coefficient, varName = "t"): string {
+  if (near(coeff.timeSlope)) {
+    if (near(coeff.constant, 1)) return "";
+    if (near(coeff.constant, -1)) return "-";
+    return `${texNumber(coeff.constant)}`;
+  }
+  if (near(coeff.timeSlope, 1) && near(coeff.constant)) return `${varName}\\,`;
+  if (near(coeff.timeSlope, -1) && near(coeff.constant)) return `-${varName}\\,`;
+  if (near(coeff.constant)) return `${texNumber(coeff.timeSlope)}${varName}\\,`;
+  return `\\left(${formatAffineArg(coeff.timeSlope, coeff.constant, varName)}\\right)`;
+}
+
+function formatInputSample(term: Extract<SystemTerm, { kind: "input-sample" }>, signalVar = "x", varName = "t"): string {
+  const c = formatCoeff(term.coefficient, varName);
+  const arg = formatAffineArg(term.argument.slope, term.argument.offset, varName);
+  const pow = !near(term.power, 1) ? `^{${texNumber(term.power)}}` : "";
+  return `${c}${signalVar}${pow}(${arg})`;
+}
+
+function generateLinearityProof(
+  system: SystemSemantic,
+  nonlinearTerm: Extract<SystemTerm, { kind: "input-sample" }> | undefined,
+  constantOffset: boolean,
+  signalTerm: Extract<SystemTerm, { kind: "signal" }> | undefined,
+  derivativeTex: string,
+): string[] {
+  if (nonlinearTerm) {
+    const p = nonlinearTerm.power;
+    const pTex = texNumber(p);
+    const arg = formatAffineArg(nonlinearTerm.argument.slope, nonlinearTerm.argument.offset, "t");
+    const coeff = formatCoeff(nonlinearTerm.coefficient, "t");
+    if (near(p, 2)) {
+      return [
+        `T\\{a\\,x_1(t) + b\\,x_2(t)\\} = ${coeff}\\left(a\\,x_1(${arg}) + b\\,x_2(${arg})\\right)^2`,
+        `= ${coeff}\\left(a^2 x_1^2(${arg}) + 2ab\\,x_1(${arg})x_2(${arg}) + b^2 x_2^2(${arg})\\right)`,
+        `a\\,T\\{x_1(t)\\} + b\\,T\\{x_2(t)\\} = ${coeff}\\left(a\\,x_1^2(${arg}) + b\\,x_2^2(${arg})\\right)`,
+        `T\\{a\\,x_1(t) + b\\,x_2(t)\\} \\ne a\\,T\\{x_1(t)\\} + b\\,T\\{x_2(t)\\} \\quad (\\text{cross-term } 2ab\\,x_1 x_2 \\ne 0)`,
+        `\\therefore \\text{The system is Non-Linear}`,
+      ];
+    }
+    return [
+      `T\\{a\\,x_1(t) + b\\,x_2(t)\\} = ${coeff}\\left(a\\,x_1(${arg}) + b\\,x_2(${arg})\\right)^{${pTex}}`,
+      `a\\,T\\{x_1(t)\\} + b\\,T\\{x_2(t)\\} = ${coeff}\\left(a\\,x_1^{${pTex}}(${arg}) + b\\,x_2^{${pTex}}(${arg})\\right)`,
+      `T\\{a\\,x_1(t) + b\\,x_2(t)\\} \\ne a\\,T\\{x_1(t)\\} + b\\,T\\{x_2(t)\\}`,
+      `\\therefore \\text{The system is Non-Linear}`,
+    ];
+  }
+
+  if (constantOffset) {
+    const constTerm = system.terms.find((t): t is Extract<SystemTerm, { kind: "constant" }> => t.kind === "constant");
+    const val = constTerm?.value ?? 5;
+    const cTex = texNumber(val);
+    const sampled = inputTerms(system)[0];
+    const sTerm1 = sampled ? formatInputSample(sampled, "x_1", "t") : "x_1(t)";
+    const sTerm2 = sampled ? formatInputSample(sampled, "x_2", "t") : "x_2(t)";
+    return [
+      `T\\{a\\,x_1(t) + b\\,x_2(t)\\} = a\\,${sTerm1} + b\\,${sTerm2} + ${cTex}`,
+      `a\\,T\\{x_1(t)\\} + b\\,T\\{x_2(t)\\} = a\\left(${sTerm1} + ${cTex}\\right) + b\\left(${sTerm2} + ${cTex}\\right) = a\\,${sTerm1} + b\\,${sTerm2} + ${cTex}a + ${cTex}b`,
+      `\\text{Since } ${cTex} \\ne ${cTex}a + ${cTex}b \\text{ for general } a, b \\implies T\\{a x_1 + b x_2\\} \\ne a T\\{x_1\\} + b T\\{x_2\\}`,
+      `\\therefore \\text{The system is Non-Linear}`,
+    ];
+  }
+
+  if (signalTerm) {
+    return [
+      `T\\{0\\} = ${signalTex(signalTerm)} \\ne 0 \\quad (\\text{Zero-input response is non-zero})`,
+      `\\text{An independent source violates additivity: } T\\{a\\,x_1(t) + b\\,x_2(t)\\} \\ne a\\,T\\{x_1(t)\\} + b\\,T\\{x_2(t)\\}`,
+      `\\therefore \\text{The system is Non-Linear}`,
+    ];
+  }
+
+  if (system.terms.some((t) => t.kind === "integral")) {
+    return [
+      `T\\{a\\,x_1(t) + b\\,x_2(t)\\} = \\int_{-\\infty}^{t} \\left(a\\,x_1(\\tau) + b\\,x_2(\\tau)\\right) d\\tau = a \\int_{-\\infty}^{t} x_1(\\tau)\\,d\\tau + b \\int_{-\\infty}^{t} x_2(\\tau)\\,d\\tau`,
+      `a\\,T\\{x_1(t)\\} + b\\,T\\{x_2(t)\\} = a \\int_{-\\infty}^{t} x_1(\\tau)\\,d\\tau + b \\int_{-\\infty}^{t} x_2(\\tau)\\,d\\tau`,
+      `T\\{a\\,x_1(t) + b\\,x_2(t)\\} = a\\,T\\{x_1(t)\\} + b\\,T\\{x_2(t)\\}`,
+      `\\therefore \\text{The system is Linear}`,
+    ];
+  }
+
+  if (system.terms.some((t) => t.kind === "derivative")) {
+    const d1 = derivativeTex.replace("x(t)", "x_1(t)");
+    const d2 = derivativeTex.replace("x(t)", "x_2(t)");
+    return [
+      `T\\{a\\,x_1(t) + b\\,x_2(t)\\} = \\frac{d}{dt}\\left(a\\,x_1(t) + b\\,x_2(t)\\right) = a\\,${d1} + b\\,${d2}`,
+      `a\\,T\\{x_1(t)\\} + b\\,T\\{x_2(t)\\} = a\\,${d1} + b\\,${d2}`,
+      `T\\{a\\,x_1(t) + b\\,x_2(t)\\} = a\\,T\\{x_1(t)\\} + b\\,T\\{x_2(t)\\}`,
+      `\\therefore \\text{The system is Linear}`,
+    ];
+  }
+
+  const sampled = inputTerms(system);
+  if (sampled.length > 0) {
+    const s1 = sampled.map((t) => formatInputSample(t, "x_1", "t")).join(" + ");
+    const s2 = sampled.map((t) => formatInputSample(t, "x_2", "t")).join(" + ");
+    return [
+      `T\\{a\\,x_1(t) + b\\,x_2(t)\\} = a\\,${s1} + b\\,${s2}`,
+      `a\\,T\\{x_1(t)\\} + b\\,T\\{x_2(t)\\} = a\\,y_1(t) + b\\,y_2(t) = a\\,${s1} + b\\,${s2}`,
+      `T\\{a\\,x_1(t) + b\\,x_2(t)\\} = a\\,T\\{x_1(t)\\} + b\\,T\\{x_2(t)\\}`,
+      `\\therefore \\text{The system is Linear}`,
+    ];
+  }
+
+  return [
+    `T\\{a\\,x_1(t) + b\\,x_2(t)\\} = a\\,T\\{x_1(t)\\} + b\\,T\\{x_2(t)\\}`,
+    `\\therefore \\text{The system is Linear}`,
+  ];
+}
+
+function generateTimeInvarianceProof(
+  system: SystemSemantic,
+  variantTerm: Extract<SystemTerm, { kind: "input-sample" }> | undefined,
+  signalTerm: Extract<SystemTerm, { kind: "signal" }> | undefined,
+): string[] {
+  if (variantTerm) {
+    const isCoeffTimeVariant = !near(variantTerm.coefficient.timeSlope);
+    if (isCoeffTimeVariant) {
+      return [
+        `y_{\\text{shifted}}(t) = T\\{x(t - t_0)\\} = t\\,x(t - t_0)`,
+        `y(t - t_0) = (t - t_0)\\,x(t - t_0)`,
+        `t\\,x(t - t_0) \\ne (t - t_0)\\,x(t - t_0) \\implies T\\{x(t - t_0)\\} \\ne y(t - t_0)`,
+        `\\therefore \\text{The system is Time-Variant}`,
+      ];
+    }
+    const alpha = variantTerm.argument.slope;
+    const beta = variantTerm.argument.offset;
+    const alphaTex = texNumber(alpha);
+    const betaTex = beta ? (beta > 0 ? ` + ${texNumber(beta)}` : ` - ${texNumber(Math.abs(beta))}`) : "";
+    const shiftArg = beta ? `${alphaTex}t - t_0${betaTex}` : `${alphaTex}t - t_0`;
+    const outArg = beta ? `${alphaTex}t - ${alphaTex}t_0${betaTex}` : `${alphaTex}t - ${alphaTex}t_0`;
+    return [
+      `y_{\\text{shifted}}(t) = T\\{x(t - t_0)\\} = x\\left(${shiftArg}\\right)`,
+      `y(t - t_0) = x\\left(${alphaTex}(t - t_0)${betaTex}\\right) = x\\left(${outArg}\\right)`,
+      `x\\left(${shiftArg}\\right) \\ne x\\left(${outArg}\\right) \\implies T\\{x(t - t_0)\\} \\ne y(t - t_0)`,
+      `\\therefore \\text{The system is Time-Variant}`,
+    ];
+  }
+
+  if (signalTerm) {
+    return [
+      `T\\{x(t - t_0)\\} \\text{ keeps } ${signalTex(signalTerm)} \\text{ anchored at } t`,
+      `y(t - t_0) \\text{ shifts the entire output including } ${SIGNAL_TEX[signalTerm.signal]}(t - t_0)`,
+      `T\\{x(t - t_0)\\} \\ne y(t - t_0)`,
+      `\\therefore \\text{The system is Time-Variant}`,
+    ];
+  }
+
+  if (system.terms.some((t) => t.kind === "integral")) {
+    return [
+      `T\\{x(t - t_0)\\} = \\int_{-\\infty}^{t} x(\\tau - t_0)\\,d\\tau \\quad \\xrightarrow{\\lambda = \\tau - t_0} \\quad \\int_{-\\infty}^{t - t_0} x(\\lambda)\\,d\\lambda`,
+      `y(t - t_0) = \\int_{-\\infty}^{t - t_0} x(\\tau)\\,d\\tau`,
+      `T\\{x(t - t_0)\\} = y(t - t_0)`,
+      `\\therefore \\text{The system is Time-Invariant}`,
+    ];
+  }
+
+  if (system.terms.some((t) => t.kind === "derivative")) {
+    return [
+      `T\\{x(t - t_0)\\} = \\frac{d}{dt}x(t - t_0)`,
+      `y(t - t_0) = \\left.\\frac{dx(\\tau)}{d\\tau}\\right|_{\\tau = t - t_0} = \\frac{d}{dt}x(t - t_0)`,
+      `T\\{x(t - t_0)\\} = y(t - t_0)`,
+      `\\therefore \\text{The system is Time-Invariant}`,
+    ];
+  }
+
+  const sampled = inputTerms(system);
+  if (sampled.length > 0) {
+    const term = sampled[0];
+    const offset = term.argument.offset;
+    const pow = !near(term.power, 1) ? `^{${texNumber(term.power)}}` : "";
+    const shiftArg = offset ? `t - t_0 ${offset > 0 ? "+" : "-"} ${texNumber(Math.abs(offset))}` : `t - t_0`;
+    return [
+      `y_{\\text{shifted}}(t) = T\\{x(t - t_0)\\} = x${pow}\\left(${shiftArg}\\right)`,
+      `y(t - t_0) = x${pow}\\left(${shiftArg}\\right)`,
+      `T\\{x(t - t_0)\\} = y(t - t_0)`,
+      `\\therefore \\text{The system is Time-Invariant}`,
+    ];
+  }
+
+  return [
+    `T\\{x(t - t_0)\\} = y(t - t_0)`,
+    `\\therefore \\text{The system is Time-Invariant}`,
+  ];
+}
+
+function generateCausalityProof(
+  system: SystemSemantic,
+  futureTerm: Extract<SystemTerm, { kind: "input-sample" }> | undefined,
+  derivativeTerm: Extract<SystemTerm, { kind: "derivative" }> | undefined,
+  derivativeTex: string,
+): string[] {
+  if (futureTerm) {
+    const alpha = futureTerm.argument.slope;
+    const beta = futureTerm.argument.offset;
+    let t1 = 1;
+    if (alpha < 0) t1 = -1;
+    else if (near(alpha, 1) && beta > 0) t1 = 0;
+    const tau = alpha * t1 + beta;
+    const alphaTex = texNumber(alpha);
+    const betaStr = near(beta) ? "" : (beta > 0 ? ` + ${texNumber(beta)}` : ` - ${texNumber(Math.abs(beta))}`);
+    const subStr = near(alpha, 1) ? `${t1}${betaStr}` : `${alphaTex} \\cdot (${t1})${betaStr}`;
+    return [
+      `\\text{Observation instant: } t_1 = ${t1}`,
+      `y(${t1}) = x\\left(${subStr}\\right) = x(${texNumber(tau)})`,
+      `\\text{Since required sampling instant } \\tau = ${texNumber(tau)} > t_1 = ${t1} \\text{ (future sample)}`,
+      `\\therefore \\text{The system is Non-Causal}`,
+    ];
+  }
+
+  if (derivativeTerm) {
+    return [
+      `y(t) = ${derivativeTex} = \\lim_{h \\to 0} \\frac{x(t + h) - x(t - h)}{2h}`,
+      `\\text{Evaluating the limit requires future input samples } x(t + h) \\text{ where } t + h > t`,
+      `\\therefore \\text{The system is Non-Causal in real time}`,
+    ];
+  }
+
+  if (system.terms.some((t) => t.kind === "integral")) {
+    return [
+      `y(t_1) = \\int_{-\\infty}^{t_1} x(\\tau)\\,d\\tau`,
+      `\\text{The integration range is } \\tau \\in (-\\infty, t_1] \\implies \\tau \\le t_1 \\text{ for all integration points}`,
+      `\\text{The output depends strictly on past and present values of } x`,
+      `\\therefore \\text{The system is Causal}`,
+    ];
+  }
+
+  const sampled = inputTerms(system);
+  if (sampled.length > 0) {
+    const term = sampled[0];
+    const offset = term.argument.offset;
+    if (offset < 0) {
+      return [
+        `\\text{At observation instant } t_1: \\quad y(t_1) = x(t_1 - ${texNumber(Math.abs(offset))})`,
+        `\\text{Input sampling point: } \\tau = t_1 - ${texNumber(Math.abs(offset))} < t_1 \\quad \\forall t_1 \\in \\mathbb{R}`,
+        `\\therefore \\text{The system is Causal (Depends strictly on past input)}`,
+      ];
+    }
+    return [
+      `\\text{At observation instant } t_1: \\quad y(t_1) \\text{ depends solely on } x(t_1)`,
+      `\\text{Input sampling instant: } \\tau = t_1 \\le t_1 \\quad \\forall t_1 \\in \\mathbb{R}`,
+      `\\therefore \\text{The system is Causal}`,
+    ];
+  }
+
+  return [
+    `y(t_1) \\text{ depends only on } x(\\tau) \\text{ for } \\tau \\le t_1`,
+    `\\therefore \\text{The system is Causal}`,
+  ];
+}
+
+function generateMemoryProof(
+  system: SystemSemantic,
+  delayedTerm: Extract<SystemTerm, { kind: "input-sample" }> | undefined,
+  hasIntegral: boolean,
+  hasDerivative: boolean,
+  derivativeTex: string,
+): string[] {
+  if (delayedTerm) {
+    const alpha = delayedTerm.argument.slope;
+    const beta = delayedTerm.argument.offset;
+    let t = 2;
+    if (near(alpha, 1) && !near(beta)) t = 1;
+    const tau = alpha * t + beta;
+    return [
+      `\\text{A system is memoryless iff } y(t) \\text{ depends solely on } x(t) \\text{ at the same instant } \\tau = t`,
+      `\\text{At } t = ${t}: \\quad y(${t}) = x(${texNumber(tau)}) \\ne x(${t})`,
+      `\\text{Output requires input at time } \\tau = ${texNumber(tau)} \\ne ${t}`,
+      `\\therefore \\text{The system is Dynamic (Has Memory)}`,
+    ];
+  }
+
+  if (hasIntegral) {
+    return [
+      `\\text{A system is memoryless iff } y(t) \\text{ depends solely on } x(t) \\text{ at the identical instant } t`,
+      `y(t) = \\int_{-\\infty}^{t} x(\\tau)\\,d\\tau`,
+      `\\text{Output accumulates the past continuum of inputs } x(\\tau) \\text{ for } \\tau < t`,
+      `\\therefore \\text{The system is Dynamic (Has Memory)}`,
+    ];
+  }
+
+  if (hasDerivative) {
+    return [
+      `\\text{A system is memoryless iff } y(t) \\text{ depends solely on } x(t) \\text{ at the identical instant } t`,
+      `y(t) = ${derivativeTex}`,
+      `\\text{Evaluating the instantaneous slope requires values of } x(\\tau) \\text{ in a neighborhood of } t`,
+      `\\therefore \\text{The system is Dynamic (Has Memory)}`,
+    ];
+  }
+
+  return [
+    `\\text{A system is memoryless iff } y(t) \\text{ depends solely on } x(t) \\text{ at the identical instant } t`,
+    `y(t) \\text{ depends solely on the current input sample } x(t) \\text{ at identical instant } \\tau = t`,
+    `\\text{No values of } x \\text{ from the past or future are required to determine } y(t)`,
+    `\\therefore \\text{The system is Memoryless}`,
+  ];
+}
+
+function generateStabilityProof(
+  system: SystemSemantic,
+  unboundedGain: Extract<SystemTerm, { kind: "input-sample" }> | undefined,
+  unboundedSignal: boolean,
+  hasIntegral: boolean,
+  hasDerivative: boolean,
+  derivativeTex: string,
+): string[] {
+  if (unboundedGain) {
+    return [
+      `\\text{Premise: Let } |x(t)| \\le M_x < \\infty \\quad \\forall t`,
+      `|y(t)| = |t\\,x(t)| = |t|\\,|x(t)| \\le |t|\\,M_x`,
+      `\\lim_{t \\to \\infty} |y(t)| = \\lim_{t \\to \\infty} |t|\\,M_x = \\infty \\quad (\\text{Output grows without bound})`,
+      `\\therefore \\text{The system is Unstable}`,
+    ];
+  }
+
+  if (hasIntegral) {
+    return [
+      `\\text{Premise: Let } |x(t)| \\le M_x < \\infty \\quad \\forall t`,
+      `\\text{Apply the bounded unit step input } x(t) = u(t) \\quad (|u(t)| \\le 1):`,
+      `y(t) = \\int_{-\\infty}^{t} u(\\tau)\\,d\\tau = t\\,u(t) \\implies \\lim_{t \\to \\infty} |y(t)| = \\infty`,
+      `\\therefore \\text{The system is Unstable}`,
+    ];
+  }
+
+  if (hasDerivative) {
+    return [
+      `\\text{Premise: Let } |x(t)| \\le M_x < \\infty \\quad \\forall t`,
+      `\\text{Apply the bounded unit step input } x(t) = u(t) \\quad (|u(t)| \\le 1):`,
+      `y(t) = \\frac{d}{dt}u(t) = \\delta(t) \\implies \\delta(0) \\to \\infty`,
+      `\\text{The impulse response is unbounded at } t = 0`,
+      `\\therefore \\text{The system is Unstable}`,
+    ];
+  }
+
+  if (unboundedSignal) {
+    return [
+      `\\text{Premise: Let } |x(t)| \\le M_x < \\infty \\quad \\forall t`,
+      `\\text{The system contains an unbounded internal signal term } r(t) = t\\,u(t)`,
+      `\\lim_{t \\to \\infty} |y(t)| = \\infty`,
+      `\\therefore \\text{The system is Unstable}`,
+    ];
+  }
+
+  const sampled = inputTerms(system);
+  if (sampled.length > 0) {
+    const term = sampled[0];
+    const pow = !near(term.power, 1) ? `^{${texNumber(term.power)}}` : "";
+    const arg = formatAffineArg(term.argument.slope, term.argument.offset, "t");
+    if (!near(term.power, 1)) {
+      return [
+        `\\text{Premise: Let } |x(t)| \\le M_x < \\infty \\quad \\forall t`,
+        `|y(t)| = |x(${arg})|${pow} \\le M_x${pow} < \\infty \\quad \\forall t`,
+        `\\text{Raising a finite bounded signal to a finite power preserves boundedness}`,
+        `\\therefore \\text{The system is BIBO Stable}`,
+      ];
+    }
+    return [
+      `\\text{Premise: Let } |x(t)| \\le M_x < \\infty \\quad \\forall t`,
+      `|y(t)| = |x(${arg})| \\le M_x < \\infty \\quad \\forall t`,
+      `\\text{Affine argument transformations } (${arg}) \\text{ do not alter the amplitude bound}`,
+      `\\therefore \\text{The system is BIBO Stable}`,
+    ];
+  }
+
+  const constTerm = system.terms.find((t): t is Extract<SystemTerm, { kind: "constant" }> => t.kind === "constant");
+  if (constTerm) {
+    const cTex = texNumber(Math.abs(constTerm.value));
+    return [
+      `\\text{Premise: Let } |x(t)| \\le M_x < \\infty \\quad \\forall t`,
+      `|y(t)| \\le |x(t)| + ${cTex} \\le M_x + ${cTex} < \\infty \\quad \\forall t`,
+      `\\text{Adding a finite constant preserves output boundedness}`,
+      `\\therefore \\text{The system is BIBO Stable}`,
+    ];
+  }
+
+  return [
+    `\\text{Premise: Let } |x(t)| \\le M_x < \\infty \\quad \\forall t`,
+    `|y(t)| \\le M_y < \\infty \\quad \\forall t`,
+    `\\therefore \\text{The system is BIBO Stable}`,
+  ];
+}
+
 export function classifySystem(system: SystemSemantic): ClassificationReport {
   const sampled = inputTerms(system); const hasIntegral = system.terms.some((term) => term.kind === "integral"); const hasDerivative = system.terms.some((term) => term.kind === "derivative");
   const constantOffset = system.terms.some((term) => term.kind === "constant" && !near(term.value));
@@ -204,11 +597,46 @@ export function classifySystem(system: SystemSemantic): ClassificationReport {
   const stable = !hasIntegral && !hasDerivative && !unboundedGain && !unboundedSignal;
 
   const pillars: Pillar[] = [
-    { id: "linearity", title: outline("linearity").title, verdict: linear ? "Linear" : "Non-Linear", passed: linear, visualLead: outline("linearity").visualLead, proof: linear ? ["T\\!\\left\\{a x_1(t)+b x_2(t)\\right\\}=aT\\!\\left\\{x_1(t)\\right\\}+bT\\!\\left\\{x_2(t)\\right\\}", "\\therefore\\ \\text{the system is linear}"] : signalTerm ? [`T\\!\\left\\{0\\right\\}=${signalTex(signalTerm)}\\ne 0`, "\\text{a source independent of }x\\text{ breaks homogeneity}", "\\therefore\\ \\text{the system is nonlinear}"] : constantOffset ? ["T\\!\\left\\{a x_1+b x_2\\right\\}=a x_1+b x_2+5", "aT\\!\\left\\{x_1\\right\\}+bT\\!\\left\\{x_2\\right\\}=a x_1+b x_2+5a+5b", "\\therefore\\ T\\{a x_1+b x_2\\}\\ne aT\\{x_1\\}+bT\\{x_2\\}"] : [`T\\!\\left\\{a x_1+b x_2\\right\\}=\\left(a x_1+b x_2\\right)^{${texNumber(nonlinearTerm?.power ?? 2)}}`, "\\left(a x_1+b x_2\\right)^2\\ne a x_1^2+b x_2^2", "\\therefore\\ \\text{the system is nonlinear}"] },
-    { id: "time", title: outline("time").title, verdict: timeInvariant ? "Time-Invariant" : "Time-Variant", passed: timeInvariant, visualLead: outline("time").visualLead, proof: timeInvariant ? ["T\\!\\left\\{x(t-t_0)\\right\\}=y(t-t_0)", "\\therefore\\ \\text{the system is time-invariant}"] : !variantTerm && signalTerm ? [`T\\!\\left\\{x(t-t_0)\\right\\}\\ \\text{keeps}\\ ${signalTex(signalTerm)}\\ \\text{anchored at}\\ t`, `y(t-t_0)\\ \\text{shifts it to}\\ ${SIGNAL_TEX[signalTerm.signal]}\\!\\left(t-t_0\\right)`, "\\therefore\\ T\\{x(t-t_0)\\}\\ne y(t-t_0)\\quad\\text{(time-variant)}"] : !near(variantTerm?.coefficient.timeSlope ?? 0) ? ["T\\!\\left\\{x(t-t_0)\\right\\}=t\\,x(t-t_0)", "y(t-t_0)=(t-t_0)\\,x(t-t_0)", "\\therefore\\ T\\{x(t-t_0)\\}\\ne y(t-t_0)\\quad\\text{(time-variant)}"] : [`T\\!\\left\\{x(t-t_0)\\right\\}=x\\!\\left(${texNumber(variantTerm?.argument.slope ?? 2)}t-t_0\\right)`, `y(t-t_0)=x\\!\\left(${texNumber(variantTerm?.argument.slope ?? 2)}t-${texNumber(variantTerm?.argument.slope ?? 2)}t_0\\right)`, "\\therefore\\ T\\{x(t-t_0)\\}\\ne y(t-t_0)\\quad\\text{(time-variant)}"] },
-    { id: "causality", title: outline("causality").title, verdict: causal ? "Causal" : "Non-Causal", passed: causal, visualLead: outline("causality").visualLead, proof: causal ? ["y(t_1)\\ \\text{depends only on}\\ x(\\tau),\\quad\\tau\\le t_1", "\\therefore\\ \\text{the system is causal}"] : !futureTerm && derivativeTerm ? [`y(t)=${derivativeTex}=\\lim_{h\\to 0}\\frac{x(t+h)-x(t-h)}{2h}`, "\\text{the limit samples}\\ x(t+h)\\ \\text{with}\\ t+h>t", "\\therefore\\ \\text{the system is non-causal in real time}"] : [`y(t_1)\\ \\text{requires}\\ x\\!\\left(${signedAffine(futureTerm)}\\right)`, `${signedAffine(futureTerm)}>t_1\\quad\\text{for a valid counterexample}`, "\\therefore\\ \\text{the system is non-causal}"] },
-    { id: "memory", title: outline("memory").title, verdict: memoryless ? "Memoryless" : "Dynamic", passed: memoryless, visualLead: outline("memory").visualLead, proof: memoryless ? ["y(t)\\ \\text{depends only on}\\ x(t)", "\\therefore\\ \\text{the system is memoryless}"] : hasIntegral ? ["y(t)=\\int_{-\\infty}^{t}x(\\tau)\\,d\\tau", "y(t)\\ \\text{depends on the input history}\\ x(\\tau),\\ \tau<t", "\\therefore\\ \\text{the system is dynamic}"] : !delayedTerm && derivativeTerm ? [`y(t)=${derivativeTex}`, "\\text{the rate needs input values in a neighbourhood of}\\ t", "\\therefore\\ \\text{the system is dynamic}"] : [`y(t)\\ \\text{uses}\\ x\\!\\left(${signedAffine(delayedTerm).replace("_1", "")}\\right)`, "\\therefore\\ \\text{the system is dynamic}"] },
-    { id: "stability", title: outline("stability").title, verdict: stable ? "BIBO Stable" : "Unstable", passed: stable, visualLead: outline("stability").visualLead, proof: stable ? ["\\left|x(t)\\right|\\le M\\ \Longrightarrow\\ \\left|y(t)\\right|\\le C(M)<\\infty", "\\therefore\\ \\text{the system is BIBO stable}"] : unboundedSignal && !hasIntegral && !hasDerivative ? ["x(t)=u(t)\\ \\text{is bounded, yet}\\ r(t)=t\\,u(t)\\ \\text{is not}", "\\lim_{t\\to\\infty}\\left|y(t)\\right|=\\infty", "\\therefore\\ \\text{the system is unstable}"] : hasIntegral ? ["x(t)=u(t),\\qquad y(t)=\\int_{-\\infty}^{t}u(\\tau)\\,d\\tau=t\\,u(t)", "\\lim_{t\\to\\infty}\\left|y(t)\\right|=\\infty", "\\therefore\\ \\text{the system is unstable}"] : derivativeTerm ? [`x(t)=u(t)\\ \\text{is bounded, yet}\\ ${derivativeTex}=\\delta(t)`, "\\text{the impulse response is unbounded at}\\ t=0", "\\therefore\\ \\text{the system is unstable}"] : ["x(t)=u(t),\\qquad y(t)=t\\,u(t)", "\\lim_{t\\to\\infty}\\left|t\\,u(t)\\right|=\\infty", "\\therefore\\ \\text{the system is unstable}"] },
+    {
+      id: "linearity",
+      title: outline("linearity").title,
+      verdict: linear ? "Linear" : "Non-Linear",
+      passed: linear,
+      visualLead: outline("linearity").visualLead,
+      proof: generateLinearityProof(system, nonlinearTerm, constantOffset, signalTerm, derivativeTex),
+    },
+    {
+      id: "time",
+      title: outline("time").title,
+      verdict: timeInvariant ? "Time-Invariant" : "Time-Variant",
+      passed: timeInvariant,
+      visualLead: outline("time").visualLead,
+      proof: generateTimeInvarianceProof(system, variantTerm, signalTerm),
+    },
+    {
+      id: "causality",
+      title: outline("causality").title,
+      verdict: causal ? "Causal" : "Non-Causal",
+      passed: causal,
+      visualLead: outline("causality").visualLead,
+      proof: generateCausalityProof(system, futureTerm, derivativeTerm, derivativeTex),
+    },
+    {
+      id: "memory",
+      title: outline("memory").title,
+      verdict: memoryless ? "Memoryless" : "Dynamic",
+      passed: memoryless,
+      visualLead: outline("memory").visualLead,
+      proof: generateMemoryProof(system, delayedTerm, hasIntegral, hasDerivative, derivativeTex),
+    },
+    {
+      id: "stability",
+      title: outline("stability").title,
+      verdict: stable ? "BIBO Stable" : "Unstable",
+      passed: stable,
+      visualLead: outline("stability").visualLead,
+      proof: generateStabilityProof(system, unboundedGain, unboundedSignal, hasIntegral, hasDerivative, derivativeTex),
+    },
   ];
   return { pillars };
 }

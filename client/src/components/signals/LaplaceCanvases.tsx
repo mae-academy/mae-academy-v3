@@ -8,10 +8,15 @@ import {
   impulseResponse,
   type TransferFunction,
 } from "@/features/signals/engines/laplaceEngine";
+import { KatexMath } from "@/components/ui/KatexMath";
 import { StandardStepPlot } from "@/components/common/templates/StandardStepPlot";
 
-export function FrequencyResponseCanvases({ system }: { system: TransferFunction }) {
-  const data = useMemo(() => frequencyResponse(system), [system]);
+/** Magnitude and phase slices side by side; `children` (the time response) gets its own full-width row. */
+export function FrequencyResponseCanvases({ system, children }: { system: TransferFunction; children?: React.ReactNode }) {
+  const discrete = system.mode === "z";
+  const gain = discrete ? "|H(e^{j\\Omega})|" : "|H(j\\omega)|"; const angle = discrete ? "\\angle H(e^{j\\Omega})" : "\\angle H(j\\omega)"; const axis = discrete ? "\\Omega\\text{ (rad/sample)}" : "\\omega\\text{ (rad/s)}";
+  const data = useMemo(() => frequencyResponse(system, 260, system.mode === "s" ? 20 : undefined), [system]);
+  const xDomain: [number, number] = system.mode === "s" ? [-20, 20] : [-Math.PI, Math.PI];
 
   const magPoints = useMemo(() => {
     return data.map((item) => ({
@@ -28,39 +33,42 @@ export function FrequencyResponseCanvases({ system }: { system: TransferFunction
   }, [data]);
 
   return (
-    <div className="space-y-4">
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 [&>*]:min-w-0">
       <StandardStepPlot
-        title="Bode Magnitude |H(jω)|"
+        title={<KatexMath math={gain} />}
         series={[
           {
             id: "magnitude",
-            katexName: "|H(j\\omega)|\\text{ (dB)}",
+            katexName: `${gain}\\text{ (dB)}`,
             data: magPoints,
             color: "#2563EB",
           },
         ]}
-        height={180}
-        xLabelKatex="\omega\text{ (rad/s)}"
-        yLabelKatex="|H(j\omega)|\text{ (dB)}"
+        height={320}
+        xDomain={xDomain}
+        xLabelKatex={axis}
+        yLabelKatex={`${gain}\\text{ (dB)}`}
         forceBipolar
         showLegend={false}
       />
       <StandardStepPlot
-        title="Bode Phase ∠H(jω)"
+        title={<KatexMath math={angle} />}
         series={[
           {
             id: "phase",
-            katexName: "\\angle H(j\\omega)\\text{ (rad)}",
+            katexName: `${angle}\\text{ (rad)}`,
             data: phasePoints,
             color: "#E11D48",
           },
         ]}
-        height={180}
-        xLabelKatex="\omega\text{ (rad/s)}"
-        yLabelKatex="\angle H(j\omega)\text{ (rad)}"
+        height={320}
+        xDomain={xDomain}
+        xLabelKatex={axis}
+        yLabelKatex={`${angle}\\text{ (rad)}`}
         forceBipolar
         showLegend={false}
       />
+      {children}
     </div>
   );
 }
@@ -98,7 +106,7 @@ export const ImpulseResponseCanvas = forwardRef<ImpulseResponseCanvasHandle, { s
 
     return (
       <StandardStepPlot
-        title="Impulse Response h(t)"
+        title={<KatexMath math="h(t)" />}
         series={[
           {
             id: "impulse-response",
@@ -108,7 +116,7 @@ export const ImpulseResponseCanvas = forwardRef<ImpulseResponseCanvasHandle, { s
             unit: "",
           },
         ]}
-        height={180}
+        height={320}
         xLabelKatex="t\text{ (s)}"
         yLabelKatex="h(t)"
         forceBipolar

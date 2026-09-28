@@ -54,6 +54,10 @@ type Props = {
   calculus?: boolean;
   extraTokens?: readonly SignalToken[];
   extraTokensLabel?: string;
+  signalTokens?: readonly SignalToken[];
+  signalTokensLabel?: string;
+  operatorTokens?: readonly SignalToken[];
+  operatorTokensLabel?: string;
   className?: string;
   children?: ReactNode;
 };
@@ -77,7 +81,20 @@ function operatorTokensFor(domain: TerminalDomain) {
 }
 
 export const UnifiedSignalEngineTerminal = forwardRef<UnifiedSignalEngineTerminalHandle, Props>(function UnifiedSignalEngineTerminal(
-  { channels, title = "SIGNAL ENGINE", domain = "t", calculus = domain === "t", extraTokens, extraTokensLabel = "Studio tokens", className, children },
+  {
+    channels,
+    title = "SIGNAL ENGINE",
+    domain = "t",
+    calculus = domain === "t",
+    extraTokens,
+    extraTokensLabel = "Studio tokens",
+    signalTokens: customSignalTokens,
+    signalTokensLabel,
+    operatorTokens: customOperatorTokens,
+    operatorTokensLabel,
+    className,
+    children,
+  },
   ref,
 ) {
   const uid = useId();
@@ -86,8 +103,14 @@ export const UnifiedSignalEngineTerminal = forwardRef<UnifiedSignalEngineTermina
   const [activeId, setActiveId] = useState(channels[0]?.id ?? "");
   const [status, setStatus] = useState<CalculusStatus>(null);
   const active = channels.find((channel) => channel.id === activeId) ?? channels[0];
-  const signalTokens = useMemo(() => (domain === "t" ? SIGNAL_TOKENS : domain === "n" ? discreteTokens() : domain === "w" ? spectrumTokens() : transferTokens(domain)), [domain]);
-  const operatorTokens = useMemo(() => operatorTokensFor(domain), [domain]);
+  const signalTokens = useMemo(
+    () => customSignalTokens ?? (domain === "t" ? SIGNAL_TOKENS : domain === "n" ? discreteTokens() : domain === "w" ? spectrumTokens() : transferTokens(domain)),
+    [customSignalTokens, domain],
+  );
+  const operatorTokens = useMemo(
+    () => customOperatorTokens ?? operatorTokensFor(domain),
+    [customOperatorTokens, domain],
+  );
 
   useImperativeHandle(ref, () => ({
     setValue: (latex, channelId) => { editors.current[channelId ?? active?.id ?? ""]?.setValue(splitSignalEquation(latex).rhs); },
@@ -171,7 +194,7 @@ export const UnifiedSignalEngineTerminal = forwardRef<UnifiedSignalEngineTermina
 
         <div className="min-w-0 space-y-3">
           <div>
-            <p className={sectionLabel}>{domain === "t" ? "Signals" : domain === "n" ? "Sequences" : domain === "w" ? "Spectrum" : "Transfer function"}</p>
+            <p className={sectionLabel}>{signalTokensLabel ?? (domain === "t" ? "Signals" : domain === "n" ? "Sequences" : domain === "w" ? "Spectrum" : "Transfer function")}</p>
             <div className="mt-2 flex flex-wrap gap-1.5">
               {signalTokens.map((token) => (
                 <button key={token.id} type="button" aria-label={token.ariaLabel} onMouseDown={keepFocus} onClick={() => insert(token)} className={chip}><KatexMath math={token.label} /></button>
@@ -179,7 +202,7 @@ export const UnifiedSignalEngineTerminal = forwardRef<UnifiedSignalEngineTermina
             </div>
           </div>
           <div>
-            <p className={sectionLabel}>Operators &amp; constants</p>
+            <p className={sectionLabel}>{operatorTokensLabel ?? "Operators & constants"}</p>
             <div className="mt-2 flex flex-wrap gap-1.5">
               {operatorTokens.map((token) => (
                 <button key={token.id} type="button" aria-label={token.ariaLabel} onMouseDown={keepFocus} onClick={() => insert(token)} className={cn(chip, "min-w-10")}><KatexMath math={token.label} /></button>

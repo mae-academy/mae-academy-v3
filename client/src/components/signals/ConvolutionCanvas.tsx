@@ -222,7 +222,7 @@ function SvgScopeTier({
   return (
     <div
       ref={containerRef}
-      className="relative min-h-[240px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-inner dark:border-slate-800 dark:bg-[#07101e]"
+      className="relative min-h-[240px] overflow-hidden rounded-2xl border border-slate-200 bg-slate-50/60 shadow-sm backdrop-blur-sm dark:border-slate-800 dark:bg-slate-900/60"
       style={{ height }}
     >
       <svg

@@ -40,17 +40,17 @@ export function SystemProofCanvas({ system, pillar, a, b, t0 }: Props) {
         yLabel: "y(t)",
         series: [
           {
-            id: "input",
-            katexName: "x(t)\\text{ (bounded)}",
-            data: points.map((p) => ({ x: p.t, y: p.input })),
-            color: "#64748B",
-            dashArray: "5 5",
-          },
-          {
             id: "output",
             katexName: "y(t)",
             data: points.map((p) => ({ x: p.t, y: p.output })),
-            color: isUnstable ? "#E11D48" : "#2563EB",
+            color: "#2563EB",
+          },
+          {
+            id: "input",
+            katexName: "x(t)\\text{ (bounded)}",
+            data: points.map((p) => ({ x: p.t, y: p.input })),
+            color: "#DC2626",
+            dashArray: "5 5",
           },
         ],
       };
@@ -77,7 +77,7 @@ export function SystemProofCanvas({ system, pillar, a, b, t0 }: Props) {
             id: "right",
             katexName: "a T\\{x_1\\} + b T\\{x_2\\}",
             data: data.map((p) => ({ x: p.t, y: p.right })),
-            color: "#EA580C",
+            color: "#DC2626",
             dashArray: "6 4",
           },
         ],
@@ -105,7 +105,7 @@ export function SystemProofCanvas({ system, pillar, a, b, t0 }: Props) {
             id: "shifted-output",
             katexName: "y(t - t_0)",
             data: data.map((p) => ({ x: p.t, y: p.right })),
-            color: "#EA580C",
+            color: "#DC2626",
             dashArray: "6 4",
           },
         ],
@@ -132,17 +132,17 @@ export function SystemProofCanvas({ system, pillar, a, b, t0 }: Props) {
         yLabel: "y(t)",
         series: [
           {
-            id: "input",
-            katexName: "x(t)",
-            data: inputData,
-            color: "#64748B",
-            dashArray: "4 4",
-          },
-          {
             id: "output",
             katexName: "y(t)",
             data: outputData,
-            color: verdict === "Non-Causal" ? "#E11D48" : "#2563EB",
+            color: "#2563EB",
+          },
+          {
+            id: "input",
+            katexName: "x(t)",
+            data: inputData,
+            color: "#DC2626",
+            dashArray: "4 4",
           },
         ],
       };
@@ -168,17 +168,17 @@ export function SystemProofCanvas({ system, pillar, a, b, t0 }: Props) {
       yLabel: "y(t)",
       series: [
         {
-          id: "input",
-          katexName: "x(t)",
-          data: inputData,
-          color: "#64748B",
-          dashArray: "4 4",
-        },
-        {
           id: "output",
           katexName: "y(t)",
           data: outputData,
-          color: verdict === "Dynamic" ? "#EA580C" : "#2563EB",
+          color: "#2563EB",
+        },
+        {
+          id: "input",
+          katexName: "x(t)",
+          data: inputData,
+          color: "#DC2626",
+          dashArray: "4 4",
         },
       ],
     };

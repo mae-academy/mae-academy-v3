@@ -43,7 +43,7 @@ export type SignalAnalysis = {
 
 type TokenKind = "number" | "identifier" | "operator" | "leftParen" | "rightParen" | "end";
 type Token = { kind: TokenKind; value: string; index: number };
-type LinearForm = { slope: number; offset: number };
+export type LinearForm = { slope: number; offset: number };
 
 const KNOWN_FUNCTIONS = new Set<SignalFunction>(["u", "r", "delta", "rect", "tri", "sinc", "Sa", "sin", "cos", "tan", "exp", "ln", "log", "abs", "sqrt", "sgn", "int", "runint", "derivative"]);
 const EPSILON = 1e-9;
@@ -288,7 +288,7 @@ export function toLatex(node: SignalNode, timeSymbol = "t"): string {
   }
 }
 
-function linearForm(node: SignalNode): LinearForm | null {
+export function linearForm(node: SignalNode): LinearForm | null {
   if (node.kind === "number") return { slope: 0, offset: node.value };
   if (node.kind === "variable") return node.name === "t" ? { slope: 1, offset: 0 } : { slope: 0, offset: Math.PI };
   if (node.kind === "unary") { const value = linearForm(node.value); return value ? { slope: node.operator === "-" ? -value.slope : value.slope, offset: node.operator === "-" ? -value.offset : value.offset } : null; }

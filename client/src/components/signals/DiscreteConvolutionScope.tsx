@@ -7,6 +7,7 @@
  */
 import { symmetricYBound } from "@/lib/plotAutoScale";
 import { SvgKatexTick } from "@/components/common/templates/SvgKatexTick";
+import { useElementSize } from "@/hooks/useElementSize";
 import React, { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { Play, Pause, StepForward, Rewind, RotateCcw } from "lucide-react";
 import { KatexMath } from "@/components/ui/KatexMath";
@@ -30,7 +31,7 @@ export type DiscreteConvolutionScopeProps = {
   hideControls?: boolean;
 };
 
-const PAD = { top: 24, right: 28, bottom: 44, left: 48 };
+const PAD = { top: 24, right: 48, bottom: 44, left: 48 };
 const COLORS = {
   x: "#2563EB",
   h: "#E11D48",
@@ -49,7 +50,7 @@ interface StemTierProps {
   xMax: number;
   height?: number;
   activeMarkerX?: number;
-  hudContent?: (size: { width: number; height: number }) => React.ReactNode;
+  hudContent?: (coords: { width: number; height: number; mapX: (k: number) => number; mapY: (v: number) => number }) => React.ReactNode;
   onPointerMove?: (domainX: number, relX: number, relY: number) => void;
   onPointerLeave?: () => void;
   children: (coords: {
@@ -76,24 +77,7 @@ function StemScopeTier({
   onPointerLeave,
   children,
 }: StemTierProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [size, setSize] = useState({ width: 500, height });
-
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const update = () => {
-      const rect = el.getBoundingClientRect();
-      if (rect.width > 0 && rect.height > 0) {
-        setSize({ width: rect.width, height: rect.height });
-      }
-    };
-    update();
-    const observer = new ResizeObserver(update);
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
-
+  const [containerRef, size] = useElementSize<HTMLDivElement>({ width: 500, height });
   const plotW = Math.max(10, size.width - PAD.left - PAD.right);
   const plotH = Math.max(10, size.height - PAD.top - PAD.bottom);
 
@@ -113,12 +97,14 @@ function StemScopeTier({
   const zeroX = mapX(0);
   const zeroY = mapY(0);
 
-  // Integer ticks for horizontal axis
+  // Integer ticks for horizontal axis, strictly symmetric about 0
   const xTicks = useMemo(() => {
-    const ticks: number[] = [];
-    const step = xMax - xMin > 18 ? 2 : 1;
-    for (let k = Math.ceil(xMin); k <= Math.floor(xMax); k += step) {
+    const ticks: number[] = [0];
+    const span = xMax - xMin;
+    const step = span > 24 ? 2 : 1;
+    for (let k = step; k <= xMax; k += step) {
       ticks.push(k);
+      ticks.unshift(-k);
     }
     return ticks;
   }, [xMin, xMax]);
@@ -138,22 +124,22 @@ function StemScopeTier({
     const svgRect = e.currentTarget.getBoundingClientRect();
     const relX = e.clientX - svgRect.left;
     const relY = e.clientY - svgRect.top;
-    const domainK = Math.round(xMin + ((relX - PAD.left) / plotW) * (xMax - xMin));
+    const innerWidth = Math.max(10, svgRect.width - PAD.left - PAD.right);
+    const domainK = Math.round(xMin + ((relX - PAD.left) / innerWidth) * (xMax - xMin));
     onPointerMove(domainK, relX, relY);
   };
 
   return (
     <div
       ref={containerRef}
-      className="relative min-h-[240px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-inner dark:border-slate-800 dark:bg-[#07101e]"
+      className="relative min-h-[240px] overflow-hidden rounded-2xl border border-slate-200 bg-slate-50/60 shadow-sm backdrop-blur-sm dark:border-slate-800 dark:bg-slate-900/60"
       style={{ height }}
     >
       <svg
         className="stem-scope-svg absolute inset-0 h-full w-full select-none cursor-crosshair"
         onPointerMove={handlePointer}
         onPointerLeave={onPointerLeave}
-        onMouseMove={handlePointer}
-        onMouseLeave={onPointerLeave}
+        onPointerCancel={onPointerLeave}
       >
         {/* Subtle dashed auxiliary vertical grid lines */}
         {xTicks.map((k) => {
@@ -221,7 +207,7 @@ function StemScopeTier({
 
         {/* Horizontal Axis Numbers */}
         {xTicks.map((k) => (
-          <SvgKatexTick x={mapX(k)} y={size.height - PAD.bottom + 18} anchor="middle" baseline active={k === activeMarkerX}>{k}</SvgKatexTick>
+          <SvgKatexTick key={`tick-x-${k}`} x={mapX(k)} y={size.height - PAD.bottom + 18} anchor="middle" baseline active={k === activeMarkerX}>{k}</SvgKatexTick>
         ))}
 
         {/* Stems & Waveform Content */}
@@ -252,7 +238,7 @@ function StemScopeTier({
       </div>
 
       {/* Golden Floating HUD */}
-      {hudContent?.(size)}
+      {hudContent?.({ width: size.width, height: size.height, mapX, mapY })}
     </div>
   );
 }
@@ -307,10 +293,7 @@ export function DiscreteConvolutionScope({
     const minReach = Math.min(0, -(Nh - 1));
     const maxReach = Math.max(Nx - 1, Nx + Nh - 2);
     // Finite support of x[k], h[n-k] and y[n], padded by one sample so stems never touch the frame edge.
-    const spanBound = Math.max(Math.abs(minReach), Math.abs(maxReach)) + 1;
-    // n ∈ [min − 1, max + 1]: the full finite support plus one sample of clearance on each side (k = 0 stays on-screen).
-    const kLo = Math.min(0, minReach) - 1;
-    const kHi = Math.max(maxReach, spanBound - 1) + 1;
+    const spanBound = Math.max(Math.abs(minReach), Math.abs(maxReach), 5) + 1;
 
     // Amplitude peak across x, h, products, and y
     const maxVal = Math.max(
@@ -322,8 +305,8 @@ export function DiscreteConvolutionScope({
     const ampBound = symmetricYBound(maxVal);
 
     return {
-      kMin: kLo,
-      kMax: kHi,
+      kMin: -spanBound,
+      kMax: spanBound,
       ampMax: ampBound,
     };
   }, [x, h, convResult.values]);
@@ -458,12 +441,12 @@ export function DiscreteConvolutionScope({
           setHoverData({ tier: 1, domainVal, relX, relY })
         }
         onPointerLeave={() => setHoverData(null)}
-        hudContent={({ width, height }) =>
+        hudContent={({ width, height, mapX }) =>
           hoverData?.tier === 1 && (
             <div
               className="absolute z-30 pointer-events-none px-3 py-1.5 rounded-xl bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-slate-200/80 dark:border-slate-800 shadow-xl text-xs space-y-1 transition-transform"
               style={{
-                left: Math.min(width - 160, Math.max(12, hoverData.relX + 14)),
+                left: Math.min(width - 160, Math.max(12, mapX(hoverData.domainVal) + 14)),
                 top: Math.min(height - 85, Math.max(12, hoverData.relY - 30)),
               }}
             >
@@ -582,12 +565,12 @@ export function DiscreteConvolutionScope({
           setHoverData({ tier: 2, domainVal, relX, relY })
         }
         onPointerLeave={() => setHoverData(null)}
-        hudContent={({ width, height }) =>
+        hudContent={({ width, height, mapX }) =>
           hoverData?.tier === 2 && (
             <div
               className="absolute z-30 pointer-events-none px-3 py-1.5 rounded-xl bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-slate-200/80 dark:border-slate-800 shadow-xl text-xs space-y-1 transition-transform"
               style={{
-                left: Math.min(width - 160, Math.max(12, hoverData.relX + 14)),
+                left: Math.min(width - 160, Math.max(12, mapX(hoverData.domainVal) + 14)),
                 top: Math.min(height - 75, Math.max(12, hoverData.relY - 30)),
               }}
             >
@@ -694,12 +677,12 @@ export function DiscreteConvolutionScope({
           setHoverData({ tier: 3, domainVal, relX, relY })
         }
         onPointerLeave={() => setHoverData(null)}
-        hudContent={({ width, height }) =>
+        hudContent={({ width, height, mapX }) =>
           hoverData?.tier === 3 && (
             <div
               className="absolute z-30 pointer-events-none px-3 py-1.5 rounded-xl bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-slate-200/80 dark:border-slate-800 shadow-xl text-xs space-y-1 transition-transform"
               style={{
-                left: Math.min(width - 160, Math.max(12, hoverData.relX + 14)),
+                left: Math.min(width - 160, Math.max(12, mapX(hoverData.domainVal) + 14)),
                 top: Math.min(height - 75, Math.max(12, hoverData.relY - 30)),
               }}
             >
@@ -761,18 +744,9 @@ export function DiscreteConvolutionScope({
                         cy={sy}
                         r={4.5}
                         fill={COLORS.output}
-                        stroke="#FFFFFF"
+                        className="stroke-white dark:stroke-slate-900"
                         strokeWidth={2}
                       />
-                      {/* Value readout badge */}
-                      <text
-                        x={sx}
-                        y={val > 0 ? sy - 8 : sy + 15}
-                        textAnchor="middle"
-                        className="fill-blue-600 font-mono text-[10px] font-bold dark:fill-blue-400"
-                      >
-                        y[{m}]={val}
-                      </text>
                     </g>
                   );
                 }
@@ -793,7 +767,7 @@ export function DiscreteConvolutionScope({
                         cy={sy}
                         r={4}
                         fill={COLORS.output}
-                        stroke="#FFFFFF"
+                        className="stroke-white dark:stroke-slate-900"
                         strokeWidth={1.5}
                       />
                     </g>

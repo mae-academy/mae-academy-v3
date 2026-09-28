@@ -11,7 +11,7 @@ import { StatusBadge, StudioSlider, StudioCard, InnerBox } from "@/components/co
 import { UnifiedSignalEngineTerminal } from "@/components/signals/common/UnifiedSignalEngineTerminal";
 import type { SignalToken } from "@/lib/signals/unifiedSignalParser";
 import SystemProofCanvas from "@/components/signals/SystemProofCanvas";
-import { classifySystem, parseSystemExpression, PILLAR_OUTLINE, type Pillar, type PillarId } from "@/features/signals/engines/systemClassifier";
+import { classifySystem, evaluateSystem, parseSystemExpression, PILLAR_OUTLINE, x2, type Pillar, type PillarId } from "@/features/signals/engines/systemClassifier";
 
 const tex = String.raw;
 const idle = "border-slate-200 text-slate-600 hover:border-violet-300 hover:text-violet-700 dark:border-slate-800 dark:text-slate-300 dark:hover:border-violet-500 dark:hover:text-violet-200";
@@ -21,12 +21,28 @@ const presets = [
   { label: tex`y(t)=x^2(t)`, latex: "y(t)=x^2(t)" }, { label: tex`y(t)=\int_{-\infty}^{t}x(\tau)\,d\tau`, latex: "y(t)=\\int_{-\\infty}^{t}x(\\tau)\\,d\\tau" },
 ] as const;
 
-// System-specific input/operator tokens appended to the unified keypad (the classifier grammar is x(t)-based).
-const systemTokens: readonly SignalToken[] = [
+// System-specific input tokens strictly aligned with the classifier grammar:
+// input samples x(t), scaled x(2t), shifted x(t-1), reflected x(-t), power x^2(t),
+// time-multipliers t x(t), running integral, derivatives, and canonical step source.
+const systemSignalTokens: readonly SignalToken[] = [
   { id: "x", label: tex`x(t)`, insert: "x(t)", mode: "after", ariaLabel: "Input x of t" },
-  { id: "x2t", label: tex`x(2t)`, insert: "x(2t)", mode: "after", ariaLabel: "Time-scaled input" },
-  { id: "tx", label: tex`t\,x(t)`, insert: "t\\,x(t)", mode: "after", ariaLabel: "Time-weighted input" },
-  { id: "xsq", label: tex`x^2(t)`, insert: "x^{2}(t)", mode: "after", ariaLabel: "Squared input" },
+  { id: "x2t", label: tex`x(2t)`, insert: "x(2t)", mode: "after", ariaLabel: "Time-scaled input x(2t)" },
+  { id: "xshift", label: tex`x(t-1)`, insert: "x(t-1)", mode: "after", ariaLabel: "Time-shifted input x(t-1)" },
+  { id: "xrefl", label: tex`x(-t)`, insert: "x(-t)", mode: "after", ariaLabel: "Time-reflected input x(-t)" },
+  { id: "xsq", label: tex`x^2(t)`, insert: "x^{2}(t)", mode: "after", ariaLabel: "Squared input x^2(t)" },
+  { id: "tx", label: tex`t\,x(t)`, insert: "t\\,x(t)", mode: "after", ariaLabel: "Time-weighted input t x(t)" },
+  { id: "t", label: tex`t`, insert: "t", mode: "after", ariaLabel: "Time variable t" },
+  { id: "u", label: tex`u(t)`, insert: "u(t)", mode: "after", ariaLabel: "Unit step source u(t)" },
+];
+
+const systemOperatorTokens: readonly SignalToken[] = [
+  { id: "plus", label: "+", insert: "+", mode: "after", ariaLabel: "Plus" },
+  { id: "minus", label: "-", insert: "-", mode: "after", ariaLabel: "Minus" },
+  { id: "times", label: tex`\times`, insert: tex`\times`, mode: "after", ariaLabel: "Multiply" },
+  { id: "power", label: tex`x^{\square}`, insert: "^{#?}", mode: "placeholder", ariaLabel: "Power" },
+];
+
+const systemExtraTokens: readonly SignalToken[] = [
   { id: "runint", label: tex`\int_{-\infty}^{t}x(\tau)\,d\tau`, insert: "\\int_{-\\infty}^{t}x(\\tau)\\,d\\tau", mode: "after", ariaLabel: "Running integral of the input" },
   { id: "defint", label: tex`\int_{-\infty}^{\infty}x(t)\,dt`, insert: "\\int_{-\\infty}^{\\infty}x(t)\\,dt", mode: "after", ariaLabel: "Definite integral of the input" },
   { id: "ddt", label: tex`\frac{d}{dt}x(t)`, insert: "\\frac{d}{dt}x(t)", mode: "after", ariaLabel: "Derivative of the input" },
@@ -34,33 +50,49 @@ const systemTokens: readonly SignalToken[] = [
   { id: "xpp", label: tex`x''(t)`, insert: "x^{\\prime\\prime}(t)", mode: "after", ariaLabel: "Second derivative of the input" },
 ];
 
-function PillarIcon({ id }: { id: PillarId }) { const icons = { linearity: FunctionSquare, time: Timer, causality: ChevronRight, memory: Braces, stability: Activity }; const Icon = icons[id]; return <Icon className="h-4 w-4" />; }
-function Slider({ label, value, onChange, min, max, step = 0.1 }: { label: string; value: number; onChange: (next: number) => void; min: number; max: number; step?: number }) { return <StudioSlider label={<KatexMath math={label} />} value={value} onChange={onChange} min={min} max={max} step={step} />; }
+import {
+  PillarDerivationCard,
+  PillarIcon,
+  PillarSubtitle,
+  PendingBadge,
+  VerdictBadge,
+} from "@/features/signals/ui/ClassificationPillars";
 
-function PendingBadge() {
+function Slider({
+  label,
+  value,
+  onChange,
+  min = -2,
+  max = 2,
+  step = 0.1,
+  className,
+}: {
+  label: string;
+  value: number;
+  onChange: (next: number) => void;
+  min?: number;
+  max?: number;
+  step?: number;
+  className?: string;
+}) {
   return (
-    <StatusBadge variant="neutral" className="gap-1.5 uppercase tracking-[0.1em] text-[10px]">
-      <CircleAlert className="h-3.5 w-3.5" />
-      Syntax check
-    </StatusBadge>
-  );
-}
-
-function VerdictBadge({ pillar }: { pillar: Pillar }) {
-  return (
-    <StatusBadge
-      variant={pillar.passed ? "info" : "danger"}
-      className="gap-1.5 uppercase tracking-[0.1em] text-[10px]"
-    >
-      {pillar.passed ? <CheckCircle2 className="h-3.5 w-3.5" /> : <CircleAlert className="h-3.5 w-3.5" />}
-      {pillar.verdict}
-    </StatusBadge>
+    <StudioSlider
+      label={<KatexMath math={label} />}
+      value={value}
+      onChange={onChange}
+      min={min}
+      max={max}
+      step={step}
+      showLimits
+      valueDisplay={<span className="font-serif text-xs"><KatexMath math={`${label} = ${value.toFixed(1)}`} /></span>}
+      className={`min-w-[200px] max-w-sm flex-1 [&_.relative.flex]:h-6 [&_span.h-1\\.5]:h-2.5 [&_span.h-4.w-4]:h-5 [&_span.h-4.w-4]:w-5 [&_span.h-4.w-4]:shadow-md ${className ?? ""}`}
+    />
   );
 }
 
 export function SystemClassificationLab() {
   const [expression, setExpression] = useState(tex`y(t)=x(2t)`);
-  const [a, setA] = useState(1.2); const [b, setB] = useState(-0.7); const [t0, setT0] = useState(0.6);
+  const [a, setA] = useState(1.0); const [b, setB] = useState(-1.0); const [t0, setT0] = useState(1.0);
   const parsed = useMemo(() => parseSystemExpression(expression), [expression]);
   const report = useMemo(() => parsed.ok ? classifySystem(parsed.system) : null, [parsed]);
 
@@ -69,14 +101,19 @@ export function SystemClassificationLab() {
       <div className="flex flex-col gap-4 border-b border-slate-200 pb-5 dark:border-slate-800 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h2 className="mt-1 text-xl font-black tracking-tight text-slate-900 dark:text-white">System Classification</h2>
-          <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500 dark:text-slate-400">Enter a system in terms of its input <KatexMath math="x(t)" />.</p>
+          <p className="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">Enter a system in terms of its input <KatexMath math="x(t)" />.</p>
         </div>
       </div>
-      <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1fr)_18rem]">
+      <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <UnifiedSignalEngineTerminal
           channels={[{ id: "y", lhs: "y(t)", value: expression, onChange: (rhs) => setExpression(`y(t)=${rhs}`), error: parsed.ok ? null : parsed.error }]}
-          extraTokens={systemTokens}
-          extraTokensLabel="System operators"
+          signalTokens={systemSignalTokens}
+          signalTokensLabel="System inputs"
+          operatorTokens={systemOperatorTokens}
+          operatorTokensLabel="Operators & powers"
+          extraTokens={systemExtraTokens}
+          extraTokensLabel="System calculus & derivatives"
+          calculus={false}
         />
         <InnerBox className="self-start">
           <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-white pb-2 border-b border-slate-100 dark:border-slate-800">ACADEMIC TEST SYSTEMS</h3>
@@ -89,7 +126,7 @@ export function SystemClassificationLab() {
     <StudioCard>
       <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
         <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-white pb-2 border-b border-slate-100 dark:border-slate-800">FIVE CLASSIFICATION PILLARS</h3>
-        <p className="max-w-md text-right text-xs leading-5 text-slate-500 dark:text-slate-400">Solid blue represents the direct system test. Dashed orange represents the comparison construction; overlap is the visual proof.</p>
+        <p className="max-w-md text-right text-xs leading-5 text-slate-500 dark:text-slate-400">Solid blue represents the direct system test. Dashed red represents the comparison construction; overlap is the visual proof.</p>
       </div>
       <Accordion type="multiple" defaultValue={["linearity", "time"]} className="space-y-3">
         {PILLAR_OUTLINE.map((entry) => {
@@ -99,30 +136,36 @@ export function SystemClassificationLab() {
               <span className="flex min-w-0 items-center gap-3">
                 <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${!pillar ? "bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500" : pillar.passed ? "bg-blue-100 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200" : "bg-rose-100 text-rose-700 dark:bg-rose-400/10 dark:text-rose-200"}`}><PillarIcon id={entry.id} /></span>
                 <span className="min-w-0 text-left">
-                  <span className="block text-sm font-black text-slate-900 dark:text-white">{entry.title}{pillar ? ` (${pillar.verdict})` : ""}</span>
-                  <span className="mt-0.5 block text-xs font-normal text-slate-500 dark:text-slate-400">{entry.visualLead}</span>
+                  <span className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm font-black text-slate-900 dark:text-white">{entry.title}</span>
+                    {pillar ? <VerdictBadge pillar={pillar} /> : <PendingBadge />}
+                  </span>
+                  <PillarSubtitle id={entry.id} />
                 </span>
               </span>
-              {pillar ? <VerdictBadge pillar={pillar} /> : <PendingBadge />}
             </AccordionTrigger>
             <AccordionContent className="px-4 pb-5">
               {pillar && parsed.ok ? <div className="grid gap-4 xl:grid-cols-[minmax(0,1.45fr)_minmax(17rem,0.55fr)]">
                 <div>
                   <SystemProofCanvas system={parsed.system} pillar={pillar.id} a={a} b={b} t0={t0} />
-                  <div className="mt-3 flex flex-wrap gap-4">
-                    {pillar.id === "linearity" && <><Slider label="a" value={a} onChange={setA} min={-2} max={2} /><Slider label="b" value={b} onChange={setB} min={-2} max={2} /></>}
-                    {pillar.id === "time" && <Slider label="t_0" value={t0} onChange={setT0} min={-1.5} max={1.5} />}
+                  <div className="mt-4 flex flex-col gap-3">
+                    {pillar.id === "linearity" && (
+                      <div className="flex flex-wrap items-center gap-4">
+                        <Slider label="a" value={a} onChange={setA} min={-2} max={2} step={0.1} />
+                        <Slider label="b" value={b} onChange={setB} min={-2} max={2} step={0.1} />
+                      </div>
+                    )}
+                    {pillar.id === "time" && (
+                      <div className="flex flex-wrap items-center gap-4">
+                        <Slider label="t_0" value={t0} onChange={setT0} min={-2} max={2} step={0.1} />
+                      </div>
+                    )}
                     {pillar.id === "causality" && <p className="text-xs text-rose-600 dark:text-rose-300">The red region represents future input samples relative to the marked output instant.</p>}
-                    {pillar.id === "memory" && <p className="text-xs text-slate-500 dark:text-slate-400">Dashed slate: input <KatexMath math="x(t)" />. Solid trace: system output.</p>}
-                    {pillar.id === "stability" && <p className="text-xs text-slate-500 dark:text-slate-400">Dashed slate: bounded <KatexMath math="u(t)" />. Auto-range preserves the exploding output envelope when applicable.</p>}
+                    {pillar.id === "memory" && <p className="text-xs text-slate-500 dark:text-slate-400">Dashed red: input <KatexMath math="x(t)" />. Solid blue: system output.</p>}
+                    {pillar.id === "stability" && <p className="text-xs text-slate-500 dark:text-slate-400">Dashed red: bounded <KatexMath math="u(t)" />. Solid blue: system output.</p>}
                   </div>
                 </div>
-                <InnerBox>
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-white pb-2 border-b border-slate-100 dark:border-slate-800">DERIVATION</h3>
-                  <div className="mt-3 space-y-3 overflow-x-auto">
-                    {pillar.proof.map((step, index) => <KatexMath key={index} math={step} block className="block text-left text-xs leading-6 text-slate-600 dark:text-slate-300" />)}
-                  </div>
-                </InnerBox>
+                <PillarDerivationCard proof={pillar.proof} />
               </div> : <div className="rounded-xl border border-dashed border-slate-300 bg-white/60 p-6 text-center dark:border-slate-700 dark:bg-slate-950/40">
                 <p className="text-xs font-bold text-slate-500 dark:text-slate-400">Awaiting valid input</p>
                 <p className="mt-1 text-xs leading-5 text-slate-400 dark:text-slate-500">{parsed.ok ? "Recomputing the proof trace…" : parsed.error}</p>

@@ -117,8 +117,13 @@ export function DiscreteConvolutionTable({
               onChange={(event) => setXSource(event.target.value)}
               className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 font-mono text-sm text-slate-900 outline-none focus:border-blue-500 dark:border-slate-800 dark:bg-slate-950 dark:text-white"
             />
-            <div className="mt-1.5 flex items-center gap-1.5 rounded-lg border border-slate-200/70 bg-slate-50/70 px-2 py-0.5 text-xs dark:border-slate-800 dark:bg-slate-900/60 font-serif">
+            <div className="mt-1.5 flex items-center justify-between gap-1.5 rounded-lg border border-slate-200/70 bg-slate-50/70 px-2 py-0.5 text-xs dark:border-slate-800 dark:bg-slate-900/60 font-serif">
               <KatexMath math={`x[n] = \\{${x.map(tv).join(",\\; ")}\\}`} />
+              {x.length === 1 && x[0] === 1 && (
+                <span className="text-[11px] font-sans text-blue-600 dark:text-blue-400 font-medium">
+                  (<KatexMath math="x[n] = \delta[n]" />)
+                </span>
+              )}
             </div>
           </label>
           <label className="text-xs font-bold text-slate-600 dark:text-slate-300">
@@ -128,8 +133,13 @@ export function DiscreteConvolutionTable({
               onChange={(event) => setHSource(event.target.value)}
               className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 font-mono text-sm text-slate-900 outline-none focus:border-blue-500 dark:border-slate-800 dark:bg-slate-950 dark:text-white"
             />
-            <div className="mt-1.5 flex items-center gap-1.5 rounded-lg border border-slate-200/70 bg-slate-50/70 px-2 py-0.5 text-xs dark:border-slate-800 dark:bg-slate-900/60 font-serif">
+            <div className="mt-1.5 flex items-center justify-between gap-1.5 rounded-lg border border-slate-200/70 bg-slate-50/70 px-2 py-0.5 text-xs dark:border-slate-800 dark:bg-slate-900/60 font-serif">
               <KatexMath math={`h[n] = \\{${h.map(tv).join(",\\; ")}\\}`} />
+              {h.length === 1 && h[0] === 1 && (
+                <span className="text-[11px] font-sans text-rose-600 dark:text-rose-400 font-medium">
+                  (<KatexMath math="h[n] = \delta[n]" />)
+                </span>
+              )}
             </div>
           </label>
         </InnerBox>
@@ -151,12 +161,12 @@ export function DiscreteConvolutionTable({
             <StatusBadge variant="info">
               {`Step n = ${index} / ${maxN} · Reverse Diagonal`}
             </StatusBadge>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1.5">
               <button
                 type="button"
                 onClick={() => setActive(Math.max(0, index - 1))}
                 disabled={index <= 0}
-                className="rounded-lg border border-slate-200 px-2 py-0.5 font-mono text-[10px] font-bold text-slate-700 hover:bg-slate-100 disabled:opacity-30 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800 transition cursor-pointer"
+                className="rounded-lg border border-slate-200 px-2.5 py-1 font-['Poppins',sans-serif] font-medium text-xs text-slate-700 hover:bg-slate-100 disabled:opacity-30 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800 transition cursor-pointer"
                 title="Previous step"
               >
                 &larr; Prev
@@ -165,7 +175,7 @@ export function DiscreteConvolutionTable({
                 type="button"
                 onClick={() => setActive(Math.min(maxN, index + 1))}
                 disabled={index >= maxN}
-                className="rounded-lg border border-slate-200 px-2 py-0.5 font-mono text-[10px] font-bold text-slate-700 hover:bg-slate-100 disabled:opacity-30 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800 transition cursor-pointer"
+                className="rounded-lg border border-slate-200 px-2.5 py-1 font-['Poppins',sans-serif] font-medium text-xs text-slate-700 hover:bg-slate-100 disabled:opacity-30 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800 transition cursor-pointer"
                 title="Next step"
               >
                 Next &rarr;
@@ -188,19 +198,27 @@ export function DiscreteConvolutionTable({
             <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.17em] text-slate-500 dark:text-slate-400">
               Matrix Product Grid (k &times; j)
             </p>
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse text-center text-xs">
+            <div className="overflow-x-auto pb-1">
+              <table className="border-collapse text-center text-xs mx-auto">
                 <thead>
                   <tr>
-                    <th className="border border-slate-200 bg-slate-100/80 p-1.5 text-center font-serif text-xs text-slate-500 dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-400">
-                      <KatexMath math="x[k] \backslash h[n-k]" />
+                    <th className="w-12 h-10 min-w-12 max-w-12 border border-slate-200 bg-slate-100/90 p-0 text-center font-serif text-xs font-semibold text-slate-500 dark:border-slate-800 dark:bg-slate-900/90 dark:text-slate-400">
+                      <div className="flex h-full w-full items-center justify-center">
+                        <KatexMath math="x[k]" />
+                      </div>
                     </th>
                     {h.map((hVal, hIndex) => (
                       <th
                         key={hIndex}
-                        className="border border-slate-200 bg-slate-100/80 p-1.5 font-serif text-xs font-semibold text-rose-600 dark:border-slate-800 dark:bg-slate-900/80 dark:text-rose-400"
+                        className="w-12 h-10 min-w-12 max-w-12 border border-slate-200 bg-slate-100/90 p-0 font-serif text-xs font-semibold text-rose-600 dark:border-slate-800 dark:bg-slate-900/90 dark:text-rose-400"
+                        title={`h[${hIndex}] = ${tv(hVal)}`}
                       >
-                        <KatexMath math={tv(hVal)} />
+                        <div className="flex flex-col h-full w-full items-center justify-center leading-tight">
+                          <span className="text-[9px] font-sans font-normal text-slate-400 dark:text-slate-500">
+                            <KatexMath math={`h[${hIndex}]`} />
+                          </span>
+                          <KatexMath math={tv(hVal)} />
+                        </div>
                       </th>
                     ))}
                   </tr>
@@ -208,8 +226,16 @@ export function DiscreteConvolutionTable({
                 <tbody>
                   {x.map((xVal, xIndex) => (
                     <tr key={xIndex}>
-                      <th className="border border-slate-200 bg-slate-100/80 p-1.5 font-serif text-xs font-semibold text-blue-600 dark:border-slate-800 dark:bg-slate-900/80 dark:text-blue-400">
-                        <KatexMath math={tv(xVal)} />
+                      <th
+                        className="w-12 h-10 min-w-12 max-w-12 border border-slate-200 bg-slate-100/90 p-0 font-serif text-xs font-semibold text-blue-600 dark:border-slate-800 dark:bg-slate-900/90 dark:text-blue-400"
+                        title={`x[${xIndex}] = ${tv(xVal)}`}
+                      >
+                        <div className="flex flex-col h-full w-full items-center justify-center leading-tight">
+                          <span className="text-[9px] font-sans font-normal text-slate-400 dark:text-slate-500">
+                            <KatexMath math={`x[${xIndex}]`} />
+                          </span>
+                          <KatexMath math={tv(xVal)} />
+                        </div>
                       </th>
                       {h.map((hVal, hIndex) => {
                         const isActive = xIndex + hIndex === index;
@@ -218,14 +244,18 @@ export function DiscreteConvolutionTable({
                           <td
                             key={hIndex}
                             onClick={() => setActive(xIndex + hIndex)}
-                            className={`border transition-colors cursor-pointer text-center font-serif text-xs py-1 px-1.5 ${
+                            className={`w-12 h-10 min-w-12 max-w-12 p-0 border transition-colors cursor-pointer text-center font-serif text-xs ${
                               isActive
                                 ? "bg-purple-500/15 border-purple-400/50 text-purple-950 dark:text-purple-200 font-bold ring-1 ring-purple-400/40"
                                 : "border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-900/50"
                             }`}
                             title={`Click to set shift n = ${xIndex + hIndex}`}
                           >
-                            <span className={isActive ? "inline-block rounded border border-purple-400/30 bg-purple-500/15 px-1.5 py-0.5" : "inline-block"}><KatexMath math={tv(cellVal)} /></span>
+                            <div className="flex h-full w-full items-center justify-center">
+                              <span className={isActive ? "inline-block rounded border border-purple-400/30 bg-purple-500/15 px-1.5 py-0.5" : "inline-block"}>
+                                <KatexMath math={tv(cellVal)} />
+                              </span>
+                            </div>
                           </td>
                         );
                       })}

@@ -62,7 +62,7 @@ export function SignalOperationsLab() {
         <div className="flex flex-col gap-4 border-b border-slate-200 pb-5 dark:border-slate-800 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <h2 className="mt-1 text-xl font-black tracking-tight text-slate-900 dark:text-white">Signal Operations &amp; Properties</h2>
-            <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500 dark:text-slate-400">
+            <p className="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">
               Compose any additive, subtractive, or multiplicative combination of canonical signals in terms of <KatexMath math={domain === "ct" ? "t" : "n\\in\\mathbb{Z}"} className="inline" />.
             </p>
           </div>
@@ -70,8 +70,24 @@ export function SignalOperationsLab() {
             value={domain}
             onChange={setDomain}
             options={[
-              { value: "ct", label: "Continuous-Time [x(t)]" },
-              { value: "dt", label: "Discrete-Time [x[n]]" },
+              {
+                value: "ct",
+                label: (
+                  <span className="font-['Poppins',sans-serif] font-medium inline-flex items-center gap-1.5">
+                    Continuous-Time <KatexMath math="[x(t)]" />
+                  </span>
+                ),
+                "aria-label": "Continuous-Time [x(t)]",
+              },
+              {
+                value: "dt",
+                label: (
+                  <span className="font-['Poppins',sans-serif] font-medium inline-flex items-center gap-1.5">
+                    Discrete-Time <KatexMath math="[x[n]]" />
+                  </span>
+                ),
+                "aria-label": "Discrete-Time [x[n]]",
+              },
             ]}
             aria-label="Signal domain"
           />
@@ -172,8 +188,38 @@ export function SignalOperationsLab() {
                 <InnerBox>
                   <p className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-white">Fundamental period</p>
                   <div className="mt-2.5 space-y-2">
-                    <KatexMath math={tex`\omega_0 = \operatorname{GCD}(\omega_i) = ${fmt(analysis.fundamentalAngularFrequency)}\text{ rad/s}`} block className="text-sm text-violet-700 dark:text-violet-200" />
-                    <KatexMath math={tex`T_0 = \frac{2\pi}{\omega_0} = ${fmt(analysis.fundamentalPeriod)}\text{ s}`} block className="text-sm text-violet-700 dark:text-violet-200" />
+                    {analysis.components && analysis.components.length > 1 ? (
+                      <>
+                        <KatexMath
+                          math={tex`\omega_1 = ${fmt(analysis.components[0].omega)}\text{ rad/s}, \quad \omega_2 = ${fmt(analysis.components[1].omega)}\text{ rad/s}`}
+                          block
+                          className="text-sm text-violet-700 dark:text-violet-200"
+                        />
+                        <KatexMath
+                          math={tex`T_1 = \frac{2\pi}{\omega_1} = ${fmt(analysis.components[0].period)}\text{ s}, \quad T_2 = \frac{2\pi}{\omega_2} = ${fmt(analysis.components[1].period)}\text{ s}`}
+                          block
+                          className="text-sm text-violet-700 dark:text-violet-200"
+                        />
+                        <KatexMath
+                          math={tex`T_0 = \operatorname{LCM}(T_1, T_2) = ${fmt(analysis.fundamentalPeriod)}\text{ s} \quad \left(\omega_0 = \frac{2\pi}{T_0} = ${fmt(analysis.fundamentalAngularFrequency)}\text{ rad/s}\right)`}
+                          block
+                          className="text-sm text-violet-700 dark:text-violet-200"
+                        />
+                      </>
+                    ) : (
+                      <>
+                        <KatexMath
+                          math={tex`\omega_1 = ${fmt(analysis.fundamentalAngularFrequency)}\text{ rad/s}, \quad T_1 = \frac{2\pi}{\omega_1} = ${fmt(analysis.fundamentalPeriod)}\text{ s}`}
+                          block
+                          className="text-sm text-violet-700 dark:text-violet-200"
+                        />
+                        <KatexMath
+                          math={tex`T_0 = T_1 = ${fmt(analysis.fundamentalPeriod)}\text{ s} \quad \left(\omega_0 = \frac{2\pi}{T_0} = ${fmt(analysis.fundamentalAngularFrequency)}\text{ rad/s}\right)`}
+                          block
+                          className="text-sm text-violet-700 dark:text-violet-200"
+                        />
+                      </>
+                    )}
                   </div>
                 </InnerBox>
               ) : (

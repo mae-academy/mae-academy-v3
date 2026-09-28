@@ -1,6 +1,7 @@
-import { forwardRef, useRef, useState, type ReactNode } from "react";
+import { forwardRef, useMemo, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { KatexMath } from "@/components/ui/KatexMath";
+import { HARMONIC_SPECTRUM, spectrumHex } from "@/lib/spectralPalette";
 
 export interface StudioSliderProps {
   label?: ReactNode;
@@ -20,6 +21,11 @@ export interface StudioSliderProps {
   name?: string;
   title?: string;
   "aria-label"?: string;
+
+  /** Visual track variant. "spectral" renders the multi-stop scientific rainbow/spectral gradient */
+  variant?: "default" | "spectral";
+  /** Optional custom CSS gradient string or array of color stops */
+  trackGradient?: string | ReadonlyArray<string>;
 
   /** When true, renders editable input boxes for min and max bounds */
   editableLimits?: boolean;
@@ -66,6 +72,8 @@ export const StudioSlider = forwardRef<HTMLInputElement, StudioSliderProps>(
       className,
       valueDisplay,
       disabled,
+      variant = "default",
+      trackGradient,
       editableLimits = false,
       onMinChange,
       onMaxChange,
@@ -86,6 +94,27 @@ export const StudioSlider = forwardRef<HTMLInputElement, StudioSliderProps>(
 
     const span = max - min;
     const pct = span > 0 ? Math.min(100, Math.max(0, ((currentVal - min) / span) * 100)) : 0;
+    const ratio = pct / 100;
+
+    const isSpectral = variant === "spectral";
+    const gradientCss = useMemo(() => {
+      if (trackGradient) {
+        return typeof trackGradient === "string"
+          ? trackGradient
+          : `linear-gradient(to right, ${trackGradient.join(", ")})`;
+      }
+      if (isSpectral) {
+        return `linear-gradient(to right, ${HARMONIC_SPECTRUM.join(", ")})`;
+      }
+      return "linear-gradient(to right, #2563EB, #7C3AED, #E11D48)";
+    }, [trackGradient, isSpectral]);
+
+    const currentThumbColor = useMemo(() => {
+      if (isSpectral) {
+        return spectrumHex(HARMONIC_SPECTRUM, ratio);
+      }
+      return "#2563EB";
+    }, [isSpectral, ratio]);
 
     const containerRef = useRef<HTMLDivElement>(null);
 
@@ -96,9 +125,13 @@ export const StudioSlider = forwardRef<HTMLInputElement, StudioSliderProps>(
       }
       onChange?.(next);
       const nextPct = span > 0 ? Math.min(100, Math.max(0, ((next - min) / span) * 100)) : 0;
+      const nextRatio = nextPct / 100;
       if (containerRef.current) {
         containerRef.current.style.setProperty("--slider-pct", `${nextPct}%`);
-        containerRef.current.style.setProperty("--slider-ratio", `${nextPct / 100}`);
+        containerRef.current.style.setProperty("--slider-ratio", `${nextRatio}`);
+        if (isSpectral) {
+          containerRef.current.style.setProperty("--slider-thumb-color", spectrumHex(HARMONIC_SPECTRUM, nextRatio));
+        }
       }
     };
 
@@ -138,11 +171,18 @@ export const StudioSlider = forwardRef<HTMLInputElement, StudioSliderProps>(
     };
 
     const renderTrack = () => (
-      <span className="relative flex h-4 items-center flex-1 min-w-0">
-        <span className="h-1.5 w-full bg-slate-200 dark:bg-slate-700 rounded-full relative overflow-hidden">
+      <span className="relative flex h-5 items-center flex-1 min-w-0">
+        <span className="h-2 w-full bg-slate-200/80 dark:bg-slate-700/80 rounded-full relative overflow-hidden shadow-inner">
           <span
-            className="block h-full bg-gradient-to-r from-[#2563EB] to-[#7C3AED] rounded-full"
-            style={{ width: "var(--slider-pct)" }}
+            className="block h-full rounded-full transition-[width] duration-75"
+            style={{
+              width: "var(--slider-pct)",
+              background: gradientCss,
+              backgroundSize: isSpectral
+                ? "calc(100% / max(0.001, var(--slider-ratio, 1))) 100%"
+                : "100% 100%",
+              backgroundRepeat: "no-repeat",
+            }}
           />
         </span>
         <input
@@ -156,14 +196,23 @@ export const StudioSlider = forwardRef<HTMLInputElement, StudioSliderProps>(
           onChange={handleInput}
           onInput={handleInput}
           disabled={disabled}
-          className="peer absolute inset-0 h-full w-full cursor-pointer opacity-0"
+          className="peer absolute inset-0 h-full w-full cursor-pointer opacity-0 z-10"
           {...props}
         />
         <span
           aria-hidden
-          className="pointer-events-none absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow-md border border-slate-200 dark:border-slate-600 peer-focus-visible:ring-2 peer-focus-visible:ring-blue-500 peer-hover:scale-110 peer-active:scale-95 transition-all"
-          style={{ left: "calc(8px + (100% - 16px) * var(--slider-ratio))" }}
-        />
+          className="pointer-events-none absolute top-1/2 h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow-md border-2 border-white dark:border-slate-800 peer-focus-visible:ring-2 peer-focus-visible:ring-blue-500 peer-hover:scale-110 peer-active:scale-95 transition-all flex items-center justify-center"
+          style={{ left: "calc(10px + (100% - 20px) * var(--slider-ratio))" }}
+        >
+          {isSpectral && (
+            <span
+              className="h-2.5 w-2.5 rounded-full shadow-xs"
+              style={{
+                backgroundColor: "var(--slider-thumb-color, #2563EB)",
+              }}
+            />
+          )}
+        </span>
       </span>
     );
 
@@ -173,7 +222,8 @@ export const StudioSlider = forwardRef<HTMLInputElement, StudioSliderProps>(
         className={cn("grid gap-2 text-xs font-medium text-slate-600 dark:text-slate-300", className)}
         style={{
           ["--slider-pct" as string]: `${pct}%`,
-          ["--slider-ratio" as string]: `${pct / 100}`,
+          ["--slider-ratio" as string]: `${ratio}`,
+          ["--slider-thumb-color" as string]: currentThumbColor,
         }}
       >
         {renderHeader()}

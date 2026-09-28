@@ -7,12 +7,12 @@ import type { FourierSeriesResult } from "@/features/signals/engines/fourierEngi
 import { niceCeil } from "@/lib/plotAutoScale";
 import { HARMONIC_SPECTRUM, spectrumHex } from "@/lib/spectralPalette";
 
-export type SpectrumMode = "positive" | "bilateral" | "negative";
+export type SpectrumMode = "positive" | "bilateral";
 
 /** Depth tracks follow the shared N (1…50) of the Analysis Settings. */
 export const WATERFALL_MAX_HARMONICS = 50;
-/** The spectral colour ramp is anchored at |k| = 25; higher harmonics keep the terminal rose. */
-export const COLOR_RAMP_MAX = 25;
+/** The spectral colour ramp is anchored at |k| = 50; reaching the terminal crimson at k = 50. */
+export const COLOR_RAMP_MAX = 50;
 /** Minimum samples over the observation window (grows with N · periods-in-window). */
 export const WATERFALL_SAMPLES = 481;
 const SAMPLES_PER_CYCLE = 32;
@@ -65,7 +65,6 @@ export function harmonicColor(k: number): string {
 export function laneOrder(mode: SpectrumMode, n: number): number[] {
   const count = Math.max(0, Math.floor(n));
   if (mode === "positive") return Array.from({ length: count + 1 }, (_, i) => i);
-  if (mode === "negative") return Array.from({ length: count + 1 }, (_, i) => (i === 0 ? 0 : -i));
   // Bilateral: negative zone in front, DC in the middle lane, positive zone behind.
   return Array.from({ length: 2 * count + 1 }, (_, i) => i - count);
 }

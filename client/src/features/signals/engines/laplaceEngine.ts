@@ -4,6 +4,7 @@
  * deliberately decoupled from React, Canvas, Plotly, and DOM event lifecycles.
  */
 import { containsVariable, type MathNode } from "./diracIntegral";
+import type { DerivationStep, DerivationSymbols } from "./derivationTypes";
 
 export type PlaneMode = "s" | "z";
 export type RocKind = "right" | "left" | "two-sided";
@@ -147,7 +148,7 @@ export function impulseResponse(functionData: TransferFunction, duration = 6, sa
   return Array.from({ length: samples + 1 }, (_, index) => { const time = duration * index / samples; const value = residues.reduce((sum, residue, poleIndex) => add(sum, mul(residue, complexExponential(functionData.poles[poleIndex], time))), c()); return { time, value: clean(value.re, 8) }; });
 }
 export function rocFor(functionData: TransferFunction, kind: RocKind): RocResult { const values = functionData.mode === "s" ? functionData.poles.map((pole) => pole.re) : functionData.poles.map(abs); const outer = values.length ? Math.max(...values) : 0; const inner = values.length ? Math.min(...values) : 0; const stable = functionData.mode === "s" ? kind === "right" ? 0 > outer : kind === "left" ? 0 < inner : 0 > inner && 0 < outer : kind === "right" ? 1 > outer : kind === "left" ? 1 < inner : 1 > inner && 1 < outer; const variable = functionData.mode === "s" ? "\\Re\\{s\\}" : "|z|"; const slice = functionData.mode === "s" ? "j\\omega" : "|z|=1"; const boundary = clean(outer, 4); const innerBoundary = clean(inner, 4); const latex = kind === "right" ? `\\mathrm{ROC}: ${variable}>${boundary}` : kind === "left" ? `\\mathrm{ROC}: ${variable}<${innerBoundary}` : `\\mathrm{ROC}: ${innerBoundary}<${variable}<${boundary}`; return { kind, boundary, innerBoundary: kind === "two-sided" ? innerBoundary : undefined, stable, latex, description: stable ? `The ROC includes ${slice}; the system is BIBO stable.` : `The ROC excludes ${slice}; the system is BIBO unstable.` }; }
-export function frequencyResponse(functionData: TransferFunction, points = 260): FrequencyPoint[] { const span = functionData.mode === "s" ? 14 : Math.PI; return Array.from({ length: points + 1 }, (_, index) => { const omega = -span + (2 * span * index) / points; const point = functionData.mode === "s" ? c(0, omega) : c(Math.cos(omega), Math.sin(omega)); const response = evaluateTransfer(functionData, point); const magnitude = Math.min(abs(response), 1e4); return { omega, magnitude, phase: magnitude < EPSILON ? 0 : Math.atan2(response.im, response.re), re: response.re, im: response.im }; }); }
+export function frequencyResponse(functionData: TransferFunction, points = 260, spanOverride?: number): FrequencyPoint[] { const span = spanOverride ?? (functionData.mode === "s" ? 14 : Math.PI); return Array.from({ length: points + 1 }, (_, index) => { const omega = -span + (2 * span * index) / points; const point = functionData.mode === "s" ? c(0, omega) : c(Math.cos(omega), Math.sin(omega)); const response = evaluateTransfer(functionData, point); const magnitude = Math.min(abs(response), 1e4); return { omega, magnitude, phase: magnitude < EPSILON ? 0 : Math.atan2(response.im, response.re), re: response.re, im: response.im }; }); }
 export function magnitudeLandscape(functionData: TransferFunction, resolution = 42, span = 4, ceiling = 14): Landscape { const x = Array.from({ length: resolution }, (_, index) => -span + (2 * span * index) / (resolution - 1)); const y = Array.from({ length: resolution }, (_, index) => -span + (2 * span * index) / (resolution - 1)); const z = y.map((imaginary) => x.map((real) => Math.min(ceiling, abs(evaluateTransfer(functionData, c(real, imaginary)))))); const slice = frequencyResponse(functionData, 150); return { x, y, z, path: { x: slice.map((item) => functionData.mode === "s" ? 0 : Math.cos(item.omega)), y: slice.map((item) => functionData.mode === "s" ? item.omega : Math.sin(item.omega)), z: slice.map((item) => Math.min(ceiling, item.magnitude)) } }; }
 
 /* ─────────────────────────── Inverse Laplace transform (PFE / Heaviside residues) ─────────────────────────── */
@@ -535,4 +536,229 @@ export function forwardLaplace(node: MathNode, evaluate: (node: MathNode, at: nu
     if (error instanceof LaplaceTableError) return { ok: false, error: error.message };
     return { ok: false, error: error instanceof Error ? error.message : "The signal could not be transformed." };
   }
+}
+
+/* ─────────────────────────── Step-by-step Laplace derivations (forward bilateral + inverse PFE) ─────────────────────────── */
+
+const DEFAULT_SYMBOLS: DerivationSymbols = { time: "x", freq: "X" };
+
+/** s − r written as s, s+a or s−a. */
+const shiftedS = (rate: number) => (isZero(rate) ? "s" : rate < 0 ? `s+${fmt(-rate)}` : `s-${fmt(rate)}`);
+const leadCoefficient = (value: number) => (isZero(value - 1) ? "" : isZero(value + 1) ? "-" : fmt(value));
+const polyReflect = (poly: AscendingPoly): AscendingPoly => poly.map((coefficient, power) => (power % 2 === 0 ? coefficient : -coefficient));
+
+type LaplaceSide = "right" | "left";
+type LaplaceHit =
+  | { kind: "exp"; side: LaplaceSide; coefficient: number; tPower: number; rate: number; oscillator: { kind: "sin" | "cos"; omega: number } | null }
+  | { kind: "pulse"; family: "rect" | "tri"; coefficient: number; t0: number; halfSpan: number }
+  | { kind: "delta"; coefficient: number };
+
+/** Classifies one additive term as c·tⁿ·e^{rt}·{1,sin,cos}·u(±t), a finite pulse, or c·δ(t); throws LaplaceTableError otherwise. */
+function classifyLaplaceTerm(node: MathNode, evaluate: (node: MathNode, at: number) => number): LaplaceHit {
+  const state = { coefficient: 1, tPower: 0, rate: 0, oscillator: null as { kind: "sin" | "cos"; omega: number } | null, side: null as LaplaceSide | null, pulse: null as { family: "rect" | "tri"; t0: number; halfSpan: number } | null, delta: false };
+  const constantValue = (value: MathNode) => { if (containsVariable(value, "t")) return null; const result = evaluate(value, 0); return Number.isFinite(result) ? result : null; };
+  const collect = (value: MathNode) => {
+    const constant = constantValue(value);
+    if (constant !== null && value.kind !== "delta") { state.coefficient *= constant; return; }
+    switch (value.kind) {
+      case "neg": state.coefficient *= -1; collect(value.value); return;
+      case "mul": collect(value.left); collect(value.right); return;
+      case "div": { const divisor = constantValue(value.right); if (divisor === null || Math.abs(divisor) < 1e-12) throw new LaplaceTableError("Only division by a nonzero constant is supported."); state.coefficient /= divisor; collect(value.left); return; }
+      case "var": state.tPower += 1; return;
+      case "pow": {
+        const exponent = constantValue(value.exponent);
+        if (value.base.kind === "var" && exponent !== null && Number.isInteger(exponent) && exponent >= 0) { state.tPower += exponent; return; }
+        if (value.base.kind === "num" && Math.abs(value.base.value - Math.E) < 1e-12) { const form = affineOf(value.exponent, evaluate); state.rate += form.slope; state.coefficient *= Math.exp(form.intercept); return; }
+        throw new LaplaceTableError("Powers must be tⁿ with a non-negative integer n.");
+      }
+      case "delta": {
+        const form = affineOf(value.argument, evaluate);
+        if (value.order !== 0 || Math.abs(form.intercept) > 1e-12 || Math.abs(Math.abs(form.slope) - 1) > 1e-12) throw new LaplaceTableError("Only δ(t) is derived step by step.");
+        state.delta = true; return;
+      }
+      case "call": {
+        const form = affineOf(value.argument, evaluate);
+        if (value.name === "exp") { state.rate += form.slope; state.coefficient *= Math.exp(form.intercept); return; }
+        if (value.name === "u") {
+          if (Math.abs(form.intercept) > 1e-12 || Math.abs(form.slope) < 1e-12) throw new LaplaceTableError("Shifted steps are outside this table.");
+          if (state.side) throw new LaplaceTableError("A product of two steps is outside this table.");
+          state.side = form.slope > 0 ? "right" : "left"; return;
+        }
+        if (value.name === "rect" || value.name === "tri") {
+          if (Math.abs(form.slope) < 1e-12 || state.pulse) throw new LaplaceTableError("Pulse arguments must be affine in t.");
+          state.pulse = { family: value.name, t0: -form.intercept / form.slope, halfSpan: (value.name === "rect" ? 0.5 : 1) / Math.abs(form.slope) }; return;
+        }
+        if (value.name === "sin" || value.name === "cos") {
+          if (state.oscillator) throw new LaplaceTableError("Products of two sinusoids are outside the transform table.");
+          if (Math.abs(form.intercept) > 1e-12) throw new LaplaceTableError("Phase-shifted sinusoids must be expanded first.");
+          if (value.name === "sin" && form.slope < 0) state.coefficient *= -1;
+          state.oscillator = { kind: value.name, omega: Math.abs(form.slope) }; return;
+        }
+        throw new LaplaceTableError(`${value.name}(t) is outside the Laplace transform table.`);
+      }
+      default: throw new LaplaceTableError("This term is outside the Laplace transform table.");
+    }
+  };
+  collect(node);
+  if (state.delta) { if (state.tPower || state.oscillator || state.side || state.pulse) throw new LaplaceTableError("Multiply δ(t) only by constants."); return { kind: "delta", coefficient: state.coefficient }; }
+  if (state.pulse) { if (state.tPower || state.oscillator || state.side || Math.abs(state.rate) > 1e-12) throw new LaplaceTableError("A pulse multiplied by other factors is outside this table."); return { kind: "pulse", coefficient: state.coefficient, ...state.pulse }; }
+  return { kind: "exp", side: state.side ?? "right", coefficient: state.coefficient, tPower: state.tPower, rate: state.rate, oscillator: state.oscillator };
+}
+
+/** Rational transform of c·tⁿe^{rt}{1,sin,cos}: right-sided directly, left-sided through x(t) = g(−t) ⇒ X(s) = G(−s). */
+function expTransform(hit: Extract<LaplaceHit, { kind: "exp" }>): Rational {
+  const reflected = hit.side === "left";
+  // c·tⁿe^{rt}u(−t) = g(−t) with g(t) = c(−1)ⁿ tⁿ e^{−rt}u(t) (and sin flips sign under t → −t).
+  const rate = reflected ? -hit.rate : hit.rate;
+  const oscillatorSign = reflected && hit.oscillator?.kind === "sin" ? -1 : 1;
+  const coefficient = hit.coefficient * (reflected ? (-1) ** hit.tPower : 1) * oscillatorSign;
+  let transform: Rational = hit.oscillator === null ? { num: [1], den: [0, 1] } : hit.oscillator.kind === "sin"
+    ? { num: [hit.oscillator.omega], den: [hit.oscillator.omega ** 2, 0, 1] }
+    : { num: [0, 1], den: [hit.oscillator.omega ** 2, 0, 1] };
+  for (let order = 0; order < hit.tPower; order += 1) transform = ratNeg(ratDerivative(transform));
+  if (Math.abs(rate) > 1e-12) transform = ratShift(transform, rate);
+  transform = ratMul(ratConst(coefficient), transform);
+  if (reflected) transform = { num: polyReflect(transform.num), den: polyReflect(transform.den) };
+  return reduceRational(transform);
+}
+
+/**
+ * Step-by-step bilateral X(s) = ∫x(t)e^{−st}dt with its ROC: definition, support splitting, antiderivative with
+ * the convergence limit, ROC formalization, and the algebraic result. Covers c·tⁿe^{rt}{1,sin,cos}u(±t),
+ * finite rect/tri pulses and δ(t); other terms are flagged and left out of the closed form.
+ */
+export function deriveForwardLaplaceSteps(node: MathNode, evaluate: (node: MathNode, at: number) => number, toLatex: (node: MathNode) => string, symbols: DerivationSymbols = DEFAULT_SYMBOLS): DerivationStep[] {
+  const X = symbols.freq; const x = symbols.time;
+  const support: string[] = []; const limits: string[] = []; const rocLines: string[] = []; const pieces: string[] = [];
+  let total: Rational = ratConst(0); let rational = true; let unsupported = false; let lower = Number.NEGATIVE_INFINITY; let upper = Number.POSITIVE_INFINITY;
+
+  const flatten = (value: MathNode, sign: number, into: Array<{ sign: number; node: MathNode }>) => {
+    if (value.kind === "add") { flatten(value.left, sign, into); flatten(value.right, sign, into); return into; }
+    if (value.kind === "sub") { flatten(value.left, sign, into); flatten(value.right, -sign, into); return into; }
+    if (value.kind === "neg") { flatten(value.value, -sign, into); return into; }
+    into.push({ sign, node: value }); return into;
+  };
+
+  const terms = flatten(node, 1, []); const multi = terms.length > 1; let allRight = true;
+  terms.forEach(({ sign, node: termNode }, index) => {
+    const sub = multi ? `_{${index + 1}}` : "";
+    const label = `${sign < 0 ? "-" : ""}${toLatex(termNode)}`;
+    let hit: LaplaceHit;
+    try { hit = classifyLaplaceTerm(termNode, evaluate); }
+    catch { unsupported = true; support.push(`${label}:\\quad\\text{outside the closed-form table; omitted from the result}`); return; }
+    const coefficient = sign * hit.coefficient;
+
+    if (hit.kind === "delta") {
+      support.push(`${label}:\\quad ${X}${sub}(s)=\\int_{-\\infty}^{\\infty}${fmt(coefficient)}\\delta(t)e^{-st}dt`);
+      limits.push(`\\int f(t)\\delta(t)\\,dt=f(0)\\ \\Rightarrow\\ ${X}${sub}(s)=${fmt(coefficient)}`);
+      rocLines.push(`\\text{ROC}${sub}:\\ \\text{entire }s\\text{-plane (no convergence condition)}`);
+      total = ratAdd(total, ratConst(coefficient)); pieces.push(fmt(coefficient)); return;
+    }
+
+    if (hit.kind === "pulse") {
+      const { family, t0, halfSpan } = hit; const lo = t0 - halfSpan; const hi = t0 + halfSpan; const span = 2 * halfSpan;
+      const weight = family === "tri" ? `\\left(1-\\frac{|t-${fmt(t0)}|}{${fmt(halfSpan)}}\\right)` : "";
+      support.push(`${label}:\\quad \\operatorname{${family}}\\text{ is nonzero on }[${fmt(lo)},\\,${fmt(hi)}]\\ \\Rightarrow\\ ${X}${sub}(s)=\\int_{${fmt(lo)}}^{${fmt(hi)}}${leadCoefficient(coefficient)}${weight}e^{-st}dt`);
+      limits.push(family === "rect"
+        ? `${X}${sub}(s)=${leadCoefficient(coefficient)}\\left[\\frac{e^{-st}}{-s}\\right]_{${fmt(lo)}}^{${fmt(hi)}}=${leadCoefficient(coefficient)}\\frac{e^{${fmt(halfSpan)}s}-e^{-${fmt(halfSpan)}s}}{s}${isZero(t0) ? "" : `e^{-(${fmt(t0)})s}`}`
+        : `\\int t\\,e^{-st}dt=\\frac{t\\,e^{-st}}{-s}-\\int\\frac{e^{-st}}{-s}dt\\quad(\\text{by parts on each ramp})`);
+      const kernel = family === "rect" ? `${leadCoefficient(coefficient * span)}\\frac{\\sinh(${fmt(halfSpan)}s)}{${fmt(halfSpan)}s}` : `${leadCoefficient(coefficient * halfSpan)}\\left[\\frac{\\sinh(${fmt(halfSpan / 2)}s)}{${fmt(halfSpan / 2)}s}\\right]^{2}`;
+      rocLines.push(`\\text{ROC}${sub}:\\ \\text{finite support}\\ \\Rightarrow\\ \\text{the integral converges for every }s\\ \\Rightarrow\\ \\text{entire }s\\text{-plane}`);
+      const piece = `${kernel}${isZero(t0) ? "" : `e^{-(${fmt(t0)})s}`}`;
+      rational = false; pieces.push(piece); return;
+    }
+
+    const { side, tPower, rate, oscillator } = hit; const right = side === "right"; const p = shiftedS(rate);
+    const bounds = right ? "0}^{\\infty" : "-\\infty}^{0";
+    const oscillation = oscillator ? `\\${oscillator.kind}(${fmt(oscillator.omega)}t)` : "";
+    const power = tPower ? (tPower === 1 ? "t" : `t^{${tPower}}`) : "";
+    const growth = isZero(rate) ? "" : `e^{${isZero(rate - 1) ? "" : isZero(rate + 1) ? "-" : fmt(rate)}t}`;
+    support.push(`${label}:\\quad u(${right ? "" : "-"}t)\\ \\Rightarrow\\ ${X}${sub}(s)=\\int_{${bounds}}${leadCoefficient(coefficient)}${power}${growth}${oscillation}\\,e^{-st}dt`);
+    if (!right && (tPower || oscillator)) limits.push(`${x}(t)=g(-t)\\ \\Rightarrow\\ ${X}(s)=G(-s)\\quad(\\text{transform the reflected right-sided signal, then } s\\to-s)`);
+    if (oscillator) {
+      const w = fmt(oscillator.omega);
+      limits.push(oscillator.kind === "cos"
+        ? `\\cos(${w}t)=\\tfrac12\\left(e^{j${w}t}+e^{-j${w}t}\\right)\\ \\Rightarrow\\ \\text{poles at }s=${fmt(rate)}\\pm j${w}`
+        : `\\sin(${w}t)=\\tfrac{1}{2j}\\left(e^{j${w}t}-e^{-j${w}t}\\right)\\ \\Rightarrow\\ \\text{poles at }s=${fmt(rate)}\\pm j${w}`);
+    }
+    if (tPower) limits.push(`\\int_{0}^{\\infty}t^{${tPower}}e^{-pt}dt=\\frac{${tPower}!}{p^{${tPower + 1}}},\\quad p=${p}${oscillator ? `\\mp j${fmt(oscillator.omega)}` : ""}\\quad(\\operatorname{Re}\\{p\\}>0\\ \\Rightarrow\\ \\sigma${right ? ">" : "<"}${fmt(rate)})`);
+    else {
+      const pole = oscillator ? `${p}\\mp j${fmt(oscillator.omega)}` : p;
+      limits.push(right
+        ? `${X}${sub}(s)=${leadCoefficient(coefficient)}\\lim_{T\\to\\infty}\\left[\\frac{e^{-(${pole})t}}{-(${pole})}\\right]_{0}^{T}\\quad\\text{requires}\\quad\\operatorname{Re}\\{${p}\\}>0\\ \\Rightarrow\\ \\sigma>${fmt(rate)}`
+        : `${X}${sub}(s)=${leadCoefficient(coefficient)}\\lim_{T\\to\\infty}\\left[\\frac{e^{-(${pole})t}}{-(${pole})}\\right]_{-T}^{0}\\quad\\text{requires}\\quad\\operatorname{Re}\\{${p}\\}<0\\ \\Rightarrow\\ \\sigma<${fmt(rate)}`);
+    }
+    rocLines.push(right ? `\\text{ROC}${sub}:\\ \\operatorname{Re}\\{s\\}>${fmt(rate)}\\quad(\\text{right-sided})` : `\\text{ROC}${sub}:\\ \\operatorname{Re}\\{s\\}<${fmt(rate)}\\quad(\\text{left-sided})`);
+    if (right) lower = Math.max(lower, rate); else { upper = Math.min(upper, rate); allRight = false; }
+    const transform = expTransform({ ...hit, coefficient });
+    total = ratAdd(total, transform); pieces.push(rationalLatex(transform));
+  });
+
+  const reduced = reduceRational(total);
+  const closed = rational ? (pieces.length ? rationalLatex(reduced) : "0") : pieces.map((piece, index) => (index > 0 && !piece.startsWith("-") ? `+${piece}` : piece)).join("");
+  const rocFinal = lower < upper
+    ? Number.isFinite(lower) && Number.isFinite(upper) ? `${fmt(lower)}<\\operatorname{Re}\\{s\\}<${fmt(upper)}` : Number.isFinite(lower) ? `\\operatorname{Re}\\{s\\}>${fmt(lower)}` : Number.isFinite(upper) ? `\\operatorname{Re}\\{s\\}<${fmt(upper)}` : "\\text{entire }s\\text{-plane}"
+    : "\\varnothing\\ \\text{(the bilateral transform does not converge)}";
+  return [
+    { title: "Step 1 — Bilateral Laplace Definition", lines: [`${X}(s)=\\mathcal{L}\\{${x}(t)\\}=\\int_{-\\infty}^{\\infty}${x}(t)\\,e^{-st}\\,dt,\\qquad s=\\sigma+j\\omega`, ...(allRight && terms.length ? [`${x}(t)=0\\ (t<0)\\ \\Rightarrow\\ ${X}(s)=\\int_{0}^{\\infty}${x}(t)\\,e^{-st}\\,dt`] : [])] },
+    { title: "Step 2 — Support Boundaries & Causal / Anti-Causal Splitting", lines: support.length ? support : [`\\text{No additive terms were found in }${x}(t).`] },
+    { title: "Step 3 — Antiderivative & Convergence Condition", lines: limits.length ? limits : ["\\text{No antiderivative is required for the remaining terms.}"] },
+    { title: "Step 4 — Region of Convergence (ROC) Formalization", lines: multi ? [...rocLines, `\\text{ROC}:\\ ${rocFinal}\\quad\\left(\\text{intersection of the term ROCs}\\right)`] : [...rocLines, `\\text{ROC}:\\ ${rocFinal}`] },
+    { title: "Step 5 — Final Algebraic Transfer Function", lines: [`${X}(s)=${closed},\\qquad ${lower < upper ? `\\text{ROC}:\\ ${rocFinal}` : "\\text{ROC}=\\varnothing"}${unsupported ? "\\quad(\\text{partial: some terms omitted})" : ""}`] },
+  ];
+}
+
+/**
+ * Step-by-step x(t) = 𝓛⁻¹{X(s)} by partial fractions: pole–zero factorization, PFE setup, residues A = lim (s−p)X(s)
+ * (Heaviside cover-up, derivatives for repeated poles), ROC matching per term, and the synthesized time signal.
+ */
+export function deriveInverseLaplaceSteps(system: TransferFunction, rocKind: RocKind, options: InverseLaplaceOptions = {}, symbols: DerivationSymbols = DEFAULT_SYMBOLS): DerivationStep[] {
+  const X = symbols.freq; const x = symbols.time;
+  const result = inverseLaplace(system, rocKind, options);
+  const groups = clusterPoles(system.poles);
+  const numeratorLead = system.numerator.find((value) => Math.abs(value) > EPSILON) ?? 0; const denominatorLead = system.denominator.find((value) => Math.abs(value) > EPSILON) ?? 1;
+  const gain = numeratorLead / denominatorLead;
+  const zeroFactors = clusterPoles(system.zeros).map(({ pole, multiplicity }) => `\\left(${sMinus(pole)}\\right)${multiplicity > 1 ? `^{${multiplicity}}` : ""}`).join("");
+  const poleFactors = groups.map(({ pole, multiplicity }) => `\\left(${sMinus(pole)}\\right)${multiplicity > 1 ? `^{${multiplicity}}` : ""}`).join("") || "1";
+  const gainTex = isZero(gain - 1) ? "" : fmt(gain);
+  const index = new Map<string, number>(); groups.forEach((group, position) => index.set(`${group.pole.re},${group.pole.im}`, position + 1));
+  const rowKey = (pole: Complex) => index.get(`${clean(pole.re, 6)},${clean(pole.im, 6)}`) ?? 0;
+
+  const factorization = [
+    `${X}(s)=\\frac{N(s)}{D(s)}=\\frac{${formatPolynomial(system.numerator, "s")}}{${formatPolynomial(system.denominator, "s")}}`,
+    `${X}(s)=${gainTex}\\frac{${zeroFactors || "1"}}{${poleFactors}}\\qquad\\left(\\text{poles: }${groups.map((group, position) => `p_{${position + 1}}=${complexLatex(group.pole)}${group.multiplicity > 1 ? `\\,(m=${group.multiplicity})` : ""}`).join(",\\ ") || "\\text{none}"}\\right)`,
+    ...(result.properness !== "strict" ? [`\\deg N\\ge\\deg D\\ \\Rightarrow\\ \\text{polynomial division first: }X(s)=Q(s)+\\frac{R(s)}{D(s)}`] : []),
+  ];
+
+  const setup = groups.length ? [`${X}(s)=${result.direct.some((value) => !isZero(value)) ? "Q(s)+" : ""}${groups.map((group, position) => Array.from({ length: group.multiplicity }, (_, order) => group.multiplicity > 1 ? `\\frac{A_{${position + 1},${order + 1}}}{${order === 0 ? `s-p_{${position + 1}}` : `\\left(s-p_{${position + 1}}\\right)^{${order + 1}}`}}` : `\\frac{A_{${position + 1}}}{s-p_{${position + 1}}}`).join("+")).join("+")}`] : ["\\text{No finite poles: the transform is a polynomial in }s."];
+
+  const residues: string[] = [];
+  const ordered = result.terms.slice().sort((left, right) => rowKey(left.pole) - rowKey(right.pole) || left.order - right.order);
+  const visible = ordered.filter((term) => term.pole.im >= -EPSILON);
+  ordered.forEach((term) => {
+    const position = rowKey(term.pole); const suffix = term.multiplicity > 1 ? `${position},${term.order}` : `${position}`;
+    const derivativeOrder = term.multiplicity - term.order;
+    const definition = term.multiplicity === 1
+      ? `A_{${suffix}}=\\lim_{s\\to p_{${position}}}\\left(s-p_{${position}}\\right)${X}(s)`
+      : `A_{${suffix}}=\\frac{1}{${derivativeOrder}!}\\lim_{s\\to p_{${position}}}\\frac{d^{${derivativeOrder}}}{ds^{${derivativeOrder}}}\\left[\\left(s-p_{${position}}\\right)^{${term.multiplicity}}${X}(s)\\right]`;
+    residues.push(`${definition}=${complexText(term.residue)}`);
+  });
+  if (!residues.length) residues.push(result.direct.some((value) => !isZero(value)) ? "\\text{All of }X(s)\\text{ is the polynomial quotient }Q(s);\\ \\text{no residues remain.}" : "\\text{No residues: the numerator is zero.}");
+
+  const rocInfo = rocFor(system, rocKind);
+  const matching: string[] = [`${rocInfo.latex}`];
+  visible.forEach((term) => {
+    const position = rowKey(term.pole); const p = complexLatex(term.pole);
+    matching.push(`p_{${position}}=${p}:\\ ${term.causal ? "\\text{pole left of the ROC (right-sided)}\\ \\Rightarrow\\ e^{p_{" + position + "}t}u(t)" : "\\text{pole right of the ROC (left-sided)}\\ \\Rightarrow\\ -e^{p_{" + position + "}t}u(-t)"}${term.order > 1 ? `,\\ \\text{with the factor }\\frac{t^{${term.order - 1}}}{${factorial(term.order - 1)}}` : ""}`);
+  });
+  if (visible.some((term) => !isZero(term.pole.im))) matching.push("A_k\\text{ and }A_k^{*}\\text{ of a conjugate pair combine: }2e^{\\sigma t}\\left[\\operatorname{Re}\\{A\\}\\cos\\omega t-\\operatorname{Im}\\{A\\}\\sin\\omega t\\right]");
+  if (result.direct.some((value) => !isZero(value))) matching.push("Q(s)\\ \\Rightarrow\\ \\text{impulse terms }\\delta(t),\\,\\delta'(t),\\dots");
+
+  return [
+    { title: "Step 1 — Pole-Zero Factorization", lines: factorization },
+    { title: "Step 2 — Partial Fraction Expansion Setup", lines: setup },
+    { title: "Step 3 — Residue Calculation", lines: residues },
+    { title: "Step 4 — ROC Matching & Inversion Lookup", lines: matching },
+    { title: "Step 5 — Final Synthesized Time-Domain Signal", lines: [result.timeLatex.replace(/^h\(t\)/, x + "(t)"), result.pfeLatex.replace(/^H\(s\)/, `${X}(s)`)] },
+  ];
 }

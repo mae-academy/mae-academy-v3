@@ -16,13 +16,15 @@ export type MathLiveSignalInputHandle = {
   setValue: (latex: string) => void;
 };
 
-type Props = { value: string; onChange: (latex: string) => void; labelledBy: string; /** Borderless inline variant for embedding inside a host row that already draws the chrome. */ compact?: boolean };
+type Props = { value: string; onChange: (latex: string) => void; onBlur?: () => void; labelledBy: string; /** Borderless inline variant for embedding inside a host row that already draws the chrome. */ compact?: boolean };
 
-export const MathLiveSignalInput = forwardRef<MathLiveSignalInputHandle, Props>(function MathLiveSignalInput({ value, onChange, labelledBy, compact = false }, ref) {
+export const MathLiveSignalInput = forwardRef<MathLiveSignalInputHandle, Props>(function MathLiveSignalInput({ value, onChange, onBlur, labelledBy, compact = false }, ref) {
   const hostRef = useRef<HTMLDivElement>(null);
   const fieldRef = useRef<MathfieldElement | null>(null);
   const latestChange = useRef(onChange);
   latestChange.current = onChange;
+  const latestBlur = useRef(onBlur);
+  latestBlur.current = onBlur;
 
   useEffect(() => {
     const host = hostRef.current; if (!host) return;
@@ -46,7 +48,9 @@ export const MathLiveSignalInput = forwardRef<MathLiveSignalInputHandle, Props>(
     field.smartSuperscript = true;
     field.defaultMode = "math";
     const handleInput = () => latestChange.current(field.value);
+    const handleBlur = () => { if (latestBlur.current) latestBlur.current(); };
     field.addEventListener("input", handleInput);
+    field.addEventListener("focusout", handleBlur);
     host.replaceChildren(field); fieldRef.current = field;
     // Strip the Desmos-style chrome once mounted: no context menu, no virtual-keyboard toggle.
     field.menuItems = [];
@@ -54,7 +58,7 @@ export const MathLiveSignalInput = forwardRef<MathLiveSignalInputHandle, Props>(
     stripToggles();
     const toggles = new MutationObserver(stripToggles);
     if (field.shadowRoot) toggles.observe(field.shadowRoot, { childList: true, subtree: true });
-    return () => { toggles.disconnect(); field.removeEventListener("input", handleInput); field.remove(); fieldRef.current = null; };
+    return () => { toggles.disconnect(); field.removeEventListener("input", handleInput); field.removeEventListener("focusout", handleBlur); field.remove(); fieldRef.current = null; };
   }, [labelledBy, compact]);
 
   useEffect(() => { const field = fieldRef.current; if (field && field.value !== value) field.value = value; }, [value]);

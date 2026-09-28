@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from "react";
+import { tickText } from "@/components/common/templates/SvgKatexTick";
 import { KatexMath } from "@/components/ui/KatexMath";
 import type { StandardStepPlotProps, PlotPoint, PlotSeries } from "./types";
 
@@ -316,8 +317,8 @@ export function StandardStepPlot({
 
   return (
     <div
-      className={`relative flex flex-col w-full h-full min-h-[320px] md:min-h-[360px] rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/60 backdrop-blur-sm shadow-sm p-4 ${className}`}
-      style={height !== undefined ? { height: typeof height === "number" ? `${height}px` : height } : undefined}
+      className={`relative flex flex-col w-full h-full rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/60 backdrop-blur-sm shadow-sm p-4 ${height === undefined ? "min-h-[320px] md:min-h-[360px]" : ""} ${className}`}
+      style={height !== undefined ? { height: typeof height === "number" ? `${height}px` : height, minHeight: typeof height === "number" ? `${height}px` : height } : undefined}
     >
       {/* Header Bar: Title + Legend Badges */}
       <div className="flex flex-wrap items-center justify-between gap-2 pb-2">
@@ -342,8 +343,8 @@ export function StandardStepPlot({
                     onClick={() => toggleSeries(s.id)}
                     aria-pressed={!isHidden}
                     className={`group inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium transition-all select-none ${isHidden
-                        ? "border border-dashed border-slate-300 dark:border-slate-700 bg-slate-100/50 dark:bg-slate-800/40 text-slate-400 opacity-50 hover:opacity-80"
-                        : "border border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 shadow-sm hover:border-slate-300 dark:hover:border-slate-600"
+                      ? "border border-dashed border-slate-300 dark:border-slate-700 bg-slate-100/50 dark:bg-slate-800/40 text-slate-400 opacity-50 hover:opacity-80"
+                      : "border border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 shadow-sm hover:border-slate-300 dark:hover:border-slate-600"
                       }`}
                   >
                     <span
@@ -502,11 +503,9 @@ export function StandardStepPlot({
 
             {/* Y-axis tick labels (KaTeX when custom labels are supplied) */}
             {yTickLabels && yTickLabels.map((tick) => (
-              <foreignObject key={`lbl-yk-${tick.value}`} x={padding.left - 52} y={toY(tick.value) - 10} width={46} height={20} pointerEvents="none" overflow="visible">
-                <div className="flex h-full items-center justify-end text-[11px] leading-none text-slate-600 dark:text-slate-300">
-                  <KatexMath math={tick.katex} />
-                </div>
-              </foreignObject>
+              <text key={`lbl-yk-${tick.value}`} x={padding.left - 8} y={toY(tick.value)} textAnchor="end" dominantBaseline="central" pointerEvents="none" fontSize={12} style={{ fontFamily: "KaTeX_Main, 'Times New Roman', serif" }} className="fill-slate-600 dark:fill-slate-300">
+                {tickText(tick.katex)}
+              </text>
             ))}
             {!yTickLabels && yTicks.map((tick) => {
               const yPos = toY(tick);

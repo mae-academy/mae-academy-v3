@@ -37,9 +37,13 @@ export const ConvolutionAnalysisCard = forwardRef<ConvolutionAnalysisHandle>(fun
         </>}
         {r.closedFormLatex === null && r.kind !== "impulse" && <span className="text-[11px] text-slate-500 dark:text-slate-400">No low-order closed form detected; value is integrated numerically.</span>}
       </FormulaBox>
-      <div className="flex items-baseline justify-between rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-2 font-mono text-xs dark:border-slate-800 dark:bg-slate-900/40">
-        <span className="text-slate-500 dark:text-slate-400">t = {fmt(snap.t, 3)}</span>
-        <span className="font-semibold text-blue-600 dark:text-blue-400">y(t) = {fmt(snap.value, 5)}</span>
+      <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50/60 px-3.5 py-2.5 text-xs dark:border-slate-800 dark:bg-slate-900/40">
+        <span className="text-slate-600 dark:text-slate-300">
+          <KatexMath math={`t = ${fmt(snap.t, 3)}`} />
+        </span>
+        <span className="font-semibold text-blue-600 dark:text-blue-400">
+          <KatexMath math={`y(t) = ${fmt(snap.value, 5)}`} />
+        </span>
       </div>
     </div>}
   </StudioCard>;

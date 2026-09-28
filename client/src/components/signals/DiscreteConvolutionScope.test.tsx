@@ -116,17 +116,17 @@ describe("ConvolutionLab Mode Switching", () => {
     const { container } = render(<ConvolutionLab />);
 
     // Initially in continuous mode
-    expect(screen.getByText("Continuous")).toBeDefined();
+    expect(screen.getByRole("tab", { name: "Continuous-Time [x(t)]" })).toBeDefined();
 
     // Click discrete segmented option
-    const discreteBtn = screen.getByText("Discrete");
+    const discreteBtn = screen.getByRole("tab", { name: "Discrete-Time [x[n]]" });
     fireEvent.click(discreteBtn);
 
     // Check for discrete title and sequence inputs
     expect(screen.getByText(/THREE-TIER DISCRETE STEM CANVAS/i)).toBeDefined();
     expect(screen.getByText(/DISCRETE CONVOLUTION MATRIX/i)).toBeDefined();
-    expect(screen.getByLabelText("x[n]=")).toBeDefined();
-    expect(screen.getByLabelText("h[n]=")).toBeDefined();
+    expect(screen.getByLabelText("x[n] =")).toBeDefined();
+    expect(screen.getByLabelText("h[n] =")).toBeDefined();
     expect(screen.queryByText(/SEQUENCE [AB]/i)).toBeNull();
   });
 });

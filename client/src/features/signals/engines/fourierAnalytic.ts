@@ -8,10 +8,11 @@
  *   the jω axis, plus impulse lines δ(ω−ω₀) and ideal low-pass rect/sinc/Sa spectra.
  * Pure math: no React, DOM, or canvas.
  */
-import { affineArgument, containsVariable, evaluateNode, nodeToLatex, type MathNode } from "./diracIntegral";
+import { affineArgument, containsVariable, evaluateNode, flattenSum, nodeToLatex, type MathNode } from "./diracIntegral";
 import {
   expandFraction,
   evaluateInverseLaplace,
+  formatPolynomial,
   forwardLaplace,
   inverseLaplace,
   clusterPoles,
@@ -20,6 +21,7 @@ import {
   type InverseLaplaceResult,
   type TransferFunction,
 } from "./laplaceEngine";
+import type { DerivationStep } from "./derivationTypes";
 import { estimateSupport } from "@/lib/plotAutoScale";
 
 /* ─────────────────────────── Shared helpers ─────────────────────────── */
@@ -513,6 +515,92 @@ export function forwardFourier(node: MathNode): ForwardFourierResult {
   }
 }
 
+/* ─────────────────────────── Step-by-step CTFT derivation ─────────────────────────── */
+
+
+type FTPulseHit = { kind: "pulse"; family: "rect" | "tri"; coefficient: number; t0: number; halfSpan: number };
+type FTTrigHit = { kind: "trig"; coefficient: number; omega1: number; phase: number; isSine: boolean };
+type FTDcHit = { kind: "dc"; value: number };
+type FTTermHit = FTPulseHit | FTTrigHit | FTDcHit | { kind: "unsupported" };
+
+function classifyForwardFourierTerm(node: MathNode): FTTermHit {
+  const leaves = leavesOf(node);
+  const constants = leaves.filter((leaf) => constantOf(leaf) !== null);
+  const active = leaves.filter((leaf) => constantOf(leaf) === null);
+  const coefficient = constants.reduce((product, leaf) => product * (constantOf(leaf) ?? 1), 1);
+  if (active.length === 0) return { kind: "dc", value: coefficient };
+  if (active.length !== 1) return { kind: "unsupported" };
+  const leaf = active[0];
+  if (leaf.kind === "call" && (leaf.name === "rect" || leaf.name === "tri")) {
+    const family = leaf.name; const form = affineArgument(leaf.argument, T); if (!form || isZero(form.slope)) return { kind: "unsupported" };
+    return { kind: "pulse", family, coefficient, t0: -form.intercept / form.slope, halfSpan: (family === "rect" ? 0.5 : 1) / Math.abs(form.slope) };
+  }
+  if (leaf.kind === "call" && (leaf.name === "cos" || leaf.name === "sin")) {
+    const form = affineArgument(leaf.argument, T); if (!form || isZero(form.slope)) return { kind: "unsupported" };
+    return { kind: "trig", coefficient, omega1: Math.abs(form.slope), phase: form.slope < 0 ? -form.intercept : form.intercept, isSine: leaf.name === "sin" };
+  }
+  return { kind: "unsupported" };
+}
+
+/**
+ * Step-by-step X(jω) derivation for the active aperiodic signal: the synthesis definition,
+ * substitution of the concrete x(t), direct boundary-evaluated integration, algebraic reduction
+ * to a named kernel, and spectrum symmetry. Covers {rect, tri, sin, cos, constants} and sums
+ * thereof; other shapes fall back to a numeric note. The Step 5 closed form always reuses the
+ * already-verified forwardFourier() result so this pass can never disagree with the plotted spectrum.
+ */
+export function deriveForwardFourierSteps(node: MathNode): DerivationStep[] {
+  const domainLines: string[] = []; const integrationLines: string[] = []; const reductionLines: string[] = []; const symmetryLines: string[] = [];
+  let hasUnsupported = false;
+
+  flattenSum(node).forEach(({ sign, node: termNode }) => {
+    const label = `${sign < 0 ? "-" : ""}${nodeToLatex(termNode)}`; const hit = classifyForwardFourierTerm(termNode);
+    const coefficient = sign * (hit.kind === "dc" || hit.kind === "unsupported" ? 0 : hit.coefficient);
+
+    if (hit.kind === "dc") { const value = sign * hit.value; domainLines.push(`${label}:\\quad\\text{constant, not absolutely integrable; contributes }2\\pi(${fmt(value)})\\delta(\\omega)`); return; }
+    if (hit.kind === "unsupported") { hasUnsupported = true; domainLines.push(`${label}:\\quad\\text{outside the closed-form table; folded numerically into the spectrum above}`); return; }
+
+    if (hit.kind === "pulse") {
+      const { family, t0, halfSpan } = hit; const lower = t0 - halfSpan; const upper = t0 + halfSpan; const span = 2 * halfSpan;
+      domainLines.push(`${label}=${fmt(coefficient)}\\operatorname{${family}}\\!\\left(\\dots\\right),\\quad\\text{nonzero on }t\\in[${fmt(lower)},\\,${fmt(upper)}]`);
+      domainLines.push(`X^{(${family})}(j\\omega)=\\int_{${fmt(lower)}}^{${fmt(upper)}}${fmt(coefficient)}${family === "tri" ? `\\left(1-\\frac{|t-${fmt(t0)}|}{${fmt(halfSpan)}}\\right)` : ""}e^{-j\\omega t}\\,dt`);
+      const phase = Math.abs(t0) > 1e-9 ? `\\,e^{-j\\omega(${fmt(t0)})}` : "";
+      integrationLines.push(family === "rect"
+        ? `X^{(\\mathrm{rect})}(j\\omega)=${fmt(coefficient)}\\left[\\frac{e^{-j\\omega t}}{-j\\omega}\\right]_{${fmt(lower)}}^{${fmt(upper)}}=${fmt(coefficient)}\\frac{e^{j\\omega${fmt(halfSpan)}}-e^{-j\\omega${fmt(halfSpan)}}}{j\\omega}${phase}`
+        : `X^{(\\mathrm{tri})}(j\\omega)=${fmt(coefficient)}\\left(\\int_{${fmt(lower)}}^{${fmt(t0)}}\\!\\!\\left(1+\\tfrac{t-${fmt(t0)}}{${fmt(halfSpan)}}\\right)e^{-j\\omega t}dt+\\int_{${fmt(t0)}}^{${fmt(upper)}}\\!\\!\\left(1-\\tfrac{t-${fmt(t0)}}{${fmt(halfSpan)}}\\right)e^{-j\\omega t}dt\\right)\\quad(\\text{by parts})`);
+      const gain = coefficient * (family === "rect" ? span : halfSpan);
+      const kernel = family === "rect" ? `\\operatorname{sinc}\\!\\left(\\frac{${fmt(span)}\\,\\omega}{2\\pi}\\right)` : `\\operatorname{sinc}^{2}\\!\\left(\\frac{${fmt(halfSpan)}\\,\\omega}{2\\pi}\\right)`;
+      reductionLines.push(`X^{(${family})}(j\\omega)=${fmt(gain)}${kernel}${phase}`);
+      const zeroSpacing = family === "rect" ? (2 * Math.PI) / span : (2 * Math.PI) / halfSpan;
+      symmetryLines.push(Math.abs(t0) < 1e-9
+        ? `${label}:\\quad\\text{real and even}\\ \\Rightarrow\\ X^{(${family})}(j\\omega)\\in\\mathbb{R};\\quad\\text{zero-crossings at }\\omega=${fmt(zeroSpacing)}k,\\ k\\in\\mathbb{Z}\\setminus\\{0\\}`
+        : `${label}:\\quad\\text{delayed by }t_0=${fmt(t0)}\\ \\Rightarrow\\ |X^{(${family})}(j\\omega)|\\text{ unchanged, phase gains }-\\omega t_0`);
+      return;
+    }
+
+    const { omega1, phase, isSine } = hit;
+    domainLines.push(`${label}:\\quad\\text{not absolutely integrable; evaluated distributionally via }\\int_{-\\infty}^{\\infty}e^{j(\\omega_1-\\omega)t}\\,dt=2\\pi\\delta(\\omega-\\omega_1)`);
+    integrationLines.push(isSine
+      ? `${fmt(coefficient)}\\sin(\\omega_1t+\\varphi)=\\frac{${fmt(coefficient)}}{2j}e^{j(\\omega_1t+\\varphi)}-\\frac{${fmt(coefficient)}}{2j}e^{-j(\\omega_1t+\\varphi)}`
+      : `${fmt(coefficient)}\\cos(\\omega_1t+\\varphi)=\\frac{${fmt(coefficient)}}{2}e^{j(\\omega_1t+\\varphi)}+\\frac{${fmt(coefficient)}}{2}e^{-j(\\omega_1t+\\varphi)}`);
+    const half = coefficient / 2; const areaTex = isSine ? `-j${fmt(2 * Math.PI * half)}` : `${fmt(2 * Math.PI * half)}`;
+    reductionLines.push(`X^{(${isSine ? "\\sin" : "\\cos"})}(j\\omega)=${areaTex}e^{j\\varphi}\\delta(\\omega-${fmt(omega1)})+${isSine ? `j${fmt(2 * Math.PI * half)}` : areaTex}e^{-j\\varphi}\\delta(\\omega+${fmt(omega1)})`);
+    symmetryLines.push(`${label}:\\quad\\text{a line spectrum: two impulses at }\\omega=\\pm${fmt(omega1)}\\text{, not an ordinary function}`);
+  });
+
+  const closedForm = forwardFourier(node);
+  return [
+    { title: "Step 1 — Synthesis & Transform Pair Definition", lines: [`X(j\\omega)=\\int_{-\\infty}^{\\infty}x(t)\\,e^{-j\\omega t}\\,dt`] },
+    { title: "Step 2 — Substitution of the Active Input Signal", lines: domainLines.length ? domainLines : ["\\text{No additive terms were found in }x(t)."] },
+    { title: "Step 3 — Direct Integration Steps", lines: integrationLines.length ? integrationLines : ["\\text{Every remaining term is constant; no antiderivative is required.}"] },
+    { title: "Step 4 — Algebraic Reduction & Kernel Identification", lines: reductionLines.length ? reductionLines : ["\\text{No pulse or trigonometric term required reduction.}"] },
+    { title: "Step 5 — Final Closed-Form & Symmetry", lines: [
+      closedForm.ok ? closedForm.spectrum.latex : hasUnsupported ? "\\text{No fully closed form; the numerical spectrum above is used instead.}" : `\\text{${closedForm.error}}`,
+      ...symmetryLines,
+    ] },
+  ];
+}
+
 /**
  * Convolution theorem: x₁(t) ∗ x₂(t) ↔ X₁(jω)·X₂(jω). At most one factor may carry impulse lines
  * (Aδ(ω−ω₀)·Y(jω) = A·Y(jω₀)·δ(ω−ω₀)); the product of two impulse trains is undefined.
@@ -776,6 +864,104 @@ export function inverseFourier(source: string): InverseFourierResult {
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : "The spectrum could not be inverted." };
   }
+}
+
+/* ─────────────────────────── Step-by-step inverse CTFT derivation ─────────────────────────── */
+
+const leadCoefficient = (value: number) => (isZero(value - 1) ? "" : isZero(value + 1) ? "-" : fmt(value));
+const inverseStripPrefix = /^\s*X\s*(?:\\left)?\(\s*j\s*\\omega\s*(?:\\right)?\)\s*=/;
+
+/**
+ * Step-by-step x(t) = 𝓕⁻¹{X(jω)}: inversion integral, substitution with bandwidth limits, antiderivative
+ * or contour/PFE identification, Euler → sinc/decay reduction. Covers rect/tri pass-bands, sinc/Sa
+ * (by duality), δ lines and rational spectra; Step 5 always reuses the verified inverseFourier() result.
+ */
+export function deriveInverseFourierSteps(source: string): DerivationStep[] {
+  const substitution: string[] = []; const integration: string[] = []; const reduction: string[] = [];
+  const body = source.replace(inverseStripPrefix, "").trim();
+  if (body) substitution.push(`X(j\\omega)=${body}`);
+  const outside = "\\text{This term is outside the closed-form table; the inverse is computed numerically.}";
+  let index = 0;
+
+  const passBand = (name: "rect" | "tri", k: number, center: number, A: number) => {
+    const W = (name === "rect" ? 0.5 : 1) / A; const lo = center - W; const hi = center + W;
+    const carrier = isZero(center) ? "" : `\\,e^{j${fmt(center)}t}`;
+    const ramp = name === "tri" ? `\\left(1-\\frac{|\\omega${isZero(center) ? "" : `-${fmt(center)}`}|}{${fmt(W)}}\\right)` : "";
+    substitution.push(`\\omega_c=${fmt(W)}\\ \\text{rad/s}:\\quad x_{${index}}(t)=\\frac{1}{2\\pi}\\int_{${fmt(lo)}}^{${fmt(hi)}}${leadCoefficient(k)}${ramp}e^{j\\omega t}\\,d\\omega`);
+    if (name === "rect") {
+      integration.push(`x_{${index}}(t)=\\frac{${fmt(k)}}{2\\pi}\\left[\\frac{e^{j\\omega t}}{jt}\\right]_{${fmt(lo)}}^{${fmt(hi)}}=\\frac{${fmt(k)}}{2\\pi}\\cdot\\frac{e^{j(${fmt(hi)})t}-e^{j(${fmt(lo)})t}}{jt}`);
+      reduction.push(`\\frac{${fmt(k)}}{2\\pi}\\cdot\\frac{e^{j${fmt(W)}t}-e^{-j${fmt(W)}t}}{jt}=\\frac{${leadCoefficient(k)}\\sin(${fmt(W)}t)}{\\pi t}=\\frac{${fmt(k * W)}}{\\pi}\\operatorname{sinc}\\!\\left(\\frac{${fmt(W)}t}{\\pi}\\right)${carrier}`);
+    } else {
+      integration.push(`\\int\\omega\\,e^{j\\omega t}\\,d\\omega=\\frac{\\omega\\,e^{j\\omega t}}{jt}-\\int\\frac{e^{j\\omega t}}{jt}\\,d\\omega\\quad(\\text{by parts on each ramp})`);
+      reduction.push(`\\frac{${fmt(k)}}{2\\pi}\\cdot\\frac{2-2\\cos(${fmt(W)}t)}{${fmt(W)}\\,t^{2}}=\\frac{${fmt(k * W)}}{2\\pi}\\operatorname{sinc}^{2}\\!\\left(\\frac{${fmt(W)}t}{2\\pi}\\right)${carrier}`);
+    }
+  };
+
+  const rationalTerm = (part: { sign: number; text: string }, delay: number) => {
+    const parsedTerm = parseComplexRational(extractDelay(part.text).text); const value = part.sign < 0 ? rNeg(parsedTerm) : parsedTerm;
+    const toS = (poly: CPoly) => poly.map((coefficient, power) => cMul(coefficient, [c(1), c(0, -1), c(-1), c(0, 1)][power % 4]));
+    const num = toS(trim(value.num)); const den = toS(trim(value.den)); const lead = den[den.length - 1];
+    const numS = num.map((entry) => cDiv(entry, lead)); const denS = den.map((entry) => cDiv(entry, lead));
+    if ([...numS, ...denS].some((entry) => Math.abs(entry.im) > 1e-9 * Math.max(1, cAbs(entry)))) throw new FourierTableError("X(jω) must be conjugate-symmetric.");
+    const numerator = numS.map((entry) => entry.re).reverse(); const denominator = denS.map((entry) => entry.re).reverse();
+    const system: TransferFunction = { mode: "s", numerator, denominator, zeros: polynomialRoots(numerator), poles: polynomialRoots(denominator), source: "" };
+    const inverse = inverseLaplace(system, "two-sided", { stripAt: 0 });
+    substitution.push(`s=j\\omega:\\quad x_{${index}}(t)=\\frac{1}{2\\pi}\\int_{-\\infty}^{\\infty}X(j\\omega)e^{j\\omega t}d\\omega\\ \\Rightarrow\\ X(s)=\\frac{${formatPolynomial(numerator, "s")}}{${formatPolynomial(denominator, "s")}},\\ \\operatorname{Re}\\{s\\}=0`);
+    integration.push(inverse.pfeLatex.replace(/^H\(s\)/, "X(s)"));
+    inverse.terms.filter((term) => term.pole.im >= -1e-9).forEach((term) => {
+      integration.push(`p=${complexTex(term.pole)}\\ (\\operatorname{Re}\\{p\\}${term.pole.re < 0 ? "<" : ">"}0)\\ \\Rightarrow\\ ${term.causal ? "e^{pt}u(t)" : "-e^{pt}u(-t)"}\\ \\text{(residue }A=${complexTex(term.residue)}\\text{)}`);
+      const power = term.order > 1 ? `\\frac{t^{${term.order - 1}}}{${factorialOf(term.order - 1)}}` : "";
+      const step = term.causal ? "u(t)" : "-u(-t)";
+      const denominatorTex = term.order > 1 ? `\\left(s-p\\right)^{${term.order}}` : "s-p";
+      reduction.push(isZero(term.pole.im)
+        ? `\\frac{${fmt(term.residue.re)}}{${denominatorTex}}\\ \\longleftrightarrow\\ ${leadCoefficient(term.residue.re)}${power}e^{${fmt(term.pole.re)}t}${step},\\quad p=${fmt(term.pole.re)}`
+        : `\\frac{A}{${denominatorTex}}+\\frac{A^{*}}{${denominatorTex.replace("p", "p^{*}")}}\\ \\longleftrightarrow\\ 2${power}e^{${fmt(term.pole.re)}t}\\left[${fmt(term.residue.re)}\\cos(${fmt(term.pole.im)}t)-${fmt(term.residue.im)}\\sin(${fmt(term.pole.im)}t)\\right]${step}`);
+    });
+    const time = shiftTimeLatex(inverse.timeLatex.replace(/^h\(t\)=/, ""), delay);
+    reduction.push(`x_{${index}}(t)=${time}`);
+  };
+
+  const handleTerm = (part: { sign: number; text: string }) => {
+    const { text, delay } = extractDelay(part.text);
+    const call = extractCall(text, ["delta", "rect", "sinc", "Sa", "tri"]);
+    if (!call) { rationalTerm(part, delay); return; }
+    if (!isZero(delay)) throw new FourierTableError("A delay factor multiplying δ or a pass-band is outside this table.");
+    const coefficient = cScale(call.coefficient, part.sign); const { a, b } = affineOmega(call.argument);
+    if (isZero(a)) throw new FourierTableError("The argument needs an ω-dependent slope.");
+    const A = Math.abs(a); const center = -b / a;
+    if (call.name === "delta") {
+      const area = cScale(coefficient, 1 / A); const areaTex = isZero(area.im) ? piTex(area.re) : complexTex(area);
+      substitution.push(`x_{${index}}(t)=\\frac{1}{2\\pi}\\int_{-\\infty}^{\\infty}${areaTex}\\,\\delta(${shifted("\\omega", center)})\\,e^{j\\omega t}\\,d\\omega`);
+      integration.push(`\\int f(\\omega)\\,\\delta(\\omega-\\omega_0)\\,d\\omega=f(\\omega_0)\\ \\Rightarrow\\ x_{${index}}(t)=\\frac{${areaTex}}{2\\pi}${isZero(center) ? "" : `e^{j${fmt(center)}t}`}`);
+      reduction.push(isZero(center)
+        ? `x_{${index}}(t)=\\frac{${areaTex}}{2\\pi}=${fmt(area.re / (2 * Math.PI))}`
+        : `\\frac{${areaTex}}{2\\pi}\\left(e^{j${fmt(Math.abs(center))}t}+e^{-j${fmt(Math.abs(center))}t}\\right)=\\frac{${isZero(area.im) ? piTex(area.re) : fmt(area.re)}}{\\pi}\\cos(${fmt(Math.abs(center))}t)\\quad(\\text{mirrored line pair})`);
+      return;
+    }
+    if (!isZero(coefficient.im)) throw new FourierTableError("Pass-band gains must be real.");
+    if (call.name === "rect" || call.name === "tri") { passBand(call.name, coefficient.re, center, A); return; }
+    const entry: LowPass = { family: call.name as LowPass["family"], coefficient: coefficient.re, a: A, center };
+    substitution.push(`${call.name === "sinc" ? "\\operatorname{sinc}" : "\\operatorname{Sa}"}\\text{ spectrum: no finite cutoff; the inversion integral is resolved by duality}`);
+    integration.push(`x(t)\\longleftrightarrow X(j\\omega)\\ \\Longrightarrow\\ X(jt)\\longleftrightarrow2\\pi\\,x(-\\omega)`);
+    reduction.push(`x_{${index}}(t)=${lowPassTime(entry, false).latex}`);
+  };
+
+  try {
+    for (const part of splitTerms(normalizeSpectrumSource(source))) {
+      index += 1;
+      try { handleTerm(part); }
+      catch { substitution.push(outside); }
+    }
+  } catch { substitution.push(outside); }
+
+  const result = inverseFourier(source);
+  return [
+    { title: "Step 1 — Inversion Integral Definition", lines: ["x(t)=\\frac{1}{2\\pi}\\int_{-\\infty}^{\\infty}X(j\\omega)\\,e^{j\\omega t}\\,d\\omega"] },
+    { title: "Step 2 — Substitution & Bandwidth Limits", lines: substitution.length ? substitution : ["\\text{Enter a spectrum X(j\\omega).}"] },
+    { title: "Step 3 — Integration & Kernel Resolution", lines: integration.length ? integration : ["\\text{No antiderivative could be identified for this spectrum.}"] },
+    { title: "Step 4 — Euler Conversion & Sinc / Decay Formulation", lines: reduction.length ? reduction : ["\\text{No pass-band or decay term required reduction.}"] },
+    { title: "Step 5 — Final Closed-Form Time Signal", lines: [result.ok ? result.latex : `\\text{No closed-form inverse.}`] },
+  ];
 }
 
 /* ─────────────────────────── Auto-scaling ─────────────────────────── */

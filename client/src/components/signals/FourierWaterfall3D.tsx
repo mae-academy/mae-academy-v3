@@ -51,7 +51,6 @@ type Props = {
 const WINDOW_OPTIONS: ReadonlyArray<{ value: WindowPreset; label: string }> = [
   { value: "one", label: "1 Period" },
   { value: "two", label: "2 Periods" },
-  { value: "custom", label: "Custom" },
 ];
 
 const RAIL_X = 1.12;
@@ -65,14 +64,12 @@ const PALETTE = {
 const SPECTRUM_OPTIONS: ReadonlyArray<{ value: SpectrumMode; label: ReactNode }> = [
   { value: "positive", label: <span className="inline-flex items-center gap-1">Positive <KatexMath math="[0,+\infty)" /></span> },
   { value: "bilateral", label: <span className="inline-flex items-center gap-1">Bilateral <KatexMath math="(-\infty,+\infty)" /></span> },
-  { value: "negative", label: <span className="inline-flex items-center gap-1">Negative <KatexMath math="(-\infty,0]" /></span> },
 ];
 
 const CAMERA_OPTIONS: ReadonlyArray<{ value: CameraPresetId; label: string }> = [
   { value: "isometric", label: "3D Isometric" },
   { value: "front", label: "Time Domain (Front)" },
   { value: "side", label: "Frequency Domain (Side)" },
-  { value: "top", label: "Top-Down" },
 ];
 
 interface CurveGeometry {
@@ -239,7 +236,7 @@ export function FourierWaterfall3D({ series, harmonics, onHarmonicsChange, harmo
   const labels = useMemo<LabelDef[]>(() => {
     const g = geometry;
     const defs: LabelDef[] = [];
-    const nTop = mode === "negative" ? `\\sum_{k=-${n}}^{0}` : `x_{${n}}(t)`;
+    const nTop = `x_{${n}}(t)`;
     defs.push({ id: "rail:composite", kind: "rail", world: [RAIL_X, 0, g.zFront], priority: 420, content: <KatexMath math={nTop} /> });
     for (const c of g.curves) {
       defs.push({
@@ -583,9 +580,7 @@ export function FourierWaterfall3D({ series, harmonics, onHarmonicsChange, harmo
   const compositeFormula =
     mode === "positive"
       ? `x_N(t)=\\sum_{k=0}^{N} A_k\\cos(k\\omega_0 t+\\phi_k),\\;A_k=2|c_k|\\;(k\\ge 1)`
-      : mode === "bilateral"
-        ? `x_N(t)=\\sum_{k=-N}^{N} c_k\\,e^{jk\\omega_0 t}`
-        : `\\sum_{k=-N}^{0}\\operatorname{Re}\\{c_k\\,e^{jk\\omega_0 t}\\}`;
+      : `x_N(t)=\\sum_{k=-N}^{N} c_k\\,e^{jk\\omega_0 t}`;
   const spectralKey = spectrumCss(HARMONIC_SPECTRUM);
 
   return (
@@ -610,6 +605,7 @@ export function FourierWaterfall3D({ series, harmonics, onHarmonicsChange, harmo
         <StudioSlider
           className="min-w-[14rem] flex-1"
           label="Harmonic density"
+          variant="spectral"
           min={harmonicLimits.min}
           max={Math.min(harmonicLimits.max, available)}
           step={1}
@@ -643,7 +639,7 @@ export function FourierWaterfall3D({ series, harmonics, onHarmonicsChange, harmo
           <span className="h-1.5 w-24 rounded-full" style={{ background: spectralKey }} />
           <KatexMath math={`k\\ge ${COLOR_RAMP_MAX}`} />
           <span className="ml-1 inline-block h-0 w-5 border-t-2 border-dashed border-blue-500" />
-          <KatexMath math={mode === "negative" ? "\\sum_{k=-N}^{0}" : "x_N(t)"} />
+          <KatexMath math="x_N(t)" />
         </div>
 
         {labels.map((def) => (

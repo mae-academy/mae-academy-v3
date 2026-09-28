@@ -40,7 +40,7 @@ type PanelProps = { expression: string; onExpressionChange: (latex: string) => v
 export function DiscreteInputPanel({ expression, onExpressionChange }: PanelProps) {
   const parsed = useMemo(() => parseDiscreteSignal(expression), [expression]);
   return (
-    <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1fr)_18rem]">
+    <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
       <UnifiedSignalEngineTerminal
         key="discrete"
         title="SIGNAL ENGINE"

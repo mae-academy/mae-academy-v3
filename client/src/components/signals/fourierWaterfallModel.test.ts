@@ -35,12 +35,6 @@ describe("Fourier waterfall model", () => {
     for (const i of [0, 50, 120]) expect(scene.composite[i]).toBeCloseTo(partialSum(rect, scene.time[i], 5), 4);
   });
 
-  it("negative mode isolates k ≤ 0 with DC at the front lane", () => {
-    expect(laneOrder("negative", 3)).toEqual([0, -1, -2, -3]);
-    const scene = buildWaterfallScene(rect, 3, "negative", { samples: 101 });
-    expect(scene.harmonics[0].k).toBe(0);
-    expect(scene.harmonics[0].lane).toBe(1);
-  });
 
   it("amplitude bound is a clean value that contains every trace", () => {
     const scene = buildWaterfallScene(rect, 25, "positive", { samples: 481 });
@@ -67,9 +61,9 @@ describe("Fourier waterfall model", () => {
 
   it("assigns the persistent spectral colour identity", () => {
     expect(harmonicColor(1)).toBe("#2563EB");
-    expect(harmonicColor(25)).toBe("#E11D48");
-    expect(harmonicColor(20)).toBe(harmonicColor(20));
-    expect(harmonicColor(40)).toBe("#E11D48");
+    expect(harmonicColor(50)).toBe("#E11D48");
+    expect(harmonicColor(25)).toBe(harmonicColor(25));
+    expect(harmonicColor(60)).toBe("#E11D48");
     expect(harmonicColor(-3)).toBe(harmonicColor(3));
   });
 

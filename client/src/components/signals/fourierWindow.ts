@@ -7,7 +7,7 @@ import { estimateSupport } from "@/lib/plotAutoScale";
 export const N_MAX = 50;
 export const PERIOD_BOUNDS = { min: 0.1, max: 20 } as const;
 
-export type WindowPreset = "one" | "two" | "custom";
+export type WindowPreset = "one" | "two";
 
 export interface TimeWindow {
   start: number;
@@ -15,7 +15,7 @@ export interface TimeWindow {
 }
 
 /** 1 period → [−T₀/2, T₀/2]; 2 periods → [−T₀, T₀]. */
-export function presetWindow(preset: Exclude<WindowPreset, "custom">, period: number): TimeWindow {
+export function presetWindow(preset: WindowPreset, period: number): TimeWindow {
   const half = preset === "one" ? period / 2 : period;
   return { start: -half, end: half };
 }

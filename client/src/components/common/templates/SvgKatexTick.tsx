@@ -1,5 +1,4 @@
 import React from "react";
-import { KatexMath } from "@/components/ui/KatexMath";
 
 export interface SvgKatexTickProps {
   x: number;
@@ -11,24 +10,36 @@ export interface SvgKatexTickProps {
   children: React.ReactNode;
 }
 
-const BOX_W = 56;
-const BOX_H = 18;
+/** Tick LaTeX (numbers, −, π, \frac{π}{n}) → the Unicode KaTeX itself would typeset. */
+export function tickText(source: string): string {
+  return source
+    .replace(/\\frac\{([^{}]*)\}\{([^{}]*)\}/g, "$1/$2")
+    .replace(/\\pi/g, "π")
+    .replace(/\\,|\\!|\\ /g, "")
+    .replace(/-/g, "−")
+    .replace(/[{}]/g, "");
+}
 
-/** Axis tick label rendered as pure KaTeX inside an SVG <foreignObject>. */
+/**
+ * Axis tick label as native SVG <text> in the KaTeX_Main face. Deliberately not HTML-in-<foreignObject>:
+ * WebKit (Safari) positions KaTeX's position:relative spans inside a foreignObject from the wrong origin,
+ * so labels drifted away from the stems/ticks they belong to.
+ */
 export function SvgKatexTick({ x, y, anchor = "middle", baseline = false, active = false, children }: SvgKatexTickProps) {
-  const left = anchor === "end" ? x - BOX_W : anchor === "start" ? x : x - BOX_W / 2;
-  const top = baseline ? y - BOX_H + 4 : y - BOX_H / 2;
-  const justify = anchor === "end" ? "flex-end" : anchor === "start" ? "flex-start" : "center";
-  const text = String(children);
   return (
-    <foreignObject x={left} y={top} width={BOX_W} height={BOX_H} pointerEvents="none" overflow="visible">
-      <div
-        className={`flex h-full items-center text-[11px] leading-none ${active ? "font-bold text-blue-600 dark:text-blue-400" : "text-slate-600 dark:text-slate-300"}`}
-        style={{ justifyContent: justify }}
-      >
-        <KatexMath math={text} />
-      </div>
-    </foreignObject>
+    <text
+      x={x}
+      y={y}
+      textAnchor={anchor}
+      dominantBaseline={baseline ? "alphabetic" : "central"}
+      pointerEvents="none"
+      fontSize={12}
+      fontWeight={active ? 700 : 400}
+      style={{ fontFamily: "KaTeX_Main, 'Times New Roman', serif" }}
+      className={active ? "fill-blue-600 dark:fill-blue-400" : "fill-slate-600 dark:fill-slate-300"}
+    >
+      {tickText(String(children))}
+    </text>
   );
 }
 

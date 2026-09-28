@@ -10,7 +10,7 @@ afterEach(() => cleanup());
 
 const stems = () => Array.from(screen.getByTestId("stem-original").querySelectorAll<SVGGElement>("g[data-n]")).map((g) => ({ n: Number(g.dataset.n), value: Number(g.dataset.value), cx: Number(g.querySelector("circle:last-of-type")!.getAttribute("cx")) }));
 const live = () => stems().filter((stem) => stem.value !== 0).map((stem) => stem.n);
-const goDiscrete = () => { render(<SignalOperationsLab />); fireEvent.click(screen.getByText("Discrete-Time [x[n]]")); };
+const goDiscrete = () => { render(<SignalOperationsLab />); fireEvent.click(screen.getByRole("tab", { name: "Discrete-Time [x[n]]" })); };
 const clickPreset = (index: number) => fireEvent.click(screen.getByTestId(`discrete-preset-${index}`));
 
 describe("Signal Operations — discrete-time mode", () => {
@@ -61,7 +61,7 @@ describe("Signal Operations — discrete-time mode", () => {
 
   it("switches back to continuous time", () => {
     goDiscrete();
-    fireEvent.click(screen.getByText("Continuous-Time [x(t)]"));
+    fireEvent.click(screen.getByRole("tab", { name: "Continuous-Time [x(t)]" }));
     expect(screen.getByText("COMPOSITE SIGNAL VIEW")).toBeTruthy();
     expect(screen.queryByTestId("stem-original")).toBeNull();
   });

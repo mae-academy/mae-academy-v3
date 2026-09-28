@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 export interface SegmentedOption<T extends string | number | boolean = string> {
   value: T;
   label: ReactNode;
+  href?: string;
   disabled?: boolean;
   badge?: ReactNode;
   icon?: ReactNode;
@@ -68,29 +69,8 @@ export function SegmentedControl<T extends string | number | boolean = string>({
         const isActive = option.value === value;
         const isDisabled = disabled || option.disabled;
 
-        return (
-          <button
-            key={String(option.value)}
-            type="button"
-            role="tab"
-            disabled={isDisabled}
-            aria-selected={isActive}
-            aria-label={option["aria-label"]}
-            onClick={() => {
-              if (!isDisabled && !isActive) {
-                onChange(option.value);
-              }
-            }}
-            className={cn(
-              "rounded-full font-semibold transition-all duration-200 cursor-pointer inline-flex items-center justify-center gap-1.5 whitespace-nowrap select-none disabled:cursor-not-allowed disabled:opacity-40",
-              currentSize.pill,
-              fullWidth && "flex-1",
-              isActive
-                ? "text-white shadow-sm bg-gradient-to-br from-[#2563EB] via-[#7C3AED] to-[#E11D48]"
-                : "font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/40 dark:hover:bg-slate-800/40",
-              pillClassName
-            )}
-          >
+        const content = (
+          <>
             {option.icon && (
               <span className={cn("shrink-0", currentSize.icon)}>
                 {option.icon}
@@ -109,6 +89,57 @@ export function SegmentedControl<T extends string | number | boolean = string>({
                 {option.badge}
               </span>
             )}
+          </>
+        );
+
+        const pillClasses = cn(
+          "rounded-full font-semibold transition-all duration-200 cursor-pointer inline-flex items-center justify-center gap-1.5 whitespace-nowrap select-none disabled:cursor-not-allowed disabled:opacity-40",
+          currentSize.pill,
+          fullWidth && "flex-1",
+          isActive
+            ? "text-white shadow-sm bg-gradient-to-br from-[#2563EB] via-[#7C3AED] to-[#E11D48]"
+            : "font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/40 dark:hover:bg-slate-800/40",
+          pillClassName
+        );
+
+        if (option.href) {
+          return (
+            <a
+              key={String(option.value)}
+              href={option.href}
+              role="tab"
+              aria-selected={isActive}
+              aria-label={option["aria-label"]}
+              onClick={(e) => {
+                if (isDisabled) {
+                  e.preventDefault();
+                  return;
+                }
+                onChange(option.value);
+              }}
+              className={pillClasses}
+            >
+              {content}
+            </a>
+          );
+        }
+
+        return (
+          <button
+            key={String(option.value)}
+            type="button"
+            role="tab"
+            disabled={isDisabled}
+            aria-selected={isActive}
+            aria-label={option["aria-label"]}
+            onClick={() => {
+              if (!isDisabled && !isActive) {
+                onChange(option.value);
+              }
+            }}
+            className={pillClasses}
+          >
+            {content}
           </button>
         );
       })}

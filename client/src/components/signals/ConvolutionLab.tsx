@@ -25,6 +25,7 @@ const presets = [{ label: "Rectangular pulse", x: "\\text{rect}(t)", h: "\\text{
 
 const discretePresets = [
   { label: "Rectangular pulses", x: "1, 2, 1", h: "1, -1, 2" },
+  { label: "Unit impulse response", math: "h[n]=\\delta[n]", x: "1, 2, 3, 2, 1", h: "1" },
   { label: "Moving average filter", x: "1, 1, 1, 1", h: "1, 1" },
   { label: "Bipolar steps", x: "1, -1, 1, -1", h: "1, 1, 1" },
   { label: "Echo / Multipath", x: "3, 2, 1", h: "1, 0, 1" },
@@ -91,15 +92,31 @@ export function ConvolutionLab() {
           value={mode}
           onChange={(m) => { setMode(m); setIsPlaying(false); }}
           options={[
-            { value: "continuous", label: "Continuous" },
-            { value: "discrete", label: "Discrete" },
+            {
+              value: "continuous",
+              label: (
+                <span className="font-['Poppins',sans-serif] font-medium inline-flex items-center gap-1.5">
+                  Continuous-Time <KatexMath math="[x(t)]" />
+                </span>
+              ),
+              "aria-label": "Continuous-Time [x(t)]",
+            },
+            {
+              value: "discrete",
+              label: (
+                <span className="font-['Poppins',sans-serif] font-medium inline-flex items-center gap-1.5">
+                  Discrete-Time <KatexMath math="[x[n]]" />
+                </span>
+              ),
+              "aria-label": "Discrete-Time [x[n]]",
+            },
           ]}
         />
       </div>
 
       {mode === "continuous" ? (
         <>
-          <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1fr)_18rem]">
+          <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
             <UnifiedSignalEngineTerminal
               channels={[
                 { id: "x", lhs: "x(t)", accent: "blue", value: xExpression, onChange: setXExpression, error: xParsed.ok ? null : xParsed.error },
@@ -113,13 +130,13 @@ export function ConvolutionLab() {
           </div>
         </>
       ) : (
-        <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1fr)_18rem]">
+        <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
           <div className="min-w-0 space-y-3">
             <p className="text-xs text-slate-500 dark:text-slate-400">Comma-separated samples, starting at n = 0.</p>
             <div className="grid w-full grid-cols-1 gap-4 md:grid-cols-2">
               {([
-                { id: "x", prefix: "x[n]=", source: discreteXSource, values: discreteX, set: setDiscreteXSource, accent: "border-blue-500/80 bg-blue-500/5 ring-2 ring-blue-500/20", placeholder: "e.g. 1, 2, 1" },
-                { id: "h", prefix: "h[n]=", source: discreteHSource, values: discreteH, set: setDiscreteHSource, accent: "border-rose-500/80 bg-rose-500/5 ring-2 ring-rose-500/20", placeholder: "e.g. 1, -1, 2" },
+                { id: "x", prefix: "x[n] =", source: discreteXSource, values: discreteX, set: setDiscreteXSource, accent: "border-blue-500/80 bg-blue-500/5 ring-2 ring-blue-500/20", placeholder: "e.g. 1, 2, 1" },
+                { id: "h", prefix: "h[n] =", source: discreteHSource, values: discreteH, set: setDiscreteHSource, accent: "border-rose-500/80 bg-rose-500/5 ring-2 ring-rose-500/20", placeholder: "e.g. 1, -1, 2" },
               ] as const).map((field) => (
                 <div key={field.id}>
                   <div onClick={() => setActiveTarget(field.id)} className={`flex items-center gap-2.5 rounded-xl border p-3 transition-all cursor-pointer ${activeTarget === field.id ? field.accent : "border-slate-200 bg-white/50 dark:border-slate-800 dark:bg-slate-900/50"}`}>
@@ -128,13 +145,14 @@ export function ConvolutionLab() {
                       value={field.source}
                       onFocus={() => setActiveTarget(field.id)}
                       onChange={(e) => { field.set(e.target.value); setDiscreteN(0); }}
-                      className="min-w-0 flex-1 bg-transparent font-mono text-sm text-slate-900 outline-none dark:text-white"
+                      className="min-w-0 flex-1 bg-transparent text-sm text-slate-900 outline-none dark:text-white"
+                      style={{ fontFamily: "'KaTeX_Main', 'KaTeX_Math', 'Times New Roman', serif" }}
                       placeholder={field.placeholder}
                       aria-label={field.prefix}
                     />
                   </div>
                   <div className="mt-2 flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-400">
-                    <KatexMath math={`${field.prefix.slice(0, -1)} = \\{${field.values.join(",\\; ")}\\}`} />
+                    <KatexMath math={`${field.id}[n] = \\{${field.values.join(",\\; ")}\\}`} />
                   </div>
                 </div>
               ))}
@@ -150,7 +168,14 @@ export function ConvolutionLab() {
                   onClick={() => { setDiscreteXSource(preset.x); setDiscreteHSource(preset.h); setDiscreteN(0); }}
                   className={`rounded-xl border px-3 py-2 text-left text-xs font-bold transition active:scale-[0.98] ${idle}`}
                 >
-                  {preset.label}
+                  <span className="flex items-center justify-between gap-1.5">
+                    <span>{preset.label}</span>
+                    {"math" in preset && (
+                      <span className="text-[11px] font-normal text-slate-500 dark:text-slate-400">
+                        <KatexMath math={preset.math} />
+                      </span>
+                    )}
+                  </span>
                 </button>
               ))}
             </div>
