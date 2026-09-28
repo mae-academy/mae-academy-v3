@@ -29,10 +29,10 @@ const itemVariants: Variants = {
   },
 };
 
-// Clean Visual Preview Placeholder Slot (Ready for static image imports)
+// Clean Visual Preview Placeholder Slot (Responsive aspect ratio, no rigid height)
 function VisualPreviewSlot() {
   return (
-    <div className="relative w-full min-h-[440px] lg:min-h-[500px] rounded-2xl border border-slate-200/80 bg-slate-50/50 shadow-sm overflow-hidden flex items-center justify-center dark:border-white/[0.08] dark:bg-zinc-950/60" />
+    <div className="relative w-full min-h-[200px] sm:min-h-[280px] lg:min-h-[440px] aspect-[16/10] rounded-2xl border border-slate-200/80 bg-slate-50/50 shadow-sm overflow-hidden flex items-center justify-center dark:border-white/[0.08] dark:bg-zinc-950/60" />
   );
 }
 
@@ -49,7 +49,7 @@ export default function EngineeringPlatformsSection() {
       viewport={{ once: true, amount: 0.08 }}
       className="py-12 sm:py-16 border-t border-slate-200/80 dark:border-white/[0.08] bg-white dark:bg-[#000000]"
     >
-      <div className="max-w-[1380px] mx-auto px-6 sm:px-8 lg:px-12 w-full">
+      <div className="max-w-[1380px] mx-auto px-4 sm:px-6 lg:px-8 w-full">
         {/* Section Header */}
         <motion.div variants={itemVariants} className="text-center max-w-3xl mx-auto mb-12 sm:mb-16">
           <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-slate-900 dark:text-white">

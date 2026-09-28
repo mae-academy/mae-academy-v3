@@ -424,11 +424,11 @@ export default function AcademicLibrary() {
 
       {/* ── Grid / Results ── */}
       {isLoading ? (
-        <div ref={gridRef} className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div ref={gridRef} className="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {Array.from({ length: Math.min(perPage, 12) }).map((_, i) => (
             <div
               key={i}
-              className="h-[430px] animate-pulse rounded-2xl border border-slate-200 bg-slate-100 dark:border-slate-800 dark:bg-white/[0.03]"
+              className="min-h-[380px] animate-pulse rounded-2xl border border-slate-200 bg-slate-100 dark:border-slate-800 dark:bg-white/[0.03]"
             />
           ))}
         </div>
@@ -466,7 +466,7 @@ export default function AcademicLibrary() {
       ) : (
         <motion.div
           ref={gridRef}
-          className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+          className="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
           variants={containerVariants}
         >
           {books.map((book) => (

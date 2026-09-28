@@ -35,12 +35,16 @@ export default function HeaderNavigationSlider({ locale: _locale }: HeaderNaviga
   }));
 
   return (
-    <nav aria-label={copy.controls.platformNavigation} className="flex justify-center w-full">
+    <nav
+      aria-label={copy.controls.platformNavigation}
+      className="flex justify-start md:justify-center w-full overflow-x-auto no-scrollbar py-0.5 px-0.5"
+    >
       <SegmentedControl
         options={options}
         value={activeValue}
         onChange={(href) => setLocation(href)}
         size="md"
+        className="shrink-0"
         aria-label={copy.controls.platformNavigation}
       />
     </nav>

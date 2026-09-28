@@ -297,7 +297,7 @@ export default function PracticalSimulations({
       {filteredSimulations.length > 0 ? (
         <motion.div
           layout
-          className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3"
+          className="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-2 lg:grid-cols-3"
           variants={containerVariants}
         >
           <AnimatePresence mode="popLayout">
@@ -353,7 +353,7 @@ export default function PracticalSimulations({
                     <div className="pt-2">
                       <Link
                         href={sim.href}
-                        className="group/button inline-flex items-center gap-2 rounded-full border border-violet-300/70 bg-white/50 px-4 py-2.5 text-xs font-bold text-violet-700 shadow-sm transition-all duration-200 hover:scale-[1.02] hover:border-violet-400 hover:bg-violet-50 active:scale-[.97] dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-violet-300 dark:hover:bg-white/[0.08]"
+                        className="group/button inline-flex min-h-[44px] items-center gap-2 rounded-full border border-violet-300/70 bg-white/50 px-4 py-2.5 text-xs font-bold text-violet-700 shadow-sm transition-all duration-200 hover:scale-[1.02] hover:border-violet-400 hover:bg-violet-50 active:scale-[.97] dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-violet-300 dark:hover:bg-white/[0.08]"
                       >
                         {copy.controls.explore}{" "}
                         <ArrowUpRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover/button:-translate-y-0.5 group-hover/button:translate-x-0.5" />

@@ -63,10 +63,10 @@ export function SimulationPageHeader({
   return (
     <div className={`w-full flex flex-col items-center justify-center text-center ${className}`}>
       {showBack && backLabel ? (
-        <div className="w-full flex justify-start mb-6">
+        <div className="w-full flex justify-start mb-4 sm:mb-6">
           <Link
             href={backRoute}
-            className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:border-white/[0.08] dark:bg-[#08080A] dark:text-zinc-200 dark:hover:bg-white/[0.04]"
+            className="inline-flex min-h-[44px] items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:border-white/[0.08] dark:bg-[#08080A] dark:text-zinc-200 dark:hover:bg-white/[0.04]"
           >
             <ArrowLeft className={`h-4 w-4 stroke-[1.5] ${isRtl ? "rotate-180" : ""}`} />
             {backLabel}
@@ -75,12 +75,12 @@ export function SimulationPageHeader({
       ) : null}
 
       {showTitle && title ? (
-        <div className="mb-8 flex flex-col items-center justify-center text-center">
-          <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-slate-900 dark:text-white select-none">
+        <div className="mb-6 sm:mb-8 flex flex-col items-center justify-center text-center px-2">
+          <h1 className="text-2xl sm:text-3xl md:text-5xl font-extrabold tracking-tight text-slate-900 dark:text-white select-none break-words">
             {title}
           </h1>
           {subtitle && (
-            <p className="mt-2 text-sm sm:text-base text-slate-500 dark:text-slate-400 max-w-2xl">
+            <p className="mt-2 text-xs sm:text-sm md:text-base text-slate-500 dark:text-slate-400 max-w-2xl leading-relaxed">
               {subtitle}
             </p>
           )}
@@ -90,14 +90,14 @@ export function SimulationPageHeader({
       {showToolNavigation && hasTools ? (
         <nav
           aria-label={`${title ?? "Simulation"} tools`}
-          className="mb-8 flex justify-center overflow-x-auto pb-1 w-full"
+          className="mb-6 sm:mb-8 flex justify-start sm:justify-center overflow-x-auto no-scrollbar pb-1 w-full max-w-full px-1"
         >
           <SegmentedControl
             options={tools.map((tool) => ({ label: tool.label, value: tool.id }))}
             value={activeTool}
             onChange={onSelectTool!}
             size="lg"
-            className="shadow-sm"
+            className="shadow-sm shrink-0"
             aria-label={`${title ?? "Simulation"} tools`}
           />
         </nav>

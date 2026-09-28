@@ -356,29 +356,29 @@ export default function EngineeringScope({ className = "" }: EngineeringScopePro
   return (
     <div
       ref={containerRef}
-      className={`flex flex-col bg-white border border-slate-200/80 rounded-2xl shadow-sm p-3.5 sm:p-4 w-full h-fit self-center relative overflow-hidden backdrop-blur-sm dark:border-white/[0.08] dark:bg-[#08080A] ${className}`}
+      className={`flex flex-col bg-white border border-slate-200/80 rounded-2xl shadow-sm p-3.5 sm:p-4 w-full max-w-sm sm:max-w-md mx-auto h-fit self-center relative overflow-hidden backdrop-blur-sm dark:border-white/[0.08] dark:bg-[#08080A] ${className}`}
     >
       {/* Top Tri-Color Signature Accent Line */}
       <div className="absolute top-0 left-0 right-0 h-[2.5px] bg-gradient-to-br from-[#2563eb] via-[#9333ea] to-[#e11d48]" />
 
       {/* Scope Header Bar: Channel indicators & Timebase */}
-      <div className="flex items-center justify-between gap-3 mb-3 pb-2.5 border-b border-slate-200/70 dark:border-white/[0.08]">
-        <div className="flex items-center gap-2.5 sm:gap-3 text-xs font-medium text-slate-600 dark:text-zinc-400">
+      <div className="flex items-center justify-between gap-2 sm:gap-3 mb-2.5 sm:mb-3 pb-2 border-b border-slate-200/70 dark:border-white/[0.08]">
+        <div className="flex items-center gap-2 sm:gap-3 text-[11px] sm:text-xs font-medium text-slate-600 dark:text-zinc-400">
           <span className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-blue-600" />
+            <span className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-blue-600" />
             CH1
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-purple-600" />
+            <span className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-purple-600" />
             CH2
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-rose-500" />
+            <span className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-rose-500" />
             CH3
           </span>
         </div>
 
-        <div className="px-2.5 py-1 bg-slate-100 rounded-md text-xs font-mono font-medium text-slate-700 dark:bg-white/[0.06] dark:border dark:border-white/[0.08] dark:text-zinc-200 flex items-center">
+        <div className="px-2 py-0.5 sm:py-1 bg-slate-100 rounded-md text-[10px] sm:text-xs font-mono font-medium text-slate-700 dark:bg-white/[0.06] dark:border dark:border-white/[0.08] dark:text-zinc-200 flex items-center">
           <KatexMath math="10\text{ ms/div}" />
         </div>
       </div>
@@ -409,7 +409,7 @@ export default function EngineeringScope({ className = "" }: EngineeringScopePro
       </div>
 
       {/* Readout Footer snug directly below grid without gaps */}
-      <div className="flex justify-between items-center mt-3 pt-1 text-xs text-slate-600 dark:text-zinc-300 font-mono">
+      <div className="flex justify-between items-center mt-2.5 sm:mt-3 pt-1 text-[10px] sm:text-xs text-slate-600 dark:text-zinc-300 font-mono whitespace-nowrap gap-1 overflow-x-auto no-scrollbar">
         <KatexMath math="f = 120\text{ Hz}" />
         <KatexMath math="\zeta = 0.35" />
         <KatexMath math="V_{\text{p-p}} = 3.3\text{ V}" />

@@ -124,7 +124,7 @@ export default function About() {
           aria-hidden="true"
         />
 
-        <div className="relative z-10 grid gap-8 p-6 sm:p-10 lg:grid-cols-[380px_1fr] lg:gap-12 xl:grid-cols-[400px_1fr]">
+        <div className="relative z-10 grid gap-8 p-4 sm:p-8 lg:p-10 lg:grid-cols-[380px_1fr] lg:gap-12 xl:grid-cols-[400px_1fr]">
           {/* Left Column: Avatar Frame with iOS Segmented Switcher */}
           <div className="flex flex-col items-center justify-start lg:border-r lg:border-slate-100 lg:pr-10 dark:lg:border-white/[0.06]">
             <FounderAvatarFrame className="w-full" />
@@ -270,7 +270,7 @@ export default function About() {
       >
         <div className="grid grid-cols-2 divide-y divide-slate-200 sm:grid-cols-4 sm:divide-y-0 sm:divide-x dark:divide-slate-800">
           {impactMetrics.map((metric) => (
-            <div key={metric.id} className="p-6 sm:p-7 text-center sm:text-start">
+            <div key={metric.id} className="p-4 sm:p-7 text-center sm:text-start">
               <span className="text-3xl sm:text-4xl font-bold tracking-tight text-slate-900 dark:text-white">
                 {metric.value}
               </span>
@@ -301,7 +301,7 @@ export default function About() {
                 -------------------------------------------------------------- */}
             <motion.article
               variants={itemVariants}
-              className="rounded-3xl border border-slate-200/90 bg-white p-6 shadow-xs sm:p-8 dark:border-white/[0.08] dark:bg-[#08090d]"
+              className="rounded-3xl border border-slate-200/90 bg-white p-4 shadow-xs sm:p-8 dark:border-white/[0.08] dark:bg-[#08090d]"
             >
               <div>
                 {/* Header */}
@@ -425,7 +425,7 @@ export default function About() {
                 -------------------------------------------------------------- */}
             <motion.article
               variants={itemVariants}
-              className="rounded-3xl border border-slate-200/90 bg-white p-6 shadow-xs sm:p-8 dark:border-white/[0.08] dark:bg-[#08090d]"
+              className="rounded-3xl border border-slate-200/90 bg-white p-4 shadow-xs sm:p-8 dark:border-white/[0.08] dark:bg-[#08090d]"
             >
               <div>
                 {/* Header */}
@@ -512,7 +512,7 @@ export default function About() {
           <div className="flex flex-col">
             <motion.article
               variants={itemVariants}
-              className="rounded-3xl border border-slate-200/90 bg-white p-6 shadow-xs sm:p-8 dark:border-white/[0.08] dark:bg-[#08090d]"
+              className="rounded-3xl border border-slate-200/90 bg-white p-4 shadow-xs sm:p-8 dark:border-white/[0.08] dark:bg-[#08090d]"
             >
               <div>
                 {/* Header */}

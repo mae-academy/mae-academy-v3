@@ -42,35 +42,35 @@ export default function Home() {
         <div className="pointer-events-none absolute -top-24 left-1/2 -translate-x-1/2 w-[850px] h-[360px] opacity-35 blur-3xl mae-gradient-glow rounded-full -z-10 dark:opacity-20" />
 
         <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-12">
-          <div className="grid grid-cols-12 gap-4 lg:gap-8 items-center">
-            {/* Left Column: Headings, Subtitle, Actions (58-60% width) */}
-            <div className="col-span-7 flex flex-col justify-center gap-3 sm:gap-4 z-10 min-w-0">
-              <motion.h1
+          <div className="flex flex-col lg:flex-row items-center justify-between gap-8 lg:gap-12 w-full">
+            {/* Left Column: Headings, Subtitle, Actions */}
+            <div className="flex flex-col justify-center gap-3 sm:gap-4 z-10 w-full lg:max-w-xl text-left rtl:text-right">
+              <motion.span
                 variants={itemVariants}
-                className="font-bold tracking-tight text-slate-900 dark:text-white text-xl sm:text-2xl md:text-3xl lg:text-5xl whitespace-nowrap"
+                className="text-xs sm:text-sm font-medium tracking-wide text-violet-600 dark:text-violet-400"
               >
                 {home.headlinePrimary}
-              </motion.h1>
+              </motion.span>
 
-              <motion.h2
+              <motion.h1
                 variants={itemVariants}
-                className="font-semibold text-xl sm:text-2xl md:text-3xl lg:text-5xl whitespace-nowrap text-brand-gradient leading-normal"
+                className="font-extrabold tracking-tight text-slate-900 dark:text-white text-2xl sm:text-3xl md:text-5xl break-words text-left rtl:text-right leading-tight"
               >
-                {home.headlineSecondary}
-              </motion.h2>
+                <span className="text-brand-gradient">{home.headlineSecondary}</span>
+              </motion.h1>
 
               <motion.p
                 variants={itemVariants}
-                className="text-slate-600 dark:text-zinc-300 text-xs sm:text-sm md:text-base max-w-xl leading-relaxed"
+                className="text-slate-600 dark:text-slate-400 text-xs sm:text-sm max-w-md leading-relaxed text-left rtl:text-right"
               >
                 {home.description}
               </motion.p>
 
               {/* Call-to-Action Buttons */}
-              <motion.div variants={itemVariants} className="flex flex-wrap items-center gap-2.5 sm:gap-3 mt-1 sm:mt-2">
+              <motion.div variants={itemVariants} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto mt-2">
                 <Link
                   href="/simulations"
-                  className="btn-brand-primary px-5 sm:px-7 md:px-8 py-2.5 sm:py-3.5 text-xs sm:text-sm md:text-base font-semibold shrink-0 gap-2"
+                  className="btn-brand-primary min-h-[44px] px-6 sm:px-8 py-3 text-xs sm:text-sm font-semibold justify-center gap-2"
                 >
                   {home.ctaPrimary}
                   <ArrowRight className="h-4 w-4" />
@@ -78,15 +78,15 @@ export default function Home() {
 
                 <Link
                   href="/library"
-                  className="btn-brand-subtle px-5 sm:px-7 md:px-8 py-2.5 sm:py-3.5 text-xs sm:text-sm md:text-base font-semibold shadow-xs hover:shadow-sm shrink-0 gap-2"
+                  className="btn-brand-subtle min-h-[44px] px-6 sm:px-8 py-3 text-xs sm:text-sm font-semibold justify-center shadow-xs hover:shadow-sm gap-2"
                 >
                   {home.ctaSecondary}
                 </Link>
               </motion.div>
             </div>
 
-            {/* Right Column: Oscilloscope (40-42% width) */}
-            <motion.div variants={itemVariants} className="col-span-5 flex justify-end w-full">
+            {/* Right Column: Oscilloscope */}
+            <motion.div variants={itemVariants} className="w-full max-w-sm sm:max-w-md mx-auto aspect-[4/3] rounded-2xl flex justify-center">
               <Suspense
                 fallback={
                   <div className="w-full aspect-[4/3] rounded-2xl border border-slate-200/80 bg-slate-50/50 p-4 animate-pulse dark:border-white/[0.08] dark:bg-zinc-950/60" />
@@ -114,7 +114,7 @@ export default function Home() {
         viewport={{ once: true, amount: 0.15 }}
         className="py-12 sm:py-16 bg-white dark:bg-[#000000] border-t border-slate-200/80 dark:border-white/[0.08]"
       >
-        <div className="max-w-[1380px] mx-auto px-6 sm:px-8 lg:px-12 w-full">
+        <div className="max-w-[1380px] mx-auto px-4 sm:px-6 lg:px-8 w-full">
           <motion.div
             variants={itemVariants}
             className="relative overflow-hidden rounded-2xl border border-slate-200/90 bg-slate-50/80 p-8 lg:p-10 shadow-sm dark:border-white/[0.08] dark:bg-[#08080A]"
