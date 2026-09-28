@@ -25,7 +25,7 @@ export default function ResearchPaperCard({
   return (
     <motion.article
       variants={itemVariants}
-      className="group relative flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white/75 shadow-[0_15px_40px_-28px_rgba(15,23,42,.45)] transition-all duration-300 hover:-translate-y-2 hover:border-violet-400 hover:shadow-2xl hover:shadow-purple-500/20 dark:border-white/[0.08] dark:bg-[#08080A] dark:hover:border-white/[0.15] font-['Tajawal',sans-serif] leading-relaxed"
+      className="group relative flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white/75 shadow-[0_15px_40px_-28px_rgba(15,23,42,.45)] transition-all duration-300 hover:-translate-y-2 hover:border-violet-400 hover:shadow-2xl hover:shadow-purple-500/20 dark:border-white/[0.08] dark:bg-[#08080A] dark:hover:border-white/[0.15] font-sans leading-relaxed"
     >
       {/* Gradient top line on hover */}
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-brand-gradient opacity-0 transition-opacity duration-300 group-hover:opacity-100" />

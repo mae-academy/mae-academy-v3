@@ -22,7 +22,13 @@ type HeaderProps = {
 const localeLabel: Record<Locale, string> = { en: "EN", ar: "AR", es: "ES" };
 
 function BrandMark() {
-  return <svg viewBox="0 0 48 44" className="h-10 w-11 shrink-0" aria-label="MAE Academy tri-axis mark" role="img"><defs><linearGradient id="mark-gradient" x1="5" y1="3" x2="42" y2="41" gradientUnits="userSpaceOnUse"><stop stopColor="#2563EB"/><stop offset=".5" stopColor="#7C3AED"/><stop offset="1" stopColor="#E11D48"/></linearGradient></defs><path d="M5 35V11l11 14L24 9l8 16 11-14v24" fill="none" stroke="url(#mark-gradient)" strokeWidth="4.5" strokeLinecap="square" strokeLinejoin="bevel"/><path d="M8 37h32M24 7v31" stroke="currentColor" strokeOpacity=".3" strokeWidth="1"/><circle cx="24" cy="9" r="3.3" fill="#7C3AED"/></svg>;
+  return (
+    <div
+      className="w-8 h-8 shrink-0 mae-logo-mask [mask-image:url(/mae.svg)] [mask-size:contain] [mask-repeat:no-repeat] [mask-position:center] [-webkit-mask-image:url(/mae.svg)] [-webkit-mask-size:contain] [-webkit-mask-repeat:no-repeat] [-webkit-mask-position:center] bg-gradient-to-r from-blue-600 via-violet-600 to-pink-500"
+      role="img"
+      aria-label="MAE Academy logo"
+    />
+  );
 }
 
 function Header({ locale, onLocaleChange, isLocaleTransitioning, isDark, onThemeToggle }: HeaderProps) {

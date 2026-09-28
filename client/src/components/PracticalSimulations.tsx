@@ -173,17 +173,17 @@ export default function PracticalSimulations({
         className="mb-10 grid gap-6 lg:grid-cols-[1.2fr_.8fr] lg:items-end"
       >
         <div>
-          <div className="mb-4 flex items-center gap-3">
-            <p className="text-[10px] font-bold tracking-[0.18em] text-violet-700 dark:text-violet-300">
+          <div className="mb-3 flex items-center gap-3">
+            <p className="text-sm font-semibold tracking-wider text-indigo-600 dark:text-indigo-400">
               {eyebrow}
             </p>
             <span className="h-px w-16 bg-brand-gradient" />
           </div>
-          <h1 className="max-w-3xl text-4xl font-black tracking-[-0.055em] text-slate-950 sm:text-5xl lg:text-6xl dark:text-white">
+          <h1 className="max-w-3xl text-3xl lg:text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white">
             {title}
           </h1>
         </div>
-        <p className="max-w-xl border-l-2 border-gradient-signal pl-5 text-base leading-7 text-slate-600 dark:text-zinc-400 rtl:border-l-0 rtl:border-r-2 rtl:pl-0 rtl:pr-5">
+        <p className="max-w-xl border-l-2 border-gradient-signal pl-5 text-sm md:text-base text-slate-500 leading-relaxed dark:text-zinc-400 rtl:border-l-0 rtl:border-r-2 rtl:pl-0 rtl:pr-5">
           {description}
         </p>
       </motion.div>

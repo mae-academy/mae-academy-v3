@@ -85,7 +85,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
           {/* Column 2: Platform Navigation */}
           <div>
-            <p className="text-xs font-mono font-semibold tracking-wider text-slate-400 dark:text-slate-500">
+            <p className="text-xs font-semibold tracking-wider text-slate-400 dark:text-slate-500">
               PLATFORM
             </p>
             <nav className="mt-4 flex flex-col gap-3 text-sm">

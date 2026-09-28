@@ -70,7 +70,7 @@ export default function ResearchDetail({ params }: { params: { id: string } }) {
 
   if (error || !paper) {
     return (
-      <div className="container py-20 text-center font-['Tajawal',sans-serif]">
+      <div className="container py-20 text-center font-sans">
         <h1 className="mb-4 text-2xl font-bold text-slate-900 dark:text-white">Paper Not Found</h1>
         <p className="mb-8 text-slate-500 dark:text-zinc-400">{error || "Could not load the requested research paper."}</p>
         <Link
@@ -119,7 +119,7 @@ export default function ResearchDetail({ params }: { params: { id: string } }) {
   };
 
   return (
-    <div className="container py-14 sm:py-20 font-['Tajawal',sans-serif] leading-relaxed max-w-[1400px]">
+    <div className="container py-14 sm:py-20 font-sans leading-relaxed max-w-[1400px]">
       {/* ── Breadcrumb / Back ── */}
       <div className="mb-8">
         <Link
