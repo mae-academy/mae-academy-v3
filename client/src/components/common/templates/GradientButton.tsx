@@ -20,7 +20,7 @@ export function GradientButton({
   }[size];
 
   const variantClasses = {
-    default: "text-white shadow-sm hover:opacity-90 active:scale-95 bg-gradient-to-br from-[#2563EB] via-[#7C3AED] to-[#E11D48]",
+    default: "btn-active-brand hover:opacity-90 active:scale-95",
     ghost: "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 shadow-sm",
     outline: "text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-700 hover:border-violet-500 dark:hover:border-violet-400 bg-transparent",
   }[variant];

@@ -97,7 +97,7 @@ export function SegmentedControl<T extends string | number | boolean = string>({
           currentSize.pill,
           fullWidth && "flex-1",
           isActive
-            ? "text-white shadow-sm bg-gradient-to-br from-[#6366F1] via-[#8B5CF6] to-[#EC4899]"
+            ? "btn-active-brand brand-active-pill"
             : "font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/40 dark:hover:bg-slate-800/40",
           pillClassName
         );

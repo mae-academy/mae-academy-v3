@@ -203,8 +203,8 @@ export default function PracticalSimulations({
                   key={cat.id}
                   onClick={() => setSelectedCategory(cat.id)}
                   type="button"
-                  className={`whitespace-nowrap rounded-full px-5 py-1.5 text-sm font-medium transition-all duration-200 ${isActive
-                      ? "bg-gradient-to-br from-blue-600 via-purple-600 to-rose-500 text-white shadow-md"
+                  className={`whitespace-nowrap rounded-full px-5 py-1.5 text-sm transition-all duration-200 ${isActive
+                      ? "btn-active-brand brand-active-pill"
                       : "bg-transparent text-slate-600 hover:text-slate-900 dark:text-zinc-400 dark:hover:text-white"
                     }`}
                 >

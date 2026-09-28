@@ -154,10 +154,10 @@ const TAB_D_SYMBOL_SCALE = 1.5;
 const TERMINAL_HIT_RADIUS = 13;
 const TERMINAL_RADIUS = 4;
 const CONTROL_SYSTEMS_HEADING = 'text-sm font-bold uppercase tracking-wider text-slate-800 dark:text-white';
-/* Unified signature gradient matching the Mesh tab button (135deg from blue-600 through purple to rose). */
-const TAB_GRADIENT = 'linear-gradient(135deg, #2563EB 0%, #7C3AED 50%, #E11D48 100%)';
-const TAB_GRADIENT_REV = 'linear-gradient(135deg, #E11D48 0%, #7C3AED 50%, #2563EB 100%)';
-const TAB_ACTIVE_SHADOW = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
+/* Unified signature gradient (pure horizontal left-to-right from blue-600 through purple to rose). */
+const TAB_GRADIENT = 'linear-gradient(to right, #2563EB, #7C3AED, #E11D48)';
+const TAB_GRADIENT_REV = 'linear-gradient(to right, #E11D48, #7C3AED, #2563EB)';
+const TAB_ACTIVE_SHADOW = '0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)';
 /** Debounce before an edited circuit re-runs through the SPICE accuracy bridge. */
 const SPICE_DEBOUNCE_MS = 400;
 /** How many periods of the detected system frequency a `.tran` accuracy pass covers. */
@@ -3413,12 +3413,13 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
         {/* Examples button hidden for final launch UI polish */}
         {/* <ToolbarButton colors={colors} icon={<Library size={14} />} label="Examples" title="Browse the Interactive Examples Library" onClick={() => setExamplesModalOpen(true)} /> */}
         <button
+          type="button"
           onClick={() => { hasStartedSimulation.current = true; setSimulationRunning(value => !value); }}
           title={simulationRunning ? 'Pause simulation' : 'Run simulation'}
           className={`h-8 inline-flex items-center justify-center gap-1.5 px-3.5 text-xs font-semibold cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 whitespace-nowrap shrink-0 ${
             !simulationRunning && hasStartedSimulation.current
               ? "brand-pill-active-rev"
-              : "brand-pill-active"
+              : "btn-active-brand"
           }`}
         >
           {simulationRunning ? <Pause size={14} /> : <Play size={14} />}
@@ -3536,7 +3537,7 @@ interface Palette { background: string; canvas: string; panel: string; panelAlt:
 
 function ToolbarButton({ colors, icon, label, title, onClick, active, disabled, rounded }: { colors: Palette; icon?: React.ReactNode; label?: string; title: string; onClick: () => void; active?: boolean; disabled?: boolean; rounded?: boolean }) {
   const isActive = Boolean(active) && !disabled;
-  return <button title={title} onClick={onClick} disabled={disabled} style={{ border: isActive ? '1px solid transparent' : `1px solid ${colors.line}`, background: isActive ? TAB_GRADIENT : colors.panelAlt, color: isActive ? '#ffffff' : disabled ? colors.subtle : colors.muted, borderRadius: rounded ? 9999 : 8, padding: '6px 12px', minHeight: 32, display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 500, cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? .5 : 1, boxShadow: isActive ? TAB_ACTIVE_SHADOW : 'none', flexShrink: 0, whiteSpace: 'nowrap', transition: 'background .15s ease' }}>{icon}{label}</button>;
+  return <button title={title} onClick={onClick} disabled={disabled} className={isActive ? "btn-active-brand" : ""} style={{ border: isActive ? 'none' : `1px solid ${colors.line}`, background: isActive ? undefined : colors.panelAlt, color: isActive ? '#ffffff' : disabled ? colors.subtle : colors.muted, borderRadius: 9999, padding: '6px 14px', minHeight: 32, display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 500, cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? .5 : 1, boxShadow: isActive ? '0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)' : 'none', flexShrink: 0, whiteSpace: 'nowrap', transition: 'all 0.2s ease-in-out' }}>{icon}{label}</button>;
 }
 
 function ToolbarDivider({ colors }: { colors: Palette }) { return <span style={{ width: 1, height: 20, background: colors.line, margin: '0 1px', flexShrink: 0 }} />; }

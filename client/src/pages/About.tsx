@@ -250,7 +250,7 @@ export default function About() {
               <button
                 type="button"
                 onClick={() => setCvModalOpen(true)}
-                className="inline-flex items-center gap-2 rounded-full bg-gradient-to-br from-[#6366F1] via-[#8B5CF6] to-[#EC4899] px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:opacity-95 hover:shadow active:scale-95 shrink-0"
+                className="inline-flex items-center gap-2 rounded-full brand-active-pill px-4 py-2 text-xs font-semibold shadow-sm transition hover:opacity-95 hover:shadow active:scale-95 shrink-0"
               >
                 <BookOpen className="h-3.5 w-3.5" />
                 <span>{locale === "ar" ? "السيرة الأكاديمية (CV)" : "Academic Curriculum Vitae"}</span>
@@ -408,7 +408,7 @@ export default function About() {
 
                       <Link
                         href="/simulations"
-                        className="group inline-flex items-center justify-center gap-2 rounded-full bg-gradient-to-br from-[#6366F1] via-[#8B5CF6] to-[#EC4899] px-5 py-2.5 text-xs font-semibold text-white shadow-sm hover:shadow-md hover:opacity-95 transition-all active:scale-95 shrink-0"
+                        className="group inline-flex items-center justify-center gap-2 rounded-full brand-active-pill px-5 py-2.5 text-xs font-semibold shadow-sm hover:shadow-md hover:opacity-95 transition-all active:scale-95 shrink-0"
                       >
                         <span>{locale === "ar" ? "تشغيل بيئات المحاكاة" : "Launch Simulators"}</span>
                         <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
@@ -667,7 +667,7 @@ export default function About() {
 
                     <a
                       href={channel.href}
-                      className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-br from-[#6366F1] via-[#8B5CF6] to-[#EC4899] px-4 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:opacity-95 hover:shadow active:scale-95"
+                      className="inline-flex items-center gap-1.5 rounded-full brand-active-pill px-4 py-1.5 text-xs font-semibold shadow-sm transition hover:opacity-95 hover:shadow active:scale-95"
                     >
                       <Mail className="h-3.5 w-3.5" />
                       <span>{locale === "ar" ? "مراسلة" : "Mail"}</span>

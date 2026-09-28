@@ -161,7 +161,7 @@ export default function ResearchDetail({ params }: { params: { id: string } }) {
                 type="button"
                 onClick={handleDownload}
                 disabled={downloadState === "checking"}
-                className="inline-flex items-center gap-2 rounded-full bg-gradient-to-br from-blue-600 via-purple-600 to-red-600 hover:opacity-95 text-white font-medium shadow-md transition-all active:scale-95 px-6 py-2.5 text-sm disabled:cursor-wait disabled:opacity-70"
+                className="inline-flex items-center gap-2 rounded-full brand-active-pill hover:opacity-95 shadow-md active:scale-95 px-6 py-2.5 text-sm disabled:cursor-wait disabled:opacity-70"
               >
                 {downloadState === "checking" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
                 Download PDF

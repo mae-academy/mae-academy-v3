@@ -356,10 +356,10 @@ export default function EngineeringScope({ className = "" }: EngineeringScopePro
   return (
     <div
       ref={containerRef}
-      className={`flex flex-col bg-white border border-slate-200/80 rounded-2xl shadow-sm p-3.5 sm:p-4 w-full max-w-sm sm:max-w-md mx-auto h-fit self-center relative overflow-hidden backdrop-blur-sm dark:border-white/[0.08] dark:bg-[#08080A] ${className}`}
+      className={`flex flex-col bg-white border border-slate-200/80 rounded-2xl shadow-sm p-3.5 sm:p-4 w-full max-w-md lg:max-w-none mx-auto h-fit self-center relative overflow-hidden backdrop-blur-sm dark:border-white/[0.08] dark:bg-[#08080A] ${className}`}
     >
       {/* Top Tri-Color Signature Accent Line */}
-      <div className="absolute top-0 left-0 right-0 h-[2.5px] bg-gradient-to-br from-[#2563eb] via-[#9333ea] to-[#e11d48]" />
+      <div className="absolute top-0 left-0 right-0 h-[2.5px] bg-gradient-to-r from-[#2563EB] via-[#7C3AED] to-[#E11D48]" />
 
       {/* Scope Header Bar: Channel indicators & Timebase */}
       <div className="flex items-center justify-between gap-2 sm:gap-3 mb-2.5 sm:mb-3 pb-2 border-b border-slate-200/70 dark:border-white/[0.08]">

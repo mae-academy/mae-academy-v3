@@ -228,7 +228,7 @@ export function ArduinoStudio() {
                 type="button"
                 onClick={onRun}
                 title={running ? "Pause execution" : status === "paused" ? "Resume execution" : "Run execution"}
-                className={`inline-flex h-9 shrink-0 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap px-3.5 text-xs font-semibold ${!running && started.current ? "brand-pill-active-rev" : "brand-pill-active"}`}
+                className={`inline-flex h-9 shrink-0 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap px-3.5 text-xs font-semibold ${!running && started.current ? "brand-pill-active-rev" : "btn-active-brand"}`}
               >
                 {running ? <Pause className="h-3.5 w-3.5 fill-current" /> : <Play className="h-3.5 w-3.5 fill-current" />}
                 <span>{running ? "Pause" : status === "paused" ? "Resume" : "Run"}</span>

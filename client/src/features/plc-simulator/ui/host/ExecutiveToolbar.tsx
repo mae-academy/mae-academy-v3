@@ -160,7 +160,7 @@ export function ExecutiveToolbar({
                 onClick={handleRunClick}
                 aria-label={running ? 'Pause' : paused ? 'Resume' : 'Run'}
                 title={running ? 'Pause execution' : paused ? 'Resume execution' : 'Run execution'}
-                className={`inline-flex h-9 shrink-0 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap px-3.5 text-xs font-semibold active:scale-[.98] ${paused ? 'brand-pill-active-rev' : 'brand-pill-active'
+                className={`inline-flex h-9 shrink-0 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap px-3.5 text-xs font-semibold active:scale-[.98] ${paused ? 'brand-pill-active-rev' : 'btn-active-brand'
                   }`}
               >
                 {running ? (

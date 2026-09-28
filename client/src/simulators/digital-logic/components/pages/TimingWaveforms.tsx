@@ -229,11 +229,7 @@ export function TimingWaveforms({ expression: controlledExpr, onExpressionChange
                 type="button"
                 onClick={() => setPlaying((current) => !current)}
                 aria-label={playing ? 'Pause timing simulation' : 'Play timing simulation'}
-                style={{
-                  background: 'linear-gradient(135deg, #7C3AED 0%, #2563EB 100%)',
-                  boxShadow: '0 2px 8px rgba(124, 58, 237, 0.35)',
-                }}
-                className="inline-flex items-center gap-1.5 px-4 py-1.5 text-xs font-medium text-white rounded-full transition-all hover:opacity-95 active:scale-95 cursor-pointer whitespace-nowrap"
+                className="btn-active-brand inline-flex items-center gap-1.5 px-4 py-1.5 text-xs font-medium cursor-pointer whitespace-nowrap active:scale-95"
               >
                 {playing ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
                 <span>{playing ? 'Pause' : 'Play'}</span>

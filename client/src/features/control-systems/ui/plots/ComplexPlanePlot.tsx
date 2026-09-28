@@ -532,9 +532,9 @@ export function ComplexPlanePlot({
                 setGridMode("cartesian");
                 onGridModeChange?.("cartesian");
               }}
-              className={`cursor-pointer select-none whitespace-nowrap transition-all inline-flex items-center ${gridMode === "cartesian"
-                ? "bg-gradient-to-br from-[#2563EB] via-[#7C3AED] to-[#E11D48] text-white font-semibold rounded-full px-3.5 py-1 text-xs shadow-sm"
-                : "rounded-full px-3.5 py-1 text-xs font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+              className={`cursor-pointer select-none whitespace-nowrap transition-all inline-flex items-center rounded-full px-3.5 py-1 text-xs ${gridMode === "cartesian"
+                ? "btn-active-brand brand-active-pill"
+                : "font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
                 }`}
             >
               Cartesian
@@ -547,9 +547,9 @@ export function ComplexPlanePlot({
                 setGridMode("polar");
                 onGridModeChange?.("polar");
               }}
-              className={`cursor-pointer select-none whitespace-nowrap transition-all inline-flex items-center ${gridMode === "polar"
-                ? "bg-gradient-to-br from-[#2563EB] via-[#7C3AED] to-[#E11D48] text-white font-semibold rounded-full px-3.5 py-1 text-xs shadow-sm"
-                : "rounded-full px-3.5 py-1 text-xs font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+              className={`cursor-pointer select-none whitespace-nowrap transition-all inline-flex items-center rounded-full px-3.5 py-1 text-xs ${gridMode === "polar"
+                ? "btn-active-brand brand-active-pill"
+                : "font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
                 }`}
             >
               Polar

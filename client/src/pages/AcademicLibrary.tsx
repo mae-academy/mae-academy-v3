@@ -314,7 +314,7 @@ export default function AcademicLibrary() {
                         onClick={() => handleCategoryChange(opt.value)}
                         className={`flex w-full items-center justify-between rounded-xl px-3 py-1.5 text-start text-xs transition-all ${
                           category === opt.value
-                            ? "bg-gradient-to-br from-blue-600 via-purple-600 to-red-600 font-semibold text-white shadow-sm"
+                            ? "brand-active-pill"
                             : "font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/70 dark:hover:text-white"
                         }`}
                       >
@@ -348,7 +348,7 @@ export default function AcademicLibrary() {
                         onClick={() => handleLanguageChange(opt.value)}
                         className={`flex w-full items-center justify-between rounded-xl px-3 py-1.5 text-start text-xs transition-all ${
                           language === opt.value
-                            ? "bg-gradient-to-br from-blue-600 via-purple-600 to-red-600 font-semibold text-white shadow-sm"
+                            ? "brand-active-pill"
                             : "font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/70 dark:hover:text-white"
                         }`}
                       >
@@ -369,9 +369,9 @@ export default function AcademicLibrary() {
                   <button
                     key={opt.value}
                     onClick={() => handleSortChange(opt.value)}
-                    className={`rounded-full px-3.5 py-1.5 text-xs font-medium transition-all duration-200 ${
+                    className={`rounded-full px-3.5 py-1.5 text-xs transition-all duration-200 ${
                       sort === opt.value
-                        ? "bg-gradient-to-br from-blue-600 via-purple-600 to-red-600 font-semibold text-white shadow-md"
+                        ? "brand-active-pill"
                         : "bg-transparent text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
                     }`}
                   >
@@ -517,7 +517,7 @@ export default function AcademicLibrary() {
                   onClick={() => goToPage(num as number)}
                   className={
                     page === num
-                      ? "flex h-9 min-w-[2.25rem] items-center justify-center rounded-full bg-gradient-to-br from-blue-600 via-purple-600 to-red-600 px-3.5 text-xs font-bold text-white shadow-md transition-transform active:scale-95"
+                      ? "flex h-9 min-w-[2.25rem] items-center justify-center rounded-full brand-active-pill px-3.5 text-xs font-bold transition-transform active:scale-95"
                       : "flex h-9 w-9 items-center justify-center rounded-full text-xs font-medium text-slate-700 transition-colors hover:bg-slate-200 dark:text-slate-300 dark:hover:bg-slate-800"
                   }
                 >
@@ -544,9 +544,9 @@ export default function AcademicLibrary() {
                 <button
                   key={size}
                   onClick={() => handlePageSizeChange(size)}
-                  className={`rounded-full px-3 py-1 text-xs font-medium transition-all duration-200 ${
+                  className={`rounded-full px-3 py-1 text-xs transition-all duration-200 ${
                     perPage === size
-                      ? "bg-gradient-to-br from-blue-600 via-purple-600 to-red-600 font-semibold text-white shadow-md"
+                      ? "brand-active-pill"
                       : "bg-transparent text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
                   }`}
                 >

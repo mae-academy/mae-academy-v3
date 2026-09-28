@@ -54,9 +54,9 @@ export function AnalysisBox({ elements, geometry, nodalNodes = [], colors, stand
             role="tab"
             aria-selected={sel}
             onClick={() => setMethod(item.id)}
-            className={`inline-flex min-h-[36px] items-center justify-center rounded-lg px-4 py-2 text-xs font-medium transition-colors ${
+            className={`inline-flex min-h-[36px] items-center justify-center rounded-full px-4 py-2 text-xs font-medium transition-colors ${
               sel
-                ? 'bg-brand-gradient text-white shadow-sm'
+                ? 'btn-active-brand'
                 : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400 dark:hover:bg-slate-800'
             }`}
           >

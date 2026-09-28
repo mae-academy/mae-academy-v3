@@ -41,52 +41,52 @@ export default function Home() {
         {/* Subtle Tri-Tone Background Ambient Glow */}
         <div className="pointer-events-none absolute -top-24 left-1/2 -translate-x-1/2 w-[850px] h-[360px] opacity-35 blur-3xl mae-gradient-glow rounded-full -z-10 dark:opacity-20" />
 
-        <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-12">
-          <div className="flex flex-col lg:flex-row items-center justify-between gap-8 lg:gap-12 w-full">
-            {/* Left Column: Headings, Subtitle, Actions */}
-            <div className="flex flex-col justify-center gap-3 sm:gap-4 z-10 w-full lg:max-w-xl text-left rtl:text-right">
-              <motion.span
-                variants={itemVariants}
-                className="text-xs sm:text-sm font-medium tracking-wide text-violet-600 dark:text-violet-400"
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-16">
+          {/* Left Column (Text & CTAs): Span 7 columns */}
+          <div className="lg:col-span-7 flex flex-col items-start space-y-6 z-10 text-left rtl:text-right">
+            <motion.span
+              variants={itemVariants}
+              className="text-sm sm:text-base font-semibold text-slate-900 dark:text-white tracking-wide"
+            >
+              {home.headlinePrimary}
+            </motion.span>
+
+            <motion.h1
+              variants={itemVariants}
+              className="text-2xl sm:text-3xl lg:text-[2.25rem] xl:text-[2.6rem] font-bold tracking-tight text-slate-900 dark:text-white whitespace-nowrap text-left rtl:text-right leading-tight"
+            >
+              <span className="text-brand-gradient">{home.headlineSecondary}</span>
+            </motion.h1>
+
+            <motion.p
+              variants={itemVariants}
+              className="text-slate-600 dark:text-slate-400 text-xs sm:text-sm max-w-lg leading-relaxed text-left rtl:text-right"
+            >
+              {home.description}
+            </motion.p>
+
+            {/* Call-to-Action Buttons */}
+            <motion.div variants={itemVariants} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto pt-1">
+              <Link
+                href="/simulations"
+                className="btn-brand-primary min-h-[44px] px-6 sm:px-8 py-3 text-xs sm:text-sm font-semibold justify-center gap-2"
               >
-                {home.headlinePrimary}
-              </motion.span>
+                {home.ctaPrimary}
+                <ArrowRight className="h-4 w-4" />
+              </Link>
 
-              <motion.h1
-                variants={itemVariants}
-                className="font-extrabold tracking-tight text-slate-900 dark:text-white text-2xl sm:text-3xl md:text-5xl break-words text-left rtl:text-right leading-tight"
+              <Link
+                href="/library"
+                className="btn-brand-subtle min-h-[44px] px-6 sm:px-8 py-3 text-xs sm:text-sm font-semibold justify-center shadow-xs hover:shadow-sm gap-2"
               >
-                <span className="text-brand-gradient">{home.headlineSecondary}</span>
-              </motion.h1>
+                {home.ctaSecondary}
+              </Link>
+            </motion.div>
+          </div>
 
-              <motion.p
-                variants={itemVariants}
-                className="text-slate-600 dark:text-slate-400 text-xs sm:text-sm max-w-md leading-relaxed text-left rtl:text-right"
-              >
-                {home.description}
-              </motion.p>
-
-              {/* Call-to-Action Buttons */}
-              <motion.div variants={itemVariants} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto mt-2">
-                <Link
-                  href="/simulations"
-                  className="btn-brand-primary min-h-[44px] px-6 sm:px-8 py-3 text-xs sm:text-sm font-semibold justify-center gap-2"
-                >
-                  {home.ctaPrimary}
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
-
-                <Link
-                  href="/library"
-                  className="btn-brand-subtle min-h-[44px] px-6 sm:px-8 py-3 text-xs sm:text-sm font-semibold justify-center shadow-xs hover:shadow-sm gap-2"
-                >
-                  {home.ctaSecondary}
-                </Link>
-              </motion.div>
-            </div>
-
-            {/* Right Column: Oscilloscope */}
-            <motion.div variants={itemVariants} className="w-full max-w-sm sm:max-w-md mx-auto aspect-[4/3] rounded-2xl flex justify-center">
+          {/* Right Column (Oscilloscope Interactive Widget): Span 5 columns */}
+          <motion.div variants={itemVariants} className="lg:col-span-5 flex justify-center lg:justify-end w-full">
+            <div className="w-full max-w-md lg:max-w-none">
               <Suspense
                 fallback={
                   <div className="w-full aspect-[4/3] rounded-2xl border border-slate-200/80 bg-slate-50/50 p-4 animate-pulse dark:border-white/[0.08] dark:bg-zinc-950/60" />
@@ -94,8 +94,8 @@ export default function Home() {
               >
                 <EngineeringScope />
               </Suspense>
-            </motion.div>
-          </div>
+            </div>
+          </motion.div>
         </div>
       </section>
 
@@ -120,7 +120,7 @@ export default function Home() {
             className="relative overflow-hidden rounded-2xl border border-slate-200/90 bg-slate-50/80 p-8 lg:p-10 shadow-sm dark:border-white/[0.08] dark:bg-[#08080A]"
           >
             {/* Subtle brand gradient bottom line */}
-            <div className="absolute bottom-0 left-[10%] h-0.5 w-[80%] bg-gradient-to-r from-transparent via-blue-500/40 via-violet-500/60 to-rose-500/50" />
+            <div className="absolute bottom-0 left-[10%] h-0.5 w-[80%] bg-gradient-to-r from-transparent via-[#2563EB]/40 via-[#7C3AED]/60 to-[#E11D48]/50" />
 
             <div className="relative grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
               {/* Left Column (lg:col-span-7): Headline, Quote, Mission (Top badge removed) */}
@@ -168,7 +168,7 @@ export default function Home() {
                   {/* Founder Action CTA: Blue to Purple diagonal gradient with rounded-full */}
                   <Link
                     href="/about"
-                    className="inline-flex items-center gap-2 rounded-full bg-gradient-to-br from-[#2563eb] to-[#9333ea] hover:from-[#1d4ed8] hover:to-[#7e22ce] px-7 py-3.5 text-sm sm:text-base font-semibold text-white shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 w-full sm:w-auto justify-center"
+                    className="inline-flex items-center gap-2 rounded-full brand-active-pill px-7 py-3.5 text-sm sm:text-base font-semibold shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 w-full sm:w-auto justify-center"
                   >
                     Meet the Founder & About MAE
                     <MoveRight className="h-4 w-4" />

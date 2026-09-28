@@ -45,9 +45,14 @@
 }
 
 :root {
-  --mae-gradient-start: #6366F1;
-  --mae-gradient-mid: #8B5CF6;
-  --mae-gradient-end: #EC4899;
+  --slider-blue: #2563EB;
+  --slider-violet: #7C3AED;
+  --slider-red: #E11D48;
+  --brand-gradient: linear-gradient(to right, #2563EB, #7C3AED, #E11D48);
+  --brand-gradient-diagonal: linear-gradient(135deg, #2563EB 0%, #7C3AED 50%, #E11D48 100%);
+  --mae-gradient-start: #2563EB;
+  --mae-gradient-mid: #7C3AED;
+  --mae-gradient-end: #E11D48;
   --background: #ffffff;
   --surface: #ffffff;
   --card: #ffffff;
@@ -71,9 +76,14 @@
 }
 
 .dark {
-  --mae-gradient-start: #3B82F6;
-  --mae-gradient-mid: #8B5CF6;
-  --mae-gradient-end: #F43F5E;
+  --slider-blue: #2563EB;
+  --slider-violet: #7C3AED;
+  --slider-red: #E11D48;
+  --brand-gradient: linear-gradient(to right, #2563EB, #7C3AED, #E11D48);
+  --brand-gradient-diagonal: linear-gradient(135deg, #2563EB 0%, #7C3AED 50%, #E11D48 100%);
+  --mae-gradient-start: #2563EB;
+  --mae-gradient-mid: #7C3AED;
+  --mae-gradient-end: #E11D48;
   --background: #000000;
   --surface: #090a0d;
   --card: #0d0f12;
@@ -395,30 +405,33 @@
     font-style: normal !important;
   }
 
-  /* Universal Platform Signature Pill */
+  /* Universal Platform Signature Pill & Active Button Utility */
+  .btn-active-brand,
+  .brand-active-pill,
   .brand-pill-active,
   .tab-brand-gradient[data-state=active],
   [data-state=active].tab-brand-gradient,
   [data-state=active].brand-pill-tab {
-    background: linear-gradient(135deg, #2563EB 0%, #7C3AED 50%, #E11D48 100%) !important;
+    /* Pure horizontal linear gradient: Left to Right */
+    background: linear-gradient(to right, var(--slider-blue, #2563EB), var(--slider-violet, #7C3AED), var(--slider-red, #EC4899)) !important;
     color: #ffffff !important;
-    border-radius: 9999px !important;
-    /* rounded-full */
-    box-shadow: 0 2px 8px -1px rgba(124, 58, 237, 0.35) !important;
-    border: 1px solid transparent !important;
-    font-weight: 600;
-    transition: all 0.15s ease-in-out;
+    border-radius: 9999px !important; /* rounded-full capsule */
+    border: none !important;
+    font-family: 'Poppins', sans-serif !important;
+    font-weight: 500 !important;
+    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1) !important;
+    transition: all 0.2s ease-in-out !important;
   }
 
   .brand-pill-active-rev {
-    background: linear-gradient(135deg, #f43f5e 0%, #7c3aed 50%, #2563eb 100%) !important;
+    background: linear-gradient(to right, var(--slider-red, #EC4899), var(--slider-violet, #7C3AED), var(--slider-blue, #2563EB)) !important;
     color: #ffffff !important;
-    border-radius: 9999px !important;
-    /* rounded-full */
-    box-shadow: 0 2px 8px -1px rgba(124, 58, 237, 0.35) !important;
-    border: 1px solid transparent !important;
-    font-weight: 500;
-    transition: all 0.15s ease-in-out;
+    border-radius: 9999px !important; /* rounded-full capsule */
+    border: none !important;
+    font-family: 'Poppins', sans-serif !important;
+    font-weight: 500 !important;
+    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1) !important;
+    transition: all 0.2s ease-in-out !important;
   }
 
   .brand-pill-inactive,
@@ -451,7 +464,7 @@
   }
 
   .bg-brand-gradient {
-    background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 50%, #EC4899 100%) !important;
+    background: var(--brand-gradient) !important;
     color: #ffffff !important;
   }
 
@@ -464,12 +477,13 @@
     mask-size: contain;
     mask-repeat: no-repeat;
     mask-position: center;
+    background: var(--brand-gradient);
   }
 
-  /* Unified Button Design System (Rectangular full pill-rounded sides + diagonal 135deg gradients) */
+  /* Unified Button Design System (Pure horizontal left-to-right gradients + capsule pills) */
   .btn-brand-hero {
     border-radius: 9999px;
-    background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 50%, #EC4899 100%);
+    background: var(--brand-gradient);
     color: #ffffff;
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
     transition: all 0.2s ease-in-out;
@@ -486,7 +500,7 @@
 
   .btn-brand-blue-purple {
     border-radius: 9999px;
-    background: linear-gradient(135deg, #2563eb 0%, #9333ea 100%);
+    background: linear-gradient(to right, #2563eb, #7c3aed);
     color: #ffffff;
     box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
     transition: all 0.2s ease-in-out;
@@ -503,7 +517,7 @@
 
   .btn-brand-purple-rose {
     border-radius: 9999px;
-    background: linear-gradient(135deg, #9333ea 0%, #e11d48 100%);
+    background: linear-gradient(to right, #7c3aed, #e11d48);
     color: #ffffff;
     box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
     transition: all 0.2s ease-in-out;
@@ -1031,9 +1045,21 @@
 }
 
 @layer components {
+  .brand-active-pill,
+  .btn-active-brand {
+    background: linear-gradient(to right, var(--slider-blue, #2563EB), var(--slider-violet, #7C3AED), var(--slider-red, #EC4899)) !important;
+    color: #ffffff !important;
+    border-radius: 9999px !important;
+    border: none !important;
+    font-family: 'Poppins', sans-serif !important;
+    font-weight: 500 !important;
+    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1) !important;
+    transition: all 0.2s ease-in-out !important;
+  }
+
   .btn-brand-primary {
     @apply inline-flex items-center justify-center font-medium text-white rounded-full transition-all duration-200 shadow-md hover:shadow-lg active:scale-[0.98];
-    background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 50%, #EC4899 100%);
+    background: var(--brand-gradient);
   }
 
   .btn-brand-subtle {
@@ -1041,7 +1067,7 @@
   }
 
   .text-brand-gradient {
-    background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 50%, #EC4899 100%);
+    background: var(--brand-gradient-diagonal);
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;

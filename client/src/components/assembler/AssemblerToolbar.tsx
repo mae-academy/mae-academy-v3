@@ -95,7 +95,7 @@ export function ToolbarPillButton({
       disabled={disabled}
       className={`h-9 inline-flex items-center justify-center gap-1.5 ${label ? "px-2.5" : "w-9 px-0"} text-xs font-medium transition active:scale-[.98] whitespace-nowrap shrink-0 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 ${
         isActive
-          ? "brand-pill-active font-semibold"
+          ? "btn-active-brand font-semibold"
           : "rounded-full border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 hover:border-slate-300 dark:border-[#1a1d24] dark:bg-[#090a0d] dark:text-slate-300 dark:hover:bg-[#13161c]"
       } ${className}`}
     >
@@ -249,7 +249,7 @@ export function AssemblerToolbar({
               className={`h-9 inline-flex items-center justify-center gap-1.5 px-3.5 text-xs font-semibold cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 whitespace-nowrap shrink-0 ${
                 !running && hasStartedRef.current
                   ? "brand-pill-active-rev"
-                  : "brand-pill-active"
+                  : "btn-active-brand"
               }`}
             >
               {running ? (

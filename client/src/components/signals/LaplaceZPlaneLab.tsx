@@ -22,7 +22,7 @@ import { nodeToLatex } from "@/features/signals/engines/diracIntegral";
 import { evaluateUnifiedSignal, parseUnifiedSignal } from "@/lib/signals/unifiedSignalParser";
 import "./laplaceAcademic.css";
 
-const selected = "border-transparent bg-gradient-to-r from-[#2563EB] via-[#7C3AED] to-[#E11D48] text-white shadow-sm font-semibold";
+const selected = "border-transparent btn-active-brand brand-active-pill font-semibold";
 const idle = "border-slate-200 text-slate-600 hover:border-violet-300 hover:text-violet-700 dark:border-slate-800 dark:text-slate-300 dark:hover:border-violet-500 dark:hover:text-violet-200";
 const presets: Record<PlaneMode, Array<{ label: string; value: string }>> = { s: [{ label: "Damped pair", value: "\\frac{1}{s^2+4s+13}" }, { label: "Stable first order", value: "\\frac{1}{s+2}" }, { label: "Unstable pole", value: "\\frac{1}{s-1}" }, { label: "Two real poles", value: "\\frac{1}{(s+1)(s+3)}" }, { label: "Undamped oscillator", value: "\\frac{s}{s^2+4}" }, { label: "Repeated pole", value: "\\frac{1}{(s+1)^2}" }], z: [{ label: "Stable pair", value: "\\frac{z+0.5}{z^2-1.2z+0.32}" }, { label: "Unit-delay filter", value: "\\frac{1}{z-0.6}" }, { label: "Unstable pole", value: "\\frac{1}{z-1.2}" }] };
 const initial: Record<PlaneMode, string> = { s: "\\frac{1}{s^2+4s+13}", z: "\\frac{z+0.5}{z^2-1.2z+0.32}" };

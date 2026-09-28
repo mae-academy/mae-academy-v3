@@ -2,9 +2,9 @@ import React from 'react';
 import { V3Math } from '@/components/ui/V3Math';
 import type { Palette } from '@/simulators/shared/workspace/workspaceTheme';
 
-/* Unified signature gradient matching the Mesh tab button exactly (135deg from blue-600 through purple to rose). */
-export const TAB_GRADIENT = 'linear-gradient(135deg, #2563EB 0%, #7C3AED 50%, #E11D48 100%)';
-export const TAB_ACTIVE_SHADOW = '0 1px 3px rgba(2, 6, 23, 0.18)';
+/* Unified signature gradient (pure horizontal left-to-right from blue-600 through purple to rose). */
+export const TAB_GRADIENT = 'linear-gradient(to right, #2563EB, #7C3AED, #E11D48)';
+export const TAB_ACTIVE_SHADOW = '0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)';
 
 export const CONTROL_SYSTEMS_HEADING = 'text-sm font-bold uppercase tracking-wider text-slate-800 dark:text-white';
 
@@ -40,12 +40,13 @@ export function ToolbarButton({ colors, icon, label, title, onClick, active, dis
       title={title}
       onClick={onClick}
       disabled={disabled}
+      className={isActive ? "btn-active-brand" : ""}
       style={{
-        border: isActive ? '1px solid transparent' : `1px solid ${colors.line}`,
-        background: isActive ? TAB_GRADIENT : colors.panelAlt,
+        border: isActive ? 'none' : `1px solid ${colors.line}`,
+        background: isActive ? undefined : colors.panelAlt,
         color: isActive ? '#ffffff' : disabled ? colors.subtle : colors.muted,
-        borderRadius: rounded ? 9999 : 8,
-        padding: '6px 12px',
+        borderRadius: 9999,
+        padding: '6px 14px',
         minHeight: 32,
         display: 'inline-flex',
         alignItems: 'center',
@@ -54,10 +55,10 @@ export function ToolbarButton({ colors, icon, label, title, onClick, active, dis
         fontWeight: 500,
         cursor: disabled ? 'not-allowed' : 'pointer',
         opacity: disabled ? 0.5 : 1,
-        boxShadow: isActive ? TAB_ACTIVE_SHADOW : 'none',
+        boxShadow: isActive ? '0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)' : 'none',
         flexShrink: 0,
         whiteSpace: 'nowrap',
-        transition: 'background .15s ease',
+        transition: 'all 0.2s ease-in-out',
       }}
     >
       {icon}

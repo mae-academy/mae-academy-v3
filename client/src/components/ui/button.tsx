@@ -19,9 +19,10 @@ const buttonVariants = cva(
         ghost:
           "hover:bg-accent dark:hover:bg-accent/50",
         link: "text-primary underline-offset-4 hover:underline",
-        hero: "rounded-full bg-gradient-to-br from-[#2563eb] via-[#9333ea] to-[#e11d48] text-white shadow-md hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0",
-        bluePurple: "rounded-full bg-gradient-to-br from-[#2563eb] to-[#9333ea] text-white shadow-sm hover:shadow-md hover:-translate-y-0.5 active:translate-y-0",
-        purpleRose: "rounded-full bg-gradient-to-br from-[#9333ea] to-[#e11d48] text-white shadow-sm hover:shadow-md hover:-translate-y-0.5 active:translate-y-0",
+        brand: "rounded-full btn-active-brand hover:-translate-y-0.5 active:translate-y-0",
+        hero: "rounded-full bg-gradient-to-r from-[#2563EB] via-[#7C3AED] to-[#E11D48] text-white shadow-md hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0",
+        bluePurple: "rounded-full bg-gradient-to-r from-[#2563EB] to-[#7C3AED] text-white shadow-sm hover:shadow-md hover:-translate-y-0.5 active:translate-y-0",
+        purpleRose: "rounded-full bg-gradient-to-r from-[#7C3AED] to-[#E11D48] text-white shadow-sm hover:shadow-md hover:-translate-y-0.5 active:translate-y-0",
         brandOutline: "rounded-full border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:border-purple-300 hover:-translate-y-0.5 active:translate-y-0 dark:border-white/15 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10 dark:hover:border-purple-400",
       },
       size: {

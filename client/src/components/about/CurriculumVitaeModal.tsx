@@ -100,7 +100,7 @@ MAE Academy: Model. Analyze. Engineering.`;
             <button
               type="button"
               onClick={handlePrint}
-              className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-br from-[#6366F1] via-[#8B5CF6] to-[#EC4899] px-4 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:opacity-95 hover:shadow active:scale-95"
+              className="inline-flex items-center gap-1.5 rounded-full brand-active-pill px-4 py-1.5 text-xs font-semibold shadow-sm transition hover:opacity-95 hover:shadow active:scale-95"
             >
               <Printer className="h-3.5 w-3.5" />
               <span>Print / Save PDF</span>

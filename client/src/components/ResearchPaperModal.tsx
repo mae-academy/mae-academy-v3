@@ -70,7 +70,7 @@ export default function ResearchPaperModal({ isOpen, onClose, paper }: ResearchP
                 download
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 rounded-full bg-gradient-to-br from-blue-600 via-purple-600 to-red-600 hover:opacity-95 text-white font-medium shadow-md transition-all active:scale-95 px-5 py-2.5 text-sm"
+                className="inline-flex items-center gap-2 rounded-full brand-active-pill hover:opacity-95 shadow-md active:scale-95 px-5 py-2.5 text-sm"
               >
                 <Download className="w-4 h-4" /> Download PDF
               </a>
@@ -108,7 +108,7 @@ export default function ResearchPaperModal({ isOpen, onClose, paper }: ResearchP
                   href={paper.pdfUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-br from-blue-600 via-purple-600 to-red-600 text-white font-medium shadow-sm hover:opacity-95 text-xs px-3.5 py-1.5 transition-all"
+                  className="inline-flex items-center gap-1.5 rounded-full brand-active-pill shadow-sm hover:opacity-95 text-xs px-3.5 py-1.5"
                 >
                   Open Direct PDF in New Tab <ExternalLink className="w-3.5 h-3.5" />
                 </a>

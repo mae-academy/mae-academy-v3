@@ -77,7 +77,7 @@ import { pointInComponentBox, routeWires } from '@/components/common/schematic/s
 import type { SchematicComponentLibrary, SchematicTerminal } from '@/components/common/schematic/schematicTypes';
 
 /* Reversed variant used only by the Run/Pause pill after a session has started; not part of the shared chrome contract. */
-const TAB_GRADIENT_REV = 'linear-gradient(135deg, #E11D48 0%, #7C3AED 50%, #2563EB 100%)';
+const TAB_GRADIENT_REV = 'linear-gradient(to right, #E11D48, #7C3AED, #2563EB)';
 
 function numeric(value: unknown, fallback = 0): number {
   const parsed = Number(value);
@@ -503,24 +503,19 @@ export function DigitalLogicSimulatorHome({
         <ToolbarButton colors={colors} icon={<Share2 size={14} />} label="Share Project" title="Share circuit via Web Share API or deep link" onClick={handleShareProject} />
         <ToolbarDivider colors={colors} />
         <button
+          type="button"
           onClick={() => { hasStartedSimulation.current = true; setSimulationRunning(v => !v); }}
           title={simulationRunning ? 'Pause simulation' : 'Run simulation'}
+          className={(!simulationRunning && hasStartedSimulation.current) ? "brand-pill-active-rev" : "btn-active-brand"}
           style={{
             display: 'inline-flex',
             alignItems: 'center',
             gap: 5,
-            background: (!simulationRunning && hasStartedSimulation.current) ? TAB_GRADIENT_REV : TAB_GRADIENT,
-            color: '#ffffff',
-            fontWeight: 500,
             padding: '6px 14px',
             minHeight: 32,
-            borderRadius: 8,
             fontSize: 12,
-            boxShadow: TAB_ACTIVE_SHADOW,
-            border: '1px solid transparent',
             cursor: 'pointer',
             whiteSpace: 'nowrap',
-            transition: 'background .3s ease',
           }}
         >
           {simulationRunning ? <Pause size={14} /> : <Play size={14} />}
