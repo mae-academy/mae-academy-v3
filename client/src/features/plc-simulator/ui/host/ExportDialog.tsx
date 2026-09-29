@@ -1,5 +1,6 @@
 import { Check, Copy, Download } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import type { ExportFile } from '../../transpiler';
 import { copyText, downloadText } from './download';
@@ -16,6 +17,7 @@ const button =
 
 /** STEP 7-Micro/WIN export: preview, copy to clipboard, or download the `.awl` (and `.sym`). */
 export function ExportDialog({ open, onOpenChange, build }: ExportDialogProps) {
+  const { t } = useTranslation('simulators');
   const [file, setFile] = useState<ExportFile | null>(null);
   const [copied, setCopied] = useState(false);
 
@@ -39,24 +41,27 @@ export function ExportDialog({ open, onOpenChange, build }: ExportDialogProps) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl">
         <DialogHeader>
-          <DialogTitle>Export to STEP 7-Micro/WIN</DialogTitle>
+          <DialogTitle>{t('plc.exportDialogTitle', 'Export to STEP 7-Micro/WIN')}</DialogTitle>
           <DialogDescription>
-            Paste the source into the STL editor, or use File ► Import. Not yet verified against a real Micro/WIN
-            install: confirm one import before relying on it.
+            {t(
+              'plc.exportDialogDescription',
+              'Paste the source into the STL editor, or use File ► Import. Not yet verified against a real Micro/WIN install: confirm one import before relying on it.',
+            )}
           </DialogDescription>
         </DialogHeader>
 
         <textarea
           readOnly
+          dir="ltr"
           value={file?.content ?? ''}
-          aria-label="AWL source"
+          aria-label={t('plc.awlSourceAria', 'AWL source')}
           spellCheck={false}
           wrap="off"
-          className="h-72 w-full resize-none rounded-md border border-slate-200 bg-slate-50 p-3 font-mono text-xs leading-5 text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+          className="h-72 w-full resize-none rounded-md border border-slate-200 bg-slate-50 p-3 text-left font-mono text-xs leading-5 text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
         />
 
         {(problems.length > 0 || warnings.length > 0) && (
-          <ul aria-label="Export diagnostics" className="max-h-24 overflow-y-auto text-xs">
+          <ul aria-label={t('plc.exportDiagnosticsAria', 'Export diagnostics')} className="max-h-24 overflow-y-auto text-xs">
             {[...problems, ...warnings].slice(0, 8).map((d, i) => (
               <li key={i} className={d.severity === 'error' ? 'text-red-600' : 'text-amber-600'}>
                 {d.severity}: {d.message}
@@ -68,7 +73,7 @@ export function ExportDialog({ open, onOpenChange, build }: ExportDialogProps) {
         <div className="flex flex-wrap items-center justify-end gap-2">
           <button type="button" className={button} disabled={!file} onClick={copy}>
             {copied ? <Check className="h-3.5 w-3.5" aria-hidden="true" /> : <Copy className="h-3.5 w-3.5" aria-hidden="true" />}
-            {copied ? 'Copied' : 'Copy'}
+            {copied ? t('plc.copiedShort', 'Copied') : t('plc.copyShort', 'Copy')}
           </button>
           {file?.symbolTable && (
             <button
@@ -82,7 +87,7 @@ export function ExportDialog({ open, onOpenChange, build }: ExportDialogProps) {
           )}
           <button type="button" className={button} disabled={!file} onClick={() => file && downloadText(file.fileName, file.content)}>
             <Download className="h-3.5 w-3.5" aria-hidden="true" />
-            Download {file?.fileName ?? '.awl'}
+            {t('plc.downloadFile', 'Download {{filename}}', { filename: file?.fileName ?? '.awl' })}
           </button>
         </div>
       </DialogContent>

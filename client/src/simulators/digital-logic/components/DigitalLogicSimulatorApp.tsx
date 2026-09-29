@@ -6,6 +6,8 @@ import { TimingWaveforms } from '@/simulators/digital-logic/components/pages/Tim
 import { StateMachineExplorer } from '@/simulators/digital-logic/components/pages/StateMachineExplorer';
 import { DiscreteEventLogicEngine } from '@/simulators/digital-logic/engine/desLogicCore';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { useLocale } from '@/contexts/LocaleContext';
 import SimulationPageHeader from '@/components/SimulationPageHeader';
 import { SegmentedControl } from '@/components/common/templates';
 
@@ -15,28 +17,31 @@ import { SegmentedControl } from '@/components/common/templates';
  */
 type DigitalLogicTool = 'schematic' | 'analyzer' | 'kmap' | 'synthesis' | 'timing' | 'state-machine';
 
-const DIGITAL_LOGIC_TOOLS: ReadonlyArray<{ id: DigitalLogicTool; label: string }> = [
-  { id: 'schematic', label: 'Schematic Workspace' },
-  { id: 'analyzer', label: 'Logic Analyzer' },
-  { id: 'kmap', label: 'K-Map Minimizer' },
-  { id: 'synthesis', label: 'Universal Synthesis' },
-  { id: 'timing', label: 'Timing Waveforms' },
-  { id: 'state-machine', label: 'State Machine Explorer' },
-];
 const createDigitalLogicEngine = () => new DiscreteEventLogicEngine();
-const initialDigitalLogicTool = (): DigitalLogicTool => {
+const initialDigitalLogicTool = (tools: ReadonlyArray<{ id: DigitalLogicTool; label: string }>): DigitalLogicTool => {
   if (typeof window === 'undefined') return 'schematic';
   const requested = new URLSearchParams(window.location.search).get('tool');
-  return DIGITAL_LOGIC_TOOLS.some(tool => tool.id === requested) ? requested as DigitalLogicTool : 'schematic';
+  return tools.some(tool => tool.id === requested) ? requested as DigitalLogicTool : 'schematic';
 };
 
 /** Digital Logic Design owns a separate cloned workspace, state tree, and solver instance. */
 export function DigitalLogicSimulatorApp() {
-  const [activeTool, setActiveTool] = useState<DigitalLogicTool>(initialDigitalLogicTool);
-  const activeLabel = DIGITAL_LOGIC_TOOLS.find(tool => tool.id === activeTool)?.label ?? 'Digital Logic Lab';
+  const { t } = useTranslation('simulators');
+  const { copy } = useLocale();
+  const DIGITAL_LOGIC_TOOLS: ReadonlyArray<{ id: DigitalLogicTool; label: string }> = [
+    { id: 'schematic', label: t('digital.schematicWorkspace', 'Schematic Workspace') },
+    { id: 'analyzer', label: t('digital.logicAnalyzer', 'Logic Analyzer') },
+    { id: 'kmap', label: t('digital.kmapMinimizer', 'K-Map Minimizer') },
+    { id: 'synthesis', label: t('digital.universalSynthesis', 'Universal Synthesis') },
+    { id: 'timing', label: t('digital.timingWaveforms', 'Timing Waveforms') },
+    { id: 'state-machine', label: t('digital.stateMachineExplorer', 'State Machine Explorer') },
+  ];
+  const shellTitle = copy.collections.simulations.cards.find((card) => card.code === "S.07")?.title ?? "Digital Logic Design";
+  const [activeTool, setActiveTool] = useState<DigitalLogicTool>(() => initialDigitalLogicTool(DIGITAL_LOGIC_TOOLS));
+  const activeLabel = DIGITAL_LOGIC_TOOLS.find(tool => tool.id === activeTool)?.label ?? t('digital.labTitle', 'Digital Logic Lab');
   return <div className="v3-simulator-root simulator-theme-b" data-simulator-theme="b">
     <SimulationPageHeader
-      title="Digital Logic Design"
+      title={shellTitle}
       tools={DIGITAL_LOGIC_TOOLS}
       activeTool={activeTool}
       onSelectTool={(id) => setActiveTool(id as DigitalLogicTool)}

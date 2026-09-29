@@ -1,5 +1,6 @@
 import { Search } from 'lucide-react';
 import { useMemo, useState, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { PANEL, PANEL_TITLE } from '../chrome';
 
@@ -30,9 +31,11 @@ export function LibraryPanel<T>({
   itemKey,
   renderItem,
   ariaLabel,
-  title = 'Component Library',
+  title,
   className = '',
 }: LibraryPanelProps<T>) {
+  const { t } = useTranslation('simulators');
+  const resolvedTitle = title ?? t('shell.componentLibrary', 'Component Library');
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState<string[]>(() => categories.map((category) => category.id));
 
@@ -51,7 +54,7 @@ export function LibraryPanel<T>({
   return (
     <nav aria-label={ariaLabel} className={`${PANEL} ${className}`}>
       <div className="shrink-0 border-b border-slate-200 px-3 py-2 dark:border-[#1a1d24]">
-        <div className={PANEL_TITLE}>{title}</div>
+        <div className={PANEL_TITLE}>{resolvedTitle}</div>
       </div>
       <div className="shrink-0 border-b border-slate-200 p-2.5 dark:border-[#1a1d24]">
         <div className="relative">
@@ -60,8 +63,8 @@ export function LibraryPanel<T>({
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search components"
-            aria-label="Search components"
+            placeholder={t('shell.searchComponents', 'Search components')}
+            aria-label={t('shell.searchComponents', 'Search components')}
             className="w-full rounded-[7px] border border-slate-200 bg-slate-50 py-2 pe-2 ps-7 text-[11px] text-slate-900 outline-none focus:border-violet-500 dark:border-[#1a1d24] dark:bg-[#090a0d] dark:text-slate-100"
           />
         </div>

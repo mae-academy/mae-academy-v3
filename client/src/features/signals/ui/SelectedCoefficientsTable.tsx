@@ -4,6 +4,7 @@
  * the positive and negative harmonics as two horizontal rows whose tiles line up column-for-column (c_k above c_{-k}).
  */
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import { KatexMath } from "@/components/ui/KatexMath";
 import type { ComplexCoefficient } from "@/features/signals/engines/fourierEngine";
@@ -34,6 +35,7 @@ function HarmonicRow({ title, children }: { title: string; children: ReactNode }
 }
 
 export function SelectedCoefficientsTable({ coefficients, spanLimit, period, omega0, className }: Props) {
+  const { t } = useTranslation('simulators');
   const c0 = coefficients.find((item) => item.harmonic === 0);
   const harmonics = Array.from({ length: spanLimit }, (_, index) => index + 1).filter((n) => coefficients.some((item) => Math.abs(item.harmonic) === n));
   const find = (harmonic: number) => coefficients.find((item) => item.harmonic === harmonic);
@@ -41,7 +43,7 @@ export function SelectedCoefficientsTable({ coefficients, spanLimit, period, ome
   return (
     <section className={cn("min-w-0 rounded-2xl border border-slate-200/80 bg-white/70 p-3.5 shadow-sm backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/70 sm:p-4", className)}>
       <header className="flex items-center justify-between gap-2 border-b border-slate-100 pb-2.5 dark:border-slate-800/80">
-        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-white">FOURIER COEFFICIENTS</h3>
+        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-white">{t('signals.fourierCoefficients', 'Fourier coefficients')}</h3>
         <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500"><KatexMath math={`n \\in [${-spanLimit}, ${spanLimit}]`} /></span>
       </header>
 
@@ -55,17 +57,17 @@ export function SelectedCoefficientsTable({ coefficients, spanLimit, period, ome
           </div>
           {c0 && (
             <div className="flex min-w-0 flex-col items-center justify-center gap-0.5 rounded-lg border border-violet-300/80 bg-violet-50/70 px-3 py-2 text-center text-sm dark:border-violet-500/40 dark:bg-violet-950/25">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-violet-700 dark:text-violet-300">DC component</p>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-violet-700 dark:text-violet-300">{t('signals.dcComponent', 'DC component')}</p>
               <KatexMath math={String.raw`c_0=\frac{1}{T_0}\int_{\langle T_0\rangle}x(t)\,dt=${c0.real.toFixed(4)}`} className="max-w-full overflow-x-auto text-violet-800 dark:text-violet-200" />
               <KatexMath math={`|c_0|=${c0.magnitude.toFixed(4)},\\ \\angle c_0=${c0.phase.toFixed(3)}`} className="text-xs text-slate-600 dark:text-slate-300" />
             </div>
           )}
         </div>
         <div className="flex min-w-0 flex-col gap-3 lg:border-l lg:border-slate-100 lg:pl-4 lg:dark:border-slate-800/80">
-          <HarmonicRow title="Positive harmonics">
+          <HarmonicRow title={t('signals.positiveHarmonics', 'Positive harmonics')}>
             {harmonics.map((n) => <CoefficientTile key={n} harmonic={n} item={find(n)} />)}
           </HarmonicRow>
-          <HarmonicRow title="Negative harmonics">
+          <HarmonicRow title={t('signals.negativeHarmonics', 'Negative harmonics')}>
             {harmonics.map((n) => <CoefficientTile key={n} harmonic={-n} item={find(-n)} />)}
           </HarmonicRow>
         </div>

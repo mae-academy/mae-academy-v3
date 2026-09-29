@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 
 export type PowerWarningSeverity = "error" | "warning" | "info";
 export interface PowerWarning { code: string; message: string; }
@@ -102,14 +103,14 @@ const WARNING_SEVERITY: Record<string, PowerWarningSeverity> = {
   CCM_DCM_BOUNDARY: "info",
 };
 
-const SEVERITY_CONFIG: Record<PowerWarningSeverity, { variant: "error" | "warning" | "info"; label: string }> = {
-  error: { variant: "error", label: "FAULT" },
-  warning: { variant: "warning", label: "DESIGN WARNING" },
-  info: { variant: "info", label: "SYSTEM NOTICE" },
-};
-
 /** Unified MAE-compliant warning/alert component for Power Electronics Studios */
 export function PowerWarningAlert({ warnings, className = "" }: { warnings: PowerWarning[]; className?: string }) {
+  const { t } = useTranslation("simulators");
+  const SEVERITY_CONFIG: Record<PowerWarningSeverity, { variant: "error" | "warning" | "info"; label: string }> = {
+    error: { variant: "error", label: t("power.faultBadge", "FAULT") },
+    warning: { variant: "warning", label: t("power.designWarningBadge", "DESIGN WARNING") },
+    info: { variant: "info", label: t("power.systemNoticeBadge", "SYSTEM NOTICE") },
+  };
   if (!warnings.length) return null;
   const sorted = [...warnings].sort(
     (a, b) => SEVERITY_ORDER[WARNING_SEVERITY[a.code] ?? "warning"] - SEVERITY_ORDER[WARNING_SEVERITY[b.code] ?? "warning"]

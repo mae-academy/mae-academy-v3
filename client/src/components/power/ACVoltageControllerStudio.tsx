@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { KatexMath } from "@/components/ui/KatexMath";
 import { SegmentedControl, StudioCard, StudioSlider, InnerBox } from "@/components/common/templates";
 import { PowerWarningAlert } from "./PowerWarningAlert";
@@ -20,27 +21,6 @@ const tex = String.raw;
 const field =
   "h-11 w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 text-slate-800 text-xl font-medium sm:text-2xl tracking-wide dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 dark:focus:ring-violet-400 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [-moz-appearance:textfield] m-0 text-center disabled:cursor-not-allowed disabled:opacity-35 transition";
 
-const phaseOptions: Array<{ value: AcPhase; label: string }> = [
-  { value: "single", label: "Single-Phase (1-Φ)" },
-  { value: "three", label: "Three-Phase (3-Φ)" }
-];
-
-const topologyOptions: Array<{ value: AcTopology; label: string }> = [
-  { value: "unidirectional", label: "Unidirectional" },
-  { value: "bidirectional", label: "Bidirectional / TRIAC" }
-];
-
-const connectionOptions: Array<{ value: ThreePhaseConnection; label: string }> = [
-  { value: "star-3w", label: "Star-3W" },
-  { value: "star-4w", label: "Star-4W" },
-  { value: "delta", label: "Delta" }
-];
-
-const modeOptions: Array<{ value: AcControlMode; label: string }> = [
-  { value: "phase-angle", label: "Phase-Angle" },
-  { value: "integral-cycle", label: "Integral-Cycle" }
-];
-
 const formatOptions = [
   { value: "rms" as AcVoltageFormat, label: <KatexMath math={tex`V_{\mathrm{RMS}}`} /> },
   { value: "peak" as AcVoltageFormat, label: <KatexMath math="V_m" /> }
@@ -51,11 +31,6 @@ const loadOptions = [
   { value: "RL" as AcLoad, label: <KatexMath math="RL" /> }
 ];
 
-const overlayOptions = [
-  { value: "none" as const, label: "Standard" },
-  { value: "thyristor" as const, label: <KatexMath math="V_T" /> },
-  { value: "gate" as const, label: "Gate" }
-];
 
 function numberTex(value: number, digits = 2) {
   if (!Number.isFinite(value)) return "0";
@@ -113,18 +88,24 @@ function Metric({ label, value }: { label: string; value: string }) {
 }
 
 function Circuit({ parameters }: { parameters: AcVoltageControllerParameters }) {
+  const { t } = useTranslation("simulators");
+  const connectionLabels: Record<ThreePhaseConnection, string> = {
+    "star-3w": t("power.star3w", "Star-3W"),
+    "star-4w": t("power.star4w", "Star-4W"),
+    delta: t("power.delta", "Delta"),
+  };
   const title = parameters.phase === "three"
-    ? `3-Φ ${parameters.threePhaseConnection.toUpperCase()}`
+    ? `3-Φ ${connectionLabels[parameters.threePhaseConnection].toUpperCase()}`
     : parameters.topology === "bidirectional"
-    ? "1-Φ Bidirectional TRIAC"
-    : "1-Φ Unidirectional SCR";
+    ? t("power.onePhaseBidirectionalTriac", "1-Φ Bidirectional TRIAC")
+    : t("power.onePhaseUnidirectionalScr", "1-Φ Unidirectional SCR");
 
   return (
     <StudioCard
-      title="Circuit Diagram"
+      title={t("power.circuitDiagram", "Circuit Diagram")}
       actionSlot={
         <span className="text-xs font-bold text-violet-700 dark:text-violet-300">
-          {parameters.controlMode === "phase-angle" ? "PHASE" : "INTEGRAL"}
+          {parameters.controlMode === "phase-angle" ? t("power.phaseBadge", "PHASE") : t("power.integralBadge", "INTEGRAL")}
         </span>
       }
       className="min-h-[340px]"
@@ -136,13 +117,36 @@ function Circuit({ parameters }: { parameters: AcVoltageControllerParameters }) 
           <path d="M30 60c4-10 9-10 13 0s9 10 13 0M142 38v44m12-35-24 26m24 0-24-26" stroke="currentColor" strokeWidth="1.5" className="text-slate-400 dark:text-slate-500" />
           <path d="M292 36v48m-12-40h24m-24 16h24m-24 16h24" stroke="currentColor" strokeWidth="1.5" className="text-violet-500" />
         </svg>
-        <span className="mt-2 block text-[10px] font-bold tracking-[.06em] text-slate-400">{title}</span>
+        <span className="mt-2 block mae-i18n-text text-[10px] font-bold tracking-[.06em] text-slate-400">{title}</span>
       </div>
     </StudioCard>
   );
 }
 
 export function ACVoltageControllerStudio() {
+  const { t } = useTranslation("simulators");
+  const phaseOptions: Array<{ value: AcPhase; label: string }> = [
+    { value: "single", label: t("power.phaseSingleFull", "Single-Phase (1-Φ)") },
+    { value: "three", label: t("power.phaseThreeFull", "Three-Phase (3-Φ)") },
+  ];
+  const topologyOptions: Array<{ value: AcTopology; label: string }> = [
+    { value: "unidirectional", label: t("power.unidirectional", "Unidirectional") },
+    { value: "bidirectional", label: t("power.bidirectionalTriac", "Bidirectional / TRIAC") },
+  ];
+  const connectionOptions: Array<{ value: ThreePhaseConnection; label: string }> = [
+    { value: "star-3w", label: t("power.star3w", "Star-3W") },
+    { value: "star-4w", label: t("power.star4w", "Star-4W") },
+    { value: "delta", label: t("power.delta", "Delta") },
+  ];
+  const modeOptions: Array<{ value: AcControlMode; label: string }> = [
+    { value: "phase-angle", label: t("power.phaseAngle", "Phase-Angle") },
+    { value: "integral-cycle", label: t("power.integralCycle", "Integral-Cycle") },
+  ];
+  const overlayOptions = [
+    { value: "none" as const, label: t("power.standard", "Standard") },
+    { value: "thyristor" as const, label: <KatexMath math="V_T" /> },
+    { value: "gate" as const, label: t("power.gate", "Gate") },
+  ];
   const [parameters, setParameters] = useState<AcVoltageControllerParameters>(defaultAcVoltageControllerParameters);
   const [overlay, setOverlay] = useState<"none" | "thyristor" | "gate">("none");
   const simulation = useMemo(() => simulateAcVoltageController(parameters), [parameters]);
@@ -279,10 +283,10 @@ export function ACVoltageControllerStudio() {
   }, [isPhase, metrics.firingAngle, metrics.extinctionAngle, simulation.period]);
 
   const topology = (
-    <StudioCard title="Topology Configuration">
+    <StudioCard title={t("power.topologyConfig", "Topology Configuration")}>
       <div className="mt-4 space-y-4">
         <div>
-          <span className="mb-2 block text-xs font-bold text-slate-500 dark:text-slate-400">Phase</span>
+          <span className="mb-2 block mae-i18n-text text-xs font-bold text-slate-500 dark:text-slate-400">{t("power.phase", "Phase")}</span>
           <SegmentedControl
             value={parameters.phase}
             options={phaseOptions}
@@ -291,7 +295,7 @@ export function ACVoltageControllerStudio() {
           />
         </div>
         <div>
-          <span className="mb-2 block text-xs font-bold text-slate-500 dark:text-slate-400">Topology Type</span>
+          <span className="mb-2 block mae-i18n-text text-xs font-bold text-slate-500 dark:text-slate-400">{t("power.topologyTypeLabel", "Topology Type")}</span>
           <SegmentedControl
             value={parameters.topology}
             options={topologyOptions}
@@ -301,7 +305,7 @@ export function ACVoltageControllerStudio() {
         </div>
         {parameters.phase === "three" && (
           <div>
-            <span className="mb-2 block text-xs font-bold text-slate-500 dark:text-slate-400">3-Φ Connection</span>
+            <span className="mb-2 block mae-i18n-text text-xs font-bold text-slate-500 dark:text-slate-400">{t("power.threePhaseConnectionLabel", "3-Φ Connection")}</span>
             <SegmentedControl
               value={parameters.threePhaseConnection}
               options={connectionOptions}
@@ -315,7 +319,7 @@ export function ACVoltageControllerStudio() {
   );
 
   const control = (
-    <StudioCard title="Control Technique">
+    <StudioCard title={t("power.controlTechnique", "Control Technique")}>
       <div className="mt-4">
         <SegmentedControl
           value={parameters.controlMode}
@@ -340,7 +344,7 @@ export function ACVoltageControllerStudio() {
             </div>
           </div>
           <StudioSlider
-            aria-label="firing angle"
+            aria-label={t("power.firingAngleAria", "firing angle")}
             min={0}
             max={180}
             step={1}
@@ -392,9 +396,9 @@ export function ACVoltageControllerStudio() {
   );
 
   const sourceLoad = (
-    <StudioCard title="Source & Load Configuration">
+    <StudioCard title={t("power.sourceLoadConfig", "Source & Load Configuration")}>
       <div className="mt-4">
-        <span className="mb-2 block text-xs font-bold text-slate-500 dark:text-slate-400">Voltage Format</span>
+        <span className="mb-2 block mae-i18n-text text-xs font-bold text-slate-500 dark:text-slate-400">{t("power.voltageFormat", "Voltage Format")}</span>
         <SegmentedControl
           value={parameters.voltageFormat}
           options={formatOptions}
@@ -419,7 +423,7 @@ export function ACVoltageControllerStudio() {
         />
       </div>
       <div className="mt-4">
-        <span className="mb-2 block text-xs font-bold text-slate-500 dark:text-slate-400">Load Set</span>
+        <span className="mb-2 block mae-i18n-text text-xs font-bold text-slate-500 dark:text-slate-400">{t("power.loadSet", "Load Set")}</span>
         <SegmentedControl
           value={parameters.loadType}
           options={loadOptions}
@@ -449,7 +453,7 @@ export function ACVoltageControllerStudio() {
 
   const metricPanel = (
     <StudioCard
-      title="Steady-State Metrics"
+      title={t("power.steadyStateMetrics", "Steady-State Metrics")}
       actionSlot={<KatexMath math={tex`\frac{1}{T}\int_{0}^{T}(\cdot)\,dt`} className="text-xs text-slate-500 dark:text-slate-400" />}
     >
       <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -473,7 +477,7 @@ export function ACVoltageControllerStudio() {
   );
 
   return (
-    <StudioErrorBoundary studioName="AC Voltage Controller">
+    <StudioErrorBoundary studioName={t("power.acControllerName", "AC Voltage Controller")}>
       <div className="space-y-6">
         <PowerWarningAlert warnings={simulation.warnings} />
         <div className="grid gap-4 lg:gap-5 lg:grid-cols-2 items-start">
@@ -487,8 +491,8 @@ export function ACVoltageControllerStudio() {
             <PowerScopePlot
               title={
                 parameters.phase === "three"
-                  ? "THREE-PHASE AC CONTROLLER OUTPUT SCOPE"
-                  : "SINGLE-PHASE AC CONTROLLER OUTPUT SCOPE"
+                  ? t("power.threePhaseAcScope", "THREE-PHASE AC CONTROLLER OUTPUT SCOPE")
+                  : t("power.singlePhaseAcScope", "SINGLE-PHASE AC CONTROLLER OUTPUT SCOPE")
               }
               subtitleLatex={
                 parameters.phase === "three"
@@ -503,7 +507,7 @@ export function ACVoltageControllerStudio() {
                   value={overlay}
                   options={overlayOptions}
                   onChange={setOverlay}
-                  aria-label="Scope Overlay Mode"
+                  aria-label={t("power.scopeOverlayModeAria", "Scope Overlay Mode")}
                 />
               }
             />

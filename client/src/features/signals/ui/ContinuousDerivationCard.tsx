@@ -4,6 +4,7 @@
  * Shared by the Fourier series, CTFT / inverse CTFT and Laplace / inverse Laplace studios.
  */
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import { KatexMath } from "@/components/ui/KatexMath";
 
@@ -33,6 +34,7 @@ function splitTitle(title: string, index: number) {
 }
 
 export function ContinuousDerivationCard({ title, pair, steps, target, badge, actions, notes = [], error = null, targetTestId, className }: Props) {
+  const { t } = useTranslation('simulators');
   const finalFormula = target === undefined ? steps[steps.length - 1]?.lines[0] ?? null : target;
   return (
     <section className={cn("min-w-0 rounded-2xl border border-slate-200/80 bg-white/70 p-3.5 shadow-sm backdrop-blur-md transition-all dark:border-slate-800 dark:bg-slate-900/70 sm:p-4 lg:p-5", className)}>
@@ -60,7 +62,7 @@ export function ContinuousDerivationCard({ title, pair, steps, target, badge, ac
               <li key={step.title} className="py-3.5 first:pt-3.5 last:pb-0">
                 <div className="flex flex-wrap items-baseline gap-2 pb-1.5 text-left">
                   <span className="font-sans text-xs font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">
-                    Step {number}:
+                    {t('signals.stepLabel', 'Step {{number}}', { number })}:
                   </span>
                   <span className="font-sans text-xs font-semibold text-slate-800 dark:text-slate-100">
                     {label}

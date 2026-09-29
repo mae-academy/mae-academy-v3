@@ -3,6 +3,7 @@
  * Canonical vector SVG implementation consuming StandardStepPlot template.
  */
 import React, { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { StandardStepPlot } from "@/components/common/templates/StandardStepPlot";
 import {
   classifySystem,
@@ -24,6 +25,16 @@ type Props = {
 };
 
 export function SystemProofCanvas({ system, pillar, a, b, t0 }: Props) {
+  const { t } = useTranslation('simulators');
+  const verdictLabel = (verdict: string) => {
+    switch (verdict) {
+      case "Causal": return t('signals.verdictCausal', 'Causal');
+      case "Non-Causal": return t('signals.verdictNonCausal', 'Non-Causal');
+      case "Memoryless": return t('signals.verdictMemoryless', 'Memoryless');
+      case "Dynamic": return t('signals.verdictDynamic', 'Dynamic');
+      default: return verdict;
+    }
+  };
   const { series, title, xLabel, yLabel } = useMemo(() => {
     const report = classifySystem(system);
     const verdict = report.pillars.find((item) => item.id === pillar)?.verdict ?? "";
@@ -35,7 +46,7 @@ export function SystemProofCanvas({ system, pillar, a, b, t0 }: Props) {
       const isUnstable = verdict === "Unstable";
 
       return {
-        title: `BIBO Stability Test — ${isUnstable ? "Unstable / Divergent" : "Stable / Bounded"}`,
+        title: `${t('signals.bipoStabilityTest', 'BIBO Stability Test')} — ${isUnstable ? t('signals.unstableDivergent', 'Unstable / Divergent') : t('signals.stableBounded', 'Stable / Bounded')}`,
         xLabel: "t\\text{ (s)}",
         yLabel: "y(t)",
         series: [
@@ -63,7 +74,7 @@ export function SystemProofCanvas({ system, pillar, a, b, t0 }: Props) {
       const isLinear = Math.max(...data.map((p) => Math.abs(p.difference))) < 1e-5;
 
       return {
-        title: `Linear Superposition Test — ${isLinear ? "Linear (Coincident)" : "Non-Linear (Separated)"}`,
+        title: `${t('signals.linearSuperpositionTest', 'Linear Superposition Test')} — ${isLinear ? t('signals.linearCoincident', 'Linear (Coincident)') : t('signals.nonLinearSeparated', 'Non-Linear (Separated)')}`,
         xLabel: "t\\text{ (s)}",
         yLabel: "y(t)",
         series: [
@@ -91,7 +102,7 @@ export function SystemProofCanvas({ system, pillar, a, b, t0 }: Props) {
       const isTimeInvariant = Math.max(...data.map((p) => Math.abs(p.difference))) < 1e-5;
 
       return {
-        title: `Time Invariance Test — ${isTimeInvariant ? "Time-Invariant" : "Time-Variant"}`,
+        title: `${t('signals.timeInvarianceTest', 'Time Invariance Test')} — ${isTimeInvariant ? t('signals.timeInvariantLabel', 'Time-Invariant') : t('signals.timeVariantLabel', 'Time-Variant')}`,
         xLabel: "t\\text{ (s)}",
         yLabel: "y(t)",
         series: [
@@ -127,7 +138,7 @@ export function SystemProofCanvas({ system, pillar, a, b, t0 }: Props) {
       }
 
       return {
-        title: `Causality Test — ${verdict}`,
+        title: `${t('signals.causalityTest', 'Causality Test')} — ${verdictLabel(verdict)}`,
         xLabel: "t\\text{ (s)}",
         yLabel: "y(t)",
         series: [
@@ -163,7 +174,7 @@ export function SystemProofCanvas({ system, pillar, a, b, t0 }: Props) {
     }
 
     return {
-      title: `Memory Test — ${verdict}`,
+      title: `${t('signals.memoryTest', 'Memory Test')} — ${verdictLabel(verdict)}`,
       xLabel: "t\\text{ (s)}",
       yLabel: "y(t)",
       series: [
@@ -182,7 +193,7 @@ export function SystemProofCanvas({ system, pillar, a, b, t0 }: Props) {
         },
       ],
     };
-  }, [a, b, pillar, system, t0]);
+  }, [a, b, pillar, system, t0, t]);
 
   return (
     <StandardStepPlot

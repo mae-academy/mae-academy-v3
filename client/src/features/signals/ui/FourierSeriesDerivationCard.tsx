@@ -3,6 +3,7 @@
  * Scroll-contained so it can sit in the inspection column beneath the selected coefficients.
  */
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { SegmentedControl } from "@/components/common/templates";
 import { KatexMath } from "@/components/ui/KatexMath";
 import type { DerivationStep } from "@/features/signals/engines/derivationTypes";
@@ -17,11 +18,12 @@ const PAIRS: Record<SeriesForm, string> = {
 };
 
 export function FourierSeriesDerivationCard({ efsSteps, tfsSteps, className }: Props) {
+  const { t } = useTranslation('simulators');
   const [form, setForm] = useState<SeriesForm>("efs");
   return (
     <ContinuousDerivationCard
       className={className ?? "max-h-[520px] overflow-y-auto pr-1"}
-      title="Fourier Series Derivation"
+      title={t('signals.fourierSeriesDerivation', 'Fourier Series Derivation')}
       pair={PAIRS[form]}
       steps={form === "efs" ? efsSteps : tfsSteps}
       actions={

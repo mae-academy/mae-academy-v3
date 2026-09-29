@@ -66,8 +66,8 @@ export default function SimulationDetail() {
   const circuitLabClone = meta.slug === "circuitlab-1" || meta.slug === "circuitlab-2" || meta.slug === "circuitlab-3";
   const circuitTabs = circuitTabCopy[locale];
   const tools = isControlSystems ? controlSystemToolMeta[locale]
-    : isPowerElectronics ? powerElectronicsToolMeta
-      : isSignalsAndSystems ? signalsAndSystemsToolMeta
+    : isPowerElectronics ? powerElectronicsToolMeta[locale]
+      : isSignalsAndSystems ? signalsAndSystemsToolMeta[locale]
         : isLinearAlgebra ? linearAlgebraToolMeta[locale]
           : isCircuitLab ? [{ slug: "workspace", label: circuitTabs.canvas }]
             : isDigitalLogicDesign ? [{ slug: "workspace", label: simulation.title }]
@@ -153,7 +153,7 @@ export default function SimulationDetail() {
   return <motion.div variants={container} initial="hidden" animate="visible">
     <SimulatorLayout title={isDigitalLogicDesign ? "" : simulation.title} tabs={tools} activeTab={tool || ""} routePrefix={isDirectCode ? "/code" : `/simulations/${meta.slug}`} backLabel={copy.footer.simulations} isRtl={isRtl} hideToolNavigation={isDigitalLogicDesign || isCircuitLab || isCodeStudio}>
       <motion.div variants={item} className="mt-0" dir="ltr">
-        <div className="ltr text-left" style={{ direction: 'ltr', textAlign: 'left' }}>
+        <div className="ltr text-left mae-simulator-shell" style={{ direction: 'ltr', textAlign: 'left' }}>
           {toolContent}
         </div>
       </motion.div>

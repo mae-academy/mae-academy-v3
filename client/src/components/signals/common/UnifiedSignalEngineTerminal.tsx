@@ -7,6 +7,7 @@
  */
 import { forwardRef, useId, useImperativeHandle, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { Delete } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { KatexMath } from "@/components/ui/KatexMath";
 import { MathLiveSignalInput, type MathLiveSignalInputHandle } from "@/components/signals/MathLiveSignalInput";
 import { cn } from "@/lib/utils";
@@ -83,11 +84,11 @@ function operatorTokensFor(domain: TerminalDomain) {
 export const UnifiedSignalEngineTerminal = forwardRef<UnifiedSignalEngineTerminalHandle, Props>(function UnifiedSignalEngineTerminal(
   {
     channels,
-    title = "SIGNAL ENGINE",
+    title,
     domain = "t",
     calculus = domain === "t",
     extraTokens,
-    extraTokensLabel = "Studio tokens",
+    extraTokensLabel,
     signalTokens: customSignalTokens,
     signalTokensLabel,
     operatorTokens: customOperatorTokens,
@@ -97,6 +98,9 @@ export const UnifiedSignalEngineTerminal = forwardRef<UnifiedSignalEngineTermina
   },
   ref,
 ) {
+  const { t } = useTranslation('simulators');
+  const resolvedTitle = title ?? t('signals.signalEngineTitle', 'Signal Engine');
+  const resolvedExtraTokensLabel = extraTokensLabel ?? t('signals.studioTokensLabel', 'Studio tokens');
   const uid = useId();
   const labelId = `${uid}-label`;
   const editors = useRef<Record<string, MathLiveSignalInputHandle | null>>({});
@@ -136,7 +140,7 @@ export const UnifiedSignalEngineTerminal = forwardRef<UnifiedSignalEngineTermina
   return (
     <section className={cn("rounded-2xl border border-slate-200/80 bg-white/80 p-4 shadow-sm backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/80", className)}>
       <header className="border-b border-slate-100 pb-3 dark:border-slate-800/80">
-        <h3 id={labelId} className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-white">{title}</h3>
+        <h3 id={labelId} className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-white">{resolvedTitle}</h3>
       </header>
 
       {/* A. One inline row per signal: KaTeX prefix + live MathLive editor. */}
@@ -167,7 +171,7 @@ export const UnifiedSignalEngineTerminal = forwardRef<UnifiedSignalEngineTermina
                   />
                 </div>
               </div>
-              {channel.error && <p role="alert" className="mt-2 text-xs font-medium text-rose-500">Syntax error: {channel.error}</p>}
+              {channel.error && <p role="alert" className="mt-2 text-xs font-medium text-rose-500">{t('signals.syntaxErrorPrefix', 'Syntax error:')} {channel.error}</p>}
             </div>
           );
         })}
@@ -181,7 +185,7 @@ export const UnifiedSignalEngineTerminal = forwardRef<UnifiedSignalEngineTermina
       {/* B. Split terminal: numeric keypad | signal & operator palette. */}
       <div className="mt-4 grid gap-4 md:grid-cols-[minmax(11rem,13rem)_minmax(0,1fr)]">
         <div>
-          <p className={sectionLabel}>Keypad</p>
+          <p className={sectionLabel}>{t('signals.keypadLabel', 'Keypad')}</p>
           <div className="mt-2 grid grid-cols-3 gap-1.5">
             {NUMPAD_ROWS.flat().map((digit) => (
               <button key={digit} type="button" aria-label={digit} onMouseDown={keepFocus} onClick={() => insert({ insert: digit, mode: "after" })} className={key}><KatexMath math={digit} /></button>
@@ -194,7 +198,7 @@ export const UnifiedSignalEngineTerminal = forwardRef<UnifiedSignalEngineTermina
 
         <div className="min-w-0 space-y-3">
           <div>
-            <p className={sectionLabel}>{signalTokensLabel ?? (domain === "t" ? "Signals" : domain === "n" ? "Sequences" : domain === "w" ? "Spectrum" : "Transfer function")}</p>
+            <p className={sectionLabel}>{signalTokensLabel ?? (domain === "t" ? t('signals.signalsLabel', 'Signals') : domain === "n" ? t('signals.sequencesLabel', 'Sequences') : domain === "w" ? t('signals.spectrumLabel', 'Spectrum') : t('signals.transferFunctionLabel', 'Transfer function'))}</p>
             <div className="mt-2 flex flex-wrap gap-1.5">
               {signalTokens.map((token) => (
                 <button key={token.id} type="button" aria-label={token.ariaLabel} onMouseDown={keepFocus} onClick={() => insert(token)} className={chip}><KatexMath math={token.label} /></button>
@@ -202,7 +206,7 @@ export const UnifiedSignalEngineTerminal = forwardRef<UnifiedSignalEngineTermina
             </div>
           </div>
           <div>
-            <p className={sectionLabel}>{operatorTokensLabel ?? "Operators & constants"}</p>
+            <p className={sectionLabel}>{operatorTokensLabel ?? t('signals.operatorsConstants', 'Operators & constants')}</p>
             <div className="mt-2 flex flex-wrap gap-1.5">
               {operatorTokens.map((token) => (
                 <button key={token.id} type="button" aria-label={token.ariaLabel} onMouseDown={keepFocus} onClick={() => insert(token)} className={cn(chip, "min-w-10")}><KatexMath math={token.label} /></button>
@@ -211,7 +215,7 @@ export const UnifiedSignalEngineTerminal = forwardRef<UnifiedSignalEngineTermina
           </div>
           {extraTokens && extraTokens.length > 0 && (
             <div>
-              <p className={sectionLabel}>{extraTokensLabel}</p>
+              <p className={sectionLabel}>{resolvedExtraTokensLabel}</p>
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {extraTokens.map((token) => (
                   <button key={token.id} type="button" aria-label={token.ariaLabel} onMouseDown={keepFocus} onClick={() => insert(token)} className={chip}><KatexMath math={token.label} /></button>
@@ -221,7 +225,7 @@ export const UnifiedSignalEngineTerminal = forwardRef<UnifiedSignalEngineTermina
           )}
           {calculus && (
             <div>
-              <p className={sectionLabel}>Calculus Engine</p>
+              <p className={sectionLabel}>{t('signals.calculusEngineLabel', 'Calculus Engine')}</p>
               <div className="mt-2 flex flex-wrap gap-1.5">
                 <button type="button" aria-label="Differentiate Expression" title="Differentiate Expression" onMouseDown={keepFocus} onClick={() => applyOperator(differentiateExpression(active.value), "Differentiated")} className={chip}><KatexMath math={String.raw`\frac{d}{dt}f(t)`} /></button>
                 <button type="button" aria-label="Integrate Expression" title="Integrate Expression" onMouseDown={keepFocus} onClick={() => applyOperator(integrateExpression(active.value), "Integrated")} className={chip}><KatexMath math={String.raw`\int f(t)\,dt`} /></button>

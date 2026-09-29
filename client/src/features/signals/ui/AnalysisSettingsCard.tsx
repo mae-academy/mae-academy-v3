@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import { KatexMath } from "@/components/ui/KatexMath";
 import { SegmentedControl, StudioSlider, InnerBox } from "@/components/common/templates";
@@ -8,11 +9,6 @@ function number(value: number, digits = 4) { return Number(value.toFixed(digits)
 
 /** Hard range of the aperiodic time scale a. */
 const SCALE_BOUNDS = { min: 0.1, max: 2 } as const;
-
-const WINDOW_OPTIONS: ReadonlyArray<{ value: WindowPreset; label: string }> = [
-  { value: "one", label: "1 Period" },
-  { value: "two", label: "2 Periods" },
-];
 
 export type AnalysisSettingsCardProps = {
   freqMode: boolean;
@@ -53,23 +49,28 @@ export function AnalysisSettingsCard({
   scale,
   setScale,
 }: AnalysisSettingsCardProps) {
+  const { t } = useTranslation('simulators');
   const [scaleLimits, setScaleLimits] = useState<{ min: number; max: number }>({ min: SCALE_BOUNDS.min, max: SCALE_BOUNDS.max });
+  const WINDOW_OPTIONS: ReadonlyArray<{ value: WindowPreset; label: string }> = [
+    { value: "one", label: t('signals.onePeriod', '1 Period') },
+    { value: "two", label: t('signals.twoPeriods', '2 Periods') },
+  ];
 
   return (
     <InnerBox className={cn("flex flex-col", mode === "fs" && !freqMode && "flex-1 justify-between pb-6")}>
       <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-white pb-2 border-b border-slate-100 dark:border-slate-800">
-        ANALYSIS SETTINGS
+        {t('signals.analysisSettings', 'Analysis settings')}
       </h3>
       {freqMode ? (
         <p className="mt-3 text-[11px] leading-5 text-slate-500 dark:text-slate-400">
-          Magnitude and phase are evaluated directly from <KatexMath math="X(j\omega)" />; the time trace is the synthesized{" "}
-          <KatexMath math="x(t)" />. All axes auto-scale to the spectrum's bandwidth.
+          {t('signals.freqModeNoteIntro', 'Magnitude and phase are evaluated directly from ')}<KatexMath math="X(j\omega)" />{t('signals.freqModeNoteMid', '; the time trace is the synthesized ')}{" "}
+          <KatexMath math="x(t)" />{t('signals.freqModeNoteOutro', ". All axes auto-scale to the spectrum's bandwidth.")}
         </p>
       ) : mode === "fs" ? (
         <>
           <StudioSlider
             className="mt-4"
-            label="Fundamental period"
+            label={t('signals.fundamentalPeriod', 'Fundamental period')}
             mathLabel={<KatexMath math="T_0\ (\text{s})" />}
             min={periodLimits.min}
             max={periodLimits.max}
@@ -98,7 +99,7 @@ export function AnalysisSettingsCard({
           </div>
           <StudioSlider
             className="mt-5"
-            label="Number of harmonics"
+            label={t('signals.numberOfHarmonics', 'Number of harmonics')}
             variant="spectral"
             min={harmonicLimits.min}
             max={harmonicLimits.max}
@@ -128,7 +129,7 @@ export function AnalysisSettingsCard({
           />
           <div className="mt-5 grid gap-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="text-xs font-bold text-slate-700 dark:text-slate-200">Observation window</span>
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-200">{t('signals.observationWindow', 'Observation window')}</span>
               <SegmentedControl<WindowPreset>
                 options={WINDOW_OPTIONS}
                 value={windowPreset}
@@ -142,14 +143,14 @@ export function AnalysisSettingsCard({
             </div>
           </div>
           <p className="mt-3 text-[11px] leading-5 text-slate-500 dark:text-slate-400">
-            The partial sum redraws as <KatexMath math="N" /> changes; Gibbs overshoot stays visible at every jump discontinuity.
+            {t('signals.partialSumIntro', 'The partial sum redraws as ')}<KatexMath math="N" />{t('signals.partialSumOutro', ' changes; Gibbs overshoot stays visible at every jump discontinuity.')}
           </p>
         </>
       ) : (
         <>
           <StudioSlider
             className="mt-4"
-            label="Time scale"
+            label={t('signals.timeScaleLabel', 'Time scale')}
             mathLabel={<KatexMath math="a" />}
             min={scaleLimits.min}
             max={scaleLimits.max}

@@ -34,7 +34,7 @@ export default function PlcSimulatorPage() {
   return (
     <SimulatorLayout title="PLC" tabs={[]} activeTab="" routePrefix="/simulations/plc" backLabel={copy.footer.simulations} isRtl={isRtl} hideToolNavigation compact>
       {/* The simulator is left-to-right engineering notation regardless of page language. */}
-      <div dir="ltr" className="mt-3 flex min-h-[calc(100svh-var(--mae-header-height)-9rem)] flex-col">
+      <div dir="ltr" className="mt-3 flex min-h-[calc(100svh-var(--mae-header-height)-9rem)] flex-col mae-simulator-shell">
         <PlcSimulatorApp initialNetworks={DEMO_NETWORKS} symbols={DEMO_SYMBOLS} className="flex flex-1 flex-col" />
       </div>
     </SimulatorLayout>

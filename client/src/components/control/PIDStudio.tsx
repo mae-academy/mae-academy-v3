@@ -2,6 +2,7 @@
  * PID Studio — compact Root Locus-parity control workspace.
  * Layout contract: plant → input/parameters → controller/scope → specs/construction/metrics.
  */
+import { useTranslation } from 'react-i18next';
 import { useEffect, useMemo, useState } from "react";
 import {
   StandardStepPlot,
@@ -32,23 +33,6 @@ import {
 
 type SignalState = { type: SignalType; magnitude: number; parameter: number };
 const primaryOptions: ControllerPrimary[] = ["P", "I", "D", "PI", "PD", "PID"];
-const signalOptions: Array<{ value: SignalType; label: string }> = [
-  { value: "impulse", label: "Impulse" },
-  { value: "step", label: "Step" },
-  { value: "ramp", label: "Ramp" },
-  { value: "parabolic", label: "Parabolic" },
-  { value: "exponential", label: "Exponential" },
-  { value: "sine", label: "Sinusoidal (Sine)" },
-  { value: "cosine", label: "Sinusoidal (Cosine)" },
-];
-const subtypeLabels: Record<ControllerSubtype, string> = {
-  parallel: "Parallel",
-  series: "Series",
-  "parallel-standard": "Parallel Standard",
-  "parallel-modified": "Parallel Modified",
-  "series-standard": "Series Standard",
-  "series-modified": "Series Modified",
-};
 const field =
   "h-10 w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 text-slate-800 text-lg tracking-wide dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [-moz-appearance:textfield] m-0";
 
@@ -131,6 +115,24 @@ function GainControl({
 }
 
 export function PIDStudio() {
+  const { t } = useTranslation('simulators');
+  const signalOptions: Array<{ value: SignalType; label: string }> = [
+    { value: "impulse", label: t('control.signalImpulse', 'Impulse') },
+    { value: "step", label: t('control.signalStep', 'Step') },
+    { value: "ramp", label: t('control.signalRamp', 'Ramp') },
+    { value: "parabolic", label: t('control.signalParabolic', 'Parabolic') },
+    { value: "exponential", label: t('control.signalExponential', 'Exponential') },
+    { value: "sine", label: t('control.signalSine', 'Sinusoidal (Sine)') },
+    { value: "cosine", label: t('control.signalCosine', 'Sinusoidal (Cosine)') },
+  ];
+  const subtypeLabels: Record<ControllerSubtype, string> = {
+    parallel: t('control.parallel', 'Parallel'),
+    series: t('control.subtypeSeries', 'Series'),
+    "parallel-standard": t('control.subtypeParallelStandard', 'Parallel Standard'),
+    "parallel-modified": t('control.subtypeParallelModified', 'Parallel Modified'),
+    "series-standard": t('control.subtypeSeriesStandard', 'Series Standard'),
+    "series-modified": t('control.subtypeSeriesModified', 'Series Modified'),
+  };
   const [plant, setPlant] = useState<TransferFunctionData>({
     mode: "polynomial",
     numPoly: [1, 2],
@@ -203,7 +205,7 @@ export function PIDStudio() {
       title={
         <div className="w-full">
           <span className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-white block">
-            Controller & Input Parameters
+            {t('control.controllerInputParams', 'Controller & Input Parameters')}
           </span>
           <div className="mt-2 flex flex-wrap gap-4 text-xs sm:text-sm text-violet-700 dark:text-violet-300 normal-case font-normal select-none">
             <KatexMath math={formattedRTime} className="normal-case" />
@@ -217,7 +219,7 @@ export function PIDStudio() {
         {/* 1. System Input */}
         <div className="space-y-3">
           <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-            System Input
+            {t('control.systemInput', 'System Input')}
           </h4>
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
@@ -280,7 +282,7 @@ export function PIDStudio() {
         {/* 2. Controller Architecture */}
         <div className="space-y-4">
           <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-            Controller Architecture
+            {t('control.controllerArchitecture', 'Controller Architecture')}
           </h4>
           <div>
             <SegmentedControl
@@ -298,7 +300,7 @@ export function PIDStudio() {
           </div>
           {subtypes.length > 0 && (
             <div className="space-y-2">
-              <p className="text-xs font-bold text-slate-500 dark:text-slate-400">Controller Form</p>
+              <p className="text-xs font-bold text-slate-500 dark:text-slate-400">{t('control.controllerForm', 'Controller Form')}</p>
               <SegmentedControl
                 value={subtype}
                 onChange={(val) => setSubtype(val as ControllerSubtype)}
@@ -315,7 +317,7 @@ export function PIDStudio() {
         {/* 3. Tuning Parameters */}
         <div className="space-y-3">
           <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-            Tuning Parameters
+            {t('control.tuningParameters', 'Tuning Parameters')}
           </h4>
           <InnerBox className="space-y-3">
             {showKp && (
@@ -357,7 +359,7 @@ export function PIDStudio() {
 
   const scopePanel = (
     <StudioCard
-      title="INTERACTIVE SCOPE"
+      title={t('control.interactiveScope', 'Interactive Scope')}
       className="h-full flex flex-col"
       actionSlot={
         <div className="flex items-center gap-2">
@@ -396,7 +398,7 @@ export function PIDStudio() {
   );
 
   const specsPanel = (
-    <StudioCard title="Design by Specs">
+    <StudioCard title={t('control.designBySpecs', 'Design by Specs')}>
       <div className="space-y-3">
         <FormulaBox>
           <KatexMath
@@ -445,14 +447,14 @@ export function PIDStudio() {
           className="inline-flex items-center gap-2"
         >
           <Calculator className="h-4 w-4" />
-          Calculate PID
+          {t('control.calculatePid', 'Calculate PID')}
         </GradientButton>
       </div>
     </StudioCard>
   );
 
   const constructionPanel = (
-    <StudioCard title="Closed-Loop Construction">
+    <StudioCard title={t('control.closedLoopConstruction', 'Closed-Loop Construction')}>
       <div className="space-y-3 text-sm">
         <FormulaBox>
           <KatexMath
@@ -473,7 +475,7 @@ export function PIDStudio() {
   );
 
   const metricsPanel = (
-    <StudioCard title="Transient Metrics">
+    <StudioCard title={t('control.transientMetrics', 'Transient Metrics')}>
       <div className="divide-y divide-slate-100 dark:divide-slate-800">
         <div className="flex items-center justify-between py-3">
           <MathLabel math="M_p" />

@@ -6,6 +6,7 @@
  */
 import { cn } from "@/lib/utils";
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { KatexMath } from "@/components/ui/KatexMath";
 import { SegmentedControl, StatusBadge, StudioSlider, StudioCard, InnerBox, MathNumberInput } from "@/components/common/templates";
 import { UnifiedSignalEngineTerminal } from "@/components/signals/common/UnifiedSignalEngineTerminal";
@@ -53,6 +54,7 @@ function sampleTrace(fn: (time: number) => number, radius: number, samples = 600
 }
 
 export function FourierStudio() {
+  const { t } = useTranslation('simulators');
   const [domain, setDomain] = useState<Domain>("time");
   const [expression, setExpression] = useState("\\text{rect}(t)"); const [spectrumSource, setSpectrumSource] = useState<string>(freqExamples[0].value);
   const [mode, setMode] = useState<"fs" | "ft">("fs"); const [scale, setScale] = useState(1);
@@ -134,15 +136,15 @@ export function FourierStudio() {
     <StudioCard className="overflow-hidden">
       <div className="flex flex-col gap-4 border-b border-slate-200 pb-5 dark:border-slate-800 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h2 className="mt-1 text-xl font-black tracking-tight text-slate-900 dark:text-white">Harmonic Workspace</h2>
-          <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500 dark:text-slate-400">Transform between time and frequency, and examine magnitude/phase spectra, the harmonic builder, and a rotatable time–harmonic space.</p>
+          <h2 className="mt-1 text-xl font-black tracking-tight text-slate-900 dark:text-white">{t('signals.harmonicWorkspace', 'Harmonic Workspace')}</h2>
+          <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500 dark:text-slate-400">{t('signals.harmonicWorkspaceDescription', 'Transform between time and frequency, and examine magnitude/phase spectra, the harmonic builder, and a rotatable time–harmonic space.')}</p>
         </div>
         <SegmentedControl
           value={mode}
           onChange={setMode}
           options={[
-            { value: "fs", label: "Periodic / FS" },
-            { value: "ft", label: "Aperiodic / FT" },
+            { value: "fs", label: t('signals.periodicFS', 'Periodic / FS') },
+            { value: "ft", label: t('signals.aperiodicFT', 'Aperiodic / FT') },
           ]}
         />
       </div>
@@ -158,7 +160,7 @@ export function FourierStudio() {
                   value: "time",
                   label: (
                     <span className="font-['Poppins',sans-serif] font-medium inline-flex items-center gap-1.5">
-                      Time-Domain <KatexMath math="[x(t)]" />
+                      {t('signals.timeDomain', 'Time-Domain')} <KatexMath math="[x(t)]" />
                     </span>
                   ),
                   "aria-label": "Time-Domain [x(t)]",
@@ -167,7 +169,7 @@ export function FourierStudio() {
                   value: "freq",
                   label: (
                     <span className="font-['Poppins',sans-serif] font-medium inline-flex items-center gap-1.5">
-                      Frequency-Domain <KatexMath math={mode === "ft" ? "[X(j\\omega)]" : "[X(j\\omega)\\ /\\ c_n]"} />
+                      {t('signals.frequencyDomain', 'Frequency-Domain')} <KatexMath math={mode === "ft" ? "[X(j\\omega)]" : "[X(j\\omega)\\ /\\ c_n]"} />
                     </span>
                   ),
                   "aria-label": mode === "ft" ? "Frequency-Domain [X(j\\omega)]" : "Frequency-Domain [X(j\\omega) / c_n]",
@@ -177,11 +179,11 @@ export function FourierStudio() {
             />
           )}
           {freqMode ? (
-            <UnifiedSignalEngineTerminal key="freq" title="FREQUENCY-DOMAIN SPECTRUM" domain="w" channels={[{ id: "X", lhs: "X(j\\omega)", value: spectrumSource, onChange: setSpectrumSource, error: inverse && !inverse.ok ? inverse.error : null }]}>
+            <UnifiedSignalEngineTerminal key="freq" title={t('signals.frequencyDomainSpectrumTitle', 'Frequency-domain spectrum')} domain="w" channels={[{ id: "X", lhs: "X(j\\omega)", value: spectrumSource, onChange: setSpectrumSource, error: inverse && !inverse.ok ? inverse.error : null }]}>
               <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">{freqExamples.map((example) => <button key={example.label} type="button" onClick={() => setSpectrumSource(example.value)} className={`rounded-xl border px-3 py-2 text-left text-xs font-bold transition active:scale-[.98] ${idle}`}>{example.label}</button>)}</div>
             </UnifiedSignalEngineTerminal>
           ) : (
-            <UnifiedSignalEngineTerminal key="time" title="TIME-DOMAIN SIGNAL" channels={[{ id: "x", lhs: "x(t)", value: expression, onChange: setExpression, error: parsed.ok ? null : parsed.error }]}>
+            <UnifiedSignalEngineTerminal key="time" title={t('signals.timeDomainSignalTitle', 'Time-domain signal')} channels={[{ id: "x", lhs: "x(t)", value: expression, onChange: setExpression, error: parsed.ok ? null : parsed.error }]}>
               <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">{timeExamples.map((example) => <button key={example.label} type="button" onClick={() => setExpression(example.value)} className={`rounded-xl border px-3 py-2 text-left text-xs font-bold transition active:scale-[.98] ${idle}`}>{example.label}</button>)}</div>
             </UnifiedSignalEngineTerminal>
           )}
@@ -213,7 +215,7 @@ export function FourierStudio() {
           <StudioCard className="min-w-0 flex-1 flex flex-col justify-between">
             <div className="mb-4">
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-white pb-2 border-b border-slate-100 dark:border-slate-800">
-                MAGNITUDE, PHASE &amp; {freqMode ? "SYNTHESIZED x(t)" : mode === "fs" ? "HARMONIC BUILDER" : "TIME SCALING"}
+                {t('signals.magnitudePhaseAnd', 'Magnitude, phase & ')}{freqMode ? t('signals.synthesizedX', 'Synthesized x(t)') : mode === "fs" ? t('signals.harmonicBuilder', 'Harmonic builder') : t('signals.timeScaling', 'Time scaling')}
               </h3>
             </div>
             <FourierCanvases
@@ -233,23 +235,23 @@ export function FourierStudio() {
           {freqMode && inverseDerivationSteps ? (
             <ContinuousDerivationCard
               className="overflow-y-auto pr-1 lg:absolute lg:inset-0"
-              title="Inverse Fourier Transform"
+              title={t('signals.inverseFourierTransform', 'Inverse Fourier Transform')}
               pair={String.raw`\mathcal{F}^{-1}\{X(j\omega)\}=x(t)`}
               steps={inverseDerivationSteps}
               target={inverse?.ok ? inverse.latex : null}
               targetTestId="fourier-solution"
-              badge={<StatusBadge variant={inverse?.ok ? "info" : "neutral"} className="uppercase tracking-wider text-[10px]">{inverse?.ok ? "Analytic" : "Numerical"}</StatusBadge>}
+              badge={<StatusBadge variant={inverse?.ok ? "info" : "neutral"} className="uppercase tracking-wider text-[10px]">{inverse?.ok ? t('signals.analytic', 'Analytic') : t('signals.numerical', 'Numerical')}</StatusBadge>}
               notes={[...(inverse?.ok ? inverse.notes : []), ...impulseNote]}
             />
           ) : !freqMode && mode === "ft" && transformDerivationSteps ? (
             <ContinuousDerivationCard
               className="overflow-y-auto pr-1 lg:absolute lg:inset-0"
-              title="Fourier Transform"
+              title={t('signals.fourierTransform', 'Fourier Transform')}
               pair={String.raw`\mathcal{F}\{x(t)\}=X(j\omega)`}
               steps={transformDerivationSteps}
               target={forward?.ok ? forward.spectrum.latex : null}
               targetTestId="fourier-solution"
-              badge={<StatusBadge variant={forward?.ok ? "info" : "neutral"} className="uppercase tracking-wider text-[10px]">{forward?.ok ? "Analytic" : "Numerical"}</StatusBadge>}
+              badge={<StatusBadge variant={forward?.ok ? "info" : "neutral"} className="uppercase tracking-wider text-[10px]">{forward?.ok ? t('signals.analytic', 'Analytic') : t('signals.numerical', 'Numerical')}</StatusBadge>}
               notes={[...(forward && !forward.ok ? [`${forward.error} The spectra are computed numerically from the definition integral.`] : []), ...impulseNote]}
             />
           ) : (
@@ -278,9 +280,9 @@ export function FourierStudio() {
       {viewMode === "fs" && series ? <StudioCard>
         <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
           <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-white pb-2 border-b border-slate-100 dark:border-slate-800">
-            3D TIME–FREQUENCY HARMONIC WATERFALL
+            {t('signals.harmonicWaterfall3D', '3D time–frequency harmonic waterfall')}
           </h3>
-          <span className="text-[11px] text-slate-400">Drag to orbit • Scroll to zoom • Hover a harmonic to inspect it</span>
+          <span className="text-[11px] text-slate-400">{t('signals.orbitHintHarmonic', 'Drag to orbit • Scroll to zoom • Hover a harmonic to inspect it')}</span>
         </div>
         <FourierWaterfall3D
           series={series}

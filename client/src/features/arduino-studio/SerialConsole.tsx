@@ -1,6 +1,8 @@
 /** Serial Monitor (Serial.print/println output + input buffer for Serial.read) and a real-time waveform plotter. */
 import { ChevronDown, ChevronUp, CornerDownLeft, Terminal, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import type { SerialState } from "./useArduinoRuntime";
 
 const SERIES_COLORS = ["#ef4444", "#06b6d4", "#8b5cf6", "#f59e0b", "#22c55e", "#ec4899"] as const;
@@ -32,7 +34,7 @@ export function parsePlotLine(line: string): { label: string | null; value: numb
   return out;
 }
 
-export function buildPlotData(lines: readonly string[], times: readonly number[]): PlotData {
+export function buildPlotData(lines: readonly string[], times: readonly number[], seriesLabel: (index: number) => string = i => `Series ${i}`): PlotData {
   const rows: { label: string | null; value: number }[][] = [];
   const t: number[] = [];
   let newest = -1;
@@ -46,7 +48,7 @@ export function buildPlotData(lines: readonly string[], times: readonly number[]
     t.unshift(ti);
   }
   const width = rows.reduce((m, r) => Math.max(m, r.length), 0);
-  const labels = Array.from({ length: width }, (_, i) => rows.map(r => r[i]?.label).find(l => l) ?? `Series ${i + 1}`);
+  const labels = Array.from({ length: width }, (_, i) => rows.map(r => r[i]?.label).find(l => l) ?? seriesLabel(i + 1));
   const series = Array.from({ length: width }, (_, i) => rows.map(r => r[i]?.value ?? NaN));
   return { labels, series, times: t };
 }
@@ -67,15 +69,15 @@ function smoothPath(pts: [number, number][]): string {
   return d;
 }
 
-function Plotter({ data }: { data: PlotData }) {
+function Plotter({ data, t }: { data: PlotData; t: TFunction }) {
   const W = 400;
   const H = 160;
   const pad = { l: 34, r: 8, t: 8, b: 4 };
   const finite = data.series.flat().filter(Number.isFinite);
   if (finite.length === 0) {
     return (
-      <div className="flex h-full items-center justify-center px-4 text-center font-mono text-[11px] text-slate-400 dark:text-slate-600">
-        Print numeric values (one per line, comma-separated for several series) to plot them live.
+      <div className="mae-i18n-text flex h-full items-center justify-center px-4 text-center font-mono text-[11px] text-slate-400 dark:text-slate-600">
+        {t("arduino.plotterHint", "Print numeric values (one per line, comma-separated for several series) to plot them live.")}
       </div>
     );
   }
@@ -99,7 +101,7 @@ function Plotter({ data }: { data: PlotData }) {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="relative min-h-0 flex-1">
-        <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="absolute inset-0 h-full w-full" role="img" aria-label="Serial plotter" shapeRendering="geometricPrecision">
+        <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="absolute inset-0 h-full w-full" role="img" aria-label={t("arduino.serialPlotterAria", "Serial plotter")} shapeRendering="geometricPrecision">
           {ticks.map(t => (
             <line key={t} x1={pad.l} x2={W - pad.r} y1={y(t)} y2={y(t)} className="stroke-slate-200 dark:stroke-slate-800" strokeWidth={0.6} vectorEffect="non-scaling-stroke" />
           ))}
@@ -124,7 +126,7 @@ function Plotter({ data }: { data: PlotData }) {
             {(ms / 1000).toFixed(0)}
           </span>
         ))}
-        <span className="absolute inset-x-0 top-3 text-center font-semibold text-slate-500 dark:text-slate-400">Time (s)</span>
+        <span className="absolute inset-x-0 top-3 text-center font-semibold text-slate-500 dark:text-slate-400">{t("arduino.timeAxisLabel", "Time (s)")}</span>
       </div>
       <div className="flex flex-wrap gap-1.5 px-2 pb-1.5 pt-1 font-mono text-[10px]">
         {data.labels.map((label, i) => {
@@ -153,10 +155,14 @@ interface Props {
 }
 
 export function SerialConsole({ serial, baud, collapsed, onToggleCollapsed, onSend, onClear, className }: Props) {
+  const { t } = useTranslation("simulators");
   const [input, setInput] = useState("");
   const [autoscroll, setAutoscroll] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const plot = useMemo(() => buildPlotData(serial.lines, serial.times), [serial.lines, serial.times]);
+  const plot = useMemo(
+    () => buildPlotData(serial.lines, serial.times, index => t("arduino.seriesLabel", "Series {{index}}", { index })),
+    [serial.lines, serial.times, t]
+  );
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -184,12 +190,12 @@ export function SerialConsole({ serial, baud, collapsed, onToggleCollapsed, onSe
           {collapsed ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
         </button>
         <div className="flex items-center gap-3 font-mono text-[10px] text-slate-400 dark:text-slate-500">
-          <span>{baud ? `${baud} baud` : "port closed"}</span>
+          <span>{baud ? t("arduino.baudSuffix", "{{baud}} baud", { baud }) : t("arduino.portClosed", "port closed")}</span>
           <label className="flex cursor-pointer items-center gap-1">
             <input type="checkbox" checked={autoscroll} onChange={e => setAutoscroll(e.target.checked)} className="accent-violet-500" />
-            autoscroll
+            {t("arduino.autoscroll", "autoscroll")}
           </label>
-          <button type="button" onClick={onClear} title="Clear serial output" className="cursor-pointer p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+          <button type="button" onClick={onClear} title={t("arduino.clearSerialOutput", "Clear serial output")} className="cursor-pointer p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
             <Trash2 size={12} />
           </button>
         </div>
@@ -200,7 +206,9 @@ export function SerialConsole({ serial, baud, collapsed, onToggleCollapsed, onSe
           <div className="flex min-h-0 flex-col border-b border-slate-200 dark:border-[#1a1d24] md:border-b-0 md:border-e">
             <div ref={scrollRef} className="min-h-0 flex-1 select-text overflow-y-auto bg-white p-2.5 font-mono text-xs leading-relaxed text-slate-800 dark:bg-[#050608] dark:text-slate-100">
               {serial.lines.length === 0 && !serial.partial ? (
-                <div className="italic text-slate-400 dark:text-slate-600">Serial output appears here. Call Serial.begin() then Serial.println().</div>
+                <div className="mae-i18n-text italic text-slate-400 dark:text-slate-600">
+                  {t("arduino.serialEmptyState", "Serial output appears here. Call Serial.begin() then Serial.println().")}
+                </div>
               ) : (
                 <>
                   {serial.lines.map((line, i) => (
@@ -215,22 +223,22 @@ export function SerialConsole({ serial, baud, collapsed, onToggleCollapsed, onSe
             <form onSubmit={submit} className="flex shrink-0 items-center gap-1.5 border-t border-slate-200 bg-slate-50 p-1.5 dark:border-[#1a1d24] dark:bg-[#090a0d]">
               <span className="ps-2 font-mono text-xs font-bold text-violet-400">&gt;</span>
               <input
-                aria-label="Serial input buffer"
+                aria-label={t("arduino.serialInputAria", "Serial input buffer")}
                 value={input}
                 onChange={e => setInput(e.target.value)}
-                placeholder="Keyboard entry (stdin buffer)…"
+                placeholder={t("assembler.keyboardEntry", "Keyboard entry (stdin buffer)…")}
                 className="min-w-0 flex-1 bg-transparent px-2 py-1 font-mono text-xs text-slate-800 outline-none placeholder:text-slate-400 dark:text-slate-100 dark:placeholder:text-slate-600"
               />
               <button type="submit" className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 transition hover:bg-slate-100 dark:border-[#1a1d24] dark:bg-[#13161c] dark:text-slate-300 dark:hover:bg-[#1b2028] dark:hover:text-white">
                 <CornerDownLeft className="h-3 w-3" />
-                Send
+                {t("arduino.send", "Send")}
               </button>
             </form>
           </div>
 
           <div className="flex min-h-0 flex-col bg-white dark:bg-[#050608]">
             <div className="min-h-0 flex-1">
-              <Plotter data={plot} />
+              <Plotter data={plot} t={t} />
             </div>
           </div>
         </div>

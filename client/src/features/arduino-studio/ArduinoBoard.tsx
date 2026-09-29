@@ -3,6 +3,7 @@
  * pin glow and LED state, and a pixel-space layer draws flat-vector peripherals wired directly to the headers.
  */
 import { memo, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import unoRaw from "./arduinoUno.svg?raw";
 import { ANALOG_HEADER_Y, DIGITAL_HEADER_Y, HEADER_PINS, LEDS, VIEW_H, VIEW_W, analogPinX, digitalPinX, pinName } from "./arduinoBoardGeometry";
 import type { PinUsage } from "./arduinoCompiler";
@@ -122,6 +123,18 @@ export const LED_COLOR_OPTIONS = [
   { label: "White", color: "#F8FAFC" },
 ] as const;
 
+/** Localized labels for the LED color picker; falls back to the English `LED_COLOR_OPTIONS` order/colors. */
+function useLedColorOptions(): { label: string; color: string }[] {
+  const { t } = useTranslation("simulators");
+  return [
+    { label: t("arduino.colorRed", "Red"), color: "#EF4444" },
+    { label: t("arduino.colorGreen", "Green"), color: "#22C55E" },
+    { label: t("arduino.colorBlue", "Blue"), color: "#3B82F6" },
+    { label: t("arduino.colorYellow", "Yellow"), color: "#EAB308" },
+    { label: t("arduino.colorWhite", "White"), color: "#F8FAFC" },
+  ];
+}
+
 interface Props {
   snapshot: HardwareSnapshot;
   onDigitalInput: (pin: number, level: 0 | 1) => void;
@@ -140,6 +153,8 @@ const uniqSorted = (xs: number[]): number[] => Array.from(new Set(xs)).sort((a, 
 type TopModule = { kind: "in" | "out"; pin: number };
 
 export function ArduinoBoard({ snapshot, onDigitalInput, onAnalogInput, layout = EMPTY_LAYOUT, ledColors = {}, onLedColorChange }: Props) {
+  const { t } = useTranslation("simulators");
+  const ledColorOptions = useLedColorOptions();
   const [boxRef, box] = useElementSize<HTMLDivElement>();
   const [internalLedColors, setInternalLedColors] = useState<Record<number, string>>({});
   const [openPickerPin, setOpenPickerPin] = useState<number | null>(null);
@@ -249,7 +264,7 @@ export function ArduinoBoard({ snapshot, onDigitalInput, onAnalogInput, layout =
           <VectorLed x={OUT_C.ledX} y={OUT_C.ledY} width={LED_W} height={LED_H} state={brightness} color={currentColor} />
           <VectorResistor x={OUT_C.resX} y={OUT_C.resY} width={RES_W * OUT_C.resS} height={RES_H * OUT_C.resS} value={220} />
           <text x={OUT_C.resX + (RES_W * OUT_C.resS) / 2} y={OUT_C.resY - 3} textAnchor="middle" fontSize={8} fontFamily="ui-monospace, monospace" className="fill-slate-500 dark:fill-slate-400">220Ω</text>
-          <text x={62} y={16} fontSize={9} fontWeight={700} className="fill-slate-700 dark:fill-slate-200">Digital Output</text>
+          <text x={62} y={16} fontSize={9} fontWeight={700} className="fill-slate-700 dark:fill-slate-200">{t("arduino.digitalOutputLabel", "Digital Output")}</text>
           <text x={62} y={28} fontSize={8.5} fontFamily="ui-monospace, monospace" className="fill-slate-500 dark:fill-slate-400">{pinName(m.pin)}{lit ? " · HIGH" : " · LOW"}</text>
         </g>,
       );
@@ -259,8 +274,8 @@ export function ArduinoBoard({ snapshot, onDigitalInput, onAnalogInput, layout =
           <button
             type="button"
             data-testid={`led-trigger-${m.pin}`}
-            aria-label={`Customize LED color for ${pinName(m.pin)}`}
-            title={`${pinName(m.pin)} LED — click to select color`}
+            aria-label={t("arduino.customizeLedColorAria", "Customize LED color for {{pin}}", { pin: pinName(m.pin) })}
+            title={t("arduino.ledColorTitle", "{{pin}} LED — click to select color", { pin: pinName(m.pin) })}
             onClick={(e) => {
               e.stopPropagation();
               setOpenPickerPin(prev => prev === m.pin ? null : m.pin);
@@ -281,7 +296,7 @@ export function ArduinoBoard({ snapshot, onDigitalInput, onAnalogInput, layout =
             <div
               data-testid={`led-color-picker-${m.pin}`}
               role="dialog"
-              aria-label={`Color palette for ${pinName(m.pin)} LED`}
+              aria-label={t("arduino.colorPaletteAria", "Color palette for {{pin}} LED", { pin: pinName(m.pin) })}
               className="absolute z-50 flex items-center gap-1.5 rounded-xl border border-slate-700/80 bg-slate-900/95 p-1.5 shadow-xl backdrop-blur-md animate-in fade-in zoom-in-95 duration-100"
               style={{
                 left: at(OUT_C.ledX + 18, 0).x,
@@ -290,14 +305,14 @@ export function ArduinoBoard({ snapshot, onDigitalInput, onAnalogInput, layout =
               }}
               onClick={(e) => e.stopPropagation()}
             >
-              {LED_COLOR_OPTIONS.map((opt) => {
+              {ledColorOptions.map((opt) => {
                 const isActive = currentColor.toLowerCase() === opt.color.toLowerCase();
                 return (
                   <button
                     key={opt.color}
                     type="button"
                     title={`${opt.label} (${opt.color})`}
-                    aria-label={`Select ${opt.label} color`}
+                    aria-label={t("arduino.selectColorAria", "Select {{color}} color", { color: opt.label })}
                     data-color={opt.color}
                     onClick={(e) => {
                       e.stopPropagation();
@@ -327,7 +342,7 @@ export function ArduinoBoard({ snapshot, onDigitalInput, onAnalogInput, layout =
       art.push(
         <g key={`ia${m.pin}`} data-module={`D${m.pin}`} transform={xf}>
           <VectorPushButton x={IN_C.btnX} y={IN_C.btnY} width={IN_C.btnS * BTN_W} height={IN_C.btnS * BTN_H} state={high} color={high ? "#0E7490" : "#1F2937"} />
-          <text x={64} y={26} fontSize={9} fontWeight={700} className="fill-slate-700 dark:fill-slate-200">Digital Input</text>
+          <text x={64} y={26} fontSize={9} fontWeight={700} className="fill-slate-700 dark:fill-slate-200">{t("arduino.digitalInputLabel", "Digital Input")}</text>
           <text x={64} y={39} fontSize={8.5} fontFamily="ui-monospace, monospace" className="fill-slate-500 dark:fill-slate-400">{pinName(m.pin)}{high ? " · HIGH" : " · LOW"}</text>
         </g>,
       );
@@ -337,8 +352,8 @@ export function ArduinoBoard({ snapshot, onDigitalInput, onAnalogInput, layout =
           type="button"
           role="switch"
           aria-checked={high}
-          aria-label={`Digital input ${pinName(m.pin)} ${high ? "HIGH" : "LOW"}`}
-          title={`${pinName(m.pin)}: ${high ? "HIGH (1)" : "LOW (0)"} — click to toggle`}
+          aria-label={t("arduino.digitalInputAria", "Digital input {{pin}} {{state}}", { pin: pinName(m.pin), state: high ? "HIGH" : "LOW" })}
+          title={t("arduino.digitalInputToggleTitle", "{{pin}}: {{state}} — click to toggle", { pin: pinName(m.pin), state: high ? "HIGH (1)" : "LOW (0)" })}
           onClick={() => onDigitalInput(m.pin, high ? 0 : 1)}
           className="absolute cursor-pointer rounded-full"
           style={{ left: at(IN_C.btnX + 8, 0).x, top: at(0, IN_C.btnY + 8).y, width: 30 * m.k, height: 30 * m.k }}
@@ -363,14 +378,14 @@ export function ArduinoBoard({ snapshot, onDigitalInput, onAnalogInput, layout =
     overlays.push(
       <div key={`ac${ch}`} data-module={`A${ch}`} className="absolute" style={{ left: ax, top: aY + 22 * kA, width: 176, transform: `scale(${kA})`, transformOrigin: "0 0" }}>
         <div className="text-[10px] font-bold text-slate-700 dark:text-slate-200">
-          Analog Input <span className="ms-1 font-mono font-medium text-slate-500 dark:text-slate-400">A{ch}</span>
+          {t("arduino.analogInputLabel", "Analog Input")} <span className="ms-1 font-mono font-medium text-slate-500 dark:text-slate-400">A{ch}</span>
         </div>
         <StudioSlider
           min={0}
           max={1023}
           step={1}
           value={value}
-          aria-label={`Analog input A${ch}`}
+          aria-label={t("arduino.analogInputAria", "Analog input {{channel}}", { channel: `A${ch}` })}
           onChange={val => onAnalogInput(ch, val)}
           hideHeader
           className="my-1.5 w-full"
@@ -381,7 +396,7 @@ export function ArduinoBoard({ snapshot, onDigitalInput, onAnalogInput, layout =
           <span>1023</span>
         </div>
         <div className="mt-1 font-mono text-[10px] font-semibold tabular-nums text-slate-600 dark:text-slate-300">
-          raw {value} · {((value * 5) / 1023).toFixed(2)} V
+          {t("arduino.analogRawLabel", "raw {{value}} · {{voltage}} V", { value, voltage: ((value * 5) / 1023).toFixed(2) })}
         </div>
       </div>,
     );
@@ -427,7 +442,13 @@ export function ArduinoBoard({ snapshot, onDigitalInput, onAnalogInput, layout =
               const v = ledLevel[led.id] ?? 0;
               return (
                 <g key={led.id} data-led={led.id}>
-                  <title>{led.id === "L" ? "L — pin 13 built-in LED" : led.id === "ON" ? "ON — power" : `${led.id} — serial activity`}</title>
+                  <title>
+                    {led.id === "L"
+                      ? t("arduino.ledBuiltinTitle", "L — pin 13 built-in LED")
+                      : led.id === "ON"
+                        ? t("arduino.ledPowerTitle", "ON — power")
+                        : t("arduino.ledSerialActivityTitle", "{{id}} — serial activity", { id: led.id })}
+                  </title>
                   <rect x={led.x} y={led.y} width={led.w} height={led.h} rx={0.6} fill="#2a2f3a" opacity={0.92} />
                   <rect x={led.x - 1} y={led.y - 1} width={led.w + 2} height={led.h + 2} rx={1.2} fill={led.color} opacity={v * 0.85} filter="url(#arduino-glow)" />
                   <rect x={led.x} y={led.y} width={led.w} height={led.h} rx={0.6} fill={led.color} opacity={0.12 + v * 0.88} />

@@ -5,6 +5,7 @@
  */
 import { Activity, Braces, CheckCircle2, ChevronRight, CircleAlert, FunctionSquare, Sigma, Timer, Waves } from "lucide-react";
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { KatexMath } from "@/components/ui/KatexMath";
 import { StatusBadge, StudioSlider, StudioCard, InnerBox } from "@/components/common/templates";
@@ -91,6 +92,7 @@ function Slider({
 }
 
 export function SystemClassificationLab() {
+  const { t } = useTranslation('simulators');
   const [expression, setExpression] = useState(tex`y(t)=x(2t)`);
   const [a, setA] = useState(1.0); const [b, setB] = useState(-1.0); const [t0, setT0] = useState(1.0);
   const parsed = useMemo(() => parseSystemExpression(expression), [expression]);
@@ -100,23 +102,23 @@ export function SystemClassificationLab() {
     <StudioCard className="overflow-hidden">
       <div className="flex flex-col gap-4 border-b border-slate-200 pb-5 dark:border-slate-800 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h2 className="mt-1 text-xl font-black tracking-tight text-slate-900 dark:text-white">System Classification</h2>
-          <p className="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">Enter a system in terms of its input <KatexMath math="x(t)" />.</p>
+          <h2 className="mt-1 text-xl font-black tracking-tight text-slate-900 dark:text-white">{t('signals.systemClassification', 'System Classification')}</h2>
+          <p className="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">{t('signals.systemClassificationDescription', 'Enter a system in terms of its input ')}<KatexMath math="x(t)" />.</p>
         </div>
       </div>
       <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <UnifiedSignalEngineTerminal
           channels={[{ id: "y", lhs: "y(t)", value: expression, onChange: (rhs) => setExpression(`y(t)=${rhs}`), error: parsed.ok ? null : parsed.error }]}
           signalTokens={systemSignalTokens}
-          signalTokensLabel="System inputs"
+          signalTokensLabel={t('signals.systemInputsLabel', 'System inputs')}
           operatorTokens={systemOperatorTokens}
-          operatorTokensLabel="Operators & powers"
+          operatorTokensLabel={t('signals.operatorsPowersLabel', 'Operators & powers')}
           extraTokens={systemExtraTokens}
-          extraTokensLabel="System calculus & derivatives"
+          extraTokensLabel={t('signals.systemCalculusLabel', 'System calculus & derivatives')}
           calculus={false}
         />
         <InnerBox className="self-start">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-white pb-2 border-b border-slate-100 dark:border-slate-800">ACADEMIC TEST SYSTEMS</h3>
+          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-white pb-2 border-b border-slate-100 dark:border-slate-800">{t('signals.academicTestSystems', 'Academic test systems')}</h3>
           <div className="mt-3 grid gap-2">{presets.map((preset) => <button key={preset.label} type="button" onClick={() => setExpression(preset.latex)} className={`flex min-h-10 items-center rounded-xl border px-3 text-left text-xs font-bold transition active:scale-[0.97] ${idle}`}><KatexMath math={preset.label} /></button>)}</div>
         </InnerBox>
       </div>
@@ -125,8 +127,8 @@ export function SystemClassificationLab() {
     {/* The proof section stays mounted for every input state; only its per-pillar payload degrades. */}
     <StudioCard>
       <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
-        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-white pb-2 border-b border-slate-100 dark:border-slate-800">FIVE CLASSIFICATION PILLARS</h3>
-        <p className="max-w-md text-right text-xs leading-5 text-slate-500 dark:text-slate-400">Solid blue represents the direct system test. Dashed red represents the comparison construction; overlap is the visual proof.</p>
+        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-white pb-2 border-b border-slate-100 dark:border-slate-800">{t('signals.fiveClassificationPillars', 'Five classification pillars')}</h3>
+        <p className="max-w-md text-right text-xs leading-5 text-slate-500 dark:text-slate-400">{t('signals.pillarsLegend', 'Solid blue represents the direct system test. Dashed red represents the comparison construction; overlap is the visual proof.')}</p>
       </div>
       <Accordion type="multiple" defaultValue={["linearity", "time"]} className="space-y-3">
         {PILLAR_OUTLINE.map((entry) => {
@@ -160,15 +162,15 @@ export function SystemClassificationLab() {
                         <Slider label="t_0" value={t0} onChange={setT0} min={-2} max={2} step={0.1} />
                       </div>
                     )}
-                    {pillar.id === "causality" && <p className="text-xs text-rose-600 dark:text-rose-300">The red region represents future input samples relative to the marked output instant.</p>}
-                    {pillar.id === "memory" && <p className="text-xs text-slate-500 dark:text-slate-400">Dashed red: input <KatexMath math="x(t)" />. Solid blue: system output.</p>}
-                    {pillar.id === "stability" && <p className="text-xs text-slate-500 dark:text-slate-400">Dashed red: bounded <KatexMath math="u(t)" />. Solid blue: system output.</p>}
+                    {pillar.id === "causality" && <p className="text-xs text-rose-600 dark:text-rose-300">{t('signals.causalityLegend', 'The red region represents future input samples relative to the marked output instant.')}</p>}
+                    {pillar.id === "memory" && <p className="text-xs text-slate-500 dark:text-slate-400">{t('signals.memoryLegendPrefix', 'Dashed red: input ')}<KatexMath math="x(t)" />{t('signals.memoryLegendSuffix', '. Solid blue: system output.')}</p>}
+                    {pillar.id === "stability" && <p className="text-xs text-slate-500 dark:text-slate-400">{t('signals.stabilityLegendPrefix', 'Dashed red: bounded ')}<KatexMath math="u(t)" />{t('signals.stabilityLegendSuffix', '. Solid blue: system output.')}</p>}
                   </div>
                 </div>
                 <PillarDerivationCard proof={pillar.proof} />
               </div> : <div className="rounded-xl border border-dashed border-slate-300 bg-white/60 p-6 text-center dark:border-slate-700 dark:bg-slate-950/40">
-                <p className="text-xs font-bold text-slate-500 dark:text-slate-400">Awaiting valid input</p>
-                <p className="mt-1 text-xs leading-5 text-slate-400 dark:text-slate-500">{parsed.ok ? "Recomputing the proof trace…" : parsed.error}</p>
+                <p className="text-xs font-bold text-slate-500 dark:text-slate-400">{t('signals.awaitingValidInput', 'Awaiting valid input')}</p>
+                <p className="mt-1 text-xs leading-5 text-slate-400 dark:text-slate-500">{parsed.ok ? t('signals.recomputingProofTrace', 'Recomputing the proof trace…') : parsed.error}</p>
               </div>}
             </AccordionContent>
           </AccordionItem>;

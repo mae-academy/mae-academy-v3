@@ -510,17 +510,17 @@ export function DigitalLogicSimulatorHome({
         );
       }}
       toolbarRow2={<>
-        <ToolbarButton colors={colors} icon={<Download size={14} />} label="Export" title="Export circuit as NAD netlist" onClick={exportNad} />
-        <ToolbarButton colors={colors} icon={<Upload size={14} />} label="Import" title="Import circuit from NAD netlist" onClick={() => nadInputRef.current?.click()} />
+        <ToolbarButton colors={colors} icon={<Download size={14} />} label={t('toolbar.export', 'Export')} title={t('toolbar.exportNad', 'Export circuit as NAD netlist')} onClick={exportNad} />
+        <ToolbarButton colors={colors} icon={<Upload size={14} />} label={t('toolbar.import', 'Import')} title={t('toolbar.importNad', 'Import circuit from NAD netlist')} onClick={() => nadInputRef.current?.click()} />
         <input ref={nadInputRef} type="file" accept=".nad,application/x-mae-nad+json,application/json" onChange={importNad} style={{ display: 'none' }} />
         <ToolbarDivider colors={colors} />
-        <ToolbarButton colors={colors} icon={<ImageIcon size={14} />} label="Save Image" title="Save circuit as image (PNG or SVG)" onClick={handleOpenSaveImage} />
-        <ToolbarButton colors={colors} icon={<Share2 size={14} />} label="Share Project" title="Share circuit via Web Share API or deep link" onClick={handleShareProject} />
+        <ToolbarButton colors={colors} icon={<ImageIcon size={14} />} label={t('toolbar.saveImage', 'Save Image')} title={t('toolbar.saveImageTooltip', 'Save circuit as image (PNG or SVG)')} onClick={handleOpenSaveImage} />
+        <ToolbarButton colors={colors} icon={<Share2 size={14} />} label={t('toolbar.shareProject', 'Share Project')} title={t('toolbar.shareProjectTooltip', 'Share circuit via Web Share API or deep link')} onClick={handleShareProject} />
         <ToolbarDivider colors={colors} />
         <button
           type="button"
           onClick={() => { hasStartedSimulation.current = true; setSimulationRunning(v => !v); }}
-          title={simulationRunning ? 'Pause simulation' : 'Run simulation'}
+          title={simulationRunning ? t('toolbar.pauseSimTooltip', 'Pause simulation') : t('toolbar.runSimTooltip', 'Run simulation')}
           className={(!simulationRunning && hasStartedSimulation.current) ? "brand-pill-active-rev" : "btn-active-brand"}
           style={{
             display: 'inline-flex',
@@ -534,12 +534,12 @@ export function DigitalLogicSimulatorHome({
           }}
         >
           {simulationRunning ? <Pause size={14} /> : <Play size={14} />}
-          {simulationRunning ? 'Pause' : 'Run'}
+          {simulationRunning ? t('toolbar.pause', 'Pause') : t('toolbar.run', 'Run')}
         </button>
         <ToolbarButton
           colors={colors}
           icon={<Zap size={14} />}
-          title="Show / Hide signal flow"
+          title={t('digital.showHideSignalFlow', 'Show / Hide Signal Flow')}
           onClick={() => setShowElectrons(v => {
             const next = !v;
             try { localStorage.setItem('mae-show-electrons', String(next)); } catch { /* storage unavailable */ }
@@ -547,14 +547,14 @@ export function DigitalLogicSimulatorHome({
           })}
           active={showElectrons}
         />
-        <ToolbarButton colors={colors} icon={<RotateCcw size={14} />} title="Reset simulation" onClick={resetSimulation} />
+        <ToolbarButton colors={colors} icon={<RotateCcw size={14} />} title={t('toolbar.resetSim', 'Reset Simulation')} onClick={resetSimulation} />
         <span className="text-sm font-medium text-slate-700 dark:text-slate-300" style={{ minWidth: 65, textAlign: 'center', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
           <V3Math math={`${snapshot.time.toFixed(3)}\\,\\mathrm{s}`} />
         </span>
         <ToolbarDivider colors={colors} />
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <StudioSlider
-            aria-label="Simulation speed"
+            aria-label={t('circuit.simulationSpeed', 'Simulation speed')}
             min={0.25}
             max={4}
             step={0.25}
@@ -568,10 +568,10 @@ export function DigitalLogicSimulatorHome({
           </span>
         </div>
       </>}
-      canvasTitle="Interactive Digital Logic Canvas"
-      emptyHint="Drag and drop logic gates, inputs, and components from the library to begin."
+      canvasTitle={t('digital.canvasTitle', 'Interactive Digital Logic Canvas')}
+      emptyHint={t('digital.dragDropHint', 'Drag and drop logic gates, inputs, and components from the library to begin.')}
       simulationRunning={simulationRunning}
-      analysisTitle="Logic Analysis Workspace"
+      analysisTitle={t('digital.analysisWorkspace', 'Logic Analysis Workspace')}
       analysisContent={
         <DigitalLogicAnalysisBox
           colors={colors}
@@ -623,10 +623,10 @@ export function DigitalLogicSimulatorHome({
         <div className="p-5 border-t border-slate-200 bg-white dark:border-[#1a1d24] dark:bg-[#0d0f12]">
           <h3 className="text-sm font-bold tracking-wider text-slate-900 dark:text-white mb-3 uppercase flex items-center gap-2">
             <Cpu size={16} className="text-blue-600 dark:text-blue-400 shrink-0" />
-            Digital Logic Lab
+            {t('digital.labTitle', 'Digital Logic Lab')}
           </h3>
           <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-            The engine simulates real-time propagation delay, gate level logic, truth-table generation, Karnaugh mapping, and sequential timing waveforms. Place discrete gates, configure clock signals, and analyze combinational and sequential networks.
+            {t('digital.labDesc', 'The engine simulates real-time propagation delay, gate level logic, truth-table generation, Karnaugh mapping, and sequential timing waveforms. Place discrete gates, configure clock signals, and analyze combinational and sequential networks.')}
           </p>
         </div>
       }
@@ -760,10 +760,10 @@ function ComponentInspector({
                 onChange={event => onPropertyChange('state', event.target.value)}
                 style={inputStyle(colors)}
               >
-                <option value="LOW">0 · LOW</option>
-                <option value="HIGH">1 · HIGH</option>
-                <option value="Z">Z · High impedance</option>
-                <option value="X">X · Unknown</option>
+                <option value="LOW">{t('digital.low', '0 · LOW')}</option>
+                <option value="HIGH">{t('digital.high', '1 · HIGH')}</option>
+                <option value="Z">{t('digital.highZ', 'Z · High impedance')}</option>
+                <option value="X">{t('digital.unknown', 'X · Unknown')}</option>
               </select>
             </PropertyRow>
             <PropertyRow colors={colors} label="Toggle key">
@@ -789,7 +789,7 @@ function ComponentInspector({
                       : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
                     }`}
                 >
-                  {currentInputState === 'HIGH' ? '1 · HIGH' : currentInputState === 'LOW' ? '0 · LOW' : currentInputState}
+                  {currentInputState === 'HIGH' ? t('digital.high', '1 · HIGH') : currentInputState === 'LOW' ? t('digital.low', '0 · LOW') : currentInputState}
                 </span>
               </div>
             </PropertyRow>
@@ -799,7 +799,7 @@ function ComponentInspector({
         {/* Digital Output */}
         {isLogicOutput && (
           <div style={{ padding: '8px 12px', background: colors.panelAlt, border: `1px solid ${colors.line}`, borderRadius: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-            <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">MEASURED OUTPUT</span>
+            <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">{t('digital.measuredOutput', 'MEASURED OUTPUT')}</span>
             <span
               className={`px-2.5 py-1 rounded-md text-xs font-mono font-bold ${currentOutputState === 1
                   ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
@@ -851,8 +851,8 @@ function ComponentInspector({
                 onChange={event => onPropertyChange('initialState', event.target.value)}
                 style={inputStyle(colors)}
               >
-                <option value="0">0 · LOW</option>
-                <option value="1">1 · HIGH</option>
+                <option value="0">{t('digital.low', '0 · LOW')}</option>
+                <option value="1">{t('digital.high', '1 · HIGH')}</option>
               </select>
             </PropertyRow>
             <PropertyRow colors={colors} label="Trigger Edge">
@@ -861,8 +861,8 @@ function ComponentInspector({
                 onChange={event => onPropertyChange('triggerEdge', event.target.value)}
                 style={inputStyle(colors)}
               >
-                <option value="rising">Rising Edge (Posedge)</option>
-                <option value="falling">Falling Edge (Negedge)</option>
+                <option value="rising">{t('digital.risingEdge', 'Rising Edge (Posedge)')}</option>
+                <option value="falling">{t('digital.fallingEdge', 'Falling Edge (Negedge)')}</option>
               </select>
             </PropertyRow>
           </>
@@ -919,7 +919,7 @@ function ComponentInspector({
 
       <div style={{ padding: '12px 15px' }}>
         <InspectorButton colors={colors} danger onClick={onDelete}>
-          <Trash2 size={13} /> Delete Component
+          <Trash2 size={13} /> {t('digital.deleteComponent', 'Delete Component')}
         </InspectorButton>
       </div>
     </div>
@@ -1001,7 +1001,7 @@ function ReplaceComponentControl({
         onMouseLeave={e => { e.currentTarget.style.borderColor = colors.line; }}
       >
         <RefreshCw size={13} style={{ flexShrink: 0, color: colors.muted }} />
-        <span>Replace</span>
+        <span>{t('digital.replace', 'Replace')}</span>
       </button>
 
       {open && (
@@ -1062,14 +1062,14 @@ function ReplaceComponentControl({
                     onMouseLeave={event => { event.currentTarget.style.background = item.id === currentType ? colors.panelAlt : 'transparent'; }}
                   >
                     <ElectricalLabel label={item.name} />
-                    {item.id === currentType && <span style={{ fontSize: 10, color: colors.accent, fontWeight: 700 }}>Current</span>}
+                    {item.id === currentType && <span style={{ fontSize: 10, color: colors.accent, fontWeight: 700 }}>{t('digital.current', 'Current')}</span>}
                   </button>
                 ))}
               </div>
             ))}
             {Object.keys(categories).length === 0 && (
               <div style={{ padding: 10, fontSize: 11, color: colors.subtle, textAlign: 'center' }}>
-                No digital logic components match your search
+                {t('digital.noComponentsMatch', 'No digital logic components match your search')}
               </div>
             )}
           </div>

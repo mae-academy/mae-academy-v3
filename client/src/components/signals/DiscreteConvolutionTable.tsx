@@ -4,6 +4,7 @@
  * and exact summation breakdown matching the canonical academic analytical engine.
  */
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { KatexMath } from "@/components/ui/KatexMath";
 import {
   StudioCard,
@@ -48,6 +49,7 @@ export function DiscreteConvolutionTable({
   onActiveChange,
   hideInputs = false,
 }: DiscreteConvolutionTableProps = {}) {
+  const { t } = useTranslation('simulators');
   const [internalXSource, setInternalXSource] = useState("1, 2, 1");
   const [internalHSource, setInternalHSource] = useState("1, -1, 2");
   const [internalActive, setInternalActive] = useState(0);
@@ -148,7 +150,7 @@ export function DiscreteConvolutionTable({
       <StudioCard>
         <div className="flex items-center justify-between border-b border-slate-100 pb-2 dark:border-slate-800">
           <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-white">
-            DISCRETE CONVOLUTION MATRIX
+            {t('signals.discreteConvolutionMatrix', 'Discrete convolution matrix')}
           </h3>
           <span className="font-serif text-xs font-bold text-purple-600 dark:text-purple-400">
             <KatexMath math={`y[${index}] = ${tv(result.values[index] ?? 0)}`} />
@@ -159,7 +161,7 @@ export function DiscreteConvolutionTable({
           {/* Phase Badge & Step Navigation */}
           <div className="flex flex-wrap items-center justify-between gap-2">
             <StatusBadge variant="info">
-              {`Step n = ${index} / ${maxN} · Reverse Diagonal`}
+              {t('signals.stepReverseDiagonal', 'Step n = {{index}} / {{maxN}} · Reverse diagonal', { index, maxN })}
             </StatusBadge>
             <div className="flex items-center gap-1.5">
               <button
@@ -169,7 +171,7 @@ export function DiscreteConvolutionTable({
                 className="rounded-lg border border-slate-200 px-2.5 py-1 font-['Poppins',sans-serif] font-medium text-xs text-slate-700 hover:bg-slate-100 disabled:opacity-30 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800 transition cursor-pointer"
                 title="Previous step"
               >
-                &larr; Prev
+                &larr; {t('signals.prevStep', 'Prev')}
               </button>
               <button
                 type="button"
@@ -178,7 +180,7 @@ export function DiscreteConvolutionTable({
                 className="rounded-lg border border-slate-200 px-2.5 py-1 font-['Poppins',sans-serif] font-medium text-xs text-slate-700 hover:bg-slate-100 disabled:opacity-30 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800 transition cursor-pointer"
                 title="Next step"
               >
-                Next &rarr;
+                {t('signals.nextStep', 'Next')} &rarr;
               </button>
             </div>
           </div>
@@ -196,7 +198,7 @@ export function DiscreteConvolutionTable({
           {/* Convolution Matrix Table */}
           <InnerBox className="p-2 sm:p-3 overflow-hidden">
             <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.17em] text-slate-500 dark:text-slate-400">
-              Matrix Product Grid (k &times; j)
+              {t('signals.matrixProductGrid', 'Matrix product grid (k × j)')}
             </p>
             <div className="overflow-x-auto pb-1">
               <table className="border-collapse text-center text-xs mx-auto">
@@ -265,7 +267,7 @@ export function DiscreteConvolutionTable({
               </table>
             </div>
             <p className="mt-2 text-xs text-slate-500 dark:text-slate-400 flex items-center flex-wrap gap-1">
-              <span>Highlighted diagonal:</span>
+              <span>{t('signals.highlightedDiagonal', 'Highlighted diagonal:')}</span>
               <KatexMath
                 math={`${
                   contributions.length
@@ -280,7 +282,7 @@ export function DiscreteConvolutionTable({
           {activePairs.length > 0 && (
             <div className="space-y-1">
               <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-slate-500 dark:text-slate-400">
-                Contributing Samples (k, n-k)
+                {t('signals.contributingSamples', 'Contributing samples (k, n−k)')}
               </p>
               <div className="flex flex-wrap gap-1.5">
                 {activePairs.map((p, idx) => (

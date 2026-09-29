@@ -8,6 +8,7 @@ const DESCRIPTION = "Write Arduino C++ sketches and watch an interactive UNO boa
 
 export default function ArduinoStudioPage() {
   const { copy, isRtl } = useLocale();
+  const shellTitle = copy.collections.simulations.cards.find((card) => card.code === "S.09")?.title ?? "Arduino Studio";
   useEffect(() => {
     const previous = document.title;
     document.title = TITLE;
@@ -28,8 +29,9 @@ export default function ArduinoStudioPage() {
   }, []);
 
   return (
-    <SimulatorLayout title="Arduino Studio" tabs={[]} activeTab="" routePrefix="/simulators/arduino-studio" backLabel={copy.footer.simulations} isRtl={isRtl} hideToolNavigation compact>
-      <div className="mt-3">
+    <SimulatorLayout title={shellTitle} tabs={[]} activeTab="" routePrefix="/simulators/arduino-studio" backLabel={copy.footer.simulations} isRtl={isRtl} hideToolNavigation compact>
+      {/* The simulator is left-to-right engineering notation regardless of page language. */}
+      <div dir="ltr" className="mt-3 mae-simulator-shell">
         <ArduinoStudio />
       </div>
     </SimulatorLayout>

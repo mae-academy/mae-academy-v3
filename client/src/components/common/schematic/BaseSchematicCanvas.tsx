@@ -252,26 +252,30 @@ export function BaseSchematicCanvas<C extends SchematicComponent, I extends Sche
       activeTabId={activeTabId}
       onTabChange={onTabChange}
       toolbarRow1={<>
-        <ToolbarButton colors={colors} label="−" title="Zoom out" onClick={viewport.zoomOut} />
+        <ToolbarButton colors={colors} label="−" title={t('toolbar.zoomOut', 'Zoom out')} onClick={viewport.zoomOut} />
         <span style={{ color: colors.muted, fontSize: 11, minWidth: 42, textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>{Math.round(viewport.zoom * 100)}%</span>
-        <ToolbarButton colors={colors} label="+" title="Zoom in" onClick={viewport.zoomIn} />
+        <ToolbarButton colors={colors} label="+" title={t('toolbar.zoomIn', 'Zoom in')} onClick={viewport.zoomIn} />
         <ToolbarDivider colors={colors} />
-        <ToolbarButton colors={colors} icon={<Undo2 size={14} />} title="Undo (Ctrl/Cmd+Z)" onClick={canvas.undo} disabled={!document.canUndo} />
-        <ToolbarButton colors={colors} icon={<Redo2 size={14} />} title="Redo (Ctrl/Cmd+Shift+Z)" onClick={canvas.redo} disabled={!document.canRedo} />
-        <ToolbarButton colors={colors} icon={<Maximize2 size={14} />} title="Auto-scale / Center circuit" onClick={canvas.zoomToFit} />
-        <ToolbarButton colors={colors} icon={<Scissors size={14} />} title="Cut (Ctrl/Cmd+X)" onClick={clipboard.cut} disabled={!selectedComponent && marqueeIds.length === 0} />
-        <ToolbarButton colors={colors} icon={<Copy size={14} />} title="Copy (Ctrl/Cmd+C)" onClick={clipboard.copy} disabled={!selectedComponent && marqueeIds.length === 0} />
-        <ToolbarButton colors={colors} icon={<Clipboard size={14} />} title="Paste (Ctrl/Cmd+V)" onClick={clipboard.paste} disabled={!clipboard.hasClipboard} />
-        <ToolbarButton colors={colors} icon={<Trash2 size={14} />} title="Delete (Del/Backspace)" onClick={clipboard.removeSelection} disabled={nothingSelected} />
+        <ToolbarButton colors={colors} icon={<Undo2 size={14} />} title={t('toolbar.undo', 'Undo (Ctrl/Cmd+Z)')} onClick={canvas.undo} disabled={!document.canUndo} />
+        <ToolbarButton colors={colors} icon={<Redo2 size={14} />} title={t('toolbar.redo', 'Redo (Ctrl/Cmd+Shift+Z)')} onClick={canvas.redo} disabled={!document.canRedo} />
+        <ToolbarButton colors={colors} icon={<Maximize2 size={14} />} title={t('toolbar.autoScale', 'Auto-scale / Center circuit')} onClick={canvas.zoomToFit} />
+        <ToolbarButton colors={colors} icon={<Scissors size={14} />} title={t('toolbar.cut', 'Cut (Ctrl/Cmd+X)')} onClick={clipboard.cut} disabled={!selectedComponent && marqueeIds.length === 0} />
+        <ToolbarButton colors={colors} icon={<Copy size={14} />} title={t('toolbar.copy', 'Copy (Ctrl/Cmd+C)')} onClick={clipboard.copy} disabled={!selectedComponent && marqueeIds.length === 0} />
+        <ToolbarButton colors={colors} icon={<Clipboard size={14} />} title={t('toolbar.paste', 'Paste (Ctrl/Cmd+V)')} onClick={clipboard.paste} disabled={!clipboard.hasClipboard} />
+        <ToolbarButton colors={colors} icon={<Trash2 size={14} />} title={t('toolbar.delete', 'Delete (Del/Backspace)')} onClick={clipboard.removeSelection} disabled={nothingSelected} />
         <ToolbarDivider colors={colors} />
         <div className="flex items-center gap-2">
-          <SegmentedControl options={GRID_OPTIONS} value={canvas.gridMode} onChange={canvas.setGridMode} size="sm" aria-label="Grid Style" />
-          <ToolbarButton colors={colors} icon={<Type size={14} />} label="Text" title="Add editable workspace text (T)" onClick={canvas.addText} />
+          <SegmentedControl options={[
+            { label: t('simulators:shell.gridDotted', 'Dotted'), value: 'dots' },
+            { label: t('simulators:shell.gridCartesian', 'Cartesian'), value: 'cartesian' },
+            { label: t('simulators:shell.gridHidden', 'Hidden'), value: 'hidden' },
+          ]} value={canvas.gridMode} onChange={canvas.setGridMode} size="sm" aria-label="Grid Style" />
+          <ToolbarButton colors={colors} icon={<Type size={14} />} label={t('toolbar.text', 'Text')} title={t('toolbar.addText', 'Add editable workspace text (T)')} onClick={canvas.addText} />
         </div>
         <ToolbarDivider colors={colors} />
-        <ToolbarButton colors={colors} icon={<RotateCw size={14} />} label="90°" title="Rotate selected component 90° (R)" onClick={() => canvas.rotateSelected(90)} disabled={!selectedComponent} />
-        <ToolbarButton colors={colors} icon={<FlipHorizontal size={14} />} label="Flip X" title="Reflect selected component horizontally (H)" onClick={() => canvas.flipSelected('h')} disabled={!selectedComponent} />
-        <ToolbarButton colors={colors} icon={<FlipVertical size={14} />} label="Flip Y" title="Reflect selected component vertically (V)" onClick={() => canvas.flipSelected('v')} disabled={!selectedComponent} />
+        <ToolbarButton colors={colors} icon={<RotateCw size={14} />} label="90°" title={t('toolbar.rotate90', 'Rotate selected component 90° (R)')} onClick={() => canvas.rotateSelected(90)} disabled={!selectedComponent} />
+        <ToolbarButton colors={colors} icon={<FlipHorizontal size={14} />} label={t('toolbar.flipX', 'Flip X')} title={t('toolbar.flipXTooltip', 'Reflect selected component horizontally (H)')} onClick={() => canvas.flipSelected('h')} disabled={!selectedComponent} />
+        <ToolbarButton colors={colors} icon={<FlipVertical size={14} />} label={t('toolbar.flipY', 'Flip Y')} title={t('toolbar.flipYTooltip', 'Reflect selected component vertically (V)')} onClick={() => canvas.flipSelected('v')} disabled={!selectedComponent} />
         {toolbarExtra}
       </>}
       toolbarRow2={toolbarRow2}

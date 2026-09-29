@@ -503,10 +503,10 @@ export function AssemblerStudio() {
   // Inspector tabs depend on the active language; low-level tabs are MASM-only.
   const inspectorTabs: { label: string; value: string; icon: ReactNode }[] = isMasm
     ? [
-      { label: "Registers & Flags", value: "state", icon: <Cpu className="h-4 w-4" /> },
-      { label: "Execution Trace", value: "trace", icon: <ListOrdered className="h-4 w-4" /> },
-      { label: "Stack", value: "stack", icon: <Layers className="h-4 w-4" /> },
-      { label: "Main Memory", value: "memory", icon: <Database className="h-4 w-4" /> },
+      { label: t('studio.registersFlags', 'Registers & Flags'), value: "state", icon: <Cpu className="h-4 w-4" /> },
+      { label: t('studio.executionTrace', 'Execution Trace'), value: "trace", icon: <ListOrdered className="h-4 w-4" /> },
+      { label: t('studio.stack', 'Stack'), value: "stack", icon: <Layers className="h-4 w-4" /> },
+      { label: t('studio.mainMemory', 'Main Memory'), value: "memory", icon: <Database className="h-4 w-4" /> },
     ]
     : [
       { label: "Variables View", value: "state", icon: <Cpu className="h-4 w-4" /> },
@@ -548,12 +548,12 @@ export function AssemblerStudio() {
   const handleCut = () => {
     navigator.clipboard.writeText(code);
     handleCodeChange("");
-    toast.success("Cut code to clipboard");
+    toast.success(t('assembler.toastCut', 'Cut code to clipboard'));
   };
 
   const handleCopy = () => {
     navigator.clipboard.writeText(code);
-    toast.success("Copied code to clipboard");
+    toast.success(t('assembler.toastCopied', 'Copied code to clipboard'));
   };
 
   const handlePaste = async () => {
@@ -561,16 +561,16 @@ export function AssemblerStudio() {
       const text = await navigator.clipboard.readText();
       if (text) {
         handleCodeChange(text);
-        toast.success("Pasted from clipboard");
+        toast.success(t('assembler.toastPasted', 'Pasted from clipboard'));
       }
     } catch {
-      toast.error("Clipboard permission required to paste");
+      toast.error(t('assembler.toastPasteError', 'Clipboard permission required to paste'));
     }
   };
 
   const handleDelete = () => {
     handleCodeChange("");
-    toast.info("Deleted code");
+    toast.info(t('assembler.toastDeleted', 'Deleted code'));
   };
 
   // Preload/Init MASM or mark high-level ready
@@ -593,7 +593,7 @@ export function AssemblerStudio() {
         const message =
           error instanceof Error
             ? error.message
-            : "Unable to initialize MASM engine";
+            : t('assembler.engineInitError', 'Unable to initialize MASM engine');
         setEngineError(message);
       });
     return () => {
@@ -680,7 +680,7 @@ export function AssemblerStudio() {
           if (finished || hitBreakpoint) {
             setIsPlaying(false);
             if (hitBreakpoint) {
-              toast.info(`Paused at breakpoint on line ${result.steps[next].line}`);
+              toast.info(t('assembler.toastBreakpoint', 'Paused at breakpoint on line {{line}}', { line: result.steps[next].line }));
             }
           }
           return next;
@@ -721,7 +721,7 @@ export function AssemblerStudio() {
     if (updateUrl) {
       setLocation(`/simulations/code/${next}`, { replace: true });
     }
-    toast.success(`Switched to ${definition.label}`);
+    toast.success(t('assembler.toastSwitchedLanguage', 'Switched to {{language}}', { language: definition.label }));
   };
 
   const changeLanguage = (next: SupportedLanguage) => {
@@ -739,7 +739,7 @@ export function AssemblerStudio() {
     setCodeHistory(prev => [...prev, nextSrc]);
     setHistoryIndex(prev => prev + 1);
     prewarmRemote(language, nextSrc);
-    toast.success(`Loaded example: ${next}`);
+    toast.success(t('assembler.toastLoadedExample', 'Loaded example: {{example}}', { example: next }));
   };
 
   const runProgram = async (isInstant = false) => {
@@ -836,7 +836,7 @@ export function AssemblerStudio() {
     setCurrentStepIndex(-1);
     resetEngine();
     compiledKeyRef.current = null;
-    toast.info("Execution reset");
+    toast.info(t('assembler.toastExecutionReset', 'Execution reset'));
   };
 
   const onScrub = (index: number) => {
@@ -849,7 +849,7 @@ export function AssemblerStudio() {
     compiledKeyRef.current = null;
     setCurrentStepIndex(-1);
     setIsPlaying(false);
-    toast.success(`Imported ${filename}`);
+    toast.success(t('assembler.toastImported', 'Imported {{filename}}', { filename }));
   };
 
   const handleExportCode = () => {
@@ -861,7 +861,7 @@ export function AssemblerStudio() {
     link.download = filename;
     link.click();
     URL.revokeObjectURL(url);
-    toast.success(`Exported ${filename}`);
+    toast.success(t('assembler.toastExported', 'Exported {{filename}}', { filename }));
   };
 
   const handleSpeedChange = (newSpeed: ExecutionSpeed) => {
@@ -975,7 +975,7 @@ export function AssemblerStudio() {
 
                 {/* Clean Right Metadata */}
                 <div className="flex items-center gap-2 font-mono text-[11px] text-slate-400 dark:text-slate-500">
-                  <span>{code.split("\n").length} lines</span>
+                  <span>{t('assembler.linesCount', '{{count}} lines', { count: code.split("\n").length })}</span>
                 </div>
               </div>
 
@@ -1010,7 +1010,7 @@ export function AssemblerStudio() {
                       <MacWindowDots />
                       <Terminal className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400 ms-0.5" />
                       <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 tracking-wider font-mono">
-                        {t('assembler.terminalOut', 'terminal.out')}
+                        terminal.out
                       </span>
                     </div>
 
@@ -1026,7 +1026,7 @@ export function AssemblerStudio() {
                           if (currentStep) currentStep.stdout = "";
                           setStdinQueue("");
                         }}
-                        title="Clear terminal"
+                        title={t('assembler.clearTerminal', 'Clear terminal')}
                         className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-0.5 cursor-pointer"
                       >
                         <Trash2 size={12} />
@@ -1053,7 +1053,7 @@ export function AssemblerStudio() {
                       video={isMasm ? (currentStep?.video ?? null) : null}
                       awaitingInput={awaitingInput}
                       active={!combinedError}
-                      emptyLabel="Output console ready. Click 'Run' to execute."
+                      emptyLabel={t('assembler.outputConsoleReady', "Output console ready. Click 'Run' to execute.")}
                     />
                   )}
 
@@ -1065,7 +1065,7 @@ export function AssemblerStudio() {
                       if (entry) {
                         submitStdin(`${entry}\n`);
                         setStdinInput("");
-                        if (!awaitingInput) toast.success(`Queued stdin: "${entry}"`);
+                        if (!awaitingInput) toast.success(t('assembler.toastQueuedStdin', 'Queued stdin: "{{entry}}"', { entry }));
                       }
                     }}
                     className={`flex shrink-0 items-center gap-1.5 border-t p-1.5 ${awaitingInput
@@ -1077,14 +1077,14 @@ export function AssemblerStudio() {
                       &gt;
                     </span>
                     <input
-                      aria-label="Terminal keyboard entry"
+                      aria-label={t('assembler.terminalKeyboardEntryAria', 'Terminal keyboard entry')}
                       value={stdinInput}
                       onChange={event => setStdinInput(event.target.value)}
                       autoFocus={awaitingInput}
                       placeholder={
                         awaitingInput
-                          ? "Waiting for input — type a key…"
-                          : "Keyboard entry (stdin buffer)…"
+                          ? t('assembler.waitingInput', 'Waiting for input — type a key…')
+                          : t('assembler.keyboardEntry', 'Keyboard entry (stdin buffer)…')
                       }
                       onKeyDown={event => {
                         // Blocked program: a bare keystroke is delivered immediately.
@@ -1106,7 +1106,7 @@ export function AssemblerStudio() {
                       className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 transition hover:bg-slate-100 dark:border-[#1a1d24] dark:bg-[#13161c] dark:text-slate-300 dark:hover:bg-[#1b2028] dark:hover:text-white"
                     >
                       <CornerDownLeft className="h-3 w-3" />
-                      <span>Queue</span>
+                      <span>{t('assembler.queueButton', 'Queue')}</span>
                     </button>
                   </form>
 
@@ -1140,7 +1140,7 @@ export function AssemblerStudio() {
                       <MacWindowDots />
                       <Cpu className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400 ms-0.5" />
                       <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 tracking-wider font-mono">
-                        {t('assembler.inspectorExe', 'inspector.exe')}
+                        inspector.exe
                       </span>
                     </div>
 
@@ -1165,7 +1165,7 @@ export function AssemblerStudio() {
                         size="md"
                         fullWidth
                         className="h-10 bg-slate-200/60 dark:bg-[#13161c] border-slate-200/80 dark:border-[#1a1d24]"
-                        aria-label="Inspector tabs"
+                        aria-label={t('assembler.inspectorTabsAria', 'Inspector tabs')}
                       />
                     </div>
 

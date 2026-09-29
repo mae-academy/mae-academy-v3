@@ -5,6 +5,7 @@
  * plane, terminal, and transform card update imperatively; React commits once on pointer release.
  */
 import { useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { KatexMath } from "@/components/ui/KatexMath";
 import { SegmentedControl, StatusBadge, StudioCard, InnerBox } from "@/components/common/templates";
 import { UnifiedSignalEngineTerminal, type UnifiedSignalEngineTerminalHandle } from "@/components/signals/common/UnifiedSignalEngineTerminal";
@@ -43,6 +44,7 @@ const timeFromSystem = (system: TransferFunction) => inverseLaplace(system, "rig
 function parseOrNull(source: string, mode: PlaneMode): { system: TransferFunction | null; error: string | null } { if (source.includes("\\placeholder")) return { system: null, error: "Fill the empty slot to complete the transfer function." }; try { return { system: parseTransferFunction(source.replaceAll("\\times", "\\cdot").replaceAll("\\div", "/"), mode), error: null }; } catch (error) { return { system: null, error: error instanceof Error ? error.message : "The transfer function could not be parsed." }; } }
 
 export function LaplaceZPlaneLab() {
+  const { t } = useTranslation('simulators');
   const [mode, setMode] = useState<PlaneMode>("s"); const [source, setSource] = useState(initial.s); const [rocKind, setRocKind] = useState<RocKind>("right"); const inputRef = useRef<UnifiedSignalEngineTerminalHandle>(null); const impulseRef = useRef<ImpulseResponseCanvasHandle>(null); const inverseRef = useRef<InverseLaplaceCardHandle>(null);
   const [inputDomain, setInputDomain] = useState<InputDomain>("s"); const [timeSource, setTimeSource] = useState<string>(timePresets[0].value);
   const timeMode = mode === "s" && inputDomain === "t"; const zTimeMode = mode === "z" && inputDomain === "t";
@@ -70,15 +72,15 @@ export function LaplaceZPlaneLab() {
     <StudioCard className="overflow-hidden">
       <div className="flex flex-col gap-4 border-b border-slate-200 pb-5 dark:border-slate-800 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h2 className="mt-1 text-xl font-black tracking-tight text-slate-900 dark:text-white">Root Geometry Workspace</h2>
-          <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500 dark:text-slate-400">Move poles and zeros directly in the complex plane, inspect the Region of Convergence, and observe the resulting spectral landscape.</p>
+          <h2 className="mt-1 text-xl font-black tracking-tight text-slate-900 dark:text-white">{t('signals.rootGeometryWorkspace', 'Root Geometry Workspace')}</h2>
+          <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500 dark:text-slate-400">{t('signals.rootGeometryDescription', 'Move poles and zeros directly in the complex plane, inspect the Region of Convergence, and observe the resulting spectral landscape.')}</p>
         </div>
         <SegmentedControl
           value={mode}
           onChange={changeMode}
           options={[
-            { value: "s", label: "Continuous / Laplace" },
-            { value: "z", label: "Discrete / Z-Transform" },
+            { value: "s", label: t('signals.continuousLaplace', 'Continuous / Laplace') },
+            { value: "z", label: t('signals.discreteZTransform', 'Discrete / Z-Transform') },
           ]}
         />
       </div>
@@ -94,7 +96,7 @@ export function LaplaceZPlaneLab() {
                   value: "s",
                   label: (
                     <span className="font-['Poppins',sans-serif] font-medium inline-flex items-center gap-1.5">
-                      {mode === "s" ? "s-Domain" : "z-Domain"} <KatexMath math={`[H(${mode})]`} />
+                      {mode === "s" ? t('signals.sDomain', 's-Domain') : t('signals.zDomain', 'z-Domain')} <KatexMath math={`[H(${mode})]`} />
                     </span>
                   ),
                   "aria-label": `${mode}-Domain [H(${mode})]`,
@@ -103,7 +105,7 @@ export function LaplaceZPlaneLab() {
                   value: "t",
                   label: (
                     <span className="font-['Poppins',sans-serif] font-medium inline-flex items-center gap-1.5">
-                      Time-Domain <KatexMath math={mode === "s" ? "[h(t)]" : "[h[n]]"} />
+                      {t('signals.timeDomain', 'Time-Domain')} <KatexMath math={mode === "s" ? "[h(t)]" : "[h[n]]"} />
                     </span>
                   ),
                   "aria-label": mode === "s" ? "Time-Domain [h(t)]" : "Time-Domain [h[n]]",
@@ -113,15 +115,15 @@ export function LaplaceZPlaneLab() {
             />
           )}
           {zTimeMode ? (
-            <UnifiedSignalEngineTerminal ref={inputRef} key="ztime" title="SEQUENCE" domain="n" channels={[{ id: "h", lhs: "h[n]", value: zTimeSource, onChange: setZTimeSource, error: forwardZ?.error ?? null }]}>
+            <UnifiedSignalEngineTerminal ref={inputRef} key="ztime" title={t('signals.sequenceTitle', 'Sequence')} domain="n" channels={[{ id: "h", lhs: "h[n]", value: zTimeSource, onChange: setZTimeSource, error: forwardZ?.error ?? null }]}>
               <div className="mt-4 grid gap-2 sm:grid-cols-2">{zTimePresets.map((preset) => <button type="button" key={preset.label} onClick={() => setZTimeSource(preset.value)} className={`rounded-xl border px-3 py-2 text-left text-xs font-bold transition active:scale-[.98] ${idle}`}>{preset.label}</button>)}</div>
             </UnifiedSignalEngineTerminal>
           ) : timeMode ? (
-            <UnifiedSignalEngineTerminal ref={inputRef} key="time" title="IMPULSE RESPONSE" domain="t" channels={[{ id: "h", lhs: "h(t)", value: timeSource, onChange: setTimeSource, error: timeParsed && !timeParsed.ok ? timeParsed.error : null }]}>
+            <UnifiedSignalEngineTerminal ref={inputRef} key="time" title={t('signals.impulseResponseTitle', 'Impulse response')} domain="t" channels={[{ id: "h", lhs: "h(t)", value: timeSource, onChange: setTimeSource, error: timeParsed && !timeParsed.ok ? timeParsed.error : null }]}>
               <div className="mt-4 grid gap-2 sm:grid-cols-3">{timePresets.map((preset) => <button type="button" key={preset.label} onClick={() => setTimeSource(preset.value)} className={`rounded-xl border px-3 py-2 text-left text-xs font-bold transition active:scale-[.98] ${idle}`}>{preset.label}</button>)}</div>
             </UnifiedSignalEngineTerminal>
           ) : (
-            <UnifiedSignalEngineTerminal ref={inputRef} key={mode} title="TRANSFER FUNCTION" domain={mode} channels={[{ id: "H", lhs: `H(${mode})`, value: source, onChange: setSource, error: parsed.error }]}>
+            <UnifiedSignalEngineTerminal ref={inputRef} key={mode} title={t('signals.transferFunctionTitle', 'Transfer function')} domain={mode} channels={[{ id: "H", lhs: `H(${mode})`, value: source, onChange: setSource, error: parsed.error }]}>
               <div className="mt-4 grid gap-2 sm:grid-cols-3">{presets[mode].map((preset) => <button type="button" key={preset.label} onClick={() => setSource(preset.value)} className={`rounded-xl border px-3 py-2 text-left text-xs font-bold transition active:scale-[.98] ${idle}`}>{preset.label}</button>)}</div>
             </UnifiedSignalEngineTerminal>
           )}
@@ -129,13 +131,13 @@ export function LaplaceZPlaneLab() {
         <div className="flex min-w-0 flex-col gap-5 self-start">
         <InnerBox>
           <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-white pb-2 border-b border-slate-100 dark:border-slate-800">
-            REGION OF CONVERGENCE
+            {t('signals.regionOfConvergence', 'Region of convergence')}
           </h3>
-          <p className="mt-2 text-[11px] leading-5 text-slate-500 dark:text-slate-400">The shaded plane region determines whether the transform contains the {mode === "s" ? <KatexMath math="j\omega" /> : "unit-circle"} frequency slice.</p>
+          <p className="mt-2 text-[11px] leading-5 text-slate-500 dark:text-slate-400">{t('signals.rocSliceIntro', 'The shaded plane region determines whether the transform contains the ')}{mode === "s" ? <KatexMath math="j\omega" /> : t('signals.unitCircle', 'unit-circle')}{t('signals.rocSliceOutro', ' frequency slice.')}</p>
           {timeMode ? (
-            <p className="mt-4 rounded-xl border border-blue-200 bg-blue-50/70 px-3 py-2 text-[11px] leading-5 text-blue-900 dark:border-blue-900/60 dark:bg-blue-950/40 dark:text-blue-100">Unilateral transform of a causal <KatexMath math="h(t)" />: the ROC is right-sided by construction.</p>
+            <p className="mt-4 rounded-xl border border-blue-200 bg-blue-50/70 px-3 py-2 text-[11px] leading-5 text-blue-900 dark:border-blue-900/60 dark:bg-blue-950/40 dark:text-blue-100">{t('signals.unilateralCausalPrefix', 'Unilateral transform of a causal ')}<KatexMath math="h(t)" />{t('signals.unilateralCausalSuffix', ': the ROC is right-sided by construction.')}</p>
           ) : zTimeMode ? (
-            <p className="mt-4 rounded-xl border border-blue-200 bg-blue-50/70 px-3 py-2 text-[11px] leading-5 text-blue-900 dark:border-blue-900/60 dark:bg-blue-950/40 dark:text-blue-100">The ROC follows from the sequence: right-sided terms give <KatexMath math="|z|>r" />, left-sided terms <KatexMath math="|z|<r" />.</p>
+            <p className="mt-4 rounded-xl border border-blue-200 bg-blue-50/70 px-3 py-2 text-[11px] leading-5 text-blue-900 dark:border-blue-900/60 dark:bg-blue-950/40 dark:text-blue-100">{t('signals.zRocFollowsIntro', 'The ROC follows from the sequence: right-sided terms give ')}<KatexMath math="|z|>r" />{t('signals.zRocFollowsMid', ', left-sided terms ')}<KatexMath math="|z|<r" />{t('signals.zRocFollowsOutro', '.')}</p>
           ) : <div className="mt-4">
             <SegmentedControl
               value={rocKind}
@@ -143,25 +145,25 @@ export function LaplaceZPlaneLab() {
               size="sm"
               fullWidth
               options={[
-                { value: "right", label: "Right-sided / Causal" },
-                { value: "left", label: "Left-sided / Anti-causal" },
-                { value: "two-sided", label: "Two-sided / Non-causal" },
+                { value: "right", label: t('signals.rightSidedCausal', 'Right-sided / Causal') },
+                { value: "left", label: t('signals.leftSidedAnticausal', 'Left-sided / Anti-causal') },
+                { value: "two-sided", label: t('signals.twoSidedNoncausal', 'Two-sided / Non-causal') },
               ]}
             />
           </div>}
           {roc && <div className={`mt-4 rounded-xl border p-3 ${roc.stable ? "border-blue-200 bg-blue-50 text-blue-900 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-100" : "border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-100"}`}>
             <div className="flex items-center justify-between">
-              <p className="text-xs font-black">{roc.stable ? "System is Stable" : "System is Unstable"}</p>
+              <p className="text-xs font-black">{roc.stable ? t('signals.systemIsStable', 'System is Stable') : t('signals.systemIsUnstable', 'System is Unstable')}</p>
               <StatusBadge
                 variant={roc.stable ? "info" : "danger"}
                 className="uppercase tracking-wider text-[10px]"
               >
-                {roc.stable ? "STABLE" : "UNSTABLE"}
+                {roc.stable ? t('signals.stableLabel', 'Stable') : t('signals.unstableLabel', 'Unstable')}
               </StatusBadge>
             </div>
             <KatexMath math={roc.latex} block className="mt-2 block overflow-x-auto text-left text-xs" />
             <p className="mt-2 text-[11px] leading-5 text-slate-600 dark:text-slate-400">
-              The ROC {roc.stable ? "includes" : "excludes"} <KatexMath math={mode === "s" ? "j\\omega" : "|z|=1"} />; the system is {roc.stable ? "BIBO stable" : "BIBO unstable"}.
+              {t('signals.rocPrefix', 'The ROC ')}{roc.stable ? t('signals.rocIncludes', 'includes') : t('signals.rocExcludes', 'excludes')} <KatexMath math={mode === "s" ? "j\\omega" : "|z|=1"} />{t('signals.rocStabilityMid', '; the system is ')}{roc.stable ? t('signals.biboStable', 'BIBO stable') : t('signals.biboUnstable', 'BIBO unstable')}.
             </p>
           </div>}
         </InnerBox>
@@ -183,28 +185,28 @@ export function LaplaceZPlaneLab() {
             <StudioCard>
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-white pb-2 border-b border-slate-100 dark:border-slate-800">
-              {mode === "s" ? "CARTESIAN S-PLANE" : "POLAR Z-PLANE (UNIT CIRCLE)"}
+              {mode === "s" ? t('signals.cartesianSPlane', 'Cartesian S-plane') : t('signals.polarZPlane', 'Polar Z-plane (unit circle)')}
             </h3>
             <div className="flex flex-wrap gap-2 text-[10px] font-bold">
-              <span className="rounded-full border border-rose-300 bg-rose-50 px-2 py-1 text-rose-700 dark:border-rose-400/30 dark:bg-rose-500/10 dark:text-rose-200">× poles</span>
-              <span className="rounded-full border border-blue-300 bg-blue-50 px-2 py-1 text-blue-700 dark:border-blue-400/30 dark:bg-blue-500/10 dark:text-blue-200">○ zeros</span>
-              <span className="rounded-full border border-slate-300 px-2 py-1 text-slate-600 dark:border-slate-700 dark:text-slate-300">Drag roots · Auto-scaled</span>
+              <span className="rounded-full border border-rose-300 bg-rose-50 px-2 py-1 text-rose-700 dark:border-rose-400/30 dark:bg-rose-500/10 dark:text-rose-200">{t('signals.polesLegend', '× poles')}</span>
+              <span className="rounded-full border border-blue-300 bg-blue-50 px-2 py-1 text-blue-700 dark:border-blue-400/30 dark:bg-blue-500/10 dark:text-blue-200">{t('signals.zerosLegend', '○ zeros')}</span>
+              <span className="rounded-full border border-slate-300 px-2 py-1 text-slate-600 dark:border-slate-700 dark:text-slate-300">{t('signals.dragRootsAutoScaled', 'Drag roots · Auto-scaled')}</span>
             </div>
           </div>
           <SZPlaneCanvas system={system} roc={roc} extractSlice onPreview={previewRootMove} onCommit={commitRootMove} />
           <div className="mt-4 border-t border-slate-100 pt-4 dark:border-slate-800/80">
-            <p className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-white">SOLVED POLES &amp; ZEROS</p>
+            <p className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-white">{t('signals.solvedPolesZeros', 'Solved poles & zeros')}</p>
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-[.14em] text-rose-500">Poles</p>
+          <p className="text-[10px] font-bold uppercase tracking-[.14em] text-rose-500">{t('signals.polesLabel', 'Poles')}</p>
           <div className="mt-2 space-y-2">
-            {system.poles.length ? system.poles.map((root, index) => <div key={`p${index}`} className="flex items-center justify-between rounded-xl border border-rose-200 bg-rose-50/70 px-3 py-2 text-xs dark:border-rose-400/20 dark:bg-rose-500/10"><KatexMath math={`p_{${index + 1}}=${complexLatex(root)}`} /><span className="font-mono text-rose-600 dark:text-rose-200">×</span></div>) : <p className="text-xs text-slate-500">No finite poles.</p>}
+            {system.poles.length ? system.poles.map((root, index) => <div key={`p${index}`} className="flex items-center justify-between rounded-xl border border-rose-200 bg-rose-50/70 px-3 py-2 text-xs dark:border-rose-400/20 dark:bg-rose-500/10"><KatexMath math={`p_{${index + 1}}=${complexLatex(root)}`} /><span className="font-mono text-rose-600 dark:text-rose-200">×</span></div>) : <p className="text-xs text-slate-500">{t('signals.noFinitePoles', 'No finite poles.')}</p>}
           </div>
         </div>
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-[.14em] text-blue-500">Zeros</p>
+          <p className="text-[10px] font-bold uppercase tracking-[.14em] text-blue-500">{t('signals.zerosLabel', 'Zeros')}</p>
           <div className="mt-2 space-y-2">
-            {system.zeros.length ? system.zeros.map((root, index) => <div key={`z${index}`} className="flex items-center justify-between rounded-xl border border-blue-200 bg-blue-50/70 px-3 py-2 text-xs dark:border-blue-400/20 dark:bg-blue-500/10"><KatexMath math={`z_{${index + 1}}=${complexLatex(root)}`} /><span className="font-mono text-blue-600 dark:text-blue-200">○</span></div>) : <p className="text-xs text-slate-500">No finite zeros.</p>}
+            {system.zeros.length ? system.zeros.map((root, index) => <div key={`z${index}`} className="flex items-center justify-between rounded-xl border border-blue-200 bg-blue-50/70 px-3 py-2 text-xs dark:border-blue-400/20 dark:bg-blue-500/10"><KatexMath math={`z_{${index + 1}}=${complexLatex(root)}`} /><span className="font-mono text-blue-600 dark:text-blue-200">○</span></div>) : <p className="text-xs text-slate-500">{t('signals.noFiniteZeros', 'No finite zeros.')}</p>}
           </div>
         </div>
       </div>
@@ -216,7 +218,7 @@ export function LaplaceZPlaneLab() {
             <StudioCard className="lg:col-span-12">
               <div className="mb-4">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-white pb-2 border-b border-slate-100 dark:border-slate-800">
-                  SYSTEM RESPONSES
+                  {t('signals.systemResponses', 'System responses')}
                 </h3>
               </div>
               <FrequencyResponseCanvases system={system}>
@@ -249,9 +251,9 @@ export function LaplaceZPlaneLab() {
       <StudioCard>
         <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
           <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-white pb-2 border-b border-slate-100 dark:border-slate-800">
-            3D COMPLEX SURFACE STUDIO
+            {t('signals.complexSurfaceStudio3D', '3D complex surface studio')}
           </h3>
-          <span className="text-[11px] text-slate-400">Drag to orbit • Scroll to zoom • Hover the surface to probe |H|</span>
+          <span className="text-[11px] text-slate-400">{t('signals.orbitHintSurface', 'Drag to orbit • Scroll to zoom • Hover the surface to probe |H|')}</span>
         </div>
         <ComplexSurface3D system={system} roc={roc} onModeChange={changeMode} />
       </StudioCard>

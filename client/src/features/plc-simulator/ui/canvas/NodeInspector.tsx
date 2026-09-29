@@ -1,4 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { LadNode, LogicWidth, NetworkId, NumericType } from '../../domain/ast';
 import type { HardwareProfile } from '../../domain/hardware';
 import type { SymbolMap } from '../../transpiler';
@@ -338,6 +339,7 @@ export function NodeInspector({
   symbols?: SymbolMap;
   className?: string;
 }) {
+  const { t } = useTranslation('simulators');
   const { selection, networks, actions } = editor;
   const networkId: NetworkId | null = selection.networkId;
   const network = networkId === null ? undefined : networks.find((n) => n.id === networkId);
@@ -346,11 +348,11 @@ export function NodeInspector({
   return (
     <section aria-label="Selected element" className={`${PANEL} ${className}`}>
       <div className="shrink-0 border-b border-slate-200 px-3 py-2 dark:border-[#1a1d24]">
-        <div className={PANEL_TITLE}>Node Inspector</div>
+        <div className={PANEL_TITLE}>{t('plc.nodeInspector', 'Node Inspector')}</div>
       </div>
 
       {!network || !node || networkId === null ? (
-        <p className="p-4 text-center text-xs text-slate-500 dark:text-slate-400">Select an element to inspect its properties.</p>
+        <p className="p-4 text-center text-xs text-slate-500 dark:text-slate-400">{t('shell.emptyInspector', 'Select an element to inspect its properties.')}</p>
       ) : (
         <div className="flex min-h-0 flex-col gap-3 overflow-y-auto p-3">
           <div className="text-xs">

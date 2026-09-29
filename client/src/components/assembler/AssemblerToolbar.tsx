@@ -29,6 +29,7 @@ import {
   Upload,
 } from "lucide-react";
 import { useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { SupportedLanguage } from "@/features/execution-engine";
 import { SegmentedControl } from "@/components/common/templates";
 
@@ -140,6 +141,7 @@ export function AssemblerToolbar({
   onPaste,
   onDelete,
 }: ToolbarProps) {
+  const { t } = useTranslation('simulators');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [copied, setCopied] = useState(false);
   const [inputStep, setInputStep] = useState<string>("");
@@ -202,7 +204,7 @@ export function AssemblerToolbar({
               onChange={onLanguageChange}
               size="sm"
               className="border-0 bg-transparent p-0"
-              aria-label="Language selector"
+              aria-label={t('assembler.languageSelector', 'Language selector')}
             />
           </div>
 
@@ -211,15 +213,15 @@ export function AssemblerToolbar({
           {/* Simplified Examples Selector Pill */}
           <div
             className="relative h-9 inline-flex items-center gap-1.5 rounded-full border border-slate-200/80 bg-slate-200/60 px-3 text-xs font-medium text-slate-700 hover:bg-slate-300/50 dark:border-[#1a1d24] dark:bg-[#13161c] dark:text-slate-300 dark:hover:bg-[#1a1d24] cursor-pointer transition shrink-0"
-            title={`Active: ${selectedTemplate} (Click to switch example)`}
+            title={t('assembler.activeExample', 'Active: {{template}} (Click to switch example)', { template: selectedTemplate })}
           >
             <BookOpen className="h-3.5 w-3.5 text-violet-600 dark:text-violet-400 shrink-0 pointer-events-none" />
             <span className="font-semibold text-xs text-slate-800 dark:text-slate-200 pointer-events-none">
-              Examples
+              {t('toolbar.examples', 'Examples')}
             </span>
             <ChevronDown className="h-3 w-3 text-slate-400 pointer-events-none" />
             <select
-              aria-label="Examples library"
+              aria-label={t('toolbar.browseLibrary', 'Browse the Interactive Examples Library')}
               value={selectedTemplate}
               onChange={e => onTemplateChange(e.target.value)}
               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer text-xs"
@@ -245,7 +247,7 @@ export function AssemblerToolbar({
               type="button"
               onClick={onRun}
               disabled={busy}
-              title={running ? "Pause execution" : "Run execution"}
+              title={running ? t('toolbar.pauseTooltip', 'Pause execution') : t('toolbar.runTooltip', 'Assemble and run immediately (Ctrl+Enter)')}
               className={`h-9 inline-flex items-center justify-center gap-1.5 px-3.5 text-xs font-semibold cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 whitespace-nowrap shrink-0 ${
                 !running && hasStartedRef.current
                   ? "brand-pill-active-rev"
@@ -257,26 +259,26 @@ export function AssemblerToolbar({
               ) : (
                 <Play className="h-3.5 w-3.5 fill-current" />
               )}
-              <span>{running ? "Pause" : "Run"}</span>
+              <span>{running ? t('assembler.pause', 'Pause') : t('assembler.run', 'Run')}</span>
             </button>
 
             {/* Stepper Controls */}
             <ToolbarPillButton
               icon={<StepForward className="h-3.5 w-3.5 text-violet-600 dark:text-violet-400" />}
-              label="Step"
-              title="Step forward"
+              label={t('assembler.step', 'Step')}
+              title={t('toolbar.stepTooltip', 'Execute next instruction (F10)')}
               onClick={onStep}
               disabled={busy}
             />
             <ToolbarPillButton
               icon={<ChevronLeft className="h-3.5 w-3.5 text-violet-600 dark:text-violet-400" />}
-              title="Step back"
+              title={t('assembler.stepBackTooltip', 'Step back')}
               onClick={onStepBack}
               disabled={busy || currentStepIndex <= 0}
             />
             <ToolbarPillButton
               icon={<RotateCcw className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" />}
-              title="Reset execution state"
+              title={t('assembler.reset', 'Reset execution state')}
               onClick={onReset}
               disabled={busy}
             />
@@ -288,19 +290,19 @@ export function AssemblerToolbar({
           <div className="flex items-center gap-1 shrink-0">
             <ToolbarPillButton
               icon={<Undo2 size={13} />}
-              title="Undo (Ctrl/Cmd+Z)"
+              title={t('toolbar.undo', 'Undo (Ctrl/Cmd+Z)')}
               onClick={() => onUndo?.()}
               disabled={!canUndo}
             />
             <ToolbarPillButton
               icon={<Redo2 size={13} />}
-              title="Redo (Ctrl/Cmd+Shift+Z)"
+              title={t('toolbar.redo', 'Redo (Ctrl/Cmd+Shift+Z)')}
               onClick={() => onRedo?.()}
               disabled={!canRedo}
             />
             <ToolbarPillButton
               icon={<Scissors size={13} />}
-              title="Cut Selection / All"
+              title={t('toolbar.cut', 'Cut (Ctrl/Cmd+X)')}
               onClick={() => onCut?.()}
             />
             {/* Clean Icon-only Copy Button */}
@@ -312,17 +314,17 @@ export function AssemblerToolbar({
                   <Copy size={13} />
                 )
               }
-              title={copied ? "Copied!" : "Copy code"}
+              title={copied ? t('assembler.copied', 'Copied!') : t('toolbar.copy', 'Copy (Ctrl/Cmd+C)')}
               onClick={handleCopyClick}
             />
             <ToolbarPillButton
               icon={<Clipboard size={13} />}
-              title="Paste from clipboard"
+              title={t('toolbar.paste', 'Paste (Ctrl/Cmd+V)')}
               onClick={() => onPaste?.()}
             />
             <ToolbarPillButton
               icon={<Trash2 size={13} />}
-              title="Delete / Clear editor content"
+              title={t('toolbar.delete', 'Delete (Del/Backspace)')}
               onClick={() => onDelete?.()}
             />
 
@@ -331,7 +333,7 @@ export function AssemblerToolbar({
             {/* File Ops (Import, Export) - Clean Visible Icon Buttons */}
             <ToolbarPillButton
               icon={<Upload size={13} />}
-              title="Import file (.asm, .py, .cpp, .c)"
+              title={t('assembler.import', 'Import file')}
               onClick={() => fileInputRef.current?.click()}
             />
             <input
@@ -343,7 +345,7 @@ export function AssemblerToolbar({
             />
             <ToolbarPillButton
               icon={<Download size={13} />}
-              title="Export / Download file"
+              title={t('assembler.export', 'Export / Download file')}
               onClick={onExportCode}
             />
           </div>
@@ -359,12 +361,12 @@ export function AssemblerToolbar({
               { label: "0.5x", value: 0.5 },
               { label: "1.0x", value: 1.0 },
               { label: "2.0x", value: 2.0 },
-              { label: "Instant", value: "instant" },
+              { label: t('toolbar.instant', 'Instant'), value: "instant" },
             ]}
             value={speed}
             onChange={onSpeedChange}
             size="sm"
-            aria-label="Execution speed"
+            aria-label={t('assembler.executionSpeedAria', 'Execution speed')}
             className="border-slate-200/80 bg-slate-200/60 dark:border-[#1a1d24] dark:bg-[#13161c]"
           />
 
@@ -373,7 +375,7 @@ export function AssemblerToolbar({
           {/* Custom Stepper Input: Step [ X ] / [ Total ] */}
           <div className="h-9 inline-flex items-center gap-1 rounded-full border border-slate-200/80 bg-slate-200/60 px-2.5 text-[11px] font-mono font-medium text-slate-700 dark:border-[#1a1d24] dark:bg-[#13161c] dark:text-slate-300 shrink-0">
             <span className="text-[10px] font-sans font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              Step
+              {t('assembler.step', 'Step')}
             </span>
             <input
               type="number"
@@ -396,7 +398,7 @@ export function AssemblerToolbar({
                 }
               }}
               disabled={totalSteps <= 0}
-              title="Type step number directly to jump"
+              title={t('assembler.stepJumpTooltip', 'Type step number directly to jump')}
               className="w-10 h-6 rounded-md bg-white dark:bg-[#090a0d] border border-slate-300 dark:border-[#222733] text-center font-mono font-normal text-[11px] text-slate-900 dark:text-slate-100 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none p-0"
             />
             <span className="text-slate-400 dark:text-slate-500">/</span>

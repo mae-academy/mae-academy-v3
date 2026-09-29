@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
+import i18n from "@/i18n/config";
 import { StudioAlert } from "./PowerWarningAlert";
 
 interface StudioErrorBoundaryProps {
@@ -32,8 +33,8 @@ export class StudioErrorBoundary extends Component<StudioErrorBoundaryProps, Stu
       <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <StudioAlert
           variant="error"
-          badge={`${this.props.studioName.toUpperCase()} · RENDER ERROR`}
-          message="The studio failed to render for the current parameter combination. Resetting to default values usually clears this."
+          badge={`${this.props.studioName.toUpperCase()} · ${i18n.t("simulators:power.renderErrorSuffix", "RENDER ERROR")}`}
+          message={i18n.t("simulators:power.renderErrorMessage", "The studio failed to render for the current parameter combination. Resetting to default values usually clears this.")}
         >
           {import.meta.env.DEV && (
             <pre className="mt-2 overflow-auto rounded-lg bg-rose-100 p-2 text-[10px] text-rose-800 dark:bg-rose-500/20 dark:text-rose-200">{error.message}</pre>
@@ -44,7 +45,7 @@ export class StudioErrorBoundary extends Component<StudioErrorBoundaryProps, Stu
           onClick={() => this.setState({ error: null })}
           className="mt-3 rounded-full border border-rose-300 px-3 py-1.5 text-xs font-bold text-rose-700 transition hover:bg-rose-50 dark:border-rose-400/40 dark:text-rose-200 dark:hover:bg-rose-500/10"
         >
-          Retry
+          {i18n.t("simulators:power.retry", "Retry")}
         </button>
       </div>
     );

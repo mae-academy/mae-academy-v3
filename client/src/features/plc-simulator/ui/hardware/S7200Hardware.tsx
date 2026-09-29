@@ -1,4 +1,5 @@
 import { memo, useCallback, useRef, useState, type PointerEvent, type ReactElement } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { HardwareProfile } from '../../domain/hardware';
 import type { MemoryMap } from '../../domain/memory';
 import type { ExecutionMode } from '../../engine/types';
@@ -188,6 +189,7 @@ export function S7200Hardware({
   fault: _fault,
   className = '',
 }: S7200HardwareProps) {
+  const { t } = useTranslation('simulators');
   const inputs = profile.memory.I?.bitCount ?? 0;
   const outputs = profile.memory.Q?.bitCount ?? 0;
 
@@ -197,7 +199,7 @@ export function S7200Hardware({
       className={`${PANEL} ${className}`}
     >
       <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-3 py-2 dark:border-[#1a1d24]">
-        <div className={PANEL_TITLE}>I/O MODULE</div>
+        <div className={PANEL_TITLE}>{t('plc.ioModule', 'I/O Module')}</div>
         <span className="font-sans text-[10px] font-medium text-slate-400 dark:text-slate-500">
           {profile.model}
         </span>
@@ -207,7 +209,7 @@ export function S7200Hardware({
         {/* Digital Outputs at the very TOP for immediate reaction visibility */}
         <div>
           <h3 className="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 px-0.5">
-            Digital Outputs
+            {t('plc.digitalOutputs', 'Digital Outputs')}
           </h3>
           <div className="rounded-lg border border-slate-200/80 bg-slate-50/70 p-1.5 dark:border-[#1a1d24] dark:bg-[#0d0f12]">
             <LedBank area="Q" bits={outputs}>
@@ -238,7 +240,7 @@ export function S7200Hardware({
         {/* Digital Inputs */}
         <div>
           <h3 className="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 px-0.5">
-            Digital Inputs
+            {t('plc.digitalInputs', 'Digital Inputs')}
           </h3>
           <div role="group" aria-label="Input switches" className="flex flex-col gap-2">
             {Array.from({ length: Math.ceil(inputs / 8) }, (_, byte) => {

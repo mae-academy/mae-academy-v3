@@ -356,7 +356,7 @@ localizedContent.ar.collections.simulations = {
     { title: "أنظمة التحكم", description: "اضبط التغذية الراجعة والاستقرار والاستجابة العابرة داخل حلقة تحكم مرئية.", code: "S.01" },
     { title: "الدوائر الكهربائية", description: "افحص التيار والجهد وسلوك الإشارة عبر منصة دوائر تفاعلية.", code: "S.02" },
     { title: "إلكترونيات القدرة", description: "اختبر طوبولوجيا التبديل ومراحل التحويل وقرارات تدفق القدرة.", code: "S.03" },
-    { title: "Code Studio", description: "Interactive Multi-Language Simulation & Trace Studio (MASM 8086, Python, C++, C).", code: "S.04" },
+    { title: "محرر الأكواد (Code Studio)", description: "استوديو تفاعلي متعدد اللغات للمحاكاة والتتبع (MASM 8086, Python, C++, C).", code: "S.04" },
     { title: "PLC", description: "ابنِ منطق السلم وراقب تسلسلات التحكم الصناعي أثناء الحركة.", code: "S.05" },
     { title: "الإشارات والأنظمة", description: "حوّل الإشارات ورشّحها وفسّرها عبر نطاقي الزمن والتردد.", code: "S.06" },
     { title: "تصميم المنطق الرقمي", description: "ركّب البوابات وحالات الحقيقة ومسارات المنطق في أنظمة رقمية عاملة.", code: "S.07" },
@@ -372,12 +372,12 @@ localizedContent.es.collections.simulations = {
     { title: "Sistemas de control", description: "Ajusta retroalimentación, estabilidad y respuesta transitoria en un bucle de control visible.", code: "S.01" },
     { title: "Circuitos Eléctricos", description: "Mide corriente, voltaje y comportamiento de señales en un banco de circuitos interactivo.", code: "S.02" },
     { title: "Electrónica de potencia", description: "Prueba topologías de conmutación, etapas de conversión y decisiones de flujo de potencia.", code: "S.03" },
-    { title: "Code Studio", description: "Interactive Multi-Language Simulation & Trace Studio (MASM 8086, Python, C++, C).", code: "S.04" },
+    { title: "Estudio de Código", description: "Estudio interactivo de simulación y trazado multilenguaje (MASM 8086, Python, C++, C).", code: "S.04" },
     { title: "PLC", description: "Construye lógica de escalera y observa secuencias de control industrial en movimiento.", code: "S.05" },
     { title: "Señales y sistemas", description: "Transforma, filtra e interpreta señales en los dominios del tiempo y la frecuencia.", code: "S.06" },
     { title: "Diseño de lógica digital", description: "Compone compuertas, estados de verdad y rutas lógicas en sistemas digitales funcionales.", code: "S.07" },
     { title: "Álgebra lineal", description: "Explora matrices, vectores, transformaciones y la geometría detrás de los modelos de ingeniería.", code: "S.08" },
-    { title: "Arduino Studio", description: "Sistemas embebidos y microcontroladores: escribe C++ de Arduino y observa la placa UNO interactiva, el monitor serie y el graficador en vivo.", code: "S.09" },
+    { title: "Estudio Arduino", description: "Sistemas embebidos y microcontroladores: escribe C++ de Arduino y observa la placa UNO interactiva, el monitor serie y el graficador en vivo.", code: "S.09" },
   ],
 };
 

@@ -13,6 +13,7 @@ import {
   Upload,
 } from 'lucide-react';
 import { useRef, useState, type ChangeEvent, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { SegmentedControl } from '@/components/common/templates';
 import type { ExecutionMode, ScanMetrics } from '../../engine/types';
 import { Divider, PANEL, PILL_BUTTON } from '../chrome';
@@ -61,11 +62,12 @@ export const SCAN_MAX_MS = 500;
 
 /** Scan statistics: refreshed at display rate through the frame store, not once per scan. */
 function ScanReadout({ frame, readMetrics }: { frame: FrameStore; readMetrics: () => ScanMetrics | null }) {
+  const { t } = useTranslation('simulators');
   useFrameVersion(frame);
   const metrics = readMetrics();
   if (!metrics) return null;
   return (
-    <span aria-label="Scan statistics" className="hidden font-sans text-[11px] font-medium tabular-nums text-slate-500 lg:block dark:text-slate-400">
+    <span aria-label={t('plc.scanStatisticsAria', 'Scan statistics')} className="hidden font-sans text-[11px] font-medium tabular-nums text-slate-500 lg:block dark:text-slate-400">
       {`cycle ${metrics.cycle} · ${metrics.scanTimeMs.toFixed(2)} ms`}
     </span>
   );
@@ -92,16 +94,19 @@ export function ExecutiveToolbar({
   onPaste,
   onDelete,
   onExport,
-  exportTitle = 'Export program',
+  exportTitle,
   onImport,
-  importTitle = 'Import program',
+  importTitle,
   importAccept,
   className = '',
 }: ExecutiveToolbarProps) {
+  const { t } = useTranslation('simulators');
   const running = mode === 'RUN';
   const paused = mode === 'PAUSE';
   const fileInput = useRef<HTMLInputElement>(null);
   const [copied, setCopied] = useState(false);
+  const resolvedExportTitle = exportTitle ?? t('plc.exportProgramDefault', 'Export program');
+  const resolvedImportTitle = importTitle ?? t('plc.importProgramDefault', 'Import program');
 
   const handleRunClick = (): void => {
     if (running) {
@@ -142,10 +147,10 @@ export function ExecutiveToolbar({
     <section className={`${PANEL} w-full shrink-0 font-['Poppins',sans-serif] ${className}`}>
       <div
         role="toolbar"
-        aria-label="Execution controls"
+        aria-label={t('plc.executionControlsAria', 'Execution controls')}
         className="scrollbar-none flex w-full flex-nowrap items-center justify-between gap-1.5 overflow-x-auto p-1.5 text-xs"
       >
-        <span role="status" aria-label={`Controller mode ${mode}`} className="sr-only">
+        <span role="status" aria-label={t('plc.controllerModeAria', 'Controller mode {{mode}}', { mode })} className="sr-only">
           {mode}
         </span>
         <div className="flex shrink-0 items-center gap-1">
@@ -158,8 +163,8 @@ export function ExecutiveToolbar({
               <button
                 type="button"
                 onClick={handleRunClick}
-                aria-label={running ? 'Pause' : paused ? 'Resume' : 'Run'}
-                title={running ? 'Pause execution' : paused ? 'Resume execution' : 'Run execution'}
+                aria-label={running ? t('toolbar.pause', 'Pause') : paused ? t('plc.resume', 'Resume') : t('toolbar.run', 'Run')}
+                title={running ? t('toolbar.pauseTooltip', 'Pause execution') : paused ? t('plc.resumeExecutionTooltip', 'Resume execution') : t('plc.runExecutionTooltip', 'Run execution')}
                 className={`inline-flex h-9 shrink-0 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap px-3.5 text-xs font-semibold active:scale-[.98] ${paused ? 'brand-pill-active-rev' : 'btn-active-brand'
                   }`}
               >
@@ -168,15 +173,15 @@ export function ExecutiveToolbar({
                 ) : (
                   <Play className="h-3.5 w-3.5 fill-current" aria-hidden="true" />
                 )}
-                <span>{running ? 'Pause' : paused ? 'Resume' : 'Run'}</span>
+                <span>{running ? t('toolbar.pause', 'Pause') : paused ? t('plc.resume', 'Resume') : t('toolbar.run', 'Run')}</span>
               </button>
             )}
 
             <button
               type="button"
               onClick={onReset ?? onStop}
-              aria-label="Stop"
-              title="Reset / Stop execution state"
+              aria-label={t('plc.stopAria', 'Stop')}
+              title={t('plc.resetStopTooltip', 'Reset / Stop execution state')}
               className={`${PILL_BUTTON} w-9 px-0`}
             >
               <RotateCcw className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" aria-hidden="true" />
@@ -190,8 +195,8 @@ export function ExecutiveToolbar({
             {onUndo && (
               <button
                 type="button"
-                title="Undo (Ctrl+Z)"
-                aria-label="Undo"
+                title={t('plc.undoTooltip', 'Undo (Ctrl+Z)')}
+                aria-label={t('plc.undoAria', 'Undo')}
                 onClick={onUndo}
                 disabled={!canUndo || running}
                 className={`${PILL_BUTTON} w-9 px-0`}
@@ -202,8 +207,8 @@ export function ExecutiveToolbar({
             {onRedo && (
               <button
                 type="button"
-                title="Redo (Ctrl+Shift+Z)"
-                aria-label="Redo"
+                title={t('plc.redoTooltip', 'Redo (Ctrl+Shift+Z)')}
+                aria-label={t('plc.redoAria', 'Redo')}
                 onClick={onRedo}
                 disabled={!canRedo || running}
                 className={`${PILL_BUTTON} w-9 px-0`}
@@ -214,8 +219,8 @@ export function ExecutiveToolbar({
             {onCopy && (
               <button
                 type="button"
-                title={copied ? 'Copied!' : 'Copy code / diagram'}
-                aria-label="Copy"
+                title={copied ? t('plc.copiedTooltip', 'Copied!') : t('plc.copyTooltip', 'Copy code / diagram')}
+                aria-label={t('plc.copyAria', 'Copy')}
                 onClick={handleCopy}
                 className={`${PILL_BUTTON} w-9 px-0`}
               >
@@ -229,8 +234,8 @@ export function ExecutiveToolbar({
             {onPaste && (
               <button
                 type="button"
-                title="Paste from clipboard"
-                aria-label="Paste"
+                title={t('plc.pasteTooltip', 'Paste from clipboard')}
+                aria-label={t('plc.pasteAria', 'Paste')}
                 onClick={onPaste}
                 disabled={running}
                 className={`${PILL_BUTTON} w-9 px-0`}
@@ -241,8 +246,8 @@ export function ExecutiveToolbar({
             {onDelete && (
               <button
                 type="button"
-                title="Delete / Clear diagram"
-                aria-label="Delete"
+                title={t('plc.deleteTooltip', 'Delete / Clear diagram')}
+                aria-label={t('plc.deleteAria', 'Delete')}
                 onClick={onDelete}
                 disabled={running}
                 className={`${PILL_BUTTON} w-9 px-0 hover:text-rose-500 dark:hover:text-rose-400`}
@@ -257,8 +262,8 @@ export function ExecutiveToolbar({
               <>
                 <button
                   type="button"
-                  title={importTitle}
-                  aria-label="Import"
+                  title={resolvedImportTitle}
+                  aria-label={t('toolbar.import', 'Import')}
                   onClick={() => fileInput.current?.click()}
                   disabled={running}
                   className={`${PILL_BUTTON} w-9 px-0`}
@@ -279,8 +284,8 @@ export function ExecutiveToolbar({
             {onExport !== undefined && (
               <button
                 type="button"
-                title={exportTitle}
-                aria-label="Export"
+                title={resolvedExportTitle}
+                aria-label={t('toolbar.export', 'Export')}
                 onClick={onExport}
                 className={`${PILL_BUTTON} w-9 px-0`}
               >
@@ -299,7 +304,7 @@ export function ExecutiveToolbar({
               value={currentSpeed}
               onChange={handleSpeedChange}
               size="sm"
-              aria-label="Simulation speed"
+              aria-label={t('plc.simulationSpeedAria', 'Simulation speed')}
               className="border-slate-200/80 bg-slate-200/60 dark:border-[#1a1d24] dark:bg-[#13161c]"
             />
           </div>

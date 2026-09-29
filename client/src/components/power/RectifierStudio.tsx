@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { useLocale } from "@/contexts/LocaleContext";
 import { KatexMath } from "@/components/ui/KatexMath";
 import { SegmentedControl, StudioCard, StudioSlider, InnerBox } from "@/components/common/templates";
 import { PowerWarningAlert } from "./PowerWarningAlert";
@@ -21,21 +23,6 @@ const field =
   "h-11 w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 text-slate-800 text-xl font-medium sm:text-2xl tracking-wide dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 dark:focus:ring-violet-400 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [-moz-appearance:textfield] m-0 text-center disabled:cursor-not-allowed disabled:opacity-35 transition";
 const tex = String.raw;
 
-const phaseOptions = [
-  { value: "single" as RectifierPhase, label: "1-Φ Single" },
-  { value: "three" as RectifierPhase, label: "3-Φ Three" },
-];
-
-const rectifierOptions = [
-  { value: "half" as RectifierType, label: "Half-Wave" },
-  { value: "full" as RectifierType, label: "Full-Wave" },
-];
-
-const fullWaveOptions = [
-  { value: "bridge" as FullWaveSubtype, label: "Bridge" },
-  { value: "center-tapped" as FullWaveSubtype, label: "Center-Tapped" },
-];
-
 const loadOptions = [
   { value: "R" as RectifierLoad, label: <KatexMath math="R" /> },
   { value: "RL" as RectifierLoad, label: <KatexMath math="RL" /> },
@@ -47,11 +34,6 @@ const loadOptions = [
 const voltageOptions = [
   { value: "rms" as VoltageFormat, label: <KatexMath math={tex`V_{\mathrm{RMS}}`} /> },
   { value: "peak" as VoltageFormat, label: <KatexMath math="V_m" /> },
-];
-
-const fwdOptions = [
-  { value: "yes", label: "Yes" },
-  { value: "no", label: "No" },
 ];
 
 function NumberValue(value: number, digits = 2) {
@@ -99,18 +81,20 @@ function MetricCell({ label, value }: { label: string; value: string }) {
 }
 
 function CircuitPlate({ parameters }: { parameters: RectifierParameters }) {
-  const topology = parameters.rectifierType === "full" ? parameters.fullWaveSubtype === "bridge" ? "Bridge" : "Center-Tapped" : "Half-Wave";
+  const { t } = useTranslation("simulators");
+  const { isRtl } = useLocale();
+  const topology = parameters.rectifierType === "full" ? parameters.fullWaveSubtype === "bridge" ? t("power.bridge", "Bridge") : t("power.centerTapped", "Center-Tapped") : t("power.halfWave", "Half-Wave");
   const bridge = parameters.rectifierType === "full" && parameters.fullWaveSubtype === "bridge";
   return (
     <section className={`${card} min-h-[340px]`}>
       <div className="flex items-center justify-between gap-3">
-        <h3 className={heading}>Converter Drafting Plate</h3>
+        <h3 className={heading}>{t("power.converterDraftingPlate", "Converter Drafting Plate")}</h3>
         <span className="font-mono text-[10px] font-bold tracking-[.12em] text-violet-700 dark:text-violet-300">
           {topology.toUpperCase()}
         </span>
       </div>
       <div className="mt-4 grid min-h-60 place-items-center overflow-hidden rounded-2xl border border-dashed border-violet-300 bg-slate-50 p-4 text-center dark:border-violet-400/30 dark:bg-slate-950">
-        <svg viewBox="0 0 360 140" className="h-36 w-full max-w-lg" fill="none" role="img" aria-label={`${topology} rectifier native drafting plate`}>
+        <svg viewBox="0 0 360 140" className="h-36 w-full max-w-lg" fill="none" role="img" aria-label={t("power.rectifierDraftingAria", "{{topology}} rectifier native drafting plate", { topology })}>
           <path d="M18 70h40m0 0 12-15v30L58 70m12 0h32M266 70h76M316 40v60m-13-48h26m-26 18h26m-26 18h26" stroke="#64748b" strokeWidth="1.5" />
           <circle cx="36" cy="70" r="18" stroke="#94a3b8" strokeWidth="1.4" />
           <path d="M24 70c4-10 9-10 13 0s9 10 13 0" stroke="#60a5fa" strokeWidth="1.6" />
@@ -131,8 +115,8 @@ function CircuitPlate({ parameters }: { parameters: RectifierParameters }) {
           <text x="115" y="126" fill="#a78bfa" fontSize="8" fontFamily="ui-monospace, monospace">{bridge ? "D1–D4 BRIDGE" : "CONTROLLED PATH"}</text>
           <text x="260" y="126" fill="#fb7185" fontSize="8" fontFamily="ui-monospace, monospace">REF / VO</text>
         </svg>
-        <span className="mt-2 block font-mono text-[9px] font-bold tracking-[.12em] text-slate-400">
-          SOURCE · RECTIFICATION PATH · LOAD REFERENCE
+        <span className={`mt-2 block mae-i18n-text text-[9px] font-bold tracking-[.12em] text-slate-400 ${isRtl ? "" : "font-mono"}`}>
+          {t("power.sourceRectificationCaption", "SOURCE · RECTIFICATION PATH · LOAD REFERENCE")}
         </span>
       </div>
     </section>
@@ -140,6 +124,23 @@ function CircuitPlate({ parameters }: { parameters: RectifierParameters }) {
 }
 
 export function RectifierStudio() {
+  const { t } = useTranslation("simulators");
+  const phaseOptions = [
+    { value: "single" as RectifierPhase, label: t("power.phaseSingleShort", "1-Φ Single") },
+    { value: "three" as RectifierPhase, label: t("power.phaseThreeShort", "3-Φ Three") },
+  ];
+  const rectifierOptions = [
+    { value: "half" as RectifierType, label: t("power.halfWave", "Half-Wave") },
+    { value: "full" as RectifierType, label: t("power.fullWave", "Full-Wave") },
+  ];
+  const fullWaveOptions = [
+    { value: "bridge" as FullWaveSubtype, label: t("power.bridge", "Bridge") },
+    { value: "center-tapped" as FullWaveSubtype, label: t("power.centerTapped", "Center-Tapped") },
+  ];
+  const fwdOptions = [
+    { value: "yes", label: t("power.yes", "Yes") },
+    { value: "no", label: t("power.no", "No") },
+  ];
   const [parameters, setParameters] = useState<RectifierParameters>(defaultRectifierParameters);
   const [chartsReady, setChartsReady] = useState(false);
   const simulation = useMemo(() => simulateControlledRectifier(parameters), [parameters]);
@@ -249,59 +250,59 @@ export function RectifierStudio() {
 
   const topologyPanel = (
     <StudioCard
-      title="Topology Configuration"
+      title={t("power.topologyConfig", "Topology Configuration")}
       actionSlot={<KatexMath math={tex`\alpha = ${NumberValue(parameters.firingAngle, 0)}^\circ`} className="text-sm font-semibold text-violet-600 dark:text-violet-400" />}
     >
       <div className="space-y-4">
         <div>
-          <span className="mb-2 block text-xs font-bold text-slate-500 dark:text-slate-400">Phase</span>
+          <span className="mb-2 block mae-i18n-text text-xs font-bold text-slate-500 dark:text-slate-400">{t("power.phase", "Phase")}</span>
           <SegmentedControl
             options={phaseOptions}
             value={parameters.phase}
             onChange={(phase) => update("phase", phase)}
             fullWidth
-            aria-label="Rectifier Phase"
+            aria-label={t("power.rectifierPhaseAria", "Rectifier Phase")}
           />
         </div>
 
         <div>
-          <span className="mb-2 block text-xs font-bold text-slate-500 dark:text-slate-400">Rectifier Type</span>
+          <span className="mb-2 block mae-i18n-text text-xs font-bold text-slate-500 dark:text-slate-400">{t("power.rectifierTypeLabel", "Rectifier Type")}</span>
           <SegmentedControl
             options={rectifierOptions}
             value={parameters.rectifierType}
             onChange={(rectifierType) => update("rectifierType", rectifierType)}
             fullWidth
-            aria-label="Rectifier Type"
+            aria-label={t("power.rectifierTypeLabel", "Rectifier Type")}
           />
         </div>
 
         {parameters.rectifierType === "full" && (
           <div>
-            <span className="mb-2 block text-xs font-bold text-slate-500 dark:text-slate-400">Full-Wave Subtype</span>
+            <span className="mb-2 block mae-i18n-text text-xs font-bold text-slate-500 dark:text-slate-400">{t("power.fullWaveSubtypeLabel", "Full-Wave Subtype")}</span>
             <SegmentedControl
               options={fullWaveOptions}
               value={parameters.fullWaveSubtype}
               onChange={(fullWaveSubtype) => update("fullWaveSubtype", fullWaveSubtype)}
               fullWidth
-              aria-label="Full-Wave Subtype"
+              aria-label={t("power.fullWaveSubtypeLabel", "Full-Wave Subtype")}
             />
           </div>
         )}
 
         <div className="border-t border-slate-200 pt-4 dark:border-slate-800">
           <div className="mb-3 flex items-center justify-between gap-3">
-            <h4 className="text-xs font-bold text-slate-700 dark:text-slate-200">Source &amp; Firing Parameters</h4>
+            <h4 className="text-xs font-bold text-slate-700 dark:text-slate-200">{t("power.sourceFiringParams", "Source & Firing Parameters")}</h4>
             <KatexMath math={tex`\omega=${NumberValue(simulation.angularFrequency, 1)}\,\mathrm{rad/s}`} className="text-xs text-violet-700 dark:text-violet-300" />
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="sm:col-span-2">
-              <span className="mb-2 block text-xs font-bold text-slate-500 dark:text-slate-400">Voltage Format</span>
+              <span className="mb-2 block mae-i18n-text text-xs font-bold text-slate-500 dark:text-slate-400">{t("power.voltageFormat", "Voltage Format")}</span>
               <SegmentedControl
                 options={voltageOptions}
                 value={parameters.voltageFormat}
                 onChange={(voltageFormat) => update("voltageFormat", voltageFormat)}
                 fullWidth
-                aria-label="Voltage Format"
+                aria-label={t("power.voltageFormat", "Voltage Format")}
               />
             </div>
             <NumberField label={tex`V_{in}\,[\mathrm{V}]`} value={parameters.inputVoltage} min={0} step={1} onChange={(inputVoltage) => update("inputVoltage", inputVoltage)} />
@@ -312,7 +313,7 @@ export function RectifierStudio() {
                 <KatexMath math={tex`\alpha = ${NumberValue(parameters.firingAngle, 0)}^\circ`} className="text-xs font-semibold text-violet-600 dark:text-violet-400" />
               </div>
               <StudioSlider
-                aria-label="firing angle slider"
+                aria-label={t("power.firingAngleSliderAria", "firing angle slider")}
                 min={0}
                 max={180}
                 step={1}
@@ -331,26 +332,26 @@ export function RectifierStudio() {
   );
 
   const loadPanel = (
-    <StudioCard title="Load Configuration">
+    <StudioCard title={t("power.loadConfig", "Load Configuration")}>
       <div className="mt-4">
-        <span className="mb-2 block text-xs font-bold text-slate-500 dark:text-slate-400">Load Type</span>
+        <span className="mb-2 block mae-i18n-text text-xs font-bold text-slate-500 dark:text-slate-400">{t("power.loadTypeLabel", "Load Type")}</span>
         <SegmentedControl
           options={loadOptions}
           value={parameters.loadType}
           onChange={(loadType) => update("loadType", loadType)}
           fullWidth
-          aria-label="Load Type"
+          aria-label={t("power.loadTypeLabel", "Load Type")}
         />
       </div>
 
       <div className="mt-4">
-        <span className="mb-2 block text-xs font-bold text-slate-500 dark:text-slate-400">Free-Wheeling Diode (FWD)</span>
+        <span className="mb-2 block mae-i18n-text text-xs font-bold text-slate-500 dark:text-slate-400">{t("power.freeWheelingDiode", "Free-Wheeling Diode (FWD)")}</span>
         <SegmentedControl
           options={fwdOptions}
           value={parameters.freeWheelingDiode ? "yes" : "no"}
           onChange={(value) => update("freeWheelingDiode", value === "yes")}
           fullWidth
-          aria-label="Free-Wheeling Diode"
+          aria-label={t("power.freeWheelingDiodeAria", "Free-Wheeling Diode")}
         />
       </div>
 
@@ -366,7 +367,7 @@ export function RectifierStudio() {
   const outputScope = (
     <div className="recharts-responsive-container w-full">
       <PowerScopePlot
-        title={parameters.phase === "three" ? "THREE-PHASE RECTIFIER SCOPE" : "SINGLE-PHASE CONVERTER SCOPE"}
+        title={parameters.phase === "three" ? t("power.threePhaseRectifierScope", "THREE-PHASE RECTIFIER SCOPE") : t("power.singlePhaseConverterScope", "SINGLE-PHASE CONVERTER SCOPE")}
         subtitleLatex={parameters.phase === "three" ? tex`V_A(t),\ V_B(t),\ V_C(t),\ V_o(t),\ I_o(t)` : tex`V_{in}(t),\ V_o(t),\ I_o(t)`}
         series={scopeSeries}
         height={530}
@@ -380,7 +381,7 @@ export function RectifierStudio() {
   const metricsPanel = (
     <section className={`${card} p-4`}>
       <div>
-        <h3 className={heading}>Steady-State Metrics</h3>
+        <h3 className={heading}>{t("power.steadyStateMetrics", "Steady-State Metrics")}</h3>
         <KatexMath math={tex`\frac{1}{T_{out}}\int_{T_{out}}(\cdot)\,dt`} className="mt-1 block text-xs text-slate-500 dark:text-slate-400" />
       </div>
       <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -401,7 +402,7 @@ export function RectifierStudio() {
   );
 
   return (
-    <StudioErrorBoundary studioName="Rectifier">
+    <StudioErrorBoundary studioName={t("power.rectifierName", "Rectifier")}>
       <div className="space-y-6">
         <PowerWarningAlert warnings={simulation.warnings} />
         <div className="grid gap-4 lg:gap-5 lg:grid-cols-2 items-start">

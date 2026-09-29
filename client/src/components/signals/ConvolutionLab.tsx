@@ -8,6 +8,7 @@ import { evaluateSignal } from "@/features/signals/engines/signalEngine";
 import katex from "katex";
 import { FastForward, Pause, Play, Rewind, Sigma, StepForward } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { ConvolutionAnalysisCard, type ConvolutionAnalysisHandle } from "@/components/signals/ConvolutionAnalysisCard";
 import { analyzeConvolutionRegime, type RegimeCache } from "@/features/signals/engines/convolutionPiecewise";
 import { KatexMath } from "@/components/ui/KatexMath";
@@ -40,6 +41,7 @@ function renderKatex(target: HTMLSpanElement | null, math: string) { if (!target
 function format(value: number, digits = 3) { return Number.isFinite(value) ? Number(value.toFixed(digits)).toString() : "—"; }
 
 export function ConvolutionLab() {
+  const { t } = useTranslation('simulators');
   const [xExpression, setXExpression] = useState("\\text{rect}(t)"); const [hExpression, setHExpression] = useState("\\text{rect}(t)");
   const [discreteXSource, setDiscreteXSource] = useState("1, 2, 1");
   const [discreteHSource, setDiscreteHSource] = useState("1, -1, 2");
@@ -81,11 +83,11 @@ export function ConvolutionLab() {
     <StudioCard className="overflow-hidden">
       <div className="flex flex-col gap-4 border-b border-slate-200 pb-5 dark:border-slate-800 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h2 className="mt-1 text-xl font-black tracking-tight text-slate-900 dark:text-white">Convolution Engine</h2>
+          <h2 className="mt-1 text-xl font-black tracking-tight text-slate-900 dark:text-white">{t('signals.convolutionEngine', 'Convolution Engine')}</h2>
           <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500 dark:text-slate-400">
             {mode === "continuous"
-              ? <>Reverse, shift, multiply, integrate. The continuous scope evaluates <KatexMath math="y(t)=\int_{-\infty}^{\infty} x(\tau)h(t-\tau)\,d\tau" /> at each canvas frame without storing animation time in React.</>
-              : <>Reverse, shift, multiply, sum. The discrete stem scope evaluates <KatexMath math="y[n]=\sum_k x[k]h[n-k]" /> across 3 synchronized stem tiers with reverse-diagonal matrix analysis.</>}
+              ? <>{t('signals.convolutionContinuousIntro', 'Reverse, shift, multiply, integrate. The continuous scope evaluates ')}<KatexMath math="y(t)=\int_{-\infty}^{\infty} x(\tau)h(t-\tau)\,d\tau" />{t('signals.convolutionContinuousOutro', ' at each canvas frame without storing animation time in React.')}</>
+              : <>{t('signals.convolutionDiscreteIntro', 'Reverse, shift, multiply, sum. The discrete stem scope evaluates ')}<KatexMath math="y[n]=\sum_k x[k]h[n-k]" />{t('signals.convolutionDiscreteOutro', ' across 3 synchronized stem tiers with reverse-diagonal matrix analysis.')}</>}
           </p>
         </div>
         <SegmentedControl
@@ -96,7 +98,7 @@ export function ConvolutionLab() {
               value: "continuous",
               label: (
                 <span className="font-['Poppins',sans-serif] font-medium inline-flex items-center gap-1.5">
-                  Continuous-Time <KatexMath math="[x(t)]" />
+                  {t('signals.continuousTime', 'Continuous-Time')} <KatexMath math="[x(t)]" />
                 </span>
               ),
               "aria-label": "Continuous-Time [x(t)]",
@@ -105,7 +107,7 @@ export function ConvolutionLab() {
               value: "discrete",
               label: (
                 <span className="font-['Poppins',sans-serif] font-medium inline-flex items-center gap-1.5">
-                  Discrete-Time <KatexMath math="[x[n]]" />
+                  {t('signals.discreteTime', 'Discrete-Time')} <KatexMath math="[x[n]]" />
                 </span>
               ),
               "aria-label": "Discrete-Time [x[n]]",
@@ -124,7 +126,7 @@ export function ConvolutionLab() {
               ]}
             />
             <InnerBox className="self-start">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-white pb-2 border-b border-slate-100 dark:border-slate-800">QUICK EXPERIMENTS</h3>
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-white pb-2 border-b border-slate-100 dark:border-slate-800">{t('signals.quickExperiments', 'Quick experiments')}</h3>
               <div className="mt-3 grid gap-2">{presets.map((preset) => <button key={preset.label} type="button" onClick={() => setPreset(preset)} className={`rounded-xl border px-3 py-2 text-left text-xs font-bold transition active:scale-[0.98] ${idle}`}>{preset.label}</button>)}</div>
             </InnerBox>
           </div>
@@ -132,7 +134,7 @@ export function ConvolutionLab() {
       ) : (
         <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
           <div className="min-w-0 space-y-3">
-            <p className="text-xs text-slate-500 dark:text-slate-400">Comma-separated samples, starting at n = 0.</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">{t('signals.commaSeparatedSamplesCaption', 'Comma-separated samples, starting at n = 0.')}</p>
             <div className="grid w-full grid-cols-1 gap-4 md:grid-cols-2">
               {([
                 { id: "x", prefix: "x[n] =", source: discreteXSource, values: discreteX, set: setDiscreteXSource, accent: "border-blue-500/80 bg-blue-500/5 ring-2 ring-blue-500/20", placeholder: "e.g. 1, 2, 1" },
@@ -159,7 +161,7 @@ export function ConvolutionLab() {
             </div>
           </div>
           <InnerBox className="self-start">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-white pb-2 border-b border-slate-100 dark:border-slate-800">DISCRETE PRESETS</h3>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-white pb-2 border-b border-slate-100 dark:border-slate-800">{t('signals.discretePresetsLabel', 'Discrete presets')}</h3>
             <div className="mt-3 grid gap-2">
               {discretePresets.map((preset) => (
                 <button
@@ -192,27 +194,27 @@ export function ConvolutionLab() {
             <StudioCard>
               <div className="mb-4 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-white pb-2 border-b border-slate-100 dark:border-slate-800">
-                  THREE-TIER CANVAS LAYOUT
+                  {t('signals.threeTierCanvasLayout', 'Three-tier canvas layout')}
                 </h3>
                 <div className="flex flex-wrap items-center gap-2">
                   <GradientButton onClick={() => setIsPlaying(true)} className="inline-flex items-center gap-1.5 cursor-pointer">
-                    <Play className="h-3.5 w-3.5 fill-current" />Play
+                    <Play className="h-3.5 w-3.5 fill-current" />{t('signals.play', 'Play')}
                   </GradientButton>
                   <StudioButton onClick={() => setIsPlaying(false)} className="inline-flex items-center gap-1.5 cursor-pointer">
-                    <Pause className="h-3.5 w-3.5" />Pause
+                    <Pause className="h-3.5 w-3.5" />{t('signals.pause', 'Pause')}
                   </StudioButton>
                   <StudioButton onClick={() => { setSpeed(2.4); setIsPlaying(true); }} className="inline-flex items-center gap-1.5 cursor-pointer">
-                    <FastForward className="h-3.5 w-3.5" />Fast forward
+                    <FastForward className="h-3.5 w-3.5" />{t('signals.fastForward', 'Fast forward')}
                   </StudioButton>
                   <StudioButton onClick={() => step(-0.45)} className="inline-flex items-center gap-1.5 cursor-pointer">
-                    <Rewind className="h-3.5 w-3.5" />Rewind
+                    <Rewind className="h-3.5 w-3.5" />{t('signals.rewind', 'Rewind')}
                   </StudioButton>
                 </div>
               </div>
               <InnerBox className="mb-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] items-end">
                 <StudioSlider
                   ref={sliderRef}
-                  label={<span>Shift parameter <KatexMath math="t" /></span>}
+                  label={<span>{t('signals.shiftParameter', 'Shift parameter')} <KatexMath math="t" /></span>}
                   valueDisplay={<span ref={resultRef} className="font-mono text-xs font-semibold px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-blue-600 dark:text-blue-400"><KatexMath math="y(-3)=0" /></span>}
                   min={convRange.from}
                   max={convRange.to}
@@ -224,7 +226,7 @@ export function ConvolutionLab() {
                   }}
                 />
                 <StudioButton onClick={() => step(0.05)} className="inline-flex items-center justify-center gap-1 cursor-pointer">
-                  <StepForward className="h-3.5 w-3.5" />Fine step
+                  <StepForward className="h-3.5 w-3.5" />{t('signals.fineStep', 'Fine step')}
                 </StudioButton>
               </InnerBox>
               <ConvolutionCanvas ref={canvas} x={xParsed.ast} h={hParsed.ast} range={convRange} isPlaying={isPlaying} speed={speed} onFrame={(result) => updateReadout(result, true)} onManualReadout={manualReadout} />
@@ -243,10 +245,10 @@ export function ConvolutionLab() {
           <StudioCard>
             <div className="mb-4 flex flex-col gap-1">
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-white pb-2 border-b border-slate-100 dark:border-slate-800">
-                THREE-TIER DISCRETE STEM CANVAS
+                {t('signals.threeTierDiscreteStemCanvas', 'Three-tier discrete stem canvas')}
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Discrete convolution evaluated in the stem domain: reverse-reflected kernel <KatexMath math="h[n-k]" /> slides across input <KatexMath math="x[k]" />. Hover over any stem to inspect exact sample values.
+                {t('signals.discreteConvIntro', 'Discrete convolution evaluated in the stem domain: reverse-reflected kernel ')}<KatexMath math="h[n-k]" />{t('signals.discreteConvMid', ' slides across input ')}<KatexMath math="x[k]" />{t('signals.discreteConvOutro', '. Hover over any stem to inspect exact sample values.')}
               </p>
             </div>
             <DiscreteConvolutionScope

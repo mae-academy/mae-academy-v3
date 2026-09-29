@@ -1,4 +1,5 @@
 import { useMemo, useState, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { KatexMath } from "@/components/ui/KatexMath";
 import { SegmentedControl, StudioCard, StudioSlider, InnerBox } from "@/components/common/templates";
 import { PowerWarningAlert } from "./PowerWarningAlert";
@@ -19,25 +20,6 @@ const card = "rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-wh
 const heading = "text-sm font-bold text-slate-800 dark:text-white";
 const field =
   "h-11 w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 text-slate-800 text-xl font-medium sm:text-2xl tracking-wide dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 dark:focus:ring-violet-400 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [-moz-appearance:textfield] m-0 text-center disabled:cursor-not-allowed disabled:opacity-35 transition";
-
-const topologyOptions: Array<{ value: ChopperTopology; label: string }> = [
-  { value: "buck", label: "Buck" },
-  { value: "boost", label: "Boost" },
-  { value: "buck-boost", label: "Buck-Boost" }
-];
-
-const quadrantOptions: Array<{ value: QuadrantClass; label: string; badge?: ReactNode }> = [
-  { value: "A", label: "Class A", badge: <span className="font-['Poppins',sans-serif] text-[10px] sm:text-xs tracking-normal font-medium">1st-Q</span> },
-  { value: "B", label: "Class B", badge: <span className="font-['Poppins',sans-serif] text-[10px] sm:text-xs tracking-normal font-medium">2nd-Q</span> },
-  { value: "C", label: "Class C", badge: <span className="font-['Poppins',sans-serif] text-[10px] sm:text-xs tracking-normal font-medium">2-Q A</span> },
-  { value: "D", label: "Class D", badge: <span className="font-['Poppins',sans-serif] text-[10px] sm:text-xs tracking-normal font-medium">2-Q B</span> },
-  { value: "E", label: "Class E", badge: <span className="font-['Poppins',sans-serif] text-[10px] sm:text-xs tracking-normal font-medium">4-Q</span> }
-];
-
-const controlOptions: Array<{ value: ChopperControl; label: string }> = [
-  { value: "pwm", label: "PWM (Time-Ratio)" },
-  { value: "frequency", label: "Frequency Mod." }
-];
 
 const loadOptions = [
   { value: "R" as ChopperLoad, label: <KatexMath math="R" /> },
@@ -122,10 +104,12 @@ function ModeMetric({ mode }: { mode: "CCM" | "DCM" }) {
 }
 
 function Circuit({ parameters }: { parameters: ChopperParameters }) {
-  const title = `${parameters.topology === "buck" ? "Buck" : parameters.topology === "boost" ? "Boost" : "Buck-Boost"} · Class ${parameters.quadrantClass}`;
+  const { t } = useTranslation("simulators");
+  const topologyLabel = parameters.topology === "buck" ? t("power.buck", "Buck") : parameters.topology === "boost" ? t("power.boost", "Boost") : t("power.buckBoost", "Buck-Boost");
+  const title = `${topologyLabel} · ${t("power.classWord", "Class")} ${parameters.quadrantClass}`;
   return (
     <StudioCard
-      title="Circuit Diagram"
+      title={t("power.circuitDiagram", "Circuit Diagram")}
       actionSlot={
         <span className="text-xs font-bold text-violet-700 dark:text-violet-300">
           {parameters.control === "pwm" ? "PWM" : "FM"}
@@ -139,13 +123,30 @@ function Circuit({ parameters }: { parameters: ChopperParameters }) {
           <circle cx="42" cy="60" r="18" stroke="currentColor" strokeWidth="1.5" className="text-slate-400 dark:text-slate-500" />
           <path d="M30 60c4-10 9-10 13 0s9 10 13 0M134 38v44m12-35-24 26m24 0-24-26M238 34v52m-11-42 22 0m-22 16 22 0m-22 16 22 0" stroke="currentColor" strokeWidth="1.5" className="text-slate-400 dark:text-slate-500" />
         </svg>
-        <span className="mt-2 block text-[10px] font-bold tracking-[.06em] text-slate-400">{title}</span>
+        <span className="mt-2 block mae-i18n-text text-[10px] font-bold tracking-[.06em] text-slate-400">{title}</span>
       </div>
     </StudioCard>
   );
 }
 
 export function ChopperStudio() {
+  const { t } = useTranslation("simulators");
+  const topologyOptions: Array<{ value: ChopperTopology; label: string }> = [
+    { value: "buck", label: t("power.buck", "Buck") },
+    { value: "boost", label: t("power.boost", "Boost") },
+    { value: "buck-boost", label: t("power.buckBoost", "Buck-Boost") },
+  ];
+  const quadrantOptions: Array<{ value: QuadrantClass; label: string; badge?: ReactNode }> = [
+    { value: "A", label: t("power.classA", "Class A"), badge: <span className="font-['Poppins',sans-serif] text-[10px] sm:text-xs tracking-normal font-medium">1st-Q</span> },
+    { value: "B", label: t("power.classB", "Class B"), badge: <span className="font-['Poppins',sans-serif] text-[10px] sm:text-xs tracking-normal font-medium">2nd-Q</span> },
+    { value: "C", label: t("power.classC", "Class C"), badge: <span className="font-['Poppins',sans-serif] text-[10px] sm:text-xs tracking-normal font-medium">2-Q A</span> },
+    { value: "D", label: t("power.classD", "Class D"), badge: <span className="font-['Poppins',sans-serif] text-[10px] sm:text-xs tracking-normal font-medium">2-Q B</span> },
+    { value: "E", label: t("power.classE", "Class E"), badge: <span className="font-['Poppins',sans-serif] text-[10px] sm:text-xs tracking-normal font-medium">4-Q</span> },
+  ];
+  const controlOptions: Array<{ value: ChopperControl; label: string }> = [
+    { value: "pwm", label: t("power.controlPwmTimeRatio", "PWM (Time-Ratio)") },
+    { value: "frequency", label: t("power.controlFreqMod", "Frequency Mod.") },
+  ];
   const [parameters, setParameters] = useState<ChopperParameters>(defaultChopperParameters);
   const simulation = useMemo(() => simulateChopper(parameters), [parameters]);
   const metrics = simulation.metrics;
@@ -195,10 +196,10 @@ export function ChopperStudio() {
   }, [simulation.samples]);
 
   const topology = (
-    <StudioCard title="Topology Configuration">
+    <StudioCard title={t("power.topologyConfig", "Topology Configuration")}>
       <div className="space-y-4">
         <div>
-          <span className="mb-2 block text-xs font-bold text-slate-500 dark:text-slate-400">Basic Topology</span>
+          <span className="mb-2 block mae-i18n-text text-xs font-bold text-slate-500 dark:text-slate-400">{t("power.basicTopologyLabel", "Basic Topology")}</span>
           <SegmentedControl
             value={parameters.topology}
             options={topologyOptions}
@@ -207,7 +208,7 @@ export function ChopperStudio() {
           />
         </div>
         <div>
-          <span className="mb-2 block text-xs font-bold text-slate-500 dark:text-slate-400">Quadrant Classification</span>
+          <span className="mb-2 block mae-i18n-text text-xs font-bold text-slate-500 dark:text-slate-400">{t("power.quadrantClassLabel", "Quadrant Classification")}</span>
           <SegmentedControl
             value={parameters.quadrantClass}
             options={quadrantOptions}
@@ -255,7 +256,7 @@ export function ChopperStudio() {
   );
 
   const control = (
-    <StudioCard title="Control Technique">
+    <StudioCard title={t("power.controlTechnique", "Control Technique")}>
       <div>
         <SegmentedControl
           value={parameters.control}
@@ -270,7 +271,7 @@ export function ChopperStudio() {
           <KatexMath math={tex`D = ${numberTex(parameters.dutyCycle, 2)}`} className="text-xs font-semibold text-violet-600 dark:text-violet-400" />
         </div>
         <StudioSlider
-          aria-label="duty cycle"
+          aria-label={t("power.dutyCycleAria", "duty cycle")}
           min={0}
           max={1}
           step={0.01}
@@ -289,12 +290,12 @@ export function ChopperStudio() {
   );
 
   const sourceLoad = (
-    <StudioCard title="Source & Load Configuration">
+    <StudioCard title={t("power.sourceLoadConfig", "Source & Load Configuration")}>
       <div>
         <Field label={tex`V_s\,[\mathrm{V}]`} value={parameters.inputVoltage} min={1} step={1} onChange={(inputVoltage) => update("inputVoltage", inputVoltage)} />
       </div>
       <div className="mt-4">
-        <span className="mb-2 block text-xs font-bold text-slate-500 dark:text-slate-400">Load Set</span>
+        <span className="mb-2 block mae-i18n-text text-xs font-bold text-slate-500 dark:text-slate-400">{t("power.loadSet", "Load Set")}</span>
         <SegmentedControl
           value={parameters.loadType}
           options={loadOptions}
@@ -312,7 +313,7 @@ export function ChopperStudio() {
 
   const metricPanel = (
     <StudioCard
-      title="Steady-State Metrics"
+      title={t("power.steadyStateMetrics", "Steady-State Metrics")}
       actionSlot={<KatexMath math={tex`\frac{1}{T_s}\int_0^{T_s}(\cdot)\,dt`} className="text-xs text-slate-500 dark:text-slate-400" />}
     >
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -333,7 +334,7 @@ export function ChopperStudio() {
   );
 
   return (
-    <StudioErrorBoundary studioName="Chopper">
+    <StudioErrorBoundary studioName={t("power.chopperName", "Chopper")}>
       <div className="space-y-6">
         <PowerWarningAlert warnings={simulation.warnings} />
         <div className="grid gap-4 lg:gap-5 lg:grid-cols-2 items-start">
@@ -346,7 +347,10 @@ export function ChopperStudio() {
           <main className="min-w-0 w-full space-y-6">
 
             <PowerScopePlot
-              title={`CLASS ${parameters.quadrantClass} · ${parameters.topology === "buck" ? "BUCK" : parameters.topology === "boost" ? "BOOST" : "BUCK-BOOST"} CHOPPER OUTPUT SCOPE`}
+              title={t("power.chopperScopeTitle", "CLASS {{quadrantClass}} · {{topology}} CHOPPER OUTPUT SCOPE", {
+                quadrantClass: parameters.quadrantClass,
+                topology: (parameters.topology === "buck" ? t("power.buck", "Buck") : parameters.topology === "boost" ? t("power.boost", "Boost") : t("power.buckBoost", "Buck-Boost")).toUpperCase(),
+              })}
               subtitleLatex={tex`T_s=\frac{1}{f_s}=${numberTex(simulation.period * 1000, 3)}\,\mathrm{ms}`}
               series={series}
             />

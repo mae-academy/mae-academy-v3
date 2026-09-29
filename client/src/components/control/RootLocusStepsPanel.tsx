@@ -47,7 +47,7 @@ export function RootLocusStepsPanel({
                 onClick={() => onHighlight(stepKey)}
                 className="py-0.5 px-3 text-xs"
             >
-                Show
+                {t('control.showStep', 'Show')}
             </GradientButton>
         );
     };
@@ -79,7 +79,7 @@ export function RootLocusStepsPanel({
                     </div>
                     <p className="mb-2">
                         {t('control.step2Desc', 'The root locus exists on the real axis to the left of an odd number of total real poles and zeros.')}
-                        This satisfies the angle condition <KatexMath math={`\\sum \\angle(s-z_i) - \\sum \\angle(s-p_j) = (2k+1)180^\\circ`} />.
+                        {' '}{t('control.step2AngleCondition', 'This satisfies the angle condition')} <KatexMath math={`\\sum \\angle(s-z_i) - \\sum \\angle(s-p_j) = (2k+1)180^\\circ`} />.
                     </p>
                     <InnerBox>
                         <div className="text-xs text-slate-600 dark:text-slate-400">
@@ -105,7 +105,7 @@ export function RootLocusStepsPanel({
                     </div>
                     {i > 0 && asymptotes ? (
                         <>
-                            <div className="mb-2">{t('control.step4Desc', 'Calculate the centroid')} <KatexMath math="\sigma_a" /> and angles <KatexMath math="\psi" />.</div>
+                            <div className="mb-2">{t('control.step4Desc', 'Calculate the centroid')} <KatexMath math="\sigma_a" /> {t('control.step4AndAngles', 'and angles')} <KatexMath math="\psi" />.</div>
                             <InnerBox>
                                 <KatexMath math={`\\sigma_a = \\frac{\\sum p - \\sum z}{i} = ${parseFloat(asymptotes.centroid.toFixed(4))}`} displayMode={true} />
                                 <div className="mt-2 text-center text-slate-500 text-xs">{t('control.step4Sub', 'Angles (Degrees)')}</div>

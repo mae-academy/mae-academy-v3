@@ -3,6 +3,7 @@
  * Canvas vectors and trajectories remain solid black/white; control equations
  * and state labels are routed through KaTeX in the surrounding instrument UI.
  */
+import { useTranslation } from 'react-i18next';
 import { MousePointer2, Orbit } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useLocale } from "@/contexts/LocaleContext";
@@ -382,6 +383,7 @@ function StateSpace3D({ matrix, initialState, duration }: { matrix: Matrix; init
 
 
 export function StateSpacePortraits({ matrix, closedLoopMatrix, order }: Props) {
+  const { t } = useTranslation('simulators');
   const { locale } = useLocale(); const labels = copy[locale as LocaleCode] ?? copy.en;
   const [initialState, setInitialState] = useState<Vector>(() => Array.from({ length: order }, (_, index) => index === 0 ? 1 : 0));
   const duration = 10;

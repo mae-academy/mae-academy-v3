@@ -10,6 +10,7 @@ import { SvgKatexTick } from "@/components/common/templates/SvgKatexTick";
 import { useElementSize } from "@/hooks/useElementSize";
 import React, { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { Play, Pause, StepForward, Rewind, RotateCcw } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { KatexMath } from "@/components/ui/KatexMath";
 import {
   StudioSlider,
@@ -251,6 +252,7 @@ export function DiscreteConvolutionScope({
   className = "",
   hideControls = false,
 }: DiscreteConvolutionScopeProps) {
+  const { t } = useTranslation('simulators');
   const [internalN, setInternalN] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [hoverData, setHoverData] = useState<{
@@ -358,7 +360,7 @@ export function DiscreteConvolutionScope({
       {!hideControls && (
         <InnerBox className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] items-end">
           <StudioSlider
-            label={<span>Discrete shift parameter <KatexMath math="n" /></span>}
+            label={<span>{t('signals.discreteShiftParameter', 'Discrete shift parameter')} <KatexMath math="n" /></span>}
             mathLabel={<span className="text-slate-400 font-normal">(&Delta;n = 1)</span>}
             valueDisplay={
               <span className="font-mono text-xs font-bold px-2.5 py-1 rounded-md bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900/50">
@@ -382,11 +384,11 @@ export function DiscreteConvolutionScope({
             >
               {isPlaying ? (
                 <>
-                  <Pause className="h-3.5 w-3.5" /> Pause
+                  <Pause className="h-3.5 w-3.5" /> {t('signals.pause', 'Pause')}
                 </>
               ) : (
                 <>
-                  <Play className="h-3.5 w-3.5 fill-current" /> Auto step
+                  <Play className="h-3.5 w-3.5 fill-current" /> {t('signals.autoStep', 'Auto step')}
                 </>
               )}
             </GradientButton>
@@ -399,7 +401,7 @@ export function DiscreteConvolutionScope({
               disabled={n <= 0}
               className="inline-flex items-center gap-1 cursor-pointer text-xs"
             >
-              <Rewind className="h-3.5 w-3.5" /> Prev
+              <Rewind className="h-3.5 w-3.5" /> {t('signals.prevStep', 'Prev')}
             </StudioButton>
 
             <StudioButton
@@ -410,7 +412,7 @@ export function DiscreteConvolutionScope({
               disabled={n >= maxN}
               className="inline-flex items-center gap-1 cursor-pointer text-xs"
             >
-              <StepForward className="h-3.5 w-3.5" /> Next
+              <StepForward className="h-3.5 w-3.5" /> {t('signals.nextStep', 'Next')}
             </StudioButton>
 
             <StudioButton
@@ -421,7 +423,7 @@ export function DiscreteConvolutionScope({
               className="inline-flex items-center gap-1 cursor-pointer text-xs"
               title="Reset shift to n = 0"
             >
-              <RotateCcw className="h-3.5 w-3.5" /> Reset
+              <RotateCcw className="h-3.5 w-3.5" /> {t('signals.resetStep', 'Reset')}
             </StudioButton>
           </div>
         </InnerBox>

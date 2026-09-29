@@ -5,6 +5,7 @@
 import { BookOpen, Check, ChevronDown, Clipboard, Code, Copy, Cpu, Download, Pause, Play, Redo2, RotateCcw, Trash2, Undo2, Upload } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { useTranslation } from "react-i18next";
 import { cpp } from "@codemirror/lang-cpp";
 import { CodeEditor, type LineSeverity } from "@/components/code-editor/CodeEditor";
 import { SegmentedControl } from "@/components/common/templates";
@@ -31,6 +32,7 @@ function SketchEditor({
   activeLine: number;
   onActiveLine: (line: number) => void;
 }) {
+  const { t } = useTranslation("simulators");
   const lineSeverity = useMemo(
     () => (errorLine === null ? undefined : new Map<number, LineSeverity>([[errorLine, "error"]])),
     [errorLine]
@@ -43,7 +45,7 @@ function SketchEditor({
       activeLine={activeLine}
       onCursorLine={onActiveLine}
       lineSeverity={lineSeverity}
-      ariaLabel="Arduino sketch"
+      ariaLabel={t("arduino.sketchAria", "Arduino sketch")}
     />
   );
 }
@@ -51,12 +53,15 @@ function SketchEditor({
 // ---------------------------------------------------------------------------
 // Ribbon
 // ---------------------------------------------------------------------------
-const SPEED_OPTIONS = [
-  { label: "0.5x", value: "0.5" },
-  { label: "1.0x", value: "1" },
-  { label: "2.0x", value: "2" },
-  { label: "Instant", value: "instant" },
-] as const;
+function useSpeedOptions() {
+  const { t } = useTranslation("simulators");
+  return [
+    { label: "0.5x", value: "0.5" },
+    { label: "1.0x", value: "1" },
+    { label: "2.0x", value: "2" },
+    { label: t("toolbar.instant", "Instant"), value: "instant" },
+  ] as const;
+}
 
 const pillButton =
   "h-9 inline-flex items-center justify-center gap-1.5 px-2.5 text-xs font-medium transition active:scale-[.98] whitespace-nowrap shrink-0 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 rounded-full border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 hover:border-slate-300 dark:border-[#1a1d24] dark:bg-[#090a0d] dark:text-slate-300 dark:hover:bg-[#13161c]";
@@ -69,6 +74,8 @@ const STATUS_STYLE = {
 } as const;
 
 export function ArduinoStudio() {
+  const { t } = useTranslation("simulators");
+  const SPEED_OPTIONS = useSpeedOptions();
   const rt = useArduinoRuntime();
   const [code, setCode] = useState(DEFAULT_SKETCH);
   const [exampleId, setExampleId] = useState<string>("default");
@@ -155,22 +162,22 @@ export function ArduinoStudio() {
     void navigator.clipboard.writeText(code);
     setCopied(true);
     window.setTimeout(() => setCopied(false), 2000);
-    toast.success("Copied code to clipboard");
+    toast.success(t("assembler.toastCopied", "Copied code to clipboard"));
   };
   const handlePaste = async () => {
     try {
       const text = await navigator.clipboard.readText();
       if (text) {
         editSketch(text);
-        toast.success("Pasted from clipboard");
+        toast.success(t("assembler.toastPasted", "Pasted from clipboard"));
       }
     } catch {
-      toast.error("Clipboard permission required to paste");
+      toast.error(t("assembler.toastPasteError", "Clipboard permission required to paste"));
     }
   };
   const handleDelete = () => {
     editSketch("");
-    toast.info("Deleted code");
+    toast.info(t("assembler.toastDeleted", "Deleted code"));
   };
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -179,7 +186,7 @@ export function ArduinoStudio() {
     reader.onload = () => {
       if (typeof reader.result === "string") {
         editSketch(reader.result);
-        toast.success(`Imported ${file.name}`);
+        toast.success(t("assembler.toastImported", "Imported {{filename}}", { filename: file.name }));
       }
     };
     reader.readAsText(file);
@@ -194,7 +201,11 @@ export function ArduinoStudio() {
     URL.revokeObjectURL(url);
   };
 
-  const errorMessage = rt.diagnostic ? `Line ${rt.diagnostic.line}: ${rt.diagnostic.message}` : rt.runtimeError ? `Runtime error: ${rt.runtimeError}` : null;
+  const errorMessage = rt.diagnostic
+    ? t("arduino.lineError", "Line {{line}}: {{message}}", { line: rt.diagnostic.line, message: rt.diagnostic.message })
+    : rt.runtimeError
+      ? t("arduino.runtimeError", "Runtime error: {{error}}", { error: rt.runtimeError })
+      : null;
 
   return (
     <div className="arduino-studio flex h-[calc(100vh-15rem)] min-h-[600px] w-full select-none flex-col gap-2.5 overflow-hidden font-sans text-slate-800 dark:text-slate-200">
@@ -206,13 +217,15 @@ export function ArduinoStudio() {
           <div className="flex shrink-0 items-center gap-1">
             <div
               className="relative inline-flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-slate-200/80 bg-slate-200/60 px-3 text-xs font-medium text-slate-700 transition hover:bg-slate-300/50 dark:border-[#1a1d24] dark:bg-[#13161c] dark:text-slate-300 dark:hover:bg-[#1a1d24]"
-              title={`Active: ${ARDUINO_EXAMPLES.find(e => e.id === exampleId)?.label ?? "Custom sketch"} (Click to switch example)`}
+              title={t("assembler.activeExample", "Active: {{template}} (Click to switch example)", {
+                template: ARDUINO_EXAMPLES.find(e => e.id === exampleId)?.label ?? t("arduino.customSketch", "Custom sketch"),
+              })}
             >
               <BookOpen className="pointer-events-none h-3.5 w-3.5 shrink-0 text-violet-600 dark:text-violet-400" />
-              <span className="pointer-events-none text-xs font-semibold text-slate-800 dark:text-slate-200">Examples</span>
+              <span className="pointer-events-none text-xs font-semibold text-slate-800 dark:text-slate-200">{t("toolbar.examples", "Examples")}</span>
               <ChevronDown className="pointer-events-none h-3 w-3 text-slate-400" />
-              <select aria-label="Examples library" value={exampleId} onChange={e => onExample(e.target.value)} className="absolute inset-0 h-full w-full cursor-pointer text-xs opacity-0">
-                {!ARDUINO_EXAMPLES.some(ex => ex.id === exampleId) && <option value={exampleId}>Custom sketch</option>}
+              <select aria-label={t("toolbar.browseLibrary", "Browse the Interactive Examples Library")} value={exampleId} onChange={e => onExample(e.target.value)} className="absolute inset-0 h-full w-full cursor-pointer text-xs opacity-0">
+                {!ARDUINO_EXAMPLES.some(ex => ex.id === exampleId) && <option value={exampleId}>{t("arduino.customSketch", "Custom sketch")}</option>}
                 {ARDUINO_EXAMPLES.map(ex => (
                   <option key={ex.id} value={ex.id} className="bg-white font-sans text-slate-800 dark:bg-[#13161c] dark:text-slate-200">
                     {ex.label}
@@ -227,13 +240,19 @@ export function ArduinoStudio() {
               <button
                 type="button"
                 onClick={onRun}
-                title={running ? "Pause execution" : status === "paused" ? "Resume execution" : "Run execution"}
+                title={
+                  running
+                    ? t("toolbar.pauseTooltip", "Pause execution")
+                    : status === "paused"
+                      ? t("arduino.resumeTooltip", "Resume execution")
+                      : t("arduino.runTooltip", "Run execution")
+                }
                 className={`inline-flex h-9 shrink-0 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap px-3.5 text-xs font-semibold ${!running && started.current ? "brand-pill-active-rev" : "btn-active-brand"}`}
               >
                 {running ? <Pause className="h-3.5 w-3.5 fill-current" /> : <Play className="h-3.5 w-3.5 fill-current" />}
-                <span>{running ? "Pause" : status === "paused" ? "Resume" : "Run"}</span>
+                <span>{running ? t("toolbar.pause", "Pause") : status === "paused" ? t("arduino.resume", "Resume") : t("toolbar.run", "Run")}</span>
               </button>
-              <button type="button" onClick={onReset} title="Reset execution state" className={`${pillButton} w-9 px-0`}>
+              <button type="button" onClick={onReset} title={t("arduino.resetTooltip", "Reset execution state")} className={`${pillButton} w-9 px-0`}>
                 <RotateCcw className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" />
               </button>
             </div>
@@ -241,29 +260,29 @@ export function ArduinoStudio() {
             <span className="mx-1 h-5 w-px shrink-0 self-center bg-slate-200 dark:bg-[#1a1d24]" />
 
             <div className="flex shrink-0 items-center gap-1">
-              <button type="button" title="Undo" onClick={handleUndo} disabled={historyIndex <= 0} className={`${pillButton} w-9 px-0`}>
+              <button type="button" title={t("toolbar.undo", "Undo (Ctrl/Cmd+Z)")} onClick={handleUndo} disabled={historyIndex <= 0} className={`${pillButton} w-9 px-0`}>
                 <Undo2 size={13} />
               </button>
-              <button type="button" title="Redo" onClick={handleRedo} disabled={historyIndex >= history.length - 1} className={`${pillButton} w-9 px-0`}>
+              <button type="button" title={t("toolbar.redo", "Redo (Ctrl/Cmd+Shift+Z)")} onClick={handleRedo} disabled={historyIndex >= history.length - 1} className={`${pillButton} w-9 px-0`}>
                 <Redo2 size={13} />
               </button>
-              <button type="button" title={copied ? "Copied!" : "Copy code"} onClick={handleCopy} className={`${pillButton} w-9 px-0`}>
+              <button type="button" title={copied ? t("assembler.copied", "Copied!") : t("toolbar.copy", "Copy (Ctrl/Cmd+C)")} onClick={handleCopy} className={`${pillButton} w-9 px-0`}>
                 {copied ? <Check size={13} className="text-violet-600 dark:text-violet-400" /> : <Copy size={13} />}
               </button>
-              <button type="button" title="Paste from clipboard" onClick={handlePaste} className={`${pillButton} w-9 px-0`}>
+              <button type="button" title={t("toolbar.paste", "Paste (Ctrl/Cmd+V)")} onClick={handlePaste} className={`${pillButton} w-9 px-0`}>
                 <Clipboard size={13} />
               </button>
-              <button type="button" title="Delete / Clear editor content" onClick={handleDelete} className={`${pillButton} w-9 px-0`}>
+              <button type="button" title={t("toolbar.delete", "Delete (Del/Backspace)")} onClick={handleDelete} className={`${pillButton} w-9 px-0`}>
                 <Trash2 size={13} />
               </button>
 
               <span className="mx-1 h-5 w-px shrink-0 self-center bg-slate-200 dark:bg-[#1a1d24]" />
 
-              <button type="button" title="Import file (.ino, .cpp, .c)" onClick={() => fileInputRef.current?.click()} className={`${pillButton} w-9 px-0`}>
+              <button type="button" title={t("arduino.importTooltip", "Import file (.ino, .cpp, .c)")} onClick={() => fileInputRef.current?.click()} className={`${pillButton} w-9 px-0`}>
                 <Upload size={13} />
               </button>
               <input ref={fileInputRef} type="file" accept=".ino,.cpp,.cc,.c,.h,.txt" onChange={handleImport} className="hidden" />
-              <button type="button" title="Export / Download file (.ino)" onClick={handleExport} className={`${pillButton} w-9 px-0`}>
+              <button type="button" title={t("arduino.exportTooltip", "Export / Download file (.ino)")} onClick={handleExport} className={`${pillButton} w-9 px-0`}>
                 <Download size={13} />
               </button>
             </div>
@@ -275,7 +294,7 @@ export function ArduinoStudio() {
               value={String(speed)}
               onChange={onSpeed}
               size="sm"
-              aria-label="Execution speed"
+              aria-label={t("assembler.executionSpeedAria", "Execution speed")}
               className="border-slate-200/80 bg-slate-200/60 dark:border-[#1a1d24] dark:bg-[#13161c]"
             />
           </div>
@@ -299,7 +318,7 @@ export function ArduinoStudio() {
                   <Code className="ms-0.5 h-3.5 w-3.5 text-slate-500 dark:text-slate-400" />
                   <span className="font-mono text-xs font-semibold text-slate-700 dark:text-slate-300">sketch.ino</span>
                 </div>
-                <span className="font-mono text-[11px] text-slate-400 dark:text-slate-500">{lines} lines</span>
+                <span className="font-mono text-[11px] text-slate-400 dark:text-slate-500">{t("assembler.linesCount", "{{count}} lines", { count: lines })}</span>
               </div>
               <SketchEditor code={code} onChange={editSketch} errorLine={rt.diagnostic?.line ?? null} activeLine={activeLine} onActiveLine={setActiveLine} />
               {errorMessage && (

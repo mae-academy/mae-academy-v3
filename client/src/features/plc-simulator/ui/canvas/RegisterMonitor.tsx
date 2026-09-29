@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState, useSyncExternalStore } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { Network } from '../../domain/ast';
 import type { HardwareProfile } from '../../domain/hardware';
 import type { MemoryMap } from '../../domain/memory';
@@ -120,6 +121,7 @@ function RegisterRow({ reg, memory }: { reg: ReferencedRegister; memory: MemoryM
  * writes straight into the running VM's memory — the same store the ladder, IL and I/O rack read.
  */
 export function RegisterMonitor({ networks, profile, memory, className = '' }: RegisterMonitorProps) {
+  const { t } = useTranslation('simulators');
   // Recomputed only when the program itself changes; a scan updating memory never touches this,
   // each row's own subscription (below) handles that independently.
   const registers = useMemo(() => collectReferencedRegisters(networks, profile), [networks, profile]);
@@ -127,12 +129,12 @@ export function RegisterMonitor({ networks, profile, memory, className = '' }: R
   return (
     <section aria-label="Used registers and memory" className={`${PANEL} ${className}`}>
       <div className={PANEL_HEADER}>
-        <div className={PANEL_TITLE}>Registers &amp; Memory</div>
-        <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500">{registers.length} used</span>
+        <div className={PANEL_TITLE}>{t('plc.registersMemory', 'Registers & Memory')}</div>
+        <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500">{t('plc.usedCount', '{{count}} used', { count: registers.length })}</span>
       </div>
       {registers.length === 0 ? (
         <p className="p-3 text-center text-[11px] text-slate-500 dark:text-slate-400">
-          No VW/VD/VB, timer or counter operands in this program yet.
+          {t('plc.noRegistersYet', 'No VW/VD/VB, timer or counter operands in this program yet.')}
         </p>
       ) : (
         <div className="flex max-h-64 flex-col gap-1.5 overflow-y-auto p-2 font-sans text-xs">

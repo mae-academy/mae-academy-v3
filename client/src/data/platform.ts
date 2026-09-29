@@ -160,20 +160,50 @@ export const controlSystemToolMeta: Record<Locale, Array<{ slug: string; label: 
   ],
 };
 
-export const powerElectronicsToolMeta = [
-  { slug: "a", label: "Rectifiers" },
-  { slug: "b", label: "Inverters" },
-  { slug: "c", label: "AC Voltage Controller" },
-  { slug: "d", label: "Choppers" },
-] as const;
+export const powerElectronicsToolMeta: Record<Locale, Array<{ slug: string; label: string }>> = {
+  en: [
+    { slug: "a", label: "Rectifiers" },
+    { slug: "b", label: "Inverters" },
+    { slug: "c", label: "AC Voltage Controller" },
+    { slug: "d", label: "Choppers" },
+  ],
+  ar: [
+    { slug: "a", label: "المقوّمات" },
+    { slug: "b", label: "العواكس" },
+    { slug: "c", label: "متحكم جهد التيار المتردد" },
+    { slug: "d", label: "المقطّعات" },
+  ],
+  es: [
+    { slug: "a", label: "Rectificadores" },
+    { slug: "b", label: "Inversores" },
+    { slug: "c", label: "Controlador de Voltaje AC" },
+    { slug: "d", label: "Troceadores" },
+  ],
+};
 
-export const signalsAndSystemsToolMeta = [
-  { slug: "signal-operations-and-properties", label: "Signal Operations & Properties" },
-  { slug: "system-classification", label: "System Classification" },
-  { slug: "convolution-engine", label: "Convolution Engine" },
-  { slug: "fourier-analysis", label: "3D Fourier Analysis" },
-  { slug: "laplace-s-plane", label: "3D Laplace & S-Plane" },
-] as const;
+export const signalsAndSystemsToolMeta: Record<Locale, Array<{ slug: string; label: string }>> = {
+  en: [
+    { slug: "signal-operations-and-properties", label: "Signal Operations & Properties" },
+    { slug: "system-classification", label: "System Classification" },
+    { slug: "convolution-engine", label: "Convolution Engine" },
+    { slug: "fourier-analysis", label: "3D Fourier Analysis" },
+    { slug: "laplace-s-plane", label: "3D Laplace & S-Plane" },
+  ],
+  ar: [
+    { slug: "signal-operations-and-properties", label: "عمليات الإشارة وخصائصها" },
+    { slug: "system-classification", label: "تصنيف الأنظمة" },
+    { slug: "convolution-engine", label: "محرك الالتفاف" },
+    { slug: "fourier-analysis", label: "تحليل فورييه ثلاثي الأبعاد" },
+    { slug: "laplace-s-plane", label: "لابلاس ومستوى S ثلاثي الأبعاد" },
+  ],
+  es: [
+    { slug: "signal-operations-and-properties", label: "Operaciones y Propiedades de la Señal" },
+    { slug: "system-classification", label: "Clasificación de Sistemas" },
+    { slug: "convolution-engine", label: "Motor de Convolución" },
+    { slug: "fourier-analysis", label: "Análisis de Fourier 3D" },
+    { slug: "laplace-s-plane", label: "Laplace y Plano S 3D" },
+  ],
+};
 
 export const linearAlgebraToolMeta: Record<Locale, Array<{ slug: string; label: string }>> = {
   en: [

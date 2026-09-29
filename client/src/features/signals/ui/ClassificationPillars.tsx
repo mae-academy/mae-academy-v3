@@ -12,6 +12,7 @@ import {
   FunctionSquare,
   Timer,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { InnerBox, StatusBadge } from "@/components/common/templates";
 import { KatexMath } from "@/components/ui/KatexMath";
 import type { Pillar, PillarId } from "@/features/signals/engines/systemClassifier";
@@ -29,39 +30,40 @@ export function PillarIcon({ id }: { id: PillarId }) {
 }
 
 export function PillarSubtitle({ id }: { id: PillarId }) {
+  const { t } = useTranslation('simulators');
   switch (id) {
     case "linearity":
       return (
         <span className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 font-normal">
-          <span>Compare</span>
+          <span>{t('signals.compareLabel', 'Compare')}</span>
           <KatexMath math="T\{a x_1(t) + b x_2(t)\} \quad \text{with} \quad a T\{x_1(t)\} + b T\{x_2(t)\}" />
         </span>
       );
     case "time":
       return (
         <span className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 font-normal">
-          <span>Compare</span>
+          <span>{t('signals.compareLabel', 'Compare')}</span>
           <KatexMath math="T\{x(t - t_0)\} \quad \text{with} \quad y(t - t_0)" />
         </span>
       );
     case "causality":
       return (
         <span className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 font-normal">
-          <span>Evaluate dependency at</span>
+          <span>{t('signals.evaluateDependencyAt', 'Evaluate dependency at')}</span>
           <KatexMath math="t = t_1" />
         </span>
       );
     case "memory":
       return (
         <span className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 font-normal">
-          <span>Test dependence on past/future</span>
+          <span>{t('signals.testDependenceOnPastFuture', 'Test dependence on past/future')}</span>
           <KatexMath math="x(\tau), \ \tau \ne t" />
         </span>
       );
     case "stability":
       return (
         <span className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 font-normal">
-          <span>Inject bounded input</span>
+          <span>{t('signals.injectBoundedInput', 'Inject bounded input')}</span>
           <KatexMath math="|x(t)| \le M < \infty" />
         </span>
       );
@@ -69,10 +71,11 @@ export function PillarSubtitle({ id }: { id: PillarId }) {
 }
 
 export function PendingBadge() {
+  const { t } = useTranslation('simulators');
   return (
     <StatusBadge variant="neutral" className="gap-1.5 uppercase tracking-[0.1em] text-[10px]">
       <CircleAlert className="h-3.5 w-3.5" />
-      Syntax check
+      {t('signals.syntaxCheck', 'Syntax check')}
     </StatusBadge>
   );
 }
@@ -93,20 +96,21 @@ export function VerdictBadge({ pillar }: { pillar: Pillar }) {
  * Dedicated Derivation Card rendering step-by-step KaTeX mathematical substitution proofs.
  */
 export function PillarDerivationCard({ proof }: { proof: readonly string[] }) {
+  const { t } = useTranslation('simulators');
   return (
     <InnerBox>
       <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
         <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-white">
-          DERIVATION
+          {t('signals.derivationLabel', 'Derivation')}
         </h3>
         <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500">
-          {proof.length} analytical steps
+          {t('signals.analyticalSteps', '{{count}} analytical steps', { count: proof.length })}
         </span>
       </div>
       <div className="mt-3 space-y-3 overflow-x-auto">
         {proof.map((step, index) => (
           <div key={index} className="grid gap-1 sm:grid-cols-[4.5rem_minmax(0,1fr)] sm:gap-3">
-            <span className="font-sans text-xs font-semibold uppercase tracking-wider text-purple-600 dark:text-purple-400">Step {index + 1}</span>
+            <span className="font-sans text-xs font-semibold uppercase tracking-wider text-purple-600 dark:text-purple-400">{t('signals.stepLabel', 'Step {{number}}', { number: index + 1 })}</span>
             <div className="min-w-0">
               <KatexMath
                 math={step}

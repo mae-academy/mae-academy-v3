@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import type { Network } from '../../domain/ast';
 import { getProfile, listProfiles, S7_200_CPU224, S7_200_CPU226, S7_200_CPU226_EXP } from '../../domain/hardware';
@@ -35,6 +36,7 @@ const CPU_OPTIONS = [
 
 /** STEP 7-Micro/WIN style environment: ladder / IL editing plus the S7-200 rack. Remounted per CPU. */
 export function S7Workspace({ active, profileId, initialNetworks, symbols, runtimeOptions, onProfileChange, onNetworks }: S7WorkspaceProps) {
+  const { t } = useTranslation('simulators');
   const profile = getProfile(profileId) ?? S7_200_CPU224;
   const host = usePlcHost(profile, initialNetworks, { symbols, runtimeOptions });
   const [exporting, setExporting] = useState(false);
@@ -130,15 +132,15 @@ export function S7Workspace({ active, profileId, initialNetworks, symbols, runti
         frame={session.frame}
         readMetrics={host.readMetrics}
         onExport={() => setExporting(true)}
-        exportTitle="Export STEP 7-Micro/WIN program (.awl)"
+        exportTitle={t('plc.exportMicrowinTooltip', 'Export STEP 7-Micro/WIN program (.awl)')}
         onImport={(file) => void importFile(file)}
-        importTitle="Import STL program (.awl, .txt)"
+        importTitle={t('plc.importStlTooltip', 'Import STL program (.awl, .txt)')}
         importAccept=".awl,.txt"
         leading={
           <div className="flex items-center gap-1.5 shrink-0">
             <div
               role="tablist"
-              aria-label="CPU Selection"
+              aria-label={t('plc.cpuSelectionAria', 'CPU Selection')}
               className="inline-flex items-center p-1 rounded-full bg-slate-100/80 dark:bg-slate-800/50 backdrop-blur-sm border border-slate-200/60 dark:border-slate-700/50"
             >
               {CPU_OPTIONS.map((opt) => {
@@ -161,7 +163,7 @@ export function S7Workspace({ active, profileId, initialNetworks, symbols, runti
               })}
             </div>
             <select
-              aria-label="Hardware profile"
+              aria-label={t('plc.hardwareProfileAria', 'Hardware profile')}
               value={profile.id}
               onChange={(event) => onProfileChange(event.target.value)}
               className="sr-only"

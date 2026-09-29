@@ -154,16 +154,16 @@ export function SignalOperationsLab() {
                     </span>
                     <div className="text-base font-semibold">
                       {analysis.classification === "Power Signal" ? (
-                        <span className="text-blue-600 dark:text-blue-400 font-serif tracking-wide text-base">
-                          <KatexMath math={`\\text{${t('signals.powerSignal', 'Power Signal')}}`} />
+                        <span className="text-blue-600 dark:text-blue-400 tracking-wide text-base">
+                          {t('signals.powerSignal', 'Power Signal')}
                         </span>
                       ) : analysis.classification === "Energy Signal" ? (
-                        <span className="text-purple-600 dark:text-purple-400 font-serif tracking-wide text-base">
-                          <KatexMath math={`\\text{${t('signals.energySignal', 'Energy Signal')}}`} />
+                        <span className="text-purple-600 dark:text-purple-400 tracking-wide text-base">
+                          {t('signals.energySignal', 'Energy Signal')}
                         </span>
                       ) : (
-                        <span className="text-slate-500 dark:text-slate-400 font-serif text-base">
-                          <KatexMath math={`\\text{${t('signals.neither', 'Neither')}}`} />
+                        <span className="text-slate-500 dark:text-slate-400 text-base">
+                          {t('signals.neither', 'Neither')}
                         </span>
                       )}
                     </div>
@@ -177,8 +177,8 @@ export function SignalOperationsLab() {
                       value={periodicOverride === "auto" ? (analysis.autoPeriodic ? "periodic" : "aperiodic") : periodicOverride}
                       onChange={(value) => setPeriodicOverride(value)}
                       options={[
-                        { label: "Periodic", value: "periodic" as const },
-                        { label: "Aperiodic", value: "aperiodic" as const },
+                        { label: t('signals.periodic', 'Periodic'), value: "periodic" as const },
+                        { label: t('signals.aperiodic', 'Aperiodic'), value: "aperiodic" as const },
                       ]}
                       aria-label="Periodicity override"
                     />
@@ -269,7 +269,7 @@ export function SignalOperationsLab() {
 
               {model.impulses.length > 0 && (
                 <div className="border-l-2 border-rose-400 bg-rose-50/70 px-3 py-2 dark:bg-rose-500/10 rounded-r-xl">
-                  <p className="text-[10px] font-bold uppercase tracking-[.14em] text-rose-700 dark:text-rose-200">Symbolic Dirac entity</p>
+                  <p className="text-[10px] font-bold uppercase tracking-[.14em] text-rose-700 dark:text-rose-200">{t('signals.symbolicDiracEntity', 'Symbolic Dirac entity')}</p>
                   {model.impulses.map((impulse) => (
                     <KatexMath key={`${impulse.time}-${impulse.weight}`} math={impulse.latex} block className="mt-1 text-sm font-bold text-rose-700 dark:text-rose-100" />
                   ))}
@@ -284,7 +284,7 @@ export function SignalOperationsLab() {
             </>
           ) : (
             <div className="rounded-xl border border-dashed border-slate-300 bg-white/60 p-6 text-center dark:border-slate-700 dark:bg-slate-950/40">
-              <p className="text-xs font-bold text-slate-500 dark:text-slate-400">Awaiting valid input</p>
+              <p className="text-xs font-bold text-slate-500 dark:text-slate-400">{t('signals.awaitingValidInput', 'Awaiting valid input')}</p>
               <p className="mt-1 text-xs leading-5 text-slate-400 dark:text-slate-500">{!parsed.ok ? parsed.error : ""}</p>
             </div>
           )}

@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { SegmentedControl } from '@/components/common/templates';
 import type { Network } from '../../domain/ast';
 import { getProfile, LOGO_0BA8, S7_200_CPU224 } from '../../domain/hardware';
@@ -42,6 +43,7 @@ export function PlcSimulatorApp({
   runtimeOptions,
   className = '',
 }: PlcSimulatorAppProps) {
+  const { t } = useTranslation('simulators');
   const [platform, setPlatform] = useState<PlcPlatform>(initialProfileId === LOGO_0BA8.id ? 'logo' : 's7');
   const [cpuId, setCpuId] = useState(() => {
     const requested = getProfile(initialProfileId);
@@ -56,7 +58,7 @@ export function PlcSimulatorApp({
     <div className={`flex min-h-[640px] w-full flex-col gap-2.5 font-sans text-slate-800 dark:text-slate-200 ${platform === 's7' ? 'h-[calc(100vh-15rem)]' : ''} ${className}`}>
       <div className="flex shrink-0 items-center justify-center py-0.5">
         <SegmentedControl<PlcPlatform>
-          aria-label="Controller platform"
+          aria-label={t('plc.controllerPlatformAria', 'Controller platform')}
           size="md"
           value={platform}
           options={PLATFORM_OPTIONS.map((option) => ({ ...option }))}

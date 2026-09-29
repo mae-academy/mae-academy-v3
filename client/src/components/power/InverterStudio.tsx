@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { KatexMath } from "@/components/ui/KatexMath";
 import { SegmentedControl, StudioCard, StudioSlider, InnerBox } from "@/components/common/templates";
 import { PowerWarningAlert, StudioAlert, NoticeBadge } from "./PowerWarningAlert";
@@ -22,26 +23,9 @@ const heading = "text-sm font-bold text-slate-800 dark:text-white";
 const field =
   "h-11 w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 text-slate-800 text-xl font-medium sm:text-2xl tracking-wide dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 dark:focus:ring-violet-400 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [-moz-appearance:textfield] m-0 text-center disabled:cursor-not-allowed disabled:opacity-35 transition";
 
-const phases = [
-  { value: "single" as InverterPhase, label: "Single-Phase (1-Φ)" },
-  { value: "three" as InverterPhase, label: "Three-Phase (3-Φ)" },
-];
-
-const singleTopologies = [
-  { value: "half-bridge" as SinglePhaseSubtype, label: "Half-Bridge" },
-  { value: "full-bridge" as SinglePhaseSubtype, label: "Full-Bridge" },
-];
-
 const threeModes = [
   { value: "180" as ThreePhaseConduction, label: <KatexMath math={tex`180^\circ`} /> },
   { value: "120" as ThreePhaseConduction, label: <KatexMath math={tex`120^\circ`} /> },
-];
-
-const techniques = [
-  { value: "square" as SwitchingTechnique, label: "Square" },
-  { value: "single-pulse" as SwitchingTechnique, label: "Single-P" },
-  { value: "multi-pulse" as SwitchingTechnique, label: "Multi-P" },
-  { value: "spwm" as SwitchingTechnique, label: "SPWM" },
 ];
 
 const loads = [
@@ -113,18 +97,26 @@ function computeInverterHarmonics(samples: InverterSample[], period: number, max
 }
 
 function Circuit({ parameters, faulted }: { parameters: InverterParameters; faulted: boolean }) {
-  const topology = parameters.phase === "single" ? `${parameters.singlePhaseSubtype === "full-bridge" ? "Full" : "Half"}-Bridge VSI` : `Three-Phase ${parameters.threePhaseConduction}° VSI`;
+  const { t } = useTranslation("simulators");
+  const techniqueLabels: Record<SwitchingTechnique, string> = {
+    square: t("power.switchSquare", "Square"),
+    "single-pulse": t("power.switchSingleP", "Single-P"),
+    "multi-pulse": t("power.switchMultiP", "Multi-P"),
+    spwm: t("power.switchSpwm", "SPWM"),
+  };
+  const bridgeWord = parameters.singlePhaseSubtype === "full-bridge" ? t("power.fullBridge", "Full-Bridge") : t("power.halfBridge", "Half-Bridge");
+  const topology = parameters.phase === "single" ? `${bridgeWord} VSI` : `${t("power.threePhaseWord", "Three-Phase")} ${parameters.threePhaseConduction}° VSI`;
   const switchColor = faulted ? "text-rose-500" : "text-violet-500";
   return (
     <section className={`${card} min-h-[340px]`}>
       <div className="flex items-center justify-between gap-3">
-        <h3 className={heading}>Circuit Diagram</h3>
+        <h3 className={heading}>{t("power.circuitDiagram", "Circuit Diagram")}</h3>
         <span className={`text-xs font-bold ${faulted ? "text-rose-600 dark:text-rose-300" : "text-violet-700 dark:text-violet-300"}`}>
-          {faulted ? "FAULT / LEG INHIBITED" : parameters.technique.toUpperCase()}
+          {faulted ? t("power.faultLegInhibited", "FAULT / LEG INHIBITED") : techniqueLabels[parameters.technique].toUpperCase()}
         </span>
       </div>
       <div className={`mt-4 grid min-h-60 place-items-center overflow-hidden rounded-2xl border border-dashed p-4 text-center dark:bg-slate-950 ${faulted ? "border-rose-400 bg-rose-50 dark:border-rose-400/50 dark:bg-rose-500/10" : "border-violet-300 bg-slate-50 dark:border-violet-400/30 dark:bg-slate-950"}`}>
-        <svg viewBox="0 0 360 150" className="h-36 w-full max-w-lg" fill="none" aria-label={faulted ? "Shoot-through fault detected in inverter leg" : topology}>
+        <svg viewBox="0 0 360 150" className="h-36 w-full max-w-lg" fill="none" aria-label={faulted ? t("power.shootThroughFaultAriaLabel", "Shoot-Through fault detected in inverter leg") : topology}>
           <defs>
             {faulted && (
               <filter id="shoot-through-glow" x="-50%" y="-50%" width="200%" height="200%">
@@ -148,8 +140,8 @@ function Circuit({ parameters, faulted }: { parameters: InverterParameters; faul
             </g>
           )}
         </svg>
-        <span className={`mt-2 block text-[10px] font-bold tracking-[.06em] ${faulted ? "text-rose-600 dark:text-rose-300" : "text-slate-400"}`}>
-          {faulted ? "SHOOT-THROUGH · OUTPUT INHIBITED" : topology}
+        <span className={`mt-2 block mae-i18n-text text-[10px] font-bold tracking-[.06em] ${faulted ? "text-rose-600 dark:text-rose-300" : "text-slate-400"}`}>
+          {faulted ? t("power.shootThroughOutputInhibited", "SHOOT-THROUGH · OUTPUT INHIBITED") : topology}
         </span>
       </div>
     </section>
@@ -157,6 +149,21 @@ function Circuit({ parameters, faulted }: { parameters: InverterParameters; faul
 }
 
 export function InverterStudio() {
+  const { t } = useTranslation("simulators");
+  const phases = [
+    { value: "single" as InverterPhase, label: t("power.phaseSingleFull", "Single-Phase (1-Φ)") },
+    { value: "three" as InverterPhase, label: t("power.phaseThreeFull", "Three-Phase (3-Φ)") },
+  ];
+  const singleTopologies = [
+    { value: "half-bridge" as SinglePhaseSubtype, label: t("power.halfBridge", "Half-Bridge") },
+    { value: "full-bridge" as SinglePhaseSubtype, label: t("power.fullBridge", "Full-Bridge") },
+  ];
+  const techniques = [
+    { value: "square" as SwitchingTechnique, label: t("power.switchSquare", "Square") },
+    { value: "single-pulse" as SwitchingTechnique, label: t("power.switchSingleP", "Single-P") },
+    { value: "multi-pulse" as SwitchingTechnique, label: t("power.switchMultiP", "Multi-P") },
+    { value: "spwm" as SwitchingTechnique, label: t("power.switchSpwm", "SPWM") },
+  ];
   const [parameters, setParameters] = useState<InverterParameters>(defaultInverterParameters);
   const [showSignals, setShowSignals] = useState(false);
   const simulation = useMemo(() => simulateInverter(parameters), [parameters]);
@@ -279,40 +286,40 @@ export function InverterStudio() {
 
   const topology = (
     <StudioCard
-      title="Topology Configuration"
+      title={t("power.topologyConfig", "Topology Configuration")}
       actionSlot={<KatexMath math={tex`V_{dc}=${numberTex(parameters.dcVoltage, 0)}\,\mathrm{V}`} className="text-sm text-violet-700 dark:text-violet-300" />}
     >
       <div className="space-y-4">
         <div>
-          <span className="mb-2 block text-xs font-bold text-slate-500 dark:text-slate-400">Phase</span>
+          <span className="mb-2 block mae-i18n-text text-xs font-bold text-slate-500 dark:text-slate-400">{t("power.phase", "Phase")}</span>
           <SegmentedControl
             options={phases}
             value={parameters.phase}
             onChange={(phase) => update("phase", phase)}
             fullWidth
-            aria-label="Inverter Phase"
+            aria-label={t("power.inverterPhaseAria", "Inverter Phase")}
           />
         </div>
         {parameters.phase === "single" ? (
           <div>
-            <span className="mb-2 block text-xs font-bold text-slate-500 dark:text-slate-400">1-Φ Sub-Type</span>
+            <span className="mb-2 block mae-i18n-text text-xs font-bold text-slate-500 dark:text-slate-400">{t("power.singlePhaseSubtypeLabel", "1-Φ Sub-Type")}</span>
             <SegmentedControl
               options={singleTopologies}
               value={parameters.singlePhaseSubtype}
               onChange={(singlePhaseSubtype) => update("singlePhaseSubtype", singlePhaseSubtype)}
               fullWidth
-              aria-label="1-Φ Sub-Type"
+              aria-label={t("power.singlePhaseSubtypeLabel", "1-Φ Sub-Type")}
             />
           </div>
         ) : (
           <div>
-            <span className="mb-2 block text-xs font-bold text-slate-500 dark:text-slate-400">3-Φ Conduction Mode</span>
+            <span className="mb-2 block mae-i18n-text text-xs font-bold text-slate-500 dark:text-slate-400">{t("power.threePhaseConductionLabel", "3-Φ Conduction Mode")}</span>
             <SegmentedControl
               options={threeModes}
               value={parameters.threePhaseConduction}
               onChange={(threePhaseConduction) => update("threePhaseConduction", threePhaseConduction)}
               fullWidth
-              aria-label="3-Φ Conduction Mode"
+              aria-label={t("power.threePhaseConductionLabel", "3-Φ Conduction Mode")}
             />
           </div>
         )}
@@ -321,14 +328,14 @@ export function InverterStudio() {
   );
 
   const control = (
-    <StudioCard title="Control Technique">
+    <StudioCard title={t("power.controlTechnique", "Control Technique")}>
       <div className="mt-4">
         <SegmentedControl
           options={techniques}
           value={parameters.technique}
           onChange={(technique) => update("technique", technique)}
           fullWidth
-          aria-label="Switching Technique"
+          aria-label={t("power.switchingTechniqueAria", "Switching Technique")}
         />
       </div>
 
@@ -342,7 +349,7 @@ export function InverterStudio() {
               <KatexMath math={numberTex(parameters.modulationIndex, 2)} className="text-xs text-violet-700 dark:text-violet-300" />
             </div>
             <StudioSlider
-              aria-label="modulation index"
+              aria-label={t("power.modulationIndexAria", "modulation index")}
               min={0}
               max={1.2}
               step={0.01}
@@ -367,13 +374,13 @@ export function InverterStudio() {
           <div>
             <div className="flex items-center gap-2">
               <NoticeBadge
-                label="PROTECTION TEST"
+                label={t("power.protectionTest", "PROTECTION TEST")}
                 tone={shootThroughFault ? "rose" : "slate"}
               />
-              <span className="text-xs font-semibold">Same-Leg Shoot-Through Command</span>
+              <span className="text-xs font-semibold">{t("power.shootThroughCommand", "Same-Leg Shoot-Through Command")}</span>
             </div>
             <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">
-              Toggle the documented shoot-through condition. The solver inhibits output rather than presenting a normal waveform.
+              {t("power.shootThroughDesc", "Toggle the documented shoot-through condition. The solver inhibits output rather than presenting a normal waveform.")}
             </p>
           </div>
           <button
@@ -386,7 +393,7 @@ export function InverterStudio() {
                 : "border-slate-300 text-slate-600 hover:border-rose-400 hover:text-rose-600 dark:border-slate-700 dark:text-slate-300"
             }`}
           >
-            {shootThroughFault ? "Clear Fault" : "Trigger Fault"}
+            {shootThroughFault ? t("power.clearFault", "Clear Fault") : t("power.triggerFault", "Trigger Fault")}
           </button>
         </div>
       </div>
@@ -394,19 +401,19 @@ export function InverterStudio() {
   );
 
   const sourceLoad = (
-    <StudioCard title="Source & Load Configuration">
+    <StudioCard title={t("power.sourceLoadConfig", "Source & Load Configuration")}>
       <div className="mt-4">
         <Field label={tex`V_{dc}\,[\mathrm{V}]`} value={parameters.dcVoltage} min={1} step={1} setValue={(dcVoltage) => update("dcVoltage", dcVoltage)} />
       </div>
 
       <div className="mt-4">
-        <span className="mb-2 block text-xs font-bold text-slate-500 dark:text-slate-400">Load Set</span>
+        <span className="mb-2 block mae-i18n-text text-xs font-bold text-slate-500 dark:text-slate-400">{t("power.loadSet", "Load Set")}</span>
         <SegmentedControl
           options={loads}
           value={parameters.loadType}
           onChange={(loadType) => update("loadType", loadType)}
           fullWidth
-          aria-label="Load Set"
+          aria-label={t("power.loadSet", "Load Set")}
         />
       </div>
 
@@ -422,12 +429,12 @@ export function InverterStudio() {
     <SegmentedControl
       size="sm"
       options={[
-        { label: "Waveform Only", value: false },
-        { label: "PWM Carrier", value: true },
+        { label: t("power.waveformOnly", "Waveform Only"), value: false },
+        { label: t("power.pwmCarrier", "PWM Carrier"), value: true },
       ]}
       value={showSignals}
       onChange={setShowSignals}
-      aria-label="PWM carrier visibility"
+      aria-label={t("power.pwmCarrierVisibilityAria", "PWM carrier visibility")}
     />
   ) : null;
 
@@ -436,15 +443,15 @@ export function InverterStudio() {
       {shootThroughFault && (
         <StudioAlert
           variant="error"
-          badge="PROTECTION EVENT · DC LINK LEG"
-          title="Shoot-Through Fault Detected"
-          message="The inverter output scope is inhibited. Short-circuit current cannot be modeled without a parasitic DC bus impedance."
+          badge={t("power.protectionEventBadge", "PROTECTION EVENT · DC LINK LEG")}
+          title={t("power.shootThroughFaultTitle", "Shoot-Through Fault Detected")}
+          message={t("power.shootThroughFaultMsg", "The inverter output scope is inhibited. Short-circuit current cannot be modeled without a parasitic DC bus impedance.")}
           className="mb-4"
         />
       )}
 
       <PowerScopePlot
-        title={parameters.phase === "three" ? "THREE-PHASE VSI OUTPUT SCOPE" : "SINGLE-PHASE VSI OUTPUT SCOPE"}
+        title={parameters.phase === "three" ? t("power.threePhaseVsiScope", "THREE-PHASE VSI OUTPUT SCOPE") : t("power.singlePhaseVsiScope", "SINGLE-PHASE VSI OUTPUT SCOPE")}
         subtitleLatex={
           parameters.phase === "three"
             ? tex`V_{oA}(t),\ V_{oB}(t),\ V_{oC}(t),\ I_o(t)`
@@ -461,7 +468,7 @@ export function InverterStudio() {
   const metricsPanel = (
     <section className={`${card} p-4`}>
       <div>
-        <h3 className={heading}>Steady-State Metrics</h3>
+        <h3 className={heading}>{t("power.steadyStateMetrics", "Steady-State Metrics")}</h3>
         <KatexMath math={tex`\mathrm{DFT}\{V_{an},I_o\}_{T}`} className="mt-1 block text-xs text-slate-500 dark:text-slate-400" />
       </div>
       <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -482,7 +489,7 @@ export function InverterStudio() {
   );
 
   return (
-    <StudioErrorBoundary studioName="Inverter">
+    <StudioErrorBoundary studioName={t("power.inverterName", "Inverter")}>
       <div className="space-y-6">
         <PowerWarningAlert warnings={displayWarnings} />
         <div className="grid gap-4 lg:gap-5 lg:grid-cols-2 items-start">

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useTranslation } from 'react-i18next';
 import { KatexMath } from "@/components/ui/KatexMath";
 import { simulateLtiStepResponse } from "@/features/control/controlMath";
 import {
@@ -53,6 +54,7 @@ function algebraicDcGain(numerator: number[], denominator: number[]) {
 }
 
 export function FrequencyResponseStudio() {
+  const { t } = useTranslation('simulators');
   const [tfData, setTfData] = useState<TransferFunctionData>(INITIAL_TF);
   const [gain, setGain] = useState(1);
   const [selectedFactorIds, setSelectedFactorIds] = useState<string[]>([]);
@@ -120,9 +122,9 @@ export function FrequencyResponseStudio() {
             value={primaryView}
             onChange={(val) => setPrimaryView(val as PrimaryView)}
             options={[
-              { value: "bode", label: "Bode" },
-              { value: "nyquist", label: "Nyquist" },
-              { value: "nichols", label: "Nichols" },
+              { value: "bode", label: t('control.bode', 'Bode') },
+              { value: "nyquist", label: t('control.nyquist', 'Nyquist') },
+              { value: "nichols", label: t('control.nichols', 'Nichols') },
             ]}
           />
         </div>
@@ -136,10 +138,10 @@ export function FrequencyResponseStudio() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
         {/* Left Column: Compact Control Panel */}
         <div className="col-span-12 lg:col-span-4 flex flex-col">
-          <StudioCard title="Live Gain Compensation" className="h-full flex flex-col justify-between">
+          <StudioCard title={t('control.liveGainCompensation', 'Live Gain Compensation')} className="h-full flex flex-col justify-between">
             <div className="space-y-5">
               <StudioSlider
-                label={<span className="text-xs font-semibold text-slate-700 dark:text-slate-300">Gain Compensation</span>}
+                label={<span className="text-xs font-semibold text-slate-700 dark:text-slate-300">{t('control.gainCompensation', 'Gain Compensation')}</span>}
                 mathLabel={<KatexMath math="K" />}
                 min={0.01}
                 max={10}
@@ -178,7 +180,7 @@ export function FrequencyResponseStudio() {
         {/* Right Column: Step Response Scope */}
         <div className="col-span-12 lg:col-span-8 min-w-0 flex flex-col">
           <StandardStepPlot
-            title="Closed-Loop Step Response"
+            title={t('control.closedLoopStepResponse', 'Closed-Loop Step Response')}
             xLabelKatex="t \text{ (s)}"
             yLabelKatex="y(t)"
             height={320}
@@ -229,7 +231,7 @@ export function FrequencyResponseStudio() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
         {/* Left Column: Time-Domain Correlation */}
         <div className="col-span-12 lg:col-span-5 flex flex-col">
-          <StudioCard title="Time-Domain Correlation" className="h-full flex flex-col justify-between">
+          <StudioCard title={t('control.timeDomainCorrelation', 'Time-Domain Correlation')} className="h-full flex flex-col justify-between">
             <div className="grid grid-cols-2 gap-2.5 h-full content-between">
               <MetricTile label="M_p" value={`${formatEngineering(stepResponse.overshootPercent)}\\%`} />
               <MetricTile label="t_r" value={`${formatEngineering(stepResponse.riseTime)}\\,\\mathrm{s}`} />
@@ -276,9 +278,10 @@ function SketchTutorial({
   events: Array<{ omega: number; deltaDbPerDecade: number; label: string }>;
   className?: string;
 }) {
+  const { t } = useTranslation('simulators');
   let runningSlope = initialSlope;
   return (
-    <StudioCard title="Step-by-Step Sketch Tutor" className={className}>
+    <StudioCard title={t('control.sketchTutor', 'Step-by-Step Sketch Tutor')} className={className}>
       <div className="grid divide-y divide-slate-100 dark:divide-slate-800 xl:grid-cols-3 xl:divide-x xl:divide-y-0">
         <TutorialStep title="\mathrm{Anchor\ the\ DC\ gain}">
           <KatexMath math={`K_{DC}=${dcGain}`} displayMode className="text-lg text-violet-700 dark:text-violet-300" />

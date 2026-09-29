@@ -3001,10 +3001,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     if (!tabDUiRefinement && category === 'Diodes') {
       categoryItems = categoryItems.filter(item => item.id !== 'diode');
     }
-    const items = categoryItems.filter(item => !item.hidden).map(item => ({
-      ...item,
-      name: t(`simulators:circuit.${item.id.replace(/[-]/g, '')}`, item.name)
-    }));
+    const items = categoryItems.filter(item => !item.hidden);
     if (items.length) all[translatedCategory] = items;
     return all;
   }, {}), [tabDUiRefinement, t]);
@@ -3410,19 +3407,19 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
         )}
       </>}
       toolbarRow2={<>
-        <ToolbarButton colors={colors} icon={<Download size={14} />} label={t('simulators:toolbar.export')} title="Export circuit as NAD netlist" onClick={exportNad} />
-        <ToolbarButton colors={colors} icon={<Upload size={14} />} label={t('simulators:toolbar.import')} title="Import circuit from NAD netlist" onClick={() => nadInputRef.current?.click()} />
+        <ToolbarButton colors={colors} icon={<Download size={14} />} label={t('simulators:toolbar.export')} title={t('toolbar.exportNad', 'Export circuit as NAD netlist')} onClick={exportNad} />
+        <ToolbarButton colors={colors} icon={<Upload size={14} />} label={t('simulators:toolbar.import')} title={t('toolbar.importNad', 'Import circuit from NAD netlist')} onClick={() => nadInputRef.current?.click()} />
         <input ref={nadInputRef} type="file" accept=".nad,application/x-mae-nad+json,application/json" onChange={importNad} style={{ display: 'none' }} />
         <ToolbarDivider colors={colors} />
-        <ToolbarButton colors={colors} icon={<ImageIcon size={14} />} label={t('simulators:toolbar.saveImage')} title="Save circuit as image (PNG or SVG)" onClick={handleOpenSaveImage} />
-        <ToolbarButton colors={colors} icon={<Share2 size={14} />} label={t('simulators:toolbar.shareProject')} title="Share circuit via Web Share API or deep link" onClick={handleShareProject} />
+        <ToolbarButton colors={colors} icon={<ImageIcon size={14} />} label={t('simulators:toolbar.saveImage')} title={t('toolbar.saveImageTooltip', 'Save circuit as image (PNG or SVG)')} onClick={handleOpenSaveImage} />
+        <ToolbarButton colors={colors} icon={<Share2 size={14} />} label={t('simulators:toolbar.shareProject')} title={t('toolbar.shareProjectTooltip', 'Share circuit via Web Share API or deep link')} onClick={handleShareProject} />
         <ToolbarDivider colors={colors} />
         {/* Examples button hidden for final launch UI polish */}
-        {/* <ToolbarButton colors={colors} icon={<Library size={14} />} label="Examples" title="Browse the Interactive Examples Library" onClick={() => setExamplesModalOpen(true)} /> */}
+        {/* <ToolbarButton colors={colors} icon={<Library size={14} />} label={t('toolbar.examples', 'Examples')} title={t('toolbar.browseLibrary', 'Browse the Interactive Examples Library')} onClick={() => setExamplesModalOpen(true)} /> */}
         <button
           type="button"
           onClick={() => { hasStartedSimulation.current = true; setSimulationRunning(value => !value); }}
-          title={simulationRunning ? 'Pause simulation' : 'Run simulation'}
+          title={simulationRunning ? t('simulators:toolbar.pauseSimTooltip', 'Pause simulation') : t('simulators:toolbar.runSimTooltip', 'Run simulation')}
           className={`h-8 inline-flex items-center justify-center gap-1.5 px-3.5 text-xs font-semibold cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 whitespace-nowrap shrink-0 ${
             !simulationRunning && hasStartedSimulation.current
               ? "brand-pill-active-rev"
@@ -3430,7 +3427,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
           }`}
         >
           {simulationRunning ? <Pause size={14} /> : <Play size={14} />}
-          <span>{simulationRunning ? 'Pause' : 'Run'}</span>
+          <span>{simulationRunning ? t('simulators:toolbar.pause', 'Pause') : t('simulators:toolbar.run', 'Run')}</span>
         </button>
         <ToolbarButton colors={colors} icon={<Zap size={14} />} title={t('simulators:circuit.showHideElectrons')} onClick={() => setShowElectrons(v => { const next = !v; try { localStorage.setItem('mae-show-electrons', String(next)); } catch { } return next; })} active={showElectrons} />
         <ToolbarButton colors={colors} icon={<RotateCcw size={14} />} title={t('simulators:circuit.resetSim')} onClick={resetSimulation} />
@@ -3606,10 +3603,7 @@ function ReplaceComponentControl({ colors, currentType, tabDUiRefinement, onRepl
       items = items.filter(item => !trimmedQuery || item.name.toLowerCase().includes(trimmedQuery) || item.description.toLowerCase().includes(trimmedQuery));
       items = items.filter(item => !trimmedQuery || item.name.toLowerCase().includes(trimmedQuery) || item.description.toLowerCase().includes(trimmedQuery));
       if (items.length) {
-        all[translatedCategory] = items.map(item => ({
-          ...item,
-          name: t(`simulators:circuit.${item.id.replace(/[-]/g, '')}`, item.name)
-        }));
+        all[translatedCategory] = items;
       }
       return all;
     }, {});

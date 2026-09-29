@@ -46,6 +46,7 @@ const studioCopy: Record<LocaleCode, {
   characteristic: string; openEigenvalues: string; controllability: string; observability: string; rank: string; complete: string;
   leoTitle: string; leoText: string; leoControllability: string; leoObservability: string; desiredPoles: string; poleHint: string;
   calculate: string; feedback: string; desiredCharacteristic: string; closedLoop: string; closedEigenvalues: string; placeUnavailable: string;
+  analysisError: string; rankBadge: string; leoBadge: string; polesLabel: string; analysisUnavailable: string;
 }> = {
   en: {
     eyebrow: "CONTROL THEORY / STATE FORM", title: "State-Space Studio", reset: "Reset canonical system", order: "System order", stateOrder: "Order",
@@ -53,6 +54,7 @@ const studioCopy: Record<LocaleCode, {
     controllability: "Controllability", observability: "Observability", rank: "Rank", complete: "Full rank", leoTitle: "Leo Alert",
     leoText: "Mathematical Flaw: System is Uncontrollable/Unobservable!", leoControllability: "The controllability matrix is rank deficient.", leoObservability: "The observability matrix is rank deficient.",
     desiredPoles: "Desired closed-loop poles", poleHint: "Enter one real pole per state.", calculate: "Apply Ackermann", feedback: "State-feedback gain", desiredCharacteristic: "Desired characteristic polynomial", closedLoop: "Closed-loop system", closedEigenvalues: "Closed-loop eigenvalues", placeUnavailable: "Pole placement requires a controllable system.",
+    analysisError: "Analysis Error", rankBadge: "Rank Deficient", leoBadge: "Deficient Rank", polesLabel: "Poles", analysisUnavailable: "Analysis unavailable",
   },
   ar: {
     eyebrow: "نظرية التحكم / صيغة الحالة", title: "استوديو فضاء الحالة", reset: "إعادة النظام القياسي", order: "رتبة النظام", stateOrder: "الرتبة",
@@ -60,6 +62,7 @@ const studioCopy: Record<LocaleCode, {
     controllability: "القابلية للتحكم", observability: "القابلية للملاحظة", rank: "الرتبة", complete: "رتبة كاملة", leoTitle: "تنبيه ليو",
     leoText: "خلل رياضي: النظام غير قابل للتحكم أو الملاحظة!", leoControllability: "مصفوفة القابلية للتحكم ناقصة الرتبة.", leoObservability: "مصفوفة القابلية للملاحظة ناقصة الرتبة.",
     desiredPoles: "أقطاب الحلقة المغلقة المطلوبة", poleHint: "أدخل قطبًا حقيقيًا واحدًا لكل حالة.", calculate: "تطبيق أكرمان", feedback: "مكسب تغذية الحالة الراجعة", desiredCharacteristic: "كثيرة الحدود المميزة المطلوبة", closedLoop: "نظام الحلقة المغلقة", closedEigenvalues: "القيم الذاتية للحلقة المغلقة", placeUnavailable: "يتطلب تعيين الأقطاب نظامًا قابلًا للتحكم.",
+    analysisError: "خطأ في التحليل", rankBadge: "رتبة ناقصة", leoBadge: "رتبة ناقصة", polesLabel: "الأقطاب", analysisUnavailable: "التحليل غير متاح",
   },
   es: {
     eyebrow: "TEORÍA DE CONTROL / FORMA DE ESTADO", title: "Estudio de espacio de estados", reset: "Restablecer sistema canónico", order: "Orden del sistema", stateOrder: "Orden",
@@ -67,6 +70,7 @@ const studioCopy: Record<LocaleCode, {
     controllability: "Controlabilidad", observability: "Observabilidad", rank: "Rango", complete: "Rango completo", leoTitle: "Alerta de Leo",
     leoText: "Falla matemática: ¡el sistema es incontrolable/no observable!", leoControllability: "La matriz de controlabilidad tiene rango deficiente.", leoObservability: "La matriz de observabilidad tiene rango deficiente.",
     desiredPoles: "Polos deseados de lazo cerrado", poleHint: "Ingrese un polo real por cada estado.", calculate: "Aplicar Ackermann", feedback: "Ganancia de realimentación de estado", desiredCharacteristic: "Polinomio característico deseado", closedLoop: "Sistema de lazo cerrado", closedEigenvalues: "Valores propios de lazo cerrado", placeUnavailable: "La ubicación de polos requiere un sistema controlable.",
+    analysisError: "Error de Análisis", rankBadge: "Rango Deficiente", leoBadge: "Rango Deficiente", polesLabel: "Polos", analysisUnavailable: "Análisis no disponible",
   },
 };
 
@@ -86,7 +90,7 @@ function LeoAlert({ messages, copy }: { messages: string[]; copy: typeof studioC
         <div className="space-y-2">
           <div className="flex items-center gap-2">
             <h3 className="text-sm font-bold uppercase tracking-wider text-rose-700 dark:text-rose-300">{copy.leoTitle}</h3>
-            <StatusBadge variant="danger" label="Deficient Rank" />
+            <StatusBadge variant="danger" label={copy.leoBadge} />
           </div>
           <KatexMath math={`\\text{${copy.leoText.replace(/[{}]/g, "")}}`} displayMode className="block overflow-x-auto text-sm font-semibold text-slate-800 dark:text-white" />
           <p className="text-xs leading-5 text-slate-600 dark:text-slate-300">{messages.join(" ")}</p>
@@ -96,7 +100,7 @@ function LeoAlert({ messages, copy }: { messages: string[]; copy: typeof studioC
   );
 }
 
-function StatusCard({ title, symbol, matrix, isFullRank }: { title: string; symbol: string; matrix: Matrix; isFullRank?: boolean }) {
+function StatusCard({ title, symbol, matrix, isFullRank, rankBadgeLabel }: { title: string; symbol: string; matrix: Matrix; isFullRank?: boolean; rankBadgeLabel: string }) {
   return (
     <StudioCard
       title={
@@ -107,7 +111,7 @@ function StatusCard({ title, symbol, matrix, isFullRank }: { title: string; symb
       }
       actionSlot={
         isFullRank === false ? (
-          <StatusBadge variant="danger" label="Rank Deficient" />
+          <StatusBadge variant="danger" label={rankBadgeLabel} />
         ) : undefined
       }
     >
@@ -131,8 +135,8 @@ export function StateSpaceStudio() {
       const controllabilityRank = rank(controllability);
       const observabilityRank = rank(observability);
       return { characteristic: characteristicPolynomial(system.A), eigenvalues: eigenvalues(system.A), controllability, observability, controllabilityRank, observabilityRank, controllable: controllabilityRank === order, observable: observabilityRank === order };
-    } catch (error) { return { error: error instanceof Error ? error.message : "Analysis unavailable" }; }
-  }, [order, system]);
+    } catch (error) { return { error: error instanceof Error ? error.message : copy.analysisUnavailable }; }
+  }, [order, system, copy]);
 
   const placement = useMemo(() => {
     if (!("controllable" in analysis) || !analysis.controllable) return null;
@@ -169,7 +173,7 @@ export function StateSpaceStudio() {
       </StudioCard>
 
       {"error" in analysis ? (
-        <StudioCard title="Analysis Error">
+        <StudioCard title={copy.analysisError}>
           <p className="text-sm text-rose-600 dark:text-rose-300">{analysis.error}</p>
         </StudioCard>
       ) : (
@@ -190,8 +194,8 @@ export function StateSpaceStudio() {
           </StudioCard>
 
           <div className="grid gap-5 lg:grid-cols-2">
-            <StatusCard title={copy.controllability} symbol="\mathcal{C}" matrix={analysis.controllability} isFullRank={analysis.controllable} />
-            <StatusCard title={copy.observability} symbol="\mathcal{O}" matrix={analysis.observability} isFullRank={analysis.observable} />
+            <StatusCard title={copy.controllability} symbol="\mathcal{C}" matrix={analysis.controllability} isFullRank={analysis.controllable} rankBadgeLabel={copy.rankBadge} />
+            <StatusCard title={copy.observability} symbol="\mathcal{O}" matrix={analysis.observability} isFullRank={analysis.observable} rankBadgeLabel={copy.rankBadge} />
           </div>
 
           {messages.length > 0 && <LeoAlert messages={messages} copy={copy} />}
@@ -207,7 +211,7 @@ export function StateSpaceStudio() {
           >
             <div className="flex items-stretch gap-4">
               <div className="w-28 shrink-0 flex-col">
-                <p className="mb-2 text-center text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Poles</p>
+                <p className="mb-2 text-center text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{copy.polesLabel}</p>
                 <div className="flex flex-col gap-2">
                   {desiredPoles.map((pole, index) => (
                     <label key={index} className="flex items-center justify-between gap-1.5">

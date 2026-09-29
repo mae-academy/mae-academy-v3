@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef, useCallback, useEffect } from "react";
+import { useTranslation } from 'react-i18next';
 import {
   findPolynomialRoots,
   simulateLtiStepResponse,
@@ -20,6 +21,7 @@ import {
 } from "@/components/common/templates";
 
 export function RootLocusStudio() {
+  const { t } = useTranslation('simulators');
   // Dual-mode transfer function state
   const [tfData, setTfData] = useState<TransferFunctionData>({
     mode: "polynomial",
@@ -445,7 +447,7 @@ export function RootLocusStudio() {
               onGridModeChange={setGridMode}
               highlightedStep={highlightedStep}
               interactive={true}
-              title="S-Plane Root Locus"
+              title={t('control.splaneTitle', 'S-Plane Root Locus')}
               className="w-full h-full"
               height="100%"
             />
@@ -457,7 +459,7 @@ export function RootLocusStudio() {
             style={plotHeights ? { height: plotHeights.stepResp, minHeight: plotHeights.stepResp } : undefined}
           >
             <StandardStepPlot
-              title="Closed-Loop Step Response"
+              title={t('control.closedLoopStepResponse', 'Closed-Loop Step Response')}
               headerRight={
                 <div className="flex items-center gap-2">
                   <KatexMath math="t_{max}" className="text-xs font-bold text-slate-500 dark:text-slate-400" />
@@ -487,7 +489,7 @@ export function RootLocusStudio() {
         {/* Right Column (4 of 12 columns): */}
         <div ref={sidebarColRef} className="lg:col-span-4 space-y-6">
           {/* Prominent Gain Calibration Card matching PID Studio style */}
-          <StudioCard title="Gain Calibration">
+          <StudioCard title={t('control.gainCalibration', 'Gain Calibration')}>
             <StudioSlider
               label={<KatexMath math="K =" />}
               min={kMin}
@@ -521,13 +523,13 @@ export function RootLocusStudio() {
       <div className="w-full grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch mt-6">
         {/* RK4 Transient Metrics (1 quadrant = 3 of 12 columns) */}
         <StudioCard
-          title="Transient Metrics"
+          title={t('control.transientMetrics', 'Transient Metrics')}
           className="lg:col-span-5 w-full flex flex-col justify-between"
         >
           <div className="space-y-3">
             <div className="flex justify-between items-center pb-2 border-b border-slate-100 dark:border-slate-800">
               <span className="text-xs font-bold text-slate-500">
-                Overshoot (<KatexMath math="\%OS" />)
+                {t('control.overshoot', 'Overshoot')} (<KatexMath math="\%OS" />)
               </span>
               <span className="text-sm font-bold text-slate-900 dark:text-white">
                 <KatexMath math={`${stepResponse?.overshootPercent.toFixed(2)}\\%`} />
@@ -535,7 +537,7 @@ export function RootLocusStudio() {
             </div>
             <div className="flex justify-between items-center pb-2 border-b border-slate-100 dark:border-slate-800">
               <span className="text-xs font-bold text-slate-500">
-                Peak Time (<KatexMath math="T_p" />)
+                {t('control.peakTime', 'Peak Time')} (<KatexMath math="T_p" />)
               </span>
               <span className="text-sm font-bold text-slate-900 dark:text-white">
                 <KatexMath math={`${stepResponse?.peakTime.toFixed(3)}\\,\\text{s}`} />
@@ -543,7 +545,7 @@ export function RootLocusStudio() {
             </div>
             <div className="flex justify-between items-center pb-2 border-b border-slate-100 dark:border-slate-800">
               <span className="text-xs font-bold text-slate-500">
-                Settling Time (<KatexMath math="T_s" />)
+                {t('control.settlingTime', 'Settling Time')} (<KatexMath math="T_s" />)
               </span>
               <span className="text-sm font-bold text-slate-900 dark:text-white">
                 <KatexMath math={`${stepResponse?.settlingTime.toFixed(3)}\\,\\text{s}`} />
@@ -551,7 +553,7 @@ export function RootLocusStudio() {
             </div>
             <div className="flex justify-between items-center pb-2 border-b border-slate-100 dark:border-slate-800">
               <span className="text-xs font-bold text-slate-500">
-                Rise Time (<KatexMath math="T_r" />)
+                {t('control.riseTime', 'Rise Time')} (<KatexMath math="T_r" />)
               </span>
               <span className="text-sm font-bold text-slate-900 dark:text-white">
                 <KatexMath math={`${stepResponse?.riseTime.toFixed(3)}\\,\\text{s}`} />
@@ -559,7 +561,7 @@ export function RootLocusStudio() {
             </div>
             <div className="flex justify-between items-center pb-2 border-b border-slate-100 dark:border-slate-800">
               <span className="text-xs font-bold text-slate-500">
-                Delay Time (<KatexMath math="T_d" />)
+                {t('control.delayTime', 'Delay Time')} (<KatexMath math="T_d" />)
               </span>
               <span className="text-sm font-bold text-slate-900 dark:text-white">
                 <KatexMath math={`${stepResponse?.delayTime.toFixed(3)}\\,\\text{s}`} />
@@ -567,7 +569,7 @@ export function RootLocusStudio() {
             </div>
             <div className="flex justify-between items-center">
               <span className="text-xs font-bold text-slate-500">
-                Steady State (<KatexMath math="y_{ss}" />)
+                {t('control.steadyState', 'Steady State')} (<KatexMath math="y_{ss}" />)
               </span>
               <span className="text-sm font-bold text-slate-900 dark:text-white">
                 <KatexMath math={`${(stepResponse?.y[stepResponse.y.length - 1] ?? 0).toFixed(3)}`} />
@@ -578,7 +580,7 @@ export function RootLocusStudio() {
 
         {/* Closed-Loop Poles at Gain K (3 quadrants = 9 of 12 columns) */}
         <StudioCard
-          title="Closed-Loop Poles"
+          title={t('control.closedLoopPoles', 'Closed-Loop Poles')}
           actionSlot={<KatexMath math={`K = ${Number(gainK.toFixed(4))}`} className="text-xs font-bold text-violet-600 dark:text-violet-400" />}
           className="lg:col-span-7 w-full flex flex-col justify-between"
         >
@@ -605,7 +607,7 @@ export function RootLocusStudio() {
                   )}
                   {group.unstable && (
                     <div className="col-span-2 mt-1">
-                      <StatusBadge variant="danger">Unstable Region</StatusBadge>
+                      <StatusBadge variant="danger">{t('control.unstableRegion', 'Unstable Region')}</StatusBadge>
                     </div>
                   )}
                 </div>

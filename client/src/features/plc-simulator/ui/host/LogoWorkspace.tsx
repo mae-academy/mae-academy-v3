@@ -1,5 +1,6 @@
 import { BookOpen, ChevronDown, Factory } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { SegmentedControl, StudioCard } from '@/components/common/templates';
 import {
@@ -42,6 +43,7 @@ const DEVICE_OPTIONS = [
  * device itself, through its LCD and six-key keypad, exactly as on the real unit.
  */
 export function LogoWorkspace({ active, initialScenario = 'seal-in-gates', initialDevice, runtimeOptions }: LogoWorkspaceProps) {
+  const { t } = useTranslation('simulators');
   const { controller } = useLogoBench({
     scenario: initialScenario,
     device: initialDevice,
@@ -138,14 +140,14 @@ export function LogoWorkspace({ active, initialScenario = 'seal-in-gates', initi
         onReset={handleReset}
         hideRunControls
         onExport={exportProgram}
-        exportTitle="Export circuit program (.logo)"
+        exportTitle={t('plc.exportLogoTooltip', 'Export circuit program (.logo)')}
         onImport={(file) => void importFile(file)}
-        importTitle="Load circuit program into LOGO! (.logo, .lsc, .json)"
+        importTitle={t('plc.importLogoTooltip', 'Load circuit program into LOGO! (.logo, .lsc, .json)')}
         importAccept=".logo,.lsc,.json,application/json,application/octet-stream,text/plain"
         leading={
           <div className="flex shrink-0 items-center gap-1.5">
             <SegmentedControl<DeviceClass>
-              aria-label="Supply voltage class"
+              aria-label={t('plc.supplyVoltageClassAria', 'Supply voltage class')}
               size="sm"
               value={spec.id}
               options={DEVICE_OPTIONS.map((option) => ({ ...option }))}
@@ -154,13 +156,13 @@ export function LogoWorkspace({ active, initialScenario = 'seal-in-gates', initi
             />
             <div
               className="relative inline-flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-slate-200/80 bg-slate-200/60 px-3 font-['Poppins',sans-serif] text-xs font-medium text-slate-700 transition hover:bg-slate-300/50 dark:border-[#1a1d24] dark:bg-[#13161c] dark:text-slate-300 dark:hover:bg-[#1a1d24]"
-              title={`Active: ${scenario.title} (Click to switch example)`}
+              title={t('plc.activeExampleTooltip', 'Active: {{example}} (Click to switch example)', { example: scenario.title })}
             >
               <BookOpen className="pointer-events-none h-3.5 w-3.5 shrink-0 text-violet-600 dark:text-violet-400" aria-hidden="true" />
-              <span className="pointer-events-none font-['Poppins',sans-serif] text-xs font-semibold text-slate-800 dark:text-slate-200">Examples</span>
+              <span className="pointer-events-none font-['Poppins',sans-serif] text-xs font-semibold text-slate-800 dark:text-slate-200">{t('toolbar.examples', 'Examples')}</span>
               <ChevronDown className="pointer-events-none h-3 w-3 text-slate-400" aria-hidden="true" />
               <select
-                aria-label="Application scenario"
+                aria-label={t('plc.applicationScenarioAria', 'Application scenario')}
                 value={controller.scenario}
                 onChange={(event) => {
                   const id = event.target.value;
@@ -186,8 +188,8 @@ export function LogoWorkspace({ active, initialScenario = 'seal-in-gates', initi
               type="button"
               onClick={() => setManualOpen((open) => !open)}
               aria-pressed={manualOpen}
-              aria-label="Beginner's manual"
-              title="LOGO! beginner's manual"
+              aria-label={t('plc.beginnersManualAria', "Beginner's manual")}
+              title={t('plc.beginnersManualTooltip', 'LOGO! beginner\'s manual')}
               className={`h-9 inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full px-3 py-1.5 font-['Poppins',sans-serif] text-xs font-medium transition active:scale-[.98] ${
                 manualOpen
                   ? 'border border-violet-600 bg-violet-50 text-violet-700 dark:border-violet-500 dark:bg-violet-950/40 dark:text-violet-300'
@@ -195,7 +197,7 @@ export function LogoWorkspace({ active, initialScenario = 'seal-in-gates', initi
               }`}
             >
               <BookOpen className="h-3.5 w-3.5 text-violet-600 dark:text-violet-400" aria-hidden="true" />
-              <span>Manual</span>
+              <span>{t('plc.manual', 'Manual')}</span>
             </button>
           </div>
         }
@@ -230,25 +232,25 @@ export function LogoWorkspace({ active, initialScenario = 'seal-in-gates', initi
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 px-1 font-['Poppins',sans-serif]">
           <div
             role="note"
-            aria-label="Keyboard shortcuts"
+            aria-label={t('plc.keyboardShortcutsAria', 'Keyboard shortcuts')}
             className="flex flex-wrap items-center gap-1.5 font-['Poppins',sans-serif] text-xs font-medium text-slate-500 dark:text-slate-400"
           >
             {/* Navigation Scheme Pill: Clicking toggles between Arrows and WASD */}
             <button
               type="button"
               onClick={toggleNavScheme}
-              aria-label={keybindings.nav === 'arrows' ? 'WASD keys navigation' : 'Arrow keys navigation'}
-              title="Click to toggle navigation keys (Arrow keys ⇄ WASD)"
+              aria-label={keybindings.nav === 'arrows' ? t('plc.navToggleToWasdAria', 'WASD keys navigation') : t('plc.navToggleToArrowsAria', 'Arrow keys navigation')}
+              title={t('plc.navToggleTooltip', 'Click to toggle navigation keys (Arrow keys ⇄ WASD)')}
               className="inline-flex items-center gap-1 rounded-full border border-slate-200/80 bg-slate-100/90 px-2.5 py-1 font-['Poppins',sans-serif] text-xs font-semibold text-slate-700 shadow-2xs transition hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-300 dark:hover:border-violet-600 dark:hover:bg-violet-950/40 dark:hover:text-violet-300"
             >
               <span>
                 [{keybindings.nav === 'arrows' ? (
                   <span className="inline-flex items-center gap-1">
                     <NavTriangles className="h-2.5 w-2.5" includeSpace />
-                    <span>Nav</span>
+                    <span>{t('plc.navLabel', 'Nav')}</span>
                   </span>
                 ) : (
-                  'WASD Nav'
+                  t('plc.wasdNavLabel', 'WASD Nav')
                 )}]
               </span>
             </button>
@@ -257,46 +259,50 @@ export function LogoWorkspace({ active, initialScenario = 'seal-in-gates', initi
             <button
               type="button"
               onClick={() => setRecordingTarget((curr) => (curr === 'ok' ? null : 'ok'))}
-              aria-label={recordingTarget === 'ok' ? 'Listening for OK key press' : 'Record OK key binding'}
-              title={recordingTarget === 'ok' ? 'Press any key to bind to OK...' : 'Click to record OK key'}
+              aria-label={recordingTarget === 'ok' ? t('plc.listeningOkAria', 'Listening for OK key press') : t('plc.recordOkAria', 'Record OK key binding')}
+              title={recordingTarget === 'ok' ? t('plc.pressAnyKeyToBindOk', 'Press any key to bind to OK...') : t('plc.recordOkTooltip', 'Click to record OK key')}
               className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 font-['Poppins',sans-serif] text-xs font-semibold transition ${
                 recordingTarget === 'ok'
                   ? 'animate-pulse border border-violet-500 bg-violet-50 text-violet-700 ring-2 ring-violet-500/20 dark:border-violet-400 dark:bg-violet-950/60 dark:text-violet-300'
                   : 'border border-slate-200/80 bg-slate-100/90 text-slate-700 shadow-2xs hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-300 dark:hover:border-violet-600 dark:hover:bg-violet-950/40 dark:hover:text-violet-300'
               }`}
             >
-              <span>{recordingTarget === 'ok' ? '[ Press any key... ]' : `[ ${normalizeKey(keybindings.ok)}: OK ]`}</span>
+              <span>{recordingTarget === 'ok' ? t('plc.pressAnyKey', '[ Press any key... ]') : t('plc.okKeyLabel', '[ {{key}}: OK ]', { key: normalizeKey(keybindings.ok) })}</span>
             </button>
 
             {/* Back (ESC) Action Pill: Interactive key recording */}
             <button
               type="button"
               onClick={() => setRecordingTarget((curr) => (curr === 'esc' ? null : 'esc'))}
-              aria-label={recordingTarget === 'esc' ? 'Listening for Back key press' : 'Record Back key binding'}
-              title={recordingTarget === 'esc' ? 'Press any key to bind to Back...' : 'Click to record Back key'}
+              aria-label={recordingTarget === 'esc' ? t('plc.listeningBackAria', 'Listening for Back key press') : t('plc.recordBackAria', 'Record Back key binding')}
+              title={recordingTarget === 'esc' ? t('plc.pressAnyKeyToBindBack', 'Press any key to bind to Back...') : t('plc.recordBackTooltip', 'Click to record Back key')}
               className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 font-['Poppins',sans-serif] text-xs font-semibold transition ${
                 recordingTarget === 'esc'
                   ? 'animate-pulse border border-violet-500 bg-violet-50 text-violet-700 ring-2 ring-violet-500/20 dark:border-violet-400 dark:bg-violet-950/60 dark:text-violet-300'
                   : 'border border-slate-200/80 bg-slate-100/90 text-slate-700 shadow-2xs hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-300 dark:hover:border-violet-600 dark:hover:bg-violet-950/40 dark:hover:text-violet-300'
               }`}
             >
-              <span>{recordingTarget === 'esc' ? '[ Press any key... ]' : `[ ${normalizeKey(keybindings.esc)}: Back ]`}</span>
+              <span>{recordingTarget === 'esc' ? t('plc.pressAnyKey', '[ Press any key... ]') : t('plc.backKeyLabel', '[ {{key}}: Back ]', { key: normalizeKey(keybindings.esc) })}</span>
             </button>
 
             {/* Numeric hotkeys info pill */}
             <span
               className="inline-flex items-center gap-1 rounded-full border border-slate-200/60 bg-slate-50 px-2.5 py-1 font-['Poppins',sans-serif] text-xs font-medium text-slate-500 dark:border-slate-800/60 dark:bg-slate-900/40 dark:text-slate-400"
-              title="Global hotkeys: press 1-8 to actuate inputs I1-I8"
+              title={t('plc.globalHotkeysTooltip', 'Global hotkeys: press 1-8 to actuate inputs I1-I8')}
             >
-              [1-8: Inputs]
+              {t('plc.hotkeysInputsLabel', '[1-8: Inputs]')}
             </span>
           </div>
         </div>
       </StudioCard>
 
       <StudioCard
-        title="Function block diagram"
-        subtitle={controller.running ? 'Live: wires carrying a 1 are highlighted; timers and counters show their accumulator.' : 'Start the program from the LCD to see live signal flow.'}
+        title={t('plc.functionBlockDiagramTitle', 'Function block diagram')}
+        subtitle={
+          controller.running
+            ? t('plc.fbdLiveSubtitle', 'Live: wires carrying a 1 are highlighted; timers and counters show their accumulator.')
+            : t('plc.fbdIdleSubtitle', 'Start the program from the LCD to see live signal flow.')
+        }
       >
         <div id="logo-fbd">
           <FbdViewer

@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from "react";
+import { useTranslation } from 'react-i18next';
 import { KatexMath } from "../ui/KatexMath";
 import { SegmentedControl, StudioCard, FormulaBox } from "@/components/common/templates";
 import { rootsToPolynomial, parseRootsList, Complex } from "@/features/control/controlMath";
@@ -37,6 +38,7 @@ function convolve(a: number[], b: number[]): number[] {
 }
 
 export function TransferFunctionInput({ onUpdate, defaultData, gainK }: TransferFunctionInputProps) {
+  const { t } = useTranslation('simulators');
   const [mode, setMode] = useState<TfInputMode>(defaultData?.mode || "polynomial");
 
   // State for Mode A: Polynomial
@@ -191,12 +193,12 @@ export function TransferFunctionInput({ onUpdate, defaultData, gainK }: Transfer
 
   return (
     <StudioCard
-      title="Transfer Function Engine"
+      title={t('control.tfEngine', 'Transfer Function Engine')}
       actionSlot={
         <SegmentedControl
           options={[
-            { label: "Polynomial", value: "polynomial" },
-            { label: "ZPK", value: "zpk" },
+            { label: t('control.polynomial', 'Polynomial'), value: "polynomial" },
+            { label: t('control.zpk', 'ZPK'), value: "zpk" },
           ]}
           value={mode}
           onChange={setMode}
@@ -220,7 +222,7 @@ export function TransferFunctionInput({ onUpdate, defaultData, gainK }: Transfer
                   className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2 text-slate-800 text-lg tracking-wide dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="e.g. 1 2"
                 />
-                <p className="text-[10px] text-slate-400 mt-1">Space-separated from highest to lowest power.</p>
+                <p className="text-[10px] text-slate-400 mt-1">{t('control.polySpaceHint', 'Space-separated from highest to lowest power.')}</p>
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1"><KatexMath math="D(s) \text{ coefficients}" /></label>
@@ -268,7 +270,7 @@ export function TransferFunctionInput({ onUpdate, defaultData, gainK }: Transfer
                   className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2 text-slate-800 text-lg tracking-wide dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="e.g. 0, -1, -2"
                 />
-                <p className="text-[10px] text-slate-400 mt-1">Comma-separated roots. Use 'j' for complex conjugate pairs.</p>
+                <p className="text-[10px] text-slate-400 mt-1">{t('control.rootsCommaHint', "Comma-separated roots. Use 'j' for complex conjugate pairs.")}</p>
               </div>
             </>
           )}
