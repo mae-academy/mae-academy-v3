@@ -285,14 +285,15 @@ export default defineConfig({
             id.includes("node_modules/react/") ||
             id.includes("node_modules/react-dom/") ||
             id.includes("node_modules/react-i18next") ||
-            id.includes("node_modules/scheduler/")
+            id.includes("node_modules/scheduler/") ||
+            id.includes("commonjsHelpers") ||
+            id.includes("node_modules/framer-motion") ||
+            id.includes("node_modules/motion-") ||
+            id.includes("node_modules/wouter")
           ) {
             return "vendor-react";
           }
           // ── Animation & routing (shared across all pages) ──────────────
-          if (id.includes("node_modules/framer-motion") || id.includes("node_modules/wouter")) {
-            return "vendor-motion";
-          }
           // ── Icon library ───────────────────────────────────────────────
           if (id.includes("node_modules/lucide-react")) {
             return "vendor-icons";
