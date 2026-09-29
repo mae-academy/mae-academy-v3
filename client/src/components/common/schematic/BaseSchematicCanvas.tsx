@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ChevronDown,
   ChevronRight,
@@ -212,6 +213,7 @@ export function BaseSchematicCanvas<C extends SchematicComponent, I extends Sche
   onTabChange,
   children,
 }: BaseSchematicCanvasProps<C, I>) {
+  const { t } = useTranslation('simulators');
   const [search, setSearch] = useState('');
   const { library, gridSize, isDark, components, wires, texts, document, viewport, routing, clipboard, handlers, dragState, hoveredComponentId, setHoveredComponentId, selectedComponent } = canvas;
   const { selection, marqueeIds } = document;
@@ -415,7 +417,7 @@ export function BaseSchematicCanvas<C extends SchematicComponent, I extends Sche
         <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', pointerEvents: 'none' }}>
           <div className="flex flex-col items-center justify-center pointer-events-none select-none">
             <div className="px-6 py-2.5 bg-white border border-slate-100 rounded-2xl shadow-sm mb-3 dark:bg-[#0d0f12] dark:border-[#1a1d24]">
-              <span className="text-base font-semibold text-slate-900 tracking-tight dark:text-white">Canvas Ready</span>
+              <span className="text-base font-semibold text-slate-900 tracking-tight dark:text-white">{t('shell.canvasReady', 'Canvas Ready')}</span>
             </div>
             <p className="text-xs text-slate-400 font-normal">{emptyHint}</p>
           </div>

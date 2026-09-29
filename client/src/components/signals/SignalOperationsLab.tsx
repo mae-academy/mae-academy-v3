@@ -6,6 +6,7 @@
  * A top segmented control switches to the discrete-time x[n] workspace (stem plots, integer operations).
  */
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { KatexMath } from "@/components/ui/KatexMath";
 import { MathNumberInput, SegmentedControl, StudioCard, InnerBox, StatusBadge } from "@/components/common/templates";
 import { UnifiedSignalEngineTerminal } from "@/components/signals/common/UnifiedSignalEngineTerminal";
@@ -41,6 +42,7 @@ const scopeSample = (model: ScopeModel, from: number, to: number, sampleCount?: 
   sampleCompositeSignal(model as CompositeSignalModel, from, to, sampleCount ?? 3000);
 
 export function SignalOperationsLab() {
+  const { t } = useTranslation('simulators');
   const [domain, setDomain] = useState<"ct" | "dt">("ct");
   const [discreteExpression, setDiscreteExpression] = useState<string>(DISCRETE_DEFAULT);
   const [expression, setExpression] = useState(tex`\sin(2\pi t)+\cos(4\pi t)`);
@@ -61,9 +63,9 @@ export function SignalOperationsLab() {
       <StudioCard className="overflow-hidden">
         <div className="flex flex-col gap-4 border-b border-slate-200 pb-5 dark:border-slate-800 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <h2 className="mt-1 text-xl font-black tracking-tight text-slate-900 dark:text-white">Signal Operations &amp; Properties</h2>
+            <h2 className="mt-1 text-xl font-black tracking-tight text-slate-900 dark:text-white">{t('signals.operationsProperties', 'Signal Operations & Properties')}</h2>
             <p className="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">
-              Compose any additive, subtractive, or multiplicative combination of canonical signals in terms of <KatexMath math={domain === "ct" ? "t" : "n\\in\\mathbb{Z}"} className="inline" />.
+              {t('signals.composeDescription', 'Compose any additive, subtractive, or multiplicative combination of canonical signals in terms of ')}<KatexMath math={domain === "ct" ? "t" : "n\\in\\mathbb{Z}"} className="inline" />.
             </p>
           </div>
           <SegmentedControl
@@ -74,7 +76,7 @@ export function SignalOperationsLab() {
                 value: "ct",
                 label: (
                   <span className="font-['Poppins',sans-serif] font-medium inline-flex items-center gap-1.5">
-                    Continuous-Time <KatexMath math="[x(t)]" />
+                    {t('signals.continuousTime', 'Continuous-Time')} <KatexMath math="[x(t)]" />
                   </span>
                 ),
                 "aria-label": "Continuous-Time [x(t)]",
@@ -83,7 +85,7 @@ export function SignalOperationsLab() {
                 value: "dt",
                 label: (
                   <span className="font-['Poppins',sans-serif] font-medium inline-flex items-center gap-1.5">
-                    Discrete-Time <KatexMath math="[x[n]]" />
+                    {t('signals.discreteTime', 'Discrete-Time')} <KatexMath math="[x[n]]" />
                   </span>
                 ),
                 "aria-label": "Discrete-Time [x[n]]",
@@ -99,7 +101,7 @@ export function SignalOperationsLab() {
           />
 
           <InnerBox className="self-start">
-            <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-slate-500 dark:text-slate-400">Academic test signals</p>
+            <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-slate-500 dark:text-slate-400">{t('signals.academicTestSignals', 'Academic test signals')}</p>
             <div className="mt-3 grid gap-2">
               {presets.map((preset) => (
                 <button
@@ -121,7 +123,7 @@ export function SignalOperationsLab() {
       {domain === "ct" && <div className="grid gap-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(21rem,0.65fr)]">
         {/* Left Scope: Composite Signal View */}
         <StudioCard>
-          <h4 className="mb-4 text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-white">COMPOSITE SIGNAL VIEW</h4>
+          <h4 className="mb-4 text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-white">{t('signals.compositeSignalView', 'COMPOSITE SIGNAL VIEW')}</h4>
           {model ? (
             <PiecewiseSignalScope
               model={model}
@@ -131,7 +133,7 @@ export function SignalOperationsLab() {
             />
           ) : (
             <div className="flex min-h-[420px] items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50/60 dark:border-slate-700 dark:bg-slate-950/40">
-              <p className="text-xs font-bold text-slate-400 dark:text-slate-500">Awaiting a valid signal expression</p>
+              <p className="text-xs font-bold text-slate-400 dark:text-slate-500">{t('signals.awaitingValidInput', 'Awaiting a valid signal expression')}</p>
             </div>
           )}
         </StudioCard>
@@ -139,7 +141,7 @@ export function SignalOperationsLab() {
         {/* Right Sidebar: Academic Analysis */}
         <StudioCard className="space-y-4">
           <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-white pb-2 border-b border-slate-100 dark:border-slate-800">
-            ACADEMIC ANALYSIS
+            {t('signals.academicAnalysis', 'ACADEMIC ANALYSIS')}
           </h3>
 
           {analysis && model ? (
@@ -148,27 +150,27 @@ export function SignalOperationsLab() {
                 <InnerBox>
                   <div className="flex flex-col items-start gap-1">
                     <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                      Classification
+                      {t('signals.classification', 'Classification')}
                     </span>
                     <div className="text-base font-semibold">
                       {analysis.classification === "Power Signal" ? (
                         <span className="text-blue-600 dark:text-blue-400 font-serif tracking-wide text-base">
-                          <KatexMath math="\text{Power Signal}" />
+                          <KatexMath math={`\\text{${t('signals.powerSignal', 'Power Signal')}}`} />
                         </span>
                       ) : analysis.classification === "Energy Signal" ? (
                         <span className="text-purple-600 dark:text-purple-400 font-serif tracking-wide text-base">
-                          <KatexMath math="\text{Energy Signal}" />
+                          <KatexMath math={`\\text{${t('signals.energySignal', 'Energy Signal')}}`} />
                         </span>
                       ) : (
                         <span className="text-slate-500 dark:text-slate-400 font-serif text-base">
-                          <KatexMath math="\text{Neither}" />
+                          <KatexMath math={`\\text{${t('signals.neither', 'Neither')}}`} />
                         </span>
                       )}
                     </div>
                   </div>
                 </InnerBox>
                 <InnerBox>
-                  <p className="text-[10px] font-bold uppercase tracking-[.13em] text-slate-500 dark:text-slate-400">Periodicity</p>
+                  <p className="text-[10px] font-bold uppercase tracking-[.13em] text-slate-500 dark:text-slate-400">{t('signals.periodicity', 'Periodicity')}</p>
                   <div className="mt-1.5">
                     <SegmentedControl
                       size="sm"
@@ -186,7 +188,7 @@ export function SignalOperationsLab() {
 
               {analysis.fundamentalPeriod !== null ? (
                 <InnerBox>
-                  <p className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-white">Fundamental period</p>
+                  <p className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-white">{t('signals.fundamentalPeriod', 'Fundamental period')}</p>
                   <div className="mt-2.5 space-y-2">
                     {analysis.components && analysis.components.length > 1 ? (
                       <>
@@ -224,7 +226,7 @@ export function SignalOperationsLab() {
                 </InnerBox>
               ) : (
                 <InnerBox>
-                  <p className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-white">Observation window</p>
+                  <p className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-white">{t('signals.observationWindow', 'Observation window')}</p>
                   <div className="mt-2.5 flex flex-wrap items-center gap-3">
                     <label className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
                       <KatexMath math="\left[t_1\right]" />

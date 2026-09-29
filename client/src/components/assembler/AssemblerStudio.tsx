@@ -23,6 +23,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { cpp } from "@codemirror/lang-cpp";
 import { python } from "@codemirror/lang-python";
 import type { Extension } from "@codemirror/state";
@@ -393,6 +394,7 @@ const QUICK_REFERENCE: Partial<Record<SupportedLanguage, [string, string][]>> = 
 // Main Studio Component (4-Quadrant IDE Viewport Split)
 // ---------------------------------------------------------------------------
 export function AssemblerStudio() {
+  const { t } = useTranslation('simulators');
   const {
     isRunning: engineBusy,
     result,
@@ -1008,14 +1010,14 @@ export function AssemblerStudio() {
                       <MacWindowDots />
                       <Terminal className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400 ms-0.5" />
                       <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 tracking-wider font-mono">
-                        terminal.out
+                        {t('assembler.terminalOut', 'terminal.out')}
                       </span>
                     </div>
 
                     <div className="flex items-center gap-2">
                       {stdinQueue && (
                         <span className="rounded-md bg-violet-950/60 border border-violet-800/40 px-2 py-0.5 text-[10px] font-mono text-violet-300">
-                          stdin queued
+                          {t('assembler.stdinQueued', 'stdin queued')}
                         </span>
                       )}
                       <button
@@ -1037,12 +1039,12 @@ export function AssemblerStudio() {
                     <div className="flex-1 min-h-0 p-3 font-mono text-xs bg-[#050608] text-violet-400 italic flex items-start gap-2">
                       <span className="h-2 w-2 mt-1 rounded-full bg-violet-500 animate-ping" />
                       {language === "c" || language === "cpp"
-                        ? "[Compiling & Linking...]"
-                        : "Executing program..."}
+                        ? t('assembler.compilingLinking', "[Compiling & Linking...]")
+                        : t('assembler.assemblingExecutable', "[Assembling Executable...]")}
                     </div>
                   ) : combinedError && !currentStep?.stdout && !currentStep?.video ? (
                     <div className="flex-1 min-h-0 p-3 bg-[#050608] text-[#F43F5E] italic font-sans text-xs">
-                      Execution stopped. Check diagnostics below.
+                      {t('assembler.execStopped', 'Execution stopped. Check diagnostics below.')}
                     </div>
                   ) : (
                     <TerminalSurface
@@ -1138,7 +1140,7 @@ export function AssemblerStudio() {
                       <MacWindowDots />
                       <Cpu className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400 ms-0.5" />
                       <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 tracking-wider font-mono">
-                        inspector.exe
+                        {t('assembler.inspectorExe', 'inspector.exe')}
                       </span>
                     </div>
 

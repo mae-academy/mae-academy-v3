@@ -2985,6 +2985,8 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
 
   const libraryCategories = useMemo(() => CATEGORIES.reduce<Record<string, ComponentDef[]>>((all, category) => {
     if (category === 'Classic Control') return all;
+    const catKey = category.toLowerCase().replace(/[\s-]/g, '');
+    const translatedCategory = t(`simulators:circuit.${catKey}`, category);
     let categoryItems = getComponentsByCategory(category).filter(item => !item.hidden);
     if (tabDUiRefinement && category === 'Passive') {
       categoryItems = [...categoryItems, ...['star-resistor-pack', 'delta-resistor-pack'].map(getDef).filter((item): item is ComponentDef => Boolean(item))];
@@ -2999,10 +3001,13 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     if (!tabDUiRefinement && category === 'Diodes') {
       categoryItems = categoryItems.filter(item => item.id !== 'diode');
     }
-    const items = categoryItems.filter(item => !item.hidden);
-    if (items.length) all[category] = items;
+    const items = categoryItems.filter(item => !item.hidden).map(item => ({
+      ...item,
+      name: t(`simulators:circuit.${item.id.replace(/[-]/g, '')}`, item.name)
+    }));
+    if (items.length) all[translatedCategory] = items;
     return all;
-  }, {}), [tabDUiRefinement]);
+  }, {}), [tabDUiRefinement, t]);
 
   const linkedCoils = components.filter(component => ['coil', 'contactor', 'relay-spst', 'relay-spdt', 'relay-dpst'].includes(component.type));
 
@@ -3427,15 +3432,15 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
           {simulationRunning ? <Pause size={14} /> : <Play size={14} />}
           <span>{simulationRunning ? 'Pause' : 'Run'}</span>
         </button>
-        <ToolbarButton colors={colors} icon={<Zap size={14} />} title="Show / Hide electron flow" onClick={() => setShowElectrons(v => { const next = !v; try { localStorage.setItem('mae-show-electrons', String(next)); } catch { } return next; })} active={showElectrons} />
-        <ToolbarButton colors={colors} icon={<RotateCcw size={14} />} title="Reset simulation" onClick={resetSimulation} />
+        <ToolbarButton colors={colors} icon={<Zap size={14} />} title={t('simulators:circuit.showHideElectrons')} onClick={() => setShowElectrons(v => { const next = !v; try { localStorage.setItem('mae-show-electrons', String(next)); } catch { } return next; })} active={showElectrons} />
+        <ToolbarButton colors={colors} icon={<RotateCcw size={14} />} title={t('simulators:circuit.resetSim')} onClick={resetSimulation} />
         <span className="text-sm font-medium text-slate-700 dark:text-slate-300" style={{ minWidth: 65, textAlign: 'center', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
           <V3Math math={`${snapshot.time.toFixed(3)}\\,\\mathrm{s}`} />
         </span>
         <ToolbarDivider colors={colors} />
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <StudioSlider
-            aria-label="Simulation speed"
+            aria-label={t('simulators:circuit.simulationSpeed')}
             min={0.25}
             max={4}
             step={0.25}
@@ -3450,15 +3455,15 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
         </div>
       </>}
       canvasTitle={t('simulators:shell.interactiveCanvas')}
-      emptyHint="Drag and drop components from the library to begin circuit design."
+      emptyHint={t('simulators:circuit.dragDropHint')}
       simulationRunning={simulationRunning}
       canvasStatusExtra={<>
-        {spiceStatus.kind === 'running' && <span style={{ fontWeight: 750 }}>SPICE ACCURACY PASS…</span>}
-        {spiceStatus.kind === 'ready' && <span style={{ color: colors.accent, fontWeight: 750 }}>SPICE-VERIFIED</span>}
-        {spiceStatus.kind === 'unsupported' && <span title={spiceStatus.reason} style={{ fontWeight: 750 }}>SPICE UNAVAILABLE · LIVE ENGINE</span>}
-        {!snapshot.converged && <span style={{ color: colors.danger, fontWeight: 750 }}>CHECK CIRCUIT WARNINGS</span>}
+        {spiceStatus.kind === 'running' && <span style={{ fontWeight: 750 }}>{t('simulators:circuit.spiceAccuracyPass')}</span>}
+        {spiceStatus.kind === 'ready' && <span style={{ color: colors.accent, fontWeight: 750 }}>{t('simulators:circuit.spiceVerified')}</span>}
+        {spiceStatus.kind === 'unsupported' && <span title={spiceStatus.reason} style={{ fontWeight: 750 }}>{t('simulators:circuit.spiceUnavailable')}</span>}
+        {!snapshot.converged && <span style={{ color: colors.danger, fontWeight: 750 }}>{t('simulators:circuit.checkWarnings')}</span>}
       </>}
-      analysisTitle="Academic Analysis Workspace"
+      analysisTitle={t('simulators:circuit.academicWorkspace')}
       analysisContent={<AnalysisBox elements={dcMna.elements} geometry={meshGeometry} nodalNodes={nodalGeometry} colors={colors} standalone onTraceChange={handleAnalysisTrace} components={components} />}
       inspectorTop={<>
       <OscilloscopeTracePanel colors={colors} scopes={components.filter(c => c.type === 'oscilloscope')} instrumentReadings={effectiveSnapshot.instrumentReadings} displaySettings={oscilloscopeDisplaySettings} />
@@ -3475,10 +3480,10 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
       <div className="p-5 border-t border-slate-200 bg-white dark:border-[#1a1d24] dark:bg-[#0d0f12]">
         <h3 className="text-sm font-bold tracking-wider text-slate-900 dark:text-white mb-3 uppercase flex items-center gap-2">
           <CircuitBoard size={16} className="text-blue-600 dark:text-blue-400 shrink-0" />
-          Electrical Circuit Lab
+          {t('simulators:circuit.electricalCircuitLab')}
         </h3>
         <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-          The engine models continuous-time electrical behavior using Modified Nodal Analysis (MNA) and SPICE algorithms. Build circuits, run the simulation, and interact with components like switches or potentiometers in real-time.
+          {t('simulators:circuit.circuitLabDesc')}
         </p>
       </div>
       </>}
@@ -3563,6 +3568,7 @@ function PropertyRow({ colors, label, unit, children }: { colors: Palette; label
  * swap the selected part in place instead of deleting it and dragging a new one from scratch.
  */
 function ReplaceComponentControl({ colors, currentType, tabDUiRefinement, onReplace }: { colors: Palette; currentType: string; tabDUiRefinement: boolean; onReplace: (newType: string) => void }) {
+  const { t } = useTranslation('simulators');
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
@@ -3581,6 +3587,8 @@ function ReplaceComponentControl({ colors, currentType, tabDUiRefinement, onRepl
     const trimmedQuery = query.trim().toLowerCase();
     return CATEGORIES.reduce<Record<string, ComponentDef[]>>((all, category) => {
       if (category === 'Classic Control') return all;
+      const catKey = category.toLowerCase().replace(/[\s-]/g, '');
+      const translatedCategory = t(`simulators:circuit.${catKey}`, category);
       let items = getComponentsByCategory(category).filter(item => !item.hidden);
       if (tabDUiRefinement && category === 'Passive') {
         items = [...items, ...['star-resistor-pack', 'delta-resistor-pack'].map(getDef).filter((item): item is ComponentDef => Boolean(item))];
@@ -3596,10 +3604,16 @@ function ReplaceComponentControl({ colors, currentType, tabDUiRefinement, onRepl
         items = items.filter(item => item.id !== 'diode');
       }
       items = items.filter(item => !trimmedQuery || item.name.toLowerCase().includes(trimmedQuery) || item.description.toLowerCase().includes(trimmedQuery));
-      if (items.length) all[category] = items;
+      items = items.filter(item => !trimmedQuery || item.name.toLowerCase().includes(trimmedQuery) || item.description.toLowerCase().includes(trimmedQuery));
+      if (items.length) {
+        all[translatedCategory] = items.map(item => ({
+          ...item,
+          name: t(`simulators:circuit.${item.id.replace(/[-]/g, '')}`, item.name)
+        }));
+      }
       return all;
     }, {});
-  }, [open, query, tabDUiRefinement]);
+  }, [open, query, tabDUiRefinement, t]);
 
   return (
     <div ref={containerRef} style={{ position: 'relative', width: '100%' }}>

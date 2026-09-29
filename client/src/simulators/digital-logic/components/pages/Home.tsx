@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 /* MAE Luminous Technical Atelier: Digital Logic Simulator UI
    Canvas, wiring, selection, history and shortcuts come from the shared BaseSchematicCanvas;
    this studio supplies only the logic component library and the discrete-event engine. */
@@ -189,6 +190,7 @@ export function DigitalLogicSimulatorHome({
   createSimulationEngine = () => new DiscreteEventLogicEngine(),
   tabDUiRefinement = true,
 }: DigitalLogicSimulatorHomeProps) {
+  const { t } = useTranslation('simulators');
   const [simulationRunning, setSimulationRunning] = useState(false);
   const [simulationSpeed, setSimulationSpeed] = useState(1);
   const [showElectrons, setShowElectrons] = useState<boolean>(() => {
@@ -435,12 +437,25 @@ export function DigitalLogicSimulatorHome({
     setShareModalOpen(true);
   }, [nadDocument]);
 
+  const translatedLibraryCategories = useMemo(() => {
+    return DIGITAL_LOGIC_CATEGORIES.reduce<Record<string, ComponentDef[]>>((all, category) => {
+      const catKey = category.toLowerCase().replace(/[\s-]/g, '');
+      const translatedCategory = t(`simulators:digital.${catKey}`, category);
+      const items = getDigitalLogicComponentsByCategory(category).map(item => ({
+        ...item,
+        name: t(`simulators:digital.${item.id.replace(/[-]/g, '')}`, item.name)
+      }));
+      if (items.length) all[translatedCategory] = items;
+      return all;
+    }, {});
+  }, [t]);
+
   return (
     <BaseSchematicCanvas
       canvas={canvas}
       colors={colors}
       canvasDefs={<style>{KATEX_EMBEDDED_FONT_CSS}</style>}
-      libraryCategories={DIGITAL_LIBRARY_CATEGORIES}
+      libraryCategories={translatedLibraryCategories}
       renderLibraryIcon={item => <ComponentPaletteIcon definition={item} colors={colors} documented={tabDUiRefinement} isDark={darkPreview} />}
       wireColor={colors.wire}
       wirePathRef={(wireId, element) => {
@@ -661,6 +676,7 @@ function ComponentInspector({
   onDelete: () => void;
   onReplace: (newType: string) => void;
 }) {
+  const { t } = useTranslation('simulators');
   const isLogicInput = component.type === 'digital-input';
   const isLogicOutput = component.type === 'digital-output';
   const isClock = component.type === 'logic-clock';
@@ -687,7 +703,7 @@ function ComponentInspector({
               <V3Math math={componentLabelToLatex(component.label)} />
             </span>
             <span className="text-slate-700 dark:text-slate-300 font-semibold text-lg" style={{ letterSpacing: 0, textTransform: 'none', fontFamily: "'KaTeX_Main', 'KaTeX_Math', serif" }}>
-              <ElectricalLabel label={definition.name} />
+              <ElectricalLabel label={t(`digital.${definition.id.replace(/[-]/g, '')}`, definition.name)} />
             </span>
           </span>
         }
@@ -713,8 +729,8 @@ function ComponentInspector({
             onChange={event => onPropertyChange('_hideLabel', event.target.value === 'hide')}
             style={inputStyle(colors)}
           >
-            <option value="show">Show</option>
-            <option value="hide">Hide</option>
+            <option value="show">{t('digital.show', 'Show')}</option>
+            <option value="hide">{t('digital.hide', 'Hide')}</option>
           </select>
         </PropertyRow>
 
@@ -919,6 +935,7 @@ function ReplaceComponentControl({
   currentType: string;
   onReplace: (newType: string) => void;
 }) {
+  const { t } = useTranslation('simulators');
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
@@ -936,6 +953,8 @@ function ReplaceComponentControl({
     if (!open) return {};
     const trimmedQuery = query.trim().toLowerCase();
     return DIGITAL_LOGIC_CATEGORIES.reduce<Record<string, ComponentDef[]>>((all, category) => {
+      const catKey = category.toLowerCase().replace(/[\s-]/g, '');
+      const translatedCategory = t(`simulators:digital.${catKey}`, category);
       let items = getDigitalLogicComponentsByCategory(category);
       items = items.filter(
         item =>
@@ -943,10 +962,15 @@ function ReplaceComponentControl({
           item.name.toLowerCase().includes(trimmedQuery) ||
           item.description.toLowerCase().includes(trimmedQuery),
       );
-      if (items.length) all[category] = items;
+      if (items.length) {
+        all[translatedCategory] = items.map(item => ({
+          ...item,
+          name: t(`simulators:digital.${item.id.replace(/[-]/g, '')}`, item.name)
+        }));
+      }
       return all;
     }, {});
-  }, [open, query]);
+  }, [open, query, t]);
 
   return (
     <div ref={containerRef} style={{ position: 'relative', width: '100%' }}>
@@ -1066,9 +1090,10 @@ function WireInspector({
   onRouting: (routing: CircuitWire['routing']) => void;
   onDelete: () => void;
 }) {
+  const { t } = useTranslation('simulators');
   return (
     <div style={{ overflowY: 'auto' }}>
-      <InspectorHeader colors={colors} title="Wire path" subtitle="Ideal digital conductor connection between logic terminals." />
+      <InspectorHeader colors={colors} title="Wire path" subtitle={t('digital.wireDesc', 'Digital net propagating discrete Boolean levels (0/1/Z/X). The router maintains clean 90-degree orthogonal paths with jump arcs across disjoint nets.')} />
       <InspectorSection colors={colors} label="Routing Mode">
         <PropertyRow colors={colors} label="Routing">
           <select
@@ -1076,20 +1101,20 @@ function WireInspector({
             onChange={event => onRouting(event.target.value as CircuitWire['routing'])}
             style={inputStyle(colors)}
           >
-            <option value="orthogonal">Orthogonal (Strict 90°)</option>
-            <option value="straight">Straight</option>
-            <option value="manual">Manual Waypoints</option>
+            <option value="orthogonal">{t('digital.orthogonal', 'Orthogonal (Strict 90°)')}</option>
+            <option value="straight">{t('digital.straight', 'Straight')}</option>
+            <option value="manual">{t('digital.manualWaypoints', 'Manual Waypoints')}</option>
           </select>
         </PropertyRow>
       </InspectorSection>
       <InspectorSection colors={colors} label="Logic Meaning">
         <p style={{ color: colors.muted, fontSize: 11, lineHeight: 1.45, margin: 0 }}>
-          Digital net propagating discrete Boolean levels (0/1/Z/X). The router maintains clean 90-degree orthogonal paths with jump arcs across disjoint nets.
+          {t('digital.wireDesc', 'Digital net propagating discrete Boolean levels (0/1/Z/X). The router maintains clean 90-degree orthogonal paths with jump arcs across disjoint nets.')}
         </p>
       </InspectorSection>
       <div style={{ padding: '12px 15px' }}>
         <InspectorButton colors={colors} danger onClick={onDelete}>
-          <Trash2 size={13} /> Delete Wire
+          <Trash2 size={13} /> {t('digital.deleteWire', 'Delete Wire')}
         </InspectorButton>
       </div>
     </div>
@@ -1109,6 +1134,7 @@ function TextInspector({
   onMove: (dx: number, dy: number) => void;
   onDelete: () => void;
 }) {
+  const { t } = useTranslation('simulators');
   return (
     <div style={{ overflowY: 'auto' }}>
       <InspectorHeader colors={colors} title="Workspace text" subtitle="Editable annotation in the digital logic canvas." />
@@ -1139,7 +1165,7 @@ function TextInspector({
       </InspectorSection>
       <div style={{ padding: '12px 15px' }}>
         <InspectorButton colors={colors} danger onClick={onDelete}>
-          <Trash2 size={13} /> Delete Text
+          <Trash2 size={13} /> {t('digital.deleteText', 'Delete Text')}
         </InspectorButton>
       </div>
     </div>
