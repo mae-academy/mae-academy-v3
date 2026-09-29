@@ -177,6 +177,8 @@
     "rootsCommaHint": "Raíces separadas por comas. Use 'j' para pares complejos conjugados."
   },
   "digital": {
+    "inputsSuffix": "entradas",
+    "autoReferencePrefix": "Prefijo de referencia automático",
     "schematicWorkspace": "Espacio Esquemático",
     "logicAnalyzer": "Analizador Lógico",
     "kmapMinimizer": "Minimizador de Mapa K",
@@ -203,6 +205,7 @@
     "replace": "Reemplazar",
     "current": "Actual",
     "noComponentsMatch": "Ningún componente de lógica digital coincide con tu búsqueda",
+    "toggleKeyTooltip": "Enfoca y pulsa una tecla para asignar el atajo",
     "orthogonal": "Ortogonal (Estricto 90°)",
     "straight": "Recto",
     "manualWaypoints": "Puntos de Ruta Manuales",

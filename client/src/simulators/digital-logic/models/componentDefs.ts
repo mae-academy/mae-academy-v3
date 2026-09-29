@@ -872,14 +872,14 @@ const OPAMPS: Record<string, ComponentDef> = {
 // ─── DIGITAL LOGIC ────────────────────────────────────────────────────────────
 const DIGITAL_LOGIC: Record<string, ComponentDef> = {
   'digital-input': {
-    id: 'digital-input', name: 'Logic Input', category: 'Digital Logic', width: 60, height: 40, symbol: 'digital-input',
-    terminals: [{ id: 'out', name: 'OUT', x: 25, y: 0, type: 'output' }],
+    id: 'digital-input', name: 'Logic Input', category: 'Digital Logic', width: 100, height: 40, symbol: 'digital-input',
+    terminals: [{ id: 'out', name: 'OUT', x: 50, y: 0, type: 'output' }],
     properties: { state: { type: 'select', value: 'LOW', options: ['LOW', 'HIGH'], label: 'Logic State' } },
     description: 'Ideal Boolean 0/1 stimulus',
   },
   'digital-output': {
-    id: 'digital-output', name: 'Logic Output', category: 'Digital Logic', width: 60, height: 40, symbol: 'digital-output',
-    terminals: [{ id: 'in', name: 'IN', x: -25, y: 0, type: 'input' }],
+    id: 'digital-output', name: 'Logic Output', category: 'Digital Logic', width: 100, height: 40, symbol: 'digital-output',
+    terminals: [{ id: 'in', name: 'IN', x: -50, y: 0, type: 'input' }],
     properties: {},
     description: 'Ideal Boolean state output',
   },

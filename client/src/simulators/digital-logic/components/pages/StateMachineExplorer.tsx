@@ -340,7 +340,7 @@ function StateDiagram({
                   r={NODE_RADIUS}
                   className={`${
                     selected
-                      ? 'fill-white stroke-blue-600 dark:fill-slate-900 dark:stroke-blue-400'
+                      ? 'fill-white stroke-violet-600 dark:fill-slate-900 dark:stroke-violet-400'
                       : 'fill-white stroke-slate-700 dark:fill-slate-800 dark:stroke-slate-400'
                   }`}
                   strokeWidth={selected ? '2.5' : '1.8'}
@@ -351,9 +351,11 @@ function StateDiagram({
                   <tspan dy="3" fontSize="8">{state.name.slice(1)}</tspan>
                 </text>
                 {machine.kind === 'Moore' && (
-                  <text y="14" textAnchor="middle" className="fill-blue-600 font-mono text-[10px] font-bold dark:fill-blue-400">
-                    {machine.outputName}={state.output}
-                  </text>
+                  <foreignObject x={-24} y={5} width={48} height={18} style={{ overflow: 'visible', pointerEvents: 'none' }}>
+                    <div className="flex h-full items-center justify-center text-[11px] text-violet-600 dark:text-violet-400" style={{ direction: 'ltr' }}>
+                      <KatexMath math={`${machine.outputName}=${state.output}`} />
+                    </div>
+                  </foreignObject>
                 )}
               </g>
             );
@@ -490,7 +492,7 @@ export function StateMachineExplorer() {
         <StudioCard title="EDA Controls">
           <StudioButton
             onClick={addState}
-            className="w-full justify-center flex items-center gap-1.5 bg-blue-600 text-white border-blue-600 hover:bg-blue-500 hover:text-white"
+            className="btn-active-brand w-full justify-center flex items-center gap-1.5 rounded-full border-transparent text-white hover:text-white"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>Add State</span>
@@ -499,7 +501,7 @@ export function StateMachineExplorer() {
           {selectedState ? (
             <div className="mt-4 border-t border-slate-200 pt-3 dark:border-slate-800 space-y-3">
               <div className="flex items-center justify-between">
-                <StatusBadge variant="info">Selected: {selectedState.name}</StatusBadge>
+                <StatusBadge variant="default">Selected: {selectedState.name}</StatusBadge>
                 <KatexMath math={latexSignal(selectedState.name)} className="text-xs font-semibold text-blue-600 dark:text-blue-400" />
               </div>
               <StudioButton
@@ -754,7 +756,7 @@ export function StateMachineExplorer() {
                 </div>
               ))
             ) : (
-              <div className="col-span-full rounded-lg border border-amber-200 bg-amber-50 p-2.5 text-xs text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300">
+              <div className="col-span-full rounded-lg border border-rose-200 bg-rose-50 p-2.5 text-xs text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300">
                 Selected encoding exceeds 5-variable K-Map limit.
               </div>
             )}

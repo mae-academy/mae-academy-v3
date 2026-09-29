@@ -357,54 +357,6 @@ export const simulationsMeta: Record<string, SimulationMetaItem> = {
       images: [`${BASE_URL}/og/digital-logic.png`],
     },
   },
-
-  // 7. Linear Algebra
-  "linear-algebra": {
-    id: "linear-algebra",
-    slug: "linear-algebra",
-    canonicalPath: "/simulations/linear-algebra",
-    // 59 characters (< 60 chars)
-    title: "Linear Algebra - Online Interactive Simulator | MAE Academy",
-    shortTitle: "Linear Algebra Simulator",
-    // 157 characters (140-160 chars)
-    description:
-      "Visualize linear algebra transformations in real-time 2D and 3D. Compute eigenvalues, eigenvectors, and matrix operations with interactive geometric visuals.",
-    keywords: [
-      "linear algebra visualizer online",
-      "matrix transformation visualizer 3D",
-      "eigenvalue eigenvector visualizer",
-      "geometric linear algebra simulator",
-      "matrix multiplication visualizer",
-      "vector space transformation",
-      "determinant geometry visualizer",
-      "interactive linear systems",
-      "basis transformation visualizer",
-    ],
-    openGraph: {
-      title: "Linear Algebra - Online Interactive Simulator | MAE Academy",
-      description:
-        "Visualize linear algebra transformations in real-time 2D and 3D. Compute eigenvalues, eigenvectors, and matrix operations with interactive geometric visuals.",
-      url: `${BASE_URL}/simulations/linear-algebra`,
-      siteName: "MAE Academy",
-      locale: "en_US",
-      type: "website",
-      images: [
-        {
-          url: `${BASE_URL}/og/linear-algebra.png`,
-          width: 1200,
-          height: 630,
-          alt: "MAE Academy 2D/3D Linear Algebra Matrix Transformation and Eigenvalue Visualizer",
-        },
-      ],
-    },
-    twitter: {
-      card: "summary_large_image",
-      title: "Linear Algebra - Online Interactive Simulator | MAE Academy",
-      description:
-        "Visualize linear algebra transformations in real-time 2D and 3D. Compute eigenvalues, eigenvectors, and matrix operations with interactive geometric visuals.",
-      images: [`${BASE_URL}/og/linear-algebra.png`],
-    },
-  },
 };
 
 /**
@@ -428,7 +380,6 @@ const ROUTE_ALIASES: Record<string, string> = {
   "digital-logic-design": "digital-logic",
   "/simulations/digital-logic-design": "digital-logic",
   "/simulations/digital-logic": "digital-logic",
-  "/simulations/linear-algebra": "linear-algebra",
 };
 
 /**

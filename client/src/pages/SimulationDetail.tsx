@@ -24,7 +24,6 @@ import SimulationToolWorkspace from "@/components/SimulationToolWorkspace";
 import { useLocale } from "@/contexts/LocaleContext";
 import {
   controlSystemToolMeta,
-  linearAlgebraToolMeta,
   powerElectronicsToolMeta,
   signalsAndSystemsToolMeta,
   simulationRouteMeta,
@@ -37,7 +36,6 @@ import NotFound from "./NotFound";
 const ControlStudiosRenderer = lazy(() => import("@/chunks/controlStudios"));
 const PowerStudiosRenderer = lazy(() => import("@/chunks/powerStudios"));
 const SignalsStudiosRenderer = lazy(() => import("@/chunks/signalsStudios"));
-const LinearAlgebraRenderer = lazy(() => import("@/chunks/linearAlgebraStudios"));
 const CircuitStudiosRenderer = lazy(() => import("@/chunks/circuitStudios"));
 const DigitalLogicRenderer = lazy(() => import("@/chunks/digitalLogicStudios"));
 const CodeStudiosRenderer = lazy(() => import("@/chunks/codeStudios"));
@@ -93,7 +91,6 @@ export default function SimulationDetail() {
   const isControlSystems = meta.slug === "control-systems";
   const isPowerElectronics = meta.slug === "power-electronics";
   const isSignalsAndSystems = meta.slug === "signals-and-systems";
-  const isLinearAlgebra = meta.slug === "linear-algebra";
   const isCircuitLab = meta.slug === "circuit-lab";
   const isDigitalLogicDesign = meta.slug === "digital-logic-design";
   const isCodeStudio = meta.slug === "code";
@@ -102,7 +99,6 @@ export default function SimulationDetail() {
   const tools = isControlSystems ? controlSystemToolMeta[locale]
     : isPowerElectronics ? powerElectronicsToolMeta[locale]
       : isSignalsAndSystems ? signalsAndSystemsToolMeta[locale]
-        : isLinearAlgebra ? linearAlgebraToolMeta[locale]
           : isCircuitLab ? [{ slug: "workspace", label: circuitTabs.canvas }]
             : isDigitalLogicDesign ? [{ slug: "workspace", label: simulation.title }]
               : isCodeStudio ? [{ slug: "", label: simulation.title }]
@@ -164,13 +160,6 @@ export default function SimulationDetail() {
       return (
         <Suspense fallback={<StudioSkeleton />}>
           <SignalsStudiosRenderer tool={tool} />
-        </Suspense>
-      );
-    }
-    if (isLinearAlgebra) {
-      return (
-        <Suspense fallback={<StudioSkeleton />}>
-          <LinearAlgebraRenderer tool={tool} />
         </Suspense>
       );
     }

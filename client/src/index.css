@@ -239,6 +239,13 @@
 @layer components {
 
 
+  /* Code Studio: terminal/diagnostics share the editor's monospace metrics */
+  .mae-code-mono, .mae-code-mono * {
+    font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Courier New', monospace !important;
+  }
+  .mae-code-font, .mae-code-font * { font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Courier New', monospace !important; }
+  .mae-code-mono { font-size: 14px; line-height: 22px; }
+
   /* Inspector Panel Design System classes */
   .mae-panel-section-header {
     font-size: 12px;
@@ -1176,24 +1183,65 @@ html[lang="ar"] *:not(
   .font-mono, [class*="font-mono"],
   code, pre, kbd, samp,
   .cm-editor, .cm-editor *,
-  .katex, .katex-html, .katex *
+  .mae-code-mono, .mae-code-mono *, .mae-code-font, .mae-code-font *,
+  .katex, .katex-html, .katex *,
+  [data-math-input="true"], .formula-input, .math-expression-display
 ),
 html[dir="rtl"] *:not(
   .font-mono, [class*="font-mono"],
   code, pre, kbd, samp,
   .cm-editor, .cm-editor *,
-  .katex, .katex-html, .katex *
+  .mae-code-mono, .mae-code-mono *, .mae-code-font, .mae-code-font *,
+  .katex, .katex-html, .katex *,
+  [data-math-input="true"], .formula-input, .math-expression-display
 ) {
   font-family: 'Tajawal', sans-serif !important;
 }
 
 /* Strict preservation for code, registers, and math */
 html[lang="ar"] :where(.font-mono, [class*="font-mono"], code, pre, kbd, samp, .cm-editor, .cm-editor *),
-html[dir="rtl"] :where(.font-mono, [class*="font-mono"], code, pre, kbd, samp, .cm-editor, .cm-editor *) {
-  font-family: 'JetBrains Mono', monospace !important;
+html[dir="rtl"] :where(.font-mono, [class*="font-mono"], code, pre, kbd, samp, .cm-editor, .cm-editor *, .mae-code-mono, .mae-code-mono *, .mae-code-font, .mae-code-font *) {
+  font-family: 'JetBrains Mono', 'Fira Code', Menlo, Monaco, Consolas, 'Courier New', monospace !important;
 }
 
-html[lang="ar"] :where(.katex, .katex-html, .katex *),
-html[dir="rtl"] :where(.katex, .katex-html, .katex *) {
-  font-family: KaTeX_Main, serif !important;
+/* Absolute protection for KaTeX math notation: the blanket Tajawal rule above already
+   :not()-excludes these selectors, but browsers that fail to parse a `:not()` argument
+   list silently drop that whole exclusion clause, so this backstop re-asserts the real
+   math fonts with matching !important + a placement *after* the blanket rule, guaranteeing
+   these nodes render authentic KaTeX glyphs (and stay LTR) regardless of locale. */
+html[lang="ar"] .katex,
+html[lang="ar"] .katex *,
+html[lang="ar"] .katex-display,
+html[lang="ar"] .katex-html,
+html[lang="ar"] .katex-html *,
+html[dir="rtl"] .katex,
+html[dir="rtl"] .katex *,
+html[dir="rtl"] .katex-display,
+html[dir="rtl"] .katex-html,
+html[dir="rtl"] .katex-html * {
+  font-family: KaTeX_Main, KaTeX_Math, 'Times New Roman', serif !important;
+  direction: ltr !important;
+  text-align: left !important;
+}
+
+html[lang="ar"] .katex .mathnormal,
+html[lang="ar"] .katex-html .mathnormal,
+html[dir="rtl"] .katex .mathnormal,
+html[dir="rtl"] .katex-html .mathnormal {
+  font-family: KaTeX_Math, serif !important;
+  font-style: italic !important;
+}
+
+/* Dedicated math/formula input fields (e.g. the Boolean Expression box, transfer-function
+   coefficient inputs): these render user-typed math in an italic serif KaTeX-style font via
+   an inline style, which the blanket Tajawal rule above would otherwise clobber. */
+html[lang="ar"] [data-math-input="true"],
+html[lang="ar"] .formula-input,
+html[lang="ar"] .math-expression-display,
+html[dir="rtl"] [data-math-input="true"],
+html[dir="rtl"] .formula-input,
+html[dir="rtl"] .math-expression-display {
+  font-family: KaTeX_Main, KaTeX_Math, 'JetBrains Mono', monospace !important;
+  direction: ltr !important;
+  text-align: left !important;
 }

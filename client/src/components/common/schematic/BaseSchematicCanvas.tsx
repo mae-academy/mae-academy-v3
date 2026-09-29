@@ -120,6 +120,9 @@ interface SchematicLibraryPanelProps<I extends SchematicLibraryItem> {
 }
 
 /** Shared tile grid for every studio's component catalog (drag-to-place or click-to-add). */
+/** Legacy/default annotation colours that follow the active theme instead of staying frozen at creation time. */
+const ADAPTIVE_TEXT_COLORS = new Set(['#000', '#000000', '#0f172a', '#172033', '#e2e8f0', '#f8fafc', '#fff', '#ffffff']);
+
 export function SchematicLibraryPanel<I extends SchematicLibraryItem>({ colors, categories, renderIcon, onAdd }: SchematicLibraryPanelProps<I>) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   return (
@@ -157,7 +160,7 @@ export function SchematicLibraryPanel<I extends SchematicLibraryItem>({ colors, 
                     onMouseEnter={event => { event.currentTarget.style.background = colors.panelAlt; }}
                     onMouseLeave={event => { event.currentTarget.style.background = colors.panel; }}
                   >
-                    <div className="flex flex-1 min-h-0 w-full items-center justify-center p-2">{renderIcon(item)}</div>
+                    <div className="flex h-16 min-h-0 w-full flex-1 items-center justify-center overflow-hidden p-2">{renderIcon(item)}</div>
                     <div className="flex h-7 w-full shrink-0 items-center justify-center border-t px-1.5" style={{ borderColor: colors.line, background: `${colors.line}15` }}>
                       <span className="flex items-center justify-center text-[11px] font-medium text-slate-800 dark:text-slate-200 tracking-tight text-center leading-tight truncate w-full" title={item.name}>
                         <ElectricalLabel label={item.name} />
@@ -318,7 +321,7 @@ export function BaseSchematicCanvas<C extends SchematicComponent, I extends Sche
           {wireRender.map(({ wire, selected, path, hitPath, renderPath, stroke, dashed }) => (
             <g key={wire.id} data-wire-id={wire.id}>
               <path d={hitPath} fill="none" stroke="transparent" strokeWidth={19} strokeLinecap="round" strokeLinejoin="round" onMouseDown={event => handlers.onWireMouseDown(event, wire)} onDoubleClick={event => handlers.onWireDoubleClick(event, wire)} style={{ cursor: 'pointer' }} />
-              <path ref={wirePathRef ? element => wirePathRef(wire.id, element) : undefined} d={renderPath} fill="none" stroke={stroke} strokeWidth={selected ? 2.8 : 2.2} strokeDasharray={dashed ? '3 3' : undefined} strokeLinecap="round" strokeLinejoin="round" pointerEvents="none" />
+              <path ref={wirePathRef ? element => wirePathRef(wire.id, element) : undefined} d={renderPath} fill="none" stroke={stroke} strokeWidth={library.wireStrokeWidth ?? 2} strokeDasharray={dashed ? '3 3' : undefined} strokeLinecap="round" strokeLinejoin="round" pointerEvents="none" />
               {selected && path.length > 2 && path.slice(1, -1).map((corner, index) => (
                 <circle key={`${wire.id}-${index + 1}`} cx={corner[0]} cy={corner[1]} {...cornerHandle} onMouseDown={event => handlers.onWireCornerMouseDown(event, wire, index + 1)} style={{ cursor: 'move' }} />
               ))}
@@ -333,10 +336,10 @@ export function BaseSchematicCanvas<C extends SchematicComponent, I extends Sche
             <path d={pointsToPath(routing.draftPath)} fill="none" stroke={colors.accent} strokeDasharray="6 4" strokeWidth={1.6} opacity={0.75} strokeLinecap="round" strokeLinejoin="round" pointerEvents="none" />
           )}
           {routing.snapProjection && (
-            <circle cx={routing.snapProjection.point[0]} cy={routing.snapProjection.point[1]} r={6} fill="none" stroke={colors.accent} strokeWidth={2} pointerEvents="none" />
+            <circle cx={routing.snapProjection.point[0]} cy={routing.snapProjection.point[1]} r={6} fill="none" stroke="#7C3AED" strokeWidth={2} pointerEvents="none" />
           )}
           {routing.wiring.lockedCorners?.map((corner, index) => (
-            <circle key={`corner-${index}`} cx={corner[0]} cy={corner[1]} r={3} fill={colors.panel} stroke={colors.accent} strokeWidth={1.2} pointerEvents="none" />
+            <circle key={`corner-${index}`} cx={corner[0]} cy={corner[1]} r={3} fill="#7C3AED" stroke="#ffffff" strokeWidth={1.5} pointerEvents="none" />
           ))}
 
           {components.map(component => {
@@ -368,7 +371,7 @@ export function BaseSchematicCanvas<C extends SchematicComponent, I extends Sche
                     <g key={terminal.id}>
                       <circle cx={x} cy={y} r={TERMINAL_HIT_RADIUS} fill="transparent" style={{ cursor: 'crosshair' }} />
                       <g style={{ opacity: showTerminals ? 1 : 0, transition: 'opacity 0.2s ease-in-out' }} pointerEvents="none">
-                        <circle cx={x} cy={y} r={TERMINAL_RADIUS} fill={starting ? colors.accent : terminalFill?.(component, terminal.id) ?? colors.panel} stroke={wiringActive ? colors.primary : colors.muted} strokeWidth={1.4} />
+                        <circle cx={x} cy={y} r={TERMINAL_RADIUS} fill={starting ? colors.accent : terminalFill?.(component, terminal.id) ?? colors.panel} stroke={wiringActive ? '#7C3AED' : colors.muted} strokeWidth={1.4} />
                         {terminal.label && (
                           <text
                             x={x}
@@ -396,7 +399,7 @@ export function BaseSchematicCanvas<C extends SchematicComponent, I extends Sche
             {labelsLayer}
             <g className="electron-particles" pointerEvents="none">
               {wireRender.flatMap(({ wire, flowDots }) => flowDots.map((dot, index) => (
-                <circle key={`${wire.id}-particle-${index}`} cx={dot[0]} cy={dot[1]} r={3} fill={colors.powered} pointerEvents="none" />
+                <circle key={`${wire.id}-particle-${index}`} cx={dot[0]} cy={dot[1]} r={3} fill="#7C3AED" pointerEvents="none" />
               )))}
             </g>
           </g>
@@ -406,7 +409,7 @@ export function BaseSchematicCanvas<C extends SchematicComponent, I extends Sche
             return (
               <g key={text.id} data-text-id={text.id} transform={`translate(${text.x},${text.y}) rotate(${text.rotation})`} onMouseDown={event => handlers.onTextMouseDown(event, text)} style={{ cursor: 'move' }}>
                 <foreignObject x={0} y={0} width={1} height={1} style={{ overflow: 'visible', pointerEvents: 'auto' }}>
-                  <div style={{ width: 'max-content', color: text.color, fontSize: text.fontSize, fontWeight: 400, userSelect: 'none', display: 'flex', border: selected ? `1px dashed ${colors.selection}` : 'none', padding: 4, transform: 'translate(-4px, -4px)' }}>
+                  <div style={{ width: 'max-content', color: ADAPTIVE_TEXT_COLORS.has((text.color ?? '').toLowerCase()) || !text.color ? (isDark ? '#F8FAFC' : '#0F172A') : text.color, fontSize: text.fontSize, fontWeight: 400, userSelect: 'none', display: 'flex', border: selected ? `1px dashed ${colors.selection}` : 'none', padding: 4, transform: 'translate(-4px, -4px)' }}>
                     <V3Math math={text.text} />
                   </div>
                 </foreignObject>

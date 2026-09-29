@@ -117,14 +117,6 @@ export const simulationsCatalog: SimulationItemMeta[] = [
     createdAt: "2026-02-25T00:00:00Z",
   },
   {
-    id: "linear-algebra",
-    slug: "linear-algebra",
-    index: 7,
-    category: "systems-control",
-    isFeatured: false,
-    createdAt: "2026-03-01T00:00:00Z",
-  },
-  {
     id: "arduino-studio",
     slug: "arduino-studio",
     index: 8,
@@ -202,30 +194,6 @@ export const signalsAndSystemsToolMeta: Record<Locale, Array<{ slug: string; lab
     { slug: "convolution-engine", label: "Motor de Convolución" },
     { slug: "fourier-analysis", label: "Análisis de Fourier 3D" },
     { slug: "laplace-s-plane", label: "Laplace y Plano S 3D" },
-  ],
-};
-
-export const linearAlgebraToolMeta: Record<Locale, Array<{ slug: string; label: string }>> = {
-  en: [
-    { slug: "a", label: "Matrix Basics & Determinants" },
-    { slug: "b", label: "Systems & RREF" },
-    { slug: "c", label: "Null & Column Spaces" },
-    { slug: "d", label: "Transformations" },
-    { slug: "e", label: "Eigen Analysis" },
-  ],
-  ar: [
-    { slug: "a", label: "أساسيات المصفوفات والمحددات" },
-    { slug: "b", label: "الأنظمة وRREF" },
-    { slug: "c", label: "الفضاء الصفري وفضاء الأعمدة" },
-    { slug: "d", label: "التحويلات" },
-    { slug: "e", label: "التحليل الذاتي" },
-  ],
-  es: [
-    { slug: "a", label: "Bases matriciales y determinantes" },
-    { slug: "b", label: "Sistemas y RREF" },
-    { slug: "c", label: "Espacios nulo y columna" },
-    { slug: "d", label: "Transformaciones" },
-    { slug: "e", label: "Análisis espectral" },
   ],
 };
 

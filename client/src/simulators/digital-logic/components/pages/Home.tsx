@@ -1,5 +1,7 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useLocation } from 'wouter';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 /* MAE Luminous Technical Atelier: Digital Logic Simulator UI
    Canvas, wiring, selection, history and shortcuts come from the shared BaseSchematicCanvas;
    this studio supplies only the logic component library and the discrete-event engine. */
@@ -95,8 +97,33 @@ function logicTerminals(component: CircuitComponent): ComponentDef['terminals'] 
   return getLogicComponentTerminals(component, definition) ?? definition.terminals;
 }
 
+/**
+ * Orders a wire's render path so it starts at the driving (output) pin. The topological driver decides
+ * the flow vector; the path's stored direction is verified geometrically so drawing order never matters.
+ */
+function orientPathFromDriver(path: Point[], wire: CircuitWire, components: CircuitComponent[], driverIsToEnd: boolean): Point[] {
+  const terminalPos = (componentId: string, terminalId: string): Point | null => {
+    const owner = components.find(candidate => candidate.id === componentId);
+    if (!owner) return null;
+    const terminal = DIGITAL_LOGIC_LIBRARY.getTerminals(owner).find(entry => entry.id === terminalId);
+    return terminal ? [terminal.position[0], terminal.position[1]] : null;
+  };
+  const from = terminalPos(wire.fromComp, wire.fromTerm);
+  const to = terminalPos(wire.toComp, wire.toTerm);
+  const d = (a: Point, b: Point) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+  const first = path[0]; const last = path[path.length - 1];
+  let startsAtFrom = true;
+  if (from && to) startsAtFrom = d(first, from) + d(last, to) <= d(first, to) + d(last, from);
+  else if (from) startsAtFrom = d(first, from) <= d(last, from);
+  else if (to) startsAtFrom = d(last, to) <= d(first, to);
+  const startsAtDriver = startsAtFrom !== driverIsToEnd;
+  return startsAtDriver ? path : [...path].reverse();
+}
+
 /** Digital component library adapter: the only canvas-facing surface of this studio's catalog. */
 export const DIGITAL_LOGIC_LIBRARY: SchematicComponentLibrary<CircuitComponent> = {
+  // Logic symbols draw at strokeWidth 2 with no scale — wires match exactly.
+  wireStrokeWidth: 2,
   getTerminals: (component): SchematicTerminal[] => logicTerminals(component).map(terminal => ({
     id: terminal.id,
     position: getTerminalWorldPos(component.x, component.y, terminal.x, terminal.y, component.rotation, component.flipH, component.flipV),
@@ -151,15 +178,29 @@ function ComponentPaletteIcon({ definition, colors, documented, isDark }: { defi
     offsetY = (minY + maxY) / 2;
   }
 
+  // Fit the viewBox to the symbol's real geometry so wide ICs never spill past the tile.
+  const symbolRef = useRef<SVGGElement>(null);
+  const [fitBox, setFitBox] = useState<string | null>(null);
+  useLayoutEffect(() => {
+    try {
+      const box = symbolRef.current?.getBBox();
+      if (box && box.width > 0 && box.height > 0) {
+        const pad = 6;
+        setFitBox(`${box.x - pad} ${box.y - pad} ${box.width + pad * 2} ${box.height + pad * 2}`);
+      }
+    } catch { /* getBBox unavailable (e.g. jsdom) — fall back to the computed box */ }
+  }, [definition.id, documented]);
+
   return (
     <svg
       width="100%"
       height="100%"
-      viewBox={`${-w / 2} ${offsetY - h / 2} ${w} ${h}`}
+      viewBox={fitBox ?? `${-w / 2} ${offsetY - h / 2} ${w} ${h}`}
+      preserveAspectRatio="xMidYMid meet"
       aria-hidden="true"
-      style={{ overflow: 'visible', color: colors.text, pointerEvents: 'none' }}
+      style={{ overflow: 'hidden', color: colors.text, pointerEvents: 'none' }}
     >
-      <g>
+      <g ref={symbolRef}>
         {renderSymbol(
           definition.symbol,
           false,
@@ -245,7 +286,7 @@ export function DigitalLogicSimulatorHome({
       primary: '#38bdf8',
       accent: '#a855f7',
       danger: '#f43f5e',
-      selection: '#38bdf8',
+      selection: '#7C3AED',
       grid: '#181b22',
       wire: '#f8fafc',
       powered: '#38bdf8',
@@ -264,7 +305,7 @@ export function DigitalLogicSimulatorHome({
       primary: '#2563eb',
       accent: '#7c3aed',
       danger: '#be123c',
-      selection: '#2563eb',
+      selection: '#7C3AED',
       grid: '#dbe7f3',
       wire: '#0f172a',
       powered: '#2563eb',
@@ -373,6 +414,51 @@ export function DigitalLogicSimulatorHome({
     workspace: { gridVisible: canvas.gridMode !== 'hidden', snapEnabled: canvas.snapEnabled },
   }), [canvas.gridMode, canvas.snapEnabled, components, texts, viewport.pan, viewport.zoom, wires]);
 
+  // Unsaved-circuit guard: dirty = the canvas holds work that was never exported, shared or loaded from a file.
+  const { i18n } = useTranslation('simulators');
+  const [, setRouteLocation] = useLocation();
+  const [pendingLeave, setPendingLeave] = useState<string | null>(null);
+  const latestCircuitRef = useRef({ components, wires, texts });
+  latestCircuitRef.current = { components, wires, texts };
+  const circuitSignature = () => JSON.stringify(latestCircuitRef.current);
+  const savedSignatureRef = useRef(JSON.stringify({ components: [], wires: [], texts: [] }));
+  const baselineNextRef = useRef(false);
+  const markCircuitSaved = useCallback(() => { savedSignatureRef.current = circuitSignature(); }, []);
+  const isCircuitDirty = () => {
+    const { components: c, wires: w, texts: x } = latestCircuitRef.current;
+    return (c.length > 0 || w.length > 0 || x.length > 0) && circuitSignature() !== savedSignatureRef.current;
+  };
+  useEffect(() => {
+    if (baselineNextRef.current) { baselineNextRef.current = false; savedSignatureRef.current = circuitSignature(); }
+  }, [components, wires, texts]);
+  const leaveCopy = ({
+    ar: { message: 'لديك دائرة منطقية غير محفوظة. هل أنت متأكد من المغادرة؟', stay: 'إلغاء', leave: 'مغادرة' },
+    en: { message: 'You have an unsaved logic circuit. Are you sure you want to leave?', stay: 'Cancel', leave: 'Leave' },
+    es: { message: 'Tienes un circuito lógico sin guardar. ¿Estás seguro de salir?', stay: 'Cancelar', leave: 'Salir' },
+  } as Record<string, { message: string; stay: string; leave: string }>)[(i18n.language || 'en').slice(0, 2)] ?? { message: 'You have an unsaved logic circuit. Are you sure you want to leave?', stay: 'Cancel', leave: 'Leave' };
+  useEffect(() => {
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!isCircuitDirty()) return;
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    const onClick = (event: MouseEvent) => {
+      if (!isCircuitDirty() || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey) return;
+      const anchor = (event.target as HTMLElement | null)?.closest?.('a[href]') as HTMLAnchorElement | null;
+      if (!anchor || anchor.target === '_blank' || anchor.origin !== window.location.origin) return;
+      if (anchor.pathname === window.location.pathname) return;
+      event.preventDefault();
+      event.stopPropagation();
+      setPendingLeave(anchor.pathname + anchor.search + anchor.hash);
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    document.addEventListener('click', onClick, true);
+    return () => {
+      window.removeEventListener('beforeunload', onBeforeUnload);
+      document.removeEventListener('click', onClick, true);
+    };
+  }, []);
+
   // Export / Import NAD netlist
   const exportNad = useCallback(() => {
     const blob = new Blob([serializeNad(nadDocument())], { type: 'application/json' });
@@ -382,8 +468,9 @@ export function DigitalLogicSimulatorHome({
     a.download = `digital-logic-${Date.now()}.nad`;
     a.click();
     URL.revokeObjectURL(url);
+    markCircuitSaved();
     toast.success('Netlist exported successfully');
-  }, [nadDocument]);
+  }, [nadDocument, markCircuitSaved]);
 
   const importNad = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -392,6 +479,7 @@ export function DigitalLogicSimulatorHome({
     reader.onload = (e) => {
       try {
         const parsed = parseNad(String(e.target?.result ?? ''));
+        baselineNextRef.current = true;
         canvas.loadDocument({ components: parsed.components, wires: parsed.wires, texts: parsed.texts ?? [] });
         if (parsed.viewport?.pan && parsed.viewport.zoom) viewport.setView({ zoom: parsed.viewport.zoom, pan: parsed.viewport.pan });
         toast.success('Netlist imported successfully');
@@ -411,12 +499,42 @@ export function DigitalLogicSimulatorHome({
 
   const handleOpenSaveImage = useCallback(() => {
     const svg = viewport.svgRef.current;
-    if (!svg) return;
-    const cloned = svg.cloneNode(true) as SVGSVGElement;
-    cloned.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
-    const svgData = new XMLSerializer().serializeToString(cloned);
-    const blob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
-    const previewUrl = URL.createObjectURL(blob);
+    const layer = svg?.querySelector('#circuit-elements-layer') as SVGGElement | null;
+    if (!svg || !layer || (components.length === 0 && wires.length === 0 && texts.length === 0)) {
+      toast.error('No circuit elements to export');
+      return;
+    }
+    // Tight world-space bounds of parts + wires (+ text annotations), padded by 32px.
+    const PAD = 32;
+    let minX = Infinity; let minY = Infinity; let maxX = -Infinity; let maxY = -Infinity;
+    try {
+      const box = layer.getBBox();
+      if (box.width > 0 || box.height > 0) { minX = box.x; minY = box.y; maxX = box.x + box.width; maxY = box.y + box.height; }
+    } catch { /* getBBox unavailable */ }
+    texts.forEach(text => {
+      const width = Math.max(24, text.text.length * text.fontSize * 0.6);
+      minX = Math.min(minX, text.x - 4); minY = Math.min(minY, text.y - 4);
+      maxX = Math.max(maxX, text.x + width + 4); maxY = Math.max(maxY, text.y + text.fontSize + 8);
+    });
+    if (!Number.isFinite(minX)) { toast.error('No circuit elements to export'); return; }
+    const x = Math.floor(minX - PAD); const y = Math.floor(minY - PAD);
+    const width = Math.ceil(maxX - minX + PAD * 2); const height = Math.ceil(maxY - minY + PAD * 2);
+
+    const ns = 'http://www.w3.org/2000/svg';
+    const out = document.createElementNS(ns, 'svg');
+    out.setAttribute('xmlns', ns);
+    out.setAttribute('viewBox', `${x} ${y} ${width} ${height}`);
+    out.setAttribute('width', String(width));
+    out.setAttribute('height', String(height));
+    const defs = svg.querySelector('defs');
+    if (defs) out.appendChild(defs.cloneNode(true));
+    const group = document.createElementNS(ns, 'g');
+    group.setAttribute('style', `color:${colors.text}`);
+    group.appendChild(layer.cloneNode(true));
+    svg.querySelectorAll('[data-text-id]').forEach(node => group.appendChild(node.cloneNode(true)));
+    out.appendChild(group); // No background rect: the export stays transparent and themed by its stroke colours.
+    const svgData = new XMLSerializer().serializeToString(out);
+    const previewUrl = URL.createObjectURL(new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' }));
     setExportItems([
       {
         id: 'circuit-main',
@@ -429,13 +547,14 @@ export function DigitalLogicSimulatorHome({
       },
     ]);
     setExportModalOpen(true);
-  }, [viewport.svgRef]);
+  }, [colors.text, components.length, texts, viewport.svgRef, wires.length]);
 
   const handleShareProject = useCallback(() => {
     const serialized = encodeURIComponent(serializeNad(nadDocument()));
     setShareUrl(`${window.location.origin}${window.location.pathname}?project=${serialized}`);
+    markCircuitSaved();
     setShareModalOpen(true);
-  }, [nadDocument]);
+  }, [nadDocument, markCircuitSaved]);
 
   const translatedLibraryCategories = useMemo(() => {
     return DIGITAL_LOGIC_CATEGORIES.reduce<Record<string, ComponentDef[]>>((all, category) => {
@@ -465,8 +584,8 @@ export function DigitalLogicSimulatorHome({
       wireAppearance={(wire, path) => {
         const isHigh = simulation.current.getWireLogicState(wire.id) === 1;
         return {
-          stroke: isHigh ? colors.powered : colors.wire,
-          flowDots: showElectrons && isHigh ? getDotsOnPath(path, Math.max(1, Math.round(pathLength(path) / 36)), snapshot.time * 2) : [],
+          stroke: colors.wire,
+          flowDots: showElectrons && isHigh ? getDotsOnPath(orientPathFromDriver(path, wire, components, simulation.current.isWireFlowReversed(wire.id)), Math.max(1, Math.round(pathLength(path) / 36)), snapshot.time * 2) : [],
         };
       }}
       renderComponent={(component, { selected, symbolTransform }) => {
@@ -492,19 +611,11 @@ export function DigitalLogicSimulatorHome({
               )}
             </g>
             {shouldShowLabel && (
-              <text
-                x={0}
-                y={def.height / 2 + 16}
-                textAnchor="middle"
-                fontSize={11}
-                fontFamily="'KaTeX_Math', 'KaTeX_Main', serif"
-                fontStyle="italic"
-                fontWeight={400}
-                fill={colors.text}
-                pointerEvents="none"
-              >
-                {renderComponentCanvasLabel(component.label)}
-              </text>
+              <foreignObject x={-40} y={def.height / 2 + 4} width={80} height={24} style={{ overflow: 'visible', pointerEvents: 'none' }}>
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', color: colors.text, fontSize: 13, direction: 'ltr' }}>
+                  <V3Math math={componentLabelToLatex(component.label)} />
+                </div>
+              </foreignObject>
             )}
           </>
         );
@@ -555,9 +666,9 @@ export function DigitalLogicSimulatorHome({
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <StudioSlider
             aria-label={t('circuit.simulationSpeed', 'Simulation speed')}
-            min={0.25}
+            min={0.1}
             max={4}
-            step={0.25}
+            step={0.05}
             value={simulationSpeed}
             onChange={val => setSimulationSpeed(val)}
             hideHeader
@@ -647,6 +758,18 @@ export function DigitalLogicSimulatorHome({
         wireCount={wires.length}
         previewUrl={null}
       />
+      <AlertDialog open={pendingLeave !== null} onOpenChange={open => { if (!open) setPendingLeave(null); }}>
+        <AlertDialogContent dir={i18n.language?.startsWith('ar') ? 'rtl' : 'ltr'}>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{leaveCopy.message}</AlertDialogTitle>
+            <AlertDialogDescription className="sr-only">{leaveCopy.message}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{leaveCopy.stay}</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { const target = pendingLeave; savedSignatureRef.current = circuitSignature(); setPendingLeave(null); if (target) setRouteLocation(target); }}>{leaveCopy.leave}</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </BaseSchematicCanvas>
   );
 }
@@ -715,6 +838,7 @@ function ComponentInspector({
           <input
             value={component.label}
             onChange={event => onLabelChange(event.target.value)}
+            data-math-input="true"
             style={mathReferenceInputStyle(colors)}
           />
         </PropertyRow>
@@ -740,13 +864,13 @@ function ComponentInspector({
             onChange={event => onPropertyChange('_hideValue', event.target.value === 'hide')}
             style={inputStyle(colors)}
           >
-            <option value="show">Show</option>
-            <option value="hide">Hide</option>
+            <option value="show">{t('digital.show', 'Show')}</option>
+            <option value="hide">{t('digital.hide', 'Hide')}</option>
           </select>
         </PropertyRow>
 
         <div className="mae-panel-meta" style={{ marginTop: 8, fontSize: 10, color: colors.subtle }}>
-          Auto reference prefix: {componentPrefix(component.type)}.
+          {t('digital.autoReferencePrefix', 'Auto reference prefix')}: {componentPrefix(component.type)}.
         </div>
       </InspectorSection>
 
@@ -762,8 +886,6 @@ function ComponentInspector({
               >
                 <option value="LOW">{t('digital.low', '0 · LOW')}</option>
                 <option value="HIGH">{t('digital.high', '1 · HIGH')}</option>
-                <option value="Z">{t('digital.highZ', 'Z · High impedance')}</option>
-                <option value="X">{t('digital.unknown', 'X · Unknown')}</option>
               </select>
             </PropertyRow>
             <PropertyRow colors={colors} label="Toggle key">
@@ -778,20 +900,8 @@ function ComponentInspector({
                   }
                 }}
                 style={inputStyle(colors)}
-                title="Focus then press a key to assign shortcut"
+                title={t('digital.toggleKeyTooltip', 'Focus then press a key to assign shortcut')}
               />
-            </PropertyRow>
-            <PropertyRow colors={colors} label="Live state">
-              <div style={{ display: 'flex', alignItems: 'center', height: 32 }}>
-                <span
-                  className={`px-2.5 py-1 rounded-md text-xs font-mono font-bold ${currentInputState === 'HIGH'
-                      ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
-                      : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
-                    }`}
-                >
-                  {currentInputState === 'HIGH' ? t('digital.high', '1 · HIGH') : currentInputState === 'LOW' ? t('digital.low', '0 · LOW') : currentInputState}
-                </span>
-              </div>
             </PropertyRow>
           </>
         )}
@@ -802,7 +912,7 @@ function ComponentInspector({
             <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">{t('digital.measuredOutput', 'MEASURED OUTPUT')}</span>
             <span
               className={`px-2.5 py-1 rounded-md text-xs font-mono font-bold ${currentOutputState === 1
-                  ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                  ? 'bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300'
                   : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
                 }`}
             >
@@ -820,7 +930,7 @@ function ComponentInspector({
               style={inputStyle(colors)}
             >
               {['2', '3', '4', '5', '6', '7', '8'].map(num => (
-                <option key={num} value={num}>{num} Inputs</option>
+                <option key={num} value={num}>{num} {t('digital.inputsSuffix', 'Inputs')}</option>
               ))}
             </select>
           </PropertyRow>
@@ -836,6 +946,7 @@ function ComponentInspector({
                 max={60000}
                 value={numeric(component.props.clockPeriodMs, 250)}
                 onChange={event => onPropertyChange('clockPeriodMs', numeric(event.target.value, 250))}
+                data-math-input="true"
                 style={mathNumericInputStyle(colors)}
               />
             </PropertyRow>
@@ -871,7 +982,7 @@ function ComponentInspector({
         {/* Dynamic Scale Config (MUX, DEMUX, Adders, etc.) */}
         {(() => {
           const config = dynamicScaleConfigFor(component.type);
-          if (!config) return null;
+          if (!config || (isGate && config.key === 'inputCount')) return null;
           return (
             <PropertyRow colors={colors} label={config.label}>
               <select
@@ -886,18 +997,6 @@ function ComponentInspector({
             </PropertyRow>
           );
         })()}
-
-        {/* Propagation Delay for all logic components */}
-        <PropertyRow colors={colors} label="Propagation Delay" unit="ns">
-          <input
-            type="number"
-            min={0}
-            max={10000}
-            value={numeric(component.props.propagationDelayNs, 10)}
-            onChange={event => onPropertyChange('propagationDelayNs', numeric(event.target.value, 10))}
-            style={mathNumericInputStyle(colors)}
-          />
-        </PropertyRow>
 
         {/* Generic Properties */}
         {Object.entries(definition.properties).map(([key, property]) => {
@@ -1177,7 +1276,7 @@ function PropertyEditorField({ colors, label, definition, value, onChange }: { c
   if (definition.type === 'select') return <PropertyRow colors={colors} label={label} unit={definition.unit}><select value={String(value)} onChange={event => onChange(event.target.value)} style={inputStyle(colors)}>{definition.options?.map(option => <option key={option} value={option}>{option}</option>)}</select></PropertyRow>;
   if (definition.type === 'color') return <PropertyRow colors={colors} label={label}><input type="color" value={String(value)} onChange={event => onChange(event.target.value)} style={{ width: '100%', height: 30, border: `1px solid ${colors.line}`, borderRadius: 5, background: colors.input }} /></PropertyRow>;
   if (definition.type === 'text') return <PropertyRow colors={colors} label={label}><input value={String(value)} onChange={event => onChange(event.target.value)} style={inputStyle(colors)} /></PropertyRow>;
-  return <PropertyRow colors={colors} label={label} unit={definition.unit}><input type="number" min={definition.min} max={definition.max} step={definition.step ?? 'any'} value={numeric(value)} onChange={event => onChange(numeric(event.target.value, numeric(definition.value)))} style={mathNumericInputStyle(colors)} /></PropertyRow>;
+  return <PropertyRow colors={colors} label={label} unit={definition.unit}><input type="number" min={definition.min} max={definition.max} step={definition.step ?? 'any'} value={numeric(value)} onChange={event => onChange(numeric(event.target.value, numeric(definition.value)))} data-math-input="true" style={mathNumericInputStyle(colors)} /></PropertyRow>;
 }
 
 // ─── TOOLBAR & BASE UI HELPERS ──────────────────────────────────────────────

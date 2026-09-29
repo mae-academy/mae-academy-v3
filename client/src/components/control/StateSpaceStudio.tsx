@@ -27,7 +27,7 @@ import {
   observabilityMatrix,
   rank,
   type Matrix,
-} from "@/features/linear-algebra/matrixMath";
+} from "@/features/control/matrixMath";
 
 type SystemModel = { A: Matrix; B: Matrix; C: Matrix; D: Matrix };
 type Order = 2 | 3;
@@ -77,7 +77,7 @@ const studioCopy: Record<LocaleCode, {
 function MatrixGrid({ name, matrix, onChange }: { name: string; matrix: Matrix; onChange: (row: number, column: number, value: number) => void }) {
   const columns = matrix[0].length;
   const rows = matrix.length;
-  return <div className="flex w-full flex-col items-center"><div className="flex items-center justify-between w-full gap-3 pr-0.5"><KatexMath math={`${name} =`} className="text-base font-bold text-slate-800 dark:text-white" /><span className="font-mono text-[10px] text-slate-500 dark:text-slate-400">{rows} × {columns}</span></div><div className={`${MATRIX_BRACKETS} mt-2 flex justify-center`}><div className="inline-grid gap-1.5" style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>{matrix.map((row, rowIndex) => row.map((value, columnIndex) => <input key={`${name}-${rowIndex}-${columnIndex}`} aria-label={`${name} ${rowIndex + 1}, ${columnIndex + 1}`} inputMode="decimal" type="number" step="any" value={Number.isFinite(value) ? value : 0} onChange={(event) => onChange(rowIndex, columnIndex, Number(event.target.value) || 0)} style={{ fontFamily: "'KaTeX_Main', 'Times New Roman', serif" }} className={MATRIX_INPUT} />))}</div></div></div>;
+  return <div className="flex w-full flex-col items-center"><div className="flex items-center justify-between w-full gap-3 pr-0.5"><KatexMath math={`${name} =`} className="text-base font-bold text-slate-800 dark:text-white" /><span className="font-mono text-[10px] text-slate-500 dark:text-slate-400">{rows} × {columns}</span></div><div className={`${MATRIX_BRACKETS} mt-2 flex justify-center`}><div className="inline-grid gap-1.5" style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>{matrix.map((row, rowIndex) => row.map((value, columnIndex) => <input key={`${name}-${rowIndex}-${columnIndex}`} aria-label={`${name} ${rowIndex + 1}, ${columnIndex + 1}`} inputMode="decimal" type="number" step="any" value={Number.isFinite(value) ? value : 0} onChange={(event) => onChange(rowIndex, columnIndex, Number(event.target.value) || 0)} data-math-input="true" style={{ fontFamily: "'KaTeX_Main', 'Times New Roman', serif" }} className={MATRIX_INPUT} />))}</div></div></div>;
 }
 
 function LeoAlert({ messages, copy }: { messages: string[]; copy: typeof studioCopy.en }) {
@@ -221,6 +221,7 @@ export function StateSpaceStudio() {
                         step="any"
                         value={pole}
                         onChange={(event) => setDesiredPoles((current) => current.map((existing, position) => position === index ? Number(event.target.value) || 0 : existing))}
+                        data-math-input="true"
                         style={{ fontFamily: "'KaTeX_Main', 'Times New Roman', serif" }}
                         className="w-16 rounded-md border border-slate-200 bg-white px-1.5 py-1 text-center text-slate-800 text-base tracking-wide outline-none transition focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:text-white [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [-moz-appearance:textfield] m-0"
                       />

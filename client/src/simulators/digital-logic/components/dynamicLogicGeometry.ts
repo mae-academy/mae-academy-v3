@@ -154,10 +154,11 @@ export const logicBlockLayoutFor = (type: string, inputs: string[], outputs: str
 
   // Block body: exactly GRID (25px) symmetric top & bottom padding around outermost pin.
   // → topClearance === bottomClearance === GRID for every pin count.
-  const bodyHalfHeight = Math.max(GRID * 2, outerPinY(maxVertical)   + GRID);
-  const bodyHalfWidth  = Math.max(GRID * 2, outerPinY(maxHorizontal) + GRID);
+  const bodyHalfHeight = type === 'logic-clock' ? 20 : Math.max(GRID * 2, outerPinY(maxVertical)   + GRID);
+  const bodyHalfWidth  = type === 'logic-clock' ? 20 : Math.max(GRID * 2, outerPinY(maxHorizontal) + GRID);
 
-  const lead = LOGIC_SYMBOL_GRID_UNIT;
+  // Clock is a compact 40×40 source: body ±20 plus a 30px lead puts its pin on the 50px grid column.
+  const lead = type === 'logic-clock' ? 30 : LOGIC_SYMBOL_GRID_UNIT;
   const bottomAxis = slotPinsFor(groups.bottom.length + groups.bottomOutputs.length);
   const pins: LogicSymbolPin[] = [
     ...groups.left.map((id, i)  => ({ id, type: 'input'  as const, side: 'left'   as const, x: -bodyHalfWidth - lead, y: slotPinsFor(groups.left.length)[i]  })),

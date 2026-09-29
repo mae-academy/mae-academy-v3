@@ -148,6 +148,7 @@ export function ConvolutionLab() {
                       onFocus={() => setActiveTarget(field.id)}
                       onChange={(e) => { field.set(e.target.value); setDiscreteN(0); }}
                       className="min-w-0 flex-1 bg-transparent text-sm text-slate-900 outline-none dark:text-white"
+                      data-math-input="true"
                       style={{ fontFamily: "'KaTeX_Main', 'KaTeX_Math', 'Times New Roman', serif" }}
                       placeholder={field.placeholder}
                       aria-label={field.prefix}

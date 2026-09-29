@@ -168,14 +168,14 @@ const data = {
 ['en', 'ar', 'es'].forEach(lang => {
   const path = `./client/src/locales/${lang}/simulators.json`;
   const json = JSON.parse(fs.readFileSync(path, 'utf8'));
-  
+
   for (const [key, value] of Object.entries(data[lang])) {
     if (!json[key]) json[key] = {};
     for (const [subKey, subValue] of Object.entries(value)) {
       json[key][subKey] = subValue;
     }
   }
-  
+
   fs.writeFileSync(path, JSON.stringify(json, null, 2));
 });
 console.log("simulators.json updated");

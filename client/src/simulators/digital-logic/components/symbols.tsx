@@ -974,16 +974,17 @@ const LogicGate: SymbolFC = ({ props }) => {
 };
 
 
+// Input/Output share the Clock's 40×40 body and 20→50 lead so pins land on identical grid offsets.
 const DigitalInputSymbol: SymbolFC = ({ props }) => <g>
-  <rect x={-25} y={-12} width={42} height={24} rx={4} fill="none" stroke="currentColor" strokeWidth={2} />
-  <text x={-4} y={4} textAnchor="middle" fontSize={10} fontFamily="'KaTeX_Main', serif" fontWeight={700} fill="currentColor">{props?.state === 'HIGH' ? '1' : '0'}</text>
-  <line x1={17} y1={0} x2={GRID} y2={0} stroke="currentColor" strokeWidth={2} />
+  <rect x={-20} y={-20} width={40} height={40} rx={3} fill="none" stroke="currentColor" strokeWidth={2} />
+  <text x={0} y={5} textAnchor="middle" fontSize={14} fontFamily="'KaTeX_Main', serif" fontWeight={700} fill="currentColor">{props?.state === 'HIGH' ? '1' : '0'}</text>
+  <line x1={20} y1={0} x2={GRID * 2} y2={0} stroke="currentColor" strokeWidth={2} strokeLinecap="round" />
 </g>;
 
 const DigitalOutputSymbol: SymbolFC = ({ powered }) => <g>
-  <rect x={-17} y={-12} width={42} height={24} rx={4} fill="none" stroke="currentColor" strokeWidth={2} />
-  <text x={4} y={4} textAnchor="middle" fontSize={10} fontFamily="'KaTeX_Main', serif" fontWeight={700} fill="currentColor">{powered ? '1' : '0'}</text>
-  <line x1={-GRID} y1={0} x2={-17} y2={0} stroke="currentColor" strokeWidth={2} />
+  <rect x={-20} y={-20} width={40} height={40} rx={3} fill="none" stroke="currentColor" strokeWidth={2} />
+  <text x={0} y={5} textAnchor="middle" fontSize={14} fontFamily="'KaTeX_Main', serif" fontWeight={700} fill="currentColor">{powered ? '1' : '0'}</text>
+  <line x1={-GRID * 2} y1={0} x2={-20} y2={0} stroke="currentColor" strokeWidth={2} strokeLinecap="round" />
 </g>;
 
 export const BLOCK_ABBREVIATIONS: Record<string, string> = {
@@ -1047,7 +1048,7 @@ export function normalizeLogicType(raw: string): string {
 
 export const LogicClockSymbol: SymbolFC = ({ powered }) => (
   <g>
-    <rect x={-20} y={-20} width={40} height={40} rx={4} fill="none" stroke={powered ? '#38bdf8' : 'currentColor'} strokeWidth={2} />
+    <rect x={-20} y={-20} width={40} height={40} rx={3} fill="none" stroke={powered ? '#38bdf8' : 'currentColor'} strokeWidth={2} />
     <path
       d="M -12,4 H -4 V -6 H 4 V 4 H 12 V -6"
       fill="none"
@@ -1058,7 +1059,7 @@ export const LogicClockSymbol: SymbolFC = ({ powered }) => (
     />
     <text x={0} y={15} textAnchor="middle" fontSize={7} fontFamily="'KaTeX_Main', serif" fontWeight={700} fill="currentColor">CLK</text>
     {/* Lead terminates at (bodyHalfWidth + lead) = (GRID*2 + GRID) from logicBlockLayoutFor's single-output layout, matching the actual dynamic terminal position. */}
-    <line x1={20} y1={0} x2={GRID * 3} y2={0} stroke="currentColor" strokeWidth={2} strokeLinecap="round" />
+    <line x1={20} y1={0} x2={GRID * 2} y2={0} stroke="currentColor" strokeWidth={2} strokeLinecap="round" />
   </g>
 );
 

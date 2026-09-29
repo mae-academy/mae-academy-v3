@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React from 'react';
 import { V3Math } from '@/components/ui/V3Math';
 import type { Palette } from '@/simulators/shared/workspace/workspaceTheme';
@@ -81,8 +82,8 @@ export function InspectorHeader({ colors, title, subtitle }: InspectorHeaderProp
   return (
     <div style={{ padding: '16px 16px 14px', borderBottom: `1px solid ${colors.line}` }}>
       <div>
-        <div className="text-xl font-bold tracking-tight text-slate-800 dark:text-slate-100">{title}</div>
-        <div className="text-slate-600 dark:text-slate-400" style={{ marginTop: 4, fontSize: 11, lineHeight: 1.25 }}>{subtitle}</div>
+        <div className="mae-i18n-text text-xl font-bold tracking-tight text-slate-800 dark:text-slate-100">{title}</div>
+        <div className="mae-i18n-text text-slate-600 dark:text-slate-400" style={{ marginTop: 4, fontSize: 11, lineHeight: 1.25 }}>{subtitle}</div>
       </div>
     </div>
   );
@@ -125,10 +126,23 @@ export function InspectorButton({ colors, children, onClick, danger, active, dis
   );
 }
 
+const INSPECTOR_TERMS: Record<string, Record<string, string>> = {
+  ar: {"Clock Period (ms)": "دورة الساعة (ms)", "Clock Period": "دورة الساعة", "Color": "اللون", "Component": "المكوّن", "Content": "المحتوى", "Initial State": "الحالة الابتدائية", "Input Count": "عدد المداخل", "Instance label": "تسمية العنصر", "Logic Meaning": "المعنى المنطقي", "Logic properties": "الخصائص المنطقية", "Logic state": "الحالة المنطقية", "Logic State": "الحالة المنطقية", "Move": "إزاحة", "Reference": "المرجع", "Routing Mode": "نمط التوصيل", "Routing": "التوصيل", "Show Label": "إظهار التسمية", "Show Value": "إظهار القيمة", "Size": "الحجم", "Text properties": "خصائص النص", "Toggle key": "مفتاح التبديل", "Trigger Edge": "حافة التفعيل", "Bit Width": "عرض البت", "Selector Count": "عدد خطوط الاختيار", "Divide By": "القسمة على", "Auto reference prefix": "بادئة المرجع التلقائية"},
+  es: {"Clock Period (ms)": "Periodo de reloj (ms)", "Clock Period": "Periodo de reloj", "Color": "Color", "Component": "Componente", "Content": "Contenido", "Initial State": "Estado inicial", "Input Count": "Número de entradas", "Instance label": "Etiqueta de instancia", "Logic Meaning": "Significado lógico", "Logic properties": "Propiedades lógicas", "Logic state": "Estado lógico", "Logic State": "Estado lógico", "Move": "Mover", "Reference": "Referencia", "Routing Mode": "Modo de trazado", "Routing": "Trazado", "Show Label": "Mostrar etiqueta", "Show Value": "Mostrar valor", "Size": "Tamaño", "Text properties": "Propiedades del texto", "Toggle key": "Tecla de conmutación", "Trigger Edge": "Flanco de disparo", "Bit Width": "Ancho de bits", "Selector Count": "Líneas de selección", "Divide By": "Dividir por", "Auto reference prefix": "Prefijo de referencia automático"},
+};
+
+/** Localises shared inspector captions; unknown captions (and English) pass through unchanged. */
+export function useInspectorText() {
+  const { i18n } = useTranslation();
+  const table = INSPECTOR_TERMS[(i18n.language || 'en').slice(0, 2)];
+  return (label: string) => table?.[label] ?? label;
+}
+
 export function InspectorSection({ colors, label, children }: { colors: Palette; label: string; children: React.ReactNode }) {
+  const tx = useInspectorText();
   return (
     <section style={{ padding: '12px 15px', borderBottom: `1px solid ${colors.line}` }}>
-      <div className="mae-panel-section-header" style={{ marginBottom: 8 }}>{label}</div>
+      <div className="mae-panel-section-header mae-i18n-text" style={{ marginBottom: 8 }}>{tx(label)}</div>
       {children}
     </section>
   );
@@ -144,10 +158,11 @@ export function ElectricalLabel({ label, unit }: { label: string; unit?: string 
 }
 
 export function PropertyRow({ colors, label, unit, children }: { colors: Palette; label: string; unit?: string; children: React.ReactNode }) {
+  const tx = useInspectorText();
   return (
     <label style={{ display: 'grid', gridTemplateColumns: '1fr 156px', gap: 8, alignItems: 'center', marginBottom: 8 }}>
-      <span className="mae-panel-field-label" style={{ lineHeight: 1.25 }}>
-        <ElectricalLabel label={label} unit={unit} />
+      <span className="mae-panel-field-label mae-i18n-text" style={{ lineHeight: 1.25 }}>
+        <ElectricalLabel label={tx(label)} unit={unit} />
       </span>
       {children}
     </label>

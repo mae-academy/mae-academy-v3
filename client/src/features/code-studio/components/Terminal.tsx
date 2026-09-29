@@ -74,7 +74,7 @@ export const TerminalSurface = memo(function TerminalSurface({
   if (!video) {
     if (!stdout) {
       return (
-        <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto p-3 font-mono text-xs text-slate-100 leading-relaxed bg-[#050608] select-text">
+        <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto p-3 mae-code-mono text-slate-100 bg-[#050608] select-text">
           <div className="text-slate-600 italic">{emptyLabel}</div>
         </div>
       );
@@ -86,11 +86,11 @@ export const TerminalSurface = memo(function TerminalSurface({
       const exitFooter = exitMatch[2];
 
       return (
-        <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto p-3 font-mono text-xs text-slate-100 leading-relaxed bg-[#050608] select-text">
+        <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto p-3 mae-code-mono text-slate-100 bg-[#050608] select-text">
           {mainOutput ? (
             <p className="whitespace-pre-wrap">{mainOutput}</p>
           ) : null}
-          <div className="text-xs text-slate-500 font-mono italic mt-2" data-testid="terminal-exit-footer">
+          <div className="mae-code-mono text-slate-500 italic mt-2" data-testid="terminal-exit-footer">
             {exitFooter}
           </div>
         </div>
@@ -98,7 +98,7 @@ export const TerminalSurface = memo(function TerminalSurface({
     }
 
     return (
-      <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto p-3 font-mono text-xs text-slate-100 leading-relaxed bg-[#050608] select-text">
+      <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto p-3 mae-code-mono text-slate-100 bg-[#050608] select-text">
         <p className="whitespace-pre-wrap">{stdout}</p>
       </div>
     );
@@ -130,7 +130,7 @@ export const TerminalSurface = memo(function TerminalSurface({
       }`}
     >
       <style>{"@keyframes terminal-blink{0%,49%{opacity:1}50%,100%{opacity:0}}"}</style>
-      <div className="inline-block font-mono text-[13px] leading-[1.15]">
+      <div className="inline-block mae-code-font font-mono text-[13px] leading-[1.15]">
         {video.grid.map((row, rowIndex) => (
           <div key={rowIndex} className="flex whitespace-pre">
             {row.map((cell, colIndex) => {

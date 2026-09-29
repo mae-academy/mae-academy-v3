@@ -107,7 +107,7 @@ export function LogicAnalyzer({ expression, onExpressionChange }: LogicAnalyzerP
             Interactive Truth Table ({rows.length} rows)
           </div>
           {hasExceededVariables && (
-            <StatusBadge variant="warning">
+            <StatusBadge variant="danger">
               Maximum 8 input variables (A–H) supported — table bounded to {activeVariables.join(', ')}
             </StatusBadge>
           )}

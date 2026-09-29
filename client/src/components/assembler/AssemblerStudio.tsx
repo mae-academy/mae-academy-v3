@@ -34,6 +34,16 @@ import { TerminalSurface } from "@/features/code-studio/components/Terminal";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Tabs,
   TabsContent,
   TabsList,
@@ -392,9 +402,38 @@ const QUICK_REFERENCE: Partial<Record<SupportedLanguage, [string, string][]>> = 
 
 // ---------------------------------------------------------------------------
 // Main Studio Component (4-Quadrant IDE Viewport Split)
+// Per-language code buffers (persisted so switching languages never loses typed code)
+const BUFFER_KEY = (lang: string) => `mae.codeStudio.buffer.${lang}`;
+type CodeBuffer = { code: string; template: string };
+
+function readBuffer(lang: SupportedLanguage): CodeBuffer | null {
+  try {
+    const raw = localStorage.getItem(BUFFER_KEY(lang));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as CodeBuffer;
+    return typeof parsed?.code === "string" && typeof parsed?.template === "string" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeBuffer(lang: SupportedLanguage, buffer: CodeBuffer) {
+  try {
+    localStorage.setItem(BUFFER_KEY(lang), JSON.stringify(buffer));
+  } catch {
+    /* storage unavailable */
+  }
+}
+
+const LEAVE_COPY: Record<string, { message: string; stay: string; leave: string }> = {
+  ar: { message: "لديك تعديلات غير محفوظة في محرر الكود. هل أنت متأكد من المغادرة؟", stay: "إلغاء", leave: "مغادرة" },
+  en: { message: "You have unsaved changes in the code editor. Are you sure you want to leave?", stay: "Stay", leave: "Leave" },
+  es: { message: "Tienes cambios sin guardar en el editor de código. ¿Estás seguro de salir?", stay: "Quedarme", leave: "Salir" },
+};
+
 // ---------------------------------------------------------------------------
 export function AssemblerStudio() {
-  const { t } = useTranslation('simulators');
+  const { t, i18n } = useTranslation('simulators');
   const {
     isRunning: engineBusy,
     result,
@@ -413,11 +452,56 @@ export function AssemblerStudio() {
   const initialLang: SupportedLanguage = getRouteLanguage() ?? "masm8086";
   const [language, setLanguage] = useState<SupportedLanguage>(initialLang);
   const initialDef = LANGUAGE_DEFINITIONS[initialLang];
-  const [template, setTemplate] = useState(initialDef.defaultTemplate);
-  const initialCode = initialDef.sources[initialDef.defaultTemplate] ?? MASM_EXAMPLE_SOURCES[DEFAULT_MASM_TEMPLATE];
+  const initialBuffer = readBuffer(initialLang);
+  const initialTemplate =
+    initialBuffer && initialDef.sources[initialBuffer.template] !== undefined ? initialBuffer.template : initialDef.defaultTemplate;
+  const [template, setTemplate] = useState(initialTemplate);
+  const initialCode = initialBuffer?.code ?? initialDef.sources[initialDef.defaultTemplate] ?? MASM_EXAMPLE_SOURCES[DEFAULT_MASM_TEMPLATE];
   const [code, setCode] = useState(initialCode);
   const [codeHistory, setCodeHistory] = useState<string[]>([initialCode]);
   const [historyIndex, setHistoryIndex] = useState<number>(0);
+
+  // Persist the active buffer per language.
+  useEffect(() => {
+    writeBuffer(language, { code, template });
+  }, [language, code, template]);
+
+  // Dirty = any language buffer differs from its pristine template.
+  const isDirty = (() => {
+    return (Object.keys(LANGUAGE_DEFINITIONS) as SupportedLanguage[]).some(lang => {
+      const def = LANGUAGE_DEFINITIONS[lang];
+      const buf = lang === language ? { code, template } : readBuffer(lang);
+      return !!buf && buf.code !== (def.sources[buf.template] ?? def.sources[def.defaultTemplate]);
+    });
+  })();
+  const isDirtyRef = useRef(false);
+  isDirtyRef.current = isDirty;
+  const [pendingLeave, setPendingLeave] = useState<string | null>(null);
+  const leaveCopy = LEAVE_COPY[(i18n.language || "en").slice(0, 2)] ?? LEAVE_COPY.en;
+
+  useEffect(() => {
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (!isDirtyRef.current) return;
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    // Intercept in-app link navigation that leaves Code Studio.
+    const onClick = (e: MouseEvent) => {
+      if (!isDirtyRef.current || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey) return;
+      const a = (e.target as HTMLElement | null)?.closest?.("a[href]") as HTMLAnchorElement | null;
+      if (!a || a.target === "_blank" || a.origin !== window.location.origin) return;
+      if (/^\/(?:simulations\/code|code)(?:\/|$)/i.test(a.pathname)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      setPendingLeave(a.pathname + a.search + a.hash);
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    document.addEventListener("click", onClick, true);
+    return () => {
+      window.removeEventListener("beforeunload", onBeforeUnload);
+      document.removeEventListener("click", onClick, true);
+    };
+  }, []);
 
   // Synchronize document title and search engine meta descriptions reactively
   useEffect(() => {
@@ -711,9 +795,12 @@ export function AssemblerStudio() {
     setCurrentStepIndex(-1);
     setBreakpoints([]);
     setActiveLine(1);
+    writeBuffer(language, { code, template });
     const definition = LANGUAGE_DEFINITIONS[next];
-    setTemplate(definition.defaultTemplate);
-    const src = definition.sources[definition.defaultTemplate];
+    const saved = readBuffer(next);
+    const nextTemplate = saved && definition.sources[saved.template] !== undefined ? saved.template : definition.defaultTemplate;
+    setTemplate(nextTemplate);
+    const src = saved?.code ?? definition.sources[definition.defaultTemplate];
     setCode(src);
     setCodeHistory([src]);
     setHistoryIndex(0);
@@ -1118,7 +1205,7 @@ export function AssemblerStudio() {
                         <span className="font-bold uppercase tracking-wider text-[10.5px] text-[#F43F5E] block mb-0.5 font-sans">
                           DIAGNOSTICS / EXECUTION ERROR
                         </span>
-                        <div className="font-mono text-[11.5px] leading-relaxed break-words whitespace-pre-wrap text-rose-900 dark:text-rose-200 font-normal">
+                        <div className="mae-code-mono break-words whitespace-pre-wrap !text-[13px] text-rose-900 dark:text-rose-200 font-normal">
                           {formatDiagnostic(combinedError)}
                         </div>
                       </div>
@@ -1570,6 +1657,28 @@ export function AssemblerStudio() {
           </ResizablePanel>
         </ResizablePanelGroup>
       </div>
+
+      <AlertDialog open={pendingLeave !== null} onOpenChange={open => { if (!open) setPendingLeave(null); }}>
+        <AlertDialogContent dir={i18n.language?.startsWith("ar") ? "rtl" : "ltr"}>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{leaveCopy.message}</AlertDialogTitle>
+            <AlertDialogDescription className="sr-only">{leaveCopy.message}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{leaveCopy.stay}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                const target = pendingLeave;
+                isDirtyRef.current = false;
+                setPendingLeave(null);
+                if (target) setLocation(target);
+              }}
+            >
+              {leaveCopy.leave}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

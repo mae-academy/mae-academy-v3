@@ -177,6 +177,8 @@
     "rootsCommaHint": "جذور مفصولة بفواصل. استخدم 'j' للأزواج المترافقة المركبة."
   },
   "digital": {
+    "inputsSuffix": "مداخل",
+    "autoReferencePrefix": "بادئة المرجع التلقائية",
     "schematicWorkspace": "مساحة المخطط التخطيطي",
     "logicAnalyzer": "محلل منطقي",
     "kmapMinimizer": "مبسّط خرائط كارنو",
@@ -203,6 +205,7 @@
     "replace": "استبدال",
     "current": "الحالي",
     "noComponentsMatch": "لا توجد مكونات منطق رقمي مطابقة لبحثك",
+    "toggleKeyTooltip": "ركّز ثم اضغط مفتاحًا لتعيين الاختصار",
     "orthogonal": "متعامد (90° صارمة)",
     "straight": "مستقيم",
     "manualWaypoints": "نقاط تمرير يدوية",

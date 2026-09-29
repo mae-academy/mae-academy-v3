@@ -33,9 +33,8 @@ describe("TerminalSurface", () => {
     const footer = screen.getByTestId("terminal-exit-footer");
     expect(footer).toBeTruthy();
     expect(footer.textContent).toBe("[Process exited with code 0]");
-    expect(footer.className).toContain("text-xs");
+    expect(footer.className).toContain("mae-code-mono");
     expect(footer.className).toContain("text-slate-500");
-    expect(footer.className).toContain("font-mono");
     expect(footer.className).toContain("italic");
     expect(footer.className).toContain("mt-2");
   });

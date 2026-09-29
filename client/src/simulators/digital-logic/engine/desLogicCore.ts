@@ -237,6 +237,32 @@ const resolveConnection = (wire: CircuitWire, pins: Map<string, LogicPinMap>): D
   return fromOutput ? { wire, wireIds: [wire.id], driver: wire.fromComp, driverPin: wire.fromTerm, receiver: wire.toComp, receiverPin: wire.toTerm } : { wire, wireIds: [wire.id], driver: wire.toComp, driverPin: wire.toTerm, receiver: wire.fromComp, receiverPin: wire.fromTerm };
 };
 const isJunctionNode = (id: string) => id.startsWith('junc_') || id.startsWith('junction') || id === 'junc';
+/** Wires whose stored from→to direction runs against signal flow (output pin → input pin, through junctions). */
+const resolveReversedWires = (wires: CircuitWire[], pins: Map<string, LogicPinMap>): Set<string> => {
+  const key = (component: string, pin: string) => (isJunctionNode(component) ? component : `${component}:${pin}`);
+  const adjacent = new Map<string, CircuitWire[]>();
+  wires.forEach(wire => [key(wire.fromComp, wire.fromTerm), key(wire.toComp, wire.toTerm)].forEach(node => adjacent.set(node, [...(adjacent.get(node) ?? []), wire])));
+  const reversed = new Set<string>();
+  const seen = new Set<string>();
+  const queue: string[] = [];
+  wires.forEach(wire => [[wire.fromComp, wire.fromTerm], [wire.toComp, wire.toTerm]].forEach(([component, pin]) => {
+    if (pins.get(component)?.outputs.includes(pin) && !seen.has(key(component, pin))) { seen.add(key(component, pin)); queue.push(key(component, pin)); }
+  }));
+  const done = new Set<string>();
+  while (queue.length) {
+    const node = queue.shift() as string;
+    (adjacent.get(node) ?? []).forEach(wire => {
+      if (done.has(wire.id)) return;
+      done.add(wire.id);
+      const fromNode = key(wire.fromComp, wire.fromTerm);
+      const other = node === fromNode ? key(wire.toComp, wire.toTerm) : fromNode;
+      if (node !== fromNode) reversed.add(wire.id);
+      if (!seen.has(other)) { seen.add(other); queue.push(other); }
+    });
+  }
+  return reversed;
+};
+
 /** Flattens junction-split nets (canvas T-junctions) into driver→receiver connections. */
 const resolveJunctionConnections = (wires: CircuitWire[], pins: Map<string, LogicPinMap>): DirectedConnection[] => {
   const parent = new Map<string, string>();
@@ -268,6 +294,7 @@ export class DiscreteEventLogicEngine extends SimulationEngine {
   private logicComponents: CircuitComponent[] = [];
   private runtimes = new Map<string, LogicComponent>();
   private connections: DirectedConnection[] = [];
+  private reversedWires = new Set<string>();
   private events: LogicEvent[] = [];
   private sequence = 0;
   private nowNs = 0;
@@ -284,6 +311,7 @@ export class DiscreteEventLogicEngine extends SimulationEngine {
     this.runtimes = new Map(this.logicComponents.map(component => [component.id, createLogicComponent(component)]));
     const pins = new Map(this.logicComponents.map(component => [component.id, logicPinsFor(component)]));
     this.connections = [...wires.map(wire => resolveConnection(wire, pins)).filter((wire): wire is DirectedConnection => Boolean(wire)), ...resolveJunctionConnections(wires, pins)];
+    this.reversedWires = resolveReversedWires(wires, pins);
     this.events = []; this.sequence = 0; this.nowNs = 0; this.nextClockEdgeNs.clear(); this.eventBudgetReached = false;
     this.logicComponents.forEach(component => { if (component.type === 'digital-input') this.runtimes.get(component.id)?.setInput('state', asLogicState(component.props.state)); this.schedule(component.id, 0, 'evaluate'); });
     this.flush(this.initialSettleNs);
@@ -300,6 +328,8 @@ export class DiscreteEventLogicEngine extends SimulationEngine {
     if (!runtime) return 'X';
     return runtime.pinMap.outputs.includes(pin) ? runtime.getOutput(pin) : runtime.inputs.get(pin) ?? 'X';
   }
+  /** True when the wire's stored path runs input→output, i.e. signal flow must be drawn along the reversed path. */
+  isWireFlowReversed(wireId: string): boolean { return this.reversedWires.has(wireId); }
   getWireLogicState(wireId: string): LogicState {
     const conn = this.connections.find(c => c.wireIds.includes(wireId));
     if (!conn) return 'X';

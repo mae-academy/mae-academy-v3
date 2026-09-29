@@ -9,7 +9,7 @@ import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useLocale } from "@/contexts/LocaleContext";
 import { KatexMath } from "@/components/ui/KatexMath";
 import { SegmentedControl, StudioCard, InnerBox } from "@/components/common/templates";
-import { integrateStateRK4, type Matrix, type Vector } from "@/features/linear-algebra/matrixMath";
+import { integrateStateRK4, type Matrix, type Vector } from "@/features/control/matrixMath";
 
 type LocaleCode = "en" | "ar" | "es";
 type Props = { matrix: Matrix; closedLoopMatrix?: Matrix; order: 2 | 3 };
@@ -404,6 +404,7 @@ export function StateSpacePortraits({ matrix, closedLoopMatrix, order }: Props) 
                 step="any"
                 value={value}
                 onChange={(event) => setInitialState((current) => current.map((state, position) => position === index ? Number(event.target.value) || 0 : state))}
+                data-math-input="true"
                 style={{ fontFamily: "'KaTeX_Main', 'Times New Roman', serif" }}
                 className={inputClass}
               />

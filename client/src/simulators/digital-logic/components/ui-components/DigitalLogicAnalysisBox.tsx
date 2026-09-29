@@ -146,8 +146,8 @@ export function DigitalLogicAnalysisBox({
         borderTop: standalone ? 'none' : `1px solid ${colors.line}`,
       }}
     >
-      {/* 1. Centered Segmented Control Header */}
-      <div className="flex w-full justify-center mb-5">
+      {/* 1. Left-docked Segmented Control Header */}
+      <div className="flex w-full justify-start mb-5">
         <SegmentedControl<DigitalLogicAnalysisMethod>
           options={ANALYSIS_TABS}
           value={method}
@@ -223,6 +223,7 @@ export function DigitalLogicAnalysisBox({
               <input
                 id="executive-boolean-expression-input"
                 data-unstyled
+                data-math-input="true"
                 type="text"
                 value={sharedExpression}
                 onChange={(e) => handleExpressionChange(e.target.value)}
@@ -263,7 +264,7 @@ export function DigitalLogicAnalysisBox({
                 </div>
               )}
               {isExceedingVariableLimit && (
-                <StatusBadge variant="warning">
+                <StatusBadge variant="danger">
                   Maximum 8 input variables (A–H) supported
                 </StatusBadge>
               )}

@@ -251,6 +251,7 @@ export function PIDStudio() {
                 onChange={(event) =>
                   setSignal((current: SignalState) => ({ ...current, magnitude: Number(event.target.value) }))
                 }
+                data-math-input="true"
                 style={{ fontFamily: "'KaTeX_Main', 'Times New Roman', serif" }}
                 className={field}
               />
@@ -268,6 +269,7 @@ export function PIDStudio() {
                   onChange={(event) =>
                     setSignal((current: SignalState) => ({ ...current, parameter: Number(event.target.value) }))
                   }
+                  data-math-input="true"
                   style={{ fontFamily: "'KaTeX_Main', 'Times New Roman', serif" }}
                   className={field}
                 />
@@ -371,6 +373,7 @@ export function PIDStudio() {
             step="1"
             value={maxTime}
             onChange={(event) => setMaxTime(Math.max(1, Number(event.target.value)))}
+            data-math-input="true"
             style={{ fontFamily: "'KaTeX_Main', 'Times New Roman', serif" }}
             className="h-8 w-20 rounded-lg border border-slate-200 bg-slate-50 px-2 text-right text-slate-800 text-lg tracking-wide focus:outline-blue-500 dark:border-slate-800 dark:bg-slate-950 dark:text-white [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [-moz-appearance:textfield] m-0"
           />
@@ -419,6 +422,7 @@ export function PIDStudio() {
               step="0.01"
               value={zeta}
               onChange={(event) => setZeta(Number(event.target.value))}
+              data-math-input="true"
               style={{ fontFamily: "'KaTeX_Main', 'Times New Roman', serif" }}
               className={field}
             />
@@ -433,6 +437,7 @@ export function PIDStudio() {
               step="0.1"
               value={omegaN}
               onChange={(event) => setOmegaN(Number(event.target.value))}
+              data-math-input="true"
               style={{ fontFamily: "'KaTeX_Main', 'Times New Roman', serif" }}
               className={field}
             />

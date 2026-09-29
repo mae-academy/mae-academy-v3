@@ -177,6 +177,8 @@
     "rootsCommaHint": "Comma-separated roots. Use 'j' for complex conjugate pairs."
   },
   "digital": {
+    "inputsSuffix": "Inputs",
+    "autoReferencePrefix": "Auto reference prefix",
     "schematicWorkspace": "Schematic Workspace",
     "logicAnalyzer": "Logic Analyzer",
     "kmapMinimizer": "K-Map Minimizer",
@@ -203,6 +205,7 @@
     "replace": "Replace",
     "current": "Current",
     "noComponentsMatch": "No digital logic components match your search",
+    "toggleKeyTooltip": "Focus then press a key to assign shortcut",
     "orthogonal": "Orthogonal (Strict 90°)",
     "straight": "Straight",
     "manualWaypoints": "Manual Waypoints",

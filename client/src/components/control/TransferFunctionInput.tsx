@@ -218,6 +218,7 @@ export function TransferFunctionInput({ onUpdate, defaultData, gainK }: Transfer
                   type="text"
                   value={numStr}
                   onChange={(e) => setNumStr(e.target.value)}
+                  data-math-input="true"
                   style={{ fontFamily: "'KaTeX_Main', 'Times New Roman', serif" }}
                   className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2 text-slate-800 text-lg tracking-wide dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="e.g. 1 2"
@@ -230,6 +231,7 @@ export function TransferFunctionInput({ onUpdate, defaultData, gainK }: Transfer
                   type="text"
                   value={denStr}
                   onChange={(e) => setDenStr(e.target.value)}
+                  data-math-input="true"
                   style={{ fontFamily: "'KaTeX_Main', 'Times New Roman', serif" }}
                   className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2 text-slate-800 text-lg tracking-wide dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="e.g. 1 3 2 0"
@@ -245,6 +247,7 @@ export function TransferFunctionInput({ onUpdate, defaultData, gainK }: Transfer
                   value={kStr}
                   placeholder="1"
                   onChange={(e) => setKStr(e.target.value)}
+                  data-math-input="true"
                   style={{ fontFamily: "'KaTeX_Main', 'Times New Roman', serif" }}
                   className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2 text-slate-800 text-lg tracking-wide dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
@@ -255,6 +258,7 @@ export function TransferFunctionInput({ onUpdate, defaultData, gainK }: Transfer
                   type="text"
                   value={zStr}
                   onChange={(e) => setZStr(e.target.value)}
+                  data-math-input="true"
                   style={{ fontFamily: "'KaTeX_Main', 'Times New Roman', serif" }}
                   className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2 text-slate-800 text-lg tracking-wide dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="e.g. -2, -3+4j"
@@ -266,6 +270,7 @@ export function TransferFunctionInput({ onUpdate, defaultData, gainK }: Transfer
                   type="text"
                   value={pStr}
                   onChange={(e) => setPStr(e.target.value)}
+                  data-math-input="true"
                   style={{ fontFamily: "'KaTeX_Main', 'Times New Roman', serif" }}
                   className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2 text-slate-800 text-lg tracking-wide dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="e.g. 0, -1, -2"

@@ -154,7 +154,7 @@ export function KMapMinimizer({ expression, onExpressionChange }: KMapMinimizerP
           </div>
 
           <div className="flex items-center gap-2">
-            {exceedsMap && <StatusBadge variant="warning">K-Map limited to 4 variables</StatusBadge>}
+            {exceedsMap && <StatusBadge variant="danger">K-Map limited to 4 variables</StatusBadge>}
             <span className="hidden sm:inline text-xs text-slate-400 dark:text-slate-500 mr-2">
               Click cell to cycle <KatexMath math={'0 \\to 1 \\to X \\to 0'} />
             </span>

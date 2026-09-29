@@ -158,6 +158,7 @@ export const StudioSlider = forwardRef<HTMLInputElement, StudioSliderProps>(
                 const val = parseFloat(e.target.value);
                 if (!isNaN(val)) onChange?.(val);
               }}
+              data-math-input="true"
               style={{ fontFamily: "'KaTeX_Main', 'Times New Roman', serif" }}
               className="h-8 w-24 rounded-md border border-slate-200 bg-slate-50 px-2 text-right text-slate-800 text-lg tracking-wide focus:outline-blue-500 dark:border-slate-800 dark:bg-slate-950 dark:text-white [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [-moz-appearance:textfield] m-0"
             />
@@ -236,6 +237,7 @@ export const StudioSlider = forwardRef<HTMLInputElement, StudioSliderProps>(
                 const v = parseFloat(e.target.value);
                 if (!isNaN(v) && onMinChange) onMinChange(v);
               }}
+              data-math-input="true"
               style={{ fontFamily: "'KaTeX_Main', 'Times New Roman', serif" }}
               className="font-serif text-slate-800 text-lg tracking-wide bg-transparent border-none outline-none w-16 text-center [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [-moz-appearance:textfield] m-0 dark:text-white"
             />
@@ -247,6 +249,7 @@ export const StudioSlider = forwardRef<HTMLInputElement, StudioSliderProps>(
                 const v = parseFloat(e.target.value);
                 if (!isNaN(v) && onMaxChange) onMaxChange(v);
               }}
+              data-math-input="true"
               style={{ fontFamily: "'KaTeX_Main', 'Times New Roman', serif" }}
               className="font-serif text-slate-800 text-lg tracking-wide bg-transparent border-none outline-none w-16 text-center [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [-moz-appearance:textfield] m-0 dark:text-white"
             />

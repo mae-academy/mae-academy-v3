@@ -22,6 +22,17 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+const CARD_ICON_SLUGS = new Set([
+  "control-systems",
+  "circuit-lab",
+  "power-electronics",
+  "code",
+  "plc",
+  "signals-and-systems",
+  "digital-logic-design",
+  "arduino-studio",
+]);
+
 export interface PracticalSimulationsProps {
   eyebrow: string;
   title: string;
@@ -297,7 +308,7 @@ export default function PracticalSimulations({
       {filteredSimulations.length > 0 ? (
         <motion.div
           layout
-          className="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-2 lg:grid-cols-3"
+          className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 xl:gap-6"
           variants={containerVariants}
         >
           <AnimatePresence mode="popLayout">
@@ -313,13 +324,37 @@ export default function PracticalSimulations({
                   animate="visible"
                   exit="exit"
                   key={sim.id}
-                  className="simulation-station group relative flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white/75 p-4 shadow-[0_15px_40px_-28px_rgba(15,23,42,.45)] transition-all duration-300 hover:-translate-y-2 hover:border-violet-400 hover:shadow-2xl hover:shadow-purple-500/20 dark:border-white/[0.08] dark:bg-[#08080A] dark:hover:border-white/[0.15]"
+                  className="simulation-station group relative flex h-full min-w-0 flex-col justify-between overflow-hidden rounded-2xl border border-slate-200 bg-white/75 p-4 shadow-[0_15px_40px_-28px_rgba(15,23,42,.45)] transition-all duration-300 hover:-translate-y-2 hover:border-violet-400 hover:shadow-2xl hover:shadow-purple-500/20 dark:border-white/[0.08] dark:bg-[#08080A] dark:hover:border-white/[0.15]"
                 >
                   {/* Glowing Top Edge on Hover */}
                   <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-brand-gradient opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
 
                   {/* Schematic Visual Box */}
                   <div className="relative mb-4 overflow-hidden rounded-xl border border-slate-200/70 bg-slate-50 p-2 dark:border-white/[0.08] dark:bg-zinc-950/60">
+                    {CARD_ICON_SLUGS.has(sim.id) ? (
+                      <div className="relative flex aspect-[16/10] w-full items-center justify-center overflow-hidden p-4 transition-transform duration-500 group-hover:scale-[1.035]">
+                        <div
+                          aria-hidden="true"
+                          className="pointer-events-none absolute inset-[22%] rounded-full bg-brand-gradient opacity-20 blur-3xl transition-opacity duration-500 group-hover:opacity-40"
+                        />
+                        <div
+                          aria-hidden="true"
+                          className="relative h-full max-h-[160px] w-full drop-shadow-[0_10px_24px_rgba(124,58,237,0.28)]"
+                          style={{
+                            background:
+                              "linear-gradient(135deg, #2563EB 0%, #7C3AED 50%, #E11D48 100%)",
+                            WebkitMaskImage: `url(/cards/${sim.id}.svg?v=2)`,
+                            maskImage: `url(/cards/${sim.id}.svg?v=2)`,
+                            WebkitMaskRepeat: "no-repeat",
+                            maskRepeat: "no-repeat",
+                            WebkitMaskPosition: "center",
+                            maskPosition: "center",
+                            WebkitMaskSize: "contain",
+                            maskSize: "contain",
+                          }}
+                        />
+                      </div>
+                    ) : (
                     <SimulationSchematic
                       variant={
                         typeof sim.visualVariant === "number"
@@ -329,6 +364,7 @@ export default function PracticalSimulations({
                       labelled={false}
                       className="aspect-[1.26] w-full transition-transform duration-500 group-hover:scale-[1.035]"
                     />
+                    )}
 
                     {/* Featured / Hot Pill Badge (Top-Right of card/visual) */}
                     {(sim.isFeatured || sim.badge === "HOT") && (

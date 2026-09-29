@@ -344,8 +344,7 @@ localizedContent.en.collections.simulations = {
     { title: "PLC", description: "Build ladder logic and observe industrial control sequences in motion.", code: "S.05" },
     { title: "Signals and Systems", description: "Transform, filter, and interpret signals across time and frequency domains.", code: "S.06" },
     { title: "Digital Logic Design", description: "Compose gates, truth states, and logic paths into working digital systems.", code: "S.07" },
-    { title: "Linear Algebra", description: "Explore matrices, vectors, transformations, and the geometry behind engineering models.", code: "S.08" },
-    { title: "Arduino Studio", description: "Embedded Systems & Microcontrollers: write Arduino C++ and watch an interactive UNO board, serial monitor, and live plotter respond.", code: "S.09" },
+    { title: "Arduino Studio", description: "Embedded Systems & Microcontrollers: write Arduino C++ and watch an interactive UNO board, serial monitor, and live plotter respond.", code: "S.08" },
   ],
 };
 localizedContent.ar.collections.simulations = {
@@ -360,8 +359,7 @@ localizedContent.ar.collections.simulations = {
     { title: "PLC", description: "ابنِ منطق السلم وراقب تسلسلات التحكم الصناعي أثناء الحركة.", code: "S.05" },
     { title: "الإشارات والأنظمة", description: "حوّل الإشارات ورشّحها وفسّرها عبر نطاقي الزمن والتردد.", code: "S.06" },
     { title: "تصميم المنطق الرقمي", description: "ركّب البوابات وحالات الحقيقة ومسارات المنطق في أنظمة رقمية عاملة.", code: "S.07" },
-    { title: "الجبر الخطي", description: "استكشف المصفوفات والمتجهات والتحويلات والهندسة الكامنة خلف النماذج الهندسية.", code: "S.08" },
-    { title: "استوديو الأردوينو", description: "الأنظمة المدمجة والمتحكمات: اكتب شيفرة أردوينو C++ وشاهد لوحة UNO التفاعلية ومراقب التسلسل والراسم الحي وهي تستجيب.", code: "S.09" },
+    { title: "استوديو الأردوينو", description: "الأنظمة المدمجة والمتحكمات: اكتب شيفرة أردوينو C++ وشاهد لوحة UNO التفاعلية ومراقب التسلسل والراسم الحي وهي تستجيب.", code: "S.08" },
   ],
 };
 localizedContent.es.collections.simulations = {
@@ -376,8 +374,7 @@ localizedContent.es.collections.simulations = {
     { title: "PLC", description: "Construye lógica de escalera y observa secuencias de control industrial en movimiento.", code: "S.05" },
     { title: "Señales y sistemas", description: "Transforma, filtra e interpreta señales en los dominios del tiempo y la frecuencia.", code: "S.06" },
     { title: "Diseño de lógica digital", description: "Compone compuertas, estados de verdad y rutas lógicas en sistemas digitales funcionales.", code: "S.07" },
-    { title: "Álgebra lineal", description: "Explora matrices, vectores, transformaciones y la geometría detrás de los modelos de ingeniería.", code: "S.08" },
-    { title: "Estudio Arduino", description: "Sistemas embebidos y microcontroladores: escribe C++ de Arduino y observa la placa UNO interactiva, el monitor serie y el graficador en vivo.", code: "S.09" },
+    { title: "Estudio Arduino", description: "Sistemas embebidos y microcontroladores: escribe C++ de Arduino y observa la placa UNO interactiva, el monitor serie y el graficador en vivo.", code: "S.08" },
   ],
 };
 

@@ -43,7 +43,6 @@ const heavyChunks: Record<string, () => Promise<unknown>> = {
   "/simulations/control-systems":      () => import("../pages/SimulationDetail"),
   "/simulations/power-electronics":    () => import("../pages/SimulationDetail"),
   "/simulations/signals-and-systems":  () => import("../pages/SimulationDetail"),
-  "/simulations/linear-algebra":       () => import("../pages/SimulationDetail"),
   "/simulations/circuit-lab":          () => import("../pages/SimulationDetail"),
   "/simulations/digital-logic-design": () => import("../pages/SimulationDetail"),
   "/simulations/code":                 () => import("../pages/SimulationDetail"),

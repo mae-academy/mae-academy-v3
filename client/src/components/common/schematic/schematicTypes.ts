@@ -114,6 +114,8 @@ export interface SchematicComponentLibrary<C extends SchematicComponent> {
   validatePaste?: (components: C[]) => string | null;
   /** Transform applied to the symbol group inside the component's translate frame. */
   symbolScale?: (component: C) => number;
+  /** Effective symbol stroke width (stroke × symbolScale); wires are drawn with exactly this width. */
+  wireStrokeWidth?: number;
 }
 
 export type SchematicDragState =

@@ -57,6 +57,7 @@ function Field({ label, value, setValue, disabled = false, min = 0, step = "any"
         disabled={disabled}
         value={Number.isFinite(value) ? value : 0}
         onChange={(event) => setValue(Number(event.target.value) || 0)}
+        data-math-input="true"
         style={{
           fontFamily: "'KaTeX_Main', 'Times New Roman', serif"
         }}

@@ -4,6 +4,8 @@ import { pointInComponentBox } from '@/components/common/schematic/schematicGeom
 import type { SchematicBounds, SchematicComponentLibrary, SchematicTerminal } from '@/components/common/schematic/schematicTypes';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useLocation } from 'wouter';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 /* MAE Luminous Technical Atelier: Tab D keeps documented 25 px terminal geometry,
    direct electromechanical controls, and a quiet Control Systems-aligned inspector. */
 import {
@@ -967,6 +969,8 @@ export function createAnalogCanvasLibrary(tabD: boolean): SchematicComponentLibr
     cloneForPaste: copyComponentForPaste,
     validatePaste: components => (tabD && components.some(component => !isTabDComponentAvailable(component.type)) ? 'Some power semiconductors are unavailable in this mode' : null),
     symbolScale: component => (isExactCadComponent(component.type) ? 1 : scale),
+    // Symbols draw at 1.5 (or 1 × TAB_D_SYMBOL_SCALE when documented) — wires must match exactly.
+    wireStrokeWidth: 1.5,
   };
 }
 
@@ -980,7 +984,7 @@ export interface V3HomeProps {
 }
 
 export function V3Home({ createSimulationEngine = () => new SimulationEngine(), createStaticMna, tabDUiRefinement = false }: V3HomeProps) {
-  const { t } = useTranslation(['simulators']);
+  const { t, i18n } = useTranslation(['simulators']);
   const gridSize = tabDUiRefinement ? TAB_D_GRID_SIZE : GRID_SIZE;
   const visualSymbolScale = tabDUiRefinement ? TAB_D_SYMBOL_SCALE : 1;
   const [darkPreview, setDarkPreview] = useState(() => typeof document !== 'undefined' && document.documentElement.classList.contains('dark'));
@@ -1119,17 +1123,50 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
   const [examplesModalOpen, setExamplesModalOpen] = useState(false);
   const [sharePreviewUrl, setSharePreviewUrl] = useState<string | null>(null);
 
-  // Safe Exit / Refresh Warning (BeforeUnload)
+  // Unsaved-circuit guard: dirty = circuit differs from the last exported/shared/loaded state.
+  const [, setRouteLocation] = useLocation();
+  const [pendingLeave, setPendingLeave] = useState<string | null>(null);
+  const latestCircuitRef = useRef({ components, wires, texts });
+  latestCircuitRef.current = { components, wires, texts };
+  const circuitSignature = () => JSON.stringify(latestCircuitRef.current);
+  const savedSignatureRef = useRef<string>(JSON.stringify({ components: [], wires: [], texts: [] }));
+  const baselineNextRef = useRef(false);
+  const markCircuitSaved = useCallback(() => { savedSignatureRef.current = circuitSignature(); }, []);
+  const isCircuitDirty = () => {
+    const { components: c, wires: w, texts: x } = latestCircuitRef.current;
+    return (c.length > 0 || w.length > 0 || x.length > 0) && circuitSignature() !== savedSignatureRef.current;
+  };
+  useEffect(() => {
+    if (baselineNextRef.current) { baselineNextRef.current = false; savedSignatureRef.current = circuitSignature(); }
+  }, [components, wires, texts]);
+  const leaveCopy = ({
+    ar: { message: 'لديك دائرة غير محفوظة. احفظها أو شاركها قبل المغادرة، وإلا ستفقد عملك. هل أنت متأكد من المغادرة؟', stay: 'إلغاء', leave: 'مغادرة' },
+    en: { message: 'You have an unsaved circuit. Save or share it before leaving, or your work will be lost. Are you sure you want to leave?', stay: 'Stay', leave: 'Leave' },
+    es: { message: 'Tienes un circuito sin guardar. Guárdalo o compártelo antes de salir o perderás tu trabajo. ¿Estás seguro de salir?', stay: 'Quedarme', leave: 'Salir' },
+  } as Record<string, { message: string; stay: string; leave: string }>)[(i18n.language || 'en').slice(0, 2)] ?? { message: 'You have an unsaved circuit. Are you sure you want to leave?', stay: 'Stay', leave: 'Leave' };
+
   useEffect(() => {
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-      if (components.length > 0 || wires.length > 0) {
-        event.preventDefault();
-        event.returnValue = '';
-      }
+      if (!isCircuitDirty()) return;
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    const handleClick = (event: MouseEvent) => {
+      if (!isCircuitDirty() || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey) return;
+      const anchor = (event.target as HTMLElement | null)?.closest?.('a[href]') as HTMLAnchorElement | null;
+      if (!anchor || anchor.target === '_blank' || anchor.origin !== window.location.origin) return;
+      if (anchor.pathname === window.location.pathname) return;
+      event.preventDefault();
+      event.stopPropagation();
+      setPendingLeave(anchor.pathname + anchor.search + anchor.hash);
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [components.length, wires.length]);
+    document.addEventListener('click', handleClick, true);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      document.removeEventListener('click', handleClick, true);
+    };
+  }, []);
 
   const getCanvasTerminalPosition = useCallback((component: CircuitComponent, terminalId: string): Point | null =>
     analogTerminalPosition(component, terminalId, tabDUiRefinement, true), [tabDUiRefinement]);
@@ -1296,8 +1333,9 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     const anchor = window.document.createElement('a');
     anchor.href = href; anchor.download = 'circuit-lab.nad'; anchor.click();
     URL.revokeObjectURL(href);
+    markCircuitSaved();
     toast.success('NAD circuit exported');
-  }, [components, gridVisible, pan, snapEnabled, texts, wires, zoom]);
+  }, [markCircuitSaved, components, gridVisible, pan, snapEnabled, texts, wires, zoom]);
 
   const loadCircuitDocument = useCallback((document: NADDocument) => {
     const importedComponents = tabDUiRefinement ? filterTabDImportedComponents(document.components) : document.components;
@@ -1348,6 +1386,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
 
     const refreshedWires = recalculateAllOrthogonalPaths(importedWires, importedComponents);
 
+    baselineNextRef.current = true;
     canvas.loadDocument({ components: importedComponents, wires: refreshedWires, texts: document.texts || [] }, { resetHistory: true });
     canvas.viewport.setView({ zoom: document.viewport.zoom, pan: document.viewport.pan });
     if (!document.workspace.gridVisible) canvas.setGridMode('hidden');
@@ -1562,8 +1601,9 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     setSharePreviewUrl(preview);
 
     // Open internal ShareProjectModal
+    markCircuitSaved();
     setShareModalOpen(true);
-  }, [components, generateCircuitSnapshot, gridVisible, pan, snapEnabled, texts, wires, zoom]);
+  }, [markCircuitSaved, components, generateCircuitSnapshot, gridVisible, pan, snapEnabled, texts, wires, zoom]);
 
   const updateComponentProperty = useCallback((key: string, value: unknown) => {
     if (!selectedComponent) return;
@@ -3438,9 +3478,9 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <StudioSlider
             aria-label={t('simulators:circuit.simulationSpeed')}
-            min={0.25}
+            min={0.1}
             max={4}
-            step={0.25}
+            step={0.05}
             value={simulationSpeed}
             onChange={val => setSimulationSpeed(val)}
             hideHeader
@@ -3528,6 +3568,18 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
       onClose={() => setExamplesModalOpen(false)}
       onLoad={handleLoadExample}
     />
+    <AlertDialog open={pendingLeave !== null} onOpenChange={open => { if (!open) setPendingLeave(null); }}>
+      <AlertDialogContent dir={i18n.language?.startsWith('ar') ? 'rtl' : 'ltr'}>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{leaveCopy.message}</AlertDialogTitle>
+          <AlertDialogDescription className="sr-only">{leaveCopy.message}</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>{leaveCopy.stay}</AlertDialogCancel>
+          <AlertDialogAction onClick={() => { const target = pendingLeave; savedSignatureRef.current = circuitSignature(); setPendingLeave(null); if (target) setRouteLocation(target); }}>{leaveCopy.leave}</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
     </BaseSchematicCanvas>
   );
 }
@@ -3702,7 +3754,7 @@ function ComponentInspector({ colors, component, definition, allComponents, link
     )}
     <InspectorSection colors={colors} label="Instance label">
       <PropertyRow colors={colors} label="Reference">
-        <input value={component.type === 'ground' ? 'GND' : component.label} disabled={component.type === 'ground'} onChange={event => onLabelChange(component.type === 'ground' ? 'GND' : event.target.value)} style={mathReferenceInputStyle(colors)} />
+        <input value={component.type === 'ground' ? 'GND' : component.label} disabled={component.type === 'ground'} onChange={event => onLabelChange(component.type === 'ground' ? 'GND' : event.target.value)} data-math-input="true" style={mathReferenceInputStyle(colors)} />
       </PropertyRow>
 
       <PropertyRow colors={colors} label="Component">
@@ -3749,8 +3801,8 @@ function ComponentInspector({ colors, component, definition, allComponents, link
             return (
               <PropertyRow key={key} colors={colors} label={property.label ?? key}>
                 <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 68px', gap: 5 }}>
-                  <input type="number" step="any" value={numeric(component.props[key], defaultAng)} onChange={event => onPropertyChange(key, numeric(event.target.value, defaultAng))} style={mathNumericInputStyle(colors)} />
-                  <select value={String(component.props.angleUnit ?? 'degree')} onChange={event => onPropertyChange('angleUnit', event.target.value)} style={mathSelectStyle(colors)}>
+                  <input type="number" step="any" value={numeric(component.props[key], defaultAng)} onChange={event => onPropertyChange(key, numeric(event.target.value, defaultAng))} data-math-input="true" style={mathNumericInputStyle(colors)} />
+                  <select value={String(component.props.angleUnit ?? 'degree')} onChange={event => onPropertyChange('angleUnit', event.target.value)} data-math-input="true" style={mathSelectStyle(colors)}>
                     <option value="degree">deg</option>
                     <option value="radian">rad</option>
                   </select>
@@ -3836,7 +3888,7 @@ function PropertyEditorField({ colors, label, definition, value, onChange }: { c
   if (definition.type === 'select') return <PropertyRow colors={colors} label={label} unit={definition.unit}><select value={String(value)} onChange={event => onChange(event.target.value)} style={inputStyle(colors)}>{definition.options?.map(option => <option key={option} value={option}>{definition.optionLabels?.[option] ?? option}</option>)}</select></PropertyRow>;
   if (definition.type === 'color') return <PropertyRow colors={colors} label={label}><input type="color" value={String(value)} onChange={event => onChange(event.target.value)} style={{ width: '100%', height: 30, border: `1px solid ${colors.line}`, borderRadius: 5, background: colors.input }} /></PropertyRow>;
   if (definition.type === 'text') return <PropertyRow colors={colors} label={label}><input value={String(value)} onChange={event => onChange(event.target.value)} style={inputStyle(colors)} /></PropertyRow>;
-  return <PropertyRow colors={colors} label={label} unit={definition.unit}><input type="number" min={definition.min} max={definition.max} step={definition.step ?? 'any'} value={numeric(value)} onChange={event => onChange(numeric(event.target.value, numeric(definition.value)))} style={mathNumericInputStyle(colors)} /></PropertyRow>;
+  return <PropertyRow colors={colors} label={label} unit={definition.unit}><input type="number" min={definition.min} max={definition.max} step={definition.step ?? 'any'} value={numeric(value)} onChange={event => onChange(numeric(event.target.value, numeric(definition.value)))} data-math-input="true" style={mathNumericInputStyle(colors)} /></PropertyRow>;
 }
 
 function PrefixedPropertyEditorField({ colors, propertyKey, label, definition, value, prefix, onChange, onPrefixChange }: { colors: Palette; propertyKey: string; label: string; definition: PropertyDef; value: unknown; prefix: string; onChange: (value: number) => void; onPrefixChange: (prefix: string) => void }) {
@@ -3848,7 +3900,7 @@ function PrefixedPropertyEditorField({ colors, propertyKey, label, definition, v
     onPrefixChange(nextPrefix);
     onChange(visibleValue * engineeringFactor(nextPrefix));
   };
-  return <PropertyRow colors={colors} label={label} unit={definition.unit}><div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 68px', gap: 5 }}><input aria-label={`${propertyKey} numeric value`} type="number" step="any" value={displayValue} onChange={event => onChange(numeric(event.target.value, displayValue) * factor)} style={mathNumericInputStyle(colors)} /><select aria-label={`${propertyKey} engineering prefix`} value={prefix} onChange={event => selectPrefix(event.target.value)} style={mathSelectStyle(colors)} title={`Engineering prefix for ${definition.unit ?? ''}`}>{ENGINEERING_PREFIXES.map(item => <option key={item.key || 'base'} value={item.key}>{item.symbol || '—'}{definition.unit}</option>)}</select></div></PropertyRow>;
+  return <PropertyRow colors={colors} label={label} unit={definition.unit}><div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 68px', gap: 5 }}><input aria-label={`${propertyKey} numeric value`} type="number" step="any" value={displayValue} onChange={event => onChange(numeric(event.target.value, displayValue) * factor)} data-math-input="true" style={mathNumericInputStyle(colors)} /><select aria-label={`${propertyKey} engineering prefix`} value={prefix} onChange={event => selectPrefix(event.target.value)} data-math-input="true" style={mathSelectStyle(colors)} title={`Engineering prefix for ${definition.unit ?? ''}`}>{ENGINEERING_PREFIXES.map(item => <option key={item.key || 'base'} value={item.key}>{item.symbol || '—'}{definition.unit}</option>)}</select></div></PropertyRow>;
 }
 
 function WireInspector({ colors, wire, tabDUiRefinement, onRouting, onAddCorner, onNudge, onDelete }: { colors: Palette; wire: CircuitWire; tabDUiRefinement: boolean; onRouting: (routing: CircuitWire['routing']) => void; onAddCorner: () => void; onNudge: (amount: number) => void; onDelete: () => void }) {

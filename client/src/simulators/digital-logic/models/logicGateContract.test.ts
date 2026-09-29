@@ -20,8 +20,8 @@ describe('Digital Logic multi-input gate contract', () => {
   it('keeps Logic Input and Logic Output terminals exactly at their symbol-lead endpoints on the 25px grid', () => {
     const input = { id: 'I', type: 'digital-input', x: 0, y: 0, rotation: 0, flipH: false, flipV: false, label: 'I1', props: {} };
     const output = { id: 'O', type: 'digital-output', x: 0, y: 0, rotation: 0, flipH: false, flipV: false, label: 'O1', props: {} };
-    expect(getLogicComponentTerminals(input, getDef('digital-input')!)).toEqual([{ id: 'out', name: 'OUT', x: 25, y: 0, type: 'output' }]);
-    expect(getLogicComponentTerminals(output, getDef('digital-output')!)).toEqual([{ id: 'in', name: 'IN', x: -25, y: 0, type: 'input' }]);
+    expect(getLogicComponentTerminals(input, getDef('digital-input')!)).toEqual([{ id: 'out', name: 'OUT', x: 50, y: 0, type: 'output' }]);
+    expect(getLogicComponentTerminals(output, getDef('digital-output')!)).toEqual([{ id: 'in', name: 'IN', x: -50, y: 0, type: 'input' }]);
   });
   it('pins the fixed single-input NOT gate exactly on its drawn ±50px lead ends', () => {
     const notGate = { id: 'N', type: 'gate-not', x: 0, y: 0, rotation: 0, flipH: false, flipV: false, label: 'N1', props: {} };

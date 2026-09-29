@@ -470,6 +470,7 @@ export function RootLocusStudio() {
                       const val = parseFloat(e.target.value);
                       if (!isNaN(val) && val > 0) setMaxTime(val);
                     }}
+                    data-math-input="true"
                     style={{ fontFamily: "'KaTeX_Main', 'Times New Roman', serif" }}
                     className="bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 text-slate-800 text-lg tracking-wide dark:text-white w-20 text-right focus:outline-blue-500 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [-moz-appearance:textfield] m-0"
                   />

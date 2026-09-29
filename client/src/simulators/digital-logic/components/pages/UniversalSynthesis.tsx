@@ -192,7 +192,7 @@ export function UniversalSynthesis({ expression: controlledExpr, onExpressionCha
               <button
                 type="button"
                 onClick={() => handleExpressionChange(canonicalAlternative.expr)}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-900 transition-colors hover:bg-amber-100 dark:border-amber-700/50 dark:bg-amber-950/40 dark:text-amber-200 dark:hover:bg-amber-950/70 cursor-pointer"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-violet-300 bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-800 transition-colors hover:bg-violet-100 dark:border-violet-700/50 dark:bg-violet-950/40 dark:text-violet-200 dark:hover:bg-violet-950/70 cursor-pointer"
               >
                 <span>{canonicalAlternative.label}:</span>
                 <KatexMath math={canonicalAlternative.latex} />

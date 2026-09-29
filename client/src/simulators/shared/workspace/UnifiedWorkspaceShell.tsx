@@ -206,7 +206,7 @@ export function UnifiedWorkspaceShell({
     onCanvasMouseMove?.(event);
   };
   return (
-    <div dir="ltr" className="v3-mae-layout font-sans text-slate-900 dark:text-slate-100" style={{ minHeight: 760, color: colors.text }}>
+    <div dir="ltr" className="v3-mae-layout mae-simulator-shell font-sans text-slate-900 dark:text-slate-100" style={{ minHeight: 760, color: colors.text }}>
       {tabs && tabs.length > 0 && activeTabId !== undefined && (
         <div className="mb-4">
           <SegmentedControl
@@ -253,7 +253,7 @@ export function UnifiedWorkspaceShell({
             </aside>
 
             <main className="relative flex-1 min-w-0 h-[700px] overflow-hidden rounded-2xl border shadow-sm border-slate-200 bg-white dark:border-[#1a1d24] dark:bg-[#07080a]" style={{ background: colors.canvas, borderColor: colors.line }}>
-              <div className="flex items-start justify-between border-b px-4 py-2" style={{ borderColor: colors.line }}>
+              <div className="flex items-start justify-between border-b px-4 py-2 mae-card-header-row panel-header" data-slot="card-header" style={{ borderColor: colors.line }}>
                 <div>
                   <div className={CONTROL_SYSTEMS_HEADING}>{canvasTitle}</div>
                 </div>
