@@ -124,3 +124,4 @@ client/src/simulators/circuit-engine/engine/spice/mnaValidationSuite.ac.report.m
 
 # Generated thumbnail / featured-list cache
 .cache/
+.claude/worktrees/
