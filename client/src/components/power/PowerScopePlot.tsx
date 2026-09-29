@@ -410,8 +410,8 @@ export function PowerScopePlot({
       style={height !== undefined ? { height: typeof height === "number" ? `${height}px` : height } : undefined}
     >
       {/* Header Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-200/60 dark:border-slate-800/80">
-        <div>
+      <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-200/60 dark:border-slate-800/80 mae-card-header-row panel-header" data-slot="card-header">
+        <div className="mae-card-header-title min-w-0">
           <div className="flex items-center gap-2">
             {title && (
               <h3 className="text-sm font-bold uppercase tracking-wider text-slate-800 dark:text-white">
@@ -437,7 +437,7 @@ export function PowerScopePlot({
         </div>
 
         {/* Toolbar & Interactive Signal Legend */}
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2.5 mae-card-header-actions shrink-0">
           {activeTab === "waveform" && series.length > 0 && (
             <div className="flex flex-wrap items-center gap-1.5" role="toolbar" aria-label="Signal toggles">
               {series.map((s) => {

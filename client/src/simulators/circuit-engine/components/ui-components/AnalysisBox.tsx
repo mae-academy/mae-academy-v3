@@ -141,8 +141,8 @@ export function AnalysisBox({
       className="rounded-xl border border-slate-200/80 bg-slate-50/70 dark:border-[#1a1d24] dark:bg-[#090a0d]"
       style={{ padding: standalone ? '18px 20px 22px' : '12px 15px', borderTop: standalone ? 'none' : `1px solid ${colors.line}` }}
     >
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
-        <div>
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-3 mae-card-header-row panel-header" data-slot="card-header">
+        <div className="mae-card-header-title min-w-0">
           <div className="text-sm font-bold uppercase tracking-wider text-slate-800 dark:text-white">
             {hasAC ? 'AC Analysis (Phasors)' : trace.heading}
           </div>
@@ -152,7 +152,11 @@ export function AnalysisBox({
             </div>
           )}
         </div>
-        {!hasAC && <DecimalPlacesSelector precision={precision} onChangePrecision={setPrecision} />}
+        {!hasAC && (
+          <div className="mae-card-header-actions shrink-0">
+            <DecimalPlacesSelector precision={precision} onChangePrecision={setPrecision} />
+          </div>
+        )}
       </div>
 
       <div className="mb-4">

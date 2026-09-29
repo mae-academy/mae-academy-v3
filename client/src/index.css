@@ -1031,6 +1031,61 @@
     text-align: left;
   }
 
+  /* Simulator Card Headers: Flip Header Title & Action Controls in Arabic Mode without mirroring workspaces */
+  .mae-card-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  /* Swap header item order in Arabic without flipping the workspace shell */
+  html[lang="ar"] .mae-card-header-row,
+  html[dir="rtl"] .mae-card-header-row,
+  html[lang="ar"] .mae-simulator-shell .panel-header,
+  html[dir="rtl"] .mae-simulator-shell .panel-header,
+  html[lang="ar"] .mae-simulator-shell [data-slot="card-header"],
+  html[dir="rtl"] .mae-simulator-shell [data-slot="card-header"],
+  html[lang="ar"] .panel-header,
+  html[dir="rtl"] .panel-header,
+  html[lang="ar"] [data-slot="card-header"]:not([data-no-flip]),
+  html[dir="rtl"] [data-slot="card-header"]:not([data-no-flip]) {
+    flex-direction: row-reverse;
+  }
+
+  /* Ensure card header titles are explicitly aligned to the right in Arabic */
+  html[lang="ar"] .mae-card-header-title,
+  html[dir="rtl"] .mae-card-header-title,
+  html[lang="ar"] .mae-card-header-row > :first-child:not(.mae-card-header-actions),
+  html[dir="rtl"] .mae-card-header-row > :first-child:not(.mae-card-header-actions),
+  html[lang="ar"] .mae-simulator-shell .panel-header > :first-child:not(.mae-card-header-actions),
+  html[dir="rtl"] .mae-simulator-shell .panel-header > :first-child:not(.mae-card-header-actions),
+  html[lang="ar"] .mae-simulator-shell [data-slot="card-header"] > :first-child:not(.mae-card-header-actions),
+  html[dir="rtl"] .mae-simulator-shell [data-slot="card-header"] > :first-child:not(.mae-card-header-actions),
+  html[lang="ar"] .panel-header > :first-child:not(.mae-card-header-actions),
+  html[dir="rtl"] .panel-header > :first-child:not(.mae-card-header-actions),
+  html[lang="ar"] [data-slot="card-header"] > :first-child:not(.mae-card-header-actions),
+  html[dir="rtl"] [data-slot="card-header"] > :first-child:not(.mae-card-header-actions) {
+    text-align: right;
+  }
+
+  /* For grid-based card headers with actions (e.g. CardHeader from ui/card) */
+  html[lang="ar"] [data-slot="card-header"]:has([data-slot="card-action"]),
+  html[dir="rtl"] [data-slot="card-header"]:has([data-slot="card-action"]) {
+    grid-template-columns: auto 1fr;
+  }
+  html[lang="ar"] [data-slot="card-header"] [data-slot="card-action"],
+  html[dir="rtl"] [data-slot="card-header"] [data-slot="card-action"] {
+    grid-column-start: 1;
+    justify-self: start;
+  }
+  html[lang="ar"] [data-slot="card-header"] [data-slot="card-title"],
+  html[dir="rtl"] [data-slot="card-header"] [data-slot="card-title"],
+  html[lang="ar"] [data-slot="card-header"] [data-slot="card-description"],
+  html[dir="rtl"] [data-slot="card-header"] [data-slot="card-description"] {
+    grid-column-start: 2;
+    text-align: right;
+  }
+
 }
 
 @layer components {

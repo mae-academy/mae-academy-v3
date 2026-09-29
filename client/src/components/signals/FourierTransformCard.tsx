@@ -24,12 +24,14 @@ export function FourierTransformCard({ direction, latex, pairs = [], notes = [],
   const forward = direction === "forward";
   return (
     <section className="min-w-0 rounded-2xl border border-slate-200/80 bg-white/80 p-4 shadow-sm backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/80">
-      <header className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3 dark:border-slate-800/80">
-        <div className="min-w-0">
+      <header className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3 dark:border-slate-800/80 mae-card-header-row panel-header" data-slot="card-header">
+        <div className="mae-card-header-title min-w-0">
           <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-white">{forward ? t('signals.fourierTransform', 'Fourier Transform') : t('signals.inverseFourierTransform', 'Inverse Fourier Transform')}</h3>
           <KatexMath math={forward ? String.raw`\mathcal{F}\{x(t)\}=X(j\omega)` : String.raw`\mathcal{F}^{-1}\{X(j\omega)\}=x(t)`} className="mt-1 block text-sm text-slate-600 dark:text-slate-300" />
         </div>
-        <StatusBadge variant={latex ? "info" : "neutral"} className="uppercase tracking-wider text-[10px]">{latex ? t('signals.analytic', 'Analytic') : t('signals.numerical', 'Numerical')}</StatusBadge>
+        <div className="mae-card-header-actions shrink-0">
+          <StatusBadge variant={latex ? "info" : "neutral"} className="uppercase tracking-wider text-[10px]">{latex ? t('signals.analytic', 'Analytic') : t('signals.numerical', 'Numerical')}</StatusBadge>
+        </div>
       </header>
 
       {latex ? (

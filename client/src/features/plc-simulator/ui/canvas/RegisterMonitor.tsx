@@ -128,9 +128,9 @@ export function RegisterMonitor({ networks, profile, memory, className = '' }: R
 
   return (
     <section aria-label="Used registers and memory" className={`${PANEL} ${className}`}>
-      <div className={PANEL_HEADER}>
-        <div className={PANEL_TITLE}>{t('plc.registersMemory', 'Registers & Memory')}</div>
-        <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500">{t('plc.usedCount', '{{count}} used', { count: registers.length })}</span>
+      <div className={`${PANEL_HEADER} mae-card-header-row panel-header`} data-slot="card-header">
+        <div className={`${PANEL_TITLE} mae-card-header-title`}>{t('plc.registersMemory', 'Registers & Memory')}</div>
+        <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500 mae-card-header-actions shrink-0">{t('plc.usedCount', '{{count}} used', { count: registers.length })}</span>
       </div>
       {registers.length === 0 ? (
         <p className="p-3 text-center text-[11px] text-slate-500 dark:text-slate-400">

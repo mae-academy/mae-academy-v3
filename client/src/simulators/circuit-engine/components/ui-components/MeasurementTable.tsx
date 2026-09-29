@@ -34,9 +34,9 @@ export function MeasurementTable({
       className="rounded-lg bg-slate-50 dark:bg-[#0d0f12] border border-slate-200/80 dark:border-[#1a1d24] p-2 shadow-xs transition-colors"
       style={{ borderLeft: `3.5px solid ${color}` }}
     >
-      <div className="flex justify-between items-center mb-1.5 pb-1 border-b border-slate-200 dark:border-[#1a1d24]">
-        <span className="text-[11px] font-bold" style={{ color }}>{channel.toUpperCase()}</span>
-        <span className="text-[9px] text-slate-500 dark:text-slate-400 font-medium">● Connected</span>
+      <div className="flex justify-between items-center mb-1.5 pb-1 border-b border-slate-200 dark:border-[#1a1d24] mae-card-header-row panel-header" data-slot="card-header">
+        <span className="text-[11px] font-bold mae-card-header-title" style={{ color }}>{channel.toUpperCase()}</span>
+        <span className="text-[9px] text-slate-500 dark:text-slate-400 font-medium mae-card-header-actions shrink-0">● Connected</span>
       </div>
       <div className="grid grid-cols-2 gap-[1px] bg-slate-200 dark:bg-[#1a1d24] rounded overflow-hidden border border-slate-200 dark:border-[#1a1d24]">
         <MeasurementCell math={`V_{\\text{rms}} = ${measurements!.vrms.toFixed(2)}\\ \\text{V}`} />

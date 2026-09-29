@@ -378,9 +378,9 @@ export function UnifiedWorkspaceShell({
             style={{ background: colors.panel, borderColor: colors.line }}
             data-testid="workspace-shortcuts-card"
           >
-            <div className="border-b px-3 py-2 flex items-center justify-between" style={{ borderColor: colors.line }}>
-              <div className={CONTROL_SYSTEMS_HEADING}>{t('simulators:shell.workspaceShortcuts')}</div>
-              <Keyboard size={13} className="text-slate-400 dark:text-slate-500" />
+            <div className="border-b px-3 py-2 flex items-center justify-between mae-card-header-row panel-header" data-slot="card-header" style={{ borderColor: colors.line }}>
+              <div className={`${CONTROL_SYSTEMS_HEADING} mae-card-header-title`}>{t('simulators:shell.workspaceShortcuts')}</div>
+              <Keyboard size={13} className="text-slate-400 dark:text-slate-500 mae-card-header-actions shrink-0" />
             </div>
             <div className="p-3.5 flex flex-col gap-2.5 text-xs" data-testid="canvas-shortcuts">
               <div className="grid grid-cols-2 gap-2">

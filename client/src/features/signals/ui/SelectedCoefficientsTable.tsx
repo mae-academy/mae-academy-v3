@@ -42,9 +42,9 @@ export function SelectedCoefficientsTable({ coefficients, spanLimit, period, ome
 
   return (
     <section className={cn("min-w-0 rounded-2xl border border-slate-200/80 bg-white/70 p-3.5 shadow-sm backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/70 sm:p-4", className)}>
-      <header className="flex items-center justify-between gap-2 border-b border-slate-100 pb-2.5 dark:border-slate-800/80">
-        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-white">{t('signals.fourierCoefficients', 'Fourier coefficients')}</h3>
-        <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500"><KatexMath math={`n \\in [${-spanLimit}, ${spanLimit}]`} /></span>
+      <header className="flex items-center justify-between gap-2 border-b border-slate-100 pb-2.5 dark:border-slate-800/80 mae-card-header-row panel-header" data-slot="card-header">
+        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-white mae-card-header-title">{t('signals.fourierCoefficients', 'Fourier coefficients')}</h3>
+        <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500 mae-card-header-actions shrink-0"><KatexMath math={`n \\in [${-spanLimit}, ${spanLimit}]`} /></span>
       </header>
 
       <div className="grid gap-4 pt-3 lg:grid-cols-[minmax(0,23rem)_minmax(0,1fr)]">

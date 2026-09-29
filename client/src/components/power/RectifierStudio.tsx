@@ -87,9 +87,9 @@ function CircuitPlate({ parameters }: { parameters: RectifierParameters }) {
   const bridge = parameters.rectifierType === "full" && parameters.fullWaveSubtype === "bridge";
   return (
     <section className={`${card} min-h-[340px]`}>
-      <div className="flex items-center justify-between gap-3">
-        <h3 className={heading}>{t("power.converterDraftingPlate", "Converter Drafting Plate")}</h3>
-        <span className="font-mono text-[10px] font-bold tracking-[.12em] text-violet-700 dark:text-violet-300">
+      <div className="flex items-center justify-between gap-3 mae-card-header-row panel-header" data-slot="card-header">
+        <h3 className={`${heading} mae-card-header-title`}>{t("power.converterDraftingPlate", "Converter Drafting Plate")}</h3>
+        <span className="font-mono text-[10px] font-bold tracking-[.12em] text-violet-700 dark:text-violet-300 mae-card-header-actions shrink-0">
           {topology.toUpperCase()}
         </span>
       </div>
@@ -290,9 +290,9 @@ export function RectifierStudio() {
         )}
 
         <div className="border-t border-slate-200 pt-4 dark:border-slate-800">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <h4 className="text-xs font-bold text-slate-700 dark:text-slate-200">{t("power.sourceFiringParams", "Source & Firing Parameters")}</h4>
-            <KatexMath math={tex`\omega=${NumberValue(simulation.angularFrequency, 1)}\,\mathrm{rad/s}`} className="text-xs text-violet-700 dark:text-violet-300" />
+          <div className="mb-3 flex items-center justify-between gap-3 mae-card-header-row panel-header" data-slot="card-header">
+            <h4 className="text-xs font-bold text-slate-700 dark:text-slate-200 mae-card-header-title">{t("power.sourceFiringParams", "Source & Firing Parameters")}</h4>
+            <KatexMath math={tex`\omega=${NumberValue(simulation.angularFrequency, 1)}\,\mathrm{rad/s}`} className="text-xs text-violet-700 dark:text-violet-300 mae-card-header-actions shrink-0" />
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="sm:col-span-2">

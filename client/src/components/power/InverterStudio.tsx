@@ -109,9 +109,9 @@ function Circuit({ parameters, faulted }: { parameters: InverterParameters; faul
   const switchColor = faulted ? "text-rose-500" : "text-violet-500";
   return (
     <section className={`${card} min-h-[340px]`}>
-      <div className="flex items-center justify-between gap-3">
-        <h3 className={heading}>{t("power.circuitDiagram", "Circuit Diagram")}</h3>
-        <span className={`text-xs font-bold ${faulted ? "text-rose-600 dark:text-rose-300" : "text-violet-700 dark:text-violet-300"}`}>
+      <div className="flex items-center justify-between gap-3 mae-card-header-row panel-header" data-slot="card-header">
+        <h3 className={`${heading} mae-card-header-title`}>{t("power.circuitDiagram", "Circuit Diagram")}</h3>
+        <span className={`text-xs font-bold mae-card-header-actions shrink-0 ${faulted ? "text-rose-600 dark:text-rose-300" : "text-violet-700 dark:text-violet-300"}`}>
           {faulted ? t("power.faultLegInhibited", "FAULT / LEG INHIBITED") : techniqueLabels[parameters.technique].toUpperCase()}
         </span>
       </div>
