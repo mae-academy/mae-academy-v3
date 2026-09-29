@@ -11,10 +11,12 @@ import {
   Layers,
   X,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { BOOK_CATEGORIES, LibrarySort } from "@/lib/internetarchive";
 import { searchAllBooks } from "@/lib/unifiedBooks";
 import type { UnifiedBook } from "@/lib/bookSources";
 import LibraryBookCard from "@/components/LibraryBookCard";
+import { usePageTitle } from "@/hooks/usePageTitle";
 
 const containerVariants: Variants = {
   hidden: {},
@@ -28,36 +30,38 @@ const itemVariants: Variants = {
 const PAGE_SIZES = [12, 24, 48, 96];
 const ARCHIVE_MAX_WINDOW = 10_000;
 
-const LIBRARY_COPY = {
-  eyebrow: "02 / Academic Library",
-  title: "Read the books that engineers learn from.",
-  description:
-    "Open textbooks, manuals and references in engineering, computing, mathematics and physics, readable in the browser straight from the Internet Archive.",
-};
-
-const CATEGORY_OPTIONS = BOOK_CATEGORIES.map((name) => ({ label: name, value: name }));
-
-const SORT_OPTIONS: { label: string; value: LibrarySort }[] = [
-  { label: "Trending", value: "trending" },
-  { label: "Most Downloaded", value: "top_downloaded" },
-  { label: "Newest", value: "newest" },
-  { label: "Earliest", value: "earliest" },
-];
-
-const LANGUAGE_OPTIONS = [
-  { label: "All Languages", value: "all" },
-  { label: "English (en)", value: "en" },
-  { label: "العربية – Arabic (ar)", value: "ar" },
-  { label: "Español – Spanish (es)", value: "es" },
-  { label: "Deutsch – German (de)", value: "de" },
-  { label: "Français – French (fr)", value: "fr" },
-  { label: "中文 – Chinese (zh)", value: "zh" },
-  { label: "日本語 – Japanese (ja)", value: "ja" },
-  { label: "Italiano – Italian (it)", value: "it" },
-  { label: "Русский – Russian (ru)", value: "ru" },
+const LANGUAGE_VALUES = [
+  "all", "en", "ar", "es", "de", "fr", "zh", "ja", "it", "ru"
 ];
 
 export default function AcademicLibrary() {
+  const { t } = useTranslation(["library"]);
+  usePageTitle(t("header.eyebrow").split(" / ")[1] ?? "Academic Library");
+
+  const CATEGORY_OPTIONS = BOOK_CATEGORIES.map((name) => ({ 
+    label: name === "All Engineering" ? t("filters.allEngineering") : t(`categories.${name}` as any, name), 
+    value: name 
+  }));
+
+  const SORT_OPTIONS: { label: string; value: LibrarySort }[] = [
+    { label: t("filters.sortOptions.trending"), value: "trending" },
+    { label: t("filters.sortOptions.top_downloaded"), value: "top_downloaded" },
+    { label: t("filters.sortOptions.newest"), value: "newest" },
+    { label: t("filters.sortOptions.earliest"), value: "earliest" },
+  ];
+
+  const LANGUAGE_OPTIONS = [
+    { label: t("filters.allLanguages"), value: "all" },
+    { label: t("filters.languageNames.en"), value: "en" },
+    { label: t("filters.languageNames.ar"), value: "ar" },
+    { label: t("filters.languageNames.es"), value: "es" },
+    { label: t("filters.languageNames.de"), value: "de" },
+    { label: t("filters.languageNames.fr"), value: "fr" },
+    { label: t("filters.languageNames.zh"), value: "zh" },
+    { label: t("filters.languageNames.ja"), value: "ja" },
+    { label: t("filters.languageNames.it"), value: "it" },
+    { label: t("filters.languageNames.ru"), value: "ru" },
+  ];
 
   // ── Isolated, non-leaking state ───────────────────────────────────────────
   const [searchInput, setSearchInput] = useState("");
@@ -179,10 +183,10 @@ export default function AcademicLibrary() {
   const capNotice =
     totalCount > ARCHIVE_MAX_WINDOW ? (
       <span
-        title={`The Internet Archive serves at most ${ARCHIVE_MAX_WINDOW.toLocaleString()} results per query. Narrow the search, category or language to reach the rest of the ${totalCount.toLocaleString()} matches.`}
+        title={t("results.capNoticeTitle", { max: ARCHIVE_MAX_WINDOW.toLocaleString(), total: totalCount.toLocaleString() })}
         className="inline-flex cursor-help items-center rounded-full bg-slate-200 px-2.5 py-0.5 text-[11px] font-semibold text-slate-600 dark:bg-slate-700/60 dark:text-slate-300"
       >
-        Browsing top {ARCHIVE_MAX_WINDOW.toLocaleString()} indexed books
+        {t("results.capNotice", { max: ARCHIVE_MAX_WINDOW.toLocaleString() })}
       </span>
     ) : null;
 
@@ -242,16 +246,16 @@ export default function AcademicLibrary() {
         <div>
           <div className="mb-3 flex items-center gap-3">
             <p className="text-sm font-semibold tracking-wider text-indigo-600 dark:text-indigo-400">
-              {LIBRARY_COPY.eyebrow}
+              {t("header.eyebrow")}
             </p>
             <span className="h-px w-16 bg-brand-gradient" />
           </div>
           <h1 className="max-w-3xl text-3xl lg:text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white">
-            {LIBRARY_COPY.title}
+            {t("header.title")}
           </h1>
         </div>
         <p className="max-w-xl border-l-2 border-gradient-signal pl-5 text-sm md:text-base text-slate-500 leading-relaxed dark:text-zinc-400 rtl:border-l-0 rtl:border-r-2 rtl:pl-0 rtl:pr-5">
-          {LIBRARY_COPY.description}
+          {t("header.description")}
         </p>
       </motion.div>
 
@@ -266,7 +270,7 @@ export default function AcademicLibrary() {
             <input
               type="text"
               id="library-search-input"
-              placeholder="Search books by title, author or topic (e.g. thermodynamics, PLC)…"
+              placeholder={t("search.placeholder")}
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               onKeyDown={handleKeyDown}
@@ -280,7 +284,7 @@ export default function AcademicLibrary() {
                 <button
                   onClick={clearSearch}
                   className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-200 text-slate-500 transition-colors hover:bg-slate-300 dark:bg-slate-700 dark:text-slate-400 dark:hover:bg-slate-600"
-                  aria-label="Clear search"
+                  aria-label={t("search.clear")}
                 >
                   <X className="h-3.5 w-3.5" />
                 </button>
@@ -299,13 +303,13 @@ export default function AcademicLibrary() {
                 className="flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-100 px-4 py-2 text-xs font-semibold text-slate-700 shadow-xs transition-all hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800/90 dark:text-slate-200 dark:hover:text-white"
               >
                 <Layers className="h-3.5 w-3.5 shrink-0 text-violet-600 dark:text-violet-400" />
-                <span className="max-w-[150px] truncate">Category: {activeCategoryLabel}</span>
+                <span className="max-w-[150px] truncate">{t("filters.category")} {activeCategoryLabel}</span>
                 <ChevronDown className={`h-3.5 w-3.5 text-slate-400 transition-transform duration-200 ${openDropdown === "category" ? "rotate-180" : ""}`} />
               </button>
               {openDropdown === "category" && (
                 <div className="absolute right-0 top-full z-50 mt-2 max-h-80 w-72 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-1.5 shadow-xl animate-in fade-in zoom-in-95 dark:border-slate-800 dark:bg-slate-900">
                   <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                    Engineering Disciplines
+                    {t("filters.engineeringDisciplines")}
                   </div>
                   <div className="space-y-0.5">
                     {CATEGORY_OPTIONS.map((opt) => (
@@ -335,7 +339,7 @@ export default function AcademicLibrary() {
                 className="flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-100 px-4 py-2 text-xs font-semibold text-slate-700 shadow-xs transition-all hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800/90 dark:text-slate-200 dark:hover:text-white"
               >
                 <Globe className="h-3.5 w-3.5 shrink-0 text-violet-600 dark:text-violet-400" />
-                <span className="max-w-[140px] truncate">Language: {activeLanguageLabel}</span>
+                <span className="max-w-[140px] truncate">{t("filters.language")} {activeLanguageLabel}</span>
                 <ChevronDown className={`h-3.5 w-3.5 text-slate-400 transition-transform duration-200 ${openDropdown === "language" ? "rotate-180" : ""}`} />
               </button>
               {openDropdown === "language" && (
@@ -361,7 +365,7 @@ export default function AcademicLibrary() {
 
             {/* Sort segmented pill */}
             <div className="flex items-center gap-2">
-              <span className="hidden text-xs font-semibold text-slate-500 dark:text-slate-400 sm:inline">Sort:</span>
+              <span className="hidden text-xs font-semibold text-slate-500 dark:text-slate-400 sm:inline">{t("filters.sort")}</span>
               <div className="flex items-center gap-1 rounded-full border border-slate-200 bg-slate-100 p-1 shadow-xs dark:border-slate-700 dark:bg-slate-800/90">
                 {SORT_OPTIONS.map((opt) => (
                   <button
@@ -385,7 +389,7 @@ export default function AcademicLibrary() {
           <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-slate-500 dark:text-slate-400">
             {totalCount > 0 && (
               <span>
-                Discovered <strong className="text-slate-900 dark:text-white">{totalCount.toLocaleString()}</strong> free-to-read engineering &amp; science books
+                {t("results.discovered")} <strong className="text-slate-900 dark:text-white">{totalCount.toLocaleString()}</strong> {t("results.books")}
               </span>
             )}
             {capNotice}
@@ -403,7 +407,7 @@ export default function AcademicLibrary() {
             )}
             {submittedQuery && (
               <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-2.5 py-0.5 text-[11px] font-semibold text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
-                Keyword: "{submittedQuery}"
+                {t("results.keyword")} "{submittedQuery}"
                 <button onClick={clearSearch} className="hover:text-purple-900 dark:hover:text-white ml-0.5">✕</button>
               </span>
             )}
@@ -413,7 +417,7 @@ export default function AcademicLibrary() {
               onClick={resetAll}
               className="text-xs font-semibold text-violet-600 hover:underline dark:text-violet-400"
             >
-              Reset all filters
+              {t("filters.resetAll")}
             </button>
           )}
         </div>
@@ -435,13 +439,13 @@ export default function AcademicLibrary() {
           role="alert"
           className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-red-300 py-20 text-center dark:border-red-500/30"
         >
-          <p className="text-lg font-bold text-slate-900 dark:text-white">Could not load books</p>
+          <p className="text-lg font-bold text-slate-900 dark:text-white">{t("results.errorTitle")}</p>
           <p className="mt-2 max-w-md text-sm text-slate-500 dark:text-zinc-400">{error}</p>
           <button
             onClick={() => setRetryTick((t) => t + 1)}
             className="mt-6 rounded-full bg-violet-100 px-6 py-2 text-sm font-bold text-violet-700 transition-colors hover:bg-violet-200 dark:bg-violet-900/30 dark:text-violet-300"
           >
-            Retry
+            {t("results.retry")}
           </button>
         </div>
       ) : books.length === 0 ? (
@@ -449,15 +453,15 @@ export default function AcademicLibrary() {
           ref={gridRef}
           className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 py-20 text-center dark:border-white/[0.08]"
         >
-          <p className="text-lg font-bold text-slate-900 dark:text-white">No books found</p>
+          <p className="text-lg font-bold text-slate-900 dark:text-white">{t("results.emptyTitle")}</p>
           <p className="mt-2 text-sm text-slate-500 dark:text-zinc-400">
-            Try adjusting your search query or selecting a different discipline.
+            {t("results.emptyDesc")}
           </p>
           <button
             onClick={resetAll}
             className="mt-6 rounded-full bg-violet-100 px-6 py-2 text-sm font-bold text-violet-700 transition-colors hover:bg-violet-200 dark:bg-violet-900/30 dark:text-violet-300"
           >
-            Reset Search
+            {t("results.resetSearch")}
           </button>
         </div>
       ) : (
@@ -481,11 +485,11 @@ export default function AcademicLibrary() {
         <div className="mt-16 flex flex-col gap-6 border-t border-slate-200 pt-8 dark:border-slate-800/80 lg:flex-row lg:items-center lg:justify-between">
           {/* Status */}
           <div className="text-center text-xs font-medium text-slate-500 dark:text-slate-400 lg:text-start">
-            Page{" "}
+            {t("results.page")}{" "}
             <span className="font-semibold text-slate-800 dark:text-slate-200">{page}</span>{" "}
-            of{" "}
+            {t("results.of")}{" "}
             <span className="font-semibold text-slate-800 dark:text-slate-200">{maxSafePage.toLocaleString()}</span>{" "}
-            <span className="opacity-75">({totalCount.toLocaleString()} total books)</span>{" "}
+            <span className="opacity-75">{t("results.totalBooks", { total: totalCount.toLocaleString() })}</span>{" "}
             {capNotice}
           </div>
 
@@ -494,7 +498,7 @@ export default function AcademicLibrary() {
             <button
               onClick={() => goToPage(page - 1)}
               disabled={page <= 1}
-              aria-label="Previous page"
+              aria-label={t("results.previousPage")}
               className="flex h-9 w-9 items-center justify-center rounded-full bg-transparent text-slate-600 transition-all hover:text-slate-900 disabled:opacity-30 dark:text-slate-400 dark:hover:text-white"
             >
               <ChevronLeft className="h-4 w-4" />
@@ -526,7 +530,7 @@ export default function AcademicLibrary() {
             <button
               onClick={() => goToPage(page + 1)}
               disabled={page >= maxSafePage}
-              aria-label="Next page"
+              aria-label={t("results.nextPage")}
               className="flex h-9 w-9 items-center justify-center rounded-full bg-transparent text-slate-600 transition-all hover:text-slate-900 disabled:opacity-30 dark:text-slate-400 dark:hover:text-white"
             >
               <ChevronRight className="h-4 w-4" />
@@ -535,7 +539,7 @@ export default function AcademicLibrary() {
 
           {/* Per-page selector */}
           <div className="flex items-center justify-center gap-2 lg:justify-end">
-            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Per page:</span>
+            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">{t("results.perPage")}</span>
             <div className="flex items-center gap-1 rounded-full border border-slate-200 bg-slate-100 p-1 shadow-xs dark:border-slate-700 dark:bg-slate-800/90">
               {PAGE_SIZES.map((size) => (
                 <button

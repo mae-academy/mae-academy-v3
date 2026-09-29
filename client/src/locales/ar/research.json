@@ -1,0 +1,96 @@
+{
+  "header": {
+    "eyebrow": "01 / البحث الأكاديمي",
+    "title": "حوّل الأدلة إلى اتجاه هندسي.",
+    "description": "فهرس ومحرك بحث للأوراق الهندسية مفتوحة الوصول. ابحث واقرأ وحمل الأبحاث مباشرة عبر OpenAlex و DOAB."
+  },
+  "search": {
+    "placeholder": "ابحث في ملايين الأوراق العلمية مفتوحة الوصول عبر OpenAlex و DOAB...",
+    "clear": "مسح البحث",
+    "button": "بحث"
+  },
+  "filters": {
+    "category": "الفئة:",
+    "language": "اللغة:",
+    "sort": "ترتيب:",
+    "resetAll": "إعادة ضبط الفلاتر",
+    "allEngineering": "كل الهندسة",
+    "allLanguages": "كل اللغات",
+    "researchFields": "مجالات البحث",
+    "languageNames": {
+      "en": "الإنجليزية (en)",
+      "ar": "العربية (ar)",
+      "es": "الإسبانية (es)",
+      "de": "الألمانية (de)",
+      "fr": "الفرنسية (fr)",
+      "zh": "الصينية (zh)",
+      "ja": "اليابانية (ja)",
+      "it": "الإيطالية (it)",
+      "ru": "الروسية (ru)"
+    },
+    "sortOptions": {
+      "trending": "رائج",
+      "top_cited": "الأكثر اقتباساً",
+      "newest": "الأحدث",
+      "earliest": "الأقدم",
+      "relevance": "الصلة"
+    }
+  },
+  "results": {
+    "discovered": "تم اكتشاف",
+    "papers": "أوراق بحثية مفتوحة الوصول",
+    "capNotice": "تصفح أعلى {{max}} منشور مفهرس",
+    "capNoticeTitle": "يقدم OpenAlex بحد أقصى {{max}} نتيجة لكل استعلام. قم بتضييق نطاق البحث أو الفئة أو اللغة للوصول إلى بقية النتائج البالغة {{total}}.",
+    "keyword": "الكلمة المفتاحية:",
+    "errorTitle": "تعذر تحميل الأوراق",
+    "retry": "إعادة المحاولة",
+    "emptyTitle": "لم يتم العثور على أوراق",
+    "emptyDesc": "حاول تعديل استعلام البحث الخاص بك أو اختيار مجال هندسي مختلف.",
+    "resetSearch": "إعادة ضبط البحث",
+    "page": "صفحة",
+    "of": "من",
+    "totalPages": "({{total}} إجمالي المنشورات)",
+    "previousPage": "الصفحة السابقة",
+    "nextPage": "الصفحة التالية",
+    "perPage": "لكل صفحة:"
+  },
+  "categories": {
+    "Mechatronics Engineering": "هندسة الميكاترونيكس",
+    "Robotics & Automation": "الروبوتات والأتمتة",
+    "Control Systems Engineering": "هندسة أنظمة التحكم",
+    "Mechanical Engineering": "الهندسة الميكانيكية",
+    "Electrical & Electronics": "الكهرباء والإلكترونيات",
+    "Civil & Structural Engineering": "الهندسة المدنية والإنشائية",
+    "Computer & Software Engineering": "هندسة الحاسوب والبرمجيات",
+    "Artificial Intelligence & Machine Learning": "الذكاء الاصطناعي وتعلم الآلة",
+    "Smart Systems & IoT": "الأنظمة الذكية وإنترنت الأشياء",
+    "Biomedical Engineering": "الهندسة الطبية الحيوية",
+    "Aerospace & Aeronautical": "هندسة الفضاء والطيران",
+    "Industrial & Systems Engineering": "الهندسة الصناعية والأنظمة",
+    "Materials & Nanotechnology": "المواد وتقنية النانو",
+    "Energy & Power Systems": "أنظمة الطاقة والقدرة",
+    "Chemical & Process Engineering": "الهندسة الكيميائية والعمليات",
+    "Telecommunications Engineering": "هندسة الاتصالات",
+    "Automotive Engineering": "هندسة السيارات"
+  },
+  "card": {
+    "openAccess": "وصول مفتوح",
+    "peerReviewed": "مراجعة الأقران",
+    "authors": "المؤلفون",
+    "publishedIn": "نُشر في",
+    "doi": "المعرف الرقمي DOI",
+    "viewFullPaper": "عرض الورقة كاملة",
+    "citationCount": "عدد الاقتباسات",
+    "citations": "الاقتباسات",
+    "abstract": "الملخص"
+  },
+  "detail": {
+    "abstract": "الملخص",
+    "authors": "المؤلفون",
+    "publishedIn": "نُشر في",
+    "doi": "المعرف الرقمي DOI",
+    "viewFullPaper": "عرض الورقة كاملة",
+    "citationCount": "عدد الاقتباسات",
+    "noAbstract": "لا يوجد ملخص متاح"
+  }
+}

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { X, ExternalLink, Download, Star, Eye, FileText } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import type { ResearchPaper } from "@/lib/openalex";
 
 interface ResearchPaperModalProps {
@@ -9,6 +10,7 @@ interface ResearchPaperModalProps {
 }
 
 export default function ResearchPaperModal({ isOpen, onClose, paper }: ResearchPaperModalProps) {
+  const { t } = useTranslation(["research"]);
   const [showViewer, setShowViewer] = useState(false);
 
   if (!isOpen || !paper) return null;
@@ -36,10 +38,10 @@ export default function ResearchPaperModal({ isOpen, onClose, paper }: ResearchP
             </span>
             <div className="inline-flex items-center gap-1.5 h-6 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-800 dark:bg-white/[0.06] dark:text-slate-200 border border-slate-200/80 dark:border-white/[0.06]">
               <Star className="w-3.5 h-3.5 text-red-500 fill-red-500 shrink-0" />
-              <span>{paper.citations ?? 0} Citations</span>
+              <span>{paper.citations ?? 0} {t("card.citations", { defaultValue: "Citations" })}</span>
             </div>
             <span className="inline-flex items-center h-6 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wider">
-              OPEN ACCESS
+              {t("card.openAccess", { defaultValue: "OPEN ACCESS" })}
             </span>
           </div>
           
@@ -48,16 +50,16 @@ export default function ResearchPaperModal({ isOpen, onClose, paper }: ResearchP
           </h2>
           
           <p className="text-sm font-medium text-slate-600 dark:text-slate-400 mb-6 leading-relaxed">
-            By {paper.authors.join(", ")}
+            {t("detail.by", { defaultValue: "By" })} {paper.authors.join(", ")}
           </p>
         </div>
 
         <div className="prose prose-slate dark:prose-invert max-w-none mb-8">
           <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400 dark:text-zinc-500 mb-2">
-            Abstract
+            {t("detail.abstract", { defaultValue: "Abstract" })}
           </h3>
           <p className="text-sm leading-relaxed text-slate-700 dark:text-zinc-300">
-            {paper.abstract || "No abstract available for this paper."}
+            {paper.abstract || t("detail.noAbstract", { defaultValue: "No abstract available for this paper." })}
           </p>
         </div>
 
@@ -72,7 +74,7 @@ export default function ResearchPaperModal({ isOpen, onClose, paper }: ResearchP
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 rounded-full brand-active-pill hover:opacity-95 shadow-md active:scale-95 px-5 py-2.5 text-sm"
               >
-                <Download className="w-4 h-4" /> Download PDF
+                <Download className="w-4 h-4" /> {t("detail.downloadPdf", { defaultValue: "Download PDF" })}
               </a>
 
               <button
@@ -80,7 +82,7 @@ export default function ResearchPaperModal({ isOpen, onClose, paper }: ResearchP
                 className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-medium text-slate-800 shadow-xs transition-all hover:bg-slate-50 hover:border-slate-300 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-zinc-200 dark:hover:bg-white/[0.08] active:scale-95"
               >
                 {showViewer ? <X className="w-4 h-4" /> : <Eye className="w-4 h-4 text-purple-600 dark:text-purple-400" />}
-                {showViewer ? "Hide Viewer" : "View PDF Online"}
+                {showViewer ? t("detail.hideViewer", { defaultValue: "Hide Viewer" }) : t("detail.viewPdfOnline", { defaultValue: "View PDF Online" })}
               </button>
             </>
           )}
@@ -91,7 +93,7 @@ export default function ResearchPaperModal({ isOpen, onClose, paper }: ResearchP
             rel="noopener noreferrer"
             className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-medium text-slate-600 shadow-xs transition-all hover:border-slate-300 hover:text-slate-900 hover:bg-slate-50 active:scale-95 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-zinc-300 dark:hover:bg-white/[0.08]"
           >
-            Publisher Page <ExternalLink className="w-4 h-4" />
+            {t("detail.publisherPage", { defaultValue: "Publisher Page" })} <ExternalLink className="w-4 h-4" />
           </a>
         </div>
 
@@ -101,7 +103,7 @@ export default function ResearchPaperModal({ isOpen, onClose, paper }: ResearchP
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-4 py-2.5 text-xs text-slate-500 dark:border-white/[0.06] dark:text-zinc-400 bg-white/50 dark:bg-zinc-900/50">
               <span className="font-semibold flex items-center gap-1.5 text-slate-700 dark:text-zinc-200">
                 <FileText className="w-3.5 h-3.5 text-purple-500" />
-                Live Document Preview (Bypassing X-Frame Blocks)
+                {t("detail.liveDocumentPreview", { defaultValue: "Live Document Preview (Bypassing X-Frame Blocks)" })}
               </span>
               <div className="flex items-center gap-2">
                 <a
@@ -110,7 +112,7 @@ export default function ResearchPaperModal({ isOpen, onClose, paper }: ResearchP
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1.5 rounded-full brand-active-pill shadow-sm hover:opacity-95 text-xs px-3.5 py-1.5"
                 >
-                  Open Direct PDF in New Tab <ExternalLink className="w-3.5 h-3.5" />
+                  {t("detail.openDirectPdf", { defaultValue: "Open Direct PDF in New Tab" })} <ExternalLink className="w-3.5 h-3.5" />
                 </a>
               </div>
             </div>

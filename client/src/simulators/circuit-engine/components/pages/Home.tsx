@@ -3,6 +3,7 @@ import { useSchematicCanvas } from '@/components/common/schematic/useSchematicCa
 import { pointInComponentBox } from '@/components/common/schematic/schematicGeometry';
 import type { SchematicBounds, SchematicComponentLibrary, SchematicTerminal } from '@/components/common/schematic/schematicTypes';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 /* MAE Luminous Technical Atelier: Tab D keeps documented 25 px terminal geometry,
    direct electromechanical controls, and a quiet Control Systems-aligned inspector. */
 import {
@@ -979,6 +980,7 @@ export interface V3HomeProps {
 }
 
 export function V3Home({ createSimulationEngine = () => new SimulationEngine(), createStaticMna, tabDUiRefinement = false }: V3HomeProps) {
+  const { t } = useTranslation(['simulators']);
   const gridSize = tabDUiRefinement ? TAB_D_GRID_SIZE : GRID_SIZE;
   const visualSymbolScale = tabDUiRefinement ? TAB_D_SYMBOL_SCALE : 1;
   const [darkPreview, setDarkPreview] = useState(() => typeof document !== 'undefined' && document.documentElement.classList.contains('dark'));
@@ -3403,12 +3405,12 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
         )}
       </>}
       toolbarRow2={<>
-        <ToolbarButton colors={colors} icon={<Download size={14} />} label="Export" title="Export circuit as NAD netlist" onClick={exportNad} />
-        <ToolbarButton colors={colors} icon={<Upload size={14} />} label="Import" title="Import circuit from NAD netlist" onClick={() => nadInputRef.current?.click()} />
+        <ToolbarButton colors={colors} icon={<Download size={14} />} label={t('simulators:toolbar.export')} title="Export circuit as NAD netlist" onClick={exportNad} />
+        <ToolbarButton colors={colors} icon={<Upload size={14} />} label={t('simulators:toolbar.import')} title="Import circuit from NAD netlist" onClick={() => nadInputRef.current?.click()} />
         <input ref={nadInputRef} type="file" accept=".nad,application/x-mae-nad+json,application/json" onChange={importNad} style={{ display: 'none' }} />
         <ToolbarDivider colors={colors} />
-        <ToolbarButton colors={colors} icon={<ImageIcon size={14} />} label="Save Image" title="Save circuit as image (PNG or SVG)" onClick={handleOpenSaveImage} />
-        <ToolbarButton colors={colors} icon={<Share2 size={14} />} label="Share Project" title="Share circuit via Web Share API or deep link" onClick={handleShareProject} />
+        <ToolbarButton colors={colors} icon={<ImageIcon size={14} />} label={t('simulators:toolbar.saveImage')} title="Save circuit as image (PNG or SVG)" onClick={handleOpenSaveImage} />
+        <ToolbarButton colors={colors} icon={<Share2 size={14} />} label={t('simulators:toolbar.shareProject')} title="Share circuit via Web Share API or deep link" onClick={handleShareProject} />
         <ToolbarDivider colors={colors} />
         {/* Examples button hidden for final launch UI polish */}
         {/* <ToolbarButton colors={colors} icon={<Library size={14} />} label="Examples" title="Browse the Interactive Examples Library" onClick={() => setExamplesModalOpen(true)} /> */}
@@ -3447,7 +3449,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
           </span>
         </div>
       </>}
-      canvasTitle="Interactive Circuit Schematic Canvas"
+      canvasTitle={t('simulators:shell.interactiveCanvas')}
       emptyHint="Drag and drop components from the library to begin circuit design."
       simulationRunning={simulationRunning}
       canvasStatusExtra={<>

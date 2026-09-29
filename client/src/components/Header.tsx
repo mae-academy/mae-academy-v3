@@ -1,9 +1,10 @@
 import { memo, useState } from "react";
 import { Link, useLocation } from "wouter";
-import { ChevronDown, FileText, Menu, Moon, ShieldCheck, Sun, X } from "lucide-react";
+import { ChevronDown, Menu, Moon, Sun, X } from "lucide-react";
 import HeaderNavigationSlider from "./HeaderNavigationSlider";
 import { isRouteActive, Locale, platformRoutes } from "@/data/platform";
 import { useLocale } from "@/contexts/LocaleContext";
+import { useTranslation } from "react-i18next";
 
 export type { Locale } from "@/data/platform";
 
@@ -30,15 +31,15 @@ function BrandMark() {
 
 function Header({ locale, onLocaleChange, isLocaleTransitioning, isDark, onThemeToggle }: HeaderProps) {
   const { copy } = useLocale();
+  const { t, i18n } = useTranslation("common");
   const [languageOpen, setLanguageOpen] = useState(false);
-  const [legalOpen, setLegalOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [location] = useLocation();
 
   return (
     <header className="sticky top-0 z-50 border-b border-slate-200/70 bg-white/85 backdrop-blur-md dark:border-white/[0.08] dark:bg-[#0D0D11]/90 w-full max-w-full">
       <div className="max-w-[1380px] mx-auto px-4 sm:px-6 lg:px-8 w-full flex h-[68px] sm:h-[72px] md:h-[76px] items-center justify-between gap-3">
-        <Link href="/" className="group flex items-center gap-2.5 sm:gap-3 text-slate-950 transition-transform duration-200 hover:scale-[1.02] active:scale-[.98] dark:text-white" aria-label={copy.controls.home}>
+        <Link href="/" className="group flex items-center gap-2.5 sm:gap-3 text-slate-950 transition-transform duration-200 hover:scale-[1.02] active:scale-[.98] dark:text-white" aria-label={t("controls.home")}>
           <BrandMark />
           <div className="flex flex-col justify-center leading-none">
             <span className="text-xl md:text-2xl font-bold tracking-tight bg-gradient-to-r from-[#2563EB] via-[#7C3AED] to-[#EC4899] bg-clip-text text-transparent">
@@ -50,66 +51,15 @@ function Header({ locale, onLocaleChange, isLocaleTransitioning, isDark, onTheme
           </div>
         </Link>
         <div className="flex items-center gap-1.5 sm:gap-2">
-          {/* Legal / Compliance Dropdown (Desktop/Tablet) */}
-          <div className="relative hidden sm:block">
-            <button
-              onClick={() => {
-                setLegalOpen((value) => !value);
-                setLanguageOpen(false);
-              }}
-              className="flex h-10 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 transition-all duration-200 hover:scale-105 hover:border-violet-300 hover:text-violet-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600 active:scale-95 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-zinc-200 dark:hover:border-violet-400 dark:hover:text-violet-300"
-              aria-label={locale === "ar" ? "الوثائق والامتثال" : "Legal & Compliance"}
-              aria-haspopup="menu"
-              aria-expanded={legalOpen}
-            >
-              <ShieldCheck className="h-3.5 w-3.5 text-violet-600 dark:text-violet-400" />
-              <span>{locale === "ar" ? "الامتثال" : "Legal"}</span>
-              <ChevronDown className={`h-3 w-3 transition-transform duration-200 ${legalOpen ? "rotate-180" : ""}`} />
-            </button>
-            {legalOpen && (
-              <div
-                className="absolute end-0 top-12 min-w-48 origin-top-right overflow-hidden rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl shadow-slate-950/10 motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95 z-50 dark:border-white/[0.08] dark:bg-[#0D0D11] dark:shadow-black/60"
-                role="menu"
-              >
-                <Link
-                  href="/privacy-policy"
-                  onClick={() => setLegalOpen(false)}
-                  className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold transition-colors duration-200 ${
-                    location === "/privacy-policy"
-                      ? "bg-violet-50 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300"
-                      : "text-slate-600 hover:bg-slate-100 dark:text-zinc-300 dark:hover:bg-white/10"
-                  }`}
-                  role="menuitem"
-                >
-                  <ShieldCheck className="h-3.5 w-3.5 text-violet-500" />
-                  <span>{locale === "ar" ? "سياسة الخصوصية" : "Privacy Policy"}</span>
-                </Link>
-                <Link
-                  href="/terms-of-service"
-                  onClick={() => setLegalOpen(false)}
-                  className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold transition-colors duration-200 ${
-                    location === "/terms-of-service"
-                      ? "bg-violet-50 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300"
-                      : "text-slate-600 hover:bg-slate-100 dark:text-zinc-300 dark:hover:bg-white/10"
-                  }`}
-                  role="menuitem"
-                >
-                  <FileText className="h-3.5 w-3.5 text-violet-500" />
-                  <span>{locale === "ar" ? "شروط الاستخدام" : "Terms of Service"}</span>
-                </Link>
-              </div>
-            )}
-          </div>
 
           {/* Language Selector */}
           <div className="relative">
             <button
               onClick={() => {
                 setLanguageOpen((value) => !value);
-                setLegalOpen(false);
               }}
               className="flex h-10 items-center gap-1 rounded-full border border-slate-200 bg-white px-3 text-xs font-bold tracking-[0.1em] text-slate-700 transition-all duration-200 hover:scale-105 hover:border-violet-300 hover:text-violet-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600 active:scale-95 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-zinc-200 dark:hover:border-violet-400 dark:hover:text-violet-300"
-              aria-label={copy.controls.language}
+              aria-label={t("controls.language")}
               aria-haspopup="listbox"
               aria-expanded={languageOpen}
             >
@@ -120,13 +70,14 @@ function Header({ locale, onLocaleChange, isLocaleTransitioning, isDark, onTheme
               <div
                 className="absolute end-0 top-12 min-w-32 origin-top-right overflow-hidden rounded-xl border border-slate-200 bg-white p-1 shadow-xl shadow-slate-950/10 motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95 z-50 dark:border-white/[0.08] dark:bg-[#0D0D11] dark:shadow-black/60"
                 role="listbox"
-                aria-label={copy.controls.languageOptions}
+                aria-label={t("controls.languageOptions")}
               >
                 {(["en", "ar", "es"] as Locale[]).map((option) => (
                   <button
                     key={option}
                     disabled={isLocaleTransitioning}
                     onClick={() => {
+                      i18n.changeLanguage(option);
                       onLocaleChange(option);
                       setLanguageOpen(false);
                     }}
@@ -138,7 +89,7 @@ function Header({ locale, onLocaleChange, isLocaleTransitioning, isDark, onTheme
                     role="option"
                     aria-selected={locale === option}
                   >
-                    {copy.languageNames[option]}
+                    {t(`languageSelector.${option}`)}
                     <span className="text-[10px] tracking-wider opacity-70">{localeLabel[option]}</span>
                   </button>
                 ))}
@@ -146,7 +97,7 @@ function Header({ locale, onLocaleChange, isLocaleTransitioning, isDark, onTheme
             )}
           </div>
           {/* Theme Toggle */}
-          <button onClick={onThemeToggle} className="grid h-10 w-10 place-items-center rounded-full border border-slate-200 bg-white text-slate-700 transition-all duration-200 hover:scale-105 hover:border-violet-300 hover:text-violet-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600 active:scale-95 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-zinc-200 dark:hover:border-violet-400 dark:hover:text-violet-300" aria-label={isDark ? copy.controls.themeToLight : copy.controls.themeToDark}>{isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}</button>
+          <button onClick={onThemeToggle} className="grid h-10 w-10 place-items-center rounded-full border border-slate-200 bg-white text-slate-700 transition-all duration-200 hover:scale-105 hover:border-violet-300 hover:text-violet-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600 active:scale-95 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-zinc-200 dark:hover:border-violet-400 dark:hover:text-violet-300" aria-label={isDark ? t("controls.themeToLight") : t("controls.themeToDark")}>{isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}</button>
           {/* Mobile Hamburger Drawer Toggle */}
           <button onClick={() => setMobileMenuOpen((open) => !open)} className="grid h-10 w-10 md:hidden place-items-center rounded-full border border-slate-200 bg-white text-slate-700 transition-all duration-200 hover:scale-105 hover:border-violet-300 hover:text-violet-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600 active:scale-95 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-zinc-200 dark:hover:border-violet-400 dark:hover:text-violet-300" aria-label="Toggle navigation menu" aria-expanded={mobileMenuOpen}>{mobileMenuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}</button>
         </div>
@@ -169,54 +120,13 @@ function Header({ locale, onLocaleChange, isLocaleTransitioning, isDark, onTheme
                       : "text-slate-700 hover:bg-slate-100 dark:text-zinc-200 dark:hover:bg-white/[0.06]"
                   }`}
                 >
-                  <span>{copy.navigation[route.index]}</span>
+                  <span>{t(`navbar.${route.index}`)}</span>
                   <span className={`text-[11px] font-mono opacity-70 ${active ? "text-white" : "text-slate-400"}`}>
                     {route.index}
                   </span>
                 </Link>
               );
             })}
-
-            {/* Legal Section in Mobile Drawer */}
-            <div className="pt-2 mt-2 border-t border-slate-200/60 dark:border-white/[0.08] flex flex-col gap-1">
-              <span className="px-4 py-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                {locale === "ar" ? "الوثائق والامتثال" : "Legal & Compliance"}
-              </span>
-              <Link
-                href="/privacy-policy"
-                onClick={() => setMobileMenuOpen(false)}
-                className={`flex items-center justify-between min-h-[44px] px-4 py-2.5 rounded-xl font-semibold text-sm transition-all ${
-                  location === "/privacy-policy"
-                    ? "brand-active-pill"
-                    : "text-slate-700 hover:bg-slate-100 dark:text-zinc-200 dark:hover:bg-white/[0.06]"
-                }`}
-              >
-                <span className="flex items-center gap-2">
-                  <ShieldCheck className="h-4 w-4 text-violet-500" />
-                  {locale === "ar" ? "سياسة الخصوصية" : "Privacy Policy"}
-                </span>
-                <span className={`text-[11px] font-mono opacity-70 ${location === "/privacy-policy" ? "text-white" : "text-slate-400"}`}>
-                  LEGAL
-                </span>
-              </Link>
-              <Link
-                href="/terms-of-service"
-                onClick={() => setMobileMenuOpen(false)}
-                className={`flex items-center justify-between min-h-[44px] px-4 py-2.5 rounded-xl font-semibold text-sm transition-all ${
-                  location === "/terms-of-service"
-                    ? "brand-active-pill"
-                    : "text-slate-700 hover:bg-slate-100 dark:text-zinc-200 dark:hover:bg-white/[0.06]"
-                }`}
-              >
-                <span className="flex items-center gap-2">
-                  <FileText className="h-4 w-4 text-violet-500" />
-                  {locale === "ar" ? "شروط الاستخدام" : "Terms of Service"}
-                </span>
-                <span className={`text-[11px] font-mono opacity-70 ${location === "/terms-of-service" ? "text-white" : "text-slate-400"}`}>
-                  LEGAL
-                </span>
-              </Link>
-            </div>
           </nav>
         </div>
       )}

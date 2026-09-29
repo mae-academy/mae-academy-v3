@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Search, Keyboard } from 'lucide-react';
 import SegmentedControl from '@/components/ui/SegmentedControl';
 import type { Palette } from '@/simulators/shared/workspace/workspaceTheme';
@@ -82,11 +83,14 @@ function ShortcutItemBadge({ shortcut, colors }: ShortcutItemBadgeProps) {
     color: colors.text,
   };
 
+  const { t } = useTranslation(['simulators']);
+  const labelKey = shortcut.label === 'Copy/Paste' ? 'copyPaste' : shortcut.label.toLowerCase();
+
   if (shortcut.key === 'Space' || shortcut.key === 'R') {
     return (
       <div className="flex items-center gap-1.5 min-w-0">
         <kbd className="rounded border px-1.5 py-0.5 font-mono text-[10px] font-semibold shadow-xs shrink-0" style={kbdStyle}>Space</kbd>
-        <span className="truncate text-slate-700 dark:text-slate-300">{shortcut.label}</span>
+        <span className="truncate text-slate-700 dark:text-slate-300">{t(`simulators:shortcuts.${labelKey}`)}</span>
       </div>
     );
   }
@@ -95,7 +99,7 @@ function ShortcutItemBadge({ shortcut, colors }: ShortcutItemBadgeProps) {
     return (
       <div className="flex items-center gap-1.5 min-w-0">
         <kbd className="rounded border px-1.5 py-0.5 font-mono text-[10px] font-semibold shadow-xs shrink-0" style={kbdStyle}>Del</kbd>
-        <span className="truncate text-slate-700 dark:text-slate-300">{shortcut.label}</span>
+        <span className="truncate text-slate-700 dark:text-slate-300">{t(`simulators:shortcuts.${labelKey}`)}</span>
       </div>
     );
   }
@@ -105,7 +109,7 @@ function ShortcutItemBadge({ shortcut, colors }: ShortcutItemBadgeProps) {
       <div className="flex items-center gap-1.5 min-w-0 text-slate-700 dark:text-slate-300">
         <kbd className="rounded border px-1.5 py-0.5 font-mono text-[10px] font-semibold shadow-xs shrink-0" style={kbdStyle}>Alt</kbd>
         <span className="text-[10px] text-slate-500 font-mono">+ Drag</span>
-        <span>{shortcut.label}</span>
+        <span>{t(`simulators:shortcuts.${labelKey}`)}</span>
       </div>
     );
   }
@@ -117,7 +121,7 @@ function ShortcutItemBadge({ shortcut, colors }: ShortcutItemBadgeProps) {
         <kbd className="rounded border px-1.5 py-0.5 font-mono text-[10px] font-semibold shadow-xs shrink-0" style={kbdStyle}>Ctrl/Cmd</kbd>
         <span className="text-[10px] text-slate-500 font-mono">+</span>
         <kbd className="rounded border px-1.5 py-0.5 font-mono text-[10px] font-semibold shadow-xs shrink-0" style={kbdStyle}>Z</kbd>
-        <span>{shortcut.label}</span>
+        <span>{t(`simulators:shortcuts.${labelKey}`)}</span>
       </div>
     );
   }
@@ -131,7 +135,7 @@ function ShortcutItemBadge({ shortcut, colors }: ShortcutItemBadgeProps) {
         <kbd className="rounded border px-1.5 py-0.5 font-mono text-[10px] font-semibold shadow-xs shrink-0" style={kbdStyle}>C</kbd>
         <span className="text-[10px] text-slate-500 font-mono">/</span>
         <kbd className="rounded border px-1.5 py-0.5 font-mono text-[10px] font-semibold shadow-xs shrink-0" style={kbdStyle}>V</kbd>
-        <span>{shortcut.label}</span>
+        <span>{t(`simulators:shortcuts.${labelKey}`)}</span>
       </div>
     );
   }
@@ -139,7 +143,7 @@ function ShortcutItemBadge({ shortcut, colors }: ShortcutItemBadgeProps) {
   return (
     <div className="flex items-center gap-1.5 min-w-0 text-slate-700 dark:text-slate-300">
       <kbd className="rounded border px-1.5 py-0.5 font-mono text-[10px] font-semibold shadow-xs shrink-0" style={kbdStyle}>{shortcut.key}</kbd>
-      <span>{shortcut.label}</span>
+      <span>{t(`simulators:shortcuts.${labelKey}`)}</span>
     </div>
   );
 }
@@ -191,6 +195,7 @@ export function UnifiedWorkspaceShell({
   inspectorFooter,
   children,
 }: UnifiedWorkspaceShellProps) {
+  const { t } = useTranslation(['simulators']);
   const [cursor, setCursor] = React.useState<[number, number]>([0, 0]);
   const handleMouseMove = (event: React.MouseEvent<SVGSVGElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
@@ -201,7 +206,7 @@ export function UnifiedWorkspaceShell({
     onCanvasMouseMove?.(event);
   };
   return (
-    <div className="v3-mae-layout font-sans text-slate-900 dark:text-slate-100" style={{ minHeight: 760, color: colors.text }}>
+    <div dir="ltr" className="v3-mae-layout font-sans text-slate-900 dark:text-slate-100" style={{ minHeight: 760, color: colors.text }}>
       {tabs && tabs.length > 0 && activeTabId !== undefined && (
         <div className="mb-4">
           <SegmentedControl
@@ -229,7 +234,7 @@ export function UnifiedWorkspaceShell({
           <div className="flex flex-col md:flex-row gap-4 items-start w-full">
             <aside className="w-full md:w-64 shrink-0 min-h-0 overflow-hidden rounded-2xl border shadow-sm border-slate-200 bg-white dark:border-[#1a1d24] dark:bg-[#0d0f12]" style={{ background: colors.panel, borderColor: colors.line, display: 'flex', flexDirection: 'column', height: '700px' }}>
               <div className="border-b px-3 py-2" style={{ borderColor: colors.line }}>
-                <div className={CONTROL_SYSTEMS_HEADING}>Component Library</div>
+                <div className={CONTROL_SYSTEMS_HEADING}>{t('simulators:shell.componentLibrary')}</div>
               </div>
               <div style={{ padding: 10, borderBottom: `1px solid ${colors.line}` }}>
                 <div style={{ position: 'relative' }}>
@@ -237,7 +242,7 @@ export function UnifiedWorkspaceShell({
                   <input
                     value={librarySearchValue}
                     onChange={event => onLibrarySearchChange(event.target.value)}
-                    placeholder="Search components"
+                    placeholder={t('simulators:shell.searchComponents')}
                     style={{ width: '100%', boxSizing: 'border-box', border: `1px solid ${colors.line}`, outline: 'none', background: colors.input, color: colors.text, borderRadius: 7, padding: '8px 9px 8px 29px', fontSize: 11 }}
                   />
                 </div>
@@ -357,11 +362,11 @@ export function UnifiedWorkspaceShell({
           <aside className="w-full min-h-0 overflow-y-auto rounded-2xl border shadow-sm border-slate-200 bg-white dark:border-[#1a1d24] dark:bg-[#0d0f12]" style={{ background: colors.panel, borderColor: colors.line, display: 'flex', flexDirection: 'column' }}>
             {inspectorTop}
             <div className="border-b px-3 py-2" style={{ borderColor: colors.line }}>
-              <div className={CONTROL_SYSTEMS_HEADING}>Active Element &amp; Properties</div>
+              <div className={CONTROL_SYSTEMS_HEADING}>{t('simulators:shell.activeElement')}</div>
             </div>
             {inspectorContent ?? (
               <div style={{ padding: '24px 16px', textAlign: 'center', color: colors.muted, fontSize: 12 }}>
-                {INSPECTOR_EMPTY_STATE_TEXT}
+                {t('simulators:shell.emptyInspector')}
               </div>
             )}
             {inspectorFooter}
@@ -374,7 +379,7 @@ export function UnifiedWorkspaceShell({
             data-testid="workspace-shortcuts-card"
           >
             <div className="border-b px-3 py-2 flex items-center justify-between" style={{ borderColor: colors.line }}>
-              <div className={CONTROL_SYSTEMS_HEADING}>Workspace Shortcuts</div>
+              <div className={CONTROL_SYSTEMS_HEADING}>{t('simulators:shell.workspaceShortcuts')}</div>
               <Keyboard size={13} className="text-slate-400 dark:text-slate-500" />
             </div>
             <div className="p-3.5 flex flex-col gap-2.5 text-xs" data-testid="canvas-shortcuts">

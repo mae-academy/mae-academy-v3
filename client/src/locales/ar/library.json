@@ -1,0 +1,81 @@
+{
+  "header": {
+    "eyebrow": "02 / المكتبة الأكاديمية",
+    "title": "اقرأ الكتب التي يتعلّم منها المهندسون.",
+    "description": "كتب منهجية، ومراجع هندسية، وحسابية، ورياضية، وفيزيائية مفتوحة، يمكن قراءتها في المتصفح مباشرة من أرشيف الإنترنت."
+  },
+  "search": {
+    "placeholder": "ابحث عن كتب منهجية ومراجع هندسية كلاسيكية...",
+    "clear": "مسح البحث",
+    "button": "بحث"
+  },
+  "filters": {
+    "category": "الفئة:",
+    "language": "اللغة:",
+    "sort": "ترتيب:",
+    "resetAll": "إعادة ضبط الفلاتر",
+    "allEngineering": "كل الهندسة",
+    "allLanguages": "كل اللغات",
+    "engineeringDisciplines": "التخصصات الهندسية",
+    "languageNames": {
+      "en": "الإنجليزية (en)",
+      "ar": "العربية (ar)",
+      "es": "الإسبانية (es)",
+      "de": "الألمانية (de)",
+      "fr": "الفرنسية (fr)",
+      "zh": "الصينية (zh)",
+      "ja": "اليابانية (ja)",
+      "it": "الإيطالية (it)",
+      "ru": "الروسية (ru)"
+    },
+    "sortOptions": {
+      "trending": "رائج",
+      "top_downloaded": "الأكثر تحميلاً",
+      "newest": "الأحدث",
+      "earliest": "الأقدم"
+    }
+  },
+  "results": {
+    "discovered": "تم اكتشاف",
+    "books": "كتب هندسية وعلمية مجانية للقراءة",
+    "capNotice": "تصفح أعلى {{max}} كتاب مفهرس",
+    "capNoticeTitle": "يقدم أرشيف الإنترنت بحد أقصى {{max}} نتيجة لكل استعلام. قم بتضييق نطاق البحث أو الفئة أو اللغة للوصول إلى بقية النتائج البالغة {{total}}.",
+    "keyword": "الكلمة المفتاحية:",
+    "errorTitle": "تعذر تحميل الكتب",
+    "retry": "إعادة المحاولة",
+    "emptyTitle": "لم يتم العثور على كتب",
+    "emptyDesc": "حاول تعديل استعلام البحث الخاص بك أو اختيار تخصص مختلف.",
+    "resetSearch": "إعادة ضبط البحث",
+    "page": "صفحة",
+    "of": "من",
+    "totalBooks": "({{total}} إجمالي الكتب)",
+    "previousPage": "الصفحة السابقة",
+    "nextPage": "الصفحة التالية",
+    "perPage": "لكل صفحة:"
+  },
+  "categories": {
+    "Computer Science": "علوم الحاسوب",
+    "Mathematics": "الرياضيات",
+    "Physics": "الفيزياء",
+    "Mechanics": "الميكانيكا",
+    "Electrical & Electronics": "الكهرباء والإلكترونيات",
+    "Mechanical Engineering": "الهندسة الميكانيكية",
+    "Civil & Structural": "الهندسة المدنية والإنشائية",
+    "Robotics & Control": "الروبوتات والتحكم",
+    "Chemistry & Materials": "الكيمياء والمواد",
+    "Energy & Power": "الطاقة والقدرة",
+    "Aerospace": "الفضاء والطيران"
+  },
+  "card": {
+    "openAccess": "وصول مفتوح",
+    "internetArchive": "أرشيف الإنترنت",
+    "readOnline": "اقرأ عبر الإنترنت",
+    "downloadPdf": "تحميل PDF",
+    "pages": "الصفحات",
+    "year": "السنة",
+    "downloads": "التنزيلات",
+    "catalogEntry": "إدخال الفهرس",
+    "variousAuthors": "مؤلفون متنوعون",
+    "details": "التفاصيل"
+  }
+}

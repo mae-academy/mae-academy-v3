@@ -1,0 +1,90 @@
+{
+  "privacy": {
+    "title": "Privacy Policy",
+    "effectiveDate": "Effective Date: September 29, 2026 • MAE Academy",
+    "intro": "MAE Academy (<a href=\"https://maeacademy.org\" target=\"_blank\" rel=\"noopener noreferrer\" class=\"font-medium text-violet-600 dark:text-violet-400 underline underline-offset-4 hover:text-violet-700\">https://maeacademy.org</a>) is dedicated to safeguarding and respecting the privacy of our visitors. This Privacy Policy details the types of information we may collect and how it is used and protected.",
+    "collection": {
+      "title": "Information Collection & User Accounts",
+      "p1": "MAE Academy does not require any user registration or account creation to access its tools, simulations, open-source literature, or academic resources.",
+      "p2": "We do not collect or store any personally identifiable information (PII) unless you voluntarily reach out to us via our designated contact email (<a href=\"mailto:maeacademy2026@gmail.com\" class=\"font-medium text-violet-600 dark:text-violet-400 underline underline-offset-4 hover:text-violet-700\">maeacademy2026@gmail.com</a>). In such instances, your email address and message are utilized solely to respond to your inquiry."
+    },
+    "logs": {
+      "title": "Server Log Files",
+      "p1": "Like most standard web servers, MAE Academy utilizes standard log files. The logged data includes Internet Protocol (IP) addresses, browser type, Internet Service Provider (ISP), date and time stamps, and referring/exit pages. This information is non-personally identifiable and is analyzed solely for technical administration, security, and optimizing site performance."
+    },
+    "cookies": {
+      "title": "Cookies and Third-Party Advertising",
+      "intro": "Our website does not set first-party cookies for tracking user identities. However, we partner with third-party vendors, including Google, to serve advertisements when you visit our website:",
+      "l1": "Google uses cookies, including the DART cookie, to serve targeted ads to our users based on their visits to our site and other destinations across the web.",
+      "l2": "Third-party ad networks may also use cookies, JavaScript, or Web Beacons to gauge the effectiveness of their advertising campaigns and customize ad content.",
+      "optOut": "Users can opt out of personalized advertising by visiting <a href=\"https://adssettings.google.com\" target=\"_blank\" rel=\"noopener noreferrer\" class=\"font-medium text-violet-600 dark:text-violet-400 underline underline-offset-4 hover:text-violet-700\">Google Ads Settings</a> or via the <a href=\"https://www.aboutads.info/choices/\" target=\"_blank\" rel=\"noopener noreferrer\" class=\"font-medium text-violet-600 dark:text-violet-400 underline underline-offset-4 hover:text-violet-700\">Network Advertising Initiative Opt-Out Page</a>."
+    },
+    "ip": {
+      "title": "Open-Source Resources & Intellectual Property",
+      "p1": "Our platform references and links to open-access research papers, textbooks, and public domain materials. All referenced works remain the intellectual property of their respective authors and publishers, cited and distributed in compliance with their applicable open licenses."
+    },
+    "children": {
+      "title": "Children's Online Privacy (COPPA Compliance)",
+      "p1": "We do not knowingly collect personal information from children under the age of 13. If you believe that a minor has provided us with personal information, please contact us immediately, and we will promptly remove such records from our systems."
+    },
+    "contact": {
+      "title": "Updates & Contact",
+      "p1": "We reserve the right to revise this policy to reflect operational, legal, or regulatory modifications. We encourage visitors to review this page periodically.",
+      "p2": "For any legal or privacy inquiries, please contact us at: <a href=\"mailto:maeacademy2026@gmail.com\" class=\"font-medium text-violet-600 dark:text-violet-400 underline underline-offset-4 hover:text-violet-700\">maeacademy2026@gmail.com</a>"
+    }
+  },
+  "terms": {
+    "title": "Terms of Service",
+    "effectiveDate": "Effective Date: September 29, 2026 • MAE Academy",
+    "intro": "Welcome to MAE Academy (<a href=\"https://maeacademy.org\" target=\"_blank\" rel=\"noopener noreferrer\" class=\"font-medium text-violet-600 dark:text-violet-400 underline underline-offset-4 hover:text-violet-700\">https://maeacademy.org</a>). By accessing or using our website, interactive tools, and educational resources, you acknowledge that you have read, understood, and agreed to be bound by these Terms of Service.",
+    "service": {
+      "title": "Description of Service",
+      "p1": "MAE Academy is an open educational platform offering interactive engineering simulators, technical explanations, and curated references to open-access academic literature and publications, provided without mandatory registration or subscription fees."
+    },
+    "ip": {
+      "title": "Intellectual Property Rights & Permitted Use",
+      "p1": "<strong class=\"font-semibold text-slate-900 dark:text-white\">Proprietary Content:</strong> All original platform code, interactive simulations, custom diagrams, visual assets, and written tutorials are the property of MAE Academy. You may not copy, reverse-engineer, scrape, redistribute, or exploit this proprietary content for commercial gain without explicit prior written authorization.",
+      "p2": "<strong class=\"font-semibold text-slate-900 dark:text-white\">Open-Source Literature:</strong> Open-access papers and third-party references are provided strictly for academic and educational purposes under their respective open-access licenses (e.g., Creative Commons)."
+    },
+    "disclaimer": {
+      "title": "Engineering & Educational Disclaimer",
+      "p1": "All simulators, computational tools, and technical explanations are provided strictly on an \"as-is\" and \"as-available\" basis for educational and self-study purposes only.",
+      "p2": "While we strive for mathematical and theoretical accuracy, MAE Academy disclaims all liability for any computational inaccuracies, unintended errors, or practical decisions made based directly on these tools without independent professional verification and standard industrial compliance checks."
+    },
+    "links": {
+      "title": "External Links and Advertisements",
+      "p1": "Our site may contain links to external third-party websites or advertisements provided by advertising networks (such as Google). We do not control, endorse, or assume responsibility for the content, privacy practices, or accuracy of third-party domains."
+    },
+    "law": {
+      "title": "Governing Law and Jurisdiction",
+      "p1": "These Terms and any disputes arising out of or related to your use of this platform shall be governed by and construed in accordance with the laws of the Hashemite Kingdom of Jordan, and the competent courts of Jordan shall have exclusive jurisdiction."
+    },
+    "contact": {
+      "title": "Contact Information",
+      "p1": "For any legal inquiries, copyright concerns, or questions regarding these terms, please contact: <a href=\"mailto:maeacademy2026@gmail.com\" class=\"font-medium text-violet-600 dark:text-violet-400 underline underline-offset-4 hover:text-violet-700\">maeacademy2026@gmail.com</a>"
+    }
+  },
+  "attribution": {
+    "title": "Intellectual Property, Open Access & Academic Attribution Policy",
+    "effectiveDate": "Effective Date: September 29, 2026 • MAE Academy",
+    "intro": "MAE Academy is an open-access engineering platform providing interactive simulation tools and indexing public academic literature strictly for educational, non-commercial purposes.",
+    "library": {
+      "title": "Academic Library Indexing",
+      "p1": "The MAE Academy library index acts as an educational discovery tool. We do not host, store, or distribute copyrighted textbooks on private servers for profit. Instead, we leverage open public metadata and legal digital archives, primarily the Internet Archive (<a href=\"https://archive.org\" target=\"_blank\" rel=\"noopener noreferrer\" class=\"font-medium text-violet-600 dark:text-violet-400 underline underline-offset-4 hover:text-violet-700\">archive.org</a>), under fair use and Open Educational Resources (OER) principles."
+    },
+    "research": {
+      "title": "Academic Research Discovery",
+      "p1": "Our research module functions as an academic metadata aggregator. Paper records and citations are queried securely through established open-access discovery indices, including <a href=\"https://openalex.org\" target=\"_blank\" rel=\"noopener noreferrer\" class=\"font-medium text-violet-600 dark:text-violet-400 underline underline-offset-4 hover:text-violet-700\">OpenAlex</a> and <a href=\"https://www.doabooks.org\" target=\"_blank\" rel=\"noopener noreferrer\" class=\"font-medium text-violet-600 dark:text-violet-400 underline underline-offset-4 hover:text-violet-700\">DOAB</a>. We are strictly committed to preserving all original author attributions, Digital Object Identifiers (DOIs), and adhering to their respective open licenses."
+    },
+    "simulations": {
+      "title": "Proprietary Simulation Engines",
+      "p1": "All client-side interactive simulators, mathematical solvers, physical modeling scripts, visual interfaces, and animation architectures are original intellectual property created and maintained by MAE Academy. They operate client-side in the browser and are protected by applicable copyright legislation."
+    },
+    "dmca": {
+      "title": "DMCA Notice & Takedown Procedure",
+      "p1": "MAE Academy respects the intellectual property rights of creators and copyright owners. If you believe in good faith that any indexed record or reference on our platform infringes your copyright, please submit a formal written notice to our compliance address:",
+      "p2": "<a href=\"mailto:maeacademy2026@gmail.com\" class=\"font-medium text-violet-600 dark:text-violet-400 underline underline-offset-4 hover:text-violet-700\">maeacademy2026@gmail.com</a>",
+      "p3": "Our Commitment: We pledge to review and verify any formal notice, and promptly delist or remove any contested third-party reference within 48 business hours of receipt."
+    }
+  }
+}

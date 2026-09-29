@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { motion, Variants } from "framer-motion";
 import { Download, ArrowRight, FileText } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import type { LibraryBook } from "@/lib/internetarchive";
 import { bookPath, SOURCE_LABELS, type UnifiedBook } from "@/lib/bookSources";
 
@@ -16,6 +17,7 @@ export default function LibraryBookCard({
   book,
   itemVariants,
 }: LibraryBookCardProps) {
+  const { t } = useTranslation(["library"]);
   // Track the exact URL that failed so a new book never inherits a stale error flag.
   const [failedSrcs, setFailedSrcs] = useState<string[]>([]);
 
@@ -103,7 +105,7 @@ export default function LibraryBookCard({
         <div className="mb-2.5 flex items-center justify-between text-xs">
           <div className="flex items-center gap-1.5 font-semibold text-slate-800 dark:text-slate-200">
             <Download className="h-3.5 w-3.5 shrink-0 text-violet-500" />
-            <span>{book.source && book.source !== "archive" && book.downloads === 0 ? "Catalog entry" : `${compactCount.format(book.downloads)} downloads`}</span>
+            <span>{book.source && book.source !== "archive" && book.downloads === 0 ? t("card.catalogEntry") : `${compactCount.format(book.downloads)} ${t("card.downloads")}`}</span>
           </div>
           <span className="flex items-center gap-2 font-semibold text-slate-500 dark:text-slate-400">
             {book.source && (
@@ -125,7 +127,7 @@ export default function LibraryBookCard({
 
         {/* Authors */}
         <p className="mb-2 line-clamp-1 text-xs font-medium leading-relaxed text-slate-500 dark:text-zinc-400">
-          {book.authors.length > 0 ? book.authors.join(", ") : "Various Authors"}
+          {book.authors.length > 0 ? book.authors.join(", ") : t("card.variousAuthors")}
         </p>
 
         {/* Description */}
@@ -141,7 +143,7 @@ export default function LibraryBookCard({
             rel="noopener noreferrer"
             className="group/btn flex items-center gap-1 text-xs font-semibold text-violet-600 transition-colors hover:text-violet-700 dark:text-violet-400 dark:hover:text-violet-300"
           >
-            Details
+            {t("card.details")}
             <ArrowRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover/btn:translate-x-0.5" />
           </a>
         </div>

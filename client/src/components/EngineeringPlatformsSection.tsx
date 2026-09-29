@@ -8,7 +8,7 @@
 import { Link } from "wouter";
 import { motion, Variants } from "framer-motion";
 import { ArrowRight } from "lucide-react";
-import { useLocale } from "@/contexts/LocaleContext";
+import { useTranslation } from "react-i18next";
 
 const sectionVariants: Variants = {
   hidden: {},
@@ -37,8 +37,7 @@ function VisualPreviewSlot() {
 }
 
 export default function EngineeringPlatformsSection() {
-  const { copy } = useLocale();
-  const { home } = copy;
+  const { t } = useTranslation("landing");
 
   return (
     <motion.section
@@ -53,11 +52,11 @@ export default function EngineeringPlatformsSection() {
         {/* Section Header */}
         <motion.div variants={itemVariants} className="text-center max-w-3xl mx-auto mb-12 sm:mb-16">
           <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-slate-900 dark:text-white">
-            {home.platformsTitle}
+            {t("platforms.title")}
           </h2>
           <div className="mae-signal-rule mx-auto my-3" />
           <p className="mt-2 text-base md:text-lg text-slate-500 dark:text-zinc-400 max-w-xl mx-auto">
-            {home.platformsSubtitle}
+            {t("platforms.subtitle")}
           </p>
         </motion.div>
 
@@ -78,11 +77,11 @@ export default function EngineeringPlatformsSection() {
             <div className="lg:col-span-5 flex flex-col justify-center space-y-6">
               <div>
                 <h3 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">
-                  Practical Simulations & Virtual Lab Benches
+                  {t("platforms.simulations.title")}
                 </h3>
 
                 <p className="mt-3 text-base text-slate-600 dark:text-zinc-400 leading-relaxed">
-                  Bridge abstract mathematics with interactive, real-time physical simulation. Explore state transitions, transient settling curves, and feedback responses instantly in your browser.
+                  {t("platforms.simulations.description")}
                 </p>
               </div>
 
@@ -93,7 +92,7 @@ export default function EngineeringPlatformsSection() {
                   className="group flex items-center justify-between px-3.5 py-3.5 -mx-3.5 rounded-lg hover:bg-slate-50 dark:hover:bg-white/[0.04] transition-colors"
                 >
                   <span className="text-base md:text-lg font-medium text-slate-800 transition-colors group-hover:text-blue-600 dark:text-zinc-300 dark:group-hover:text-white">
-                    Control Systems Simulator
+                    {t("platforms.simulations.links.control")}
                   </span>
                   <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-blue-600 group-hover:translate-x-1 transition-all dark:text-zinc-500 dark:group-hover:text-white" />
                 </Link>
@@ -103,7 +102,7 @@ export default function EngineeringPlatformsSection() {
                   className="group flex items-center justify-between px-3.5 py-3.5 -mx-3.5 rounded-lg hover:bg-slate-50 dark:hover:bg-white/[0.04] transition-colors"
                 >
                   <span className="text-base md:text-lg font-medium text-slate-800 transition-colors group-hover:text-blue-600 dark:text-zinc-300 dark:group-hover:text-white">
-                    Electrical Circuits Simulator
+                    {t("platforms.simulations.links.circuits")}
                   </span>
                   <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-blue-600 group-hover:translate-x-1 transition-all dark:text-zinc-500 dark:group-hover:text-white" />
                 </Link>
@@ -113,7 +112,7 @@ export default function EngineeringPlatformsSection() {
                   className="group flex items-center justify-between px-3.5 py-3.5 -mx-3.5 rounded-lg hover:bg-slate-50 dark:hover:bg-white/[0.04] transition-colors"
                 >
                   <span className="text-base md:text-lg font-medium text-slate-800 transition-colors group-hover:text-blue-600 dark:text-zinc-300 dark:group-hover:text-white">
-                    Power Electronics Simulator
+                    {t("platforms.simulations.links.power")}
                   </span>
                   <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-blue-600 group-hover:translate-x-1 transition-all dark:text-zinc-500 dark:group-hover:text-white" />
                 </Link>
@@ -125,7 +124,7 @@ export default function EngineeringPlatformsSection() {
                   href="/simulations"
                   className="btn-brand-primary px-7 py-3.5 text-base font-semibold gap-2"
                 >
-                  Explore All Simulations
+                  {t("platforms.simulations.cta")}
                   <ArrowRight className="h-4 w-4" />
                 </Link>
               </div>
@@ -143,29 +142,29 @@ export default function EngineeringPlatformsSection() {
             <div className="lg:col-span-5 flex flex-col justify-center space-y-6 order-2 lg:order-1">
               <div>
                 <h3 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">
-                  Open Textbooks & Engineering Manuals
+                  {t("platforms.library.title")}
                 </h3>
 
                 <p className="mt-3 text-base text-slate-600 dark:text-zinc-400 leading-relaxed">
-                  Open textbooks, technical manuals, and foundational references in engineering, computing, mathematics, and physics, readable in the browser straight from open archives.
+                  {t("platforms.library.description")}
                 </p>
               </div>
 
               {/* Clean Navigational Links (Text-First, No Icons) */}
               <div className="space-y-1">
                 {[
-                  "Electrical & Electronics",
-                  "Computer Science",
-                  "Robotics & Control",
-                  "Mechanical & Structural",
-                ].map((category) => (
+                  { key: "electrical", label: t("platforms.library.links.electrical") },
+                  { key: "computer", label: t("platforms.library.links.computer") },
+                  { key: "robotics", label: t("platforms.library.links.robotics") },
+                  { key: "mechanical", label: t("platforms.library.links.mechanical") },
+                ].map(({ key, label }) => (
                   <Link
-                    key={category}
+                    key={key}
                     href="/library"
                     className="group flex items-center justify-between px-3.5 py-3.5 -mx-3.5 rounded-lg hover:bg-slate-50 dark:hover:bg-white/[0.04] transition-colors"
                   >
                     <span className="text-base md:text-lg font-medium text-slate-800 transition-colors group-hover:text-violet-600 dark:text-zinc-300 dark:group-hover:text-white">
-                      {category}
+                      {label}
                     </span>
                     <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-violet-600 group-hover:translate-x-1 transition-all dark:text-zinc-500 dark:group-hover:text-white" />
                   </Link>
@@ -178,7 +177,7 @@ export default function EngineeringPlatformsSection() {
                   href="/library"
                   className="btn-brand-primary px-7 py-3.5 text-base font-semibold gap-2"
                 >
-                  Explore Academic Library
+                  {t("platforms.library.cta")}
                   <ArrowRight className="h-4 w-4" />
                 </Link>
               </div>
@@ -206,28 +205,28 @@ export default function EngineeringPlatformsSection() {
             <div className="lg:col-span-5 flex flex-col justify-center space-y-6">
               <div>
                 <h3 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">
-                  Mathematical Research & System Identification
+                  {t("platforms.research.title")}
                 </h3>
 
                 <p className="mt-3 text-base text-slate-600 dark:text-zinc-400 leading-relaxed">
-                  Open research notes, mathematical formulations, transfer functions, and algorithmic proofs behind our simulations. Grounded in numerical physics and validated against benchmark experiments.
+                  {t("platforms.research.description")}
                 </p>
               </div>
 
               {/* Clean Navigational Links (Text-First, No Icons) */}
               <div className="space-y-1">
                 {[
-                  "Nonlinear System Identification",
-                  "Dynamic Simulation Solvers",
-                  "Algorithmic Derivations & Proofs",
-                ].map((pillar) => (
+                  { key: "identification", label: t("platforms.research.links.identification") },
+                  { key: "solvers", label: t("platforms.research.links.solvers") },
+                  { key: "proofs", label: t("platforms.research.links.proofs") },
+                ].map(({ key, label }) => (
                   <Link
-                    key={pillar}
+                    key={key}
                     href="/research"
                     className="group flex items-center justify-between px-3.5 py-3.5 -mx-3.5 rounded-lg hover:bg-slate-50 dark:hover:bg-white/[0.04] transition-colors"
                   >
                     <span className="text-base md:text-lg font-medium text-slate-800 transition-colors group-hover:text-rose-600 dark:text-zinc-300 dark:group-hover:text-white">
-                      {pillar}
+                      {label}
                     </span>
                     <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-rose-600 group-hover:translate-x-1 transition-all dark:text-zinc-500 dark:group-hover:text-white" />
                   </Link>
@@ -240,7 +239,7 @@ export default function EngineeringPlatformsSection() {
                   href="/research"
                   className="btn-brand-primary px-7 py-3.5 text-base font-semibold gap-2"
                 >
-                  Explore Research Notes
+                  {t("platforms.research.cta")}
                   <ArrowRight className="h-4 w-4" />
                 </Link>
               </div>

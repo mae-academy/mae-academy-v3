@@ -1,0 +1,36 @@
+{
+  "navbar": {
+    "00": "Home",
+    "01": "Academic Research",
+    "02": "Academic Library",
+    "03": "Practical Simulations",
+    "04": "About"
+  },
+  "languageSelector": {
+    "en": "English",
+    "ar": "العربية",
+    "es": "Español"
+  },
+  "controls": {
+    "home": "MAE Academy home",
+    "language": "Language",
+    "languageOptions": "Language options",
+    "themeToLight": "Switch to light theme",
+    "themeToDark": "Switch to dark theme",
+    "platformNavigation": "Platform navigation"
+  },
+  "footer": {
+    "description": "Model. Analyze. Engineering. A global platform for rigorous engineering learning and applied systems thinking.",
+    "platform": "Platform",
+    "research": "Research",
+    "courses": "Courses",
+    "library": "Library",
+    "simulations": "Simulations",
+    "legalAndCompliance": "Legal & Compliance",
+    "privacyPolicy": "Privacy Policy",
+    "termsOfService": "Terms of Service",
+    "attributionPolicy": "Attribution Policy",
+    "supportOurMission": "Support Our Mission",
+    "copyright": "© {{year}} MAE Academy. All rights reserved."
+  }
+}

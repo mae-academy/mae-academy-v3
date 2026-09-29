@@ -11,6 +11,9 @@ import { LocaleProvider } from "@/contexts/LocaleContext";
 import { localizedContent } from "@/data/content";
 import LanguageTransition from "@/components/LanguageTransition";
 import { SegmentedControl } from "@/components/common/templates";
+import PrefetchLink from "@/components/common/PrefetchLink";
+import { useTranslation } from "react-i18next";
+import "@/i18n/config";
 
 type MainLayoutProps = { children: ReactNode };
 
@@ -28,16 +31,14 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const [languageTarget, setLanguageTarget] = useState<Locale | null>(null);
   const transitionTimers = useRef<number[]>([]);
   const copy = localizedContent[locale];
+  const { t } = useTranslation("common");
 
   useEffect(() => {
     const root = document.documentElement;
     root.classList.toggle("dark", isDark);
-    root.lang = locale;
-    root.dir = locale === "ar" ? "rtl" : "ltr";
     localStorage.setItem("mae-theme", isDark ? "dark" : "light");
     localStorage.setItem("mae-locale", locale);
-    document.title = `MAE Academy — ${copy.about.title}`;
-  }, [locale, isDark, copy.about.title]);
+  }, [locale, isDark]);
 
   useEffect(() => () => transitionTimers.current.forEach((timer) => window.clearTimeout(timer)), []);
 
@@ -61,68 +62,69 @@ export default function MainLayout({ children }: MainLayoutProps) {
     <main className="min-h-[calc(100svh-var(--mae-header-height))] w-full max-w-full overflow-x-hidden">{children}</main>
     <footer className="border-t border-slate-200/80 bg-white/40 backdrop-blur-xs dark:border-white/[0.08] dark:bg-[#08080A]/80">
       <div className="max-w-[1536px] mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14 lg:py-16 w-full">
-        <div className="grid gap-10 lg:grid-cols-[1.3fr_0.9fr_1fr] lg:gap-12">
+        <div className="grid items-start gap-10 sm:grid-cols-2 lg:grid-cols-[1.3fr_0.8fr_0.9fr_1fr] lg:gap-12">
           {/* Column 1: Brand & Mission */}
-          <div className="flex flex-col justify-between">
-            <div>
-              <Link href="/" className="group inline-flex items-center gap-2.5 text-slate-950 dark:text-white">
-                <span className="text-xl font-black tracking-tight">
-                  MAE <span className="mae-gradient-text font-black">Academy</span>
-                </span>
-              </Link>
-              <p className="mt-3 max-w-sm text-sm leading-relaxed text-slate-600 dark:text-slate-400">
-                Model. Analyze. Engineering. A global platform for rigorous engineering learning and applied systems thinking.
-              </p>
-              <a
-                href="mailto:maeacademy2026@gmail.com"
-                className="mt-4 inline-flex items-center gap-2 text-xs font-medium text-slate-500 transition-colors hover:text-violet-600 dark:text-slate-400 dark:hover:text-violet-300"
-              >
-                <Mail className="h-4 w-4 text-violet-600 dark:text-violet-400" />
-                <span>maeacademy2026@gmail.com</span>
-              </a>
-            </div>
+          <div>
+            <Link href="/" className="group inline-flex items-center gap-2.5 text-slate-950 dark:text-white">
+              <span className="text-xl font-black tracking-tight">
+                MAE <span className="mae-gradient-text font-black">Academy</span>
+              </span>
+            </Link>
+            <p className="mt-3 max-w-sm text-sm leading-relaxed text-slate-600 dark:text-slate-400">
+              {t("footer.description")}
+            </p>
+            <a
+              href="mailto:maeacademy2026@gmail.com"
+              className="mt-4 inline-flex items-center gap-2 text-xs font-medium text-slate-500 transition-colors hover:text-violet-600 dark:text-slate-400 dark:hover:text-violet-300"
+            >
+              <Mail className="h-4 w-4 text-violet-600 dark:text-violet-400" />
+              <span>maeacademy2026@gmail.com</span>
+            </a>
           </div>
 
-          {/* Column 2: Platform Navigation & Legal */}
+          {/* Column 2: Platform Navigation */}
           <div>
             <p className="text-xs font-semibold tracking-wider text-slate-400 dark:text-slate-500 uppercase">
-              {locale === "ar" ? "المنصة" : "Platform"}
+              {t("footer.platform")}
             </p>
             <nav className="mt-4 flex flex-col gap-3 text-sm">
-              <Link
+              <PrefetchLink
                 href="/research"
                 className="group inline-flex items-center gap-2.5 text-slate-600 transition-colors hover:text-violet-600 dark:text-slate-400 dark:hover:text-violet-300"
               >
                 <Compass className="h-4 w-4 text-slate-400 transition-colors group-hover:text-violet-600 dark:text-slate-500 dark:group-hover:text-violet-300" />
-                <span className="font-medium">{copy.footer.research}</span>
-              </Link>
-              <Link
+                <span className="font-medium">{t("footer.research")}</span>
+              </PrefetchLink>
+              <PrefetchLink
                 href="/library"
                 className="group inline-flex items-center gap-2.5 text-slate-600 transition-colors hover:text-violet-600 dark:text-slate-400 dark:hover:text-violet-300"
               >
                 <BookOpen className="h-4 w-4 text-slate-400 transition-colors group-hover:text-violet-600 dark:text-slate-500 dark:group-hover:text-violet-300" />
-                <span className="font-medium">{copy.footer.library || copy.footer.courses}</span>
-              </Link>
-              <Link
+                <span className="font-medium">{t("footer.library")}</span>
+              </PrefetchLink>
+              <PrefetchLink
                 href="/simulations"
                 className="group inline-flex items-center gap-2.5 text-slate-600 transition-colors hover:text-violet-600 dark:text-slate-400 dark:hover:text-violet-300"
               >
                 <Cpu className="h-4 w-4 text-slate-400 transition-colors group-hover:text-violet-600 dark:text-slate-500 dark:group-hover:text-violet-300" />
-                <span className="font-medium">{copy.footer.simulations}</span>
-              </Link>
+                <span className="font-medium">{t("footer.simulations")}</span>
+              </PrefetchLink>
             </nav>
+          </div>
 
-            <p className="mt-6 text-xs font-semibold tracking-wider text-slate-400 dark:text-slate-500 uppercase">
-              {locale === "ar" ? "الوثائق القانونية" : "Legal & Compliance"}
+          {/* Column 3: Legal & Compliance */}
+          <div>
+            <p className="text-xs font-semibold tracking-wider text-slate-400 dark:text-slate-500 uppercase">
+              {t("footer.legalAndCompliance")}
             </p>
-            <nav className="mt-3 flex flex-col gap-2.5 text-sm">
+            <nav className="mt-4 flex flex-col gap-3 text-sm">
               <Link
                 href="/privacy-policy"
                 className="group inline-flex items-center gap-2.5 text-slate-600 transition-colors hover:text-violet-600 dark:text-slate-400 dark:hover:text-violet-300"
               >
                 <ShieldCheck className="h-4 w-4 text-slate-400 transition-colors group-hover:text-violet-600 dark:text-slate-500 dark:group-hover:text-violet-300" />
                 <span className="font-medium">
-                  {locale === "ar" ? "سياسة الخصوصية" : "Privacy Policy"}
+                  {t("footer.privacyPolicy")}
                 </span>
               </Link>
               <Link
@@ -131,14 +133,23 @@ export default function MainLayout({ children }: MainLayoutProps) {
               >
                 <FileText className="h-4 w-4 text-slate-400 transition-colors group-hover:text-violet-600 dark:text-slate-500 dark:group-hover:text-violet-300" />
                 <span className="font-medium">
-                  {locale === "ar" ? "شروط الاستخدام" : "Terms of Service"}
+                  {t("footer.termsOfService")}
+                </span>
+              </Link>
+              <Link
+                href="/attribution-policy"
+                className="group inline-flex items-center gap-2.5 text-slate-600 transition-colors hover:text-violet-600 dark:text-slate-400 dark:hover:text-violet-300"
+              >
+                <ShieldCheck className="h-4 w-4 text-slate-400 transition-colors group-hover:text-violet-600 dark:text-slate-500 dark:group-hover:text-violet-300" />
+                <span className="font-medium">
+                  {t("footer.attributionPolicy")}
                 </span>
               </Link>
             </nav>
           </div>
 
-          {/* Column 3: Community, Languages & Support */}
-          <div className="flex flex-col justify-between gap-6">
+          {/* Column 4: Community, Languages & Support */}
+          <div className="flex flex-col gap-6">
             <div className="space-y-4">
               {/* Language Switcher */}
               <SegmentedControl
@@ -167,32 +178,39 @@ export default function MainLayout({ children }: MainLayoutProps) {
                   className="inline-flex items-center gap-2 rounded-lg border border-slate-200/90 bg-white/70 px-3.5 py-1.5 text-xs font-medium text-slate-600 shadow-2xs backdrop-blur-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-rose-300 hover:bg-white hover:text-rose-600 dark:border-white/15 dark:bg-white/5 dark:text-slate-300 dark:hover:border-rose-400 dark:hover:bg-white/10 dark:hover:text-rose-300"
                 >
                   <Heart className="h-3.5 w-3.5 text-rose-500 dark:text-rose-400" />
-                  <span>Support Our Mission</span>
+                  <span>{t("footer.supportOurMission")}</span>
                 </a>
               </div>
             </div>
+          </div>
+        </div>
 
-            {/* Copyright & Legal Compliance Links */}
-            <div className="space-y-2 pt-2 border-t border-slate-200/60 dark:border-white/[0.06]">
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                © {new Date().getFullYear()} MAE Academy. All rights reserved.
-              </p>
-              <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
-                <Link
-                  href="/privacy-policy"
-                  className="hover:text-violet-600 dark:hover:text-violet-400 transition-colors"
-                >
-                  {locale === "ar" ? "سياسة الخصوصية" : "Privacy Policy"}
-                </Link>
-                <span>·</span>
-                <Link
-                  href="/terms-of-service"
-                  className="hover:text-violet-600 dark:hover:text-violet-400 transition-colors"
-                >
-                  {locale === "ar" ? "شروط الاستخدام" : "Terms of Service"}
-                </Link>
-              </div>
-            </div>
+        {/* Bottom Bar: Copyright & Subtle Legal Links */}
+        <div className="mt-12 pt-8 border-t border-slate-200/60 dark:border-white/[0.06] flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500 dark:text-slate-400">
+          <p>
+            {t("footer.copyright", { year: new Date().getFullYear() })}
+          </p>
+          <div className="flex flex-wrap items-center gap-3">
+            <Link
+              href="/privacy-policy"
+              className="hover:text-violet-600 dark:hover:text-violet-400 transition-colors"
+            >
+              {t("footer.privacyPolicy")}
+            </Link>
+            <span>·</span>
+            <Link
+              href="/terms-of-service"
+              className="hover:text-violet-600 dark:hover:text-violet-400 transition-colors"
+            >
+              {t("footer.termsOfService")}
+            </Link>
+            <span>·</span>
+            <Link
+              href="/attribution-policy"
+              className="hover:text-violet-600 dark:hover:text-violet-400 transition-colors"
+            >
+              {t("footer.attributionPolicy")}
+            </Link>
           </div>
         </div>
       </div>

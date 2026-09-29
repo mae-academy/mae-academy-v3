@@ -920,7 +920,7 @@ export function AssemblerStudio() {
   const flags = toFlagRecord(currentStep?.flags);
 
   return (
-    <div className="code-studio assembler-studio flex flex-col gap-2.5 h-[calc(100vh-10rem)] min-h-[560px] w-full overflow-hidden select-none font-sans text-slate-800 dark:text-slate-200">
+    <div dir="ltr" className="ltr text-left code-studio assembler-studio flex flex-col gap-2.5 h-[calc(100vh-10rem)] min-h-[560px] w-full overflow-hidden select-none font-sans text-slate-800 dark:text-slate-200">
       {/* ===================================================================== */}
       {/* 1. CONSOLIDATED CIRCUIT-STYLE TOP TOOLBAR                             */}
       {/* ===================================================================== */}

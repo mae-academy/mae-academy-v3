@@ -15,7 +15,7 @@ const toPdfFilename = (title: string): string =>
 // Lazy: keeps pdf.js (~1 MB) out of the main bundle until a paper with a PDF is opened.
 const RestrictedPdfViewer = lazy(() => import("@/components/RestrictedPdfViewer"));
 
-export default function ResearchDetail({ params }: { params: { id: string } }) {
+export default function ResearchDetail({ params }: any) {
   const [paper, setPaper] = useState<ResearchPaper | null>(null);
   const [relatedPapers, setRelatedPapers] = useState<ResearchPaper[]>([]);
   const [isLoading, setIsLoading] = useState(true);

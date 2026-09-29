@@ -1,6 +1,7 @@
 import { lazy, Suspense, useState, useEffect } from "react";
 import { Link } from "wouter";
 import { Loader2, ExternalLink, Download, ArrowLeft, FileText } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { fetchAnyBookById, fetchRelatedFor } from "@/lib/unifiedBooks";
 import { SOURCE_PAGE_LABEL, type UnifiedBook } from "@/lib/bookSources";
 import type { LibraryBook } from "@/lib/internetarchive";
@@ -17,7 +18,8 @@ const toPdfFilename = (title: string): string =>
 // Lazy: keeps pdf.js (~1 MB) out of the main bundle until a book with a PDF is opened.
 const RestrictedPdfViewer = lazy(() => import("@/components/RestrictedPdfViewer"));
 
-export default function LibraryDetail({ params }: { params: { id: string } }) {
+export default function LibraryDetail({ params }: any) {
+  const { t } = useTranslation(["library"]);
   const [book, setBook] = useState<UnifiedBook | null>(null);
   const [relatedBooks, setRelatedBooks] = useState<LibraryBook[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -80,13 +82,13 @@ export default function LibraryDetail({ params }: { params: { id: string } }) {
   if (error || !book) {
     return (
       <div className="container py-20 text-center font-sans">
-        <h1 className="mb-4 text-2xl font-bold text-slate-900 dark:text-white">Book Not Found</h1>
-        <p className="mb-8 text-slate-500 dark:text-zinc-400">{error || "Could not load the requested book."}</p>
+        <h1 className="mb-4 text-2xl font-bold text-slate-900 dark:text-white">{t("detail.bookNotFound", { defaultValue: "Book Not Found" })}</h1>
+        <p className="mb-8 text-slate-500 dark:text-zinc-400">{error || t("detail.bookLoadError", { defaultValue: "Could not load the requested book." })}</p>
         <Link
           href="/library"
           className="inline-flex items-center gap-2 rounded-full bg-violet-100 px-6 py-2.5 text-sm font-bold text-violet-700 transition-colors hover:bg-violet-200 dark:bg-violet-900/30 dark:text-violet-300"
         >
-          <ArrowLeft className="h-4 w-4" /> Back to Library
+          <ArrowLeft className="h-4 w-4" /> {t("detail.backToLibrary", { defaultValue: "Back to Library" })}
         </Link>
       </div>
     );
@@ -144,7 +146,7 @@ export default function LibraryDetail({ params }: { params: { id: string } }) {
           href="/library"
           className="inline-flex items-center gap-2 text-sm font-semibold text-slate-500 transition-colors hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
         >
-          <ArrowLeft className="h-4 w-4" /> Back to Search
+          <ArrowLeft className="h-4 w-4" /> {t("detail.backToSearch", { defaultValue: "Back to Search" })}
         </Link>
       </div>
 
@@ -155,7 +157,7 @@ export default function LibraryDetail({ params }: { params: { id: string } }) {
             {book.year || "n/a"}
           </span>
           <span className="inline-flex items-center h-6 rounded-full bg-violet-500/10 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300 border border-violet-500/20 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wider">
-            {book.pdfUrl ? "FREE TO READ" : "CATALOG RECORD"}
+            {book.pdfUrl ? t("detail.freeToRead", { defaultValue: "FREE TO READ" }) : t("detail.catalogRecord", { defaultValue: "CATALOG RECORD" })}
           </span>
           <span className="inline-flex items-center h-6 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-600 dark:bg-white/[0.06] dark:text-zinc-400 border border-slate-200/80 dark:border-white/[0.06]">
             {providerName}
@@ -178,7 +180,7 @@ export default function LibraryDetail({ params }: { params: { id: string } }) {
         
         <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-base sm:text-lg font-medium text-slate-600 dark:text-slate-400 leading-relaxed max-w-4xl">
-            By {book.authors.length > 0 ? book.authors.join(", ") : "Various Authors"}
+            {t("detail.by", { defaultValue: "By" })} {book.authors.length > 0 ? book.authors.join(", ") : t("card.variousAuthors")}
           </p>
 
           {/* ── Action Bar ── */}
@@ -191,7 +193,7 @@ export default function LibraryDetail({ params }: { params: { id: string } }) {
                 className="inline-flex items-center gap-2 rounded-full brand-active-pill hover:opacity-95 shadow-md active:scale-95 px-6 py-2.5 text-sm disabled:cursor-wait disabled:opacity-70"
               >
                 {downloadState === "checking" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-                Download Book PDF
+                {t("detail.downloadPdf", { defaultValue: "Download Book PDF" })}
               </button>
             )}
             <a
@@ -206,7 +208,7 @@ export default function LibraryDetail({ params }: { params: { id: string } }) {
         </div>
         {downloadState === "error" && (
           <p role="alert" className="text-sm font-medium text-red-600 dark:text-red-400">
-            A direct download isn't available for this book. Please use the {providerPageLabel} instead.
+            {t("detail.downloadError", { provider: providerPageLabel, defaultValue: `A direct download isn't available for this book. Please use the ${providerPageLabel} instead.` })}
           </p>
         )}
       </header>
@@ -216,10 +218,10 @@ export default function LibraryDetail({ params }: { params: { id: string } }) {
         <div className="lg:col-span-5 mb-12 lg:mb-0">
           <section className="rounded-2xl bg-slate-50 p-6 sm:p-8 dark:bg-white/[0.02] border border-slate-100 dark:border-white/[0.05]">
             <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400 dark:text-zinc-500 mb-5">
-              Description / Synopsis
+              {t("detail.description", { defaultValue: "Description / Synopsis" })}
             </h3>
             <p className="text-base sm:text-lg leading-relaxed text-slate-700 dark:text-zinc-300">
-              {book.description || "No description available for this book."}
+              {book.description || t("detail.noDescription", { defaultValue: "No description available for this book." })}
             </p>
           </section>
         </div>
@@ -244,9 +246,9 @@ export default function LibraryDetail({ params }: { params: { id: string } }) {
                 <FileText className="h-6 w-6 text-slate-500 dark:text-slate-400" />
               </div>
               <div>
-                <h3 className="mb-1 text-lg font-bold text-slate-800 dark:text-zinc-200">In-Browser Preview Unavailable</h3>
+                <h3 className="mb-1 text-lg font-bold text-slate-800 dark:text-zinc-200">{t("detail.previewUnavailable", { defaultValue: "In-Browser Preview Unavailable" })}</h3>
                 <p className="text-sm text-slate-500 dark:text-zinc-400 max-w-sm mx-auto">
-                  This edition is indexed as a library record without an open direct PDF stream. You can inspect the catalog entry or borrow it directly from the provider.
+                  {t("detail.previewUnavailableDesc", { defaultValue: "This edition is indexed as a library record without an open direct PDF stream. You can inspect the catalog entry or borrow it directly from the provider." })}
                 </p>
               </div>
               <div className="mt-2 flex flex-col gap-3 sm:flex-row">
@@ -257,7 +259,7 @@ export default function LibraryDetail({ params }: { params: { id: string } }) {
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-2 rounded-full bg-violet-600 px-6 py-2 text-sm font-semibold text-white transition-colors hover:bg-violet-700"
                   >
-                    View on {providerName} <ExternalLink className="h-4 w-4" />
+                    {t("detail.viewOn", { provider: providerName, defaultValue: `View on ${providerName}` })} <ExternalLink className="h-4 w-4" />
                   </a>
                 )}
               </div>
@@ -270,8 +272,8 @@ export default function LibraryDetail({ params }: { params: { id: string } }) {
       {validRelatedBooks.length > 0 && (
         <section className="mt-16 pt-10 border-t border-slate-200 dark:border-white/[0.08] w-full">
           <div className="mb-6">
-            <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">See Also / Related Books</h2>
-            <p className="text-sm text-slate-500 dark:text-zinc-400 mt-1">Explore books on similar topics</p>
+            <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">{t("detail.relatedBooks", { defaultValue: "See Also / Related Books" })}</h2>
+            <p className="text-sm text-slate-500 dark:text-zinc-400 mt-1">{t("detail.exploreSimilar", { defaultValue: "Explore books on similar topics" })}</p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {validRelatedBooks.map((relBook) => (

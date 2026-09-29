@@ -1,0 +1,41 @@
+{
+  "header": {
+    "eyebrow": "Acerca de MAE Academy",
+    "title": "Modelar. Analizar. Ingeniería.",
+    "subtitle": "Currículum de Ingeniería Interactivo y Dosier del Fundador — conectando la dinámica del hardware físico y simulaciones digitales intuitivas."
+  },
+  "dossier": {
+    "authoredWorks": {
+      "title": "Obras de Autor y Videoconferencias",
+      "subtitle": "Cursos en Video, Guías de Estudio y Manuales de Laboratorio"
+    },
+    "simulationBanner": {
+      "badge": "Software de Producción",
+      "title": "Motores de Simulación Web Interactivos MAE",
+      "description": "Motores de simulación en tiempo real basados en web para lógica PLC, microarquitecturas 8086 y control de retroalimentación.",
+      "cta": "Lanzar Simuladores"
+    },
+    "leadership": {
+      "title": "Liderazgo Académico y Servicio",
+      "subtitle": "Dirección Académica en los Equipos de Ingeniería Spectrum & Athar"
+    },
+    "robotics": {
+      "title": "Competiciones de Robótica de Campo",
+      "subtitle": "Concursos Nacionales y Hardware Autónomo",
+      "photoSlot": "Espacio para Foto"
+    }
+  },
+  "contact": {
+    "title": "Consultas Directas y Canales Oficiales",
+    "subtitle": "Líneas de comunicación directa verificadas para instituciones académicas, colaboración en investigación y asociaciones educativas.",
+    "verified": "Líneas de Comunicación Verificadas",
+    "institutionalLabel": "Oficial Universitario",
+    "platformLabel": "Oficial de la Plataforma",
+    "copied": "Copiado",
+    "copy": "Copiar",
+    "mail": "Correo"
+  },
+  "cv": {
+    "button": "Currículum Vitae Académico"
+  }
+}

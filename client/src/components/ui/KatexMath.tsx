@@ -1,5 +1,4 @@
-import React, { useMemo } from "react";
-import katex from "katex";
+import React, { useMemo, useState, useEffect } from "react";
 import "katex/dist/katex.min.css";
 
 export type KatexMathProps = {
@@ -20,6 +19,20 @@ export function KatexMath({
   // JavaScript string escaping has already been resolved before this component receives `math`.
   const normalizedMath = math;
 
+  const [katexModule, setKatexModule] = useState<any>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    import("katex").then((m) => {
+      if (mounted) {
+        setKatexModule(m.default || m);
+      }
+    }).catch(err => console.error("Failed to load KaTeX", err));
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   const html = useMemo(() => {
     // Any LaTeX that KaTeX cannot parse (or a malformed/raw string that slipped
     // through) must degrade to a clean, sanitized fallback instead of spilling
@@ -34,8 +47,13 @@ export function KatexMath({
           .replace(/\s+/g, " ")
           .trim() || "…",
       );
+
+    if (!katexModule) {
+      return fallback();
+    }
+
     try {
-      const rendered = katex.renderToString(normalizedMath, {
+      const rendered = katexModule.renderToString(normalizedMath, {
         displayMode: isBlock,
         throwOnError: false,
       });
@@ -45,7 +63,7 @@ export function KatexMath({
     } catch {
       return fallback();
     }
-  }, [normalizedMath, isBlock]);
+  }, [normalizedMath, isBlock, katexModule]);
 
   return (
     <span

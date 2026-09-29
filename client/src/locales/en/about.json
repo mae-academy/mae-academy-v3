@@ -1,0 +1,41 @@
+{
+  "header": {
+    "eyebrow": "About MAE Academy",
+    "title": "Model. Analyze. Engineering.",
+    "subtitle": "Interactive Engineering Curriculum Vitae & Founder Dossier — bridging physical hardware dynamics and intuitive digital simulations."
+  },
+  "dossier": {
+    "authoredWorks": {
+      "title": "Authored Works & Video Lectures",
+      "subtitle": "Video Courses, Study Guides & Laboratory Manuals"
+    },
+    "simulationBanner": {
+      "badge": "Production Software",
+      "title": "MAE Interactive Web Simulation Engines",
+      "description": "Web-based real-time simulation engines for PLC logic, 8086 microarchitectures, and feedback control.",
+      "cta": "Launch Simulators"
+    },
+    "leadership": {
+      "title": "Academic Leadership & Service",
+      "subtitle": "Academic Directorship across Spectrum & Athar Engineering Teams"
+    },
+    "robotics": {
+      "title": "Field Robotics Competitions",
+      "subtitle": "National Contests & Autonomous Hardware",
+      "photoSlot": "Photo Slot"
+    }
+  },
+  "contact": {
+    "title": "Direct Inquiries & Official Channels",
+    "subtitle": "Verified direct communication lines for academic institutions, research collaboration, and educational partnerships.",
+    "verified": "Verified Communication Lines",
+    "institutionalLabel": "University Official",
+    "platformLabel": "Platform Official",
+    "copied": "Copied",
+    "copy": "Copy",
+    "mail": "Mail"
+  },
+  "cv": {
+    "button": "Academic Curriculum Vitae"
+  }
+}

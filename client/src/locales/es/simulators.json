@@ -1,0 +1,67 @@
+{
+  "toolbar": {
+    "run": "Ejecutar",
+    "shareProject": "Compartir Proyecto",
+    "saveImage": "Guardar Imagen",
+    "import": "Importar",
+    "export": "Exportar",
+    "text": "Texto",
+    "hidden": "Oculto",
+    "cartesian": "Cartesiano",
+    "dotted": "Punteado"
+  },
+  "shell": {
+    "componentLibrary": "Biblioteca de Componentes",
+    "activeElement": "Elemento Activo y Propiedades",
+    "workspaceShortcuts": "Atajos del Espacio de Trabajo",
+    "interactiveCanvas": "Lienzo Esquemático de Circuito Interactivo",
+    "emptyInspector": "Seleccione un elemento para inspeccionar sus propiedades.",
+    "canvasReady": "Lienzo Listo",
+    "searchComponents": "Buscar componentes"
+  },
+  "shortcuts": {
+    "rotate": "Rotar",
+    "delete": "Eliminar",
+    "pan": "Desplazar",
+    "undo": "Deshacer",
+    "copyPaste": "Copiar/Pegar"
+  },
+  "circuit": {
+    "dcPowerRail": "Riel de Energía DC",
+    "ground": "Tierra (GND)",
+    "acVoltageSource": "Fuente de Voltaje AC",
+    "phaseRail3": "Riel de Phase-3",
+    "sources": "Fuentes"
+  },
+  "control": {
+    "transferFunctionConfig": "Configuración de Función de Transferencia",
+    "stepResponse": "Respuesta al Escalón",
+    "bodePlot": "Diagrama de Bode",
+    "rootLocus": "Lugar de las Raíces",
+    "polesZeros": "Polos y Ceros",
+    "dampingRatio": "Relación de Amortiguamiento",
+    "naturalFrequency": "Frecuencia Natural",
+    "simulateResponse": "Simular Respuesta",
+    "resetSystem": "Restablecer Sistema",
+    "exportData": "Exportar Datos"
+  },
+  "digital": {
+    "timingWaveforms": "Formas de Onda de Sincronización",
+    "truthTable": "Tabla de Verdad",
+    "logicGates": "Puertas Lógicas",
+    "clockCycle": "Ciclo de Reloj",
+    "propagationDelay": "Retardo de Propagación",
+    "highLowState": "Estado High / Low"
+  },
+  "assembler": {
+    "codeStudio": "Estudio de Código",
+    "registers": "Registros",
+    "flags": "Banderas",
+    "memoryMap": "Mapa de Memoria",
+    "run": "Ejecutar",
+    "step": "Paso",
+    "reset": "Restablecer",
+    "assemble": "Ensamblar",
+    "hexViewer": "Visor Hex"
+  }
+}

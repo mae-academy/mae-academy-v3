@@ -1,0 +1,36 @@
+{
+  "navbar": {
+    "00": "Inicio",
+    "01": "Investigación Académica",
+    "02": "Biblioteca Académica",
+    "03": "Simulaciones Prácticas",
+    "04": "Acerca de"
+  },
+  "languageSelector": {
+    "en": "English",
+    "ar": "العربية",
+    "es": "Español"
+  },
+  "controls": {
+    "home": "Inicio de MAE Academy",
+    "language": "Idioma",
+    "languageOptions": "Opciones de idioma",
+    "themeToLight": "Cambiar al tema claro",
+    "themeToDark": "Cambiar al tema oscuro",
+    "platformNavigation": "Navegación de la plataforma"
+  },
+  "footer": {
+    "description": "Modelar. Analizar. Ingeniería. Una plataforma global para el aprendizaje riguroso de ingeniería y el pensamiento aplicado de sistemas.",
+    "platform": "Plataforma",
+    "research": "Investigación",
+    "courses": "Cursos",
+    "library": "Biblioteca",
+    "simulations": "Simulaciones",
+    "legalAndCompliance": "Legal y Cumplimiento",
+    "privacyPolicy": "Política de Privacidad",
+    "termsOfService": "Términos de Servicio",
+    "attributionPolicy": "Política de Atribución",
+    "supportOurMission": "Apoya Nuestra Misión",
+    "copyright": "© {{year}} MAE Academy. Todos los derechos reservados."
+  }
+}

@@ -152,7 +152,11 @@ export default function SimulationDetail() {
 
   return <motion.div variants={container} initial="hidden" animate="visible">
     <SimulatorLayout title={isDigitalLogicDesign ? "" : simulation.title} tabs={tools} activeTab={tool || ""} routePrefix={isDirectCode ? "/code" : `/simulations/${meta.slug}`} backLabel={copy.footer.simulations} isRtl={isRtl} hideToolNavigation={isDigitalLogicDesign || isCircuitLab || isCodeStudio}>
-      <motion.div variants={item} className="mt-0">{toolContent}</motion.div>
+      <motion.div variants={item} className="mt-0" dir="ltr">
+        <div className="ltr text-left" style={{ direction: 'ltr', textAlign: 'left' }}>
+          {toolContent}
+        </div>
+      </motion.div>
     </SimulatorLayout>
   </motion.div>;
 }

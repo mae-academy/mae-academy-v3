@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
+import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { prefetchRoute } from "@/lib/routePrefetch";
 
 export interface SegmentedOption<T extends string | number | boolean = string> {
   value: T;
@@ -20,6 +22,7 @@ export interface SegmentedControlProps<T extends string | number | boolean = str
   pillClassName?: string;
   fullWidth?: boolean;
   disabled?: boolean;
+  layoutId?: string;
   "aria-label"?: string;
 }
 
@@ -50,6 +53,7 @@ export function SegmentedControl<T extends string | number | boolean = string>({
   pillClassName,
   fullWidth = false,
   disabled = false,
+  layoutId,
   "aria-label": ariaLabel,
 }: SegmentedControlProps<T>) {
   const currentSize = sizeStyles[size] || sizeStyles.md;
@@ -71,16 +75,23 @@ export function SegmentedControl<T extends string | number | boolean = string>({
 
         const content = (
           <>
+            {isActive && layoutId && (
+              <motion.div
+                layoutId={layoutId}
+                className="absolute inset-0 rounded-full btn-active-brand brand-active-pill"
+                transition={{ type: "spring", stiffness: 380, damping: 30 }}
+              />
+            )}
             {option.icon && (
-              <span className={cn("shrink-0", currentSize.icon)}>
+              <span className={cn("relative z-10 shrink-0", currentSize.icon)}>
                 {option.icon}
               </span>
             )}
-            <span>{option.label}</span>
+            <span className="relative z-10">{option.label}</span>
             {option.badge && (
               <span
                 className={cn(
-                  "ml-1.5 rounded-full px-1.5 py-0.5 font-['Poppins',sans-serif] text-[10px] sm:text-xs tracking-normal font-medium",
+                  "relative z-10 ml-1.5 rounded-full px-1.5 py-0.5 font-['Poppins',sans-serif] text-[10px] sm:text-xs tracking-normal font-medium",
                   isActive
                     ? "bg-white/20 text-white"
                     : "bg-slate-200/60 dark:bg-slate-800 text-slate-500 dark:text-slate-400"
@@ -93,12 +104,16 @@ export function SegmentedControl<T extends string | number | boolean = string>({
         );
 
         const pillClasses = cn(
-          "rounded-full font-semibold transition-all duration-200 cursor-pointer inline-flex items-center justify-center gap-1.5 whitespace-nowrap select-none disabled:cursor-not-allowed disabled:opacity-40",
+          "relative rounded-full transition-colors duration-200 cursor-pointer inline-flex items-center justify-center gap-1.5 whitespace-nowrap select-none disabled:cursor-not-allowed disabled:opacity-40",
           currentSize.pill,
           fullWidth && "flex-1",
-          isActive
-            ? "btn-active-brand brand-active-pill"
-            : "font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/40 dark:hover:bg-slate-800/40",
+          layoutId
+            ? isActive
+              ? "text-white font-semibold"
+              : "font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/40 dark:hover:bg-slate-800/40"
+            : isActive
+              ? "btn-active-brand brand-active-pill font-semibold"
+              : "font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/40 dark:hover:bg-slate-800/40",
           pillClassName
         );
 
@@ -110,12 +125,17 @@ export function SegmentedControl<T extends string | number | boolean = string>({
               role="tab"
               aria-selected={isActive}
               aria-label={option["aria-label"]}
+              onMouseEnter={() => { if (option.href) prefetchRoute(option.href); }}
+              onFocus={() => { if (option.href) prefetchRoute(option.href); }}
               onClick={(e) => {
                 if (isDisabled) {
                   e.preventDefault();
                   return;
                 }
-                onChange(option.value);
+                if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && e.button === 0) {
+                  e.preventDefault();
+                  onChange(option.value);
+                }
               }}
               className={pillClasses}
             >

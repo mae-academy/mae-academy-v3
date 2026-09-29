@@ -1,0 +1,96 @@
+{
+  "header": {
+    "eyebrow": "01 / Academic Research",
+    "title": "Turn evidence into engineering direction.",
+    "description": "An open-access engineering paper catalog and discovery engine. Search, read, and download live research directly through OpenAlex and DOAB."
+  },
+  "search": {
+    "placeholder": "Search millions of open-access papers via OpenAlex & DOAB...",
+    "clear": "Clear search",
+    "button": "Search"
+  },
+  "filters": {
+    "category": "Category:",
+    "language": "Language:",
+    "sort": "Sort:",
+    "resetAll": "Reset all filters",
+    "allEngineering": "All Engineering",
+    "allLanguages": "All Languages",
+    "researchFields": "Research Fields",
+    "languageNames": {
+      "en": "English (en)",
+      "ar": "العربية – Arabic (ar)",
+      "es": "Español – Spanish (es)",
+      "de": "Deutsch – German (de)",
+      "fr": "Français – French (fr)",
+      "zh": "中文 – Chinese (zh)",
+      "ja": "日本語 – Japanese (ja)",
+      "it": "Italiano – Italian (it)",
+      "ru": "Русский – Russian (ru)"
+    },
+    "sortOptions": {
+      "trending": "Trending",
+      "top_cited": "Top Cited",
+      "newest": "Newest",
+      "earliest": "Earliest",
+      "relevance": "Relevance"
+    }
+  },
+  "results": {
+    "discovered": "Discovered",
+    "papers": "open-access research papers",
+    "capNotice": "Browsing top {{max}} indexed publications",
+    "capNoticeTitle": "OpenAlex serves at most {{max}} results per query. Narrow the search, category or language to reach the rest of the {{total}} matches.",
+    "keyword": "Keyword:",
+    "errorTitle": "Could not load papers",
+    "retry": "Retry",
+    "emptyTitle": "No papers found",
+    "emptyDesc": "Try adjusting your search query or selecting a different engineering field.",
+    "resetSearch": "Reset Search",
+    "page": "Page",
+    "of": "of",
+    "totalPages": "({{total}} total publications)",
+    "previousPage": "Previous page",
+    "nextPage": "Next page",
+    "perPage": "Per page:"
+  },
+  "categories": {
+    "Mechatronics Engineering": "Mechatronics Engineering",
+    "Robotics & Automation": "Robotics & Automation",
+    "Control Systems Engineering": "Control Systems Engineering",
+    "Mechanical Engineering": "Mechanical Engineering",
+    "Electrical & Electronics": "Electrical & Electronics",
+    "Civil & Structural Engineering": "Civil & Structural Engineering",
+    "Computer & Software Engineering": "Computer & Software Engineering",
+    "Artificial Intelligence & Machine Learning": "Artificial Intelligence & Machine Learning",
+    "Smart Systems & IoT": "Smart Systems & IoT",
+    "Biomedical Engineering": "Biomedical Engineering",
+    "Aerospace & Aeronautical": "Aerospace & Aeronautical",
+    "Industrial & Systems Engineering": "Industrial & Systems Engineering",
+    "Materials & Nanotechnology": "Materials & Nanotechnology",
+    "Energy & Power Systems": "Energy & Power Systems",
+    "Chemical & Process Engineering": "Chemical & Process Engineering",
+    "Telecommunications Engineering": "Telecommunications Engineering",
+    "Automotive Engineering": "Automotive Engineering"
+  },
+  "card": {
+    "openAccess": "Open-Access",
+    "peerReviewed": "Peer-Reviewed",
+    "authors": "Authors",
+    "publishedIn": "Published in",
+    "doi": "DOI",
+    "viewFullPaper": "View Full Paper",
+    "citationCount": "Citation Count",
+    "citations": "Citations",
+    "abstract": "Abstract"
+  },
+  "detail": {
+    "abstract": "Abstract",
+    "authors": "Authors",
+    "publishedIn": "Published in",
+    "doi": "DOI",
+    "viewFullPaper": "View Full Paper",
+    "citationCount": "Citation Count",
+    "noAbstract": "No abstract available"
+  }
+}

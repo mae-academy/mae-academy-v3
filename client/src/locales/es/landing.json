@@ -1,0 +1,52 @@
+{
+  "hero": {
+    "headlinePrimary": "Bienvenido a MAE Academy",
+    "headlineSecondary": "Ingeniería, simulada en tiempo real.",
+    "description": "Laboratorios interactivos de sistemas de control, electrónica de potencia y análisis de señales — construye intuición ejecutando el modelo, no solo leyendo sobre él.",
+    "ctaPrimary": "Iniciar una Simulación",
+    "ctaSecondary": "Explorar Biblioteca"
+  },
+  "founder": {
+    "title": "La educación en ingeniería se vuelve potente cuando permanece cerca del sistema real.",
+    "description": "Conoce al fundador y la premisa de MAE detrás de la plataforma: Modelar. Analizar. Ingeniería.",
+    "quote": "La educación en ingeniería se vuelve potente cuando permanece cerca del sistema real. MAE Academy convierte la curiosidad de ingeniería abstracta en modelos estructurados, claridad analítica y simulación práctica.",
+    "role": "Fundador y Educador de Ingeniería // MAE",
+    "cta": "Conoce al Fundador y Acerca de MAE",
+    "name": "Mohammad AbuElyan"
+  },
+  "platforms": {
+    "title": "Plataformas Principales de Ingeniería",
+    "subtitle": "Tres capas interconectadas de aprendizaje que unen la teoría matemática rigurosa con la intuición práctica en tiempo real.",
+    "simulations": {
+      "title": "Simulaciones Prácticas y Bancos de Laboratorio Virtuales",
+      "description": "Conecta la matemática abstracta con simulación física interactiva en tiempo real. Explora transiciones de estado, curvas de asentamiento transitorio y respuestas de retroalimentación instantáneamente en tu navegador.",
+      "links": {
+        "control": "Simulador de Sistemas de Control",
+        "circuits": "Simulador de Circuitos Eléctricos",
+        "power": "Simulador de Electrónica de Potencia"
+      },
+      "cta": "Explorar Todas las Simulaciones"
+    },
+    "library": {
+      "title": "Libros de Texto Abiertos y Manuales de Ingeniería",
+      "description": "Libros de texto abiertos, manuales técnicos y referencias fundamentales en ingeniería, computación, matemáticas y física, legibles en el navegador directamente desde archivos abiertos.",
+      "links": {
+        "electrical": "Eléctrica y Electrónica",
+        "computer": "Ciencia de la Computación",
+        "robotics": "Robótica y Control",
+        "mechanical": "Mecánica y Estructural"
+      },
+      "cta": "Explorar Biblioteca Académica"
+    },
+    "research": {
+      "title": "Investigación Matemática e Identificación de Sistemas",
+      "description": "Notas de investigación abiertas, formulaciones matemáticas, funciones de transferencia y pruebas algorítmicas detrás de nuestras simulaciones. Basado en física numérica y validado contra experimentos de referencia.",
+      "links": {
+        "identification": "Identificación de Sistemas No Lineales",
+        "solvers": "Solucionadores de Simulación Dinámica",
+        "proofs": "Derivaciones y Pruebas Algorítmicas"
+      },
+      "cta": "Explorar Notas de Investigación"
+    }
+  }
+}

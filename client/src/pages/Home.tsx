@@ -9,7 +9,8 @@ import { ArrowRight, MoveRight } from "lucide-react";
 import { Link } from "wouter";
 import FounderArchiveSeal from "@/components/FounderArchiveSeal";
 import EngineeringPlatformsSection from "@/components/EngineeringPlatformsSection";
-import { useLocale } from "@/contexts/LocaleContext";
+import { useTranslation } from "react-i18next";
+import { usePageTitle } from "@/hooks/usePageTitle";
 
 // Code-split: Framed oscilloscope monitor hero visual
 const EngineeringScope = lazy(() => import("@/components/hero-visualizer/EngineeringScope"));
@@ -29,8 +30,8 @@ const itemVariants: Variants = {
 };
 
 export default function Home() {
-  const { copy } = useLocale();
-  const { home } = copy;
+  const { t } = useTranslation("landing");
+  usePageTitle("Model. Analyze. Engineering");
 
   return (
     <motion.div variants={sectionVariants} initial="hidden" animate="visible" className="w-full">
@@ -48,21 +49,21 @@ export default function Home() {
               variants={itemVariants}
               className="text-sm sm:text-base font-semibold text-slate-900 dark:text-white tracking-wide"
             >
-              {home.headlinePrimary}
+              {t("hero.headlinePrimary")}
             </motion.span>
 
             <motion.h1
               variants={itemVariants}
               className="text-2xl sm:text-3xl lg:text-[2.25rem] xl:text-[2.6rem] font-bold tracking-tight text-slate-900 dark:text-white whitespace-nowrap text-left rtl:text-right leading-tight"
             >
-              <span className="text-brand-gradient">{home.headlineSecondary}</span>
+              <span className="text-brand-gradient">{t("hero.headlineSecondary")}</span>
             </motion.h1>
 
             <motion.p
               variants={itemVariants}
               className="text-slate-600 dark:text-slate-400 text-xs sm:text-sm max-w-lg leading-relaxed text-left rtl:text-right"
             >
-              {home.description}
+              {t("hero.description")}
             </motion.p>
 
             {/* Call-to-Action Buttons */}
@@ -71,7 +72,7 @@ export default function Home() {
                 href="/simulations"
                 className="btn-brand-primary min-h-[44px] px-6 sm:px-8 py-3 text-xs sm:text-sm font-semibold justify-center gap-2"
               >
-                {home.ctaPrimary}
+                {t("hero.ctaPrimary")}
                 <ArrowRight className="h-4 w-4" />
               </Link>
 
@@ -79,7 +80,7 @@ export default function Home() {
                 href="/library"
                 className="btn-brand-subtle min-h-[44px] px-6 sm:px-8 py-3 text-xs sm:text-sm font-semibold justify-center shadow-xs hover:shadow-sm gap-2"
               >
-                {home.ctaSecondary}
+                {t("hero.ctaSecondary")}
               </Link>
             </motion.div>
           </div>
@@ -126,10 +127,10 @@ export default function Home() {
               {/* Left Column (lg:col-span-7): Headline, Quote, Mission (Top badge removed) */}
               <div className="lg:col-span-7 space-y-4">
                 <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight leading-tight text-slate-900 dark:text-white">
-                  {home.founderTitle}
+                  {t("founder.title")}
                 </h2>
                 <p className="text-base sm:text-lg leading-relaxed text-slate-600 dark:text-zinc-400">
-                  Engineering education becomes powerful when it remains close to the real system. MAE Academy turns abstract engineering curiosity into structured models, analytical clarity, and hands-on simulation.
+                  {t("founder.quote")}
                 </p>
               </div>
 
@@ -144,10 +145,10 @@ export default function Home() {
                   </div>
                   <div>
                     <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                      Mohammad AbuElyan
+                      {t("founder.name")}
                     </h3>
                     <p className="text-xs text-slate-500 dark:text-slate-400">
-                      Founder & Engineering Educator // MAE
+                      {t("founder.role")}
                     </p>
                     {/* Brand Slogan Gradient: Model (Blue) · Analyze (Violet) · Engineering (Warm Rose/Red) */}
                     <p className="mt-1.5 text-xs font-semibold tracking-wide">
@@ -161,7 +162,7 @@ export default function Home() {
                 </div>
 
                 <p className="text-sm leading-relaxed text-slate-600 dark:text-zinc-400">
-                  {home.founderDescription}
+                  {t("founder.description")}
                 </p>
 
                 <div className="pt-1">
@@ -170,7 +171,7 @@ export default function Home() {
                     href="/about"
                     className="inline-flex items-center gap-2 rounded-full brand-active-pill px-7 py-3.5 text-sm sm:text-base font-semibold shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 w-full sm:w-auto justify-center"
                   >
-                    Meet the Founder & About MAE
+                    {t("founder.cta")}
                     <MoveRight className="h-4 w-4" />
                   </Link>
                 </div>

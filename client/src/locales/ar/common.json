@@ -1,0 +1,36 @@
+{
+  "navbar": {
+    "00": "الرئيسية",
+    "01": "الأبحاث الأكاديمية",
+    "02": "المكتبة الأكاديمية",
+    "03": "المحاكيات التطبيقية",
+    "04": "عن الأكاديمية"
+  },
+  "languageSelector": {
+    "en": "English",
+    "ar": "العربية",
+    "es": "Español"
+  },
+  "controls": {
+    "home": "الصفحة الرئيسية لأكاديمية MAE",
+    "language": "اللغة",
+    "languageOptions": "خيارات اللغة",
+    "themeToLight": "التحويل إلى الوضع الفاتح",
+    "themeToDark": "التحويل إلى الوضع الداكن",
+    "platformNavigation": "تنقل المنصة"
+  },
+  "footer": {
+    "description": "نمذجة. تحليل. هندسة. منصة عالمية لتعلّم الهندسة بعمق والتفكير في الأنظمة التطبيقية.",
+    "platform": "المنصة",
+    "research": "البحث",
+    "courses": "الدورات",
+    "library": "المكتبة",
+    "simulations": "المحاكاة",
+    "legalAndCompliance": "الوثائق القانونية",
+    "privacyPolicy": "سياسة الخصوصية",
+    "termsOfService": "شروط الاستخدام",
+    "attributionPolicy": "حقوق الملكية والإتاحة",
+    "supportOurMission": "ادعم رسالتنا",
+    "copyright": "© {{year}} أكاديمية MAE. جميع الحقوق محفوظة."
+  }
+}

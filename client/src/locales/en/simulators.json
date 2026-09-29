@@ -1,0 +1,67 @@
+{
+  "toolbar": {
+    "run": "Run",
+    "shareProject": "Share Project",
+    "saveImage": "Save Image",
+    "import": "Import",
+    "export": "Export",
+    "text": "Text",
+    "hidden": "Hidden",
+    "cartesian": "Cartesian",
+    "dotted": "Dotted"
+  },
+  "shell": {
+    "componentLibrary": "Component Library",
+    "activeElement": "Active Element & Properties",
+    "workspaceShortcuts": "Workspace Shortcuts",
+    "interactiveCanvas": "Interactive Circuit Schematic Canvas",
+    "emptyInspector": "Select an element to inspect its properties.",
+    "canvasReady": "Canvas Ready",
+    "searchComponents": "Search components"
+  },
+  "shortcuts": {
+    "rotate": "Rotate",
+    "delete": "Delete",
+    "pan": "Pan",
+    "undo": "Undo",
+    "copyPaste": "Copy/Paste"
+  },
+  "circuit": {
+    "dcPowerRail": "DC Power Rail",
+    "ground": "Ground",
+    "acVoltageSource": "AC Voltage Source",
+    "phaseRail3": "Phase Rail-3",
+    "sources": "Sources"
+  },
+  "control": {
+    "transferFunctionConfig": "Transfer Function Configuration",
+    "stepResponse": "Step Response",
+    "bodePlot": "Bode Plot",
+    "rootLocus": "Root Locus",
+    "polesZeros": "Poles & Zeros",
+    "dampingRatio": "Damping Ratio",
+    "naturalFrequency": "Natural Frequency",
+    "simulateResponse": "Simulate Response",
+    "resetSystem": "Reset System",
+    "exportData": "Export Data"
+  },
+  "digital": {
+    "timingWaveforms": "Timing Waveforms",
+    "truthTable": "Truth Table",
+    "logicGates": "Logic Gates",
+    "clockCycle": "Clock Cycle",
+    "propagationDelay": "Propagation Delay",
+    "highLowState": "High / Low State"
+  },
+  "assembler": {
+    "codeStudio": "Code Studio",
+    "registers": "Registers",
+    "flags": "Flags",
+    "memoryMap": "Memory Map",
+    "run": "Run",
+    "step": "Step",
+    "reset": "Reset",
+    "assemble": "Assemble",
+    "hexViewer": "Hex Viewer"
+  }
+}

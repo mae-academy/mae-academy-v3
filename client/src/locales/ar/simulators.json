@@ -1,0 +1,67 @@
+{
+  "toolbar": {
+    "run": "تشغيل",
+    "shareProject": "مشاركة المشروع",
+    "saveImage": "حفظ الصورة",
+    "import": "استيراد",
+    "export": "تصدير",
+    "text": "نص",
+    "hidden": "مخفي",
+    "cartesian": "ديكارتي",
+    "dotted": "منقط"
+  },
+  "shell": {
+    "componentLibrary": "مكتبة المكونات",
+    "activeElement": "العنصر النشط والخصائص",
+    "workspaceShortcuts": "اختصارات مساحة العمل",
+    "interactiveCanvas": "مساحة المخطط التفاعلي للدوائر",
+    "emptyInspector": "حدد عنصرًا لفحص خصائصه.",
+    "canvasReady": "المساحة جاهزة",
+    "searchComponents": "البحث عن المكونات"
+  },
+  "shortcuts": {
+    "rotate": "تدوير",
+    "delete": "حذف",
+    "pan": "تحريك",
+    "undo": "تراجع",
+    "copyPaste": "نسخ/لصق"
+  },
+  "circuit": {
+    "dcPowerRail": "مسار طاقة DC",
+    "ground": "أرضي (GND)",
+    "acVoltageSource": "مصدر جهد AC",
+    "phaseRail3": "مسار Phase-3",
+    "sources": "المصادر"
+  },
+  "control": {
+    "transferFunctionConfig": "إعدادات دالة التحويل",
+    "stepResponse": "استجابة الخطوة",
+    "bodePlot": "مخطط Bode",
+    "rootLocus": "المحل الهندسي للجذور",
+    "polesZeros": "الأقطاب والأصفار",
+    "dampingRatio": "نسبة التخميد",
+    "naturalFrequency": "التردد الطبيعي",
+    "simulateResponse": "محاكاة الاستجابة",
+    "resetSystem": "إعادة ضبط النظام",
+    "exportData": "تصدير البيانات"
+  },
+  "digital": {
+    "timingWaveforms": "الأشكال الموجية الزمنية",
+    "truthTable": "جدول الحقيقة",
+    "logicGates": "البوابات المنطقية",
+    "clockCycle": "دورة الساعة",
+    "propagationDelay": "تأخير الانتشار",
+    "highLowState": "حالة High / Low"
+  },
+  "assembler": {
+    "codeStudio": "استوديو الكود",
+    "registers": "السجلات",
+    "flags": "العلامات",
+    "memoryMap": "خريطة الذاكرة",
+    "run": "تشغيل",
+    "step": "خطوة",
+    "reset": "إعادة ضبط",
+    "assemble": "تجميع",
+    "hexViewer": "عارض Hex"
+  }
+}

@@ -18,6 +18,8 @@ import {
   verifiedSocialLinks,
 } from "@/data/founderDossier";
 import { useLocale } from "@/contexts/LocaleContext";
+import { useTranslation } from "react-i18next";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import FounderAvatarFrame from "@/components/about/FounderAvatarFrame";
 import CurriculumVitaeModal from "@/components/about/CurriculumVitaeModal";
 import {
@@ -59,7 +61,9 @@ const itemVariants: Variants = {
 };
 
 export default function About() {
+  const { t } = useTranslation("about");
   const { locale, isRtl } = useLocale();
+  usePageTitle("Founder & Leadership");
   const [copiedEmail, setCopiedEmail] = useState<string | null>(null);
   const [cvModalOpen, setCvModalOpen] = useState(false);
 
@@ -89,20 +93,18 @@ export default function About() {
         className="mb-10 grid gap-6 lg:grid-cols-[1.2fr_.8fr] lg:items-end"
       >
         <div>
-          <div className="mb-3 flex items-center gap-3">
+          <div className="flex items-center gap-4 mb-4">
             <p className="text-sm font-semibold tracking-wider text-indigo-600 dark:text-indigo-400">
-              04 / {locale === "ar" ? "عن الأكاديمية والمؤسس" : "About MAE Academy"}
+              04 / {t("header.eyebrow")}
             </p>
             <span className="h-px w-16 bg-brand-gradient" />
           </div>
           <h1 className="max-w-3xl text-3xl lg:text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white">
-            {locale === "ar" ? "نمذجة. تحليل. هندسة." : "Model. Analyze. Engineering."}
+            {t("header.title")}
           </h1>
         </div>
         <p className="max-w-xl border-l-2 border-indigo-500/40 pl-5 text-sm md:text-base text-slate-500 leading-relaxed dark:text-zinc-400 rtl:border-l-0 rtl:border-r-2 rtl:pl-0 rtl:pr-5 font-normal">
-          {locale === "ar"
-            ? "السيرة الهندسية والملف التوثيقي لمؤسس أكاديمية MAE — ردم الفجوة بين ديناميكا الأجهزة الفيزيائية والمحاكاة الرقمية التفاعلية."
-            : "Interactive Engineering Curriculum Vitae & Founder Dossier — bridging physical hardware dynamics and intuitive digital simulations."}
+          {t("header.subtitle")}
         </p>
       </motion.div>
 
@@ -253,7 +255,7 @@ export default function About() {
                 className="inline-flex items-center gap-2 rounded-full brand-active-pill px-4 py-2 text-xs font-semibold shadow-sm transition hover:opacity-95 hover:shadow active:scale-95 shrink-0"
               >
                 <BookOpen className="h-3.5 w-3.5" />
-                <span>{locale === "ar" ? "السيرة الأكاديمية (CV)" : "Academic Curriculum Vitae"}</span>
+                <span>{t("cv.button")}</span>
               </button>
             </div>
           </div>
@@ -311,12 +313,10 @@ export default function About() {
                   </span>
                   <div>
                     <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                      {locale === "ar" ? "المؤلفات والمساقات التعليمية" : "Authored Works & Video Lectures"}
+                      {t("dossier.authoredWorks.title")}
                     </h3>
                     <p className="text-xs font-normal text-slate-500 dark:text-slate-400">
-                      {locale === "ar"
-                        ? "المساقات المرئية، الأدلة المنهجية، والمذكرات التطبيقية"
-                        : "Video Courses, Study Guides & Laboratory Manuals"}
+                      {t("dossier.authoredWorks.subtitle")}
                     </p>
                   </div>
                 </div>
@@ -390,19 +390,17 @@ export default function About() {
                       <div>
                         <div className="flex items-center gap-2">
                           <span className="rounded-full bg-violet-100 px-2.5 py-0.5 text-xs font-semibold text-violet-700 dark:bg-violet-950/60 dark:text-violet-300">
-                            {locale === "ar" ? "برمجيات هندسية" : "Production Software"}
+                            {t("dossier.simulationBanner.badge")}
                           </span>
                           <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
                             MAE Engine V3
                           </span>
                         </div>
                         <h4 className="mt-1.5 text-base font-bold text-slate-900 dark:text-white">
-                          {locale === "ar" ? "محركات محاكاة MAE الهندسية التفاعلية" : "MAE Interactive Web Simulation Engines"}
+                          {t("dossier.simulationBanner.title")}
                         </h4>
                         <p className="mt-1 text-xs font-normal text-slate-600 dark:text-slate-300">
-                          {locale === "ar"
-                            ? "محركات حوسبة رقمية داخل المتصفح للوحات PLC ومعالجات 8086 وأنظمة التحكم الديناميكية."
-                            : "Web-based real-time simulation engines for PLC logic, 8086 microarchitectures, and feedback control."}
+                          {t("dossier.simulationBanner.description")}
                         </p>
                       </div>
 
@@ -410,7 +408,7 @@ export default function About() {
                         href="/simulations"
                         className="group inline-flex items-center justify-center gap-2 rounded-full brand-active-pill px-5 py-2.5 text-xs font-semibold shadow-sm hover:shadow-md hover:opacity-95 transition-all active:scale-95 shrink-0"
                       >
-                        <span>{locale === "ar" ? "تشغيل بيئات المحاكاة" : "Launch Simulators"}</span>
+                        <span>{t("dossier.simulationBanner.cta")}</span>
                         <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
                       </Link>
                     </div>
@@ -435,12 +433,10 @@ export default function About() {
                   </span>
                   <div>
                     <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                      {locale === "ar" ? "القيادة الأكاديمية والمبادرات الطلابية" : "Academic Leadership & Service"}
+                      {t("dossier.leadership.title")}
                     </h3>
                     <p className="text-xs font-normal text-slate-500 dark:text-slate-400">
-                      {locale === "ar"
-                        ? "المسؤولية الأكاديمية في فريقي سبيكتروم وأثر الهندسيين"
-                        : "Academic Directorship across Spectrum & Athar Engineering Teams"}
+                      {t("dossier.leadership.subtitle")}
                     </p>
                   </div>
                 </div>
@@ -522,10 +518,10 @@ export default function About() {
                   </span>
                   <div>
                     <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                      {locale === "ar" ? "الروبوتات الميدانية والمنافسات" : "Field Robotics Competitions"}
+                      {t("dossier.robotics.title")}
                     </h3>
                     <p className="text-xs font-normal text-slate-500 dark:text-slate-400">
-                      {locale === "ar" ? "المسابقات الوطنية والروبوتات المستقلة" : "National Contests & Autonomous Hardware"}
+                      {t("dossier.robotics.subtitle")}
                     </p>
                   </div>
                 </div>
@@ -561,7 +557,7 @@ export default function About() {
                           <div className="flex flex-col items-center justify-center text-slate-400 dark:text-slate-500">
                             <Camera className="h-6 w-6 stroke-[1.5] mb-1.5 opacity-60" />
                             <span className="text-xs font-medium tracking-wide">
-                              {locale === "ar" ? "مساحة الصورة" : "Photo Slot"}
+                              {t("dossier.robotics.photoSlot")}
                             </span>
                           </div>
                         )}
@@ -590,18 +586,16 @@ export default function About() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-100 pb-6 dark:border-white/[0.06]">
           <div>
             <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-2xl">
-              {locale === "ar" ? "قنوات المراسلات الرسمية" : "Direct Inquiries & Official Channels"}
+              {t("contact.title")}
             </h2>
             <p className="mt-1 text-xs font-normal text-slate-500 dark:text-slate-400">
-              {locale === "ar"
-                ? "قنوات تواصل معتمدة للجامعات، المؤتمرات، والتعاون الأكاديمي والبحثي."
-                : "Verified direct communication lines for academic institutions, research collaboration, and educational partnerships."}
+              {t("contact.subtitle")}
             </p>
           </div>
 
           <div className="flex items-center gap-2 text-xs font-medium text-slate-400 dark:text-slate-500">
             <ShieldCheck className="h-4 w-4 text-violet-600 dark:text-violet-400" />
-            <span>Verified Communication Lines</span>
+            <span>{t("contact.verified")}</span>
           </div>
         </div>
 
@@ -618,12 +612,8 @@ export default function About() {
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-semibold text-violet-700 dark:text-violet-400">
                       {channel.type === "institutional"
-                        ? locale === "ar"
-                          ? "البريد الجامعي الرسمي"
-                          : "University Official"
-                        : locale === "ar"
-                        ? "بريد المنصة التنفيذي"
-                        : "Platform Official"}
+                        ? t("contact.institutionalLabel")
+                        : t("contact.platformLabel")}
                     </span>
                     <span className="flex h-2 w-2 rounded-full bg-violet-500" />
                   </div>
@@ -654,13 +644,13 @@ export default function About() {
                         <>
                           <Check className="h-3.5 w-3.5 text-violet-600 dark:text-violet-400" />
                           <span className="text-violet-600 dark:text-violet-400 font-medium">
-                            {locale === "ar" ? "تم النسخ" : "Copied"}
+                            {t("contact.copied")}
                           </span>
                         </>
                       ) : (
                         <>
                           <Copy className="h-3.5 w-3.5" />
-                          <span>{locale === "ar" ? "نسخ" : "Copy"}</span>
+                          <span>{t("contact.copy")}</span>
                         </>
                       )}
                     </button>
@@ -670,7 +660,7 @@ export default function About() {
                       className="inline-flex items-center gap-1.5 rounded-full brand-active-pill px-4 py-1.5 text-xs font-semibold shadow-sm transition hover:opacity-95 hover:shadow active:scale-95"
                     >
                       <Mail className="h-3.5 w-3.5" />
-                      <span>{locale === "ar" ? "مراسلة" : "Mail"}</span>
+                      <span>{t("contact.mail")}</span>
                     </a>
                   </div>
                 </div>

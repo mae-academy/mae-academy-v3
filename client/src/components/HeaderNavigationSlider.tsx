@@ -6,12 +6,14 @@ import { useLocation } from "wouter";
 import { SegmentedControl, type SegmentedOption } from "@/components/common/templates";
 import { isRouteActive, Locale, platformRoutes } from "@/data/platform";
 import { useLocale } from "@/contexts/LocaleContext";
+import { useTranslation } from "react-i18next";
 
 type HeaderNavigationSliderProps = { locale: Locale };
 
 export default function HeaderNavigationSlider({ locale: _locale }: HeaderNavigationSliderProps) {
   const [location, setLocation] = useLocation();
   const { copy } = useLocale();
+  const { t } = useTranslation("common");
 
   const isSimulationsActive =
     location === "/simulations" ||
@@ -30,13 +32,13 @@ export default function HeaderNavigationSlider({ locale: _locale }: HeaderNaviga
 
   const options: SegmentedOption<string>[] = platformRoutes.map((item) => ({
     value: item.href,
-    label: copy.navigation[item.index],
+    label: t(`navbar.${item.index}`),
     href: item.href,
   }));
 
   return (
     <nav
-      aria-label={copy.controls.platformNavigation}
+      aria-label={t("controls.platformNavigation")}
       className="flex justify-start md:justify-center w-full overflow-x-auto no-scrollbar py-0.5 px-0.5"
     >
       <SegmentedControl
@@ -45,7 +47,8 @@ export default function HeaderNavigationSlider({ locale: _locale }: HeaderNaviga
         onChange={(href) => setLocation(href)}
         size="md"
         className="shrink-0"
-        aria-label={copy.controls.platformNavigation}
+        aria-label={t("controls.platformNavigation")}
+        layoutId="activeNavPill"
       />
     </nav>
   );

@@ -1,0 +1,96 @@
+{
+  "header": {
+    "eyebrow": "01 / Investigación Académica",
+    "title": "Convierte la evidencia en dirección de ingeniería.",
+    "description": "Un catálogo de artículos de ingeniería de acceso abierto y motor de descubrimiento. Busca, lee y descarga investigaciones en vivo directamente a través de OpenAlex y DOAB."
+  },
+  "search": {
+    "placeholder": "Busca millones de artículos de acceso abierto vía OpenAlex y DOAB...",
+    "clear": "Borrar búsqueda",
+    "button": "Buscar"
+  },
+  "filters": {
+    "category": "Categoría:",
+    "language": "Idioma:",
+    "sort": "Ordenar:",
+    "resetAll": "Restablecer filtros",
+    "allEngineering": "Toda la Ingeniería",
+    "allLanguages": "Todos los Idiomas",
+    "researchFields": "Campos de Investigación",
+    "languageNames": {
+      "en": "Inglés (en)",
+      "ar": "Árabe (ar)",
+      "es": "Español (es)",
+      "de": "Alemán (de)",
+      "fr": "Francés (fr)",
+      "zh": "Chino (zh)",
+      "ja": "Japonés (ja)",
+      "it": "Italiano (it)",
+      "ru": "Ruso (ru)"
+    },
+    "sortOptions": {
+      "trending": "Tendencias",
+      "top_cited": "Más citados",
+      "newest": "Más recientes",
+      "earliest": "Más antiguos",
+      "relevance": "Relevancia"
+    }
+  },
+  "results": {
+    "discovered": "Descubiertos",
+    "papers": "artículos de investigación de acceso abierto",
+    "capNotice": "Explorando las mejores {{max}} publicaciones indexadas",
+    "capNoticeTitle": "OpenAlex muestra como máximo {{max}} resultados por consulta. Filtre su búsqueda, categoría o idioma para acceder al resto de las {{total}} coincidencias.",
+    "keyword": "Palabra clave:",
+    "errorTitle": "No se pudieron cargar los artículos",
+    "retry": "Reintentar",
+    "emptyTitle": "No se encontraron artículos",
+    "emptyDesc": "Intenta ajustar tu búsqueda o seleccionar un campo de ingeniería diferente.",
+    "resetSearch": "Restablecer Búsqueda",
+    "page": "Página",
+    "of": "de",
+    "totalPages": "({{total}} publicaciones en total)",
+    "previousPage": "Página anterior",
+    "nextPage": "Página siguiente",
+    "perPage": "Por página:"
+  },
+  "categories": {
+    "Mechatronics Engineering": "Ingeniería Mecatrónica",
+    "Robotics & Automation": "Robótica y Automatización",
+    "Control Systems Engineering": "Ingeniería de Sistemas de Control",
+    "Mechanical Engineering": "Ingeniería Mecánica",
+    "Electrical & Electronics": "Eléctrica y Electrónica",
+    "Civil & Structural Engineering": "Ingeniería Civil y Estructural",
+    "Computer & Software Engineering": "Ingeniería de Computación y Software",
+    "Artificial Intelligence & Machine Learning": "Inteligencia Artificial y Aprendizaje Automático",
+    "Smart Systems & IoT": "Sistemas Inteligentes e IoT",
+    "Biomedical Engineering": "Ingeniería Biomédica",
+    "Aerospace & Aeronautical": "Aeroespacial y Aeronáutica",
+    "Industrial & Systems Engineering": "Ingeniería Industrial y de Sistemas",
+    "Materials & Nanotechnology": "Materiales y Nanotecnología",
+    "Energy & Power Systems": "Sistemas de Energía y Potencia",
+    "Chemical & Process Engineering": "Ingeniería Química y de Procesos",
+    "Telecommunications Engineering": "Ingeniería de Telecomunicaciones",
+    "Automotive Engineering": "Ingeniería Automotriz"
+  },
+  "card": {
+    "openAccess": "Acceso Abierto",
+    "peerReviewed": "Revisado por Pares",
+    "authors": "Autores",
+    "publishedIn": "Publicado en",
+    "doi": "DOI",
+    "viewFullPaper": "Ver Artículo Completo",
+    "citationCount": "Recuento de Citas",
+    "citations": "Citas",
+    "abstract": "Resumen"
+  },
+  "detail": {
+    "abstract": "Resumen",
+    "authors": "Autores",
+    "publishedIn": "Publicado en",
+    "doi": "DOI",
+    "viewFullPaper": "Ver Artículo Completo",
+    "citationCount": "Recuento de Citas",
+    "noAbstract": "No hay resumen disponible"
+  }
+}

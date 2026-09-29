@@ -1,0 +1,52 @@
+{
+  "hero": {
+    "headlinePrimary": "Welcome to MAE Academy",
+    "headlineSecondary": "Model-Analyze-Engineering",
+    "description": "Interactive labs for control systems, power electronics, and signal analysis — build intuition by running the model, not just reading about it.",
+    "ctaPrimary": "Launch a Simulation",
+    "ctaSecondary": "Explore Library"
+  },
+  "founder": {
+    "title": "Engineering education becomes powerful when it remains close to the real system.",
+    "description": "Meet the founder and the MAE premise behind the platform: Model. Analyze. Engineering.",
+    "quote": "Engineering education becomes powerful when it remains close to the real system. MAE Academy turns abstract engineering curiosity into structured models, analytical clarity, and hands-on simulation.",
+    "role": "Founder & Engineering Educator // MAE",
+    "cta": "Meet the Founder & About MAE",
+    "name": "Mohammad AbuElyan"
+  },
+  "platforms": {
+    "title": "Core Engineering Platforms",
+    "subtitle": "Three interconnected learning layers bridging rigorous mathematical theory with interactive, real-time hardware intuition.",
+    "simulations": {
+      "title": "Practical Simulations & Virtual Lab Benches",
+      "description": "Bridge abstract mathematics with interactive, real-time physical simulation. Explore state transitions, transient settling curves, and feedback responses instantly in your browser.",
+      "links": {
+        "control": "Control Systems Simulator",
+        "circuits": "Electrical Circuits Simulator",
+        "power": "Power Electronics Simulator"
+      },
+      "cta": "Explore All Simulations"
+    },
+    "library": {
+      "title": "Open Textbooks & Engineering Manuals",
+      "description": "Open textbooks, technical manuals, and foundational references in engineering, computing, mathematics, and physics, readable in the browser straight from open archives.",
+      "links": {
+        "electrical": "Electrical & Electronics",
+        "computer": "Computer Science",
+        "robotics": "Robotics & Control",
+        "mechanical": "Mechanical & Structural"
+      },
+      "cta": "Explore Academic Library"
+    },
+    "research": {
+      "title": "Mathematical Research & System Identification",
+      "description": "Open research notes, mathematical formulations, transfer functions, and algorithmic proofs behind our simulations. Grounded in numerical physics and validated against benchmark experiments.",
+      "links": {
+        "identification": "Nonlinear System Identification",
+        "solvers": "Dynamic Simulation Solvers",
+        "proofs": "Algorithmic Derivations & Proofs"
+      },
+      "cta": "Explore Research Notes"
+    }
+  }
+}

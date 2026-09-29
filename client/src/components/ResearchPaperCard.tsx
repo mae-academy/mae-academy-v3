@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { motion, Variants } from "framer-motion";
 import { Star, ArrowRight, FileText } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import type { ResearchPaper } from "@/lib/openalex";
 
 interface ResearchPaperCardProps {
@@ -12,6 +13,7 @@ export default function ResearchPaperCard({
   paper,
   itemVariants,
 }: ResearchPaperCardProps) {
+  const { t } = useTranslation(["research"]);
   // Track the exact URL that failed so a new paper never inherits a stale error flag.
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
 
@@ -98,7 +100,7 @@ export default function ResearchPaperCard({
         <div className="mb-2.5 flex items-center justify-between text-xs">
           <div className="flex items-center gap-1.5 font-semibold text-slate-800 dark:text-slate-200">
             <Star className="h-3.5 w-3.5 shrink-0 fill-red-500 text-red-500" />
-            <span>{paper.citations.toLocaleString()} Citations</span>
+            <span>{paper.citations.toLocaleString()} {t("card.citations", { defaultValue: "Citations" })}</span>
           </div>
           <span className="font-semibold text-slate-500 dark:text-slate-400">{paper.year}</span>
         </div>
@@ -110,7 +112,7 @@ export default function ResearchPaperCard({
 
         {/* Authors */}
         <p className="mb-2 line-clamp-1 text-xs font-medium leading-relaxed text-slate-500 dark:text-zinc-400">
-          {paper.authors.length > 0 ? paper.authors.join(", ") : "Various Authors"}
+          {paper.authors.length > 0 ? paper.authors.join(", ") : t("card.variousAuthors", { defaultValue: "Various Authors" })}
         </p>
 
         {/* Abstract */}
@@ -126,7 +128,7 @@ export default function ResearchPaperCard({
             rel="noopener noreferrer"
             className="group/btn flex items-center gap-1 text-xs font-semibold text-violet-600 transition-colors hover:text-violet-700 dark:text-violet-400 dark:hover:text-violet-300"
           >
-            Details
+            {t("card.details", { defaultValue: "Details" })}
             <ArrowRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover/btn:translate-x-0.5" />
           </a>
         </div>

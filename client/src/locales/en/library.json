@@ -1,0 +1,77 @@
+{
+  "header": {
+    "eyebrow": "02 / Academic Library",
+    "title": "Read the books that engineers learn from.",
+    "description": "Open textbooks, manuals and references in engineering, computing, mathematics and physics, readable in the browser straight from the Internet Archive."
+  },
+  "search": {
+    "placeholder": "Search textbooks, classic engineering treatises...",
+    "clear": "Clear search",
+    "button": "Search"
+  },
+  "filters": {
+    "category": "Category:",
+    "language": "Language:",
+    "sort": "Sort:",
+    "resetAll": "Reset all filters",
+    "allEngineering": "All Engineering",
+    "allLanguages": "All Languages",
+    "engineeringDisciplines": "Engineering Disciplines",
+    "languageNames": {
+      "en": "English (en)",
+      "ar": "العربية – Arabic (ar)",
+      "es": "Español – Spanish (es)",
+      "de": "Deutsch – German (de)",
+      "fr": "Français – French (fr)",
+      "zh": "中文 – Chinese (zh)",
+      "ja": "日本語 – Japanese (ja)",
+      "it": "Italiano – Italian (it)",
+      "ru": "Русский – Russian (ru)"
+    },
+    "sortOptions": {
+      "trending": "Trending",
+      "top_downloaded": "Most Downloaded",
+      "newest": "Newest",
+      "earliest": "Earliest"
+    }
+  },
+  "results": {
+    "discovered": "Discovered",
+    "books": "free-to-read engineering & science books",
+    "capNotice": "Browsing top {{max}} indexed books",
+    "capNoticeTitle": "The Internet Archive serves at most {{max}} results per query. Narrow the search, category or language to reach the rest of the {{total}} matches.",
+    "keyword": "Keyword:",
+    "errorTitle": "Could not load books",
+    "retry": "Retry",
+    "emptyTitle": "No books found",
+    "emptyDesc": "Try adjusting your search query or selecting a different discipline.",
+    "resetSearch": "Reset Search",
+    "page": "Page",
+    "of": "of",
+    "totalBooks": "({{total}} total books)",
+    "previousPage": "Previous page",
+    "nextPage": "Next page",
+    "perPage": "Per page:"
+  },
+  "categories": {
+    "Computer Science": "Computer Science",
+    "Mathematics": "Mathematics",
+    "Physics": "Physics",
+    "Mechanics": "Mechanics",
+    "Electrical & Electronics": "Electrical & Electronics",
+    "Mechanical Engineering": "Mechanical Engineering",
+    "Civil & Structural": "Civil & Structural",
+    "Robotics & Control": "Robotics & Control",
+    "Chemistry & Materials": "Chemistry & Materials",
+    "Energy & Power": "Energy & Power",
+    "Aerospace": "Aerospace"
+  },
+  "card": {
+    "openAccess": "Open Access",
+    "internetArchive": "Internet Archive",
+    "readOnline": "Read Online",
+    "downloadPdf": "Download PDF",
+    "pages": "Pages",
+    "year": "Year", "downloads": "downloads", "catalogEntry": "Catalog entry", "variousAuthors": "Various Authors", "details": "Details"
+  }
+}

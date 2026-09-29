@@ -265,6 +265,15 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          "vendor-react": ["react", "react-dom"],
+          "vendor-icons": ["lucide-react"],
+        },
+      },
+    },
+    chunkSizeWarningLimit: 800,
   },
   optimizeDeps: {
     // Pyodide is loaded from the jsdelivr CDN at runtime (see pythonEngine.ts); the npm package
@@ -277,7 +286,7 @@ export default defineConfig({
   },
   server: {
     port: 3000,
-    strictPort: false, // Will find next available port if 3000 is busy
+    strictPort: true, // Fail or alert instead of auto-incrementing to 3001/3002
     host: true,
     allowedHosts: true,
     fs: {

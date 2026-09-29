@@ -1,0 +1,90 @@
+{
+  "privacy": {
+    "title": "Política de Privacidad",
+    "effectiveDate": "Fecha de vigencia: 29 de septiembre de 2026 • MAE Academy",
+    "intro": "MAE Academy (<a href=\"https://maeacademy.org\" target=\"_blank\" rel=\"noopener noreferrer\" class=\"font-medium text-violet-600 dark:text-violet-400 underline underline-offset-4 hover:text-violet-700\">https://maeacademy.org</a>) se dedica a salvaguardar y respetar la privacidad de nuestros visitantes. Esta Política de Privacidad detalla los tipos de información que podemos recopilar y cómo se utiliza y protege.",
+    "collection": {
+      "title": "Recopilación de Información y Cuentas de Usuario",
+      "p1": "MAE Academy no requiere ningún registro de usuario o creación de cuenta para acceder a sus herramientas, simulaciones, literatura de código abierto o recursos académicos.",
+      "p2": "No recopilamos ni almacenamos ninguna información de identificación personal (PII) a menos que nos contactes voluntariamente a través de nuestro correo electrónico de contacto designado (<a href=\"mailto:maeacademy2026@gmail.com\" class=\"font-medium text-violet-600 dark:text-violet-400 underline underline-offset-4 hover:text-violet-700\">maeacademy2026@gmail.com</a>). En tales casos, tu dirección de correo electrónico y mensaje se utilizan únicamente para responder a tu consulta."
+    },
+    "logs": {
+      "title": "Archivos de Registro del Servidor",
+      "p1": "Al igual que la mayoría de los servidores web estándar, MAE Academy utiliza archivos de registro estándar. Los datos registrados incluyen direcciones de Protocolo de Internet (IP), tipo de navegador, Proveedor de Servicios de Internet (ISP), marcas de fecha y hora, y páginas de referencia/salida. Esta información no es de identificación personal y se analiza únicamente para administración técnica, seguridad y optimización del rendimiento del sitio."
+    },
+    "cookies": {
+      "title": "Cookies y Publicidad de Terceros",
+      "intro": "Nuestro sitio web no establece cookies de origen para rastrear las identidades de los usuarios. Sin embargo, nos asociamos con proveedores externos, incluido Google, para publicar anuncios cuando visitas nuestro sitio web:",
+      "l1": "Google utiliza cookies, incluida la cookie DART, para publicar anuncios dirigidos a nuestros usuarios en función de sus visitas a nuestro sitio y otros destinos en la web.",
+      "l2": "Las redes publicitarias de terceros también pueden usar cookies, JavaScript o Web Beacons para medir la efectividad de sus campañas publicitarias y personalizar el contenido de los anuncios.",
+      "optOut": "Los usuarios pueden optar por no recibir publicidad personalizada visitando <a href=\"https://adssettings.google.com\" target=\"_blank\" rel=\"noopener noreferrer\" class=\"font-medium text-violet-600 dark:text-violet-400 underline underline-offset-4 hover:text-violet-700\">Configuración de Anuncios de Google</a> o a través de la <a href=\"https://www.aboutads.info/choices/\" target=\"_blank\" rel=\"noopener noreferrer\" class=\"font-medium text-violet-600 dark:text-violet-400 underline underline-offset-4 hover:text-violet-700\">Página de Exclusión de la Iniciativa de Publicidad en la Red</a>."
+    },
+    "ip": {
+      "title": "Recursos de Código Abierto y Propiedad Intelectual",
+      "p1": "Nuestra plataforma hace referencia y enlaza a trabajos de investigación de acceso abierto, libros de texto y materiales de dominio público. Todas las obras referenciadas siguen siendo propiedad intelectual de sus respectivos autores y editores, citados y distribuidos de conformidad con sus licencias abiertas aplicables."
+    },
+    "children": {
+      "title": "Privacidad en Línea de los Niños (Cumplimiento de COPPA)",
+      "p1": "No recopilamos a sabiendas información personal de niños menores de 13 años. Si crees que un menor nos ha proporcionado información personal, comunícate con nosotros de inmediato y eliminaremos de inmediato dichos registros de nuestros sistemas."
+    },
+    "contact": {
+      "title": "Actualizaciones y Contacto",
+      "p1": "Nos reservamos el derecho de revisar esta política para reflejar modificaciones operativas, legales o reglamentarias. Alentamos a los visitantes a revisar esta página periódicamente.",
+      "p2": "Para cualquier consulta legal o de privacidad, contáctanos en: <a href=\"mailto:maeacademy2026@gmail.com\" class=\"font-medium text-violet-600 dark:text-violet-400 underline underline-offset-4 hover:text-violet-700\">maeacademy2026@gmail.com</a>"
+    }
+  },
+  "terms": {
+    "title": "Términos de Servicio",
+    "effectiveDate": "Fecha de vigencia: 29 de septiembre de 2026 • MAE Academy",
+    "intro": "Bienvenido a MAE Academy (<a href=\"https://maeacademy.org\" target=\"_blank\" rel=\"noopener noreferrer\" class=\"font-medium text-violet-600 dark:text-violet-400 underline underline-offset-4 hover:text-violet-700\">https://maeacademy.org</a>). Al acceder o usar nuestro sitio web, herramientas interactivas y recursos educativos, reconoces que has leído, entendido y aceptado estar sujeto a estos Términos de Servicio.",
+    "service": {
+      "title": "Descripción del Servicio",
+      "p1": "MAE Academy es una plataforma educativa abierta que ofrece simuladores de ingeniería interactivos, explicaciones técnicas y referencias curadas a literatura académica y publicaciones de acceso abierto, proporcionadas sin registro obligatorio ni cuotas de suscripción."
+    },
+    "ip": {
+      "title": "Derechos de Propiedad Intelectual y Uso Permitido",
+      "p1": "<strong class=\"font-semibold text-slate-900 dark:text-white\">Contenido Propietario:</strong> Todo el código original de la plataforma, simulaciones interactivas, diagramas personalizados, activos visuales y tutoriales escritos son propiedad de MAE Academy. No puedes copiar, aplicar ingeniería inversa, extraer, redistribuir o explotar este contenido propietario para fines comerciales sin autorización previa explícita por escrito.",
+      "p2": "<strong class=\"font-semibold text-slate-900 dark:text-white\">Literatura de Código Abierto:</strong> Los artículos de acceso abierto y las referencias de terceros se proporcionan estrictamente para fines académicos y educativos bajo sus respectivas licencias de acceso abierto (por ejemplo, Creative Commons)."
+    },
+    "disclaimer": {
+      "title": "Descargo de Responsabilidad Educativa y de Ingeniería",
+      "p1": "Todos los simuladores, herramientas computacionales y explicaciones técnicas se proporcionan estrictamente «tal cual» y «según disponibilidad» solo con fines educativos y de autoestudio.",
+      "p2": "Si bien nos esforzamos por lograr precisión matemática y teórica, MAE Academy se exime de toda responsabilidad por inexactitudes computacionales, errores involuntarios o decisiones prácticas tomadas en base directamente a estas herramientas sin verificación profesional independiente y verificaciones estándar de cumplimiento industrial."
+    },
+    "links": {
+      "title": "Enlaces Externos y Anuncios",
+      "p1": "Nuestro sitio puede contener enlaces a sitios web externos de terceros o anuncios proporcionados por redes publicitarias (como Google). No controlamos, respaldamos ni asumimos responsabilidad por el contenido, las prácticas de privacidad o la precisión de dominios de terceros."
+    },
+    "law": {
+      "title": "Ley Aplicable y Jurisdicción",
+      "p1": "Estos Términos y cualquier disputa que surja de o en relación con tu uso de esta plataforma se regirán e interpretarán de acuerdo con las leyes del Reino Hachemita de Jordania, y los tribunales competentes de Jordania tendrán jurisdicción exclusiva."
+    },
+    "contact": {
+      "title": "Información de Contacto",
+      "p1": "Para cualquier consulta legal, inquietud sobre derechos de autor o preguntas con respecto a estos términos, comunícate con: <a href=\"mailto:maeacademy2026@gmail.com\" class=\"font-medium text-violet-600 dark:text-violet-400 underline underline-offset-4 hover:text-violet-700\">maeacademy2026@gmail.com</a>"
+    }
+  },
+  "attribution": {
+    "title": "Política de Propiedad Intelectual, Acceso Abierto y Atribución Académica",
+    "effectiveDate": "Fecha de vigencia: 29 de septiembre de 2026 • MAE Academy",
+    "intro": "MAE Academy es una plataforma de ingeniería de acceso abierto que proporciona herramientas de simulación interactiva e indexa literatura académica pública estrictamente para fines educativos y no comerciales.",
+    "library": {
+      "title": "Indexación de la Biblioteca Académica",
+      "p1": "El índice de la biblioteca de MAE Academy actúa como una herramienta de descubrimiento educativo. No alojamos, almacenamos ni distribuimos libros de texto con derechos de autor en servidores privados con fines de lucro. En su lugar, aprovechamos los metadatos públicos abiertos y los archivos digitales legales, principalmente el Internet Archive (<a href=\"https://archive.org\" target=\"_blank\" rel=\"noopener noreferrer\" class=\"font-medium text-violet-600 dark:text-violet-400 underline underline-offset-4 hover:text-violet-700\">archive.org</a>), bajo principios de uso justo y Recursos Educativos Abiertos (OER)."
+    },
+    "research": {
+      "title": "Descubrimiento de Investigación Académica",
+      "p1": "Nuestro módulo de investigación funciona como un agregador de metadatos académicos. Los registros de documentos y las citas se consultan de forma segura a través de índices de descubrimiento de acceso abierto establecidos, incluidos <a href=\"https://openalex.org\" target=\"_blank\" rel=\"noopener noreferrer\" class=\"font-medium text-violet-600 dark:text-violet-400 underline underline-offset-4 hover:text-violet-700\">OpenAlex</a> y <a href=\"https://www.doabooks.org\" target=\"_blank\" rel=\"noopener noreferrer\" class=\"font-medium text-violet-600 dark:text-violet-400 underline underline-offset-4 hover:text-violet-700\">DOAB</a>. Estamos estrictamente comprometidos a preservar todas las atribuciones de los autores originales, los Identificadores de Objetos Digitales (DOI) y cumplir con sus respectivas licencias abiertas."
+    },
+    "simulations": {
+      "title": "Motores de Simulación Propietarios",
+      "p1": "Todos los simuladores interactivos del lado del cliente, solucionadores matemáticos, scripts de modelado físico, interfaces visuales y arquitecturas de animación son propiedad intelectual original creada y mantenida por MAE Academy. Operan del lado del cliente en el navegador y están protegidos por la legislación de derechos de autor aplicable."
+    },
+    "dmca": {
+      "title": "Aviso de DMCA y Procedimiento de Eliminación",
+      "p1": "MAE Academy respeta los derechos de propiedad intelectual de los creadores y propietarios de derechos de autor. Si crees de buena fe que cualquier registro indexado o referencia en nuestra plataforma infringe tus derechos de autor, envía un aviso formal por escrito a nuestra dirección de cumplimiento:",
+      "p2": "<a href=\"mailto:maeacademy2026@gmail.com\" class=\"font-medium text-violet-600 dark:text-violet-400 underline underline-offset-4 hover:text-violet-700\">maeacademy2026@gmail.com</a>",
+      "p3": "Nuestro Compromiso: Nos comprometemos a revisar y verificar cualquier aviso formal, y a retirar de la lista o eliminar de inmediato cualquier referencia de terceros impugnada dentro de las 48 horas hábiles posteriores a la recepción."
+    }
+  }
+}

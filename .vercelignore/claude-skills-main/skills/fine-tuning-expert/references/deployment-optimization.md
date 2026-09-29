@@ -458,7 +458,6 @@ async def lifespan(app: FastAPI):
     # Cleanup on shutdown
     del model, tokenizer
     torch.cuda.empty_cache()
-
 app = FastAPI(lifespan=lifespan)
 
 @app.post("/generate", response_model=GenerationResponse)
