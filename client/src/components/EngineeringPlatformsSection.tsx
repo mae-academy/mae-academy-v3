@@ -6,7 +6,7 @@
  * 3. Academic Research: Image slot + Mathematical modeling content
  */
 import { Link } from "wouter";
-import { motion, Variants } from "framer-motion";
+import { motion, useReducedMotion, Variants } from "framer-motion";
 import { ArrowRight } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -29,10 +29,94 @@ const itemVariants: Variants = {
   },
 };
 
-// Clean Visual Preview Placeholder Slot (Responsive aspect ratio, no rigid height)
-function VisualPreviewSlot() {
+const BRAND_GRADIENT = "linear-gradient(135deg, #2563EB 0%, #7C3AED 50%, #E11D48 100%)";
+
+type PreviewIcon = "simulation" | "books" | "research";
+
+// Per-icon idle motion: simulation pulses, books float, research sways
+const ICON_MOTION: Record<PreviewIcon, { animate: Record<string, number[]>; duration: number }> = {
+  simulation: { animate: { scale: [1, 1.07, 1], rotate: [0, 3, 0, -3, 0] }, duration: 6 },
+  books: { animate: { y: [0, -18, 0], rotate: [-2, 2, -2] }, duration: 5 },
+  research: { animate: { rotate: [-5, 5, -5], scale: [1, 1.05, 1] }, duration: 7 },
+};
+
+const SPARKS = [
+  { top: "14%", left: "16%", size: 10, delay: 0 },
+  { top: "22%", left: "84%", size: 7, delay: 0.8 },
+  { top: "78%", left: "12%", size: 8, delay: 1.6 },
+  { top: "82%", left: "88%", size: 12, delay: 2.4 },
+];
+
+// Visual preview slot: brand-gradient masked SVG icon that fills the card, with layered idle animation
+function VisualPreviewSlot({ icon }: { icon: PreviewIcon }) {
+  const reduceMotion = useReducedMotion();
+  const { animate, duration } = ICON_MOTION[icon];
+  const mask = `url(/cards/${icon}.svg?v=3)`;
+
   return (
-    <div className="relative w-full min-h-[200px] sm:min-h-[280px] lg:min-h-[440px] aspect-[16/10] rounded-2xl border border-slate-200/80 bg-slate-50/50 shadow-sm overflow-hidden flex items-center justify-center dark:border-white/[0.08] dark:bg-zinc-950/60" />
+    <div className="group relative w-full min-h-[200px] sm:min-h-[280px] lg:min-h-[440px] aspect-[16/10] rounded-2xl border border-slate-200/80 bg-slate-50/50 shadow-sm overflow-hidden flex items-center justify-center dark:border-white/[0.08] dark:bg-zinc-950/60">
+      {/* Breathing brand glow */}
+      <motion.div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-[12%] rounded-full opacity-20 blur-3xl transition-opacity duration-500 group-hover:opacity-40"
+        style={{ background: BRAND_GRADIENT }}
+        animate={reduceMotion ? undefined : { scale: [1, 1.25, 1], opacity: [0.16, 0.34, 0.16] }}
+        transition={{ duration: duration * 0.8, repeat: Infinity, ease: "easeInOut" }}
+      />
+      {/* Slowly rotating dashed orbit */}
+      <motion.div
+        aria-hidden="true"
+        className="pointer-events-none absolute aspect-square h-[88%] rounded-full border border-dashed border-violet-400/40 dark:border-violet-300/25"
+        animate={reduceMotion ? undefined : { rotate: 360 }}
+        transition={{ duration: 40, repeat: Infinity, ease: "linear" }}
+      />
+      {/* Floating sparks */}
+      {SPARKS.map((sp, i) => (
+        <motion.span
+          key={i}
+          aria-hidden="true"
+          className="pointer-events-none absolute rounded-full"
+          style={{ top: sp.top, left: sp.left, width: sp.size, height: sp.size, background: BRAND_GRADIENT }}
+          animate={reduceMotion ? undefined : { y: [0, -16, 0], opacity: [0.2, 0.9, 0.2], scale: [0.8, 1.3, 0.8] }}
+          transition={{ duration: 3.5, delay: sp.delay, repeat: Infinity, ease: "easeInOut" }}
+        />
+      ))}
+      {/* Icon: entrance spring, then idle motion */}
+      <motion.div
+        aria-hidden="true"
+        className="relative h-[86%] w-[86%] transition-transform duration-500 group-hover:scale-[1.06]"
+        initial={reduceMotion ? false : { opacity: 0, scale: 0.7 }}
+        whileInView={{ opacity: 1, scale: 1 }}
+        viewport={{ once: true }}
+        transition={{ type: "spring", stiffness: 90, damping: 14 }}
+      >
+        <motion.div
+          className="h-full w-full drop-shadow-[0_18px_36px_rgba(124,58,237,0.35)]"
+          animate={reduceMotion ? undefined : animate}
+          transition={{ duration, repeat: Infinity, ease: "easeInOut" }}
+        >
+          {/* Flowing gradient inside the mask */}
+          <motion.div
+            className="h-full w-full"
+            style={{
+              backgroundImage:
+                "linear-gradient(135deg, #2563EB 0%, #7C3AED 25%, #E11D48 50%, #7C3AED 75%, #2563EB 100%)",
+              backgroundSize: "200% 200%",
+              WebkitMaskImage: mask,
+              maskImage: mask,
+              WebkitMaskRepeat: "no-repeat",
+              maskRepeat: "no-repeat",
+              WebkitMaskPosition: "center",
+              maskPosition: "center",
+              WebkitMaskSize: "contain",
+              maskSize: "contain",
+            }}
+            animate={reduceMotion ? undefined : { backgroundPosition: ["0% 0%", "100% 100%", "0% 0%"] }}
+            transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+          />
+        </motion.div>
+      </motion.div>
+    </div>
   );
 }
 
@@ -70,7 +154,7 @@ export default function EngineeringPlatformsSection() {
           >
             {/* Visual Column: lg:col-span-7 */}
             <div className="lg:col-span-7 w-full h-full flex items-center">
-              <VisualPreviewSlot />
+              <VisualPreviewSlot icon="simulation" />
             </div>
 
             {/* Content Column: lg:col-span-5 */}
@@ -185,7 +269,7 @@ export default function EngineeringPlatformsSection() {
 
             {/* Visual Column: lg:col-span-7 */}
             <div className="lg:col-span-7 w-full h-full flex items-center order-1 lg:order-2">
-              <VisualPreviewSlot />
+              <VisualPreviewSlot icon="books" />
             </div>
           </motion.div>
 
@@ -198,7 +282,7 @@ export default function EngineeringPlatformsSection() {
           >
             {/* Visual Column: lg:col-span-7 */}
             <div className="lg:col-span-7 w-full h-full flex items-center">
-              <VisualPreviewSlot />
+              <VisualPreviewSlot icon="research" />
             </div>
 
             {/* Content Column: lg:col-span-5 */}
