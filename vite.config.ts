@@ -281,7 +281,12 @@ export default defineConfig({
          */
         manualChunks(id) {
           // ── Core React runtime ─────────────────────────────────────────
-          if (id.includes("node_modules/react/") || id.includes("node_modules/react-dom/")) {
+          if (
+            id.includes("node_modules/react/") ||
+            id.includes("node_modules/react-dom/") ||
+            id.includes("node_modules/react-i18next") ||
+            id.includes("node_modules/scheduler/")
+          ) {
             return "vendor-react";
           }
           // ── Animation & routing (shared across all pages) ──────────────
@@ -315,7 +320,7 @@ export default defineConfig({
             return "vendor-monaco";
           }
           // ── i18n runtime ───────────────────────────────────────────────
-          if (id.includes("node_modules/i18next") || id.includes("node_modules/react-i18next")) {
+          if (id.includes("node_modules/i18next")) {
             return "vendor-i18n";
           }
           // Let Rollup split everything else automatically
