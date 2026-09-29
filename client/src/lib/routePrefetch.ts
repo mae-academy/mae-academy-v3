@@ -7,12 +7,19 @@
  * users see a spinner (PageLoader) on every first-visit transition.
  *
  * This module solves it with two strategies:
- * 1. Eager prefetch of high-priority routes on idle (core pages).
+ * 1. Eager prefetch of high-priority routes on idle (core pages + simulator hub).
  * 2. Intent-based prefetch on hover/focus for all navigable links.
  *
  * The dynamic import() cache is native to the browser module system — once a
  * chunk is fetched, subsequent lazy() calls for the same module resolve
  * synchronously from the module graph cache.
+ *
+ * Simulator-specific notes:
+ * - SimulationDetail is a SINGLE page chunk that renders ALL tool studios eagerly
+ *   (no per-tool lazy loading). Tab switching inside a simulator is instant.
+ * - The only "Loading Module..." you'll see for simulators is on first navigation
+ *   TO a simulator slug (e.g. /simulations/control-systems). Prefetching
+ *   SimulationDetail during idle eliminates it.
  */
 
 // ── Route chunk import factories ────────────────────────────────────────────
@@ -29,10 +36,17 @@ const routeChunks: Record<string, () => Promise<unknown>> = {
   "/attribution-policy":  () => import("../pages/AttributionPolicy"),
 };
 
-// Heavy simulator pages — only prefetched on explicit hover, never eagerly.
+// Heavy simulator pages — prefetched on hover AND warmed during idle after core routes.
 const heavyChunks: Record<string, () => Promise<unknown>> = {
-  "/simulations/arduino-studio": () => import("../pages/ArduinoStudioPage"),
-  "/simulations/plc":            () => import("../pages/PlcSimulatorPage"),
+  "/simulations/arduino-studio":       () => import("../pages/ArduinoStudioPage"),
+  "/simulations/plc":                  () => import("../pages/PlcSimulatorPage"),
+  "/simulations/control-systems":      () => import("../pages/SimulationDetail"),
+  "/simulations/power-electronics":    () => import("../pages/SimulationDetail"),
+  "/simulations/signals-and-systems":  () => import("../pages/SimulationDetail"),
+  "/simulations/linear-algebra":       () => import("../pages/SimulationDetail"),
+  "/simulations/circuit-lab":          () => import("../pages/SimulationDetail"),
+  "/simulations/digital-logic-design": () => import("../pages/SimulationDetail"),
+  "/simulations/code":                 () => import("../pages/SimulationDetail"),
 };
 
 // Track what has already been prefetched to avoid redundant calls.
@@ -79,6 +93,40 @@ export function prefetchCoreRoutes(): void {
   } else {
     setTimeout(prefetchBatch, 2000);
   }
+}
+
+/**
+ * Warm the SimulationDetail chunk (shared by all /simulations/* slugs) plus
+ * ArduinoStudio and PlcSimulator during a second idle callback, after core
+ * routes are already cached. This eliminates the "Loading Module..." flash
+ * for first-time simulator navigation.
+ *
+ * Called from App.tsx after prefetchCoreRoutes().
+ */
+export function prefetchSimulatorHub(): void {
+  const simulatorRoutes = [
+    "/simulations/control-systems",   // warms SimulationDetail chunk
+    "/simulations/arduino-studio",
+    "/simulations/plc",
+  ];
+
+  const prefetchBatch = () => {
+    for (const route of simulatorRoutes) {
+      prefetchRoute(route);
+    }
+  };
+
+  const schedule = (cb: () => void) => {
+    if ("requestIdleCallback" in window) {
+      (window as Window & { requestIdleCallback: (cb: () => void, opts?: { timeout: number }) => void })
+        .requestIdleCallback(cb, { timeout: 5000 });
+    } else {
+      setTimeout(cb, 4000);
+    }
+  };
+
+  // Delay by one extra idle cycle so we don't compete with core prefetches
+  schedule(() => schedule(prefetchBatch));
 }
 
 /**

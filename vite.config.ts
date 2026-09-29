@@ -267,14 +267,67 @@ export default defineConfig({
     emptyOutDir: true,
     rollupOptions: {
       output: {
-        manualChunks: {
-          "vendor-react": ["react", "react-dom"],
-          "vendor-icons": ["lucide-react"],
+        /**
+         * Manual chunk strategy for MAE Academy:
+         *
+         * Goals:
+         * 1. Stable, long-lived vendor caches — libraries with slow churn get
+         *    their own chunk so a single app code change doesn't bust them.
+         * 2. Heavy simulator deps (math, charting, animation) isolated from the
+         *    main bundle so they load in parallel with app code.
+         * 3. Avoid cascade loading — SimulationDetail imports all studio
+         *    components eagerly, so they land in one chunk; tab switching is
+         *    synchronous (no per-tool lazy cascade).
+         */
+        manualChunks(id) {
+          // ── Core React runtime ─────────────────────────────────────────
+          if (id.includes("node_modules/react/") || id.includes("node_modules/react-dom/")) {
+            return "vendor-react";
+          }
+          // ── Animation & routing (shared across all pages) ──────────────
+          if (id.includes("node_modules/framer-motion") || id.includes("node_modules/wouter")) {
+            return "vendor-motion";
+          }
+          // ── Icon library ───────────────────────────────────────────────
+          if (id.includes("node_modules/lucide-react")) {
+            return "vendor-icons";
+          }
+          // ── Math / signal processing (heavy — simulator-only) ──────────
+          if (
+            id.includes("node_modules/mathjs") ||
+            id.includes("node_modules/numeric") ||
+            id.includes("node_modules/ml-matrix") ||
+            id.includes("node_modules/complex.js")
+          ) {
+            return "vendor-math";
+          }
+          // ── Charting / plotting (heavy — simulator-only) ───────────────
+          if (
+            id.includes("node_modules/plotly.js") ||
+            id.includes("node_modules/chart.js") ||
+            id.includes("node_modules/d3") ||
+            id.includes("node_modules/recharts")
+          ) {
+            return "vendor-charts";
+          }
+          // ── Monaco Editor (extremely heavy — code studio only) ─────────
+          if (id.includes("node_modules/monaco-editor")) {
+            return "vendor-monaco";
+          }
+          // ── i18n runtime ───────────────────────────────────────────────
+          if (id.includes("node_modules/i18next") || id.includes("node_modules/react-i18next")) {
+            return "vendor-i18n";
+          }
+          // Let Rollup split everything else automatically
+          return undefined;
         },
       },
     },
-    chunkSizeWarningLimit: 800,
+    // Increase threshold — simulator chunks with bundled math/plot libs are
+    // intentionally large; 1200 kB prevents spurious warnings.
+    chunkSizeWarningLimit: 1200,
   },
+
   optimizeDeps: {
     // Pyodide is loaded from the jsdelivr CDN at runtime (see pythonEngine.ts); the npm package
     // is types-only here, and pre-bundling it would make Vite try to parse its Node-only assets.

@@ -17,7 +17,7 @@ import { Route, Switch, useLocation, Redirect } from "wouter";
 import ErrorBoundary from "@/components/ui/ErrorBoundary";
 import MainLayout from "./components/MainLayout";
 import { lazyRetry } from "@/lib/lazyRetry";
-import { prefetchCoreRoutes } from "@/lib/routePrefetch";
+import { prefetchCoreRoutes, prefetchSimulatorHub } from "@/lib/routePrefetch";
 import ScrollToTop from "@/components/common/ScrollToTop";
 import PageLoader from "@/components/ui/PageLoader";
 
@@ -112,9 +112,12 @@ function AnimatedRoutes() {
 }
 
 export default function App() {
-  // Eagerly prefetch core navigation routes during browser idle time.
+  // Prefetch core routes + simulator chunks during browser idle time.
+  // Two separate idle callbacks: core routes first, then simulator hub
+  // (so they don't compete for bandwidth on slow connections).
   useEffect(() => {
     prefetchCoreRoutes();
+    prefetchSimulatorHub();
   }, []);
 
   return (

@@ -225,7 +225,19 @@
   }
 }
 
+/* ── Loading text: Poppins-enforced, locale-immune ─────────────────────────
+ * Use this class on any "Loading..." / "Loading Module..." text inside
+ * Suspense fallbacks. It overrides any RTL font stack that the locale context
+ * might inject into the cascade.
+ * ----------------------------------------------------------------------- */
+.mae-loading-text {
+  font-family: 'Poppins', system-ui, sans-serif !important;
+  font-weight: 500 !important;
+  letter-spacing: 0.02em !important;
+}
+
 @layer components {
+
 
   /* Inspector Panel Design System classes */
   .mae-panel-section-header {

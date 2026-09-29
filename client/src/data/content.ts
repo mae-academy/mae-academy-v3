@@ -182,7 +182,7 @@ const ar: LocaleContent = {
   languageNames: { en: "الإنجليزية", ar: "العربية", es: "الإسبانية" },
   footer: { description: "نمذجة. تحليل. هندسة. منصة عالمية لتعلّم الهندسة بعمق والتفكير في الأنظمة التطبيقية.", research: "البحث", courses: "الدورات", library: "المكتبة", simulations: "المحاكاة" },
   home: {
-    headlinePrimary: "أهلاً بك في أكاديمية MAE", headlineSecondary: "هندسة تُحاكى في الزمن الحقيقي.", description: "معامل تفاعلية لأنظمة التحكم، الإلكترونيات القدرية، وتحليل الإشارات — ابنِ فهمك بتشغيل النموذج، لا بقراءته فقط.", ctaPrimary: "ابدأ محاكاة", ctaSecondary: "تصفح المكتبة",
+    headlinePrimary: "أهلاً بك في أكاديمية MAE", headlineSecondary: "نمذجة - تحليل - هندسة", description: "معامل تفاعلية لأنظمة التحكم، الإلكترونيات القدرية، وتحليل الإشارات — ابنِ فهمك بتشغيل النموذج، لا بقراءته فقط.", ctaPrimary: "ابدأ محاكاة", ctaSecondary: "تصفح المكتبة",
     stats: [{ value: "12+", label: "محاكاة تفاعلية" }, { value: "40+", label: "وحدة دراسية" }, { value: "100%", label: "محرك يعمل بالكامل على المتصفح" }],
     fieldTitle: "اختر محطتك. اتبع الإشارة.",
     gateways: [
@@ -259,7 +259,7 @@ const es: LocaleContent = {
   languageNames: { en: "Inglés", ar: "Árabe", es: "Español" },
   footer: { description: "Modelar. Analizar. Ingeniería. Una plataforma global para el aprendizaje riguroso de ingeniería y el pensamiento aplicado de sistemas.", research: "Investigación", courses: "Cursos", library: "Biblioteca", simulations: "Simulaciones" },
   home: {
-    headlinePrimary: "Bienvenido a MAE Academy", headlineSecondary: "Ingeniería, simulada en tiempo real.", description: "Laboratorios interactivos de sistemas de control, electrónica de potencia y análisis de señales — construye intuición ejecutando el modelo, no solo leyendo sobre él.", ctaPrimary: "Iniciar una Simulación", ctaSecondary: "Explorar Biblioteca",
+    headlinePrimary: "Bienvenido a MAE Academy", headlineSecondary: "Modelar - Analizar - Ingeniería", description: "Laboratorios interactivos de sistemas de control, electrónica de potencia y análisis de señales — construye intuición ejecutando el modelo, no solo leyendo sobre él.", ctaPrimary: "Iniciar una Simulación", ctaSecondary: "Explorar Biblioteca",
     stats: [{ value: "12+", label: "Simulaciones Interactivas" }, { value: "40+", label: "Módulos de Curso" }, { value: "100%", label: "Motor 100% en el Cliente" }],
     fieldTitle: "Elige una estación. Sigue la señal.",
     gateways: [

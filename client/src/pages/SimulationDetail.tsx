@@ -2,34 +2,68 @@
  * Every simulator is routed through this page.  SimulatorLayout owns the
  * universal heading and segmented navigation; individual studios own only
  * their tool-specific workspace and state.
+ *
+ * Performance architecture (post-audit):
+ * - Studios are grouped by simulator domain and lazy-loaded as separate chunks.
+ * - Each domain chunk is fetched only on first visit to that simulator slug.
+ * - Within a domain, ALL tools share the same chunk → tab switching is instant
+ *   (no per-tab network requests, no cascading loaders).
+ * - An inner <Suspense> shows a compact skeleton so the navigation header
+ *   stays fully visible while the domain chunk resolves (avoids blank screen).
+ * - The outer route-level <Suspense> in App.tsx is still the safety net for
+ *   SimulationDetail itself (this page's shell); it is rarely hit after the
+ *   first visit because the shell chunk is tiny (~30 kB).
  */
+import { lazy, Suspense } from "react";
 import { motion, type Variants } from "framer-motion";
 import { useEffect, useRef } from "react";
 import { useLocation } from "wouter";
+import { Loader2 } from "lucide-react";
 import SimulatorLayout from "@/components/SimulatorLayout";
 import SimulationToolWorkspace from "@/components/SimulationToolWorkspace";
-import { RootLocusStudio } from "@/components/control/RootLocusStudio";
-import { PIDStudio } from "@/components/control/PIDStudio";
-import { StateSpaceStudio } from "@/components/control/StateSpaceStudio";
-import { BlockDiagramStudio } from "@/components/control/BlockDiagramStudio";
-import { FrequencyResponseStudio } from "@/components/control/FrequencyResponseStudio";
-import { RectifierStudio } from "@/components/power/RectifierStudio";
-import { InverterStudio } from "@/components/power/InverterStudio";
-import { ACVoltageControllerStudio } from "@/components/power/ACVoltageControllerStudio";
-import { ChopperStudio } from "@/components/power/ChopperStudio";
-import { AssemblerStudio } from "@/components/assembler/AssemblerStudio";
-import { AnalogCircuitSimulator } from "@/simulators/circuit-engine/components/AnalogCircuitSimulator";
-import { DigitalCircuitSimulator } from "@/simulators/digital-logic/components/DigitalCircuitSimulator";
-import { DigitalLogicSimulator } from "@/components/digitalLogic/DigitalLogicSimulator";
-import { LinearAlgebraStudio } from "@/components/linearAlgebra/LinearAlgebraStudio";
-import { SignalOperationsLab } from "@/components/signals/SignalOperationsLab";
-import { SystemClassificationLab } from "@/components/signals/SystemClassificationLab";
-import { ConvolutionLab } from "@/components/signals/ConvolutionLab";
-import { FourierStudio } from "@/features/signals/ui/FourierStudio";
-import { LaplaceZPlaneLab } from "@/components/signals/LaplaceZPlaneLab";
 import { useLocale } from "@/contexts/LocaleContext";
-import { controlSystemToolMeta, linearAlgebraToolMeta, powerElectronicsToolMeta, signalsAndSystemsToolMeta, simulationRouteMeta } from "@/data/platform";
+import {
+  controlSystemToolMeta,
+  linearAlgebraToolMeta,
+  powerElectronicsToolMeta,
+  signalsAndSystemsToolMeta,
+  simulationRouteMeta,
+} from "@/data/platform";
 import NotFound from "./NotFound";
+
+// ── Domain-grouped lazy chunks ──────────────────────────────────────────────
+// Each lazy() points to a barrel file that bundles ALL tools for that domain.
+// Vite/Rollup co-locates them into a single JS chunk per domain.
+const ControlStudiosRenderer = lazy(() => import("@/chunks/controlStudios"));
+const PowerStudiosRenderer = lazy(() => import("@/chunks/powerStudios"));
+const SignalsStudiosRenderer = lazy(() => import("@/chunks/signalsStudios"));
+const LinearAlgebraRenderer = lazy(() => import("@/chunks/linearAlgebraStudios"));
+const CircuitStudiosRenderer = lazy(() => import("@/chunks/circuitStudios"));
+const DigitalLogicRenderer = lazy(() => import("@/chunks/digitalLogicStudios"));
+const CodeStudiosRenderer = lazy(() => import("@/chunks/codeStudios"));
+
+// ── Lightweight skeleton for inner Suspense ──────────────────────────────────
+// Shown while a domain chunk loads for the first time.
+// Does NOT say "Loading Module..." — that phrase is reserved for the route-level loader.
+// The header and tab bar remain fully visible above this skeleton.
+function StudioSkeleton() {
+  return (
+    <div className="flex min-h-[60vh] w-full flex-col items-center justify-center gap-3">
+      <div
+        className="h-[2px] w-40 rounded-full"
+        style={{
+          background: "linear-gradient(90deg, #2563EB 0%, #7C3AED 50%, #E11D48 100%)",
+          animation: "pulse 1.6s ease-in-out infinite",
+        }}
+        aria-hidden="true"
+      />
+      <Loader2
+        className="h-6 w-6 animate-spin text-violet-500 opacity-70"
+        aria-label="Loading studio..."
+      />
+    </div>
+  );
+}
 
 const container: Variants = { hidden: {}, visible: { transition: { staggerChildren: 0.1 } } };
 const item: Variants = { hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 165, damping: 21 } } };
@@ -108,47 +142,67 @@ export default function SimulationDetail() {
 
   if (!tool && !isCodeStudio) return null;
 
-  const isRootLocus = isControlSystems && tool === "root-locus";
-  const isPidStudio = isControlSystems && tool === "pid";
-  const isStateSpaceStudio = isControlSystems && tool === "state-space";
-  const isBlockDiagram = isControlSystems && tool === "block-diagram-signal-flow";
-  const isFrequencyResponse = isControlSystems && tool === "frequency-response";
-  const isRectifierStudio = isPowerElectronics && tool === "a";
-  const isInverterStudio = isPowerElectronics && tool === "b";
-  const isAcVoltageControllerStudio = isPowerElectronics && tool === "c";
-  const isChopperStudio = isPowerElectronics && tool === "d";
-  const isCodeStudioContent = isCodeStudio;
-  const isDigitalLogicWorkspace = isDigitalLogicDesign && tool === "workspace";
-  const isLinearAlgebraStudio = isLinearAlgebra && ["a", "b", "c", "d", "e"].includes(tool);
-  const circuitToolContent = isCircuitLab
-    ? <DigitalCircuitSimulator />
-    : circuitLabClone ? <AnalogCircuitSimulator instanceId={meta.slug} label={simulation.title} /> : null;
-  const isSignalsOperations = isSignalsAndSystems && (tool === "signal-operations-and-properties" || tool === "a");
-  const isSystemClassification = isSignalsAndSystems && (tool === "system-classification" || tool === "b");
-  const isConvolutionEngine = isSignalsAndSystems && (tool === "convolution-engine" || tool === "c");
-  const isFourierAnalysis = isSignalsAndSystems && (tool === "fourier-analysis" || tool === "d");
-  const isLaplacePlane = isSignalsAndSystems && (tool === "laplace-s-plane" || tool === "e");
-
-  const toolContent = circuitToolContent ?? (
-    isSignalsOperations ? <SignalOperationsLab />
-      : isSystemClassification ? <SystemClassificationLab />
-        : isConvolutionEngine ? <ConvolutionLab />
-          : isFourierAnalysis ? <FourierStudio />
-            : isLaplacePlane ? <LaplaceZPlaneLab />
-              : isDigitalLogicWorkspace ? <DigitalLogicSimulator />
-                : isRootLocus ? <RootLocusStudio />
-                  : isPidStudio ? <PIDStudio />
-                    : isFrequencyResponse ? <FrequencyResponseStudio />
-                      : isStateSpaceStudio ? <StateSpaceStudio />
-                        : isBlockDiagram ? <BlockDiagramStudio />
-                          : isRectifierStudio ? <RectifierStudio />
-                            : isInverterStudio ? <InverterStudio />
-                              : isAcVoltageControllerStudio ? <ACVoltageControllerStudio />
-                                : isChopperStudio ? <ChopperStudio />
-                                  : isCodeStudioContent ? <AssemblerStudio />
-                                    : isLinearAlgebraStudio ? <LinearAlgebraStudio section={tool as "a" | "b" | "c" | "d" | "e"} />
-                                      : <SimulationToolWorkspace toolKey={`${meta.slug}-${tool}`} />
-  );
+  // ── Domain resolver → lazy chunk ───────────────────────────────────────────
+  // Each branch renders the matching lazy chunk inside a local <Suspense>.
+  // The StudioSkeleton keeps the header + tab bar visible while loading.
+  const toolContent = (() => {
+    if (isControlSystems) {
+      return (
+        <Suspense fallback={<StudioSkeleton />}>
+          <ControlStudiosRenderer tool={tool} />
+        </Suspense>
+      );
+    }
+    if (isPowerElectronics) {
+      return (
+        <Suspense fallback={<StudioSkeleton />}>
+          <PowerStudiosRenderer tool={tool} />
+        </Suspense>
+      );
+    }
+    if (isSignalsAndSystems) {
+      return (
+        <Suspense fallback={<StudioSkeleton />}>
+          <SignalsStudiosRenderer tool={tool} />
+        </Suspense>
+      );
+    }
+    if (isLinearAlgebra) {
+      return (
+        <Suspense fallback={<StudioSkeleton />}>
+          <LinearAlgebraRenderer tool={tool} />
+        </Suspense>
+      );
+    }
+    if (isCircuitLab || circuitLabClone) {
+      return (
+        <Suspense fallback={<StudioSkeleton />}>
+          <CircuitStudiosRenderer
+            isCircuitLab={isCircuitLab}
+            isCircuitLabClone={circuitLabClone}
+            instanceId={meta.slug}
+            label={simulation.title}
+          />
+        </Suspense>
+      );
+    }
+    if (isDigitalLogicDesign) {
+      return (
+        <Suspense fallback={<StudioSkeleton />}>
+          <DigitalLogicRenderer />
+        </Suspense>
+      );
+    }
+    if (isCodeStudio) {
+      return (
+        <Suspense fallback={<StudioSkeleton />}>
+          <CodeStudiosRenderer />
+        </Suspense>
+      );
+    }
+    // Fallback for unknown simulator slugs
+    return <SimulationToolWorkspace toolKey={`${meta.slug}-${tool}`} />;
+  })();
 
   return <motion.div variants={container} initial="hidden" animate="visible">
     <SimulatorLayout title={isDigitalLogicDesign ? "" : simulation.title} tabs={tools} activeTab={tool || ""} routePrefix={isDirectCode ? "/code" : `/simulations/${meta.slug}`} backLabel={copy.footer.simulations} isRtl={isRtl} hideToolNavigation={isDigitalLogicDesign || isCircuitLab || isCodeStudio}>
