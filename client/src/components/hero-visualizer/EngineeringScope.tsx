@@ -6,6 +6,15 @@
 import { useEffect, useRef, useState } from "react";
 import { KatexMath } from "@/components/ui/KatexMath";
 
+const FREQ_HZ = 120;
+const A1 = 1.65; // Peak amplitude for V_p-p = 3.3 V
+const A2 = 2.4;  // Channel 2 transient peak amplitude
+const PHASE_DEG = -42.0;
+const PHASE_RAD = (PHASE_DEG * Math.PI) / 180;
+const TIMEBASE_MS_PER_DIV = 10;
+const NUM_COLS = 10;
+const TOTAL_SPAN_MS = TIMEBASE_MS_PER_DIV * NUM_COLS; // 100 ms
+
 export interface EngineeringScopeProps {
   className?: string;
 }
@@ -19,8 +28,8 @@ export default function EngineeringScope({ className = "" }: EngineeringScopePro
     x: number;
     y: number;
     time: string;
-    vBlue: string;
-    vViolet: string;
+    v1: string;
+    v2: string;
   } | null>(null);
 
   const stateRef = useRef({
@@ -318,31 +327,26 @@ export default function EngineeringScope({ className = "" }: EngineeringScopePro
     stateRef.current.cursorY = y;
     stateRef.current.isHovered = true;
 
-    // Real-time instantaneous sampling of the mathematical waveforms at slice t
-    const t = stateRef.current.timeAcc;
-    const baseWavenumber = 0.018;
-    const phaseDiff = 0.72;
+    // Time position across the canvas time division grid
     const normX = x / rect.width;
-    const decay = Math.exp(-stateRef.current.damping * 2.5 * normX);
+    const tMs = normX * TOTAL_SPAN_MS; // 0 to 100 ms
+    const tSec = tMs / 1000;
 
-    // V1(t) = A1 * sin(ω1*x - t) normalized to ±3.3V full scale
-    const sin1 = Math.sin(baseWavenumber * x - t);
-    const v1 = (sin1 * 1.65).toFixed(2);
-    const v1Str = Number(v1) >= 0 ? `+${v1}` : v1;
+    // Formula synchronization:
+    // V_1(t) = A_1 * sin(2*pi*f*t)
+    const v1 = A1 * Math.sin(2 * Math.PI * FREQ_HZ * tSec);
+    const v1Str = (v1 >= 0 ? "+" : "") + v1.toFixed(2);
 
-    // V2(t) = A2 * decay * sin(ω2*x - t*1.15 + phi) normalized to ±3.3V
-    const sin2 = decay * Math.sin(baseWavenumber * 1.25 * x - t * 1.15 + phaseDiff);
-    const v2 = (sin2 * 2.4).toFixed(2);
-    const v2Str = Number(v2) >= 0 ? `+${v2}` : v2;
-
-    const timeMs = (normX * 80).toFixed(1);
+    // V_2(t) = A_2 * sin(2*pi*f*t + phi)
+    const v2 = A2 * Math.sin(2 * Math.PI * FREQ_HZ * tSec + PHASE_RAD);
+    const v2Str = (v2 >= 0 ? "+" : "") + v2.toFixed(2);
 
     setHoverInfo({
       x,
       y,
-      time: timeMs,
-      vBlue: v1Str,
-      vViolet: v2Str,
+      time: tMs.toFixed(1),
+      v1: v1Str,
+      v2: v2Str,
     });
   };
 
@@ -388,7 +392,9 @@ export default function EngineeringScope({ className = "" }: EngineeringScopePro
         <canvas
           ref={canvasRef}
           onPointerMove={handlePointerMove}
+          onPointerDown={handlePointerMove}
           onPointerLeave={handlePointerLeave}
+          onPointerUp={handlePointerLeave}
           className="w-full h-full block cursor-crosshair touch-none relative z-10"
         />
 
@@ -397,12 +403,12 @@ export default function EngineeringScope({ className = "" }: EngineeringScopePro
           <div
             className="pointer-events-none absolute z-20 -translate-x-1/2 -translate-y-full mb-2 rounded-lg border border-slate-200/90 bg-white/95 px-3 py-1.5 shadow-md backdrop-blur-md dark:border-white/[0.15] dark:bg-[#08080A]/95 text-xs text-slate-800 dark:text-zinc-100 transition-opacity duration-150 whitespace-nowrap"
             style={{
-              left: Math.max(110, Math.min(hoverInfo.x, (canvasRef.current?.getBoundingClientRect().width || 360) - 110)),
+              left: Math.max(120, Math.min(hoverInfo.x, (canvasRef.current?.getBoundingClientRect().width || 360) - 120)),
               top: Math.max(35, hoverInfo.y - 12),
             }}
           >
             <KatexMath
-              math={`\\Delta t = ${hoverInfo.time}\\text{ ms}, \\quad \\textcolor{#2563EB}{V_{\\text{1}}(t) = ${hoverInfo.vBlue}\\text{ V}}, \\quad \\textcolor{#7C3AED}{V_{\\text{2}}(t) = ${hoverInfo.vViolet}\\text{ V}}`}
+              math={`\\Delta t = ${hoverInfo.time}\\text{ ms}, \\quad \\textcolor{#2563EB}{V_1(t) = ${hoverInfo.v1}\\text{ V}}, \\quad \\textcolor{#7C3AED}{V_2(t) = ${hoverInfo.v2}\\text{ V}}`}
             />
           </div>
         )}
@@ -413,7 +419,7 @@ export default function EngineeringScope({ className = "" }: EngineeringScopePro
         <KatexMath math="f = 120\text{ Hz}" />
         <KatexMath math="\zeta = 0.35" />
         <KatexMath math="V_{\text{p-p}} = 3.3\text{ V}" />
-        <KatexMath math="\phi = 42.0^\circ" />
+        <KatexMath math="\phi = -42.0^\circ" />
       </div>
     </div>
   );

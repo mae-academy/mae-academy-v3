@@ -167,14 +167,14 @@ export function AnalysisBox({
 
       {hasAC ? (
         <div
-          data-testid="ac-analysis-coming-soon"
+          data-testid="ac-analysis-unsupported"
           className="my-3 flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50/70 p-8 text-center dark:border-slate-800 dark:bg-[#0d0f12]/60"
         >
           <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100">
-            AC Analysis (Phasors) — Coming Soon
+            AC Analysis (Phasors) Active
           </h3>
           <p className="mt-2 max-w-md text-center text-sm text-slate-500 dark:text-slate-400">
-            The simulator engine is successfully running your AC circuit in the background. However, step-by-step academic derivations using complex numbers (Phasors) for Nodal, Mesh, Superposition, and Thévenin are locked for a future update.
+            The simulator engine is successfully running your AC circuit in the background. Step-by-step academic derivations using complex numbers (Phasors) for Nodal, Mesh, Superposition, and Thévenin are currently unmapped for this view.
           </p>
         </div>
       ) : (

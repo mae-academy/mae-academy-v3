@@ -6,18 +6,19 @@ import { AnimatePresence, motion } from "framer-motion";
 import { lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { Route, Switch, useLocation } from "wouter";
+import { Route, Switch, useLocation, Redirect } from "wouter";
 import ErrorBoundary from "@/components/ui/ErrorBoundary";
 import MainLayout from "./components/MainLayout";
 import Home from "./pages/Home";
 import Research from "./pages/Research";
 import ResearchDetail from "./pages/ResearchDetail";
-import Courses from "./pages/Courses";
 import AcademicLibrary from "./pages/AcademicLibrary";
 import LibraryDetail from "./pages/LibraryDetail";
 import Simulations from "./pages/Simulations";
 import SimulationDetail from "./pages/SimulationDetail";
 import About from "./pages/About";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import TermsOfService from "./pages/TermsOfService";
 import NotFound from "./pages/NotFound";
 const ArduinoStudioPage = lazy(() => import("./pages/ArduinoStudioPage"));
 const PlcSimulatorPage = lazy(() => import("./pages/PlcSimulatorPage"));
@@ -55,7 +56,7 @@ function AnimatedRoutes() {
           <Route path="/research/:id" component={ResearchDetail} />
           <Route path="/library" component={AcademicLibrary} />
           <Route path="/library/:id" component={LibraryDetail} />
-          <Route path="/courses" component={Courses} />
+          <Route path="/courses"><Redirect to="/library" /></Route>
           <Route path="/code/:lang" component={SimulationDetail} />
           <Route path="/code" component={SimulationDetail} />
           <Route path="/assembler/:tool" component={SimulationDetail} />
@@ -80,7 +81,9 @@ function AnimatedRoutes() {
             <Suspense fallback={<div className="container py-16 font-mono text-xs text-slate-500">Loading Arduino Studio…</div>}><ArduinoStudioPage /></Suspense>
           </Route>
           <Route path="/about" component={About} />
-          <Route path="/_dev/symbols" component={HiddenSymbolDesigner} />
+          <Route path="/privacy-policy" component={PrivacyPolicy} />
+          <Route path="/terms-of-service" component={TermsOfService} />
+          {!import.meta.env.PROD && <Route path="/_dev/symbols" component={HiddenSymbolDesigner} />}
           <Route path="/404" component={NotFound} />
           <Route component={NotFound} />
         </Switch>

@@ -143,21 +143,18 @@ export const controlSystemToolMeta: Record<Locale, Array<{ slug: string; label: 
   en: [
     { slug: "root-locus", label: "Root Locus" },
     { slug: "pid", label: "PID" },
-    { slug: "block-diagram-signal-flow", label: "Block Diagram & Signal Flow" },
     { slug: "frequency-response", label: "Frequency Response" },
     { slug: "state-space", label: "State Space" },
   ],
   ar: [
     { slug: "root-locus", label: "مسار الجذور" },
     { slug: "pid", label: "PID" },
-    { slug: "block-diagram-signal-flow", label: "مخطط الكتل وتدفق الإشارة" },
     { slug: "frequency-response", label: "استجابة التردد" },
     { slug: "state-space", label: "فضاء الحالة" },
   ],
   es: [
     { slug: "root-locus", label: "Lugar de las raíces" },
     { slug: "pid", label: "PID" },
-    { slug: "block-diagram-signal-flow", label: "Diagrama de bloques y flujo de señal" },
     { slug: "frequency-response", label: "Respuesta en frecuencia" },
     { slug: "state-space", label: "Espacio de estados" },
   ],

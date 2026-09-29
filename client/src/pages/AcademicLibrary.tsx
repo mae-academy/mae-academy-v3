@@ -38,46 +38,46 @@ const LIBRARY_COPY = {
 const CATEGORY_OPTIONS = BOOK_CATEGORIES.map((name) => ({ label: name, value: name }));
 
 const SORT_OPTIONS: { label: string; value: LibrarySort }[] = [
-  { label: "Trending",        value: "trending"       },
+  { label: "Trending", value: "trending" },
   { label: "Most Downloaded", value: "top_downloaded" },
-  { label: "Newest",          value: "newest"         },
-  { label: "Earliest",        value: "earliest"       },
+  { label: "Newest", value: "newest" },
+  { label: "Earliest", value: "earliest" },
 ];
 
 const LANGUAGE_OPTIONS = [
-  { label: "All Languages",               value: "all" },
-  { label: "English (en)",                value: "en"  },
-  { label: "العربية – Arabic (ar)",       value: "ar"  },
-  { label: "Español – Spanish (es)",      value: "es"  },
-  { label: "Deutsch – German (de)",       value: "de"  },
-  { label: "Français – French (fr)",      value: "fr"  },
-  { label: "中文 – Chinese (zh)",          value: "zh"  },
-  { label: "日本語 – Japanese (ja)",       value: "ja"  },
-  { label: "Italiano – Italian (it)",     value: "it"  },
-  { label: "Русский – Russian (ru)",      value: "ru"  },
+  { label: "All Languages", value: "all" },
+  { label: "English (en)", value: "en" },
+  { label: "العربية – Arabic (ar)", value: "ar" },
+  { label: "Español – Spanish (es)", value: "es" },
+  { label: "Deutsch – German (de)", value: "de" },
+  { label: "Français – French (fr)", value: "fr" },
+  { label: "中文 – Chinese (zh)", value: "zh" },
+  { label: "日本語 – Japanese (ja)", value: "ja" },
+  { label: "Italiano – Italian (it)", value: "it" },
+  { label: "Русский – Russian (ru)", value: "ru" },
 ];
 
 export default function AcademicLibrary() {
 
   // ── Isolated, non-leaking state ───────────────────────────────────────────
-  const [searchInput,    setSearchInput]    = useState("");
+  const [searchInput, setSearchInput] = useState("");
   const [submittedQuery, setSubmittedQuery] = useState("");
-  const [category,  setCategory]  = useState("All Engineering");
-  const [language,  setLanguage]  = useState("all");
-  const [sort,      setSort]      = useState<LibrarySort>("trending");
-  const [page,      setPage]      = useState(1);
-  const [perPage,   setPerPage]   = useState(24);
+  const [category, setCategory] = useState("All Engineering");
+  const [language, setLanguage] = useState("all");
+  const [sort, setSort] = useState<LibrarySort>("trending");
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(24);
 
-  const [books,     setBooks]     = useState<UnifiedBook[]>([]);
+  const [books, setBooks] = useState<UnifiedBook[]>([]);
   const [totalCount, setTotalCount] = useState(0);
-  const [isLoading,  setIsLoading]  = useState(true);
-  const [error,      setError]      = useState<string | null>(null);
-  const [retryTick,  setRetryTick]  = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [retryTick, setRetryTick] = useState(0);
 
   // Dropdowns
   const [openDropdown, setOpenDropdown] = useState<"category" | "language" | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const gridRef     = useRef<HTMLDivElement>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -167,7 +167,7 @@ export default function AcademicLibrary() {
   };
 
   // ── Pagination ─────────────────────────────────────────────────────────────
-  const totalPages  = Math.max(1, Math.ceil(totalCount / perPage));
+  const totalPages = Math.max(1, Math.ceil(totalCount / perPage));
   const maxSafePage = Math.min(totalPages, Math.floor(ARCHIVE_MAX_WINDOW / perPage));
 
   // Clamp page whenever maxSafePage shrinks (e.g. after filter change)
@@ -312,11 +312,10 @@ export default function AcademicLibrary() {
                       <button
                         key={opt.value}
                         onClick={() => handleCategoryChange(opt.value)}
-                        className={`flex w-full items-center justify-between rounded-xl px-3 py-1.5 text-start text-xs transition-all ${
-                          category === opt.value
+                        className={`flex w-full items-center justify-between rounded-xl px-3 py-1.5 text-start text-xs transition-all ${category === opt.value
                             ? "brand-active-pill"
                             : "font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/70 dark:hover:text-white"
-                        }`}
+                          }`}
                       >
                         <span className="truncate">{opt.label}</span>
                         {category === opt.value && <Check className="ml-1.5 h-3.5 w-3.5 shrink-0" />}
@@ -346,11 +345,10 @@ export default function AcademicLibrary() {
                       <button
                         key={opt.value}
                         onClick={() => handleLanguageChange(opt.value)}
-                        className={`flex w-full items-center justify-between rounded-xl px-3 py-1.5 text-start text-xs transition-all ${
-                          language === opt.value
+                        className={`flex w-full items-center justify-between rounded-xl px-3 py-1.5 text-start text-xs transition-all ${language === opt.value
                             ? "brand-active-pill"
                             : "font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/70 dark:hover:text-white"
-                        }`}
+                          }`}
                       >
                         <span>{opt.label}</span>
                         {language === opt.value && <Check className="h-3.5 w-3.5 shrink-0" />}
@@ -369,11 +367,10 @@ export default function AcademicLibrary() {
                   <button
                     key={opt.value}
                     onClick={() => handleSortChange(opt.value)}
-                    className={`rounded-full px-3.5 py-1.5 text-xs transition-all duration-200 ${
-                      sort === opt.value
+                    className={`rounded-full px-3.5 py-1.5 text-xs transition-all duration-200 ${sort === opt.value
                         ? "brand-active-pill"
                         : "bg-transparent text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
-                    }`}
+                      }`}
                   >
                     {opt.label}
                   </button>
@@ -544,11 +541,10 @@ export default function AcademicLibrary() {
                 <button
                   key={size}
                   onClick={() => handlePageSizeChange(size)}
-                  className={`rounded-full px-3 py-1 text-xs transition-all duration-200 ${
-                    perPage === size
+                  className={`rounded-full px-3 py-1 text-xs transition-all duration-200 ${perPage === size
                       ? "brand-active-pill"
                       : "bg-transparent text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
-                  }`}
+                    }`}
                 >
                   {size}
                 </button>

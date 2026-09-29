@@ -4,7 +4,7 @@
  */
 import { ReactNode, useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
-import { BookOpen, Compass, Cpu, Heart, Mail } from "lucide-react";
+import { BookOpen, Compass, Cpu, FileText, Heart, Mail, ShieldCheck } from "lucide-react";
 import Header, { Locale } from "./Header";
 import SocialLinks from "@/components/SocialLinks";
 import { LocaleProvider } from "@/contexts/LocaleContext";
@@ -83,10 +83,10 @@ export default function MainLayout({ children }: MainLayoutProps) {
             </div>
           </div>
 
-          {/* Column 2: Platform Navigation */}
+          {/* Column 2: Platform Navigation & Legal */}
           <div>
-            <p className="text-xs font-semibold tracking-wider text-slate-400 dark:text-slate-500">
-              PLATFORM
+            <p className="text-xs font-semibold tracking-wider text-slate-400 dark:text-slate-500 uppercase">
+              {locale === "ar" ? "المنصة" : "Platform"}
             </p>
             <nav className="mt-4 flex flex-col gap-3 text-sm">
               <Link
@@ -109,6 +109,30 @@ export default function MainLayout({ children }: MainLayoutProps) {
               >
                 <Cpu className="h-4 w-4 text-slate-400 transition-colors group-hover:text-violet-600 dark:text-slate-500 dark:group-hover:text-violet-300" />
                 <span className="font-medium">{copy.footer.simulations}</span>
+              </Link>
+            </nav>
+
+            <p className="mt-6 text-xs font-semibold tracking-wider text-slate-400 dark:text-slate-500 uppercase">
+              {locale === "ar" ? "الوثائق القانونية" : "Legal & Compliance"}
+            </p>
+            <nav className="mt-3 flex flex-col gap-2.5 text-sm">
+              <Link
+                href="/privacy-policy"
+                className="group inline-flex items-center gap-2.5 text-slate-600 transition-colors hover:text-violet-600 dark:text-slate-400 dark:hover:text-violet-300"
+              >
+                <ShieldCheck className="h-4 w-4 text-slate-400 transition-colors group-hover:text-violet-600 dark:text-slate-500 dark:group-hover:text-violet-300" />
+                <span className="font-medium">
+                  {locale === "ar" ? "سياسة الخصوصية" : "Privacy Policy"}
+                </span>
+              </Link>
+              <Link
+                href="/terms-of-service"
+                className="group inline-flex items-center gap-2.5 text-slate-600 transition-colors hover:text-violet-600 dark:text-slate-400 dark:hover:text-violet-300"
+              >
+                <FileText className="h-4 w-4 text-slate-400 transition-colors group-hover:text-violet-600 dark:text-slate-500 dark:group-hover:text-violet-300" />
+                <span className="font-medium">
+                  {locale === "ar" ? "شروط الاستخدام" : "Terms of Service"}
+                </span>
               </Link>
             </nav>
           </div>
@@ -148,10 +172,27 @@ export default function MainLayout({ children }: MainLayoutProps) {
               </div>
             </div>
 
-            {/* Copyright */}
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              © {new Date().getFullYear()} MAE Academy. All rights reserved.
-            </p>
+            {/* Copyright & Legal Compliance Links */}
+            <div className="space-y-2 pt-2 border-t border-slate-200/60 dark:border-white/[0.06]">
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                © {new Date().getFullYear()} MAE Academy. All rights reserved.
+              </p>
+              <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
+                <Link
+                  href="/privacy-policy"
+                  className="hover:text-violet-600 dark:hover:text-violet-400 transition-colors"
+                >
+                  {locale === "ar" ? "سياسة الخصوصية" : "Privacy Policy"}
+                </Link>
+                <span>·</span>
+                <Link
+                  href="/terms-of-service"
+                  className="hover:text-violet-600 dark:hover:text-violet-400 transition-colors"
+                >
+                  {locale === "ar" ? "شروط الاستخدام" : "Terms of Service"}
+                </Link>
+              </div>
+            </div>
           </div>
         </div>
       </div>

@@ -28,44 +28,44 @@ const PAGE_SIZES = [12, 24, 48, 96];
 const OPENALEX_MAX_WINDOW = 10_000;
 
 const CATEGORY_OPTIONS = [
-  { label: "All Engineering",                         value: "All Engineering" },
-  { label: "Mechatronics Engineering",                value: "Mechatronics Engineering" },
-  { label: "Robotics & Automation",                   value: "Robotics & Automation" },
-  { label: "Control Systems Engineering",             value: "Control Systems Engineering" },
-  { label: "Mechanical Engineering",                  value: "Mechanical Engineering" },
-  { label: "Electrical & Electronics",                value: "Electrical & Electronics" },
-  { label: "Civil & Structural Engineering",          value: "Civil & Structural Engineering" },
-  { label: "Computer & Software Engineering",         value: "Computer & Software Engineering" },
+  { label: "All Engineering", value: "All Engineering" },
+  { label: "Mechatronics Engineering", value: "Mechatronics Engineering" },
+  { label: "Robotics & Automation", value: "Robotics & Automation" },
+  { label: "Control Systems Engineering", value: "Control Systems Engineering" },
+  { label: "Mechanical Engineering", value: "Mechanical Engineering" },
+  { label: "Electrical & Electronics", value: "Electrical & Electronics" },
+  { label: "Civil & Structural Engineering", value: "Civil & Structural Engineering" },
+  { label: "Computer & Software Engineering", value: "Computer & Software Engineering" },
   { label: "Artificial Intelligence & Machine Learning", value: "Artificial Intelligence & Machine Learning" },
-  { label: "Smart Systems & IoT",                     value: "Smart Systems & IoT" },
-  { label: "Biomedical Engineering",                  value: "Biomedical Engineering" },
-  { label: "Aerospace & Aeronautical",                value: "Aerospace & Aeronautical" },
-  { label: "Industrial & Systems Engineering",        value: "Industrial & Systems Engineering" },
-  { label: "Materials & Nanotechnology",              value: "Materials & Nanotechnology" },
-  { label: "Energy & Power Systems",                  value: "Energy & Power Systems" },
-  { label: "Chemical & Process Engineering",          value: "Chemical & Process Engineering" },
-  { label: "Telecommunications Engineering",          value: "Telecommunications Engineering" },
-  { label: "Automotive Engineering",                  value: "Automotive Engineering" },
+  { label: "Smart Systems & IoT", value: "Smart Systems & IoT" },
+  { label: "Biomedical Engineering", value: "Biomedical Engineering" },
+  { label: "Aerospace & Aeronautical", value: "Aerospace & Aeronautical" },
+  { label: "Industrial & Systems Engineering", value: "Industrial & Systems Engineering" },
+  { label: "Materials & Nanotechnology", value: "Materials & Nanotechnology" },
+  { label: "Energy & Power Systems", value: "Energy & Power Systems" },
+  { label: "Chemical & Process Engineering", value: "Chemical & Process Engineering" },
+  { label: "Telecommunications Engineering", value: "Telecommunications Engineering" },
+  { label: "Automotive Engineering", value: "Automotive Engineering" },
 ];
 
 const SORT_OPTIONS: { label: string; value: ResearchSort }[] = [
-  { label: "Trending",  value: "trending"  },
+  { label: "Trending", value: "trending" },
   { label: "Top Cited", value: "top_cited" },
-  { label: "Newest",    value: "newest"    },
-  { label: "Earliest",  value: "earliest"  },
+  { label: "Newest", value: "newest" },
+  { label: "Earliest", value: "earliest" },
 ];
 
 const LANGUAGE_OPTIONS = [
-  { label: "All Languages",               value: "all" },
-  { label: "English (en)",                value: "en"  },
-  { label: "العربية – Arabic (ar)",       value: "ar"  },
-  { label: "Español – Spanish (es)",      value: "es"  },
-  { label: "Deutsch – German (de)",       value: "de"  },
-  { label: "Français – French (fr)",      value: "fr"  },
-  { label: "中文 – Chinese (zh)",          value: "zh"  },
-  { label: "日本語 – Japanese (ja)",       value: "ja"  },
-  { label: "Italiano – Italian (it)",     value: "it"  },
-  { label: "Русский – Russian (ru)",      value: "ru"  },
+  { label: "All Languages", value: "all" },
+  { label: "English (en)", value: "en" },
+  { label: "العربية – Arabic (ar)", value: "ar" },
+  { label: "Español – Spanish (es)", value: "es" },
+  { label: "Deutsch – German (de)", value: "de" },
+  { label: "Français – French (fr)", value: "fr" },
+  { label: "中文 – Chinese (zh)", value: "zh" },
+  { label: "日本語 – Japanese (ja)", value: "ja" },
+  { label: "Italiano – Italian (it)", value: "it" },
+  { label: "Русский – Russian (ru)", value: "ru" },
 ];
 
 export default function Research() {
@@ -73,24 +73,24 @@ export default function Research() {
   const researchCopy = copy.collections.research;
 
   // ── Isolated, non-leaking state ───────────────────────────────────────────
-  const [searchInput,    setSearchInput]    = useState("");
+  const [searchInput, setSearchInput] = useState("");
   const [submittedQuery, setSubmittedQuery] = useState("");
-  const [category,  setCategory]  = useState("All Engineering");
-  const [language,  setLanguage]  = useState("all");
-  const [sort,      setSort]      = useState<ResearchSort>("trending");
-  const [page,      setPage]      = useState(1);
-  const [perPage,   setPerPage]   = useState(24);
+  const [category, setCategory] = useState("All Engineering");
+  const [language, setLanguage] = useState("all");
+  const [sort, setSort] = useState<ResearchSort>("trending");
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(24);
 
-  const [papers,     setPapers]     = useState<ResearchPaper[]>([]);
+  const [papers, setPapers] = useState<ResearchPaper[]>([]);
   const [totalCount, setTotalCount] = useState(0);
-  const [isLoading,  setIsLoading]  = useState(true);
-  const [error,      setError]      = useState<string | null>(null);
-  const [retryTick,  setRetryTick]  = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [retryTick, setRetryTick] = useState(0);
 
   // Dropdowns
   const [openDropdown, setOpenDropdown] = useState<"category" | "language" | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const gridRef     = useRef<HTMLDivElement>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -180,7 +180,7 @@ export default function Research() {
   };
 
   // ── Pagination ─────────────────────────────────────────────────────────────
-  const totalPages  = Math.max(1, Math.ceil(totalCount / perPage));
+  const totalPages = Math.max(1, Math.ceil(totalCount / perPage));
   const maxSafePage = Math.min(totalPages, Math.floor(OPENALEX_MAX_WINDOW / perPage));
 
   // Clamp page whenever maxSafePage shrinks (e.g. after filter change)
@@ -325,11 +325,10 @@ export default function Research() {
                       <button
                         key={opt.value}
                         onClick={() => handleCategoryChange(opt.value)}
-                        className={`flex w-full items-center justify-between rounded-xl px-3 py-1.5 text-start text-xs transition-all ${
-                          category === opt.value
+                        className={`flex w-full items-center justify-between rounded-xl px-3 py-1.5 text-start text-xs transition-all ${category === opt.value
                             ? "brand-active-pill"
                             : "font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/70 dark:hover:text-white"
-                        }`}
+                          }`}
                       >
                         <span className="truncate">{opt.label}</span>
                         {category === opt.value && <Check className="ml-1.5 h-3.5 w-3.5 shrink-0" />}
@@ -359,11 +358,10 @@ export default function Research() {
                       <button
                         key={opt.value}
                         onClick={() => handleLanguageChange(opt.value)}
-                        className={`flex w-full items-center justify-between rounded-xl px-3 py-1.5 text-start text-xs transition-all ${
-                          language === opt.value
+                        className={`flex w-full items-center justify-between rounded-xl px-3 py-1.5 text-start text-xs transition-all ${language === opt.value
                             ? "brand-active-pill"
                             : "font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/70 dark:hover:text-white"
-                        }`}
+                          }`}
                       >
                         <span>{opt.label}</span>
                         {language === opt.value && <Check className="h-3.5 w-3.5 shrink-0" />}
@@ -382,11 +380,10 @@ export default function Research() {
                   <button
                     key={opt.value}
                     onClick={() => handleSortChange(opt.value)}
-                    className={`rounded-full px-3.5 py-1.5 text-xs transition-all duration-200 ${
-                      sort === opt.value
+                    className={`rounded-full px-3.5 py-1.5 text-xs transition-all duration-200 ${sort === opt.value
                         ? "brand-active-pill"
                         : "bg-transparent text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
-                    }`}
+                      }`}
                   >
                     {opt.label}
                   </button>
@@ -557,11 +554,10 @@ export default function Research() {
                 <button
                   key={size}
                   onClick={() => handlePageSizeChange(size)}
-                  className={`rounded-full px-3 py-1 text-xs transition-all duration-200 ${
-                    perPage === size
+                  className={`rounded-full px-3 py-1 text-xs transition-all duration-200 ${perPage === size
                       ? "brand-active-pill"
                       : "bg-transparent text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
-                  }`}
+                    }`}
                 >
                   {size}
                 </button>
