@@ -133,83 +133,12 @@
     overflow-x: hidden;
   }
 
-  /* Form and button primitive font inheritance */
-  button, input, select, textarea {
-    font-family: inherit;
-  }
-
-  html,
-  body,
-  h1, h2, h3, h4, h5, h6,
-  p, span, a, button, input, select, textarea,
-  label, [role="tab"], [role="button"], [data-slot] {
+  body {
     font-family: 'Poppins', var(--font-sans, sans-serif);
   }
 
-  /* Force Tajawal on ALL text, buttons, links, inputs, and interactive tags in Arabic mode */
-  html[lang="ar"],
-  html[dir="rtl"],
-  html[lang="ar"] body,
-  html[dir="rtl"] body,
-  html[lang="ar"] button,
-  html[dir="rtl"] button,
-  html[lang="ar"] a,
-  html[dir="rtl"] a,
-  html[lang="ar"] input,
-  html[dir="rtl"] input,
-  html[lang="ar"] select,
-  html[dir="rtl"] select,
-  html[lang="ar"] textarea,
-  html[dir="rtl"] textarea,
-  html[lang="ar"] label,
-  html[dir="rtl"] label,
-  html[lang="ar"] [role="button"],
-  html[dir="rtl"] [role="button"],
-  html[lang="ar"] [role="tab"],
-  html[dir="rtl"] [role="tab"],
-  html[lang="ar"] [role="tablist"] > *,
-  html[dir="rtl"] [role="tablist"] > *,
-  html[lang="ar"] [role="dialog"],
-  html[dir="rtl"] [role="dialog"],
-  html[lang="ar"] [role="dialog"] *,
-  html[dir="rtl"] [role="dialog"] * {
-    font-family: 'Tajawal', sans-serif !important;
-  }
-
-  /* Preserve pure monospace for technical tokens, registers, code, and math */
-  html[lang="ar"] .font-mono,
-  html[lang="ar"] [class*="font-mono"],
-  html[lang="ar"] code,
-  html[lang="ar"] pre,
-  html[lang="ar"] kbd,
-  html[lang="ar"] samp,
-  html[lang="ar"] .cm-editor,
-  html[lang="ar"] .cm-editor *,
-  html[lang="ar"] .katex,
-  html[lang="ar"] .katex-html,
-  html[lang="ar"] .katex *,
-  html[dir="rtl"] .font-mono,
-  html[dir="rtl"] [class*="font-mono"],
-  html[dir="rtl"] code,
-  html[dir="rtl"] pre,
-  html[dir="rtl"] kbd,
-  html[dir="rtl"] samp,
-  html[dir="rtl"] .cm-editor,
-  html[dir="rtl"] .cm-editor *,
-  html[dir="rtl"] .katex,
-  html[dir="rtl"] .katex-html,
-  html[dir="rtl"] .katex * {
-    font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
-  }
-
-  /* Strict KaTeX math serif preservation */
-  html[lang="ar"] .katex,
-  html[lang="ar"] .katex-html,
-  html[lang="ar"] .katex *,
-  html[dir="rtl"] .katex,
-  html[dir="rtl"] .katex-html,
-  html[dir="rtl"] .katex * {
-    font-family: KaTeX_Main, serif !important;
+  button, input, select, textarea {
+    font-family: inherit;
   }
 
   button:not(:disabled),
@@ -464,7 +393,6 @@
     color: #ffffff !important;
     border-radius: 9999px !important; /* rounded-full capsule */
     border: none !important;
-    font-family: 'Poppins', sans-serif !important;
     font-weight: 500 !important;
     box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1) !important;
     transition: all 0.2s ease-in-out !important;
@@ -475,7 +403,6 @@
     color: #ffffff !important;
     border-radius: 9999px !important; /* rounded-full capsule */
     border: none !important;
-    font-family: 'Poppins', sans-serif !important;
     font-weight: 500 !important;
     box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1) !important;
     transition: all 0.2s ease-in-out !important;
@@ -1164,4 +1091,42 @@
 
 .no-scrollbar::-webkit-scrollbar {
   display: none;
+}
+
+/* ==========================================================================
+   Unbreakable site-wide Arabic typography enforcement (outside of @layer)
+   ========================================================================== */
+:root:lang(ar),
+[lang="ar"],
+[dir="rtl"],
+html[lang="ar"] body,
+html[dir="rtl"] body {
+  font-family: 'Tajawal', sans-serif !important;
+}
+
+/* Force every textual and interactive element under Arabic to use Tajawal */
+html[lang="ar"] *:not(
+  .font-mono, [class*="font-mono"],
+  code, pre, kbd, samp,
+  .cm-editor, .cm-editor *,
+  .katex, .katex-html, .katex *
+),
+html[dir="rtl"] *:not(
+  .font-mono, [class*="font-mono"],
+  code, pre, kbd, samp,
+  .cm-editor, .cm-editor *,
+  .katex, .katex-html, .katex *
+) {
+  font-family: 'Tajawal', sans-serif !important;
+}
+
+/* Strict preservation for code, registers, and math */
+html[lang="ar"] :where(.font-mono, [class*="font-mono"], code, pre, kbd, samp, .cm-editor, .cm-editor *),
+html[dir="rtl"] :where(.font-mono, [class*="font-mono"], code, pre, kbd, samp, .cm-editor, .cm-editor *) {
+  font-family: 'JetBrains Mono', monospace !important;
+}
+
+html[lang="ar"] :where(.katex, .katex-html, .katex *),
+html[dir="rtl"] :where(.katex, .katex-html, .katex *) {
+  font-family: KaTeX_Main, serif !important;
 }
