@@ -1,6 +1,4 @@
-import { z } from 'zod';
-import { evaluateBatch, UnknownProfileError } from './evaluate';
-import { EvaluateRequestSchema } from '../../plc/schema';
+import { serveEvaluate } from './service';
 
 const MAX_BODY_BYTES = 512 * 1024;
 const json = (body: unknown, status = 200, headers: Record<string, string> = {}) =>
@@ -28,19 +26,12 @@ export async function handleEvaluate(request: Request): Promise<Response> {
     return json({ error: 'Body must be valid JSON' }, 400);
   }
 
-  const parsed = EvaluateRequestSchema.safeParse(payload);
-  if (!parsed.success) {
-    return json({ error: 'Invalid request', issues: z.treeifyError(parsed.error) }, 400);
-  }
-
   try {
     const started = performance.now();
-    const result = evaluateBatch(parsed.data);
-    return json({ ...result, serverMs: Math.round((performance.now() - started) * 100) / 100 });
+    const result = await serveEvaluate(payload);
+    const serverMs = Math.round((performance.now() - started) * 100) / 100;
+    return json(result.status === 200 ? { ...result.body, ms: serverMs } : result.body, result.status);
   } catch (error) {
-    if (error instanceof UnknownProfileError) return json({ error: error.message }, 400);
-    // Malformed-but-schema-valid input (e.g. wrong snapshot size) is the caller's fault, not ours.
-    if (error instanceof Error && /Snapshot|not allocated|address/i.test(error.message)) return json({ error: error.message }, 400);
     console.error('plc/evaluate failed', error);
     return json({ error: 'Internal error' }, 500);
   }

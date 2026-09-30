@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { POST } from '../../plc/evaluate';
 import { evaluateGuard, guarded, setLimiterForTests } from './guard';
 import { checkOrigin } from './origin';
-import { MemoryLimiter, TIERS } from './ratelimit';
+import { HybridLimiter, MemoryLimiter, TIERS } from './ratelimit';
 
 const prod = { NODE_ENV: 'production' };
 const dev = { NODE_ENV: 'development' };
@@ -140,6 +140,58 @@ describe('guard: 403 / 429 behaviour and headers', () => {
       expect(res.status).toBe(403);
     } finally {
       process.env.NODE_ENV = prevEnv;
+    }
+  });
+});
+
+describe('hybrid limiter (plc tier): Redis stays off the response path', () => {
+  const never = new Promise<never>(() => {});
+  const fast = async <T>(work: Promise<T>): Promise<T> => Promise.race([work, new Promise<never>((_, r) => setTimeout(() => r(new Error('blocked on Redis')), 100))]);
+
+  it('decides locally without waiting for a slow or hung Redis, and hands back the sync as background work', async () => {
+    const limiter = new HybridLimiter(new MemoryLimiter(900, 60_000), { limit: () => never }, 900);
+    const result = await fast(limiter.limit('ip'));
+    expect(result.success).toBe(true);
+    expect(result.pending).toBeInstanceOf(Promise);
+  });
+
+  it('when the shared counter says the IP is over its global limit, it is refused locally from then on', async () => {
+    let now = 1_000_000;
+    const limiter = new HybridLimiter(new MemoryLimiter(900, 60_000, () => now), { limit: async () => ({ success: false, reset: now + 30_000 }) }, 900, () => now);
+    const first = await limiter.limit('ip');
+    expect(first.success).toBe(true); // this request was admitted on the local decision
+    await first.pending; // the background sync lands
+    const next = await limiter.limit('ip');
+    expect(next).toMatchObject({ success: false, remaining: 0, reset: now + 30_000 });
+    expect((await limiter.limit('other-ip')).success).toBe(true); // per key
+    now += 31_000; // the block expires with the window
+    expect((await limiter.limit('ip')).success).toBe(true);
+  });
+
+  it('a failing or timed-out Redis never affects users, and the local window still enforces the limit', async () => {
+    const limiter = new HybridLimiter(new MemoryLimiter(2, 60_000), { limit: async () => { throw new Error('redis down'); } }, 2);
+    const a = await limiter.limit('ip');
+    await a.pending;
+    expect((await limiter.limit('ip')).success).toBe(true);
+    expect((await limiter.limit('ip')).success).toBe(false); // local limit of 2 reached
+  });
+
+  it('guarded() keeps the background sync alive without delaying the reply', async () => {
+    const tracked: Promise<unknown>[] = [];
+    let release!: () => void;
+    const slow = new Promise<void>((resolve) => (release = resolve));
+    setLimiterForTests('plc', { limit: async () => ({ success: true, limit: 900, remaining: 899, reset: Date.now() + 1000, pending: slow.then(() => tracked.push(slow)) }) });
+    const handler = guarded('plc', async () => new Response('{}'));
+    const prev = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'production';
+    try {
+      const res = await fast(handler(new Request('http://x/api/plc/evaluate', { method: 'POST', headers: { origin: 'https://maeacademy.org', 'x-forwarded-for': '9.9.9.9' }, body: '{}' })));
+      expect(res.status).toBe(200); // replied while the sync is still outstanding
+      expect(res.headers.get('x-ratelimit-limit')).toBe('900');
+    } finally {
+      process.env.NODE_ENV = prev;
+      release();
+      setLimiterForTests('plc', undefined);
     }
   });
 });

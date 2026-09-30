@@ -88,51 +88,43 @@ export const ProgramSchema = z.object({
 });
 
 const base64 = z.string().max(LIMITS.maxBase64Chars).regex(/^[A-Za-z0-9+/]*={0,2}$/, 'invalid base64');
-const u16Array = z.array(int.min(0).max(0xffff)).max(1024);
 
-const timerState = z.object({
-  accumulatedMs: finite,
-  timing: z.boolean(),
-  previousIn: z.boolean(),
-  lastScan: int.min(0),
-  pending: z.object({ fn: z.enum(['TON', 'TOF', 'TONR']), timeBaseMs: finite, preset: finite, input: z.boolean() }).nullable(),
-});
-const counterState = z.object({
-  previousCu: z.boolean(),
-  previousCd: z.boolean(),
-  previousLd: z.boolean(),
-  previousR: z.boolean(),
-  lastScan: int.min(0),
-});
+// Runtime state is opaque to the browser: it echoes back what the previous response carried. The
+// compact positional form is validated strictly because it is still client-supplied.
+//   edges:    [nodeId, 0|1]
+//   timers:   [address, accumulatedMs, flags (1 = timing, 2 = previousIn), lastScan, pending]
+//   counters: [address, flags (1 = Cu, 2 = Cd, 4 = Ld, 8 = R), lastScan]
+//   pending:  0 | [fn (0 TON, 1 TOF, 2 TONR), timeBaseMs, preset, input 0|1]
+const bit = z.union([z.literal(0), z.literal(1)]);
+const pending = z.union([z.literal(0), z.tuple([int.min(0).max(2), finite, finite, bit])]);
+export const RuntimeWireSchema = z.tuple([
+  z.array(z.tuple([id, bit])).max(LIMITS.maxStateEntries),
+  z.array(z.tuple([address, finite, int.min(0).max(3), int.min(0), pending])).max(LIMITS.maxStateEntries),
+  z.array(z.tuple([address, int.min(0).max(15), int.min(0)])).max(LIMITS.maxStateEntries),
+]);
+export type RuntimeWire = z.infer<typeof RuntimeWireSchema>;
 
-const indexedStore = z.object({ current: u16Array, preset: u16Array, status: base64 });
+const hash = z.string().regex(/^[0-9a-f]{32}$/, 'invalid program hash');
 
-/** Everything a stateless server needs to continue a run where the previous request stopped. */
-export const StateSchema = z.object({
-  memory: z.object({
-    profileId: id,
-    bytes: z.object({ I: base64.optional(), Q: base64.optional(), M: base64.optional(), V: base64.optional() }),
-    indexed: z.object({ T: indexedStore.optional(), C: indexedStore.optional() }),
-  }),
-  runtime: z.object({
-    edges: z.array(z.tuple([id, z.boolean()])).max(LIMITS.maxStateEntries),
-    timers: z.array(z.tuple([address, timerState])).max(LIMITS.maxStateEntries),
-    counters: z.array(z.tuple([address, counterState])).max(LIMITS.maxStateEntries),
-  }),
-  cycle: int.min(0),
-});
-
-export const EvaluateRequestSchema = z.object({
-  program: ProgramSchema,
-  /** Omit (or null) for a cold start: memory zeroed, edges and timers cleared. */
-  state: StateSchema.nullish(),
-  /** Ask for the power-flow trace of the last scan (canvas wire highlighting). */
-  trace: z.boolean().optional(),
-  scans: z
-    .array(z.object({ deltaMs: finite.min(0).max(LIMITS.maxDeltaMs), inputs: base64 }))
-    .min(1)
-    .max(LIMITS.maxScansPerRequest),
-});
+/**
+ * Protocol v2 request. The program is sent once (no `h`), after which the client sends only the
+ * hash the server returned. Memory is a zero-run-suppressed image (see shared/plcWire.ts).
+ */
+export const EvaluateRequestSchema = z
+  .object({
+    v: z.literal(2),
+    /** Hash of a program the server has seen; omit it and send `program` instead to (re)register. */
+    h: hash.optional(),
+    program: ProgramSchema.optional(),
+    st: z.object({ m: base64, r: RuntimeWireSchema, c: int.min(0) }),
+    /** Input image for every scan in the batch. */
+    in: base64,
+    n: int.min(1).max(LIMITS.maxScansPerRequest),
+    /** Simulated milliseconds per scan. */
+    dt: finite.min(0).max(LIMITS.maxDeltaMs),
+    /** Ask for the power-flow trace of the last scan. */
+    tr: z.boolean().optional(),
+  })
+  .refine((request) => request.h !== undefined || request.program !== undefined, { message: 'send a program or a program hash' });
 
 export type EvaluateRequest = z.infer<typeof EvaluateRequestSchema>;
-export type WireState = z.infer<typeof StateSchema>;

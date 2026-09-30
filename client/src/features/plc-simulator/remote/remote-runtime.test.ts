@@ -170,4 +170,73 @@ describe('RemoteRuntime (RUN) pipelining, optimism and failure handling', () => 
     expect(memory.readBit('Q0.0')).toBe(false);
     expect(runtime.mode).toBe('PAUSE');
   });
+
+  it('sends the program once, then only its hash, and the requests stay tiny', async () => {
+    const bodies: { program?: unknown; h?: string }[] = [];
+    const sizes: number[] = [];
+    const { runtime, field } = make(async (body) => {
+      bodies.push(body);
+      sizes.push(JSON.stringify(body).length);
+      return inProcess(body);
+    });
+    field.writeInput('I0.0', true);
+    runtime.run();
+    await wait(500);
+    runtime.stop();
+    expect(bodies.length).toBeGreaterThanOrEqual(3);
+    expect(bodies[0]!.program).toBeDefined();
+    expect(bodies[0]!.h).toBeUndefined();
+    expect(bodies.slice(1).every((b) => b.program === undefined && typeof b.h === 'string')).toBe(true);
+    expect(Math.max(...sizes.slice(1))).toBeLessThan(1000); // was ~11 KB
+  });
+
+  it('answers a server that forgot the program (409) by sending it again, without stopping', async () => {
+    let forgot = false;
+    let calls = 0;
+    const bodies: { program?: unknown }[] = [];
+    const { runtime, memory, field } = make(async (body) => {
+      calls++;
+      bodies.push(body);
+      if (calls === 4 && !forgot) {
+        forgot = true;
+        throw new PlcEngineError('needs program', 409, undefined, 'need_program');
+      }
+      return inProcess(body);
+    });
+    field.writeInput('I0.0', true);
+    runtime.run();
+    await wait(600);
+    expect(forgot).toBe(true);
+    expect(runtime.mode).toBe('RUN');
+    expect(memory.readBit('Q0.0')).toBe(true);
+    // the request right after the 409 carried the program again
+    expect(bodies[4]!.program).toBeDefined();
+    runtime.stop();
+  });
+
+  it('a program edit during a run is re-registered: the next request carries the new program', async () => {
+    const bodies: { program?: unknown; h?: string }[] = [];
+    const { runtime, field } = make(async (body) => (bodies.push(body), inProcess(body)));
+    field.writeInput('I0.0', true);
+    runtime.run();
+    await wait(300);
+    const before = bodies.length;
+    runtime.loadProgram({ ...program, networks: program.networks.slice(0, 1) });
+    await wait(300);
+    runtime.stop();
+    const after = bodies.slice(before);
+    expect(after.some((b) => b.program !== undefined)).toBe(true);
+    expect(after.find((b) => b.program !== undefined)).toBeDefined();
+  });
+
+  it('a protocol-version mismatch stops the controller with a reload message', async () => {
+    const { runtime, events } = make(async () => {
+      throw new PlcEngineError('The simulator was updated; reload the page.', 400, undefined, 'version');
+    });
+    runtime.run();
+    await wait(200);
+    expect(runtime.mode).toBe('STOP');
+    const fault = events.find((e) => e.type === 'diagnostic' && e.diagnostic.code === 'ENGINE_UNREACHABLE');
+    expect(fault && fault.type === 'diagnostic' ? fault.diagnostic.message : '').toMatch(/reload/i);
+  });
 });

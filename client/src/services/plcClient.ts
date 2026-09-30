@@ -1,18 +1,45 @@
 import type { LadderProgram } from '@/features/plc-simulator/domain/ast';
-import type { MemorySnapshot } from '@/features/plc-simulator/domain/memory';
-import type { EvaluateResponse } from '../../../api/_lib/plc/evaluate';
-import type { EvaluateRequest, WireState } from '../../../api/plc/schema';
+import type { Diagnostic } from '@/features/plc-simulator/engine/types';
 
-export type { EvaluateResponse, WireState };
+/** Protocol v2 (see shared/plcWire.ts and api/plc/schema.ts). */
+export interface EvaluateBody {
+  v: 2;
+  /** Hash of a program the server already holds; omitted when `program` is sent instead. */
+  h?: string;
+  program?: LadderProgram;
+  /** Carried state: memory (zero-run packed, base64), the server's opaque runtime state, scan counter. */
+  st: { m: string; r: unknown; c: number };
+  /** Input image, sampled once for the whole batch. */
+  in: string;
+  /** Scans in the batch and simulated ms per scan. */
+  n: number;
+  dt: number;
+  tr?: boolean;
+}
 
-/** Request body as the client builds it; the server re-validates everything with Zod. */
-export type EvaluateBody = Omit<EvaluateRequest, 'program' | 'state' | 'scans'> & {
-  program: LadderProgram;
-  state: WireState;
-  scans: { deltaMs: number; inputs: string }[];
-};
+export interface EvaluateResponse {
+  v: 2;
+  ok: boolean;
+  /** Hash to send instead of the program from now on. */
+  h?: string;
+  /** Changed memory cells, as a diff against the memory the request carried. */
+  m?: string;
+  r?: unknown;
+  c?: number;
+  /** Area Q after the last scan. */
+  o?: string;
+  tr?: { nodes: number; bits: string };
+  /** Sparse per-scan results: `f` = one flag byte per scan, `g` = [scanIndex, diagnostics][]. */
+  sc?: { f?: string; g?: [number, Diagnostic[]][] };
+  /** Compile diagnostics: warnings on registration, errors when `ok` is false. */
+  cd?: Diagnostic[];
+  /** Server time spent on the request. */
+  ms?: number;
+}
 
 export type PlcTransport = (body: EvaluateBody, signal?: AbortSignal) => Promise<EvaluateResponse>;
+
+export type PlcErrorCode = 'need_program' | 'version';
 
 export class PlcEngineError extends Error {
   constructor(
@@ -20,12 +47,13 @@ export class PlcEngineError extends Error {
     readonly status?: number,
     /** From a 429's Retry-After header. */
     readonly retryAfterMs?: number,
+    readonly code?: PlcErrorCode,
   ) {
     super(message);
   }
   /** Worth retrying: network failure, throttling or a transient server error. */
   get retryable(): boolean {
-    return this.status === undefined || this.status === 429 || this.status >= 500;
+    return this.code === undefined && (this.status === undefined || this.status === 429 || this.status >= 500);
   }
 }
 
@@ -46,6 +74,13 @@ export const evaluateRemote: PlcTransport = async (body, signal) => {
     throw new PlcEngineError('Cannot reach the simulation engine');
   }
   if (!response.ok) {
+    const detail = (await response.json().catch(() => null)) as { error?: string; message?: string } | null;
+    if (response.status === 409 && detail?.error === 'need_program') {
+      throw new PlcEngineError('The engine needs the program', 409, undefined, 'need_program');
+    }
+    if (response.status === 400 && detail?.error === 'version_mismatch') {
+      throw new PlcEngineError(detail.message ?? 'The simulator was updated; reload the page.', 400, undefined, 'version');
+    }
     const retryAfter = Number(response.headers.get('retry-after'));
     throw new PlcEngineError(
       response.status === 429
@@ -59,49 +94,3 @@ export const evaluateRemote: PlcTransport = async (body, signal) => {
   }
   return (await response.json()) as EvaluateResponse;
 };
-
-// ---- wire codec ---------------------------------------------------------------------------------
-
-export function toBase64(bytes: Uint8Array): string {
-  let binary = '';
-  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]!);
-  return btoa(binary);
-}
-
-export function fromBase64(text: string): Uint8Array {
-  const binary = atob(text);
-  const out = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) out[i] = binary.charCodeAt(i);
-  return out;
-}
-
-const BYTE_AREAS = ['I', 'Q', 'M', 'V'] as const;
-const INDEXED_AREAS = ['T', 'C'] as const;
-
-export function encodeMemory(snapshot: MemorySnapshot): WireState['memory'] {
-  const bytes: Record<string, string> = {};
-  for (const area of BYTE_AREAS) {
-    const b = snapshot.bytes[area];
-    if (b) bytes[area] = toBase64(b);
-  }
-  const indexed: Record<string, { current: number[]; preset: number[]; status: string }> = {};
-  for (const area of INDEXED_AREAS) {
-    const s = snapshot.indexed[area];
-    if (s) indexed[area] = { current: Array.from(s.current), preset: Array.from(s.preset), status: toBase64(s.status) };
-  }
-  return { profileId: snapshot.profileId, bytes, indexed };
-}
-
-export function decodeMemory(wire: WireState['memory']): MemorySnapshot {
-  const bytes: MemorySnapshot['bytes'] = {};
-  for (const area of BYTE_AREAS) {
-    const text = wire.bytes[area];
-    if (text !== undefined) bytes[area] = fromBase64(text);
-  }
-  const indexed: MemorySnapshot['indexed'] = {};
-  for (const area of INDEXED_AREAS) {
-    const s = wire.indexed[area];
-    if (s) indexed[area] = { current: Uint16Array.from(s.current), preset: Uint16Array.from(s.preset), status: fromBase64(s.status) };
-  }
-  return { profileId: wire.profileId, bytes, indexed };
-}

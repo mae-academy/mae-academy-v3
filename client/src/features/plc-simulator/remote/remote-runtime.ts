@@ -1,4 +1,5 @@
-import { evaluateRemote, decodeMemory, encodeMemory, fromBase64, toBase64, PlcEngineError, type EvaluateBody, type EvaluateResponse, type PlcTransport, type WireState } from '@/services/plcClient';
+import { evaluateRemote, PlcEngineError, type EvaluateBody, type EvaluateResponse, type PlcTransport } from '@/services/plcClient';
+import { applyDiff, encodeDiff, flattenSnapshot, fromBase64, toBase64, unflattenSnapshot } from '@shared/plcWire';
 import type { LadderProgram } from '../domain/ast';
 import { byteAreaSize } from '../domain/hardware';
 import type { MemoryMap } from '../domain/memory';
@@ -48,7 +49,8 @@ export interface RemoteRuntimeOptions {
 
 const DEFAULTS: { targetScanMs: number; stepDeltaMs: number; maxDeltaMs: number; clearOutputsOnStop: boolean; scanEventEvery: number } = { targetScanMs: 20, stepDeltaMs: 20, maxDeltaMs: 250, clearOutputsOnStop: true, scanEventEvery: 1 };
 const MAX_BATCH = 64; // matches LIMITS.maxScansPerRequest on the server
-const EMPTY_RUNTIME: WireState['runtime'] = { edges: [], timers: [], counters: [] };
+/** Fresh carried state: the server's opaque runtime snapshot with nothing in it (edges, timers, counters). */
+const EMPTY_RUNTIME: unknown = [[], [], []];
 
 /** Keeps only what the engine needs: titles, comments, symbols and IL text stay in the browser. */
 function slim(program: LadderProgram): LadderProgram {
@@ -87,7 +89,9 @@ export class RemoteRuntime implements PlcRuntimePort {
   private currentMode: ExecutionMode = 'STOP';
   private lastMetrics: ScanMetrics | null = null;
 
-  private runtimeState: WireState['runtime'] = EMPTY_RUNTIME;
+  private runtimeState: unknown = EMPTY_RUNTIME;
+  /** Hash of the program the server holds for us; null means the next request carries the program. */
+  private programHash: string | null = null;
   private cycle = 0;
   private revision = 0; // bumped on every program swap
   private generation = 0; // bumped on every mode change that must cancel in-flight work
@@ -144,6 +148,7 @@ export class RemoteRuntime implements PlcRuntimePort {
     this.source = program;
     this.program = compileProgram(program, this.memory.profile);
     this.revision += 1;
+    this.programHash = null;
     this.emit({ type: 'program', diagnostics: this.program.diagnostics });
     if (!this.program.ok && this.currentMode === 'RUN') this.stop();
     return this.program;
@@ -262,10 +267,9 @@ export class RemoteRuntime implements PlcRuntimePort {
   private async exchange(n: number, deltaMs: number, generation: number): Promise<ScanReport | null> {
     const clock = this.options.clock ?? defaultClock;
     const revision = this.revision;
-    const body = this.buildBody(n, deltaMs);
 
     const sentAt = clock();
-    const response = await this.send(body, generation);
+    const response = await this.send(() => this.buildBody(n, deltaMs), generation);
     if (response === null || generation !== this.generation) return null;
     const rtt = clock() - sentAt;
     this.rttMs = this.rttMs === 0 ? rtt : this.rttMs * 0.8 + rtt * 0.2;
@@ -273,13 +277,20 @@ export class RemoteRuntime implements PlcRuntimePort {
     return this.apply(response, n, deltaMs, rtt, revision === this.revision);
   }
 
-  private async send(body: EvaluateBody, generation: number): Promise<EvaluateResponse | null> {
+  private async send(build: () => EvaluateBody, generation: number): Promise<EvaluateResponse | null> {
     let failures = 0;
     let warned = false;
+    let renegotiated = false;
     for (;;) {
       try {
-        return await this.transport(body);
+        return await this.transport(build());
       } catch (error) {
+        if (error instanceof PlcEngineError && error.code === 'need_program' && !renegotiated) {
+          // The server recycled its program cache: send the program itself this once.
+          renegotiated = true;
+          this.programHash = null;
+          continue;
+        }
         if (error instanceof PlcEngineError && error.status === 429) {
           // Throttled: keep the last frame on screen, tell the user once, and try again after the
           // server's Retry-After. Nothing is lost, because the engine is stateless and we resend.
@@ -307,45 +318,59 @@ export class RemoteRuntime implements PlcRuntimePort {
   }
 
   private buildBody(n: number, deltaMs: number): EvaluateBody {
-    const inputs = toBase64(this.sampleField() ?? new Uint8Array(0));
+    const image = flattenSnapshot(this.memory.snapshot());
     return {
-      program: slim(this.source),
-      state: { memory: encodeMemory(this.memory.snapshot()), runtime: this.runtimeState, cycle: this.cycle },
-      trace: true,
-      scans: Array.from({ length: n }, () => ({ deltaMs, inputs })),
+      v: 2,
+      ...(this.programHash ? { h: this.programHash } : { program: slim(this.source) }),
+      // the whole image against zeros: an idle controller packs down to a few bytes
+      st: { m: toBase64(encodeDiff(new Uint8Array(image.length), image)), r: this.runtimeState, c: this.cycle },
+      in: toBase64(this.sampleField() ?? new Uint8Array(0)),
+      n,
+      dt: deltaMs,
+      tr: true,
     };
   }
 
-  private apply(response: EvaluateResponse, n: number, deltaMs: number, rtt: number, traceValid: boolean): ScanReport | null {
-    if (!response.ok || !response.state) {
-      this.fail(new PlcEngineError('The engine rejected the program'));
+  private apply(response: EvaluateResponse, n: number, deltaMs: number, rtt: number, sameProgram: boolean): ScanReport | null {
+    if (!response.ok || response.m === undefined || response.r === undefined || response.c === undefined) {
+      const first = response.cd?.find((d) => d.severity === 'error');
+      this.fail(new PlcEngineError(first ? `The engine rejected the program: ${first.message}` : 'The engine rejected the program'));
       return null;
     }
     const clock = this.options.clock ?? defaultClock;
     const { fieldIo, statusFlagMirror } = this.options;
-    const last = response.scans[response.scans.length - 1];
 
-    this.runtimeState = response.state.runtime;
-    this.cycle = response.state.cycle;
+    this.runtimeState = response.r;
+    this.cycle = response.c;
+    if (sameProgram && response.h) this.programHash = response.h; // from now on send the hash, not the program
+
+    // Per-scan results arrive sparse: one flag byte per scan, diagnostics only where a scan had some.
+    const flagBytes = response.sc?.f ? fromBase64(response.sc.f) : null;
+    const lastFlags = flagBytes?.[n - 1] ?? 0;
+    const statusFlags = { zero: (lastFlags & 1) !== 0, overflow: (lastFlags & 2) !== 0, negative: (lastFlags & 4) !== 0, divideByZero: (lastFlags & 8) !== 0 };
 
     this.memory.transaction(() => {
-      this.memory.restore(decodeMemory(response.state!.memory));
+      // The reply lists only the cells this batch changed; write them over the memory as it is now,
+      // so anything the user touched while the request was in flight (and the server left alone) stays.
+      const template = this.memory.snapshot();
+      const patched = applyDiff(flattenSnapshot(template), fromBase64(response.m!));
+      this.memory.restore(unflattenSnapshot(template, patched) as ReturnType<MemoryMap['snapshot']>);
       this.syncInputs(); // keep optimistic input toggles that happened while the request was in flight
-      if (statusFlagMirror && last) {
-        if (statusFlagMirror.zero) this.memory.writeBit(statusFlagMirror.zero, last.statusFlags.zero);
-        if (statusFlagMirror.overflow) this.memory.writeBit(statusFlagMirror.overflow, last.statusFlags.overflow);
-        if (statusFlagMirror.negative) this.memory.writeBit(statusFlagMirror.negative, last.statusFlags.negative);
-        if (statusFlagMirror.divideByZero) this.memory.writeBit(statusFlagMirror.divideByZero, last.statusFlags.divideByZero);
+      if (statusFlagMirror) {
+        if (statusFlagMirror.zero) this.memory.writeBit(statusFlagMirror.zero, statusFlags.zero);
+        if (statusFlagMirror.overflow) this.memory.writeBit(statusFlagMirror.overflow, statusFlags.overflow);
+        if (statusFlagMirror.negative) this.memory.writeBit(statusFlagMirror.negative, statusFlags.negative);
+        if (statusFlagMirror.divideByZero) this.memory.writeBit(statusFlagMirror.divideByZero, statusFlags.divideByZero);
       }
     });
-    if (response.outputs && fieldIo?.commitOutputs) fieldIo.commitOutputs(fromBase64(response.outputs));
+    if (response.o && fieldIo?.commitOutputs) fieldIo.commitOutputs(fromBase64(response.o));
 
     // The trace describes the program the request carried; skip it if the program changed since.
-    if (response.trace && traceValid) {
-      applyWireTrace(this.trace, this.program.networks.map((c) => c.root), response.trace, fromBase64);
+    if (response.tr && sameProgram) {
+      applyWireTrace(this.trace, this.program.networks.map((c) => c.root), response.tr, fromBase64);
     }
 
-    const scanTimeMs = (response.serverMs ?? 0) / Math.max(1, n);
+    const scanTimeMs = (response.ms ?? 0) / Math.max(1, n);
     this.minScanMs = Math.min(this.minScanMs, scanTimeMs);
     this.maxScanMs = Math.max(this.maxScanMs, scanTimeMs);
     this.scanTimes.push(scanTimeMs);
@@ -362,13 +387,8 @@ export class RemoteRuntime implements PlcRuntimePort {
     };
     this.lastMetrics = metrics;
 
-    const diagnostics = dedupe(response.scans.flatMap((scan) => scan.diagnostics));
-    const report: ScanReport = {
-      metrics,
-      diagnostics,
-      statusFlags: last?.statusFlags ?? { zero: false, overflow: false, negative: false, divideByZero: false },
-      memoryVersion: this.memory.version,
-    };
+    const diagnostics = dedupe((response.sc?.g ?? []).flatMap(([, list]) => list));
+    const report: ScanReport = { metrics, diagnostics, statusFlags, memoryVersion: this.memory.version };
     for (const diagnostic of diagnostics) this.emit({ type: 'diagnostic', diagnostic });
     this.batches += 1;
     if (this.batches % this.options.scanEventEvery === 0) this.emit({ type: 'scan', report });

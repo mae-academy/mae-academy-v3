@@ -15,6 +15,8 @@ export interface LimitResult {
   readonly remaining: number;
   /** Epoch ms at which the window has room again. */
   readonly reset: number;
+  /** Background work the caller should keep alive after replying (`waitUntil`), e.g. a Redis sync. */
+  readonly pending?: Promise<unknown>;
 }
 
 export interface Limiter {
@@ -66,6 +68,52 @@ export class MemoryLimiter implements Limiter {
 }
 
 const UPSTASH_TIMEOUT_MS = 400;
+const SYNC_TIMEOUT_MS = 3000;
+
+/** The shared (cross-instance) counter; Upstash in production, a stub in tests. */
+export interface RemoteCounter {
+  limit(key: string): Promise<{ success: boolean; reset: number }>;
+}
+
+/**
+ * For hot routes (the live simulation): the admission decision comes from the local window in
+ * microseconds, and the shared Redis count is updated in the background. If Redis later reports the
+ * IP over its global limit, that IP is refused locally until the window resets, so a burst can
+ * overshoot by about one request per instance but the Redis round trip never sits in the response
+ * time.
+ */
+export class HybridLimiter implements Limiter {
+  private readonly blocked = new Map<string, number>();
+
+  constructor(
+    private readonly local: Limiter,
+    private readonly remote: RemoteCounter,
+    private readonly max: number,
+    private readonly now: () => number = Date.now,
+  ) {}
+
+  async limit(key: string): Promise<LimitResult> {
+    const now = this.now();
+    const until = this.blocked.get(key);
+    if (until !== undefined) {
+      if (until > now) return { success: false, limit: this.max, remaining: 0, reset: until };
+      this.blocked.delete(key);
+    }
+    const result = await this.local.limit(key);
+    if (!result.success) return result;
+    if (this.blocked.size > 10_000) this.blocked.forEach((t, k) => t <= now && this.blocked.delete(k));
+
+    const pending = Promise.race([
+      this.remote.limit(key),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('redis sync timeout')), SYNC_TIMEOUT_MS)),
+    ])
+      .then((shared) => {
+        if (!shared.success) this.blocked.set(key, shared.reset);
+      })
+      .catch(() => undefined); // Redis trouble never affects the user; the local window still protects us
+    return { ...result, pending };
+  }
+}
 
 /** Upstash sliding window; any Redis failure or slowness falls back to the in-memory limiter. */
 class RedisLimiter implements Limiter {
@@ -106,5 +154,6 @@ export function createLimiter(tier: Tier, env: LimiterEnv): Limiter {
     prefix: `mae:rl:${tier}`,
     analytics: false,
   });
-  return new RedisLimiter(remote, memory);
+  // The simulation loop must not wait on Redis; every other tier can.
+  return tier === 'plc' ? new HybridLimiter(memory, remote, limit) : new RedisLimiter(remote, memory);
 }
