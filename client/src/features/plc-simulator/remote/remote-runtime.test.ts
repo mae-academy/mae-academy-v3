@@ -107,18 +107,40 @@ describe('RemoteRuntime (RUN) pipelining, optimism and failure handling', () => 
     runtime.stop();
   });
 
-  it('retries throttled requests, then recovers', async () => {
+  it('holds the last state through a 429 storm, warns once, and resumes', async () => {
     let n = 0;
-    const { runtime, memory, field } = make(async (body) => {
-      if (n++ < 2) throw new PlcEngineError('Simulation rate limit reached', 429, 5);
-      return inProcess(body);
-    });
+    const { runtime, memory, field, events } = make(
+      async (body) => {
+        if (n++ < 6) throw new PlcEngineError('Simulation rate limit reached', 429, 5); // far more than `retries`
+        return inProcess(body);
+      },
+      { minThrottleWaitMs: 1 },
+    );
     field.writeInput('I0.0', true);
     runtime.run();
-    await wait(200);
-    expect(runtime.mode).toBe('RUN');
-    expect(memory.readBit('Q0.0')).toBe(true);
+    await wait(100);
+    expect(runtime.mode).toBe('RUN'); // still running, not dropped to STOP
+    await wait(300);
+    expect(memory.readBit('Q0.0')).toBe(true); // resumed once the limit cleared
+    const warnings = events.filter((e) => e.type === 'diagnostic' && e.diagnostic.code === 'ENGINE_THROTTLED');
+    expect(warnings).toHaveLength(1); // one warning per throttled request, not one per retry
     runtime.stop();
+  });
+
+  it('a 429 does not leave an unhandled rejection behind when stopped mid-wait', async () => {
+    const unhandled: unknown[] = [];
+    const listener = (reason: unknown) => unhandled.push(reason);
+    process.on('unhandledRejection', listener);
+    const { runtime } = make(async () => {
+      throw new PlcEngineError('Simulation rate limit reached', 429, 5000);
+    });
+    runtime.run();
+    await wait(30);
+    runtime.stop();
+    await wait(30);
+    process.off('unhandledRejection', listener);
+    expect(unhandled).toEqual([]);
+    expect(runtime.mode).toBe('STOP');
   });
 
   it('drops to STOP with an ENGINE_UNREACHABLE diagnostic when the engine is down', async () => {

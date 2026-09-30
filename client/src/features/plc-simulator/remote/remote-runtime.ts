@@ -40,8 +40,10 @@ export interface RemoteRuntimeOptions {
   readonly transport?: PlcTransport;
   /** Scans per request at the default 20 ms period; grows automatically on slow links. */
   readonly batchScans?: number;
-  /** Extra attempts after a transient failure (network error, 429, 5xx). */
+  /** Extra attempts after a transient failure (network error, 5xx). A 429 is retried for as long as the run lasts. */
   readonly retries?: number;
+  /** Floor for the wait after a 429, whatever Retry-After says. */
+  readonly minThrottleWaitMs?: number;
 }
 
 const DEFAULTS: { targetScanMs: number; stepDeltaMs: number; maxDeltaMs: number; clearOutputsOnStop: boolean; scanEventEvery: number } = { targetScanMs: 20, stepDeltaMs: 20, maxDeltaMs: 250, clearOutputsOnStop: true, scanEventEvery: 1 };
@@ -76,6 +78,7 @@ export class RemoteRuntime implements PlcRuntimePort {
   private readonly transport: PlcTransport;
   private readonly baseBatch: number;
   private readonly retries: number;
+  private readonly minThrottleWaitMs: number;
   private readonly listeners = new Set<PlcEventListener>();
   private readonly trace = new FlowTrace();
 
@@ -96,11 +99,12 @@ export class RemoteRuntime implements PlcRuntimePort {
   private maxScanMs = 0;
 
   constructor(readonly memory: MemoryMap, program: LadderProgram, options: RemoteRuntimeOptions = {}) {
-    const { transport, batchScans, retries, ...rest } = options;
+    const { transport, batchScans, retries, minThrottleWaitMs, ...rest } = options;
     this.options = { ...DEFAULTS, ...rest };
     this.transport = transport ?? evaluateRemote;
     this.baseBatch = Math.max(1, Math.min(MAX_BATCH, batchScans ?? 5));
     this.retries = retries ?? 2;
+    this.minThrottleWaitMs = minThrottleWaitMs ?? 1_000;
     this.source = program;
     this.program = compileProgram(program, memory.profile);
   }
@@ -270,14 +274,34 @@ export class RemoteRuntime implements PlcRuntimePort {
   }
 
   private async send(body: EvaluateBody, generation: number): Promise<EvaluateResponse | null> {
-    for (let attempt = 0; ; attempt++) {
+    let failures = 0;
+    let warned = false;
+    for (;;) {
       try {
         return await this.transport(body);
       } catch (error) {
+        if (error instanceof PlcEngineError && error.status === 429) {
+          // Throttled: keep the last frame on screen, tell the user once, and try again after the
+          // server's Retry-After. Nothing is lost, because the engine is stateless and we resend.
+          const waitMs = Math.min(15_000, Math.max(this.minThrottleWaitMs, error.retryAfterMs ?? 2_000));
+          if (!warned) {
+            warned = true;
+            this.emit({
+              type: 'diagnostic',
+              diagnostic: {
+                code: 'ENGINE_THROTTLED',
+                severity: 'warning',
+                message: `Too many simulation requests; holding the last state and retrying in ${Math.ceil(waitMs / 1000)} s`,
+              },
+            });
+          }
+          if (!(await this.sleep(waitMs, generation))) return null;
+          continue;
+        }
         const retryable = error instanceof PlcEngineError ? error.retryable : true;
-        if (!retryable || attempt >= this.retries) throw error;
-        const backoff = error instanceof PlcEngineError && error.retryAfterMs ? error.retryAfterMs : 100 * 2 ** attempt;
-        if (!(await this.sleep(backoff, generation))) return null;
+        if (!retryable || failures >= this.retries) throw error;
+        if (!(await this.sleep(100 * 2 ** failures, generation))) return null;
+        failures += 1;
       }
     }
   }

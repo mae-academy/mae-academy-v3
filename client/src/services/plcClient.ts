@@ -48,7 +48,11 @@ export const evaluateRemote: PlcTransport = async (body, signal) => {
   if (!response.ok) {
     const retryAfter = Number(response.headers.get('retry-after'));
     throw new PlcEngineError(
-      response.status === 429 ? 'Simulation rate limit reached' : `Simulation engine error (${response.status})`,
+      response.status === 429
+        ? 'Simulation rate limit reached'
+        : response.status === 403
+          ? 'The simulation engine refused this request'
+          : `Simulation engine error (${response.status})`,
       response.status,
       Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : undefined,
     );

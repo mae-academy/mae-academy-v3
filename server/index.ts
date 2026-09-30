@@ -10,6 +10,8 @@ import { libraryResolveHandler } from "./libraryResolve";
 import { featuredHandler, isFeaturedUrl, warmFeatured } from "./featured";
 import { createThumbHandler } from "./pdfThumb";
 import { handleEvaluate } from "../api/_lib/plc/handler";
+import { expressGuard } from "../api/_lib/security/node-adapter";
+import type { Tier } from "../api/_lib/security/ratelimit";
 import { pdfCheckHandler, pdfDownloadHandler, pdfProxyHandler } from "./pdfProxy";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -18,6 +20,16 @@ const __dirname = path.dirname(__filename);
 async function startServer() {
   const app = express();
   const server = createServer(app);
+  // Every /api route passes the origin check and a per-IP rate limit. Covers, thumbnails and PDF
+  // range requests fire once per visible card or page, so they get a higher tier than the rest.
+  const tierFor = (path: string): Tier =>
+    path.startsWith("/plc/")
+      ? "plc"
+      : /^\/(pdf-thumb|pdf-proxy|pdf-download|library\/cover)/.test(path)
+        ? "assets"
+        : "general";
+  app.use("/api", expressGuard(tierFor));
+
   // Same web-standard handler Vercel runs for api/plc/evaluate.ts; mounted ahead of the global
   // JSON parser so the handler sees the raw body and applies its own (larger) size limit.
   app.post("/api/plc/evaluate", express.text({ type: "*/*", limit: "512kb" }), async (req, res) => {

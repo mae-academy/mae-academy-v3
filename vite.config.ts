@@ -236,9 +236,9 @@ function vitePluginPlcApi(): Plugin {
             chunks.push(chunk as Buffer);
           }
           const { POST } = await server.ssrLoadModule(path.resolve(PROJECT_ROOT, "api/plc/evaluate.ts"));
-          const response: Response = await POST(
-            new Request("http://localhost/api/plc/evaluate", { method: "POST", body: Buffer.concat(chunks) }),
-          );
+          const { toWebRequest } = await server.ssrLoadModule(path.resolve(PROJECT_ROOT, "api/_lib/security/node-adapter.ts"));
+          // POST is the guarded handler: origin check + rate limit run here exactly as on Vercel.
+          const response: Response = await POST(toWebRequest(req, "http://localhost/api/plc/evaluate", Buffer.concat(chunks)));
           res.statusCode = response.status;
           response.headers.forEach((value, key) => res.setHeader(key, value));
           res.end(await response.text());
