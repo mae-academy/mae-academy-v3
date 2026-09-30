@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { S7_200_CPU224 } from '../../domain/hardware';
 import { MemoryMap } from '../../domain/memory';
-import { PlcRuntime } from '../../engine/plc-runtime';
+import { RemoteRuntime } from '../../remote/remote-runtime';
+import { inProcessTransport } from '../../remote/test-utils';
 import type { LadderProgram } from '../../domain/ast';
 import { createFrameStore } from './frame-store';
 import { VirtualField, bitAddress } from './virtual-field';
@@ -35,7 +36,7 @@ describe('VirtualField', () => {
     expect(field.getRevision()).toBe(2);
   });
 
-  it('feeds the scan cycle and receives the latched outputs', () => {
+  it('feeds the scan cycle and receives the latched outputs', async () => {
     const memory = new MemoryMap(S7_200_CPU224);
     const field = new VirtualField(14, 10);
     const program: LadderProgram = {
@@ -53,16 +54,16 @@ describe('VirtualField', () => {
         },
       ],
     };
-    const runtime = new PlcRuntime(memory, program, { fieldIo: field, scheduler: { schedule: () => 0, cancel: () => {} }, clock: () => 0 });
+    const runtime = new RemoteRuntime(memory, program, { fieldIo: field, scheduler: { schedule: () => 0, cancel: () => {} }, clock: () => 0, transport: inProcessTransport });
 
     field.writeInput('I0.3', true);
-    runtime.step();
+    await runtime.step();
     expect(memory.readBit('Q1.1')).toBe(true);
     expect(field.getOutput(9)).toBe(true);
     expect(bitAddress('Q', 9)).toBe('Q1.1');
 
     field.writeInput('I0.3', false);
-    runtime.step();
+    await runtime.step();
     expect(field.getOutput(9)).toBe(false);
   });
 

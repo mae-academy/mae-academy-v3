@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { jsxLocPlugin } from "@builder.io/vite-plugin-jsx-loc";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
@@ -209,6 +210,48 @@ function vitePluginStorageProxy(): Plugin {
   };
 }
 
+/**
+ * Serves api/plc/evaluate inside `pnpm dev`, so the serverless engine works without the Express
+ * server or the Vercel CLI. The engine is loaded through Vite's SSR loader (hot-reloads on edit)
+ * and stays server-side: the client only ever sees the fetch to /api/plc/evaluate.
+ */
+function vitePluginPlcApi(): Plugin {
+  return {
+    name: "plc-api-dev",
+    apply: "serve",
+    configureServer(server: ViteDevServer) {
+      server.middlewares.use("/api/plc/evaluate", async (req, res) => {
+        if (req.method !== "POST") {
+          res.statusCode = 405;
+          res.setHeader("allow", "POST");
+          res.end();
+          return;
+        }
+        try {
+          const chunks: Buffer[] = [];
+          let size = 0;
+          for await (const chunk of req) {
+            size += (chunk as Buffer).length;
+            if (size > 1024 * 1024) break;
+            chunks.push(chunk as Buffer);
+          }
+          const { POST } = await server.ssrLoadModule(path.resolve(PROJECT_ROOT, "api/plc/evaluate.ts"));
+          const { toWebRequest } = await server.ssrLoadModule(path.resolve(PROJECT_ROOT, "api/_lib/security/node-adapter.ts"));
+          // POST is the guarded handler: origin check + rate limit run here exactly as on Vercel.
+          const response: Response = await POST(toWebRequest(req, "http://localhost/api/plc/evaluate", Buffer.concat(chunks)));
+          res.statusCode = response.status;
+          response.headers.forEach((value, key) => res.setHeader(key, value));
+          res.end(await response.text());
+        } catch (error) {
+          server.config.logger.error(`plc-api-dev: ${error instanceof Error ? error.message : String(error)}`);
+          res.statusCode = 500;
+          res.end(JSON.stringify({ error: "Internal error" }));
+        }
+      });
+    },
+  };
+}
+
 const plugins = [
   react(),
   tailwindcss(),
@@ -216,6 +259,7 @@ const plugins = [
   vitePluginManusRuntime(),
   vitePluginManusDebugCollector(),
   vitePluginStorageProxy(),
+  vitePluginPlcApi(),
 ];
 
 export default defineConfig({
@@ -260,11 +304,16 @@ export default defineConfig({
       },
     ],
   },
+  test: {
+    // root is ./client; the serverless engine lives beside it in ./api
+    include: ["**/*.{test,spec}.?(c|m)[jt]s?(x)", "../api/**/*.test.ts", "../shared/**/*.test.ts"],
+  },
   envDir: path.resolve(import.meta.dirname),
   root: path.resolve(import.meta.dirname, "client"),
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+    sourcemap: false,
     rollupOptions: {
       output: {
         /**
@@ -350,6 +399,7 @@ export default defineConfig({
     allowedHosts: true,
     fs: {
       strict: true,
+      allow: [path.resolve(import.meta.dirname)],
       deny: ["**/.*"],
     },
     proxy: {

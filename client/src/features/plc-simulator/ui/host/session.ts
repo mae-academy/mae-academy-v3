@@ -1,6 +1,7 @@
 import type { HardwareProfile } from '../../domain/hardware';
 import { MemoryMap } from '../../domain/memory';
-import { PlcRuntime, type RuntimeOptions } from '../../engine/plc-runtime';
+import { RemoteRuntime, type RemoteRuntimeOptions } from '../../remote/remote-runtime';
+import type { PlcRuntimePort } from '../../remote/runtime-port';
 import type { Diagnostic, ExecutionMode } from '../../engine/types';
 import type { SimulationStore } from '../canvas/simulation';
 import { createSimulationStore } from '../canvas/simulation';
@@ -32,7 +33,7 @@ const sameDiagnostic = (a: Diagnostic, b: Diagnostic): boolean =>
  * one of those fields really changes, so a controller scanning at 50 Hz does not re-render the
  * toolbar or the hardware chassis on every scan.
  */
-function createHostStatus(runtime: PlcRuntime): HostStatusStore {
+function createHostStatus(runtime: PlcRuntimePort): HostStatusStore {
   let snapshot: HostStatus = { mode: runtime.mode, fault: false, programOk: runtime.compiled.ok, diagnostics: [] };
   const listeners = new Set<() => void>();
 
@@ -89,7 +90,7 @@ export interface HostSession {
   readonly profile: HardwareProfile;
   readonly memory: MemoryMap;
   readonly field: VirtualField;
-  readonly runtime: PlcRuntime;
+  readonly runtime: PlcRuntimePort;
   readonly store: SimulationStore;
   /** Paces the LCD and scan readouts at display rate. */
   readonly frame: FrameStore;
@@ -99,11 +100,16 @@ export interface HostSession {
 export function createSession(
   profile: HardwareProfile,
   networks: readonly Network[],
-  runtimeOptions: Partial<RuntimeOptions> = {},
+  runtimeOptions: RemoteRuntimeOptions = {},
 ): HostSession {
   const memory = new MemoryMap(profile);
   const field = new VirtualField(profile.memory.I?.bitCount ?? 0, profile.memory.Q?.bitCount ?? 0);
-  const runtime = new PlcRuntime(memory, toProgram(networks, profile), { fieldIo: field, ...runtimeOptions });
+  const program = toProgram(networks, profile);
+  const runtime = new RemoteRuntime(memory, program, { fieldIo: field, ...runtimeOptions });
+  // A flipped switch shows on the LED and contacts at once; the controller reacts on the next batch.
+  field.subscribe(() => {
+    if (runtime.mode !== 'STOP') runtime.syncInputs();
+  });
   const store = createSimulationStore(runtime); // also switches FlowTrace on
   const frame = createFrameStore((notify) => {
     const offMemory = memory.subscribe(notify);

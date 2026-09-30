@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import type { Network } from '../../domain/ast';
 import type { HardwareProfile } from '../../domain/hardware';
 import type { CompiledProgram } from '../../engine/compiler';
-import type { RuntimeOptions } from '../../engine/plc-runtime';
+import type { RemoteRuntimeOptions } from '../../remote/remote-runtime';
 import type { ScanMetrics } from '../../engine/types';
 import { exportMicroWin, type ExportFile, type SymbolMap } from '../../transpiler';
 import type { SimulationStore } from '../canvas/simulation';
@@ -15,7 +15,7 @@ import { createSession, type HostSession, type HostStatus } from './session';
 
 export interface PlcHostOptions {
   /** Overrides for the runtime (clock and scheduler are injected by tests). */
-  readonly runtimeOptions?: Partial<RuntimeOptions>;
+  readonly runtimeOptions?: RemoteRuntimeOptions;
   readonly initialScanMs?: number;
   readonly symbols?: SymbolMap;
   /**

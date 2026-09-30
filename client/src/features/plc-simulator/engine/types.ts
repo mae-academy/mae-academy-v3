@@ -28,7 +28,9 @@ export type DiagnosticCode =
   | 'DUPLICATE_INSTANCE'
   | 'MCR_DEPTH_EXCEEDED'
   | 'MCR_UNBALANCED'
-  | 'SCAN_WATCHDOG';
+  | 'SCAN_WATCHDOG'
+  | 'ENGINE_UNREACHABLE'
+  | 'ENGINE_THROTTLED';
 
 export interface Diagnostic {
   readonly code: DiagnosticCode;
