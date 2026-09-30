@@ -15,6 +15,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Route, Switch, useLocation, Redirect } from "wouter";
 import ErrorBoundary from "@/components/ui/ErrorBoundary";
+import { useCanonical } from "@/hooks/useCanonical";
 import MainLayout from "./components/MainLayout";
 import { lazyRetry } from "@/lib/lazyRetry";
 import { prefetchCoreRoutes, prefetchSimulatorHub } from "@/lib/routePrefetch";
@@ -40,6 +41,7 @@ const HiddenSymbolDesigner = lazyRetry(() => import("./simulators/circuit-engine
 
 function AnimatedRoutes() {
   const [location] = useLocation();
+  useCanonical(location);
   const [, startTransition] = useTransition();
   const deferredLocation = useRef(location);
 

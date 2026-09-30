@@ -1,0 +1,7 @@
+.git
+.github
+.manus-logs
+.playwright-mcp
+.vite
+*.test.*
+__tests__
