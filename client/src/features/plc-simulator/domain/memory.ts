@@ -63,6 +63,7 @@ export class MemoryMap {
   private readonly parsedCache = new Map<string, ParsedAddress>();
   private pending: MemoryChange[] | null = null;
   private _version = 0;
+  private restored = false;
 
   constructor(readonly profile: HardwareProfile) {
     for (const p of BYTE_AREAS) {
@@ -101,7 +102,10 @@ export class MemoryMap {
     } finally {
       if (outer) {
         this.pending = null;
-        if (batch.length > 0) this.flush(batch);
+        if (batch.length > 0 || this.restored) {
+          this.restored = false;
+          this.flush(batch);
+        }
       }
     }
   }
@@ -209,6 +213,30 @@ export class MemoryMap {
       if (s) indexed[p] = { current: s.current.slice(), preset: s.preset.slice(), status: s.status.slice() };
     }
     return { profileId: this.profile.id, bytes, indexed };
+  }
+
+  /**
+   * Loads a snapshot produced by {@link snapshot} (the remote engine's result) and notifies once;
+   * inside a `transaction` the notification joins the surrounding batch.
+   */
+  restore(snapshot: MemorySnapshot): void {
+    if (snapshot.profileId !== this.profile.id) throw new PlcAddressError('Snapshot belongs to another profile');
+    for (const p of BYTE_AREAS) {
+      const dst = this.bytes[p];
+      const src = snapshot.bytes[p];
+      if (dst && src && src.length === dst.length) dst.set(src);
+    }
+    for (const p of INDEXED_AREAS) {
+      const dst = this.indexed[p];
+      const src = snapshot.indexed[p];
+      if (dst && src && src.current.length === dst.current.length) {
+        dst.current.set(src.current);
+        dst.preset.set(src.preset);
+        dst.status.set(src.status);
+      }
+    }
+    if (this.pending === null) this.flush([]);
+    else this.restored = true;
   }
 
   /** Zeroes all memory (STOP -> RUN cold start) and notifies once. */

@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { LOGO_0BA8, S7_200_CPU224, S7_200_CPU226_EXP } from '../../domain/hardware';
 import { MemoryMap } from '../../domain/memory';
-import { PlcRuntime } from '../../engine/plc-runtime';
+import { RemoteRuntime } from '../../remote/remote-runtime';
+import { inProcessTransport } from '../../remote/test-utils';
 import { ladToIl, exportMicroWin } from '../../transpiler';
 import { DEMO_SYMBOLS, DEMO_STL, createDemoNetworks } from './demo-program';
 import { VirtualField } from '../hardware/virtual-field';
@@ -31,36 +32,36 @@ describe('demo program', () => {
     expect(alarm?.nodes.find((n) => n.type === 'coil')).toMatchObject({ target: 'Q0.1' });
   });
 
-  it('behaves: latches on start, alarms after exactly 5 s, and resets on stop', () => {
+  it('behaves: latches on start, alarms after exactly 5 s, and resets on stop', async () => {
     const memory = new MemoryMap(S7_200_CPU224);
     const field = new VirtualField(14, 10);
     let now = 0;
-    const runtime = new PlcRuntime(
+    const runtime = new RemoteRuntime(
       memory,
       { schemaVersion: 1, profileId: S7_200_CPU224.id, networks: createDemoNetworks() },
-      { fieldIo: field, clock: () => now, stepDeltaMs: 100, scheduler: { schedule: () => 0, cancel: () => {} } },
+      { fieldIo: field, clock: () => now, stepDeltaMs: 100, scheduler: { schedule: () => 0, cancel: () => {} }, transport: inProcessTransport },
     );
-    const scan = (n = 1) => {
-      for (let i = 0; i < n; i++) runtime.step();
+    const scan = async (n = 1) => {
+      for (let i = 0; i < n; i++) await runtime.step();
     };
 
-    scan(3);
+    await scan(3);
     expect(memory.readBit('Q0.0')).toBe(false);
 
     field.writeInput('I0.0', true); // press start
-    scan();
+    await scan();
     field.writeInput('I0.0', false); // release: the seal-in holds the motor
-    scan(20);
+    await scan(20);
     expect(memory.readBit('Q0.0')).toBe(true);
     expect(memory.readBit('Q0.1')).toBe(false); // ~2.1 s in: not yet
 
-    scan(28); // 50 scans of 100 ms since the motor started
+    await scan(28); // 50 scans of 100 ms since the motor started
     expect(memory.readBit('Q0.1')).toBe(false);
-    scan(3);
+    await scan(3);
     expect(memory.readBit('Q0.1')).toBe(true);
 
     field.writeInput('I0.1', true); // stop
-    scan(2);
+    await scan(2);
     expect(memory.readBit('Q0.0')).toBe(false);
     expect(memory.readBit('Q0.1')).toBe(false); // the timer resets with the motor
     expect(now).toBe(0);

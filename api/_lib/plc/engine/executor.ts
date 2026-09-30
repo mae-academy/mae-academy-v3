@@ -83,6 +83,11 @@ export class ScanExecutor {
     return this.cycle;
   }
 
+  /** Resumes the scan counter of a previous request (timer `lastScan` bookkeeping depends on it). */
+  restoreCycle(cycle: number): void {
+    this.cycle = cycle;
+  }
+
   /** Enables (or, with `null`, disables) power-flow recording for the UI. */
   setTrace(trace: FlowTrace | null): void {
     this.ctx.trace = trace;

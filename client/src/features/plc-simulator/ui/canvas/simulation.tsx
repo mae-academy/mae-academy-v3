@@ -3,11 +3,11 @@ import type { MemoryMap } from '../../domain/memory';
 import type { Network } from '../../domain/ast';
 import type { EvalTree } from '../../engine/compiler';
 import type { FlowTrace } from '../../engine/flow-trace';
-import type { PlcRuntime } from '../../engine/plc-runtime';
+import type { PlcRuntimePort } from '../../remote/runtime-port';
 import type { FlowRef } from './wiring';
 
 /**
- * Bridge between a running `PlcRuntime` and the canvas.
+ * Bridge between a running controller (`PlcRuntimePort`) and the canvas.
  *
  * The store fans one runtime subscription out to any number of components, and every hook below
  * hands `useSyncExternalStore` a *primitive* snapshot (a boolean or a number). React therefore only
@@ -25,7 +25,7 @@ export interface SimulationStore {
   treeFor(network: Network): EvalTree | null;
 }
 
-export function createSimulationStore(runtime: PlcRuntime): SimulationStore {
+export function createSimulationStore(runtime: PlcRuntimePort): SimulationStore {
   const trace = runtime.enableFlowTrace();
   const listeners = new Set<() => void>();
   let version = 0;

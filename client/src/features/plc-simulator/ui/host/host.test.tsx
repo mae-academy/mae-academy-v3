@@ -5,6 +5,7 @@ import { LOGO_0BA8, S7_200_CPU224, S7_200_CPU226_EXP } from '../../domain/hardwa
 import type { Network } from '../../domain/ast';
 import type { Scheduler } from '../../engine/types';
 import { ilToLad } from '../../transpiler';
+import { inProcessTransport, settle } from '../../remote/test-utils';
 import { PlcSimulatorApp } from './PlcSimulatorApp';
 
 // Radix Slider measures its thumb with ResizeObserver, which jsdom does not implement.
@@ -13,6 +14,9 @@ globalThis.ResizeObserver ??= class {
   unobserve(): void { }
   disconnect(): void { }
 };
+
+// Each scan is now an async round trip to the engine handler, and these suites render a full UI.
+vi.setConfig({ testTimeout: 20_000 });
 
 afterEach(() => {
   cleanup();
@@ -33,13 +37,17 @@ function manual() {
     },
   };
   return {
-    runtimeOptions: { scheduler, clock: () => now },
+    runtimeOptions: { scheduler, clock: () => now, transport: inProcessTransport, batchScans: 1 },
     /** Advance simulated time and let the scan loop fire once. */
-    scan(ms = 20) {
+    async scan(ms = 20) {
       now += ms;
       const cb = pending;
       pending = null;
-      act(() => cb?.());
+      // the engine answers over an async round trip, so let the request and its reply settle
+      await act(async () => {
+        cb?.();
+        await settle();
+      });
     },
   };
 }
@@ -59,7 +67,7 @@ const status = () => screen.getByRole('status', { name: '' }) ?? null;
 const mode = () => within(screen.getByRole('toolbar', { name: 'Execution controls' })).getAllByRole('status')[0]?.textContent;
 
 describe('S7-200 host', () => {
-  it('runs the program against the virtual hardware end to end', () => {
+  it('runs the program against the virtual hardware end to end', async () => {
     const sched = manual();
     const { container } = render(<PlcSimulatorApp initialNetworks={SEAL} runtimeOptions={sched.runtimeOptions} />);
     expect(mode()).toBe('STOP');
@@ -67,28 +75,28 @@ describe('S7-200 host', () => {
     fireEvent.click(screen.getByRole('button', { name: 'I0.0 ON' }));
     fireEvent.click(screen.getByRole('button', { name: 'Run' }));
     expect(mode()).toBe('RUN');
-    sched.scan();
+    await sched.scan();
 
     expect(led(container, 'Q0.0 on')).toBeDefined();
 
     // the seal-in keeps Q0.0 after the start switch is released...
     fireEvent.click(screen.getByRole('button', { name: 'I0.0 OFF' }));
-    sched.scan();
+    await sched.scan();
     expect(led(container, 'Q0.0 on')).toBeDefined();
     // ...until stop is pressed
     fireEvent.click(screen.getByRole('button', { name: 'I0.1 ON' }));
-    sched.scan();
+    await sched.scan();
     expect(led(container, 'Q0.0 off')).toBeDefined();
   });
 
-  it('shows live power flow on the canvas and locks editing while running, then unlocks on stop', () => {
+  it('shows live power flow on the canvas and locks editing while running, then unlocks on stop', async () => {
     const sched = manual();
     const { container } = render(<PlcSimulatorApp initialNetworks={SEAL} runtimeOptions={sched.runtimeOptions} />);
     expect(container.querySelector('[data-cell]')).not.toBeNull(); // editable in STOP
 
     fireEvent.click(screen.getByRole('button', { name: 'I0.0 ON' }));
     fireEvent.click(screen.getByRole('button', { name: 'Run' }));
-    sched.scan();
+    await sched.scan();
 
     expect(container.querySelector('[data-cell]')).toBeNull(); // locked
     expect(nodesLayer(container).querySelector('[class*="stroke-[#6366f1]"]')).not.toBeNull();
@@ -100,13 +108,13 @@ describe('S7-200 host', () => {
     expect(led(container, 'Q0.0 off')).toBeDefined(); // outputs de-energised on STOP
   });
 
-  it('runs, pauses, and resumes execution without single step button', () => {
+  it('runs, pauses, and resumes execution without single step button', async () => {
     const sched = manual();
     const { container } = render(<PlcSimulatorApp initialNetworks={SEAL} runtimeOptions={sched.runtimeOptions} />);
     expect(screen.queryByRole('button', { name: 'Single step' })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'I0.0 ON' }));
     fireEvent.click(screen.getByRole('button', { name: /Run|Resume/ }));
-    sched.scan();
+    await sched.scan();
     expect(mode()).toBe('RUN');
     expect(led(container, 'Q0.0 on')).toBeDefined();
     // pausing keeps the outputs; Run resumes without a cold start
@@ -203,12 +211,12 @@ describe('hardware profile switching', () => {
     expect(screen.queryByRole('searchbox', { name: 'Search components' })).toBeNull();
   });
 
-  it('starts from a clean memory image after a switch', () => {
+  it('starts from a clean memory image after a switch', async () => {
     const sched = manual();
     const { container } = render(<PlcSimulatorApp initialNetworks={SEAL} runtimeOptions={sched.runtimeOptions} />);
     fireEvent.click(screen.getByRole('button', { name: 'I0.0 ON' }));
     fireEvent.click(screen.getByRole('button', { name: /Run|Resume/ }));
-    sched.scan();
+    await sched.scan();
     expect(led(container, 'Q0.0 on')).toBeDefined();
 
     fireEvent.change(screen.getByRole('combobox', { name: 'Hardware profile' }), { target: { value: S7_200_CPU226_EXP.id } });

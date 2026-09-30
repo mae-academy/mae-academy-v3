@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { LOGO_0BA8 } from '../../domain/hardware';
 import type { Scheduler } from '../../engine/types';
 import type { ScenarioId } from '../../logo/scenarios';
+import { inProcessTransport, settle } from '../../remote/test-utils';
 import { PlcSimulatorApp } from './PlcSimulatorApp';
 
 // Radix Slider measures its thumb with ResizeObserver, which jsdom does not implement.
@@ -14,6 +15,9 @@ globalThis.ResizeObserver ??= class {
   unobserve(): void {}
   disconnect(): void {}
 };
+
+// Each scan is now an async round trip to the engine handler, and these suites render a full UI.
+vi.setConfig({ testTimeout: 20_000 });
 
 afterEach(() => {
   cleanup();
@@ -34,13 +38,17 @@ function manual() {
     },
   };
   return {
-    runtimeOptions: { scheduler, clock: () => now },
+    runtimeOptions: { scheduler, clock: () => now, transport: inProcessTransport, batchScans: 1 },
     /** Advance simulated time and let the scan loop fire once. */
-    scan(ms = 20) {
+    async scan(ms = 20) {
       now += ms;
       const cb = pending;
       pending = null;
-      act(() => cb?.());
+      // the engine answers over an async round trip, so let the request and its reply settle
+      await act(async () => {
+        cb?.();
+        await settle();
+      });
     },
   };
 }
@@ -67,10 +75,10 @@ describe('LOGO! 0BA4 bench', () => {
     key('Down');
     key('OK'); // Start
     expect(mode()).toBe('RUN');
-    sched.scan();
+    await sched.scan();
 
     fireEvent.pointerDown(input(/^I1 S1 Stair buttons/));
-    sched.scan();
+    await sched.scan();
     await waitFor(() => expect(led(container, 'Relay Q1 closed')).toBeDefined());
     expect(led(container, 'H1 Stair lights energized')).toBeDefined();
     expect(container.querySelector('[data-relay="Q1"]')?.getAttribute('data-closed')).toBe('true');
@@ -80,10 +88,10 @@ describe('LOGO! 0BA4 bench', () => {
     await waitFor(() => expect(display().textContent).toContain('0..123456789'));
   });
 
-  it('confirms "Stop Prg" (No preselected) and halts on Yes', () => {
+  it('confirms "Stop Prg" (No preselected) and halts on Yes', async () => {
     const { sched } = startLogo();
     ['Down', 'Down', 'Down', 'OK'].forEach(key);
-    sched.scan();
+    await sched.scan();
     key('Escape');
     expect(display().textContent).toContain('>Stop');
     key('OK');
@@ -94,19 +102,19 @@ describe('LOGO! 0BA4 bench', () => {
     expect(display().textContent).toContain('>Program..');
   });
 
-  it('follows a stop issued from the toolbar', () => {
+  it('follows a stop issued from the toolbar', async () => {
     const { sched } = startLogo();
     ['Down', 'Down', 'Down', 'OK'].forEach(key);
-    sched.scan();
+    await sched.scan();
     fireEvent.click(screen.getByRole('button', { name: 'Stop' }));
     expect(mode()).toBe('STOP');
     expect(display().textContent).toContain('>Program..');
   });
 
-  it('edits a timer from Set Param while running', () => {
+  it('edits a timer from Set Param while running', async () => {
     const { sched } = startLogo();
     ['Down', 'Down', 'Down', 'OK'].forEach(key);
-    sched.scan();
+    await sched.scan();
     ['Escape', 'Down', 'OK'].forEach(key);
     expect(display().textContent).toContain('T  =30:00s');
     ['OK', 'Up', 'OK'].forEach(key);
@@ -118,7 +126,7 @@ describe('LOGO! 0BA4 bench', () => {
     const { sched, container } = startLogo();
     ['Down', 'Down', 'Down', 'OK'].forEach(key);
     fireEvent.pointerDown(input(/^I2 S2 Corridor button/));
-    sched.scan();
+    await sched.scan();
     await waitFor(() => expect(led(container, 'Relay Q2 closed')).toBeDefined());
 
     fireEvent.click(screen.getByRole('switch', { name: 'Mains breaker' }));
@@ -144,8 +152,8 @@ describe('LOGO! 0BA4 bench', () => {
 
     ['Down', 'Down', 'Down', 'OK'].forEach(key);
     fireEvent.pointerDown(input(/^I1 S1 Cycle enable/));
-    sched.scan();
-    sched.scan();
+    await sched.scan();
+    await sched.scan();
     await waitFor(() => expect(led(container, 'H3 Green lamp energized')).toBeDefined());
   });
 
@@ -199,7 +207,7 @@ describe('LOGO! 0BA4 bench', () => {
     expect(within(motorImg).queryByText('M')).toBeNull();
     expect(within(motorImg).queryByText('MOTOR')).toBeNull();
     fireEvent.pointerDown(input(/^I1 S1 Stair buttons/));
-    sched.scan();
+    await sched.scan();
     await waitFor(() => expect(rotor()).toBe('spinning'));
     fireEvent.pointerUp(input(/^I1 S1 Stair buttons/));
 
@@ -267,7 +275,7 @@ describe('LOGO! 0BA4 bench', () => {
     ]);
     fireEvent.click(within(menu).getByRole('menuitemradio', { name: 'Contactor drive coil' }));
     fireEvent.pointerDown(input(/^I1 S1 Stair buttons/));
-    sched.scan();
+    await sched.scan();
     await waitFor(() => expect(led(container, 'K1 Contactor coil energized')).toBeDefined());
     expect(container.querySelector('[data-relay="Q1"] [data-bridge]')).not.toBeNull();
 
@@ -375,9 +383,9 @@ describe('LOGO! program library, FBD viewer and manual', () => {
 
     ['Down', 'Down', 'Down', 'OK'].forEach(key);
     fireEvent.pointerDown(screen.getByRole('button', { name: /^I1 S1 START/ }));
-    sched.scan();
+    await sched.scan();
     fireEvent.pointerUp(screen.getByRole('button', { name: /^I1 S1 START/ }));
-    sched.scan();
+    await sched.scan();
     await waitFor(() => expect(fbd().querySelector('[data-fbd-block="B2"]')?.getAttribute('data-high')).toBe('true'));
     expect(fbd().querySelector('path[data-net="B2"]')?.getAttribute('class')).toContain('lb-flow');
     await waitFor(() => expect(fbd().querySelector('path[data-net="I1"]')?.getAttribute('data-high')).toBe('false')); // released, sealed in via Q1
@@ -392,9 +400,9 @@ describe('LOGO! program library, FBD viewer and manual', () => {
     fireEvent.change(screen.getByRole('combobox', { name: 'Application scenario' }), { target: { value: 'pre-lube' } });
     ['Down', 'Down', 'Down', 'OK'].forEach(key);
     fireEvent.pointerDown(screen.getByRole('button', { name: /^I1 S1 START/ }));
-    sched.scan();
-    sched.scan(1000);
-    sched.scan(1000);
+    await sched.scan();
+    await sched.scan(1000);
+    await sched.scan(1000);
     await waitFor(() => expect(container.querySelector('[data-fbd-live="B2"]')?.textContent).toMatch(/^2\.\d\d \/ 5\.00 s$/));
   });
 
@@ -454,14 +462,14 @@ describe('LOGO! physical keyboard', () => {
     expect(hint.textContent).toContain('Esc: Back');
   });
 
-  it('maps Enter to OK, arrows to navigation and Escape to the parameter menu', () => {
+  it('maps Enter to OK, arrows to navigation and Escape to the parameter menu', async () => {
     const { sched } = startLogo();
     press('ArrowDown');
     press('ArrowDown');
     press('ArrowDown');
     press('Enter'); // Start
     expect(mode()).toBe('RUN');
-    sched.scan();
+    await sched.scan();
     press('ArrowDown');
     expect(display().textContent).toContain('I:');
     press('Escape');
@@ -483,7 +491,7 @@ describe('LOGO! physical keyboard', () => {
     expect(display().textContent).toContain('>Program..');
   });
 
-  it('supports WASD navigation and dynamic keybindings customization', () => {
+  it('supports WASD navigation and dynamic keybindings customization', async () => {
     const { sched } = startLogo();
     // Toggle to WASD mode via quick toggle
     fireEvent.click(screen.getByRole('button', { name: 'WASD keys navigation' }));
@@ -496,7 +504,7 @@ describe('LOGO! physical keyboard', () => {
     press('s');
     press('Enter');
     expect(mode()).toBe('RUN');
-    sched.scan();
+    await sched.scan();
 
     // Navigate in RUN mode with 's'
     press('s');

@@ -60,6 +60,12 @@ const createCounterState = (): CounterState => ({
   lastScan: 0,
 });
 
+export interface RuntimeStateSnapshot {
+  edges: [NodeId, boolean][];
+  timers: [PlcAddress, TimerState][];
+  counters: [PlcAddress, CounterState][];
+}
+
 export class RuntimeState {
   /** Previous conduction state of P/N contacts, keyed by node. */
   private readonly contactEdges = new Map<NodeId, boolean>();
@@ -110,6 +116,22 @@ export class RuntimeState {
   /** Visits every live timer instance; used by Phase C to drain latched enables. */
   forEachTimer(visit: (instance: PlcAddress, state: TimerState) => void): void {
     this.timers.forEach((state, instance) => visit(instance, state));
+  }
+
+  /** Plain-object copy of everything that must survive between requests. */
+  exportState(): RuntimeStateSnapshot {
+    return {
+      edges: Array.from(this.contactEdges, ([id, level]) => [id, level] as [NodeId, boolean]),
+      timers: Array.from(this.timers, ([addr, t]) => [addr, { ...t, pending: t.pending ? { ...t.pending } : null }] as [PlcAddress, TimerState]),
+      counters: Array.from(this.counters, ([addr, c]) => [addr, { ...c }] as [PlcAddress, CounterState]),
+    };
+  }
+
+  importState(snapshot: RuntimeStateSnapshot): void {
+    this.clear();
+    for (const [id, level] of snapshot.edges) this.contactEdges.set(id, level);
+    for (const [addr, t] of snapshot.timers) this.timers.set(addr, { ...t, pending: t.pending ? { ...t.pending } : null });
+    for (const [addr, c] of snapshot.counters) this.counters.set(addr, { ...c });
   }
 
   /** Cold start: forget every edge and accumulator (STOP -> RUN transition). */

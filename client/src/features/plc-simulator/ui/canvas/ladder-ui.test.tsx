@@ -5,7 +5,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 import type { Branch, LadNode, Network } from '../../domain/ast';
 import { S7_200_CPU224 } from '../../domain/hardware';
 import { MemoryMap } from '../../domain/memory';
-import { PlcRuntime } from '../../engine/plc-runtime';
+import { RemoteRuntime } from '../../remote/remote-runtime';
+import { inProcessTransport } from '../../remote/test-utils';
 import type { FieldIoAdapter, Scheduler } from '../../engine/types';
 import { buildNetworkTree } from '../../engine/compiler';
 import { getEditorText, setEditorText } from '@/components/code-editor/testing';
@@ -347,7 +348,7 @@ describe('live power flow', () => {
   const LIVE = 'stroke-[#6366f1]';
   const isLive = (el: Element | null): boolean => (el?.getAttribute('class') ?? '').includes(LIVE);
 
-  it('energises exactly the wires and symbols power reaches, and follows the inputs', () => {
+  it('energises exactly the wires and symbols power reaches, and follows the inputs', async () => {
     let captured: EditorHandle | null = null;
     const view = render(<Harness onEditor={(editor) => (captured = editor)} sim={null} />);
     const networks = (captured as EditorHandle | null)?.networks;
@@ -355,10 +356,10 @@ describe('live power flow', () => {
 
     const memory = new MemoryMap(profile);
     const field = new Field();
-    const runtime = new PlcRuntime(
+    const runtime = new RemoteRuntime(
       memory,
       { schemaVersion: 1, profileId: profile.id, networks },
-      { fieldIo: field, scheduler: idle, clock: () => 0 },
+      { fieldIo: field, scheduler: idle, clock: () => 0, transport: inProcessTransport },
     );
     const store = createSimulationStore(runtime);
     view.rerender(<Harness onEditor={(editor) => (captured = editor)} sim={store} />);
@@ -369,8 +370,8 @@ describe('live power flow', () => {
 
     // Press start (I0.0): the whole rung including the coil lights up.
     field.inputs[0] = 0b01;
-    act(() => {
-      runtime.step();
+    await act(async () => {
+      await runtime.step();
     });
     expect(memory.readBit('Q0.0')).toBe(true);
     expect(isLive(container.querySelector('[data-layer="nodes"] [data-symbol="coil-OUT"] path'))).toBe(true);
@@ -381,16 +382,16 @@ describe('live power flow', () => {
 
     // Release start: the seal-in path keeps Q0.0 on, so the rung stays energised through the lower lane.
     field.inputs[0] = 0;
-    act(() => {
-      runtime.step();
+    await act(async () => {
+      await runtime.step();
     });
     expect(memory.readBit('Q0.0')).toBe(true);
     expect(isLive(container.querySelector('[data-wire="0:2-7"]'))).toBe(true);
 
     // Stop (I0.1 opens the NC contact): everything downstream goes dark again.
     field.inputs[0] = 0b10;
-    act(() => {
-      runtime.step();
+    await act(async () => {
+      await runtime.step();
     });
     expect(memory.readBit('Q0.0')).toBe(false);
     expect(isLive(container.querySelector('[data-wire="0:2-7"]'))).toBe(false);
@@ -406,10 +407,10 @@ describe('live power flow', () => {
     let captured: EditorHandle | null = null;
     const view = render(<Harness onEditor={(editor) => (captured = editor)} sim={null} />);
     const networks = (captured as EditorHandle | null)?.networks ?? [];
-    const runtime = new PlcRuntime(
+    const runtime = new RemoteRuntime(
       new MemoryMap(profile),
       { schemaVersion: 1, profileId: profile.id, networks },
-      { scheduler: idle, clock: () => 0 },
+      { scheduler: idle, clock: () => 0, transport: inProcessTransport },
     );
     view.rerender(<Harness onEditor={(editor) => (captured = editor)} sim={createSimulationStore(runtime)} />);
     expect(view.container.querySelector('[data-cell]')).toBeNull();

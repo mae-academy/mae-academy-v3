@@ -9,6 +9,7 @@ import { libraryDoabHandler, libraryDoabItemHandler } from "./libraryDoab";
 import { libraryResolveHandler } from "./libraryResolve";
 import { featuredHandler, isFeaturedUrl, warmFeatured } from "./featured";
 import { createThumbHandler } from "./pdfThumb";
+import { handleEvaluate } from "../api/_lib/plc/handler";
 import { pdfCheckHandler, pdfDownloadHandler, pdfProxyHandler } from "./pdfProxy";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -17,6 +18,18 @@ const __dirname = path.dirname(__filename);
 async function startServer() {
   const app = express();
   const server = createServer(app);
+  // Same web-standard handler Vercel runs for api/plc/evaluate.ts; mounted ahead of the global
+  // JSON parser so the handler sees the raw body and applies its own (larger) size limit.
+  app.post("/api/plc/evaluate", express.text({ type: "*/*", limit: "512kb" }), async (req, res) => {
+    const response = await handleEvaluate(
+      new Request("http://localhost/api/plc/evaluate", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: typeof req.body === "string" ? req.body : "",
+      }),
+    );
+    res.status(response.status).type("application/json").send(await response.text());
+  });
   app.use(express.json());
 
   app.post("/api/ai/analyze", async (req, res) => {

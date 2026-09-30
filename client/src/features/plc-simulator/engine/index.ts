@@ -1,10 +1,6 @@
+// Canvas-side engine surface: types, operand metadata, the series/parallel compiler (wire topology)
+// and the power-flow trace container. Execution itself runs on the server (api/_lib/plc).
 export * from './types';
 export * from './numeric';
-export * from './runtime-state';
-export * from './context';
 export * from './compiler';
-export * from './evaluator';
 export * from './flow-trace';
-export * from './executor';
-export * from './plc-runtime';
-export { executeNode, advanceAsyncTimers, type PinLevels } from './instructions';
