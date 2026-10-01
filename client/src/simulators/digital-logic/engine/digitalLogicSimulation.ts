@@ -95,7 +95,7 @@ export class DigitalLogicSimulationEngine extends SimulationEngine {
       this.documentedSnapshot = {
         time: this.documentedMna.getTime(),
         nodeVoltages: {}, terminalVoltages: {}, branchCurrents: {}, wireCurrents: {}, componentPowered: {}, componentIntensity: {}, nodeHistory: {}, branchHistory: {}, instrumentReadings: {},
-        warnings: [{ code: 'TAB_D_MNA', message }],
+        warnings: [{ code: error instanceof TabDMnaError ? error.code : 'TAB_D_MNA', message }],
         converged: false,
       };
       return this.documentedSnapshot;
@@ -152,6 +152,9 @@ export class DigitalLogicSimulationEngine extends SimulationEngine {
     const powerLatchModels: Array<{ id: string; gate: string; cathode: string; triggerVoltage: number; holdCurrent: number }> = [];
     const fuseModels: Array<{ id: string; ratedCurrent: number }> = [];
     const breakerModels: Array<{ id: string; tripCurrent: number }> = [];
+    /** Active (non-tri-state) logic drivers by net: two of them on one net is a direct output tie. */
+    const activeDrivers = new Map<string, string[]>();
+    const drive = (net: string, id: string) => activeDrivers.set(net, [...(activeDrivers.get(net) ?? []), id]);
     const digitalModels: Array<{ id: string; inputs: string[]; output: string; ground: string; threshold: number; highVoltage: number; delay: number; rule: (levels: boolean[]) => boolean }> = [];
     const priorVoltage = (node: string) => priorNodeVoltages[node] ?? 0;
     const relayClosed = (id: string) => this.tabDRelayStates.get(id) ?? false;
@@ -405,7 +408,7 @@ export class DigitalLogicSimulationEngine extends SimulationEngine {
           for (const phase of ['u', 'v', 'w']) primitives.push({ kind: 'resistor', id: `${component.id}:${phase}`, positive: p(phase), negative: p('pe'), resistance: phaseResistance });
           break;
         }
-        case 'digital-input': primitives.push({ kind: 'voltage', id: component.id, positive: p('out'), negative: p('gnd'), voltage: component.props.state === 'HIGH' ? value(component, 'highVoltage', 5) : 0 }); break;
+        case 'digital-input': drive(p('out'), component.id); primitives.push({ kind: 'voltage', id: component.id, positive: p('out'), negative: p('gnd'), voltage: component.props.state === 'HIGH' ? value(component, 'highVoltage', 5) : 0 }); break;
         case 'digital-output': primitives.push({ kind: 'resistor', id: component.id, positive: p('in'), negative: p('gnd'), resistance: 10_000_000 }); break;
         case 'gate-and': case 'gate-or': case 'gate-not': case 'gate-nand': case 'gate-nor': case 'gate-xor': case 'gate-xnor': {
           const unary = component.type === 'gate-not'; const inputs = unary ? [p('a')] : [p('a'), p('b')]; const ground = p('gnd'); const high = value(component, 'highVoltage', 5); const threshold = value(component, 'threshold', 2.5);
@@ -419,7 +422,7 @@ export class DigitalLogicSimulationEngine extends SimulationEngine {
             if (component.type === 'gate-xor') return a !== b;
             return a === b;
           };
-          const output = p('y'); const observed = inputs.map(input => priorVoltage(input) - priorVoltage(ground) >= threshold); const target = rule(observed) ? high : 0;
+          const output = p('y'); drive(output, component.id); const observed = inputs.map(input => priorVoltage(input) - priorVoltage(ground) >= threshold); const target = rule(observed) ? high : 0;
           primitives.push({ kind: 'voltage', id: component.id, positive: output, negative: ground, voltage: this.tabDDigitalLevels.get(component.id) ?? target });
           digitalModels.push({ id: component.id, inputs, output, ground, threshold, highVoltage: high, delay: Math.max(0, value(component, 'delay', 1e-6)), rule });
           break;
@@ -444,6 +447,9 @@ export class DigitalLogicSimulationEngine extends SimulationEngine {
           if (LOGIC_COMPONENT_TYPES.has(component.type)) break;
           return null;
       }
+    }
+    for (const [net, ids] of activeDrivers) {
+      if (ids.length > 1 && net !== '0') throw new TabDMnaError(`Output contention: direct driver tie detected (${ids.join(', ')})`, 'LOGIC_OUTPUT_CONTENTION');
     }
     return {
       primitives,

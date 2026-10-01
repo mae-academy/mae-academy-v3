@@ -68,7 +68,8 @@ export abstract class LogicComponent {
 
   constructor(readonly id: string, readonly pinMap: LogicPinMap, readonly propagationDelayNs = 10) {
     pinMap.inputs.forEach(pin => this.inputs.set(pin, 0));
-    pinMap.outputs.forEach(pin => this.outputs.set(pin, 0));
+    // Complementary power-up: Q = 0 means QN = 1, so no downstream ripple stage sees a spurious rising edge.
+    pinMap.outputs.forEach(pin => this.outputs.set(pin, pin === 'qn' ? 1 : 0));
   }
 
   setInput(pin: string, value: LogicState) { if (this.inputs.has(pin)) this.inputs.set(pin, value); }
@@ -187,7 +188,7 @@ class BehavioralLogicComponent extends LogicComponent {
     else if (this.type === 'logic-counter') { const clk = read('clk'); if (read('reset') === 1) this.state = [0, 0, 0, 0]; else if (this.lastClock === 0 && clk === 1) { const number = this.state.reduce<number>((total, value, idx) => total | ((value === 1 ? 1 : 0) << idx), 0); this.state = [0, 1, 2, 3].map(idx => ((number + 1) >> idx & 1) as LogicState); } this.lastClock = clk; this.state.forEach((value, idx) => out(`q${idx}`, value)); }
     else if (this.type === 'logic-nbit-register') {
       const clk = read('clk');
-      let visibleState = this.state;
+      let visibleState = this.pendingState ?? this.state; // several evaluates may share one instant: keep the capture visible
       if (this.lastClock === 0 && clk === 1) {
         const clear = read('clear');
         const next: LogicState[] = clear === 1 ? this.state.map(() => 0 as LogicState) : clear === 0 ? this.state.map((_, bit) => read(`d${bit}`)) : this.state.map(() => 'X' as LogicState);
@@ -198,9 +199,9 @@ class BehavioralLogicComponent extends LogicComponent {
       visibleState.forEach((value, bit) => out(`q${bit}`, value));
     }
     else if (this.type === 'logic-ram-16x8') {
-      const address = selectorIndex(bitPinIdsFor('a', 4)); const clk = read('clk'); let visibleMemory = this.memory;
+      const address = selectorIndex(bitPinIdsFor('a', 4)); const clk = read('clk'); let visibleMemory = this.pendingMemory ?? this.memory;
       if (this.lastClock === 0 && clk === 1 && read('we') === 1 && address !== null && this.memory) {
-        const next = this.memory.map(word => [...word]); next[address] = bitPinIdsFor('d', 8).map(read); this.pendingMemory = next; visibleMemory = next;
+        const next = (this.pendingMemory ?? this.memory).map(word => [...word]); next[address] = bitPinIdsFor('d', 8).map(read); this.pendingMemory = next; visibleMemory = next;
       }
       this.lastClock = clk;
       const oe = read('oe'); const word = address === null || !visibleMemory ? null : visibleMemory[address];
@@ -290,6 +291,16 @@ const resolveJunctionConnections = (wires: CircuitWire[], pins: Map<string, Logi
   return connections;
 };
 
+/**
+ * Total order: time, delta cycle, phase (every commit of a delta cycle lands before any evaluate reads
+ * the nets, so simultaneous clock/data changes cannot depend on who happened to be queued first), then
+ * target component id (never wire/array creation order), then FIFO.
+ */
+const phaseRank = (event: LogicEvent) => event.phase === 'commit' ? 0 : 1;
+const compareEvents = (a: LogicEvent, b: LogicEvent) => a.atNs - b.atNs || a.delta - b.delta || phaseRank(a) - phaseRank(b) || (a.targetId < b.targetId ? -1 : a.targetId > b.targetId ? 1 : 0) || a.id - b.id;
+/** A pin that toggles this many times inside one settle window never converges. */
+const OSCILLATION_TOGGLES = 64;
+
 export class DiscreteEventLogicEngine extends SimulationEngine {
   private logicComponents: CircuitComponent[] = [];
   private runtimes = new Map<string, LogicComponent>();
@@ -302,6 +313,9 @@ export class DiscreteEventLogicEngine extends SimulationEngine {
   private snapshot: SimulationSnapshot = this.makeLogicSnapshot();
   private readonly subscribers = new Map<string, Set<LogicStateListener>>();
   private eventBudgetReached = false;
+  private oscillating = false;
+  /** Delta cycle of the event being processed; zero-delay commits open the next cycle of the same instant. */
+  private currentDelta = 0;
   private readonly maxEventsPerFlush = 20_000;
   private readonly initialSettleNs = 10_000;
 
@@ -377,16 +391,20 @@ export class DiscreteEventLogicEngine extends SimulationEngine {
     return this.snapshot;
   }
 
-  private schedule(targetId: string, delayNs: number, phase: LogicEvent['phase']) { this.events.push({ id: this.sequence++, atNs: this.nowNs + delayNs, delta: phase === 'commit' ? 1 : 0, targetId, phase }); this.events.sort((a, b) => a.atNs - b.atNs || a.delta - b.delta || a.id - b.id); }
+  private schedule(targetId: string, delayNs: number, phase: LogicEvent['phase']) { this.events.push({ id: this.sequence++, atNs: this.nowNs + delayNs, delta: phase === 'commit' && delayNs > 0 ? 0 : phase === 'commit' ? this.currentDelta + 1 : this.currentDelta, targetId, phase }); this.events.sort(compareEvents); }
   private clockHalfPeriodNs(component: CircuitComponent) { return Math.max(1, Number(component.props.clockPeriodMs ?? 250) * 500_000); }
   private flush(untilNs = Number.POSITIVE_INFINITY) {
     let guard = 0;
+    const toggles = new Map<string, number>();
+    let oscillating = false;
     while (this.events.length && this.events[0].atNs <= untilNs && guard++ < this.maxEventsPerFlush) {
-      const event = this.events.shift()!; this.nowNs = Math.max(this.nowNs, event.atNs); const runtime = this.runtimes.get(event.targetId); if (!runtime) continue;
+      const event = this.events.shift()!; this.nowNs = Math.max(this.nowNs, event.atNs); this.currentDelta = event.delta; const runtime = this.runtimes.get(event.targetId); if (!runtime) continue;
       if (event.phase === 'evaluate') { this.feedInputs(event.targetId); runtime.evaluate(); this.schedule(event.targetId, runtime.propagationDelayNs, 'commit'); }
-      else { const changed = runtime.commit(); changed.forEach((value, pin) => this.propagate(event.targetId, pin, value)); }
+      else { const changed = runtime.commit(); changed.forEach((value, pin) => { const key = `${event.targetId}:${pin}`; const count = (toggles.get(key) ?? 0) + 1; toggles.set(key, count); if (count >= OSCILLATION_TOGGLES) oscillating = true; this.propagate(event.targetId, pin, value); }); }
     }
     this.eventBudgetReached = Boolean(this.events.length && this.events[0].atNs <= untilNs && guard >= this.maxEventsPerFlush);
+    this.oscillating = oscillating || this.eventBudgetReached;
+    this.currentDelta = 0;
     this.snapshot = this.createSnapshot();
   }
   private feedInputs(componentId: string) {
@@ -409,12 +427,13 @@ export class DiscreteEventLogicEngine extends SimulationEngine {
     const driversByReceiverPin = new Map<string, LogicState[]>();
     this.connections.forEach(connection => { const key = terminalKey(connection.receiver, connection.receiverPin); const values = driversByReceiverPin.get(key) ?? []; values.push(this.runtimes.get(connection.driver)?.getOutput(connection.driverPin) ?? 'X'); driversByReceiverPin.set(key, values); });
     driversByReceiverPin.forEach((values, pin) => { if (values.length > 1 && resolveLogicDrivers(values) === 'X') warnings.push({ code: 'logic-driver-conflict', message: `Conflicting logic drivers at ${pin}` }); });
+    if (this.oscillating) warnings.push({ code: 'logic-oscillation', message: 'Feedback loop oscillates: the network never settles (ring oscillator or an unstable latch).' });
     if (this.eventBudgetReached) warnings.push({ code: 'logic-event-budget', message: 'Feedback activity exceeded the event budget for this simulation slice; remaining events are queued.' });
     this.logicComponents.filter(component => component.type === 'digital-output').forEach(component => {
       const value = this.runtimes.get(component.id)?.inputs.get('in') ?? 'X';
       terminalVoltages[terminalKey(component.id, 'in')] = value === 1 ? 1 : 0;
       componentPowered[component.id] = value === 1;
     });
-    return { time: this.getTime(), nodeVoltages: {}, terminalVoltages, branchCurrents: {}, wireCurrents, componentPowered, componentIntensity: Object.fromEntries(Object.entries(componentPowered).map(([id, powered]) => [id, powered ? 1 : 0])), nodeHistory: {}, branchHistory: {}, instrumentReadings: {}, warnings, converged: warnings.length === 0 };
+    return { time: this.getTime(), nodeVoltages: {}, terminalVoltages, branchCurrents: {}, wireCurrents, componentPowered, componentIntensity: Object.fromEntries(Object.entries(componentPowered).map(([id, powered]) => [id, powered ? 1 : 0])), nodeHistory: {}, branchHistory: {}, instrumentReadings: {}, warnings, converged: warnings.length === 0, status: this.oscillating ? 'oscillating' as const : 'settled' as const };
   }
 }

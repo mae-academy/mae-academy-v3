@@ -27,7 +27,8 @@ export class MNAError extends Error {
   }
 }
 
-const PIVOT_EPSILON = 1e-12;
+/** Rejects only a structurally singular matrix; node conductances down to 1e-18 S (R ≤ 1e18 Ω) are legitimate. */
+const PIVOT_EPSILON = 1e-18;
 const VALUE_EPSILON = 1e-9;
 
 function finite(value: number, label: string) {
@@ -187,7 +188,7 @@ function gaussianSolve(matrix: number[][], rhs: number[]): number[] {
     for (let row = 0; row < size; row += 1) {
       if (row === column) continue;
       const factor = augmented[row][column];
-      if (Math.abs(factor) < PIVOT_EPSILON) continue;
+      if (factor === 0) continue;
       for (let index = column; index <= size; index += 1) augmented[row][index] -= factor * augmented[column][index];
     }
   }

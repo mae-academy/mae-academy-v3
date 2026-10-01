@@ -27,7 +27,7 @@ export interface TabDOperatingPoint {
 }
 
 export class TabDMnaError extends Error {
-  constructor(message: string) {
+  constructor(message: string, readonly code: string = 'TAB_D_MNA') {
     super(message);
     this.name = 'TabDMnaError';
   }

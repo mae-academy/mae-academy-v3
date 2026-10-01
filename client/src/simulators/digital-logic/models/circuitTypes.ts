@@ -82,6 +82,8 @@ export interface SimulationSnapshot {
   instrumentReadings: Record<string, InstrumentReading>;
   warnings: SimulationWarning[];
   converged: boolean;
+  /** Discrete-event engine only: `oscillating` when a feedback loop never reaches a steady state. */
+  status?: 'settled' | 'oscillating';
 }
 
 const PREFIXES: Record<string, string> = {
