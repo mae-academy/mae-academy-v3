@@ -1,4 +1,5 @@
 import type { Request, Response } from "express";
+import { HOST_ALLOWLISTS, readLimited, safeFetch } from "./ssrf";
 import { buildDownloadUrl, pickPdfFile, type ArchiveFile } from "../client/src/lib/internetarchive";
 
 const METADATA_URL = "https://archive.org/metadata";
@@ -8,6 +9,7 @@ const MAX_IDS = 60;
 const BATCH_SIZE = 15;
 const TIMEOUT_MS = 6000;
 const TTL_MS = 60 * 60 * 1000;
+const MAX_METADATA_BYTES = 8 * 1024 * 1024;
 
 interface MetadataResponse {
   metadata?: { "access-restricted-item"?: string };
@@ -23,9 +25,9 @@ async function resolveOne(id: string): Promise<string | null> {
   if (hit && hit.expires > Date.now()) return hit.url;
 
   try {
-    const res = await fetch(`${METADATA_URL}/${encodeURIComponent(id)}`, { signal: AbortSignal.timeout(TIMEOUT_MS) });
+    const res = await safeFetch(`${METADATA_URL}/${encodeURIComponent(id)}`, { allowlist: [...HOST_ALLOWLISTS.archive], signal: AbortSignal.timeout(TIMEOUT_MS) });
     if (!res.ok) return null; // transient failures are not cached
-    const data = (await res.json()) as MetadataResponse;
+    const data = JSON.parse((await readLimited(res, MAX_METADATA_BYTES)).toString("utf8")) as MetadataResponse;
     const restricted = data.metadata?.["access-restricted-item"] === "true" || data.is_dark === true;
     const file = restricted ? null : pickPdfFile(data.files);
     const url = file ? buildDownloadUrl(id, file.name) : null;

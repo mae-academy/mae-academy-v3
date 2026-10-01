@@ -7,12 +7,24 @@ dist/
 build/
 *.dist
 
-# Environment variables
+# Environment variables (every variant; the committed template is .env.example)
 .env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env.*
+!.env.example
+*.env
+
+# Private keys and credential files
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+id_rsa*
+id_ed25519*
+*credentials*.json
+service-account*.json
+.vercel/
+.netlify/
 
 # IDE and editor files
 .vscode/

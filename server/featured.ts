@@ -3,6 +3,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { buildOpenAlexUrl, parseWork } from "../client/src/lib/openalex";
 import { getThumbnail } from "./pdfThumb";
+import { HOST_ALLOWLISTS, readLimited, safeFetch } from "./ssrf";
 
 /** A default-view paper whose first-page thumbnail was rendered successfully by this server. */
 export interface FeaturedItem {
@@ -40,9 +41,9 @@ async function fetchCandidates(page: number): Promise<RawWork[]> {
   const url = new URL(buildOpenAlexUrl({ page, perPage: CANDIDATE_PAGE_SIZE }));
   const key = process.env.VITE_OPENALEX_API_KEY;
   if (key) url.searchParams.set("api_key", key);
-  const res = await fetch(url);
+  const res = await safeFetch(url.toString(), { allowlist: [...HOST_ALLOWLISTS.openAlex] });
   if (!res.ok) throw new Error(`OpenAlex candidate fetch failed (${res.status})`);
-  return ((await res.json()) as { results?: RawWork[] }).results ?? [];
+  return (JSON.parse((await readLimited(res, 16 * 1024 * 1024)).toString("utf8")) as { results?: RawWork[] }).results ?? [];
 }
 
 /**

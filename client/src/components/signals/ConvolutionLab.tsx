@@ -85,7 +85,7 @@ export function ConvolutionLab() {
     <StudioCard className="overflow-hidden">
       <div className="flex flex-col gap-4 border-b border-slate-200 pb-5 dark:border-slate-800 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h2 className="mt-1 text-xl font-black tracking-tight text-slate-900 dark:text-white">{t('signals.convolutionEngine', 'Convolution Engine')}</h2>
+          <h2 className="mt-1 text-xl font-black tracking-tight text-slate-900 dark:text-white">{t('signals.convolutionLabTitle', 'Convolution Engine')}</h2>
           <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500 dark:text-slate-400">
             {mode === "continuous"
               ? <>{t('signals.convolutionContinuousIntro', 'Reverse, shift, multiply, integrate. The continuous scope evaluates ')}<KatexMath math="y(t)=\int_{-\infty}^{\infty} x(\tau)h(t-\tau)\,d\tau" />{t('signals.convolutionContinuousOutro', ' at each canvas frame without storing animation time in React.')}</>

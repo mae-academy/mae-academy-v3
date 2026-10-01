@@ -331,7 +331,7 @@
     "verdictNonCausal": "غير سببي",
     "verdictMemoryless": "بلا ذاكرة",
     "verdictDynamic": "ديناميكي",
-    "convolutionEngine": "محرك الالتفاف",
+    "convolutionLabTitle": "محرك الالتفاف",
     "convolutionContinuousIntro": "اعكس، ثم أزح، ثم اضرب، ثم كامل. يحسب الراسم المستمر ",
     "convolutionContinuousOutro": " عند كل إطار من الرسم دون تخزين زمن الحركة في React.",
     "convolutionDiscreteIntro": "اعكس، ثم أزح، ثم اضرب، ثم اجمع. يحسب راسم الأعمدة المتقطع ",

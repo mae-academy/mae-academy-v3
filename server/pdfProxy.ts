@@ -1,9 +1,8 @@
 import type { Request, Response } from "express";
-import { lookup } from "node:dns/promises";
-import { isIP } from "node:net";
+import { assertSafeTarget, configuredProxyAllowlist, SsrfError } from "./ssrf";
 
 const MAX_REDIRECTS = 5;
-const MAX_BYTES = 60 * 1024 * 1024;
+const MAX_BYTES = 50 * 1024 * 1024; // inline viewer stream ceiling
 const MAX_DOWNLOAD_BYTES = 1024 * 1024 * 1024; // books can be 100+ MB; downloads are streamed, never buffered
 const TIMEOUT_MS = 20_000; // time to first byte only; a long transfer must not be cut off mid-stream
 export const PDF_MAGIC = Buffer.from("%PDF");
@@ -14,44 +13,14 @@ class ProxyError extends Error {
   }
 }
 
-function isPrivateIPv4(ip: string): boolean {
-  const [a, b] = ip.split(".").map(Number);
-  return (
-    a === 0 ||
-    a === 10 ||
-    a === 127 ||
-    (a === 100 && b >= 64 && b <= 127) || // CGNAT
-    (a === 169 && b === 254) || // link-local / cloud metadata
-    (a === 172 && b >= 16 && b <= 31) ||
-    (a === 192 && b === 168) ||
-    a >= 224 // multicast / reserved
-  );
-}
-
-function isPrivateAddress(ip: string): boolean {
-  if (isIP(ip) === 4) return isPrivateIPv4(ip);
-  const v6 = ip.toLowerCase();
-  const mapped = v6.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
-  if (mapped) return isPrivateIPv4(mapped[1]);
-  return v6 === "::" || v6 === "::1" || v6.startsWith("fc") || v6.startsWith("fd") || v6.startsWith("fe80");
-}
-
-/** Rejects non-http(s) URLs and any host that resolves to a private / loopback / link-local address. */
+/** Applies the shared outbound policy (https only, no IP literals / credentials / odd ports, public addresses only, optional host allowlist). */
 async function assertPublicHttpUrl(raw: string): Promise<URL> {
-  let url: URL;
   try {
-    url = new URL(raw);
-  } catch {
-    throw new ProxyError(400, "Invalid URL");
+    return await assertSafeTarget(raw, configuredProxyAllowlist());
+  } catch (error) {
+    if (error instanceof SsrfError) throw new ProxyError(error.status, error.message);
+    throw error;
   }
-  if (url.protocol !== "http:" && url.protocol !== "https:") throw new ProxyError(400, "Invalid URL");
-  if (url.username || url.password) throw new ProxyError(400, "Invalid URL");
-
-  const host = url.hostname.replace(/^\[|\]$/g, "");
-  const addresses = isIP(host) ? [{ address: host }] : await lookup(host, { all: true }).catch(() => []);
-  if (addresses.length === 0) throw new ProxyError(502, "Host could not be resolved");
-  if (addresses.some((a) => isPrivateAddress(a.address))) throw new ProxyError(403, "Target host is not allowed");
-  return url;
 }
 
 const UPSTREAM_ATTEMPTS = 3;

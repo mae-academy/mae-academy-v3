@@ -331,7 +331,7 @@
     "verdictNonCausal": "No Causal",
     "verdictMemoryless": "Sin Memoria",
     "verdictDynamic": "Dinámico",
-    "convolutionEngine": "Motor de Convolución",
+    "convolutionLabTitle": "Motor de Convolución",
     "convolutionContinuousIntro": "Invierte, desplaza, multiplica, integra. El osciloscopio continuo evalúa ",
     "convolutionContinuousOutro": " en cada fotograma del lienzo sin almacenar el tiempo de animación en React.",
     "convolutionDiscreteIntro": "Invierte, desplaza, multiplica, suma. El osciloscopio discreto de tallos evalúa ",

@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { HOST_ALLOWLISTS, readLimited, safeFetch } from "./ssrf";
 
 const CACHE_DIR = path.resolve(process.env.PDF_CACHE_DIR ?? ".cache", "covers");
 /** Internet Archive identifiers only: the upstream URL is always archive.org/services/img/<id>. */
@@ -26,10 +27,10 @@ async function withSlot<T>(task: () => Promise<T>): Promise<T> {
 
 async function download(id: string): Promise<Buffer | null> {
   try {
-    const res = await fetch(`https://archive.org/services/img/${encodeURIComponent(id)}`, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
+    const res = await safeFetch(`https://archive.org/services/img/${encodeURIComponent(id)}`, { allowlist: [...HOST_ALLOWLISTS.archive], signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
     if (!res.ok || !(res.headers.get("content-type") ?? "").startsWith("image/")) return null;
-    const image = Buffer.from(await res.arrayBuffer());
-    if (image.length === 0 || image.length > MAX_COVER_BYTES) return null;
+    const image = await readLimited(res, MAX_COVER_BYTES);
+    if (image.length === 0) return null;
     await mkdir(CACHE_DIR, { recursive: true });
     await writeFile(path.join(CACHE_DIR, `${id}.img`), image);
     return image;

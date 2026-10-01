@@ -331,7 +331,7 @@
     "verdictNonCausal": "Non-Causal",
     "verdictMemoryless": "Memoryless",
     "verdictDynamic": "Dynamic",
-    "convolutionEngine": "Convolution Engine",
+    "convolutionLabTitle": "Convolution Engine",
     "convolutionContinuousIntro": "Reverse, shift, multiply, integrate. The continuous scope evaluates ",
     "convolutionContinuousOutro": " at each canvas frame without storing animation time in React.",
     "convolutionDiscreteIntro": "Reverse, shift, multiply, sum. The discrete stem scope evaluates ",

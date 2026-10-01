@@ -1,4 +1,5 @@
 import type { Request, Response } from "express";
+import { HOST_ALLOWLISTS, readLimited, safeFetch } from "./ssrf";
 
 const DOAB_URL = "https://directory.doabooks.org/rest/search";
 const TIMEOUT_MS = 9000;
@@ -6,6 +7,7 @@ const MAX_QUERY_LENGTH = 200;
 const MAX_LIMIT = 30;
 const TTL_MS = 10 * 60 * 1000;
 const CACHE_MAX_ENTRIES = 500;
+const MAX_BODY_BYTES = 8 * 1024 * 1024;
 
 const cache = new Map<string, { body: string; expires: number }>();
 
@@ -33,7 +35,8 @@ export async function libraryDoabHandler(req: Request, res: Response): Promise<v
 
   try {
     const params = new URLSearchParams({ query, expand: "metadata", limit: String(limit), offset: String(offset) });
-    const upstream = await fetch(`${DOAB_URL}?${params.toString()}`, {
+    const upstream = await safeFetch(`${DOAB_URL}?${params.toString()}`, {
+      allowlist: [...HOST_ALLOWLISTS.doab],
       headers: { Accept: "application/json" },
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
@@ -41,7 +44,7 @@ export async function libraryDoabHandler(req: Request, res: Response): Promise<v
       res.status(502).json({ error: `DOAB answered ${upstream.status}` });
       return;
     }
-    const body = await upstream.text();
+    const body = (await readLimited(upstream, MAX_BODY_BYTES)).toString("utf8");
     if (cache.size >= CACHE_MAX_ENTRIES) cache.delete(cache.keys().next().value as string);
     cache.set(key, { body, expires: Date.now() + TTL_MS });
     res.type("application/json").send(body);
@@ -71,7 +74,8 @@ export async function libraryDoabItemHandler(req: Request, res: Response): Promi
   }
 
   try {
-    const upstream = await fetch(`https://directory.doabooks.org/rest/handle/${handle}?expand=metadata,bitstreams`, {
+    const upstream = await safeFetch(`https://directory.doabooks.org/rest/handle/${handle}?expand=metadata,bitstreams`, {
+      allowlist: [...HOST_ALLOWLISTS.doab],
       headers: { Accept: "application/json" },
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
@@ -83,7 +87,7 @@ export async function libraryDoabItemHandler(req: Request, res: Response): Promi
       res.status(502).json({ error: `DOAB answered ${upstream.status}` });
       return;
     }
-    const body = await upstream.text();
+    const body = (await readLimited(upstream, MAX_BODY_BYTES)).toString("utf8");
     if (itemCache.size >= CACHE_MAX_ENTRIES) itemCache.delete(itemCache.keys().next().value as string);
     itemCache.set(handle, { body, expires: Date.now() + TTL_MS });
     res.type("application/json").send(body);
