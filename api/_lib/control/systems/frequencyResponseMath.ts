@@ -2,6 +2,10 @@
  * Client-side Bode, Nyquist, Nichols, and stability-margin algorithms.
  * No backend calls are used: every transfer-function evaluation runs in the browser.
  */
+import type { FrequencyFactorKind, FrequencyFactor, FrequencyPoint, StabilityMargins, FactorSlopeEvent } from "../../../../shared/control/frequencyTypes";
+import { formatEngineering } from "../../../../shared/control/frequencyTypes";
+export type { FrequencyFactorKind, FrequencyFactor, FrequencyPoint, StabilityMargins, FactorSlopeEvent };
+export { formatEngineering };
 import {
   complexDiv,
   complexMag,
@@ -12,47 +16,8 @@ import {
   type Complex,
 } from "./controlMath";
 
-export type FrequencyFactorKind = "gain" | "zero" | "pole";
-
-export type FrequencyFactor = {
-  id: string;
-  kind: FrequencyFactorKind;
-  label: string;
-  roots: Complex[];
-  constant?: number;
-};
-
-export type FrequencyPoint = {
-  omega: number;
-  re: number;
-  im: number;
-  magnitudeDb: number;
-  phaseDeg: number;
-  phaseUnwrappedDeg: number;
-  asymMagnitudeDb: number;
-  asymPhaseDeg: number;
-};
-
-export type StabilityMargins = {
-  gainCrossover?: { omega: number; phaseDeg: number; phaseMarginDeg: number };
-  phaseCrossover?: { omega: number; magnitudeDb: number; gainMarginDb: number };
-};
-
-export type FactorSlopeEvent = {
-  omega: number;
-  deltaDbPerDecade: number;
-  label: string;
-};
-
 const EPSILON = 1e-8;
 const RAD_TO_DEG = 180 / Math.PI;
-
-export function formatEngineering(value: number, precision = 3) {
-  if (!Number.isFinite(value)) return "\\infty";
-  if (Math.abs(value) < 1e-10) return "0";
-  const rounded = Number(value.toPrecision(precision));
-  return `${rounded}`;
-}
 
 export function logspace(startExp = -2, endExp = 4, samples = 320): number[] {
   const steps = Math.max(2, samples - 1);

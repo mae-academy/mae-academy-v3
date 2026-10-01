@@ -1,7 +1,7 @@
 import * as React from "react";
 import { useTranslation } from 'react-i18next';
 import { KatexMath } from "../ui/KatexMath";
-import { Complex } from "@/features/control/controlMath";
+import { Complex } from "@shared/control/polynomial";
 import { StudioCard, InnerBox, GradientButton } from "@/components/common/templates";
 
 interface RootLocusStepsPanelProps {

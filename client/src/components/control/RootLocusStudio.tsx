@@ -1,12 +1,8 @@
 import React, { useState, useMemo, useRef, useCallback, useEffect } from "react";
 import { useTranslation } from 'react-i18next';
-import {
-  findPolynomialRoots,
-  simulateLtiStepResponse,
-  findBreakawayPoints,
-  generateFlawlessRootLocus,
-  type Complex,
-} from "@/features/control/controlMath";
+import type { Complex } from "@shared/control/polynomial";
+import { rootLocusRemote } from "@/services/controlClient";
+import { useRemoteQuery } from "@/lib/useRemoteQuery";
 import { TransferFunctionInput, TransferFunctionData } from "./TransferFunctionInput";
 import { RootLocusStepsPanel } from "./RootLocusStepsPanel";
 import { KatexMath } from "../ui/KatexMath";
@@ -19,6 +15,11 @@ import {
   StatusBadge,
   type PlotSeries,
 } from "@/components/common/templates";
+
+const EMPTY: Complex[] = [];
+const EMPTY_BRANCHES: Complex[][] = [];
+const EMPTY_CROSSINGS: Array<{ k: number; omega: number }> = [];
+const EMPTY_NUMBERS: number[] = [];
 
 export function RootLocusStudio() {
   const { t } = useTranslation('simulators');
@@ -69,176 +70,20 @@ export function RootLocusStudio() {
     return { num: n, den: d };
   }, [tfData]);
 
-  const openLoopZeros = useMemo(() => findPolynomialRoots(num), [num]);
-  const openLoopPoles = useMemo(() => findPolynomialRoots(den), [den]);
-
-  // Asymptotes Calculation
-  const asymptotes = useMemo(() => {
-    const n = openLoopPoles.length;
-    const m = openLoopZeros.length;
-    const i = n - m;
-    if (i <= 0) return null;
-
-    const sumPoles = openLoopPoles.reduce((acc, val) => acc + val.re, 0.0);
-    const sumZeros = openLoopZeros.reduce((acc, val) => acc + val.re, 0.0);
-
-    const centroid = (sumPoles - sumZeros) / i;
-    const angles = [];
-    for (let k = 0; k < i; k++) {
-      angles.push(((2 * k + 1) * Math.PI) / i);
-    }
-    return { centroid, angles };
-  }, [openLoopPoles, openLoopZeros]);
-
-  // Precompute Root Locus Sweeps and Crossings
-  const { locusTrajectories, imagCrossings } = useMemo(() => {
-    if (openLoopPoles.length === 0) return { locusTrajectories: [], imagCrossings: [], angleDepartures: [] };
-
-    const computeRoots = (kVal: number): Complex[] => {
-      const maxDeg = Math.max(den.length, num.length);
-      const charPoly = new Array(maxDeg).fill(0);
-      const dOffset = maxDeg - den.length;
-      for (let idx = 0; idx < den.length; idx++) charPoly[dOffset + idx] += den[idx];
-      const nOffset = maxDeg - num.length;
-      for (let idx = 0; idx < num.length; idx++) charPoly[nOffset + idx] += kVal * num[idx];
-
-      let st = 0;
-      while (st < charPoly.length && Math.abs(charPoly[st]) < 1e-12) st++;
-      if (st === charPoly.length) return [];
-      const lead = charPoly[st];
-      const normPoly = charPoly.slice(st).map((val) => val / lead);
-      return findPolynomialRoots(normPoly);
-    };
-
-    let branches = generateFlawlessRootLocus(openLoopPoles, computeRoots);
-
-    // Breakaway Injection Pass
-    const analyticalBreakPts = findBreakawayPoints(num, den);
-    if (analyticalBreakPts.length > 0) {
-      branches = branches.map((branch) => {
-        const result: Complex[] = [];
-        for (let i = 0; i < branch.length; i++) {
-          const pt = branch[i];
-          const prevPt = i > 0 ? branch[i - 1] : null;
-
-          const wasReal = prevPt !== null && Math.abs(prevPt.im) < 1e-4;
-          const isComplex = Math.abs(pt.im) > 1e-4;
-
-          if (wasReal && isComplex && prevPt) {
-            let bestBreak: number | null = null;
-            let bestDist = Infinity;
-            for (const bp of analyticalBreakPts) {
-              const d = Math.abs(bp - prevPt.re);
-              if (d < bestDist) {
-                bestDist = d;
-                bestBreak = bp;
-              }
-            }
-            if (bestBreak !== null && bestDist < 1.0) {
-              result.push({ re: bestBreak, im: 0 });
-              result.push({ re: bestBreak, im: pt.im >= 0 ? 0.0001 : -0.0001 });
-            }
-          }
-          result.push(pt);
-        }
-        return result;
-      });
-    }
-
-    // Imaginary Axis Crossing Detection
-    const crossingSet = new Map<string, { k: number; omega: number }>();
-
-    const findStabilityK = (): number => {
-      let kLo = 0,
-        kHi = 1e6;
-      for (let iter = 0; iter < 60; iter++) {
-        const kMid = (kLo + kHi) / 2;
-        const roots = computeRoots(kMid);
-        if (roots.some((r) => r.re > 0)) kHi = kMid;
-        else kLo = kMid;
-      }
-      return (kLo + kHi) / 2;
-    };
-
-    const kMarginal = findStabilityK();
-    if (kMarginal > 0.01 && kMarginal < 999999) {
-      const rootsAtK = computeRoots(kMarginal);
-      rootsAtK.forEach((r) => {
-        if (Math.abs(r.re) < 0.05 && Math.abs(r.im) > 0.05) {
-          const key = r.im.toFixed(2);
-          if (!crossingSet.has(key)) {
-            crossingSet.set(key, { k: kMarginal, omega: Math.abs(r.im) });
-          }
-        }
-      });
-    }
-
-    const crossings = Array.from(crossingSet.values());
-
-    // Angle of Departure / Arrival
-    const angleDepartures: { pole: Complex; angleDeg: number }[] = [];
-    openLoopPoles.forEach((p) => {
-      if (Math.abs(p.im) > 1e-5) {
-        let sumZeros = 0;
-        openLoopZeros.forEach((z) => {
-          sumZeros += Math.atan2(p.im - z.im, p.re - z.re);
-        });
-        let sumPoles = 0;
-        openLoopPoles.forEach((otherP) => {
-          if (otherP !== p) {
-            sumPoles += Math.atan2(p.im - otherP.im, p.re - otherP.re);
-          }
-        });
-        const phi = Math.PI + sumZeros - sumPoles;
-        let deg = (phi * 180) / Math.PI;
-        while (deg > 180) deg -= 360;
-        while (deg < -180) deg += 360;
-        angleDepartures.push({ pole: p, angleDeg: deg });
-      }
-    });
-
-    return { locusTrajectories: branches, imagCrossings: crossings, angleDepartures };
-  }, [num, den, openLoopPoles, openLoopZeros]);
-
-  // Current roots at current gain K
-  const currentRoots = useMemo(() => {
-    const maxDeg = Math.max(den.length, num.length);
-    const charPoly = new Array(maxDeg).fill(0);
-    const dOffset = maxDeg - den.length;
-    for (let idx = 0; idx < den.length; idx++) charPoly[dOffset + idx] += den[idx];
-    const nOffset = maxDeg - num.length;
-    for (let idx = 0; idx < num.length; idx++) charPoly[nOffset + idx] += gainK * num[idx];
-
-    let st = 0;
-    while (st < charPoly.length && Math.abs(charPoly[st]) < 1e-12) st++;
-    if (st === charPoly.length) return [];
-    const lead = charPoly[st];
-    const normPoly = charPoly.slice(st).map((val) => val / lead);
-    return findPolynomialRoots(normPoly);
-  }, [num, den, gainK]);
-
-  // Closed Loop Step Response Simulation
-  const stepResponse = useMemo(() => {
-    const maxDeg = Math.max(num.length, den.length);
-    const alignArr = (arr: number[]) => {
-      const out = new Array(maxDeg).fill(0);
-      for (let i = 0; i < arr.length; i++) out[maxDeg - arr.length + i] = arr[i];
-      return out;
-    };
-
-    const dAligned = alignArr(den);
-    const nAligned = alignArr(num);
-
-    const numCl = nAligned.map((val) => gainK * val);
-    const denCl = dAligned.map((d_val, i) => d_val + gainK * nAligned[i]);
-
-    return simulateLtiStepResponse(numCl, denCl, 1.0, maxTime, 0.01);
-  }, [num, den, gainK, maxTime]);
-
-  // Breakaway Points
-  const breakawayPoints = useMemo(() => {
-    return findBreakawayPoints(num, den);
-  }, [num, den]);
+  // The locus sweep (singularities, asymptotes, branches, breakaway points, crossings, departure angles) and the closed loop at the
+  // current gain (poles, unit-step response) are solved by the serverless engine; the last answer stays plotted while a newer one loads.
+  const locusQuery = useRemoteQuery(`locus|${num.join(",")}|${den.join(",")}`, (signal) => rootLocusRemote(num, den, { locus: true }, signal), { debounceMs: 60 });
+  const closedLoopQuery = useRemoteQuery(`cl|${num.join(",")}|${den.join(",")}|${gainK}|${maxTime}`, (signal) => rootLocusRemote(num, den, { locus: false, gain: gainK, maxTime: Math.min(200, maxTime) }, signal), { debounceMs: 40 });
+  const locus = locusQuery.error ? undefined : locusQuery.data?.locus;
+  const openLoopZeros: Complex[] = locus?.openLoopZeros ?? EMPTY;
+  const openLoopPoles: Complex[] = locus?.openLoopPoles ?? EMPTY;
+  const asymptotes = locus?.asymptotes ?? null;
+  const locusTrajectories: Complex[][] = locus?.branches ?? EMPTY_BRANCHES;
+  const imagCrossings = locus?.imagCrossings ?? EMPTY_CROSSINGS;
+  const breakawayPoints = locus?.breakawayPoints ?? EMPTY_NUMBERS;
+  const closedLoop = closedLoopQuery.error ? undefined : closedLoopQuery.data?.closedLoop;
+  const currentRoots: Complex[] = closedLoop?.roots ?? EMPTY;
+  const stepResponse = closedLoop?.stepResponse ?? null;
 
   // Formatted asymptote lines for ComplexPlanePlot
   const formattedAsymptotes = useMemo(() => {

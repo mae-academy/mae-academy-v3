@@ -1,3 +1,6 @@
+import { RemoteSimulationGate } from "./RemoteSimulationGate";
+import { simulateAcControllerRemote } from "@/services/controlClient";
+import type { Dispatch, SetStateAction } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { KatexMath } from "@/components/ui/KatexMath";
@@ -7,7 +10,6 @@ import { StudioErrorBoundary } from "./StudioErrorBoundary";
 import { PowerScopePlot, type ScopeSeries } from "./PowerScopePlot";
 import {
   defaultAcVoltageControllerParameters,
-  simulateAcVoltageController,
   type AcControlMode,
   type AcLoad,
   type AcPhase,
@@ -15,7 +17,8 @@ import {
   type AcVoltageControllerParameters,
   type AcVoltageFormat,
   type ThreePhaseConnection
-} from "@/features/power-electronics/acVoltageControllerMath";
+} from "@shared/power/acVoltageControllerTypes";
+import type { AcControllerSimulation } from "@shared/power/acVoltageControllerTypes";
 
 const tex = String.raw;
 const field =
@@ -124,7 +127,7 @@ function Circuit({ parameters }: { parameters: AcVoltageControllerParameters }) 
   );
 }
 
-export function ACVoltageControllerStudio() {
+function ACVoltageControllerStudioBody({ parameters, setParameters, simulation }: { parameters: AcVoltageControllerParameters; setParameters: Dispatch<SetStateAction<AcVoltageControllerParameters>>; simulation: AcControllerSimulation }) {
   const { t } = useTranslation("simulators");
   const phaseOptions: Array<{ value: AcPhase; label: string }> = [
     { value: "single", label: t("power.phaseSingleFull", "Single-Phase (1-Φ)") },
@@ -148,9 +151,7 @@ export function ACVoltageControllerStudio() {
     { value: "thyristor" as const, label: <KatexMath math="V_T" /> },
     { value: "gate" as const, label: t("power.gate", "Gate") },
   ];
-  const [parameters, setParameters] = useState<AcVoltageControllerParameters>(defaultAcVoltageControllerParameters);
   const [overlay, setOverlay] = useState<"none" | "thyristor" | "gate">("none");
-  const simulation = useMemo(() => simulateAcVoltageController(parameters), [parameters]);
   const metrics = simulation.metrics;
   const isPhase = parameters.controlMode === "phase-angle";
   const hasInductance = parameters.loadType === "RL";
@@ -521,3 +522,13 @@ export function ACVoltageControllerStudio() {
 }
 
 export default ACVoltageControllerStudio;
+
+/** Holds the converter parameters; the simulation itself is solved by the serverless engine and streamed back as sample arrays. */
+export function ACVoltageControllerStudio() {
+  const [parameters, setParameters] = useState<AcVoltageControllerParameters>(defaultAcVoltageControllerParameters);
+  return (
+    <RemoteSimulationGate parameters={parameters} fetcher={simulateAcControllerRemote}>
+      {(simulation) => <ACVoltageControllerStudioBody parameters={parameters} setParameters={setParameters} simulation={simulation} />}
+    </RemoteSimulationGate>
+  );
+}

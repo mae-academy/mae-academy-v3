@@ -1,3 +1,6 @@
+import { RemoteSimulationGate } from "./RemoteSimulationGate";
+import { simulateRectifierRemote } from "@/services/controlClient";
+import type { Dispatch, SetStateAction } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useLocale } from "@/contexts/LocaleContext";
@@ -8,14 +11,14 @@ import { StudioErrorBoundary } from "./StudioErrorBoundary";
 import { PowerScopePlot, type ScopeSeries } from "./PowerScopePlot";
 import {
   defaultRectifierParameters,
-  simulateControlledRectifier,
   type FullWaveSubtype,
   type RectifierLoad,
   type RectifierParameters,
   type RectifierPhase,
   type RectifierType,
   type VoltageFormat,
-} from "@/features/power-electronics/rectifierMath";
+} from "@shared/power/rectifierTypes";
+import type { RectifierSimulation } from "@shared/power/rectifierTypes";
 
 const card = "rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white/70 dark:bg-slate-900/70 backdrop-blur-md shadow-sm p-5 md:p-6 transition-all";
 const heading = "text-sm font-bold text-slate-800 dark:text-white";
@@ -124,7 +127,7 @@ function CircuitPlate({ parameters }: { parameters: RectifierParameters }) {
   );
 }
 
-export function RectifierStudio() {
+function RectifierStudioBody({ parameters, setParameters, simulation }: { parameters: RectifierParameters; setParameters: Dispatch<SetStateAction<RectifierParameters>>; simulation: RectifierSimulation }) {
   const { t } = useTranslation("simulators");
   const phaseOptions = [
     { value: "single" as RectifierPhase, label: t("power.phaseSingleShort", "1-Φ Single") },
@@ -142,9 +145,7 @@ export function RectifierStudio() {
     { value: "yes", label: t("power.yes", "Yes") },
     { value: "no", label: t("power.no", "No") },
   ];
-  const [parameters, setParameters] = useState<RectifierParameters>(defaultRectifierParameters);
   const [chartsReady, setChartsReady] = useState(false);
-  const simulation = useMemo(() => simulateControlledRectifier(parameters), [parameters]);
   const hasResistance = ["R", "RL", "RC", "RLC", "RLE"].includes(parameters.loadType);
   const hasInductance = ["RL", "RLC", "RLE"].includes(parameters.loadType);
   const hasCapacitance = ["RC", "RLC"].includes(parameters.loadType);
@@ -423,3 +424,13 @@ export function RectifierStudio() {
 }
 
 export default RectifierStudio;
+
+/** Holds the converter parameters; the simulation itself is solved by the serverless engine and streamed back as sample arrays. */
+export function RectifierStudio() {
+  const [parameters, setParameters] = useState<RectifierParameters>(defaultRectifierParameters);
+  return (
+    <RemoteSimulationGate parameters={parameters} fetcher={simulateRectifierRemote}>
+      {(simulation) => <RectifierStudioBody parameters={parameters} setParameters={setParameters} simulation={simulation} />}
+    </RemoteSimulationGate>
+  );
+}

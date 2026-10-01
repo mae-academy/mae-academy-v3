@@ -1,3 +1,6 @@
+import { RemoteSimulationGate } from "./RemoteSimulationGate";
+import { simulateInverterRemote } from "@/services/controlClient";
+import type { Dispatch, SetStateAction } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { KatexMath } from "@/components/ui/KatexMath";
@@ -7,7 +10,6 @@ import { StudioErrorBoundary } from "./StudioErrorBoundary";
 import { PowerScopePlot, type ScopeSeries } from "./PowerScopePlot";
 import {
   defaultInverterParameters,
-  simulateInverter,
   type InverterLoad,
   type InverterParameters,
   type InverterPhase,
@@ -15,7 +17,8 @@ import {
   type SinglePhaseSubtype,
   type SwitchingTechnique,
   type ThreePhaseConduction,
-} from "@/features/power-electronics/inverterMath";
+} from "@shared/power/inverterTypes";
+import type { InverterSimulation } from "@shared/power/inverterTypes";
 
 const tex = String.raw;
 const card = "rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white/70 dark:bg-slate-900/70 backdrop-blur-md shadow-sm p-5 md:p-6 transition-all";
@@ -149,7 +152,7 @@ function Circuit({ parameters, faulted }: { parameters: InverterParameters; faul
   );
 }
 
-export function InverterStudio() {
+function InverterStudioBody({ parameters, setParameters, simulation }: { parameters: InverterParameters; setParameters: Dispatch<SetStateAction<InverterParameters>>; simulation: InverterSimulation }) {
   const { t } = useTranslation("simulators");
   const phases = [
     { value: "single" as InverterPhase, label: t("power.phaseSingleFull", "Single-Phase (1-Φ)") },
@@ -165,9 +168,7 @@ export function InverterStudio() {
     { value: "multi-pulse" as SwitchingTechnique, label: t("power.switchMultiP", "Multi-P") },
     { value: "spwm" as SwitchingTechnique, label: t("power.switchSpwm", "SPWM") },
   ];
-  const [parameters, setParameters] = useState<InverterParameters>(defaultInverterParameters);
   const [showSignals, setShowSignals] = useState(false);
-  const simulation = useMemo(() => simulateInverter(parameters), [parameters]);
   const metrics = simulation.metrics;
   const isPwm = parameters.technique === "spwm";
   const hasL = parameters.loadType !== "R";
@@ -512,3 +513,13 @@ export function InverterStudio() {
 
 export default InverterStudio;
 
+
+/** Holds the converter parameters; the simulation itself is solved by the serverless engine and streamed back as sample arrays. */
+export function InverterStudio() {
+  const [parameters, setParameters] = useState<InverterParameters>(defaultInverterParameters);
+  return (
+    <RemoteSimulationGate parameters={parameters} fetcher={simulateInverterRemote}>
+      {(simulation) => <InverterStudioBody parameters={parameters} setParameters={setParameters} simulation={simulation} />}
+    </RemoteSimulationGate>
+  );
+}

@@ -4,6 +4,8 @@
  */
 import { useTranslation } from 'react-i18next';
 import { useEffect, useMemo, useState } from "react";
+import { pidStepRemote, pidTuneRemote } from "@/services/controlClient";
+import { useRemoteQuery } from "@/lib/useRemoteQuery";
 import {
   StandardStepPlot,
   SegmentedControl,
@@ -19,17 +21,15 @@ import { TransferFunctionInput, TransferFunctionData } from "./TransferFunctionI
 import { KatexMath } from "../ui/KatexMath";
 import { NativeSelect } from "@/components/ui/NativeSelect";
 import {
-  controllerTransfer,
   defaultControllerSubtype,
-  estimatePidFromSpecs,
   getControllerSubtypes,
-  inputSignalTransfer,
   PidGains,
   ControllerPrimary,
   ControllerSubtype,
   SignalType,
-  simulatePidScope,
-} from "@/features/control/pidMath";
+  TransferPolynomial,
+  PidScopeData,
+} from "@shared/control/pidTypes";
 
 type SignalState = { type: SignalType; magnitude: number; parameter: number };
 const primaryOptions: ControllerPrimary[] = ["P", "I", "D", "PI", "PD", "PID"];
@@ -114,6 +114,9 @@ function GainControl({
   );
 }
 
+const EMPTY_TRANSFER: TransferPolynomial = { numerator: [0], denominator: [1], latex: "0" };
+const EMPTY_SCOPE: PidScopeData = { t: [], y: [], r: [], overshoot: 0, peakTime: 0, settlingTime: 0, steadyStateError: 0, openLoop: EMPTY_TRANSFER, closedLoop: EMPTY_TRANSFER, output: EMPTY_TRANSFER };
+
 export function PIDStudio() {
   const { t } = useTranslation('simulators');
   const signalOptions: Array<{ value: SignalType; label: string }> = [
@@ -149,12 +152,17 @@ export function PIDStudio() {
   const [omegaN, setOmegaN] = useState(2);
 
   useEffect(() => setSubtype(defaultControllerSubtype(primary)), [primary]);
-  const controller = useMemo(() => controllerTransfer(primary, subtype, gains), [primary, subtype, gains]);
-  const inputTransfer = useMemo(() => inputSignalTransfer(signal.type, signal.magnitude, signal.parameter), [signal]);
-  const scope = useMemo(
-    () => simulatePidScope(controller, plant.numPoly, plant.denPoly, signal, maxTime),
-    [controller, plant, signal, maxTime]
+  // Controller transfer, input generator, closed loop and the RK4 scope (with overshoot / settling metrics) are solved by the
+  // serverless engine; the last answer stays plotted while a newer one loads.
+  const pidQuery = useRemoteQuery(
+    `pid|${primary}|${subtype}|${JSON.stringify(gains)}|${plant.numPoly.join(",")}|${plant.denPoly.join(",")}|${JSON.stringify(signal)}|${maxTime}`,
+    (abort) => pidStepRemote(primary, subtype, gains, plant.numPoly, plant.denPoly, signal, Math.min(200, maxTime), abort),
+    { debounceMs: 40 },
   );
+  const pid = pidQuery.error ? null : pidQuery.data;
+  const controller: TransferPolynomial = pid?.controller ?? EMPTY_TRANSFER;
+  const inputTransfer: TransferPolynomial = pid?.inputTransfer ?? EMPTY_TRANSFER;
+  const scope: PidScopeData = pid?.scope ?? EMPTY_SCOPE;
 
   const stepPlotSeries: PlotSeries[] = useMemo(() => {
     const rData = scope.t.map((time, index) => ({ x: time, y: scope.r[index] }));
@@ -447,7 +455,7 @@ export function PIDStudio() {
           onClick={() => {
             setPrimary("PID");
             setSubtype("parallel-standard");
-            setGains(estimatePidFromSpecs(plant.numPoly, plant.denPoly, zeta, omegaN));
+            void pidTuneRemote(plant.numPoly, plant.denPoly, zeta, omegaN).then(setGains).catch(() => undefined);
           }}
           className="inline-flex items-center gap-2"
         >

@@ -1,3 +1,6 @@
+import { RemoteSimulationGate } from "./RemoteSimulationGate";
+import { simulateChopperRemote } from "@/services/controlClient";
+import type { Dispatch, SetStateAction } from "react";
 import { useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { KatexMath } from "@/components/ui/KatexMath";
@@ -7,13 +10,13 @@ import { StudioErrorBoundary } from "./StudioErrorBoundary";
 import { PowerScopePlot, type ScopeSeries } from "./PowerScopePlot";
 import {
   defaultChopperParameters,
-  simulateChopper,
   type ChopperControl,
   type ChopperLoad,
   type ChopperParameters,
   type ChopperTopology,
   type QuadrantClass
-} from "@/features/power-electronics/chopperMath";
+} from "@shared/power/chopperTypes";
+import type { ChopperSimulation } from "@shared/power/chopperTypes";
 
 const tex = String.raw;
 const card = "rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white/70 dark:bg-slate-900/70 backdrop-blur-md shadow-sm p-5 md:p-6 transition-all";
@@ -130,7 +133,7 @@ function Circuit({ parameters }: { parameters: ChopperParameters }) {
   );
 }
 
-export function ChopperStudio() {
+function ChopperStudioBody({ parameters, setParameters, simulation }: { parameters: ChopperParameters; setParameters: Dispatch<SetStateAction<ChopperParameters>>; simulation: ChopperSimulation }) {
   const { t } = useTranslation("simulators");
   const topologyOptions: Array<{ value: ChopperTopology; label: string }> = [
     { value: "buck", label: t("power.buck", "Buck") },
@@ -148,8 +151,6 @@ export function ChopperStudio() {
     { value: "pwm", label: t("power.controlPwmTimeRatio", "PWM (Time-Ratio)") },
     { value: "frequency", label: t("power.controlFreqMod", "Frequency Mod.") },
   ];
-  const [parameters, setParameters] = useState<ChopperParameters>(defaultChopperParameters);
-  const simulation = useMemo(() => simulateChopper(parameters), [parameters]);
   const metrics = simulation.metrics;
   const hasL = parameters.loadType !== "R";
   const hasE = parameters.loadType === "RLE";
@@ -364,3 +365,13 @@ export function ChopperStudio() {
 }
 
 export default ChopperStudio;
+
+/** Holds the converter parameters; the simulation itself is solved by the serverless engine and streamed back as sample arrays. */
+export function ChopperStudio() {
+  const [parameters, setParameters] = useState<ChopperParameters>(defaultChopperParameters);
+  return (
+    <RemoteSimulationGate parameters={parameters} fetcher={simulateChopperRemote}>
+      {(simulation) => <ChopperStudioBody parameters={parameters} setParameters={setParameters} simulation={simulation} />}
+    </RemoteSimulationGate>
+  );
+}

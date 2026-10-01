@@ -9,7 +9,11 @@ import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useLocale } from "@/contexts/LocaleContext";
 import { KatexMath } from "@/components/ui/KatexMath";
 import { SegmentedControl, StudioCard, InnerBox } from "@/components/common/templates";
-import { integrateStateRK4, type Matrix, type Vector } from "@/features/control/matrixMath";
+import type { Matrix, StateTrajectory, Vector } from "@shared/control/matrixTypes";
+import { stateTrajectoryRemote } from "@/services/controlClient";
+import { useRemoteQuery } from "@/lib/useRemoteQuery";
+
+const EMPTY_TRAJECTORY: StateTrajectory = { time: [], states: [] };
 
 type LocaleCode = "en" | "ar" | "es";
 type Props = { matrix: Matrix; closedLoopMatrix?: Matrix; order: 2 | 3 };
@@ -32,7 +36,8 @@ function drawArrow(ctx: CanvasRenderingContext2D, startX: number, startY: number
 function PhasePlane({ matrix, initialState, duration }: { matrix: Matrix; initialState: Vector; duration: number }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 560, height: 440 });
-  const trajectory = useMemo(() => integrateStateRK4(matrix, initialState, duration), [duration, initialState, matrix]);
+  // The RK4 trajectory is integrated by the serverless engine (debounced while the initial state is dragged); the last one stays drawn.
+  const trajectory = useRemoteQuery(`traj|${JSON.stringify(matrix)}|${initialState.join(",")}|${duration}`, (signal) => stateTrajectoryRemote(matrix, initialState, duration, undefined, signal), { debounceMs: 20 }).data ?? EMPTY_TRAJECTORY;
   const { locale } = useLocale();
   const labels = copy[locale as LocaleCode] ?? copy.en;
 
@@ -236,7 +241,8 @@ function StateSpace3D({ matrix, initialState, duration }: { matrix: Matrix; init
   const [size, setSize] = useState({ width: 480, height: 360 });
   const pointerRef = useRef<{ id: number; x: number; y: number } | null>(null);
   const [rotation, setRotation] = useState({ yaw: -0.65, pitch: 0.45 });
-  const trajectory = useMemo(() => integrateStateRK4(matrix, initialState, duration), [duration, initialState, matrix]);
+  // The RK4 trajectory is integrated by the serverless engine (debounced while the initial state is dragged); the last one stays drawn.
+  const trajectory = useRemoteQuery(`traj|${JSON.stringify(matrix)}|${initialState.join(",")}|${duration}`, (signal) => stateTrajectoryRemote(matrix, initialState, duration, undefined, signal), { debounceMs: 20 }).data ?? EMPTY_TRAJECTORY;
   const { locale } = useLocale();
   const labels = copy[locale as LocaleCode] ?? copy.en;
 

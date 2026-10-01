@@ -14,6 +14,7 @@ import { handleLogoEvaluate } from "../api/_lib/plc/logo/handler";
 import { handleSolve } from "../api/_lib/circuit/handler";
 import { handleLogic } from "../api/_lib/logic/handler";
 import { handleSignals } from "../api/_lib/signals/handler";
+import { handleControl } from "../api/_lib/control/handler";
 import { expressGuard } from "../api/_lib/security/node-adapter";
 import type { Tier } from "../api/_lib/security/ratelimit";
 import { pdfCheckHandler, pdfDownloadHandler, pdfProxyHandler } from "./pdfProxy";
@@ -35,6 +36,8 @@ async function startServer() {
         ? "logic"
         : path.startsWith("/signals/")
         ? "signals"
+        : path.startsWith("/control/")
+        ? "control"
         : /^\/(pdf-thumb|pdf-proxy|pdf-download|library\/cover)/.test(path)
         ? "assets"
         : "general";
@@ -89,6 +92,17 @@ async function startServer() {
   app.post("/api/signals/transform", express.text({ type: "*/*", limit: "384kb" }), async (req, res) => {
     const response = await handleSignals(
       new Request("http://localhost/api/signals/transform", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: typeof req.body === "string" ? req.body : "",
+      }),
+    );
+    res.status(response.status).type("application/json").send(await response.text());
+  });
+  // Control systems & power electronics: same web-standard handler as api/control/solve.ts.
+  app.post("/api/control/solve", express.text({ type: "*/*", limit: "384kb" }), async (req, res) => {
+    const response = await handleControl(
+      new Request("http://localhost/api/control/solve", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: typeof req.body === "string" ? req.body : "",

@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { KatexMath } from "@/components/ui/KatexMath";
-import type { FrequencyPoint, StabilityMargins } from "@/features/control/frequencyResponseMath";
+import type { FrequencyPoint, StabilityMargins } from "@shared/control/frequencyTypes";
 
 export interface BodePhasePlotProps {
   data: FrequencyPoint[];

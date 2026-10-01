@@ -1,11 +1,22 @@
 // @vitest-environment jsdom
-import { beforeAll, describe, expect, it } from "vitest";
-import { act, fireEvent, render } from "@testing-library/react";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { act, fireEvent, render, waitFor } from "@testing-library/react";
+import { installInProcessControlApi, uninstallInProcessControlApi } from "./test-utils";
+
+/** The converter model is solved by the serverless engine: wait for the first answer, and for each re-solve after an edit. */
+async function renderReady(ui: React.ReactElement) {
+  const result = render(ui);
+  await waitFor(() => expect(result.container.querySelector('[role="status"]')).toBeNull());
+  return result;
+}
+const flushSim = () => act(async () => { await new Promise((resolve) => setTimeout(resolve, 120)); });
+
 import { InverterStudio } from "./InverterStudio";
 import { ACVoltageControllerStudio } from "./ACVoltageControllerStudio";
 import { ChopperStudio } from "./ChopperStudio";
 
 beforeAll(() => {
+  installInProcessControlApi();
   class StubResizeObserver {
     observe() {}
     unobserve() {}
@@ -27,9 +38,11 @@ beforeAll(() => {
   });
 });
 
+afterAll(uninstallInProcessControlApi);
+
 describe("InverterStudio", () => {
   it("renders with SegmentedControl and allows switching between Waveform and Spectrum views", async () => {
-    const { container } = render(<InverterStudio />);
+    const { container } = await renderReady(<InverterStudio />);
 
     // Check that PowerScopePlot is present
     expect(container.querySelector("svg")).not.toBeNull();
@@ -44,6 +57,7 @@ describe("InverterStudio", () => {
       await act(async () => {
         fireEvent.click(threePhaseBtn);
       });
+    await flushSim();
     }
 
     // Verify 3-phase subtitle has VoA, VoB, VoC, Io
@@ -59,6 +73,7 @@ describe("InverterStudio", () => {
       await act(async () => {
         fireEvent.click(spectrumBtn);
       });
+    await flushSim();
     }
 
     expect(container.textContent).toContain("Harmonic Spectrum");
@@ -82,7 +97,7 @@ describe("InverterStudio", () => {
 
 describe("ACVoltageControllerStudio", () => {
   it("renders with SegmentedControl and updates parameters", async () => {
-    const { container } = render(<ACVoltageControllerStudio />);
+    const { container } = await renderReady(<ACVoltageControllerStudio />);
 
     expect(container.querySelector("svg")).not.toBeNull();
 
@@ -95,6 +110,7 @@ describe("ACVoltageControllerStudio", () => {
       await act(async () => {
         fireEvent.click(threePhaseBtn);
       });
+    await flushSim();
     }
 
     // Check 3-Phase scope title & trace nomenclature
@@ -106,7 +122,7 @@ describe("ACVoltageControllerStudio", () => {
   });
 
   it("renders alpha and beta annotations in KaTeX math italics and g(t) in violet", async () => {
-    const { container } = render(<ACVoltageControllerStudio />);
+    const { container } = await renderReady(<ACVoltageControllerStudio />);
 
     // Check angle annotations typography
     const annotationTexts = Array.from(container.querySelectorAll("svg text")).filter(
@@ -128,13 +144,14 @@ describe("ACVoltageControllerStudio", () => {
       await act(async () => {
         fireEvent.click(gateBtn);
       });
+    await flushSim();
       const gateTrace = container.querySelector('path[stroke="#7c3aed"]');
       expect(gateTrace).not.toBeNull();
     }
   });
 
   it("displays computed beta alongside alpha as a read-only readout with parity on scope", async () => {
-    const { container } = render(<ACVoltageControllerStudio />);
+    const { container } = await renderReady(<ACVoltageControllerStudio />);
 
     // Confirm beta is displayed as a read-only math label alongside alpha
     expect(container.textContent).toContain("α=");
@@ -173,7 +190,7 @@ describe("ACVoltageControllerStudio", () => {
 
 describe("ChopperStudio", () => {
   it("renders with SegmentedControl for quadrant class and topology", async () => {
-    const { container } = render(<ChopperStudio />);
+    const { container } = await renderReady(<ChopperStudio />);
 
     expect(container.querySelector("svg")).not.toBeNull();
     // Verify trace names
@@ -189,6 +206,7 @@ describe("ChopperStudio", () => {
       await act(async () => {
         fireEvent.click(boostBtn);
       });
+    await flushSim();
     }
 
     const classBBtn = buttons.find((b) => b.textContent?.includes("Class B"));
@@ -198,13 +216,14 @@ describe("ChopperStudio", () => {
       await act(async () => {
         fireEvent.click(classBBtn);
       });
+    await flushSim();
     }
 
     expect(container.textContent).toContain("Boost");
   });
 
   it("renders g(t) trace with violet stroke and swatch, and settles cleanly at zero duty cycle without dcm markers", async () => {
-    const { container } = render(<ChopperStudio />);
+    const { container } = await renderReady(<ChopperStudio />);
 
     // Verify g(t) trace path or swatch uses violet #7c3aed
     const gatePath = container.querySelector('path[stroke="#7c3aed"]');
@@ -227,6 +246,7 @@ describe("ChopperStudio", () => {
       await act(async () => {
         fireEvent.change(dutyInput, { target: { value: "0" } });
       });
+    await flushSim();
     }
 
     // Verify there are no internal dcm-marker SVG elements
@@ -234,7 +254,7 @@ describe("ChopperStudio", () => {
   });
 
   it("switches to Class B without triggering warnings and displays quadrant badges in Poppins", async () => {
-    const { container } = render(<ChopperStudio />);
+    const { container } = await renderReady(<ChopperStudio />);
 
     // Verify quadrant badge uses Poppins styling
     const badgeSpans = Array.from(container.querySelectorAll("button span"));
@@ -251,6 +271,7 @@ describe("ChopperStudio", () => {
       await act(async () => {
         fireEvent.click(classBBtn);
       });
+    await flushSim();
     }
 
     // Verify no warning or error alerts are triggered
@@ -259,7 +280,7 @@ describe("ChopperStudio", () => {
   });
 
   it("opens in CCM by default: no DCM banner text, mode badge shows CCM", async () => {
-    const { container } = render(<ChopperStudio />);
+    const { container } = await renderReady(<ChopperStudio />);
     expect(container.textContent).not.toContain("DISCONTINUOUS CONDUCTION");
     expect(container.textContent).not.toContain("Load current reaches 0 A");
     const allSpans = Array.from(container.querySelectorAll("span"));

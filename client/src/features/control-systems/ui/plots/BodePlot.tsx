@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import type { FrequencyPoint, StabilityMargins } from "@/features/control/frequencyResponseMath";
+import type { FrequencyPoint, StabilityMargins } from "@shared/control/frequencyTypes";
 import { BodeMagnitudePlot } from "./BodeMagnitudePlot";
 import { BodePhasePlot } from "./BodePhasePlot";
 

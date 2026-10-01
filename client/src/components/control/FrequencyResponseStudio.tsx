@@ -1,16 +1,16 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useTranslation } from 'react-i18next';
 import { KatexMath } from "@/components/ui/KatexMath";
-import { simulateLtiStepResponse } from "@/features/control/controlMath";
 import {
-  buildFrequencyFactors,
-  computeFrequencyResponse,
-  extractStabilityMargins,
-  factorSlopeEvents,
   formatEngineering,
-  logspace,
+  type FactorSlopeEvent,
   type FrequencyFactor,
-} from "@/features/control/frequencyResponseMath";
+  type FrequencyPoint,
+  type StabilityMargins,
+} from "@shared/control/frequencyTypes";
+import { bodeRemote } from "@/services/controlClient";
+import { useRemoteQuery } from "@/lib/useRemoteQuery";
+import type { StepResponseData } from "@shared/control/stepTypes";
 import { SegmentedControl, StandardStepPlot, StudioCard, InnerBox, StudioSlider, MathNumberInput } from "@/components/common/templates";
 import {
   BodePlot,
@@ -18,6 +18,12 @@ import {
   NicholsPlot,
 } from "@/features/control-systems/ui/plots";
 import { TransferFunctionInput, type TransferFunctionData } from "./TransferFunctionInput";
+
+const EMPTY_FACTORS: FrequencyFactor[] = [];
+const EMPTY_RESPONSE: FrequencyPoint[] = [];
+const EMPTY_MARGINS: StabilityMargins = {};
+const EMPTY_SLOPES = { initialSlopeDbPerDecade: 0, events: [] as FactorSlopeEvent[] };
+const EMPTY_STEP = { t: [], y: [], sp: [], error: [], overshootPercent: 0, peakTime: 0, settlingTime: 0, riseTime: 0, delayTime: 0, steadyStateError: 0, termination: "complete" } satisfies StepResponseData;
 
 type PrimaryView = "bode" | "nyquist" | "nichols";
 
@@ -68,35 +74,28 @@ export function FrequencyResponseStudio() {
     }),
     [gain, tfData.denPoly, tfData.numPoly]
   );
-  const factors = useMemo(
-    () => buildFrequencyFactors(openLoop.numerator, openLoop.denominator),
-    [openLoop.denominator, openLoop.numerator]
+  // Factor decomposition, Bode / Nyquist / Nichols data, margins, slope events and the closed-loop step response are computed
+  // by the serverless engine; the last answer stays plotted while a newer one loads.
+  const bodeQuery = useRemoteQuery(
+    `bode|${tfData.numPoly.join(",")}|${tfData.denPoly.join(",")}|${gain}|${selectedFactorIds.join(",")}|${timeHorizon}`,
+    (signal) => bodeRemote(tfData.numPoly, tfData.denPoly, gain, selectedFactorIds, Math.min(200, timeHorizon), 360, signal),
+    { debounceMs: 40 },
   );
+  const bode = bodeQuery.error ? null : bodeQuery.data;
+  const factors: FrequencyFactor[] = bode?.factors ?? EMPTY_FACTORS;
+  const factorIdsKey = factors.map((factor) => factor.id).join("|");
 
   useEffect(() => {
     setSelectedFactorIds((previous) => {
-      const supported = previous.filter((id) => factors.some((factor) => factor.id === id));
-      return previous.length === 0 ? factors.map((factor) => factor.id) : supported;
+      const supported = previous.filter((id) => factorIdsKey.split("|").includes(id));
+      return previous.length === 0 ? (factorIdsKey ? factorIdsKey.split("|") : previous) : supported.length === previous.length ? previous : supported;
     });
-  }, [factors]);
+  }, [factorIdsKey]);
 
-  const response = useMemo(
-    () => computeFrequencyResponse(factors, selectedFactorIds, logspace(-2, 4, 360)),
-    [factors, selectedFactorIds]
-  );
-  const margins = useMemo(() => extractStabilityMargins(response), [response]);
-  const slopeLogic = useMemo(
-    () => factorSlopeEvents(factors.filter((factor) => selectedFactorIds.includes(factor.id))),
-    [factors, selectedFactorIds]
-  );
-  const closedLoop = useMemo(
-    () => makeClosedLoop(tfData.numPoly, tfData.denPoly, gain),
-    [gain, tfData.denPoly, tfData.numPoly]
-  );
-  const stepResponse = useMemo(
-    () => simulateLtiStepResponse(closedLoop.numerator, closedLoop.denominator, 1, timeHorizon, Math.min(0.02, timeHorizon / 700)),
-    [closedLoop.denominator, closedLoop.numerator, timeHorizon]
-  );
+  const response: FrequencyPoint[] = bode?.response ?? EMPTY_RESPONSE;
+  const margins: StabilityMargins = bode?.margins ?? EMPTY_MARGINS;
+  const slopeLogic = bode?.slopeLogic ?? EMPTY_SLOPES;
+  const stepResponse = bode?.stepResponse ?? EMPTY_STEP;
 
   const nicholsData = useMemo(
     () =>

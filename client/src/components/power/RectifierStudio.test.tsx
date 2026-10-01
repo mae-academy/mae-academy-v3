@@ -1,9 +1,20 @@
 // @vitest-environment jsdom
-import { beforeAll, describe, expect, it } from "vitest";
-import { act, fireEvent, render } from "@testing-library/react";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { act, fireEvent, render, waitFor } from "@testing-library/react";
+import { installInProcessControlApi, uninstallInProcessControlApi } from "./test-utils";
+
+/** The converter model is solved by the serverless engine: wait for the first answer, and for each re-solve after an edit. */
+async function renderReady(ui: React.ReactElement) {
+  const result = render(ui);
+  await waitFor(() => expect(result.container.querySelector('[role="status"]')).toBeNull());
+  return result;
+}
+const flushSim = () => act(async () => { await new Promise((resolve) => setTimeout(resolve, 120)); });
+
 import { RectifierStudio } from "./RectifierStudio";
 
 beforeAll(() => {
+  installInProcessControlApi();
   // jsdom has no layout engine: recharts' ResponsiveContainer needs ResizeObserver
   // and a non-zero getBoundingClientRect to actually mount its chart body (including
   // the ReferenceLine whose yAxisId resolution is under test) instead of bailing out
@@ -19,9 +30,11 @@ function findByAriaLabel(container: HTMLElement, label: string) {
   return match;
 }
 
+afterAll(uninstallInProcessControlApi);
+
 describe("RectifierStudio", () => {
   it("renders the DCM extinction marker on the output scope without a recharts yAxisId crash", async () => {
-    const { container } = render(<RectifierStudio />);
+    const { container } = await renderReady(<RectifierStudio />);
 
     // Default load is already RL; disable the free-wheeling diode and shrink the
     // inductance so the load enters discontinuous conduction (DCM), which draws the
@@ -29,12 +42,15 @@ describe("RectifierStudio", () => {
     const fwdNoButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "No");
     if (!fwdNoButton) throw new Error("FWD 'No' button not found");
     await act(async () => { fireEvent.click(fwdNoButton); });
+    await flushSim();
 
     const inductanceField = findByAriaLabel(container, "L\\,[\\mathrm{mH}]");
     await act(async () => { fireEvent.change(inductanceField, { target: { value: "0.02" } }); });
 
     const firingAngleSlider = findByAriaLabel(container, "firing angle slider");
     await act(async () => { fireEvent.change(firingAngleSlider, { target: { value: "65" } }); });
+
+    await flushSim();
 
     // Flush the requestAnimationFrame that gates chart rendering (chartsReady).
     await act(async () => { await new Promise((resolve) => requestAnimationFrame(resolve)); });

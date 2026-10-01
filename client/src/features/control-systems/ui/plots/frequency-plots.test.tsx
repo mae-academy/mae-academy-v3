@@ -9,7 +9,7 @@ import {
   NyquistPlot,
   NicholsPlot,
 } from "./index";
-import type { FrequencyPoint, StabilityMargins } from "@/features/control/frequencyResponseMath";
+import type { FrequencyPoint, StabilityMargins } from "@shared/control/frequencyTypes";
 
 // Mock ResizeObserver for jsdom
 class MockResizeObserver {

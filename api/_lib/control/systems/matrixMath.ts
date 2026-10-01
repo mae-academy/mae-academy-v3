@@ -4,11 +4,10 @@
  * learning workspace exposes every linear-control operation client-side.
  */
 
-export type Matrix = number[][];
-export type Vector = number[];
-export type ComplexValue = { re: number; im: number };
-
-const EPSILON = 1e-9;
+import type { Matrix, Vector, ComplexValue, PolePlacementResult, StateTrajectory } from "../../../../shared/control/matrixTypes";
+import { EPSILON, formatNumber, matrixToLatex, vectorToLatex, complexToLatex } from "../../../../shared/control/matrixTypes";
+export type { Matrix, Vector, ComplexValue, PolePlacementResult, StateTrajectory };
+export { formatNumber, matrixToLatex, vectorToLatex, complexToLatex };
 
 export const zeros = (rows: number, columns: number): Matrix => Array.from({ length: rows }, () => Array(columns).fill(0));
 export const identity = (size: number): Matrix => Array.from({ length: size }, (_, row) => Array.from({ length: size }, (_, column) => (row === column ? 1 : 0)));
@@ -207,8 +206,6 @@ export function evaluatePolynomialMatrix(coefficients: number[], matrix: Matrix)
   return coefficients.reduce((output, coefficient, index) => addMatrices(output, scaleMatrix(matrixPower(matrix, degree - index), coefficient)), zeros(matrix.length, matrix.length));
 }
 
-export type PolePlacementResult = { gain: Vector; acl: Matrix; desiredPolynomial: number[]; closedLoopEigenvalues: ComplexValue[] };
-
 /** Single-input Ackermann pole placement: K = e_n^T C^{-1} phi_d(A). */
 export function ackermannPolePlacement(a: Matrix, b: Matrix, desiredPoles: number[]): PolePlacementResult {
   const size = a.length;
@@ -222,8 +219,6 @@ export function ackermannPolePlacement(a: Matrix, b: Matrix, desiredPoles: numbe
   const acl = subtractMatrices(a, b.map((row) => gain.map((value) => row[0] * value)));
   return { gain, acl, desiredPolynomial, closedLoopEigenvalues: eigenvalues(acl) };
 }
-
-export type StateTrajectory = { time: number[]; states: Vector[] };
 
 /** RK4 trajectory for x-dot = Ax. The matrix may be A or the pole-placed A_cl. */
 export function integrateStateRK4(matrix: Matrix, initialState: Vector, duration = 12, step = 0.025): StateTrajectory {
@@ -244,7 +239,3 @@ export function integrateStateRK4(matrix: Matrix, initialState: Vector, duration
   return { time, states };
 }
 
-export const formatNumber = (value: number, precision = 4) => Number((Math.abs(value) < EPSILON ? 0 : value).toFixed(precision)).toString();
-export const matrixToLatex = (matrix: Matrix, precision = 3) => `\\begin{bmatrix}${matrix.map((row) => row.map((value) => formatNumber(value, precision)).join(" & ")).join("\\\\")}\\end{bmatrix}`;
-export const vectorToLatex = (vector: Vector, precision = 3, row = false) => row ? `\\begin{bmatrix}${vector.map((value) => formatNumber(value, precision)).join(" & ")}\\end{bmatrix}` : `\\begin{bmatrix}${vector.map((value) => formatNumber(value, precision)).join("\\\\")}\\end{bmatrix}`;
-export const complexToLatex = (value: ComplexValue, precision = 3) => Math.abs(value.im) < EPSILON ? formatNumber(value.re, precision) : `${formatNumber(value.re, precision)} ${value.im < 0 ? "-" : "+"} ${formatNumber(Math.abs(value.im), precision)}i`;

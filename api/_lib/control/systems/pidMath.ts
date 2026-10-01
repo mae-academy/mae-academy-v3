@@ -2,26 +2,11 @@
  * PID Studio mathematics engine — polynomial controller forms, closed-loop construction,
  * input generators, design-spec matching, and an RK4-driven LTI response solver.
  */
+import type { ControllerPrimary, ControllerSubtype, PidGains, SignalType, TransferPolynomial, PidScopeData } from "../../../../shared/control/pidTypes";
+import { getControllerSubtypes, defaultControllerSubtype } from "../../../../shared/control/pidTypes";
+export type { ControllerPrimary, ControllerSubtype, PidGains, SignalType, TransferPolynomial, PidScopeData };
+export { getControllerSubtypes, defaultControllerSubtype };
 import { multiplyPolynomials, polyAdd } from "./controlMath";
-
-export type ControllerPrimary = "P" | "I" | "D" | "PI" | "PD" | "PID";
-export type ControllerSubtype = "parallel" | "series" | "parallel-standard" | "parallel-modified" | "series-standard" | "series-modified";
-export type PidGains = { kp: number; ki: number; kd: number; n: number };
-export type SignalType = "impulse" | "step" | "ramp" | "parabolic" | "exponential" | "sine" | "cosine";
-
-export type TransferPolynomial = { numerator: number[]; denominator: number[]; latex: string };
-export type PidScopeData = {
-  t: number[];
-  y: number[];
-  r: number[];
-  overshoot: number;
-  peakTime: number;
-  settlingTime: number;
-  steadyStateError: number;
-  openLoop: TransferPolynomial;
-  closedLoop: TransferPolynomial;
-  output: TransferPolynomial;
-};
 
 const tidy = (poly: number[]) => {
   const output = poly.map((value) => (Math.abs(value) < 1e-10 ? 0 : value));
@@ -46,18 +31,6 @@ export function polynomialLatex(coefficients: number[], variable = "s") {
     else terms.push(`${coefficient < 0 ? "-" : "+"} ${body}`);
   });
   return terms.join(" ") || "0";
-}
-
-export function getControllerSubtypes(primary: ControllerPrimary): ControllerSubtype[] {
-  if (primary === "PI") return ["parallel", "series"];
-  if (primary === "PD" || primary === "PID") return ["parallel-standard", "parallel-modified", "series-standard", "series-modified"];
-  return [];
-}
-
-export function defaultControllerSubtype(primary: ControllerPrimary): ControllerSubtype {
-  if (primary === "PI") return "parallel";
-  if (primary === "PD" || primary === "PID") return "parallel-standard";
-  return "parallel-standard";
 }
 
 export function controllerTransfer(primary: ControllerPrimary, subtype: ControllerSubtype, gains: PidGains): TransferPolynomial {

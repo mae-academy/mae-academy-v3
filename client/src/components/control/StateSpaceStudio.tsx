@@ -16,18 +16,11 @@ import {
   StatusBadge,
 } from "@/components/common/templates";
 import { StateSpacePortraits } from "@/components/control/StateSpacePortraits";
-import {
-  ackermannPolePlacement,
-  characteristicPolynomial,
-  complexToLatex,
-  controllabilityMatrix,
-  eigenvalues,
-  formatNumber,
-  matrixToLatex,
-  observabilityMatrix,
-  rank,
-  type Matrix,
-} from "@/features/control/matrixMath";
+import { complexToLatex, formatNumber, matrixToLatex, type Matrix } from "@shared/control/matrixTypes";
+import { stateSpaceRemote, type StateSpaceAnalysis } from "@/services/controlClient";
+import { useRemoteQuery } from "@/lib/useRemoteQuery";
+
+const PENDING_ANALYSIS: StateSpaceAnalysis = { error: "…" };
 
 type SystemModel = { A: Matrix; B: Matrix; C: Matrix; D: Matrix };
 type Order = 2 | 3;
@@ -128,20 +121,15 @@ export function StateSpaceStudio() {
   const [desiredPoles, setDesiredPoles] = useState<number[]>(() => initialPoles(2));
   const [placementRequested, setPlacementRequested] = useState(true);
 
-  const analysis = useMemo(() => {
-    try {
-      const controllability = controllabilityMatrix(system.A, system.B);
-      const observability = observabilityMatrix(system.A, system.C);
-      const controllabilityRank = rank(controllability);
-      const observabilityRank = rank(observability);
-      return { characteristic: characteristicPolynomial(system.A), eigenvalues: eigenvalues(system.A), controllability, observability, controllabilityRank, observabilityRank, controllable: controllabilityRank === order, observable: observabilityRank === order };
-    } catch (error) { return { error: error instanceof Error ? error.message : copy.analysisUnavailable }; }
-  }, [order, system, copy]);
-
-  const placement = useMemo(() => {
-    if (!("controllable" in analysis) || !analysis.controllable) return null;
-    try { return ackermannPolePlacement(system.A, system.B, desiredPoles); } catch { return null; }
-  }, [analysis, desiredPoles, system.A, system.B]);
+  // Controllability / observability ranks, eigenvalues, the characteristic polynomial and Ackermann pole placement are solved by the
+  // serverless engine; the last answer stays shown while a newer one loads.
+  const stateQuery = useRemoteQuery(
+    `ss|${JSON.stringify(system)}|${desiredPoles.join(",")}`,
+    (signal) => stateSpaceRemote(system.A, system.B, system.C, system.D, desiredPoles, signal),
+    { debounceMs: 40 },
+  );
+  const analysis: StateSpaceAnalysis = stateQuery.error ? { error: stateQuery.error } : stateQuery.data?.analysis ?? PENDING_ANALYSIS;
+  const placement = !stateQuery.error && stateQuery.data?.analysis && "controllable" in stateQuery.data.analysis && stateQuery.data.analysis.controllable ? stateQuery.data.placement : null;
 
   const updateMatrix = (key: keyof SystemModel, row: number, column: number, value: number) => setSystem((current) => ({ ...current, [key]: current[key].map((existingRow, rowIndex) => existingRow.map((existingValue, columnIndex) => rowIndex === row && columnIndex === column ? value : existingValue)) }));
   const changeOrder = (nextOrder: Order) => { setOrder(nextOrder); setSystem(initialSystem(nextOrder)); setDesiredPoles(initialPoles(nextOrder)); setPlacementRequested(true); };

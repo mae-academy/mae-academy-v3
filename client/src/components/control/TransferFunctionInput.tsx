@@ -2,7 +2,7 @@ import React, { useState, useMemo } from "react";
 import { useTranslation } from 'react-i18next';
 import { KatexMath } from "../ui/KatexMath";
 import { SegmentedControl, StudioCard, FormulaBox } from "@/components/common/templates";
-import { rootsToPolynomial, parseRootsList, Complex } from "@/features/control/controlMath";
+import { rootsToPolynomial, parseRootsList, Complex } from "@shared/control/polynomial";
 
 export type TfInputMode = "polynomial" | "zpk";
 
