@@ -15,6 +15,7 @@ import { handleSolve } from "../api/_lib/circuit/handler";
 import { handleLogic } from "../api/_lib/logic/handler";
 import { handleSignals } from "../api/_lib/signals/handler";
 import { handleControl } from "../api/_lib/control/handler";
+import { handleCode } from "../api/_lib/code/handler";
 import { expressGuard } from "../api/_lib/security/node-adapter";
 import type { Tier } from "../api/_lib/security/ratelimit";
 import { pdfCheckHandler, pdfDownloadHandler, pdfProxyHandler } from "./pdfProxy";
@@ -38,6 +39,8 @@ async function startServer() {
         ? "signals"
         : path.startsWith("/control/")
         ? "control"
+        : path.startsWith("/code/")
+        ? "code"
         : /^\/(pdf-thumb|pdf-proxy|pdf-download|library\/cover)/.test(path)
         ? "assets"
         : "general";
@@ -103,6 +106,17 @@ async function startServer() {
   app.post("/api/control/solve", express.text({ type: "*/*", limit: "384kb" }), async (req, res) => {
     const response = await handleControl(
       new Request("http://localhost/api/control/solve", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: typeof req.body === "string" ? req.body : "",
+      }),
+    );
+    res.status(response.status).type("application/json").send(await response.text());
+  });
+  // Arduino compiler and C/C++ trace / STL preprocessing: same web-standard handler as api/code/process.ts.
+  app.post("/api/code/process", express.text({ type: "*/*", limit: "512kb" }), async (req, res) => {
+    const response = await handleCode(
+      new Request("http://localhost/api/code/process", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: typeof req.body === "string" ? req.body : "",

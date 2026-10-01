@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { run } from "@/features/execution-engine/cppEngine";
+import { run } from "./cppEngine";
 
 describe("C++ Execution Engine - Advanced E2E Verification Suite", () => {
   // =========================================================================

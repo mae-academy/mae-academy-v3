@@ -1,4 +1,4 @@
-import type { TraceStep } from "@/features/execution-engine/types";
+import type { RemoteOutcome, TraceStep } from "../../../../shared/code/traceTypes";
 
 export interface CppTraceStep {
   lineNumber: number;
@@ -6,11 +6,7 @@ export interface CppTraceStep {
   isTerminated?: boolean;
 }
 
-export interface RemoteOutcome {
-  stdout: string;
-  stderr: string;
-  exitCode: number;
-}
+export type { RemoteOutcome };
 
 const OUTPUT_CALL = /\b(?:std\s*::\s*)?(?:cout|cerr|printf|fprintf|puts|putchar|fputs)\b/;
 

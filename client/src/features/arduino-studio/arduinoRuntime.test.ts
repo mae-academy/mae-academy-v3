@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { compileSketch } from "./arduinoCompiler";
+import { compileSketch } from "../../../../api/_lib/code/arduino/arduinoCompiler";
 import { ArduinoRuntime, type HardwareSnapshot } from "./arduinoRuntime";
 import { ARDUINO_EXAMPLES } from "./arduinoExamples";
 
@@ -143,7 +143,7 @@ describe("arduino compiler + runtime", () => {
   });
 });
 
-import { analyzeSketch } from "./arduinoCompiler";
+import { analyzeSketch } from "../../../../api/_lib/code/arduino/arduinoCompiler";
 describe("static pin analysis", () => {
   it("resolves constants and classifies pins", () => {
     const u = analyzeSketch(`

@@ -1,6 +1,11 @@
 // @vitest-environment jsdom
 import { render } from "@testing-library/react";
-import { describe, it, expect, vi } from "vitest";
+import { afterAll, beforeAll, describe, it, expect, vi } from "vitest";
+import { installInProcessCodeApi, uninstallInProcessCodeApi } from "@/services/codeClient.test-utils";
+
+// The pin layout and Run compile come from the serverless compiler.
+beforeAll(installInProcessCodeApi);
+afterAll(uninstallInProcessCodeApi);
 import { ArduinoStudio } from "./ArduinoStudio";
 
 // Mock ResizeObserver

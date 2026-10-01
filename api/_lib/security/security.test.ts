@@ -4,6 +4,7 @@ import { POST as LOGO_POST } from '../../plc/logo/evaluate';
 import { POST as LOGIC_POST } from '../../logic/solve';
 import { POST as SIGNALS_POST } from '../../signals/transform';
 import { POST as CONTROL_POST } from '../../control/solve';
+import { POST as CODE_POST } from '../../code/process';
 import { evaluateGuard, guarded, setLimiterForTests } from './guard';
 import { checkOrigin } from './origin';
 import { HybridLimiter, MemoryLimiter, TIERS } from './ratelimit';
@@ -132,6 +133,17 @@ describe('guard: 403 / 429 behaviour and headers', () => {
       expect(second.status).toBe(429);
       expect(second.headers.get('retry-after')).not.toBeNull();
       expect(await second.json()).toEqual({ error: 'Too Many Requests' });
+    } finally {
+      process.env.NODE_ENV = prevEnv;
+    }
+  });
+
+  it('the real /api/code/process route is guarded', async () => {
+    const prevEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'production';
+    try {
+      const res = await CODE_POST(new Request('http://x/api/code/process', { method: 'POST', body: '{}' }));
+      expect(res.status).toBe(403);
     } finally {
       process.env.NODE_ENV = prevEnv;
     }

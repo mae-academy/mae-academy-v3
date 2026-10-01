@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import * as masmEngine from "@/features/execution-engine/masmEngine";
-import { toTraceSteps } from "@/features/code-studio/services/cppTrace";
+import { traceCppRemote } from "@/services/codeClient";
 import { runRemoteCached } from "@/features/code-studio/executionCache";
 import type {
   ExecutionRequest,
@@ -169,9 +169,8 @@ export function useExecutionEngine(): UseExecutionEngineReturn {
         const stdin = options?.stdin ?? "";
 
         return runRemoteCached(language, code, stdin)
-          .then(remoteOutcome => {
+          .then(async remoteOutcome => {
             if (!mountedRef.current || id !== latestIdRef.current) return;
-            setIsRunning(false);
 
             const isSuccess = remoteOutcome.success && remoteOutcome.exitCode === 0;
             const compilerOrRuntimeError = !isSuccess
@@ -182,19 +181,30 @@ export function useExecutionEngine(): UseExecutionEngineReturn {
               ? (remoteOutcome.stdout ? `${remoteOutcome.stdout}\n${remoteOutcome.stderr}` : remoteOutcome.stderr)
               : remoteOutcome.stdout;
 
-            // Successful builds are replayed as a per-statement trace of main(); failures keep
-            // the single frame so the compiler diagnostics show immediately.
-            const steps: TraceStep[] = isSuccess
-              ? toTraceSteps(code, remoteOutcome)
-              : [
-                  {
-                    stepIndex: 0,
-                    line: 1,
-                    callStack: ["main"],
-                    variables: {},
-                    stdout: terminalOutput,
-                  },
-                ];
+            // Successful builds are replayed as a per-statement trace of main() by the serverless trace engine; failures keep
+            // the single frame so the compiler diagnostics show immediately. If the trace service is unreachable the program
+            // output is still shown, as one terminating frame.
+            let steps: TraceStep[];
+            if (isSuccess) {
+              const outcome = { stdout: remoteOutcome.stdout, stderr: remoteOutcome.stderr, exitCode: remoteOutcome.exitCode };
+              try {
+                steps = await traceCppRemote(language, code, outcome);
+              } catch {
+                steps = [{ stepIndex: 0, line: 1, callStack: ["main"], variables: {}, stdout: `${terminalOutput}${terminalOutput && !terminalOutput.endsWith("\n") ? "\n" : ""}[Process exited with code ${remoteOutcome.exitCode}]` }];
+              }
+            } else {
+              steps = [
+                {
+                  stepIndex: 0,
+                  line: 1,
+                  callStack: ["main"],
+                  variables: {},
+                  stdout: terminalOutput,
+                },
+              ];
+            }
+            if (!mountedRef.current || id !== latestIdRef.current) return;
+            setIsRunning(false);
 
             setResult({
               success: isSuccess,

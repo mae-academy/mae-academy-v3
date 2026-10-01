@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { compileSketch, type Diagnostic } from "./arduinoCompiler";
+import type { Diagnostic } from "@shared/code/arduinoTypes";
+import { compileSketchRemote } from "@/services/codeClient";
 import { ArduinoRuntime, type ArduinoSpeed, type HardwareSnapshot } from "./arduinoRuntime";
 
 const MAX_LINES = 1000;
@@ -50,6 +51,7 @@ export function useArduinoRuntime(): ArduinoStudioRuntime {
   const flushScheduled = useRef(false);
   const speedRef = useRef<ArduinoSpeed>(1);
   const runtimeRef = useRef<ArduinoRuntime | null>(null);
+  const disposedRef = useRef(false);
 
   const flush = useCallback(() => {
     flushScheduled.current = false;
@@ -98,12 +100,14 @@ export function useArduinoRuntime(): ArduinoStudioRuntime {
 
   useEffect(
     () => () => {
+      disposedRef.current = true;
       runtimeRef.current?.dispose();
       runtimeRef.current = null;
     },
     [],
   );
 
+  const runRequest = useRef(0);
   const run = useCallback(
     (source: string) => {
       const rt = getRuntime();
@@ -111,19 +115,25 @@ export function useArduinoRuntime(): ArduinoStudioRuntime {
         rt.start();
         return;
       }
-      const result = compileSketch(source);
-      if (!result.ok) {
-        setDiagnostic(result.error);
-        setRuntimeError(null);
-        rt.reset();
-        return;
-      }
-      setDiagnostic(null);
-      setRuntimeError(null);
-      pending.current = [];
-      setSerial({ lines: [], times: [], partial: "" });
-      rt.load(result.sketch);
-      rt.start();
+      // The sketch is compiled by the serverless compiler; only the newest Run is honoured when several overlap.
+      const request = ++runRequest.current;
+      void compileSketchRemote(source)
+        .catch((error: unknown) => ({ ok: false as const, error: { line: 1, message: error instanceof Error ? error.message : "The code service could not be reached." } }))
+        .then((result) => {
+          if (request !== runRequest.current || disposedRef.current) return;
+          if (!result.ok) {
+            setDiagnostic(result.error);
+            setRuntimeError(null);
+            rt.reset();
+            return;
+          }
+          setDiagnostic(null);
+          setRuntimeError(null);
+          pending.current = [];
+          setSerial({ lines: [], times: [], partial: "" });
+          rt.load(result.sketch);
+          rt.start();
+        });
     },
     [getRuntime],
   );
@@ -131,6 +141,7 @@ export function useArduinoRuntime(): ArduinoStudioRuntime {
   const pause = useCallback(() => runtimeRef.current?.pause(), []);
 
   const reset = useCallback(() => {
+    runRequest.current++; // a compile still in flight must not start the sketch after Reset
     runtimeRef.current?.reset();
     pending.current = [];
     setSerial({ lines: [], times: [], partial: "" });

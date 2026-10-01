@@ -6,7 +6,7 @@ import { memo, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import unoRaw from "./arduinoUno.svg?raw";
 import { ANALOG_HEADER_Y, DIGITAL_HEADER_Y, HEADER_PINS, LEDS, VIEW_H, VIEW_W, analogPinX, digitalPinX, pinName } from "./arduinoBoardGeometry";
-import type { PinUsage } from "./arduinoCompiler";
+import type { PinUsage } from "@shared/code/arduinoTypes";
 import { BTN_H, BTN_W, LED_H, LED_W, POT_H, POT_W, RES_H, RES_W, VectorLed, VectorPotentiometer, VectorPushButton, VectorResistor } from "./components/circuit";
 import type { HardwareSnapshot } from "./arduinoRuntime";
 import { StudioSlider } from "@/components/common/templates";

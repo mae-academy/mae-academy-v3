@@ -2,14 +2,14 @@
 import JSCPP from "JSCPP";
 import type { JscppDebugger } from "JSCPP";
 
-import algorithmInclude from "./cppStl/algorithmInclude";
-import { wrapIostreamForContainerPrinting } from "./cppStl/iostreamPatch";
-import { preprocessCpp } from "./cppStl/preprocess";
-import queueInclude from "./cppStl/queueInclude";
-import setInclude from "./cppStl/setInclude";
-import stackInclude from "./cppStl/stackInclude";
-import vectorInclude from "./cppStl/vectorInclude";
-import type { ExecutionOptions, ExecutionResult, TraceStep, TraceVariable } from "./types";
+import algorithmInclude from "./algorithmInclude";
+import { wrapIostreamForContainerPrinting } from "./iostreamPatch";
+import { preprocessCpp } from "./preprocess";
+import queueInclude from "./queueInclude";
+import setInclude from "./setInclude";
+import stackInclude from "./stackInclude";
+import vectorInclude from "./vectorInclude";
+import type { ExecutionOptions, ExecutionResult, TraceStep, TraceVariable } from "../../../../shared/code/traceTypes";
 
 JSCPP.includes.vector = vectorInclude;
 JSCPP.includes.algorithm = algorithmInclude;

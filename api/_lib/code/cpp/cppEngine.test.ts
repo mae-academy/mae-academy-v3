@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { run } from "@/features/execution-engine/cppEngine";
+import { run } from "./cppEngine";
 
 describe("cppEngine.run", () => {
   it("traces a C++ program with a function call and captures stdout", async () => {

@@ -1,10 +1,15 @@
 /** @vitest-environment jsdom */
 import { renderHook, act } from "@testing-library/react";
-import { describe, it, expect, vi } from "vitest";
+import { afterAll, beforeAll, describe, it, expect, vi } from "vitest";
+import { installInProcessCodeApi, uninstallInProcessCodeApi } from "@/services/codeClient.test-utils";
 import { useExecutionEngine } from "./useExecutionEngine";
 import * as remoteCppEngine from "./remoteCppEngine";
 
 describe("useExecutionEngine Integration for C/C++", () => {
+  // The per-statement trace of a finished run is produced by the serverless trace engine.
+  beforeAll(installInProcessCodeApi);
+  afterAll(uninstallInProcessCodeApi);
+
   it("routes cpp code through executeRemoteCpp and pipes output to terminal steps", async () => {
     const spy = vi.spyOn(remoteCppEngine, "executeRemoteCpp").mockResolvedValueOnce({
       stdout: "Hello C++ 20\n",

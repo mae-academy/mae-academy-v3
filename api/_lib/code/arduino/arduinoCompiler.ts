@@ -6,10 +6,8 @@
 
 export type Ty = "void" | "bool" | "char" | "int8" | "uint8" | "int16" | "uint16" | "int32" | "uint32" | "float" | "string";
 
-export interface Diagnostic {
-  line: number;
-  message: string;
-}
+import type { Diagnostic, PinUsage, SketchInstance, CompiledSketch, CompileResult } from "../../../../shared/code/arduinoTypes";
+export type { Diagnostic, PinUsage, SketchInstance, CompiledSketch, CompileResult };
 
 export class CompileError extends Error {
   constructor(
@@ -1424,26 +1422,28 @@ function coerceTo(r: R, to: Ty, line: number): string {
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
-export interface SketchInstance {
-  /** Generator that runs setup() once, then loop() forever, yielding scheduler requests. */
-  main: () => Iterator<unknown, void, unknown>;
-}
-export interface CompiledSketch {
-  js: string;
-  instantiate: (rt: unknown, helpers: unknown) => SketchInstance;
-}
-export type CompileResult = { ok: true; sketch: CompiledSketch } | { ok: false; error: Diagnostic };
-
-export function compileSketch(source: string): CompileResult {
+/** Transpiles a sketch to JavaScript source. No dynamic code evaluation happens here, so it runs on the Edge runtime. */
+export function compileSketchToJs(source: string): { ok: true; js: string } | { ok: false; error: Diagnostic } {
   try {
     const tokens = preprocess(lex(source));
     const parser = new Parser(tokens);
     const items = parser.parseProgram();
     const js = new Codegen(parser.enumConsts).compile(items);
-    const factory = new Function("$rt", "$h", js) as (rt: unknown, h: unknown) => SketchInstance;
-    return { ok: true, sketch: { js, instantiate: (rt, h) => factory(rt, h) } };
+    return { ok: true, js };
   } catch (err) {
     if (err instanceof CompileError) return { ok: false, error: { line: err.line, message: err.message } };
+    return { ok: false, error: { line: 1, message: err instanceof Error ? err.message : String(err) } };
+  }
+}
+
+/** Compiles and instantiates in one step (tests and Node tooling; the deployed route returns the JavaScript instead). */
+export function compileSketch(source: string): CompileResult {
+  const compiled = compileSketchToJs(source);
+  if (!compiled.ok) return compiled;
+  try {
+    const factory = new Function("$rt", "$h", compiled.js) as (rt: unknown, h: unknown) => SketchInstance;
+    return { ok: true, sketch: { js: compiled.js, instantiate: (rt, h) => factory(rt, h) } };
+  } catch (err) {
     return { ok: false, error: { line: 1, message: err instanceof Error ? err.message : String(err) } };
   }
 }
@@ -1451,16 +1451,6 @@ export function compileSketch(source: string): CompileResult {
 // ---------------------------------------------------------------------------
 // Static pin-usage analysis (drives the board's persistent module scaffolding)
 // ---------------------------------------------------------------------------
-export interface PinUsage {
-  /** Digital pins (0-13) read as inputs. */
-  digitalInputs: number[];
-  /** Subset of digitalInputs configured with INPUT_PULLUP. */
-  pullups: number[];
-  /** Analog channels (0-5) read via analogRead(). */
-  analogInputs: number[];
-  /** Digital pins (0-13) driven as outputs. */
-  outputs: number[];
-}
 
 function exprChildren(e: Expr): Expr[] {
   switch (e.k) {

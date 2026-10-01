@@ -1,11 +1,10 @@
 /// Web Worker hosting the Pyodide and JSCPP interpreters, keeping user-code execution off the main thread.
-import * as cppEngine from "./cppEngine";
 import * as pythonEngine from "./pythonEngine";
 import type { ExecutionOptions, ExecutionResult, SupportedLanguage } from "./types";
 
 export interface ExecutionRequest {
   type: "RUN" | "RUN_FAST" | "PREWARM";
-  payload: { language: Exclude<SupportedLanguage, "masm8086">; code: string; options?: ExecutionOptions };
+  payload: { language: "python"; code: string; options?: ExecutionOptions };
   id?: string;
 }
 
@@ -47,7 +46,6 @@ async function execute(request: ExecutionRequest): Promise<ExecutionResult> {
       ? pythonEngine.runFast(code, options)
       : pythonEngine.run(code, options);
   }
-  if (language === "cpp" || language === "c") return cppEngine.run(code, options);
   throw new Error(`Unsupported language for the execution worker: ${String(language)}`);
 }
 

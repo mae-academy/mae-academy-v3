@@ -11,7 +11,9 @@ import { CodeEditor, type LineSeverity } from "@/components/code-editor/CodeEdit
 import { SegmentedControl } from "@/components/common/templates";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ArduinoBoard } from "./ArduinoBoard";
-import { analyzeSketch, type PinUsage } from "./arduinoCompiler";
+import type { PinUsage } from "@shared/code/arduinoTypes";
+import { analyzeSketchRemote } from "@/services/codeClient";
+import { useRemoteQuery } from "@/lib/useRemoteQuery";
 import { ARDUINO_EXAMPLES, DEFAULT_SKETCH } from "./arduinoExamples";
 import type { ArduinoSpeed } from "./arduinoRuntime";
 import { SerialConsole } from "./SerialConsole";
@@ -83,11 +85,13 @@ export function ArduinoStudio() {
   const [serialCollapsed, setSerialCollapsed] = useState(false);
   const started = useRef(false);
   const lastLayout = useRef<PinUsage | undefined>(undefined);
+  // The static pin layout comes from the serverless compiler (debounced while typing); the last layout that parsed stays on the board.
+  const layoutQuery = useRemoteQuery(code, (signal) => analyzeSketchRemote(code, signal), { debounceMs: 350 });
   const layout = useMemo(() => {
-    const parsed = analyzeSketch(code);
+    const parsed = layoutQuery.data ?? null;
     if (parsed) lastLayout.current = parsed;
     return parsed ?? lastLayout.current;
-  }, [code]);
+  }, [layoutQuery.data]);
   const [activeLine, setActiveLine] = useState(1);
   const [history, setHistory] = useState<string[]>([DEFAULT_SKETCH]);
   const [historyIndex, setHistoryIndex] = useState(0);

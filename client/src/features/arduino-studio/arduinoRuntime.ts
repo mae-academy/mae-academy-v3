@@ -3,7 +3,7 @@
  * Compiled sketches are generators; delay() yields a sleep request instead of blocking the browser thread.
  */
 import { ArduinoRuntimeError, helpers, toBase, toStr, type StrKind } from "./arduinoHelpers";
-import type { CompiledSketch } from "./arduinoCompiler";
+import type { CompiledSketch } from "@shared/code/arduinoTypes";
 
 export type ArduinoSpeed = 0.5 | 1 | 2 | "instant";
 export type RunStatus = "idle" | "running" | "paused" | "error";
