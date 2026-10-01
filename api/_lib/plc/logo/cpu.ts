@@ -1,30 +1,8 @@
-import { INITIAL_BLOCK_STATE, stepBlock, type BlockState } from './blocks';
+import { ADDRESS_SPACE, BLOCK_SPECS, STARTUP_FLAG, type Bit, type ConnectorRef, type WireIn } from '../../../../shared/logo/types';
+import { INITIAL_BLOCK_STATE, type BlockState } from '../../../../shared/logo/state';
+import type { CpuMode, LogoWireState } from '../../../../shared/logo/wire';
+import { stepBlock } from './blocks';
 import type { CompiledProgram } from './compile';
-import { msToUnits } from './time';
-import {
-  ADDRESS_SPACE,
-  BLOCK_SPECS,
-  STARTUP_FLAG,
-  type Bit,
-  type ConnectorRef,
-  type NumericParamKey,
-  type TimeBase,
-  type WireIn,
-} from './types';
-
-export type CpuMode = 'RUN' | 'STOP';
-
-/** One editable parameter as parameter-assignment mode lists it. */
-export interface ParamView {
-  readonly blockId: number;
-  readonly key: NumericParamKey;
-  readonly kind: 'time' | 'count';
-  /** Time params: timebase units; count params: the threshold. */
-  readonly value: number;
-  readonly base: TimeBase | null;
-  /** Live actual value: `Ta` in timebase units, or `Cnt`. */
-  readonly actual: number;
-}
 
 const zeros = (length: number): Bit[] => Array<Bit>(length).fill(0);
 
@@ -155,6 +133,37 @@ export class LogoCpu {
     return true;
   }
 
+  // ---- wire state --------------------------------------------------------------------------
+
+  /** Restores the CPU from what the previous response carried (the browser echoes it back). */
+  restore(wire: LogoWireState): void {
+    const live = new Set(this.compiled.program.blocks.map((block) => block.id));
+    this.states = new Map(
+      wire.b.filter(([id]) => live.has(id)).map(([id, q, ta, phase, cnt, prev]) => [id, { q: q === 1 ? 1 : 0, ta, phase, cnt, prev }] as const),
+    );
+    const bits = (text: string, length: number): Bit[] => Array.from({ length }, (_, i): Bit => (text[i] === '1' ? 1 : 0));
+    this.inputs = bits(wire.i, ADDRESS_SPACE.I);
+    this.q = bits(wire.q, ADDRESS_SPACE.Q);
+    this.m = bits(wire.m, ADDRESS_SPACE.M);
+    this.cycleCount = wire.c;
+    this.lastScanAt = wire.t;
+    this.lastDtMs = wire.dt;
+    this.modeValue = wire.run === 1 ? 'RUN' : 'STOP';
+  }
+
+  snapshot(): LogoWireState {
+    return {
+      b: Array.from(this.states, ([id, st]) => [id, st.q, st.ta, st.phase, st.cnt, st.prev] as [number, number, number, number, number, number]),
+      i: this.inputs.join(''),
+      q: this.q.join(''),
+      m: this.m.join(''),
+      c: this.cycleCount,
+      t: this.lastScanAt,
+      dt: this.lastDtMs,
+      run: this.modeValue === 'RUN' ? 1 : 0,
+    };
+  }
+
   // ---- read access -------------------------------------------------------------------------
 
   readInputs(): readonly Bit[] {
@@ -175,25 +184,6 @@ export class LogoCpu {
 
   blockState(id: number): BlockState {
     return this.states.get(id) ?? INITIAL_BLOCK_STATE;
-  }
-
-  /** Every parameter visible in parameter-assignment mode (`+` protection), in block order. */
-  params(): ParamView[] {
-    const views: ParamView[] = [];
-    for (const block of [...this.compiled.program.blocks].sort((a, b) => a.id - b.id)) {
-      if (block.protected) continue;
-      const spec = BLOCK_SPECS[block.type];
-      const state = this.blockState(block.id);
-      for (const key of spec.timeParams) {
-        const time = block.params[key];
-        if (!time) continue;
-        views.push({ blockId: block.id, key, kind: 'time', value: time.value, base: time.base, actual: msToUnits(state.ta, time.base) });
-      }
-      for (const key of spec.countParams) {
-        views.push({ blockId: block.id, key, kind: 'count', value: block.params[key] ?? 0, base: null, actual: state.cnt });
-      }
-    }
-    return views;
   }
 
   // ---- internals ---------------------------------------------------------------------------

@@ -10,7 +10,7 @@ import {
   toggleNav,
   type LogoKeyBindings,
 } from '../../logo/keybindings';
-import { MEMORY_LIMITS } from '../../logo/engine/memory';
+import { MEMORY_LIMITS } from '@shared/logo/memory';
 import type { DeviceClass } from '../../logo/hardware/devices';
 import { parseProgram, serializeProgram } from '../../logo/persist';
 import { isScenarioId, SCENARIO_GROUPS, SCENARIO_LIST, SCENARIOS, type ScenarioId } from '../../logo/scenarios';
@@ -49,6 +49,8 @@ export function LogoWorkspace({ active, initialScenario = 'seal-in-gates', initi
     device: initialDevice,
     scheduler: runtimeOptions?.scheduler,
     clock: runtimeOptions?.clock,
+    transport: runtimeOptions?.logoTransport,
+    batchMs: runtimeOptions?.logoBatchMs,
   });
   const [importError, setImportError] = useState<string | null>(null);
   const [manualOpen, setManualOpen] = useState(false);

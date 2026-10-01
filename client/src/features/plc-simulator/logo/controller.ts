@@ -1,8 +1,10 @@
 import { defaultClock, defaultScheduler, type MonotonicClock, type ScanMetrics, type Scheduler } from '../engine/types';
-import { compileProgram, placeBlock, rewire, setInvert, withParam, type CompiledProgram, type LogoDiagnostic } from './engine/compile';
-import { LogoCpu } from './engine/cpu';
-import type { BlockState } from './engine/blocks';
-import { ADDRESS_SPACE, EMPTY_PROGRAM, type Bit, type ConnectorRef, type LogoProgram } from './engine/types';
+import type { LogoTransport } from '@/services/logoClient';
+import type { BlockState } from '@shared/logo/state';
+import { ADDRESS_SPACE, EMPTY_PROGRAM, type Bit, type ConnectorRef, type LogoProgram } from '@shared/logo/types';
+import { checkProgram, type CheckedProgram, type LogoDiagnostic } from '@shared/logo/validate';
+import { placeBlock, rewire, setInvert, withParam } from './model/edit';
+import { LogoRemoteCpu } from './remote';
 import { initialPanel, panelReduce, renderPanel, type PanelEffect, type PanelFrame, type PanelKey, type PanelScreen, type PanelSnapshot, type RtcReading } from './firmware/panel';
 import {
   BASIC_INPUTS,
@@ -35,6 +37,10 @@ export interface LogoControllerOptions {
   /** Epoch milliseconds feeding the real-time clock. */
   readonly wallClock?: () => number;
   readonly scanMs?: number;
+  /** Sends batches to the engine; defaults to `fetch('/api/plc/logo/evaluate')`. */
+  readonly transport?: LogoTransport;
+  /** Minimum time between two scan requests (ms of `clock`). */
+  readonly batchMs?: number;
   readonly scenario?: ScenarioId;
   readonly device?: DeviceClass;
 }
@@ -62,8 +68,8 @@ export class LogoBenchController {
   private deviceClass: DeviceClass;
   private scenarioId: ScenarioId;
   private programValue: LogoProgram;
-  private compiledValue: CompiledProgram;
-  private readonly cpu: LogoCpu;
+  private compiledValue: CheckedProgram;
+  private readonly cpu: LogoRemoteCpu;
   private inputs: BenchInputState[] = [];
   private loadsValue: readonly OutputLoad[] = [];
   private poweredValue = true;
@@ -106,8 +112,14 @@ export class LogoBenchController {
     const scenario = SCENARIOS[this.scenarioId];
     this.deviceClass = options.device ?? scenario.device;
     this.programValue = scenario.program;
-    this.compiledValue = compileProgram(scenario.program);
-    this.cpu = new LogoCpu(this.compiledValue);
+    this.compiledValue = checkProgram(scenario.program);
+    this.cpu = new LogoRemoteCpu(this.compiledValue, {
+      transport: options.transport,
+      batchMs: options.batchMs,
+      clock: this.clock,
+      onUpdate: () => this.emit('scan'),
+      onError: (message) => this.engineFailed(message),
+    });
     this.dressBench(scenario.inputs, scenario.loads);
     this.screen = initialPanel(this.snapshot());
   }
@@ -311,6 +323,7 @@ export class LogoBenchController {
     this.simNow += this.cpu.cycle === 0 ? 0 : this.scanMsValue;
     this.lastClock = null;
     this.scanOnce();
+    void this.cpu.flush();
     this.syncPanel();
     this.emit();
   }
@@ -402,7 +415,7 @@ export class LogoBenchController {
 
   /** Loads an externally supplied program (import). Rejected programs never reach LOGO! memory. */
   importProgram(program: LogoProgram): readonly LogoDiagnostic[] {
-    const compiled = compileProgram(program);
+    const compiled = checkProgram(program);
     if (!compiled.ok) return compiled.diagnostics;
     this.cancel();
     this.cpu.stop();
@@ -541,6 +554,20 @@ export class LogoBenchController {
     return false;
   }
 
+  /** The engine could not be reached (or refused the program): halt like a CPU fault, keep the reason on screen. */
+  private engineFailed(message: string): void {
+    this.cancel();
+    if (this.hostMode === 'RUN') this.hostMode = 'PAUSE';
+    this.noticeValue = message;
+    this.syncPanel();
+    this.emit();
+  }
+
+  /** Resolves once every operation sent to the engine has been answered and applied. */
+  idle(): Promise<void> {
+    return this.cpu.idle();
+  }
+
   private startCpu(): boolean {
     if (this.programValue.sinks.length === 0) {
       this.noticeValue = 'No program in LOGO! memory.';
@@ -558,13 +585,13 @@ export class LogoBenchController {
 
   private install(program: LogoProgram, keepState: boolean): void {
     this.programValue = program;
-    this.compiledValue = compileProgram(program);
+    this.compiledValue = checkProgram(program);
     this.cpu.load(this.compiledValue, keepState);
   }
 
   /** Applies a firmware edit only if the result is still a complete, loop-free program. */
   private edit(candidate: LogoProgram, label: string): void {
-    const compiled = compileProgram(candidate);
+    const compiled = checkProgram(candidate);
     if (!compiled.ok) {
       this.noticeValue = `${label}: ${compiled.diagnostics.find((d) => d.severity === 'error')?.message ?? 'invalid'}`;
       return;
@@ -611,9 +638,8 @@ export class LogoBenchController {
   }
 
   private scanOnce(): void {
-    const started = this.clock();
     this.cpu.scan(this.simNow, this.physicalInputs());
-    this.lastScanWorkMs = Math.max(0, this.clock() - started);
+    this.lastScanWorkMs = this.cpu.workMs;
   }
 
   private readonly loop = (): void => {

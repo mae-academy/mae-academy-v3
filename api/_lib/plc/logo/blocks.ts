@@ -1,25 +1,12 @@
-import { COUNT_MAX, toMs } from './time';
-import type { Bit, LogoBlock, TimeValue } from './types';
+import { COUNT_MAX, toMs } from '../../../../shared/logo/time';
+import type { Bit, LogoBlock, TimeValue } from '../../../../shared/logo/types';
+import type { BlockState } from '../../../../shared/logo/state';
 
 /**
  * Evaluators for every implemented GF / SF block (spec §4.2, §4.4). Each is a pure step:
  * pin levels (already defaulted and inverted, in `BLOCK_SPECS[type].pins` order) + previous state +
  * elapsed wall time since the previous scan → next state. `q` of the returned state is the output.
  */
-
-export interface BlockState {
-  readonly q: Bit;
-  /** Elapsed time of the running timer, ms. */
-  readonly ta: number;
-  /** Block-specific internal phase (0 = idle). */
-  readonly phase: number;
-  /** Counter value. */
-  readonly cnt: number;
-  /** Previous-cycle pin levels: bit i = pin i. Drives every edge detector. */
-  readonly prev: number;
-}
-
-export const INITIAL_BLOCK_STATE: BlockState = { q: 0, ta: 0, phase: 0, cnt: 0, prev: 0 };
 
 const bit = (value: boolean): Bit => (value ? 1 : 0);
 const ZERO: TimeValue = { base: 's', value: 0 };

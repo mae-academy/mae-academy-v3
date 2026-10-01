@@ -1,7 +1,7 @@
 import { useMemo, useRef } from 'react';
-import type { BlockState } from '../engine/blocks';
-import { toMs } from '../engine/time';
-import { BLOCK_SPECS, type Bit, type BlockType, type ConnectorRef, type LogoBlock, type LogoProgram } from '../engine/types';
+import type { BlockState } from '@shared/logo/state';
+import { toMs } from '@shared/logo/time';
+import { BLOCK_SPECS, type Bit, type BlockType, type ConnectorRef, type LogoBlock, type LogoProgram } from '@shared/logo/types';
 import { FBD, layoutFbd, type FbdEdge, type PlacedNode } from './fbd-layout';
 import { usePortLabelAudit } from './label-audit';
 import { LabelCanvas } from './LabelCanvas';

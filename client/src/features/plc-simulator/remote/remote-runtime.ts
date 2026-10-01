@@ -1,3 +1,4 @@
+import type { LogoTransport } from '@/services/logoClient';
 import { evaluateRemote, PlcEngineError, type EvaluateBody, type EvaluateResponse, type PlcTransport } from '@/services/plcClient';
 import { applyDiff, encodeDiff, flattenSnapshot, fromBase64, toBase64, unflattenSnapshot } from '@shared/plcWire';
 import type { LadderProgram } from '../domain/ast';
@@ -45,6 +46,10 @@ export interface RemoteRuntimeOptions {
   readonly retries?: number;
   /** Floor for the wait after a 429, whatever Retry-After says. */
   readonly minThrottleWaitMs?: number;
+  /** LOGO! bench only: sends batches to /api/plc/logo/evaluate by default; tests inject an in-process handler. */
+  readonly logoTransport?: LogoTransport;
+  /** LOGO! bench only: minimum time between two scan requests. */
+  readonly logoBatchMs?: number;
 }
 
 const DEFAULTS: { targetScanMs: number; stepDeltaMs: number; maxDeltaMs: number; clearOutputsOnStop: boolean; scanEventEvery: number } = { targetScanMs: 20, stepDeltaMs: 20, maxDeltaMs: 250, clearOutputsOnStop: true, scanEventEvery: 1 };

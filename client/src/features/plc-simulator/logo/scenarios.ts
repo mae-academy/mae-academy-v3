@@ -1,5 +1,5 @@
 import type { DeviceClass, InputDevice, OutputLoad } from './hardware/devices';
-import type { LogoProgram } from './engine/types';
+import type { LogoProgram } from '@shared/logo/types';
 import { AC_SUITE } from './library/ac';
 import { DC_SUITE } from './library/dc';
 import { TUTORIAL_SUITE } from './library/tutorial';

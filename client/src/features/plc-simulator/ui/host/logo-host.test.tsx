@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { LOGO_0BA8 } from '../../domain/hardware';
 import type { Scheduler } from '../../engine/types';
 import type { ScenarioId } from '../../logo/scenarios';
-import { inProcessTransport, settle } from '../../remote/test-utils';
+import { inProcessLogoTransport, inProcessTransport, settle } from '../../remote/test-utils';
 import { PlcSimulatorApp } from './PlcSimulatorApp';
 
 // Radix Slider measures its thumb with ResizeObserver, which jsdom does not implement.
@@ -38,7 +38,7 @@ function manual() {
     },
   };
   return {
-    runtimeOptions: { scheduler, clock: () => now, transport: inProcessTransport, batchScans: 1 },
+    runtimeOptions: { scheduler, clock: () => now, transport: inProcessTransport, batchScans: 1, logoTransport: inProcessLogoTransport, logoBatchMs: 0 },
     /** Advance simulated time and let the scan loop fire once. */
     async scan(ms = 20) {
       now += ms;

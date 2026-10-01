@@ -9,7 +9,7 @@ import {
   type SinkTarget,
   type TimeValue,
   type WireIn,
-} from './engine/types';
+} from '@shared/logo/types';
 
 /** File envelope of an exported LOGO! circuit program (`.logo` / `.lsc`). */
 export const LOGO_FILE_FORMAT = 'mae-logo-0ba4';

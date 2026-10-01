@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BLOCK_SPECS } from '../engine/types';
+import { BLOCK_SPECS } from '@shared/logo/types';
 import { SCENARIO_LIST } from '../scenarios';
 import { layoutFbd, type Point } from './fbd-layout';
 

@@ -2,7 +2,7 @@ import { X } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { SegmentedControl, StudioCard } from '@/components/common/templates';
 import { KatexMath } from '@/components/ui/KatexMath';
-import { INITIAL_BLOCK_STATE } from '../engine/blocks';
+import { INITIAL_BLOCK_STATE } from '@shared/logo/state';
 import { SCENARIOS, type ScenarioId } from '../scenarios';
 import { TriangleGlyph } from '../../ui/TriangleGlyph';
 import { FbdViewer } from './FbdViewer';

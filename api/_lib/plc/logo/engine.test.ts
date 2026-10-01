@@ -1,13 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { classifyInput, DEVICES } from '../hardware/devices';
-import { parseProgram, serializeProgram } from '../persist';
-import { SCENARIO_LIST } from '../scenarios';
-import { INITIAL_BLOCK_STATE, stepBlock } from './blocks';
-import { compileProgram, pruneOrphans, rewire } from './compile';
+import { classifyInput, DEVICES } from '../../../../client/src/features/plc-simulator/logo/hardware/devices';
+import { pruneOrphans, rewire } from '../../../../client/src/features/plc-simulator/logo/model/edit';
+import { parseProgram, serializeProgram } from '../../../../client/src/features/plc-simulator/logo/persist';
+import { SCENARIO_LIST } from '../../../../client/src/features/plc-simulator/logo/scenarios';
+import { canAddBlock, MEMORY_LIMITS, measureProgram } from '../../../../shared/logo/memory';
+import { INITIAL_BLOCK_STATE } from '../../../../shared/logo/state';
+import { formatTime, toMs } from '../../../../shared/logo/time';
+import type { Bit, BlockType, ConnectorRef, LogoBlock, LogoProgram, WireIn } from '../../../../shared/logo/types';
+import { stepBlock } from './blocks';
+import { compileProgram } from './compile';
 import { LogoCpu } from './cpu';
-import { canAddBlock, MEMORY_LIMITS, measureProgram } from './memory';
-import { formatTime, toMs } from './time';
-import type { Bit, BlockType, ConnectorRef, LogoBlock, LogoProgram, WireIn } from './types';
 
 // ---- fixtures ------------------------------------------------------------------------------------
 

@@ -211,7 +211,7 @@ function vitePluginStorageProxy(): Plugin {
 }
 
 /**
- * Serves api/plc/evaluate inside `pnpm dev`, so the serverless engine works without the Express
+ * Serves api/plc/evaluate and api/plc/logo/evaluate inside `pnpm dev`, so the serverless engine works without the Express
  * server or the Vercel CLI. The engine is loaded through Vite's SSR loader (hot-reloads on edit)
  * and stays server-side: the client only ever sees the fetch to /api/plc/evaluate.
  */
@@ -220,7 +220,7 @@ function vitePluginPlcApi(): Plugin {
     name: "plc-api-dev",
     apply: "serve",
     configureServer(server: ViteDevServer) {
-      server.middlewares.use("/api/plc/evaluate", async (req, res) => {
+      for (const route of ["/api/plc/evaluate", "/api/plc/logo/evaluate"]) server.middlewares.use(route, async (req, res) => {
         if (req.method !== "POST") {
           res.statusCode = 405;
           res.setHeader("allow", "POST");
@@ -235,10 +235,10 @@ function vitePluginPlcApi(): Plugin {
             if (size > 1024 * 1024) break;
             chunks.push(chunk as Buffer);
           }
-          const { POST } = await server.ssrLoadModule(path.resolve(PROJECT_ROOT, "api/plc/evaluate.ts"));
+          const { POST } = await server.ssrLoadModule(path.resolve(PROJECT_ROOT, `api${route.slice(4)}.ts`));
           const { toWebRequest } = await server.ssrLoadModule(path.resolve(PROJECT_ROOT, "api/_lib/security/node-adapter.ts"));
           // POST is the guarded handler: origin check + rate limit run here exactly as on Vercel.
-          const response: Response = await POST(toWebRequest(req, "http://localhost/api/plc/evaluate", Buffer.concat(chunks)));
+          const response: Response = await POST(toWebRequest(req, `http://localhost${route}`, Buffer.concat(chunks)));
           res.statusCode = response.status;
           response.headers.forEach((value, key) => res.setHeader(key, value));
           res.end(await response.text());

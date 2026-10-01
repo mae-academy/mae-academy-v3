@@ -1,4 +1,4 @@
-import type { Bit } from '../engine/types';
+import type { Bit } from '@shared/logo/types';
 
 /** Bench voltage classes (spec §1.1): each maps to one Basic unit variant. */
 export type DeviceClass = '230RC' | '12/24RC';

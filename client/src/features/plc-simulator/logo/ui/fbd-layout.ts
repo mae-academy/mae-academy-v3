@@ -1,4 +1,4 @@
-import { BLOCK_SPECS, connectorName, sinkName, type ConnectorRef, type LogoBlock, type LogoProgram, type PinName, type Sink } from '../engine/types';
+import { BLOCK_SPECS, connectorName, sinkName, type ConnectorRef, type LogoBlock, type LogoProgram, type PinName, type Sink } from '@shared/logo/types';
 
 /**
  * Layered (Sugiyama-style) layout of a LOGO! circuit program as a function block diagram:

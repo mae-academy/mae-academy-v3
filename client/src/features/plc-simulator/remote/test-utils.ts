@@ -1,4 +1,6 @@
+import { LogoEngineError, type LogoTransport } from '@/services/logoClient';
 import { PlcEngineError, type PlcTransport } from '@/services/plcClient';
+import { handleLogoEvaluate } from '../../../../../api/_lib/plc/logo/handler';
 import { handleEvaluate } from '../../../../../api/_lib/plc/handler';
 
 /**
@@ -14,4 +16,11 @@ export const inProcessTransport: PlcTransport = async (body) => {
 /** Lets pending promise callbacks and the handler's stream reads finish. */
 export const settle = async (rounds = 6): Promise<void> => {
   for (let i = 0; i < rounds; i++) await new Promise((resolve) => setTimeout(resolve, 0));
+};
+
+/** LOGO! counterpart of `inProcessTransport`: same handler and Zod validation as /api/plc/logo/evaluate. */
+export const inProcessLogoTransport: LogoTransport = async (body) => {
+  const response = await handleLogoEvaluate(new Request('http://x/api/plc/logo/evaluate', { method: 'POST', body: JSON.stringify(body) }));
+  if (!response.ok) throw new LogoEngineError(`engine ${response.status}: ${await response.text()}`, response.status);
+  return response.json();
 };

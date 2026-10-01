@@ -1,7 +1,8 @@
-import { nextBlockId, type WireTarget } from '../engine/compile';
-import type { CpuMode, ParamView } from '../engine/cpu';
-import { canAddBlock, freeMemory, type MemoryUsage } from '../engine/memory';
-import { COUNT_MAX, formatTime, fromTimeFields, TIME_MAX, timeFields } from '../engine/time';
+import { nextBlockId, type WireTarget } from '../model/edit';
+import type { CpuMode } from '@shared/logo/wire';
+import type { ParamView } from '../model/params';
+import { canAddBlock, freeMemory, type MemoryUsage } from '@shared/logo/memory';
+import { COUNT_MAX, formatTime, fromTimeFields, TIME_MAX, timeFields } from '@shared/logo/time';
 import {
   BLOCK_SPECS,
   connectorName,
@@ -14,7 +15,7 @@ import {
   type NumericParamKey,
   type PinName,
   type WireIn,
-} from '../engine/types';
+} from '@shared/logo/types';
 
 /**
  * LOGO! 0BA4 front-panel firmware (spec §2): the menu tree of Appendix D as a pure state machine.

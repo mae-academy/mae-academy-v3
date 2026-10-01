@@ -1,19 +1,6 @@
 import { measureProgram, MEMORY_LIMITS, type MemoryUsage } from './memory';
 import { COUNT_MAX, TIME_MAX } from './time';
-import {
-  ADDRESS_SPACE,
-  BLOCK_SPECS,
-  sinkName,
-  type ConnectorRef,
-  type LogoBlock,
-  type LogoProgram,
-  type BlockParams,
-  type BlockType,
-  type NumericParamKey,
-  type PinName,
-  type SinkTarget,
-  type WireIn,
-} from './types';
+import { ADDRESS_SPACE, BLOCK_SPECS, sinkName, type ConnectorRef, type LogoBlock, type LogoProgram } from './types';
 
 export interface LogoDiagnostic {
   readonly severity: 'error' | 'warning';
@@ -21,22 +8,13 @@ export interface LogoDiagnostic {
   readonly blockId?: number;
 }
 
-export interface CompiledProgram {
+export interface CheckedProgram {
   readonly program: LogoProgram;
-  /** Blocks in dependency order: every block evaluates after the blocks it reads. */
-  readonly order: readonly LogoBlock[];
   readonly usage: MemoryUsage;
   readonly diagnostics: readonly LogoDiagnostic[];
   /** No errors: the firmware would accept (save) this program. */
   readonly ok: boolean;
 }
-
-/** Where a rewire lands: a sink (by position in `program.sinks`) or one pin of a block. */
-export type WireTarget =
-  | { readonly kind: 'sink'; readonly index: number }
-  /** An output by name: creates its sink on first connection (the firmware's empty `- [ Q1 ]` slot). */
-  | { readonly kind: 'output'; readonly target: SinkTarget }
-  | { readonly kind: 'pin'; readonly blockId: number; readonly pin: PinName };
 
 function refError(ref: ConnectorRef, blocks: ReadonlyMap<number, LogoBlock>): string | null {
   switch (ref.kind) {
@@ -59,7 +37,8 @@ function refError(ref: ConnectorRef, blocks: ReadonlyMap<number, LogoBlock>): st
   }
 }
 
-const sourcesOf = (block: LogoBlock): number[] =>
+/** Ids of the blocks whose outputs feed this block's inputs. */
+export const sourcesOf = (block: LogoBlock): number[] =>
   BLOCK_SPECS[block.type].pins.flatMap((pin) => {
     const ref = block.inputs[pin]?.ref;
     return ref?.kind === 'block-output' ? [ref.blockId] : [];
@@ -67,10 +46,10 @@ const sourcesOf = (block: LogoBlock): number[] =>
 
 /**
  * Validates a program the way the firmware does before it saves one (spec §2.3): fully wired, no
- * same-cycle feedback, every block reachable from an output, inside the §3.1 memory budget. The
- * dependency order it returns is the evaluation order of the scan cycle.
+ * same-cycle feedback, every block reachable from an output, inside the §3.1 memory budget. Used by
+ * the front panel to gate edits and by the engine to refuse a program before it runs.
  */
-export function compileProgram(program: LogoProgram): CompiledProgram {
+export function checkProgram(program: LogoProgram): CheckedProgram {
   const diagnostics: LogoDiagnostic[] = [];
   const error = (message: string, blockId?: number): void => {
     diagnostics.push({ severity: 'error', message, blockId });
@@ -124,8 +103,7 @@ export function compileProgram(program: LogoProgram): CompiledProgram {
     if (problem) error(`${target}: ${problem}`);
   }
 
-  // Topological order; a same-cycle block loop is illegal and must be broken through a flag.
-  const order: LogoBlock[] = [];
+  // A same-cycle block loop is illegal and must be broken through a flag.
   const mark = new Map<number, 'visiting' | 'done'>();
   let looped = false;
   const visit = (id: number): void => {
@@ -141,7 +119,6 @@ export function compileProgram(program: LogoProgram): CompiledProgram {
     mark.set(id, 'visiting');
     for (const source of sourcesOf(block)) visit(source);
     mark.set(id, 'done');
-    order.push(block);
   };
   Array.from(byId.keys()).sort((a, b) => a - b).forEach(visit);
 
@@ -162,88 +139,5 @@ export function compileProgram(program: LogoProgram): CompiledProgram {
   if (usage.blocks > MEMORY_LIMITS.blocks) error(`Too many blocks: ${usage.blocks} / ${MEMORY_LIMITS.blocks}`);
   if (usage.rem > MEMORY_LIMITS.rem) error(`Retentive memory exceeded: ${usage.rem} / ${MEMORY_LIMITS.rem} bytes`);
 
-  return { program, order, usage, diagnostics, ok: diagnostics.every((d) => d.severity !== 'error') };
-}
-
-/** Drops every block no longer reachable from a sink (the firmware deletes disconnected blocks). */
-export function pruneOrphans(program: LogoProgram): LogoProgram {
-  const byId = new Map(program.blocks.map((block) => [block.id, block] as const));
-  const keep = new Set<number>();
-  const walk = (id: number): void => {
-    const block = byId.get(id);
-    if (!block || keep.has(id)) return;
-    keep.add(id);
-    sourcesOf(block).forEach(walk);
-  };
-  for (const sink of program.sinks) if (sink.source.kind === 'block-output') walk(sink.source.blockId);
-  return keep.size === program.blocks.length ? program : { ...program, blocks: program.blocks.filter((block) => keep.has(block.id)) };
-}
-
-/** Re-points one connector, keeping its inversion, then prunes whatever became disconnected. */
-export function rewire(program: LogoProgram, target: WireTarget, ref: ConnectorRef): LogoProgram {
-  if (target.kind === 'output') {
-    const name = sinkName(target.target);
-    const exists = program.sinks.some((sink) => sinkName(sink.target) === name);
-    const sinks = exists
-      ? program.sinks.map((sink) => (sinkName(sink.target) === name ? { ...sink, source: ref } : sink))
-      : [...program.sinks, { target: target.target, source: ref }];
-    return pruneOrphans({ ...program, sinks });
-  }
-  if (target.kind === 'sink') {
-    const sinks = program.sinks.map((sink, index) => (index === target.index ? { ...sink, source: ref } : sink));
-    return pruneOrphans({ ...program, sinks });
-  }
-  const blocks = program.blocks.map((block) => {
-    if (block.id !== target.blockId) return block;
-    const wire: WireIn = { ...block.inputs[target.pin], ref };
-    return { ...block, inputs: { ...block.inputs, [target.pin]: wire } };
-  });
-  return pruneOrphans({ ...program, blocks });
-}
-
-/** Toggles negation on one block pin (spec §2.3): connectivity is unchanged, so no pruning is needed. */
-export function setInvert(program: LogoProgram, target: WireTarget, invert: boolean): LogoProgram {
-  if (target.kind !== 'pin') return program;
-  const blocks = program.blocks.map((block) => {
-    if (block.id !== target.blockId) return block;
-    const current = block.inputs[target.pin];
-    if (!current) return block;
-    const wire: WireIn = { ...current, invert };
-    return { ...block, inputs: { ...block.inputs, [target.pin]: wire } };
-  });
-  return { ...program, blocks };
-}
-
-/** Writes one numeric parameter (range-checked by `compileProgram`). */
-export function withParam(program: LogoProgram, blockId: number, key: NumericParamKey, value: number): LogoProgram {
-  const blocks = program.blocks.map((block) => {
-    if (block.id !== blockId) return block;
-    if (key === 'On' || key === 'Off') return { ...block, params: { ...block.params, [key]: value } };
-    const current = block.params[key];
-    return current ? { ...block, params: { ...block.params, [key]: { base: current.base, value } } } : block;
-  });
-  return { ...program, blocks };
-}
-
-export const nextBlockId = (program: LogoProgram): number => program.blocks.reduce((max, block) => Math.max(max, block.id), 0) + 1;
-
-/** A freshly placed block: open inputs (mandatory ones tied low) and the firmware's default parameters. */
-export function defaultBlock(id: number, type: BlockType): LogoBlock {
-  const spec = BLOCK_SPECS[type];
-  const inputs: Partial<Record<PinName, WireIn>> = {};
-  for (const pin of spec.pins) inputs[pin] = { ref: { kind: spec.required.includes(pin) ? 'lo' : 'x' } };
-  const params: { -readonly [K in keyof BlockParams]: BlockParams[K] } = {};
-  for (const key of spec.timeParams) params[key] = { base: 's', value: key === 'T!' || key === 'T!L' ? 0 : 100 };
-  if (spec.countParams.length > 0) {
-    params.On = 1;
-    params.Off = 0;
-  }
-  if (type === 'PULSE_RELAY') params.Par = 'RS';
-  return { id, type, inputs, params, retentive: false };
-}
-
-/** Places a new block and wires its output to `target`; whatever it displaces is pruned. */
-export function placeBlock(program: LogoProgram, target: WireTarget, type: BlockType): LogoProgram {
-  const id = nextBlockId(program);
-  return rewire({ ...program, blocks: [...program.blocks, defaultBlock(id, type)] }, target, { kind: 'block-output', blockId: id });
+  return { program, usage, diagnostics, ok: diagnostics.every((d) => d.severity !== 'error') };
 }

@@ -10,6 +10,7 @@ import { libraryResolveHandler } from "./libraryResolve";
 import { featuredHandler, isFeaturedUrl, warmFeatured } from "./featured";
 import { createThumbHandler } from "./pdfThumb";
 import { handleEvaluate } from "../api/_lib/plc/handler";
+import { handleLogoEvaluate } from "../api/_lib/plc/logo/handler";
 import { handleSolve } from "../api/_lib/circuit/handler";
 import { expressGuard } from "../api/_lib/security/node-adapter";
 import type { Tier } from "../api/_lib/security/ratelimit";
@@ -38,6 +39,17 @@ async function startServer() {
   app.post("/api/plc/evaluate", express.text({ type: "*/*", limit: "512kb" }), async (req, res) => {
     const response = await handleEvaluate(
       new Request("http://localhost/api/plc/evaluate", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: typeof req.body === "string" ? req.body : "",
+      }),
+    );
+    res.status(response.status).type("application/json").send(await response.text());
+  });
+  // LOGO! engine: same web-standard handler as api/plc/logo/evaluate.ts.
+  app.post("/api/plc/logo/evaluate", express.text({ type: "*/*", limit: "256kb" }), async (req, res) => {
+    const response = await handleLogoEvaluate(
+      new Request("http://localhost/api/plc/logo/evaluate", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: typeof req.body === "string" ? req.body : "",

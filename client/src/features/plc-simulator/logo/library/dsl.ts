@@ -1,5 +1,5 @@
 import { loadOf, type ActuatorKind, type ContactType, type LampColor, type LoadKind, type OutputLoad } from '../hardware/devices';
-import type { BlockParams, BlockType, ConnectorRef, LogoBlock, Sink, TimeValue, WireIn } from '../engine/types';
+import type { BlockParams, BlockType, ConnectorRef, LogoBlock, Sink, TimeValue, WireIn } from '@shared/logo/types';
 import type { BenchInput } from '../scenarios';
 
 /** Compact notation for the preloaded circuit programs; every program is still validated by compileProgram. */
