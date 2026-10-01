@@ -5,7 +5,8 @@ import { UniversalSynthesis } from '@/simulators/digital-logic/components/pages/
 import { TimingWaveforms } from '@/simulators/digital-logic/components/pages/TimingWaveforms';
 import { StateMachineExplorer } from '@/simulators/digital-logic/components/pages/StateMachineExplorer';
 import { RemoteDesEngine } from '@/simulators/digital-logic/remote/remoteDesEngine';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useSimulatorSeo } from '@/seo/useSimulatorSeo';
 import { useTranslation } from 'react-i18next';
 import { useLocale } from '@/contexts/LocaleContext';
 import SimulationPageHeader from '@/components/SimulationPageHeader';
@@ -38,7 +39,15 @@ export function DigitalLogicSimulatorApp() {
   ];
   const shellTitle = copy.collections.simulations.cards.find((card) => card.code === "S.07")?.title ?? "Digital Logic Design";
   const [activeTool, setActiveTool] = useState<DigitalLogicTool>(() => initialDigitalLogicTool(DIGITAL_LOGIC_TOOLS));
-  const activeLabel = DIGITAL_LOGIC_TOOLS.find(tool => tool.id === activeTool)?.label ?? t('digital.labTitle', 'Digital Logic Lab');
+  // Each mode gets its own title/meta/docs; the active mode is mirrored into ?tool= so it is linkable and canonical.
+  useSimulatorSeo(`dl-${activeTool === 'state-machine' ? 'fsm' : activeTool}`);
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (url.searchParams.get('tool') === activeTool) return;
+    url.searchParams.set('tool', activeTool);
+    window.history.replaceState(window.history.state, '', url);
+  }, [activeTool]);
+  const activeLabel =DIGITAL_LOGIC_TOOLS.find(tool => tool.id === activeTool)?.label ?? t('digital.labTitle', 'Digital Logic Lab');
   return <div className="v3-simulator-root simulator-theme-b" data-simulator-theme="b">
     <SimulationPageHeader
       title={shellTitle}

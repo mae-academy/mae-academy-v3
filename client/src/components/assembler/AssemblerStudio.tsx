@@ -32,6 +32,7 @@ import { masmLanguage } from "@/components/code-editor/languages";
 import { prewarmRemote } from "@/features/code-studio/executionCache";
 import { TerminalSurface } from "@/features/code-studio/components/Terminal";
 import { toast } from "sonner";
+import { useSimulatorSeo } from "@/seo/useSimulatorSeo";
 import { useLocation } from "wouter";
 import {
   AlertDialog,
@@ -70,44 +71,6 @@ import {
   type SupportedLanguage,
   type TraceStep,
 } from "@/features/execution-engine";
-
-export const CODE_STUDIO_SEO: Record<SupportedLanguage, { title: string; description: string }> = {
-  masm8086: {
-    title: "Online 8086 Assembler & Register Emulator | Code Studio",
-    description: "Step through Intel 8086 assembly instructions with live CPU registers, flags, stack, and memory visualization.",
-  },
-  cpp: {
-    title: "Online C++ Compiler & STL Visualizer | Code Studio",
-    description: "Run C++ online with step-by-step trace inspection, vectors, stacks, queues, and standard algorithms.",
-  },
-  python: {
-    title: "Online Python Code Visualizer & Trace Studio | Code Studio",
-    description: "Interactive Python execution with live call stack, scope inspection, and variables visualizer.",
-  },
-  c: {
-    title: "Online C Compiler & Memory Visualizer | Code Studio",
-    description: "Execute standard C programs with line-by-line tracing, memory views, and terminal I/O.",
-  },
-};
-
-export function updatePageSeo(language: SupportedLanguage) {
-  const meta = CODE_STUDIO_SEO[language];
-  if (!meta) return;
-  document.title = meta.title;
-
-  let descMeta = document.querySelector('meta[name="description"]');
-  if (!descMeta) {
-    descMeta = document.createElement("meta");
-    descMeta.setAttribute("name", "description");
-    document.head.appendChild(descMeta);
-  }
-  descMeta.setAttribute("content", meta.description);
-
-  let ogTitle = document.querySelector('meta[property="og:title"]');
-  if (ogTitle) ogTitle.setAttribute("content", meta.title);
-  let ogDesc = document.querySelector('meta[property="og:description"]');
-  if (ogDesc) ogDesc.setAttribute("content", meta.description);
-}
 
 function formatDiagnostic(raw: string): string {
   if (!raw) return "";
@@ -504,9 +467,7 @@ export function AssemblerStudio() {
   }, []);
 
   // Synchronize document title and search engine meta descriptions reactively
-  useEffect(() => {
-    updatePageSeo(language);
-  }, [language]);
+  useSimulatorSeo(`code-${language}`);
 
   // Synchronize with external route changes (e.g. browser back/forward)
   useEffect(() => {

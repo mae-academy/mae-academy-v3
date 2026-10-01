@@ -21,6 +21,8 @@ export interface PlcSimulatorAppProps {
   symbols?: SymbolMap;
   /** Runtime overrides; tests inject a manual clock and scheduler here. */
   runtimeOptions?: PlcHostOptions['runtimeOptions'];
+  /** Fires when the student switches between the S7-200 and LOGO! environments (used for per-tool SEO). */
+  onPlatformChange?: (platform: PlcPlatform) => void;
   className?: string;
 }
 
@@ -41,6 +43,7 @@ export function PlcSimulatorApp({
   initialLogoScenario = 'seal-in-gates',
   symbols,
   runtimeOptions,
+  onPlatformChange,
   className = '',
 }: PlcSimulatorAppProps) {
   const { t } = useTranslation('simulators');
@@ -62,7 +65,10 @@ export function PlcSimulatorApp({
           size="md"
           value={platform}
           options={PLATFORM_OPTIONS.map((option) => ({ ...option }))}
-          onChange={setPlatform}
+          onChange={(next) => {
+            setPlatform(next);
+            onPlatformChange?.(next);
+          }}
           className="border-slate-200/80 bg-slate-200/60 dark:border-[#1a1d24] dark:bg-[#13161c]"
         />
       </div>

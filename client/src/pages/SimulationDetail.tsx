@@ -28,6 +28,9 @@ import {
   signalsAndSystemsToolMeta,
   simulationRouteMeta,
 } from "@/data/platform";
+import SimulatorDocumentation from "@/components/SimulatorDocumentation";
+import { seoKeyForRoute } from "@/seo/simulatorSeoData";
+import { useSimulatorSeo } from "@/seo/useSimulatorSeo";
 import NotFound from "./NotFound";
 
 // ── Domain-grouped lazy chunks ──────────────────────────────────────────────
@@ -85,6 +88,9 @@ export default function SimulationDetail() {
   const slug = rawSlug === "circuits" ? "circuit-lab" : (rawSlug === "assembly" || rawSlug === "assembler") ? "code" : rawSlug;
   const meta = simulationRouteMeta.find((entry) => entry.slug === slug);
   const { copy, isRtl, locale } = useLocale();
+  const seoKey = seoKeyForRoute(slug, tool);
+  // Digital Logic and Code Studio switch modes internally and publish their own SEO key.
+  useSimulatorSeo(seoKey);
   if (!meta) return <NotFound />;
 
   const simulation = copy.collections.simulations.cards[meta.index];
@@ -107,10 +113,10 @@ export default function SimulationDetail() {
   const defaultTool = tools[0].slug;
 
   useEffect(() => {
-    if (isCodeStudio) return; // Dynamic multi-language SEO title & meta is managed by CodeStudio
+    if (isCodeStudio || isDigitalLogicDesign || seoKey) return; // Per-tool SEO title & meta come from the SEO registry
     const timer = window.setTimeout(() => { document.title = `MAE Academy — ${simulation.title}`; }, 0);
     return () => window.clearTimeout(timer);
-  }, [isCodeStudio, simulation.title]);
+  }, [isCodeStudio, isDigitalLogicDesign, seoKey, simulation.title]);
 
   useEffect(() => {
     if (isCodeStudio) {
@@ -200,6 +206,7 @@ export default function SimulationDetail() {
           {toolContent}
         </div>
       </motion.div>
+      <SimulatorDocumentation />
     </SimulatorLayout>
   </motion.div>;
 }
