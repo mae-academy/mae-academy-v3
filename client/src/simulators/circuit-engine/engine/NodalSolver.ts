@@ -1,8 +1,9 @@
-import { MNASolver, matrixResidualInfinity, type MNAElement } from '@/simulators/circuit-engine/engine/mnaSolver';
+import { MNASolver, matrixResidualInfinity, normalizedResidual, type MNAElement } from '@/simulators/circuit-engine/engine/mnaSolver';
 import { AcademicNodalDictionary } from '@/simulators/circuit-engine/models/AcademicNodalDictionary';
 import { nonReferenceNodes, type AnalysisTrace, type NodalNodeLabel } from '@/simulators/circuit-engine/models/analysisTypes';
 import { latexMatrix } from '@/simulators/circuit-engine/models/analysisFormatting';
 import {
+  branchCurrentExpression,
   detectGroundedSourceResistorBranches,
   generateReducedNodalMatrix,
   reindexUINodes,
@@ -35,6 +36,18 @@ export interface DependentSourceInfo {
   gain: number;
 }
 
+/** LaTeX for Σ coefficient·V + constant, e.g. `-0.01 \cdot V_{1} + 0.01 \cdot V_{3}`. */
+function linearCombination(terms: Map<string, number>, constant: number, symbolicVoltage: (node: string) => string): string {
+  const parts: string[] = [];
+  terms.forEach((value, node) => {
+    if (Math.abs(value) < 1e-15) return;
+    const magnitude = Math.abs(value);
+    parts.push(`${value < 0 ? '-' : '+'}${Math.abs(magnitude - 1) < 1e-12 ? '' : `${algebraicNumber(magnitude)} \\cdot `}${symbolicVoltage(node)}`);
+  });
+  if (Math.abs(constant) > 1e-15) parts.push(`${constant < 0 ? '-' : '+'}${algebraicNumber(Math.abs(constant))}`);
+  return parts.join(' ').replace(/^\+\s*/, '') || '0';
+}
+
 export function getDependentSourceInfo(
   element: Extract<MNAElement, { type: 'vccs' | 'cccs' | 'vcvs' | 'ccvs' }>,
   elements: MNAElement[],
@@ -55,6 +68,15 @@ export function getDependentSourceInfo(
   } else {
     // cccs or ccvs
     const gain = element.gain ?? (element as any).transresistance ?? 1;
+    if (!targetResistor && element.type === 'cccs') {
+      // Controlled by a voltage-defined branch (an ideal transformer's primary): show the branch current as the node-voltage
+      // expression KCL gives at its output node — the same expression the reduced matrix stamps.
+      const expression = branchCurrentExpression(elements, element);
+      if (expression) {
+        const body = linearCombination(expression.terms, expression.constant, symbolicVoltage);
+        return { element, varName: `I_{${dictionary.element(expression.branch)}}`, subDef: body, subExpr: body, gain };
+      }
+    }
     const varName = targetResistor ? `I_{${resLabel}}` : 'I_x';
     const tp = targetResistor?.positive ?? ('controlPositive' in element ? element.controlPositive ?? '0' : '0');
     const tn = targetResistor?.negative ?? ('controlNegative' in element ? element.controlNegative ?? '0' : '0');
@@ -174,8 +196,13 @@ export class NodalSolver {
       const dictionary = new AcademicNodalDictionary(this.elements, reduced.unknownNodes);
       const symbolicContext: SymbolicKCLContext = { elements: this.elements, dictionary, uiIndices, knownNodes: reduced.knownNodes };
       const compoundSupernodes = identifyCompoundSupernodes(this.elements);
-      const reducedResidual = matrixResidualInfinity(reduced.conductance, reduced.unknownNodes.map((node) => result.nodeVoltages[node] ?? 0), reduced.rhs);
-      if (reducedResidual > 1e-7 || reduced.residualInfinity > 1e-7) throw new Error(`Reduced nodal residual certificate failed (||G·V-z||∞=${Math.max(reducedResidual, reduced.residualInfinity).toExponential(3)}).`);
+      const reducedSolution = reduced.unknownNodes.map((node) => result.nodeVoltages[node] ?? 0);
+      const reducedResidual = matrixResidualInfinity(reduced.conductance, reducedSolution, reduced.rhs);
+      // Scale-aware certificate (see normalizedResidual): an absolute bound refuses correct solutions of gain-10⁶ networks. 1e-7 relative
+      // is the agreement two independent evaluations of a matrix with a 10¹² conductance spread can honestly promise (each entry is
+      // only stored to ε·|entry|), whereas it still catches any real stamping or elimination error.
+      const reducedRelative = Math.max(normalizedResidual(reduced.conductance, reducedSolution, reduced.rhs), reduced.relativeResidual);
+      if (!(reducedRelative <= 1e-7)) throw new Error(`Reduced nodal residual certificate failed (||G·V-z||∞=${Math.max(reducedResidual, reduced.residualInfinity).toExponential(3)}, relative ${reducedRelative.toExponential(3)}).`);
       const supernodeMembers = new Set(compoundSupernodes.flatMap((item) => item.nodes));
       const knownVoltageNodes = new Set(reduced.knownNodes.keys());
       const symbolicVoltage = (node: string): string => {

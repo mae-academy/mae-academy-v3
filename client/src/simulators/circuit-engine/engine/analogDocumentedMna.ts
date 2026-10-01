@@ -24,6 +24,8 @@ export interface TabDOperatingPoint {
   nodeVoltages: Record<string, number>;
   branchCurrents: Record<string, number>;
   terminalVoltages: Record<string, number>;
+  /** Newton results only: the primitive set (with companion stamps) linearized at the accepted operating point. */
+  tangent?: TabDPrimitive[];
 }
 
 export class TabDMnaError extends Error {
@@ -35,7 +37,7 @@ export class TabDMnaError extends Error {
 
 interface BranchUnknown {
   id: string;
-  primitive: Extract<TabDPrimitive, { kind: 'voltage' | 'inductor' | 'vcvs' | 'ccvs' }>;
+  primitive: Extract<TabDPrimitive, { kind: 'voltage' | 'inductor' | 'vcvs' | 'ccvs' | 'resistor' | 'resistive-switch' }>;
 }
 
 interface LuFactorization {
@@ -44,31 +46,89 @@ interface LuFactorization {
 }
 
 const MIN_DT = 1e-12;
-const RESISTIVE_SWITCH_ON = 1e-15;
-const RESISTIVE_SWITCH_OFF = 1e15;
+/**
+ * Closed-switch on-resistance: 10 µΩ. The former 1 fΩ (10¹⁵ S) stamp made the conductance matrix numerically
+ * singular (catastrophic cancellation of 10¹⁵ − 10³⁰/10¹⁵ in the Schur pivot) and turned the reported switch
+ * current ΔV/R into rounding noise. 10⁵ S is still an effectively ideal contact but keeps the matrix well conditioned.
+ */
+export const RESISTIVE_SWITCH_ON = 1e-5;
+export const RESISTIVE_SWITCH_OFF = 1e15;
+/** Smallest |R| accepted for a resistor: below this the branch is a zero-ohm short that must be modelled explicitly. */
+export const MIN_RESISTANCE = 1e-9;
+/**
+ * Resistors below this value (and every closed switch) are stamped as a branch whose current is an MNA unknown
+ * (V₊ − V₋ − R·I = 0) instead of a conductance. For R → 0 the conductance form forces the current out of a difference
+ * of two nearly equal node voltages (ΔV/R is rounding noise); the branch form returns it directly, exactly as a
+ * voltage-source current.
+ */
+const LOW_RESISTANCE_BRANCH = 1e-3;
+/** A closed switch carrying more than this is an ideal-source dead short, not a circuit operating point. */
+export const MAX_SWITCH_CURRENT = 1e5;
+/** Row-scaled pivot magnitude below which the MNA matrix is treated as numerically singular (≈ 64·ε). */
+const SCALED_PIVOT_EPSILON = 1e-14;
 
-function finite(value: number, fallback: number): number {
-  return Number.isFinite(value) ? value : fallback;
+function requireFinite(value: number, description: string): number {
+  if (!Number.isFinite(value)) throw new TabDMnaError(`Invalid Circuit: ${description} must be a finite number (got ${String(value)}).`);
+  return value;
+}
+
+/**
+ * Rejects malformed primitives before any stamping. Non-finite parameters are never replaced by a default, and a
+ * resistance is never re-interpreted (|R|, clamp to 1 fΩ): the solver either solves the declared circuit or raises
+ * a structured diagnostic.
+ */
+function validatePrimitives(primitives: TabDPrimitive[]) {
+  for (const primitive of primitives) {
+    const label = `${primitive.kind} ${primitive.id}`;
+    switch (primitive.kind) {
+      case 'resistor':
+        requireFinite(primitive.resistance, `${label} resistance`);
+        if (primitive.resistance < 0) throw new TabDMnaError(`Invalid Circuit: ${label} has negative resistance (${primitive.resistance} Ω); a passive resistor must be positive.`);
+        if (primitive.resistance < MIN_RESISTANCE) throw new TabDMnaError(`Invalid Circuit: ${label} is a zero-ohm resistor (${primitive.resistance} Ω); model an ideal short with a 0 V source or a closed switch.`);
+        break;
+      case 'current': requireFinite(primitive.current, `${label} current`); break;
+      case 'voltage': requireFinite(primitive.voltage, `${label} voltage`); break;
+      case 'capacitor': requireFinite(primitive.capacitance, `${label} capacitance`); break;
+      case 'inductor':
+        requireFinite(primitive.inductance, `${label} inductance`);
+        if (primitive.seriesResistance !== undefined) requireFinite(primitive.seriesResistance, `${label} series resistance`);
+        break;
+      case 'vccs': requireFinite(primitive.gain ?? primitive.transconductance ?? 0, `${label} gain`); break;
+      case 'vcvs': requireFinite(primitive.gain, `${label} gain`); break;
+      case 'cccs': requireFinite(primitive.gain, `${label} gain`); break;
+      case 'ccvs': requireFinite(primitive.gain ?? primitive.transresistance ?? 0, `${label} gain`); break;
+      default: break;
+    }
+  }
 }
 
 function createMatrix(size: number): number[][] {
   return Array.from({ length: size }, () => Array(size).fill(0));
 }
 
-/** LU factorization with partial pivoting; throws instead of silently accepting a singular system. */
+/**
+ * LU factorization with scaled partial pivoting (pivot candidates are divided by their original row infinity-norm);
+ * throws instead of silently accepting a singular system. Singularity is judged on the scaled pivot, so a well-posed
+ * matrix whose entries span many decades is not mistaken for a singular one (and vice versa).
+ */
 function factorLu(matrix: number[][]): LuFactorization {
   const size = matrix.length;
   const lu = matrix.map(row => [...row]);
   const pivot = Array.from({ length: size }, (_, index) => index);
+  const scale = lu.map(row => row.reduce((maximum, value) => Math.max(maximum, Math.abs(value)), 0));
+  for (const rowScale of scale) if (!(rowScale > 0) || !Number.isFinite(rowScale)) throw new TabDMnaError('Singular MNA matrix: define a reference and remove conflicting ideal constraints.');
   for (let column = 0; column < size; column += 1) {
     let pivotRow = column;
+    let best = Math.abs(lu[column][column]) / scale[column];
     for (let row = column + 1; row < size; row += 1) {
-      if (Math.abs(lu[row][column]) > Math.abs(lu[pivotRow][column])) pivotRow = row;
+      const candidate = Math.abs(lu[row][column]) / scale[row];
+      if (candidate > best) { best = candidate; pivotRow = row; }
     }
-    if (Math.abs(lu[pivotRow][column]) < 1e-18) throw new TabDMnaError('Singular MNA matrix: define a reference and remove conflicting ideal constraints.');
+    if (!(best > SCALED_PIVOT_EPSILON)) throw new TabDMnaError('Singular MNA matrix: define a reference and remove conflicting ideal constraints.');
     if (pivotRow !== column) {
       [lu[column], lu[pivotRow]] = [lu[pivotRow], lu[column]];
       [pivot[column], pivot[pivotRow]] = [pivot[pivotRow], pivot[column]];
+      [scale[column], scale[pivotRow]] = [scale[pivotRow], scale[column]];
     }
     for (let row = column + 1; row < size; row += 1) {
       lu[row][column] /= lu[column][column];
@@ -98,6 +158,17 @@ function solveLu(factorization: LuFactorization, rhs: number[]): number[] {
   return solution;
 }
 
+/** A closed switch carrying more than MAX_SWITCH_CURRENT is an ideal-source dead short, not an operating point. */
+function assertNoDeadShort(primitives: TabDPrimitive[], branchCurrents: Record<string, number>) {
+  for (const primitive of primitives) {
+    if (primitive.kind !== 'resistive-switch' || !primitive.closed) continue;
+    const current = Math.abs(branchCurrents[primitive.id] ?? 0);
+    if (current > MAX_SWITCH_CURRENT) {
+      throw new TabDMnaError(`Invalid Circuit: short circuit — closed switch ${primitive.id} would carry ${current.toExponential(2)} A (> ${MAX_SWITCH_CURRENT.toExponential(0)} A); ideal sources are shorted through it.`);
+    }
+  }
+}
+
 /**
  * Independent modified-nodal solver for the confirmed Tab C primitive stamps.
  * Capacitors and inductors use the blueprint's backward-difference companion
@@ -114,12 +185,46 @@ export class TabDDocumentedMna {
     this.time = 0;
   }
 
+  /**
+   * Commits the reactive history of an operating point that was solved without committing (`solve(..., false)`), and advances
+   * the clock — the same state update a committing solve performs, without factorising the matrix a second time.
+   */
+  commitHistory(primitives: TabDPrimitive[], point: TabDOperatingPoint, elapsedSeconds: number): TabDOperatingPoint {
+    const dt = Math.max(MIN_DT, requireFinite(elapsedSeconds, 'time step'));
+    assertNoDeadShort(primitives, point.branchCurrents);
+    const voltage = (name: string) => name === '0' ? 0 : point.nodeVoltages[name] ?? 0;
+    for (const primitive of primitives) {
+      if (primitive.kind === 'capacitor') this.capacitorVoltage.set(primitive.id, voltage(primitive.positive) - voltage(primitive.negative));
+      if (primitive.kind === 'inductor') this.inductorCurrent.set(primitive.id, point.branchCurrents[primitive.id] ?? 0);
+    }
+    this.time += dt;
+    return { ...point, time: this.time };
+  }
+
+  /**
+   * Keeps the stored capacitor voltages / inductor currents (and the clock) of every primitive whose id belongs to a
+   * surviving component — ids equal to it or namespaced `<component>:<part>` — so a schematic edit or switch toggle
+   * does not zero the energy stored in the circuit (I_L(t⁻) = I_L(t⁺), V_C(t⁻) = V_C(t⁺)).
+   */
+  retainState(componentIds: Set<string>) {
+    const survives = (primitiveId: string) => {
+      if (componentIds.has(primitiveId)) return true;
+      for (let colon = primitiveId.indexOf(':'); colon > 0; colon = primitiveId.indexOf(':', colon + 1)) {
+        if (componentIds.has(primitiveId.slice(0, colon))) return true;
+      }
+      return false;
+    };
+    for (const id of Array.from(this.capacitorVoltage.keys())) if (!survives(id)) this.capacitorVoltage.delete(id);
+    for (const id of Array.from(this.inductorCurrent.keys())) if (!survives(id)) this.inductorCurrent.delete(id);
+  }
+
   getTime() {
     return this.time;
   }
 
   solve(primitives: TabDPrimitive[], elapsedSeconds = 1e-3, commitHistory = true): TabDOperatingPoint {
-    const dt = Math.max(MIN_DT, finite(elapsedSeconds, 1e-3));
+    const dt = Math.max(MIN_DT, requireFinite(elapsedSeconds, 'time step'));
+    validatePrimitives(primitives);
     const nodeNames = new Set<string>();
     for (const primitive of primitives) {
       nodeNames.add(primitive.positive);
@@ -134,7 +239,10 @@ export class TabDDocumentedMna {
     if (nodeNames.size && !nodeNames.has('0')) throw new TabDMnaError('Tab D documented MNA requires an explicit ground reference named 0.');
     const orderedNodes = Array.from(nodeNames).filter(node => node !== '0').sort();
     const nodeIndex = new Map(orderedNodes.map((node, index) => [node, index]));
-    const branchPrimitives = primitives.filter((primitive): primitive is BranchUnknown['primitive'] => ['voltage', 'inductor', 'vcvs', 'ccvs'].includes(primitive.kind));
+    const branchPrimitives = primitives.filter((primitive): primitive is BranchUnknown['primitive'] =>
+      ['voltage', 'inductor', 'vcvs', 'ccvs'].includes(primitive.kind)
+      || (primitive.kind === 'resistor' && primitive.resistance < LOW_RESISTANCE_BRANCH)
+      || (primitive.kind === 'resistive-switch' && primitive.closed));
     const branchUnknowns: BranchUnknown[] = branchPrimitives.map(primitive => ({ id: primitive.id, primitive }));
     const branchIndex = new Map(branchUnknowns.map(({ id }, index) => [id, orderedNodes.length + index]));
     const size = orderedNodes.length + branchUnknowns.length;
@@ -163,17 +271,21 @@ export class TabDDocumentedMna {
       if (n >= 0) { matrix[n][column] -= 1; matrix[column][n] -= 1; }
     };
 
+    const targetResistance = (resistance: number, label: string) => {
+      requireFinite(resistance, `${label} resistance`);
+      if (!(resistance >= MIN_RESISTANCE)) throw new TabDMnaError(`Invalid Circuit: ${label} must have a resistance of at least ${MIN_RESISTANCE} Ω to sense a current.`);
+      return resistance;
+    };
+
     const resolveTargetResistor = (targetRef?: string, fallbackCp?: string, fallbackCn?: string, fallbackR?: number) => {
       if (targetRef) {
         const found = primitives.find(p => p.id === targetRef && p.kind === 'resistor') as Extract<TabDPrimitive, { kind: 'resistor' }> | undefined;
         if (found) {
-          const r = Math.max(1e-15, Math.abs(found.resistance));
-          return { positive: found.positive, negative: found.negative, resistance: r };
+          return { positive: found.positive, negative: found.negative, resistance: targetResistance(found.resistance, found.id) };
         }
       }
       if (fallbackCp && fallbackCn && fallbackR !== undefined) {
-        const r = Math.max(1e-15, Math.abs(fallbackR));
-        return { positive: fallbackCp, negative: fallbackCn, resistance: r };
+        return { positive: fallbackCp, negative: fallbackCn, resistance: targetResistance(fallbackR, 'current-control target') };
       }
       return null;
     };
@@ -181,11 +293,22 @@ export class TabDDocumentedMna {
     for (const primitive of primitives) {
       switch (primitive.kind) {
         case 'resistor':
-          stampConductance(primitive.positive, primitive.negative, 1 / Math.max(1e-15, Math.abs(primitive.resistance)));
+          if (primitive.resistance < LOW_RESISTANCE_BRANCH) {
+            const column = branchIndex.get(primitive.id)!;
+            stampBranchConnection(primitive.positive, primitive.negative, column);
+            matrix[column][column] -= primitive.resistance;
+          } else {
+            stampConductance(primitive.positive, primitive.negative, 1 / primitive.resistance);
+          }
           break;
         case 'resistive-switch': {
-          const resistance = primitive.closed ? RESISTIVE_SWITCH_ON : RESISTIVE_SWITCH_OFF;
-          stampConductance(primitive.positive, primitive.negative, 1 / resistance);
+          if (primitive.closed) {
+            const column = branchIndex.get(primitive.id)!;
+            stampBranchConnection(primitive.positive, primitive.negative, column);
+            matrix[column][column] -= RESISTIVE_SWITCH_ON;
+          } else {
+            stampConductance(primitive.positive, primitive.negative, 1 / RESISTIVE_SWITCH_OFF);
+          }
           break;
         }
         case 'current':
@@ -281,15 +404,17 @@ export class TabDDocumentedMna {
     }
 
     const solution = solveLu(factorLu(matrix), rhs);
+    if (solution.some(value => !Number.isFinite(value))) throw new TabDMnaError('Singular MNA matrix: the solve produced non-finite values; define a reference and remove conflicting ideal constraints.');
     const nodeVoltages: Record<string, number> = { '0': 0 };
     for (const [name, index] of Array.from(nodeIndex.entries())) nodeVoltages[name] = solution[index];
     const branchCurrents: Record<string, number> = {};
     for (const [id, index] of Array.from(branchIndex.entries())) branchCurrents[id] = solution[index];
     for (const primitive of primitives) {
-      if (primitive.kind === 'resistor') branchCurrents[primitive.id] = (voltage(solution, primitive.positive) - voltage(solution, primitive.negative)) / Math.max(1e-15, Math.abs(primitive.resistance));
+      // Branch-stamped elements (R < 1 mΩ, closed switches) already hold their solved current; conductance-stamped
+      // ones are read back through Ohm's law.
+      if (primitive.kind === 'resistor' && !branchIndex.has(primitive.id)) branchCurrents[primitive.id] = (voltage(solution, primitive.positive) - voltage(solution, primitive.negative)) / primitive.resistance;
       if (primitive.kind === 'resistive-switch') {
-        const resistance = primitive.closed ? RESISTIVE_SWITCH_ON : RESISTIVE_SWITCH_OFF;
-        branchCurrents[primitive.id] = (voltage(solution, primitive.positive) - voltage(solution, primitive.negative)) / resistance;
+        if (!primitive.closed) branchCurrents[primitive.id] = (voltage(solution, primitive.positive) - voltage(solution, primitive.negative)) / RESISTIVE_SWITCH_OFF;
       }
       if (primitive.kind === 'current') branchCurrents[primitive.id] = primitive.current;
       if (primitive.kind === 'capacitor') {
@@ -318,7 +443,7 @@ export class TabDDocumentedMna {
         }
       }
     }
-    if (commitHistory) this.time += dt;
+    if (commitHistory) { assertNoDeadShort(primitives, branchCurrents); this.time += dt; }
     return { time: this.time, converged: true, nodeVoltages, branchCurrents, terminalVoltages: {} };
   }
 }

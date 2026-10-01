@@ -81,7 +81,7 @@ export function buildPillar4(): Circuit[] {
     const thr = state === 'set' ? depth * vcc : (1 - depth) * vcc; const trg = state === 'set' ? depth * vcc : (1 - depth) * vcc;
     const nb = new NB().V('vcc', '0', vcc, 'Vcc').R('vcc', 'ref2', 5e3, 'R1').R('ref2', 'ref1', 5e3, 'R2').R('ref1', '0', 5e3, 'R3')
       .V('thr', '0', thr, 'Vthr').V('trg', '0', trg, 'Vtrg')
-      .OA('thr', 'ref2', 'c1', 1e5, 'U1').OA('ref1', 'trg', 'c2', 1e5, 'U2')
+      .OA('thr', 'ref2', 'c1', 1e5, 'U1', vcc).OA('ref1', 'trg', 'c2', 1e5, 'U2', vcc)
       .GATE('nor', 'c1', 'qb', 'q', vcc, 'N1').GATE('nor', 'c2', 'q', 'qb', vcc, 'N2')
       .R('qb', 'bd', 10e3, 'Rb').Q('npn', 'bd', 'dis', '0', 100, 'QD').R('vcc', 'dis', 10e3, 'Rext').R('q', 'out', 100, 'Ro').R('out', '0', 1e3, 'Rl');
     const expectQ = state === 'set' ? vcc : 0;

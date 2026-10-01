@@ -3,13 +3,17 @@
  * and numerical sanity — evaluated on the canonical primitive list against the solver's *reported* result.
  */
 import type { Prim } from '@/simulators/circuit-engine/engine/industrialAudit/ir';
+import { RESISTIVE_SWITCH_OFF, RESISTIVE_SWITCH_ON } from '@/simulators/circuit-engine/engine/analogDocumentedMna';
+
+/** Element law of a `resistive-switch` as the engine under test stamps it (single source of truth). */
+const switchResistance = (closed: boolean) => (closed ? RESISTIVE_SWITCH_ON : RESISTIVE_SWITCH_OFF);
 
 export interface GateOptions {
   kclTol?: number;
   kvlTol?: number;
   powerRel?: number;
   powerFloor?: number;
-  /** `abs` mirrors TabDDocumentedMna, which stamps max(1e-15, |R|) regardless of sign. */
+  /** `abs` mirrors the legacy clamp max(ε, |R|); TabDDocumentedMna now rejects non-positive R, so this only matters for raw-engine primitives. */
   resistorMode?: 'raw' | 'abs';
 }
 
@@ -55,7 +59,7 @@ export function evaluateGates(prims: Prim[], nodeV: Record<string, number>, repo
       case 'current': return p.current;
       case 'nl': return p.current(vAll);
       case 'resistor': return got ?? (V(p.positive) - V(p.negative)) / resistance(p.resistance);
-      case 'resistive-switch': return got ?? (V(p.positive) - V(p.negative)) / (p.closed ? 1e-15 : 1e15);
+      case 'resistive-switch': return got ?? (V(p.positive) - V(p.negative)) / switchResistance(p.closed);
       case 'vccs': return got ?? (p.gain ?? p.transconductance ?? 0) * (V(p.controlPositive) - V(p.controlNegative));
       default:
         if (got === undefined || got === null) { issues.push(`${p.kind} ${p.id}: branch current not reported by solver`); return NaN; }
@@ -65,7 +69,7 @@ export function evaluateGates(prims: Prim[], nodeV: Record<string, number>, repo
   const constitutiveV = (p: Prim, i: number): number | null => {
     switch (p.kind) {
       case 'resistor': return resistance(p.resistance) * i;
-      case 'resistive-switch': return (p.closed ? 1e-15 : 1e15) * i;
+      case 'resistive-switch': return switchResistance(p.closed) * i;
       case 'voltage': return p.voltage;
       case 'vcvs': return p.gain * (V(p.controlPositive) - V(p.controlNegative));
       default: return null;
@@ -77,7 +81,7 @@ export function evaluateGates(prims: Prim[], nodeV: Record<string, number>, repo
   const derivedCurrent = (p: Prim, reportedI: number): number => {
     switch (p.kind) {
       case 'resistor': return (V(p.positive) - V(p.negative)) / resistance(p.resistance);
-      case 'resistive-switch': return (V(p.positive) - V(p.negative)) / (p.closed ? 1e-15 : 1e15);
+      case 'resistive-switch': return (V(p.positive) - V(p.negative)) / switchResistance(p.closed);
       case 'vccs': return (p.gain ?? p.transconductance ?? 0) * (V(p.controlPositive) - V(p.controlNegative));
       default: return reportedI;
     }

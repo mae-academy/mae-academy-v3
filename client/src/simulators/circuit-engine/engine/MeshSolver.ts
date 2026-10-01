@@ -344,7 +344,12 @@ const topologyFor = (edges: MeshEdge[], faceCount: number): MeshTopology => {
 };
 
 export const matrixRank = (matrix: number[][], epsilon = 1e-10) => {
-  const reduced = matrix.map((row) => [...row]);
+  // Row equilibration: the pivot tolerance is relative to each row's own magnitude, so impedances spanning many
+  // decades (1 mΩ … 1 TΩ) are neither declared rank-deficient nor given a spurious full rank.
+  const reduced = matrix.map((row) => {
+    const scale = row.reduce((maximum, value) => Math.max(maximum, Math.abs(value)), 0);
+    return scale > 0 ? row.map((value) => value / scale) : [...row];
+  });
   let rank = 0;
   for (let column = 0; column < (reduced[0]?.length ?? 0) && rank < reduced.length; column += 1) {
     let pivot = rank;
@@ -360,6 +365,36 @@ export const matrixRank = (matrix: number[][], epsilon = 1e-10) => {
     rank += 1;
   }
   return rank;
+};
+
+/** Basis of {w : M·w = 0} by reduced-row-echelon elimination (M is small: current sources × meshes of one supermesh). */
+const nullSpaceBasis = (matrix: number[][], columns: number): number[][] => {
+  const reduced = matrix.map((row) => [...row]);
+  const pivotColumns: number[] = [];
+  let rank = 0;
+  for (let column = 0; column < columns && rank < reduced.length; column += 1) {
+    let pivot = rank;
+    for (let row = rank + 1; row < reduced.length; row += 1) if (Math.abs(reduced[row][column]) > Math.abs(reduced[pivot][column])) pivot = row;
+    if (Math.abs(reduced[pivot][column]) < 1e-12) continue;
+    [reduced[rank], reduced[pivot]] = [reduced[pivot], reduced[rank]];
+    const divisor = reduced[rank][column];
+    for (let item = 0; item < columns; item += 1) reduced[rank][item] /= divisor;
+    for (let row = 0; row < reduced.length; row += 1) if (row !== rank) {
+      const factor = reduced[row][column];
+      for (let item = 0; item < columns; item += 1) reduced[row][item] -= factor * reduced[rank][item];
+    }
+    pivotColumns.push(column);
+    rank += 1;
+  }
+  const basis: number[][] = [];
+  for (let free = 0; free < columns; free += 1) {
+    if (pivotColumns.includes(free)) continue;
+    const vector = Array<number>(columns).fill(0);
+    vector[free] = 1;
+    pivotColumns.forEach((pivotColumn, row) => { vector[pivotColumn] = -reduced[row][free]; });
+    basis.push(vector);
+  }
+  return basis;
 };
 
 /** Replaces loop KVL rows with Supermesh constraints and merges constituent rows into a combined supermesh KVL row. */
@@ -535,12 +570,23 @@ const stampCurrentConstraints = (
     }
 
     if (availableRows.length > 0) {
-      const elimRow = availableRows.shift()!;
-      assignedRows.add(elimRow);
-      impedance[elimRow] = impedance[0].map((_, col) =>
-        meshIndices.reduce((sum, m) => sum + origImpedance[m][col], 0)
-      );
-      source[elimRow] = meshIndices.reduce((sum, m) => sum + origSource[m], 0);
+      // The supermesh KVL row must not contain the unknown voltage of any current source inside it. A plain sum of the
+      // constituent rows only cancels it when the two meshes traverse the source in opposite directions; meshes built
+      // from chord orientation may traverse it in the same direction, so the weights w are the null-space of the
+      // source-traversal matrix (w·c(·,s) = 0 for every current source s). The plain sum is kept whenever it is valid.
+      const traversal = currentEdges.map((edge) => meshIndices.map((m) => cycles[m].get(edge.id) ?? 0));
+      const plainSum = meshIndices.map(() => 1);
+      const cancels = (w: number[]) => traversal.every((row) => Math.abs(row.reduce((sum, c, i) => sum + c * w[i], 0)) < 1e-12);
+      const basis = cancels(plainSum) ? [plainSum] : nullSpaceBasis(traversal, meshIndices.length);
+      for (const weights of basis) {
+        if (!availableRows.length) break;
+        const elimRow = availableRows.shift()!;
+        assignedRows.add(elimRow);
+        impedance[elimRow] = impedance[0].map((_, col) =>
+          meshIndices.reduce((sum, m, i) => sum + weights[i] * origImpedance[m][col], 0)
+        );
+        source[elimRow] = meshIndices.reduce((sum, m, i) => sum + weights[i] * origSource[m], 0);
+      }
     }
   }
 
@@ -651,7 +697,8 @@ export const buildMeshSystem = (elements: MNAElement[], geometry?: MeshGeometry)
 /**
  * Assembles the planar mesh impedance matrix Z_m following Pillage Sec 1.4 & 2.2:
  * - Z_m[k, k] = sum of evaluated resistances of all resistor components in Loop k: sum_{b in Loop k} R_b
- * - Z_m[k, l] = Z_m[l, k] = -R_s for shared resistor branch R_s between Loop k and Loop l (or 0 if no shared resistor)
+ * - Z_m[k, l] = Z_m[l, k] = sum_{b shared} R_b * c(k,b) * c(l,b): -R_b when loops k and l traverse the shared branch in
+ *   opposite directions (adjacent clockwise faces), +R_b when they traverse it in the same direction (0 if nothing is shared)
  */
 export const assembleMeshImpedance = (
   cycles: SignedCycle[],
@@ -666,20 +713,15 @@ export const assembleMeshImpedance = (
 
   return cycles.map((row, rowIndex) =>
     cycles.map((column, columnIndex) => {
-      let term = 0;
-      if (rowIndex === columnIndex) {
-        term += resistors.reduce((sum, edge) => {
-          const inLoop = Math.abs(row.get(edge.id) ?? 0) > 0;
-          return sum + (inLoop ? edge.value : 0);
-        }, 0);
-      } else {
-        term += resistors.reduce((sum, edge) => {
-          const inRow = Math.abs(row.get(edge.id) ?? 0) > 0;
-          const inCol = Math.abs(column.get(edge.id) ?? 0) > 0;
-          if (!inRow || !inCol) return sum;
-          return sum - edge.value;
-        }, 0);
-      }
+      // Z[k][l] = Σ_b R_b · c(k,b) · c(l,b): KVL around cycle k sees the voltage R_b·i_b of every resistor it
+      // traverses, and i_b = Σ_l c(l,b)·I_l. Two cycles that run through a shared branch in opposite directions
+      // (clockwise neighbouring faces) therefore couple with -R_b, while cycles built from chord orientation that
+      // run through it in the same direction couple with +R_b. The diagonal is the c² = 1 special case.
+      let term = resistors.reduce((sum, edge) => {
+        const inRow = row.get(edge.id) ?? 0;
+        const inColumn = column.get(edge.id) ?? 0;
+        return inRow === 0 || inColumn === 0 ? sum : sum + edge.value * inRow * inColumn;
+      }, 0);
 
       for (const edge of depVoltages) {
         const traversal = row.get(edge.id) ?? 0;
@@ -740,21 +782,28 @@ const colorCell = (value: string, rowIndex: number) => `\\color{${MESH_COLORS[ro
 const coloredMatrix = (rows: number[][]) => `\\begin{bmatrix}${rows.map((row, rowIndex) => row.map((value) => colorCell(formatAcademicNumber(value), rowIndex)).join(' & ')).join(' \\\\ ')}\\end{bmatrix}`;
 const coloredVector = (values: string[]) => `\\begin{bmatrix}${values.map((value, index) => colorCell(value, index)).join(' \\\\ ')}\\end{bmatrix}`;
 
-/** Partial-pivot Gaussian elimination for the visible [Z_m][I_m]=[E_m] system. */
+/**
+ * Scaled partial-pivot Gauss-Jordan elimination for the visible [Z_m][I_m]=[E_m] system. Pivots are judged relative to
+ * their own row and no solved current is flushed to zero, so nano-/pico-ampere (and smaller) mesh currents keep
+ * full IEEE-754 double resolution.
+ */
 export const solveMeshCurrents = (impedance: number[][], source: number[]) => {
   const size = impedance.length;
   if (matrixRank(impedance) < size) throw new Error('Mesh-current system is rank-deficient after Supermesh constraints; inspect constrained source topology.');
   const augmented = impedance.map((row, index) => [...row, source[index] ?? 0]);
+  const scale = impedance.map((row) => row.reduce((maximum, value) => Math.max(maximum, Math.abs(value)), 0) || 1);
   for (let pivot = 0; pivot < size; pivot += 1) {
     let best = pivot;
-    for (let row = pivot + 1; row < size; row += 1) if (Math.abs(augmented[row][pivot]) > Math.abs(augmented[best][pivot])) best = row;
-    if (Math.abs(augmented[best][pivot]) < 1e-12) throw new Error('Mesh-current system is singular; inspect constrained MNA branch currents.');
+    for (let row = pivot + 1; row < size; row += 1) if (Math.abs(augmented[row][pivot]) / scale[row] > Math.abs(augmented[best][pivot]) / scale[best]) best = row;
+    if (!(Math.abs(augmented[best][pivot]) / scale[best] > 1e-14)) throw new Error('Mesh-current system is singular; inspect constrained MNA branch currents.');
     [augmented[pivot], augmented[best]] = [augmented[best], augmented[pivot]];
+    [scale[pivot], scale[best]] = [scale[best], scale[pivot]];
     const divisor = augmented[pivot][pivot];
     for (let column = pivot; column <= size; column += 1) augmented[pivot][column] /= divisor;
-    for (let row = 0; row < size; row += 1) if (row !== pivot) { const factor = augmented[row][pivot]; for (let column = pivot; column <= size; column += 1) augmented[row][column] -= factor * augmented[pivot][column]; }
+    for (let row = 0; row < size; row += 1) if (row !== pivot) { const factor = augmented[row][pivot]; if (factor === 0) continue; for (let column = pivot; column <= size; column += 1) augmented[row][column] -= factor * augmented[pivot][column]; }
   }
-  return augmented.map((row) => Math.abs(row[size]) < 1e-12 ? 0 : row[size]);
+  // `+ 0` only normalises IEEE negative zero; it never discards magnitude.
+  return augmented.map((row) => row[size] + 0);
 };
 
 /** Mesh trace generator for planar resistor/source circuits; branch values remain cross-checked against strict MNA. */
@@ -853,7 +902,7 @@ export class MeshSolver {
           title: '2. KVL loop equations · assembled mesh-current coefficient system',
           math: (kvlDerivations.length ? `\\begin{aligned}${kvlDerivations.join(' \\\\ ')}\\end{aligned}\\\\ ` : '') +
             `${loopSystem}\\qquad\\left[Z_m\\right]\\left[I_m\\right]=\\left[E_m\\right]`,
-          prose: 'Each diagonal entry is the sum of resistances in its mesh. An off-diagonal entry is the signed negative shared resistance, so this system has exactly one row and one column per mesh.' + burnedNote,
+          prose: 'Each diagonal entry is the sum of resistances in its mesh. An off-diagonal entry is the shared resistance signed by how the two meshes traverse it (negative when they circulate in opposite directions through it, positive when in the same direction), so this system has exactly one row and one column per mesh.' + burnedNote,
         },
         ...(hasSupermesh ? [{ title: '3. Supermesh constraints', math: supermeshMath || 'i_b-i_a=I_s', prose: currentConstraints.length ? 'Each ideal current-source branch replaces one KVL row with its signed mesh-current constraint, preventing a singular mesh-current system.' : 'A dependent current-source branch is excluded from the KVL perimeter and restored by its explicit controlled-current constraint.' }] : []),
         { title: hasSupermesh ? '4. Solved mesh-current vector' : '3. Solved mesh-current vector', math: solvedVector, prose: 'The solved I_1 through I_n values come directly from the displayed mesh coefficient system and are the mesh-level current readings.' },

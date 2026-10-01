@@ -45,6 +45,8 @@ export interface Circuit {
   engineStepSeconds?: number;
   /** Analytic reference checks evaluated on every solver run that produced a solution. */
   physics?: (ctx: PhysicsCtx) => PhysicsCheck[];
+  /** Positive-feedback circuit with two stable saturated states: the unbounded linear DC reference is an unstable equilibrium and is not a valid expectation. */
+  bistable?: boolean;
   /** Op-amp output nodes must stay inside ±limit (the supply rails declared by the design). */
   rails?: { nodes: string[]; limit: number };
   /** Passive resistive network driven only by independent voltage sources: every node must lie within the source hull. */
@@ -164,7 +166,7 @@ export function runCircuit(circuit: Circuit): CircuitResult {
         case 'tabd':
           if (circuit.tran) { const r = runTran(circuit.els, circuit.tran); run = r.rec; trace = r.trace; } else run = runTabdDc(circuit.els);
           break;
-        case 'engine': run = runEngine(circuit.els, { steps: circuit.engineSteps, stepSeconds: circuit.engineStepSeconds, settleSeconds: circuit.engineSettle }); break;
+        case 'engine': run = runEngine(circuit.els, { steps: circuit.engineSteps, stepSeconds: circuit.engineStepSeconds, settleSeconds: circuit.engineSettle, skipDeclaredOracle: circuit.bistable }); break;
       }
       outcomes.push(judgeRun(circuit, run, trace));
     }

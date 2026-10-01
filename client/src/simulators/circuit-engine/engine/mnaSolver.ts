@@ -33,7 +33,10 @@ export class MNAError extends Error {
   }
 }
 
-const PIVOT_EPSILON = 1e-12;
+/** Relative (row-scaled) pivot magnitude below which a matrix is treated as numerically singular (≈ 64·ε). */
+const SCALED_PIVOT_EPSILON = 1e-14;
+/** Backward-error bound of the normalised residual certificate. */
+const RESIDUAL_TOLERANCE = 1e-9;
 const VALUE_EPSILON = 1e-9;
 /** Stand-in resistance for a burned-out component: 1 TΩ (1e-12 S conductance), safely severing the node while preventing singular matrices. */
 export const BURNED_OUT_RESISTANCE = 1e12;
@@ -215,7 +218,8 @@ export class MNASolver {
 
     const solution = gaussianSolve(matrix, rhs);
     const residualInfinity = matrixResidualInfinity(matrix, solution, rhs);
-    if (residualInfinity > 1e-9) throw new MNAError('RESIDUAL_VIOLATION', `Invalid Circuit: MNA residual certificate failed (||A·x-z||∞=${residualInfinity.toExponential(3)})`);
+    const relativeResidual = normalizedResidual(matrix, solution, rhs);
+    if (!(relativeResidual <= RESIDUAL_TOLERANCE)) throw new MNAError('RESIDUAL_VIOLATION', `Invalid Circuit: MNA residual certificate failed (||A·x-z||∞=${residualInfinity.toExponential(3)}, relative ${relativeResidual.toExponential(3)})`);
     const nodeVoltages: Record<string, number> = { '0': 0 };
     nodeOrder.forEach((id, index) => { nodeVoltages[id] = solution[index]; });
     const branchCurrents: Record<string, number> = {};
@@ -311,21 +315,52 @@ export function matrixResidualInfinity(matrix: number[][], solution: number[], r
   return matrix.reduce((maximum, row, index) => Math.max(maximum, Math.abs(row.reduce((sum, value, column) => sum + value * (solution[column] ?? 0), 0) - (rhs[index] ?? 0))), 0);
 }
 
+/**
+ * Scale-aware residual certificate: ||A·x-z||∞ / (||A||∞·||x||∞ + ||z||∞).
+ * An unscaled absolute threshold sits at the double-precision floor for gain-10⁶ matrices (κ ≳ 10¹¹),
+ * so a correct solution would be refused; the normalised form measures backward error instead.
+ */
+export function normalizedResidual(matrix: number[][], solution: number[], rhs: number[]): number {
+  const residual = matrixResidualInfinity(matrix, solution, rhs);
+  const matrixNorm = matrix.reduce((maximum, row) => Math.max(maximum, row.reduce((sum, value) => sum + Math.abs(value), 0)), 0);
+  const solutionNorm = solution.reduce((maximum, value) => Math.max(maximum, Math.abs(value)), 0);
+  const rhsNorm = rhs.reduce((maximum, value) => Math.max(maximum, Math.abs(value)), 0);
+  const scale = matrixNorm * solutionNorm + rhsNorm;
+  return scale > 0 ? residual / scale : residual;
+}
+
+/**
+ * Gauss-Jordan elimination with scaled partial pivoting. Pivot candidates are compared after dividing by the
+ * infinity-norm of their original row, and singularity is judged on that scaled magnitude, so well-posed
+ * matrices whose entries span many decades (1 TΩ leakage next to 10⁶ gain stamps) are never mistaken for
+ * singular and no elimination update is skipped on an absolute-magnitude basis.
+ */
 function gaussianSolve(matrix: number[][], rhs: number[]): number[] {
   const size = rhs.length;
   const augmented = matrix.map((row, index) => [...row, rhs[index]]);
+  const rowScale = matrix.map(row => row.reduce((maximum, value) => Math.max(maximum, Math.abs(value)), 0));
+  for (const scale of rowScale) if (!(scale > 0) || !Number.isFinite(scale)) throw new MNAError('SINGULAR_MATRIX', 'Invalid Circuit: Singular Matrix');
+  const scaleOf = Array.from({ length: size }, (_, index) => rowScale[index]);
   for (let column = 0; column < size; column += 1) {
     let pivot = column;
-    for (let row = column + 1; row < size; row += 1) if (Math.abs(augmented[row][column]) > Math.abs(augmented[pivot][column])) pivot = row;
-    if (Math.abs(augmented[pivot][column]) < PIVOT_EPSILON) throw new MNAError('SINGULAR_MATRIX', 'Invalid Circuit: Singular Matrix');
-    [augmented[column], augmented[pivot]] = [augmented[pivot], augmented[column]];
+    let best = Math.abs(augmented[column][column]) / scaleOf[column];
+    for (let row = column + 1; row < size; row += 1) {
+      const candidate = Math.abs(augmented[row][column]) / scaleOf[row];
+      if (candidate > best) { best = candidate; pivot = row; }
+    }
+    if (!(best > SCALED_PIVOT_EPSILON)) throw new MNAError('SINGULAR_MATRIX', 'Invalid Circuit: Singular Matrix');
+    if (pivot !== column) {
+      [augmented[column], augmented[pivot]] = [augmented[pivot], augmented[column]];
+      [scaleOf[column], scaleOf[pivot]] = [scaleOf[pivot], scaleOf[column]];
+    }
     const divisor = augmented[column][column];
     for (let index = column; index <= size; index += 1) augmented[column][index] /= divisor;
     for (let row = 0; row < size; row += 1) {
       if (row === column) continue;
       const factor = augmented[row][column];
-      if (Math.abs(factor) < PIVOT_EPSILON) continue;
+      if (factor === 0) continue;
       for (let index = column; index <= size; index += 1) augmented[row][index] -= factor * augmented[column][index];
+      augmented[row][column] = 0;
     }
   }
   return augmented.map(row => row[size]);

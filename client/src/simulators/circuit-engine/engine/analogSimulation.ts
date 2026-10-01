@@ -3,10 +3,48 @@ import { manualRelayClosed } from '@/simulators/circuit-engine/models/componentI
 import { terminalKey, type CircuitComponent, type CircuitWire, type InstrumentReading, type SimulationSnapshot } from '@/simulators/circuit-engine/models/circuitTypes';
 import { compileDcTopology, type TabBMnaState } from '@/simulators/circuit-engine/components/hooks/useSimulation';
 import { SimulationEngine } from '@/simulators/circuit-engine/engine/simulation';
-import { TabDMnaError, type TabDPrimitive } from '@/simulators/circuit-engine/engine/analogDocumentedMna';
-import { shockleyCurrent, TabDNewtonMna, type TabDNonlinearDevice } from '@/simulators/circuit-engine/engine/analogNewtonMna';
+import { TabDMnaError, type TabDOperatingPoint, type TabDPrimitive } from '@/simulators/circuit-engine/engine/analogDocumentedMna';
+import { JUNCTION_GMIN, shockleyCurrent, TabDNewtonMna, type TabDJunction, type TabDNonlinearDevice } from '@/simulators/circuit-engine/engine/analogNewtonMna';
+import { spectralAbscissa } from '@/simulators/circuit-engine/engine/realEigen';
 import { toTabDObservableOperatingPoint, type TabDObservableOperatingPoint } from '@/simulators/circuit-engine/models/analogResultAdapter';
 import { getBrokenWireIds, isComponentOpen } from '@/simulators/circuit-engine/engine/brokenBranches';
+
+const THERMAL_VOLTAGE = 0.02585;
+/** Base-emitter saturation current of the BJT model (the transport current is β times the base current). */
+const BJT_BASE_SATURATION = 1e-15;
+
+/**
+ * Reverse current gain β_R that makes the Ebers–Moll model reach the declared V_CE(sat) at the datasheet test
+ * condition of forced gain Ic/Ib = 10:  V_CE(sat) = V_T·ln[(1 + 10/β_R)(1 + β_R) / (β_R (1 − 10/β_F))].
+ */
+function reverseBetaFor(forwardBeta: number, vceSat: number): number {
+  const target = Math.exp(Math.max(0.03, Math.min(0.6, vceSat)) / THERMAL_VOLTAGE);
+  const drive = Math.max(0.05, 1 - 10 / Math.max(forwardBeta, 10.5));
+  const ratio = (betaR: number) => (1 + 10 / betaR) * (1 + betaR) / (betaR * drive);
+  let low = 1e-3; let high = 1e2;
+  for (let i = 0; i < 60; i += 1) {
+    const mid = Math.sqrt(low * high);
+    if (ratio(mid) > target) low = mid; else high = mid;
+  }
+  return Math.sqrt(low * high);
+}
+
+/** Saturation state of an op-amp output stage: 0 = linear, +1 / −1 = latched to the positive / negative rail. */
+type OpAmpMode = -1 | 0 | 1;
+
+interface OpAmpModel {
+  id: string;
+  gainId: string;
+  internalOut: string;
+  out: string;
+  reference: string;
+  inPositive: string;
+  inNegative: string;
+  gain: number;
+  rail: number;
+  /** Read by the output-stage device on every evaluation; set by the piecewise-linear consistency loop. */
+  mode: OpAmpMode;
+}
 
 class SignalIntegrator {
   private window: { val: number; sq: number; dt: number }[] = [];
@@ -92,19 +130,42 @@ export class TabDSimulationEngine extends SimulationEngine {
   private lastDisplayTime = -1;
   private timeAccumulator = 0;
   private lastWireCurrents: Record<string, number> = {};
+  /** Node voltages of the last accepted solve: warm start for Newton and the op-amp saturation history. */
+  private warmStart: Record<string, number> | undefined;
+  /** Per-component wiring fingerprint of the last circuit, used to tell a schematic edit from a different circuit. */
+  private circuitFingerprints = new Map<string, string>();
+  /** Latched saturation state of every op-amp — the output-stage history that gives a Schmitt trigger its hysteresis. */
+  private readonly opampModes = new Map<string, OpAmpMode>();
 
   override setCircuit(components: CircuitComponent[], wires: CircuitWire[]) {
     super.setCircuit(components, wires);
     this.tabDComponents = components.map(component => ({ ...component, props: { ...component.props }, state: component.state ? { ...component.state } : undefined }));
     this.tabDWires = wires.map(wire => ({ ...wire, path: wire.path.map(point => [...point] as [number, number]) }));
-    this.documentedMna.reset();
+    // Schematic edits and switch toggles arrive through setCircuit. Stored energy does not vanish when the netlist changes:
+    // I_L(t⁻) = I_L(t⁺) and V_C(t⁻) = V_C(t⁺) for every reactive element that is still the same part wired the same way.
+    // A different circuit (fewer than half of the parts unchanged) starts from rest, exactly as before; `reset()` is the
+    // explicit way to discharge a circuit.
+    const fingerprints = this.fingerprintCircuit(components, wires);
+    const unchanged = new Set(Array.from(fingerprints).filter(([id, fingerprint]) => this.circuitFingerprints.get(id) === fingerprint).map(([id]) => id));
+    const sameCircuit = this.circuitFingerprints.size > 0 && unchanged.size >= 0.5 * this.circuitFingerprints.size;
+    this.circuitFingerprints = fingerprints;
+    if (sameCircuit) {
+      this.documentedMna.retainState(unchanged);
+    } else {
+      this.documentedMna.reset();
+      this.warmStart = undefined;
+      this.opampModes.clear();
+      this.tabDCoilCurrents.clear();
+      this.tabDCoilEnergized.clear();
+    }
     this.documentedSnapshot = null;
+    for (const id of Array.from(this.opampModes.keys())) if (!unchanged.has(id)) this.opampModes.delete(id);
     this.tabDRelayStates.clear();
     this.tabDPowerLatchStates.clear();
     this.tabDFuseBlown.clear();
     this.tabDDigitalLevels.clear();
-    this.tabDCoilCurrents.clear();
-    this.tabDCoilEnergized.clear();
+    for (const id of Array.from(this.tabDCoilCurrents.keys())) if (!unchanged.has(id)) this.tabDCoilCurrents.delete(id);
+    for (const id of Array.from(this.tabDCoilEnergized.keys())) if (!unchanged.has(id)) this.tabDCoilEnergized.delete(id);
     this.integrators.clear();
     this.displayReadings = {};
     this.lastDisplayTime = -1;
@@ -116,8 +177,22 @@ export class TabDSimulationEngine extends SimulationEngine {
     this.lastWireCurrents = {};
   }
 
+  /** Part type plus the wire endpoints attached to it: unchanged for a value edit or a switch toggle, different once a part is rewired or replaced. */
+  private fingerprintCircuit(components: CircuitComponent[], wires: CircuitWire[]): Map<string, string> {
+    const links = new Map<string, string[]>();
+    const attach = (id: string, link: string) => { const list = links.get(id); if (list) list.push(link); else links.set(id, [link]); };
+    for (const wire of wires) {
+      attach(wire.fromComp, `${wire.fromTerm}>${wire.toComp}.${wire.toTerm}`);
+      attach(wire.toComp, `${wire.toTerm}>${wire.fromComp}.${wire.fromTerm}`);
+    }
+    return new Map(components.map(component => [component.id, `${component.type}|${(links.get(component.id) ?? []).sort().join(',')}`]));
+  }
+
   override reset() {
     super.reset();
+    this.warmStart = undefined;
+    this.opampModes.clear();
+    this.circuitFingerprints.clear();
     this.documentedMna.reset();
     this.documentedSnapshot = null;
     this.tabDRelayStates.clear();
@@ -185,8 +260,9 @@ export class TabDSimulationEngine extends SimulationEngine {
         if (!compiled) return super.step(elapsedSeconds);
         finalWiredTerminals = compiled.wiredTerminals;
 
-        const initialGuess = this.documentedSnapshot?.converged ? this.documentedSnapshot.nodeVoltages : undefined;
-        const result = this.documentedMna.solve(compiled.primitives, compiled.nonlinear, fixedDt, { initialGuess });
+        const initialGuess = this.warmStart ?? (this.documentedSnapshot?.converged ? this.documentedSnapshot.nodeVoltages : undefined);
+        const result = this.solveOperatingPoint(compiled, fixedDt, initialGuess);
+        this.warmStart = result.nodeVoltages;
 
         const branchCurrents = {
           ...result.branchCurrents,
@@ -546,6 +622,7 @@ export class TabDSimulationEngine extends SimulationEngine {
       };
       return this.documentedSnapshot;
     } catch (error) {
+      this.warmStart = undefined;
       const errorMessage = error instanceof TabDMnaError ? error.message : error instanceof Error ? error.message : String(error);
       this.documentedSnapshot = {
         time: this.documentedMna.getTime(),
@@ -557,9 +634,80 @@ export class TabDSimulationEngine extends SimulationEngine {
     }
   }
 
+  /**
+   * Solves one fixed step. Each op-amp is piecewise linear: linear inside its supply window, or latched to a rail. Newton
+   * runs with the modes frozen (smooth equations, no bang-bang between flat clamp tangents) and an outer loop moves any
+   * op-amp whose solution contradicts its mode (linear but |A·Vd| beyond a rail; latched but A·Vd no longer pushing
+   * that way). Modes persist between steps, so a latched output stays latched while the input is inside the hysteresis
+   * window — and at power-up (no history) a linear equilibrium that is unstable under net positive feedback is latched
+   * to the rail the output would physically run to, starting from 0 V.
+   */
+  private solveOperatingPoint(compiled: NonNullable<ReturnType<TabDSimulationEngine['compileDocumentedPrimitives']>>, dt: number, guess?: Record<string, number>): TabDOperatingPoint {
+    const { primitives, nonlinear, opamps } = compiled;
+    if (!opamps.length) return this.documentedMna.solve(primitives, nonlinear, dt, { initialGuess: guess });
+
+    const solveModes = (start?: Record<string, number>) => this.documentedMna.solve(primitives, nonlinear, dt, { initialGuess: start, commit: false });
+    const pattern = () => opamps.map(op => op.mode).join(',');
+    const seen = new Set<string>();
+    let probe = solveModes(guess);
+    for (let round = 0; round < 12 + 2 * opamps.length; round += 1) {
+      seen.add(pattern());
+      let changed = false;
+      for (const op of opamps) {
+        const drive = (probe.nodeVoltages[op.internalOut] ?? 0) - (probe.nodeVoltages[op.reference] ?? 0);
+        const wanted: OpAmpMode = drive > op.rail ? 1 : drive < -op.rail ? -1 : 0;
+        if (wanted !== op.mode) { op.mode = wanted; changed = true; }
+      }
+      if (!changed && !guess) {
+        // Power-up: test the consistent linear set for an unstable (positive-feedback) equilibrium.
+        const latch = this.findUnstableOpAmp(opamps, probe, dt);
+        if (latch) { latch.op.mode = latch.direction; changed = true; }
+      }
+      if (!changed) break;
+      if (seen.has(pattern())) break; // limit cycle between mode sets: keep the last one
+      probe = solveModes(probe.nodeVoltages);
+    }
+    for (const op of opamps) this.opampModes.set(op.id, op.mode);
+    return this.documentedMna.commit(probe, dt);
+  }
+
+  /** The linear-region op-amp that sits on an unstable DC equilibrium of the tangent circuit, with the rail it should latch to. */
+  private findUnstableOpAmp(opamps: OpAmpModel[], point: TabDOperatingPoint, dt: number): { op: OpAmpModel; direction: 1 | -1 } | null {
+    const tangent = point.tangent;
+    if (!tangent) return null;
+    const linear = opamps.filter(op => op.mode === 0);
+    if (!linear.length) return null;
+    const gainIds = new Set(opamps.map(op => op.gainId));
+    const passive = tangent.filter(primitive => !gainIds.has(primitive.id));
+    const differential = (drive: number) => {
+      const solved = this.documentedMna.solveTangent([
+        ...passive,
+        ...opamps.map((op, index) => ({ kind: 'voltage' as const, id: op.gainId, positive: op.internalOut, negative: op.reference, voltage: index === drive ? 1 : 0 })),
+      ], dt);
+      return opamps.map(op => (solved.nodeVoltages[op.inPositive] ?? 0) - (solved.nodeVoltages[op.inNegative] ?? 0));
+    };
+    let baseline: number[];
+    let columns: number[][];
+    try { baseline = differential(-1); columns = opamps.map((_, index) => differential(index)); } catch (error) { if (error instanceof TabDMnaError) return null; throw error; }
+    // H[k][j] = ∂(V₊−V₋)_k / ∂(internal output of op-amp j). With the lag τ·v̇ = A·Vd − v the equilibrium is stable iff every
+    // eigenvalue of H − I/A has a negative real part; a latched output stage ignores its gain node, so its column of H is 0.
+    const h = opamps.map((_, k) => opamps.map((__, j) => columns[j][k] - baseline[k]));
+    const minGain = Math.min(...opamps.map(op => op.gain));
+    const shifted = h.map((row, k) => row.map((value, j) => value - (k === j ? 1 / minGain : 0)));
+    if (!(spectralAbscissa(shifted) > 0)) return null;
+    // Latch the linear-region op-amp with the strongest self-loop (most positive feedback).
+    let best = -1; let bestLoop = 0;
+    opamps.forEach((op, k) => { if (op.mode === 0 && h[k][k] > bestLoop) { bestLoop = h[k][k]; best = k; } });
+    if (best < 0) return null;
+    const op = opamps[best];
+    // Starting from 0 V the output moves away from the equilibrium it cannot hold.
+    const equilibrium = (point.nodeVoltages[op.out] ?? 0) - (point.nodeVoltages[op.reference] ?? 0);
+    return { op, direction: equilibrium > 0 ? -1 : 1 };
+  }
+
   private lastFixedDt = 0.0005;
 
-  private compileDocumentedPrimitives(dt = this.lastFixedDt): { primitives: TabDPrimitive[]; nonlinear: TabDNonlinearDevice[]; netForTerminal: (componentId: string, terminalId: string) => string; wiredTerminals: Set<string>; commit: (nodeVoltages: Record<string, number>, branchCurrents: Record<string, number>, elapsedSeconds: number) => void } | null {
+  private compileDocumentedPrimitives(dt = this.lastFixedDt): { primitives: TabDPrimitive[]; nonlinear: TabDNonlinearDevice[]; netForTerminal: (componentId: string, terminalId: string) => string; wiredTerminals: Set<string>; opamps: OpAmpModel[]; commit: (nodeVoltages: Record<string, number>, branchCurrents: Record<string, number>, elapsedSeconds: number) => void } | null {
     const parent = new Map<string, string>();
     const find = (value: string): string => {
       const existing = parent.get(value);
@@ -589,7 +737,22 @@ export class TabDSimulationEngine extends SimulationEngine {
       return root === reference ? '0' : `n:${root}`;
     };
     const value = (component: CircuitComponent, key: string, fallback: number) => {
-      const number = Number(component.props[key]); return Number.isFinite(number) ? number : fallback;
+      const raw = component.props[key];
+      const number = Number(raw);
+      if (Number.isFinite(number)) return number;
+      // A parameter that was never set takes the component default; one that was set to NaN/±∞ is a malformed
+      // circuit and is reported, never silently replaced by the default (which would solve a different circuit).
+      const declared = raw !== undefined && raw !== null && raw !== '';
+      if (declared && (typeof raw === 'number' || (typeof raw === 'string' && raw.trim() !== ''))) {
+        throw new TabDMnaError(`Invalid Circuit: ${component.label || component.id} (${component.type}) parameter "${key}" must be a finite number (got ${String(raw)}).`);
+      }
+      return fallback;
+    };
+    /** Resistance in ohms: zero is lifted to the 1 nΩ short-circuit floor; a negative value is an invalid passive resistor, never reinterpreted. */
+    const resistanceValue = (component: CircuitComponent, key: string, fallback: number) => {
+      const ohms = value(component, key, fallback);
+      if (ohms < 0) throw new TabDMnaError(`Invalid Circuit: ${component.label || component.id} (${component.type}) has negative ${key} (${ohms} Ω); a passive resistor must be positive.`);
+      return Math.max(1e-9, ohms);
     };
     const sourceValue = (component: CircuitComponent, amplitudeKey: string, fallback: number) => {
       const format = String(component.props.format ?? 'polar');
@@ -623,6 +786,9 @@ export class TabDSimulationEngine extends SimulationEngine {
     const systemFrequency = acSource ? Number(acSource.props.frequency ?? 50) : 50;
     const primitives: TabDPrimitive[] = [];
     const nonlinear: TabDNonlinearDevice[] = [];
+    const opamps: OpAmpModel[] = [];
+    /** Junction leakage (gmin): a resistor across every p-n junction of the device model. */
+    const junctionLeak = (id: string, positive: string, negative: string) => primitives.push({ kind: 'resistor', id: `${id}:leak`, positive, negative, resistance: 1 / JUNCTION_GMIN });
     const priorNodeVoltages = this.documentedSnapshot?.nodeVoltages ?? { '0': 0 };
     const relayModels: Array<{ id: string; coilPositive: string; coilNegative: string; ratedVoltage: number }> = [];
     const powerLatchModels: Array<{ id: string; gate: string; cathode: string; triggerVoltage: number; holdCurrent: number }> = [];
@@ -683,9 +849,9 @@ export class TabDSimulationEngine extends SimulationEngine {
       const p = (terminal: string) => netForTerminal(component.id, terminal);
       switch (component.type) {
         case 'ground': break;
-        case 'resistor': primitives.push({ kind: 'resistor', id: component.id, positive: p('a'), negative: p('b'), resistance: Math.max(1e-9, value(component, 'resistance', 1000)) }); break;
+        case 'resistor': primitives.push({ kind: 'resistor', id: component.id, positive: p('a'), negative: p('b'), resistance: resistanceValue(component, 'resistance', 1000) }); break;
         case 'star-resistor-pack': {
-          const resistance = Math.max(1e-9, value(component, 'resistance', 1000));
+          const resistance = resistanceValue(component, 'resistance', 1000);
           const neutral = p('n');
           primitives.push({ kind: 'resistor', id: `${component.id}:1`, positive: p('l1'), negative: neutral, resistance });
           primitives.push({ kind: 'resistor', id: `${component.id}:2`, positive: p('l2'), negative: neutral, resistance });
@@ -693,7 +859,7 @@ export class TabDSimulationEngine extends SimulationEngine {
           break;
         }
         case 'delta-resistor-pack': {
-          const resistance = Math.max(1e-9, value(component, 'resistance', 1000));
+          const resistance = resistanceValue(component, 'resistance', 1000);
           primitives.push({ kind: 'resistor', id: `${component.id}:12`, positive: p('l1'), negative: p('l2'), resistance });
           primitives.push({ kind: 'resistor', id: `${component.id}:23`, positive: p('l2'), negative: p('l3'), resistance });
           primitives.push({ kind: 'resistor', id: `${component.id}:31`, positive: p('l3'), negative: p('l1'), resistance });
@@ -702,7 +868,7 @@ export class TabDSimulationEngine extends SimulationEngine {
         case 'potentiometer': {
           const a = p('t1') ?? p('a');
           const b = p('t2') ?? p('b');
-          const total = Math.max(1e-9, value(component, 'resistance', 10000));
+          const total = resistanceValue(component, 'resistance', 10000);
           const rawWiper = value(component, 'wiper', 0.5);
           const wiper = Math.max(0, Math.min(1, rawWiper > 1 ? rawWiper / 100 : rawWiper));
           primitives.push({ kind: 'resistor', id: `${component.id}:a`, positive: a, negative: p('wiper'), resistance: Math.max(1e-9, total * wiper) });
@@ -923,32 +1089,36 @@ export class TabDSimulationEngine extends SimulationEngine {
           const anode = p('anode'); const cathode = p('cathode');
           const intAnode = `${anode}:rs:${component.id}`;
           primitives.push({ kind: 'resistor', id: `${component.id}:rs`, positive: anode, negative: intAnode, resistance: 0.001 });
-          nonlinear.push({ id: component.id, positive: intAnode, negative: cathode, controls: [intAnode, cathode], current: (nodes: Record<string, number>) => shockleyCurrent((nodes[intAnode] ?? 0) - (nodes[cathode] ?? 0), 1e-8, 0.01) });
+          junctionLeak(component.id, intAnode, cathode);
+          nonlinear.push({ id: component.id, positive: intAnode, negative: cathode, controls: [intAnode, cathode], junctions: [{ positive: intAnode, negative: cathode, saturationCurrent: 1e-8, thermalVoltage: 0.01 }], current: (nodes: Record<string, number>) => shockleyCurrent((nodes[intAnode] ?? 0) - (nodes[cathode] ?? 0), 1e-8, 0.01) });
           break;
         }
         case 'diode': {
           const anode = p('anode'); const cathode = p('cathode');
           const intAnode = `${anode}:rs:${component.id}`;
           primitives.push({ kind: 'resistor', id: `${component.id}:rs`, positive: anode, negative: intAnode, resistance: 0.001 });
+          junctionLeak(component.id, intAnode, cathode);
           const material = String(component.props.material ?? 'silicon').toLowerCase();
           const saturationByMaterial: Record<string, number> = { silicon: 1e-12, germanium: 1e-6, gaas: 1e-18 };
           const ideal = material === 'ideal';
           const saturation = ideal ? 1e-8 : saturationByMaterial[material] ?? 1e-12;
           const thermal = ideal ? 0.01 : 0.02585;
-          nonlinear.push({ id: component.id, positive: intAnode, negative: cathode, controls: [intAnode, cathode], current: (nodes: Record<string, number>) => shockleyCurrent((nodes[intAnode] ?? 0) - (nodes[cathode] ?? 0), saturation, thermal) });
+          nonlinear.push({ id: component.id, positive: intAnode, negative: cathode, controls: [intAnode, cathode], junctions: [{ positive: intAnode, negative: cathode, saturationCurrent: saturation, thermalVoltage: thermal }], current: (nodes: Record<string, number>) => shockleyCurrent((nodes[intAnode] ?? 0) - (nodes[cathode] ?? 0), saturation, thermal) });
           break;
         }
         case 'diode-silicon': case 'diode-germanium': case 'diode-gaas': {
           const anode = p('anode'); const cathode = p('cathode');
           const intAnode = `${anode}:rs:${component.id}`;
           primitives.push({ kind: 'resistor', id: `${component.id}:rs`, positive: anode, negative: intAnode, resistance: 0.001 });
-          nonlinear.push({ id: component.id, positive: intAnode, negative: cathode, controls: [intAnode, cathode], current: (nodes: Record<string, number>) => shockleyCurrent((nodes[intAnode] ?? 0) - (nodes[cathode] ?? 0), value(component, 'Is', 1e-12)) });
+          junctionLeak(component.id, intAnode, cathode);
+          nonlinear.push({ id: component.id, positive: intAnode, negative: cathode, controls: [intAnode, cathode], junctions: [{ positive: intAnode, negative: cathode, saturationCurrent: value(component, 'Is', 1e-12) }], current: (nodes: Record<string, number>) => shockleyCurrent((nodes[intAnode] ?? 0) - (nodes[cathode] ?? 0), value(component, 'Is', 1e-12)) });
           break;
         }
         case 'led': {
           const anode = p('anode'); const cathode = p('cathode');
           const intAnode = `${anode}:rs:${component.id}`;
           primitives.push({ kind: 'resistor', id: `${component.id}:rs`, positive: anode, negative: intAnode, resistance: 0.001 });
+          junctionLeak(component.id, intAnode, cathode);
           const vf = Math.max(0.1, value(component, 'forwardVoltage', 2));
           nonlinear.push({
             id: component.id,
@@ -966,6 +1136,7 @@ export class TabDSimulationEngine extends SimulationEngine {
           const anode = p('anode'); const cathode = p('cathode');
           const intAnode = `${anode}:rs:${component.id}`;
           primitives.push({ kind: 'resistor', id: `${component.id}:rs`, positive: anode, negative: intAnode, resistance: 0.001 });
+          junctionLeak(component.id, intAnode, cathode);
           const breakdown = Math.max(0.1, value(component, 'breakdownVoltage', 5.1));
           nonlinear.push({
             id: component.id, positive: intAnode, negative: cathode, controls: [intAnode, cathode], breakdownVoltage: breakdown, current: (nodes: Record<string, number>) => {
@@ -979,22 +1150,36 @@ export class TabDSimulationEngine extends SimulationEngine {
           const anode = p('anode'); const cathode = p('cathode');
           const intAnode = `${anode}:rs:${component.id}`;
           primitives.push({ kind: 'resistor', id: `${component.id}:rs`, positive: anode, negative: intAnode, resistance: 0.001 });
+          junctionLeak(component.id, intAnode, cathode);
           const dark = Math.max(0, value(component, 'darkCurrent', 1e-9));
           nonlinear.push({ id: component.id, positive: intAnode, negative: cathode, controls: [intAnode, cathode], current: (nodes: Record<string, number>) => shockleyCurrent((nodes[intAnode] ?? 0) - (nodes[cathode] ?? 0), dark) - dark });
           break;
         }
-        case 'bjt-npn': {
-          const base = p('base'); const collector = p('collector'); const emitter = p('emitter'); const beta = Math.max(1, value(component, 'beta', 100));
-          const junction = (nodes: Record<string, number>) => shockleyCurrent((nodes[base] ?? 0) - (nodes[emitter] ?? 0), 1e-15);
-          nonlinear.push({ id: `${component.id}:be`, positive: base, negative: emitter, controls: [base, emitter], current: junction });
-          nonlinear.push({ id: component.id, positive: collector, negative: emitter, controls: [base, emitter], current: (nodes: Record<string, number>) => beta * junction(nodes) });
-          break;
-        }
-        case 'bjt-pnp': {
-          const base = p('base'); const collector = p('collector'); const emitter = p('emitter'); const beta = Math.max(1, value(component, 'beta', 100));
-          const junction = (nodes: Record<string, number>) => shockleyCurrent((nodes[emitter] ?? 0) - (nodes[base] ?? 0), 1e-15);
-          nonlinear.push({ id: `${component.id}:be`, positive: emitter, negative: base, controls: [base, emitter], current: junction });
-          nonlinear.push({ id: component.id, positive: emitter, negative: collector, controls: [base, emitter], current: (nodes: Record<string, number>) => beta * junction(nodes) });
+        case 'bjt-npn': case 'bjt-pnp': {
+          // Ebers–Moll transport model. Forward active: Ic = β·Ib exactly as before. The base-collector junction makes
+          // the saturation regime physical: once V_BC forward-biases, Ic = β·I_BE − (β_R + 1)·I_BC falls off, so
+          // V_CE(sat) settles near the declared `vceSat` instead of the collector running negative.
+          const pnp = component.type === 'bjt-pnp'; const sign = pnp ? -1 : 1;
+          const base = p('base'); const collector = p('collector'); const emitter = p('emitter');
+          const beta = Math.max(1, value(component, 'beta', 100));
+          const betaReverse = reverseBetaFor(beta, value(component, 'vceSat', 0.2));
+          const reverseSaturation = BJT_BASE_SATURATION * beta / betaReverse;
+          const ibe = (nodes: Record<string, number>) => shockleyCurrent(sign * ((nodes[base] ?? 0) - (nodes[emitter] ?? 0)), BJT_BASE_SATURATION);
+          const ibc = (nodes: Record<string, number>) => shockleyCurrent(sign * ((nodes[base] ?? 0) - (nodes[collector] ?? 0)), reverseSaturation);
+          const emitterJunction: TabDJunction = { positive: pnp ? emitter : base, negative: pnp ? base : emitter, saturationCurrent: BJT_BASE_SATURATION, seed: 'forward' };
+          const collectorJunction: TabDJunction = { positive: pnp ? collector : base, negative: pnp ? base : collector, saturationCurrent: reverseSaturation, seed: 'flat' };
+          nonlinear.push({ id: `${component.id}:be`, positive: emitterJunction.positive, negative: emitterJunction.negative, controls: [base, emitter], junctions: [emitterJunction], current: ibe });
+          nonlinear.push({ id: `${component.id}:bc`, positive: collectorJunction.positive, negative: collectorJunction.negative, controls: [base, collector], junctions: [collectorJunction], current: ibc });
+          junctionLeak(`${component.id}:be`, emitterJunction.positive, emitterJunction.negative);
+          junctionLeak(`${component.id}:bc`, collectorJunction.positive, collectorJunction.negative);
+          nonlinear.push({
+            id: component.id,
+            positive: pnp ? emitter : collector,
+            negative: pnp ? collector : emitter,
+            controls: [base, emitter, collector],
+            junctions: [emitterJunction, collectorJunction],
+            current: (nodes: Record<string, number>) => beta * ibe(nodes) - betaReverse * ibc(nodes),
+          });
           break;
         }
         case 'mosfet-n': case 'mosfet-p': {
@@ -1006,10 +1191,13 @@ export class TabDSimulationEngine extends SimulationEngine {
             const vds = pChannel ? vs - vd : vd - vs;
             if (overdrive <= 0) return (pChannel ? vs - vd : vd - vs) / 1e9;
             const k = 1 / (rds * Math.max(1, overdrive));
-            const channel = vds < overdrive ? k * (overdrive * vds - 0.5 * vds * vds) : 0.5 * k * overdrive * overdrive * (1 + 0.02 * Math.max(0, vds));
-            return channel;
+            // The channel-length factor multiplies the triode branch too: both branches then equal 0.5·k·Vov²·(1+λ·Vov) at
+            // Vds = Vov with equal slope, so the drain current is C¹ across the region boundary (a jump there leaves a
+            // CMOS stage with no exact KCL root at its switching point and defeats any Newton or homotopy solver).
+            const modulation = 1 + 0.02 * Math.max(0, vds);
+            return vds < overdrive ? k * (overdrive * vds - 0.5 * vds * vds) * modulation : 0.5 * k * overdrive * overdrive * modulation;
           };
-          nonlinear.push({ id: component.id, positive: pChannel ? source : drain, negative: pChannel ? drain : source, controls: [gate, drain, source], current });
+          nonlinear.push({ id: component.id, positive: pChannel ? source : drain, negative: pChannel ? drain : source, controls: [gate, drain, source], junctions: [], current });
           primitives.push({ kind: 'resistor', id: `${component.id}:gate`, positive: gate, negative: source, resistance: 1e12 });
           break;
         }
@@ -1022,17 +1210,34 @@ export class TabDSimulationEngine extends SimulationEngine {
             const vds = pChannel ? vs - vd : vd - vs;
             return idss * normalized * normalized * Math.tanh(vds / 0.1);
           };
-          nonlinear.push({ id: component.id, positive: pChannel ? source : drain, negative: pChannel ? drain : source, controls: [gate, drain, source], current });
+          nonlinear.push({ id: component.id, positive: pChannel ? source : drain, negative: pChannel ? drain : source, controls: [gate, drain, source], junctions: [], current });
           primitives.push({ kind: 'resistor', id: `${component.id}:gate`, positive: gate, negative: source, resistance: 1e12 });
           break;
         }
         case 'opamp': {
           const internalOut = `@${component.id}:out`;
           const vee = wiredTerminals.has(terminalKey(component.id, 'vee')) ? p('vee') : '0';
-          primitives.push({ kind: 'vcvs', id: `${component.id}:gain`, positive: internalOut, negative: vee, controlPositive: p('in+'), controlNegative: p('in-'), gain: Math.max(1, value(component, 'gain', 10)) });
-          primitives.push({ kind: 'resistor', id: `${component.id}:out`, positive: internalOut, negative: p('out'), resistance: 50 });
+          const out = p('out');
+          const gain = Math.max(1, value(component, 'gain', 10));
+          // Supply rails: ±vcc about the negative-supply node (default ±15 V); the realistic model loses `railMargin` to the output stage.
+          const supply = Math.max(0.1, value(component, 'vcc', 15));
+          const rail = String(component.props.model ?? 'ideal') === 'realistic' ? Math.max(0.1, supply - Math.max(0, value(component, 'railMargin', 1.5))) : supply;
+          const outputResistance = 50;
+          const model: OpAmpModel = { id: component.id, gainId: `${component.id}:gain`, internalOut, out, reference: vee, inPositive: p('in+'), inNegative: p('in-'), gain, rail, mode: this.opampModes.get(component.id) ?? 0 };
+          primitives.push({ kind: 'vcvs', id: model.gainId, positive: internalOut, negative: vee, controlPositive: p('in+'), controlNegative: p('in-'), gain });
+          // Output stage: unclamped gain node → 50 Ω → pin while the op-amp is linear, and a ±rail source behind the same 50 Ω
+          // once it is latched. The gain node itself stays A·(V₊−V₋) so virtual-ground relations remain observable.
+          nonlinear.push({
+            id: `${component.id}:out`, positive: internalOut, negative: out, controls: [internalOut, out, vee], junctions: [],
+            current: (nodes: Record<string, number>) => {
+              const reference = nodes[vee] ?? 0;
+              const target = model.mode === 0 ? (nodes[internalOut] ?? 0) : reference + model.mode * rail;
+              return (target - (nodes[out] ?? 0)) / outputResistance;
+            },
+          });
           primitives.push({ kind: 'resistor', id: `${component.id}:in+`, positive: p('in+'), negative: vee, resistance: 1e12 });
           primitives.push({ kind: 'resistor', id: `${component.id}:in-`, positive: p('in-'), negative: vee, resistance: 1e12 });
+          opamps.push(model);
           break;
         }
         case 'transformer': {
@@ -1140,6 +1345,7 @@ export class TabDSimulationEngine extends SimulationEngine {
       nonlinear,
       netForTerminal,
       wiredTerminals,
+      opamps,
       commit: (nodeVoltages, branchCurrents, elapsedSeconds) => {
         for (const relay of relayModels) {
           const component = this.tabDComponents.find((item) => item.id === relay.id);

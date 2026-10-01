@@ -22,7 +22,7 @@ export type Elem =
   | { t: 'I'; id: string; a: string; b: string; v: number }
   | { t: 'E'; id: string; a: string; b: string; cp: string; cn: string; gain: number }
   | { t: 'G'; id: string; a: string; b: string; cp: string; cn: string; gain: number }
-  | { t: 'OA'; id: string; np: string; nn: string; no: string; gain: number; rout?: number }
+  | { t: 'OA'; id: string; np: string; nn: string; no: string; gain: number; rout?: number; /** Declared ± supply (engine `vcc` property); omitted = component default (±15 V). */ vcc?: number }
   | { t: 'D'; id: string; a: string; b: string; material?: 'silicon' | 'germanium' | 'gaas' | 'ideal' }
   | { t: 'Q'; id: string; ty: 'npn' | 'pnp'; nb: string; nc: string; ne: string; beta: number }
   | { t: 'M'; id: string; ty: 'n' | 'p'; ng: string; nd: string; ns: string; rds?: number; vth?: number }
@@ -66,7 +66,7 @@ export class NB {
   I(a: string, b: string, v: number, id?: string) { this.els.push({ t: 'I', id: this.uid('I', id), a, b, v }); return this; }
   E(a: string, b: string, cp: string, cn: string, gain: number, id?: string) { this.els.push({ t: 'E', id: this.uid('E', id), a, b, cp, cn, gain }); return this; }
   G(a: string, b: string, cp: string, cn: string, gain: number, id?: string) { this.els.push({ t: 'G', id: this.uid('G', id), a, b, cp, cn, gain }); return this; }
-  OA(np: string, nn: string, no: string, gain = 1e6, id?: string) { this.els.push({ t: 'OA', id: this.uid('U', id), np, nn, no, gain }); return this; }
+  OA(np: string, nn: string, no: string, gain = 1e6, id?: string, vcc?: number) { this.els.push({ t: 'OA', id: this.uid('U', id), np, nn, no, gain, ...(vcc !== undefined ? { vcc } : {}) }); return this; }
   D(a: string, b: string, material: 'silicon' | 'germanium' | 'gaas' | 'ideal' = 'silicon', id?: string) { this.els.push({ t: 'D', id: this.uid('D', id), a, b, material }); return this; }
   Q(ty: 'npn' | 'pnp', nb: string, nc: string, ne: string, beta = 100, id?: string) { this.els.push({ t: 'Q', id: this.uid('Q', id), ty, nb, nc, ne, beta }); return this; }
   M(ty: 'n' | 'p', ng: string, nd: string, ns: string, opts: { rds?: number; vth?: number; id?: string } = {}) { this.els.push({ t: 'M', id: this.uid('M', opts.id), ty, ng, nd, ns, rds: opts.rds, vth: opts.vth }); return this; }

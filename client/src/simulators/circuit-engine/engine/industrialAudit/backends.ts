@@ -162,13 +162,18 @@ export function runNodal(els: Elem[]): RunRecord {
         else reduced.unknownNodes.forEach((n, i) => { reducedDeviation = Math.max(reducedDeviation, Math.abs(sol.x[i] - (result.nodeVoltages[n] ?? NaN))); nodeV[n] = sol.x[i]; });
       }
       reduced.knownNodes.forEach((v, n) => { reducedDeviation = Math.max(reducedDeviation, Math.abs(v - (result.nodeVoltages[n] ?? NaN))); nodeV[n] = v; });
+      // Eliminated nodes take the potentials the reduced system itself implies (back-substitution), not MNA's, so the gates grade the reduced system alone.
+      if (reduced.recoverEliminated) {
+        const unknownSolution = Object.fromEntries(reduced.unknownNodes.map(n => [n, nodeV[n]]));
+        for (const [n, v] of Object.entries(reduced.recoverEliminated(unknownSolution))) if (!reduced.unknownNodes.includes(n)) { reducedDeviation = Math.max(reducedDeviation, Math.abs(v - (result.nodeVoltages[n] ?? NaN))); nodeV[n] = v; }
+      }
       rec.extra.reducedVsMna = reducedDeviation;
       const scale = Math.max(1, ...Object.values(result.nodeVoltages).map(Math.abs));
       if (!(reducedDeviation <= 1e-6 * scale)) rec.faults.push(`reduced nodal system disagrees with MNA by ${reducedDeviation.toExponential(3)} V`);
       rec.nodeV = nodeV;
       // Branch-variable currents come from the MNA certificate; resistor/dependent currents are re-derived from the nodal voltages.
       const branchOnly: Record<string, number> = {};
-      for (const p of prims) if (['voltage', 'vcvs', 'ccvs', 'inductor'].includes(p.kind) && result.branchCurrents[p.id] !== undefined) branchOnly[p.id] = result.branchCurrents[p.id];
+      for (const p of prims) if (['voltage', 'vcvs', 'ccvs', 'cccs', 'inductor'].includes(p.kind) && result.branchCurrents[p.id] !== undefined) branchOnly[p.id] = result.branchCurrents[p.id];
       rec.reported = branchOnly;
       rec.gates = evaluateGates(prims, nodeV, branchOnly);
       rec.oracle = oracleCheck(prims, nodeV);
@@ -350,7 +355,7 @@ export function irToEngineGraph(els: Elem[]): { components: CircuitComponent[]; 
       case 'V': components.push(comp(e.id, 'dc-voltage', { voltage: e.v })); break;
       case 'S': components.push(comp(e.id, 'ac-voltage', { amplitude: e.amp, frequency: e.f, offset: e.off ?? 0, phase: (e.phase ?? 0) * 180 / Math.PI, waveform: 'sine' })); break;
       case 'I': components.push(comp(e.id, 'dc-current', { current: e.v })); break;
-      case 'OA': components.push(comp(e.id, 'opamp', { gain: e.gain, model: 'ideal' })); break;
+      case 'OA': components.push(comp(e.id, 'opamp', { gain: e.gain, model: 'ideal', ...(e.vcc !== undefined ? { vcc: e.vcc } : {}) })); break;
       case 'D': components.push(comp(e.id, 'diode', { material: e.material ?? 'silicon' })); break;
       case 'Q': components.push(comp(e.id, e.ty === 'npn' ? 'bjt-npn' : 'bjt-pnp', { beta: e.beta })); break;
       case 'M': components.push(comp(e.id, e.ty === 'n' ? 'mosfet-n' : 'mosfet-p', { rdsOn: e.rds ?? (e.ty === 'n' ? 0.1 : 0.2), vth: e.vth ?? (e.ty === 'n' ? 2 : -2) })); break;
@@ -428,7 +433,22 @@ export function existenceProof(handle: EngineHandle, rec: RunRecord) {
 /** Netlists whose *declared* DC solution the harness can compute independently of the engine's own compile step. */
 const declaredLinear = (els: Elem[]) => els.every(e => ['R', 'V', 'I', 'OA', 'GND', 'XF', 'E', 'G'].includes(e.t)) && els.every(e => e.t !== 'R' || (Number.isFinite(e.v) && e.v !== 0)) && els.every(e => e.t !== 'V' || Number.isFinite(e.v)) && els.every(e => e.t !== 'I' || Number.isFinite(e.v));
 
-export function runEngine(els: Elem[], opts: { steps?: number; stepSeconds?: number; settleSeconds?: number } = {}): RunRecord {
+/**
+ * The declared-linear oracle models op-amps as unbounded VCVS. When that ideal solution would drive an op-amp beyond its
+ * declared supply (engine default ±15 V), the physical answer is a saturated output and the unbounded reference is not a
+ * valid expectation — the rail and bistability checks of the same circuit judge it instead.
+ */
+function idealSolutionLeavesRails(els: Elem[]): boolean {
+  const amps = els.filter((e): e is Extract<Elem, { t: 'OA' }> => e.t === 'OA');
+  if (!amps.length) return false;
+  try {
+    const ref = dcOracle(expandLinear(els, 'dc'));
+    if (!ref.supported || ref.singular) return false;
+    return amps.some(e => Math.abs(ref.nodeV[`@${e.id}:out`] ?? 0) > (e.vcc ?? 15));
+  } catch { return false; }
+}
+
+export function runEngine(els: Elem[], opts: { steps?: number; stepSeconds?: number; settleSeconds?: number; skipDeclaredOracle?: boolean } = {}): RunRecord {
   const rec = blank('engine'); const t0 = performance.now();
   try {
     const handle = makeEngine(els);
@@ -441,7 +461,7 @@ export function runEngine(els: Elem[], opts: { steps?: number; stepSeconds?: num
     } else {
       inspectEngine(handle, snap, rec);
       // The engine silently clamps/substitutes parameters; compare against what the netlist *declares*.
-      if (rec.nodeV && declaredLinear(els)) { const declared = oracleCheck(expandLinear(els, 'dc'), rec.nodeV); if (declared) rec.oracle = declared; }
+      if (rec.nodeV && !opts.skipDeclaredOracle && declaredLinear(els) && !idealSolutionLeavesRails(els)) { const declared = oracleCheck(expandLinear(els, 'dc'), rec.nodeV); if (declared) rec.oracle = declared; }
     }
   } catch (e) { Object.assign(rec, classify(e)); }
   rec.ms = performance.now() - t0;

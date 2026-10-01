@@ -150,13 +150,13 @@ export function buildPillar1(): Circuit[] {
   schmittVin.forEach((vin, k) => {
     const r1 = [9e3, 3e3, 1e3, 19e3][k % 4]; const r2 = 1e3; const vref = k >= 4 ? 1 : 0; const beta = r2 / (r1 + r2);
     const nb = new NB().V('in', '0', vin, 'Vin').R('out', 'p', r1, 'R1').R('p', 'r', r2, 'R2').V('r', '0', vref, 'Vref').OA('p', 'in', 'out', A, 'U1');
-    add({ id: `P1/schmitt-inverting-${k}`, family: 'schmitt-trigger', name: `Inverting Schmitt trigger, β=${beta.toFixed(3)}, ${vref ? 'offset (asymmetric) thresholds' : 'symmetric'}, Vin=${vin} V`, els: nb.els, expect: 'solve', rails: { nodes: ['out'], limit: RAIL },
+    add({ id: `P1/schmitt-inverting-${k}`, family: 'schmitt-trigger', bistable: true, name: `Inverting Schmitt trigger, β=${beta.toFixed(3)}, ${vref ? 'offset (asymmetric) thresholds' : 'symmetric'}, Vin=${vin} V`, els: nb.els, expect: 'solve', rails: { nodes: ['out'], limit: RAIL },
       physics: ({ v, run }) => run.solver !== 'engine' ? [] : [{ name: 'bistable: output sits at a saturated state (|Vout| ≥ 0.9·Vsat), not the unstable linear equilibrium', got: Math.abs(v('out')), expected: 0.9 * RAIL, tol: 0, pass: Math.abs(v('out')) >= 0.9 * RAIL, note: 'positive-feedback loop gain Aβ≫1' }] });
   });
   schmittVin.forEach((vin, k) => {
     const r1 = [1e3, 2e3, 5e3, 10e3][k % 4]; const r2 = 10e3; const vref = k >= 4 ? 1 : 0;
     const nb = new NB().V('in', '0', vin, 'Vin').R('in', 'p', r1, 'R1').R('out', 'p', r2, 'R2').V('r', '0', vref, 'Vref').OA('p', 'r', 'out', A, 'U1');
-    add({ id: `P1/schmitt-noninverting-${k}`, family: 'schmitt-trigger', name: `Non-inverting Schmitt trigger, R2/R1=${(r2 / r1).toFixed(1)}, ${vref ? 'offset thresholds' : 'symmetric'}, Vin=${vin} V`, els: nb.els, expect: 'solve', rails: { nodes: ['out'], limit: RAIL },
+    add({ id: `P1/schmitt-noninverting-${k}`, family: 'schmitt-trigger', bistable: true, name: `Non-inverting Schmitt trigger, R2/R1=${(r2 / r1).toFixed(1)}, ${vref ? 'offset thresholds' : 'symmetric'}, Vin=${vin} V`, els: nb.els, expect: 'solve', rails: { nodes: ['out'], limit: RAIL },
       physics: ({ v, run }) => run.solver !== 'engine' ? [] : [{ name: 'bistable: output sits at a saturated state (|Vout| ≥ 0.9·Vsat), not the unstable linear equilibrium', got: Math.abs(v('out')), expected: 0.9 * RAIL, tol: 0, pass: Math.abs(v('out')) >= 0.9 * RAIL, note: 'positive-feedback loop gain Aβ≫1' }] });
   });
 
