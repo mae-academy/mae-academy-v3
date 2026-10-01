@@ -7,7 +7,6 @@
  * 4. Block Diagram Algebraic Reduction for MIMO Control Loops
  */
 
-import { Matrix, EigenvalueDecomposition } from 'ml-matrix';
 import { multiplyPolynomials, polyDeriv, polySub, type Complex } from "../../../../shared/control/polynomial";
 export type { Complex };
 import type { StepResponseData } from "../../../../shared/control/stepTypes";
@@ -66,22 +65,119 @@ export function findPolynomialRoots(coeffs: number[]): Complex[] {
     A[row][row - 1] = 1;
   }
 
-  // Use ml-matrix to compute eigenvalues
-  const matrixA = new Matrix(A);
-  const eig = new EigenvalueDecomposition(matrixA);
-  const roots: Complex[] = [];
-
-  const realParts = eig.realEigenvalues;
-  const imagParts = eig.imaginaryEigenvalues;
-
-  for (let k = 0; k < n; k++) {
-    roots.push({
-      re: realParts[k] || 0,
-      im: imagParts ? imagParts[k] || 0 : 0
-    });
-  }
+  // The companion matrix is already upper Hessenberg: shifted-QR (EISPACK hqr) gives every eigenvalue with no external dependency.
+  const roots = hessenbergEigenvalues(A);
 
   return roots.sort((a, b) => a.re - b.re || a.im - b.im);
+}
+
+/**
+ * Eigenvalues of a real upper-Hessenberg matrix by the double-shift QR algorithm (EISPACK `hqr`, as in
+ * Numerical Recipes). Works in place on a copy; pure TypeScript, no dependencies, safe for the Edge runtime.
+ */
+export function hessenbergEigenvalues(input: number[][]): Complex[] {
+  const n = input.length;
+  const a = input.map((row) => row.slice());
+  const roots: Complex[] = new Array<Complex>(n);
+  const sign = (magnitude: number, reference: number) => (reference >= 0 ? Math.abs(magnitude) : -Math.abs(magnitude));
+  let anorm = 0;
+  for (let i = 0; i < n; i++) for (let j = Math.max(i - 1, 0); j < n; j++) anorm += Math.abs(a[i][j]);
+  let nn = n - 1;
+  let t = 0;
+  while (nn >= 0) {
+    let its = 0;
+    let l: number;
+    do {
+      for (l = nn; l >= 1; l--) {
+        let s = Math.abs(a[l - 1][l - 1]) + Math.abs(a[l][l]);
+        if (s === 0) s = anorm;
+        if (Math.abs(a[l][l - 1]) + s === s) { a[l][l - 1] = 0; break; }
+      }
+      let x = a[nn][nn];
+      if (l === nn) { // one real root found
+        roots[nn] = { re: x + t, im: 0 };
+        nn--;
+      } else {
+        let y = a[nn - 1][nn - 1];
+        let w = a[nn][nn - 1] * a[nn - 1][nn];
+        if (l === nn - 1) { // a pair found
+          const p = 0.5 * (y - x);
+          const q = p * p + w;
+          let z = Math.sqrt(Math.abs(q));
+          x += t;
+          if (q >= 0) {
+            z = p + sign(z, p);
+            roots[nn - 1] = { re: x + z, im: 0 };
+            roots[nn] = { re: z !== 0 ? x - w / z : x + z, im: 0 };
+          } else {
+            roots[nn - 1] = { re: x + p, im: z };
+            roots[nn] = { re: x + p, im: -z };
+          }
+          nn -= 2;
+        } else {
+          if (its === 60) throw new Error("Eigenvalue iteration did not converge.");
+          if (its === 10 || its === 20) { // exceptional shift
+            t += x;
+            for (let i = 0; i <= nn; i++) a[i][i] -= x;
+            const s = Math.abs(a[nn][nn - 1]) + Math.abs(a[nn - 1][nn - 2]);
+            y = x = 0.75 * s;
+            w = -0.4375 * s * s;
+          }
+          its++;
+          let m: number;
+          let p = 0, q = 0, r = 0, z = 0;
+          for (m = nn - 2; m >= l; m--) {
+            z = a[m][m];
+            r = x - z;
+            const s0 = y - z;
+            p = (r * s0 - w) / a[m + 1][m] + a[m][m + 1];
+            q = a[m + 1][m + 1] - z - r - s0;
+            r = a[m + 2][m + 1];
+            const s = Math.abs(p) + Math.abs(q) + Math.abs(r);
+            p /= s; q /= s; r /= s;
+            if (m === l) break;
+            const u = Math.abs(a[m][m - 1]) * (Math.abs(q) + Math.abs(r));
+            const v = Math.abs(p) * (Math.abs(a[m - 1][m - 1]) + Math.abs(z) + Math.abs(a[m + 1][m + 1]));
+            if (u + v === v) break;
+          }
+          for (let i = m + 2; i <= nn; i++) {
+            a[i][i - 2] = 0;
+            if (i !== m + 2) a[i][i - 3] = 0;
+          }
+          for (let k = m; k <= nn - 1; k++) {
+            if (k !== m) {
+              p = a[k][k - 1];
+              q = a[k + 1][k - 1];
+              r = k !== nn - 1 ? a[k + 2][k - 1] : 0;
+              x = Math.abs(p) + Math.abs(q) + Math.abs(r);
+              if (x !== 0) { p /= x; q /= x; r /= x; }
+            }
+            const s = sign(Math.sqrt(p * p + q * q + r * r), p);
+            if (s !== 0) {
+              if (k === m) { if (l !== m) a[k][k - 1] = -a[k][k - 1]; } else a[k][k - 1] = -s * x;
+              p += s;
+              x = p / s; y = q / s; z = r / s;
+              q /= p; r /= p;
+              for (let j = k; j <= nn; j++) {
+                p = a[k][j] + q * a[k + 1][j];
+                if (k !== nn - 1) { p += r * a[k + 2][j]; a[k + 2][j] -= p * z; }
+                a[k + 1][j] -= p * y;
+                a[k][j] -= p * x;
+              }
+              const mmin = nn < k + 3 ? nn : k + 3;
+              for (let i = l; i <= mmin; i++) {
+                p = x * a[i][k] + y * a[i][k + 1];
+                if (k !== nn - 1) { p += z * a[i][k + 2]; a[i][k + 2] -= p * r; }
+                a[i][k + 1] -= p * q;
+                a[i][k] -= p;
+              }
+            }
+          }
+        }
+      }
+    } while (l < nn - 1);
+  }
+  return roots;
 }
 
 export function findBreakawayPoints(num: number[], den: number[]): number[] {
