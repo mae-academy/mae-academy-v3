@@ -18,7 +18,7 @@ export interface Palette {
   shadow: string;
 }
 
-export const SELECTION_COLOR_LIGHT = '#2563eb';
+export const SELECTION_COLOR_LIGHT = '#7c3aed';
 export const SELECTION_COLOR_DARK = '#a855f7';
 
 export interface MarqueeStyle {

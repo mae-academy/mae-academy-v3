@@ -145,25 +145,25 @@
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://maeacademy.org/simulations/power-electronics/a</loc>
+    <loc>https://maeacademy.org/simulations/power-electronics/rectifier</loc>
     <lastmod>2026-10-01</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://maeacademy.org/simulations/power-electronics/b</loc>
+    <loc>https://maeacademy.org/simulations/power-electronics/inverter</loc>
     <lastmod>2026-10-01</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://maeacademy.org/simulations/power-electronics/c</loc>
+    <loc>https://maeacademy.org/simulations/power-electronics/acvc</loc>
     <lastmod>2026-10-01</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://maeacademy.org/simulations/power-electronics/d</loc>
+    <loc>https://maeacademy.org/simulations/power-electronics/chopper</loc>
     <lastmod>2026-10-01</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>

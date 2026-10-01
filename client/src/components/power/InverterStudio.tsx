@@ -1,10 +1,11 @@
-import { RemoteSimulationGate } from "./RemoteSimulationGate";
+import { RemoteSimulationGate, prefetchSimulation } from "./RemoteSimulationGate";
 import { simulateInverterRemote } from "@/services/controlClient";
 import type { Dispatch, SetStateAction } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { KatexMath } from "@/components/ui/KatexMath";
 import { SegmentedControl, StudioCard, StudioSlider, InnerBox } from "@/components/common/templates";
+import { SchematicView, buildInverterCircuit, inverterFaultLegIds } from "@/features/power-electronics/schematics";
 import { PowerWarningAlert, StudioAlert, NoticeBadge } from "./PowerWarningAlert";
 import { StudioErrorBoundary } from "./StudioErrorBoundary";
 import { PowerScopePlot, type ScopeSeries } from "./PowerScopePlot";
@@ -110,7 +111,12 @@ function Circuit({ parameters, faulted }: { parameters: InverterParameters; faul
   };
   const bridgeWord = parameters.singlePhaseSubtype === "full-bridge" ? t("power.fullBridge", "Full-Bridge") : t("power.halfBridge", "Half-Bridge");
   const topology = parameters.phase === "single" ? `${bridgeWord} VSI` : `${t("power.threePhaseWord", "Three-Phase")} ${parameters.threePhaseConduction}° VSI`;
-  const switchColor = faulted ? "text-rose-500" : "text-violet-500";
+  const shape = parameters.singlePhaseSubtype;
+  const schematic = useMemo(
+    () => buildInverterCircuit(parameters.phase, shape, parameters.loadType),
+    [parameters.phase, shape, parameters.loadType],
+  );
+  const faultLeg = useMemo(() => inverterFaultLegIds(parameters.phase, shape), [parameters.phase, shape]);
   return (
     <section className={`${card} min-h-[340px]`}>
       <div className="flex items-center justify-between gap-3 mae-card-header-row panel-header" data-slot="card-header">
@@ -120,33 +126,11 @@ function Circuit({ parameters, faulted }: { parameters: InverterParameters; faul
         </span>
       </div>
       <div className={`mt-4 grid min-h-60 place-items-center overflow-hidden rounded-2xl border border-dashed p-4 text-center dark:bg-slate-950 ${faulted ? "border-rose-400 bg-rose-50 dark:border-rose-400/50 dark:bg-rose-500/10" : "border-violet-300 bg-slate-50 dark:border-violet-400/30 dark:bg-slate-950"}`}>
-        <svg viewBox="0 0 360 150" className="h-36 w-full max-w-lg" fill="none" aria-label={faulted ? t("power.shootThroughFaultAriaLabel", "Shoot-Through fault detected in inverter leg") : topology}>
-          <defs>
-            {faulted && (
-              <filter id="shoot-through-glow" x="-50%" y="-50%" width="200%" height="200%">
-                <feGaussianBlur stdDeviation="4" result="blur" />
-                <feMerge>
-                  <feMergeNode in="blur" />
-                  <feMergeNode in="SourceGraphic" />
-                </feMerge>
-              </filter>
-            )}
-          </defs>
-          <path d="M42 28h196m-196 94h196M70 28v94m48-94v94m48-94v94m48-94v94" stroke="currentColor" strokeWidth="2" className={switchColor} />
-          <path d="M82 46l-12 12 12 12m36-24-12 12 12 12m36-24-12 12 12 12m36-24-12 12 12 12m36-24-12 12 12 12m36-24-12 12 12 12" stroke="currentColor" strokeWidth="2" className={switchColor} filter={faulted ? "url(#shoot-through-glow)" : undefined} />
-          <circle cx="42" cy="75" r="18" stroke="currentColor" strokeWidth="1.5" className="text-slate-400 dark:text-slate-500" />
-          <path d="M30 75c4-10 9-10 13 0s9 10 13 0M238 45h50m-50 30h70m-70 30h50m50-60v60m-30-30h30" stroke="currentColor" strokeWidth="1.5" className="text-slate-400 dark:text-slate-500" />
-          <path d="M238 45l18 12-18 12m0 6 18 12-18 12" stroke="currentColor" strokeWidth="1.5" className={switchColor} />
-          {faulted && (
-            <g stroke="#fb7185" strokeWidth="1.6" filter="url(#shoot-through-glow)">
-              <path d="M63 18L89 132M89 18L63 132" />
-              <path d="M56 17h40v116H56z" strokeDasharray="4 4" />
-            </g>
-          )}
-        </svg>
-        <span className={`mt-2 block mae-i18n-text text-[10px] font-bold tracking-[.06em] ${faulted ? "text-rose-600 dark:text-rose-300" : "text-slate-400"}`}>
-          {faulted ? t("power.shootThroughOutputInhibited", "SHOOT-THROUGH · OUTPUT INHIBITED") : topology}
-        </span>
+        <SchematicView
+          document={schematic}
+          ariaLabel={faulted ? t("power.shootThroughFaultAriaLabel", "Shoot-Through fault detected in inverter leg") : topology}
+          highlightIds={faulted ? faultLeg : []}
+        />
       </div>
     </section>
   );
@@ -514,11 +498,14 @@ function InverterStudioBody({ parameters, setParameters, simulation }: { paramet
 export default InverterStudio;
 
 
+// Start the default-parameter solve as soon as this chunk evaluates, in parallel with first render.
+prefetchSimulation("inverter", defaultInverterParameters, simulateInverterRemote);
+
 /** Holds the converter parameters; the simulation itself is solved by the serverless engine and streamed back as sample arrays. */
 export function InverterStudio() {
   const [parameters, setParameters] = useState<InverterParameters>(defaultInverterParameters);
   return (
-    <RemoteSimulationGate parameters={parameters} fetcher={simulateInverterRemote}>
+    <RemoteSimulationGate namespace="inverter" parameters={parameters} fetcher={simulateInverterRemote}>
       {(simulation) => <InverterStudioBody parameters={parameters} setParameters={setParameters} simulation={simulation} />}
     </RemoteSimulationGate>
   );

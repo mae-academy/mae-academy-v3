@@ -15,7 +15,7 @@ const BADGE_TONES = {
   amber: "text-amber-600 dark:text-amber-400",
   violet: "text-violet-600 dark:text-violet-400",
   sky: "text-sky-600 dark:text-sky-400",
-  emerald: "text-emerald-600 dark:text-emerald-400",
+  emerald: "text-violet-600 dark:text-violet-400",
   slate: "text-slate-600 dark:text-slate-400",
 };
 

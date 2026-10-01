@@ -9,8 +9,8 @@
  *   so the previous page stays visible while the next chunk resolves.
  * - startTransition is used for route changes to avoid synchronous suspense fallback.
  */
-import { AnimatePresence, motion } from "framer-motion";
-import { Suspense, useEffect, useTransition, useRef } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { Suspense, useEffect, useState, useTransition, useRef } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Route, Switch, useLocation, Redirect } from "wouter";
@@ -39,9 +39,17 @@ const ArduinoStudioPage = lazyRetry(() => import("./pages/ArduinoStudioPage"));
 const PlcSimulatorPage = lazyRetry(() => import("./pages/PlcSimulatorPage"));
 const HiddenSymbolDesigner = lazyRetry(() => import("./simulators/circuit-engine/components/pages/HiddenSymbolDesigner"));
 
+const pageVariants = {
+  initial: { opacity: 0, y: 6 },
+  animate: { opacity: 1, y: 0, transition: { duration: 0.18, ease: "easeOut" as const } },
+  exit: { opacity: 0, transition: { duration: 0.12, ease: "easeIn" as const } },
+};
+
 function AnimatedRoutes() {
   const [location] = useLocation();
   useCanonical(location);
+  const reduce = useReducedMotion();
+  const [animating, setAnimating] = useState(false);
   const [, startTransition] = useTransition();
   const deferredLocation = useRef(location);
 
@@ -61,23 +69,18 @@ function AnimatedRoutes() {
       ? renderedLocation.split("/").slice(0, 3).join("/")
       : renderedLocation;
   return (
-    <AnimatePresence mode="wait" initial={false}>
+    <AnimatePresence mode="popLayout" initial={false}>
       <motion.div
         key={pageKey}
-        initial={{ x: "108vw", opacity: 0.35, rotate: 0.7 }}
-        animate={{ x: 0, opacity: 1, rotate: 0 }}
-        exit={{ x: "-108vw", opacity: 0.18, rotate: -0.7 }}
-        transition={{ type: "tween", ease: [0.77, 0, 0.175, 1], duration: 0.52 }}
-        className="relative min-h-[calc(100svh-var(--mae-header-height))] overflow-hidden"
+        variants={pageVariants}
+        initial={reduce ? false : "initial"}
+        animate="animate"
+        exit="exit"
+        style={{ willChange: animating ? "transform, opacity" : "auto" }}
+        onAnimationStart={() => setAnimating(true)}
+        onAnimationComplete={() => setAnimating(false)}
+        className="relative w-full overflow-x-clip min-h-[calc(100svh-var(--mae-header-height))]"
       >
-        <motion.div
-          aria-hidden="true"
-          initial={{ scaleY: 0 }}
-          animate={{ scaleY: 1 }}
-          exit={{ scaleY: 0 }}
-          transition={{ duration: 0.44, ease: [0.77, 0, 0.175, 1] }}
-          className="pointer-events-none absolute inset-y-0 left-0 z-20 w-px origin-top bg-gradient-to-b from-transparent via-violet-500 to-rose-500/0"
-        />
         <Suspense fallback={<PageLoader />}>
           <Switch location={renderedLocation}>
             <Route path="/" component={Home} />

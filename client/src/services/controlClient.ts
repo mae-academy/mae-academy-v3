@@ -8,6 +8,8 @@ import type { ChopperParameters, ChopperSimulation } from '@shared/power/chopper
 import type { InverterParameters, InverterSimulation } from '@shared/power/inverterTypes';
 import type { RectifierParameters, RectifierSimulation } from '@shared/power/rectifierTypes';
 
+import { clearRemoteQueryCache } from '@/lib/useRemoteQuery';
+
 const ENDPOINT = '/api/control/solve';
 
 /** Wire format of one request: `{ domain, request: { op, ... } }`, validated server-side by api/control/schema.ts. */
@@ -41,7 +43,7 @@ export const evaluateControlRemote: ControlTransport = async (body, signal) => {
 
 let transport: ControlTransport = evaluateControlRemote;
 /** Test seam: route requests through an in-process handler. Pass `null` to restore the network. */
-export const setControlTransport = (next: ControlTransport | null): void => { transport = next ?? evaluateControlRemote; };
+export const setControlTransport = (next: ControlTransport | null): void => { transport = next ?? evaluateControlRemote; clearRemoteQueryCache(); };
 
 async function call<T>(domain: ControlRequestBody['domain'], request: ControlRequestBody['request'], signal?: AbortSignal): Promise<T> {
   const response = await transport({ domain, request }, signal);

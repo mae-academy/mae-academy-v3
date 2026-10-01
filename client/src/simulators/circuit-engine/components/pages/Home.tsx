@@ -115,7 +115,7 @@ const COIL_DRIVEN_TYPES = ['coil', 'contactor', 'relay-spst', 'relay-spdt', 'rel
 import { buildSpiceNodeMap, generateNetlist, NetlistError, requiresTransientInitialConditions, type SpiceNodeMap } from '@/simulators/circuit-engine/engine/spice/netlistGenerator';
 import { parseSpiceResults } from '@/simulators/circuit-engine/engine/spice/spiceParser';
 import { buildSpiceInstrumentReadings } from '@/simulators/circuit-engine/engine/spice/spiceInstruments';
-import { filterTabDCatalog, filterTabDImportedComponents, isTabDComponentAvailable } from '@/simulators/circuit-engine/models/analogComponentCatalog';
+import { POWER_SEMICONDUCTOR_COMPONENT_IDS, filterTabDCatalog, filterTabDImportedComponents, isTabDComponentAvailable } from '@/simulators/circuit-engine/models/analogComponentCatalog';
 import { alignTabDTerminalToGrid, calculateMeshLoopBounds, calculateTabDPlanarCavity, dynamicRubberBandPath, getExactTerminalOffset, isExactCadComponent, lockTabDWireCorner, MESH_LOOP_COLORS, moveTabDOrthogonalLane, tabDComponentLabelAnchors, tabDGentleWheelZoomFactor, tabDOrthogonalDraftPath, tabDTerminalOrthogonalPath, type ObstacleBox, type TabDTerminalAxis } from '@/simulators/circuit-engine/components/analogCanvasGeometry';
 import { formatMeterReading, renderComponentCanvasLabel, renderSymbol, formatDependentSourceMath, renderDependentSourceValueTspans } from '@/simulators/circuit-engine/components/symbols';
 import { applySwitchHotkey, directControlKind, hotkeyDigit, isTextEntryTarget, momentaryControlProps, nextLatchingControlProps, releaseHeldPushbuttons } from '@shared/circuit/componentInteraction';
@@ -811,6 +811,69 @@ function populateMathTspans(svgTextEl: SVGTextElement, rawText: string, baseFont
   }
 }
 
+/** Swaps live KaTeX foreignObject labels for their vector <text> fallbacks in an export clone. */
+function swapMathLabelsForExport(svg: Element): void {
+  svg.querySelectorAll('foreignObject.v3-live-math').forEach(el => el.remove());
+  svg.querySelectorAll('text.v3-export-math-fallback').forEach(el => {
+    (el as SVGElement).style.display = 'inline';
+    el.removeAttribute('display');
+  });
+}
+
+/** Converts a plain display value such as "10 kΩ" or "5 ∠ 30° V" into KaTeX source. */
+function valueToLatex(value: string): string {
+  return value
+    .replace(/µ/g, 'μ')
+    .replace(/([A-Za-z]+)/g, '\\mathrm{$1}')
+    .replace(/Ω/g, '\\Omega')
+    .replace(/μ/g, '\\mu ')
+    .replace(/°/g, '^{\\circ}')
+    .replace(/∠/g, '\\angle ')
+    .replace(/ +/g, '\\,');
+}
+
+/**
+ * Live-canvas KaTeX label (foreignObject) paired with a hidden SVG <text> fallback that the
+ * vector exporters swap in, since foreignObject is dropped by Word/Illustrator/Figma.
+ */
+function SvgMathLabel({ x, y, anchor, math, fill, fontSize, canvas, fallback }: { x: number; y: number; anchor: 'start' | 'middle' | 'end'; math: string; fill: string; fontSize: number; canvas: string; fallback: React.ReactNode }) {
+  const width = 140;
+  const height = 28;
+  const left = anchor === 'end' ? x - width : anchor === 'middle' ? x - width / 2 : x;
+  return (
+    <g>
+      <foreignObject className="v3-live-math" x={left} y={y - height / 2} width={width} height={height} style={{ overflow: 'visible' }} pointerEvents="none">
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: anchor === 'end' ? 'flex-end' : anchor === 'middle' ? 'center' : 'flex-start',
+            width: '100%',
+            height: '100%',
+            color: fill,
+            fontSize,
+            lineHeight: 1,
+            whiteSpace: 'nowrap',
+            filter: `drop-shadow(0 0 2px ${canvas}) drop-shadow(0 0 2px ${canvas})`,
+          }}
+        >
+          <V3Math math={math} />
+        </div>
+      </foreignObject>
+      <text
+        className="v3-export-math-fallback"
+        x={x}
+        y={y}
+        textAnchor={anchor}
+        dominantBaseline="central"
+        style={{ display: 'none', fontFamily: "'KaTeX_Main', 'KaTeX_Math', serif", fontSize, fontWeight: 400, fill, paintOrder: 'stroke fill', stroke: canvas, strokeWidth: 3, strokeLinejoin: 'round', strokeLinecap: 'round' }}
+      >
+        {fallback}
+      </text>
+    </g>
+  );
+}
+
 function NodalNodeOverlay({ node, colors }: { node: NodalNodeLabel; colors: Palette }) {
   const [x, y] = node.centroid;
   const offsetX = node.textOffset ? node.textOffset[0] : 0;
@@ -1100,7 +1163,7 @@ export function V3Home({ createSimulationEngine, tabDUiRefinement = false }: V3H
       shadow: '0 12px 28px rgba(0,0,0,0.45)',
     }
     : {
-      background: '#eaf0f8', canvas: '#f8fbff', panel: '#ffffff', panelAlt: '#f1f5fb', line: '#d7e2ef', text: '#172033', muted: '#64748b', subtle: '#94a3b8', primary: '#2563eb', accent: '#7c3aed', danger: '#be123c', selection: '#2563eb', grid: '#dbe7f3', wire: '#2563eb', powered: '#8b5cf6', input: '#ffffff', shadow: '0 12px 28px rgba(15,23,42,0.10)',
+      background: '#eaf0f8', canvas: '#f8fbff', panel: '#ffffff', panelAlt: '#f1f5fb', line: '#d7e2ef', text: '#172033', muted: '#64748b', subtle: '#94a3b8', primary: '#2563eb', accent: '#7c3aed', danger: '#be123c', selection: '#7c3aed', grid: '#dbe7f3', wire: '#2563eb', powered: '#8b5cf6', input: '#ffffff', shadow: '0 12px 28px rgba(15,23,42,0.10)',
     };
 
   // Oscilloscope theme/channel-color preference — lifted here (rather than a hook call in each
@@ -1535,6 +1598,7 @@ export function V3Home({ createSimulationEngine, tabDUiRefinement = false }: V3H
       const cropHeight = Math.max(100, (bbox.maxY - bbox.minY) + PADDING * 2);
 
       const clonedSvg = liveSvg.cloneNode(true) as SVGSVGElement;
+      swapMathLabelsForExport(clonedSvg);
       clonedSvg.setAttribute('viewBox', `${cropX} ${cropY} ${cropWidth} ${cropHeight}`);
       clonedSvg.setAttribute('width', '100%');
       clonedSvg.setAttribute('height', '100%');
@@ -2562,6 +2626,7 @@ export function V3Home({ createSimulationEngine, tabDUiRefinement = false }: V3H
 
     // Run the deep style inliner while the original SVG is still attached to the DOM
     inlineComputedStyles(svgRef.current, clonedSvg);
+    swapMathLabelsForExport(clonedSvg);
 
     clonedSvg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
     clonedSvg.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
@@ -2837,6 +2902,7 @@ export function V3Home({ createSimulationEngine, tabDUiRefinement = false }: V3H
 
     // Deep style inliner — resolves currentColor, CSS vars, Tailwind classes
     inlineComputedStyles(svgRef.current, clonedSvg);
+    swapMathLabelsForExport(clonedSvg);
 
     clonedSvg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
     clonedSvg.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
@@ -3033,6 +3099,7 @@ export function V3Home({ createSimulationEngine, tabDUiRefinement = false }: V3H
       categoryItems = categoryItems.filter(item => !['diode-ideal', 'diode-silicon', 'diode-germanium', 'diode-gaas'].includes(item.id));
     }
     if (tabDUiRefinement) categoryItems = filterTabDCatalog(categoryItems);
+    categoryItems = categoryItems.filter(item => !(POWER_SEMICONDUCTOR_COMPONENT_IDS as readonly string[]).includes(item.id));
     if (!tabDUiRefinement && category === 'Diodes') {
       categoryItems = categoryItems.filter(item => item.id !== 'diode');
     }
@@ -3309,26 +3376,16 @@ export function V3Home({ createSimulationEngine, tabDUiRefinement = false }: V3H
         return (
           <g key={`labels-${component.id}`} opacity={labelOpacity} style={{ transition: 'opacity 0.25s ease' }}>
             {!hideLabel && (
-              <text
+              <SvgMathLabel
                 x={refX}
                 y={refY}
-                textAnchor={refTextAnchor}
-                dominantBaseline="central"
-                fontFamily="'KaTeX_Main', 'KaTeX_Math', serif"
-                style={{
-                  fontFamily: "'KaTeX_Main', 'KaTeX_Math', serif",
-                  fontSize: 13,
-                  fontWeight: 400,
-                  fill: refFill,
-                  paintOrder: 'stroke fill',
-                  stroke: colors.canvas,
-                  strokeWidth: 3.5,
-                  strokeLinejoin: 'round',
-                  strokeLinecap: 'round',
-                }}
-              >
-                {renderComponentCanvasLabel(component.label, isGround)}
-              </text>
+                anchor={refTextAnchor}
+                math={componentLabelToLatex(isGround ? 'GND' : component.label)}
+                fill={refFill}
+                fontSize={13}
+                canvas={colors.canvas}
+                fallback={renderComponentCanvasLabel(component.label, isGround)}
+              />
             )}
 
             {!hideValue && isDependentSource && (() => {
@@ -3341,6 +3398,7 @@ export function V3Home({ createSimulationEngine, tabDUiRefinement = false }: V3H
                 <g>
                   {/* High-fidelity KaTeX HTML/MathML rendering on live canvas */}
                   <foreignObject
+                    className="v3-live-math"
                     x={valTextAnchor === 'end' ? valX - 90 : valTextAnchor === 'middle' ? valX - 45 : valX}
                     y={valY - 14}
                     width={90}
@@ -3396,26 +3454,16 @@ export function V3Home({ createSimulationEngine, tabDUiRefinement = false }: V3H
               const value = componentDisplayValue(definition, component);
               if (!value) return null;
               return (
-                <text
+                <SvgMathLabel
                   x={valX}
                   y={valY}
-                  textAnchor={valTextAnchor}
-                  dominantBaseline="central"
-                  fontFamily="'KaTeX_Main', 'KaTeX_Math', serif"
-                  style={{
-                    fontFamily: "'KaTeX_Main', 'KaTeX_Math', serif",
-                    fontSize: 11,
-                    fontWeight: 400,
-                    fill: valFill,
-                    paintOrder: 'stroke fill',
-                    stroke: colors.canvas,
-                    strokeWidth: 3,
-                    strokeLinejoin: 'round',
-                    strokeLinecap: 'round',
-                  }}
-                >
-                  {renderFormattedValueTspans(value)}
-                </text>
+                  anchor={valTextAnchor}
+                  math={valueToLatex(value)}
+                  fill={valFill}
+                  fontSize={11}
+                  canvas={colors.canvas}
+                  fallback={renderFormattedValueTspans(value)}
+                />
               );
             })()}
           </g>
@@ -3639,6 +3687,7 @@ function ReplaceComponentControl({ colors, currentType, tabDUiRefinement, onRepl
         items = items.filter(item => !['diode-ideal', 'diode-silicon', 'diode-germanium', 'diode-gaas'].includes(item.id));
       }
       if (tabDUiRefinement) items = filterTabDCatalog(items);
+      items = items.filter(item => !(POWER_SEMICONDUCTOR_COMPONENT_IDS as readonly string[]).includes(item.id));
       if (!tabDUiRefinement && category === 'Diodes') {
         items = items.filter(item => item.id !== 'diode');
       }

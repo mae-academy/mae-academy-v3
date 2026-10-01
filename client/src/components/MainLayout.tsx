@@ -10,7 +10,7 @@ import SocialLinks from "@/components/SocialLinks";
 import { LocaleProvider } from "@/contexts/LocaleContext";
 import { localizedContent } from "@/data/content";
 import LanguageTransition from "@/components/LanguageTransition";
-import { SegmentedControl } from "@/components/common/templates";
+import { SegmentedControl } from "@/components/common/templates/SegmentedControl";
 import PrefetchLink from "@/components/common/PrefetchLink";
 import { useTranslation } from "react-i18next";
 import "@/i18n/config";

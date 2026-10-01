@@ -3,7 +3,7 @@
  * Persistent route rail: navigation bar using canonical SegmentedControl.
  */
 import { useLocation } from "wouter";
-import { SegmentedControl, type SegmentedOption } from "@/components/common/templates";
+import { SegmentedControl, type SegmentedOption } from "@/components/common/templates/SegmentedControl";
 import { isRouteActive, Locale, platformRoutes } from "@/data/platform";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useTranslation } from "react-i18next";

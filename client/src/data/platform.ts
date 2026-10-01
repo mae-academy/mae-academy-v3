@@ -154,22 +154,22 @@ export const controlSystemToolMeta: Record<Locale, Array<{ slug: string; label: 
 
 export const powerElectronicsToolMeta: Record<Locale, Array<{ slug: string; label: string }>> = {
   en: [
-    { slug: "a", label: "Rectifiers" },
-    { slug: "b", label: "Inverters" },
-    { slug: "c", label: "AC Voltage Controller" },
-    { slug: "d", label: "Choppers" },
+    { slug: "rectifier", label: "Rectifiers" },
+    { slug: "inverter", label: "Inverters" },
+    { slug: "acvc", label: "AC Voltage Controller" },
+    { slug: "chopper", label: "Choppers" },
   ],
   ar: [
-    { slug: "a", label: "المقوّمات" },
-    { slug: "b", label: "العواكس" },
-    { slug: "c", label: "متحكم جهد التيار المتردد" },
-    { slug: "d", label: "المقطّعات" },
+    { slug: "rectifier", label: "المقوّمات" },
+    { slug: "inverter", label: "العواكس" },
+    { slug: "acvc", label: "متحكم جهد التيار المتردد" },
+    { slug: "chopper", label: "المقطّعات" },
   ],
   es: [
-    { slug: "a", label: "Rectificadores" },
-    { slug: "b", label: "Inversores" },
-    { slug: "c", label: "Controlador de Voltaje AC" },
-    { slug: "d", label: "Troceadores" },
+    { slug: "rectifier", label: "Rectificadores" },
+    { slug: "inverter", label: "Inversores" },
+    { slug: "acvc", label: "Controlador de Voltaje AC" },
+    { slug: "chopper", label: "Troceadores" },
   ],
 };
 

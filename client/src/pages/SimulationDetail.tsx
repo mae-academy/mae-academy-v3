@@ -139,6 +139,11 @@ export default function SimulationDetail() {
       setLocation(`/simulations/signals-and-systems/${toolMap[tool]}`, { replace: true });
       return;
     }
+    if (meta.slug === "power-electronics" && ["a", "b", "c", "d"].includes(tool)) {
+      const powerMap: Record<string, string> = { a: "rectifier", b: "inverter", c: "acvc", d: "chopper" };
+      setLocation(`/simulations/power-electronics/${powerMap[tool]}`, { replace: true });
+      return;
+    }
     if (!tool) setLocation(`/simulations/${meta.slug}/${defaultTool}`, { replace: true });
   }, [defaultTool, isCodeStudio, isSignalsAndSystems, location, meta.slug, setLocation, tool]);
 

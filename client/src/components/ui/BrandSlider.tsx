@@ -1,5 +1,5 @@
 import * as React from "react";
-import { StudioSlider } from "@/components/common/templates";
+import { StudioSlider } from "@/components/common/templates/StudioSlider";
 
 export interface BrandSliderProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "type"> {
   className?: string;

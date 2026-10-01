@@ -286,7 +286,8 @@ describe("ChopperStudio", () => {
     const allSpans = Array.from(container.querySelectorAll("span"));
     const ccmBadge = allSpans.find((el) => el.textContent?.trim() === "CCM");
     expect(ccmBadge).toBeDefined();
-    expect(ccmBadge?.className).toContain("emerald");
+    expect(ccmBadge?.className).toContain("violet");
+    expect(ccmBadge?.className).not.toMatch(/emerald|green|rounded|bg-/);
   });
 });
 

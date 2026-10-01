@@ -1,11 +1,11 @@
-import { RemoteSimulationGate } from "./RemoteSimulationGate";
+import { RemoteSimulationGate, prefetchSimulation } from "./RemoteSimulationGate";
 import { simulateRectifierRemote } from "@/services/controlClient";
 import type { Dispatch, SetStateAction } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useLocale } from "@/contexts/LocaleContext";
 import { KatexMath } from "@/components/ui/KatexMath";
 import { SegmentedControl, StudioCard, StudioSlider, InnerBox } from "@/components/common/templates";
+import { SchematicView, buildRectifierCircuit, fwdAllowedFor, normalizeRectifierTopology, type RectifierSchematicTopology } from "@/features/power-electronics/schematics";
 import { PowerWarningAlert } from "./PowerWarningAlert";
 import { StudioErrorBoundary } from "./StudioErrorBoundary";
 import { PowerScopePlot, type ScopeSeries } from "./PowerScopePlot";
@@ -84,44 +84,35 @@ function MetricCell({ label, value }: { label: string; value: string }) {
   );
 }
 
+/** Maps studio state to the schematic topology; centre-tapped has no three-phase form, so it falls back to the bridge. */
+function schematicTopology(parameters: RectifierParameters): RectifierSchematicTopology {
+  const requested: RectifierSchematicTopology = parameters.rectifierType === "half" ? "half-wave" : parameters.fullWaveSubtype === "bridge" ? "bridge" : "center-tapped";
+  return normalizeRectifierTopology(parameters.phase, requested);
+}
+
 function CircuitPlate({ parameters }: { parameters: RectifierParameters }) {
   const { t } = useTranslation("simulators");
-  const { isRtl } = useLocale();
-  const topology = parameters.rectifierType === "full" ? parameters.fullWaveSubtype === "bridge" ? t("power.bridge", "Bridge") : t("power.centerTapped", "Center-Tapped") : t("power.halfWave", "Half-Wave");
-  const bridge = parameters.rectifierType === "full" && parameters.fullWaveSubtype === "bridge";
+  const shape = schematicTopology(parameters);
+  const topology = shape === "bridge" ? t("power.bridge", "Bridge") : shape === "center-tapped" ? t("power.centerTapped", "Center-Tapped") : t("power.halfWave", "Half-Wave");
+  // α = 0 behaves as an uncontrolled diode rectifier; any firing delay needs thyristors with gate triggers
+  const controlled = parameters.firingAngle > 0;
+  const schematic = useMemo(
+    () => buildRectifierCircuit(parameters.phase, shape, parameters.loadType, parameters.freeWheelingDiode, controlled),
+    [parameters.phase, shape, parameters.loadType, parameters.freeWheelingDiode, controlled],
+  );
   return (
     <section className={`${card} min-h-[340px]`}>
       <div className="flex items-center justify-between gap-3 mae-card-header-row panel-header" data-slot="card-header">
-        <h3 className={`${heading} mae-card-header-title`}>{t("power.converterDraftingPlate", "Converter Drafting Plate")}</h3>
+        <h3 className={`${heading} mae-card-header-title`}>{t("power.circuitDiagram", "Circuit Diagram")}</h3>
         <span className="font-mono text-[10px] font-bold tracking-[.12em] text-violet-700 dark:text-violet-300 mae-card-header-actions shrink-0">
           {topology.toUpperCase()}
         </span>
       </div>
       <div className="mt-4 grid min-h-60 place-items-center overflow-hidden rounded-2xl border border-dashed border-violet-300 bg-slate-50 p-4 text-center dark:border-violet-400/30 dark:bg-slate-950">
-        <svg viewBox="0 0 360 140" className="h-36 w-full max-w-lg" fill="none" role="img" aria-label={t("power.rectifierDraftingAria", "{{topology}} rectifier native drafting plate", { topology })}>
-          <path d="M18 70h40m0 0 12-15v30L58 70m12 0h32M266 70h76M316 40v60m-13-48h26m-26 18h26m-26 18h26" stroke="#64748b" strokeWidth="1.5" />
-          <circle cx="36" cy="70" r="18" stroke="#94a3b8" strokeWidth="1.4" />
-          <path d="M24 70c4-10 9-10 13 0s9 10 13 0" stroke="#60a5fa" strokeWidth="1.6" />
-          {bridge ? (
-            <>
-              <path d="M102 44h82v52h-82zM102 44l82 52M184 44l-82 52M143 44v-16m0 68v16M184 70h58" stroke="#8b5cf6" strokeWidth="1.7" />
-              <path d="M116 51l12 7-12 7m12-7h13m-11 24 12 7-12 7m12-7h14m17-32 12 7-12 7m12-7h12m-26 24 12 7-12 7m12-7h12" stroke="#c4b5fd" strokeWidth="1.3" />
-            </>
-          ) : (
-            <>
-              <path d="M102 70h38m0 0 13-15v30l-13-15m13 0h65m0-30v60m-13-48h26m-26 18h26m-26 18h26m-23-48 12 8-12 8m12-8h14" stroke="#8b5cf6" strokeWidth="1.7" />
-              <path d="M218 70h48" stroke="#8b5cf6" strokeWidth="1.7" />
-            </>
-          )}
-          <circle cx="266" cy="70" r="3.5" fill="#f43f5e" />
-          <path d="M266 70h22" stroke="#f43f5e" strokeWidth="1.8" />
-          <text x="18" y="126" fill="#94a3b8" fontSize="8" fontFamily="ui-monospace, monospace">AC SOURCE</text>
-          <text x="115" y="126" fill="#a78bfa" fontSize="8" fontFamily="ui-monospace, monospace">{bridge ? "D1–D4 BRIDGE" : "CONTROLLED PATH"}</text>
-          <text x="260" y="126" fill="#fb7185" fontSize="8" fontFamily="ui-monospace, monospace">REF / VO</text>
-        </svg>
-        <span className={`mt-2 block mae-i18n-text text-[9px] font-bold tracking-[.12em] text-slate-400 ${isRtl ? "" : "font-mono"}`}>
-          {t("power.sourceRectificationCaption", "SOURCE · RECTIFICATION PATH · LOAD REFERENCE")}
-        </span>
+        <SchematicView
+          document={schematic}
+          ariaLabel={t("power.rectifierDraftingAria", "{{topology}} rectifier native drafting plate", { topology })}
+        />
       </div>
     </section>
   );
@@ -145,16 +136,10 @@ function RectifierStudioBody({ parameters, setParameters, simulation }: { parame
     { value: "yes", label: t("power.yes", "Yes") },
     { value: "no", label: t("power.no", "No") },
   ];
-  const [chartsReady, setChartsReady] = useState(false);
   const hasResistance = ["R", "RL", "RC", "RLC", "RLE"].includes(parameters.loadType);
   const hasInductance = ["RL", "RLC", "RLE"].includes(parameters.loadType);
   const hasCapacitance = ["RC", "RLC"].includes(parameters.loadType);
   const hasBackEmf = parameters.loadType === "RLE";
-
-  useEffect(() => {
-    const frame = requestAnimationFrame(() => setChartsReady(true));
-    return () => cancelAnimationFrame(frame);
-  }, []);
 
   const update = <K extends keyof RectifierParameters>(key: K, value: RectifierParameters[K]) =>
     setParameters((current) => ({ ...current, [key]: value }));
@@ -340,22 +325,29 @@ function RectifierStudioBody({ parameters, setParameters, simulation }: { parame
         <SegmentedControl
           options={loadOptions}
           value={parameters.loadType}
-          onChange={(loadType) => update("loadType", loadType)}
+          onChange={(loadType) => setParameters((current) => ({
+            ...current,
+            loadType,
+            // a free-wheeling diode only exists for RL / RLE loads; drop it when switching away
+            freeWheelingDiode: fwdAllowedFor(loadType) ? current.freeWheelingDiode : false,
+          }))}
           fullWidth
           aria-label={t("power.loadTypeLabel", "Load Type")}
         />
       </div>
 
-      <div className="mt-4">
-        <span className="mb-2 block mae-i18n-text text-xs font-bold text-slate-500 dark:text-slate-400">{t("power.freeWheelingDiode", "Free-Wheeling Diode (FWD)")}</span>
-        <SegmentedControl
-          options={fwdOptions}
-          value={parameters.freeWheelingDiode ? "yes" : "no"}
-          onChange={(value) => update("freeWheelingDiode", value === "yes")}
-          fullWidth
-          aria-label={t("power.freeWheelingDiodeAria", "Free-Wheeling Diode")}
-        />
-      </div>
+      {fwdAllowedFor(parameters.loadType) && (
+        <div className="mt-4">
+          <span className="mb-2 block mae-i18n-text text-xs font-bold text-slate-500 dark:text-slate-400">{t("power.freeWheelingDiode", "Free-Wheeling Diode (FWD)")}</span>
+          <SegmentedControl
+            options={fwdOptions}
+            value={parameters.freeWheelingDiode ? "yes" : "no"}
+            onChange={(value) => update("freeWheelingDiode", value === "yes")}
+            fullWidth
+            aria-label={t("power.freeWheelingDiodeAria", "Free-Wheeling Diode")}
+          />
+        </div>
+      )}
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <NumberField label={tex`R\,[\Omega]`} value={parameters.resistance} disabled={!hasResistance} min={0.05} step={0.1} onChange={(resistance) => update("resistance", resistance)} />
@@ -425,11 +417,14 @@ function RectifierStudioBody({ parameters, setParameters, simulation }: { parame
 
 export default RectifierStudio;
 
+// Start the default-parameter solve as soon as this chunk evaluates, in parallel with first render.
+prefetchSimulation("rectifier", defaultRectifierParameters, simulateRectifierRemote);
+
 /** Holds the converter parameters; the simulation itself is solved by the serverless engine and streamed back as sample arrays. */
 export function RectifierStudio() {
   const [parameters, setParameters] = useState<RectifierParameters>(defaultRectifierParameters);
   return (
-    <RemoteSimulationGate parameters={parameters} fetcher={simulateRectifierRemote}>
+    <RemoteSimulationGate namespace="rectifier" parameters={parameters} fetcher={simulateRectifierRemote}>
       {(simulation) => <RectifierStudioBody parameters={parameters} setParameters={setParameters} simulation={simulation} />}
     </RemoteSimulationGate>
   );

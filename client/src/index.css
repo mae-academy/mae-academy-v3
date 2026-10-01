@@ -124,6 +124,8 @@
     width: 100%;
     max-width: 100%;
     overflow-x: hidden;
+    scrollbar-gutter: stable;
+    overflow-anchor: none;
     scroll-behavior: smooth;
   }
 

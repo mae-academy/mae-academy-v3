@@ -57,4 +57,46 @@ describe("RectifierStudio", () => {
 
     expect(container.querySelector(".recharts-responsive-container")).not.toBeNull();
   });
+
+  it("drives the circuit diagram from studio state and only offers a free-wheeling diode for RL / RLE", async () => {
+    const { container } = await renderReady(<RectifierStudio />);
+    const component = (id: string) => container.querySelector(`[data-testid="power-schematic"] [data-component="${id}"]`);
+    const button = (label: string) => Array.from(container.querySelectorAll("button")).find((candidate) => candidate.textContent === label);
+    const LOADS = ["R", "RL", "RC", "RLC", "RLE"];
+    const loadButton = (load: string) => findByAriaLabel(container, "Load Type").querySelectorAll("button")[LOADS.indexOf(load)];
+    const hasFwdControl = () => Array.from(container.querySelectorAll("span")).some((node) => node.textContent === "Free-Wheeling Diode (FWD)");
+
+    // defaults: controlled single-phase bridge, RL load, FWD on
+    expect(component("T1")?.getAttribute("data-kind")).toBe("thyristor");
+    expect(component("T4")).not.toBeNull();
+    expect(component("FWD")).not.toBeNull();
+    expect(hasFwdControl()).toBe(true);
+
+    await act(async () => { fireEvent.click(loadButton("R")); });
+    expect(component("FWD")).toBeNull();
+    expect(component("L")).toBeNull();
+    expect(hasFwdControl()).toBe(false);
+
+    await act(async () => { fireEvent.click(loadButton("RLC")); });
+    expect(component("C")).not.toBeNull();
+    expect(component("FWD")).toBeNull();
+    expect(hasFwdControl()).toBe(false);
+
+    // returning to an inductive load must not resurrect a stale free-wheeling diode
+    await act(async () => { fireEvent.click(loadButton("RLE")); });
+    expect(component("E")).not.toBeNull();
+    expect(hasFwdControl()).toBe(true);
+    expect(component("FWD")).toBeNull();
+    await act(async () => { fireEvent.click(button("Yes")!); });
+    expect(component("FWD")).not.toBeNull();
+
+    // topology switch rebuilds the diagram
+    await act(async () => { fireEvent.click(button("Half-Wave")!); });
+    expect(component("T1")).not.toBeNull();
+    expect(component("T4")).toBeNull();
+
+    // alpha = 0 means diodes
+    await act(async () => { fireEvent.change(findByAriaLabel(container, "firing angle slider"), { target: { value: "0" } }); });
+    expect(component("D1")?.getAttribute("data-kind")).toBe("diode");
+  });
 });

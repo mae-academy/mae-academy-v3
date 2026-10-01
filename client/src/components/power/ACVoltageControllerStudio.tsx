@@ -1,10 +1,11 @@
-import { RemoteSimulationGate } from "./RemoteSimulationGate";
+import { RemoteSimulationGate, prefetchSimulation } from "./RemoteSimulationGate";
 import { simulateAcControllerRemote } from "@/services/controlClient";
 import type { Dispatch, SetStateAction } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { KatexMath } from "@/components/ui/KatexMath";
 import { SegmentedControl, StudioCard, StudioSlider, InnerBox } from "@/components/common/templates";
+import { SchematicView, buildAcControllerCircuit } from "@/features/power-electronics/schematics";
 import { PowerWarningAlert } from "./PowerWarningAlert";
 import { StudioErrorBoundary } from "./StudioErrorBoundary";
 import { PowerScopePlot, type ScopeSeries } from "./PowerScopePlot";
@@ -104,6 +105,11 @@ function Circuit({ parameters }: { parameters: AcVoltageControllerParameters }) 
     ? t("power.onePhaseBidirectionalTriac", "1-Φ Bidirectional TRIAC")
     : t("power.onePhaseUnidirectionalScr", "1-Φ Unidirectional SCR");
 
+  const schematic = useMemo(
+    () => buildAcControllerCircuit(parameters.phase, parameters.topology, parameters.loadType, parameters.threePhaseConnection),
+    [parameters.phase, parameters.topology, parameters.loadType, parameters.threePhaseConnection],
+  );
+
   return (
     <StudioCard
       title={t("power.circuitDiagram", "Circuit Diagram")}
@@ -115,13 +121,7 @@ function Circuit({ parameters }: { parameters: AcVoltageControllerParameters }) 
       className="min-h-[340px]"
     >
       <div className="grid min-h-60 place-items-center overflow-hidden rounded-2xl border border-dashed border-violet-300 bg-slate-50 p-4 text-center dark:border-violet-400/30 dark:bg-slate-950">
-        <svg viewBox="0 0 340 120" className="h-28 w-full max-w-lg" fill="none" aria-label={title}>
-          <path d="M24 60h52m0 0 16-16v32L76 60m16 0h52m0 0 17-15v30l-17-15m17 0h36m0-30v60m-12-44h24m-24 18h24m-24 18h24M221 60h70" stroke="currentColor" strokeWidth="2" className="text-violet-500" />
-          <circle cx="42" cy="60" r="18" stroke="currentColor" strokeWidth="1.5" className="text-slate-400 dark:text-slate-500" />
-          <path d="M30 60c4-10 9-10 13 0s9 10 13 0M142 38v44m12-35-24 26m24 0-24-26" stroke="currentColor" strokeWidth="1.5" className="text-slate-400 dark:text-slate-500" />
-          <path d="M292 36v48m-12-40h24m-24 16h24m-24 16h24" stroke="currentColor" strokeWidth="1.5" className="text-violet-500" />
-        </svg>
-        <span className="mt-2 block mae-i18n-text text-[10px] font-bold tracking-[.06em] text-slate-400">{title}</span>
+        <SchematicView document={schematic} ariaLabel={title} />
       </div>
     </StudioCard>
   );
@@ -523,11 +523,14 @@ function ACVoltageControllerStudioBody({ parameters, setParameters, simulation }
 
 export default ACVoltageControllerStudio;
 
+// Start the default-parameter solve as soon as this chunk evaluates, in parallel with first render.
+prefetchSimulation("ac-controller", defaultAcVoltageControllerParameters, simulateAcControllerRemote);
+
 /** Holds the converter parameters; the simulation itself is solved by the serverless engine and streamed back as sample arrays. */
 export function ACVoltageControllerStudio() {
   const [parameters, setParameters] = useState<AcVoltageControllerParameters>(defaultAcVoltageControllerParameters);
   return (
-    <RemoteSimulationGate parameters={parameters} fetcher={simulateAcControllerRemote}>
+    <RemoteSimulationGate namespace="ac-controller" parameters={parameters} fetcher={simulateAcControllerRemote}>
       {(simulation) => <ACVoltageControllerStudioBody parameters={parameters} setParameters={setParameters} simulation={simulation} />}
     </RemoteSimulationGate>
   );

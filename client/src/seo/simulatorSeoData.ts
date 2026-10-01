@@ -455,7 +455,7 @@ export const SIMULATOR_SEO: SimulatorSeoEntry[] = [
     }),
 
   // ───────────────────────── Power Electronics ─────────────────────────
-  e("pwr-rectifier", "/simulations/power-electronics/a", "Controlled Rectifier Simulator",
+  e("pwr-rectifier", "/simulations/power-electronics/rectifier", "Controlled Rectifier Simulator",
     "Controlled Rectifier Simulator Online – Thyristor Firing Angle | MAE Academy",
     "Simulate single-phase and three-phase thyristor rectifiers online. Change the firing angle alpha and see output voltage, ripple and load current waveforms.",
     {
@@ -474,7 +474,7 @@ export const SIMULATOR_SEO: SimulatorSeoEntry[] = [
         "Compare resistive, inductive and back-EMF loads."
       ]
     }),
-  e("pwr-inverter", "/simulations/power-electronics/b", "PWM Inverter Simulator",
+  e("pwr-inverter", "/simulations/power-electronics/inverter", "PWM Inverter Simulator",
     "PWM Inverter Simulator Online – Single & Three-Phase SPWM | MAE Academy",
     "Simulate DC-AC PWM inverters online. Explore H-bridge switching, sinusoidal PWM, modulation index and harmonic content with live waveforms.",
     {
@@ -493,7 +493,7 @@ export const SIMULATOR_SEO: SimulatorSeoEntry[] = [
         "Check the harmonic spectrum and THD."
       ]
     }),
-  e("pwr-acvc", "/simulations/power-electronics/c", "AC Voltage Controller",
+  e("pwr-acvc", "/simulations/power-electronics/acvc", "AC Voltage Controller",
     "AC Voltage Controller (AC Chopper) Simulator – Phase Angle Control | MAE Academy",
     "Simulate single-phase AC voltage controllers online with phase-angle control. See RMS output voltage, power factor and waveforms for R and RL loads.",
     {
@@ -512,7 +512,7 @@ export const SIMULATOR_SEO: SimulatorSeoEntry[] = [
         "Read RMS voltage, current and power factor."
       ]
     }),
-  e("pwr-chopper", "/simulations/power-electronics/d", "DC-DC Chopper Simulator",
+  e("pwr-chopper", "/simulations/power-electronics/chopper", "DC-DC Chopper Simulator",
     "DC-DC Converter Simulator – Buck, Boost & Buck-Boost Choppers | MAE Academy",
     "Simulate DC-DC choppers online. Vary duty cycle and frequency for buck, boost and buck-boost converters and see inductor current and output ripple live.",
     {
@@ -592,7 +592,7 @@ export function seoKeyForRoute(slug: string, tool: string | undefined): string |
   const t = tool ?? "";
   const table: Record<string, Record<string, string>> = {
     "control-systems": { "root-locus": "ctl-root-locus", "frequency-response": "ctl-frequency", pid: "ctl-pid", "state-space": "ctl-state-space" },
-    "power-electronics": { a: "pwr-rectifier", b: "pwr-inverter", c: "pwr-acvc", d: "pwr-chopper" },
+    "power-electronics": { rectifier: "pwr-rectifier", inverter: "pwr-inverter", acvc: "pwr-acvc", chopper: "pwr-chopper" },
     "signals-and-systems": {
       "signal-operations-and-properties": "sig-ops", a: "sig-ops",
       "system-classification": "sig-class", b: "sig-class",

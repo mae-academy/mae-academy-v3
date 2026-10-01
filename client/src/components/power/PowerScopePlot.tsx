@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect, useCallback } from "react";
+import React, { useState, useMemo, useRef, useLayoutEffect, useCallback } from "react";
 import { KatexMath } from "@/components/ui/KatexMath";
 import { SegmentedControl } from "@/components/common/templates";
 
@@ -123,7 +123,7 @@ function interpolateVal(data: ScopePoint[], tTarget: number): number | null {
 
 const badgeToneStyles = {
   violet: "border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-400/30 dark:bg-violet-500/15 dark:text-violet-200",
-  emerald: "border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-400/15 dark:text-emerald-200",
+  emerald: "border-violet-300 bg-violet-50 text-violet-700 dark:border-violet-400/30 dark:bg-violet-400/15 dark:text-violet-200",
   amber: "border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-400/30 dark:bg-amber-400/15 dark:text-amber-200",
   rose: "border-rose-300 bg-rose-50 text-rose-700 dark:border-rose-400/30 dark:bg-rose-500/15 dark:text-rose-200",
   blue: "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-400/30 dark:bg-blue-500/15 dark:text-blue-200",
@@ -179,7 +179,7 @@ export function PowerScopePlot({
     }[];
   } | null>(null);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const el = containerRef.current;
     if (!el) return;
     const updateSize = () => {
@@ -821,7 +821,7 @@ function HarmonicSpectrumView({
 
   const [hovered, setHovered] = useState<{ order: number; rms: number; x: number; y: number } | null>(null);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const el = containerRef.current;
     if (!el) return;
     const updateSize = () => {

@@ -1,10 +1,11 @@
-import { RemoteSimulationGate } from "./RemoteSimulationGate";
+import { RemoteSimulationGate, prefetchSimulation } from "./RemoteSimulationGate";
 import { simulateChopperRemote } from "@/services/controlClient";
 import type { Dispatch, SetStateAction } from "react";
 import { useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { KatexMath } from "@/components/ui/KatexMath";
 import { SegmentedControl, StudioCard, StudioSlider, InnerBox } from "@/components/common/templates";
+import { SchematicView, buildChopperCircuit } from "@/features/power-electronics/schematics";
 import { PowerWarningAlert } from "./PowerWarningAlert";
 import { StudioErrorBoundary } from "./StudioErrorBoundary";
 import { PowerScopePlot, type ScopeSeries } from "./PowerScopePlot";
@@ -88,19 +89,13 @@ function Metric({ label, value }: { label: string; value: string }) {
   );
 }
 
-/** Conduction mode badge — emerald for CCM (healthy), amber for DCM (informational). */
+/** Conduction mode readout: plain inline metadata (no container); violet for CCM, muted for DCM. */
 function ModeMetric({ mode }: { mode: "CCM" | "DCM" }) {
   const isCcm = mode === "CCM";
   return (
     <InnerBox className="px-2.5 py-2">
       <KatexMath math={String.raw`\mathrm{Mode}`} className="block text-[10px] text-slate-500 dark:text-slate-400" />
-      <span
-        className={`mt-1.5 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wide ${
-          isCcm
-            ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300"
-            : "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300"
-        }`}
-      >
+      <span className={`mt-1.5 inline-block text-xs font-bold tracking-wide ${isCcm ? "text-violet-600 dark:text-violet-400" : "text-slate-500 dark:text-slate-400"}`}>
         {mode}
       </span>
     </InnerBox>
@@ -111,6 +106,10 @@ function Circuit({ parameters }: { parameters: ChopperParameters }) {
   const { t } = useTranslation("simulators");
   const topologyLabel = parameters.topology === "buck" ? t("power.buck", "Buck") : parameters.topology === "boost" ? t("power.boost", "Boost") : t("power.buckBoost", "Buck-Boost");
   const title = `${topologyLabel} · ${t("power.classWord", "Class")} ${parameters.quadrantClass}`;
+  const schematic = useMemo(
+    () => buildChopperCircuit(parameters.topology, parameters.quadrantClass, parameters.loadType),
+    [parameters.topology, parameters.quadrantClass, parameters.loadType],
+  );
   return (
     <StudioCard
       title={t("power.circuitDiagram", "Circuit Diagram")}
@@ -122,12 +121,7 @@ function Circuit({ parameters }: { parameters: ChopperParameters }) {
       className="min-h-[340px]"
     >
       <div className="grid min-h-60 place-items-center overflow-hidden rounded-2xl border border-dashed border-violet-300 bg-slate-50 p-4 text-center dark:border-violet-400/30 dark:bg-slate-950">
-        <svg viewBox="0 0 340 120" className="h-28 w-full max-w-lg" fill="none" aria-label={title}>
-          <path d="M24 60h52m0 0 16-16v32L76 60m16 0h42m0 0 16-16v32l-16-16m16 0h28m0-32v64m-12-48h24m-24 20h24m-24 20h24m30-28h54" stroke="currentColor" strokeWidth="2" className="text-violet-500" />
-          <circle cx="42" cy="60" r="18" stroke="currentColor" strokeWidth="1.5" className="text-slate-400 dark:text-slate-500" />
-          <path d="M30 60c4-10 9-10 13 0s9 10 13 0M134 38v44m12-35-24 26m24 0-24-26M238 34v52m-11-42 22 0m-22 16 22 0m-22 16 22 0" stroke="currentColor" strokeWidth="1.5" className="text-slate-400 dark:text-slate-500" />
-        </svg>
-        <span className="mt-2 block mae-i18n-text text-[10px] font-bold tracking-[.06em] text-slate-400">{title}</span>
+        <SchematicView document={schematic} ariaLabel={title} />
       </div>
     </StudioCard>
   );
@@ -366,11 +360,14 @@ function ChopperStudioBody({ parameters, setParameters, simulation }: { paramete
 
 export default ChopperStudio;
 
+// Start the default-parameter solve as soon as this chunk evaluates, in parallel with first render.
+prefetchSimulation("chopper", defaultChopperParameters, simulateChopperRemote);
+
 /** Holds the converter parameters; the simulation itself is solved by the serverless engine and streamed back as sample arrays. */
 export function ChopperStudio() {
   const [parameters, setParameters] = useState<ChopperParameters>(defaultChopperParameters);
   return (
-    <RemoteSimulationGate parameters={parameters} fetcher={simulateChopperRemote}>
+    <RemoteSimulationGate namespace="chopper" parameters={parameters} fetcher={simulateChopperRemote}>
       {(simulation) => <ChopperStudioBody parameters={parameters} setParameters={setParameters} simulation={simulation} />}
     </RemoteSimulationGate>
   );
