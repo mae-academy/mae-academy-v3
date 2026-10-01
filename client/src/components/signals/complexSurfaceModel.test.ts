@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseTransferFunction } from "@/features/signals/engines/laplaceEngine";
+import { parseTransferFunction } from "@/../../api/_lib/signals/laplaceEngine";
 import { buildComplexSurface, colorParameter, heightFor, magnitudeAt, softClamp, SURFACE_HEIGHT } from "@/components/signals/complexSurfaceModel";
 
 describe("complex |H| surface model", () => {

@@ -8,8 +8,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { KatexMath } from "@/components/ui/KatexMath";
 import { SvgKatexTick } from "@/components/common/templates/SvgKatexTick";
-import { niceTicks } from "@/lib/plotAutoScale";
-import { type Complex, type RocResult, type TransferFunction, withMovedRoot } from "@/features/signals/engines/laplaceEngine";
+import { niceTicks } from "@shared/signals/plotAutoScale";
+import { type Complex, type RocResult, type TransferFunction, withMovedRoot } from "@shared/signals/transferFunction";
 
 type Props = {
   system: TransferFunction;

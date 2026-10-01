@@ -5,7 +5,7 @@
  * 2. Element-wise Product: Discrete stems for x[k] * h[n - k] with active product heads highlighted
  * 3. Output Accumulation: Discrete output sequence y[n] = sum_k x[k]h[n - k] accumulating as shift n increments
  */
-import { symmetricYBound } from "@/lib/plotAutoScale";
+import { symmetricYBound } from "@shared/signals/plotAutoScale";
 import { SvgKatexTick } from "@/components/common/templates/SvgKatexTick";
 import { useElementSize } from "@/hooks/useElementSize";
 import React, { useState, useMemo, useCallback, useRef, useEffect } from "react";
@@ -18,10 +18,8 @@ import {
   GradientButton,
   InnerBox,
 } from "@/components/common/templates";
-import {
-  discreteConvolution,
-  type DiscreteConvolution,
-} from "@/features/signals/engines/convolutionEngine";
+import type { DiscreteConvolution } from "@shared/signals/results";
+import { useDiscreteConvolution } from "@/components/signals/useDiscreteConvolution";
 
 export type DiscreteConvolutionScopeProps = {
   x: number[];
@@ -262,7 +260,7 @@ export function DiscreteConvolutionScope({
     relY: number;
   } | null>(null);
 
-  const convResult: DiscreteConvolution = useMemo(() => discreteConvolution(x, h), [x, h]);
+  const convResult: DiscreteConvolution = useDiscreteConvolution(x, h);
   const maxN = Math.max(0, convResult.values.length - 1);
   const n = controlledN !== undefined ? controlledN : internalN;
 

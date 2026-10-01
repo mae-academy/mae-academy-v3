@@ -4,8 +4,8 @@
  * |H|, so the jω / unit-circle slice keeps its shape) + a Hill-function spire term that only rises in a tight
  * neighbourhood of each pole. Grid lines cluster at the poles' coordinates so the needle tips stay crisp.
  */
-import { evaluateTransfer, type Complex, type TransferFunction } from "@/features/signals/engines/laplaceEngine";
-import { niceCeil } from "@/lib/plotAutoScale";
+import { evaluateTransfer, type Complex, type TransferFunction } from "@shared/signals/transferFunction";
+import { niceCeil } from "@shared/signals/plotAutoScale";
 import { SURFACE_SPECTRUM } from "@/lib/spectralPalette";
 
 /** World height of a pole spire's asymptotic tip (≈3× the plane's half-width in relief). */

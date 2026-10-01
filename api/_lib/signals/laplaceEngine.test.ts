@@ -1,0 +1,12 @@
+import { describe, expect, it } from "vitest";
+import { complexLatex, evaluateTransfer, formatTransferLatex, frequencyResponse, impulseResponse, magnitudeLandscape, moveRootWithConjugate, rocFor, withMovedRoot } from "../../../shared/signals/transferFunction";
+import { parseTransferFunction, polynomialRoots } from "./laplaceEngine";
+
+describe("Tab E transfer-function engine", () => {
+  it("extracts the complex conjugate poles of a continuous-time quadratic", () => { const system = parseTransferFunction("H(s)=1/(s^2+4s+13)", "s"); expect(system.poles).toHaveLength(2); expect(system.poles[0].re).toBeCloseTo(-2, 4); expect(Math.abs(system.poles[0].im)).toBeCloseTo(3, 4); expect(complexLatex(system.poles[0])).toContain("j3"); });
+  it("extracts Z-transform poles, zeros, and a stable right-sided ROC", () => { const system = parseTransferFunction("H(z)=(z+0.5)/(z^2-1.2z+0.32)", "z"); expect(system.zeros[0].re).toBeCloseTo(-0.5, 4); expect(system.poles.map((pole) => pole.re)).toEqual(expect.arrayContaining([0.4, 0.8])); expect(rocFor(system, "right").stable).toBe(true); });
+  it("rejects the jω slice when a causal Laplace pole lies in the right half-plane", () => { const system = parseTransferFunction("1/(s-1)", "s"); expect(rocFor(system, "right").stable).toBe(false); });
+  it("mirrors an updated complex pole and rebuilds a real coefficient denominator", () => { const system = parseTransferFunction("1/(s^2+4s+13)", "s"); const moved = moveRootWithConjugate(system.poles, 0, { re: -1, im: 2 }); expect(moved.some((pole) => pole.re === -1 && pole.im === -2)).toBe(true); const rebuilt = withMovedRoot(system, "poles", 0, { re: -1, im: 2 }); expect(formatTransferLatex(rebuilt)).toContain("s^{2}"); expect(evaluateTransfer(rebuilt, { re: 0, im: 0 }).re).toBeCloseTo(0.2, 4); });
+  it("generates bounded frequency and magnitude-landscape samples", () => { const system = parseTransferFunction("1/(s+2)", "s"); expect(frequencyResponse(system)).toHaveLength(261); const terrain = magnitudeLandscape(system, 12); expect(terrain.z).toHaveLength(12); expect(Math.max(...terrain.z.flat())).toBeLessThanOrEqual(14); expect(polynomialRoots([1, 0, 1])).toHaveLength(2); });
+  it("reconstructs a simple-pole inverse Laplace impulse response", () => { const response = impulseResponse(parseTransferFunction("1/(s+2)", "s"), 1, 10); expect(response[0].value).toBeCloseTo(1, 5); expect(response[10].value).toBeCloseTo(Math.exp(-2), 3); });
+});

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { fourierSeries, partialSum } from "@/features/signals/engines/fourierEngine";
-import { parseUnifiedSignalNode } from "@/lib/signals/unifiedSignalParser";
+import { fourierSeries } from "../../../../api/_lib/signals/fourierEngine";
+import { partialSum } from "@shared/signals/seriesSynthesis";
+import { parseUnifiedSignalNode } from "@shared/signals/unifiedSignalParser";
 import {
   buildWaterfallScene,
   harmonicColor,

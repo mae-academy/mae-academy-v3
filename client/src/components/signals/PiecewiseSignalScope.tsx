@@ -6,7 +6,7 @@
  * zero-crossing hairline axes, authentic TeX typography ticks, vector Dirac impulses,
  * and an Apple-style floating HUD tooltip.
  */
-import { symmetricYBound } from "@/lib/plotAutoScale";
+import { symmetricYBound } from "@shared/signals/plotAutoScale";
 import React, { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { KatexMath } from "@/components/ui/KatexMath";
 import {

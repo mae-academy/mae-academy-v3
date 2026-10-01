@@ -21,9 +21,9 @@ import {
   type Pseudo3DFrame,
   type Pseudo3DHandle,
 } from "@/components/common/3d";
-import type { FourierSeriesResult } from "@/features/signals/engines/fourierEngine";
+import type { FourierSeriesResult } from "@shared/signals/results";
 import { periodTicks, type PeriodTick, type TimeWindow, type WindowPreset } from "./fourierWindow";
-import { niceTicks } from "@/lib/plotAutoScale";
+import { niceTicks } from "@shared/signals/plotAutoScale";
 import {
   buildWaterfallScene,
   harmonicProgress,

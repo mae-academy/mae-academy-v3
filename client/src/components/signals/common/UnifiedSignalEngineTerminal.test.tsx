@@ -3,7 +3,7 @@ import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { UnifiedSignalEngineTerminal } from "./UnifiedSignalEngineTerminal";
-import { SIGNAL_TOKENS } from "@/lib/signals/unifiedSignalParser";
+import { SIGNAL_TOKENS } from "@shared/signals/unifiedSignalParser";
 
 // jsdom cannot host MathLive's custom element; the terminal's own wiring is what is under test.
 vi.mock("mathlive", () => ({ MathfieldElement: class {} }));

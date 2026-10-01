@@ -2,6 +2,8 @@
 import React from "react";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
+import { afterAll, beforeAll } from "vitest";
+import { installInProcessSignalsApi, uninstallInProcessSignalsApi } from "./test-utils";
 import { PiecewiseSignalScope } from "./PiecewiseSignalScope";
 import { SignalOperationsLab } from "./SignalOperationsLab";
 import { createPiecewiseSignal } from "@/utils/signalsEngine";
@@ -212,6 +214,10 @@ describe("PiecewiseSignalScope", () => {
 });
 
 describe("SignalOperationsLab", () => {
+  // Periodicity / energy / power come from the serverless engine; route its requests through the in-process handler.
+  beforeAll(installInProcessSignalsApi);
+  afterAll(uninstallInProcessSignalsApi);
+
   it("renders standardized COMPOSITE SIGNAL VIEW card header without redundant subtitles or canvas clutter", () => {
     const { container } = render(<SignalOperationsLab />);
 
@@ -240,13 +246,13 @@ describe("SignalOperationsLab", () => {
     expect(screen.queryByText("Energy, Power & Periodicity")).toBeNull();
   });
 
-  it("classifies the default commensurate sin+cos composition as periodic with a Power Signal readout", () => {
+  it("classifies the default commensurate sin+cos composition as periodic with a Power Signal readout", async () => {
     render(<SignalOperationsLab />);
-    expect(screen.getAllByText("Power Signal").length).toBeGreaterThan(0);
+    expect((await screen.findAllByText("Power Signal")).length).toBeGreaterThan(0);
     expect(screen.getByText("Periodic")).toBeTruthy();
   });
 
-  it("classifies a preset rect(t) pulse as an aperiodic Energy Signal with a settable window", () => {
+  it("classifies a preset rect(t) pulse as an aperiodic Energy Signal with a settable window", async () => {
     const { container } = render(<SignalOperationsLab />);
     // KaTeX duplicates its source into a hidden MathML annotation, so match on inclusion, not equality.
     // The "rect(t)" pill (inserts into the mathfield) renders before the "rect(t)" preset (sets the
@@ -255,6 +261,6 @@ describe("SignalOperationsLab", () => {
     const rectPreset = rectMatches.at(-1);
     expect(rectPreset).toBeTruthy();
     fireEvent.click(rectPreset!);
-    expect(screen.getAllByText("Energy Signal").length).toBeGreaterThan(0);
+    expect((await screen.findAllByText("Energy Signal")).length).toBeGreaterThan(0);
   });
 });

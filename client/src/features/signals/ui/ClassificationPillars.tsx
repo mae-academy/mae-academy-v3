@@ -15,7 +15,7 @@ import {
 import { useTranslation } from "react-i18next";
 import { InnerBox, StatusBadge } from "@/components/common/templates";
 import { KatexMath } from "@/components/ui/KatexMath";
-import type { Pillar, PillarId } from "@/features/signals/engines/systemClassifier";
+import type { Pillar, PillarId } from "@shared/signals/results";
 
 export function PillarIcon({ id }: { id: PillarId }) {
   const icons = {

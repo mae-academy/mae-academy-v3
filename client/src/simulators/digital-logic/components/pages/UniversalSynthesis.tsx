@@ -12,7 +12,7 @@ import type { CircuitPlacementMode } from '@/simulators/digital-logic/models/cir
 import type { SynthesisMode } from '@shared/logic/synthesisTypes';
 import { synthesisDiagramToCircuit } from '@/simulators/digital-logic/models/circuitExpressionExtractor';
 import { deriveSynthesisRemote } from '@/services/logicClient';
-import { useLogicQuery } from '@/simulators/digital-logic/remote/useLogicQuery';
+import { useRemoteQuery as useLogicQuery } from '@/lib/useRemoteQuery';
 import {
   astToOverlineLatex,
   generateTruthTable,

@@ -8,7 +8,7 @@ import { SegmentedControl, type SegmentedOption, StatusBadge } from '@/component
 import { createKMapTopology, layoutKMapGroups } from '@/simulators/digital-logic/components/kmapGeometry';
 import type { KMapSolution, KMapVariableCount } from '@shared/logic/kmapTypes';
 import { solveKMapRemote } from '@/services/logicClient';
-import { useLogicQuery } from '@/simulators/digital-logic/remote/useLogicQuery';
+import { useRemoteQuery as useLogicQuery } from '@/lib/useRemoteQuery';
 import { evaluateAst, parseBooleanExpression, type ParsedLogicExpression } from '@shared/logic/logicEngine';
 
 type KMapCellState = '0' | '1' | 'X';

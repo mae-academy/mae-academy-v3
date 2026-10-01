@@ -2,7 +2,7 @@
  * Fourier series observation window: presets tied to T₀, symbolic period-grounded time ticks,
  * and signal-aware fundamental-period detection. Shared by the Harmonic Builder and the 3D waterfall.
  */
-import { estimateSupport } from "@/lib/plotAutoScale";
+import { estimateSupport } from "@shared/signals/plotAutoScale";
 
 export const N_MAX = 50;
 export const PERIOD_BOUNDS = { min: 0.1, max: 20 } as const;

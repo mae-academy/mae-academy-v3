@@ -3,11 +3,13 @@
  * Renders h(t) = 𝓛⁻¹{H(s)} as a step-by-step PFE / residue / ROC derivation for the active ROC. Root drags reach it via
  * the imperative `preview` handle, so only this card re-renders while the plane is being dragged.
  */
-import { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StatusBadge } from "@/components/common/templates";
 import { ContinuousDerivationCard } from "@/features/signals/ui/ContinuousDerivationCard";
-import { deriveInverseLaplaceSteps, inverseLaplace, type Causality, type RocKind, type TransferFunction } from "@/features/signals/engines/laplaceEngine";
+import { inverseLaplaceRemote } from "@/services/signalsClient";
+import { useRemoteQuery } from "@/lib/useRemoteQuery";
+import { type Causality, type RocKind, type TransferFunction } from "@shared/signals/transferFunction";
 
 export type InverseLaplaceCardHandle = { preview: (system: TransferFunction) => void };
 
@@ -24,19 +26,21 @@ export const InverseLaplaceCard = forwardRef<InverseLaplaceCardHandle, Props>(fu
   useEffect(() => setPreviewed(null), [system]);
   useImperativeHandle(ref, () => ({ preview: setPreviewed }), []);
   const active = previewed ?? system;
-  const result = useMemo(() => inverseLaplace(active, rocKind), [active, rocKind]);
-  const steps = useMemo(() => deriveInverseLaplaceSteps(active, rocKind, {}, { time: "h", freq: "H" }), [active, rocKind]);
-  const causality = CAUSALITY[result.causality];
+  // The residue / PFE derivation runs on the serverless engine (debounced: a root drag re-requests it); the last answer stays shown.
+  const query = useRemoteQuery(`ilt|${JSON.stringify(active)}|${rocKind}`, (signal) => inverseLaplaceRemote(active, rocKind, signal), { debounceMs: 80 });
+  const result = query.data?.result ?? null;
+  const steps = query.data?.steps ?? [];
+  const causality = result ? CAUSALITY[result.causality] : null;
 
   return (
     <ContinuousDerivationCard
       title={t('signals.inverseLaplaceTransform', 'Inverse Laplace Transform')}
       pair={String.raw`\mathcal{L}^{-1}\{H(s)\}=h(t)`}
       steps={steps}
-      target={result.timeLatex}
+      target={result?.timeLatex ?? null}
       targetTestId="inverse-laplace-ht"
-      badge={<StatusBadge variant={causality.variant} className="uppercase tracking-wider text-[10px]">{causality.label}</StatusBadge>}
-      notes={result.warnings}
+      badge={causality ? <StatusBadge variant={causality.variant} className="uppercase tracking-wider text-[10px]">{causality.label}</StatusBadge> : null}
+      notes={result?.warnings ?? []}
       className={className}
     />
   );

@@ -17,7 +17,7 @@ import {
   type StateTableRow,
 } from '@shared/logic/fsmTypes';
 import { analyzeFsmRemote } from '@/services/logicClient';
-import { useLogicQuery } from '@/simulators/digital-logic/remote/useLogicQuery';
+import { useRemoteQuery as useLogicQuery } from '@/lib/useRemoteQuery';
 
 const NODE_RADIUS = 31;
 const latexSignal = (signal: string) => signal.replace(/([A-Z])(\d+)/, '$1_{$2}');

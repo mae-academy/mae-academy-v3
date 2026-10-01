@@ -5,7 +5,7 @@
 import { useTranslation } from "react-i18next";
 import { StatusBadge } from "@/components/common/templates";
 import { ContinuousDerivationCard } from "@/features/signals/ui/ContinuousDerivationCard";
-import type { DerivationStep } from "@/features/signals/engines/derivationTypes";
+import type { DerivationStep } from "@shared/signals/derivationTypes";
 
 type Props = { steps: DerivationStep[] | null; error?: string | null; notes?: string[]; className?: string };
 

@@ -1,5 +1,5 @@
-import { convolutionWindow } from "@/lib/plotAutoScale";
-import { evaluateSignal } from "@/features/signals/engines/signalEngine";
+import { convolutionWindow } from "@shared/signals/plotAutoScale";
+import { evaluateSignal } from "@shared/signals/signalEngine";
 /**
  * MAE Academy / Signals & Systems — Tab C Convolution Engine.
  * Playback time is retained inside ConvolutionCanvas refs. This React shell
@@ -10,15 +10,15 @@ import { FastForward, Pause, Play, Rewind, Sigma, StepForward } from "lucide-rea
 import { useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ConvolutionAnalysisCard, type ConvolutionAnalysisHandle } from "@/components/signals/ConvolutionAnalysisCard";
-import { analyzeConvolutionRegime, type RegimeCache } from "@/features/signals/engines/convolutionPiecewise";
+import { convolutionRegimeRemote } from "@/services/signalsClient";
 import { KatexMath } from "@/components/ui/KatexMath";
 import { GradientButton, SegmentedControl, StudioButton, StudioSlider, StudioCard, InnerBox, FormulaBox } from "@/components/common/templates";
 import { UnifiedSignalEngineTerminal } from "@/components/signals/common/UnifiedSignalEngineTerminal";
 import { ConvolutionCanvas, type ConvolutionCanvasHandle } from "@/components/signals/ConvolutionCanvas";
 import { DiscreteConvolutionScope } from "@/components/signals/DiscreteConvolutionScope";
 import { DiscreteConvolutionTable } from "@/components/signals/DiscreteConvolutionTable";
-import { continuousConvolutionAt, type ContinuousConvolutionResult } from "@/features/signals/engines/convolutionEngine";
-import { parseUnifiedSignalNode } from "@/lib/signals/unifiedSignalParser";
+import type { ContinuousConvolutionResult } from "@shared/signals/results";
+import { parseUnifiedSignalNode } from "@shared/signals/unifiedSignalParser";
 
 const idle = "border-slate-200 text-slate-600 hover:border-violet-300 hover:text-violet-700 dark:border-slate-800 dark:text-slate-300 dark:hover:border-violet-500 dark:hover:text-violet-200";
 const primary = "border-violet-500 bg-violet-600 text-white hover:bg-violet-500 dark:border-violet-400 dark:bg-violet-500 dark:hover:bg-violet-400";
@@ -60,8 +60,8 @@ export function ConvolutionLab() {
       : { from: -3, to: 3 }),
     [xParsed, hParsed],
   );
-  const regimeCache = useMemo<RegimeCache>(() => new Map(), [xExpression, hExpression]);
-  const astRef = useRef({ x: xParsed, h: hParsed, cache: regimeCache }); astRef.current = { x: xParsed, h: hParsed, cache: regimeCache };
+  const astRef = useRef({ x: xParsed, h: hParsed, xSource: xExpression, hSource: hExpression }); astRef.current = { x: xParsed, h: hParsed, xSource: xExpression, hSource: hExpression };
+  const regimeRequest = useRef(0);
   const updateReadout = (result: ContinuousConvolutionResult, throttle: boolean) => {
     if (sliderRef.current) {
       // Update DOM directly; dispatching "input" re-enters onChange -> setTime -> onFrame -> here (infinite loop).
@@ -72,7 +72,9 @@ export function ConvolutionLab() {
     const now = performance.now();
     if (throttle && now - lastFormulaUpdate.current < 80) return;
     lastFormulaUpdate.current = now;
-    const { x, h, cache } = astRef.current; if (x.ok && h.ok) analysisRef.current?.update(analyzeConvolutionRegime(x.ast, h.ast, result.t, cache), result.t, result.value);
+    // The piecewise regime (symbolic closed form) is solved by the serverless engine; only the newest answer is shown.
+    const { x, h, xSource, hSource } = astRef.current; const request = ++regimeRequest.current;
+    if (x.ok && h.ok) void convolutionRegimeRemote(xSource, hSource, result.t).then((regime) => { if (request === regimeRequest.current) analysisRef.current?.update(regime, result.t, result.value); }).catch(() => undefined);
     renderKatex(resultRef.current, `y(${format(result.t)})=${format(result.value, 4)}`);
   };
   const manualReadout = (result: ContinuousConvolutionResult) => updateReadout(result, false);
@@ -230,7 +232,7 @@ export function ConvolutionLab() {
                   <StepForward className="h-3.5 w-3.5" />{t('signals.fineStep', 'Fine step')}
                 </StudioButton>
               </InnerBox>
-              <ConvolutionCanvas ref={canvas} x={xParsed.ast} h={hParsed.ast} range={convRange} isPlaying={isPlaying} speed={speed} onFrame={(result) => updateReadout(result, true)} onManualReadout={manualReadout} />
+              <ConvolutionCanvas ref={canvas} x={xParsed.ast} h={hParsed.ast} xSource={xExpression} hSource={hExpression} range={convRange} isPlaying={isPlaying} speed={speed} onFrame={(result) => updateReadout(result, true)} onManualReadout={manualReadout} />
             </StudioCard>
           </div>
           {/* Right Panel: Academic Analytical Engine (25% / col-span-4 or 3) */}

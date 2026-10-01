@@ -16,11 +16,11 @@ import { InverseLaplaceCard, type InverseLaplaceCardHandle } from "@/components/
 import { ForwardLaplaceCard } from "@/components/signals/ForwardLaplaceCard";
 import { DiscreteStemPlot } from "@/components/signals/DiscreteStemPlot";
 import { ZTransformDerivationCard } from "@/features/signals/ui/ZTransformDerivationCard";
-import { analyzeForwardZ, deriveInverseZSteps, inverseZ } from "@/features/signals/engines/zTransformEngine";
-import { discreteYDomain, evaluateDiscrete, parseDiscreteSignal, type DiscreteSample } from "@/features/signals/engines/discreteSignalEngine";
-import { complexLatex, deriveForwardLaplaceSteps, formatTransferLatex, forwardLaplace, inverseLaplace, parseTransferFunction, rocFor, type PlaneMode, type RocKind, type TransferFunction } from "@/features/signals/engines/laplaceEngine";
-import { nodeToLatex } from "@/features/signals/engines/diracIntegral";
-import { evaluateUnifiedSignal, parseUnifiedSignal } from "@/lib/signals/unifiedSignalParser";
+import { discreteYDomain, evaluateDiscrete, parseDiscreteSignal, type DiscreteSample } from "@shared/signals/discreteSignalEngine";
+import { complexLatex, formatTransferLatex, rocFor, type PlaneMode, type RocKind, type TransferFunction } from "@shared/signals/transferFunction";
+import { forwardLaplaceRemote, forwardZRemote, inverseLaplaceRemote, inverseZRemote, parseTransferFunctionRemote } from "@/services/signalsClient";
+import { useRemoteQuery } from "@/lib/useRemoteQuery";
+import { parseUnifiedSignal } from "@shared/signals/unifiedSignalParser";
 import "./laplaceAcademic.css";
 
 const selected = "border-transparent btn-active-brand brand-active-pill font-semibold";
@@ -38,10 +38,10 @@ const zTimePresets = [
 ] as const;
 
 /** Causal h(t) for a (dragged) H(s), rewritten into the terminal grammar ([…] → (…)). */
-const timeFromSystem = (system: TransferFunction) => inverseLaplace(system, "right").timeLatex.replace(/^h\(t\)=/, "").replaceAll("\\left[", "\\left(").replaceAll("\\right]", "\\right)");
+const timeFromSystem = async (system: TransferFunction) => (await inverseLaplaceRemote(system, "right")).result.timeLatex.replace(/^h\(t\)=/, "").replaceAll("\\left[", "\\left(").replaceAll("\\right]", "\\right)");
 
 /** Keypad operators (×, ÷) are folded onto the transfer-function grammar's own spellings. */
-function parseOrNull(source: string, mode: PlaneMode): { system: TransferFunction | null; error: string | null } { if (source.includes("\\placeholder")) return { system: null, error: "Fill the empty slot to complete the transfer function." }; try { return { system: parseTransferFunction(source.replaceAll("\\times", "\\cdot").replaceAll("\\div", "/"), mode), error: null }; } catch (error) { return { system: null, error: error instanceof Error ? error.message : "The transfer function could not be parsed." }; } }
+function transferSource(source: string): { source: string | null; error: string | null } { return source.includes("\\placeholder") ? { source: null, error: "Fill the empty slot to complete the transfer function." } : { source: source.replaceAll("\\times", "\\cdot").replaceAll("\\div", "/"), error: null }; }
 
 export function LaplaceZPlaneLab() {
   const { t } = useTranslation('simulators');
@@ -49,24 +49,31 @@ export function LaplaceZPlaneLab() {
   const [inputDomain, setInputDomain] = useState<InputDomain>("s"); const [timeSource, setTimeSource] = useState<string>(timePresets[0].value);
   const timeMode = mode === "s" && inputDomain === "t"; const zTimeMode = mode === "z" && inputDomain === "t";
   const [zTimeSource, setZTimeSource] = useState<string>(zTimePresets[0].value);
-  const forwardZ = useMemo(() => (zTimeMode ? analyzeForwardZ(zTimeSource) : null), [zTimeMode, zTimeSource]);
-  const parsed = useMemo(() => parseOrNull(source, mode), [mode, source]);
+  // Parsing, root finding and every transform below run on the serverless engine; the last good answer stays on screen while a newer one loads.
+  const forwardZQuery = useRemoteQuery(`fz|${zTimeSource}`, (signal) => forwardZRemote(zTimeSource, signal), { enabled: zTimeMode, debounceMs: 60 });
+  const forwardZ = zTimeMode ? forwardZQuery.data : null;
+  const prepared = useMemo(() => transferSource(source), [source]);
+  const parseQuery = useRemoteQuery(`tf|${mode}|${prepared.source}`, (signal) => parseTransferFunctionRemote(prepared.source ?? "", mode, signal), { enabled: !timeMode && !zTimeMode && prepared.source !== null, debounceMs: 60 });
+  const parsed: { system: TransferFunction | null; error: string | null } = prepared.error ? { system: null, error: prepared.error } : parseQuery.error ? { system: null, error: parseQuery.error } : { system: parseQuery.data && parseQuery.data.mode === mode ? parseQuery.data : null, error: null };
   const timeParsed = useMemo(() => (timeMode ? parseUnifiedSignal(timeSource) : null), [timeMode, timeSource]);
-  const forward = useMemo(() => (timeParsed?.ok ? forwardLaplace(timeParsed.node, (node, at) => evaluateUnifiedSignal(node, at), nodeToLatex) : null), [timeParsed]);
-  const forwardSteps = useMemo(() => (timeParsed?.ok ? deriveForwardLaplaceSteps(timeParsed.node, (node, at) => evaluateUnifiedSignal(node, at), nodeToLatex, { time: "h", freq: "H" }) : null), [timeParsed]);
+  const forwardQuery = useRemoteQuery(`fl|${timeSource}`, (signal) => forwardLaplaceRemote(timeSource, signal), { enabled: Boolean(timeParsed?.ok), debounceMs: 60 });
+  const forwardAnswer = timeParsed?.ok && !forwardQuery.error ? forwardQuery.data : null;
+  const forward = forwardAnswer?.forward ?? null;
+  const forwardSteps = forwardAnswer?.steps ?? null;
   const system = timeMode ? (forward?.ok ? forward.system : null) : zTimeMode ? forwardZ?.system ?? null : parsed.system;
   // The unilateral transform of a causal h(t) always converges to the right of its poles.
   const activeRoc: RocKind = timeMode ? "right" : zTimeMode ? forwardZ?.rocKind ?? "right" : rocKind;
   const roc = useMemo(() => system ? rocFor(system, activeRoc) : null, [activeRoc, system]);
   const changeMode = (next: PlaneMode) => { setMode(next); setSource(initial[next]); setRocKind("right"); };
-  const previewRootMove = (next: TransferFunction) => { if (!zTimeMode) inputRef.current?.setValue(timeMode ? timeFromSystem(next) : formatTransferLatex(next)); impulseRef.current?.drawSystem(next); inverseRef.current?.preview(next); };
-  const commitRootMove = (next: TransferFunction) => { if (timeMode) setTimeSource(timeFromSystem(next)); else { setSource(formatTransferLatex(next)); if (zTimeMode) setInputDomain("s"); } };
-  const inverseZData = useMemo(() => (mode === "z" && !zTimeMode && system ? { steps: deriveInverseZSteps(system, rocKind), result: inverseZ(system, rocKind) } : null), [mode, zTimeMode, system, rocKind]);
+  // While a root is dragged the h(t) text is not recomputed (the engine answers asynchronously); it is refreshed when the root is released.
+  const previewRootMove = (next: TransferFunction) => { if (!zTimeMode && !timeMode) inputRef.current?.setValue(formatTransferLatex(next)); impulseRef.current?.drawSystem(next); inverseRef.current?.preview(next); };
+  const commitRootMove = (next: TransferFunction) => { if (timeMode) void timeFromSystem(next).then(setTimeSource); else { setSource(formatTransferLatex(next)); if (zTimeMode) setInputDomain("s"); } };
+  const inverseZQuery = useRemoteQuery(`iz|${JSON.stringify(system)}|${rocKind}`, (signal) => inverseZRemote(system as TransferFunction, rocKind, -30, 30, signal), { enabled: mode === "z" && !zTimeMode && Boolean(system), debounceMs: 60 });
+  const inverseZData = mode === "z" && !zTimeMode && system && !inverseZQuery.error ? inverseZQuery.data : null;
   const sequenceSamples = useMemo<DiscreteSample[] | null>(() => {
     if (mode !== "z") return null;
-    const indices = Array.from({ length: 61 }, (_, index) => index - 30);
-    if (zTimeMode) { const node = parseDiscreteSignal(zTimeSource); return node.ok ? indices.map((n) => { const value = evaluateDiscrete(node.node, n); return { n, value: Number.isFinite(value) ? value : 0 }; }) : null; }
-    return inverseZData ? indices.map((n) => ({ n, value: inverseZData.result.value(n) })) : null;
+    if (zTimeMode) { const indices = Array.from({ length: 61 }, (_, index) => index - 30); const node = parseDiscreteSignal(zTimeSource); return node.ok ? indices.map((n) => { const value = evaluateDiscrete(node.node, n); return { n, value: Number.isFinite(value) ? value : 0 }; }) : null; }
+    return inverseZData ? inverseZData.indices.map((n, index) => ({ n, value: inverseZData.values[index] })) : null;
   }, [mode, zTimeMode, zTimeSource, inverseZData]);
   return <div className="laplace-academic space-y-6">
     <StudioCard className="overflow-hidden">

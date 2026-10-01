@@ -18,7 +18,7 @@ export {
   type MathNode,
   type DefiniteIntegral,
   type IntegralEvaluation,
-} from "@/features/signals/engines/diracIntegral";
+} from "@shared/signals/mathExpression";
 
 export type BasicSignalKind = "step" | "ramp" | "rect" | "tri" | "sinc" | "sa" | "signum" | "sine" | "cosine" | "dirac";
 export type SignalClassification = "Energy Signal" | "Power Signal" | "Neither" | "Symbolic Distribution";

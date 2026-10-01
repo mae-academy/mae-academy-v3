@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { autoSpan } from "./SZPlaneCanvas";
-import { parseTransferFunction, rocFor } from "@/features/signals/engines/laplaceEngine";
+import { parseTransferFunction } from "@/../../api/_lib/signals/laplaceEngine";
+import { rocFor } from "@shared/signals/transferFunction";
 
 describe("S/Z-plane auto-scale", () => {
   it("floors at 2.5 for a compact constellation", () => {

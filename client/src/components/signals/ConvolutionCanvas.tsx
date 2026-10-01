@@ -17,20 +17,21 @@ import React, {
   useCallback,
 } from "react";
 import { KatexMath } from "@/components/ui/KatexMath";
-import {
-  continuousConvolutionAt,
-  type ContinuousConvolutionResult,
-} from "@/features/signals/engines/convolutionEngine";
-import { convolutionWindow, niceTicks, symmetricYBound } from "@/lib/plotAutoScale";
-import {
-  evaluateSignal,
-  extractImpulseMarkers,
-  type SignalNode,
-} from "@/features/signals/engines/signalEngine";
+import type { ContinuousConvolutionResult } from "@shared/signals/results";
+import { convolutionSweepRemote } from "@/services/signalsClient";
+import { useRemoteQuery } from "@/lib/useRemoteQuery";
+import { frameFromSweep } from "@/components/signals/convolutionFrames";
+import { convolutionWindow, niceTicks, symmetricYBound } from "@shared/signals/plotAutoScale";
+import { evaluateSignal, extractImpulseMarkers, type SignalNode } from "@shared/signals/signalEngine";
+
+const SWEEP_SAMPLES = 601;
 
 type Props = {
   x: SignalNode;
   h: SignalNode;
+  /** Source text of x and h: the serverless engine parses and convolves these. */
+  xSource: string;
+  hSource: string;
   isPlaying: boolean;
   speed: number;
   /** Symmetric interaction window; auto-derived from the signal supports when omitted. */
@@ -349,12 +350,17 @@ function SvgScopeTier({
 }
 
 export const ConvolutionCanvas = forwardRef<ConvolutionCanvasHandle, Props>(
-  function ConvolutionCanvas({ x, h, isPlaying, speed, range: rangeProp, onFrame, onManualReadout }, ref) {
+  function ConvolutionCanvas({ x, h, xSource, hSource, isPlaying, speed, range: rangeProp, onFrame, onManualReadout }, ref) {
     const autoRange = useMemo(
       () => convolutionWindow((t) => evaluateSignal(x, t), (t) => evaluateSignal(h, t)),
       [x, h],
     );
     const range = rangeProp ?? autoRange;
+    // y(t) over the whole window comes from the serverless convolution engine as one sweep; playback interpolates it.
+    const sweep = useRemoteQuery(`${xSource}|${hSource}|${range.from}|${range.to}`, (signal) => convolutionSweepRemote(xSource, hSource, range.from, range.to, SWEEP_SAMPLES, signal), { debounceMs: 60 }).data;
+    const sweepRef = useRef(sweep); sweepRef.current = sweep;
+    const frameAt = useCallback((t: number) => frameFromSweep(sweepRef.current, x, h, t, rangeRef.current), [x, h]);
+    const rangeRef = useRef(range); rangeRef.current = range;
     const [currentTime, setCurrentTime] = useState(0);
     const timeRef = useRef(0);
     const historyRef = useRef<Point[]>([]);
@@ -371,10 +377,10 @@ export const ConvolutionCanvas = forwardRef<ConvolutionCanvasHandle, Props>(
       historyRef.current = [];
       timeRef.current = 0;
       setCurrentTime(0);
-      const res = continuousConvolutionAt(x, h, 0);
+      const res = frameAt(0);
       onFrameRef.current(res);
       onManualRef.current(res);
-    }, [x, h]);
+    }, [x, h, sweep]);
 
     // Animation playback loop
     useEffect(() => {
@@ -396,7 +402,7 @@ export const ConvolutionCanvas = forwardRef<ConvolutionCanvasHandle, Props>(
           historyRef.current = [];
         }
 
-        const res = continuousConvolutionAt(x, h, timeRef.current);
+        const res = frameAt(timeRef.current);
         const lastHist = historyRef.current[historyRef.current.length - 1];
         if (!lastHist || Math.abs(lastHist.time - res.t) > 0.004) {
           historyRef.current.push({ time: res.t, value: res.value });
@@ -412,7 +418,7 @@ export const ConvolutionCanvas = forwardRef<ConvolutionCanvasHandle, Props>(
         cancelAnimationFrame(animFrameRef.current);
         lastAnimTimeRef.current = 0;
       };
-    }, [isPlaying, speed, x, h, range]);
+    }, [isPlaying, speed, x, h, range, frameAt]);
 
     // External imperative handle
     useImperativeHandle(
@@ -422,7 +428,7 @@ export const ConvolutionCanvas = forwardRef<ConvolutionCanvasHandle, Props>(
           const clamped = Math.max(range.from, Math.min(range.to, t));
           timeRef.current = clamped;
           setCurrentTime(clamped);
-          const res = continuousConvolutionAt(x, h, clamped);
+          const res = frameAt(clamped);
           historyRef.current = [{ time: clamped, value: res.value }];
           onFrameRef.current(res);
           onManualRef.current(res);
@@ -431,20 +437,20 @@ export const ConvolutionCanvas = forwardRef<ConvolutionCanvasHandle, Props>(
           const next = Math.max(range.from, Math.min(range.to, timeRef.current + delta));
           timeRef.current = next;
           setCurrentTime(next);
-          const res = continuousConvolutionAt(x, h, next);
+          const res = frameAt(next);
           historyRef.current.push({ time: next, value: res.value });
           onFrameRef.current(res);
           onManualRef.current(res);
         },
         currentTime: () => timeRef.current,
       }),
-      [x, h, range]
+      [x, h, range, frameAt]
     );
 
     // Compute active points for current time
     const result = useMemo(
-      () => continuousConvolutionAt(x, h, currentTime),
-      [x, h, currentTime]
+      () => frameAt(currentTime),
+      [frameAt, currentTime, sweep]
     );
 
     // Sample tau-domain signals
@@ -479,13 +485,9 @@ export const ConvolutionCanvas = forwardRef<ConvolutionCanvasHandle, Props>(
     // Output y(t) peak over the whole window (stable scale while the shift animates)
     const outputPeakAmp = useMemo(() => {
       let maxVal = 0;
-      const samples = 96;
-      for (let i = 0; i <= samples; i++) {
-        const t = range.from + ((range.to - range.from) * i) / samples;
-        maxVal = Math.max(maxVal, Math.abs(continuousConvolutionAt(x, h, t).value));
-      }
+      for (const frame of sweep ?? []) maxVal = Math.max(maxVal, Math.abs(frame.value));
       return goldenYLimit(maxVal);
-    }, [x, h, range]);
+    }, [sweep]);
 
     // Segments for smooth curves
     const xSegments = useMemo(
@@ -636,7 +638,7 @@ export const ConvolutionCanvas = forwardRef<ConvolutionCanvasHandle, Props>(
           }
           hudContent={({ relX, relY, domainT }, size) => {
             const hist = historyRef.current.find((p) => Math.abs(p.time - domainT) < 0.1);
-            const yVal = hist ? hist.value : continuousConvolutionAt(x, h, domainT).value;
+            const yVal = hist ? hist.value : frameAt(domainT).value;
             const leftPos = Math.min(Math.max(10, relX + 14), size.width - 160);
             const topPos = Math.min(Math.max(10, relY - 40), size.height - 65);
             return (

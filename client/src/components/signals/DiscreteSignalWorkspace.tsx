@@ -10,10 +10,7 @@ import { KatexMath } from "@/components/ui/KatexMath";
 import { InnerBox, StatusBadge, StudioCard } from "@/components/common/templates";
 import { UnifiedSignalEngineTerminal } from "@/components/signals/common/UnifiedSignalEngineTerminal";
 import { DiscreteStemPlot } from "@/components/signals/DiscreteStemPlot";
-import {
-  analyzeSequence, discreteWindow, discreteYDomain, evaluateDiscrete, parseDiscreteSignal, sampleSequence, sequenceArrayLatex,
-  type SequenceAnalysis,
-} from "@/features/signals/engines/discreteSignalEngine";
+import { analyzeSequence, discreteWindow, discreteYDomain, evaluateDiscrete, parseDiscreteSignal, sampleSequence, sequenceArrayLatex, type SequenceAnalysis } from "@shared/signals/discreteSignalEngine";
 
 const tex = String.raw;
 const ORIGINAL = "#2563EB";

@@ -7,7 +7,7 @@ import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import { KatexMath } from "@/components/ui/KatexMath";
-import type { ComplexCoefficient } from "@/features/signals/engines/fourierEngine";
+import type { ComplexCoefficient } from "@shared/signals/results";
 
 type Props = { coefficients: ComplexCoefficient[]; spanLimit: number; period: number; omega0: number; className?: string };
 

@@ -5,7 +5,7 @@
  * from the same analytic model (numerical integration only when no table pair applies).
  */
 import { cn } from "@/lib/utils";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { KatexMath } from "@/components/ui/KatexMath";
 import { SegmentedControl, StatusBadge, StudioSlider, StudioCard, InnerBox, MathNumberInput } from "@/components/common/templates";
@@ -13,11 +13,11 @@ import { UnifiedSignalEngineTerminal } from "@/components/signals/common/Unified
 import FourierCanvases, { type SpectrumSample, type TimeTrace } from "@/components/signals/FourierCanvases";
 import { FourierWaterfall3D } from "@/components/signals/FourierWaterfall3D";
 import { N_MAX, PERIOD_BOUNDS, presetWindow, suggestPeriod, type TimeWindow, type WindowPreset } from "@/components/signals/fourierWindow";
-import { deriveFourierSeriesSteps, deriveTrigSeriesSteps, fourierSeries, fourierTransform } from "@/features/signals/engines/fourierEngine";
-import { deriveForwardFourierSteps, deriveInverseFourierSteps, forwardFourier, inverseFourier, sampleSpectrum, scaleSpectrum, spectrumBandwidth, type Impulse } from "@/features/signals/engines/fourierAnalytic";
-import { evaluateSignal } from "@/features/signals/engines/signalEngine";
-import { estimateSupport } from "@/lib/plotAutoScale";
-import { parseUnifiedSignal, parseUnifiedSignalNode } from "@/lib/signals/unifiedSignalParser";
+import { fourierInverseRemote, fourierSeriesRemote, fourierTransformRemote, type SpectrumViewWire } from "@/services/signalsClient";
+import { useRemoteQuery } from "@/lib/useRemoteQuery";
+import { evaluateSignal } from "@shared/signals/signalEngine";
+import { estimateSupport } from "@shared/signals/plotAutoScale";
+import { parseUnifiedSignal, parseUnifiedSignalNode } from "@shared/signals/unifiedSignalParser";
 import { SelectedCoefficientsTable } from "@/features/signals/ui/SelectedCoefficientsTable";
 import { ContinuousDerivationCard } from "@/features/signals/ui/ContinuousDerivationCard";
 import { FourierSeriesDerivationCard } from "@/features/signals/ui/FourierSeriesDerivationCard";
@@ -34,7 +34,7 @@ const freqExamples = [
   { label: "Two-sided exponential", value: "\\frac{4}{4+\\omega^{2}}" }, { label: "Ideal low-pass", value: "\\text{rect}\\left(\\frac{\\omega}{4}\\right)" },
 ] as const;
 type Domain = "time" | "freq";
-type SpectrumView = { samples: SpectrumSample[]; impulses: Impulse[]; bandwidth: number };
+type SpectrumView = SpectrumViewWire;
 
 function number(value: number, digits = 4) { return Number(value.toFixed(digits)).toString(); }
 
@@ -83,55 +83,47 @@ export function FourierStudio() {
   // ── Time-domain direction: 𝓕{x(t)} ──
   const parsed = useMemo(() => parseUnifiedSignalNode(expression), [expression]);
   const parsedMath = useMemo(() => parseUnifiedSignal(expression), [expression]);
-  const forward = useMemo(() => (!freqMode && parsedMath.ok ? forwardFourier(parsedMath.node) : null), [freqMode, parsedMath]);
-  const series = useMemo(() => (!freqMode && parsed.ok && mode === "fs" ? fourierSeries(parsed.ast, fundamentalPeriod, N_MAX) : null), [freqMode, mode, parsed, fundamentalPeriod]);
-  const trigDerivationSteps = useMemo(() => (!freqMode && mode === "fs" && parsed.ok ? deriveTrigSeriesSteps(parsed.ast, fundamentalPeriod) : null), [freqMode, mode, parsed, fundamentalPeriod]);
-  const seriesDerivationSteps = useMemo(() => (!freqMode && mode === "fs" && parsed.ok ? deriveFourierSeriesSteps(parsed.ast, fundamentalPeriod) : null), [freqMode, mode, parsed, fundamentalPeriod]);
-  const transformDerivationSteps = useMemo(() => (!freqMode && mode === "ft" && parsedMath.ok ? deriveForwardFourierSteps(parsedMath.node) : null), [freqMode, mode, parsedMath]);
-  // Signal-aware T₀: spectral lines → 2π/gcd(ω_i); pulses → twice their extent about t = 0.
+  // The analytic pair, spectrum, series and derivations are computed by the serverless engine; the last answer stays
+  // on screen while a newer one loads. Only plotting of the user's own expression (x(t), traces) runs here.
+  const wantSeries = !freqMode && mode === "fs" && parsed.ok;
+  const wantTransform = !freqMode && parsedMath.ok && parsed.ok;
+  const seriesQuery = useRemoteQuery(`fs|${expression}|${fundamentalPeriod}`, (signal) => fourierSeriesRemote(expression, fundamentalPeriod, N_MAX, signal), { enabled: wantSeries, debounceMs: 60 });
+  const transformQuery = useRemoteQuery(`ft|${expression}|${scale}|${mode}`, (signal) => fourierTransformRemote(expression, scale, mode === "ft", signal), { enabled: wantTransform, debounceMs: 60 });
+  const forward = wantTransform && !transformQuery.error ? transformQuery.data : null;
+  const series = wantSeries && !seriesQuery.error ? seriesQuery.data?.series ?? null : null;
+  const trigDerivationSteps = wantSeries && !seriesQuery.error ? seriesQuery.data?.trigSteps ?? null : null;
+  const seriesDerivationSteps = wantSeries && !seriesQuery.error ? seriesQuery.data?.seriesSteps ?? null : null;
+  const transformDerivationSteps = !freqMode && mode === "ft" && forward ? forward.steps : null;
+  // Signal-aware T₀: spectral lines → 2π/gcd(ω_i); pulses → twice their extent about t = 0 (once per expression, when its answer lands).
+  const suggestedFor = useRef<string | null>(null);
   useEffect(() => {
     if (freqMode || !parsed.ok) return;
+    if (!forward || forward.expression !== expression || suggestedFor.current === expression) return;
+    suggestedFor.current = expression;
     const ast = parsed.ast;
-    const lines = forward?.ok ? forward.spectrum.impulses.map((impulse) => impulse.omega) : [];
+    const lines = forward.unscaledImpulses.map((impulse) => impulse.omega);
     const suggested = suggestPeriod((time) => evaluateSignal(ast, time), lines);
     if (suggested !== null) applyPeriod(suggested);
-  }, [expression, freqMode]); // eslint-disable-line react-hooks/exhaustive-deps
-  const timeSpectrum = useMemo<SpectrumView | null>(() => {
-    if (freqMode || mode !== "ft" || !parsed.ok) return null;
-    if (forward?.ok) { const model = scaleSpectrum(forward.spectrum, scale); const bandwidth = spectrumBandwidth(model); return { samples: sampleSpectrum(model, bandwidth), impulses: model.impulses, bandwidth }; }
-    // Numerical fallback: wide pass, then crop to the 10% bandwidth (+20%).
-    const wide = fourierTransform(parsed.ast, scale, 40, 400, 10, 2000).spectrum;
-    const peak = Math.max(...wide.map((point) => point.magnitude), 1e-12);
-    const edge = Math.max(0, ...wide.filter((point) => point.magnitude > 0.1 * peak).map((point) => Math.abs(point.omega)));
-    const bandwidth = Math.min(40, Math.max(4, 1.2 * edge));
-    return { samples: wide.filter((point) => Math.abs(point.omega) <= bandwidth), impulses: [], bandwidth };
-  }, [forward, freqMode, mode, parsed, scale]);
+  }, [expression, freqMode, forward]); // eslint-disable-line react-hooks/exhaustive-deps
+  const timeSpectrum: SpectrumView | null = !freqMode && mode === "ft" && parsed.ok && forward ? forward.spectrum : null;
   const timeTrace = useMemo<TimeTrace | null>(() => {
     if (freqMode || mode !== "ft" || !parsed.ok) return null;
     const ast = parsed.ast; const fn = (time: number) => evaluateSignal(ast, scale * time);
-    const lines = forward?.ok ? forward.spectrum.impulses.map((impulse) => Math.abs(impulse.omega * scale)).filter((omega) => omega > 1e-9) : [];
+    const lines = forward ? forward.unscaledImpulses.map((impulse) => Math.abs(impulse.omega * scale)).filter((omega) => omega > 1e-9) : [];
     const radius = traceWindow(fn, lines.length ? (2 * Math.PI) / Math.min(...lines) : undefined);
     return { katexName: Math.abs(scale - 1) < 1e-9 ? "x(t)" : `x(${number(scale, 2)}t)`, data: sampleTrace(fn, radius) };
   }, [forward, freqMode, mode, parsed, scale]);
 
   // ── Frequency-domain direction: 𝓕⁻¹{X(jω)} ──
-  const inverse = useMemo(() => (freqMode ? inverseFourier(spectrumSource) : null), [freqMode, spectrumSource]);
-  const inverseDerivationSteps = useMemo(() => (freqMode ? deriveInverseFourierSteps(spectrumSource) : null), [freqMode, spectrumSource]);
-  const freqSpectrum = useMemo<SpectrumView | null>(() => {
-    if (!inverse?.ok) return null;
-    const bandwidth = spectrumBandwidth(inverse.spectrum);
-    return { samples: sampleSpectrum(inverse.spectrum, bandwidth), impulses: inverse.spectrum.impulses, bandwidth };
-  }, [inverse]);
-  const freqTrace = useMemo<TimeTrace | null>(() => {
-    if (!inverse?.ok) return null;
-    const lines = inverse.spectrum.impulses.map((impulse) => Math.abs(impulse.omega)).filter((omega) => omega > 1e-9);
-    const radius = traceWindow(inverse.valueAt, lines.length ? (2 * Math.PI) / Math.min(...lines) : undefined);
-    return { katexName: "x(t)", data: sampleTrace(inverse.valueAt, radius) };
-  }, [inverse]);
+  const inverseQuery = useRemoteQuery(`inv|${spectrumSource}`, (signal) => fourierInverseRemote(spectrumSource, signal), { enabled: freqMode, debounceMs: 60 });
+  const inverse = freqMode && !inverseQuery.error ? inverseQuery.data : null;
+  const inverseDerivationSteps = inverse ? inverse.steps : null;
+  const freqSpectrum: SpectrumView | null = inverse?.analytic && inverse.spectrum ? inverse.spectrum : null;
+  const freqTrace = useMemo<TimeTrace | null>(() => (inverse?.analytic && inverse.trace ? { katexName: "x(t)", data: inverse.trace } : null), [inverse]);
 
   const spectrum = freqMode ? freqSpectrum : timeSpectrum;
   const impulseNote = spectrum && spectrum.impulses.length > 0 ? ["Impulse lines are drawn as violet spikes whose height equals their area."] : [];
-  const ready = freqMode ? Boolean(inverse?.ok) : parsed.ok;
+  const ready = freqMode ? Boolean(inverse?.analytic) : parsed.ok;
   return <div className="fourier-academic space-y-6">
     <StudioCard className="overflow-hidden">
       <div className="flex flex-col gap-4 border-b border-slate-200 pb-5 dark:border-slate-800 lg:flex-row lg:items-end lg:justify-between">
@@ -179,7 +171,7 @@ export function FourierStudio() {
             />
           )}
           {freqMode ? (
-            <UnifiedSignalEngineTerminal key="freq" title={t('signals.frequencyDomainSpectrumTitle', 'Frequency-domain spectrum')} domain="w" channels={[{ id: "X", lhs: "X(j\\omega)", value: spectrumSource, onChange: setSpectrumSource, error: inverse && !inverse.ok ? inverse.error : null }]}>
+            <UnifiedSignalEngineTerminal key="freq" title={t('signals.frequencyDomainSpectrumTitle', 'Frequency-domain spectrum')} domain="w" channels={[{ id: "X", lhs: "X(j\\omega)", value: spectrumSource, onChange: setSpectrumSource, error: inverse && !inverse.analytic ? inverse.error ?? null : null }]}>
               <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">{freqExamples.map((example) => <button key={example.label} type="button" onClick={() => setSpectrumSource(example.value)} className={`rounded-xl border px-3 py-2 text-left text-xs font-bold transition active:scale-[.98] ${idle}`}>{example.label}</button>)}</div>
             </UnifiedSignalEngineTerminal>
           ) : (
@@ -238,10 +230,10 @@ export function FourierStudio() {
               title={t('signals.inverseFourierTransform', 'Inverse Fourier Transform')}
               pair={String.raw`\mathcal{F}^{-1}\{X(j\omega)\}=x(t)`}
               steps={inverseDerivationSteps}
-              target={inverse?.ok ? inverse.latex : null}
+              target={inverse?.analytic ? inverse.latex ?? null : null}
               targetTestId="fourier-solution"
-              badge={<StatusBadge variant={inverse?.ok ? "info" : "neutral"} className="uppercase tracking-wider text-[10px]">{inverse?.ok ? t('signals.analytic', 'Analytic') : t('signals.numerical', 'Numerical')}</StatusBadge>}
-              notes={[...(inverse?.ok ? inverse.notes : []), ...impulseNote]}
+              badge={<StatusBadge variant={inverse?.analytic ? "info" : "neutral"} className="uppercase tracking-wider text-[10px]">{inverse?.analytic ? t('signals.analytic', 'Analytic') : t('signals.numerical', 'Numerical')}</StatusBadge>}
+              notes={[...(inverse?.analytic ? inverse.notes ?? [] : []), ...impulseNote]}
             />
           ) : !freqMode && mode === "ft" && transformDerivationSteps ? (
             <ContinuousDerivationCard
@@ -249,10 +241,10 @@ export function FourierStudio() {
               title={t('signals.fourierTransform', 'Fourier Transform')}
               pair={String.raw`\mathcal{F}\{x(t)\}=X(j\omega)`}
               steps={transformDerivationSteps}
-              target={forward?.ok ? forward.spectrum.latex : null}
+              target={forward?.analytic ? forward.latex ?? null : null}
               targetTestId="fourier-solution"
-              badge={<StatusBadge variant={forward?.ok ? "info" : "neutral"} className="uppercase tracking-wider text-[10px]">{forward?.ok ? t('signals.analytic', 'Analytic') : t('signals.numerical', 'Numerical')}</StatusBadge>}
-              notes={[...(forward && !forward.ok ? [`${forward.error} The spectra are computed numerically from the definition integral.`] : []), ...impulseNote]}
+              badge={<StatusBadge variant={forward?.analytic ? "info" : "neutral"} className="uppercase tracking-wider text-[10px]">{forward?.analytic ? t('signals.analytic', 'Analytic') : t('signals.numerical', 'Numerical')}</StatusBadge>}
+              notes={[...(forward && !forward.analytic ? [`${forward.error} The spectra are computed numerically from the definition integral.`] : []), ...impulseNote]}
             />
           ) : (
             viewMode === "fs" && seriesDerivationSteps && trigDerivationSteps ? (

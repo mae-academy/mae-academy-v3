@@ -6,7 +6,7 @@
  */
 import type { PointerEvent as ReactPointerEvent, WheelEvent as ReactWheelEvent } from "react";
 import { useEffect, useRef } from "react";
-import { magnitudeLandscape, type TransferFunction } from "@/features/signals/engines/laplaceEngine";
+import { magnitudeLandscape, type TransferFunction } from "@shared/signals/transferFunction";
 import { DEFAULT_CAMERA, MAX_ELEVATION, MAX_ZOOM, MIN_ZOOM, project3D, rampColor, type Camera3D } from "./software3d";
 
 type Point3 = { x: number; y: number; z: number; t: number };

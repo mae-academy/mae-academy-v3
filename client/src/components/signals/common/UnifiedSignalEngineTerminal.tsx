@@ -11,21 +11,7 @@ import { useTranslation } from "react-i18next";
 import { KatexMath } from "@/components/ui/KatexMath";
 import { MathLiveSignalInput, type MathLiveSignalInputHandle } from "@/components/signals/MathLiveSignalInput";
 import { cn } from "@/lib/utils";
-import {
-  differentiateExpression,
-  integrateExpression,
-  NUMPAD_ROWS,
-  OPERATOR_TOKENS,
-  SIGNAL_TOKENS,
-  discreteTokens,
-  spectrumTokens,
-  splitSignalEquation,
-  transferTokens,
-  wrapDerivativeLatex,
-  wrapIntegralLatex,
-  type OperatorResult,
-  type SignalToken,
-} from "@/lib/signals/unifiedSignalParser";
+import { differentiateExpression, integrateExpression, NUMPAD_ROWS, OPERATOR_TOKENS, SIGNAL_TOKENS, discreteTokens, spectrumTokens, splitSignalEquation, transferTokens, wrapDerivativeLatex, wrapIntegralLatex, type OperatorResult, type SignalToken } from "@shared/signals/unifiedSignalParser";
 
 /** t: signals; n: discrete sequences; s/z: transfer functions; w: Fourier spectra X(jω). */
 export type TerminalDomain = "t" | "n" | "s" | "z" | "w";

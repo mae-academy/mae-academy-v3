@@ -3,7 +3,7 @@
  */
 import { useTranslation } from "react-i18next";
 import { StatusBadge } from "@/components/common/templates";
-import type { DerivationStep } from "@/features/signals/engines/derivationTypes";
+import type { DerivationStep } from "@shared/signals/derivationTypes";
 import { ContinuousDerivationCard } from "@/features/signals/ui/ContinuousDerivationCard";
 
 type Props = { direction: "forward" | "inverse"; steps: DerivationStep[] | null; error?: string | null; notes?: string[]; className?: string };

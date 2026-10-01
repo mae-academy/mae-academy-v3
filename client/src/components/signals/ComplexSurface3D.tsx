@@ -23,8 +23,8 @@ import {
   type Pseudo3DFrame,
   type Pseudo3DHandle,
 } from "@/components/common/3d";
-import { complexLatex, formatTransferLatex, type PlaneMode, type RocResult, type TransferFunction } from "@/features/signals/engines/laplaceEngine";
-import { niceTicks } from "@/lib/plotAutoScale";
+import { complexLatex, formatTransferLatex, type PlaneMode, type RocResult, type TransferFunction } from "@shared/signals/transferFunction";
+import { niceTicks } from "@shared/signals/plotAutoScale";
 import { buildComplexSurface, FLOOR_HEIGHT, heightFor, heightTicks, magnitudeAt, SURFACE_HEIGHT, SURFACE_STOPS, WIRE_EVERY, type ComplexSurface } from "./complexSurfaceModel";
 import { SurfaceRaster } from "./surfaceRaster";
 

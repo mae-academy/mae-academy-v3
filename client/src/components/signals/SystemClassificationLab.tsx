@@ -10,9 +10,12 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { KatexMath } from "@/components/ui/KatexMath";
 import { StatusBadge, StudioSlider, StudioCard, InnerBox } from "@/components/common/templates";
 import { UnifiedSignalEngineTerminal } from "@/components/signals/common/UnifiedSignalEngineTerminal";
-import type { SignalToken } from "@/lib/signals/unifiedSignalParser";
+import type { SignalToken } from "@shared/signals/unifiedSignalParser";
 import SystemProofCanvas from "@/components/signals/SystemProofCanvas";
-import { classifySystem, evaluateSystem, parseSystemExpression, PILLAR_OUTLINE, x2, type Pillar, type PillarId } from "@/features/signals/engines/systemClassifier";
+import type { Pillar, PillarId } from "@shared/signals/results";
+import { PILLAR_OUTLINE } from "@shared/signals/pillarOutline";
+import { classifyReportRemote } from "@/services/signalsClient";
+import { useRemoteQuery } from "@/lib/useRemoteQuery";
 
 const tex = String.raw;
 const idle = "border-slate-200 text-slate-600 hover:border-violet-300 hover:text-violet-700 dark:border-slate-800 dark:text-slate-300 dark:hover:border-violet-500 dark:hover:text-violet-200";
@@ -95,8 +98,10 @@ export function SystemClassificationLab() {
   const { t } = useTranslation('simulators');
   const [expression, setExpression] = useState(tex`y(t)=x(2t)`);
   const [a, setA] = useState(1.0); const [b, setB] = useState(-1.0); const [t0, setT0] = useState(1.0);
-  const parsed = useMemo(() => parseSystemExpression(expression), [expression]);
-  const report = useMemo(() => parsed.ok ? classifySystem(parsed.system) : null, [parsed]);
+  // Parsing and the five-pillar classification (with their proofs) run on the serverless engine; the last answer stays while a newer one loads.
+  const query = useRemoteQuery(`cls|${expression}`, (signal) => classifyReportRemote(expression, signal), { debounceMs: 60 });
+  const parsed: { ok: true; system: NonNullable<typeof query.data>["system"] } | { ok: false; error: string } = query.error || !query.data ? { ok: false, error: query.error ?? "" } : { ok: true, system: query.data.system };
+  const report = query.error ? null : query.data?.report ?? null;
 
   return <div className="space-y-6">
     <StudioCard className="overflow-hidden">

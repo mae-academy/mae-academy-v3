@@ -6,14 +6,15 @@
  * 3. Time trace — harmonic builder x_N(t), the time-scaled x(at), or the synthesized 𝓕⁻¹ waveform.
  * All ranges auto-scale (ω window from the spectrum's 1% bandwidth + 20% headroom); there is no zoom.
  */
-import { niceTicks, symmetricYBound } from "@/lib/plotAutoScale";
+import { niceTicks, symmetricYBound } from "@shared/signals/plotAutoScale";
 import { SvgKatexTick } from "@/components/common/templates/SvgKatexTick";
 import React, { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import { useElementSize } from "@/hooks/useElementSize";
 import { KatexMath } from "@/components/ui/KatexMath";
 import { StandardStepPlot } from "@/components/common/templates/StandardStepPlot";
-import { partialSum, type FourierSeriesResult } from "@/features/signals/engines/fourierEngine";
-import type { Impulse } from "@/features/signals/engines/fourierAnalytic";
+import type { FourierSeriesResult } from "@shared/signals/results";
+import { partialSum } from "@shared/signals/seriesSynthesis";
+import type { Impulse } from "@shared/signals/results";
 
 export type SpectrumSample = { omega: number; magnitude: number; phase: number };
 export type TimeTrace = { katexName: string; data: Array<{ x: number; y: number }> };

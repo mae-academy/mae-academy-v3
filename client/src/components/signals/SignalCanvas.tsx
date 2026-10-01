@@ -8,13 +8,7 @@ import {
   PiecewiseSignalScope,
   type ScopeModel,
 } from "@/components/signals/PiecewiseSignalScope";
-import {
-  evaluateWindowedSignal,
-  type ImpulseMarker,
-  type PeriodMode,
-  type SignalNode,
-  type SignalWindow,
-} from "@/features/signals/engines/signalEngine";
+import { evaluateWindowedSignal, type ImpulseMarker, type PeriodMode, type SignalNode, type SignalWindow } from "@shared/signals/signalEngine";
 
 type Props = {
   node: SignalNode;

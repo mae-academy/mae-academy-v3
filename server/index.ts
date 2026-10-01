@@ -13,6 +13,7 @@ import { handleEvaluate } from "../api/_lib/plc/handler";
 import { handleLogoEvaluate } from "../api/_lib/plc/logo/handler";
 import { handleSolve } from "../api/_lib/circuit/handler";
 import { handleLogic } from "../api/_lib/logic/handler";
+import { handleSignals } from "../api/_lib/signals/handler";
 import { expressGuard } from "../api/_lib/security/node-adapter";
 import type { Tier } from "../api/_lib/security/ratelimit";
 import { pdfCheckHandler, pdfDownloadHandler, pdfProxyHandler } from "./pdfProxy";
@@ -32,6 +33,8 @@ async function startServer() {
         ? "circuit"
         : path.startsWith("/logic/")
         ? "logic"
+        : path.startsWith("/signals/")
+        ? "signals"
         : /^\/(pdf-thumb|pdf-proxy|pdf-download|library\/cover)/.test(path)
         ? "assets"
         : "general";
@@ -75,6 +78,17 @@ async function startServer() {
   app.post("/api/logic/solve", express.text({ type: "*/*", limit: "384kb" }), async (req, res) => {
     const response = await handleLogic(
       new Request("http://localhost/api/logic/solve", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: typeof req.body === "string" ? req.body : "",
+      }),
+    );
+    res.status(response.status).type("application/json").send(await response.text());
+  });
+  // Signals & Systems engines: same web-standard handler as api/signals/transform.ts.
+  app.post("/api/signals/transform", express.text({ type: "*/*", limit: "384kb" }), async (req, res) => {
+    const response = await handleSignals(
+      new Request("http://localhost/api/signals/transform", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: typeof req.body === "string" ? req.body : "",

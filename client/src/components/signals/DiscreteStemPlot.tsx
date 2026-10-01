@@ -8,8 +8,8 @@ import { useCallback, useMemo, useState, type PointerEvent } from "react";
 import { useElementSize } from "@/hooks/useElementSize";
 import { KatexMath } from "@/components/ui/KatexMath";
 import { SvgKatexTick } from "@/components/common/templates/SvgKatexTick";
-import { niceTicks } from "@/lib/plotAutoScale";
-import type { DiscreteSample } from "@/features/signals/engines/discreteSignalEngine";
+import { niceTicks } from "@shared/signals/plotAutoScale";
+import type { DiscreteSample } from "@shared/signals/discreteSignalEngine";
 
 type Props = {
   title: string;

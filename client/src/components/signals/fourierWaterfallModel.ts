@@ -3,8 +3,8 @@
  * cosines y_k(t) = A_k cos(kω₀t + φ_k), assigns depth lanes per spectrum mode, and evaluates the
  * staggered synthesize/decompose weights. Rendering lives in FourierWaterfall3D.tsx.
  */
-import type { FourierSeriesResult } from "@/features/signals/engines/fourierEngine";
-import { niceCeil } from "@/lib/plotAutoScale";
+import type { FourierSeriesResult } from "@shared/signals/results";
+import { niceCeil } from "@shared/signals/plotAutoScale";
 import { HARMONIC_SPECTRUM, spectrumHex } from "@/lib/spectralPalette";
 
 export type SpectrumMode = "positive" | "bilateral";

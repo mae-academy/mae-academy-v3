@@ -6,7 +6,7 @@ import { forwardRef, useImperativeHandle, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { KatexMath } from "@/components/ui/KatexMath";
 import { FormulaBox, InnerBox, StatusBadge, StudioCard } from "@/components/common/templates";
-import type { ConvolutionRegime, RegimeKind } from "@/features/signals/engines/convolutionPiecewise";
+import type { ConvolutionRegime, RegimeKind } from "@shared/signals/results";
 
 export type ConvolutionAnalysisHandle = { update: (regime: ConvolutionRegime, t: number, value: number) => void };
 type Snapshot = { regime: ConvolutionRegime; t: number; value: number };

@@ -8,6 +8,7 @@ export const TIERS = {
   plc: { limit: 900, windowMs: 60_000 },
   circuit: { limit: 900, windowMs: 60_000 }, // live transient batches (~10/s) plus on-demand DC / derivation requests
   logic: { limit: 900, windowMs: 60_000 }, // live discrete-event batches (~10/s) plus K-map / FSM / synthesis / timing queries
+  signals: { limit: 900, windowMs: 60_000 }, // debounced slider-driven transform requests (~10/s) plus on-demand derivations
 } as const;
 export type Tier = keyof typeof TIERS;
 
@@ -157,5 +158,5 @@ export function createLimiter(tier: Tier, env: LimiterEnv): Limiter {
     analytics: false,
   });
   // The simulation loop must not wait on Redis; every other tier can.
-  return tier === 'plc' || tier === 'circuit' || tier === 'logic' ? new HybridLimiter(memory, remote, limit) : new RedisLimiter(remote, memory);
+  return tier === 'plc' || tier === 'circuit' || tier === 'logic' || tier === 'signals' ? new HybridLimiter(memory, remote, limit) : new RedisLimiter(remote, memory);
 }

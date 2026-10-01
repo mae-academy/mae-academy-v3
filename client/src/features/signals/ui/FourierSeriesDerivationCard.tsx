@@ -6,7 +6,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { SegmentedControl } from "@/components/common/templates";
 import { KatexMath } from "@/components/ui/KatexMath";
-import type { DerivationStep } from "@/features/signals/engines/derivationTypes";
+import type { DerivationStep } from "@shared/signals/derivationTypes";
 import { ContinuousDerivationCard } from "@/features/signals/ui/ContinuousDerivationCard";
 
 type SeriesForm = "efs" | "tfs";

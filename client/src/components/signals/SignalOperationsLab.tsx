@@ -12,14 +12,11 @@ import { MathNumberInput, SegmentedControl, StudioCard, InnerBox, StatusBadge } 
 import { UnifiedSignalEngineTerminal } from "@/components/signals/common/UnifiedSignalEngineTerminal";
 import { PiecewiseSignalScope, type ScopeModel } from "@/components/signals/PiecewiseSignalScope";
 import { DISCRETE_DEFAULT, DiscreteInputPanel, DiscreteResults } from "@/components/signals/DiscreteSignalWorkspace";
-import {
-  analyzeCompositeSignal,
-  createCompositeSignal,
-  sampleCompositeSignal,
-  type CompositeAnalysis,
-  type CompositeSignalModel,
-} from "@/features/signals/engines/compositeSignal";
-import { parseUnifiedSignal } from "@/lib/signals/unifiedSignalParser";
+import { createCompositeSignal, sampleCompositeSignal, type CompositeSignalModel } from "@shared/signals/compositeSignal";
+import type { CompositeAnalysis } from "@shared/signals/results";
+import { analyzeCompositeRemote } from "@/services/signalsClient";
+import { useRemoteQuery } from "@/lib/useRemoteQuery";
+import { parseUnifiedSignal } from "@shared/signals/unifiedSignalParser";
 
 const tex = String.raw;
 
@@ -52,10 +49,9 @@ export function SignalOperationsLab() {
 
   const parsed = useMemo(() => parseUnifiedSignal(expression), [expression]);
   const model = useMemo(() => (parsed.ok ? createCompositeSignal(parsed.node, parsed.latex) : null), [parsed]);
-  const analysis = useMemo(
-    () => (model ? analyzeCompositeSignal(model, { periodicOverride, windowStart, windowEnd }) : null),
-    [model, periodicOverride, windowStart, windowEnd],
-  );
+  // Periodicity (GCD/LCM), energy and power are solved by the serverless engine; the curve itself is sampled here from the parsed model.
+  const analysisQuery = useRemoteQuery(`${expression}|${periodicOverride}|${windowStart}|${windowEnd}`, (signal) => analyzeCompositeRemote(expression, periodicOverride, windowStart, windowEnd, signal), { enabled: Boolean(model), debounceMs: 80 });
+  const analysis = model && !analysisQuery.error ? analysisQuery.data : null;
 
   return (
     <div className="space-y-6">

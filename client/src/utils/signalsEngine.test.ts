@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { evaluateDefiniteIntegral, siftProduct } from "@/features/signals/engines/diracIntegral";
+import { evaluateDefiniteIntegral, siftProduct } from "@shared/signals/mathExpression";
 import { createPiecewiseSignal, evaluateBasicSignal, samplePiecewiseSignal, type SignalOperation } from "./signalsEngine";
 
 const operation = (primary: SignalOperation["primary"], transform: Partial<SignalOperation["transform"]> = {}, secondary?: SignalOperation["secondary"]): SignalOperation => ({ primary, secondary, transform: { amplitude: 1, timeScale: 1, timeShift: 0, ...transform } });

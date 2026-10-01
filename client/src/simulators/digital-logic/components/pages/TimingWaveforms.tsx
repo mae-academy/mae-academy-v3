@@ -6,7 +6,7 @@ import { StudioButton } from '@/components/common/templates';
 import { WaveformTrack } from '@/simulators/digital-logic/components/ui-components/WaveformTrack';
 import { createClockWaveform, extendWaveform, type WaveformValue } from '@shared/logic/timingTypes';
 import { evaluateTimingRemote } from '@/services/logicClient';
-import { useLogicQuery } from '@/simulators/digital-logic/remote/useLogicQuery';
+import { useRemoteQuery as useLogicQuery } from '@/lib/useRemoteQuery';
 import { parseBooleanExpression } from '@shared/logic/logicEngine';
 
 const INITIAL_EXPRESSION = 'A ^ B';

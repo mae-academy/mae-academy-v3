@@ -3,11 +3,7 @@
  * Canonical vector SVG implementation consuming StandardStepPlot template.
  */
 import React, { forwardRef, useEffect, useImperativeHandle, useState, useMemo } from "react";
-import {
-  frequencyResponse,
-  impulseResponse,
-  type TransferFunction,
-} from "@/features/signals/engines/laplaceEngine";
+import { frequencyResponse, impulseResponse, type TransferFunction } from "@shared/signals/transferFunction";
 import { KatexMath } from "@/components/ui/KatexMath";
 import { StandardStepPlot } from "@/components/common/templates/StandardStepPlot";
 

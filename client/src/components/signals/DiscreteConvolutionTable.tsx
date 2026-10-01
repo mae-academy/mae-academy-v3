@@ -12,7 +12,7 @@ import {
   FormulaBox,
   StatusBadge,
 } from "@/components/common/templates";
-import { discreteConvolution } from "@/features/signals/engines/convolutionEngine";
+import { useDiscreteConvolution } from "@/components/signals/useDiscreteConvolution";
 
 function parseSequence(source: string): number[] {
   const values = source
@@ -76,7 +76,7 @@ export function DiscreteConvolutionTable({
   const x = useMemo(() => (propX ? propX : parseSequence(xSource)), [propX, xSource]);
   const h = useMemo(() => (propH ? propH : parseSequence(hSource)), [propH, hSource]);
 
-  const result = useMemo(() => discreteConvolution(x, h), [x, h]);
+  const result = useDiscreteConvolution(x, h);
   const maxN = Math.max(0, result.values.length - 1);
   const index = Math.max(0, Math.min(active, maxN));
   const contributions = result.contributions[index] ?? [];
