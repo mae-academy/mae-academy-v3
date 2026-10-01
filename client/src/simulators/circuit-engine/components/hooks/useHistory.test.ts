@@ -2,7 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useHistory, areSnapshotsEqual, type CanvasSnapshot } from './useHistory';
-import type { CircuitComponent, CircuitWire, WorkspaceText } from '@/simulators/circuit-engine/models/circuitTypes';
+import type { CircuitComponent, CircuitWire, WorkspaceText } from '@shared/circuit/circuitTypes';
 
 describe('useHistory', () => {
   it('captures initial base state immediately on mount and history is never empty', () => {

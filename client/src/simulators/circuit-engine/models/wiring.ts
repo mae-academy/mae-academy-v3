@@ -2,7 +2,8 @@
  * ElectroLab – Wire Routing Utilities
  */
 
-export type Point = [number, number];
+import type { Point } from '@shared/circuit/circuitTypes';
+export type { Point };
 
 export function snapToGrid(v: number, grid: number): number {
   return Math.round(v / grid) * grid;

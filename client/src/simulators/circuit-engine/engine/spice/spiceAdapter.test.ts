@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type {
   CircuitComponent,
   CircuitWire,
-} from "@/simulators/circuit-engine/models/circuitTypes";
+} from "@shared/circuit/circuitTypes";
 import { generateNetlist } from "@/simulators/circuit-engine/engine/spice/netlistGenerator";
 import {
   convertToSpiceComponents,

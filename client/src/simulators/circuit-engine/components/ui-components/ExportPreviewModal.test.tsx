@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { ExportPreviewModal, svgToPngBlob, type ExportItem } from './ExportPreviewModal';
-import { getComponentsByCategory, getDef, COMPONENT_DEFS } from '@/simulators/circuit-engine/models/componentDefs';
+import { getComponentsByCategory, getDef, COMPONENT_DEFS } from '@shared/circuit/componentDefs';
 
 describe('Part 1: Classic Control Components Hidden (UI Only)', () => {
   it('marks Classic Control components as hidden in component definitions', () => {

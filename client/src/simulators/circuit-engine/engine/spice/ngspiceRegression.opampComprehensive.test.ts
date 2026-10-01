@@ -27,8 +27,8 @@ import {
 import { convertToSpiceComponents, resolveCircuitNets } from "@/simulators/circuit-engine/engine/spice/spiceAdapter";
 import { requiresTransientInitialConditions } from "@/simulators/circuit-engine/engine/spice/netlistGenerator";
 import { MIN_OPAMP_GAIN } from "@/simulators/circuit-engine/engine/spice/spiceTypes";
-import { getDef } from "@/simulators/circuit-engine/models/componentDefs";
-import type { CircuitComponent, CircuitWire } from "@/simulators/circuit-engine/models/circuitTypes";
+import { getDef } from "@shared/circuit/componentDefs";
+import type { CircuitComponent, CircuitWire } from "@shared/circuit/circuitTypes";
 import {
   OPAMP_COMPARATOR,
   OPAMP_DIFFERENTIATOR,

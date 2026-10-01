@@ -9,7 +9,7 @@
 import type {
   CircuitComponent,
   CircuitWire,
-} from "@/simulators/circuit-engine/models/circuitTypes";
+} from "@shared/circuit/circuitTypes";
 import {
   convertToSpiceComponents,
   resolveCircuitNets,

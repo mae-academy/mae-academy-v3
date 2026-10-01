@@ -60,7 +60,7 @@ import { ExportPreviewModal, svgToPngBlob, type ExportItem } from '@/simulators/
 import { ShareProjectModal } from '@/simulators/circuit-engine/components/ui-components/ShareProjectModal';
 import { LoadExampleModal } from '@/simulators/circuit-engine/components/ui-components/LoadExampleModal';
 import type { ExampleDefinition } from '@/simulators/circuit-engine/examples';
-import type { AnalysisMethod, AnalysisTrace, MeshCycle, NodalNodeLabel } from '@/simulators/circuit-engine/models/analysisTypes';
+import type { AnalysisMethod, AnalysisTrace, MeshCycle, NodalNodeLabel } from '@shared/circuit/analysisTypes';
 import {
   CATEGORIES,
   getComponentsByCategory,
@@ -68,7 +68,7 @@ import {
   LED_FORWARD_VOLTAGES,
   type ComponentDef,
   type PropertyDef,
-} from '@/simulators/circuit-engine/models/componentDefs';
+} from '@shared/circuit/componentDefs';
 import {
   componentPrefix,
   copyComponentForPaste,
@@ -83,12 +83,11 @@ import {
   type Selection,
   type SimulationSnapshot,
   type WorkspaceText,
-} from '@/simulators/circuit-engine/models/circuitTypes';
-import { SimulationEngine } from '@/simulators/circuit-engine/engine/simulation';
-import { detectCoilConflicts } from '@/simulators/circuit-engine/engine/analogSimulation';
+} from '@shared/circuit/circuitTypes';
+import type { CircuitEngine } from '@/simulators/circuit-engine/engine/RemoteCircuitEngine';
+import { detectCoilConflicts } from '@shared/circuit/coilConflicts';
 import { evaluateComponentHealth } from '@/simulators/circuit-engine/models/componentHealthCheck';
-import { compileNodalGeometry, useSimulation, type TabBMnaState } from '@/simulators/circuit-engine/components/hooks/useSimulation';
-import type { MNAElement } from '@/simulators/circuit-engine/engine/mnaSolver';
+import { compileNodalGeometry } from '@/simulators/circuit-engine/components/hooks/useSimulation';
 import { compileMeshGeometry } from '@/simulators/circuit-engine/components/meshGeometry';
 import { NormalizedCircuitGraph } from '@/simulators/circuit-engine/models/NormalizedCircuitGraph';
 import {
@@ -119,8 +118,8 @@ import { buildSpiceInstrumentReadings } from '@/simulators/circuit-engine/engine
 import { filterTabDCatalog, filterTabDImportedComponents, isTabDComponentAvailable } from '@/simulators/circuit-engine/models/analogComponentCatalog';
 import { alignTabDTerminalToGrid, calculateMeshLoopBounds, calculateTabDPlanarCavity, dynamicRubberBandPath, getExactTerminalOffset, isExactCadComponent, lockTabDWireCorner, MESH_LOOP_COLORS, moveTabDOrthogonalLane, tabDComponentLabelAnchors, tabDGentleWheelZoomFactor, tabDOrthogonalDraftPath, tabDTerminalOrthogonalPath, type ObstacleBox, type TabDTerminalAxis } from '@/simulators/circuit-engine/components/analogCanvasGeometry';
 import { formatMeterReading, renderComponentCanvasLabel, renderSymbol, formatDependentSourceMath, renderDependentSourceValueTspans } from '@/simulators/circuit-engine/components/symbols';
-import { applySwitchHotkey, directControlKind, hotkeyDigit, isTextEntryTarget, momentaryControlProps, nextLatchingControlProps, releaseHeldPushbuttons } from '@/simulators/circuit-engine/models/componentInteraction';
-import { getBrokenWireIds } from '@/simulators/circuit-engine/engine/brokenBranches';
+import { applySwitchHotkey, directControlKind, hotkeyDigit, isTextEntryTarget, momentaryControlProps, nextLatchingControlProps, releaseHeldPushbuttons } from '@shared/circuit/componentInteraction';
+import { getBrokenWireIds } from '@shared/circuit/brokenBranches';
 import {
   addWireCorner,
   getDotsOnPath,
@@ -975,15 +974,13 @@ export function createAnalogCanvasLibrary(tabD: boolean): SchematicComponentLibr
 }
 
 export interface V3HomeProps {
-  /** Creates an isolated runtime while retaining the exact Tab B presentation contract. */
-  createSimulationEngine?: () => SimulationEngine;
-  /** Supplies a tab-specific static MNA payload while retaining the same view contract. */
-  createStaticMna?: (components: CircuitComponent[], wires: CircuitWire[], normalizedGraph: NormalizedCircuitGraph) => TabBMnaState;
+  /** Creates the simulation runtime. The solver runs on the server; the canvas only drives and renders it. */
+  createSimulationEngine: () => CircuitEngine;
   /** Opts Tab D into presentation-only controls without changing Tab B's interaction contract. */
   tabDUiRefinement?: boolean;
 }
 
-export function V3Home({ createSimulationEngine = () => new SimulationEngine(), createStaticMna, tabDUiRefinement = false }: V3HomeProps) {
+export function V3Home({ createSimulationEngine, tabDUiRefinement = false }: V3HomeProps) {
   const { t, i18n } = useTranslation(['simulators']);
   const gridSize = tabDUiRefinement ? TAB_D_GRID_SIZE : GRID_SIZE;
   const visualSymbolScale = tabDUiRefinement ? TAB_D_SYMBOL_SCALE : 1;
@@ -1024,8 +1021,6 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
   const [snapshot, setSnapshot] = useState<SimulationSnapshot>(EMPTY_SNAPSHOT);
   const [animationTime, setAnimationTime] = useState(0);
   const normalizedGraph = useMemo(() => NormalizedCircuitGraph.fromCanvas(components, wires), [components, wires]);
-  const tabBMna = useSimulation(components, wires, normalizedGraph);
-  const dcMna = useMemo(() => createStaticMna ? createStaticMna(components, wires, normalizedGraph) : tabBMna, [components, createStaticMna, normalizedGraph, tabBMna, wires]);
   const meshGeometry = useMemo(() => compileMeshGeometry(components, wires, normalizedGraph), [components, wires, normalizedGraph]);
   const nodalGeometry = useMemo(() => compileNodalGeometry(components, wires, normalizedGraph), [components, wires, normalizedGraph]);
 
@@ -1067,7 +1062,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
   }, []);
 
   const nadInputRef = useRef<HTMLInputElement>(null);
-  const simulation = useRef<SimulationEngine>(createSimulationEngine());
+  const simulation = useRef<CircuitEngine>(createSimulationEngine());
   const animationFrame = useRef<number | null>(null);
   // Read inside the rAF loop below instead of a dependency, so a burnout write-back (which changes
   // `effectiveCircuitComponents`) never tears down and restarts the loop mid-run.
@@ -3501,7 +3496,7 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
         {!snapshot.converged && <span style={{ color: colors.danger, fontWeight: 750 }}>{t('simulators:circuit.checkWarnings')}</span>}
       </>}
       analysisTitle={t('simulators:circuit.academicWorkspace')}
-      analysisContent={<AnalysisBox elements={dcMna.elements} geometry={meshGeometry} nodalNodes={nodalGeometry} colors={colors} standalone onTraceChange={handleAnalysisTrace} components={components} />}
+      analysisContent={<AnalysisBox components={components} wires={wires} netLookup={normalizedGraph} geometry={meshGeometry} nodalNodes={nodalGeometry} colors={colors} standalone onTraceChange={handleAnalysisTrace} />}
       inspectorTop={<>
       <OscilloscopeTracePanel colors={colors} scopes={components.filter(c => c.type === 'oscilloscope')} instrumentReadings={effectiveSnapshot.instrumentReadings} displaySettings={oscilloscopeDisplaySettings} />
       <PersistentDmmPanel colors={colors} dmms={components.filter(c => c.type === 'dmm')} snapshot={effectiveSnapshot} darkPreview={darkPreview} />
@@ -3582,11 +3577,6 @@ export function V3Home({ createSimulationEngine = () => new SimulationEngine(), 
     </AlertDialog>
     </BaseSchematicCanvas>
   );
-}
-
-/** Keeps the historical V3 router contract unchanged for Tab B. */
-export default function Home() {
-  return <V3Home />;
 }
 
 interface Palette { background: string; canvas: string; panel: string; panelAlt: string; line: string; text: string; muted: string; subtle: string; primary: string; accent: string; danger: string; selection: string; grid: string; wire: string; powered: string; input: string; shadow: string; }

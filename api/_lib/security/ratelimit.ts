@@ -1,11 +1,12 @@
 import { Ratelimit } from '@upstash/ratelimit';
 import { Redis } from '@upstash/redis';
 
-/** Requests per minute per IP. `plc` covers the live simulation (batched scans, up to ~15/s). */
+/** Requests per minute per IP. `plc` and `circuit` cover the live simulations (batched scans / steps, up to ~15/s). */
 export const TIERS = {
   general: { limit: 60, windowMs: 60_000 },
   assets: { limit: 300, windowMs: 60_000 }, // covers, thumbnails: one request per visible card
   plc: { limit: 900, windowMs: 60_000 },
+  circuit: { limit: 900, windowMs: 60_000 }, // live transient batches (~10/s) plus on-demand DC / derivation requests
 } as const;
 export type Tier = keyof typeof TIERS;
 
@@ -155,5 +156,5 @@ export function createLimiter(tier: Tier, env: LimiterEnv): Limiter {
     analytics: false,
   });
   // The simulation loop must not wait on Redis; every other tier can.
-  return tier === 'plc' ? new HybridLimiter(memory, remote, limit) : new RedisLimiter(remote, memory);
+  return tier === 'plc' || tier === 'circuit' ? new HybridLimiter(memory, remote, limit) : new RedisLimiter(remote, memory);
 }

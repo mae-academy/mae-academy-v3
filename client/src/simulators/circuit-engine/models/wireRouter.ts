@@ -16,8 +16,8 @@
  *    returns a simple one-elbow L-shape so the wire always renders.
  */
 
-import type { CircuitComponent } from '@/simulators/circuit-engine/models/circuitTypes';
-import { getDef } from '@/simulators/circuit-engine/models/componentDefs';
+import type { CircuitComponent } from '@shared/circuit/circuitTypes';
+import { getDef } from '@shared/circuit/componentDefs';
 import { getTerminalWorldPos, simplifyOrthogonalPath, type Point } from '@/simulators/circuit-engine/models/wiring';
 
 // ---------------------------------------------------------------------------

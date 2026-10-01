@@ -1,4 +1,4 @@
-import type { CircuitComponent } from '@/simulators/circuit-engine/models/circuitTypes';
+import type { CircuitComponent } from '@shared/circuit/circuitTypes';
 
 /** Power Semiconductors catalog category definition */
 export const POWER_SEMICONDUCTORS_CATEGORY = 'Power Semiconductors';

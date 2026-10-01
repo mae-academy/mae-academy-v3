@@ -13,7 +13,7 @@ import {
   LED_COLOR_OPTIONS,
   LED_COLORS,
   LED_FORWARD_VOLTAGES,
-} from "@/simulators/circuit-engine/models/componentDefs";
+} from "@shared/circuit/componentDefs";
 import { generateNetlist } from "@/simulators/circuit-engine/engine/spice/netlistGenerator";
 import type {
   SpiceComponent,

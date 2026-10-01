@@ -1,10 +1,10 @@
 /** Canvas-to-SPICE bridge: resolves canvas connectivity and maps each UI part onto a SpiceComponent. */
 
-import { getDef } from "@/simulators/circuit-engine/models/componentDefs";
+import { getDef } from "@shared/circuit/componentDefs";
 import type {
   CircuitComponent,
   CircuitWire,
-} from "@/simulators/circuit-engine/models/circuitTypes";
+} from "@shared/circuit/circuitTypes";
 import { NormalizedCircuitGraph } from "@/simulators/circuit-engine/models/NormalizedCircuitGraph";
 import {
   DEFAULT_OPAMP_GAIN,

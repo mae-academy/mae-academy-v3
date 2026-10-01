@@ -1,5 +1,5 @@
 import LZString from 'lz-string';
-import type { CircuitComponent, CircuitWire, WorkspaceText } from '@/simulators/circuit-engine/models/circuitTypes';
+import type { CircuitComponent, CircuitWire, WorkspaceText } from '@shared/circuit/circuitTypes';
 import type { Point } from '@/simulators/circuit-engine/models/wiring';
 
 export const NAD_FORMAT = 'MAE-NAD';

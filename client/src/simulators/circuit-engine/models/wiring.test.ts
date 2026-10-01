@@ -12,7 +12,7 @@ import {
   type Point,
 } from '@/simulators/circuit-engine/models/wiring';
 import { calculateOrthogonalPath, buildComponentBBoxes } from '@/simulators/circuit-engine/models/wireRouter';
-import type { CircuitComponent } from '@/simulators/circuit-engine/models/circuitTypes';
+import type { CircuitComponent } from '@shared/circuit/circuitTypes';
 
 describe('ElectroLab Wire Routing & Waypoint Stability', () => {
   describe('1. Minimal Bend Orthogonal Routing (Fallback/Auto mode)', () => {

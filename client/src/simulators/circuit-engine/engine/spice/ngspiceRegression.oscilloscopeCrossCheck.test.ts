@@ -23,7 +23,7 @@ import {
   wire,
 } from "@/simulators/circuit-engine/engine/spice/ngspiceRegressionHelpers";
 import { calculateVdc, calculateVpp } from "@/simulators/circuit-engine/components/ui-components/oscilloscopeMeasurements";
-import type { SamplePoint } from "@/simulators/circuit-engine/models/circuitTypes";
+import type { SamplePoint } from "@shared/circuit/circuitTypes";
 
 /** Independent, naive references — deliberately not importing anything from spiceParser.ts or
  * oscilloscopeMeasurements.ts, so a bug shared between the production code and its own test

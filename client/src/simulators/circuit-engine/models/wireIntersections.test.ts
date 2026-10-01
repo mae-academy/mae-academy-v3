@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { CircuitWire } from '@/simulators/circuit-engine/models/circuitTypes';
+import type { CircuitWire } from '@shared/circuit/circuitTypes';
 import {
   buildJumpArcPath,
   calculateWireIntersections,

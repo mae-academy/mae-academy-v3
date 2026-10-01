@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { SamplePoint } from "@/simulators/circuit-engine/models/circuitTypes";
+import type { SamplePoint } from "@shared/circuit/circuitTypes";
 import { GRID_DIVS_X } from "@/simulators/circuit-engine/components/ui-components/OscilloscopeTracePanel";
 import {
   RUN_TIMEOUT,

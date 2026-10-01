@@ -1,5 +1,5 @@
-import { getDef } from '@/simulators/circuit-engine/models/componentDefs';
-import { terminalKey, type CircuitComponent, type CircuitWire } from '@/simulators/circuit-engine/models/circuitTypes';
+import { getDef } from '@shared/circuit/componentDefs';
+import { terminalKey, type CircuitComponent, type CircuitWire } from '@shared/circuit/circuitTypes';
 import { getTerminalWorldPos, type Point } from '@/simulators/circuit-engine/models/wiring';
 
 export type NormalizedBranchKind = 'resistor' | 'voltage' | 'current' | 'other';

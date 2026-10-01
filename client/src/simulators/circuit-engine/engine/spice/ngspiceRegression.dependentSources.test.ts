@@ -13,7 +13,7 @@
 import { describe, expect, it } from "vitest";
 
 import { part, wire } from "@/simulators/circuit-engine/engine/spice/ngspiceRegressionHelpers";
-import { TabDSimulationEngine } from "@/simulators/circuit-engine/engine/analogSimulation";
+import { TabDSimulationEngine } from "../../../../../../api/_lib/circuit/engine/analogSimulation";
 
 function settle(components: Parameters<TabDSimulationEngine["setCircuit"]>[0], wires: Parameters<TabDSimulationEngine["setCircuit"]>[1]) {
   const engine = new TabDSimulationEngine();

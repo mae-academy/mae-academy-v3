@@ -8,7 +8,7 @@ import {
   normalizeWire,
   normalizeComponent,
 } from '@/simulators/circuit-engine/models/nadFormat';
-import type { CircuitComponent, CircuitWire } from '@/simulators/circuit-engine/models/circuitTypes';
+import type { CircuitComponent, CircuitWire } from '@shared/circuit/circuitTypes';
 
 describe('NAD persistence format', () => {
   it('round-trips a Tab B topology through a .nad JSON document', () => {

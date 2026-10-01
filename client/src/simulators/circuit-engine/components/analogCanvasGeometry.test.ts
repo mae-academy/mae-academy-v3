@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { componentPrefix, nextComponentLabel, type CircuitComponent } from '../models/circuitTypes';
+import { componentPrefix, nextComponentLabel, type CircuitComponent } from '@shared/circuit/circuitTypes';
 import { calculateMeshLoopBounds, calculateTabDPlanarCavity, tabDComponentLabelAnchors } from './analogCanvasGeometry';
 import type { Point } from '../models/wiring';
 

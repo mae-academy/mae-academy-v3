@@ -1,7 +1,7 @@
 import React from 'react';
 import { V3Math } from '@/components/ui/V3Math';
-import type { MNAElement } from '@/simulators/circuit-engine/engine/mnaSolver';
-import { AcademicNodalDictionary } from '@/simulators/circuit-engine/models/AcademicNodalDictionary';
+import type { MNAElement } from '@shared/circuit/mnaTypes';
+import { AcademicNodalDictionary } from '@shared/circuit/AcademicNodalDictionary';
 
 export interface TargetLoadSelectorProps {
   elements: MNAElement[];

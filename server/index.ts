@@ -10,6 +10,7 @@ import { libraryResolveHandler } from "./libraryResolve";
 import { featuredHandler, isFeaturedUrl, warmFeatured } from "./featured";
 import { createThumbHandler } from "./pdfThumb";
 import { handleEvaluate } from "../api/_lib/plc/handler";
+import { handleSolve } from "../api/_lib/circuit/handler";
 import { expressGuard } from "../api/_lib/security/node-adapter";
 import type { Tier } from "../api/_lib/security/ratelimit";
 import { pdfCheckHandler, pdfDownloadHandler, pdfProxyHandler } from "./pdfProxy";
@@ -25,7 +26,9 @@ async function startServer() {
   const tierFor = (path: string): Tier =>
     path.startsWith("/plc/")
       ? "plc"
-      : /^\/(pdf-thumb|pdf-proxy|pdf-download|library\/cover)/.test(path)
+      : path.startsWith("/circuit/")
+        ? "circuit"
+        : /^\/(pdf-thumb|pdf-proxy|pdf-download|library\/cover)/.test(path)
         ? "assets"
         : "general";
   app.use("/api", expressGuard(tierFor));
@@ -35,6 +38,17 @@ async function startServer() {
   app.post("/api/plc/evaluate", express.text({ type: "*/*", limit: "512kb" }), async (req, res) => {
     const response = await handleEvaluate(
       new Request("http://localhost/api/plc/evaluate", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: typeof req.body === "string" ? req.body : "",
+      }),
+    );
+    res.status(response.status).type("application/json").send(await response.text());
+  });
+  // Circuit solver: same web-standard handler as api/circuit/solve.ts.
+  app.post("/api/circuit/solve", express.text({ type: "*/*", limit: "768kb" }), async (req, res) => {
+    const response = await handleSolve(
+      new Request("http://localhost/api/circuit/solve", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: typeof req.body === "string" ? req.body : "",

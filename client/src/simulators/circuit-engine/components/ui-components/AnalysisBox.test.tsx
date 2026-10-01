@@ -2,10 +2,14 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { AnalysisBox } from '@/simulators/circuit-engine/components/ui-components/AnalysisBox';
 import { TargetLoadSelector, DecimalPlacesSelector } from '@/simulators/circuit-engine/components/ui-components/TargetLoadSelector';
-import { buildIdToLabelMap, sanitizeMathUuids } from '@/simulators/circuit-engine/models/analysisFormatting';
-import { TheveninSolver } from '@/simulators/circuit-engine/engine/TheveninSolver';
-import { SuperpositionSolver } from '@/simulators/circuit-engine/engine/SuperpositionSolver';
-import type { MNAElement } from '@/simulators/circuit-engine/engine/mnaSolver';
+import { buildIdToLabelMap, sanitizeMathUuids } from '@shared/circuit/analysisFormatting';
+import { TheveninSolver } from '../../../../../../api/_lib/circuit/engine/TheveninSolver';
+import { SuperpositionSolver } from '../../../../../../api/_lib/circuit/engine/SuperpositionSolver';
+import type { MNAElement } from '@shared/circuit/mnaTypes';
+import type { AnalysisSource } from '@/simulators/circuit-engine/components/ui-components/AnalysisBox';
+import { NodalSolver } from '../../../../../../api/_lib/circuit/engine/NodalSolver';
+import { MeshSolver } from '../../../../../../api/_lib/circuit/engine/MeshSolver';
+import { SourceTransformationSolver } from '../../../../../../api/_lib/circuit/engine/SourceTransformationSolver';
 
 const colors = { panel: '#0f172a', panelAlt: '#172033', line: '#334155', text: '#f8fafc', muted: '#94a3b8', primary: '#3b82f6', danger: '#ef4444' };
 const elements: MNAElement[] = [
@@ -14,9 +18,22 @@ const elements: MNAElement[] = [
   { type: 'resistor', id: 'R2', label: 'R2', positive: 'n_C9KUa', negative: '0', resistance: 2000 },
 ];
 
+/**
+ * The panel normally asks the server for its derivation. The component takes an injectable source, so these tests feed it the very
+ * same solvers synchronously (renderToStaticMarkup runs no effects and there is no server in jsdom).
+ */
+const localAnalysis: AnalysisSource = (input) => {
+  const trace = input.method === 'nodal' ? new NodalSolver(elements, input.nodalNodes).analyze()
+    : input.method === 'mesh' ? new MeshSolver(elements, input.geometry).analyze()
+      : input.method === 'superposition' ? new SuperpositionSolver(elements).analyze(input.targetResistor)
+        : input.method === 'transform' ? new SourceTransformationSolver(elements).analyze(input.targetSource, input.targetResistor)
+          : new TheveninSolver(elements).analyze(input.targetResistor);
+  return { elements, trace, pending: false, error: null };
+};
+
 describe('Tab D Academic Analysis Workspace', () => {
   it('renders real solver-backed Nodal content and exposes all academic analysis modes', () => {
-    const markup = renderToStaticMarkup(<AnalysisBox elements={elements} colors={colors} standalone />);
+    const markup = renderToStaticMarkup(<AnalysisBox analyze={localAnalysis} colors={colors} standalone />);
     expect(markup).toContain('Nodal');
     expect(markup).toContain('Mesh');
     expect(markup).toContain('Superposition');
@@ -119,7 +136,7 @@ describe('Tab D Academic Analysis Workspace', () => {
       ];
 
       const markup = renderToStaticMarkup(
-        <AnalysisBox elements={elements} components={acComponents} colors={colors} standalone />
+        <AnalysisBox analyze={localAnalysis} components={acComponents} colors={colors} standalone />
       );
 
       // Title & description
@@ -146,7 +163,7 @@ describe('Tab D Academic Analysis Workspace', () => {
       ];
 
       const dcMarkup = renderToStaticMarkup(
-        <AnalysisBox elements={elements} components={pureDcComponents} colors={colors} standalone />
+        <AnalysisBox analyze={localAnalysis} components={pureDcComponents} colors={colors} standalone />
       );
 
       expect(dcMarkup).not.toContain('AC Analysis (Phasors) — Coming Soon');
@@ -161,7 +178,7 @@ describe('Tab D Academic Analysis Workspace', () => {
           { id: 'ac1', type: acType, x: 0, y: 0, rotation: 0, flipH: false, flipV: false, label: 'AC1', props: {} },
         ];
         const markup = renderToStaticMarkup(
-          <AnalysisBox elements={elements} components={comps} colors={colors} standalone />
+          <AnalysisBox analyze={localAnalysis} components={comps} colors={colors} standalone />
         );
         expect(markup).toContain('AC Analysis (Phasors) — Coming Soon');
       }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { getDef } from './componentDefs';
-import type { CircuitComponent, CircuitWire } from './circuitTypes';
+import { getDef } from '@shared/circuit/componentDefs';
+import type { CircuitComponent, CircuitWire } from '@shared/circuit/circuitTypes';
 import { NormalizedCircuitGraph, splitNormalizedSegments } from './NormalizedCircuitGraph';
 import { getTerminalWorldPos } from './wiring';
 

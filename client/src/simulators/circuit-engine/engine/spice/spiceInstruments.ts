@@ -8,7 +8,7 @@ import type {
   CircuitComponent,
   InstrumentReading,
   SamplePoint,
-} from "@/simulators/circuit-engine/models/circuitTypes";
+} from "@shared/circuit/circuitTypes";
 import {
   probeBranchKey,
   type SpiceCircuitNets,

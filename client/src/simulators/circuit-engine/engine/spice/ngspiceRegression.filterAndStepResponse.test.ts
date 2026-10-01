@@ -22,7 +22,7 @@ import { describe, expect, it } from "vitest";
 import { runNgspiceWithLog } from "@/simulators/circuit-engine/engine/spice/ngspiceTestHarness";
 import { getFrequency, getVmean, getVrms, parseSpiceResults } from "@/simulators/circuit-engine/engine/spice/spiceParser";
 import { calculateVpp } from "@/simulators/circuit-engine/components/ui-components/oscilloscopeMeasurements";
-import type { SamplePoint } from "@/simulators/circuit-engine/models/circuitTypes";
+import type { SamplePoint } from "@shared/circuit/circuitTypes";
 
 const WASM_BOOT_TIMEOUT = 30_000;
 const RUN_TIMEOUT = 15_000;

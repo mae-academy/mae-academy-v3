@@ -1,7 +1,7 @@
 import { V3Home } from './pages/Home';
-import { evaluateTabDStaticMna, TabDSimulationEngine } from '@/simulators/circuit-engine/engine/analogSimulation';
+import { RemoteCircuitEngine } from '@/simulators/circuit-engine/engine/RemoteCircuitEngine';
 
-/** Tab D reuses the exact Tab B visual component tree with an isolated solver instance. */
 export function V3SimulatorAppD() {
-  return <div className="v3-simulator-root simulator-theme-b" data-simulator-theme="b"><V3Home createSimulationEngine={() => new TabDSimulationEngine()} createStaticMna={evaluateTabDStaticMna} tabDUiRefinement /></div>;
+  // The solver runs on the server (POST /api/circuit/solve); the engine below only batches steps and carries its state.
+  return <div className="v3-simulator-root simulator-theme-b" data-simulator-theme="b"><V3Home createSimulationEngine={() => new RemoteCircuitEngine()} tabDUiRefinement /></div>;
 }

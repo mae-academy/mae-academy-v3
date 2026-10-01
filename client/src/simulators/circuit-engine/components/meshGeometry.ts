@@ -1,24 +1,10 @@
-import { getDef } from '@/simulators/circuit-engine/models/componentDefs';
-import { type CircuitComponent, type CircuitWire } from '@/simulators/circuit-engine/models/circuitTypes';
+import { getDef } from '@shared/circuit/componentDefs';
+import { type CircuitComponent, type CircuitWire } from '@shared/circuit/circuitTypes';
 import { getTerminalWorldPos, type Point } from '@/simulators/circuit-engine/models/wiring';
 import { NormalizedCircuitGraph } from '@/simulators/circuit-engine/models/NormalizedCircuitGraph';
 
-export interface MeshBranchGeometry {
-  /** MNA element id; the path is oriented from the element's positive to negative terminal. */
-  id: string;
-  path: Point[];
-}
-
-export interface MeshWireGeometry {
-  id: string;
-  path: Point[];
-}
-
-export interface MeshGeometry {
-  branches: MeshBranchGeometry[];
-  wires: MeshWireGeometry[];
-  graph?: NormalizedCircuitGraph;
-}
+export type { MeshBranchGeometry, MeshWireGeometry, MeshGeometry } from '@shared/circuit/meshGeometry';
+import type { MeshBranchGeometry, MeshGeometry } from '@shared/circuit/meshGeometry';
 
 function terminal(component: CircuitComponent, terminalId: string): Point | null {
   const definition = getDef(component.type);

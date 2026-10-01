@@ -10,7 +10,7 @@
  * for legacy wires without waypoints.
  */
 
-import type { CircuitWire } from '@/simulators/circuit-engine/models/circuitTypes';
+import type { CircuitWire } from '@shared/circuit/circuitTypes';
 import type { Point } from '@/simulators/circuit-engine/models/wiring';
 import { pointsToPath } from '@/simulators/circuit-engine/models/wiring';
 

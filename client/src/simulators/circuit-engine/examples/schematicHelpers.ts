@@ -1,5 +1,5 @@
-import type { CircuitComponent, CircuitWire } from '@/simulators/circuit-engine/models/circuitTypes';
-import { getDef } from '@/simulators/circuit-engine/models/componentDefs';
+import type { CircuitComponent, CircuitWire } from '@shared/circuit/circuitTypes';
+import { getDef } from '@shared/circuit/componentDefs';
 
 /**
  * Authoring helpers for example schematics. Wire *paths* below are deliberately only

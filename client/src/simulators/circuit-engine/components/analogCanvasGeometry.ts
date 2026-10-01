@@ -1,7 +1,7 @@
 import { getTerminalWorldPos, simplifyOrthogonalPath, snapPointToGrid, type Point } from '@/simulators/circuit-engine/models/wiring';
-import type { CircuitComponent, CircuitWire } from '@/simulators/circuit-engine/models/circuitTypes';
-import type { MeshCycle } from '@/simulators/circuit-engine/models/analysisTypes';
-import { getDef } from '@/simulators/circuit-engine/models/componentDefs';
+import type { CircuitComponent, CircuitWire } from '@shared/circuit/circuitTypes';
+import type { MeshCycle } from '@shared/circuit/analysisTypes';
+import { getDef } from '@shared/circuit/componentDefs';
 import { calculateOrthogonalPath } from '@/simulators/circuit-engine/models/wireRouter';
 
 export type TabDTerminalAxis = 'horizontal' | 'vertical';

@@ -1,4 +1,4 @@
-import type { CircuitComponent, CircuitWire } from '@/simulators/circuit-engine/models/circuitTypes';
+import type { CircuitComponent, CircuitWire } from '@shared/circuit/circuitTypes';
 
 export type ExampleDifficulty = 'Beginner' | 'Intermediate' | 'Advanced';
 

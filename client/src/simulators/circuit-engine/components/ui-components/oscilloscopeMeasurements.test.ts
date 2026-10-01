@@ -16,9 +16,9 @@
  */
 import { describe, expect, it } from "vitest";
 
-import type { SamplePoint } from "@/simulators/circuit-engine/models/circuitTypes";
+import type { SamplePoint } from "@shared/circuit/circuitTypes";
 import { calculateAutoscale, calculateVdc, calculateVpp } from "@/simulators/circuit-engine/components/ui-components/oscilloscopeMeasurements";
-import { OSCILLOSCOPE_TIME_DIV_PRESETS, OSCILLOSCOPE_VOLT_DIV_PRESETS } from "@/simulators/circuit-engine/models/componentDefs";
+import { OSCILLOSCOPE_TIME_DIV_PRESETS, OSCILLOSCOPE_VOLT_DIV_PRESETS } from "@shared/circuit/componentDefs";
 
 function naiveMean(samples: SamplePoint[]): number {
   return samples.reduce((sum, sample) => sum + sample.value, 0) / samples.length;

@@ -18,10 +18,10 @@
  */
 import { describe, expect, it } from 'vitest';
 import { EXAMPLE_LIBRARY, EXAMPLE_CATEGORIES, getExampleById, getExamplesByCategory } from '@/simulators/circuit-engine/examples';
-import { getDef } from '@/simulators/circuit-engine/models/componentDefs';
+import { getDef } from '@shared/circuit/componentDefs';
 import { NormalizedCircuitGraph } from '@/simulators/circuit-engine/models/NormalizedCircuitGraph';
-import { compileDcTopology } from '@/simulators/circuit-engine/components/hooks/useSimulation';
-import { MNASolver } from '@/simulators/circuit-engine/engine/mnaSolver';
+import { compileDcTopology } from '../../../../../api/_lib/circuit/engine/compileDc';
+import { MNASolver } from '../../../../../api/_lib/circuit/engine/mnaSolver';
 
 const near = (actual: number, expected: number, tolerance = Math.max(Math.abs(expected) * 1e-3, 1e-6)) =>
   expect(Math.abs(actual - expected)).toBeLessThanOrEqual(tolerance);

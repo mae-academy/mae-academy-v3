@@ -6,8 +6,8 @@
    panels. Theme/channel colors come from `displaySettings` (a viewer preference lifted into Home.tsx
    so both panels share one live value — see oscilloscopeDisplaySettings.ts). */
 import { useEffect, useRef } from 'react';
-import type { CircuitComponent } from '@/simulators/circuit-engine/models/circuitTypes';
-import type { InstrumentReading, SamplePoint } from '@/simulators/circuit-engine/models/circuitTypes';
+import type { CircuitComponent } from '@shared/circuit/circuitTypes';
+import type { InstrumentReading, SamplePoint } from '@shared/circuit/circuitTypes';
 import { MeasurementTable } from '@/simulators/circuit-engine/components/ui-components/MeasurementTable';
 import { calculateVdc, calculateVpp } from '@/simulators/circuit-engine/components/ui-components/oscilloscopeMeasurements';
 import type { OscilloscopeDisplaySettings } from '@/simulators/circuit-engine/components/ui-components/oscilloscopeDisplaySettings';

@@ -70,6 +70,7 @@ describe('sliding-window limiter', () => {
   it('defines the tiers agreed for the platform', () => {
     expect(TIERS.general.limit).toBe(60);
     expect(TIERS.plc.limit).toBe(900);
+    expect(TIERS.circuit.limit).toBe(900);
     expect(TIERS.assets.limit).toBeGreaterThan(TIERS.general.limit);
   });
 });

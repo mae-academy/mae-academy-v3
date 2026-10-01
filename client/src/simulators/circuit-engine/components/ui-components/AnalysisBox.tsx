@@ -1,21 +1,18 @@
 /* MAE Luminous Technical Atelier: Tab D Academic Analysis renders solver-backed derivations only.
    This view selects an engine trace; all circuit mathematics remains inside the dedicated solvers. */
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { MNAElement } from '@/simulators/circuit-engine/engine/mnaSolver';
-import { NodalSolver } from '@/simulators/circuit-engine/engine/NodalSolver';
-import { MeshSolver } from '@/simulators/circuit-engine/engine/MeshSolver';
-import { SuperpositionSolver } from '@/simulators/circuit-engine/engine/SuperpositionSolver';
-import { SourceTransformationSolver } from '@/simulators/circuit-engine/engine/SourceTransformationSolver';
-import { TheveninSolver } from '@/simulators/circuit-engine/engine/TheveninSolver';
-import type { AnalysisMethod, AnalysisTrace, NodalNodeLabel } from '@/simulators/circuit-engine/models/analysisTypes';
-import { compactMathNumbers, buildIdToLabelMap, sanitizeMathUuids } from '@/simulators/circuit-engine/models/analysisFormatting';
-import type { MeshGeometry } from '@/simulators/circuit-engine/components/meshGeometry';
+import type { MNAElement } from '@shared/circuit/mnaTypes';
+import type { AnalysisMethod, AnalysisTrace, NodalNodeLabel } from '@shared/circuit/analysisTypes';
+import { compactMathNumbers, buildIdToLabelMap, sanitizeMathUuids } from '@shared/circuit/analysisFormatting';
+import type { MeshGeometry } from '@shared/circuit/meshGeometry';
+import type { NetLookup } from '@shared/circuit/nets';
+import { useCircuitAnalysis, type AnalysisInput, type AnalysisState } from '@/simulators/circuit-engine/components/hooks/useCircuitAnalysis';
 import { V3BlockMath, V3Math } from '@/components/ui/V3Math';
 import { MESH_LOOP_COLORS } from '@/simulators/circuit-engine/components/analogCanvasGeometry';
-import { AcademicNodalDictionary } from '@/simulators/circuit-engine/models/AcademicNodalDictionary';
-import type { CircuitComponent } from '@/simulators/circuit-engine/models/circuitTypes';
+import { AcademicNodalDictionary } from '@shared/circuit/AcademicNodalDictionary';
+import type { CircuitComponent, CircuitWire } from '@shared/circuit/circuitTypes';
 import { TargetLoadSelector, DecimalPlacesSelector } from '@/simulators/circuit-engine/components/ui-components/TargetLoadSelector';
-import { isACCircuit } from '@/simulators/circuit-engine/models/isACCircuit';
+import { isACCircuit } from '@shared/circuit/isACCircuit';
 import SegmentedControl from '@/components/ui/SegmentedControl';
 
 const METHODS: Array<{ id: AnalysisMethod; label: string }> = [
@@ -27,22 +24,30 @@ const METHODS: Array<{ id: AnalysisMethod; label: string }> = [
 
 type AnalysisColors = { panel: string; panelAlt: string; line: string; text: string; muted: string; primary: string; danger: string };
 
+/** Supplies the derivation for the current schematic. The default asks the server; tests (and previews) inject a local one. */
+export type AnalysisSource = (input: AnalysisInput) => AnalysisState;
+
 export function AnalysisBox({
-  elements,
+  components = [],
+  wires = [],
+  netLookup,
   geometry,
   nodalNodes = [],
   colors,
   standalone = false,
   onTraceChange,
-  components = [],
+  analyze,
 }: {
-  elements: MNAElement[];
+  components?: CircuitComponent[];
+  wires?: CircuitWire[];
+  /** Net naming shared with the canvas labels; derived from the wires when omitted. */
+  netLookup?: NetLookup;
   geometry?: MeshGeometry;
   nodalNodes?: NodalNodeLabel[];
   colors: AnalysisColors;
   standalone?: boolean;
   onTraceChange?: (trace: AnalysisTrace) => void;
-  components?: CircuitComponent[];
+  analyze?: AnalysisSource;
 }) {
   const [method, setMethod] = useState<AnalysisMethod>('nodal');
   const [targetResistor, setTargetResistor] = useState('');
@@ -51,6 +56,9 @@ export function AnalysisBox({
   const [activeStepIndex, setActiveStepIndex] = useState<number>(0);
 
   const hasAC = useMemo(() => isACCircuit(components), [components]);
+  const useAnalysis: AnalysisSource = analyze ?? useCircuitAnalysis;
+  const analysis = useAnalysis({ components, wires, netLookup, method, targetResistor, targetSource, nodalNodes, geometry, enabled: !hasAC });
+  const elements = analysis.elements;
 
   // Dynamically merge live component labels to ensure instant synchronization when renamed on canvas
   const liveElements = useMemo(() => {
@@ -84,13 +92,11 @@ export function AnalysisBox({
         warning: undefined,
       };
     }
-    if (!liveElements.length) return { method, status: 'unsupported', heading: 'Academic Analysis', steps: [], warning: 'Build a grounded DC circuit to generate a derivation.' };
-    if (method === 'nodal') return new NodalSolver(liveElements, nodalNodes).analyze();
-    if (method === 'mesh') return new MeshSolver(liveElements, geometry).analyze();
-    if (method === 'superposition') return new SuperpositionSolver(liveElements).analyze(targetResistor);
-    if (method === 'transform') return new SourceTransformationSolver(liveElements).analyze(targetSource, targetResistor);
-    return new TheveninSolver(liveElements).analyze(targetResistor);
-  }, [hasAC, liveElements, geometry, method, nodalNodes, targetResistor, targetSource]);
+    if (analysis.trace && analysis.trace.method === method) return analysis.trace;
+    if (analysis.error) return { method, status: 'error', heading: 'Academic Analysis', steps: [], warning: `Derivation unavailable: ${analysis.error}` };
+    if (!components.length) return { method, status: 'unsupported', heading: 'Academic Analysis', steps: [], warning: 'Build a grounded DC circuit to generate a derivation.' };
+    return { method, status: 'unsupported', heading: 'Academic Analysis', steps: [], warning: analysis.pending ? 'Computing derivation…' : 'Build a grounded DC circuit to generate a derivation.' };
+  }, [hasAC, analysis.trace, analysis.error, analysis.pending, components.length, method]);
 
   // ID-to-Label mapping for intercepting UUIDs in derivations and dropdowns, strictly synchronized with latest component labels
   const idToLabelMap = useMemo(() => buildIdToLabelMap(liveElements, nodalNodes, components), [liveElements, nodalNodes, components]);

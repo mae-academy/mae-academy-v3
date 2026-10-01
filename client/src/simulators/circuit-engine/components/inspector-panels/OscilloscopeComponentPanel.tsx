@@ -3,8 +3,8 @@
    properties" number inputs and the "Live scope acquisition" list.
    All on-screen readout values (voltage, period, divisions, time) strictly render in KaTeX math format. */
 import { useState } from 'react';
-import type { CircuitComponent, InstrumentReading } from '@/simulators/circuit-engine/models/circuitTypes';
-import { OSCILLOSCOPE_TIME_DIV_PRESETS, OSCILLOSCOPE_VOLT_DIV_PRESETS } from '@/simulators/circuit-engine/models/componentDefs';
+import type { CircuitComponent, InstrumentReading } from '@shared/circuit/circuitTypes';
+import { OSCILLOSCOPE_TIME_DIV_PRESETS, OSCILLOSCOPE_VOLT_DIV_PRESETS } from '@shared/circuit/componentDefs';
 import { GRID_DIVS_X } from '@/simulators/circuit-engine/components/ui-components/OscilloscopeTracePanel';
 import { calculateAutoscale } from '@/simulators/circuit-engine/components/ui-components/oscilloscopeMeasurements';
 import { OscilloscopeControlsGrid } from '@/simulators/circuit-engine/components/ui-components/OscilloscopeControlsGrid';

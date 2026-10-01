@@ -15,6 +15,7 @@ import { filterLibrary } from '@/components/common/schematic/BaseSchematicCanvas
 import type { SchematicComponent, SchematicComponentLibrary, SchematicPoint, SchematicWire } from '@/components/common/schematic/schematicTypes';
 import { DigitalLogicSimulatorHome } from '@/simulators/digital-logic/components/pages/Home';
 import { V3Home } from '@/simulators/circuit-engine/components/pages/Home';
+import { RemoteCircuitEngine } from '@/simulators/circuit-engine/engine/RemoteCircuitEngine';
 
 const part = (id: string, x: number, y: number, rotation = 0): SchematicComponent => ({ id, type: 'two-pin', x, y, rotation, flipH: false, flipV: false, label: id, props: { value: 1 } });
 const wire = (id: string, fromComp: string, fromTerm: string, toComp: string, toTerm: string, path: SchematicPoint[]): SchematicWire => ({ id, fromComp, fromTerm, toComp, toTerm, path, routing: 'orthogonal' });
@@ -142,7 +143,7 @@ describe('studio parity on the shared canvas', () => {
 
   it('renders identical canvas chrome for Digital Logic and Electrical Circuits', () => {
     const digital = renderToStaticMarkup(<DigitalLogicSimulatorHome />);
-    const electrical = renderToStaticMarkup(<V3Home tabDUiRefinement />);
+    const electrical = renderToStaticMarkup(<V3Home createSimulationEngine={() => new RemoteCircuitEngine(async () => { throw new Error('offline'); })} tabDUiRefinement />);
     expect(sharedChrome(digital)).toEqual([]);
     expect(sharedChrome(electrical)).toEqual([]);
     expect(digital).toContain('Interactive Digital Logic Canvas');

@@ -1,8 +1,8 @@
 /* Pure waveform statistics shared by OscilloscopeTracePanel and MeasurementTable. Vrms/frequency
    already come from the SPICE engine's InstrumentReading — only the two it doesn't compute live here. */
-import type { SamplePoint } from '@/simulators/circuit-engine/models/circuitTypes';
+import type { SamplePoint } from '@shared/circuit/circuitTypes';
 import { getVmean } from '@/simulators/circuit-engine/engine/spice/spiceParser';
-import { OSCILLOSCOPE_TIME_DIV_PRESETS, OSCILLOSCOPE_VOLT_DIV_PRESETS } from '@/simulators/circuit-engine/models/componentDefs';
+import { OSCILLOSCOPE_TIME_DIV_PRESETS, OSCILLOSCOPE_VOLT_DIV_PRESETS } from '@shared/circuit/componentDefs';
 
 // Matches OscilloscopeTracePanel's own GRID_DIVS_X — not imported from there to avoid a circular
 // import (that module imports calculateVdc/calculateVpp from this one).

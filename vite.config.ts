@@ -252,6 +252,48 @@ function vitePluginPlcApi(): Plugin {
   };
 }
 
+/**
+ * Serves api/circuit/solve inside `pnpm dev`, so the serverless circuit solver works without the Express
+ * server or the Vercel CLI. The engine is loaded through Vite's SSR loader (hot-reloads on edit)
+ * and stays server-side: the client only ever sees the fetch to /api/circuit/solve.
+ */
+function vitePluginCircuitApi(): Plugin {
+  return {
+    name: "circuit-api-dev",
+    apply: "serve",
+    configureServer(server: ViteDevServer) {
+      server.middlewares.use("/api/circuit/solve", async (req, res) => {
+        if (req.method !== "POST") {
+          res.statusCode = 405;
+          res.setHeader("allow", "POST");
+          res.end();
+          return;
+        }
+        try {
+          const chunks: Buffer[] = [];
+          let size = 0;
+          for await (const chunk of req) {
+            size += (chunk as Buffer).length;
+            if (size > 768 * 1024) break;
+            chunks.push(chunk as Buffer);
+          }
+          const { POST } = await server.ssrLoadModule(path.resolve(PROJECT_ROOT, "api/circuit/solve.ts"));
+          const { toWebRequest } = await server.ssrLoadModule(path.resolve(PROJECT_ROOT, "api/_lib/security/node-adapter.ts"));
+          // POST is the guarded handler: origin check + rate limit run here exactly as on Vercel.
+          const response: Response = await POST(toWebRequest(req, "http://localhost/api/circuit/solve", Buffer.concat(chunks)));
+          res.statusCode = response.status;
+          response.headers.forEach((value, key) => res.setHeader(key, value));
+          res.end(await response.text());
+        } catch (error) {
+          server.config.logger.error(`circuit-api-dev: ${error instanceof Error ? error.message : String(error)}`);
+          res.statusCode = 500;
+          res.end(JSON.stringify({ error: "Internal error" }));
+        }
+      });
+    },
+  };
+}
+
 const plugins = [
   react(),
   tailwindcss(),
@@ -260,6 +302,7 @@ const plugins = [
   vitePluginManusDebugCollector(),
   vitePluginStorageProxy(),
   vitePluginPlcApi(),
+  vitePluginCircuitApi(),
 ];
 
 export default defineConfig({

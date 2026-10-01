@@ -13,8 +13,8 @@ import { beforeAll, describe, expect, it } from "vitest";
 import type {
   CircuitComponent,
   CircuitWire,
-} from "@/simulators/circuit-engine/models/circuitTypes";
-import { LED_FORWARD_VOLTAGES } from "@/simulators/circuit-engine/models/componentDefs";
+} from "@shared/circuit/circuitTypes";
+import { LED_FORWARD_VOLTAGES } from "@shared/circuit/componentDefs";
 import {
   RUN_TIMEOUT,
   WASM_BOOT_TIMEOUT,

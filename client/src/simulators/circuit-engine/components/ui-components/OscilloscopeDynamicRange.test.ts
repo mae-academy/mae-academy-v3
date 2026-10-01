@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import katex from 'katex';
 import { calculateAutoscale } from '@/simulators/circuit-engine/components/ui-components/oscilloscopeMeasurements';
-import type { SamplePoint } from '@/simulators/circuit-engine/models/circuitTypes';
+import type { SamplePoint } from '@shared/circuit/circuitTypes';
 
 describe('Oscilloscope Dynamic Range & Intelligent Sliders', () => {
   describe('Part 1: Dynamic Bounds Calculation', () => {

@@ -1,0 +1,636 @@
+import type { MNAElement } from './mnaSolver';
+import { nonReferenceNodes } from '../../../../shared/circuit/analysisTypes';
+
+export interface ReducedNodalMatrix {
+  knownNodes: Map<string, number>;
+  unknownNodes: string[];
+  eliminatedNodes: string[];
+  conductance: number[][];
+  rhs: number[];
+  residualInfinity: number;
+  /** ‖G·V−z‖∞ / (‖G‖∞·‖V‖∞ + ‖z‖∞): scale-free backward error of the reduced solve. */
+  relativeResidual: number;
+  /**
+   * Potentials of the eliminated (degree-two) nodes implied by a solution of the reduced system, by back-substitution through
+   * the subtraction-free elimination. `undefined` when the network was reduced by the general Schur path (dependent sources).
+   */
+  recoverEliminated?: (unknownVoltages: Record<string, number>) => Record<string, number>;
+}
+
+export interface GroundedSourceResistorBranch {
+  simpleNode: string;
+  primaryNode: string;
+  resistor: Extract<MNAElement, { type: 'resistor' }>;
+  source: Extract<MNAElement, { type: 'voltage' }>;
+  /** V_simple = V_primary + simpleOffset. */
+  simpleOffset: number;
+}
+
+export interface FloatingSupernode {
+  sourceId: string;
+  positiveNode: string;
+  negativeNode: string;
+  element: Extract<MNAElement, { type: 'voltage' | 'vcvs' | 'ccvs' }>;
+}
+
+export interface CompoundSupernode {
+  id: string;
+  nodes: string[];
+  sources: FloatingSupernode[];
+}
+
+export interface TargetResistorRef {
+  positive: string;
+  negative: string;
+  resistance: number;
+  resistor?: Extract<MNAElement, { type: 'resistor' }>;
+  label: string;
+}
+
+export function resolveTargetResistor(
+  elements: MNAElement[],
+  element: Extract<MNAElement, { type: 'cccs' | 'ccvs' | 'vccs' | 'vcvs' }>
+): TargetResistorRef | null {
+  const targetRef = ('targetId' in element ? element.targetId : undefined) || ('controlSourceId' in element ? element.controlSourceId : undefined) || '';
+  if (targetRef) {
+    const found = elements.find((e) => (e.id === targetRef || e.label === targetRef) && e.type === 'resistor') as Extract<MNAElement, { type: 'resistor' }> | undefined;
+    if (found && Math.abs(found.resistance) > 1e-12) {
+      return { positive: found.positive, negative: found.negative, resistance: found.resistance, resistor: found, label: found.label || found.id };
+    }
+  }
+  if ('controlPositive' in element && 'controlNegative' in element && element.controlPositive && element.controlNegative) {
+    const cp = element.controlPositive;
+    const cn = element.controlNegative;
+    const found = elements.find((e) => e.type === 'resistor' && ((e.positive === cp && e.negative === cn) || (e.positive === cn && e.negative === cp))) as Extract<MNAElement, { type: 'resistor' }> | undefined;
+    if (found && Math.abs(found.resistance) > 1e-12) {
+      return {
+        positive: cp,
+        negative: cn,
+        resistance: found.resistance,
+        resistor: found,
+        label: found.label || found.id,
+      };
+    }
+    if ('targetResistance' in element && element.targetResistance !== undefined && Math.abs(element.targetResistance) > 1e-12) {
+      return { positive: cp, negative: cn, resistance: element.targetResistance, label: 'R_x' };
+    }
+  }
+  return null;
+}
+
+export function identifyFloatingSupernodes(elements: MNAElement[]): FloatingSupernode[] {
+  return elements.flatMap((element) => {
+    if ((element.type !== 'voltage' && element.type !== 'vcvs' && element.type !== 'ccvs') || element.positive === '0' || element.negative === '0') return [];
+    return [{ sourceId: element.id, positiveNode: element.positive, negativeNode: element.negative, element }];
+  });
+}
+
+/**
+ * Ground-referenced VCVS/CCVS branches. `identifyFloatingSupernodes` deliberately skips them (a
+ * grounded source is not a floating supernode) and `extractPolarityAwareKnownNodes` only recognises
+ * independent sources, so without this list nothing would stamp them: their output node would get a
+ * plain KCL row that ignores the source and the rendered system would not match the MNA solution.
+ * Their output voltage is defined, but by a gain relation rather than a constant, so it needs a
+ * constraint row instead of a known-node entry.
+ */
+export function identifyGroundedDependentVoltageSources(
+  elements: MNAElement[]
+): Array<{ element: Extract<MNAElement, { type: 'vcvs' | 'ccvs' }>; outputNode: string; outputSign: number }> {
+  return elements.flatMap((element) => {
+    if (element.type !== 'vcvs' && element.type !== 'ccvs') return [];
+    const positiveGrounded = element.positive === '0';
+    const negativeGrounded = element.negative === '0';
+    if (positiveGrounded === negativeGrounded) return [];
+    // V(out) - gain·V(control) = 0, negated when the source sits with its + terminal on ground.
+    return [{ element, outputNode: positiveGrounded ? element.negative : element.positive, outputSign: positiveGrounded ? -1 : 1 }];
+  });
+}
+
+/**
+ * Detects a degree-two resistor-to-ground / independent-voltage-source series
+ * leg. The returned offset is algebraic and is shared by symbolic KCL and RHS
+ * stamping: V_simple = V_primary + simpleOffset.
+ */
+export function detectGroundedSourceResistorBranches(elements: MNAElement[]): GroundedSourceResistorBranch[] {
+  const branches: GroundedSourceResistorBranch[] = [];
+  const floatingSources = identifyFloatingSupernodes(elements);
+
+  const nodeFloatingCount = new Map<string, number>();
+  for (const s of floatingSources) {
+    nodeFloatingCount.set(s.positiveNode, (nodeFloatingCount.get(s.positiveNode) ?? 0) + 1);
+    nodeFloatingCount.set(s.negativeNode, (nodeFloatingCount.get(s.negativeNode) ?? 0) + 1);
+  }
+
+  for (const simpleNode of nonReferenceNodes(elements)) {
+    if (academicBranchDegree(elements, simpleNode) !== 2) continue;
+    const resistor = elements.find((element): element is Extract<MNAElement, { type: 'resistor' }> => element.type === 'resistor' && ((element.positive === simpleNode && element.negative === '0') || (element.negative === simpleNode && element.positive === '0')));
+    const source = elements.find((element): element is Extract<MNAElement, { type: 'voltage' }> => element.type === 'voltage' && ((element.positive === simpleNode && element.negative !== '0') || (element.negative === simpleNode && element.positive !== '0')));
+    if (!resistor || !source) continue;
+    const primaryNode = source.positive === simpleNode ? source.negative : source.positive;
+    if (primaryNode === '0') continue;
+
+    // If either node is involved in multiple floating sources, it is part of a compound supernode
+    if ((nodeFloatingCount.get(primaryNode) ?? 0) > 1 || (nodeFloatingCount.get(simpleNode) ?? 0) > 1) continue;
+
+    const simpleOffset = source.positive === simpleNode ? source.voltage : -source.voltage;
+    branches.push({ simpleNode, primaryNode, resistor, source, simpleOffset });
+  }
+  return branches;
+}
+
+/** Groups connected floating voltage sources into compound supernodes using union-find. */
+export function identifyCompoundSupernodes(elements: MNAElement[]): CompoundSupernode[] {
+  const floatingSources = identifyFloatingSupernodes(elements);
+  if (!floatingSources.length) return [];
+
+  const seriesBranches = detectGroundedSourceResistorBranches(elements);
+  const seriesNodes = new Set(seriesBranches.map((b) => b.simpleNode));
+  const activeSources = floatingSources.filter(
+    (s) => !seriesNodes.has(s.positiveNode) && !seriesNodes.has(s.negativeNode)
+  );
+  if (!activeSources.length) return [];
+
+  const parent = new Map<string, string>();
+  const find = (i: string): string => {
+    const p = parent.get(i) ?? i;
+    if (p === i) return i;
+    const root = find(p);
+    parent.set(i, root);
+    return root;
+  };
+  const union = (i: string, j: string) => {
+    const rootI = find(i);
+    const rootJ = find(j);
+    if (rootI !== rootJ) parent.set(rootI, rootJ);
+  };
+
+  for (const s of activeSources) {
+    union(s.positiveNode, s.negativeNode);
+  }
+
+  const groups = new Map<string, { nodes: Set<string>; sources: FloatingSupernode[] }>();
+  for (const s of activeSources) {
+    const root = find(s.positiveNode);
+    if (!groups.has(root)) {
+      groups.set(root, { nodes: new Set(), sources: [] });
+    }
+    const group = groups.get(root)!;
+    group.nodes.add(s.positiveNode);
+    group.nodes.add(s.negativeNode);
+    group.sources.push(s);
+  }
+
+  return Array.from(groups.entries()).map(([root, g], index) => ({
+    id: `supernode-${index + 1}`,
+    nodes: Array.from(g.nodes),
+    sources: g.sources,
+  }));
+}
+
+const EPSILON = 1e-12;
+
+/** Polarity-aware grounded-source extraction: V(+) - V(-) = source voltage. */
+export function extractPolarityAwareKnownNodes(elements: MNAElement[]): Map<string, number> {
+  const knownNodes = new Map<string, number>();
+  for (const element of elements) {
+    if (element.type !== 'voltage') continue;
+    if (element.positive === '0' && element.negative !== '0') knownNodes.set(element.negative, -element.voltage);
+    if (element.negative === '0' && element.positive !== '0') knownNodes.set(element.positive, element.voltage);
+  }
+  return knownNodes;
+}
+
+/** Counts physical analysis branches incident on a node, not matrix rows. */
+export function academicBranchDegree(elements: MNAElement[], node: string): number {
+  return elements.reduce((degree, element) => {
+    if (element.type === 'current') return degree + Number(element.from === node) + Number(element.to === node);
+    if ('positive' in element && 'negative' in element) return degree + Number(element.positive === node) + Number(element.negative === node);
+    return degree;
+  }, 0);
+}
+
+/** Returns unknown nodes that satisfy Degree >= 3 or belong to a floating supernode. */
+export function filterEssentialNodes(elements: MNAElement[], knownNodes: Map<string, number>): string[] {
+  const compound = identifyCompoundSupernodes(elements);
+  const supernodeNodes = new Set(compound.flatMap((cs) => cs.nodes));
+  const seriesBranches = detectGroundedSourceResistorBranches(elements);
+  const seriesNodes = new Set(seriesBranches.map((b) => b.simpleNode));
+  // A grounded dependent source's output node carries a constraint row, so it can never be folded
+  // away as a simple node however low its branch degree is — nothing else would define its voltage.
+  const dependentOutputs = new Set(identifyGroundedDependentVoltageSources(elements).map((item) => item.outputNode));
+  // A dependent source's control/target pins must also survive: the derivation substitutes their
+  // voltage by name, and an eliminated node has no symbol to substitute (it would render as the
+  // "V_series" placeholder even though the reduced matrix folded it in correctly).
+  const dependentControls = new Set(
+    elements.flatMap((element) => {
+      if (element.type !== 'vccs' && element.type !== 'vcvs' && element.type !== 'cccs' && element.type !== 'ccvs') return [];
+      const target = resolveTargetResistor(elements, element);
+      const positive = ('controlPositive' in element ? element.controlPositive : undefined) ?? target?.positive;
+      const negative = ('controlNegative' in element ? element.controlNegative : undefined) ?? target?.negative;
+      return [positive, negative].filter((node): node is string => Boolean(node) && node !== '0');
+    })
+  );
+
+  const essential = nonReferenceNodes(elements).filter(
+    (node) => !knownNodes.has(node) && !seriesNodes.has(node)
+      && (academicBranchDegree(elements, node) >= 3 || supernodeNodes.has(node) || dependentOutputs.has(node) || dependentControls.has(node))
+  );
+  if (essential.length === 0) {
+    return nonReferenceNodes(elements).filter((node) => !knownNodes.has(node) && !seriesNodes.has(node));
+  }
+  return essential;
+}
+
+/** Reindexes UI-only N_i/V_i names after filtering; internal graph IDs never affect the sequence. */
+export function reindexUINodes(nodes: string[]): Map<string, number> {
+  return new Map(nodes.map((node, index) => [node, index + 1]));
+}
+
+export const academicDisplayNodes = filterEssentialNodes;
+
+function solveDenseSystem(matrix: number[][], rhs: number[]): number[] {
+  const size = matrix.length;
+  if (!size) return [];
+  const augmented = matrix.map((row, index) => [...row, rhs[index]]);
+  // Scaled partial pivoting: candidates are compared (and singularity judged) relative to their own row's magnitude,
+  // so a 1 TΩ leakage conductance next to a 10⁶-gain stamp is neither skipped nor mistaken for a zero pivot.
+  const scale = matrix.map((row) => row.reduce((maximum, value) => Math.max(maximum, Math.abs(value)), 0) || 1);
+  for (let pivot = 0; pivot < size; pivot += 1) {
+    let best = pivot;
+    for (let row = pivot + 1; row < size; row += 1) if (Math.abs(augmented[row][pivot]) / scale[row] > Math.abs(augmented[best][pivot]) / scale[best]) best = row;
+    if (!(Math.abs(augmented[best][pivot]) / scale[best] > 1e-14)) throw new Error('Pedagogical node reduction encountered an unresolved simple-node chain.');
+    [augmented[pivot], augmented[best]] = [augmented[best], augmented[pivot]];
+    [scale[pivot], scale[best]] = [scale[best], scale[pivot]];
+    const divisor = augmented[pivot][pivot];
+    for (let column = pivot; column <= size; column += 1) augmented[pivot][column] /= divisor;
+    for (let row = 0; row < size; row += 1) {
+      if (row === pivot) continue;
+      const factor = augmented[row][pivot];
+      if (factor === 0) continue;
+      for (let column = pivot; column <= size; column += 1) augmented[row][column] -= factor * augmented[pivot][column];
+    }
+  }
+  return augmented.map((row) => row[size]);
+}
+
+/**
+ * The branch current I_B (positive → negative through the source) of a grounded voltage-defined source (V, VCVS, CCVS) that
+ * controls a CCCS, written as Σ coefficient·V(node) + constant. KCL at the source's non-grounded terminal gives it as minus
+ * (plus, for its negative terminal) the sum of the currents leaving that node through every other element. Returns null when
+ * the node carries anything not expressible in node voltages (another voltage-defined branch, a floating source).
+ */
+export function branchCurrentExpression(elements: MNAElement[], cccs: Extract<MNAElement, { type: 'cccs' }>, depth = 0): { branch: MNAElement; terms: Map<string, number>; constant: number } | null {
+  if (depth > 4) return null;
+  const targetRef = cccs.targetId || cccs.controlSourceId || '';
+  const branch = elements.find((item) => (item.id === targetRef || item.label === targetRef) && (item.type === 'voltage' || item.type === 'vcvs' || item.type === 'ccvs'));
+  if (!branch || !('positive' in branch)) return null;
+  const grounded = branch.positive === '0' ? branch.negative : branch.negative === '0' ? branch.positive : null;
+  if (!grounded) return null;
+  const leaving = currentLeavingNode(elements, grounded, branch.id, depth);
+  if (!leaving) return null;
+  const scale = grounded === branch.positive ? -1 : 1;
+  return { branch, terms: new Map(Array.from(leaving.terms.entries()).map(([node, value]) => [node, value * scale])), constant: leaving.constant * scale };
+}
+
+/** Current delivered by the CCCS itself: gain × the controlling branch current, as node-voltage terms plus a constant. */
+function branchControlledCurrent(elements: MNAElement[], cccs: Extract<MNAElement, { type: 'cccs' }>, depth = 0): { terms: Map<string, number>; constant: number } | null {
+  const expression = branchCurrentExpression(elements, cccs, depth);
+  if (!expression) return null;
+  return { terms: new Map(Array.from(expression.terms.entries()).map(([node, value]) => [node, value * cccs.gain])), constant: expression.constant * cccs.gain };
+}
+
+/** Σ of the currents leaving `node` through every element except `excludeId`, as node-voltage terms plus a constant. */
+function currentLeavingNode(elements: MNAElement[], node: string, excludeId: string, depth: number): { terms: Map<string, number>; constant: number } | null {
+  const terms = new Map<string, number>();
+  let constant = 0;
+  const add = (name: string | undefined, value: number) => { if (name && name !== '0') terms.set(name, (terms.get(name) ?? 0) + value); };
+  for (const item of elements) {
+    if (item.id === excludeId || item.isBurned) continue;
+    switch (item.type) {
+      case 'resistor': {
+        if (item.positive !== node && item.negative !== node) break;
+        const conductance = 1 / item.resistance;
+        add(node, conductance); add(item.positive === node ? item.negative : item.positive, -conductance);
+        break;
+      }
+      case 'current':
+        if (item.from === node) constant += item.current;
+        if (item.to === node) constant -= item.current;
+        break;
+      case 'vccs': {
+        if (item.positive !== node && item.negative !== node) break;
+        const k = (item.gain ?? item.transconductance ?? 0) * (item.positive === node ? 1 : -1);
+        if (!item.controlPositive || !item.controlNegative) return null;
+        add(item.controlPositive, k); add(item.controlNegative, -k);
+        break;
+      }
+      case 'cccs': {
+        if (item.positive !== node && item.negative !== node) break;
+        const sign = item.positive === node ? 1 : -1;
+        const resistor = resolveTargetResistor(elements, item);
+        if (resistor) {
+          const geq = sign * item.gain / resistor.resistance;
+          add(resistor.positive, geq); add(resistor.negative, -geq);
+          break;
+        }
+        const nested = branchControlledCurrent(elements, item, depth + 1);
+        if (!nested) return null;
+        nested.terms.forEach((value, name) => add(name, sign * value));
+        constant += sign * nested.constant;
+        break;
+      }
+      case 'voltage': case 'vcvs': case 'ccvs': case 'current-sense':
+        if (item.positive === node || item.negative === node) return null;
+        break;
+      default: break;
+    }
+  }
+  return { terms, constant };
+}
+
+/**
+ * Builds the textbook nodal system [G][V_unknown]=[z] for the academic trace.
+ * It stamps source-resistor series branches directly as G·V_primary=-offset/R,
+ * exactly matching the algebra rendered in the KCL derivation.
+ */
+export function generateReducedNodalMatrix(elements: MNAElement[]): ReducedNodalMatrix {
+  const knownNodes = extractPolarityAwareKnownNodes(elements);
+  const sourceResistorBranches = detectGroundedSourceResistorBranches(elements);
+  const sourceSeriesSimpleNodes = new Set(sourceResistorBranches.map((branch) => branch.simpleNode));
+  const allUnknownNodes = nonReferenceNodes(elements).filter((node) => !knownNodes.has(node) && !sourceSeriesSimpleNodes.has(node));
+  const unknownNodes = filterEssentialNodes(elements, knownNodes);
+  const eliminatedNodes = [...Array.from(sourceSeriesSimpleNodes), ...allUnknownNodes.filter((node) => !unknownNodes.includes(node))];
+  const index = new Map(allUnknownNodes.map((node, position) => [node, position]));
+  const fullConductance = Array.from({ length: allUnknownNodes.length }, () => Array<number>(allUnknownNodes.length).fill(0));
+  const fullRhs = Array<number>(allUnknownNodes.length).fill(0);
+  // Conductance of each row to the reference / known-voltage nodes, accumulated at stamping time. The subtraction-free (GTH)
+  // elimination below needs it as an exact sum: recovering it afterwards as G_ii + ΣG_ij cancels ~13 digits when a 1 mΩ
+  // resistor sits next to a 1 GΩ one. `pureNetwork` turns false as soon as any stamp is not a plain resistor to a node/known/ground.
+  const groundConductance = Array<number>(allUnknownNodes.length).fill(0);
+  let pureNetwork = true;
+  let recoverEliminated: ReducedNodalMatrix['recoverEliminated'];
+  const addToUnknown = (node: string, value: number) => {
+    const position = index.get(node);
+    if (position !== undefined) fullRhs[position] += value;
+  };
+  for (const element of elements) {
+    if (element.type === 'resistor') {
+      if (sourceResistorBranches.some((branch) => branch.resistor.id === element.id) || Math.abs(element.resistance) < EPSILON) continue;
+      const conductanceValue = 1 / element.resistance;
+      const endpoints: Array<[string, string]> = [[element.positive, element.negative], [element.negative, element.positive]];
+      for (const [inside, outside] of endpoints) {
+        const row = index.get(inside);
+        if (row === undefined) continue;
+        fullConductance[row][row] += conductanceValue;
+        const column = index.get(outside);
+        if (column !== undefined) fullConductance[row][column] -= conductanceValue;
+        else if (outside !== '0' && knownNodes.has(outside)) { fullRhs[row] += conductanceValue * knownNodes.get(outside)!; groundConductance[row] += conductanceValue; }
+        else if (outside === '0') groundConductance[row] += conductanceValue;
+        else pureNetwork = false;
+      }
+      continue;
+    }
+    if (element.type === 'current') {
+      // Same known-vector rule as mnaSolver.stampCurrent: the source LEAVES `from` (z -= I) and
+      // ENTERS `to` (z += I). addToUnknown resolves the row through `index`, so a pin that sits on
+      // a collapsed supernode/eliminated node reaches the row that survives the reduction.
+      addToUnknown(element.from, -element.current);
+      addToUnknown(element.to, element.current);
+      continue;
+    }
+    if (element.type === 'vccs') {
+      pureNetwork = false;
+      const k = element.gain ?? element.transconductance ?? 0;
+      const targetResistor = resolveTargetResistor(elements, element);
+      const cp = element.controlPositive ?? targetResistor?.positive ?? '0';
+      const cn = element.controlNegative ?? targetResistor?.negative ?? '0';
+      const stampVCCS = (node: string, sign: number) => {
+        const row = index.get(node);
+        if (row === undefined) return;
+        const cpCol = index.get(cp);
+        const cnCol = index.get(cn);
+        if (cpCol !== undefined) fullConductance[row][cpCol] += sign * k;
+        else if (cp !== '0' && knownNodes.has(cp)) fullRhs[row] -= sign * k * knownNodes.get(cp)!;
+        if (cnCol !== undefined) fullConductance[row][cnCol] -= sign * k;
+        else if (cn !== '0' && knownNodes.has(cn)) fullRhs[row] += sign * k * knownNodes.get(cn)!;
+      };
+      stampVCCS(element.positive, 1);
+      stampVCCS(element.negative, -1);
+      continue;
+    }
+    if (element.type === 'cccs') {
+      pureNetwork = false;
+      const k = element.gain;
+      const targetResistor = resolveTargetResistor(elements, element);
+      if (targetResistor) {
+        const geq = k / targetResistor.resistance;
+        const tp = targetResistor.positive;
+        const tn = targetResistor.negative;
+        const stampCCCS = (node: string, sign: number) => {
+          const row = index.get(node);
+          if (row === undefined) return;
+          const tpCol = index.get(tp);
+          const tnCol = index.get(tn);
+          if (tpCol !== undefined) fullConductance[row][tpCol] += sign * geq;
+          else if (tp !== '0' && knownNodes.has(tp)) fullRhs[row] -= sign * geq * knownNodes.get(tp)!;
+          if (tnCol !== undefined) fullConductance[row][tnCol] -= sign * geq;
+          else if (tn !== '0' && knownNodes.has(tn)) fullRhs[row] += sign * geq * knownNodes.get(tn)!;
+        };
+        stampCCCS(element.positive, 1);
+        stampCCCS(element.negative, -1);
+      } else {
+        // Current-controlled by a voltage-defined branch (the primary CCCS of an ideal transformer): express the branch current
+        // through the node voltages with KCL at the source's output node and stamp that instead of dropping the coupling.
+        const expression = branchControlledCurrent(elements, element);
+        const nodeCoefficients = expression ? Array.from(expression.terms.entries()) : [];
+        const representable = Boolean(expression) && nodeCoefficients.every(([node]) => index.has(node) || knownNodes.has(node));
+        if (expression && representable) {
+          for (const [rowNode, sign] of [[element.positive, 1], [element.negative, -1]] as const) {
+            const row = index.get(rowNode);
+            if (row === undefined) continue;
+            for (const [node, coefficient] of nodeCoefficients) {
+              const column = index.get(node);
+              if (column !== undefined) fullConductance[row][column] += sign * coefficient;
+              else fullRhs[row] -= sign * coefficient * knownNodes.get(node)!;
+            }
+            fullRhs[row] -= sign * expression.constant;
+          }
+        }
+      }
+      continue;
+    }
+  }
+  for (const branch of sourceResistorBranches) {
+    const row = index.get(branch.primaryNode);
+    if (row === undefined || Math.abs(branch.resistor.resistance) < EPSILON) continue;
+    const conductanceValue = 1 / branch.resistor.resistance;
+    fullConductance[row][row] += conductanceValue;
+    groundConductance[row] += conductanceValue;
+    // (V_primary + offset)/R = 0  =>  G·V_primary = -offset/R.
+    fullRhs[row] -= conductanceValue * branch.simpleOffset;
+  }
+
+  // A grounded ideal dependent source supplies its output node's current through ground, so that
+  // node's KCL row carries an unknown branch current and cannot be written in node voltages alone.
+  // Replace it with the source's defining constraint, exactly as the supernode branch below does.
+  // Stamping here (pre-reduction, on the full index) lets the Schur complement keep folding away any
+  // eliminated control node instead of dropping its term.
+  for (const source of identifyGroundedDependentVoltageSources(elements)) {
+    const row = index.get(source.outputNode);
+    if (row === undefined) continue;
+    pureNetwork = false;
+    fullConductance[row] = Array<number>(allUnknownNodes.length).fill(0);
+    fullRhs[row] = 0;
+    fullConductance[row][row] = source.outputSign;
+    const stampControl = (node: string, coefficient: number) => {
+      if (node === '0') return;
+      const column = index.get(node);
+      if (column !== undefined) { fullConductance[row][column] += coefficient; return; }
+      if (knownNodes.has(node)) { fullRhs[row] -= coefficient * knownNodes.get(node)!; return; }
+      // A control pin landing on an eliminated series node resolves through V_simple = V_primary + offset.
+      const series = sourceResistorBranches.find((branch) => branch.simpleNode === node);
+      if (!series) return;
+      const primaryColumn = index.get(series.primaryNode);
+      if (primaryColumn !== undefined) fullConductance[row][primaryColumn] += coefficient;
+      fullRhs[row] -= coefficient * series.simpleOffset;
+    };
+    if (source.element.type === 'vcvs') {
+      const gain = source.element.gain;
+      const targetResistor = resolveTargetResistor(elements, source.element);
+      stampControl(source.element.controlPositive ?? targetResistor?.positive ?? '0', -gain);
+      stampControl(source.element.controlNegative ?? targetResistor?.negative ?? '0', gain);
+    } else {
+      const gain = source.element.gain ?? source.element.transresistance ?? 0;
+      const targetResistor = resolveTargetResistor(elements, source.element);
+      if (targetResistor) {
+        const transfer = gain / targetResistor.resistance;
+        stampControl(targetResistor.positive, -transfer);
+        stampControl(targetResistor.negative, transfer);
+      }
+    }
+  }
+  const primary = unknownNodes.map((node) => index.get(node)!);
+  const simple = allUnknownNodes.filter((node) => !unknownNodes.includes(node)).map((node) => index.get(node)!);
+  const conductance = primary.map((row) => primary.map((column) => fullConductance[row][column]));
+  const rhs = primary.map((row) => fullRhs[row]);
+  const offDiagonalsAreConductances = fullConductance.every((row, i) => row.every((value, j) => i === j || value <= 0));
+  if (simple.length && pureNetwork && offDiagonalsAreConductances) {
+    // Subtraction-free elimination (Grassmann–Taksar–Heyman): with o_ij = −G_ij ≥ 0 and d_i the conductance to reference,
+    //   D_k = d_k + Σ o_kl;  o_ij += o_ik·o_kj / D_k;  d_i += o_ik·d_k / D_k;  z_i += o_ik·z_k / D_k
+    // so no diagonal is ever produced by subtracting two nearly equal numbers.
+    const count = allUnknownNodes.length;
+    const off = fullConductance.map((row, i) => row.map((value, j) => (i === j ? 0 : -value)));
+    const d = groundConductance.slice();
+    const z = fullRhs.slice();
+    const alive = Array<boolean>(count).fill(true);
+    const records: Array<{ node: string; total: number; z: number; neighbours: Array<[string, number]> }> = [];
+    for (const k of simple) {
+      let total = d[k];
+      const neighbours: Array<[string, number]> = [];
+      for (let l = 0; l < count; l += 1) if (alive[l] && l !== k) { total += off[k][l]; if (off[k][l] !== 0) neighbours.push([allUnknownNodes[l], off[k][l]]); }
+      if (!(total > 0)) throw new Error('Pedagogical node reduction encountered an unresolved simple-node chain.');
+      records.push({ node: allUnknownNodes[k], total, z: z[k], neighbours });
+      alive[k] = false;
+      for (let i = 0; i < count; i += 1) {
+        if (!alive[i] || off[i][k] === 0) continue;
+        const weight = off[i][k] / total;
+        d[i] += weight * d[k];
+        z[i] += weight * z[k];
+        for (let j = 0; j < count; j += 1) if (alive[j] && j !== i && off[k][j] !== 0) off[i][j] += weight * off[k][j];
+      }
+    }
+    primary.forEach((row, r) => {
+      let diagonal = d[row];
+      for (let l = 0; l < count; l += 1) if (alive[l] && l !== row) diagonal += off[row][l];
+      conductance[r][r] = diagonal;
+      primary.forEach((column, c) => { if (c !== r) conductance[r][c] = -off[row][column]; });
+      rhs[r] = z[row];
+    });
+    recoverEliminated = (unknownVoltages) => {
+      const recovered: Record<string, number> = { ...unknownVoltages };
+      for (let index = records.length - 1; index >= 0; index -= 1) {
+        const record = records[index];
+        recovered[record.node] = (record.z + record.neighbours.reduce((sum, [node, weight]) => sum + weight * (recovered[node] ?? 0), 0)) / record.total;
+      }
+      return Object.fromEntries(records.map(record => [record.node, recovered[record.node]]));
+    };
+  } else if (simple.length) {
+    const simpleMatrix = simple.map((row) => simple.map((column) => fullConductance[row][column]));
+    for (let column = 0; column < primary.length; column += 1) {
+      const coupling = simple.map((row) => fullConductance[row][primary[column]]);
+      const solved = solveDenseSystem(simpleMatrix, coupling);
+      for (let row = 0; row < primary.length; row += 1) conductance[row][column] -= simple.map((simpleRow, i) => fullConductance[primary[row]][simpleRow] * solved[i]).reduce((sum, value) => sum + value, 0);
+    }
+    const solvedRhs = solveDenseSystem(simpleMatrix, simple.map((row) => fullRhs[row]));
+    for (let row = 0; row < primary.length; row += 1) rhs[row] -= simple.map((simpleRow, i) => fullConductance[primary[row]][simpleRow] * solvedRhs[i]).reduce((sum, value) => sum + value, 0);
+  }
+
+  // Stamp compound supernode merged KCL rows and auxiliary constraint rows
+  const compoundSupernodes = identifyCompoundSupernodes(elements);
+  for (const cs of compoundSupernodes) {
+    const csNodes = cs.nodes.filter((n) => unknownNodes.includes(n));
+    if (csNodes.length < 2) continue;
+    const nodeRowIndices = csNodes.map((n) => unknownNodes.indexOf(n));
+    const primaryRow = nodeRowIndices[0];
+
+    // Merge KCL rows: Row_primary = sum(Row_k)
+    const mergedRow = conductance[0].map((_, col) =>
+      nodeRowIndices.reduce((sum, r) => sum + conductance[r][col], 0)
+    );
+    const mergedRhs = nodeRowIndices.reduce((sum, r) => sum + rhs[r], 0);
+    conductance[primaryRow] = mergedRow;
+    rhs[primaryRow] = mergedRhs;
+
+    // Allocate auxiliary constraint rows for each source in the supernode
+    for (let j = 0; j < cs.sources.length && j + 1 < nodeRowIndices.length; j += 1) {
+      const source = cs.sources[j];
+      const constraintRow = nodeRowIndices[j + 1];
+      conductance[constraintRow] = Array(unknownNodes.length).fill(0);
+      rhs[constraintRow] = 0;
+
+      const posIdx = unknownNodes.indexOf(source.positiveNode);
+      const negIdx = unknownNodes.indexOf(source.negativeNode);
+
+      if (posIdx >= 0) conductance[constraintRow][posIdx] += 1;
+      else if (knownNodes.has(source.positiveNode)) rhs[constraintRow] -= knownNodes.get(source.positiveNode)!;
+
+      if (negIdx >= 0) conductance[constraintRow][negIdx] -= 1;
+      else if (knownNodes.has(source.negativeNode)) rhs[constraintRow] += knownNodes.get(source.negativeNode)!;
+
+      if (source.element.type === 'voltage') {
+        rhs[constraintRow] += source.element.voltage;
+      } else if (source.element.type === 'vcvs') {
+        const gain = source.element.gain;
+        const targetResistor = resolveTargetResistor(elements, source.element);
+        const cp = source.element.controlPositive ?? targetResistor?.positive ?? '0';
+        const cn = source.element.controlNegative ?? targetResistor?.negative ?? '0';
+        const cPosIdx = unknownNodes.indexOf(cp);
+        const cNegIdx = unknownNodes.indexOf(cn);
+        if (cPosIdx >= 0) conductance[constraintRow][cPosIdx] -= gain;
+        else if (knownNodes.has(cp)) rhs[constraintRow] += gain * knownNodes.get(cp)!;
+        if (cNegIdx >= 0) conductance[constraintRow][cNegIdx] += gain;
+        else if (knownNodes.has(cn)) rhs[constraintRow] -= gain * knownNodes.get(cn)!;
+      } else if (source.element.type === 'ccvs') {
+        const gain = source.element.gain ?? source.element.transresistance ?? 0;
+        const targetResistor = resolveTargetResistor(elements, source.element);
+        if (targetResistor) {
+          const mueq = gain / targetResistor.resistance;
+          const tpIdx = unknownNodes.indexOf(targetResistor.positive);
+          const tnIdx = unknownNodes.indexOf(targetResistor.negative);
+          if (tpIdx >= 0) conductance[constraintRow][tpIdx] -= mueq;
+          else if (knownNodes.has(targetResistor.positive)) rhs[constraintRow] += mueq * knownNodes.get(targetResistor.positive)!;
+          if (tnIdx >= 0) conductance[constraintRow][tnIdx] += mueq;
+          else if (knownNodes.has(targetResistor.negative)) rhs[constraintRow] -= mueq * knownNodes.get(targetResistor.negative)!;
+        }
+      }
+    }
+  }
+
+  const reducedSolution = solveDenseSystem(conductance, rhs);
+  const residualInfinity = conductance.reduce((maximum, row, rowIndex) => Math.max(maximum, Math.abs(row.reduce((sum, value, column) => sum + value * (reducedSolution[column] ?? 0), 0) - (rhs[rowIndex] ?? 0))), 0);
+  const matrixNorm = conductance.reduce((maximum, row) => Math.max(maximum, row.reduce((sum, value) => sum + Math.abs(value), 0)), 0);
+  const solutionNorm = reducedSolution.reduce((maximum, value) => Math.max(maximum, Math.abs(value)), 0);
+  const rhsNorm = rhs.reduce((maximum, value) => Math.max(maximum, Math.abs(value)), 0);
+  const scale = matrixNorm * solutionNorm + rhsNorm;
+  return { knownNodes, unknownNodes, eliminatedNodes, conductance, rhs, residualInfinity, relativeResidual: scale > 0 ? residualInfinity / scale : residualInfinity, recoverEliminated };
+}

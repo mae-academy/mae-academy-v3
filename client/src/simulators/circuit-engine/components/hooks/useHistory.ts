@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
-import type { CircuitComponent, CircuitWire, WorkspaceText } from '@/simulators/circuit-engine/models/circuitTypes';
+import type { CircuitComponent, CircuitWire, WorkspaceText } from '@shared/circuit/circuitTypes';
 
 export interface CanvasSnapshot {
   components: CircuitComponent[];
