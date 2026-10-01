@@ -1,5 +1,5 @@
-import type { CircuitComponent } from '@/simulators/digital-logic/models/circuitTypes';
-import { nextComponentLabel } from '@/simulators/digital-logic/models/circuitTypes';
+import type { CircuitComponent } from '@shared/logic/circuitTypes';
+import { nextComponentLabel } from '@shared/logic/circuitTypes';
 
 const normalized = (value: unknown) => String(value ?? '').trim().toLowerCase();
 export const isLogicInput = (component: CircuitComponent) => component.type === 'digital-input';

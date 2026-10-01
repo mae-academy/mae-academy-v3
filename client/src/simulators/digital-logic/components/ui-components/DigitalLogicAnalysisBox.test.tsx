@@ -2,8 +2,8 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { DigitalLogicAnalysisBox } from '@/simulators/digital-logic/components/ui-components/DigitalLogicAnalysisBox';
-import { astToOverlineLatex } from '@/simulators/digital-logic/engine/logicEngine/ast';
-import { parseBooleanExpression } from '@/simulators/digital-logic/engine/logicEngine';
+import { astToOverlineLatex } from '@shared/logic/logicEngine/ast';
+import { parseBooleanExpression } from '@shared/logic/logicEngine';
 
 const mockColors = {
   panel: '#ffffff',

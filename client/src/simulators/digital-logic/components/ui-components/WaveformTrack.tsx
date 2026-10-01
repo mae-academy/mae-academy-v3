@@ -1,5 +1,5 @@
 /** Timing Waveforms — pure SVG square-wave track with optional tick-level input hit targets. */
-import type { TimingHazard, Waveform, WaveformValue } from '../../engine/timingEngine';
+import type { TimingHazard, Waveform, WaveformValue } from '@shared/logic/timingTypes';
 
 export const waveformY = (value: WaveformValue, highY: number, lowY: number) => value === 1 ? highY : lowY;
 

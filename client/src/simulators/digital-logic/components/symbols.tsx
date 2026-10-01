@@ -5,8 +5,8 @@
  */
 
 import React from 'react';
-import { centeredPinAxisFor, dynamicGateGeometryFor, DYNAMIC_PIN_PITCH, GRID, isScalableLogicGate, logicBlockLayoutFor, logicBodyBoundaryForPin, slotPinsFor, type LogicBlockLayout, type LogicSymbolPin } from '@/simulators/digital-logic/components/dynamicLogicGeometry';
-import { getDef } from '@/simulators/digital-logic/models/componentDefs';
+import { centeredPinAxisFor, dynamicGateGeometryFor, DYNAMIC_PIN_PITCH, GRID, isScalableLogicGate, logicBlockLayoutFor, logicBodyBoundaryForPin, slotPinsFor, type LogicBlockLayout, type LogicSymbolPin } from '@shared/logic/dynamicLogicGeometry';
+import { getDef } from '@shared/logic/componentDefs';
 
 interface SymbolProps {
   powered?: boolean;

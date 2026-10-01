@@ -6,8 +6,10 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { KatexMath } from '@/components/ui/KatexMath';
 import { SegmentedControl, type SegmentedOption, StatusBadge } from '@/components/common/templates';
 import { createKMapTopology, layoutKMapGroups } from '@/simulators/digital-logic/components/kmapGeometry';
-import { solveKMap, type KMapSolution, type KMapVariableCount } from '@/simulators/digital-logic/engine/kmapSolver';
-import { evaluateAst, parseBooleanExpression, type ParsedLogicExpression } from '@/simulators/digital-logic/engine/logicEngine';
+import type { KMapSolution, KMapVariableCount } from '@shared/logic/kmapTypes';
+import { solveKMapRemote } from '@/services/logicClient';
+import { useLogicQuery } from '@/simulators/digital-logic/remote/useLogicQuery';
+import { evaluateAst, parseBooleanExpression, type ParsedLogicExpression } from '@shared/logic/logicEngine';
 
 type KMapCellState = '0' | '1' | 'X';
 type EditableCount = 2 | 3 | 4;
@@ -57,12 +59,18 @@ const tryParse = (source: string | undefined): ParsedLogicExpression | null => {
 const nextCellState = (state: KMapCellState): KMapCellState => (state === '0' ? '1' : state === '1' ? 'X' : '0');
 const indicesWith = (cells: readonly KMapCellState[], state: KMapCellState) => cells.flatMap((value, index) => (value === state ? [index] : []));
 
-const solveSafely = (map: KMapState): KMapSolution | null => {
+/** The K-map's request for the serverless solver; indices outside the grid are discarded here. */
+const problemOf = (map: KMapState) => {
+  const maxMinterm = 2 ** map.variables.length;
+  return {
+    variables: map.variables,
+    minterms: indicesWith(map.cells, '1').filter(m => m >= 0 && m < maxMinterm),
+    dontCares: indicesWith(map.cells, 'X').filter(m => m >= 0 && m < maxMinterm),
+  };
+};
+const solveSafely = async (map: KMapState): Promise<KMapSolution | null> => {
   try {
-    const maxMinterm = 2 ** map.variables.length;
-    const minterms = indicesWith(map.cells, '1').filter(m => m >= 0 && m < maxMinterm);
-    const dontCares = indicesWith(map.cells, 'X').filter(m => m >= 0 && m < maxMinterm);
-    return solveKMap({ variables: map.variables, minterms, dontCares });
+    return await solveKMapRemote(problemOf(map));
   } catch {
     return null;
   }
@@ -99,7 +107,9 @@ export function KMapMinimizer({ expression, onExpressionChange }: KMapMinimizerP
     if (parsed) setMap(stateFromExpression(parsed, clampCount(parsed.variables.length)));
   }, [expression]);
 
-  const solution = useMemo(() => solveSafely(map), [map]);
+  // Minimization runs on the serverless engine; the last solution stays drawn until the next one arrives.
+  const problem = useMemo(() => problemOf(map), [map]);
+  const solution = useLogicQuery(JSON.stringify(problem), signal => solveKMapRemote(problem, signal)).data;
   const groups = useMemo(() => layoutKMapGroups(
     (solution?.selectedPrimeImplicants ?? []).map(implicant => ({ id: implicant.pattern, coveredMinterms: implicant.sourceTerms })),
     topology,
@@ -108,11 +118,12 @@ export function KMapMinimizer({ expression, onExpressionChange }: KMapMinimizerP
 
   const commitMap = (next: KMapState) => {
     setMap(next);
-    const nextSolution = solveSafely(next);
-    if (nextSolution && onExpressionChange) {
+    if (!onExpressionChange) return;
+    void solveSafely(next).then(nextSolution => {
+      if (!nextSolution) return;
       emittedRef.current = nextSolution.expression;
       onExpressionChange(nextSolution.expression);
-    }
+    });
   };
 
   const switchVariableCount = (count: EditableCount) => {

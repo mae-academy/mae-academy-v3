@@ -4,7 +4,7 @@ import { KMapMinimizer } from '@/simulators/digital-logic/components/pages/KMapM
 import { UniversalSynthesis } from '@/simulators/digital-logic/components/pages/UniversalSynthesis';
 import { TimingWaveforms } from '@/simulators/digital-logic/components/pages/TimingWaveforms';
 import { StateMachineExplorer } from '@/simulators/digital-logic/components/pages/StateMachineExplorer';
-import { DiscreteEventLogicEngine } from '@/simulators/digital-logic/engine/desLogicCore';
+import { RemoteDesEngine } from '@/simulators/digital-logic/remote/remoteDesEngine';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocale } from '@/contexts/LocaleContext';
@@ -17,7 +17,7 @@ import { SegmentedControl } from '@/components/common/templates';
  */
 type DigitalLogicTool = 'schematic' | 'analyzer' | 'kmap' | 'synthesis' | 'timing' | 'state-machine';
 
-const createDigitalLogicEngine = () => new DiscreteEventLogicEngine();
+const createDigitalLogicEngine = () => new RemoteDesEngine();
 const initialDigitalLogicTool = (tools: ReadonlyArray<{ id: DigitalLogicTool; label: string }>): DigitalLogicTool => {
   if (typeof window === 'undefined') return 'schematic';
   const requested = new URLSearchParams(window.location.search).get('tool');

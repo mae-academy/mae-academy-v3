@@ -1,5 +1,5 @@
-import type { CircuitComponent, CircuitWire, WorkspaceText } from '@/simulators/digital-logic/models/circuitTypes';
-import type { Point } from '@/simulators/digital-logic/models/wiring';
+import type { CircuitComponent, CircuitWire, WorkspaceText } from '@shared/logic/circuitTypes';
+import type { Point } from '@shared/logic/wiring';
 
 export const NAD_FORMAT = 'MAE-NAD';
 export const NAD_VERSION = 1;

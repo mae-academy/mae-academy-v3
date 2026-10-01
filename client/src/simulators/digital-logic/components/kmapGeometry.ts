@@ -2,7 +2,7 @@
  * MAE K-Map Geometry — pure Gray-code topology and SVG overlay mathematics.
  * Rendering components consume these coordinates; no DOM, React, or animation is present here.
  */
-import type { KMapVariableCount } from '@/simulators/digital-logic/engine/kmapSolver';
+import type { KMapVariableCount } from '@shared/logic/kmapTypes';
 
 export interface KMapCellCoordinate {
   minterm: number;

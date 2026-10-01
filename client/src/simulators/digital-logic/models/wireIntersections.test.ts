@@ -4,7 +4,7 @@ import {
   buildJumpArcPath,
   junctionDotPositions,
 } from '@/simulators/digital-logic/models/wireIntersections';
-import type { CircuitWire } from '@/simulators/digital-logic/models/circuitTypes';
+import type { CircuitWire } from '@shared/logic/circuitTypes';
 
 describe('wireIntersections (Cross-Net Bridges & Junction Dots)', () => {
   it('detects cross-net orthogonal crossings and generates jump arcs', () => {

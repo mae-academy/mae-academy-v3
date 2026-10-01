@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { getDef } from '@/simulators/digital-logic/models/componentDefs';
-import { getLogicComponentTerminals, normalizedInputCount } from '@/simulators/digital-logic/models/logicGateContract';
+import { getDef } from '@shared/logic/componentDefs';
+import { getLogicComponentTerminals, normalizedInputCount } from '@shared/logic/logicGateContract';
 
 describe('Digital Logic multi-input gate contract', () => {
   it.each([[2, ['a', 'b', 'y']], [3, ['a', 'b', 'c', 'y']], [4, ['a', 'b', 'c', 'd', 'y']]])('registers %s-input gate terminals on the documented left-side lattice', (inputCount, ids) => {

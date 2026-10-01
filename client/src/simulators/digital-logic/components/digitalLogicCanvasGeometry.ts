@@ -1,5 +1,5 @@
-import type { Point } from '@/simulators/digital-logic/models/wiring';
-import { snapPointToGrid } from '@/simulators/digital-logic/models/wiring';
+import type { Point } from '@shared/logic/wiring';
+import { snapPointToGrid } from '@shared/logic/wiring';
 import { tabDGentleWheelZoomFactor } from '@/simulators/shared/workspace/workspaceCanvasMechanics';
 
 export type TabDTerminalAxis = 'horizontal' | 'vertical';

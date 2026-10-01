@@ -8,7 +8,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import type { CircuitPlacementMode } from '@/simulators/digital-logic/engine/circuitExpressionExtractor';
+import type { CircuitPlacementMode } from '@/simulators/digital-logic/models/circuitExpressionExtractor';
 
 export interface CircuitPlacementMenuProps {
   /** The trigger button (rendered as-is). */

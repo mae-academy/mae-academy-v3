@@ -4,13 +4,10 @@ import { Play, Pause, RotateCcw, Plus } from 'lucide-react';
 import { KatexMath } from '@/components/ui/KatexMath';
 import { StudioButton } from '@/components/common/templates';
 import { WaveformTrack } from '@/simulators/digital-logic/components/ui-components/WaveformTrack';
-import {
-  createClockWaveform,
-  evaluateTimingWaveforms,
-  extendWaveform,
-  type WaveformValue,
-} from '../../engine/timingEngine';
-import { parseBooleanExpression } from '@/simulators/digital-logic/engine/logicEngine';
+import { createClockWaveform, extendWaveform, type WaveformValue } from '@shared/logic/timingTypes';
+import { evaluateTimingRemote } from '@/services/logicClient';
+import { useLogicQuery } from '@/simulators/digital-logic/remote/useLogicQuery';
+import { parseBooleanExpression } from '@shared/logic/logicEngine';
 
 const INITIAL_EXPRESSION = 'A ^ B';
 const INITIAL_TICKS = 12;
@@ -142,14 +139,14 @@ export function TimingWaveforms({ expression: controlledExpr, onExpressionChange
       })),
     [inputData, lastValidExpression.variables, tickCount],
   );
-  const timing = useMemo(() => {
-    try {
-      return evaluateTimingWaveforms(lastValidExpression.source, inputTracks, clock, { delayTicks: 1, outputName: 'F' });
-    } catch {
-      // Input tracks lag one render behind a variable-set change; show a flat output meanwhile.
-      return { output: { name: 'F', type: 'output' as const, data: Array<WaveformValue>(tickCount).fill(0) }, risingEdges: [] as number[], hazards: [] };
-    }
-  }, [clock, inputTracks, lastValidExpression.source, tickCount]);
+  // Timing and hazard analysis runs on the serverless engine; a flat output shows until the first answer.
+  const flat = useMemo(() => ({ output: { name: 'F', type: 'output' as const, data: Array<WaveformValue>(tickCount).fill(0) }, risingEdges: [] as number[], hazards: [] as { tick: number; kind: 'static' | 'dynamic'; transientValues: Array<0 | 1> }[] }), [tickCount]);
+  const timingQuery = useLogicQuery(
+    JSON.stringify([lastValidExpression.source, inputTracks, clock.data]),
+    signal => evaluateTimingRemote(lastValidExpression.source, inputTracks, clock, { delayTicks: 1, outputName: 'F' }, signal),
+  );
+  // Input tracks lag one render behind a variable-set change (the engine then rejects the request): show a flat output meanwhile.
+  const timing = !timingQuery.error && timingQuery.data && timingQuery.data.output.data.length === tickCount ? timingQuery.data : flat;
   // Ticks stretch to fill the drawer width; they only fall back to horizontal scroll below TICK_WIDTH.
   const canvasHostRef = useRef<HTMLDivElement>(null);
   const [hostWidth, setHostWidth] = useState(0);

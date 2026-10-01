@@ -1,7 +1,7 @@
 import { expect, it, describe } from 'vitest';
-import { getDef } from '@/simulators/digital-logic/models/componentDefs';
+import { getDef } from '@shared/logic/componentDefs';
 import { alignTabDTerminalToGrid, lockTabDWireCorner, moveTabDOrthogonalLane, tabDGentleWheelZoomFactor, tabDOrthogonalDraftPath, tabDTerminalOrthogonalPath } from '@/simulators/digital-logic/components/digitalLogicCanvasGeometry';
-import { getTerminalWorldPos, reconnectPathEndpoints, type Point } from '@/simulators/digital-logic/models/wiring';
+import { getTerminalWorldPos, reconnectPathEndpoints, type Point } from '@shared/logic/wiring';
 
 const TAB_D_GRID = 25;
 const TAB_D_SCALE = 1.5;

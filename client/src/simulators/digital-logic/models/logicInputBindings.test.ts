@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { CircuitComponent } from '@/simulators/digital-logic/models/circuitTypes';
+import type { CircuitComponent } from '@shared/logic/circuitTypes';
 import { defaultInputShortcut, findInputByShortcut, logicIoLabel, normalizeDefaultLogicLabel } from '@/simulators/digital-logic/models/logicInputBindings';
 
 const component = (id: string, type: string, label: string, props: Record<string, unknown> = {}): CircuitComponent => ({ id, type, label, props, x: 0, y: 0, rotation: 0, flipH: false, flipV: false });

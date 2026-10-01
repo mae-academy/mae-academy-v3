@@ -5,12 +5,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { KatexMath } from '@/components/ui/KatexMath';
 import { StatusBadge } from '@/components/common/templates';
-import type { ParsedLogicExpression, TruthTableRow } from '@/simulators/digital-logic/engine/logicEngine';
+import type { ParsedLogicExpression, TruthTableRow } from '@shared/logic/logicEngine';
 import {
   generateTruthTable,
   parseBooleanExpression,
   MAX_LOGIC_ANALYZER_VARIABLES,
-} from '@/simulators/digital-logic/engine/logicEngine';
+} from '@shared/logic/logicEngine';
 
 const INITIAL_EXPRESSION = 'A*B+C';
 const parseInitial = () => parseBooleanExpression(INITIAL_EXPRESSION);

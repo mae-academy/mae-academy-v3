@@ -10,7 +10,7 @@ import {
   routeTJunctionPath,
   simplifyOrthogonalPath,
   type Point,
-} from '@/simulators/digital-logic/models/wiring';
+} from '@shared/logic/wiring';
 import {
   dynamicRubberBandPath,
   moveTabDOrthogonalLane,

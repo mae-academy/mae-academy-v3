@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { compactMathNumbers } from '@/simulators/digital-logic/models/analysisFormatting';
+import { compactMathNumbers } from '@shared/logic/analysisFormatting';
 
 describe('academic math number compaction', () => {
   it('formats numerical literals without corrupting LaTeX identifiers or color macros', () => {

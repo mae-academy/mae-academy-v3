@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { CircuitComponent } from '@/simulators/digital-logic/models/circuitTypes';
+import type { CircuitComponent } from '@shared/logic/circuitTypes';
 import { filterTabDCatalog, filterTabDImportedComponents, isTabDComponentAvailable } from '@/simulators/digital-logic/models/digitalLogicCatalog';
 
 const component = (type: string): CircuitComponent => ({ id: type, type, x: 0, y: 0, rotation: 0, flipH: false, flipV: false, label: type, props: {} });

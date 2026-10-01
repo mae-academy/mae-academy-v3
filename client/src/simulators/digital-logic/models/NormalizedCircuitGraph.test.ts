@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { getDef } from '@/simulators/digital-logic/models/componentDefs';
-import type { CircuitComponent, CircuitWire } from '@/simulators/digital-logic/models/circuitTypes';
-import { NormalizedCircuitGraph, splitNormalizedSegments } from '@/simulators/digital-logic/models/NormalizedCircuitGraph';
-import { getTerminalWorldPos } from '@/simulators/digital-logic/models/wiring';
+import { getDef } from '@shared/logic/componentDefs';
+import type { CircuitComponent, CircuitWire } from '@shared/logic/circuitTypes';
+import { NormalizedCircuitGraph, splitNormalizedSegments } from '@shared/logic/NormalizedCircuitGraph';
+import { getTerminalWorldPos } from '@shared/logic/wiring';
 
 const component = (id: string, type: string, x: number, y: number, rotation = 0): CircuitComponent => ({ id, type, x, y, rotation, flipH: false, flipV: false, label: id, props: {} });
 const point = (item: CircuitComponent, terminalId: string) => {

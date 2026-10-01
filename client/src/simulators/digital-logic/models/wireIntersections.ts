@@ -10,9 +10,9 @@
  * for legacy wires without waypoints.
  */
 
-import type { CircuitWire } from '@/simulators/digital-logic/models/circuitTypes';
-import type { Point } from '@/simulators/digital-logic/models/wiring';
-import { pointsToPath } from '@/simulators/digital-logic/models/wiring';
+import type { CircuitWire } from '@shared/logic/circuitTypes';
+import type { Point } from '@shared/logic/wiring';
+import { pointsToPath } from '@shared/logic/wiring';
 
 // ---------------------------------------------------------------------------
 // Types & Aliases

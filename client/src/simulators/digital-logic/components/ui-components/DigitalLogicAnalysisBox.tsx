@@ -8,15 +8,15 @@ import { TimingWaveforms } from '@/simulators/digital-logic/components/pages/Tim
 import { KMapMinimizer } from '@/simulators/digital-logic/components/pages/KMapMinimizer';
 import { UniversalSynthesis } from '@/simulators/digital-logic/components/pages/UniversalSynthesis';
 import { StateMachineExplorer } from '@/simulators/digital-logic/components/pages/StateMachineExplorer';
-import { MAX_LOGIC_ANALYZER_VARIABLES, parseBooleanExpression } from '@/simulators/digital-logic/engine/logicEngine';
-import { astToOverlineLatex, sanitizeBooleanInput } from '@/simulators/digital-logic/engine/logicEngine/ast';
+import { MAX_LOGIC_ANALYZER_VARIABLES, parseBooleanExpression } from '@shared/logic/logicEngine';
+import { astToOverlineLatex, sanitizeBooleanInput } from '@shared/logic/logicEngine/ast';
 import {
   extractCircuitExpression,
   generateCircuitFromExpression,
   listCircuitOutputs,
   type CircuitPlacementMode,
   type StateEquation,
-} from '@/simulators/digital-logic/engine/circuitExpressionExtractor';
+} from '@/simulators/digital-logic/models/circuitExpressionExtractor';
 import { CircuitPlacementMenu } from '@/simulators/digital-logic/components/ui-components/CircuitPlacementMenu';
 import {
   DropdownMenu,
@@ -30,7 +30,7 @@ import type {
   CircuitComponent,
   CircuitWire,
   SimulationSnapshot,
-} from '@/simulators/digital-logic/models/circuitTypes';
+} from '@shared/logic/circuitTypes';
 
 export type DigitalLogicAnalysisMethod = 'truth-table' | 'kmap' | 'synthesis' | 'timing' | 'fsm';
 

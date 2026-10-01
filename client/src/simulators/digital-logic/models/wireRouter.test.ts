@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { calculateOrthogonalPath, buildComponentBBoxes } from '@/simulators/digital-logic/models/wireRouter';
-import type { CircuitComponent } from '@/simulators/digital-logic/models/circuitTypes';
+import type { CircuitComponent } from '@shared/logic/circuitTypes';
 
 describe('wireRouter (Digital Logic Orthogonal Routing)', () => {
   it('routes a straight horizontal wire directly', () => {

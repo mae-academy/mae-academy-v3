@@ -5,17 +5,19 @@ import { KatexMath } from '@/components/ui/KatexMath';
 import { SegmentedControl, StatusBadge, StudioButton, StudioCard, type SegmentedOption } from '@/components/common/templates';
 import {
   createDefaultFSM,
-  generateExcitationTable,
-  generateStateAssignments,
-  generateStateTable,
-  minimizeExcitationEquations,
+  type ExcitationRow,
   type FSMDefinition,
   type FSMEncoding,
+  type FSMEquation,
   type FSMKind,
   type FSMState,
   type FSMTransition,
   type FlipFlopKind,
-} from '../../engine/fsmEngine';
+  type StateAssignment,
+  type StateTableRow,
+} from '@shared/logic/fsmTypes';
+import { analyzeFsmRemote } from '@/services/logicClient';
+import { useLogicQuery } from '@/simulators/digital-logic/remote/useLogicQuery';
 
 const NODE_RADIUS = 31;
 const latexSignal = (signal: string) => signal.replace(/([A-Z])(\d+)/, '$1_{$2}');
@@ -411,10 +413,14 @@ export function StateMachineExplorer() {
     }
   }, [machine.states, selectedStateId]);
 
-  const assignments = useMemo(() => generateStateAssignments(machine.states, encoding), [machine.states, encoding]);
-  const stateTable = useMemo(() => generateStateTable(machine, encoding), [machine, encoding]);
-  const excitationTable = useMemo(() => generateExcitationTable(stateTable, flipFlop), [stateTable, flipFlop]);
-  const equations = useMemo(() => minimizeExcitationEquations(excitationTable, machine.inputName), [excitationTable, machine.inputName]);
+  // State encoding, state/excitation tables and minimized equations come from the serverless engine. State
+  // positions are layout only: they stay out of the request key, so dragging a state never re-queries.
+  const analysisKey = JSON.stringify([{ ...machine, states: machine.states.map(({ x: _x, y: _y, ...rest }) => rest) }, encoding, flipFlop]);
+  const analysis = useLogicQuery(analysisKey, signal => analyzeFsmRemote(machine, encoding, flipFlop, false, signal), { debounceMs: 120 }).data;
+  const assignments: StateAssignment[] = analysis?.assignments ?? [];
+  const stateTable: StateTableRow[] = analysis?.stateTable ?? [];
+  const excitationTable: ExcitationRow[] = analysis?.excitationTable ?? [];
+  const equations: FSMEquation[] = analysis?.equations ?? [];
 
   const selectedState = machine.states.find(state => state.id === selectedStateId);
   const stateWidth = Math.max(1, assignments[0]?.code.length ?? 1);
@@ -755,11 +761,11 @@ export function StateMachineExplorer() {
                   <KatexMath math={equation.latex} displayMode />
                 </div>
               ))
-            ) : (
+            ) : analysis ? (
               <div className="col-span-full rounded-lg border border-rose-200 bg-rose-50 p-2.5 text-xs text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300">
                 Selected encoding exceeds 5-variable K-Map limit.
               </div>
-            )}
+            ) : null}
           </div>
         </StudioCard>
       </div>

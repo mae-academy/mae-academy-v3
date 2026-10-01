@@ -12,6 +12,7 @@ import { createThumbHandler } from "./pdfThumb";
 import { handleEvaluate } from "../api/_lib/plc/handler";
 import { handleLogoEvaluate } from "../api/_lib/plc/logo/handler";
 import { handleSolve } from "../api/_lib/circuit/handler";
+import { handleLogic } from "../api/_lib/logic/handler";
 import { expressGuard } from "../api/_lib/security/node-adapter";
 import type { Tier } from "../api/_lib/security/ratelimit";
 import { pdfCheckHandler, pdfDownloadHandler, pdfProxyHandler } from "./pdfProxy";
@@ -29,6 +30,8 @@ async function startServer() {
       ? "plc"
       : path.startsWith("/circuit/")
         ? "circuit"
+        : path.startsWith("/logic/")
+        ? "logic"
         : /^\/(pdf-thumb|pdf-proxy|pdf-download|library\/cover)/.test(path)
         ? "assets"
         : "general";
@@ -61,6 +64,17 @@ async function startServer() {
   app.post("/api/circuit/solve", express.text({ type: "*/*", limit: "768kb" }), async (req, res) => {
     const response = await handleSolve(
       new Request("http://localhost/api/circuit/solve", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: typeof req.body === "string" ? req.body : "",
+      }),
+    );
+    res.status(response.status).type("application/json").send(await response.text());
+  });
+  // Digital Logic engine: same web-standard handler as api/logic/solve.ts.
+  app.post("/api/logic/solve", express.text({ type: "*/*", limit: "384kb" }), async (req, res) => {
+    const response = await handleLogic(
+      new Request("http://localhost/api/logic/solve", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: typeof req.body === "string" ? req.body : "",

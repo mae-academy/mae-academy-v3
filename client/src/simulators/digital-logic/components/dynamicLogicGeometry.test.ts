@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { getDef } from '@/simulators/digital-logic/models/componentDefs';
-import { bitPinIdsFor, dataPinIdsFor, decoderOutputPinIdsFor, dynamicScaleConfigFor, dynamicGateGeometryFor, logicBlockLayoutFor, logicBodyBoundaryForPin, pruneWiresForTerminalSet, selectorPinIdsFor } from '@/simulators/digital-logic/components/dynamicLogicGeometry';
-import { getLogicComponentBounds, getLogicComponentTerminals } from '@/simulators/digital-logic/models/logicGateContract';
-import type { CircuitComponent, CircuitWire } from '@/simulators/digital-logic/models/circuitTypes';
+import { getDef } from '@shared/logic/componentDefs';
+import { bitPinIdsFor, dataPinIdsFor, decoderOutputPinIdsFor, dynamicScaleConfigFor, dynamicGateGeometryFor, logicBlockLayoutFor, logicBodyBoundaryForPin, pruneWiresForTerminalSet, selectorPinIdsFor } from '@shared/logic/dynamicLogicGeometry';
+import { getLogicComponentBounds, getLogicComponentTerminals } from '@shared/logic/logicGateContract';
+import type { CircuitComponent, CircuitWire } from '@shared/logic/circuitTypes';
 
 const component = (type: string, inputCount: number): CircuitComponent => ({ id: 'gate', type, x: 0, y: 0, rotation: 0, flipH: false, flipV: false, label: 'G1', props: { inputCount } });
 const wire = (id: string, terminal: string): CircuitWire => ({ id, fromComp: 'source', fromTerm: 'out', toComp: 'gate', toTerm: terminal, routing: 'orthogonal', path: [[0, 0], [20, 0]] });

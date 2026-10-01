@@ -9,10 +9,10 @@
  * routing, axis-aware turn penalties) with dynamic digital logic terminal support.
  */
 
-import type { CircuitComponent } from '@/simulators/digital-logic/models/circuitTypes';
-import { getDef } from '@/simulators/digital-logic/models/componentDefs';
-import { getTerminalWorldPos, simplifyOrthogonalPath, type Point } from '@/simulators/digital-logic/models/wiring';
-import { getLogicComponentTerminals } from '@/simulators/digital-logic/models/logicGateContract';
+import type { CircuitComponent } from '@shared/logic/circuitTypes';
+import { getDef } from '@shared/logic/componentDefs';
+import { getTerminalWorldPos, simplifyOrthogonalPath, type Point } from '@shared/logic/wiring';
+import { getLogicComponentTerminals } from '@shared/logic/logicGateContract';
 
 // ---------------------------------------------------------------------------
 // Public types

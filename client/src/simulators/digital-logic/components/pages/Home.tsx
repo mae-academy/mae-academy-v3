@@ -34,7 +34,7 @@ import {
   getDef,
   type ComponentDef,
   type PropertyDef,
-} from '@/simulators/digital-logic/models/componentDefs';
+} from '@shared/logic/componentDefs';
 import {
   componentPrefix,
   copyComponentForPaste,
@@ -45,19 +45,20 @@ import {
   type SimulationSnapshot,
   type WireRouting,
   type WorkspaceText,
-} from '@/simulators/digital-logic/models/circuitTypes';
+} from '@shared/logic/circuitTypes';
 import {
   DIGITAL_LOGIC_CATEGORIES,
   getDigitalLogicComponentsByCategory,
 } from '@/simulators/digital-logic/models/digitalLogicCatalog';
-import { DiscreteEventLogicEngine, type LogicState } from '@/simulators/digital-logic/engine/desLogicCore';
-import { dynamicScaleConfigFor } from '@/simulators/digital-logic/components/dynamicLogicGeometry';
+import type { LogicState } from '@shared/logic/desTypes';
+import { RemoteDesEngine, type DigitalLogicEngine } from '@/simulators/digital-logic/remote/remoteDesEngine';
+import { dynamicScaleConfigFor } from '@shared/logic/dynamicLogicGeometry';
 import { defaultInputShortcut, findInputByShortcut } from '@/simulators/digital-logic/models/logicInputBindings';
-import { getLogicComponentBounds, getLogicComponentTerminals } from '@/simulators/digital-logic/models/logicGateContract';
+import { getLogicComponentBounds, getLogicComponentTerminals } from '@shared/logic/logicGateContract';
 import { renderSymbol } from '@/simulators/digital-logic/components/symbols';
-import { getDotsOnPath, getTerminalWorldPos, pathLength, type Point } from '@/simulators/digital-logic/models/wiring';
+import { getDotsOnPath, getTerminalWorldPos, pathLength, type Point } from '@shared/logic/wiring';
 import { calculateOrthogonalPath } from '@/simulators/digital-logic/models/wireRouter';
-import { placeGeneratedCircuit } from '@/simulators/digital-logic/engine/circuitExpressionExtractor';
+import { placeGeneratedCircuit } from '@/simulators/digital-logic/models/circuitExpressionExtractor';
 import { createNadDocument, parseNad, serializeNad } from '@/simulators/digital-logic/models/nadFormat';
 import { TAB_D_GRID_SIZE } from '@/simulators/shared/workspace/workspaceCanvasMechanics';
 import type { Palette } from '@/simulators/shared/workspace/workspaceTheme';
@@ -222,13 +223,13 @@ function ComponentPaletteIcon({ definition, colors, documented, isDark }: { defi
 }
 
 export interface DigitalLogicSimulatorHomeProps {
-  createSimulationEngine?: () => DiscreteEventLogicEngine;
+  createSimulationEngine?: () => DigitalLogicEngine;
   tabDUiRefinement?: boolean;
   digitalLogicOnly?: boolean;
 }
 
 export function DigitalLogicSimulatorHome({
-  createSimulationEngine = () => new DiscreteEventLogicEngine(),
+  createSimulationEngine = () => new RemoteDesEngine(),
   tabDUiRefinement = true,
 }: DigitalLogicSimulatorHomeProps) {
   const { t } = useTranslation('simulators');
@@ -245,7 +246,7 @@ export function DigitalLogicSimulatorHome({
 
   const hasStartedSimulation = useRef(false);
   const nadInputRef = useRef<HTMLInputElement>(null);
-  const simulation = useRef<DiscreteEventLogicEngine>(createSimulationEngine());
+  const simulation = useRef<DigitalLogicEngine>(createSimulationEngine());
   const [snapshot, setSnapshot] = useState<SimulationSnapshot>(() => simulation.current.getSnapshot());
   const animationFrame = useRef<number | null>(null);
   const wirePathRefs = useRef<Map<string, SVGPathElement>>(new Map());
@@ -312,6 +313,9 @@ export function DigitalLogicSimulatorHome({
       input: '#ffffff',
       shadow: '0 12px 28px rgba(15,23,42,0.10)',
     }, [darkPreview]);
+
+  // The engine answers asynchronously: show every applied reply.
+  useEffect(() => simulation.current.subscribe(() => setSnapshot(simulation.current.getSnapshot())), []);
 
   // Update simulation when circuit topology changes
   useEffect(() => {

@@ -1,5 +1,5 @@
-import type { CircuitComponent } from '@/simulators/digital-logic/models/circuitTypes';
-import { COMPONENT_DEFS, type ComponentDef } from '@/simulators/digital-logic/models/componentDefs';
+import type { CircuitComponent } from '@shared/logic/circuitTypes';
+import { COMPONENT_DEFS, type ComponentDef } from '@shared/logic/componentDefs';
 
 /** Components intentionally excluded from the documented Tab D learner catalog only. */
 export const TAB_D_EXCLUDED_COMPONENT_IDS = new Set(['scr', 'diac', 'triac']);

@@ -7,20 +7,18 @@ import { toast } from 'sonner';
 import { LayoutGrid } from 'lucide-react';
 import { KatexMath } from '@/components/ui/KatexMath';
 import { SegmentedControl, StudioButton, type SegmentedOption } from '@/components/common/templates';
-import type { CircuitComponent, CircuitWire } from '@/simulators/digital-logic/models/circuitTypes';
-import type { CircuitPlacementMode } from '@/simulators/digital-logic/engine/circuitExpressionExtractor';
-import {
-  deriveUniversalSynthesis,
-  synthesisDiagramToCircuit,
-  type SynthesisDerivation,
-  type SynthesisMode,
-} from '../../engine/synthesisEngine';
+import type { CircuitComponent, CircuitWire } from '@shared/logic/circuitTypes';
+import type { CircuitPlacementMode } from '@/simulators/digital-logic/models/circuitExpressionExtractor';
+import type { SynthesisMode } from '@shared/logic/synthesisTypes';
+import { synthesisDiagramToCircuit } from '@/simulators/digital-logic/models/circuitExpressionExtractor';
+import { deriveSynthesisRemote } from '@/services/logicClient';
+import { useLogicQuery } from '@/simulators/digital-logic/remote/useLogicQuery';
 import {
   astToOverlineLatex,
   generateTruthTable,
   MAX_LOGIC_ANALYZER_VARIABLES,
   parseBooleanExpression,
-} from '../../engine/logicEngine';
+} from '@shared/logic/logicEngine';
 
 const EXAMPLES: Record<SynthesisMode, string> = {
   NAND: 'A*B + C*D',
@@ -52,25 +50,6 @@ const ARCHITECTURE_OPTIONS: ReadonlyArray<SegmentedOption<SynthesisMode>> = [
 export function UniversalSynthesis({ expression: controlledExpr, onExpressionChange, onLoadCircuit }: UniversalSynthesisProps) {
   const [mode, setMode] = useState<SynthesisMode>('NAND');
   const [expression, setExpression] = useState(controlledExpr ?? EXAMPLES.NAND);
-  const [error, setError] = useState<string | null>(() => {
-    if (!controlledExpr) return null;
-    try {
-      deriveUniversalSynthesis(controlledExpr, 'NAND');
-      return null;
-    } catch (cause) {
-      return cause instanceof Error ? cause.message : 'Unable to derive this expression.';
-    }
-  });
-  const [lastValid, setLastValid] = useState<SynthesisDerivation>(() => {
-    if (controlledExpr) {
-      try {
-        return deriveUniversalSynthesis(controlledExpr, 'NAND');
-      } catch {
-        // Fall back gracefully to standard pedagogical NAND example if controlledExpr is not directly synthesizable
-      }
-    }
-    return deriveUniversalSynthesis(EXAMPLES.NAND, 'NAND');
-  });
   const debouncedExpression = useDebouncedValue(expression, 300);
 
   useEffect(() => {
@@ -79,15 +58,10 @@ export function UniversalSynthesis({ expression: controlledExpr, onExpressionCha
     }
   }, [controlledExpr, expression]);
 
-  useEffect(() => {
-    try {
-      const result = deriveUniversalSynthesis(debouncedExpression, mode);
-      setLastValid(result);
-      setError(null);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Unable to derive this expression.');
-    }
-  }, [debouncedExpression, mode]);
+  // The derivation runs on the serverless engine; the last good answer stays on screen while a newer one loads or fails.
+  const query = useLogicQuery(`${mode}|${debouncedExpression}`, signal => deriveSynthesisRemote(debouncedExpression, mode, signal));
+  const error = query.error;
+  const lastValid = query.data;
 
   const chooseMode = (nextMode: SynthesisMode) => {
     if (nextMode === mode) return;
@@ -99,7 +73,7 @@ export function UniversalSynthesis({ expression: controlledExpr, onExpressionCha
   };
 
   const loadToCanvas = (placement: CircuitPlacementMode = 'replace') => {
-    if (error) {
+    if (error || !lastValid) {
       toast.error('Fix the synthesis source before loading it onto the canvas.');
       return;
     }
@@ -210,13 +184,13 @@ export function UniversalSynthesis({ expression: controlledExpr, onExpressionCha
             </div>
           </div>
           <ol className="grid gap-3 list-none p-0 m-0">
-            {lastValid.steps.map((step, index) => (
+            {(lastValid?.steps ?? []).map((step, index) => (
               <li key={step.title} className="grid grid-cols-[28px_minmax(0,1fr)] gap-3">
                 <div className="flex flex-col items-center">
                   <span className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-blue-200 bg-blue-50 text-[10px] font-bold text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300">
                     {index + 1}
                   </span>
-                  {index < lastValid.steps.length - 1 && (
+                  {index < (lastValid?.steps.length ?? 0) - 1 && (
                     <span className="w-px flex-1 bg-slate-200 dark:bg-slate-800 my-1" />
                   )}
                 </div>
