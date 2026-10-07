@@ -71,7 +71,7 @@ describe("Code Studio Nested IDE Split-Pane Layout", () => {
 
   it("updates editor code when an example is selected from dropdown", async () => {
     const { container } = render(<CodeStudio />);
-    const select = container.querySelector("select[aria-label='Examples library']") as HTMLSelectElement;
+    const select = container.querySelector("select[aria-label='Browse the Interactive Examples Library']") as HTMLSelectElement;
     expect(select).not.toBeNull();
 
     // Change value to Bubble Sort Algorithm (Ascending Order)

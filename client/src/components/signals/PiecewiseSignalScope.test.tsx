@@ -227,7 +227,7 @@ describe("SignalOperationsLab", () => {
     expect(title.tagName).toBe("H4");
 
     // Header carries the SIGNAL ENGINE input, not the legacy dual-dropdown selectors
-    expect(screen.getByText("SIGNAL ENGINE")).toBeTruthy();
+    expect(screen.getByText("Signal Engine")).toBeTruthy();
     expect(screen.queryByText("Primary signal x₁(t)")).toBeNull();
     expect(screen.queryByText("Secondary signal x₂(t)")).toBeNull();
 

@@ -10,6 +10,9 @@ export interface WorkspaceTab {
   label: string;
 }
 
+/** Height of the canvas viewport; the component library is bound to the same value. */
+export const WORKSPACE_CANVAS_HEIGHT = 700;
+
 export type WorkspaceGridMode = 'dots' | 'cartesian' | 'hidden';
 
 export interface UnifiedWorkspaceShellProps {
@@ -231,8 +234,9 @@ export function UnifiedWorkspaceShell({
 
       <div className="flex flex-col xl:flex-row gap-4 items-start w-full">
         <div className="flex-1 min-w-0 flex flex-col gap-4 w-full">
-          <div className="flex flex-col md:flex-row gap-4 items-start w-full">
-            <aside className="w-full md:w-64 shrink-0 min-h-0 overflow-hidden rounded-2xl border shadow-sm border-slate-200 bg-white dark:border-[#1a1d24] dark:bg-[#0d0f12]" style={{ background: colors.panel, borderColor: colors.line, display: 'flex', flexDirection: 'column', height: '700px' }}>
+          {/* The library and the canvas share one height token, so the palette can never outgrow the canvas. */}
+          <div className="flex flex-col md:flex-row gap-4 items-start w-full" style={{ ['--workspace-canvas-height' as string]: `${WORKSPACE_CANVAS_HEIGHT}px` }}>
+            <aside className="w-full md:w-64 shrink-0 min-h-0 overflow-hidden rounded-2xl border shadow-sm border-slate-200 bg-white dark:border-[#1a1d24] dark:bg-[#0d0f12]" style={{ background: colors.panel, borderColor: colors.line, display: 'flex', flexDirection: 'column', height: 'var(--workspace-canvas-height)', maxHeight: 'var(--workspace-canvas-height)' }}>
               <div className="border-b px-3 py-2" style={{ borderColor: colors.line }}>
                 <div className={CONTROL_SYSTEMS_HEADING}>{t('simulators:shell.componentLibrary')}</div>
               </div>
@@ -247,12 +251,12 @@ export function UnifiedWorkspaceShell({
                   />
                 </div>
               </div>
-              <div style={{ overflowY: 'auto', padding: '6px 6px 14px' }}>
+              <div className="mae-palette-scroll" style={{ flexGrow: 1, flexShrink: 1, flexBasis: 0, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', padding: '6px 6px 14px' }}>
                 {libraryContent}
               </div>
             </aside>
 
-            <main className="relative flex-1 min-w-0 h-[700px] overflow-hidden rounded-2xl border shadow-sm border-slate-200 bg-white dark:border-[#1a1d24] dark:bg-[#07080a]" style={{ background: colors.canvas, borderColor: colors.line }}>
+            <main className="relative flex-1 min-w-0 overflow-hidden rounded-2xl border shadow-sm border-slate-200 bg-white dark:border-[#1a1d24] dark:bg-[#07080a]" style={{ background: colors.canvas, borderColor: colors.line, height: 'var(--workspace-canvas-height)' }}>
               <div className="flex items-start justify-between border-b px-4 py-2 mae-card-header-row panel-header" data-slot="card-header" style={{ borderColor: colors.line }}>
                 <div>
                   <div className={CONTROL_SYSTEMS_HEADING}>{canvasTitle}</div>

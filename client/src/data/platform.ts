@@ -127,6 +127,17 @@ export const simulationsCatalog: SimulationItemMeta[] = [
     badge: "HOT",
     createdAt: "2026-03-15T00:00:00Z",
   },
+  {
+    id: "pneumatics-and-hydraulics",
+    slug: "pneumatics-and-hydraulics",
+    index: 9,
+    category: "systems-control",
+    visualVariant: 4,
+    href: "/simulations/pneumatics-and-hydraulics",
+    isFeatured: false,
+    badge: "NEW",
+    createdAt: "2026-10-03T00:00:00Z",
+  },
 ];
 
 export const simulationRouteMeta = simulationsCatalog;

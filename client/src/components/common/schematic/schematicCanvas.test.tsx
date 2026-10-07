@@ -1,5 +1,6 @@
+// @vitest-environment jsdom
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   createWireNetResolver,
   moveOrthogonalLane,
@@ -132,6 +133,9 @@ describe('shared clipboard', () => {
     expect(filterLibrary(categories, 'zzz')).toEqual({});
   });
 });
+
+/** The Circuit studio reads its electron-flow preference from localStorage while rendering. */
+vi.stubGlobal('localStorage', { getItem: () => null, setItem: () => undefined, removeItem: () => undefined });
 
 describe('studio parity on the shared canvas', () => {
   const sharedChrome = (markup: string) => [

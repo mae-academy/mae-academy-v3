@@ -140,9 +140,9 @@ describe('Tab D Academic Analysis Workspace', () => {
       );
 
       // Title & description
-      expect(markup).toContain('AC Analysis (Phasors) — Coming Soon');
+      expect(markup).toContain('AC Analysis (Phasors) Active');
       expect(markup).toContain(
-        'The simulator engine is successfully running your AC circuit in the background. However, step-by-step academic derivations using complex numbers (Phasors) for Nodal, Mesh, Superposition, and Thévenin are locked for a future update.'
+        'The simulator engine is successfully running your AC circuit in the background. Step-by-step academic derivations using complex numbers (Phasors) for Nodal, Mesh, Superposition, and Thévenin are currently unmapped for this view.'
       );
 
       // Math steps should NOT be rendered
@@ -166,7 +166,7 @@ describe('Tab D Academic Analysis Workspace', () => {
         <AnalysisBox analyze={localAnalysis} components={pureDcComponents} colors={colors} standalone />
       );
 
-      expect(dcMarkup).not.toContain('AC Analysis (Phasors) — Coming Soon');
+      expect(dcMarkup).not.toContain('AC Analysis (Phasors) Active');
       expect(dcMarkup).toContain('Solver-backed derivation');
       expect(dcMarkup).toContain('KCL');
       expect(dcMarkup).toContain('Step 1');
@@ -180,7 +180,7 @@ describe('Tab D Academic Analysis Workspace', () => {
         const markup = renderToStaticMarkup(
           <AnalysisBox analyze={localAnalysis} components={comps} colors={colors} standalone />
         );
-        expect(markup).toContain('AC Analysis (Phasors) — Coming Soon');
+        expect(markup).toContain('AC Analysis (Phasors) Active');
       }
     });
   });

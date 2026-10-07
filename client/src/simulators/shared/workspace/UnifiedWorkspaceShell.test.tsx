@@ -1,5 +1,7 @@
+// @vitest-environment jsdom
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
+import i18n from '@/i18n/config';
 import { UnifiedWorkspaceShell } from '@/simulators/shared/workspace/UnifiedWorkspaceShell';
 import { INSPECTOR_EMPTY_STATE_TEXT } from '@/simulators/shared/workspace/workspaceChrome';
 import { clampZoom, ZOOM_MIN, ZOOM_MAX } from '@/simulators/shared/workspace/workspaceCanvasMechanics';
@@ -32,6 +34,9 @@ const baseProps = {
   analysisTitle: 'Analysis Workspace',
   analysisContent: <div>analysis</div>,
 };
+
+/** The shell's copy comes from the `simulators` dictionary, so the tests run in English like the product does. */
+beforeAll(async () => { await i18n.changeLanguage('en'); });
 
 describe('UnifiedWorkspaceShell', () => {
   it('renders the fixed empty-state placeholder when nothing is selected', () => {

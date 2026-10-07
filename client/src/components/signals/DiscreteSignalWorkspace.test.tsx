@@ -18,7 +18,7 @@ describe("Signal Operations — discrete-time mode", () => {
     goDiscrete();
     expect(screen.getByText("Academic test signals")).toBeTruthy();
     expect(screen.getByText("ACADEMIC ANALYSIS")).toBeTruthy();
-    expect(screen.getByText("SAMPLE ARRAYS")).toBeTruthy();
+    expect(screen.getByText("Sample arrays")).toBeTruthy();
     expect(screen.queryByText(/sequence operations/i)).toBeNull();
     expect(screen.queryByTestId("stem-transformed")).toBeNull();
     expect(document.querySelectorAll('[data-testid^="stem-"]:not([data-testid="stem-tooltip"])')).toHaveLength(1);

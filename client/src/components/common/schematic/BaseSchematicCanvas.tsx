@@ -51,6 +51,12 @@ export interface WireAppearance {
   dashed?: boolean;
   /** Flow particles (electrons / logic-high pulses) rendered above components. */
   flowDots?: SchematicPoint[];
+  /**
+   * Opt-in selection style for studios whose wire colour carries state (e.g. a pressure heat map):
+   * a selected wire keeps its own stroke and gets a translucent outline in this colour instead of
+   * being recoloured with the selection colour.
+   */
+  selectionHalo?: string;
 }
 
 export interface BaseSchematicCanvasProps<C extends SchematicComponent, I extends SchematicLibraryItem> {
@@ -160,9 +166,9 @@ export function SchematicLibraryPanel<I extends SchematicLibraryItem>({ colors, 
                     onMouseEnter={event => { event.currentTarget.style.background = colors.panelAlt; }}
                     onMouseLeave={event => { event.currentTarget.style.background = colors.panel; }}
                   >
-                    <div className="flex h-16 min-h-0 w-full flex-1 items-center justify-center overflow-hidden p-2">{renderIcon(item)}</div>
-                    <div className="flex h-7 w-full shrink-0 items-center justify-center border-t px-1.5" style={{ borderColor: colors.line, background: `${colors.line}15` }}>
-                      <span className="flex items-center justify-center text-[11px] font-medium text-slate-800 dark:text-slate-200 tracking-tight text-center leading-tight truncate w-full" title={item.name}>
+                    <div className="flex h-16 min-h-0 w-full flex-1 items-center justify-center overflow-hidden p-1.5">{renderIcon(item)}</div>
+                    <div className="flex h-8 w-full shrink-0 items-center justify-center border-t px-1.5" style={{ borderColor: colors.line, background: `${colors.line}15` }}>
+                      <span className="flex items-center justify-center text-[11px] font-medium text-slate-800 dark:text-slate-200 tracking-tight text-center leading-tight break-words line-clamp-2 w-full" title={item.name}>
                         <ElectricalLabel label={item.name} />
                       </span>
                     </div>
@@ -237,7 +243,8 @@ export function BaseSchematicCanvas<C extends SchematicComponent, I extends Sche
       path,
       hitPath: pointsToPath(path),
       renderPath: buildJumpArcPath(path, intersections, wire.id, 4),
-      stroke: selected ? colors.selection : appearance.stroke ?? wire.color ?? wireColor,
+      halo: selected ? appearance.selectionHalo : undefined,
+      stroke: selected && !appearance.selectionHalo ? colors.selection : appearance.stroke ?? wire.color ?? wireColor,
       dashed: appearance.dashed ?? false,
       flowDots: appearance.flowDots ?? [],
     };
@@ -318,10 +325,11 @@ export function BaseSchematicCanvas<C extends SchematicComponent, I extends Sche
 
         {/* Dedicated layer holding only schematic elements (tight export bounding box). */}
         <g id="circuit-elements-layer">
-          {wireRender.map(({ wire, selected, path, hitPath, renderPath, stroke, dashed }) => (
+          {wireRender.map(({ wire, selected, path, hitPath, renderPath, stroke, halo, dashed }) => (
             <g key={wire.id} data-wire-id={wire.id}>
               <path d={hitPath} fill="none" stroke="transparent" strokeWidth={19} strokeLinecap="round" strokeLinejoin="round" onMouseDown={event => handlers.onWireMouseDown(event, wire)} onDoubleClick={event => handlers.onWireDoubleClick(event, wire)} style={{ cursor: 'pointer' }} />
-              <path ref={wirePathRef ? element => wirePathRef(wire.id, element) : undefined} d={renderPath} fill="none" stroke={stroke} strokeWidth={library.wireStrokeWidth ?? 2} strokeDasharray={dashed ? '3 3' : undefined} strokeLinecap="round" strokeLinejoin="round" pointerEvents="none" />
+              {halo && <path className="wire-selection-halo" d={renderPath} fill="none" stroke={halo} strokeOpacity={0.5} strokeWidth={(library.wireStrokeWidth ?? 2) + 4} strokeLinecap="round" strokeLinejoin="round" pointerEvents="none" />}
+              <path className="wire-core" ref={wirePathRef ? element => wirePathRef(wire.id, element) : undefined} d={renderPath} fill="none" stroke={stroke} strokeWidth={library.wireStrokeWidth ?? 2} strokeDasharray={dashed ? '3 3' : undefined} strokeLinecap="round" strokeLinejoin="round" pointerEvents="none" />
               {selected && path.length > 2 && path.slice(1, -1).map((corner, index) => (
                 <circle key={`${wire.id}-${index + 1}`} cx={corner[0]} cy={corner[1]} {...cornerHandle} onMouseDown={event => handlers.onWireCornerMouseDown(event, wire, index + 1)} style={{ cursor: 'move' }} />
               ))}

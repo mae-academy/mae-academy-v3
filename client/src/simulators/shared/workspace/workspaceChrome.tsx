@@ -39,6 +39,7 @@ export function ToolbarButton({ colors, icon, label, title, onClick, active, dis
   return (
     <button
       title={title}
+      aria-pressed={active === undefined ? undefined : isActive}
       onClick={onClick}
       disabled={disabled}
       className={isActive ? "btn-active-brand" : ""}
@@ -83,7 +84,7 @@ export function InspectorHeader({ colors, title, subtitle }: InspectorHeaderProp
     <div style={{ padding: '16px 16px 14px', borderBottom: `1px solid ${colors.line}` }}>
       <div>
         <div className="mae-i18n-text text-xl font-bold tracking-tight text-slate-800 dark:text-slate-100">{title}</div>
-        <div className="mae-i18n-text text-slate-600 dark:text-slate-400" style={{ marginTop: 4, fontSize: 11, lineHeight: 1.25 }}>{subtitle}</div>
+        {subtitle && <div className="mae-i18n-text text-slate-600 dark:text-slate-400" style={{ marginTop: 4, fontSize: 11, lineHeight: 1.25 }}>{subtitle}</div>}
       </div>
     </div>
   );

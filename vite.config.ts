@@ -545,6 +545,7 @@ export default defineConfig({
   test: {
     // root is ./client; the serverless engine lives beside it in ./api
     include: ["**/*.{test,spec}.?(c|m)[jt]s?(x)", "../api/**/*.test.ts", "../shared/**/*.test.ts", "../server/**/*.test.ts"],
+    setupFiles: [path.resolve(import.meta.dirname, "client/src/test/i18nSetup.ts")],
   },
   envDir: path.resolve(import.meta.dirname),
   root: path.resolve(import.meta.dirname, "client"),

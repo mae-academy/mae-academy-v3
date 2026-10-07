@@ -126,6 +126,8 @@ export function pointInComponentBox(
   halfHeight: number,
   offsetY = 0,
   margin = 10,
+  /** Centre of the box along the symbol's own x axis, for parts whose origin is not their middle. */
+  offsetX = 0,
 ): boolean {
   const dx = point[0] - component.x;
   const dy = point[1] - component.y;
@@ -134,7 +136,7 @@ export function pointInComponentBox(
   const localY = dx * Math.sin(radians) + dy * Math.cos(radians);
   const x = component.flipH ? -localX : localX;
   const y = component.flipV ? -localY : localY;
-  return Math.abs(x) <= halfWidth + margin && Math.abs(y - offsetY) <= halfHeight + margin;
+  return Math.abs(x - offsetX) <= halfWidth + margin && Math.abs(y - offsetY) <= halfHeight + margin;
 }
 
 export function findTerminalPosition<C extends SchematicComponent>(

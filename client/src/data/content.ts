@@ -345,6 +345,7 @@ localizedContent.en.collections.simulations = {
     { title: "Signals and Systems", description: "Transform, filter, and interpret signals across time and frequency domains.", code: "S.06" },
     { title: "Digital Logic Design", description: "Compose gates, truth states, and logic paths into working digital systems.", code: "S.07" },
     { title: "Arduino Studio", description: "Embedded Systems & Microcontrollers: write Arduino C++ and watch an interactive UNO board, serial monitor, and live plotter respond.", code: "S.08" },
+    { title: "Pneumatics and Hydraulic Drive", description: "Interactive electro-pneumatic and hydraulic circuit simulation with animated component dissection.", code: "S.09" },
   ],
 };
 localizedContent.ar.collections.simulations = {
@@ -360,6 +361,7 @@ localizedContent.ar.collections.simulations = {
     { title: "الإشارات والأنظمة", description: "حوّل الإشارات ورشّحها وفسّرها عبر نطاقي الزمن والتردد.", code: "S.06" },
     { title: "تصميم المنطق الرقمي", description: "ركّب البوابات وحالات الحقيقة ومسارات المنطق في أنظمة رقمية عاملة.", code: "S.07" },
     { title: "استوديو الأردوينو", description: "الأنظمة المدمجة والمتحكمات: اكتب شيفرة أردوينو C++ وشاهد لوحة UNO التفاعلية ومراقب التسلسل والراسم الحي وهي تستجيب.", code: "S.08" },
+    { title: "محاكي أنظمة النيوماتيك والهيدروليك", description: "محاكاة تفاعلية للدوائر النيوماتيكية والهيدروليكية مع تشريح داخلي لميكانيزم الصمامات والسلندرات.", code: "S.09" },
   ],
 };
 localizedContent.es.collections.simulations = {
@@ -375,6 +377,7 @@ localizedContent.es.collections.simulations = {
     { title: "Señales y sistemas", description: "Transforma, filtra e interpreta señales en los dominios del tiempo y la frecuencia.", code: "S.06" },
     { title: "Diseño de lógica digital", description: "Compone compuertas, estados de verdad y rutas lógicas en sistemas digitales funcionales.", code: "S.07" },
     { title: "Estudio Arduino", description: "Sistemas embebidos y microcontroladores: escribe C++ de Arduino y observa la placa UNO interactiva, el monitor serie y el graficador en vivo.", code: "S.08" },
+    { title: "Accionamiento neumático e hidráulico", description: "Simulación interactiva de circuitos electroneumáticos e hidráulicos con disección animada de componentes.", code: "S.09" },
   ],
 };
 

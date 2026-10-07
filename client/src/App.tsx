@@ -37,6 +37,7 @@ const AttributionPolicy = lazyRetry(() => import("./pages/AttributionPolicy"));
 const NotFound = lazyRetry(() => import("./pages/NotFound"));
 const ArduinoStudioPage = lazyRetry(() => import("./pages/ArduinoStudioPage"));
 const PlcSimulatorPage = lazyRetry(() => import("./pages/PlcSimulatorPage"));
+const FluidSimulatorPage = lazyRetry(() => import("./pages/FluidSimulatorPage"));
 const HiddenSymbolDesigner = lazyRetry(() => import("./simulators/circuit-engine/components/pages/HiddenSymbolDesigner"));
 
 const pageVariants = {
@@ -95,6 +96,8 @@ function AnimatedRoutes() {
             <Route path="/assembler" component={SimulationDetail} />
             <Route path="/simulations/arduino-studio" component={ArduinoStudioPage} />
             {/* PLC: the card resolves to /simulations/plc; legacy /simulations/plc/<tool> deep links land here too. */}
+            <Route path="/simulations/pneumatics-and-hydraulics" component={FluidSimulatorPage} />
+            <Route path="/fluid-drive">{() => <Redirect to="/simulations/pneumatics-and-hydraulics" />}</Route>
             <Route path="/simulations/plc/:tool" component={PlcSimulatorPage} />
             <Route path="/simulations/plc" component={PlcSimulatorPage} />
             <Route path="/simulators/plc-simulator" component={PlcSimulatorPage} />

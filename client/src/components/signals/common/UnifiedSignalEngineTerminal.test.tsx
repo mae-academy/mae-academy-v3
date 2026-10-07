@@ -32,7 +32,7 @@ function Harness({ initial = "r(t)", dual = false }: { initial?: string; dual?: 
 describe("UnifiedSignalEngineTerminal", () => {
   it("renders the split keypad and the strictly ordered signal palette", () => {
     render(<Harness />);
-    expect(screen.getByText("SIGNAL ENGINE")).toBeTruthy();
+    expect(screen.getByText("Signal Engine")).toBeTruthy();
     for (const digit of ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "(", ")"]) expect(button(digit)).toBeTruthy();
     for (const name of ["Decimal point", "Backspace", "Clear"]) expect(button(name)).toBeTruthy();
     const palette = Array.from(document.querySelectorAll<HTMLButtonElement>("button[aria-label]")).map((node) => node.getAttribute("aria-label"));

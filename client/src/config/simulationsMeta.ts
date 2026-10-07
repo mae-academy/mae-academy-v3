@@ -357,6 +357,48 @@ export const simulationsMeta: Record<string, SimulationMetaItem> = {
       images: [`${BASE_URL}/og/digital-logic.png`],
     },
   },
+  // 7. Pneumatics & Hydraulics
+  "pneumatics-and-hydraulics": {
+    id: "pneumatics-and-hydraulics",
+    slug: "pneumatics-and-hydraulics",
+    canonicalPath: "/simulations/pneumatics-and-hydraulics",
+    title: "Pneumatics & Hydraulics - Online Simulator | MAE Academy",
+    shortTitle: "Pneumatics & Hydraulics",
+    description:
+      "Build electro-pneumatic and hydraulic circuits online. Wire ISO 1219 valves, cylinders and supply units, and watch component mechanisms animate.",
+    keywords: [
+      "pneumatic circuit simulator online",
+      "hydraulic circuit simulator",
+      "electro-pneumatic simulation",
+      "ISO 1219 symbols",
+      "5/2 directional control valve",
+      "double acting cylinder circuit",
+    ],
+    openGraph: {
+      title: "Pneumatics & Hydraulics - Online Simulator | MAE Academy",
+      description:
+        "Build electro-pneumatic and hydraulic circuits online. Wire ISO 1219 valves, cylinders and supply units, and watch component mechanisms animate.",
+      url: `${BASE_URL}/simulations/pneumatics-and-hydraulics`,
+      siteName: "MAE Academy",
+      locale: "en_US",
+      type: "website",
+      images: [
+        {
+          url: `${BASE_URL}/cards/pneumatics-and-hydraulics.svg`,
+          width: 881,
+          height: 705,
+          alt: "MAE Academy Pneumatics and Hydraulic Drive Simulator",
+        },
+      ],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: "Pneumatics & Hydraulics - Online Simulator | MAE Academy",
+      description:
+        "Build electro-pneumatic and hydraulic circuits online. Wire ISO 1219 valves, cylinders and supply units, and watch component mechanisms animate.",
+      images: [`${BASE_URL}/cards/pneumatics-and-hydraulics.svg`],
+    },
+  },
 };
 
 /**
@@ -380,6 +422,8 @@ const ROUTE_ALIASES: Record<string, string> = {
   "digital-logic-design": "digital-logic",
   "/simulations/digital-logic-design": "digital-logic",
   "/simulations/digital-logic": "digital-logic",
+  "/fluid-drive": "pneumatics-and-hydraulics",
+  "/simulations/pneumatics-and-hydraulics": "pneumatics-and-hydraulics",
 };
 
 /**

@@ -1247,3 +1247,22 @@ html[dir="rtl"] .math-expression-display {
   direction: ltr !important;
   text-align: left !important;
 }
+
+/* Component palette: the list scrolls inside its panel with a slim, quiet scrollbar. */
+.mae-palette-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(148 163 184 / 0.55) transparent;
+}
+.mae-palette-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+.mae-palette-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.mae-palette-scroll::-webkit-scrollbar-thumb {
+  background: rgb(148 163 184 / 0.55);
+  border-radius: 9999px;
+}
+.mae-palette-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgb(100 116 139 / 0.8);
+}

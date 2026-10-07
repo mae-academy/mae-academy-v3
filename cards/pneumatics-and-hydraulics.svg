@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="881" height="705" viewBox="0 0 660.75 528.75" preserveAspectRatio="xMidYMid meet" version="1.0">
+  <!-- ISO 1219: 5/2 directional control valve (top) feeding a double-acting cylinder (bottom). -->
+  <g fill="none" stroke="#38bdf8" stroke-width="12" stroke-linejoin="round" stroke-linecap="round">
+    <!-- valve envelopes -->
+    <rect x="150" y="110" width="120" height="120"/>
+    <rect x="270" y="110" width="120" height="120"/>
+    <!-- port stubs: working 4/2 on top, 5/1/3 on bottom -->
+    <path d="M190 110V70M350 110V70M190 230V275M270 230V275M350 230V275"/>
+    <!-- supply to cylinder ends -->
+    <path d="M190 70H95V300H175V345M350 70H480V300H425V345"/>
+  </g>
+  <g fill="none" stroke="#22d3ee" stroke-width="10" stroke-linejoin="round" stroke-linecap="round">
+    <!-- flow paths: left position straight, right position crossed -->
+    <path d="M190 220V125M170 145l20-20 20 20"/>
+    <path d="M230 125V220M210 200l20 20 20-20"/>
+    <path d="M290 125L370 220M290 220L370 125"/>
+  </g>
+  <g fill="#38bdf8" stroke="none">
+    <!-- solenoid + spring actuators -->
+    <rect x="100" y="140" width="30" height="60" rx="6"/>
+    <path d="M410 140h24l8 10-8 10 8 10-8 10 8 10h-24z"/>
+  </g>
+  <!-- double-acting cylinder -->
+  <g fill="none" stroke="#38bdf8" stroke-width="12" stroke-linejoin="round" stroke-linecap="round">
+    <rect x="150" y="345" width="300" height="90"/>
+    <path d="M300 345V435" stroke="#22d3ee"/>
+    <path d="M300 390H585" stroke="#22d3ee"/>
+  </g>
+  <!-- stroke arrows -->
+  <g fill="none" stroke="#22d3ee" stroke-width="9" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M470 480H610M590 462l20 18-20 18"/>
+    <path d="M610 495H470M490 477l-20 18 20 18" opacity=".55"/>
+  </g>
+  <g fill="#64748b"><rect x="585" y="360" width="22" height="60" rx="4"/></g>
+</svg>

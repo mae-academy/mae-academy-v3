@@ -31,6 +31,7 @@ const CARD_ICON_SLUGS = new Set([
   "signals-and-systems",
   "digital-logic-design",
   "arduino-studio",
+  "pneumatics-and-hydraulics",
 ]);
 
 export interface PracticalSimulationsProps {
