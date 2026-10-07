@@ -22,15 +22,19 @@ import { sensorId } from '@shared/fluid/engine/FluidEngine';
 import type { EngineMedium, OperatorSide } from '@shared/fluid/engine/types';
 import { useFluidEngineBridge } from '../hooks/useFluidEngineBridge';
 import { useFunctionDiagram } from '../hooks/useFunctionDiagram';
+import { useRelayLadder } from '../hooks/useRelayLadder';
 import { FLUID_LIBRARY_CATEGORIES, LATCHING_OPERATORS, VALVE_SPECS, valveEdges, END_CAP_LENGTH, defaultFluidProps, getFluidDefinition, nextFluidTag, circuitOfTag, type FluidLibraryItem, type FluidMedium } from '../models/fluidCatalog';
 import { FLUID_PROJECT_EXTENSION, decodeSharePayload, encodeSharePayload, parseFluidProject, serializeFluidProject } from '../models/fluidProject';
 import { pressureColor } from '../models/pressureColors';
 import { isCylinder, linkedSensor, listSensorOptions, resolveTagLinks, sensorTagsOf } from '../models/sensorCoupling';
 import { MANUAL_TAG_PROP, inheritBranchTags } from '../models/branchTags';
+import { knownSensorTags, knownSolenoidTags, sensorSignals, solenoidDrive, solenoidTargets } from '../models/ladderCoupling';
+import { EMPTY_LADDER, type LadderCircuit } from '../models/relayLadder';
 import { MANUAL_OPERATORS, assignSignalTags, operatorTagsOf } from '../models/signalTags';
 import { FluidSymbol, spoolSlideStyle } from './symbols/FluidSymbols';
 import { ActiveElementProperties } from './ActiveElementProperties';
 import { FluidAnalysisPanel } from './analysis/FluidAnalysisPanel';
+import { ControlCircuitTab } from './analysis/ControlCircuitTab';
 import { FluidIOModule } from './io/FluidIOModule';
 import { cutawayControls } from './dissection/cutawayControls';
 import { cutawayKindOf } from './dissection/cutawayPhysics';
@@ -149,6 +153,33 @@ export function FluidSimulatorApp() {
   /** Once started (running or paused) the circuit is live: pressures are shown and operators respond. */
   const live = bridge.status !== 'IDLE';
 
+  /**
+   * Control Circuit tab: the 24 V relay ladder runs on the engine's clock. Limit switches of the schematic are its sensor inputs
+   * (matched by tag); its energised solenoids hold the valve ends with the same tag on (`solenoidDrive`).
+   */
+  const [ladderCircuit, setLadderCircuit] = useState<LadderCircuit>(EMPTY_LADDER);
+  const sensorLevels = useMemo(() => (live ? sensorSignals(sensorOptions, snapshot.sensors) : {}), [live, sensorOptions, snapshot.sensors]);
+  const relay = useRelayLadder({ circuit: ladderCircuit, live, time: snapshot.time, sensors: sensorLevels });
+  const solenoids = useMemo(() => solenoidTargets(wired, signalTags, sensorOptions), [wired, signalTags, sensorOptions]);
+  /** Solenoid ends the controller currently holds on, keyed `valveId:side`. */
+  const driven = useRef<Record<string, boolean>>({});
+  useEffect(() => {
+    const drive = solenoidDrive(solenoids, live ? relay.result.solenoids : {});
+    const present = new Set(solenoids.map(target => target.key));
+    const apply = (componentId: string, side: OperatorSide, key: string, on: boolean) => {
+      driven.current[key] = on;
+      // A held push or a latch on the same end (Control Board) keeps it on after the solenoid drops out.
+      triggerManualInput(componentId, side, on || Boolean(latchedRef.current[key]));
+    };
+    for (const target of solenoids) if (Boolean(driven.current[target.key]) !== drive[target.key]) apply(target.componentId, target.side, target.key, drive[target.key]);
+    // A solenoid whose valve end was removed or re-assigned lets go.
+    for (const key of Object.keys(driven.current)) {
+      if (present.has(key)) continue;
+      if (driven.current[key]) { const split = key.lastIndexOf(':'); apply(key.slice(0, split), key.slice(split + 1) as OperatorSide, key, false); }
+      delete driven.current[key];
+    }
+  }, [solenoids, live, relay.result, triggerManualInput]);
+
   useEffect(() => {
     const root = document.documentElement;
     const sync = () => setIsDark(root.classList.contains('dark'));
@@ -161,7 +192,7 @@ export function FluidSimulatorApp() {
   const releaseHeld = useCallback(() => {
     const releasing = held.current;
     held.current = [];
-    for (const { id, side } of releasing) triggerManualInput(id, side, Boolean(latchedRef.current[`${id}:${side}`]));
+    for (const { id, side } of releasing) triggerManualInput(id, side, Boolean(latchedRef.current[`${id}:${side}`] || driven.current[`${id}:${side}`]));
   }, [triggerManualInput]);
   useEffect(() => {
     const events = ['mouseup', 'touchend', 'touchcancel'] as const;
@@ -194,17 +225,20 @@ export function FluidSimulatorApp() {
     held.current = [];
     latchedRef.current = {};
     setLatched({});
+    driven.current = {};
+    relay.clearInputs();
     bridge.reset();
-  }, [bridge.reset]);
+  }, [bridge.reset, relay.clearInputs]);
 
   const newSchematic = useCallback(() => {
     activeBranch.current = 1;
     previousWires.current = [];
     canvas.loadDocument({ components: [], wires: [], texts: [] }, { resetHistory: true });
+    setLadderCircuit(EMPTY_LADDER);
     resetSimulation();
   }, [canvas, resetSimulation]);
 
-  const projectDocument = useCallback(() => ({ medium, components, wires: canvas.wires, texts: canvas.texts }), [medium, components, canvas.wires, canvas.texts]);
+  const projectDocument = useCallback(() => ({ medium, components, wires: canvas.wires, texts: canvas.texts, ...(ladderCircuit.paths.length > 0 ? { ladder: ladderCircuit } : {}) }), [medium, components, canvas.wires, canvas.texts, ladderCircuit]);
 
   const exportProject = () => {
     const url = URL.createObjectURL(new Blob([serializeFluidProject(projectDocument())], { type: 'application/x-mae-nad+json' }));
@@ -224,6 +258,7 @@ export function FluidSimulatorApp() {
       activeBranch.current = 1;
       previousWires.current = project.wires;
       canvas.loadDocument({ components: project.components, wires: project.wires, texts: project.texts });
+      setLadderCircuit(project.ladder ?? EMPTY_LADDER);
       toast.success(tr('project.imported'));
     } catch (error) {
       toast.error(tr('project.importFailed', { reason: error instanceof Error ? error.message : '' }));
@@ -504,6 +539,19 @@ export function FluidSimulatorApp() {
           snapshot={snapshot}
           selected={cutawaySubject}
           functionDiagram={{ cylinders: diagramCylinders, tracker, active: live, startTag }}
+          controlCircuit={(
+            <ControlCircuitTab
+              colors={colors}
+              isDark={isDark}
+              circuit={ladderCircuit}
+              onCircuitChange={setLadderCircuit}
+              ladder={relay}
+              live={live}
+              sensorTags={knownSensorTags(sensorOptions)}
+              solenoidTags={knownSolenoidTags(solenoids)}
+              exampleTags={{ stop: sensorOptions.find(option => option.end === 'extended')?.tag ?? '1B2', solenoid: solenoids[0]?.tag ?? '1Y1' }}
+            />
+          )}
           cutawayControls={cutawaySubject ? cutawayControls(cutawaySubject, { components, wires: canvas.wires, update: (id, props) => canvas.updateComponent(id, { props }) }, tr) : undefined}
         /></div>
       }

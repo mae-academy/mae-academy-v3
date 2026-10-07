@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { defaultFluidProps, getFluidDefinition } from './fluidCatalog';
+import { startStopExample } from './ladderExamples';
 import { decodeSharePayload, encodeSharePayload, parseFluidProject, serializeFluidProject, type FluidProject } from './fluidProject';
 
 const part = (id: string, type: string) => ({ id, type, x: 0, y: 0, rotation: 0, flipH: false, flipV: false, label: '1V1', props: defaultFluidProps(getFluidDefinition(type)!) });
@@ -9,6 +10,18 @@ const project: FluidProject = { medium: 'PNEUMATIC', components: [part('a', 'cyl
 describe('fluid project file', () => {
   it('round-trips a schematic', () => {
     expect(parseFluidProject(serializeFluidProject(project))).toEqual(project);
+  });
+
+  it('round-trips the relay ladder, also through a share link, and leaves old projects without one', () => {
+    const ladder = startStopExample();
+    expect(parseFluidProject(serializeFluidProject({ ...project, ladder })).ladder).toEqual(ladder);
+    expect(parseFluidProject(decodeSharePayload(encodeSharePayload({ ...project, ladder }))).ladder).toEqual(ladder);
+    expect(parseFluidProject(serializeFluidProject(project)).ladder).toBeUndefined();
+  });
+
+  it('drops a damaged ladder instead of failing the whole project', () => {
+    const text = JSON.stringify({ ...JSON.parse(serializeFluidProject(project)), ladder: { paths: 'broken' } });
+    expect(parseFluidProject(text).ladder).toEqual({ paths: [] });
   });
 
   it.each([

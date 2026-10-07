@@ -2,6 +2,7 @@ import LZString from 'lz-string';
 import { isJunctionId } from '@/components/common/schematic/schematicGeometry';
 import type { SchematicComponent, SchematicDocument, SchematicText, SchematicWire } from '@/components/common/schematic/schematicTypes';
 import { getFluidDefinition, type FluidMedium } from './fluidCatalog';
+import { sanitizeLadder, type LadderCircuit } from './relayLadder';
 
 export const FLUID_PROJECT_FORMAT = 'mae-fluid-project';
 export const FLUID_PROJECT_VERSION = 1;
@@ -10,6 +11,8 @@ export const FLUID_PROJECT_EXTENSION = '.nad';
 
 export interface FluidProject extends SchematicDocument<SchematicComponent> {
   medium: FluidMedium;
+  /** The relay ladder of the Control Circuit tab; absent in projects saved before it existed. */
+  ladder?: LadderCircuit;
 }
 
 export const serializeFluidProject = (project: FluidProject): string =>
@@ -67,5 +70,5 @@ export function parseFluidProject(text: string, warn: (message: string) => void 
     wires.push(entry as unknown as SchematicWire);
   }
   const texts = Array.isArray(raw.texts) ? (raw.texts.filter(isRecord) as unknown as SchematicText[]) : [];
-  return { medium: raw.medium, components, wires, texts };
+  return { medium: raw.medium, components, wires, texts, ...(raw.ladder !== undefined ? { ladder: sanitizeLadder(raw.ladder) } : {}) };
 }
