@@ -13,6 +13,8 @@ interface Part { id: string; type: string; label: string; props: FluidProps }
 
 export const SOLENOID_OPERATOR = 'Solenoid';
 export const SERVICE_UNIT = 'service-unit';
+/** Hydraulic power unit: its shut-off is an input too, but carries no 0S tag of its own. */
+export const POWER_UNIT = 'hyd-power-unit';
 /** Operators a person drives directly; the rest (plunger, rollers) are driven by a moving machine part. */
 export const MANUAL_OPERATORS = ['Pushbutton', 'Hand Lever', 'Detent Lever', 'Foot Pedal'];
 const SIDES: OperatorSide[] = ['left', 'right'];

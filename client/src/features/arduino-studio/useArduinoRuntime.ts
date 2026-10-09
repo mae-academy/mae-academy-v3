@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Diagnostic } from "@shared/code/arduinoTypes";
 import { compileSketchRemote } from "@/services/codeClient";
+import { IDLE_LCD } from "./arduinoLcd";
 import { ArduinoRuntime, type ArduinoSpeed, type HardwareSnapshot } from "./arduinoRuntime";
 
 const MAX_LINES = 1000;
@@ -25,6 +26,7 @@ export const IDLE_SNAPSHOT: HardwareSnapshot = {
   rxCount: 0,
   baud: null,
   timeMs: 0,
+  lcd: IDLE_LCD,
 };
 
 export interface ArduinoStudioRuntime {
@@ -39,6 +41,7 @@ export interface ArduinoStudioRuntime {
   setDigitalInput: (pin: number, level: 0 | 1) => void;
   setAnalogInput: (channel: number, value: number) => void;
   sendSerial: (text: string) => void;
+  setLcdContrast: (value: number) => void;
   clearSerial: () => void;
 }
 
@@ -170,6 +173,7 @@ export function useArduinoRuntime(): ArduinoStudioRuntime {
       setDigitalInput: (pin, level) => getRuntime().setDigitalInput(pin, level),
       setAnalogInput: (channel, value) => getRuntime().setAnalogInput(channel, value),
       sendSerial: text => getRuntime().sendSerial(text),
+      setLcdContrast: value => getRuntime().setLcdContrast(value),
       clearSerial: () => {
         pending.current = [];
         setSerial({ lines: [], times: [], partial: "" });

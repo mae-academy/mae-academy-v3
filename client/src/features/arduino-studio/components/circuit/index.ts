@@ -22,3 +22,7 @@ export const circuitRegistry = {
 } as const satisfies Record<string, ComponentType<never>>;
 
 export type CircuitComponentKey = keyof typeof circuitRegistry;
+
+export { LcdWires } from "./LcdWires";
+export { buildLcdHarness, findHops, hopArcs, wirePath, HARNESS_COLORS, type HarnessInput, type HarnessWire, type Pt } from "./lcdHarness";
+export * from "./lcdGeometry";

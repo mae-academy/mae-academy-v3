@@ -20,14 +20,14 @@ describe('ladder layout', () => {
     expect(second.spine).toBeGreaterThan(first.spine);
   });
 
-  it('a parallel group widens its column and centres its elements on the spine', () => {
+  it('a parallel group widens its column and keeps the trunk on the spine and routes branches to its right', () => {
     const layout = layoutLadder(startStopExample());
     const [first, second] = layout.columns;
     expect(first.width).toBe(2 * ELEMENT_PITCH + COLUMN_MARGIN);
     expect(second.width).toBe(ELEMENT_PITCH + COLUMN_MARGIN);
     const [start, hold] = first.groups[0].elements;
     expect(hold.x - start.x).toBe(ELEMENT_PITCH);
-    expect((start.x + hold.x) / 2).toBe(first.spine);
+    expect(start.x).toBe(first.spine);
     expect(first.groups[0].busLeft).toBe(start.x);
     expect(first.groups[0].busRight).toBe(hold.x);
     // the single element below sits on the spine
@@ -68,5 +68,20 @@ describe('ladder layout', () => {
     const group = column.groups[0];
     expect(group.parallelSite.x).toBeGreaterThan(group.busRight);
     expect(group.parallelSite.x).toBeLessThan(column.left + column.width);
+  });
+
+  it('wires a heading 3-wire sensor on its own trunk with the signal branching right into the spine', () => {
+    let circuit = addPath({ paths: [] });
+    circuit = addSeries(circuit, circuit.paths[0].id, makeElement('sensor', '1B1'));
+    const [column] = layoutLadder(circuit).columns;
+    const lane = column.lane!;
+    expect(lane).toBeTruthy();
+    expect(column.groups[0].elements[0].x).toBe(lane.sensorX);
+    expect(lane.trunkX).toBeLessThan(lane.sensorX);
+    expect(column.spine).toBeGreaterThan(lane.sensorX + 18);
+    expect(lane.signalY).toBeGreaterThan(column.groups[0].y);
+    // a sensor deeper in the chain, or in a parallel group, stays inline
+    circuit = addSeries(circuit, circuit.paths[0].id, makeElement('sensor', '1B2'));
+    expect(layoutLadder(circuit).columns[0].groups[1].elements[0].x).toBe(layoutLadder(circuit).columns[0].spine);
   });
 });

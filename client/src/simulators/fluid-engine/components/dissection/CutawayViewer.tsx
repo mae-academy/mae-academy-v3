@@ -5,6 +5,9 @@ import type { FluidMedium } from '../../models/fluidCatalog';
 import { CylinderCushionCutaway } from './CylinderCushionCutaway';
 import { DualPressureCutaway } from './DualPressureCutaway';
 import { ShuttleValveCutaway } from './ShuttleValveCutaway';
+import { PressureGaugeCutaway } from './PressureGaugeCutaway';
+import { QuickExhaustCutaway } from './QuickExhaustCutaway';
+import { PressureValveCutaway } from './PressureValveCutaway';
 import { CheckValveCutaway } from './CheckValveCutaway';
 import { SpringCheckValveCutaway } from './SpringCheckValveCutaway';
 import { FlowControlCutaway } from './FlowControlCutaways';
@@ -14,6 +17,7 @@ import { Spool42Cutaway } from './Spool42Cutaway';
 import { Spool52Cutaway } from './Spool52Cutaway';
 import { SingleActingCutaway } from './SingleActingCutaway';
 import { Spool53Cutaway } from './Spool53Cutaway';
+import { Spool43Cutaway } from './Spool43Cutaway';
 import { AirReservoirCutaway } from './AirReservoirCutaway';
 import { TimeDelayCutaway } from './TimeDelayCutaway';
 import type { CutawayControl } from './cutawayControls';
@@ -39,6 +43,10 @@ function Stage({ analysis, props }: { analysis: CutawayAnalysis; props: Pick<Cut
   switch (analysis.kind) {
     case 'and': return <DualPressureCutaway analysis={analysis} {...props} />;
     case 'or': return <ShuttleValveCutaway analysis={analysis} {...props} />;
+    case 'gauge': return <PressureGaugeCutaway analysis={analysis} {...props} />;
+    case 'quickExhaust': return <QuickExhaustCutaway analysis={analysis} {...props} />;
+    case 'regulator':
+    case 'relief': return <PressureValveCutaway analysis={analysis} {...props} />;
     case 'check': return <CheckValveCutaway analysis={analysis} {...props} />;
     case 'springCheck': return <SpringCheckValveCutaway analysis={analysis} {...props} />;
     case 'throttle':
@@ -48,6 +56,8 @@ function Stage({ analysis, props }: { analysis: CutawayAnalysis; props: Pick<Cut
     case 'spool32': return <Spool32Cutaway analysis={analysis} {...props} />;
     case 'spool52': return <Spool52Cutaway analysis={analysis} {...props} />;
     case 'spool53': return <Spool53Cutaway analysis={analysis} {...props} />;
+    case 'spool43': return <Spool43Cutaway analysis={analysis} {...props} />;
+    case 'spool43float': return <Spool43Cutaway analysis={analysis} {...props} />;
     case 'cushion': return <CylinderCushionCutaway analysis={analysis} {...props} />;
     case 'single': return <SingleActingCutaway analysis={analysis} {...props} />;
     case 'reservoir': return <AirReservoirCutaway analysis={analysis} {...props} />;

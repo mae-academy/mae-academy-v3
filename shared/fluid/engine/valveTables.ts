@@ -23,11 +23,9 @@ const fiveTo2: ValveEnvelope = { flows: [['1', '2'], ['4', '5']], blocks: ['3'] 
 const fiveTo4: ValveEnvelope = { flows: [['1', '4'], ['2', '3']], blocks: ['5'] };
 const fourParallel: ValveEnvelope = { flows: [['1', '4'], ['2', '3']], blocks: [] };
 const fourCrossed: ValveEnvelope = { flows: [['1', '2'], ['4', '3']], blocks: [] };
-const threeOpen: ValveEnvelope = { flows: [['1', '2']], blocks: [] };
+const threeOpen: ValveEnvelope = { flows: [['1', '2']], blocks: ['3'] };
 /** Hydraulic 4-port ports: 1 = P, 2 = B, 3 = T, 4 = A. Float centre: A and B open to tank, P blocked. */
 const floatCentre: ValveEnvelope = { flows: [['2', '3'], ['4', '3']], blocks: ['1'] };
-/** Tandem (bypass) centre: P unloads straight to tank, A and B blocked. */
-const tandemCentre: ValveEnvelope = { flows: [['1', '3']], blocks: ['2', '4'] };
 const threeVented: ValveEnvelope = { flows: [['2', '3']], blocks: ['1'] };
 
 const TABLES: Record<string, ValveTable> = {
@@ -40,12 +38,11 @@ const TABLES: Record<string, ValveTable> = {
   'valve-5-2': { positions: 2, envelopes: [fiveTo4, fiveTo2] },
   'valve-5-3': { positions: 3, envelopes: [fiveTo4, closed5, fiveTo2] },
 };
-/** Hydraulic directional valves share the envelopes; their port 3 is the tank line T. 4/3 valves differ in their centre position. */
+/** Hydraulic directional valves share the envelopes; their port 3 is the tank line T. the 4/3 valves differ in their centre position (closed or float). */
 TABLES['hvalve-3-2-nc'] = TABLES['valve-3-2-nc'];
 TABLES['hvalve-4-2'] = TABLES['valve-4-2'];
 TABLES['hvalve-4-3'] = TABLES['valve-4-3'];
 TABLES['hvalve-4-3-float'] = { positions: 3, envelopes: [fourParallel, floatCentre, fourCrossed] };
-TABLES['hvalve-4-3-tandem'] = { positions: 3, envelopes: [fourParallel, tandemCentre, fourCrossed] };
 
 export const VALVE_TABLES: Readonly<Record<string, ValveTable>> = TABLES;
 

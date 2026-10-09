@@ -37,29 +37,50 @@ describe('fluid catalog', () => {
       const def = getFluidDefinition(type)!;
       return def.portsFor({ ...defaultFluidProps(def), actuationLeft: 'None', actuationRight: 'None' }).map(p => p.lettering).sort();
     };
-    for (const type of ['hvalve-4-2', 'hvalve-4-3', 'hvalve-4-3-float', 'hvalve-4-3-tandem']) expect(letters(type), type).toEqual(['A', 'B', 'P', 'T']);
+    for (const type of ['hvalve-4-2', 'hvalve-4-3', 'hvalve-4-3-float']) expect(letters(type), type).toEqual(['A', 'B', 'P', 'T']);
     expect(letters('hvalve-3-2-nc')).toEqual(['A', 'P', 'T']);
     expect(getFluidDefinition('hvalve-4-3')!.portsFor({}).find(p => p.lettering === 'T')!.type).toBe('EXHAUST');
   });
 
   it('keeps each medium palette separate: hydraulics opens with its energy and return elements', () => {
     expect(Object.keys(FLUID_LIBRARY_CATEGORIES.HYDRAULIC)[0]).toBe('Power Supply & Tank');
-    expect(FLUID_LIBRARY_CATEGORIES.HYDRAULIC['Power Supply & Tank'].map(item => item.id)).toEqual(['hyd-pump', 'hyd-tank', 'hyd-accumulator', 'hyd-filter', 'hyd-cooler']);
+    expect(FLUID_LIBRARY_CATEGORIES.HYDRAULIC['Power Supply & Tank'].map(item => item.id)).toEqual(['pressure-gauge', 'hyd-pump', 'hyd-pressure-source', 'hyd-tank', 'hyd-power-unit']);
     expect(FLUID_LIBRARY_CATEGORIES.HYDRAULIC['Safety & Pressure Control'].map(item => item.id)).toEqual(['hyd-pressure-relief', 'hyd-reducing-valve', 'hyd-reducing-valve-3way']);
     expect(Object.keys(FLUID_LIBRARY_CATEGORIES.PNEUMATIC)).not.toContain('Power Supply & Tank');
   });
 
   it('hydraulic mode lists no pneumatic-only part and the pneumatic palette no hydraulic one', () => {
     const ids = (medium: 'PNEUMATIC' | 'HYDRAULIC') => Object.values(FLUID_LIBRARY_CATEGORIES[medium]).flat().map(item => item.id);
-    for (const type of ['pressure-source', 'air-reservoir', 'frl-detailed', 'frl-simplified', 'valve-5-2', 'valve-5-3', 'valve-3-2-no', 'valve-2-2-no', 'valve-4-2', 'shuttle-valve', 'time-delay-valve', 'quick-exhaust', 'silencer', 'exhaust-port', 'air-motor-fixed']) {
+    for (const type of ['pressure-source', 'air-reservoir', 'frl-detailed', 'frl-simplified', 'valve-5-2', 'valve-5-3', 'valve-3-2-no', 'valve-2-2-no', 'valve-4-2', 'quick-exhaust', 'silencer', 'exhaust-port', 'air-motor-fixed']) {
       expect(ids('HYDRAULIC'), type).not.toContain(type);
     }
     for (const type of ids('HYDRAULIC')) expect(getFluidDefinition(type)!.media, type).toContain('HYDRAULIC');
     for (const type of ids('PNEUMATIC')) expect(getFluidDefinition(type)!.media, type).toContain('PNEUMATIC');
   });
 
-  it('offers the 4-port valves first, with the three standard 4/3 neutrals', () => {
-    expect(FLUID_LIBRARY_CATEGORIES.HYDRAULIC['Directional Control Valves'].map(item => item.id)).toEqual(['hvalve-4-2', 'hvalve-4-3', 'hvalve-4-3-float', 'hvalve-4-3-tandem', 'hvalve-3-2-nc']);
+  it('hydraulic palette: gauge first, no filter / cooler / accumulator, one Actuators group, shared logic and timer valves', () => {
+    const palette = FLUID_LIBRARY_CATEGORIES.HYDRAULIC;
+    expect(Object.keys(palette)).toEqual(['Power Supply & Tank', 'Actuators', 'Directional Control Valves', 'Logic & Flow Control', 'Safety & Pressure Control']);
+    expect(palette['Actuators'].map(item => item.id)).toEqual(['cylinder-single', 'cylinder-double', 'cylinder-double-rod', 'hyd-motor']);
+    expect(palette['Logic & Flow Control'].map(item => item.id)).toEqual(['shuttle-valve', 'dual-pressure-valve', 'check-valve', 'check-valve-spring', 'flow-control', 'flow-control-oneway', 'time-delay-valve']);
+    for (const group of Object.values(palette)) expect(group.length).toBeGreaterThan(0);
+    for (const gone of ['hyd-accumulator', 'hyd-filter', 'hyd-cooler']) {
+      expect(getFluidDefinition(gone), gone).toBeUndefined();
+      expect(FLUID_CATALOG.some(def => def.type === gone), gone).toBe(false);
+    }
+  });
+
+  it('the hydraulic pressure supply defaults to oil pressure and the hydraulic motor to one direction', () => {
+    expect(defaultFluidProps(getFluidDefinition('hyd-pressure-source')!).pressure).toBe(50);
+    expect(getFluidDefinition('hyd-pressure-source')!.media).toEqual(['HYDRAULIC']);
+    expect(defaultFluidProps(getFluidDefinition('hyd-motor')!).directions).toBe('Single direction');
+    expect(defaultFluidProps(getFluidDefinition('hyd-power-unit')!)).toMatchObject({ pressure: 50, shutoff: 'ON', crackingPressure: 60 });
+    expect(getFluidDefinition('hyd-power-unit')!.media).toEqual(['HYDRAULIC']);
+    expect(getFluidDefinition('service-unit')!.media).toEqual(['PNEUMATIC']);
+  });
+
+  it('offers the 4-port valves first, with the two 4/3 neutrals', () => {
+    expect(FLUID_LIBRARY_CATEGORIES.HYDRAULIC['Directional Control Valves'].map(item => item.id)).toEqual(['hvalve-4-2', 'hvalve-4-3', 'hvalve-4-3-float', 'hvalve-3-2-nc']);
   });
 
   it('every port of every part sits on the 20 px grid, so wires land on grid nodes', () => {
@@ -84,7 +105,7 @@ describe('catalog ↔ engine contract', () => {
     expect(defaults('sequence-combo').switchingPressure).toBe(4.5);
     expect(defaults('hyd-pressure-relief').crackingPressure).toBe(60);
     expect(defaults('check-valve-spring').crackingPressure).toBe(0.2);
-    expect(defaults('air-motor-variable')).toMatchObject({ speed: 3000, capacityRatio: 1 });
+    expect(defaults('air-motor-fixed')).toMatchObject({ speed: 3000 });
   });
 
   it('draws every valve from the engine flow tables', () => {

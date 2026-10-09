@@ -35,6 +35,10 @@ export const cutawayTheme = (isDark: boolean): CutawayTheme => (isDark
 /** Pneumatic pressure fill and the exhaust / atmosphere fill. */
 export const PRESSURE_BLUE = '#3B82F6';
 export const EXHAUST_GRAY = '#F3F4F6';
+/** Hydraulic oil on its way back to the tank: low pressure, a soft coral red, clearly lighter than the red / orange supply. */
+export const TANK_RETURN: FluidTint = { fill: '#FB7185', opacity: 0.7 };
+/** Muted violet alternative for the same job, kept for comparison. */
+export const TANK_RETURN_VIOLET: FluidTint = { fill: '#A78BFA', opacity: 0.7 };
 /** Vibrant blue of fluid that is flowing (as opposed to merely pressurised). */
 export const FLOW_BLUE = '#2563EB';
 /** Deep industrial blue of a fully charged accumulation volume (the reservoir and the timer's chamber). */

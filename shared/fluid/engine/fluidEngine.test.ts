@@ -782,14 +782,9 @@ describe('air motors and rotary actuators', () => {
     expect(new FluidEngine(circuit([part('m', 'air-motor-fixed', { speed: 3000 })])).step().motors.m.rpm).toBe(0);
   });
 
-  it('variable motor scales with its capacity ratio', () => {
-    expect(motorOn(part('m', 'air-motor-variable', { speed: 3000, capacityRatio: 0.5 })).step().motors.m.rpm).toBeCloseTo(1500);
-    expect(motorOn(part('m', 'air-motor-variable', { speed: 3000, capacityRatio: 0 })).step().motors.m.rpm).toBe(0);
-  });
-
   it('a bidirectional motor reverses with the pressure difference; a single-direction one does not run backwards', () => {
     const driven = (directions: string) => new FluidEngine(circuit(
-      [part('src', 'pressure-source'), part('v', 'valve-5-2', PILOTED), part('m', 'air-motor-variable', { speed: 3000, directions })],
+      [part('src', 'pressure-source'), part('v', 'valve-5-2', PILOTED), part('m', 'hyd-motor', { speed: 3000, directions })],
       [['src:out', 'v:p1'], ['v:p4', 'm:in'], ['v:p2', 'm:out']],
     ));
     const both = driven('Both directions');
@@ -802,7 +797,7 @@ describe('air motors and rotary actuators', () => {
   });
 
   it('does not turn against a blocked outlet, and slows down behind a throttle', () => {
-    const blocked = motorOn(part('m', 'air-motor-variable', { speed: 3000 }), 6, [part('plug', 'pressure-gauge')], [['src:out', 'm:in'], ['m:out', 'plug:p']]);
+    const blocked = motorOn(part('m', 'hyd-motor', { speed: 3000 }), 6, [part('plug', 'pressure-gauge')], [['src:out', 'm:in'], ['m:out', 'plug:p']]);
     expect(blocked.step().motors.m.rpm).toBe(0);
     const throttled = motorOn(part('m', 'air-motor-fixed', { speed: 3000 }), 6, [part('fc', 'flow-control', { openingPercentage: 40 })], [['src:out', 'fc:in'], ['fc:out', 'm:in']]);
     expect(throttled.step().motors.m.rpm).toBeCloseTo(1200);
@@ -817,22 +812,6 @@ describe('air motors and rotary actuators', () => {
   it('hydraulic motor reaches its rated speed at the nominal 50 bar', () => {
     const engine = new FluidEngine(circuit([part('pump', 'hyd-pump'), part('m', 'hyd-motor', { speed: 1500 }), part('tank', 'hyd-tank')], [['pump:out', 'm:in'], ['m:out', 'tank:p']]));
     expect(engine.step().motors.m.rpm).toBeCloseTo(1500);
-  });
-
-  it('a semi-rotary actuator swivels to its end angle and back, and stops there', () => {
-    const engine = new FluidEngine(circuit(
-      [part('src', 'pressure-source'), part('v', 'valve-5-2', PILOTED), part('m', 'semi-rotary', { angle: 180 })],
-      [['src:out', 'v:p1'], ['v:p4', 'm:a'], ['v:p2', 'm:b']],
-    ));
-    expect(engine.step(0.5).motors.m.angle).toBe(0);
-    pulse(engine, 'v', PILOT_LEFT);
-    const turning = engine.step(0.4);
-    expect(turning.motors.m.rpm).toBeCloseTo(30); // 180° in 1 s
-    expect(turning.motors.m.angle).toBeGreaterThan(40);
-    const end = engine.step(2);
-    expect(end.motors.m).toEqual({ angle: 180, rpm: 0 });
-    pulse(engine, 'v', PILOT_RIGHT);
-    expect(engine.step(2).motors.m).toEqual({ angle: 0, rpm: 0 });
   });
 });
 

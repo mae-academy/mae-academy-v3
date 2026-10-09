@@ -6,7 +6,7 @@ import { useSimulatorSeo } from "@/seo/useSimulatorSeo";
 
 export default function ArduinoStudioPage() {
   const { copy, isRtl } = useLocale();
-  const shellTitle = copy.collections.simulations.cards.find((card) => card.code === "S.09")?.title ?? "Arduino Studio";
+  const shellTitle = copy.collections.simulations.cards.find((card) => card.code === "S.08")?.title ?? "Arduino Studio";
   useSimulatorSeo("arduino");
 
   return (

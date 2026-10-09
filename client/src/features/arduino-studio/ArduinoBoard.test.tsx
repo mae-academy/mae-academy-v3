@@ -3,6 +3,7 @@ import { render, act, fireEvent, screen, cleanup } from "@testing-library/react"
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { ArduinoBoard } from "./ArduinoBoard";
 import type { HardwareSnapshot } from "./arduinoRuntime";
+import { IDLE_LCD } from "./arduinoLcd";
 
 // Mock ResizeObserver for JSDOM
 let resizeCallback: (entries: ResizeObserverEntry[]) => void;
@@ -28,6 +29,7 @@ const defaultSnapshot: HardwareSnapshot = {
   baud: 9600,
   txCount: 0,
   rxCount: 0,
+  lcd: IDLE_LCD,
 };
 
 describe("ArduinoBoard Scale-Transform Wrapper", () => {

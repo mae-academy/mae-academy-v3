@@ -281,7 +281,9 @@ function solveOnce(problem: PressureProblem): PressureSolution {
           if (vented[rule.a] || vented[rule.b]) vent(rule.out);
           break;
         case 'quickExhaust':
-          if (standing(rule.supply) < held[rule.work] - EPS) { vent(rule.work); outlets[rule.work] = true; }
+          // The exhaust seat is open whenever the inlet is lower than the working line, and also while the inlet is dead:
+          // a work line that has already dropped to 0 bar must stay open to atmosphere so the piston can finish its stroke.
+          if (standing(rule.supply) < held[rule.work] - EPS || standing(rule.supply) <= EPS) { vent(rule.work); outlets[rule.work] = true; }
           break;
       }
     }

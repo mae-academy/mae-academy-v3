@@ -34,11 +34,11 @@ describe('which components open a cutaway', () => {
   it('covers AND, OR, 3/2, 5/2, 5/3 and the cylinders only', () => {
     expect(['dual-pressure-valve', 'shuttle-valve', 'valve-3-2-nc', 'valve-3-2-no', 'hvalve-3-2-nc', 'valve-2-2-no', 'valve-4-2', 'hvalve-4-2', 'flow-control', 'flow-control-oneway', 'valve-5-2', 'valve-5-3', 'check-valve', 'check-valve-spring', 'cylinder-double', 'cylinder-double-rod', 'cylinder-single'].map(type => cutawayKindOf({ type })))
       .toEqual(['and', 'or', 'spool32', 'spool32', 'spool32', 'spool22', 'spool42', 'spool42', 'throttle', 'oneway', 'spool52', 'spool53', 'check', 'springCheck', 'cushion', 'cushion', 'single']);
-    for (const type of ['valve-4-3', 'pressure-source', 'regulator-nr']) expect(cutawayKindOf({ type })).toBeNull();
+    for (const type of ['valve-4-3', 'pressure-source', 'sequence-ext']) expect(cutawayKindOf({ type })).toBeNull();
   });
 
   it('analyzeCutaway returns nothing for other parts', () => {
-    const valve = part('v', 'regulator-nr');
+    const valve = part('v', 'sequence-ext');
     expect(analyzeCutaway(valve, engineOf([valve]).getSnapshot())).toBeNull();
   });
 });

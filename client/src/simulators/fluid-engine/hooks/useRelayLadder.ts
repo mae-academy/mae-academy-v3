@@ -18,6 +18,8 @@ export interface RelayLadder {
   result: LadderResult;
   /** Pushbuttons operated (held or latched), by lower-cased tag. */
   pressed: Record<string, boolean>;
+  /** The latched share of `pressed`, by lower-cased tag. */
+  latched: Record<string, boolean>;
   /** Sensors forced on by hand, by lower-cased tag. */
   forced: Record<string, boolean>;
   /** Pushes a momentary pushbutton in; it releases with the next mouse / touch release. A detented one toggles instead. */
@@ -87,5 +89,5 @@ export function useRelayLadder({ circuit, live, time, sensors }: RelayLadderOpti
     return () => events.forEach(name => window.removeEventListener(name, release));
   }, [release]);
 
-  return { result, pressed, forced, operate, release, forceSensor, clearInputs };
+  return { result, pressed, latched, forced, operate, release, forceSensor, clearInputs };
 }

@@ -21,14 +21,19 @@ export const CAGE_TRAVEL = 14;
 export const SPRING_TRAVEL = 60;
 /** Left face of the cage's stop ring. */
 const STOP_X = SEATED_X + CAGE_TRAVEL + BALL_RADIUS;
+/** Centre of the cage's flow windows, measured from the axis. */
+const WINDOW_MID = 23.5;
 const SLEEVE_MOUTH = 400;
 const RIB_X = 440;
 
 /** Outline of the flow passage: funnel into the throat, 45° cone out of it, a wider ball chamber, then back to the port bore. */
-const borePoints = (chamberEnd: number): Point[] => [
-  [100, 150], [225, 150], [THROAT_X, AXIS - THROAT_HALF], [THROAT_X + 24, 140], [chamberEnd, 140], [chamberEnd + 30, 150], [680, 150],
-  [680, 200], [chamberEnd + 30, 200], [chamberEnd, 210], [THROAT_X + 24, 210], [THROAT_X, AXIS + THROAT_HALF], [225, 200], [100, 200],
+const borePoints = (chamberEnd: number, half: number): Point[] => [
+  [100, 150], [225, 150], [THROAT_X, AXIS - THROAT_HALF], [THROAT_X + half - THROAT_HALF, AXIS - half], [chamberEnd, AXIS - half], [chamberEnd + 30, 150], [680, 150],
+  [680, 200], [chamberEnd + 30, 200], [chamberEnd, AXIS + half], [THROAT_X + half - THROAT_HALF, AXIS + half], [THROAT_X, AXIS + THROAT_HALF], [225, 200], [100, 200],
 ];
+/** Half-height of the ball chamber: the plain valve's is wide so fluid passes freely above and below the ball resting on its cage. */
+const CHAMBER_HALF = 35;
+const CAGE_CHAMBER_HALF = 50;
 const toPath = (points: Point[]) => `M ${points.map(([x, y]) => `${x} ${y}`).join(' L ')} Z`;
 
 /** Both valves share one body; `spring` swaps the retention cage for the spring in its guide sleeve. */
@@ -41,14 +46,15 @@ export function CheckStage({ analysis, medium, theme, idPrefix = 'check', spring
   // Sealed against back pressure, nothing reaches the inlet side: its chamber greys out instead of staying blank.
   const left = fluidTint(analysis.inBar, medium, analysis.backPressure);
   const right = fluidTint(analysis.outBar, medium);
-  const bore = toPath(borePoints(chamberEnd));
+  const half = spring ? CHAMBER_HALF : CAGE_CHAMBER_HALF;
+  const bore = toPath(borePoints(chamberEnd, half));
   /** Streams wash symmetrically round the lifted ball: squeeze through the opened seat, hug the ball, converge through the cage opening. */
   const forward: Point[][] = [-1, 1].map(sign => spring ? [
     [84, AXIS], [THROAT_X - 12, AXIS], [THROAT_X + 12, AXIS + sign * 15], [THROAT_X + 40, AXIS + sign * 22],
     [RIB_X - 6, AXIS + sign * 22], [RIB_X + 30, AXIS + sign * 22], [RIB_X + 60, AXIS + sign * 8], [RIB_X + 80, AXIS], [676, AXIS],
   ] : [
-    [84, AXIS], [THROAT_X - 12, AXIS], [THROAT_X + 2, AXIS + sign * 17], [ballX, AXIS + sign * (BALL_RADIUS + 7)],
-    [STOP_X + 2, AXIS + sign * 9], [STOP_X + 30, AXIS], [676, AXIS],
+    [84, AXIS], [THROAT_X - 12, AXIS], [THROAT_X, AXIS + sign * 5], [THROAT_X + 12, AXIS + sign * 13], [ballX, AXIS + sign * (BALL_RADIUS + 7)],
+    [STOP_X + 4, AXIS + sign * WINDOW_MID], [STOP_X + 24, AXIS + sign * 18], [chamberEnd + 14, AXIS + sign * 8], [chamberEnd + 40, AXIS], [676, AXIS],
   ]);
   const dischargeBar = analysis.outBar;
   const label = (x: number, y: number, text: string) => <text x={x} y={y} textAnchor="middle" fontSize={11} fontFamily={SANS} fill={theme.muted}>{text}</text>;
@@ -62,8 +68,8 @@ export function CheckStage({ analysis, medium, theme, idPrefix = 'check', spring
       <rect className="valve-body" x={100} y={100} width={580} height={150} fill={hatchFill(idPrefix)} stroke={theme.casingEdge} strokeWidth={EDGE_WIDTH} />
       <path className="check-bore" d={bore} fill={theme.bore} />
       <g clipPath={`url(#${idPrefix}-bore)`}>
-        <rect x={100} y={130} width={THROAT_X - 100} height={90} fill={left.fill} opacity={left.opacity} />
-        <rect x={THROAT_X} y={130} width={580 - (THROAT_X - 100)} height={90} fill={right.fill} opacity={right.opacity} />
+        <rect x={100} y={120} width={THROAT_X - 100} height={110} fill={left.fill} opacity={left.opacity} />
+        <rect x={THROAT_X} y={120} width={580 - (THROAT_X - 100)} height={110} fill={right.fill} opacity={right.opacity} />
       </g>
       <path d={bore} fill="none" stroke={theme.casingEdge} strokeWidth={EDGE_WIDTH} strokeLinejoin="round" />
 
@@ -78,11 +84,10 @@ export function CheckStage({ analysis, medium, theme, idPrefix = 'check', spring
         </g>
       ) : (
         <g className="retention-cage">
-          {/* two rails along the chamber walls and a stop ring with a central opening smaller than the ball */}
-          <rect x={THROAT_X + 24} y={140} width={STOP_X + 12 - (THROAT_X + 24)} height={6} {...groundProps(theme)} />
-          <rect x={THROAT_X + 24} y={204} width={STOP_X + 12 - (THROAT_X + 24)} height={6} {...groundProps(theme)} />
-          <rect className="cage-stop" x={STOP_X} y={146} width={12} height={20} {...groundProps(theme)} />
-          <rect className="cage-stop" x={STOP_X} y={184} width={12} height={20} {...groundProps(theme)} />
+          {/* perforated stop plate: solid lips against the chamber walls, a central stop pad the ball rests on, and a flow window above and below it */}
+          <rect className="cage-stop" x={STOP_X} y={AXIS - 50} width={12} height={15} {...groundProps(theme)} />
+          <rect className="cage-stop" x={STOP_X} y={AXIS + 35} width={12} height={15} {...groundProps(theme)} />
+          <rect className="cage-stop cage-pad" x={STOP_X} y={AXIS - 12} width={8} height={24} {...groundProps(theme)} />
         </g>
       )}
 

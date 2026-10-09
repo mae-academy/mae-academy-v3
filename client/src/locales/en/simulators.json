@@ -488,6 +488,11 @@
   },
   "arduino": {
     "sketchAria": "Arduino sketch",
+    "addLcd": "Add 16x2 LCD",
+    "lcdOn": "LCD 16x2",
+    "addLcdTitle": "Show the 16x2 LCD next to the board with its jumpers auto-wired",
+    "removeLcdTitle": "Hide the 16x2 LCD and its jumpers",
+    "lcdContrastAria": "LCD contrast (V0 trimmer)",
     "lineError": "Line {{line}}: {{message}}",
     "runtimeError": "Runtime error: {{error}}",
     "customSketch": "Custom sketch",
@@ -774,6 +779,9 @@
       "rotate": "Rotate",
       "duplicate": "Duplicate",
       "delete": "Delete",
+      "initialState": "Initial State",
+      "initialStateNC": "Normally Closed (NC)",
+      "initialStateNO": "Normally Open (NO)",
       "operatingParameters": "Operating parameters",
       "linkedSensor": "Linked Cylinder Sensor",
       "linkedSensorSide": "Linked Cylinder Sensor ({{side}})",
@@ -814,6 +822,10 @@
       "clear": "Clear",
       "inputs": "Inputs",
       "outputs": "Loads",
+      "groupSwitches": "Inputs & Sensors",
+      "groupContacts": "Relay Contacts",
+      "groupLoads": "Loads & Coils",
+      "library": "Component Library",
       "palette": {
         "sensor": "Proximity sensor (3-wire)",
         "pushbuttonNO": "Pushbutton (NO)",
@@ -870,10 +882,16 @@
     },
     "cutaway": {
       "names": {
+        "gauge": "Pressure Gauge",
+        "regulator": "Pressure Regulator",
+        "relief": "Pressure Relief Valve",
+        "quickExhaust": "Quick Exhaust Valve",
         "and": "Dual-Pressure Valve (AND)",
         "or": "Shuttle Valve (OR)",
         "spool52": "5/2 Spool Valve",
         "spool53": "5/3 Closed-Centre Spool Valve",
+        "spool43": "4/3 Closed-Centre Spool Valve",
+        "spool43float": "4/3 Float-Centre Spool Valve",
         "cushion": "Cushioned Cylinder",
         "single": "Single-Acting Spring-Return Cylinder",
         "throttle": "Throttle Valve (Adjustable)",
@@ -901,6 +919,48 @@
         "blockedRightText": "Only the right inlet is pressurised. It pushes the spool to the left, and the right disc face covers the passage to port 2. The signal reaches a dead end and port 2 stays empty.",
         "caption": "Stepped H-spool: two sealing discs on a shaft, landing on shoulder seats · clearance ducts around the shaft"
       },
+      "pressure": {
+        "setLabel": "set {{set}} bar",
+        "breather": "breather",
+        "regulator": {
+          "idle": "Idle — no pressure",
+          "idleText": "No pressure at any port. The spring pushes the diaphragm down and holds the poppet open.",
+          "regulating": "Regulating — poppet open",
+          "regulatingText": "Downstream pressure ({{out}}) is below the set point ({{set}}). The spring keeps the diaphragm down and the poppet open, so supply air ({{in}}) flows from port 1 to port 2.",
+          "holding": "Holding set pressure — poppet throttling",
+          "holdingText": "Port 2 has reached the set point ({{set}}). Pressure under the diaphragm balances the spring, so the diaphragm rises and the poppet throttles or closes the gap: the output stays steady at {{out}}.",
+          "venting": "Venting — overpressure on port 2",
+          "ventingText": "Port 2 ({{out}}) is above the set point ({{set}}). The diaphragm lifts off the relief seat in its centre and the excess air escapes through the bonnet vent until the pressure falls back.",
+          "caption": "Adjusting knob and spring · sensing diaphragm · throttling poppet and seat",
+          "captionRelieving": "Adjusting knob and spring · diaphragm with relief seat · throttling poppet · vent port 3"
+        },
+        "relief": {
+          "idle": "Closed — no pressure",
+          "idleText": "No pressure at the inlet. The spring presses the conical poppet onto its seat.",
+          "closed": "Closed — below set pressure",
+          "closedText": "Inlet pressure ({{in}}) is below the set pressure ({{set}}), so the spring keeps the poppet on its seat and nothing escapes.",
+          "open": "Open — relieving to vent",
+          "openText": "Inlet pressure has reached the set pressure ({{set}}). The force on the poppet overcomes the spring preload and lifts it, discharging air to the vent until the pressure falls back.",
+          "caption": "Adjusting screw and spring · conical poppet · seat",
+          "vent": "Vent / outlet"
+        }
+      },
+      "gauge": {
+        "live": "Live — {{bar}} at the port",
+        "liveText": "Reading {{bar}}. Pressure at the port flexes the Bourdon tube, which turns the needle over the 0–10 bar scale: the deflection is proportional to the measured pressure.",
+        "idle": "No pressure",
+        "idleText": "The port is at atmospheric pressure, so the needle rests at zero.",
+        "caption": "Same dial and needle as the air receiver's gauge"
+      },
+      "quickExhaust": {
+        "idle": "Idle — no pressure",
+        "idleText": "There is no pressure at any port. The rubber disc rests against the inlet seat, so port 1 is sealed and the exhaust is open to atmosphere.",
+        "fill": "Pressurising 1→2 — exhaust sealed",
+        "fillText": "Supply pressure ({{supply}}) lifts the disc onto the exhaust seat and seals port 3 to atmosphere. The edges of the disc flex, and the air rushes past them straight into working port 2 ({{work}}).",
+        "exhaust": "Rapid exhaust 2→3 — supply sealed",
+        "exhaustText": "Port 1 has dropped, so the pressure in the working line ({{work}}) drives the disc down onto the inlet seat. The supply is sealed and the whole exhaust cross-section opens: the cylinder air dumps directly to atmosphere through port 3 instead of travelling back through the control valve.",
+        "caption": "Flexible disc between the inlet seat (1) and the exhaust seat (3)"
+      },
       "or": {
         "idle": "Idle — no signal",
         "idleText": "No signal on either inlet. The ball floats in the chamber and port 2 is empty.",
@@ -918,6 +978,10 @@
         "pilotLeft": "Left pilot 14 — 1→4, 2→3",
         "pilotRight": "Right pilot 12 — 1→2, 4→5",
         "mid": "Mid-position — all ports closed",
+        "pilotRight43": "Right pilot 12 — 1→2, 4→3",
+        "midFloat": "Mid-position — P blocked, A and B open to tank",
+        "centring43": "Opposed centring springs hold the spool in the middle, so its lands seal P and both tank chambers and the cylinder lines A and B are shut in. {{description}}",
+        "centringFloat": "Opposed centring springs hold the spool in the middle: one land seals P while A and B stay open to tank, so the cylinder floats. {{description}}",
         "centring": "Opposed centring springs hold the spool in the middle, so its three lands sit over Ports 5, 1 and 3 and the cylinder lines are shut in. {{description}}",
         "groove": {
           "supplyWork": "A groove bridges supply Port 1 to working Port {{ports}}",
@@ -999,9 +1063,9 @@
       "check": {
         "closed": "Closed — ball seated",
         "closedDesc": "Nothing is pushing the ball forward, so it rests in the conical seat. The valve is closed.",
-        "open": "Free flow 1→2 — ball lifted into the cage",
+        "open": "Open / Free Flow",
         "openDesc": "Pressure at port 1 rolls the ball off the conical seat into the retention cage. The fluid passes around it through the full bore.",
-        "blocked": "Blocked — back pressure seats the ball",
+        "blocked": "Blocked / Reverse Flow",
         "blockedDesc": "Pressure at port 2 drives the ball into the conical seat. The seal is hermetic, so nothing flows back from port 2 to port 1.",
         "crackClosed": "Closed — below the cracking pressure",
         "crackClosedDesc": "Port 1 holds {{bar}} bar, below the cracking pressure of {{crack}} bar. The calibrated spring keeps the ball on its seat.",
@@ -1080,7 +1144,7 @@
         "description": "2/2-way directional control valve, normally open."
       },
       "valve-3-2-nc": {
-        "name": "3/2 Valve, NC",
+        "name": "3/2 Valve",
         "description": "3/2-way directional control valve, normally closed."
       },
       "valve-3-2-no": {
@@ -1096,7 +1160,7 @@
         "description": "5/2-way directional control valve."
       },
       "valve-5-3": {
-        "name": "5/3 Valve, Closed Mid",
+        "name": "5/3 Valve, Closed Center",
         "description": "5/3-way directional control valve, all ports blocked in mid position."
       },
       "check-valve": {
@@ -1120,7 +1184,7 @@
         "description": "Vents the working line directly through port 3."
       },
       "flow-control": {
-        "name": "Flow Control Valve (Throttle)",
+        "name": "Throttle Valve",
         "description": "Adjustable throttle valve."
       },
       "flow-control-oneway": {
@@ -1128,15 +1192,15 @@
         "description": "Throttle check valve: choked in one direction, free return."
       },
       "regulator-nr": {
-        "name": "Pressure Regulator (Non-Relieving)",
+        "name": "PRV (Non-relieving)",
         "description": "Adjustable pressure regulating valve, non-relieving."
       },
       "regulator-relieving": {
-        "name": "Pressure Regulator (Relieving)",
+        "name": "PRV (Relieving)",
         "description": "Adjustable pressure regulating valve with relief vent port 3."
       },
       "sequence-ext": {
-        "name": "Sequence Valve (External Pilot)",
+        "name": "Sequence Valve (Ext. Pilot)",
         "description": "Opens when the external pilot signal on port 12 reaches the set pressure."
       },
       "pressure-relief": {
@@ -1160,16 +1224,8 @@
         "description": "Piston rod through both end caps."
       },
       "air-motor-fixed": {
-        "name": "Air Motor (Fixed, 1 Dir.)",
+        "name": "Air Motor",
         "description": "Fixed-capacity air motor, one flow direction."
-      },
-      "air-motor-variable": {
-        "name": "Air Motor (Variable)",
-        "description": "Variable-capacity air motor."
-      },
-      "semi-rotary": {
-        "name": "Semi-Rotary Actuator",
-        "description": "Limited-angle rotary actuator."
       },
       "exhaust-port": {
         "name": "Exhaust Port",
@@ -1192,11 +1248,11 @@
         "description": "Fixed-displacement hydraulic pump: a solid triangle points out of the circle at the pressure port P."
       },
       "hyd-tank": {
-        "name": "Hydraulic Tank / Return Line (T)",
+        "name": "Hydraulic Tank",
         "description": "Open oil reservoir: every return line T ends here, below the fluid surface."
       },
       "hyd-pressure-relief": {
-        "name": "Pressure Relief Valve (DBV)",
+        "name": "Relief Valve (DBV)",
         "description": "Direct-acting relief valve: opens at the set pressure and drains to tank through port T."
       },
       "hvalve-3-2-nc": {
@@ -1208,8 +1264,16 @@
         "description": "4/2-way directional control valve (P, T, A, B)."
       },
       "hvalve-4-3": {
-        "name": "4/3 Valve, Closed Neutral",
+        "name": "4/3 Valve, Closed",
         "description": "4/3-way directional control valve, all ports blocked in the neutral position."
+      },
+      "hyd-power-unit": {
+        "name": "Oil Service Unit",
+        "description": "Pump with suction filter and tank, relief valve and 2/2 shut-off valve in series; the supply bus leaves at port 2."
+      },
+      "hyd-pressure-source": {
+        "name": "Hydraulic Pressure Supply",
+        "description": "Direct hydraulic pressure port: a solid triangle (ISO 1219) marks fluid power, where compressed air is drawn open."
       },
       "hyd-motor": {
         "name": "Hydraulic Motor",
@@ -1219,44 +1283,29 @@
         "name": "Time Delay Valve (NC)",
         "description": "On-delay timer: 1 → 2 opens a set time after pressure arrives on pilot port 12."
       },
-      "hyd-accumulator": {
-        "name": "Hydraulic Accumulator",
-        "description": "Gas-loaded bladder accumulator: stores oil under pressure and holds it when the line is shut off."
-      },
-      "hyd-filter": {
-        "name": "Hydraulic Filter",
-        "description": "In-line oil filter."
-      },
-      "hyd-cooler": {
-        "name": "Oil Cooler",
-        "description": "In-line oil cooler (heat exchanger)."
-      },
       "hyd-reducing-valve": {
-        "name": "Pressure Reducing Valve (2-Way)",
+        "name": "Pressure Reducing (2-Way)",
         "description": "Holds its outlet A at the set pressure, whatever the inlet P."
       },
       "hyd-reducing-valve-3way": {
-        "name": "Pressure Reducing Valve (3-Way)",
+        "name": "Pressure Reducing (3-Way)",
         "description": "Reducing valve whose outlet A also relieves to tank through port T when it is overloaded."
       },
       "hvalve-4-3-float": {
-        "name": "4/3 Valve, Float Neutral",
+        "name": "4/3 Valve, Float",
         "description": "4/3-way directional control valve: A and B open to tank in the neutral position, P blocked."
-      },
-      "hvalve-4-3-tandem": {
-        "name": "4/3 Valve, Tandem (Bypass) Neutral",
-        "description": "4/3-way directional control valve: P unloads to tank in the neutral position, A and B blocked."
       },
       "service-unit": {
         "name": "Main Service Unit (0Z1)",
         "description": "Simplified FRL with an integrated 3/2 manual shut-off valve with detented lever (0S1)."
       },
       "valve-2-2-nc": {
-        "name": "2/2 Valve, NC",
+        "name": "2/2 Valve",
         "description": "2/2-way directional control valve, normally closed."
       }
     },
     "groups": {
+      "actuators": "Actuators",
       "energyPreparation": "Energy & Preparation",
       "directionalControlValves": "Directional Control Valves",
       "logicFlowControl": "Logic & Flow Control",
@@ -1288,6 +1337,7 @@
       "flowDirections": "Flow Directions",
       "swivelAngle": "Swivel Angle",
       "connection": "Connection",
+      "silencer": "Silencer",
       "reservoirVolume": "Reservoir Volume",
       "accumulatorVolume": "Accumulator Volume",
       "mainShutOff": "Main Shut-off"
@@ -1304,6 +1354,7 @@
       "roller": "Roller Lever (Limit Switch)",
       "idleReturnRoller": "Idle-Return Roller",
       "pneumaticPilot": "Pneumatic Pilot (Signal 12/14)",
+      "hydraulicPilot": "Hydraulic Pilot (Signal 12/14)",
       "restPosition": "Rest position",
       "actuatedPosition": "Actuated position",
       "withLubricator": "With Lubricator",
@@ -1313,6 +1364,8 @@
       "singleDirection": "Single direction",
       "bothDirections": "Both directions",
       "unthreaded": "Unthreaded",
+      "withoutSilencer": "Without Silencer",
+      "withSilencer": "With Silencer",
       "threaded": "Threaded",
       "fixedRear": "Fixed - rear",
       "fixedBoth": "Fixed - both",
@@ -1340,7 +1393,11 @@
     "io": {
       "title": "I/O Module",
       "digitalInputs": "Digital Inputs",
+      "digitalOutputs": "Digital Outputs",
       "toggle": "ON / OFF",
+      "on": "ON",
+      "off": "OFF",
+      "channelControls": "Input controls",
       "mainSupply": "Main Supply",
       "shutoff": "Main Air Shut-off",
       "kinds": {

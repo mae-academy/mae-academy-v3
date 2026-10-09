@@ -60,21 +60,6 @@ describe('4/3 valve with the ports P, T, A, B wired to a pump, a tank and a doub
     expect(bar(snapshot, 'cyl:b')).toBe(0);
   });
 
-  it('tandem (bypass) neutral unloads the pump to tank and blocks A and B', () => {
-    const engine = drive('hvalve-4-3-tandem');
-    engine.setManual('v', 'left', true);
-    engine.step(0.4);
-    engine.setManual('v', 'left', false);
-    const snapshot = engine.step(0.4);
-    expect(snapshot.valves.v.position).toBe(2);
-    expect(bar(snapshot, 'pump:out')).toBe(0);
-    expect(bar(snapshot, 'v:p1')).toBe(0);
-    expect(snapshot.cylinders.cyl.velocity).toBe(0);
-    // an operator still takes over from the tandem centre
-    engine.setManual('v', 'left', true);
-    expect(bar(engine.step(0.1), 'pump:out')).toBe(50);
-  });
-
   it('an unpiped tank port still drains, like the old internal tank', () => {
     const engine = engineOf([part('pump', 'hyd-pump'), part('v', 'hvalve-4-3', PUSH_BOTH), part('cyl', 'cylinder-double')], [['pump:out', 'v:p1'], ['v:p4', 'cyl:a'], ['v:p2', 'cyl:b']]);
     engine.setManual('v', 'left', true);
@@ -95,26 +80,25 @@ describe('hydraulic energy and return elements', () => {
     expect(snapshot.reliefValves.relief.open).toBe(true);
   });
 
-  it('the accumulator keeps its pressure behind a check valve when the line is dumped', () => {
-    const engine = engineOf(
-      [part('pump', 'hyd-pump'), part('v', 'hvalve-3-2-nc', { actuationLeft: 'Pushbutton', actuationRight: 'Spring Return' }), part('chk', 'check-valve'), part('acc', 'hyd-accumulator'), part('gauge', 'pressure-gauge')],
-      [['pump:out', 'v:p1'], ['v:p2', 'chk:p1'], ['chk:p2', 'acc:p'], ['acc:p', 'gauge:p']],
-    );
-    engine.setManual('v', 'left', true);
-    const charged = engine.step(0.3);
-    expect(bar(charged, 'acc:p')).toBe(50);
-    expect(charged.volumes.acc.pressure).toBe(50);
-    engine.setManual('v', 'left', false);
-    const held = engine.step(1);
-    expect(bar(held, 'v:p2')).toBe(0);
-    expect(bar(held, 'acc:p')).toBe(50);
-    expect(bar(held, 'gauge:p')).toBe(50);
+  it('the hydraulic pressure supply delivers oil pressure', () => {
+    const engine = engineOf([part('ps', 'hyd-pressure-source'), part('gauge', 'pressure-gauge')], [['ps:out', 'gauge:p']]);
+    expect(bar(engine.step(), 'gauge:p')).toBe(50);
   });
 
-  it('the filter and the oil cooler pass the flow through', () => {
-    const engine = engineOf([part('pump', 'hyd-pump'), part('f', 'hyd-filter'), part('c', 'hyd-cooler'), part('relief', 'hyd-pressure-relief')], [['pump:out', 'f:in'], ['f:out', 'c:in'], ['c:out', 'relief:p1']]);
-    expect(bar(engine.step(), 'relief:p1')).toBe(50);
-    expect(engine.getSnapshot().diagnostics.some(d => d.code === 'MISSING_RELIEF_VALVE')).toBe(false);
+  it('the power unit supplies oil pressure, caps it at the relief setting and drains when shut off', () => {
+    const unit = (props: Record<string, unknown>) => engineOf([part('hpu', 'hyd-power-unit', props), part('gauge', 'pressure-gauge')], [['hpu:out', 'gauge:p']]);
+    expect(bar(unit({}).step(), 'gauge:p')).toBe(50);
+    expect(bar(unit({ pressure: 80, crackingPressure: 60 }).step(), 'gauge:p')).toBe(60);
+    expect(bar(unit({ shutoff: 'OFF' }).step(), 'gauge:p')).toBe(0);
+  });
+
+  it('a hydraulic motor runs backwards only when set to both directions', () => {
+    const run = (props: Record<string, unknown>) => {
+      const engine = engineOf([part('pump', 'hyd-pump'), part('m', 'hyd-motor', { speed: 1500, ...props }), part('tank', 'hyd-tank')], [['pump:out', 'm:out'], ['m:in', 'tank:p']]);
+      return engine.step(1).motors.m.rpm;
+    };
+    expect(run({})).toBe(0);
+    expect(run({ directions: 'Both directions' })).toBeLessThan(0);
   });
 
   it('pressure reducing valves hold their outlet at the set pressure', () => {

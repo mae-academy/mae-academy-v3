@@ -6,7 +6,7 @@
 
 export type Ty = "void" | "bool" | "char" | "int8" | "uint8" | "int16" | "uint16" | "int32" | "uint32" | "float" | "string";
 
-import type { Diagnostic, PinUsage, SketchInstance, CompiledSketch, CompileResult } from "../../../../shared/code/arduinoTypes";
+import type { Diagnostic, LcdWiring, PinUsage, SketchInstance, CompiledSketch, CompileResult } from "../../../../shared/code/arduinoTypes";
 export type { Diagnostic, PinUsage, SketchInstance, CompiledSketch, CompileResult };
 
 export class CompileError extends Error {
@@ -127,6 +127,16 @@ function lex(src: string, startLine = 1): Tok[] {
   return toks;
 }
 
+/** Library headers pulled in with `#include <...>` / `#include "..."`. */
+function includedHeaders(raw: Tok[]): Set<string> {
+  const headers = new Set<string>();
+  for (const t of raw) {
+    const m = t.t === "dir" ? /^include\s*[<"]([^>"]+)[>"]/.exec(t.v) : null;
+    if (m) headers.add(m[1]);
+  }
+  return headers;
+}
+
 /** Applies #define (object-like) substitution, drops other directives. */
 function preprocess(raw: Tok[]): Tok[] {
   const macros = new Map<string, Tok[]>();
@@ -182,6 +192,12 @@ type Expr = L &
     | { k: "init"; items: Expr[] }
   );
 
+/** Library classes the simulator models with a dedicated codegen path instead of general class support. */
+type LcdClass = "LiquidCrystal" | "LiquidCrystal_I2C";
+const LCD_CLASSES: readonly LcdClass[] = ["LiquidCrystal", "LiquidCrystal_I2C"];
+const LCD_HEADERS: Record<LcdClass, string> = { LiquidCrystal: "LiquidCrystal.h", LiquidCrystal_I2C: "LiquidCrystal_I2C.h" };
+const isLcdClass = (w: string): w is LcdClass => (LCD_CLASSES as readonly string[]).includes(w);
+
 interface Declarator {
   name: string;
   dims: (Expr | null)[];
@@ -192,6 +208,7 @@ type Stmt = L &
   (
     | { k: "block"; body: Stmt[] }
     | { k: "decl"; ty: Ty | "auto"; decls: Declarator[]; isStatic: boolean }
+    | { k: "lcd"; cls: LcdClass; name: string; args: Expr[] }
     | { k: "expr"; e: Expr }
     | { k: "if"; c: Expr; a: Stmt; b: Stmt | null }
     | { k: "for"; init: Stmt | null; c: Expr | null; u: Expr | null; body: Stmt }
@@ -238,6 +255,7 @@ interface TypeInfo {
   ty: Ty | "auto";
   isStatic: boolean;
   isPtr: boolean;
+  cls?: LcdClass;
 }
 
 class Parser {
@@ -246,7 +264,12 @@ class Parser {
   readonly enumConsts = new Map<string, number>();
   private nextEnum = 0;
 
-  constructor(private readonly toks: Tok[]) {}
+  constructor(
+    private readonly toks: Tok[],
+    headers: ReadonlySet<string> = new Set(),
+  ) {
+    for (const cls of LCD_CLASSES) if (headers.has(LCD_HEADERS[cls])) this.typeNames.add(cls);
+  }
 
   private get cur(): Tok {
     return this.toks[this.pos];
@@ -293,6 +316,8 @@ class Parser {
       this.pos++;
     }
     if (words.length === 0) throw new CompileError("Expected a type", this.cur.line);
+    const cls = words.find(isLcdClass);
+    if (cls) return { ty: "int16", isStatic, isPtr: false, cls };
     const has = (w: string) => words.includes(w);
     const unsigned = has("unsigned");
     let ty: Ty | "auto";
@@ -345,8 +370,8 @@ class Parser {
     }
     const line = this.cur.line;
     const type = this.parseType();
-    if (!type) throw new CompileError(`Unexpected '${this.cur.v}' at file scope`, line);
-    if (this.cur.t === "id" && this.peek().v === "(") {
+    if (!type) throw new CompileError(this.missingInclude() ?? `Unexpected '${this.cur.v}' at file scope`, line);
+    if (!type.cls && this.cur.t === "id" && this.peek().v === "(") {
       const name = this.ident().v;
       this.expect("(");
       const params = this.parseParams();
@@ -405,7 +430,27 @@ class Parser {
     return params;
   }
 
+  /** `LiquidCrystal lcd(...)` without its #include behaves like avr-gcc: the type is unknown. */
+  private missingInclude(): string | null {
+    const w = this.cur.v;
+    return this.cur.t === "id" && isLcdClass(w) ? `'${w}' does not name a type (did you forget #include <${LCD_HEADERS[w]}>?)` : null;
+  }
+
+  private parseLcdDecl(cls: LcdClass, line: number): Stmt {
+    const name = this.ident().v;
+    if (!this.accept("(")) throw new CompileError(`'${cls} ${name}' needs constructor arguments, e.g. ${cls} ${name}(${cls === "LiquidCrystal" ? "12, 11, 5, 4, 3, 2" : "0x27, 16, 2"});`, this.cur.line);
+    const args: Expr[] = [];
+    if (!this.is(")")) {
+      do args.push(this.parseAssign());
+      while (this.accept(","));
+    }
+    this.expect(")");
+    this.expect(";");
+    return { k: "lcd", cls, name, args, line };
+  }
+
   private parseDeclRest(type: TypeInfo, line: number): Stmt {
+    if (type.cls) return this.parseLcdDecl(type.cls, line);
     const decls: Declarator[] = [];
     do {
       while (this.accept("*")) throw new CompileError("Pointers are not supported by the simulator", this.cur.line);
@@ -758,7 +803,7 @@ const CONSTANTS: Record<string, { v: string; ty: Ty }> = {
   PI: { v: String(Math.PI), ty: "float" }, HALF_PI: { v: String(Math.PI / 2), ty: "float" }, TWO_PI: { v: String(Math.PI * 2), ty: "float" },
   DEG_TO_RAD: { v: String(Math.PI / 180), ty: "float" }, RAD_TO_DEG: { v: String(180 / Math.PI), ty: "float" },
   NULL: { v: "0", ty: "int16" }, true: { v: "true", ty: "bool" }, false: { v: "false", ty: "bool" },
-  Serial: { v: "true", ty: "bool" },
+  Serial: { v: "true", ty: "bool" }, Wire: { v: "true", ty: "bool" },
 };
 
 const UNSUPPORTED_CALLS = new Set(["tone", "noTone", "pulseIn", "pulseInLong", "attachInterrupt", "detachInterrupt", "shiftOut", "shiftIn", "analogReference", "sprintf", "snprintf", "dtostrf", "memcpy", "memset", "strlen", "strcpy", "strcmp"]);
@@ -823,6 +868,7 @@ class Codegen {
   private fn: FnCtx = { temps: 0, ret: "void", sync: true };
   private line = 1;
   private uid = 0;
+  private readonly lcdObjs = new Set<string>();
 
   constructor(private readonly enumConsts: Map<string, number>) {}
 
@@ -922,6 +968,8 @@ class Codegen {
         return `${this.expr(s.e, false).c};`;
       case "decl":
         return this.decl(s, global);
+      case "lcd":
+        return this.lcdDecl(s);
       case "if":
         return `if(${this.cond(s.c)})${this.sub(s.a)}${s.b ? ` else ${this.sub(s.b)}` : ""}`;
       case "while":
@@ -969,6 +1017,19 @@ class Codegen {
     const r = this.expr(e);
     if (r.ty === "string") this.err("Cannot use a String as a condition");
     return r.c;
+  }
+
+  /** `LiquidCrystal lcd(rs, en, d4, d5, d6, d7)` / `LiquidCrystal_I2C lcd(0x27, 16, 2)`: registers the wiring with the runtime. */
+  private lcdDecl(s: Extract<Stmt, { k: "lcd" }>): string {
+    const { cls, name, args } = s;
+    const counts = cls === "LiquidCrystal" ? [6, 7, 10, 11] : [3];
+    if (!counts.includes(args.length)) {
+      this.err(`No matching constructor for '${cls}' with ${args.length} argument(s) (expected ${counts.join(", ")})`, s.line);
+    }
+    const vals = args.map(a => coerceTo(this.expr(a), "int32", s.line));
+    this.declare(name, "int16", 0, s.line);
+    this.lcdObjs.add(name);
+    return `let v_${name}=0;\n$rt.lcdInit('${cls === "LiquidCrystal" ? "p" : "i"}',[${vals.join(",")}]);`;
   }
 
   private decl(s: Extract<Stmt, { k: "decl" }>, global: boolean): string {
@@ -1318,6 +1379,51 @@ class Codegen {
     return this.err(`'${name}' was not declared in this scope`);
   }
 
+  /** HD44780 character-LCD API shared by LiquidCrystal and LiquidCrystal_I2C. */
+  private lcdCall(
+    m: Extract<Expr, { k: "member" }>,
+    a: Expr[],
+    mk: (c: string, ty: Ty) => R,
+    num: (i: number, ty?: Ty) => string,
+    argc: (lo: number, hi?: number) => void,
+  ): R {
+    const simple: Record<string, string> = {
+      clear: "lcdClear()", home: "lcdHome()",
+      cursor: "lcdCursor(true)", noCursor: "lcdCursor(false)", blink: "lcdBlink(true)", noBlink: "lcdBlink(false)",
+      display: "lcdDisplay(true)", noDisplay: "lcdDisplay(false)",
+      scrollDisplayLeft: "lcdScroll(-1)", scrollDisplayRight: "lcdScroll(1)",
+      autoscroll: "lcdAutoscroll(true)", noAutoscroll: "lcdAutoscroll(false)",
+      leftToRight: "lcdDirection(true)", rightToLeft: "lcdDirection(false)",
+      backlight: "lcdBacklight(true)", noBacklight: "lcdBacklight(false)",
+    };
+    if (simple[m.name]) {
+      argc(0);
+      return mk(`$rt.${simple[m.name]}`, "void");
+    }
+    switch (m.name) {
+      case "begin": argc(2, 3); return mk(`$rt.lcdBegin(${num(0)},${num(1)})`, "void");
+      case "init": case "createCursor": argc(0); return mk("$rt.lcdBegin(16,2)", "void");
+      case "setBacklight": argc(1); return mk(`$rt.lcdBacklight(!!${num(0)})`, "void");
+      case "setCursor": argc(2); return mk(`$rt.lcdSetCursor(${num(0)},${num(1)})`, "void");
+      case "write": argc(1); return mk(`$rt.lcdWrite(${num(0)})`, "uint16");
+      case "print": {
+        argc(1, 2);
+        const r = this.expr(a[0]);
+        if (r.rank > 0) this.err("Cannot print an array");
+        const val = r.ty === "bool" ? `(${r.c}?1:0)` : r.c;
+        return mk(`$rt.lcdPrint(${val},'${kindOf(r.ty)}',${a.length === 2 ? num(1) : "0"})`, "uint16");
+      }
+      case "createChar": {
+        argc(2);
+        const glyph = this.expr(a[1]);
+        if (glyph.rank !== 1) this.err("createChar() needs a byte[8] array of glyph rows");
+        return mk(`$rt.lcdCreateChar(${num(0)},${glyph.c})`, "void");
+      }
+      default:
+        return this.err(`'${m.name}' is not supported by the LCD simulator`);
+    }
+  }
+
   private memberCall(m: Extract<Expr, { k: "member" }>, args: Expr[]): R {
     const mk = (c: string, ty: Ty): R => ({ c, ty, rank: 0 });
     const a = args;
@@ -1356,6 +1462,12 @@ class Codegen {
           return this.err(`'Serial.${m.name}' is not supported by the simulator`);
       }
     }
+    if (m.obj.k === "id" && m.obj.name === "Wire" && !this.lookup("Wire")) {
+      // The I2C bus is implicit in the LCD model; bus setup calls are accepted so stock sketches compile.
+      if (["begin", "setClock", "setWireTimeout"].includes(m.name)) return mk("undefined", "void");
+      return this.err(`'Wire.${m.name}' is not supported by the simulator`);
+    }
+    if (m.obj.k === "id" && this.lcdObjs.has(m.obj.name) && this.lookup(m.obj.name)) return this.lcdCall(m, a, mk, num, argc);
     const obj = this.expr(m.obj);
     if (obj.ty !== "string" || obj.rank > 0) return this.err(`Request for member '${m.name}' in non-class value`);
     const s = obj.c;
@@ -1425,8 +1537,8 @@ function coerceTo(r: R, to: Ty, line: number): string {
 /** Transpiles a sketch to JavaScript source. No dynamic code evaluation happens here, so it runs on the Edge runtime. */
 export function compileSketchToJs(source: string): { ok: true; js: string } | { ok: false; error: Diagnostic } {
   try {
-    const tokens = preprocess(lex(source));
-    const parser = new Parser(tokens);
+    const raw = lex(source);
+    const parser = new Parser(preprocess(raw), includedHeaders(raw));
     const items = parser.parseProgram();
     const js = new Codegen(parser.enumConsts).compile(items);
     return { ok: true, js };
@@ -1468,12 +1580,13 @@ function exprChildren(e: Expr): Expr[] {
   }
 }
 
-function stmtExprs(s: Stmt, visit: (e: Expr) => void, decl: (d: Declarator) => void): void {
+function stmtExprs(s: Stmt, visit: (e: Expr) => void, decl: (d: Declarator) => void, lcd?: (l: Extract<Stmt, { k: "lcd" }>) => void): void {
   const sub = (x: Stmt | null): void => {
-    if (x) stmtExprs(x, visit, decl);
+    if (x) stmtExprs(x, visit, decl, lcd);
   };
   switch (s.k) {
     case "block": s.body.forEach(sub); break;
+    case "lcd": lcd?.(s); s.args.forEach(visit); break;
     case "decl": s.decls.forEach(d => { decl(d); if (d.init) visit(d.init); d.dims.forEach(x => x && visit(x)); }); break;
     case "expr": visit(s.e); break;
     case "if": visit(s.c); sub(s.a); sub(s.b); break;
@@ -1485,12 +1598,30 @@ function stmtExprs(s: Stmt, visit: (e: Expr) => void, decl: (d: Declarator) => v
   }
 }
 
+const LCD_DEFAULT_PINS = [12, 11, 5, 4, 3, 2];
+
+/** Wiring for the first LCD object; pins that are not compile-time constants fall back to the standard tutorial wiring. */
+function lcdWiring(decl: Extract<Stmt, { k: "lcd" }> | undefined, evalConst: (e: Expr) => number | undefined): { lcd?: LcdWiring } {
+  if (!decl) return {};
+  const v = decl.args.map(evalConst);
+  if (decl.cls === "LiquidCrystal_I2C") return { lcd: { mode: "i2c", pins: [18, 19], address: v[0] ?? 0x27 } };
+  const n = v.length;
+  // (rs, en, d4..d7) | (rs, rw, en, d4..d7) | 8-bit forms, where D4..D7 are the last four data lines.
+  const rs = v[0];
+  const en = n === 7 || n === 11 ? v[2] : v[1];
+  const d = v.slice(-4);
+  const pins = [rs, en, ...d];
+  const ok = pins.every((p): p is number => p !== undefined && Number.isInteger(p) && p >= 0 && p <= 19);
+  return { lcd: { mode: "parallel", pins: ok ? (pins as number[]) : LCD_DEFAULT_PINS, address: 0 } };
+}
+
 /** Resolves pin usage from pinMode/digitalRead/analogRead/digitalWrite calls; returns null when the sketch does not parse. */
 export function analyzeSketch(source: string): PinUsage | null {
   let items: TopItem[];
   let enums: Map<string, number>;
   try {
-    const parser = new Parser(preprocess(lex(source)));
+    const raw = lex(source);
+    const parser = new Parser(preprocess(raw), includedHeaders(raw));
     items = parser.parseProgram();
     enums = parser.enumConsts;
   } catch {
@@ -1526,7 +1657,8 @@ export function analyzeSketch(source: string): PinUsage | null {
     exprChildren(e).forEach(visit);
   };
   const decls: Declarator[] = [];
-  const collect = (s: Stmt): void => stmtExprs(s, visit, d => decls.push(d));
+  const lcds: Extract<Stmt, { k: "lcd" }>[] = [];
+  const collect = (s: Stmt): void => stmtExprs(s, visit, d => decls.push(d), l => lcds.push(l));
   for (const it of items) {
     if (it.k === "func") it.body?.forEach(collect);
     else collect(it);
@@ -1577,5 +1709,5 @@ export function analyzeSketch(source: string): PinUsage | null {
   declaredOut.forEach(p => usage.out.add(p));
   usage.out.forEach(p => usage.din.delete(p));
   const sorted = (s: Set<number>): number[] => Array.from(s).sort((a, b) => a - b);
-  return { digitalInputs: sorted(usage.din), pullups: sorted(usage.pull), analogInputs: sorted(usage.ain), outputs: sorted(usage.out) };
+  return { digitalInputs: sorted(usage.din), pullups: sorted(usage.pull), analogInputs: sorted(usage.ain), outputs: sorted(usage.out), ...lcdWiring(lcds[0], evalConst) };
 }

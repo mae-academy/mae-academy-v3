@@ -2,7 +2,7 @@
  * Arduino Studio: standalone embedded C++ simulator.
  * Layout mirrors the Code Studio split panes: ribbon on top, sketch editor left, board canvas + serial monitor right.
  */
-import { BookOpen, Check, ChevronDown, Clipboard, Code, Copy, Cpu, Download, Pause, Play, Redo2, RotateCcw, Trash2, Undo2, Upload } from "lucide-react";
+import { BookOpen, Check, ChevronDown, Clipboard, Code, Copy, Cpu, Download, Monitor, Pause, Play, Redo2, RotateCcw, Trash2, Undo2, Upload } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useTranslation } from "react-i18next";
@@ -83,6 +83,8 @@ export function ArduinoStudio() {
   const [exampleId, setExampleId] = useState<string>("default");
   const [speed, setSpeedState] = useState<ArduinoSpeed>(1);
   const [serialCollapsed, setSerialCollapsed] = useState(false);
+  // null = automatic: the LCD appears as soon as a sketch constructs one; the toolbar button overrides that either way.
+  const [lcdPref, setLcdPref] = useState<boolean | null>(null);
   const started = useRef(false);
   const lastLayout = useRef<PinUsage | undefined>(undefined);
   // The static pin layout comes from the serverless compiler (debounced while typing); the last layout that parsed stays on the board.
@@ -107,6 +109,7 @@ export function ArduinoStudio() {
     return () => mq.removeEventListener("change", update);
   }, []);
 
+  const lcdVisible = lcdPref ?? (Boolean(layout?.lcd) || rt.snapshot.lcd.wiring !== null);
   const { status } = rt.snapshot;
   const running = status === "running";
   const lines = useMemo(() => code.split("\n").length, [code]);
@@ -135,6 +138,7 @@ export function ArduinoStudio() {
     if (!ex) return;
     rt.reset();
     started.current = false;
+    setLcdPref(null);
     setExampleId(id);
     commit(ex.source);
   };
@@ -237,6 +241,18 @@ export function ArduinoStudio() {
                 ))}
               </select>
             </div>
+
+            <button
+              type="button"
+              data-testid="lcd-toggle"
+              aria-pressed={lcdVisible}
+              onClick={() => setLcdPref(!lcdVisible)}
+              title={lcdVisible ? t("arduino.removeLcdTitle", "Hide the 16x2 LCD and its jumpers") : t("arduino.addLcdTitle", "Show the 16x2 LCD next to the board with its jumpers auto-wired")}
+              className={`${pillButton} ms-1 px-3 ${lcdVisible ? "!border-sky-400/60 !bg-sky-500/10 !text-sky-700 dark:!text-sky-300" : ""}`}
+            >
+              <Monitor className="h-3.5 w-3.5" />
+              <span>{lcdVisible ? t("arduino.lcdOn", "LCD 16x2") : t("arduino.addLcd", "Add 16x2 LCD")}</span>
+            </button>
 
             <span className="mx-1 h-5 w-px shrink-0 self-center bg-slate-200 dark:bg-[#1a1d24]" />
 
@@ -359,7 +375,7 @@ export function ArduinoStudio() {
                     className="relative min-h-0 flex-1 overflow-hidden bg-slate-50 dark:bg-[#07080a]"
                     style={{ backgroundImage: "radial-gradient(circle, rgba(148,163,184,.25) 1px, transparent 1px)", backgroundSize: "20px 20px" }}
                   >
-                    <ArduinoBoard snapshot={rt.snapshot} onDigitalInput={rt.setDigitalInput} onAnalogInput={rt.setAnalogInput} layout={layout} ledColors={ARDUINO_EXAMPLES.find(e => e.id === exampleId)?.ledColors} />
+                    <ArduinoBoard snapshot={rt.snapshot} onDigitalInput={rt.setDigitalInput} onAnalogInput={rt.setAnalogInput} layout={layout} ledColors={ARDUINO_EXAMPLES.find(e => e.id === exampleId)?.ledColors} lcdVisible={lcdVisible} onLcdContrast={rt.setLcdContrast} />
                   </div>
                 </section>
               </ResizablePanel>

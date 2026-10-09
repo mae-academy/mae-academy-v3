@@ -1,5 +1,5 @@
 import React, { useId } from 'react';
-import { CELL, VALVE_SPECS, cellPortPoint, cellX0, defaultFluidProps, getFluidDefinition, isHydraulicValve, restCellIndex, valveEdges, type CellState, type FluidCatalogEntry, type FluidMedium, type FluidProps, type PortKey } from '../../models/fluidCatalog';
+import { CELL, HYDRAULIC_POWER_UNIT, SERVICE_UNIT, VALVE_SPECS, cellPortPoint, cellX0, defaultFluidProps, getFluidDefinition, isHydraulicValve, restCellIndex, valveEdges, type CellState, type FluidCatalogEntry, type FluidMedium, type FluidProps, type PortKey } from '../../models/fluidCatalog';
 import {
   ARROW_HALF_WIDTH,
   ARROW_LENGTH,
@@ -113,7 +113,7 @@ export const SPOOL_TRANSITION = 'transform 150ms cubic-bezier(0.4, 0, 0.2, 1)';
 export const spoolSlideStyle = (spoolOffset = 0): React.CSSProperties => ({ transform: `translateX(${spoolShift(spoolOffset)}px)`, transition: SPOOL_TRANSITION });
 
 /* ── Actuation end-caps: drawn outward (+x) from the envelope edge, all END_CAP_LENGTH (30) long, centred on y = 0 ── */
-function EndCap({ kind, ctx, pressed = false }: { kind: string; ctx: Ctx; pressed?: boolean }) {
+function EndCap({ kind, ctx, pressed = false, hydraulic = false }: { kind: string; ctx: Ctx; pressed?: boolean; hydraulic?: boolean }) {
   const s = style(ctx, 'detail');
   const fill = pressed ? { fill: ctx.stroke, fillOpacity: PRESSED_FILL } : {};
   const d = PRESS_DEPTH;
@@ -148,14 +148,14 @@ function EndCap({ kind, ctx, pressed = false }: { kind: string; ctx: Ctx; presse
     // Symmetrical zig-zag spring: five vertices, four strokes, mirrored about the cap's centre line.
     case 'Spring Return':
     case 'Spring Centred': return <path d="M 0 0 H 3 L 6 -8 L 10.5 8 L 15 -8 L 19.5 8 L 24 -8 L 27 0 H 30" {...s} />;
-    // Solenoid coil: a 16 × 24 rectangle cut by one continuous 45° stroke.
-    case 'Solenoid': return <g><path d="M 0 0 H 14 M 14 -12 H 30 V 12 H 14 Z" {...s} {...fill} /><path d="M 14 12 L 30 -4" {...s} /></g>;
+    // Solenoid: a 20 × 24 rectangle on the push pin carrying the energy triangle, apex towards the valve body; solid for oil, open for air.
+    case 'Solenoid': return <g><path d="M 0 0 H 10 M 10 -12 H 30 V 12 H 10 Z" {...s} {...fill} /><polygon className="solenoid-triangle" points="13,0 26,-7 26,7" {...s} fill={hydraulic ? ctx.stroke : 'none'} /></g>;
     // Roller on an inclined arm; the disc is tangent to the arm's end.
     // Depressed by its cam, the whole roller sinks PRESS_DEPTH towards the casing.
     case 'Roller': return <g className="roller" data-pressed={pressed} transform={pressed ? `translate(${-d},0)` : undefined}><path d="M 0 0 H 4 L 16 -5" {...s} /><circle cx={23} cy={-5} r={7} {...s} {...fill} />{dot(23, -5, 1.5)}</g>;
     case 'Idle-Return Roller': return <g className="roller" data-pressed={pressed} transform={pressed ? `translate(${-d},0)` : undefined}><path d="M 0 0 H 4 L 16 -5" {...s} /><circle cx={23} cy={-5} r={7} {...s} {...fill} /><path d="M 10 14 L 30 -8" {...s} /><Arrow from={[10, 14]} to={[30, -8]} ctx={ctx} /></g>;
-    // Equilateral triangle (12 px sides) pointing into the casing at the pilot terminal.
-    case 'Pneumatic Pilot': return <g><polygon points="0,0 10.39,-6 10.39,6" fill={ctx.stroke} stroke="none" /><path d="M 10.39 0 H 30" {...s} /></g>;
+    // Equilateral triangle (12 px sides) pointing into the casing at the pilot terminal: solid for oil, open for air (ISO 1219).
+    case 'Pneumatic Pilot': return <g><polygon className="pilot-triangle" points="0,0 10.39,-6 10.39,6" {...s} fill={hydraulic ? ctx.stroke : 'none'} /><path d="M 10.39 0 H 30" {...s} /></g>;
     default: return null;
   }
 }
@@ -198,7 +198,7 @@ function Valve({ def, props, ctx, activeCell, spoolOffset = 0, operatorTags, ope
           return (
             <React.Fragment key={key}>
               <g className="valve-end-cap" data-side={side < 0 ? 'left' : 'right'} data-pressed={pressed} transform={`translate(${side < 0 ? edges.left : edges.right},0) scale(${side},1)`}>
-                <EndCap kind={kind} ctx={ctx} pressed={pressed} />
+                <EndCap kind={kind} ctx={ctx} pressed={pressed} hydraulic={hydraulic} />
               </g>
               {/* The tag belongs to the operator: it rides the sliding strip with its cap, centred 12 px above the glyph, never over a chamber. */}
               {tag && <Mono className="operator-tag" x={side < 0 ? edges.left - END_CAP_LENGTH / 2 : edges.right + END_CAP_LENGTH / 2} y={-(OPERATOR_TOP[kind] ?? 12) - 12} ctx={ctx} anchor="middle">{tag}</Mono>}
@@ -318,8 +318,10 @@ const PISTON_HALF_HEIGHT = CYLINDER.interiorHeight / 2;
 /** Spring amplitude: the coils touch the interior top and bottom (a 50 px swing inside the 54 px bore). */
 const SPRING_AMPLITUDE = PISTON_HALF_HEIGHT - 2;
 const PISTON_THICKNESS = 6;
+/** Entry triangle seated on the bottom casing line (y = 30) directly above its port: 8 wide, 10 high, apex pointing up into the chamber. */
+const ENTRY_TRIANGLE = { tipY: BARREL_HALF_HEIGHT - 10, baseY: BARREL_HALF_HEIGHT, halfBase: 4 } as const;
 
-function Cylinder({ def, props, ctx, extension, sensorTags, sensorActive }: { def: FluidCatalogEntry; props: FluidProps; ctx: Ctx; extension: number } & Pick<Annotations, 'sensorTags' | 'sensorActive'>) {
+function Cylinder({ def, props, ctx, extension, medium, sensorTags, sensorActive }: { def: FluidCatalogEntry; props: FluidProps; ctx: Ctx; extension: number; medium: FluidMedium } & Pick<Annotations, 'sensorTags' | 'sensorActive'>) {
   const s = style(ctx);
   const detail = style(ctx, 'detail');
   const single = def.type === 'cylinder-single';
@@ -341,6 +343,8 @@ function Cylinder({ def, props, ctx, extension, sensorTags, sensorActive }: { de
         <rect key={x} className="cylinder-flange" x={x} y={-BARREL_HALF_HEIGHT - CYLINDER.flange} width={CYLINDER.flangeWidth} height={CYLINDER_BARREL_HEIGHT + 2 * CYLINDER.flange} {...s} />
       ))}
       {def.ports.map(p => <path key={p.id} d={`M ${p.x} ${BARREL_HALF_HEIGHT} V ${p.y}`} {...s} />)}
+      {/* ISO 1219 fluid-power triangle inside the chamber, above each port and pointing in from it: solid for oil, open for air. */}
+      {def.ports.map(p => <polygon key={p.id} className="entry-triangle" data-medium={medium} points={`${p.x},${ENTRY_TRIANGLE.tipY} ${p.x - ENTRY_TRIANGLE.halfBase},${ENTRY_TRIANGLE.baseY} ${p.x + ENTRY_TRIANGLE.halfBase},${ENTRY_TRIANGLE.baseY}`} {...detail} fill={medium === 'HYDRAULIC' ? ctx.stroke : 'none'} />)}
       {/* Limit switches: a bracket above the barrel at each end of the piston travel, where the switch is mounted. */}
       {sensorTags && ([rest, rest + CYLINDER.travel] as const).map((x, end) => {
         const color = sensorActive?.[end] ? SENSOR_ON : SENSOR_OFF;
@@ -434,7 +438,7 @@ function ConicalSeats({ ctx }: { ctx: Ctx }) {
  * reservoir tee'd off the dashed pilot line, which ends on the valve's pilot cap. The 3/2 valve (1 blocked, 2 → 3 at rest;
  * spring on the right) slides like any directional valve: `spoolOffset` 1 puts the open chamber (1 → 2) over the ports.
  */
-function TimeDelayValve({ ctx, spoolOffset = 0, activeCell }: { ctx: Ctx; spoolOffset?: number; activeCell?: number }) {
+function TimeDelayValve({ ctx, spoolOffset = 0, activeCell, hydraulic = false }: { ctx: Ctx; spoolOffset?: number; activeCell?: number; hydraulic?: boolean }) {
   const spec = VALVE_SPECS['valve-3-2-nc'];
   const edges = valveEdges(spec);
   const s = style(ctx);
@@ -474,7 +478,7 @@ function TimeDelayValve({ ctx, spoolOffset = 0, activeCell }: { ctx: Ctx; spoolO
       <clipPath id={clipId}><rect x={pin} y={-10} width={2 * CELL} height={20} /></clipPath>
       <g clipPath={`url(#${clipId})`}>
         <g className="pilot-lead-slide" style={spoolSlideStyle(spoolOffset)}>
-          <g className="valve-end-cap" data-side="left" transform={`translate(${edges.left},0) scale(-1,1)`}><EndCap kind="Pneumatic Pilot" ctx={ctx} /></g>
+          <g className="valve-end-cap" data-side="left" transform={`translate(${edges.left},0) scale(-1,1)`}><EndCap kind="Pneumatic Pilot" ctx={ctx} hydraulic={hydraulic} /></g>
           <path d={`M ${capOuter} 0 H ${capOuter - 2 * CELL}`} {...detail} />
         </g>
       </g>
@@ -512,6 +516,71 @@ function ServiceUnit({ ctx }: { ctx: Ctx }) {
   );
 }
 
+/** Composite 0Z1: source → simple FRL on one line, the 2/2 shut-off valve stacked above the FRL, all inside a tight ISO dashed boundary. See SERVICE_UNIT. The 0Z1 tag is the canvas instance label, centred above the bounds. */
+function MainServiceUnit({ props, ctx, medium, operatorTags, operatorPressed }: { props: FluidProps; ctx: Ctx; medium: FluidMedium; operatorTags: Annotations['operatorTags']; operatorPressed?: Annotations['operatorPressed'] }) {
+  const s = style(ctx);
+  const on = props.shutoff !== 'OFF';
+  const clipBase = useId().replace(/[^a-zA-Z0-9]/g, '');
+  const g = SERVICE_UNIT;
+  const frlRight = g.frlX + g.frlHalf;
+  const stage = (type: string, stageProps: FluidProps, extra: Partial<FluidSymbolProps> = {}) => (
+    <FluidSymbol definition={getFluidDefinition(type)!} props={stageProps} stroke={ctx.stroke} strokeWidth={ctx.sw} medium={medium} hideText={ctx.hideText} {...extra} />
+  );
+  return (
+    <g className="service-unit" data-shutoff={on ? 'ON' : 'OFF'} transform={`translate(${g.shiftX},${g.shiftY})`}>
+      <rect className="iso-boundary" x={g.left} y={g.top} width={g.right - g.left} height={g.bottom - g.top} fill="none" stroke="#94A3B8" strokeWidth={1.5} strokeDasharray="4 4" />
+      <g data-stage="pressure-source" transform={`translate(${g.sourceX},0)`}>{stage('pressure-source', { pressure: props.pressure })}</g>
+      {/* The FRL's own stubs overlap its neighbours, so it is cut at the box and the manifold takes over. */}
+      <clipPath id={`${clipBase}f`}><rect x={-100} y={-200} width={frlRight + 100} height={400} /></clipPath>
+      <g clipPath={`url(#${clipBase}f)`}><g data-stage="frl-simplified" transform={`translate(${g.frlX},0)`}>{stage('frl-simplified', { setpoint: props.setpoint, lubricator: 'With Lubricator' })}</g></g>
+      {/* FRL outlet → up → into port 1 (bottom) of the valve; port 2 (top) runs right as the supply bus. */}
+      <path className="manifold" d={`M ${frlRight} 0 H ${g.frlOutX} V ${g.port1Y} H ${g.valveX}`} {...s} />
+      <path className="manifold" d={`M ${g.valveX} ${g.port2Y} H ${g.outletX}`} {...s} />
+      <g data-stage="valve-2-2-nc" transform={`translate(${g.valveX},${g.valveY})`}>
+        {stage('valve-2-2-nc', { actuationLeft: 'Spring Return', actuationRight: 'Detent Lever' }, { activeCell: on ? 0 : 1, spoolOffset: on ? 1 : 0, operatorPressed: { right: on }, operatorTags: { right: operatorTags?.right ?? '0S1' } })}
+      </g>
+    </g>
+  );
+}
+
+/**
+ * Hydraulic power unit: pump (solid triangle) drawing from the tank through a suction filter, a relief valve bridging the
+ * delivery line to the tank, and a 2/2 manual shut-off ahead of the outlet at port 2 (switched from the input strip, so it carries no tag). Origin and shift as for the service unit.
+ */
+function HydraulicPowerUnit({ props, ctx, medium }: { props: FluidProps; ctx: Ctx; medium: FluidMedium }) {
+  const s = style(ctx);
+  const dashed = style(ctx, 'dashed');
+  const on = props.shutoff !== 'OFF';
+  const g = HYDRAULIC_POWER_UNIT;
+  const stage = (type: string, stageProps: FluidProps, extra: Partial<FluidSymbolProps> = {}) => (
+    <FluidSymbol definition={getFluidDefinition(type)!} props={stageProps} stroke={ctx.stroke} strokeWidth={ctx.sw} medium={medium} hideText={ctx.hideText} {...extra} />
+  );
+  const dot = (cx: number, cy: number) => <circle cx={cx} cy={cy} r={2.5} fill={ctx.stroke} stroke="none" />;
+  return (
+    <g className="hydraulic-power-unit" data-shutoff={on ? 'ON' : 'OFF'} transform={`translate(${g.shiftX},${g.shiftY})`}>
+      <rect className="iso-boundary" x={g.left} y={g.top} width={g.right - g.left} height={g.bottom - g.top} fill="none" stroke="#94A3B8" strokeWidth={1.5} strokeDasharray="4 4" />
+      {/* tank: open vessel, suction and return lines end below the fluid surface */}
+      <path className="hpu-tank" d={`M ${g.tankLeft} ${g.tankTop} V ${g.tankBottom} H ${g.tankRight} V ${g.tankTop}`} {...s} />
+      <path d={`M ${g.tankLeft} ${g.fluidY} H ${g.tankRight}`} {...dashed} opacity={0.6} />
+      <g data-stage="hyd-pump">{stage('hyd-pump', { pressure: props.pressure }, { hideText: true })}</g>
+      {/* suction line with its filter: diamond across the line, dashed element */}
+      <path d={`M 0 60 V ${g.filterY - 30} M 0 ${g.filterY + 30} V ${g.fluidY + 12}`} {...s} />
+      <g className="hpu-filter" transform={`translate(0,${g.filterY}) rotate(90)`}>
+        <path className="frl-diamond" d="M -30 0 L 0 -30 L 30 0 L 0 30 Z" {...s} /><path d="M 0 -30 V 30" {...dashed} />
+      </g>
+      {/* delivery: up from the pump, across to the shut-off valve; the relief valve bridges it to the tank */}
+      <path className="manifold" d={`M 0 -60 H ${g.valveX}`} {...s} />
+      <path className="manifold" d={`M ${g.reliefX} 60 V ${g.fluidY + 12}`} {...s} />
+      {dot(g.reliefX, -60)}
+      <g data-stage="hyd-pressure-relief" transform={`translate(${g.reliefX},0) rotate(180)`}>{stage('hyd-pressure-relief', { crackingPressure: props.crackingPressure }, { hideText: true })}</g>
+      <path className="manifold" d={`M ${g.valveX} ${g.port2Y} H ${g.outletX}`} {...s} />
+      <g data-stage="valve-2-2-nc" transform={`translate(${g.valveX},${g.valveY})`}>
+        {stage('valve-2-2-nc', { actuationLeft: 'Spring Return', actuationRight: 'Detent Lever' }, { activeCell: on ? 0 : 1, spoolOffset: on ? 1 : 0, operatorPressed: { right: on } })}
+      </g>
+    </g>
+  );
+}
+
 function Body({ def, props, ctx, activeCell, spoolOffset, extension, medium, logicOffset = 0, sensorTags, sensorActive, operatorTags, operatorPressed, shaftAngle = 0 }: { def: FluidCatalogEntry; props: FluidProps; ctx: Ctx; activeCell?: number; spoolOffset?: number; extension: number; medium: FluidMedium; logicOffset?: number } & Annotations) {
   const s = style(ctx);
   const detail = style(ctx, 'detail');
@@ -523,13 +592,13 @@ function Body({ def, props, ctx, activeCell, spoolOffset, extension, medium, log
     case 'air-reservoir':
       return <g><rect x={-60} y={-30} width={120} height={60} rx={30} {...s} /><path d="M -80 0 H -60 M 60 0 H 80" {...s} /></g>;
     case 'time-delay-valve':
-      return <TimeDelayValve ctx={ctx} spoolOffset={logicOffset} activeCell={logicOffset === undefined ? undefined : logicOffset >= 1 ? 0 : 1} />;
+      return <TimeDelayValve hydraulic={solid} ctx={ctx} spoolOffset={logicOffset} activeCell={logicOffset === undefined ? undefined : logicOffset >= 1 ? 0 : 1} />;
     case 'pressure-source':
       return <g><polygon points="-17.3,-20 -17.3,20 17.3,0" {...energy} /><path d="M 17.3 0 H 40" {...s} /></g>;
     case 'regulator-nr':
       return <g><PressureEnvelope ctx={ctx} /><path d="M 0 30 V 60 M 0 -30 V -60" {...s} /><Sensing path={SENSE_OUTLET} ctx={ctx} /></g>;
     case 'regulator-relieving':
-      return <g><PressureEnvelope ctx={ctx} /><path d="M 0 30 V 60 M 0 -30 V -60 M 20 30 V 60" {...s} /><Vent x={20} y={40} dir={1} ctx={ctx} />
+      return <g><PressureEnvelope ctx={ctx} /><path d="M 0 30 V 60 M 0 -30 V -60 M 20 30 V 46" {...s} /><Vent x={20} y={46} dir={1} ctx={ctx} />
         <path d="M 12 -6 V 14" {...detail} /><Arrow from={[12, 6]} to={[12, 16]} ctx={ctx} /><Sensing path={SENSE_OUTLET} ctx={ctx} /></g>;
     case 'sequence-ext':
       return <g><PressureEnvelope ctx={ctx} closedArrow /><path d="M 0 30 V 60 M 0 -30 V -60" {...s} /><path d="M -60 0 H -30" {...dashed} /><Arrow from={[-38, 0]} to={[-SQUARE_HALF, 0]} ctx={ctx} /></g>;
@@ -548,27 +617,10 @@ function Body({ def, props, ctx, activeCell, spoolOffset, extension, medium, log
       );
     case 'frl-detailed':
       return <ServiceUnit ctx={ctx} />;
-    case 'service-unit': {
-      // Composite 0Z1, left to right: pressure source → simple FRL → 2/2 NC shut-off valve (spring left, detented lever right).
-      // Each stage is the canonical library symbol, placed on the grid and joined by manifold lines; port 2 of the valve is the unit's outlet.
-      const on = props.shutoff !== 'OFF';
-      const stage = (type: string, stageProps: FluidProps, x: number, extra: Partial<FluidSymbolProps> = {}) => (
-        <g transform={`translate(${x},0)`} data-stage={type}>
-          <FluidSymbol definition={getFluidDefinition(type)!} props={stageProps} stroke={ctx.stroke} strokeWidth={ctx.sw} medium={medium} hideText={ctx.hideText} {...extra} />
-        </g>
-      );
-      const VALVE_X = 360;
-      return (
-        <g className="service-unit" data-shutoff={on ? 'ON' : 'OFF'}>
-          {stage('pressure-source', { pressure: props.pressure }, 0)}
-          <path className="manifold" d="M 40 0 H 60" {...s} />
-          {stage('frl-simplified', { setpoint: props.setpoint, lubricator: 'With Lubricator' }, 140)}
-          {/* FRL outlet drops to port 1 of the valve; port 2 (the working line) leaves horizontally to the right above the lever. */}
-          <path className="manifold" d="M 220 0 V 60 H 360 M 360 -60 H 460" {...s} />
-          {stage('valve-2-2-nc', { actuationLeft: 'Spring Return', actuationRight: 'Detent Lever' }, VALVE_X, { activeCell: on ? 0 : 1, spoolOffset: on ? 1 : 0, operatorPressed: { right: on }, operatorTags })}
-        </g>
-      );
-    }
+    case 'hyd-power-unit':
+      return <HydraulicPowerUnit props={props} ctx={ctx} medium={medium} />;
+    case 'service-unit':
+      return <MainServiceUnit props={props} ctx={ctx} medium={medium} operatorTags={operatorTags} />;
     case 'frl-simplified':
       return (
         <g>
@@ -582,30 +634,9 @@ function Body({ def, props, ctx, activeCell, spoolOffset, extension, medium, log
     case 'cylinder-single':
     case 'cylinder-double':
     case 'cylinder-double-rod':
-      return <Cylinder def={def} props={props} ctx={ctx} extension={extension} sensorTags={sensorTags} sensorActive={sensorActive} />;
+      return <Cylinder def={def} props={props} ctx={ctx} extension={extension} medium={medium} sensorTags={sensorTags} sensorActive={sensorActive} />;
     case 'air-motor-fixed':
       return <g><circle r={MOTOR.radius} {...s} /><path d="M 0 -30 V -60 M 0 30 V 60 M 30 0 H 50 M 50 -6 V 6" {...s} /><MotorTriangle dir={-1} angle={shaftAngle} ctx={ctx} filled={false} /></g>;
-    case 'air-motor-variable': {
-      const both = props.directions === 'Both directions';
-      return (
-        <g>
-          <circle r={MOTOR.radius} {...s} /><path d="M 0 -30 V -60 M 0 30 V 60 M 30 0 H 50 M 50 -6 V 6" {...s} />
-          <MotorTriangle dir={-1} angle={shaftAngle} ctx={ctx} filled={false} />
-          {both && <MotorTriangle dir={1} angle={shaftAngle} ctx={ctx} filled={false} />}
-          <path d="M -26 26 L 26 -26" {...detail} /><Arrow from={[-14, 14]} to={[26, -26]} ctx={ctx} />
-        </g>
-      );
-    }
-    case 'semi-rotary': {
-      const radius = ROTARY_HOUSING_DIAMETER / 2;
-      return (
-        <g>
-          <circle r={radius} {...s} />
-          <path d={`M -20 -22 V -${ROTARY_HOUSING_DIAMETER} M 20 -22 V -${ROTARY_HOUSING_DIAMETER} M ${radius} 0 H 50 M 50 -6 V 6`} {...s} />
-          <path d="M -16 10 A 18 18 0 0 1 16 10" {...detail} /><Arrow from={[-13, 2]} to={[-16, 10]} ctx={ctx} /><Arrow from={[13, 2]} to={[16, 10]} ctx={ctx} />
-        </g>
-      );
-    }
     case 'check-valve': {
       const lift = logicOffset * CHECK_LIFT;
       return <g><path d={`M -60 0 H ${SEAT_VERTEX} M ${BALL_SEATED_X + LOGIC_ELEMENT_RADIUS} 0 H 60`} {...s} /><CheckCore ctx={ctx} lift={lift} /></g>;
@@ -693,31 +724,18 @@ function Body({ def, props, ctx, activeCell, spoolOffset, extension, medium, log
     case 'hyd-pump':
       return <g><circle r={30} {...s} /><path d="M 0 -30 V -60 M 0 30 V 60" {...s} /><polygon points="0,-24 -9,-8 9,-8" {...energy} fill={ctx.stroke} /></g>;
     case 'hyd-motor':
-      return <g><circle r={30} {...s} /><path d="M 0 -30 V -60 M 0 30 V 60 M 30 0 H 50 M 50 -6 V 6" {...s} /><polygon points="0,-8 -9,-24 9,-24" {...energy} fill={ctx.stroke} /></g>;
+      return (
+        <g>
+          <circle r={30} {...s} /><path d="M 0 -30 V -60 M 0 30 V 60 M 30 0 H 50 M 50 -6 V 6" {...s} />
+          <polygon points="0,-8 -9,-24 9,-24" {...energy} fill={ctx.stroke} />
+          {props.directions === 'Both directions' && <polygon points="0,8 -9,24 9,24" {...energy} fill={ctx.stroke} />}
+        </g>
+      );
     case 'hyd-tank':
       return <g><path d="M -30 0 V 30 H 30 V 0" {...s} /><path d="M 0 -40 V 14" {...s} /><path d="M -30 12 H 30" {...dashed} opacity={0.6} /></g>;
-    case 'hyd-accumulator':
-      // Gas-loaded accumulator: a vessel whose gas half (open triangle, top) is parted from the oil by a flexible diaphragm.
-      return (
-        <g>
-          <circle r={30} {...s} />
-          <path d="M 0 30 V 60" {...s} />
-          <path d="M -29.4 -6 Q 0 8 29.4 -6" {...detail} />
-          <polygon points="0,-24 -8,-12 8,-12" {...detail} />
-        </g>
-      );
-    case 'hyd-filter':
-      return <g><Diamond ctx={ctx} /><path d={`M ${-2 * DIAMOND_HALF} 0 H ${-DIAMOND_HALF} M ${DIAMOND_HALF} 0 H ${2 * DIAMOND_HALF}`} {...s} /><path d={`M 0 ${-DIAMOND_HALF} V ${DIAMOND_HALF}`} {...dashed} /></g>;
-    case 'hyd-cooler':
-      // Heat exchanger: the diamond with two arrows carrying the heat away across the oil line.
-      return (
-        <g>
-          <Diamond ctx={ctx} />
-          <path d={`M ${-2 * DIAMOND_HALF} 0 H ${-DIAMOND_HALF} M ${DIAMOND_HALF} 0 H ${2 * DIAMOND_HALF}`} {...s} />
-          <path d="M -4 -4 L -14 -14 M 4 4 L 14 14" {...detail} />
-          <Arrow from={[-4, -4]} to={[-14, -14]} ctx={ctx} /><Arrow from={[4, 4]} to={[14, 14]} ctx={ctx} />
-        </g>
-      );
+    case 'hyd-pressure-source':
+      // ISO 1219: the energy triangle of a hydraulic supply is always solid.
+      return <g><polygon points="-17.3,-20 -17.3,20 17.3,0" {...detail} fill={ctx.stroke} /><path d="M 17.3 0 H 40" {...s} /></g>;
     case 'hyd-pressure-relief':
       return <g><PressureEnvelope ctx={ctx} closedArrow /><path d="M 0 30 V 60 M 0 -30 V -60" {...s} /><Sensing path={SENSE_INLET} ctx={ctx} /></g>;
     case 'hyd-reducing-valve':
@@ -733,7 +751,7 @@ function Body({ def, props, ctx, activeCell, spoolOffset, extension, medium, log
       );
     case 'exhaust-port': {
       const threaded = props.connection === 'Threaded';
-      return <g><path d="M 0 -20 V 0" {...s} /><Vent x={0} y={0} dir={1} ctx={ctx} kind="outline" />{threaded && <rect x={-8} y={14} width={16} height={8} {...detail} />}</g>;
+      return <g><path d="M 0 -20 V 0" {...s} /><Vent x={0} y={0} dir={1} ctx={ctx} kind="outline" />{threaded && <rect x={-8} y={14} width={16} height={8} {...detail} />}{props.silencer === 'With Silencer' && <path d="M -5 6 H 5 M -3 11 H 3" {...dashed} />}</g>;
     }
     case 'silencer':
       return <g><path d="M 0 -20 V -4" {...s} /><polygon points="-12,-4 12,-4 0,20" {...s} /><path d="M -7 4 H 7 M -4 11 H 4" {...dashed} /></g>;

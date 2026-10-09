@@ -9,11 +9,13 @@ type Point = [number, number];
 export const THROTTLE_TRAVEL = 56;
 export const ONEWAY_TRAVEL = 40;
 /** How far the check poppet lifts off its seat when the return flow pushes it. */
-export const POPPET_LIFT = 34;
+export const POPPET_LIFT = 16;
 
 /** Vertical shift of the needle assembly for an opening in percent. */
 export const needleShift = (opening: number, travel: number): number => (Math.min(100, Math.max(0, opening)) / 100) * travel;
 /** Width of the streamline through an orifice: proportional to the opening, never thinner than a hairline. */
+/** Opacity of the metered stream: a nearly closed needle gives a faint trickle, a fully open one a solid jet. */
+export const streamOpacity = (opening: number): number => 0.35 + (Math.min(100, Math.max(0, opening)) / 100) * 0.65;
 export const streamWidth = (opening: number): number => 1.5 + (Math.min(100, Math.max(0, opening)) / 100) * 7.5;
 
 const VENT_COLOR = '#94A3B8';
@@ -195,7 +197,7 @@ function OneWayStage({ analysis, medium, theme, idPrefix = 'oneway' }: CutawaySt
       <Port x0={body.x + body.width} x1={body.x + body.width + 24} y={170} half={15} tint={right} theme={theme} />
       <OneWayCore opening={analysis.opening} free={free} left={left} right={right} theme={theme} idPrefix={idPrefix} />
 
-      {analysis.direction === 1 && <FlowStream points={throttle} color={FLOW_BLUE} width={streamWidth(analysis.opening)} radius={14} />}
+      {analysis.direction === 1 && <g className="metered-flow" data-opacity={streamOpacity(analysis.opening).toFixed(2)} opacity={streamOpacity(analysis.opening)}><FlowStream points={throttle} color={FLOW_BLUE} width={streamWidth(analysis.opening)} radius={14} /></g>}
       {free && [-1, 1].map(sign => <FlowStream key={sign} points={around(sign as 1 | -1)} color={FLOW_BLUE} width={7} radius={14} />)}
       {analysis.direction !== 0 && dischargeBar <= VENTED_BAR && (analysis.direction === 1 ? <VentArrow x={body.x + body.width + 28} y={170} direction={1} /> : <VentArrow x={72} y={170} direction={-1} />)}
 

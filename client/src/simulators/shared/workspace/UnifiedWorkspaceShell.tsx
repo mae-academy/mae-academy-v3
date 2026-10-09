@@ -376,7 +376,9 @@ export function UnifiedWorkspaceShell({
             {inspectorFooter}
           </aside>
 
-          {/* Dedicated Workspace Shortcuts Card */}
+          {inspectorExtraCards}
+
+          {/* Dedicated Workspace Shortcuts Card: always last */}
           <div
             className="w-full overflow-hidden rounded-2xl border shadow-sm border-slate-200 bg-white dark:border-[#1a1d24] dark:bg-[#0d0f12]"
             style={{ background: colors.panel, borderColor: colors.line }}
@@ -398,7 +400,6 @@ export function UnifiedWorkspaceShell({
             </div>
           </div>
 
-          {inspectorExtraCards}
         </div>
       </div>
 

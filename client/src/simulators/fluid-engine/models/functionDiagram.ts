@@ -96,6 +96,12 @@ function addMove(state: CycleTracker, move: DiagramMove): CycleTracker {
     const steps = joins(last) ? [...state.steps.slice(0, -1), { ...last, moves: [...last.moves, move] }] : [...state.steps, { start: move.start, moves: [move] }];
     return { ...state, steps, stepNumber: steps.length };
   }
+  // Right after the cycle closed, the first stroke of a genuine repeat is the first stroke of step 1. Anything else means the circuit only
+  // passed through its starting state mid-sequence (1A+ 1A− 2A+ 2A−): the cycle was not over, so it reopens and the stroke is the next step.
+  if (state.live === null && state.stepNumber === state.cycleLength && !state.steps[0].moves.some(first => first.cylinderId === move.cylinderId && first.direction === move.direction)) {
+    const steps = [...state.steps, { start: move.start, moves: [move] }];
+    return { ...state, steps, cycleLength: null, stepNumber: steps.length };
+  }
   return joins(state.live)
     ? { ...state, live: { ...state.live, moves: [...state.live.moves, move] } }
     : { ...state, live: { start: move.start, moves: [move] }, stepNumber: state.stepNumber + 1 };

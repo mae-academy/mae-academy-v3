@@ -1,6 +1,6 @@
 import type { FluidComponentCategory, FluidComponentDefinition, FluidPort } from '@shared/fluid/fluidTypes';
 import { VALVE_TABLES, type ValveEnvelope, type ValvePortKey } from '@shared/fluid/engine/valveTables';
-import { TIME_DELAY, FRL_DIAMOND_SIZE, CHECK_VALVE_HEIGHT, CHECK_VALVE_WIDTH, CYLINDER, CYLINDER_BARREL_HEIGHT, CYLINDER_BARREL_WIDTH, END_CAP_LENGTH, LOGIC_VALVE_HEIGHT, LOGIC_VALVE_WIDTH, ONE_WAY_FLOW_CONTROL_HEIGHT, ONE_WAY_FLOW_CONTROL_WIDTH, PORT_STUB_LENGTH, ROTARY_HOUSING_DIAMETER, VALVE_SQUARE_SIZE } from './fluidGrid';
+import { TIME_DELAY, CHECK_VALVE_HEIGHT, CHECK_VALVE_WIDTH, CYLINDER, CYLINDER_BARREL_HEIGHT, CYLINDER_BARREL_WIDTH, END_CAP_LENGTH, LOGIC_VALVE_HEIGHT, LOGIC_VALVE_WIDTH, ONE_WAY_FLOW_CONTROL_HEIGHT, ONE_WAY_FLOW_CONTROL_WIDTH, PORT_STUB_LENGTH, ROTARY_HOUSING_DIAMETER, VALVE_SQUARE_SIZE } from './fluidGrid';
 
 export * from './fluidGrid';
 
@@ -81,7 +81,6 @@ const VALVE_LAYOUTS: Record<string, ValveLayout> = {
   'hvalve-4-2': fourPort,
   'hvalve-4-3': fourPort,
   'hvalve-4-3-float': fourPort,
-  'hvalve-4-3-tandem': fourPort,
 };
 
 export const VALVE_SPECS: Record<string, ValveSpec> = Object.fromEntries(
@@ -219,25 +218,73 @@ const cushioning: FluidParameter = { key: 'cushioning', label: 'End-Position Cus
 const inOut = (half: number) => [port('in', '1', 'P', 'PRESSURE', -half, 0), port('out', '1', 'P', 'PRESSURE', half, 0)];
 const regPorts = [port('p1', '1', 'P', 'PRESSURE', 0, 60), port('p2', '2', 'A', 'WORKING', 0, -60)];
 
+/**
+ * Composite 0Z1: pressure source (lower left) feeds the simple FRL; the 2/2 NC shut-off valve (0S1) stands directly above the FRL,
+ * port 1 fed from the FRL outlet, and port 2 leaves to the right as the supply bus. x = 0 is the source's centre, y = 0 the FRL/source
+ * centreline; the whole group is then shifted by (shiftX, shiftY) so port 2 lies on the grid and the origin is the box centre.
+ */
+export const SERVICE_UNIT = (() => {
+  const spec = VALVE_SPECS['valve-2-2-nc'];
+  const edges = valveEdges(spec);
+  const travel = valveTravel(spec);
+  const pad = 5;
+  const sourceX = 0, sourceStub = 40;
+  const frlX = 108, frlHalf = 60, frlOutX = frlX + frlHalf + 20;
+  const valveX = frlX, valveY = -110;
+  const port1Y = valveY + CELL / 2 + PORT_STUB_LENGTH, port2Y = valveY - CELL / 2 - PORT_STUB_LENGTH;
+  const leverRight = valveX + edges.right + END_CAP_LENGTH + travel.right;
+  const right = Math.max(leverRight, frlOutX) + pad;
+  const left = -17.3 - pad;
+  const top = port2Y - pad;
+  const bottom = 50 + pad;
+  const shiftX = -(right % 20);
+  const shiftY = 50;
+  const half = Math.max(-(top + shiftY), bottom + shiftY);
+  return { pad, sourceX, sourceStub, frlX, frlHalf, frlOutX, valveX, valveY, port1Y, port2Y, outletX: right, left, right, top, bottom, shiftX, shiftY, half };
+})();
+
+/**
+ * Composite 0Z1 hydraulic power unit: pump over a suction filter and the tank, relief valve (P on the delivery line, T to the tank),
+ * and a 2/2 shut-off valve in the delivery line whose port 2 leaves to the right as the supply bus. Origin and shift as for SERVICE_UNIT.
+ */
+export const HYDRAULIC_POWER_UNIT = (() => {
+  const spec = VALVE_SPECS['valve-2-2-nc'];
+  const edges = valveEdges(spec);
+  const travel = valveTravel(spec);
+  const pad = 5;
+  const reliefX = 150, valveX = 300, valveY = -120;
+  const port1Y = valveY + CELL / 2 + PORT_STUB_LENGTH, port2Y = valveY - CELL / 2 - PORT_STUB_LENGTH;
+  const filterY = 90, tankTop = 190, tankBottom = 225, fluidY = 200, tankLeft = -50, tankRight = 200;
+  const right = valveX + edges.right + END_CAP_LENGTH + travel.right + pad;
+  const left = tankLeft - pad;
+  const top = port2Y - pad;
+  const bottom = tankBottom + pad;
+  const shiftX = -(right % 20);
+  const shiftY = -40;
+  const half = Math.max(-(top + shiftY), bottom + shiftY);
+  return { pad, reliefX, valveX, valveY, port1Y, port2Y, filterY, tankTop, tankBottom, fluidY, tankLeft, tankRight, outletX: right, left, right, top, bottom, shiftX, shiftY, half };
+})();
+
 export const FLUID_CATALOG: FluidCatalogEntry[] = [
   /* ── Supply & service ── */
   fixed('air-reservoir', 'SUPPLY', 'Air Reservoir', '0Z1', 'Dedicated accumulation volume: its pressure charges and discharges over time.', 120, 60,
     [port('left', '1', 'P', 'PRESSURE', -80, 0), port('right', '2', 'A', 'WORKING', 80, 0)], [vesselVolume(1000)]),
-  fixed('pressure-source', 'SUPPLY', 'Pressure Source', '0Z1', 'Direct supply port.', 40, 40,
+  fixed('pressure-source', 'SUPPLY', 'Pressure Source', '0X1', 'Direct supply port.', 40, 40,
     [port('out', '1', 'P', 'PRESSURE', 40, 0)], [pressure], { media: ['PNEUMATIC', 'HYDRAULIC'] }),
   fixed('frl-detailed', 'SUPPLY', 'Air Service Unit (Detailed)', '0Z1', 'Filter, regulator, gauge and lubricator in series.', 360, 180, inOut(180), [lubricator, setpoint]),
   fixed('frl-simplified', 'SUPPLY', 'Air Service Unit (Simple)', '0Z1', 'Simplified FRL symbol.', 120, 60, inOut(80), [lubricator, setpoint]),
-  fixed('service-unit', 'SUPPLY', 'Main Service Unit (0Z1)', '0Z1', 'Pressure source, simplified FRL and 2/2 shut-off valve with detented lever (0S1) in series; the supply bus leaves at port 2.', 480, 160,
-    [port('out', '2', 'A', 'WORKING', 460, -60)], [pressure, shutoff, setpoint], { boundsFor: () => ({ width: 480, height: 160, centerX: 220 }) }),
+  fixed('service-unit', 'SUPPLY', 'Main Service Unit (0Z1)', '0Z1', 'Pressure source, simplified FRL and 2/2 shut-off valve with detented lever (0S1) in series; the supply bus leaves at port 2.', SERVICE_UNIT.right - SERVICE_UNIT.left, 2 * SERVICE_UNIT.half,
+    [port('out', '2', 'A', 'WORKING', SERVICE_UNIT.outletX + SERVICE_UNIT.shiftX, SERVICE_UNIT.port2Y + SERVICE_UNIT.shiftY)], [pressure, shutoff, setpoint],
+    { boundsFor: () => ({ width: SERVICE_UNIT.right - SERVICE_UNIT.left, height: 2 * SERVICE_UNIT.half, centerX: (SERVICE_UNIT.left + SERVICE_UNIT.right) / 2 + SERVICE_UNIT.shiftX }) }),
 
   /* ── Directional control valves ── */
-  valveEntry('valve-2-2-nc', '2/2 Valve, NC', '1V1', '2/2-way directional control valve, normally closed.'),
+  valveEntry('valve-2-2-nc', '2/2 Valve', '1V1', '2/2-way directional control valve, normally closed.'),
   valveEntry('valve-2-2-no', '2/2 Valve, NO', '1V1', '2/2-way directional control valve, normally open.'),
-  valveEntry('valve-3-2-nc', '3/2 Valve, NC', '1V1', '3/2-way directional control valve, normally closed.'),
+  valveEntry('valve-3-2-nc', '3/2 Valve', '1V1', '3/2-way directional control valve, normally closed.'),
   valveEntry('valve-3-2-no', '3/2 Valve, NO', '1V1', '3/2-way directional control valve, normally open.'),
   valveEntry('valve-4-2', '4/2 Valve', '1V1', '4/2-way directional control valve.'),
   valveEntry('valve-5-2', '5/2 Valve', '1V1', '5/2-way directional control valve.'),
-  valveEntry('valve-5-3', '5/3 Valve, Closed Mid', '1V1', '5/3-way directional control valve, all ports blocked in mid position.'),
+  valveEntry('valve-5-3', '5/3 Valve, Closed Center', '1V1', '5/3-way directional control valve, all ports blocked in mid position.'),
 
   /* ── Non-return, logic and flow control valves (ISO 1219 §3) ── */
   fixed('check-valve', 'VALVE_LOGIC', 'Check Valve', '1V1', 'Non-return valve: free flow 1 to 2, blocked 2 to 1.', CHECK_VALVE_WIDTH, CHECK_VALVE_HEIGHT,
@@ -247,14 +294,14 @@ export const FLUID_CATALOG: FluidCatalogEntry[] = [
     { media: ['PNEUMATIC', 'HYDRAULIC'], portLabels: true }),
   fixed('shuttle-valve', 'VALVE_LOGIC', 'Shuttle Valve (OR)', '1V1', 'Outputs when either inlet is pressurised.', LOGIC_VALVE_WIDTH, LOGIC_VALVE_HEIGHT,
     [port('x', '1', 'X', 'PRESSURE', -80, 0), port('y', '1', 'Y', 'PRESSURE', 80, 0), port('out', '2', 'A', 'WORKING', 0, -60)], [],
-    { portLabels: true }),
+    { media: ['PNEUMATIC', 'HYDRAULIC'], portLabels: true }),
   fixed('dual-pressure-valve', 'VALVE_LOGIC', 'Dual-Pressure Valve (AND)', '1V1', 'Outputs only when both inlets are pressurised.', LOGIC_VALVE_WIDTH, LOGIC_VALVE_HEIGHT,
     [port('x', '1', 'X', 'PRESSURE', -80, 0), port('y', '1', 'Y', 'PRESSURE', 80, 0), port('out', '2', 'A', 'WORKING', 0, -60)], [],
-    { portLabels: true }),
+    { media: ['PNEUMATIC', 'HYDRAULIC'], portLabels: true }),
   fixed('quick-exhaust', 'VALVE_LOGIC', 'Quick Exhaust Valve', '1V1', 'Vents the working line directly through port 3.', LOGIC_VALVE_WIDTH, LOGIC_VALVE_HEIGHT,
     [port('p1', '1', 'P', 'PRESSURE', -80, 0), port('p2', '2', 'A', 'WORKING', 0, -60), port('p3', '3', 'R', 'EXHAUST', 0, 60)], [],
     { portLabels: true }),
-  fixed('flow-control', 'VALVE_FLOW', 'Flow Control Valve (Throttle)', '1V1', 'Adjustable throttle valve.', 80, 40,
+  fixed('flow-control', 'VALVE_FLOW', 'Throttle Valve', '1V1', 'Adjustable throttle valve.', 80, 40,
     [port('in', '1', 'A', 'WORKING', -40, 0), port('out', '2', 'B', 'WORKING', 40, 0)], [opening],
     { media: ['PNEUMATIC', 'HYDRAULIC'], portLabels: true }),
   fixed('flow-control-oneway', 'VALVE_FLOW', 'One-Way Flow Control Valve', '1V1', 'Throttle check valve: choked in one direction, free return.', ONE_WAY_FLOW_CONTROL_WIDTH, ONE_WAY_FLOW_CONTROL_HEIGHT,
@@ -265,14 +312,14 @@ export const FLUID_CATALOG: FluidCatalogEntry[] = [
   fixed('time-delay-valve', 'VALVE_FLOW', 'Time Delay Valve (NC)', '1V1', 'On-delay timer: 1 → 2 opens a set time after pressure arrives on pilot port 12.', TIME_DELAY.width, TIME_DELAY.height,
     [port('p1', '1', 'P', 'PRESSURE', TIME_DELAY.p1, PORT_STUB_LENGTH * 2), port('p2', '2', 'A', 'WORKING', TIME_DELAY.p2, -PORT_STUB_LENGTH * 2), port('p3', '3', 'R', 'EXHAUST', TIME_DELAY.p3, PORT_STUB_LENGTH * 2), port('z12', '12', 'Z', 'PILOT', TIME_DELAY.pilotX, 0)],
     [{ ...opening, defaultValue: 20 }, vesselVolume(500)],
-    { portLabels: false, boundsFor: () => ({ width: TIME_DELAY.width, height: TIME_DELAY.height, centerX: TIME_DELAY.centerX }) }),
+    { media: ['PNEUMATIC', 'HYDRAULIC'], portLabels: false, boundsFor: () => ({ width: TIME_DELAY.width, height: TIME_DELAY.height, centerX: TIME_DELAY.centerX }) }),
 
   /* ── Pressure control valves (ISO 1219 §4) ── */
-  fixed('regulator-nr', 'VALVE_PRESSURE', 'Pressure Regulator (Non-Relieving)', '0V1', 'Adjustable pressure regulating valve, non-relieving.', VALVE_SQUARE_SIZE, VALVE_SQUARE_SIZE, regPorts, [setpoint],
+  fixed('regulator-nr', 'VALVE_PRESSURE', 'PRV (Non-relieving)', '0V1', 'Adjustable pressure regulating valve, non-relieving.', VALVE_SQUARE_SIZE, VALVE_SQUARE_SIZE, regPorts, [setpoint],
     { portLabels: true }),
-  fixed('regulator-relieving', 'VALVE_PRESSURE', 'Pressure Regulator (Relieving)', '0V1', 'Adjustable pressure regulating valve with relief vent port 3.', VALVE_SQUARE_SIZE, VALVE_SQUARE_SIZE,
+  fixed('regulator-relieving', 'VALVE_PRESSURE', 'PRV (Relieving)', '0V1', 'Adjustable pressure regulating valve with relief vent port 3.', VALVE_SQUARE_SIZE, VALVE_SQUARE_SIZE,
     [...regPorts, port('p3', '3', 'R', 'EXHAUST', 20, 60)], [setpoint], { portLabels: true }),
-  fixed('sequence-ext', 'VALVE_PRESSURE', 'Sequence Valve (External Pilot)', '1V1', 'Opens when the external pilot signal on port 12 reaches the set pressure.', VALVE_SQUARE_SIZE, VALVE_SQUARE_SIZE,
+  fixed('sequence-ext', 'VALVE_PRESSURE', 'Sequence Valve (Ext. Pilot)', '1V1', 'Opens when the external pilot signal on port 12 reaches the set pressure.', VALVE_SQUARE_SIZE, VALVE_SQUARE_SIZE,
     [...regPorts, port('z12', '12', 'Y', 'PILOT', -60, 0)], [switching], { portLabels: true }),
   fixed('pressure-relief', 'VALVE_PRESSURE', 'Pressure Relief Valve', '0V1', 'In-line sequence / relief valve that dumps to exhaust.', VALVE_SQUARE_SIZE, VALVE_SQUARE_SIZE,
     [port('p1', '1', 'P', 'PRESSURE', 0, 60)], [reliefSetting(8)], { portLabels: true }),
@@ -288,64 +335,57 @@ export const FLUID_CATALOG: FluidCatalogEntry[] = [
     [port('a', '', 'A', 'WORKING', -CYLINDER.portX, CYLINDER_BARREL_HEIGHT / 2 + PORT_STUB_LENGTH), port('b', '', 'B', 'WORKING', CYLINDER.portX, CYLINDER_BARREL_HEIGHT / 2 + PORT_STUB_LENGTH)], [bore, stroke, cushioning], { media: ['PNEUMATIC', 'HYDRAULIC'] }),
 
   /* ── Rotary actuators (ISO 1219 §5.2) ── */
-  fixed('air-motor-fixed', 'ACTUATOR', 'Air Motor (Fixed, 1 Dir.)', '1A1', 'Fixed-capacity air motor, one flow direction.', ROTARY_HOUSING_DIAMETER, ROTARY_HOUSING_DIAMETER,
+  fixed('air-motor-fixed', 'ACTUATOR', 'Air Motor', '1A1', 'Fixed-capacity air motor, one flow direction.', ROTARY_HOUSING_DIAMETER, ROTARY_HOUSING_DIAMETER,
     [port('in', '', 'A', 'WORKING', 0, -60), port('out', '', 'R', 'EXHAUST', 0, 60)], [ratedSpeed(3000)]),
-  fixed('air-motor-variable', 'ACTUATOR', 'Air Motor (Variable)', '1A1', 'Variable-capacity air motor.', ROTARY_HOUSING_DIAMETER, ROTARY_HOUSING_DIAMETER,
-    [port('in', '', 'A', 'WORKING', 0, -60), port('out', '', 'B', 'WORKING', 0, 60)],
-    [ratedSpeed(3000), { key: 'capacityRatio', label: 'Capacity Ratio', kind: 'number', defaultValue: 1 }, { key: 'directions', label: 'Flow Directions', kind: 'select', defaultValue: 'Single direction', options: ['Single direction', 'Both directions'] }]),
-  fixed('semi-rotary', 'ACTUATOR', 'Semi-Rotary Actuator', '1A1', 'Limited-angle rotary actuator.', ROTARY_HOUSING_DIAMETER, ROTARY_HOUSING_DIAMETER,
-    [port('a', '', 'A', 'WORKING', -20, -ROTARY_HOUSING_DIAMETER), port('b', '', 'B', 'WORKING', 20, -ROTARY_HOUSING_DIAMETER)], [{ key: 'angle', label: 'Swivel Angle', unit: '°', kind: 'number', defaultValue: 180 }]),
 
   /* ── Auxiliary (ISO 1219 §6) ── */
-  fixed('exhaust-port', 'AUXILIARY', 'Exhaust Port', '0Z1', 'Exhaust to atmosphere, threaded or unthreaded.', 40, 40,
-    [port('p', '3', 'R', 'EXHAUST', 0, -20)], [{ key: 'connection', label: 'Connection', kind: 'select', defaultValue: 'Unthreaded', options: ['Unthreaded', 'Threaded'] }]),
-  fixed('silencer', 'AUXILIARY', 'Silencer', '0Z1', 'Exhaust silencer.', 40, 40, [port('p', '3', 'R', 'EXHAUST', 0, -20)]),
-  fixed('pressure-gauge', 'AUXILIARY', 'Pressure Gauge', '0Z1', 'Pressure measuring instrument.', 40, 40, [port('p', '1', 'P', 'PRESSURE', 0, 40)], [], { media: ['PNEUMATIC', 'HYDRAULIC'] }),
-  fixed('flow-indicator', 'AUXILIARY', 'Visual Flow Indicator', '0Z1', 'Visual indicator for flow or pressure.', 80, 40, [port('in', '1', 'P', 'PRESSURE', -40, 0), port('out', '2', 'A', 'WORKING', 40, 0)],
+  fixed('exhaust-port', 'AUXILIARY', 'Exhaust Port', '0X1', 'Exhaust to atmosphere, threaded or unthreaded.', 40, 40,
+    [port('p', '3', 'R', 'EXHAUST', 0, -20)], [{ key: 'connection', label: 'Connection', kind: 'select', defaultValue: 'Unthreaded', options: ['Unthreaded', 'Threaded'] },
+    { key: 'silencer', label: 'Silencer', kind: 'select', defaultValue: 'Without Silencer', options: ['Without Silencer', 'With Silencer'] }]),
+  fixed('silencer', 'AUXILIARY', 'Silencer', '0X1', 'Exhaust silencer.', 40, 40, [port('p', '3', 'R', 'EXHAUST', 0, -20)]),
+  fixed('pressure-gauge', 'AUXILIARY', 'Pressure Gauge', '0X1', 'Pressure measuring instrument.', 40, 40, [port('p', '1', 'P', 'PRESSURE', 0, 40)], [], { media: ['PNEUMATIC', 'HYDRAULIC'] }),
+  fixed('flow-indicator', 'AUXILIARY', 'Visual Flow Indicator', '0X1', 'Visual indicator for flow or pressure.', 80, 40, [port('in', '1', 'P', 'PRESSURE', -40, 0), port('out', '2', 'A', 'WORKING', 40, 0)],
     []),
 
   /* ── Hydraulic (ISO 1219 fluid conventions: solid energy triangles, tank symbols) ── */
   fixed('hyd-pump', 'SUPPLY', 'Hydraulic Pump (P)', '0P1', 'Fixed-displacement hydraulic pump: a solid triangle points out of the circle at the pressure port P.', 60, 60,
     [port('out', '1', 'P', 'PRESSURE', 0, -60), port('in', '', 'S', 'PRESSURE', 0, 60)], [{ ...pressure, defaultValue: 50 }, flow], { media: ['HYDRAULIC'] }),
-  fixed('hyd-tank', 'SUPPLY', 'Hydraulic Tank / Return Line (T)', '0Z1', 'Open oil reservoir: every return line T ends here, below the fluid surface.', 60, 60,
+  fixed('hyd-pressure-source', 'SUPPLY', 'Hydraulic Pressure Supply', '0X1', 'Direct hydraulic pressure port: a solid triangle (ISO 1219) marks fluid power, where compressed air is drawn open.', 40, 40,
+    [port('out', '1', 'P', 'PRESSURE', 40, 0)], [{ ...pressure, defaultValue: 50 }], { media: ['HYDRAULIC'] }),
+  fixed('hyd-power-unit', 'SUPPLY', 'Oil Service Unit', '0Z1', 'Pump with suction filter and tank, relief valve and 2/2 shut-off valve in series; the supply bus leaves at port 2.', HYDRAULIC_POWER_UNIT.right - HYDRAULIC_POWER_UNIT.left, 2 * HYDRAULIC_POWER_UNIT.half,
+    [port('out', '2', 'A', 'WORKING', HYDRAULIC_POWER_UNIT.outletX + HYDRAULIC_POWER_UNIT.shiftX, HYDRAULIC_POWER_UNIT.port2Y + HYDRAULIC_POWER_UNIT.shiftY)], [{ ...pressure, defaultValue: 50 }, shutoff, reliefSetting(60)],
+    { media: ['HYDRAULIC'], boundsFor: () => ({ width: HYDRAULIC_POWER_UNIT.right - HYDRAULIC_POWER_UNIT.left, height: 2 * HYDRAULIC_POWER_UNIT.half, centerX: (HYDRAULIC_POWER_UNIT.left + HYDRAULIC_POWER_UNIT.right) / 2 + HYDRAULIC_POWER_UNIT.shiftX }) }),
+  fixed('hyd-tank', 'SUPPLY', 'Hydraulic Tank', '0X1', 'Open oil reservoir: every return line T ends here, below the fluid surface.', 60, 60,
     [port('p', '3', 'T', 'EXHAUST', 0, -40)], [], { media: ['HYDRAULIC'], portLabels: true }),
-  fixed('hyd-accumulator', 'SUPPLY', 'Hydraulic Accumulator', '0Z1', 'Gas-loaded bladder accumulator: stores oil under pressure and holds it when the line is shut off.', 60, 60,
-    [port('p', '1', 'P', 'PRESSURE', 0, 60)], [{ ...vesselVolume(1000), label: 'Accumulator Volume', advanced: true }], { media: ['HYDRAULIC'], portLabels: true }),
-  fixed('hyd-filter', 'SUPPLY', 'Hydraulic Filter', '0Z1', 'In-line oil filter.', FRL_DIAMOND_SIZE, FRL_DIAMOND_SIZE, inOut(60), [], { media: ['HYDRAULIC'] }),
-  fixed('hyd-cooler', 'SUPPLY', 'Oil Cooler', '0Z1', 'In-line oil cooler (heat exchanger).', FRL_DIAMOND_SIZE, FRL_DIAMOND_SIZE, inOut(60), [], { media: ['HYDRAULIC'] }),
-  fixed('hyd-pressure-relief', 'VALVE_PRESSURE', 'Pressure Relief Valve (DBV)', '0V1', 'Direct-acting relief valve: opens at the set pressure and drains to tank through port T.', VALVE_SQUARE_SIZE, VALVE_SQUARE_SIZE,
+  fixed('hyd-pressure-relief', 'VALVE_PRESSURE', 'Relief Valve (DBV)', '0V1', 'Direct-acting relief valve: opens at the set pressure and drains to tank through port T.', VALVE_SQUARE_SIZE, VALVE_SQUARE_SIZE,
     [port('p1', '1', 'P', 'PRESSURE', 0, 60), port('t', '3', 'T', 'EXHAUST', 0, -60)], [reliefSetting(60)], { media: ['HYDRAULIC'], portLabels: true }),
-  fixed('hyd-reducing-valve', 'VALVE_PRESSURE', 'Pressure Reducing Valve (2-Way)', '0V1', 'Holds its outlet A at the set pressure, whatever the inlet P.', VALVE_SQUARE_SIZE, VALVE_SQUARE_SIZE,
+  fixed('hyd-reducing-valve', 'VALVE_PRESSURE', 'Pressure Reducing (2-Way)', '0V1', 'Holds its outlet A at the set pressure, whatever the inlet P.', VALVE_SQUARE_SIZE, VALVE_SQUARE_SIZE,
     [port('p1', '1', 'P', 'PRESSURE', 0, 60), port('p2', '2', 'A', 'WORKING', 0, -60)], [{ ...setpoint, defaultValue: 30 }], { media: ['HYDRAULIC'], portLabels: true }),
-  fixed('hyd-reducing-valve-3way', 'VALVE_PRESSURE', 'Pressure Reducing Valve (3-Way)', '0V1', 'Reducing valve whose outlet A also relieves to tank through port T when it is overloaded.', VALVE_SQUARE_SIZE, VALVE_SQUARE_SIZE,
+  fixed('hyd-reducing-valve-3way', 'VALVE_PRESSURE', 'Pressure Reducing (3-Way)', '0V1', 'Reducing valve whose outlet A also relieves to tank through port T when it is overloaded.', VALVE_SQUARE_SIZE, VALVE_SQUARE_SIZE,
     [port('p1', '1', 'P', 'PRESSURE', 0, 60), port('p2', '2', 'A', 'WORKING', 0, -60), port('t', '3', 'T', 'EXHAUST', 20, 60)], [{ ...setpoint, defaultValue: 30 }], { media: ['HYDRAULIC'], portLabels: true }),
   valveEntry('hvalve-3-2-nc', '3/2 Valve, NC', '1V1', '3/2-way directional control valve, normally closed, with tank port T.'),
   valveEntry('hvalve-4-2', '4/2 Valve', '1V1', '4/2-way directional control valve (P, T, A, B).'),
-  valveEntry('hvalve-4-3', '4/3 Valve, Closed Neutral', '1V1', '4/3-way directional control valve, all ports blocked in the neutral position.'),
-  valveEntry('hvalve-4-3-float', '4/3 Valve, Float Neutral', '1V1', '4/3-way directional control valve: A and B open to tank in the neutral position, P blocked.'),
-  valveEntry('hvalve-4-3-tandem', '4/3 Valve, Tandem (Bypass) Neutral', '1V1', '4/3-way directional control valve: P unloads to tank in the neutral position, A and B blocked.'),
+  valveEntry('hvalve-4-3', '4/3 Valve, Closed', '1V1', '4/3-way directional control valve, all ports blocked in the neutral position.'),
+  valveEntry('hvalve-4-3-float', '4/3 Valve, Float', '1V1', '4/3-way directional control valve: A and B open to tank in the neutral position, P blocked.'),
   fixed('hyd-motor', 'ACTUATOR', 'Hydraulic Motor', '1A1', 'Fixed-displacement hydraulic motor.', ROTARY_HOUSING_DIAMETER, ROTARY_HOUSING_DIAMETER,
-    [port('in', '', 'A', 'WORKING', 0, -60), port('out', '', 'B', 'WORKING', 0, 60)], [ratedSpeed(1500)], { media: ['HYDRAULIC'] }),
+    [port('in', '', 'A', 'WORKING', 0, -60), port('out', '', 'B', 'WORKING', 0, 60)], [ratedSpeed(1500), { key: 'directions', label: 'Flow Directions', kind: 'select', defaultValue: 'Single direction', options: ['Single direction', 'Both directions'] }], { media: ['HYDRAULIC'] }),
 ];
 
 const LIBRARY_GROUPS: Record<FluidMedium, Array<{ title: string; types: string[] }>> = {
   PNEUMATIC: [
-    { title: 'Energy & Preparation', types: ['pressure-source', 'air-reservoir', 'frl-detailed', 'frl-simplified', 'service-unit'] },
-    { title: 'Directional Control Valves', types: ['valve-2-2-nc', 'valve-2-2-no', 'valve-3-2-nc', 'valve-3-2-no', 'valve-4-2', 'valve-5-2', 'valve-5-3'] },
-    { title: 'Logic & Flow Control', types: ['check-valve', 'check-valve-spring', 'shuttle-valve', 'dual-pressure-valve', 'quick-exhaust', 'flow-control', 'flow-control-oneway', 'time-delay-valve'] },
-    { title: 'Pressure Control Valves', types: ['regulator-nr', 'regulator-relieving', 'sequence-ext', 'pressure-relief', 'sequence-combo'] },
-    { title: 'Linear Actuators', types: ['cylinder-single', 'cylinder-double', 'cylinder-double-rod'] },
-    { title: 'Rotary Actuators', types: ['air-motor-fixed', 'air-motor-variable', 'semi-rotary'] },
-    { title: 'Auxiliary', types: ['exhaust-port', 'silencer', 'pressure-gauge', 'flow-indicator'] },
+    { title: 'Energy & Preparation', types: ['pressure-source', 'air-reservoir', 'frl-simplified', 'service-unit', 'pressure-gauge', 'exhaust-port'] },
+    { title: 'Actuators', types: ['cylinder-single', 'cylinder-double', 'cylinder-double-rod', 'air-motor-fixed'] },
+    /** One card per base valve: normally closed / open is the Initial State in the inspector. */
+    { title: 'Directional Control Valves', types: ['valve-2-2-nc', 'valve-3-2-nc', 'valve-4-2', 'valve-5-2', 'valve-5-3'] },
+    { title: 'Logic & Flow Control', types: ['shuttle-valve', 'dual-pressure-valve', 'check-valve', 'check-valve-spring', 'flow-control', 'flow-control-oneway', 'quick-exhaust', 'time-delay-valve'] },
+    { title: 'Pressure Control Valves', types: ['regulator-nr', 'regulator-relieving', 'pressure-relief'] },
   ],
   HYDRAULIC: [
-    { title: 'Power Supply & Tank', types: ['hyd-pump', 'hyd-tank', 'hyd-accumulator', 'hyd-filter', 'hyd-cooler'] },
-    { title: 'Directional Control Valves', types: ['hvalve-4-2', 'hvalve-4-3', 'hvalve-4-3-float', 'hvalve-4-3-tandem', 'hvalve-3-2-nc'] },
+    { title: 'Power Supply & Tank', types: ['pressure-gauge', 'hyd-pump', 'hyd-pressure-source', 'hyd-tank', 'hyd-power-unit'] },
+    { title: 'Actuators', types: ['cylinder-single', 'cylinder-double', 'cylinder-double-rod', 'hyd-motor'] },
+    { title: 'Directional Control Valves', types: ['hvalve-4-2', 'hvalve-4-3', 'hvalve-4-3-float', 'hvalve-3-2-nc'] },
+    { title: 'Logic & Flow Control', types: ['shuttle-valve', 'dual-pressure-valve', 'check-valve', 'check-valve-spring', 'flow-control', 'flow-control-oneway', 'time-delay-valve'] },
     { title: 'Safety & Pressure Control', types: ['hyd-pressure-relief', 'hyd-reducing-valve', 'hyd-reducing-valve-3way'] },
-    { title: 'Logic & Flow Control', types: ['check-valve', 'check-valve-spring', 'flow-control', 'flow-control-oneway'] },
-    { title: 'Linear Actuators', types: ['cylinder-single', 'cylinder-double', 'cylinder-double-rod'] },
-    { title: 'Rotary Actuators', types: ['hyd-motor'] },
-    { title: 'Auxiliary', types: ['pressure-gauge'] },
   ],
 };
 
@@ -364,8 +404,13 @@ function libraryFor(medium: FluidMedium): Record<string, FluidLibraryItem[]> {
 export const getFluidDefinition = (type: string) => FLUID_CATALOG.find(def => def.type === type);
 /** Defaults that differ once a shared part is used with oil. */
 const HYDRAULIC_DEFAULTS: Record<string, FluidProps> = { 'pressure-source': { pressure: 50 } };
+/**
+ * Supply ends, tanks and instruments are placed without a tag or value on the canvas (the inspector can show them), and take the
+ * circuit-0 stem 0X so they never use up 0Z1 of the main service unit.
+ */
+export const BARE_ON_CANVAS = ['hyd-pump', ...(['pressure-source', 'hyd-pressure-source', 'hyd-tank', 'pressure-gauge', 'exhaust-port', 'silencer', 'flow-indicator'] as const)];
 export const defaultFluidProps = (def: FluidCatalogEntry, medium: FluidMedium = 'PNEUMATIC'): FluidProps =>
-  ({ ...DEFAULT_PROPS(def.parameters), ...(medium === 'HYDRAULIC' ? HYDRAULIC_DEFAULTS[def.type] : undefined) });
+  ({ ...DEFAULT_PROPS(def.parameters), ...(medium === 'HYDRAULIC' ? HYDRAULIC_DEFAULTS[def.type] : undefined), ...(BARE_ON_CANVAS.includes(def.type) ? { _hideLabel: true, _hideValue: true } : {}) });
 
 /** ISO 1219-2 tag stem: circuit number + letter (P pumps, A actuators, S sensors, V valves, Y solenoids, Z auxiliaries). */
 export const fluidLabelPrefix = (type: string): string => {
@@ -394,3 +439,6 @@ export const nextFluidTag = (type: string, existingLabels: string[], branch = 1)
   }
   return `${stem}${max + 1}`;
 };
+
+/** Normally-closed / normally-open twin of a consolidated valve, or undefined when the part has none. */
+export const INITIAL_STATE_TWINS: Record<string, string> = { 'valve-2-2-nc': 'valve-2-2-no', 'valve-2-2-no': 'valve-2-2-nc', 'valve-3-2-nc': 'valve-3-2-no', 'valve-3-2-no': 'valve-3-2-nc' };

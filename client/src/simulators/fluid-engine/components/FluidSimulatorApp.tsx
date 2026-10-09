@@ -455,6 +455,7 @@ export function FluidSimulatorApp() {
       operatorTags={VALVE_SPECS[selectedComponent.type] ? operatorTagsOf(selectedComponent, signalTags, sensorOptions) : undefined}
       replaceGroups={FLUID_LIBRARY_CATEGORIES[medium]}
       onReplace={replaceSelected}
+      onInitialStateChange={type => canvas.updateComponent(selectedComponent.id, { type })}
       onLabelChange={label => canvas.updateComponent(selectedComponent.id, { label, props: { ...selectedComponent.props, [MANUAL_TAG_PROP]: true } })}
       onPropsChange={props => canvas.updateComponent(selectedComponent.id, { props })}
     /></div>
@@ -570,6 +571,7 @@ export function FluidSimulatorApp() {
             sensorOptions={sensorOptions}
             onPush={pushOperator}
             onLatchToggle={toggleLatch}
+            ladder={{ circuit: ladderCircuit, relay }}
             onShutoffChange={(id, on) => { const unit = components.find(component => component.id === id); if (unit) canvas.updateComponent(id, { props: { ...unit.props, shutoff: on ? 'ON' : 'OFF' } }); }}
           />
         </div>

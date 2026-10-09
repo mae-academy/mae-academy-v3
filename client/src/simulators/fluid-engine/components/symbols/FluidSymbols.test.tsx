@@ -38,6 +38,7 @@ import { FluidLibraryIcon, PREVIEW_FILL, PREVIEW_MAX_SCALE, PREVIEW_STAGE, previ
 import { FLUID_LIBRARY_CATEGORIES } from '../../models/fluidCatalog';
 import { portsOf } from '@shared/fluid/engine/componentSolvers';
 import { isOnGrid } from '../../models/fluidGrid';
+import { SERVICE_UNIT } from '../../models/fluidCatalog';
 
 afterEach(cleanup);
 
@@ -370,8 +371,18 @@ describe('energy and preparation palette', () => {
   const ids = (medium: 'PNEUMATIC' | 'HYDRAULIC') => Object.values(FLUID_LIBRARY_CATEGORIES[medium]).flat().map(item => item.id);
   const REMOVED = ['compressor', 'filter', 'water-separator', 'lubricator'];
 
-  it('offers the pressure source, air reservoir, detailed and simple service units and the composite main unit, in that order', () => {
-    expect(FLUID_LIBRARY_CATEGORIES.PNEUMATIC['Energy & Preparation'].map(item => item.id)).toEqual(['pressure-source', 'air-reservoir', 'frl-detailed', 'frl-simplified', 'service-unit']);
+  it('offers the pressure source, air reservoir, simple service unit, composite main unit, pressure gauge and exhaust port, in that order', () => {
+    expect(FLUID_LIBRARY_CATEGORIES.PNEUMATIC['Energy & Preparation'].map(item => item.id)).toEqual(['pressure-source', 'air-reservoir', 'frl-simplified', 'service-unit', 'pressure-gauge', 'exhaust-port']);
+  });
+
+  it('orders the pneumatic palette and keeps every actuator and prunes only duplicate and sequence parts', () => {
+    const palette = FLUID_LIBRARY_CATEGORIES.PNEUMATIC;
+    expect(Object.keys(palette)).toEqual(['Energy & Preparation', 'Actuators', 'Directional Control Valves', 'Logic & Flow Control', 'Pressure Control Valves']);
+    expect(palette['Actuators'].map(item => item.id)).toEqual(['cylinder-single', 'cylinder-double', 'cylinder-double-rod', 'air-motor-fixed']);
+    expect(palette['Directional Control Valves'].map(item => item.id)).toEqual(['valve-2-2-nc', 'valve-3-2-nc', 'valve-4-2', 'valve-5-2', 'valve-5-3']);
+    expect(palette['Pressure Control Valves'].map(item => item.id)).toEqual(['regulator-nr', 'regulator-relieving', 'pressure-relief']);
+    const all = Object.values(palette).flat().map(item => item.id);
+    for (const gone of ['silencer', 'valve-2-2-no', 'valve-3-2-no', 'sequence-ext', 'sequence-combo']) expect(all).not.toContain(gone);
   });
 
   it('no longer lists the compressor, filter, water separator or lubricator anywhere', () => {
@@ -413,24 +424,87 @@ describe('hydraulic library symbols (ISO 1219-1)', () => {
     expect(container.textContent).toContain('T');
   });
 
-  it('the accumulator is a circle with a diaphragm and an open gas triangle, one oil port below', () => {
-    const container = draw('hyd-accumulator', { medium: 'HYDRAULIC' });
-    expect(container.querySelector('circle')!.getAttribute('r')).toBe('30');
-    expect(container.querySelector('polygon')!.getAttribute('fill')).toBe('none');
-    expect(Array.from(container.querySelectorAll('path')).some(path => /^M -29\.4 -6 Q/.test(path.getAttribute('d') ?? ''))).toBe(true);
-    expect(def('hyd-accumulator').ports.map(p => [p.x, p.y])).toEqual([[0, 60]]);
+  it('the pressure supply is a solid triangle (ISO 1219) even where the pneumatic one is open', () => {
+    const solid = draw('hyd-pressure-source', { medium: 'HYDRAULIC' }).querySelector('polygon')!;
+    expect(solid.getAttribute('fill')).toBe('#000');
+    expect(def('hyd-pressure-source').ports.map(p => [p.x, p.y])).toEqual([[40, 0]]);
+    cleanup();
+    expect(draw('pressure-source', { medium: 'PNEUMATIC' }).querySelector('polygon')!.getAttribute('fill')).toBe('none');
   });
 
-  it('the filter is a diamond with a dashed element and the cooler a diamond with two heat arrows, both in-line', () => {
-    expect(bbox(draw('hyd-filter').querySelector('.frl-diamond')!)).toEqual({ x0: -30, x1: 30, y0: -30, y1: 30 });
-    expect(draw('hyd-filter').querySelectorAll('path[stroke-dasharray="3,3"]')).toHaveLength(1);
+  it('every cylinder draws its entry triangle inside the barrel above each port: solid for oil, open for air', () => {
+    for (const [type, count] of [['cylinder-single', 1], ['cylinder-double', 2], ['cylinder-double-rod', 2]] as const) {
+      for (const [medium, fill] of [['HYDRAULIC', '#000'], ['PNEUMATIC', 'none']] as const) {
+        const triangles = draw(type, { medium }).querySelectorAll('.entry-triangle');
+        expect(triangles, `${type} ${medium}`).toHaveLength(count);
+        triangles.forEach((t, i) => {
+          expect(t.getAttribute('fill')).toBe(fill);
+          const [apex, left, right] = t.getAttribute('points')!.split(' ').map(pair => pair.split(',').map(Number));
+          expect(apex[1]).toBeLessThan(left[1]); // apex points up, into the chamber
+          expect(right[0] - left[0]).toBe(8);
+          for (const [, y] of [apex, left, right]) expect(Math.abs(y)).toBeLessThanOrEqual(30); // within the 60 px barrel
+          expect(Math.max(left[1], right[1])).toBe(30); // base sits on the bottom casing line
+          expect(apex[0]).toBe(def(type).ports[i].x);
+        });
+        cleanup();
+      }
+    }
+  });
+
+  it('pilot triangles are solid on hydraulic valves and open on pneumatic ones', () => {
+    const pilots = { actuationLeft: 'Pneumatic Pilot', actuationRight: 'Pneumatic Pilot' };
+    expect(draw('hvalve-4-3', { medium: 'HYDRAULIC', props: pilots }).querySelector('.pilot-triangle')!.getAttribute('fill')).toBe('#000');
     cleanup();
-    expect(draw('hyd-cooler').querySelectorAll('.arrowhead')).toHaveLength(2);
-    for (const type of ['hyd-filter', 'hyd-cooler']) expect(def(type).ports.map(p => [p.x, p.y]), type).toEqual([[-60, 0], [60, 0]]);
+    expect(draw('valve-5-3', { medium: 'PNEUMATIC', props: pilots }).querySelector('.pilot-triangle')!.getAttribute('fill')).toBe('none');
+  });
+
+  it('a solenoid is a rectangle holding the energy triangle: solid for oil, open for air', () => {
+    for (const [type, medium, fill] of [['hvalve-4-2', 'HYDRAULIC', '#000'], ['valve-5-2', 'PNEUMATIC', 'none']] as const) {
+      const container = draw(type, { medium, props: { actuationLeft: 'Solenoid', actuationRight: 'Spring Return' } });
+      expect(container.querySelector('.solenoid-triangle')!.getAttribute('fill'), medium).toBe(fill);
+      cleanup();
+    }
+  });
+
+  it('the hydraulic power unit draws a solid pump triangle, a suction filter, a relief valve and a shut-off with outlet port 2', () => {
+    const container = draw('hyd-power-unit', { medium: 'HYDRAULIC' });
+    expect(container.querySelector('[data-stage="hyd-pump"] polygon')!.getAttribute('fill')).toBe('#000');
+    expect(container.querySelector('.hpu-filter .frl-diamond')).not.toBeNull();
+    expect(container.querySelector('.hpu-tank')).not.toBeNull();
+    expect(container.querySelector('[data-stage="hyd-pressure-relief"]')).not.toBeNull();
+    expect(container.querySelector('[data-stage="valve-2-2-nc"]')).not.toBeNull();
+    expect(def('hyd-power-unit').ports).toHaveLength(1);
+    expect(def('hyd-power-unit').ports[0]).toMatchObject({ isoNumber: '2', type: 'WORKING' });
+  });
+
+  it('the power unit sets its relief valve right of the pump line, widens the tank under the return line, and shows no 0S1 tag', () => {
+    const container = draw('hyd-power-unit', { medium: 'HYDRAULIC', operatorTags: { right: '0S1' } });
+    expect(container.textContent).not.toContain('0S1');
+    const relief = container.querySelector('[data-stage="hyd-pressure-relief"]')!.getAttribute('transform')!;
+    expect(Number(/translate\((-?\d+)/.exec(relief)![1])).toBeGreaterThanOrEqual(140);
+    const basin = container.querySelector('.hpu-tank')!.getAttribute('d')!;
+    const [, left, right] = /M (-?\d+) \d+ V \d+ H (-?\d+)/.exec(basin)!.map(Number);
+    expect(right - left).toBeGreaterThan(200);
+  });
+
+  it('every shut port carries a T plug in its envelope: the open 3/2 envelope shuts port 3, the vented one port 1', () => {
+    const plugs = (type: string) => Array.from(draw(type).querySelectorAll('.valve-envelope-spool > g')).map(cell => cell.querySelectorAll('path[d^="M"][d*="V"][d*="H"]').length);
+    for (const type of ['valve-3-2-nc', 'hvalve-3-2-nc']) {
+      const counts = plugs(type);
+      expect(counts[0], type).toBeGreaterThanOrEqual(1); // actuated cell: 1→2 open, 3 shut
+      expect(counts[1], type).toBeGreaterThanOrEqual(1); // rest cell: 1 shut
+      cleanup();
+    }
+  });
+
+  it('the hydraulic motor adds a second solid triangle when it runs both ways', () => {
+    expect(draw('hyd-motor', { medium: 'HYDRAULIC' }).querySelectorAll('polygon')).toHaveLength(1);
+    cleanup();
+    expect(draw('hyd-motor', { medium: 'HYDRAULIC', props: { directions: 'Both directions' } }).querySelectorAll('polygon')).toHaveLength(2);
   });
 
   it('hydraulic valves draw the letters P, T, A, B on their own terminals instead of an internal tank', () => {
-    for (const type of ['hvalve-4-2', 'hvalve-4-3', 'hvalve-4-3-float', 'hvalve-4-3-tandem']) {
+    for (const type of ['hvalve-4-2', 'hvalve-4-3', 'hvalve-4-3-float']) {
       const container = draw(type, { medium: 'HYDRAULIC', props: { actuationLeft: 'None', actuationRight: 'None' } });
       const letters = Array.from(container.querySelectorAll('text')).map(text => text.textContent).sort();
       expect(letters, type).toEqual(['A', 'B', 'P', 'T']);
@@ -439,7 +513,7 @@ describe('hydraulic library symbols (ISO 1219-1)', () => {
     }
   });
 
-  it('the three 4/3 neutrals draw different centre chambers', () => {
+  it('the two 4/3 neutrals draw different centre chambers', () => {
     const centre = (type: string) => {
       const container = draw(type, { medium: 'HYDRAULIC', props: { actuationLeft: 'None', actuationRight: 'None' } });
       const cells = Array.from(container.querySelectorAll('.valve-envelope-spool > g'));
@@ -448,10 +522,8 @@ describe('hydraulic library symbols (ISO 1219-1)', () => {
     };
     const closed = centre('hvalve-4-3');
     const float = centre('hvalve-4-3-float');
-    const tandem = centre('hvalve-4-3-tandem');
     expect(closed[0]).toBe(0);
     expect(float[0]).toBe(2);
-    expect(tandem[0]).toBe(1);
   });
 
   it('the relief and reducing valves expose their tank port T on a stub, with no basin symbol', () => {
@@ -801,8 +873,8 @@ describe('pressure-control valves', () => {
 });
 
 describe('rotary actuators', () => {
-  it('motors, pumps and the semi-rotary actuator all use one 60 px circular housing', () => {
-    for (const type of ['air-motor-fixed', 'air-motor-variable', 'semi-rotary', 'hyd-motor', 'hyd-pump']) {
+  it('motors and pumps all use one 60 px circular housing', () => {
+    for (const type of ['air-motor-fixed', 'hyd-motor', 'hyd-pump']) {
       const housing = draw(type).querySelector('svg > g > g > circle')!;
       expect(num(housing.getAttribute('r')) * 2, type).toBe(ROTARY_HOUSING_DIAMETER);
       expect(num(housing.getAttribute('r')) * 2).toBeGreaterThanOrEqual(50);
@@ -810,7 +882,6 @@ describe('rotary actuators', () => {
       expect(def(type).boundsFor({}).width, type).toBe(60);
       cleanup();
     }
-    expect(def('semi-rotary').ports.map(p => [p.x, p.y])).toEqual([[-20, -60], [20, -60]]);
   });
 });
 
@@ -893,7 +964,7 @@ describe('actuator tags, latch, motor and limit-switch styling', () => {
   });
 
   it('the air motor triangle orbits the centre and stays inside the housing at every angle', () => {
-    for (const type of ['air-motor-fixed', 'air-motor-variable']) {
+    for (const type of ['air-motor-fixed']) {
       for (const angle of [0, 45, 90, 137, 180, 271, 359]) {
         const container = draw(type, { shaftAngle: angle, props: { directions: 'Both directions' } });
         for (const triangle of Array.from(container.querySelectorAll('.motor-triangle'))) {
@@ -932,17 +1003,38 @@ describe('composite main service unit 0Z1', () => {
     expect(container.querySelector('[data-stage="frl-simplified"] .frl-diamond, [data-stage="frl-simplified"] rect')).not.toBeNull();
   });
 
-  it('the shut-off valve has a spring on its left, the detented lever on its right and the 0S1 tag above the lever', () => {
+  it('the shut-off valve has a spring, the detented lever and the 0S1 tag above the lever', () => {
     const container = draw('service-unit', { props: { shutoff: 'ON' }, operatorTags: { right: '0S1' } });
     const valve = container.querySelector('[data-stage="valve-2-2-nc"]')!;
     expect(valve.querySelector('.valve-end-cap[data-side="left"] .spring-coil, .valve-end-cap[data-side="left"] path')).not.toBeNull();
     expect(valve.querySelector('.valve-end-cap[data-side="right"] .detent-lever')).not.toBeNull();
     expect(valve.querySelector('.detent-tooth')).not.toBeNull();
-    const tag = valve.querySelector('.operator-tag')!;
+    const tag = container.querySelector('.operator-tag')!;
     expect(tag.textContent).toBe('0S1');
-    expect(Number(tag.getAttribute('y'))).toBeLessThan(0); // above the lever
-    // ports 1 and 2 are numbered on the valve
-    expect(Array.from(valve.querySelectorAll('text')).map(t => t.textContent).filter(t => t === '1' || t === '2').sort()).toEqual(['1', '2']);
+    expect(Number(tag.getAttribute('y'))).toBeLessThan(0); // above the lever, inside the valve's frame
+  });
+
+  it('is enclosed in a tight ISO dashed boundary (at most 6 px clear of the glyphs)', () => {
+    const box = draw('service-unit', {}).querySelector('.iso-boundary')!;
+    expect([box.getAttribute('stroke'), box.getAttribute('stroke-dasharray'), box.getAttribute('stroke-width'), box.getAttribute('fill')]).toEqual(['#94A3B8', '4 4', '1.5', 'none']);
+    expect(SERVICE_UNIT.pad).toBeLessThanOrEqual(6);
+    expect(Number(box.getAttribute('x'))).toBeCloseTo(-17.3 - SERVICE_UNIT.pad);
+  });
+
+  it('stacks the valve directly above the FRL, feeds port 1 from the FRL outlet and sends port 2 straight right', () => {
+    const container = draw('service-unit', {});
+    const at = (type: string) => /translate\((-?[\d.]+),(-?[\d.]+)\)/.exec(container.querySelector(`[data-stage="${type}"]`)!.getAttribute('transform')!)!.slice(1).map(Number);
+    const [frlX, frlY] = at('frl-simplified');
+    const [valveX, valveY] = at('valve-2-2-nc');
+    const [sourceX, sourceY] = at('pressure-source');
+    expect(valveX).toBe(frlX);
+    expect(valveY).toBeLessThan(frlY);
+    expect(sourceY).toBe(frlY);
+    expect(sourceX).toBeLessThan(frlX);
+    const manifold = Array.from(container.querySelectorAll('.manifold')).map(path => path.getAttribute('d')!);
+    expect(manifold[0]).toBe(`M ${SERVICE_UNIT.frlX + SERVICE_UNIT.frlHalf} 0 H ${SERVICE_UNIT.frlOutX} V ${SERVICE_UNIT.port1Y} H ${valveX}`);
+    expect(manifold[1]).toBe(`M ${valveX} ${SERVICE_UNIT.port2Y} H ${SERVICE_UNIT.outletX}`);
+    expect(SERVICE_UNIT.frlX - SERVICE_UNIT.frlHalf - (SERVICE_UNIT.sourceX + SERVICE_UNIT.sourceStub)).toBeLessThanOrEqual(8);
   });
 
   it('shows the valve open and the lever latched when ON, and shut with the lever up when OFF', () => {
@@ -956,11 +1048,11 @@ describe('composite main service unit 0Z1', () => {
 
   it('has one port, the supply bus (port 2) on the right, on the grid and joined to the valve outlet', () => {
     const ports = def('service-unit').portsFor({});
-    expect(ports.map(p => [p.id, p.isoNumber, p.x, p.y])).toEqual([['out', '2', 460, -60]]);
-    expect(460 % 20).toBe(0);
+    expect(ports.map(p => [p.id, p.isoNumber, p.x, p.y])).toEqual([['out', '2', SERVICE_UNIT.outletX + SERVICE_UNIT.shiftX, SERVICE_UNIT.port2Y + SERVICE_UNIT.shiftY]]);
+    expect(isOnGrid(ports[0].x) && isOnGrid(ports[0].y)).toBe(true);
     const container = draw('service-unit', {});
-    const manifold = Array.from(container.querySelectorAll('.manifold')).map(path => path.getAttribute('d')).join(' ');
-    expect(manifold).toContain('M 360 -60 H 460'); // a single horizontal run to the right, clear of the lever
-    expect(def('service-unit').boundsFor({})).toEqual({ width: 480, height: 160, centerX: 220 });
+    expect(container.querySelector('[data-stage="valve-2-2-nc"]')).not.toBeNull();
+    const { width, centerX } = def('service-unit').boundsFor({});
+    expect(ports[0].x).toBeLessThanOrEqual((centerX ?? 0) + width / 2);
   });
 });

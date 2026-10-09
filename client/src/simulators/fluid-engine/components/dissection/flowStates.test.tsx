@@ -32,6 +32,10 @@ describe('plain check valve flow states', () => {
     expect(CAGE_TRAVEL).toBeGreaterThanOrEqual(12);
     expect(CAGE_TRAVEL).toBeLessThanOrEqual(15);
     expect(Number(ball.getAttribute('data-lift'))).toBe(CAGE_TRAVEL);
+    // the displaced ball rests on the stop pad with clear windows (> 12 px) above and below it
+    const pad = c.querySelector('.cage-pad')!;
+    const windowTop = Number(c.querySelector('.cage-stop')!.getAttribute('y')) + Number(c.querySelector('.cage-stop')!.getAttribute('height'));
+    expect(Number(pad.getAttribute('y')) - windowTop).toBeGreaterThan(12);
     const streams = Array.from(c.querySelectorAll('.cutaway-stream'));
     expect(streams).toHaveLength(2); // one each side of the ball
     for (const stream of streams) expect(stream.getAttribute('stroke')).toBe(FLOW_BLUE);

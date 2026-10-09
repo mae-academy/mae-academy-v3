@@ -128,12 +128,14 @@ const BEHAVIORS: Record<string, Behavior> = {
   /* Supply and preparation */
   'pressure-source': { ports: ['out'], source: 'out' },
   'hyd-pump': { ports: ['out', 'in'], source: 'out' },
+  /**
+   * Hydraulic power unit: pump (internal `in`) → shut-off valve → `out`, with an internal relief valve at the outlet.
+   * Shut-off ON passes the pump pressure up to the relief setting, OFF blocks it and drains the outlet line to tank.
+   */
+  'hyd-power-unit': { ports: ['in', 'out'], source: 'in', relief: 'out', connections: (c, n) => (c.props.shutoff === 'OFF' ? [{ kind: 'vent', node: n('out') }] : [{ kind: 'oneWay', from: n('in'), to: n('out') }]), caps: cracking('out', 60) },
+  'hyd-pressure-source': { ports: ['out'], source: 'out' },
   // Both ports open into one chamber; its pressure is a state that charges and discharges through any throttle in the line.
   'air-reservoir': { ports: ['left', 'right'], volume: { ports: ['left', 'right'], defaultCm3: 1000 }, connections: through('left', 'right') },
-  // Gas-loaded accumulator: one port into a chamber that keeps its pressure when the line is shut off.
-  'hyd-accumulator': { ports: ['p'], volume: { ports: ['p'], defaultCm3: 1000 } },
-  'hyd-filter': { ports: ['in', 'out'], connections: through('in', 'out') },
-  'hyd-cooler': { ports: ['in', 'out'], connections: through('in', 'out') },
   'hyd-tank': { ports: ['p'], exhausts: ['p'] },
   'frl-detailed': { ports: ['in', 'out'], connections: regulated('in', 'out'), caps: relieving('out') },
   'frl-simplified': { ports: ['in', 'out'], connections: regulated('in', 'out'), caps: relieving('out') },
@@ -196,9 +198,7 @@ const BEHAVIORS: Record<string, Behavior> = {
   'cylinder-double': { ports: ['a', 'b'], cylinder: { rear: 'a', front: 'b' } },
   'cylinder-double-rod': { ports: ['a', 'b'], cylinder: { rear: 'a', front: 'b', throughRod: true } },
   'air-motor-fixed': { ports: ['in', 'out'], openExhausts: ['out'], motor: { inlet: 'in', outlet: 'out', kind: 'motor', reversible: () => false } },
-  'air-motor-variable': { ports: ['in', 'out'], motor: { inlet: 'in', outlet: 'out', kind: 'motor', variable: true, reversible: props => props.directions === 'Both directions' } },
-  'hyd-motor': { ports: ['in', 'out'], motor: { inlet: 'in', outlet: 'out', kind: 'motor', reversible: () => false } },
-  'semi-rotary': { ports: ['a', 'b'], motor: { inlet: 'a', outlet: 'b', kind: 'swivel', reversible: () => true } },
+  'hyd-motor': { ports: ['in', 'out'], motor: { inlet: 'in', outlet: 'out', kind: 'motor', reversible: props => props.directions === 'Both directions' } },
 
   /* Auxiliary */
   'exhaust-port': { ports: ['p'], exhausts: ['p'] },

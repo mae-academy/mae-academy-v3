@@ -58,8 +58,9 @@ describe('control circuit workspace', () => {
     const svg = screen.getByRole('img', { name: /rails/i });
     expect(within(svg as unknown as HTMLElement).getByTestId('rail-24v')).toBeTruthy();
     expect(screen.getByTestId('rail-0v')).toBeTruthy();
-    expect(Array.from(svg.querySelectorAll('.rail-label')).map(label => label.textContent)).toEqual(['+24V', '0V']);
-    expect(Array.from(svg.querySelectorAll('.ladder-path-number')).map(label => label.textContent)).toEqual(['1', '2']);
+    const typeset = (selector: string) => Array.from(svg.querySelectorAll(selector)).map(label => (label.querySelector('.katex-html')?.textContent ?? '').replace(/\s/g, ''));
+    expect(typeset('.rail-label')).toEqual(['+24V', '0V']);
+    expect(typeset('.ladder-path-number')).toEqual(['1', '2']);
   });
 
   it('draws every symbol of the example: sensor, pushbutton, make contacts, coil and solenoid', () => {
@@ -70,7 +71,7 @@ describe('control circuit workspace', () => {
     expect(element('S5').querySelector('.pushbutton-operator.pb-no')).toBeTruthy();
     expect(element('K1', 'relayContact').querySelector('.contact-no')).toBeTruthy();
     expect(element('K1', 'relayCoil').querySelector('.coil-body')).toBeTruthy();
-    expect(element('1Y1').querySelectorAll('.solenoid-arrow')).toHaveLength(2);
+    expect(element('1Y1').querySelectorAll('.solenoid-diagonal')).toHaveLength(1);
     expect(element('S5').querySelector('.ladder-caption')?.textContent).toBe('START');
   });
 
@@ -103,18 +104,21 @@ describe('control circuit workspace', () => {
   it('prints the cross-reference of each relay under the 0V rail as a fraction: make contacts over break contacts', () => {
     render(<Harness initial={startStopExample()} />);
     const table = screen.getByTestId('ladder-xref-K1');
-    expect(table.querySelector('.xref-no')?.textContent).toBe('1 2');
+    expect(table.querySelector('.xref-no .katex-html')?.textContent?.replace(/\s/g, '')).toBe('12');
     expect(table.querySelector('.xref-bar')).toBeTruthy();
-    expect(table.querySelector('.xref-nc')?.textContent).toBe('-');
+    expect(table.querySelector('.xref-nc .katex-html')?.textContent).toBe('-');
     // bar sits between the two lines
-    const y = (selector: string) => Number(table.querySelector(selector)?.getAttribute(selector === '.xref-bar' ? 'y1' : 'y'));
+    const y = (selector: string) => {
+      const node = table.querySelector(selector);
+      return selector === '.xref-bar' ? Number(node?.getAttribute('y1')) : Number(node?.getAttribute('y')) + Number(node?.getAttribute('height')) / 2;
+    };
     expect(y('.xref-no')).toBeLessThan(y('.xref-bar'));
     expect(y('.xref-bar')).toBeLessThan(y('.xref-nc'));
   });
 
   it('lights up the cross-referenced paths whose contacts of that relay are made', () => {
     render(<Harness initial={startStopExample()} />);
-    const lit = () => Array.from(screen.getByTestId('ladder-xref-K1').querySelectorAll('.xref-no tspan')).filter(span => span.getAttribute('fill') !== null).map(span => span.textContent?.trim());
+    const lit = () => Array.from(screen.getByTestId('ladder-xref-K1').querySelectorAll('.xref-no .katex-html [style*="color"]')).map(span => span.textContent?.trim());
     expect(lit()).toEqual([]);
     fireEvent.mouseDown(element('S5'));
     expect(lit()).toEqual(['1', '2']);
@@ -123,9 +127,9 @@ describe('control circuit workspace', () => {
   it('joins parallel branches through rounded corners with junction dots', () => {
     const { container } = render(<Harness initial={startStopExample()} />);
     const caps = Array.from(container.querySelectorAll('path.ladder-conductor')).map(path => path.getAttribute('d') ?? '');
-    // one cap over and one under the S5 / K1 group, each with two quarter-circle corners
+    // one cap over and one under the S5 / K1 group, each a square horizontal run (no curves, no diagonals)
     expect(caps).toHaveLength(2);
-    for (const d of caps) expect(d.match(/Q/g)).toHaveLength(2);
+    for (const d of caps) expect(d).toMatch(/^M[\d.]+,[\d.]+ H[\d.]+$/);
     expect(container.querySelectorAll('circle').length).toBeGreaterThanOrEqual(4);
   });
 
@@ -197,7 +201,7 @@ describe('control circuit workspace', () => {
     fireEvent.change(screen.getByTestId('ladder-delay-input'), { target: { value: '3.5' } });
     fireEvent.change(screen.getByTestId('ladder-mode-select'), { target: { value: 'on' } });
     expect(last.paths[2].load).toMatchObject({ mode: 'on', delay: 3.5 });
-    expect(element('KT1').querySelector('.timer-hourglass')).toBeTruthy();
+    expect(element('KT1').querySelector('.timer-cross')).toBeTruthy();
     expect(element('KT1').querySelector('.ladder-timer-note')?.textContent).toBe('3.5 s On-delay');
   });
 
@@ -284,12 +288,71 @@ describe('control circuit simulation', () => {
   });
 });
 
+describe('control circuit cleanup', () => {
+  it('draws no glow or blur filters, and strokes live conductors 2.5 px blue and idle ones 1.5 px slate', () => {
+    const { container } = render(<Harness initial={startStopExample()} live />);
+    expect(container.innerHTML).not.toMatch(/drop-shadow|filter|blur/i);
+    const widths = new Set(Array.from(container.querySelectorAll('.ladder-conductor')).map(line => line.getAttribute('stroke-width')));
+    expect([...widths].every(width => width === '2.5' || width === '1.5')).toBe(true);
+  });
+
+  it('typesets component tags with KaTeX', () => {
+    const { container } = render(<Harness initial={startStopExample()} />);
+    expect(container.querySelectorAll('svg .ladder-tag .katex').length).toBeGreaterThan(0);
+    expect(container.querySelectorAll('svg .coil-tag .katex').length).toBeGreaterThan(0);
+  });
+
+  it('groups the palette into switches, relay contacts and loads', () => {
+    render(<Harness />);
+    const groups = within(screen.getByTestId('ladder-palette')).getAllByRole('group');
+    expect(groups).toHaveLength(3);
+    expect(within(groups[0]).getByTestId('ladder-palette-pushbutton-no')).toBeTruthy();
+    expect(within(groups[1]).getByTestId('ladder-palette-relay-contact-nc')).toBeTruthy();
+    expect(within(groups[2]).getByTestId('ladder-palette-solenoid')).toBeTruthy();
+  });
+
+  it('removes the selected element with Delete or Backspace, but not while typing in a field', () => {
+    render(<Harness initial={startStopExample()} />);
+    fireEvent.mouseDown(element('S5'));
+    fireEvent.keyDown(screen.getByTestId('ladder-tag-input'), { key: 'Backspace' });
+    expect(screen.queryByTestId('ladder-element-S5')).toBeTruthy();
+    fireEvent.keyDown(element('S5'), { key: 'Delete' });
+    expect(screen.queryByTestId('ladder-element-S5')).toBeNull();
+    expect(screen.queryByTestId('ladder-properties')).toBeNull();
+  });
+});
+
+describe('control circuit layout and history', () => {
+  it('puts the component library on the left of the wiring workspace', () => {
+    render(<Harness />);
+    const palette = screen.getByTestId('ladder-palette');
+    const workspace = screen.getByTestId('ladder-workspace');
+    expect(palette.compareDocumentPosition(workspace) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(workspace.querySelector('[data-testid="relay-ladder"]')).toBeTruthy();
+    expect(palette.querySelector('[data-testid="ladder-add-path"]')).toBeNull();
+  });
+
+  it('undoes and redoes edits with Ctrl+Z and Ctrl+Y / Ctrl+Shift+Z', () => {
+    render(<Harness initial={startStopExample()} />);
+    const panel = screen.getByTestId('control-circuit');
+    fireEvent.click(screen.getByTestId('ladder-clear'));
+    expect(screen.queryByTestId('ladder-element-S5')).toBeNull();
+    fireEvent.keyDown(panel, { key: 'z', ctrlKey: true });
+    expect(screen.queryByTestId('ladder-element-S5')).toBeTruthy();
+    fireEvent.keyDown(panel, { key: 'y', ctrlKey: true });
+    expect(screen.queryByTestId('ladder-element-S5')).toBeNull();
+    fireEvent.keyDown(panel, { key: 'z', ctrlKey: true });
+    fireEvent.keyDown(panel, { key: 'Z', ctrlKey: true, shiftKey: true });
+    expect(screen.queryByTestId('ladder-element-S5')).toBeNull();
+  });
+});
+
 describe('control circuit language', () => {
   const EMOJI = /\p{Extended_Pictographic}/u;
   it.each([
-    ['ar', 'المدخلات', 'ملف مرحّل'],
-    ['es', 'Entradas', 'Bobina de relé'],
-    ['en', 'Inputs', 'Relay coil'],
+    ['ar', 'المدخلات والحساسات', 'ملف مرحّل'],
+    ['es', 'Entradas y sensores', 'Bobina de relé'],
+    ['en', 'Inputs & Sensors', 'Relay coil'],
   ])('%s: palette and hints are translated with no emoji', async (lang, inputs, coil) => {
     await act(async () => { await i18n.changeLanguage(lang); });
     render(<I18nextProvider i18n={i18n}><Harness initial={startStopExample()} /></I18nextProvider>);

@@ -61,8 +61,8 @@ describe('FluidAnalysisPanel tabs', () => {
     expect(screen.queryByTestId('cutaway-viewer')).toBeNull();
   });
 
-  it('treats a part without a cutaway (a regulator) as nothing selected', () => {
-    const { component, snapshot } = scene(part('v3', 'regulator-nr', '1V9'));
+  it('treats a part without a cutaway (a sequence valve) as nothing selected', () => {
+    const { component, snapshot } = scene(part('v3', 'sequence-ext', '1V9'));
     renderPanel(component, snapshot);
     expect(screen.getByTestId('cutaway-empty')).toBeTruthy();
   });

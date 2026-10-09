@@ -72,6 +72,13 @@ describe('sequence tracking', () => {
     expect(tracker.cycleLength).toBe(4);
   });
 
+  it('does not mistake passing through the starting state for the end of the cycle: 1A+ 1A− 2A+ 2A− reopens the closed cycle', () => {
+    const tracker = feed([[0, at(0, 0)], [0.1, at(0.5, 0)], [0.2, at(1, 0)], [0.3, at(0.5, 0)], [0.4, at(0, 0)], [0.5, at(0, 0.5)], [0.6, at(0, 1)], [0.7, at(0, 0.5)], [0.8, at(0, 0)]]);
+    expect(names(tracker)).toEqual([['a+'], ['a-'], ['b+'], ['b-']]);
+    expect(tracker.cycleLength).toBe(4);
+    expect(tracker.stepNumber).toBe(4);
+  });
+
   it('puts strokes that start together into one step', () => {
     const tracker = feed([[0, at(0, 0)], [0.1, at(0.5, 0.5)], [0.2, at(1, 1)], [0.3, at(0.5, 0.5)], [0.4, at(0, 0)]]);
     expect(names(tracker)).toEqual([['a+', 'b+'], ['a-', 'b-']]);

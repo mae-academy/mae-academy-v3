@@ -3,7 +3,8 @@
  * Compiled sketches are generators; delay() yields a sleep request instead of blocking the browser thread.
  */
 import { ArduinoRuntimeError, helpers, toBase, toStr, type StrKind } from "./arduinoHelpers";
-import type { CompiledSketch } from "@shared/code/arduinoTypes";
+import type { CompiledSketch, LcdState } from "@shared/code/arduinoTypes";
+import { LcdController } from "./arduinoLcd";
 
 export type ArduinoSpeed = 0.5 | 1 | 2 | "instant";
 export type RunStatus = "idle" | "running" | "paused" | "error";
@@ -33,6 +34,7 @@ export interface HardwareSnapshot {
   rxCount: number;
   baud: number | null;
   timeMs: number;
+  lcd: LcdState;
 }
 
 export interface RuntimeHandlers {
@@ -72,6 +74,7 @@ export class ArduinoRuntime {
   private rxCount = 0;
   private baud: number | null = null;
   private seed = 1;
+  private readonly lcd = new LcdController();
 
   private main: Iterator<Request, void, unknown> | null = null;
   private timer: ReturnType<typeof setTimeout> | null = null;
@@ -270,6 +273,7 @@ export class ArduinoRuntime {
       rxCount: this.rxCount,
       baud: this.baud,
       timeMs: Math.floor(this.nowUs() / 1000),
+      lcd: this.lcd.snapshot(),
     };
   }
 
@@ -282,6 +286,7 @@ export class ArduinoRuntime {
     this.b = BUDGET;
     this.clockBase = 0;
     this.seed = 1;
+    this.lcd.reset();
     this.markDirty();
   }
 
@@ -383,6 +388,97 @@ export class ArduinoRuntime {
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
     const r = ((t ^ (t >>> 14)) >>> 0) / 4294967296;
     return lo + Math.floor(r * (hi - lo));
+  }
+
+  /** Turns the LCD's V0 contrast trimmer (0..1). */
+  setLcdContrast(value: number): void {
+    this.lcd.setContrast(value);
+    this.markDirty();
+  }
+
+  // --- LiquidCrystal / LiquidCrystal_I2C ---------------------------------
+  lcdInit(kind: "p" | "i", args: number[]): void {
+    this.lcd.init(kind, args);
+    this.markDirty();
+  }
+
+  lcdBegin(cols: number, rows: number): void {
+    this.lcd.begin(cols, rows);
+    // LiquidCrystal::begin() configures every interface line as an output.
+    for (const n of this.lcd.outputPins) {
+      const p = this.pin(n);
+      if (p && p.mode !== "OUTPUT") {
+        p.mode = "OUTPUT";
+        p.level = 0;
+        p.pwm = null;
+      }
+    }
+    this.markDirty();
+  }
+
+  lcdClear(): void {
+    this.lcd.clear();
+    this.markDirty();
+  }
+
+  lcdHome(): void {
+    this.lcd.home();
+    this.markDirty();
+  }
+
+  lcdSetCursor(col: number, row: number): void {
+    this.lcd.setCursor(col, row);
+    this.markDirty();
+  }
+
+  lcdPrint(v: unknown, kind: StrKind, fmt: number): number {
+    const n = this.lcd.print(v, kind, fmt);
+    this.markDirty();
+    return n;
+  }
+
+  lcdWrite(code: number): number {
+    const n = this.lcd.write(code);
+    this.markDirty();
+    return n;
+  }
+
+  lcdCursor(on: boolean): void {
+    this.lcd.setCursorVisible(on);
+    this.markDirty();
+  }
+
+  lcdBlink(on: boolean): void {
+    this.lcd.setBlink(on);
+    this.markDirty();
+  }
+
+  lcdDisplay(on: boolean): void {
+    this.lcd.setDisplay(on);
+    this.markDirty();
+  }
+
+  lcdBacklight(on: boolean): void {
+    this.lcd.setBacklight(on);
+    this.markDirty();
+  }
+
+  lcdScroll(dir: number): void {
+    this.lcd.scroll(dir);
+    this.markDirty();
+  }
+
+  lcdAutoscroll(on: boolean): void {
+    this.lcd.setAutoscroll(on);
+  }
+
+  lcdDirection(leftToRight: boolean): void {
+    this.lcd.setDirection(leftToRight);
+  }
+
+  lcdCreateChar(slot: number, rows: number[]): void {
+    this.lcd.createChar(slot, rows);
+    this.markDirty();
   }
 
   // --- Serial ------------------------------------------------------------

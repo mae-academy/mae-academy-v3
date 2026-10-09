@@ -417,10 +417,12 @@ export class FluidEngine {
       if (table) valves[component.id] = valveState(table, component.props, this.positions.get(component.id) ?? initialValvePosition(table, component.props));
       const state = logicElementState(component, port => portPressure[nodeId(component.id, port)] ?? 0, this.config);
       if (state) logic[component.id] = state;
-      const reliefPort = reliefPortOf(component);
-      if (reliefPort) {
-        const net = graph.netOf.get(nodeId(component.id, reliefPort));
-        reliefValves[component.id] = { open: net !== undefined && Boolean(solution?.clamped[net]) };
+      if (reliefPortOf(component)) {
+        // Open = the line sits at this valve's own setting and something is being held down at that setting. A power unit's pump side is
+        // the clamped net although its outlet only carries the limited pressure; a second relief valve staged at a lower setting leaves this one shut.
+        const open = capsOf(component).some(cap => (portPressure[cap.node] ?? 0) >= cap.limit - SETTLED
+          && Boolean(solution?.clamped.some((held, net) => held && Math.abs(solution.relief[net] - cap.limit) < SETTLED)));
+        reliefValves[component.id] = { open };
       }
     }
     const cylinders: Record<string, CylinderState> = {};

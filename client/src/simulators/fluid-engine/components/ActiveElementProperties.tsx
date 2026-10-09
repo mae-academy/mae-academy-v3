@@ -5,7 +5,7 @@ import { InspectorHeader, InspectorSection, PropertyRow } from '@/simulators/sha
 import type { Palette } from '@/simulators/shared/workspace/workspaceTheme';
 import { OPERATOR_IDLE_ROLLER, isMechanicalOperator } from '@shared/fluid/engine/componentSolvers';
 import { useFluidT, optionLabel, parameterLabel, partDescription, partName, type FluidTranslate } from '../i18n/fluidText';
-import { VALVE_SPECS, clampParameter, editableParameters, type FluidCatalogEntry, type FluidLibraryItem, type FluidParameter } from '../models/fluidCatalog';
+import { INITIAL_STATE_TWINS, VALVE_SPECS, clampParameter, editableParameters, type FluidCatalogEntry, type FluidLibraryItem, type FluidParameter } from '../models/fluidCatalog';
 import { ReplaceComponentControl } from './ReplaceComponentControl';
 import { EXTEND_TAG_PROP, OPERATOR_TAG_PROP, RETRACT_TAG_PROP, isCylinder, linkableSides, linkedSensor, sensorTagsOf, setLinkedSensor, setValveProperty, type SensorOption } from '../models/sensorCoupling';
 
@@ -30,17 +30,19 @@ export interface ActiveElementPropertiesProps {
   /** Library parts the selected one can be swapped for, grouped by library category; omit to hide the Replace control. */
   replaceGroups?: Record<string, FluidLibraryItem[]>;
   onReplace?: (type: string) => void;
+  /** Swaps a consolidated 2/2 or 3/2 valve for its normally-open / normally-closed twin, keeping label, operators and pipes. */
+  onInitialStateChange?: (type: string) => void;
   onLabelChange: (label: string) => void;
   onPropsChange: (props: SchematicComponent['props']) => void;
 }
 
 /** One editable operating parameter: a select, a slider with a number box (bounded fields) or a plain number box. */
-function ParameterField({ parameter, value, colors, tr, onChange }: { parameter: FluidParameter; value: unknown; colors: Palette; tr: FluidTranslate; onChange: (value: string | number) => void }) {
+function ParameterField({ parameter, value, colors, tr, hydraulic = false, onChange }: { parameter: FluidParameter; value: unknown; colors: Palette; tr: FluidTranslate; /** The part works on oil: its pilot operator reads "Hydraulic Pilot". */ hydraulic?: boolean; onChange: (value: string | number) => void }) {
   const label = parameterLabel(tr, parameter.label);
   if (parameter.kind === 'select') {
     return (
       <select aria-label={label} value={String(value ?? parameter.defaultValue)} onChange={event => onChange(event.target.value)} style={inputStyle(colors)}>
-        {parameter.options?.map(option => <option key={option} value={option}>{optionLabel(tr, option)}</option>)}
+        {parameter.options?.map(option => <option key={option} value={option}>{hydraulic && option === 'Pneumatic Pilot' ? tr('options.hydraulicPilot') : optionLabel(tr, option)}</option>)}
       </select>
     );
   }
@@ -89,7 +91,7 @@ function ToggleSwitch({ label, checked, colors, onChange }: { label: string; che
  * the operating parameters of its kind (cylinder limit switches and cushioning, throttle opening, pressure settings,
  * valve operators). Internal geometry such as bore, stroke or volume keeps its default and is never shown.
  */
-export function ActiveElementProperties({ component, definition, colors, sensorOptions, autoSensorTags, operatorTags, replaceGroups, onReplace, onLabelChange, onPropsChange }: ActiveElementPropertiesProps) {
+export function ActiveElementProperties({ component, definition, colors, sensorOptions, autoSensorTags, operatorTags, replaceGroups, onReplace, onInitialStateChange, onLabelChange, onPropsChange }: ActiveElementPropertiesProps) {
   const tr = useFluidT();
   const setProp = (key: string, value: unknown) => {
     // Changing a valve's operator may invalidate the limit switch coupled to that end.
@@ -102,6 +104,8 @@ export function ActiveElementProperties({ component, definition, colors, sensorO
   const taggedSides = OPERATOR_SIDES.filter(side => VALVE_SPECS[component.type] && isMechanicalOperator(component.props[operatorKey(side)]));
   const idleRoller = OPERATOR_SIDES.some(side => component.props[operatorKey(side)] === OPERATOR_IDLE_ROLLER);
   const cylinder = isCylinder(component);
+  const twin = onInitialStateChange ? INITIAL_STATE_TWINS[definition.type] : undefined;
+  const normallyOpen = definition.type.endsWith('-no');
 
   return (
     <div style={{ overflowY: 'auto', minHeight: 0 }} data-testid="active-element-properties">
@@ -122,11 +126,19 @@ export function ActiveElementProperties({ component, definition, colors, sensorO
           <ToggleSwitch label={tr('inspector.showValue')} checked={!component.props._hideValue} colors={colors} onChange={show => setProp('_hideValue', !show)} />
         </PropertyRow>
       </InspectorSection>
-      {(parameters.length > 0 || sides.length > 0 || taggedSides.length > 0 || idleRoller) && (
+      {(twin || parameters.length > 0 || sides.length > 0 || taggedSides.length > 0 || idleRoller) && (
         <InspectorSection colors={colors} label={tr('inspector.operatingParameters')}>
+          {twin && (
+            <PropertyRow colors={colors} label={tr('inspector.initialState')}>
+              <select aria-label={tr('inspector.initialState')} value={normallyOpen ? 'NO' : 'NC'} onChange={event => (event.target.value === 'NO') !== normallyOpen && onInitialStateChange!(twin)} style={inputStyle(colors)}>
+                <option value="NC">{tr('inspector.initialStateNC')}</option>
+                <option value="NO">{tr('inspector.initialStateNO')}</option>
+              </select>
+            </PropertyRow>
+          )}
           {parameters.map(parameter => (
             <PropertyRow key={parameter.key} colors={colors} label={parameterLabel(tr, parameter.label)} unit={parameter.slider ? undefined : parameter.unit}>
-              <ParameterField parameter={parameter} value={component.props[parameter.key]} colors={colors} tr={tr} onChange={value => setProp(parameter.key, value)} />
+              <ParameterField parameter={parameter} value={component.props[parameter.key]} colors={colors} tr={tr} hydraulic={definition.media.length === 1 && definition.media[0] === 'HYDRAULIC'} onChange={value => setProp(parameter.key, value)} />
             </PropertyRow>
           ))}
           {taggedSides.map(side => {

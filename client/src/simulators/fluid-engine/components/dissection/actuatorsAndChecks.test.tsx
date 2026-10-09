@@ -52,14 +52,14 @@ describe('ISO 1219-1 operator glyphs', () => {
     const definition = getFluidDefinition('valve-3-2-nc')!;
     return render(<svg><FluidSymbol definition={definition} stroke="#000" props={{ ...defaultFluidProps(definition), actuationLeft: kind, actuationRight: 'None' }} operatorPressed={{ left: pressed }} /></svg>).container.querySelector('.valve-end-cap[data-side="left"]')!;
   };
-  it('solenoid: a 16 × 24 coil box cut by one 45° stroke', () => {
+  it('solenoid: a 20 × 24 box on the push pin holding an open triangle whose apex points at the valve body', () => {
     const c = cap('Solenoid');
-    const box = c.querySelector('path')!.getAttribute('d')!;
-    expect(box).toContain('M 14 -12 H 30 V 12 H 14 Z');
-    const [diagonal] = c.querySelectorAll('path');
-    const d = c.querySelectorAll('path')[1].getAttribute('d')!;
-    expect(d).toBe('M 14 12 L 30 -4'); // dx 16, dy -16: exactly 45°
-    expect(diagonal).toBeTruthy();
+    expect(c.querySelector('path')!.getAttribute('d')).toContain('M 10 -12 H 30 V 12 H 10 Z');
+    const triangle = c.querySelector('.solenoid-triangle')!;
+    expect(triangle.getAttribute('fill')).toBe('none');
+    const [apex, base1, base2] = triangle.getAttribute('points')!.split(' ').map(pair => pair.split(',').map(Number));
+    expect(apex[0]).toBeLessThan(base1[0]);
+    expect(base1[0]).toBe(base2[0]);
   });
   it('hand lever: stem, 45° arm of 20 px and a solid knob of radius 3', () => {
     const c = cap('Hand Lever');
@@ -207,7 +207,7 @@ describe('check valve cutaways', () => {
     const open = run('check-valve', 6, 'open');
     const analysis = analyzeCheck(open.k, open.snapshot, 'check');
     expect(analysis.open).toBe(true);
-    expect(analysis.state).toBe('Free flow 1→2 — ball lifted into the cage');
+    expect(analysis.state).toBe('Open / Free Flow');
     const c = render(<CheckValveCutaway analysis={analysis} medium="PNEUMATIC" theme={THEME} />).container;
     expect(c.querySelector('.check-ball')!.getAttribute('data-state')).toBe('open');
     expect(num(c.querySelector('.check-ball')!, 'data-lift')).toBe(CAGE_TRAVEL);
@@ -218,7 +218,7 @@ describe('check valve cutaways', () => {
     const sealed = analyzeCheck(back.k, back.snapshot, 'check');
     expect(sealed.open).toBe(false);
     expect(sealed.backPressure).toBe(true);
-    expect(sealed.state).toBe('Blocked — back pressure seats the ball');
+    expect(sealed.state).toBe('Blocked / Reverse Flow');
     const s = render(<CheckValveCutaway analysis={sealed} medium="PNEUMATIC" theme={THEME} />).container;
     expect(s.querySelector('.check-ball')!.getAttribute('data-state')).toBe('seated');
     expect(num(s.querySelector('.check-ball')!, 'data-lift')).toBe(0);
@@ -287,7 +287,7 @@ describe('one-way flow control bypass', () => {
     }
   });
 
-  it('the sealing element is a polished ball seated in a 45° cone, lifting 34 px on free return and compressing the spring uniformly', () => {
+  it('the sealing element is a polished ball seated in a 45° cone, lifting 16 px on free return and compressing the spring uniformly', () => {
     const seated = run('extend');
     expect(seated.querySelector('.check-ball')!.tagName.toLowerCase()).toBe('circle');
     expect(seated.querySelectorAll('.check-seat')).toHaveLength(2);
@@ -295,7 +295,7 @@ describe('one-way flow control bypass', () => {
     const seatedScale = scale(seated);
     cleanup();
     const lifted = run('retract');
-    expect(num(lifted.querySelector('.check-poppet')!, 'data-lift')).toBe(34);
+    expect(num(lifted.querySelector('.check-poppet')!, 'data-lift')).toBe(16);
     expect(scale(lifted)).toBeLessThan(seatedScale);
   });
 

@@ -10,7 +10,7 @@ import { DEFAULT_ENGINE_CONFIG, type EngineSnapshot } from '@shared/fluid/engine
 import { PILOT_LEFT, PILOT_RIGHT } from '@shared/fluid/engine/valveTables';
 import { englishFluidT, joinList, type FluidTranslate } from '../../i18n/fluidText';
 
-export type CutawayKind = 'and' | 'or' | 'check' | 'springCheck' | 'throttle' | 'oneway' | 'spool22' | 'spool32' | 'spool42' | 'spool52' | 'spool53' | 'cushion' | 'single' | 'reservoir' | 'timer';
+export type CutawayKind = 'and' | 'or' | 'check' | 'springCheck' | 'throttle' | 'oneway' | 'spool22' | 'spool32' | 'spool42' | 'spool52' | 'spool53' | 'spool43' | 'spool43float' | 'cushion' | 'single' | 'reservoir' | 'timer' | 'quickExhaust' | 'regulator' | 'relief' | 'gauge';
 
 export interface CutawayComponent {
   id: string;
@@ -22,6 +22,12 @@ export interface CutawayComponent {
 const KIND_BY_TYPE: Record<string, CutawayKind> = {
   'dual-pressure-valve': 'and',
   'shuttle-valve': 'or',
+  'quick-exhaust': 'quickExhaust',
+  'pressure-gauge': 'gauge',
+  'regulator-nr': 'regulator',
+  'regulator-relieving': 'regulator',
+  'pressure-relief': 'relief',
+  'hyd-pressure-relief': 'relief',
   'check-valve': 'check',
   'check-valve-spring': 'springCheck',
   'flow-control': 'throttle',
@@ -35,6 +41,8 @@ const KIND_BY_TYPE: Record<string, CutawayKind> = {
   'hvalve-3-2-nc': 'spool32',
   'valve-5-2': 'spool52',
   'valve-5-3': 'spool53',
+  'hvalve-4-3': 'spool43',
+  'hvalve-4-3-float': 'spool43float',
   'air-reservoir': 'reservoir',
   'time-delay-valve': 'timer',
   'cylinder-single': 'single',
@@ -185,7 +193,19 @@ export interface SpoolBody {
   restStart: number;
   /** Port shown (and read from the engine) under another number, e.g. a 4/2's second exhaust chamber is port 3. */
   labels?: Partial<Record<SpoolPort, SpoolPort>>;
+  /** Hydraulic letters drawn instead of the ISO numbers (P, B, T, A). */
+  letters?: Partial<Record<SpoolPort, string>>;
+  /**
+   * Hydraulic 4-port valve: the two tank chambers (5 and 3) are cross-drilled into one duct above the bore, so the housing shows a
+   * single tank port T and exactly four ports P, T, A, B.
+   */
+  tankDuct?: boolean;
+  /** Hydraulic housing: oil returning to the tank is shown in its own colour, with a path from the working port to T. */
+  hydraulic?: boolean;
 }
+
+/** Name printed for a chamber's port: the hydraulic letter where the body has one, else the (aliased) ISO number. */
+export const spoolPortLabel = (body: SpoolBody, port: SpoolPort): string => body.letters?.[body.labels?.[port] ?? port] ?? body.labels?.[port] ?? port;
 
 /** 5-port body, left to right: exhaust 5, work 4, supply 1, work 2, exhaust 3. */
 export const SPOOL_BODY: SpoolBody = {
@@ -205,6 +225,18 @@ export const SPOOL_BODY: SpoolBody = {
 
 /** 4/2: the 5-port body with both exhaust chambers joined to port 3 (rest 1→2, 4→3; actuated 1→4, 2→3). */
 export const SPOOL42_BODY: SpoolBody = { ...SPOOL_BODY, labels: { '5': '3' } };
+
+/** Hydraulic housing: tank chambers on top joined by one duct, A, P and B below; ports are named P, T, A, B. */
+const HYDRAULIC_HOUSING = { labels: { '5': '3' }, letters: { '1': 'P', '2': 'B', '3': 'T', '4': 'A' }, top: ['5', '3'], tankDuct: true, hydraulic: true } as const satisfies Partial<SpoolBody>;
+/** Hydraulic 4/2: the five-chamber spool of a 5/2 with its two tank chambers cross-drilled to the single port T. */
+export const SPOOL42_HYDRAULIC_BODY: SpoolBody = { ...SPOOL_BODY, ...HYDRAULIC_HOUSING };
+/** Hydraulic 4/3, closed centre: the three lands sit over T, P and T in the middle, so P, T, A and B are all shut. */
+export const SPOOL43_BODY: SpoolBody = { ...SPOOL_BODY, ...HYDRAULIC_HOUSING };
+/**
+ * Hydraulic 4/3, float centre: two outer lands and one over P. In the middle only P is shut, so A and B stay open to tank;
+ * a 45 px stroke either way parts the lands from P and seals the opposite tank chamber (P→A, B→T or P→B, A→T).
+ */
+export const SPOOL43_FLOAT_BODY: SpoolBody = { ...SPOOL_BODY, ...HYDRAULIC_HOUSING, landSpacing: 240, restStart: 150, pitch: 45, stem: 8 };
 
 /** 2/2 (normally open): port 1 below, port 2 above; the left land seals port 1 when the spool is pushed one pitch. */
 export const SPOOL22_BODY: SpoolBody = {
@@ -228,10 +260,15 @@ export const SPOOL32_NC_BODY: SpoolBody = spool32Body(['1', '2', '3'], [358, 448
 /** Normally open, same layout: at rest the groove joins 1 to 2 under a land on 3; actuated, a land seals port 1 and 2 vents to 3. */
 export const SPOOL32_NO_BODY: SpoolBody = spool32Body(['1', '2', '3'], [300, 390, 480], 60, 240);
 
-export type SpoolKind = 'spool22' | 'spool32' | 'spool42' | 'spool52' | 'spool53';
+/** Hydraulic 3/2: ports P, A (port 2) and T; A drains to tank at rest. */
+export const SPOOL32_HYDRAULIC_BODY: SpoolBody = { ...SPOOL32_NC_BODY, letters: { '1': 'P', '2': 'A', '3': 'T' }, hydraulic: true };
+
+export type SpoolKind = 'spool22' | 'spool32' | 'spool42' | 'spool52' | 'spool53' | 'spool43' | 'spool43float';
+/** Spring-centred 3-position valves. */
+export const isThreePosition = (kind: SpoolKind) => kind === 'spool53' || kind === 'spool43' || kind === 'spool43float';
 /** Body of a spool-valve cutaway; the 3/2 layout depends on whether the valve is normally open. */
 export const spoolBodyOf = (kind: SpoolKind, type?: string): SpoolBody =>
-  kind === 'spool32' ? (type === 'valve-3-2-no' ? SPOOL32_NO_BODY : SPOOL32_NC_BODY) : kind === 'spool22' ? SPOOL22_BODY : kind === 'spool42' ? SPOOL42_BODY : SPOOL_BODY;
+  kind === 'spool32' ? (type === 'valve-3-2-no' ? SPOOL32_NO_BODY : type === 'hvalve-3-2-nc' ? SPOOL32_HYDRAULIC_BODY : SPOOL32_NC_BODY) : kind === 'spool22' ? SPOOL22_BODY : kind === 'spool42' ? (type?.startsWith('hvalve-') ? SPOOL42_HYDRAULIC_BODY : SPOOL42_BODY) : kind === 'spool43' ? SPOOL43_BODY : kind === 'spool43float' ? SPOOL43_FLOAT_BODY : SPOOL_BODY;
 
 /** Ports that open on the top face of the 5-port body; the others open at the bottom. */
 export const TOP_PORTS: readonly SpoolPort[] = SPOOL_BODY.top;
@@ -244,7 +281,7 @@ export const EXHAUST_PORTS: readonly SpoolPort[] = ['3', '5'];
  *   5/3: right pilot 165, centre 210, left pilot 255.
  */
 export const spoolStart = (kind: SpoolKind, offset: number, type?: string): number =>
-  kind === 'spool53' ? 210 + (SPOOL_BODY.pitch / 2) * offset : spoolBodyOf(kind, type).restStart + spoolBodyOf(kind, type).pitch * offset;
+  kind === 'spool53' || kind === 'spool43' ? 210 + (SPOOL_BODY.pitch / 2) * offset : spoolBodyOf(kind, type).restStart + spoolBodyOf(kind, type).pitch * offset;
 
 export const landPositions = (start: number, body: SpoolBody = SPOOL_BODY): number[] => Array.from({ length: body.lands }, (_, index) => start + index * body.landSpacing);
 
@@ -263,6 +300,8 @@ export interface SpoolInterval {
 export interface SpoolConnection {
   from: SpoolPort;
   to: SpoolPort;
+  /** 'return': oil leaving a working port for the tank (hydraulic housings only). */
+  kind?: 'supply' | 'return';
 }
 
 export interface SpoolAnalysis extends BaseAnalysis {
@@ -284,6 +323,10 @@ export interface SpoolAnalysis extends BaseAnalysis {
   pilotRight: number | null;
   operators: { left: string; right: string };
 }
+
+/** A hydraulic segment that joins the tank to the working lines without the supply: its oil is on its way back to the tank. */
+export const isReturnInterval = (body: SpoolBody, interval: Pick<SpoolInterval, 'ports'>): boolean =>
+  Boolean(body.hydraulic) && interval.ports.some(port => EXHAUST_PORTS.includes(port)) && !interval.ports.includes('1');
 
 /** Which chambers a set of land positions connects, and which ports it closes. */
 export function spoolGeometry(lands: number[], body: SpoolBody = SPOOL_BODY): { covered: SpoolPort[]; intervals: Array<Pick<SpoolInterval, 'x0' | 'x1' | 'ports'>> } {
@@ -315,7 +358,7 @@ const PORT_ROLE: Record<SpoolPort, string> = { '1': 'Supply', '2': 'Working', '4
 export function describeSpool(intervals: SpoolInterval[], pressures: Record<SpoolPort, number>, tr: FluidTranslate = englishFluidT, body: SpoolBody = SPOOL_BODY): string {
   const sentences: string[] = [];
   const grouped = new Set<SpoolPort>();
-  const name = (port: SpoolPort) => body.labels?.[port] ?? port;
+  const name = (port: SpoolPort) => spoolPortLabel(body, port);
   for (const interval of intervals) {
     if (interval.ports.length < 2) continue;
     interval.ports.forEach(port => grouped.add(port));
@@ -354,7 +397,12 @@ export function analyzeSpool(component: CutawayComponent, snapshot: EngineSnapsh
   }));
 
   // A groove carries fluid from its highest-pressure port to the other ports it joins.
-  const connections: SpoolConnection[] = intervals.flatMap(interval => {
+  const connections: SpoolConnection[] = intervals.flatMap((interval): SpoolConnection[] => {
+    if (isReturnInterval(body, interval)) {
+      // Hydraulic: a working line open to the tank always drains there, pressure or not.
+      const tank = interval.ports.find(port => EXHAUST_PORTS.includes(port))!;
+      return interval.ports.filter(port => port === '2' || port === '4').map(port => ({ from: port, to: tank, kind: 'return' as const }));
+    }
     if (interval.ports.length < 2 || interval.bar <= EPS) return [];
     // Ports at equal pressure (the groove is filled): the supply port is the one the fluid comes from.
     const source = interval.ports.reduce((best, port) => (pressures[port] > pressures[best] + EPS || (Math.abs(pressures[port] - pressures[best]) <= EPS && port === '1') ? port : best));
@@ -383,8 +431,11 @@ export function analyzeSpool(component: CutawayComponent, snapshot: EngineSnapsh
     state = tr('cutaway.spool.pilotLeft');
     tone = 'active';
   } else if (actuatedRight) {
-    state = tr('cutaway.spool.pilotRight');
+    state = tr(kind === 'spool53' ? 'cutaway.spool.pilotRight' : 'cutaway.spool.pilotRight43');
     tone = 'active';
+  } else if (kind === 'spool43float') {
+    state = tr('cutaway.spool.midFloat');
+    tone = 'idle';
   } else {
     state = tr('cutaway.spool.mid');
     tone = 'blocked';
@@ -392,13 +443,13 @@ export function analyzeSpool(component: CutawayComponent, snapshot: EngineSnapsh
 
   const hasPilotLeft = `${component.id}:${PILOT_LEFT}` in snapshot.portPressure;
   const hasPilotRight = `${component.id}:${PILOT_RIGHT}` in snapshot.portPressure;
-  const readings: PortReading[] = body.ports.filter(port => !body.labels || !(port in body.labels)).map(port => ({ port, label: port, bar: pressures[port] }));
+  const readings: PortReading[] = body.ports.filter(port => !body.labels || !(port in body.labels)).map(port => ({ port, label: spoolPortLabel(body, port), bar: pressures[port] }));
   if (hasPilotLeft) readings.push({ port: PILOT_LEFT, label: body.ports.includes('4') ? '14' : '12', bar: portPressure(snapshot, component, PILOT_LEFT) });
   if (hasPilotRight) readings.push({ port: PILOT_RIGHT, label: body.ports.includes('4') ? '12' : '10', bar: portPressure(snapshot, component, PILOT_RIGHT) });
 
   let description = describeSpool(intervals, pressures, tr, body);
-  if (kind === 'spool53' && !actuatedLeft && !actuatedRight) {
-    description = tr('cutaway.spool.centring', { description });
+  if (isThreePosition(kind) && !actuatedLeft && !actuatedRight) {
+    description = tr(kind === 'spool53' ? 'cutaway.spool.centring' : kind === 'spool43' ? 'cutaway.spool.centring43' : 'cutaway.spool.centringFloat', { description });
   }
 
   return {
@@ -599,6 +650,8 @@ export function analyzeSingle(component: CutawayComponent, snapshot: EngineSnaps
 /** A net at or below this pressure is open to exhaust (the exhausting side of a cylinder). */
 const VENTED_BAR = 0.5;
 const FLOWING_LPM = 1e-3;
+/** Cracking pressure of the one-way flow control's bypass check: P(2) − P(1) above this unseats the poppet. */
+export const ONEWAY_CRACK_BAR = 0.05;
 
 export interface FlowControlAnalysis extends BaseAnalysis {
   kind: 'throttle' | 'oneway';
@@ -630,9 +683,12 @@ export function flowDirection(snapshot: EngineSnapshot, component: CutawayCompon
 export function analyzeFlowControl(component: CutawayComponent, snapshot: EngineSnapshot, kind: 'throttle' | 'oneway', tr: FluidTranslate = englishFluidT): FlowControlAnalysis {
   const raw = Number(component.props.openingPercentage ?? 100);
   const opening = clamp(Number.isFinite(raw) ? raw : 100, 0, 100);
-  const direction = flowDirection(snapshot, component);
   const inBar = portPressure(snapshot, component, 'in');
   const outBar = portPressure(snapshot, component, 'out');
+  // The bypass check of a one-way flow control lifts as soon as P(2) − P(1) beats its cracking pressure, whatever the flow
+  // heuristic says (it reads 0 or forward at the instant the supply is switched to port 2).
+  const bypassOpen = kind === 'oneway' && outBar - inBar > ONEWAY_CRACK_BAR;
+  const direction = bypassOpen ? -1 : flowDirection(snapshot, component);
   const percent = String(Math.round(opening));
 
   let state = tr('cutaway.flow.idle');
@@ -690,7 +746,9 @@ export function analyzeCheck(component: CutawayComponent, snapshot: EngineSnapsh
   const flowing = flowDirection(snapshot, component, 'p1', 'p2') === 1;
   const difference = inBar - outBar;
   // Spring-loaded: the ball unseats only once the upstream force beats the spring pre-tension.
-  const open = flowing || (crack === null ? difference > FORCE_EPS : crack > 0 && difference >= crack - FORCE_EPS);
+  // The engine's own verdict (what the schematic symbol shows) wins: with no flow left and the pressures equalised, a plain ball stays in its cage.
+  const engineOffset = snapshot.logic?.[component.id]?.offset;
+  const open = flowing || (engineOffset !== undefined ? engineOffset > 0 : crack === null ? difference > FORCE_EPS : crack > 0 && difference >= crack - FORCE_EPS);
   const backPressure = !open && outBar - inBar > FORCE_EPS;
   const bars = { bar: inBar.toFixed(1), crack: (crack ?? 0).toFixed(1) };
 
@@ -882,17 +940,140 @@ export function analyzeTimer(component: CutawayComponent, snapshot: EngineSnapsh
 }
 
 
-export type CutawayAnalysis = ReservoirAnalysis | TimerAnalysis | CheckAnalysis | FlowControlAnalysis | GateAnalysis | SpoolAnalysis | CushionAnalysis | SingleAnalysis;
+/* ───────────────────────── Pressure gauge ───────────────────────── */
+
+export interface GaugeAnalysis extends BaseAnalysis {
+  kind: 'gauge';
+  pressure: number;
+}
+
+export function analyzeGauge(component: CutawayComponent, snapshot: EngineSnapshot, tr: FluidTranslate = englishFluidT): GaugeAnalysis {
+  const pressure = portPressure(snapshot, component, 'p');
+  const live = pressure > EPS;
+  return {
+    kind: 'gauge', pressure, tone: live ? 'open' : 'idle',
+    state: tr(live ? 'cutaway.gauge.live' : 'cutaway.gauge.idle'),
+    description: tr(live ? 'cutaway.gauge.liveText' : 'cutaway.gauge.idleText', { bar: bar(pressure) }),
+    readings: [{ port: 'p', label: '1', bar: pressure }],
+  };
+}
+
+/* ───────────────────────── Quick exhaust valve ───────────────────────── */
+
+export interface QuickExhaustAnalysis extends BaseAnalysis {
+  kind: 'quickExhaust';
+  /** +1: the disc seals the exhaust seat (1 → 2); -1: it seals the inlet and port 2 dumps through port 3. */
+  offset: 1 | -1;
+  mode: 'idle' | 'fill' | 'exhaust';
+  supply: number;
+  work: number;
+  exhaust: number;
+}
+
+export function analyzeQuickExhaust(component: CutawayComponent, snapshot: EngineSnapshot, tr: FluidTranslate = englishFluidT): QuickExhaustAnalysis {
+  const supply = portPressure(snapshot, component, 'p1');
+  const work = portPressure(snapshot, component, 'p2');
+  const exhaust = portPressure(snapshot, component, 'p3');
+  const offset = (snapshot.logic?.[component.id]?.offset ?? -1) > 0 ? 1 : -1;
+  const dumping = (snapshot.nets.find(net => net.connectedPortIds.includes(`${component.id}:p3`))?.flowRate ?? 0) > FLOWING_LPM;
+  const mode = offset === 1 ? 'fill' : work > FORCE_EPS || dumping ? 'exhaust' : 'idle';
+  const key = { idle: 'idle', fill: 'fill', exhaust: 'exhaust' }[mode];
+  return {
+    kind: 'quickExhaust', offset, mode, supply, work, exhaust,
+    state: tr(`cutaway.quickExhaust.${key}`),
+    tone: mode === 'fill' ? 'open' : mode === 'exhaust' ? 'active' : 'idle',
+    description: tr(`cutaway.quickExhaust.${key}Text`, { supply: bar(supply), work: bar(work) }),
+    readings: [{ port: 'p1', label: '1', bar: supply }, { port: 'p2', label: '2', bar: work }, { port: 'p3', label: '3', bar: exhaust }],
+  };
+}
+
+/* ───────────────────────── Pressure control valves ───────────────────────── */
+
+export interface PressureValveAnalysis extends BaseAnalysis {
+  kind: 'regulator' | 'relief';
+  /** Regulator with vent port 3 (relieving type). */
+  relieving: boolean;
+  /** Set pressure: the regulator's dial, or the relief valve's cracking pressure. */
+  setBar: number;
+  inBar: number;
+  /** Regulator: pressure on port 2 under the diaphragm. Relief valve: the same as the inlet. */
+  outBar: number;
+  /** Regulator: poppet gap, 0 (seated) … 1 (fully open). Relief valve: poppet lift, 0 … 1. */
+  gap: number;
+  /** Regulator: diaphragm travel against the spring, 0 (spring-side, rest) … 1 (poppet closed) … 1.4 (lifted off the relief seat). */
+  deflection: number;
+  /** Air leaves through the vent: the relieving regulator's bonnet vent, or the relief valve's outlet. */
+  venting: boolean;
+}
+
+/** Regulating band: the pressure rise below the set point over which the poppet closes. */
+const regulatingBand = (setBar: number) => Math.max(0.2, 0.1 * setBar);
+
+export function analyzeRegulator(component: CutawayComponent, snapshot: EngineSnapshot, tr: FluidTranslate = englishFluidT): PressureValveAnalysis {
+  const rawSet = Number(component.props.setpoint ?? 6);
+  const setBar = Math.max(0, Number.isFinite(rawSet) ? rawSet : 6);
+  const relieving = component.type === 'regulator-relieving';
+  const inBar = portPressure(snapshot, component, 'p1');
+  const outBar = portPressure(snapshot, component, 'p2');
+  const flowAt = (port: string) => snapshot.nets.find(net => net.connectedPortIds.includes(`${component.id}:${port}`))?.flowRate ?? 0;
+  const band = regulatingBand(setBar);
+  const atSet = outBar >= setBar - 0.05;
+  const venting = relieving && (flowAt('p3') > FLOWING_LPM || outBar > setBar + 0.05);
+  const supplied = inBar > outBar + 0.05;
+  // Below the set point the spring holds the poppet open; the diaphragm closes it over the regulating band as P2 reaches the dial.
+  const diaphragm = clamp((outBar - (setBar - band)) / band, 0, 1);
+  const gap = inBar < EPS && outBar < EPS ? 1 : atSet ? (supplied && flowAt('p2') > FLOWING_LPM ? 0.2 : 0) : 1 - diaphragm;
+  const deflection = venting ? 1.4 : 1 - gap;
+  const mode = inBar < EPS && outBar < EPS ? 'idle' : venting ? 'venting' : atSet ? 'holding' : 'regulating';
+  const values = { set: bar(setBar), out: bar(outBar), in: bar(inBar) };
+  return {
+    kind: 'regulator',
+    relieving,
+    setBar, inBar, outBar, gap, deflection, venting,
+    state: tr(`cutaway.pressure.regulator.${mode}`),
+    tone: mode === 'idle' ? 'idle' : mode === 'regulating' ? 'open' : mode === 'holding' ? 'active' : 'blocked',
+    description: tr(`cutaway.pressure.regulator.${mode}Text`, values),
+    readings: [{ port: 'p1', label: '1', bar: inBar }, { port: 'p2', label: '2', bar: outBar }, ...(relieving ? [{ port: 'p3', label: '3', bar: portPressure(snapshot, component, 'p3') }] : [])],
+  };
+}
+
+export function analyzeRelief(component: CutawayComponent, snapshot: EngineSnapshot, tr: FluidTranslate = englishFluidT): PressureValveAnalysis {
+  const hydraulic = component.type === 'hyd-pressure-relief';
+  const rawSet = Number(component.props.crackingPressure ?? (hydraulic ? 60 : 8));
+  const setBar = Math.max(0, Number.isFinite(rawSet) ? rawSet : hydraulic ? 60 : 8);
+  const inBar = portPressure(snapshot, component, 'p1');
+  const engineOpen = snapshot.reliefValves?.[component.id]?.open;
+  const open = engineOpen ?? (setBar > 0 && inBar >= setBar - 0.05);
+  const mode = open ? 'open' : inBar > EPS ? 'closed' : 'idle';
+  const values = { set: bar(setBar), in: bar(inBar) };
+  return {
+    kind: 'relief',
+    relieving: false,
+    setBar, inBar, outBar: inBar, gap: open ? 1 : 0, deflection: open ? 1 : 0, venting: open,
+    state: tr(`cutaway.pressure.relief.${mode}`),
+    tone: mode === 'open' ? 'open' : 'idle',
+    description: tr(`cutaway.pressure.relief.${mode}Text`, values),
+    readings: [{ port: 'p1', label: '1', bar: inBar }],
+  };
+}
+
+export type CutawayAnalysis = GaugeAnalysis | PressureValveAnalysis | QuickExhaustAnalysis | ReservoirAnalysis | TimerAnalysis | CheckAnalysis | FlowControlAnalysis | GateAnalysis | SpoolAnalysis | CushionAnalysis | SingleAnalysis;
 
 export function analyzeCutaway(component: CutawayComponent, snapshot: EngineSnapshot, tr: FluidTranslate = englishFluidT): CutawayAnalysis | null {
   switch (cutawayKindOf(component)) {
     case 'and': return analyzeAnd(component, snapshot, tr);
     case 'or': return analyzeOr(component, snapshot, tr);
+    case 'quickExhaust': return analyzeQuickExhaust(component, snapshot, tr);
+    case 'gauge': return analyzeGauge(component, snapshot, tr);
+    case 'regulator': return analyzeRegulator(component, snapshot, tr);
+    case 'relief': return analyzeRelief(component, snapshot, tr);
     case 'spool22': return analyzeSpool(component, snapshot, 'spool22', tr);
     case 'spool32': return analyzeSpool(component, snapshot, 'spool32', tr);
     case 'spool42': return analyzeSpool(component, snapshot, 'spool42', tr);
     case 'spool52': return analyzeSpool(component, snapshot, 'spool52', tr);
     case 'spool53': return analyzeSpool(component, snapshot, 'spool53', tr);
+    case 'spool43': return analyzeSpool(component, snapshot, 'spool43', tr);
+    case 'spool43float': return analyzeSpool(component, snapshot, 'spool43float', tr);
     case 'cushion': return analyzeCushion(component, snapshot, tr);
     case 'check': return analyzeCheck(component, snapshot, 'check', tr);
     case 'springCheck': return analyzeCheck(component, snapshot, 'springCheck', tr);

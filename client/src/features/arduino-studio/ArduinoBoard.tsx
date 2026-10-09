@@ -7,7 +7,10 @@ import { useTranslation } from "react-i18next";
 import unoRaw from "./arduinoUno.svg?raw";
 import { ANALOG_HEADER_Y, DIGITAL_HEADER_Y, HEADER_PINS, LEDS, VIEW_H, VIEW_W, analogPinX, digitalPinX, pinName } from "./arduinoBoardGeometry";
 import type { PinUsage } from "@shared/code/arduinoTypes";
-import { BTN_H, BTN_W, LED_H, LED_W, POT_H, POT_W, RES_H, RES_W, VectorLed, VectorPotentiometer, VectorPushButton, VectorResistor } from "./components/circuit";
+import { BTN_H, BTN_W, LED_H, LED_W, LCD_HOLE_Y, LcdWires, POT_H, POT_W, RES_H, RES_W, VectorLed, VectorPotentiometer, VectorPushButton, VectorResistor, buildLcdHarness } from "./components/circuit";
+import { LcdDisplay, TRIMMER } from "./components/LcdDisplay";
+import { LcdContrastKnob } from "./components/LcdContrastKnob";
+import { lcdHoleX } from "./components/circuit/lcdGeometry";
 import type { HardwareSnapshot } from "./arduinoRuntime";
 import { StudioSlider } from "@/components/common/templates";
 
@@ -21,6 +24,11 @@ const UNO_SVG = prepareUnoSvg(unoRaw);
 
 const CANVAS_W = 800;
 const CANVAS_H = 600;
+/** With the LCD on, the canvas grows upward: LCD row, jumper lanes, then (optionally) the module row above the board. */
+const LCD_HOLE_ABOVE = { withModules: 196, bare: 80 } as const;
+const LCD_TOP_MARGIN = 12;
+const LCD_BOTTOM_ROOM = 58;
+const DEFAULT_LCD_PINS = [12, 11, 5, 4, 3, 2];
 
 /** Board scaling and coordinates within the 800x600 canvas */
 const S_BOARD = 1.75;
@@ -145,6 +153,10 @@ interface Props {
   ledColors?: Record<number, string>;
   /** Callback when user changes an LED's color via the popover. */
   onLedColorChange?: (pin: number, color: string) => void;
+  /** Show the 16x2 LCD module with its auto-wired jumpers. */
+  lcdVisible?: boolean;
+  /** Turns the LCD's V0 contrast trimmer (0..1). */
+  onLcdContrast?: (value: number) => void;
 }
 
 const EMPTY_LAYOUT: PinUsage = { digitalInputs: [], pullups: [], analogInputs: [], outputs: [] };
@@ -152,7 +164,7 @@ const uniqSorted = (xs: number[]): number[] => Array.from(new Set(xs)).sort((a, 
 
 type TopModule = { kind: "in" | "out"; pin: number };
 
-export function ArduinoBoard({ snapshot, onDigitalInput, onAnalogInput, layout = EMPTY_LAYOUT, ledColors = {}, onLedColorChange }: Props) {
+export function ArduinoBoard({ snapshot, onDigitalInput, onAnalogInput, layout = EMPTY_LAYOUT, ledColors = {}, onLedColorChange, lcdVisible = false, onLcdContrast }: Props) {
   const { t } = useTranslation("simulators");
   const ledColorOptions = useLedColorOptions();
   const [boxRef, box] = useElementSize<HTMLDivElement>();
@@ -178,17 +190,30 @@ export function ArduinoBoard({ snapshot, onDigitalInput, onAnalogInput, layout =
   const rx = useFlash(snapshot.rxCount);
 
   // Static scaffolding (from the sketch) united with pins the running program touched.
-  const runtimeOutputs = snapshot.pins.map((p, i) => (p.mode === "OUTPUT" && i <= 13 ? i : -1)).filter(i => i >= 0);
-  const allOutputs = uniqSorted([...layout.outputs, ...runtimeOutputs]);
+  // The LCD owns its interface pins: they get jumpers to the module, not an LED/button of their own.
+  // While a sketch runs its live constructor arguments win; otherwise the statically analysed ones follow the editor.
+  const live = snapshot.status === "running" || snapshot.status === "paused";
+  const lcdWiring = (live ? snapshot.lcd.wiring : null) ?? layout.lcd ?? snapshot.lcd.wiring ?? null;
+  const lcdMode = lcdWiring?.mode ?? "parallel";
+  const lcdPins = lcdWiring?.mode === "i2c" ? [] : lcdWiring?.pins ?? DEFAULT_LCD_PINS;
+  const lcdOwned = new Set<number>(lcdVisible ? lcdPins : []);
+  const runtimeOutputs = snapshot.pins.map((p, i) => (p.mode === "OUTPUT" && i <= 13 && !lcdOwned.has(i) ? i : -1)).filter(i => i >= 0);
+  const allOutputs = uniqSorted([...layout.outputs.filter(p => !lcdOwned.has(p)), ...runtimeOutputs]);
   // Pin 13 is the built-in L LED; it only gets an external circuit when the sketch drives other outputs too.
   const outputs = allOutputs.filter(p => p < 13 || allOutputs.length > 1);
-  const digitalInputs = uniqSorted([...layout.digitalInputs, ...snapshot.digitalInputs]).filter(p => !allOutputs.includes(p) && p !== 13);
-  const analogInputs = uniqSorted([...layout.analogInputs, ...snapshot.analogInputs]);
+  const digitalInputs = uniqSorted([...layout.digitalInputs, ...snapshot.digitalInputs]).filter(p => !allOutputs.includes(p) && p !== 13 && !lcdOwned.has(p));
+  const analogInputs = uniqSorted([...layout.analogInputs, ...snapshot.analogInputs]).filter(ch => !lcdOwned.has(ch + 14));
   const topModules: TopModule[] = [...digitalInputs.map((pin): TopModule => ({ kind: "in", pin })), ...outputs.map((pin): TopModule => ({ kind: "out", pin }))].sort((a, b) => digitalPinX(a.pin) - digitalPinX(b.pin));
 
   const s = S_BOARD;
   const boardH = BOARD_H;
   const P = (x: number, y: number): Pt => ({ x: x * s, y: y * s });
+
+  // Vertical layout: the canvas origin is the board's top-left corner offset by `boardY`.
+  const lcdHoleY = lcdVisible ? -(topModules.length > 0 ? LCD_HOLE_ABOVE.withModules : LCD_HOLE_ABOVE.bare) : 0;
+  const lcdOriginY = lcdHoleY - LCD_HOLE_Y;
+  const boardY = lcdVisible ? LCD_TOP_MARGIN - lcdOriginY : BOARD_Y;
+  const canvasH = lcdVisible ? boardY + BOARD_H + (analogInputs.length > 0 ? GAP_BOTTOM + AN_C.h + 12 : LCD_BOTTOM_ROOM) : CANVAS_H;
 
   const pin13 = snapshot.pins[13];
   const lBrightness = pin13.mode === "OUTPUT" ? (pin13.pwm !== null ? pin13.pwm / 255 : pin13.level) : 0;
@@ -402,8 +427,49 @@ export function ArduinoBoard({ snapshot, onDigitalInput, onAnalogInput, layout =
     );
   });
 
+  let lcdLayer: React.ReactNode = null;
+  if (lcdVisible) {
+    const padOf = (id: string): Pt => {
+      const hp = HEADER_PINS.find(h => h.id === id);
+      return P(hp?.x ?? 0, hp?.y ?? 0);
+    };
+    // Align D4 (header pin 10) with Uno pin 5 so the four data lines drop straight onto their pads (parallel),
+    // or park the backpack just right of the top GND pad (I2C).
+    const alignX = lcdMode === "parallel" ? P(digitalPinX(lcdPins[2] ?? 5), 0).x - lcdHoleX(10) : P(TOP_GND.x, 0).x + 40 - lcdHoleX(11);
+    const origin: Pt = { x: alignX, y: lcdOriginY };
+    const wires = buildLcdHarness({
+      mode: lcdMode,
+      pins: lcdPins,
+      origin,
+      boardW: BOARD_W,
+      boardH,
+      pinPoint: pin => (pin >= 14 ? P(analogPinX(pin - 14), ANALOG_HEADER_Y) : P(digitalPinX(pin), DIGITAL_HEADER_Y)),
+      gndTop: P(TOP_GND.x, TOP_GND.y),
+      gndBottom: P(BOTTOM_GND.x, BOTTOM_GND.y),
+      v5: P(V5.x, V5.y),
+      sda: padOf("SDA"),
+      scl: padOf("SCL"),
+    });
+    const powered = snapshot.status !== "idle";
+    lcdLayer = (
+      <>
+        <LcdDisplay lcd={snapshot.lcd} powered={powered} mode={lcdMode} x={origin.x} y={origin.y} />
+        <LcdWires wires={wires} />
+      </>
+    );
+    overlays.push(
+      <LcdContrastKnob
+        key="lcd-contrast"
+        value={snapshot.lcd.contrast}
+        onChange={v => onLcdContrast?.(v)}
+        label={t("arduino.lcdContrastAria", "LCD contrast (V0 trimmer)")}
+        style={{ left: origin.x + TRIMMER.x, top: origin.y + TRIMMER.y, width: TRIMMER.w, height: TRIMMER.h }}
+      />,
+    );
+  }
+
   const scale = box.w > 0 && box.h > 0
-    ? Math.min(box.w / CANVAS_W, box.h / CANVAS_H) * 0.95
+    ? Math.min(box.w / CANVAS_W, box.h / canvasH) * 0.95
     : 1;
 
   return (
@@ -415,7 +481,7 @@ export function ArduinoBoard({ snapshot, onDigitalInput, onAnalogInput, layout =
         className="relative shrink-0"
         style={{
           width: CANVAS_W,
-          height: CANVAS_H,
+          height: canvasH,
           transform: `scale(${scale})`,
           transformOrigin: "center center",
         }}
@@ -424,7 +490,7 @@ export function ArduinoBoard({ snapshot, onDigitalInput, onAnalogInput, layout =
           className="absolute"
           style={{
             left: BOARD_X,
-            top: BOARD_Y,
+            top: boardY,
             width: BOARD_W,
             height: BOARD_H,
           }}
@@ -532,6 +598,7 @@ export function ArduinoBoard({ snapshot, onDigitalInput, onAnalogInput, layout =
             </g>
             {gnd}
             {mid}
+            {lcdLayer}
             {art}
             {signal}
           </svg>

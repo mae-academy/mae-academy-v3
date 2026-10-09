@@ -133,6 +133,20 @@ describe('one-way flow control cutaway', () => {
     expect(Math.max(...widths)).toBeGreaterThan(streamWidth(20));
   });
 
+  it('supplying port 2 directly (P2 − P1 above the cracking pressure) unseats the poppet and compresses the spring', () => {
+    const fc = part('fc', 'flow-control-oneway', { openingPercentage: 20 });
+    // air supplied on port 2 with the flow reading still at zero: only the pressure difference can lift the poppet
+    const snapshot = { portPressure: { 'fc:in': 0, 'fc:out': 6 }, nets: [] } as never;
+    const analysis = analyzeFlowControl(fc, snapshot, 'oneway');
+    expect(analysis.outBar).toBeGreaterThan(analysis.inBar);
+    expect(analysis.direction).toBe(-1);
+    const c = stage(analysis);
+    expect(c.querySelector('.check-poppet')!.getAttribute('data-state')).toBe('open');
+    expect(POPPET_LIFT).toBeGreaterThanOrEqual(14);
+    expect(POPPET_LIFT).toBeLessThanOrEqual(18);
+    expect(c.querySelector('.bypass-flood')).not.toBeNull();
+  });
+
   it('the spring is compressed by the lift, and the needle still follows the opening', () => {
     const seated = stage(throttleRun('flow-control-oneway', 20, 'extend').analysis);
     const scale = (c: HTMLElement) => Number(/scaleX\(([-\d.]+)\)/.exec((c.querySelector('g[style*="scaleX"]') as HTMLElement).style.transform)![1]);

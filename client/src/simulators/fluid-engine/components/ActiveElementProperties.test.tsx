@@ -172,3 +172,27 @@ describe('editable operator tags', () => {
   });
 });
 
+
+describe('Initial State of the consolidated 2/2 and 3/2 valves', () => {
+  const withTwin = (type: string) => {
+    const definition = getFluidDefinition(type)!;
+    const component = { id: 'v', type, label: '1V1', x: 0, y: 0, rotation: 0, flipH: false, flipV: false, props: defaultFluidProps(definition) };
+    const onInitialStateChange = vi.fn();
+    render(<ActiveElementProperties component={component} definition={definition} colors={COLORS} sensorOptions={[]} onLabelChange={vi.fn()} onPropsChange={vi.fn()} onInitialStateChange={onInitialStateChange} />);
+    return onInitialStateChange;
+  };
+
+  it.each([['valve-3-2-nc', 'valve-3-2-no', 'NC'], ['valve-2-2-no', 'valve-2-2-nc', 'NO']])('%s offers Normally Closed / Open and swaps to %s', (type, twin, current) => {
+    const change = withTwin(type);
+    const select = screen.getByLabelText('Initial State') as HTMLSelectElement;
+    expect(select.value).toBe(current);
+    expect(Array.from(select.options).map(option => option.textContent)).toEqual(['Normally Closed (NC)', 'Normally Open (NO)']);
+    fireEvent.change(select, { target: { value: current === 'NC' ? 'NO' : 'NC' } });
+    expect(change).toHaveBeenCalledWith(twin);
+  });
+
+  it('is not offered on other valves', () => {
+    withTwin('valve-4-2');
+    expect(screen.queryByLabelText('Initial State')).toBeNull();
+  });
+});

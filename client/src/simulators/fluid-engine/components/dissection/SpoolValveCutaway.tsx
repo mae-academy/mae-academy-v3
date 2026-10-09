@@ -1,8 +1,8 @@
 import React from 'react';
 import { useFluidT, optionLabel } from '../../i18n/fluidText';
-import { EXHAUST_PORTS, type SpoolAnalysis, type SpoolPort } from './cutawayPhysics';
+import { EXHAUST_PORTS, isReturnInterval, isThreePosition, spoolPortLabel, type SpoolAnalysis, type SpoolPort } from './cutawayPhysics';
 import { EndActuator, isOutsideActuator } from './ActuatorCutaways';
-import { AnchoredSpring, CutawayDefs, EDGE_WIDTH, FlowStream, SANS, PortTag, fluidTint, groundProps, hatchFill, slideStyle, steelProps, type CutawayStageProps } from './cutawayParts';
+import { AnchoredSpring, CutawayDefs, EDGE_WIDTH, FlowStream, SANS, PortTag, TANK_RETURN, fluidTint, groundProps, hatchFill, slideStyle, steelProps, type CutawayStageProps } from './cutawayParts';
 
 /**
  * Stage layout. One continuous bore (y 140 … 200) runs the length of a solid metal body (y 96 … 244); its two end caps
@@ -23,11 +23,13 @@ const PILOT_HEAD = { half: 30, width: 10 };
 /** Seat plate the spring presses against on a spring-operated stem end. */
 const SEAT = { half: 18, width: 6 };
 const LAND_SEALS = 14;
+/** Cross-drilled tank duct of a hydraulic 4-port housing: it runs above the bore and feeds the single tank port T. */
+const DUCT = { y0: 104, y1: 124 };
 
 const isSpring = (kind: string) => kind === 'Spring Return' || kind === 'Spring Centred';
 const isPilot = (kind: string) => kind === 'Pneumatic Pilot';
 
-const NAMES = { spool22: '2/2', spool32: '3/2', spool42: '4/2', spool52: '5/2', spool53: '5/3' } as const;
+const NAMES = { spool22: '2/2', spool32: '3/2', spool42: '4/2', spool52: '5/2', spool53: '5/3', spool43: '4/3', spool43float: '4/3' } as const;
 
 /**
  * Sectional spool valve: a single ground spool with sealing lands slides in one bore, bridging ports through the
@@ -38,7 +40,7 @@ export function SpoolValveCutaway({ analysis, medium, theme, idPrefix = 'spool',
   const tr = useFluidT();
   const { start, operators, body } = analysis;
   const { chamberX, ports, landHalf, wallLeft, wallRight, stem, landSpacing, lands, top } = body;
-  const centring = analysis.kind === 'spool53';
+  const centring = isThreePosition(analysis.kind);
   const leftSpring = centring || isSpring(operators.left);
   const rightSpring = centring || isSpring(operators.right);
   const leftPilot = isPilot(operators.left);
@@ -48,7 +50,7 @@ export function SpoolValveCutaway({ analysis, medium, theme, idPrefix = 'spool',
   const pocketRight = analysis.intervals[analysis.intervals.length - 1];
   const grooves = inner.slice(0, grooveCount);
 
-  const tintOf = (interval: typeof pocketLeft | undefined) => (interval ? fluidTint(interval.bar, medium, interval.vented) : fluidTint(0, medium));
+  const tintOf = (interval: typeof pocketLeft | undefined) => (interval && isReturnInterval(body, interval) ? TANK_RETURN : interval ? fluidTint(interval.bar, medium, interval.vented) : fluidTint(0, medium));
   const pilotTint = (bar: number | null) => fluidTint(bar ?? 0, medium);
   const leftPocket = leftPilot ? pilotTint(analysis.pilotLeft) : tintOf(pocketLeft);
   const rightPocket = rightPilot ? pilotTint(analysis.pilotRight) : tintOf(pocketRight);
@@ -60,10 +62,20 @@ export function SpoolValveCutaway({ analysis, medium, theme, idPrefix = 'spool',
   const rightFree = wallRight - rightStemEnd - (rightPilot ? PILOT_HEAD.width : SEAT.width);
 
   /** The operator on this end is the one holding the spool shifted. 2-position valves show the right-hand end at rest. */
-  const sideActive = (side: 'left' | 'right') => (side === 'left' ? analysis.offset > 0.5 : analysis.kind === 'spool53' && analysis.offset < -0.5);
+  const sideActive = (side: 'left' | 'right') => (side === 'left' ? analysis.offset > 0.5 : isThreePosition(analysis.kind) && analysis.offset < -0.5);
   const isTop = (port: SpoolPort) => top.includes(port);
+  /** Hydraulic 4-port housing: both tank chambers open into one duct; only the chamber on port 3 is tagged and the duct has the one tank stub. */
+  const ductBody = Boolean(body.tankDuct);
+  const isTank = (port: SpoolPort) => ductBody && (port === '5' || port === '3');
   const px = (port: SpoolPort) => chamberX[ports.indexOf(port)];
-  const stubTip = (port: SpoolPort) => (isTop(port) ? BODY.y - STUB.length : BODY.y + BODY.height + STUB.length);
+  const tankMid = (px('5') + px('3')) / 2;
+  /** Tint of a port's own channel: oil heading back to the tank is blue, otherwise the port pressure. */
+  const channelTint = (port: SpoolPort) => {
+    const segment = analysis.intervals.find(interval => interval.ports.includes(port));
+    return segment && isReturnInterval(body, segment) ? TANK_RETURN : fluidTint(analysis.pressures[port], medium, EXHAUST_PORTS.includes(port));
+  };
+  const tankTint = analysis.intervals.some(interval => isReturnInterval(body, interval) && interval.ports.length > 1) ? TANK_RETURN : fluidTint(analysis.pressures['3'], medium, true);
+  const stubTip = (port: SpoolPort) => (isTank(port) ? (DUCT.y0 + DUCT.y1) / 2 : isTop(port) ? BODY.y - STUB.length : BODY.y + BODY.height + STUB.length);
   const portLevel = (port: SpoolPort) => (isTop(port) ? 152 : 188);
 
   return (
@@ -72,7 +84,8 @@ export function SpoolValveCutaway({ analysis, medium, theme, idPrefix = 'spool',
       <clipPath id={`${idPrefix}-bore`}><rect x={wallLeft} y={BORE_Y.y0} width={wallRight - wallLeft} height={BORE_Y.y1 - BORE_Y.y0} /></clipPath>
 
       {/* port stubs, then the body and its end caps */}
-      {ports.map(port => {
+      {ductBody && <rect className="port-stub" data-port="T" x={tankMid - STUB.half} y={BODY.y - STUB.length} width={2 * STUB.half} height={STUB.length} fill={theme.hatch} stroke={theme.casingEdge} strokeWidth={EDGE_WIDTH} />}
+      {ports.filter(port => !isTank(port)).map(port => {
         const up = isTop(port);
         return <rect key={port} className="port-stub" data-port={port} x={px(port) - STUB.half} y={up ? BODY.y - STUB.length : BODY.y + BODY.height} width={2 * STUB.half} height={STUB.length} fill={theme.hatch} stroke={theme.casingEdge} strokeWidth={EDGE_WIDTH} />;
       })}
@@ -85,9 +98,16 @@ export function SpoolValveCutaway({ analysis, medium, theme, idPrefix = 'spool',
 
       {/* the bore and the straight rectangular port channels, tinted with their port pressure */}
       <rect x={wallLeft} y={BORE_Y.y0} width={wallRight - wallLeft} height={BORE_Y.y1 - BORE_Y.y0} fill={theme.bore} />
-      {ports.map(port => {
+      {ductBody && (
+        <g data-chamber="T" className="tank-duct">
+          {[...[px('5'), px('3')].map(x => ({ x: x - PORT_HALF, y: DUCT.y0, width: 2 * PORT_HALF, height: BORE_Y.y0 - DUCT.y0 })), { x: px('5') - PORT_HALF, y: DUCT.y0, width: px('3') - px('5') + 2 * PORT_HALF, height: DUCT.y1 - DUCT.y0 }, { x: tankMid - PORT_HALF, y: BODY.y - STUB.length, width: 2 * PORT_HALF, height: DUCT.y1 - (BODY.y - STUB.length) }].map((r, index) => (
+            <g key={index}><rect {...r} fill={theme.bore} /><rect {...r} fill={tankTint.fill} opacity={tankTint.opacity} /></g>
+          ))}
+        </g>
+      )}
+      {ports.filter(port => !isTank(port)).map(port => {
         const up = isTop(port);
-        const tint = fluidTint(analysis.pressures[port], medium, EXHAUST_PORTS.includes(port));
+        const tint = channelTint(port);
         const channel = up ? { y: BODY.y - STUB.length, height: BORE_Y.y0 - (BODY.y - STUB.length) } : { y: BORE_Y.y1, height: BODY.y + BODY.height + STUB.length - BORE_Y.y1 };
         return (
           <g key={port} data-chamber={port}>
@@ -152,8 +172,8 @@ export function SpoolValveCutaway({ analysis, medium, theme, idPrefix = 'spool',
         return <FlowStream key={`${from}-${to}`} points={points} />;
       })}
 
-      {ports.map(port => (
-        <PortTag key={port} x={px(port)} y={isTop(port) ? 62 : 282} label={body.labels?.[port] ?? port} bar={analysis.pressures[port]} theme={theme} below={!isTop(port)} />
+      {ports.filter(port => !ductBody || port !== '5').map(port => (
+        <PortTag key={port} x={isTank(port) ? tankMid : px(port)} y={isTop(port) ? 62 : 282} label={spoolPortLabel(body, port)} bar={analysis.pressures[port]} theme={theme} below={!isTop(port)} />
       ))}
       {leftPilot && <PortTag x={70} y={62} label={ports.includes('4') ? '14' : '12'} bar={analysis.pilotLeft ?? 0} theme={theme} />}
       {rightPilot && <PortTag x={710} y={62} label={ports.includes('4') ? '12' : '10'} bar={analysis.pilotRight ?? 0} theme={theme} />}

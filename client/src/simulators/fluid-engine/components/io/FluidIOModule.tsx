@@ -11,18 +11,23 @@ import { VALVE_SPECS, type FluidMedium } from '../../models/fluidCatalog';
 import { labelToLatex } from '../../models/fluidLabel';
 import { PRESSURE_SCALE } from '../../models/pressureColors';
 import { sensorTagsOf, type SensorOption } from '../../models/sensorCoupling';
-import { SERVICE_UNIT, operatorKey, operatorTagsOf, type SignalTags } from '../../models/signalTags';
+import { elementsOf, tagKey, type LadderCircuit } from '../../models/relayLadder';
+import type { RelayLadder } from '../../hooks/useRelayLadder';
+import { POWER_UNIT, SERVICE_UNIT, SOLENOID_OPERATOR, operatorKey, operatorTagsOf, type SignalTags } from '../../models/signalTags';
 
 /** Active-state crimson shared with the platform's status indicators. */
-export const ACTIVE_INDICATOR = '#E11D48';
+export const ACTIVE_INDICATOR = '#EF4444';
 
-/** Supply lamp colours: green while the main line is pressurised, red while it is shut off / vented. */
-export const SUPPLY_LIVE = '#22C55E';
+/** Supply lamp colour: the same red pilot as every other input. */
+export const SUPPLY_LIVE = ACTIVE_INDICATOR;
+
+/** Muted ring of an unlit pilot lamp. */
+const LED_RING = '#D1D5DB';
 
 /** Round pilot lamp: glowing crimson (or `glow`) while energised (1), muted grey when not (0). */
-export function Lamp({ on, off, glow = ACTIVE_INDICATOR }: { on: boolean; off: string; glow?: string }) {
+export function Lamp({ on, off, glow = ACTIVE_INDICATOR, size = 10 }: { on: boolean; off: string; glow?: string; size?: number }) {
   const tr = useFluidT();
-  return <span aria-label={on ? tr('board.active') : tr('board.inactive')} style={{ width: 10, height: 10, borderRadius: 9999, flexShrink: 0, background: on ? glow : off, boxShadow: on ? `0 0 8px 1px ${glow}` : 'none', transition: 'all 0.2s ease-in-out' }} />;
+  return <span aria-label={on ? tr('board.active') : tr('board.inactive')} style={{ width: size, height: size, borderRadius: 9999, flexShrink: 0, background: on ? glow : off, border: on ? 'none' : `1.5px solid ${LED_RING}`, boxShadow: on ? `0 0 8px 1px ${glow}` : 'none', transition: 'all 0.2s ease-in-out' }} />;
 }
 
 /** Push + Latch for momentary operators; a single ON / OFF toggle for levers, solenoids and limit-switch rollers. */
@@ -47,32 +52,41 @@ export interface InputChannelProps {
   live: boolean;
   /** Buttons offered: Push + Latch, or one ON / OFF toggle. */
   mode?: ChannelMode;
-  /** Lamp colour when active (the supply lamp is green, signal inputs crimson). */
+  /** Lamp colour when active (the supply lamp is blue, signal inputs crimson). */
   glow?: string;
   /** Momentary pulse: starts on mouse down / touch; the owner releases it on mouse up. */
   onPush: () => void;
   onLatchToggle: () => void;
 }
 
-/** One digital-input channel: pilot lamp, tag, and the Push (momentary) / Latch (bi-stable) pair. */
+/**
+ * One digital-input channel as a slim PLC strip: tag, red pilot LED and a segmented ON / OFF / PUSH block.
+ * ON latches the input high, OFF latches it low, PUSH holds it high while the pointer is down (the owner releases it).
+ * Levers, rollers and the supply shut-off have no momentary action, so they get ON / OFF only.
+ */
 export function InputChannel({ colors, tag, description, active, latched, live, mode = 'push-latch', glow, onPush, onLatchToggle }: InputChannelProps) {
   const tr = useFluidT();
   const held = active && !latched;
-  const button = (pressed: boolean): React.CSSProperties => ({
-    minHeight: 24, padding: '2px 9px', borderRadius: 9999, fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', cursor: live ? 'pointer' : 'not-allowed', opacity: live ? 1 : 0.5,
-    border: pressed ? 'none' : `1px solid ${colors.line}`, background: pressed ? undefined : colors.panel, color: pressed ? '#fff' : colors.text, userSelect: 'none',
+  const segment = (selected: boolean, first: boolean, last: boolean): React.CSSProperties => ({
+    width: '100%', minHeight: 24, padding: '2px 0', fontSize: 11, fontWeight: 800, letterSpacing: '0.02em', textTransform: 'uppercase', cursor: live ? 'pointer' : 'not-allowed', opacity: live ? 1 : 0.5, userSelect: 'none',
+    border: selected ? `1.5px solid ${colors.muted}` : '1.5px solid transparent', background: selected ? colors.panel : colors.panelAlt, color: selected ? colors.text : colors.muted,
+    borderRadius: `${first ? 8 : 4}px ${first ? 8 : 4}px ${last ? 8 : 4}px ${last ? 8 : 4}px`,
   });
+  const labels = { on: tr('io.on'), off: tr('io.off'), push: tr('board.push') };
+  const count = mode === 'push-latch' ? 3 : 2;
+  const set = (target: boolean) => { if (latched !== target) onLatchToggle(); };
   return (
-    <div data-testid="fluid-input-row" data-input={tag} style={{ display: 'grid', gridTemplateColumns: mode === 'toggle' ? 'auto minmax(0, 1fr) auto' : 'auto minmax(0, 1fr) auto auto', alignItems: 'center', gap: 8, padding: '6px 10px', border: `1px solid ${colors.line}`, borderRadius: 10, background: colors.panelAlt }}>
-      <Lamp on={active} off={colors.line} glow={glow} />
-      <span style={{ minWidth: 0, display: 'grid', color: colors.text }}>
-        <span data-testid="fluid-input-tag"><Tag label={tag} /></span>
-        <span style={{ fontSize: 10, color: colors.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{description}</span>
-      </span>
-      {mode === 'push-latch' && (
-        <button type="button" disabled={!live} title={live ? tr('board.holdTip') : tr('board.pressRunTip')} aria-pressed={held} onMouseDown={onPush} onTouchStart={event => { event.preventDefault(); onPush(); }} className={held ? 'btn-active-brand' : ''} style={button(held)}>{tr('board.push')}</button>
-      )}
-      <button type="button" disabled={!live} title={live ? tr('board.latchTip') : tr('board.pressRunTip')} aria-pressed={latched} onClick={onLatchToggle} className={latched ? 'btn-active-brand' : ''} style={button(latched)}>{mode === 'toggle' ? tr('io.toggle') : tr('board.latch')}</button>
+    <div data-testid="fluid-input-row" data-input={tag} title={description} style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: '6px 3px', border: `1px solid ${colors.line}`, borderRadius: 8, background: colors.panel, minWidth: 0 }}>
+      <span data-testid="fluid-input-tag" style={{ color: colors.text, maxWidth: '100%', overflow: 'hidden' }}><Tag label={tag} /></span>
+      <Lamp on={active} off="transparent" glow={glow} size={12} />
+      <span style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap' }}>{description}</span>
+      <div role="group" aria-label={tr('io.channelControls')} style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 2, padding: 2, border: `1px solid ${colors.line}`, borderRadius: 10, background: colors.panelAlt }}>
+        <button type="button" disabled={!live} title={live ? tr('board.latchTip') : tr('board.pressRunTip')} aria-pressed={latched} onClick={() => set(true)} style={segment(latched, true, count === 2 ? false : false)}>{labels.on}</button>
+        <button type="button" disabled={!live} title={live ? tr('board.latchTip') : tr('board.pressRunTip')} aria-pressed={!latched && !held} onClick={() => set(false)} style={segment(!latched && !held, false, count === 2)}>{labels.off}</button>
+        {mode === 'push-latch' && (
+          <button type="button" disabled={!live} title={live ? tr('board.holdTip') : tr('board.pressRunTip')} aria-pressed={held} onMouseDown={onPush} onTouchStart={event => { event.preventDefault(); onPush(); }} style={segment(held, false, true)}>{labels.push}</button>
+        )}
+      </div>
     </div>
   );
 }
@@ -92,6 +106,8 @@ export interface FluidIOModuleProps {
   onLatchToggle: (id: string, side: OperatorSide) => void;
   /** Opens or closes the main shut-off of a service unit. */
   onShutoffChange: (id: string, on: boolean) => void;
+  /** Control Circuit ladder: its pushbuttons become inputs here and its solenoids show their drive as lamps. */
+  ladder?: { circuit: LadderCircuit; relay: RelayLadder };
 }
 
 const sectionTitle: React.CSSProperties = { marginBottom: 6 };
@@ -101,17 +117,31 @@ const readout = (colors: Palette): React.CSSProperties => ({ display: 'flex', al
  * Right-hand I/O module in the style of the PLC simulator: digital inputs discovered from the schematic (manual operators,
  * limit-switch rollers, solenoids), each a Push / Latch channel with a pilot lamp, then the plant's outputs.
  */
-export function FluidIOModule({ colors, medium, components, snapshot, manualInputs, latched, live, signalTags, sensorOptions, onPush, onLatchToggle, onShutoffChange }: FluidIOModuleProps) {
+export function FluidIOModule({ colors, medium, components, snapshot, manualInputs, latched, live, signalTags, sensorOptions, onPush, onLatchToggle, onShutoffChange, ladder }: FluidIOModuleProps) {
   const tr = useFluidT();
-  const supplies = components.filter(component => component.type === SERVICE_UNIT);
+  const ladderParts = ladder ? elementsOf(ladder.circuit) : [];
+  const seen = new Set<string>();
+  const uniqueBy = (kind: string) => ladderParts.filter(part => part.kind === kind && !seen.has(`${kind}:${tagKey(part.tag)}`) && seen.add(`${kind}:${tagKey(part.tag)}`));
+  const ladderButtons = uniqueBy('pushbutton');
+  const ladderSolenoids = uniqueBy('solenoid');
+  const supplies = components.filter(component => component.type === SERVICE_UNIT || component.type === POWER_UNIT);
   const channels = components.filter(component => VALVE_SPECS[component.type]).flatMap(valve => {
     const tags = operatorTagsOf(valve, signalTags, sensorOptions);
     return (['left', 'right'] as const).flatMap(side => {
       const kind = String(valve.props[OPERATOR_PROP[side]] ?? 'None');
       const linked = String(valve.props[SENSOR_PROP[side]] ?? '');
-      return isMechanicalOperator(kind) && tags[side] ? [{ id: valve.id, side, tag: tags[side]!, kind, description: tr(`io.kinds.${KIND_NAME[kind] ?? 'pushbutton'}`), tripped: Boolean(linked && snapshot.sensors[linked]) }] : [];
+      return isMechanicalOperator(kind) && kind !== SOLENOID_OPERATOR && tags[side] ? [{ id: valve.id, side, tag: tags[side]!, kind, description: tr(`io.kinds.${KIND_NAME[kind] ?? 'pushbutton'}`), tripped: Boolean(linked && snapshot.sensors[linked]) }] : [];
     });
   });
+  /** Solenoid coils are loads of the control circuit: read-only, lit while the valve end is energised (ladder or Control Board). */
+  const valveSolenoids = components.filter(component => VALVE_SPECS[component.type]).flatMap(valve => {
+    const tags = operatorTagsOf(valve, signalTags, sensorOptions);
+    return (['left', 'right'] as const).flatMap(side => (String(valve.props[OPERATOR_PROP[side]] ?? 'None') === SOLENOID_OPERATOR && tags[side] ? [{ key: operatorKey(valve.id, side), tag: tags[side]!, on: Boolean(manualInputs[valve.id]?.[side]) }] : []));
+  });
+  const outputs = [
+    ...valveSolenoids,
+    ...ladderSolenoids.filter(part => !valveSolenoids.some(item => tagKey(item.tag) === tagKey(part.tag))).map(part => ({ key: `ladder:${tagKey(part.tag)}`, tag: part.tag, on: Boolean(ladder?.relay.result.solenoids[tagKey(part.tag)]) })),
+  ];
   const cylinders = components.filter(component => snapshot.cylinders[component.id]);
   const motors = components.filter(component => snapshot.motors[component.id]);
   const reliefs = components.filter(component => snapshot.reliefValves[component.id]);
@@ -138,10 +168,10 @@ export function FluidIOModule({ colors, medium, components, snapshot, manualInpu
           </section>
         )}
         <section data-testid="fluid-input-strip">
-          {channels.length === 0 && supplies.length === 0 ? (
+          {channels.length === 0 && supplies.length === 0 && ladderButtons.length === 0 ? (
             <div style={{ fontSize: 12, color: colors.muted }}>{tr('board.emptyInputs')}</div>
           ) : (
-            <div style={{ display: 'grid', gap: 6 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 6 }}>
               {supplies.map(unit => {
                 const on = unit.props.shutoff !== 'OFF';
                 return (
@@ -177,10 +207,42 @@ export function FluidIOModule({ colors, medium, components, snapshot, manualInpu
                   />
                 );
               })}
+              {ladder && ladderButtons.map(button => {
+                const key = tagKey(button.tag);
+                return (
+                  <div key={`ladder:${key}`} data-testid="ladder-io-input">
+                    <InputChannel
+                      colors={colors}
+                      tag={button.tag}
+                      description={tr('io.kinds.pushbutton')}
+                      active={Boolean(ladder.relay.pressed[key])}
+                      mode="push-latch"
+                      latched={Boolean(ladder.relay.latched[key])}
+                      live={live}
+                      onPush={() => ladder.relay.operate(button.tag, false)}
+                      onLatchToggle={() => ladder.relay.operate(button.tag, true)}
+                    />
+                  </div>
+                );
+              })}
               {!live && <div style={{ fontSize: 11, color: colors.muted }}>{tr('board.pressRunInputs')}</div>}
             </div>
           )}
         </section>
+        {outputs.length > 0 && (
+          <section data-testid="fluid-digital-outputs">
+            <div className="mae-panel-section-header" style={sectionTitle}>{tr('io.digitalOutputs')}</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 6 }}>
+              {outputs.map(output => (
+                <div key={output.key} data-testid="fluid-output-row" data-output={output.tag} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 6px', border: `1px solid ${colors.line}`, borderRadius: 6, background: colors.panelAlt, minWidth: 0 }}>
+                  <Lamp on={live && output.on} off={colors.line} />
+                  <Tag label={output.tag} />
+                  <span style={{ marginInlineStart: 'auto', fontSize: 9, fontWeight: 700, color: live && output.on ? ACTIVE_INDICATOR : colors.muted }}>{live && output.on ? '24 V' : '0 V'}</span>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
         {cylinders.length > 0 && (
           <section>
             <div className="mae-panel-section-header" style={sectionTitle}>{tr('board.actuators')}</div>

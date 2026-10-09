@@ -1,8 +1,8 @@
 import React from 'react';
-import { BUS_REACH, JUNCTION_RADIUS, TERMINAL_REACH, layoutLadder, type PlacedColumn, type PlacedGroup } from '../../models/ladderLayout';
+import { BUS_REACH, JUNCTION_RADIUS, SENSOR_HALF_WIDTH, TERMINAL_REACH, layoutLadder, type PlacedColumn, type PlacedGroup } from '../../models/ladderLayout';
 import { crossReferences, tagKey, type LadderCircuit, type LadderElement, type LadderResult } from '../../models/relayLadder';
 import { useFluidT, type FluidTranslate } from '../../i18n/fluidText';
-import { LadderGlyph, type LadderTheme } from './LadderGlyphs';
+import { LadderGlyph, TexLabel, offInk, tagMath, type LadderTheme } from './LadderGlyphs';
 
 export type LadderSelection = { kind: 'element'; id: string } | { kind: 'path'; id: string } | null;
 
@@ -55,10 +55,9 @@ function PathConductor({ d, on, theme }: { d: string; on: boolean; theme: Ladder
       className={on ? 'ladder-conductor ladder-conductor-live' : 'ladder-conductor'}
       d={d}
       fill="none"
-      stroke={on ? theme.live : theme.ink}
-      strokeWidth={on ? 2.2 : 1.6}
+      stroke={on ? theme.live : offInk(theme)}
+      strokeWidth={on ? 2.5 : 1.5}
       strokeLinejoin="round"
-      style={on ? { filter: `drop-shadow(0 0 3px ${theme.live}) drop-shadow(0 0 6px ${theme.live})` } : undefined}
     />
   );
 }
@@ -69,9 +68,8 @@ function Conductor({ x1, y1, x2, y2, on, theme }: { x1: number; y1: number; x2: 
     <line
       className={on ? 'ladder-conductor ladder-conductor-live' : 'ladder-conductor'}
       x1={x1} y1={y1} x2={x2} y2={y2}
-      stroke={on ? theme.live : theme.ink}
-      strokeWidth={on ? 2.2 : 1.6}
-      style={on ? { filter: `drop-shadow(0 0 3px ${theme.live}) drop-shadow(0 0 6px ${theme.live})` } : undefined}
+      stroke={on ? theme.live : offInk(theme)}
+      strokeWidth={on ? 2.5 : 1.5}
     />
   );
 }
@@ -100,13 +98,13 @@ export function RelayLadderDiagram({ circuit, result, simulating, theme, selecti
   const references = crossReferences(circuit);
   const lit = (value: boolean | undefined) => simulating && Boolean(value);
 
-  const renderElement = (element: LadderElement, x: number, y: number) => {
+  const renderElement = (element: LadderElement, x: number, y: number, lane = false) => {
     const status = result.elements[element.id];
     const isLoad = element.kind === 'relayCoil' || element.kind === 'solenoid' || element.kind === 'timerCoil';
     const operated = element.kind === 'pushbutton' && Boolean(pressed[tagKey(element.tag)]);
     const isForced = element.kind === 'sensor' && Boolean(forced[tagKey(element.tag)]);
     const selected = selection?.kind === 'element' && selection.id === element.id;
-    const state = { simulating, closed: Boolean(status?.closed), live: Boolean(status?.live), operated, forced: isForced };
+    const state = { simulating, closed: Boolean(status?.closed), live: Boolean(status?.live), operated, forced: isForced, lane };
     const interactive = element.kind === 'pushbutton';
     const name = `${element.tag} ${kindName(tr, element)}`;
     const textRight = isLoad ? (element.kind === 'solenoid' ? 31 : 27) : 16;
@@ -145,7 +143,7 @@ export function RelayLadderDiagram({ circuit, result, simulating, theme, selecti
         {selected && <rect className="ladder-selection" x={-31} y={-27} width={element.kind === 'sensor' ? 72 : 62} height={54} rx={5} fill="none" stroke={theme.selection} strokeWidth={1.5} strokeDasharray="4 3" />}
         <LadderGlyph element={element} state={state} theme={theme} />
         {!isLoad && (
-          <text className="ladder-tag" x={element.kind === 'sensor' ? -24 : textRight} y={element.kind === 'sensor' ? 3 : -1} textAnchor={element.kind === 'sensor' ? 'end' : 'start'} fontSize={12} fontWeight={700} fill={theme.ink}>{element.tag}</text>
+          <TexLabel className="ladder-tag" x={element.kind === 'sensor' ? -24 : textRight} y={element.kind === 'sensor' ? 0 : -4} anchor={element.kind === 'sensor' ? 'end' : 'start'} math={tagMath(element.tag)} color={theme.ink} />
         )}
         {element.caption && (
           <text className="ladder-caption" x={element.kind === 'sensor' ? -24 : textRight} y={isLoad ? 4 : element.kind === 'sensor' ? 14 : 11} textAnchor={element.kind === 'sensor' ? 'end' : 'start'} fontSize={9} fill={theme.ink} fillOpacity={0.7}>{element.caption}</text>
@@ -166,12 +164,12 @@ export function RelayLadderDiagram({ circuit, result, simulating, theme, selecti
       <Conductor key={`g${group.index}-in`} x1={column.spine} y1={cursor.y} x2={column.spine} y2={topY} on={cursor.on} theme={theme} />,
     ];
     if (multi) {
-      // The branches leave and rejoin the conductor through rounded corners: a cap over the group and one under it.
+      // Square 90° routing: a cap over and one under the group run right from the trunk; each branch drops straight between them.
       const r = JUNCTION_RADIUS;
       const { busLeft: left, busRight: right } = group;
       parts.push(
-        <PathConductor key={`g${group.index}-bus-top`} d={`M${left},${topY + r} Q${left},${topY} ${left + r},${topY} H${right - r} Q${right},${topY} ${right},${topY + r}`} on={live} theme={theme} />,
-        <PathConductor key={`g${group.index}-bus-bottom`} d={`M${left},${bottomY - r} Q${left},${bottomY} ${left + r},${bottomY} H${right - r} Q${right},${bottomY} ${right},${bottomY - r}`} on={through} theme={theme} />,
+        <PathConductor key={`g${group.index}-bus-top`} d={`M${left},${topY} H${right}`} on={live} theme={theme} />,
+        <PathConductor key={`g${group.index}-bus-bottom`} d={`M${left},${bottomY} H${right}`} on={through} theme={theme} />,
       );
       group.elements.forEach((placed, index) => {
         const element = result.elements[placed.element.id];
@@ -200,7 +198,22 @@ export function RelayLadderDiagram({ circuit, result, simulating, theme, selecti
     const cursor = { y: layout.topRailY, on: simulating };
     const nodes: React.ReactNode[] = [];
     const pathSelected = selection?.kind === 'path' && selection.id === path.id;
-    for (const group of column.groups) {
+    const lane = column.lane;
+    if (lane) {
+      // 3-wire sensor: terminal 1 straight up to +24 V, terminal 3 straight down to 0 V, signal out right then down the spine.
+      const heading = column.groups[0];
+      const sensorLive = lit(status?.groupClosed[0]);
+      nodes.push(
+        <Conductor key="sensor-t1" x1={lane.trunkX} y1={layout.topRailY} x2={lane.trunkX} y2={heading.y - SENSOR_HALF_WIDTH} on={simulating} theme={theme} />,
+        <Conductor key="sensor-t3" x1={lane.trunkX} y1={heading.y + SENSOR_HALF_WIDTH} x2={lane.trunkX} y2={layout.bottomRailY} on={simulating} theme={theme} />,
+        <Conductor key="sensor-out" x1={lane.sensorX + SENSOR_HALF_WIDTH} y1={lane.signalY} x2={column.spine} y2={lane.signalY} on={sensorLive} theme={theme} />,
+        <circle key="sensor-t1-dot" cx={lane.trunkX} cy={layout.topRailY} r={3.2} fill={lit(true) ? theme.live : theme.ink} />,
+        <circle key="sensor-t3-dot" cx={lane.trunkX} cy={layout.bottomRailY} r={3.2} fill={lit(true) ? theme.live : theme.ink} />,
+      );
+      cursor.y = lane.signalY;
+      cursor.on = sensorLive;
+    }
+    for (const group of lane ? column.groups.slice(1) : column.groups) {
       const drawn = renderGroup(column, group, path, cursor);
       nodes.push(...drawn.nodes);
       cursor.y = drawn.next.y;
@@ -230,7 +243,7 @@ export function RelayLadderDiagram({ circuit, result, simulating, theme, selecti
         onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelect({ kind: 'path', id: path.id }); } }}
       >
         <rect x={column.spine - 15} y={layout.topRailY - 31} width={30} height={22} rx={5} fill={pathSelected ? theme.selection : 'none'} fillOpacity={0.14} stroke={pathSelected ? theme.selection : 'none'} />
-        <text className="ladder-path-number" x={column.spine} y={layout.topRailY - 15} textAnchor="middle" fontSize={13} fontWeight={700} fill={theme.ink}>{column.number}</text>
+        <TexLabel className="ladder-path-number" x={column.spine} y={layout.topRailY - 20} size={13} math={String(column.number)} color={theme.ink} />
       </g>
     );
     const reference = references.find(entry => entry.pathNumber === column.number);
@@ -242,27 +255,25 @@ export function RelayLadderDiagram({ circuit, result, simulating, theme, selecti
         element.kind === contactKind && tagKey(element.tag) === tagKey(coil?.tag ?? '') && (element.form ?? 'NO') === form && Boolean(result.elements[element.id]?.closed)
       ));
     };
-    const fractionSide = (numbers: number[], form: 'NO' | 'NC') => (numbers.length === 0 ? [<tspan key="none">-</tspan>] : [
-      ...numbers.slice(0, MAX_REFERENCED).map((number, index) => (
-        <tspan key={number} fill={contactMade(number, form) ? theme.active : undefined} fontWeight={contactMade(number, form) ? 700 : undefined}>{index > 0 ? ` ${number}` : number}</tspan>
-      )),
-      ...(numbers.length > MAX_REFERENCED ? [<tspan key="more"> …</tspan>] : []),
-    ]);
+    const fractionMath = (numbers: number[], form: 'NO' | 'NC') => (numbers.length === 0 ? '\\text{-}' : [
+      ...numbers.slice(0, MAX_REFERENCED).map(number => (contactMade(number, form) ? `\\textcolor{${theme.active}}{\\mathbf{${number}}}` : String(number))),
+      ...(numbers.length > MAX_REFERENCED ? ['\\ldots'] : []),
+    ].join('\\;'));
     return (
       <g key={column.pathId} className="ladder-path" data-testid={`ladder-column-${column.number}`}>
         {number}
         {nodes}
-        <circle cx={column.spine} cy={layout.topRailY} r={3.2} fill={lit(true) ? theme.live : theme.ink} />
+        {!lane && <circle cx={column.spine} cy={layout.topRailY} r={3.2} fill={lit(true) ? theme.live : theme.ink} />}
         <circle cx={column.spine} cy={layout.bottomRailY} r={3.2} fill={energised ? theme.live : theme.ink} />
-        {column.groups.map(group => group.elements.map(placed => renderElement(placed.element, placed.x, placed.y)))}
+        {column.groups.map(group => group.elements.map(placed => renderElement(placed.element, placed.x, placed.y, Boolean(lane) && group.index === 0)))}
         {column.load && renderElement(column.load.element, column.load.x, column.load.y)}
         {reference && (
           <g className="ladder-cross-reference" data-testid={`ladder-xref-${reference.tag}`} aria-label={`${reference.tag}: ${tr('ladder.makeContacts')} ${reference.no.join(' ') || '-'}; ${tr('ladder.breakContacts')} ${reference.nc.join(' ') || '-'}`}>
             <title>{`${reference.tag}: ${tr('ladder.makeContacts')} ${reference.no.join(', ') || '-'} / ${tr('ladder.breakContacts')} ${reference.nc.join(', ') || '-'}`}</title>
             {/* make-contact paths over the fraction bar, break-contact paths under it */}
-            <text className="xref-no" x={column.spine} y={layout.tableY + 12} textAnchor="middle" fontSize={11} fill={theme.ink}>{fractionSide(reference.no, 'NO')}</text>
+            <TexLabel className="xref-no" x={column.spine} y={layout.tableY + 8} size={11} bold={false} math={fractionMath(reference.no, 'NO')} color={theme.ink} />
             <line className="xref-bar" x1={column.spine - 22} x2={column.spine + 22} y1={layout.tableY + 18} y2={layout.tableY + 18} stroke={theme.ink} strokeWidth={1.2} />
-            <text className="xref-nc" x={column.spine} y={layout.tableY + 32} textAnchor="middle" fontSize={11} fill={theme.ink}>{fractionSide(reference.nc, 'NC')}</text>
+            <TexLabel className="xref-nc" x={column.spine} y={layout.tableY + 28} size={11} bold={false} math={fractionMath(reference.nc, 'NC')} color={theme.ink} />
           </g>
         )}
         {armed === 'condition' && <Site x={column.seriesSite.x} y={column.seriesSite.y} label={tr('ladder.site.series', { n: column.number })} testId={`ladder-site-series-${column.number}`} theme={theme} onActivate={() => onSite({ type: 'series', pathId: path.id })} />}
@@ -287,10 +298,10 @@ export function RelayLadderDiagram({ circuit, result, simulating, theme, selecti
       >
         <rect x={0} y={0} width={layout.width} height={layout.height} fill="transparent" />
         {/* +24 V and 0 V rails */}
-        <line data-testid="rail-24v" x1={layout.railLeft} x2={layout.railRight} y1={layout.topRailY} y2={layout.topRailY} stroke={lit(true) ? theme.live : theme.ink} strokeWidth={3.5} strokeLinecap="round" style={lit(true) ? { filter: `drop-shadow(0 0 4px ${theme.live})` } : undefined} />
+        <line data-testid="rail-24v" x1={layout.railLeft} x2={layout.railRight} y1={layout.topRailY} y2={layout.topRailY} stroke={lit(true) ? theme.live : theme.ink} strokeWidth={3.5} strokeLinecap="round" />
         <line data-testid="rail-0v" x1={layout.railLeft} x2={layout.railRight} y1={layout.bottomRailY} y2={layout.bottomRailY} stroke={theme.ink} strokeWidth={3.5} strokeLinecap="round" />
-        <text className="rail-label" x={layout.railLeft - 6} y={layout.topRailY + 4.5} textAnchor="end" fontSize={13} fontWeight={800} fill={theme.ink}>+24V</text>
-        <text className="rail-label" x={layout.railLeft - 6} y={layout.bottomRailY + 4.5} textAnchor="end" fontSize={13} fontWeight={800} fill={theme.ink}>0V</text>
+        <TexLabel className="rail-label" x={layout.railLeft - 6} y={layout.topRailY} anchor="end" size={13} math={'+24\\,\\mathrm{V}'} color={theme.ink} />
+        <TexLabel className="rail-label" x={layout.railLeft - 6} y={layout.bottomRailY} anchor="end" size={13} math={'0\\,\\mathrm{V}'} color={theme.ink} />
         {layout.columns.map(renderColumn)}
         {layout.columns.length === 0 && (
           <text x={layout.railLeft + 10} y={(layout.topRailY + layout.bottomRailY) / 2} fontSize={12} fill={theme.ink} fillOpacity={0.6}>{tr('ladder.empty')}</text>

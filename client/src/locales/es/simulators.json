@@ -488,6 +488,11 @@
   },
   "arduino": {
     "sketchAria": "Sketch de Arduino",
+    "addLcd": "Añadir LCD 16x2",
+    "lcdOn": "LCD 16x2",
+    "addLcdTitle": "Mostrar el LCD 16x2 junto a la placa con sus cables ya conectados",
+    "removeLcdTitle": "Ocultar el LCD 16x2 y sus cables",
+    "lcdContrastAria": "Contraste del LCD (potenciómetro V0)",
     "lineError": "Línea {{line}}: {{message}}",
     "runtimeError": "Error en tiempo de ejecución: {{error}}",
     "customSketch": "Sketch personalizado",
@@ -772,6 +777,9 @@
       "rotate": "Girar",
       "duplicate": "Duplicar",
       "delete": "Eliminar",
+      "initialState": "Estado inicial",
+      "initialStateNC": "Normalmente cerrada (NC)",
+      "initialStateNO": "Normalmente abierta (NO)",
       "operatingParameters": "Parámetros de operación",
       "linkedSensor": "Sensor de cilindro vinculado",
       "linkedSensorSide": "Sensor de cilindro vinculado ({{side}})",
@@ -812,6 +820,10 @@
       "clear": "Borrar",
       "inputs": "Entradas",
       "outputs": "Cargas",
+      "groupSwitches": "Entradas y sensores",
+      "groupContacts": "Contactos de relé",
+      "groupLoads": "Cargas y bobinas",
+      "library": "Biblioteca de componentes",
       "palette": {
         "sensor": "Sensor de proximidad (3 hilos)",
         "pushbuttonNO": "Pulsador (NA)",
@@ -868,10 +880,16 @@
     },
     "cutaway": {
       "names": {
+        "gauge": "Manómetro",
+        "regulator": "Regulador de presión",
+        "relief": "Válvula de alivio de presión",
+        "quickExhaust": "Válvula de escape rápido",
         "and": "Válvula de Doble Presión (AND)",
         "or": "Válvula Selectora (OR)",
         "spool52": "Válvula de Carrete 5/2",
         "spool53": "Válvula de Carrete 5/3 de Centro Cerrado",
+        "spool43": "Válvula de Carrete 4/3 de Centro Cerrado",
+        "spool43float": "Válvula de Carrete 4/3 de Centro Flotante",
         "cushion": "Cilindro con Amortiguación",
         "single": "Cilindro de Simple Efecto con Retorno por Muelle",
         "throttle": "Válvula Reguladora (Ajustable)",
@@ -899,6 +917,48 @@
         "blockedRightText": "Solo la entrada derecha está presurizada. Empuja el carrete hacia la izquierda y la cara del disco derecho cubre el paso al puerto 2. La señal llega a un callejón sin salida y el puerto 2 permanece vacío.",
         "caption": "Carrete en H escalonado: dos discos de sellado sobre un eje, que asientan en resaltes · conductos de holgura alrededor del eje"
       },
+      "pressure": {
+        "setLabel": "consigna {{set}} bar",
+        "breather": "respiradero",
+        "regulator": {
+          "idle": "Reposo — sin presión",
+          "idleText": "No hay presión en ningún puerto. El muelle empuja el diafragma hacia abajo y mantiene abierto el obturador.",
+          "regulating": "Regulando — obturador abierto",
+          "regulatingText": "La presión aguas abajo ({{out}}) es menor que la consigna ({{set}}). El muelle mantiene el diafragma abajo y el obturador abierto, así que el aire de alimentación ({{in}}) pasa del puerto 1 al 2.",
+          "holding": "Presión de consigna — obturador estrangulando",
+          "holdingText": "El puerto 2 ha alcanzado la consigna ({{set}}). La presión bajo el diafragma equilibra el muelle: el diafragma sube y el obturador estrangula o cierra el paso, y la salida se mantiene en {{out}}.",
+          "venting": "Venteo — sobrepresión en el puerto 2",
+          "ventingText": "El puerto 2 ({{out}}) supera la consigna ({{set}}). El diafragma se levanta del asiento de alivio central y el exceso de aire escapa por el venteo del casquete hasta que la presión baja.",
+          "caption": "Perilla y muelle de ajuste · diafragma sensor · obturador y asiento",
+          "captionRelieving": "Perilla y muelle de ajuste · diafragma con asiento de alivio · obturador · puerto de escape 3"
+        },
+        "relief": {
+          "idle": "Cerrada — sin presión",
+          "idleText": "No hay presión en la entrada. El muelle presiona el obturador cónico contra su asiento.",
+          "closed": "Cerrada — por debajo de la presión de tarado",
+          "closedText": "La presión de entrada ({{in}}) es menor que la de tarado ({{set}}); el muelle mantiene el obturador en su asiento y no escapa nada.",
+          "open": "Abierta — aliviando al escape",
+          "openText": "La presión de entrada ha alcanzado la de tarado ({{set}}). La fuerza sobre el obturador vence la precarga del muelle y lo levanta, descargando aire al escape hasta que la presión baja.",
+          "caption": "Tornillo y muelle de ajuste · obturador cónico · asiento",
+          "vent": "Escape / salida"
+        }
+      },
+      "gauge": {
+        "live": "Activo — {{bar}} en la vía",
+        "liveText": "Lectura {{bar}}. La presión en la vía flexiona el tubo de Bourdon, que gira la aguja sobre la escala de 0–10 bar: la desviación es proporcional a la presión medida.",
+        "idle": "Sin presión",
+        "idleText": "La vía está a presión atmosférica, así que la aguja descansa en cero.",
+        "caption": "Misma esfera y aguja que el manómetro del depósito de aire"
+      },
+      "quickExhaust": {
+        "idle": "Reposo — sin presión",
+        "idleText": "No hay presión en ninguna vía. El disco de goma descansa contra el asiento de entrada: la vía 1 está sellada y el escape abierto a la atmósfera.",
+        "fill": "Presurizando 1→2 — escape sellado",
+        "fillText": "La presión de alimentación ({{supply}}) empuja el disco contra el asiento de escape y sella la vía 3 a la atmósfera. Los bordes del disco se flexionan y el aire pasa directo a la vía de trabajo 2 ({{work}}).",
+        "exhaust": "Escape rápido 2→3 — alimentación sellada",
+        "exhaustText": "La vía 1 ha caído, así que la presión de la línea de trabajo ({{work}}) empuja el disco contra el asiento de entrada. La alimentación queda sellada y se abre toda la sección de escape: el aire del cilindro se descarga directamente a la atmósfera por la vía 3 sin volver por la válvula de control.",
+        "caption": "Disco flexible entre el asiento de entrada (1) y el de escape (3)"
+      },
       "or": {
         "idle": "Reposo — sin señal",
         "idleText": "No hay señal en ninguna entrada. La bola flota en la cámara y el puerto 2 está vacío.",
@@ -916,6 +976,10 @@
         "pilotLeft": "Piloto izquierdo 14 — 1→4, 2→3",
         "pilotRight": "Piloto derecho 12 — 1→2, 4→5",
         "mid": "Posición central — todos los puertos cerrados",
+        "pilotRight43": "Piloto derecho 12 — 1→2, 4→3",
+        "midFloat": "Posición central — P bloqueado, A y B abiertos a tanque",
+        "centring43": "Dos muelles de centrado opuestos mantienen el carrete en el centro, de modo que sus collarines cierran P y ambas cámaras de tanque y las líneas A y B quedan cerradas. {{description}}",
+        "centringFloat": "Dos muelles de centrado opuestos mantienen el carrete en el centro: un collarín cierra P mientras A y B quedan abiertos a tanque, y el cilindro flota. {{description}}",
         "centring": "Dos muelles de centrado opuestos mantienen el carrete en el centro, de modo que sus tres collarines cubren los puertos 5, 1 y 3 y las líneas del cilindro quedan cerradas. {{description}}",
         "groove": {
           "supplyWork": "Una ranura une el puerto de alimentación 1 con el puerto de trabajo {{ports}}",
@@ -1078,7 +1142,7 @@
         "description": "Válvula direccional 2/2 vías, normalmente abierta."
       },
       "valve-3-2-nc": {
-        "name": "Válvula 3/2, NC",
+        "name": "Válvula 3/2",
         "description": "Válvula direccional 3/2 vías, normalmente cerrada."
       },
       "valve-3-2-no": {
@@ -1118,7 +1182,7 @@
         "description": "Descarga la línea de trabajo directamente por el puerto 3."
       },
       "flow-control": {
-        "name": "Válvula Reguladora de Caudal (Estrangulación)",
+        "name": "Válvula de Estrangulación",
         "description": "Válvula de estrangulación regulable."
       },
       "flow-control-oneway": {
@@ -1126,15 +1190,15 @@
         "description": "Válvula de estrangulación con antirretorno: estrangulada en un sentido, retorno libre."
       },
       "regulator-nr": {
-        "name": "Regulador de Presión (Sin Alivio)",
+        "name": "VRP (Sin alivio)",
         "description": "Válvula reguladora de presión ajustable, sin alivio."
       },
       "regulator-relieving": {
-        "name": "Regulador de Presión (con Alivio)",
+        "name": "VRP (Con alivio)",
         "description": "Válvula reguladora de presión ajustable con puerto de alivio 3."
       },
       "sequence-ext": {
-        "name": "Válvula de Secuencia (Piloto Externo)",
+        "name": "Secuencia (Piloto Ext.)",
         "description": "Se abre cuando la señal piloto externa en el puerto 12 alcanza la presión ajustada."
       },
       "pressure-relief": {
@@ -1158,16 +1222,8 @@
         "description": "Vástago del émbolo a través de ambas tapas."
       },
       "air-motor-fixed": {
-        "name": "Motor Neumático (Fijo, 1 Sentido)",
+        "name": "Motor Neumático",
         "description": "Motor neumático de cilindrada fija, un sentido de flujo."
-      },
-      "air-motor-variable": {
-        "name": "Motor Neumático (Variable)",
-        "description": "Motor neumático de cilindrada variable."
-      },
-      "semi-rotary": {
-        "name": "Actuador Semirrotativo",
-        "description": "Actuador rotativo de ángulo limitado."
       },
       "exhaust-port": {
         "name": "Puerto de Escape",
@@ -1190,11 +1246,11 @@
         "description": "Bomba hidráulica de cilindrada fija: un triángulo macizo sale del círculo por el puerto de presión P."
       },
       "hyd-tank": {
-        "name": "Depósito Hidráulico / Línea de Retorno (T)",
+        "name": "Depósito Hidráulico",
         "description": "Depósito de aceite abierto: todas las líneas de retorno T terminan aquí, bajo la superficie del fluido."
       },
       "hyd-pressure-relief": {
-        "name": "Válvula de Alivio de Presión (DBV)",
+        "name": "Válvula de Alivio (DBV)",
         "description": "Válvula de alivio de acción directa: abre a la presión ajustada y descarga al depósito por el puerto T."
       },
       "hvalve-3-2-nc": {
@@ -1206,8 +1262,16 @@
         "description": "Válvula direccional 4/2 (P, T, A, B)."
       },
       "hvalve-4-3": {
-        "name": "Válvula 4/3, Centro Cerrado",
+        "name": "Válvula 4/3, Cerrada",
         "description": "Válvula direccional 4/3, todos los puertos bloqueados en la posición neutra."
+      },
+      "hyd-power-unit": {
+        "name": "Unidad de Servicio de Aceite",
+        "description": "Bomba con filtro de aspiración y depósito, válvula de alivio y válvula de corte 2/2 en serie; el bus de suministro sale por la vía 2."
+      },
+      "hyd-pressure-source": {
+        "name": "Suministro de Presión Hidráulica",
+        "description": "Puerto directo de presión hidráulica: un triángulo macizo (ISO 1219) indica potencia fluida; el aire comprimido se dibuja abierto."
       },
       "hyd-motor": {
         "name": "Motor Hidráulico",
@@ -1217,44 +1281,29 @@
         "name": "Válvula Temporizadora (NC)",
         "description": "Temporizador a la conexión: 1 → 2 abre un tiempo ajustado después de que llegue presión al piloto 12."
       },
-      "hyd-accumulator": {
-        "name": "Acumulador Hidráulico",
-        "description": "Acumulador de vejiga con gas: almacena aceite a presión y la mantiene al cerrar la línea."
-      },
-      "hyd-filter": {
-        "name": "Filtro Hidráulico",
-        "description": "Filtro de aceite en línea."
-      },
-      "hyd-cooler": {
-        "name": "Enfriador de Aceite",
-        "description": "Enfriador de aceite en línea (intercambiador de calor)."
-      },
       "hyd-reducing-valve": {
-        "name": "Válvula Reductora de Presión (2 Vías)",
+        "name": "Reductora de Presión (2 Vías)",
         "description": "Mantiene su salida A a la presión ajustada, sea cual sea la entrada P."
       },
       "hyd-reducing-valve-3way": {
-        "name": "Válvula Reductora de Presión (3 Vías)",
+        "name": "Reductora de Presión (3 Vías)",
         "description": "Válvula reductora cuya salida A también descarga al depósito por el puerto T cuando se sobrecarga."
       },
       "hvalve-4-3-float": {
-        "name": "Válvula 4/3, Centro Flotante",
+        "name": "Válvula 4/3, Flotante",
         "description": "Válvula direccional 4/3: A y B abiertos al depósito en la posición neutra, P bloqueado."
-      },
-      "hvalve-4-3-tandem": {
-        "name": "Válvula 4/3, Centro en Tándem (Bypass)",
-        "description": "Válvula direccional 4/3: P descarga al depósito en la posición neutra, A y B bloqueados."
       },
       "service-unit": {
         "name": "Unidad de Servicio Principal (0Z1)",
         "description": "FRL simplificada con válvula de corte manual 3/2 integrada con palanca de enclavamiento (0S1)."
       },
       "valve-2-2-nc": {
-        "name": "Válvula 2/2, NC",
+        "name": "Válvula 2/2",
         "description": "Válvula direccional 2/2, normalmente cerrada."
       }
     },
     "groups": {
+      "actuators": "Actuadores",
       "energyPreparation": "Energía y Preparación",
       "directionalControlValves": "Válvulas de Control Direccional",
       "logicFlowControl": "Lógica y Control de Caudal",
@@ -1286,6 +1335,7 @@
       "flowDirections": "Sentidos de Flujo",
       "swivelAngle": "Ángulo de Giro",
       "connection": "Conexión",
+      "silencer": "Silenciador",
       "reservoirVolume": "Volumen del Depósito",
       "accumulatorVolume": "Volumen del Acumulador",
       "mainShutOff": "Corte principal"
@@ -1302,6 +1352,7 @@
       "roller": "Palanca con Rodillo (Final de Carrera)",
       "idleReturnRoller": "Rodillo de Retorno en Vacío",
       "pneumaticPilot": "Piloto Neumático (Señal 12/14)",
+      "hydraulicPilot": "Piloto Hidráulico (Señal 12/14)",
       "restPosition": "Posición de reposo",
       "actuatedPosition": "Posición accionada",
       "withLubricator": "Con Lubricador",
@@ -1311,6 +1362,8 @@
       "singleDirection": "Un sentido",
       "bothDirections": "Ambos sentidos",
       "unthreaded": "Sin rosca",
+      "withoutSilencer": "Sin silenciador",
+      "withSilencer": "Con silenciador",
       "threaded": "Roscado",
       "fixedRear": "Fija - trasera",
       "fixedBoth": "Fija - ambas",
@@ -1338,7 +1391,14 @@
     "io": {
       "title": "Módulo de E/S",
       "digitalInputs": "Entradas digitales",
+      "digitalOutputs": "Salidas digitales",
       "toggle": "ON / OFF",
+      "on": "ON",
+      "off": "OFF",
+      "channelControls": "Controles de entrada",
+      "on": "ON",
+      "off": "OFF",
+      "channelControls": "Controles de entrada",
       "mainSupply": "Alimentación principal",
       "shutoff": "Corte principal de aire",
       "kinds": {

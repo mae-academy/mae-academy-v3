@@ -432,4 +432,60 @@ void loop() {
 }
 `,
   },
+  {
+    id: "lcd-hello",
+    label: "16x2 LCD Hello World",
+    source: `#include <LiquidCrystal.h>
+
+const int rs = 12, en = 11, d4 = 5, d5 = 4, d6 = 3, d7 = 2;
+LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
+
+void setup() {
+  lcd.begin(16, 2);
+  lcd.print("Hello, MAE!");
+  lcd.setCursor(0, 1);
+  lcd.print("Arduino Studio");
+}
+
+void loop() {
+  // Static banner
+}
+`,
+  },
+  {
+    id: "lcd-counter-sensor",
+    label: "16x2 LCD Counter & Sensor",
+    source: `#include <LiquidCrystal.h>
+
+// Row 0 counts seconds since reset, row 1 shows the A0 potentiometer as a voltage and a bar.
+const int rs = 12, en = 11, d4 = 5, d5 = 4, d6 = 3, d7 = 2;
+LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
+unsigned long seconds = 0;
+
+void setup() {
+  lcd.begin(16, 2);
+  lcd.print("Uptime:");
+}
+
+void loop() {
+  int raw = analogRead(A0);
+  float volts = raw * 5.0 / 1023.0;
+
+  lcd.setCursor(8, 0);
+  lcd.print(seconds);
+  lcd.print("s   ");
+
+  lcd.setCursor(0, 1);
+  lcd.print(volts, 2);
+  lcd.print("V ");
+  int bars = map(raw, 0, 1023, 0, 10);
+  for (int i = 0; i < 10; i++) {
+    lcd.write(i < bars ? '#' : '.');
+  }
+
+  delay(1000);
+  seconds++;
+}
+`,
+  },
 ];
