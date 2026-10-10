@@ -31,6 +31,26 @@
       "title": "Actualizaciones y Contacto",
       "p1": "Nos reservamos el derecho de revisar esta política para reflejar modificaciones operativas, legales o reglamentarias. Alentamos a los visitantes a revisar esta página periódicamente.",
       "p2": "Para cualquier consulta legal o de privacidad, contáctanos en: <a href=\"mailto:maeacademy2026@gmail.com\" class=\"font-medium text-violet-600 dark:text-violet-400 underline underline-offset-4 hover:text-violet-700\">maeacademy2026@gmail.com</a>"
+    },
+    "instagram": {
+      "title": "Automatización de Instagram e Integración de Recursos Educativos",
+      "p1": "MAE Academy opera una integración automatizada de comentarios a mensajes directos (comment-to-DM) de Instagram diseñada exclusivamente para entregar enlaces a herramientas educativas y simuladores de ingeniería de MAE Academy.",
+      "p2": "Cuando los usuarios comentan en publicaciones oficiales de Instagram de MAE Academy con palabras clave para solicitar recursos educativos, nuestro sistema procesa transitoriamente el ID de comentario público y el nombre de usuario de Instagram para enviar el enlace solicitado a través de Mensaje Directo (Meta Private Reply) o publicar una respuesta de comentario útil.",
+      "p3": "<strong class=\"font-semibold text-slate-900 dark:text-white\">Solo Deduplicación en Memoria (Sin Almacenamiento Persistente):</strong> No se almacena ni recopila información de perfil personal, nombres de usuario o contenido de mensajes en bases de datos permanentes. El sistema utiliza estrictamente una memoria caché efímera en memoria (purgada automáticamente en una hora) únicamente para evitar enviar respuestas duplicadas al mismo comentario."
+    },
+    "dataDeletion": {
+      "title": "Instrucciones de Eliminación de Datos de Usuario",
+      "badge": "Cumplimiento de Políticas de Plataforma Meta",
+      "p1": "De conformidad con los Términos de la Plataforma Meta y los estándares de protección de datos, los usuarios tienen derecho a solicitar la eliminación de cualquier dato o registro de interacción asociado con su cuenta de Instagram.",
+      "p2": "Dado que MAE Academy no mantiene cuentas de usuario persistentes ni bases de datos de perfiles de Instagram (procesando los datos de forma transitoria en memoria), sus datos personales no se conservan de forma predeterminada. Sin embargo, para solicitar formalmente la verificación y eliminación de cualquier registro residual del servidor, siga estas instrucciones:",
+      "step1Title": "1. Enviar Solicitud por Correo Electrónico",
+      "step1Desc": "Envíe un correo electrónico a nuestra dirección de cumplimiento: <a href=\"mailto:maeacademy2026@gmail.com\" class=\"font-medium text-violet-600 dark:text-violet-400 underline underline-offset-4 hover:text-violet-700\">maeacademy2026@gmail.com</a> con el asunto <strong>\"Data Deletion Request - Instagram Automation\"</strong>.",
+      "step2Title": "2. Proporcionar Identificador Requerido",
+      "step2Desc": "Incluya su nombre de usuario público de Instagram (@usuario) y la fecha aproximada de su interacción para que podamos cotejarla con nuestros registros del servidor.",
+      "step3Title": "3. Revocar Permisos a través de Configuración de Instagram",
+      "step3Desc": "También puede revocar el acceso a la aplicación directamente desde su cuenta de Instagram en cualquier momento: vaya a <em>Configuración y actividad &rarr; Permisos del sitio web &rarr; Apps y sitios web</em>, busque MAE Academy y seleccione <strong>Eliminar</strong>.",
+      "window": "<strong class=\"font-semibold text-slate-900 dark:text-white\">Ventana de Eliminación:</strong> Todas las solicitudes verificadas se revisan y completan dentro de un plazo máximo de <strong>30 días</strong> desde su recepción. Recibirá un correo de confirmación una vez purgados los registros.",
+      "jurisdiction": "<strong class=\"font-semibold text-slate-900 dark:text-white\">Jurisdicción Aplicable:</strong> Todo el tratamiento de datos y las políticas de eliminación se rigen e interpretan de conformidad con las leyes del <strong>Reino Hachemita de Jordania</strong>."
     }
   },
   "terms": {
@@ -62,6 +82,12 @@
     "contact": {
       "title": "Información de Contacto",
       "p1": "Para cualquier consulta legal, inquietud sobre derechos de autor o preguntas con respecto a estos términos, comunícate con: <a href=\"mailto:maeacademy2026@gmail.com\" class=\"font-medium text-violet-600 dark:text-violet-400 underline underline-offset-4 hover:text-violet-700\">maeacademy2026@gmail.com</a>"
+    },
+    "instagram": {
+      "title": "Servicios Automatizados de Instagram y Entrega de Recursos",
+      "p1": "MAE Academy ofrece entrega automatizada de comentarios a mensajes directos en Instagram para herramientas educativas y simuladores de forma gratuita.",
+      "p2": "Los usuarios aceptan interactuar con el sistema automatizado únicamente para fines educativos legítimos y se comprometen a no enviar spam, sobrecargar ni perturbar los servicios.",
+      "p3": "MAE Academy se reserva el derecho de suspender o limitar las interacciones automatizadas para cuentas que exhiban conductas abusivas."
     }
   },
   "attribution": {

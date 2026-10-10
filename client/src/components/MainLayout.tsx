@@ -119,7 +119,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
             </p>
             <nav className="mt-4 flex flex-col gap-3 text-sm">
               <Link
-                href="/privacy-policy"
+                href="/privacy"
                 className="group inline-flex items-center gap-2.5 text-slate-600 transition-colors hover:text-violet-600 dark:text-slate-400 dark:hover:text-violet-300"
               >
                 <ShieldCheck className="h-4 w-4 text-slate-400 transition-colors group-hover:text-violet-600 dark:text-slate-500 dark:group-hover:text-violet-300" />
@@ -128,7 +128,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
                 </span>
               </Link>
               <Link
-                href="/terms-of-service"
+                href="/terms"
                 className="group inline-flex items-center gap-2.5 text-slate-600 transition-colors hover:text-violet-600 dark:text-slate-400 dark:hover:text-violet-300"
               >
                 <FileText className="h-4 w-4 text-slate-400 transition-colors group-hover:text-violet-600 dark:text-slate-500 dark:group-hover:text-violet-300" />
@@ -192,14 +192,14 @@ export default function MainLayout({ children }: MainLayoutProps) {
           </p>
           <div className="flex flex-wrap items-center gap-3">
             <Link
-              href="/privacy-policy"
+              href="/privacy"
               className="hover:text-violet-600 dark:hover:text-violet-400 transition-colors"
             >
               {t("footer.privacyPolicy")}
             </Link>
             <span>·</span>
             <Link
-              href="/terms-of-service"
+              href="/terms"
               className="hover:text-violet-600 dark:hover:text-violet-400 transition-colors"
             >
               {t("footer.termsOfService")}

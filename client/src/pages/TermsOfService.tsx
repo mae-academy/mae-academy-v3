@@ -25,7 +25,7 @@ export default function TermsOfService() {
       dir={isRtl ? "rtl" : "ltr"}
       lang={locale}
       className={`max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16 ${
-        isRtl ? "font-['Tajawal',sans-serif]" : "font-['Poppins',sans-serif]"
+        isRtl ? "font-[Tajawal,sans-serif]" : "font-[Poppins,sans-serif]"
       }`}
     >
       <header className="mb-10">
@@ -44,6 +44,14 @@ export default function TermsOfService() {
           {t("terms.service.title")}
         </h2>
         <p>{t("terms.service.p1")}</p>
+
+        {/* Instagram Automation Terms */}
+        <h2 className="text-xl sm:text-2xl font-semibold text-slate-900 dark:text-white mt-8 mb-3">
+          {t("terms.instagram.title")}
+        </h2>
+        <p>{t("terms.instagram.p1")}</p>
+        <p>{t("terms.instagram.p2")}</p>
+        <p>{t("terms.instagram.p3")}</p>
 
         <h2 className="text-xl sm:text-2xl font-semibold text-slate-900 dark:text-white mt-8 mb-3">
           {t("terms.ip.title")}

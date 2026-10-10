@@ -8,6 +8,8 @@ const SITE_ORIGIN = "https://maeacademy.org";
 const PATH_ALIASES: Record<string, string> = {
   "/simulators/arduino-studio": "/simulations/arduino-studio",
   "/simulators/plc-simulator": "/simulations/plc",
+  "/privacy-policy": "/privacy",
+  "/terms-of-service": "/terms",
 };
 
 /** Canonical URL path for a route: a tool's own registry path when it has one, else the simulation meta path, else the bare path. */

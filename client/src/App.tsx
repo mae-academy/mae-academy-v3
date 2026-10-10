@@ -33,6 +33,8 @@ const SimulationDetail = lazyRetry(() => import("./pages/SimulationDetail"));
 const About = lazyRetry(() => import("./pages/About"));
 const PrivacyPolicy = lazyRetry(() => import("./pages/PrivacyPolicy"));
 const TermsOfService = lazyRetry(() => import("./pages/TermsOfService"));
+const Privacy = lazyRetry(() => import("./pages/Privacy"));
+const Terms = lazyRetry(() => import("./pages/Terms"));
 const AttributionPolicy = lazyRetry(() => import("./pages/AttributionPolicy"));
 const NotFound = lazyRetry(() => import("./pages/NotFound"));
 const ArduinoStudioPage = lazyRetry(() => import("./pages/ArduinoStudioPage"));
@@ -106,7 +108,9 @@ function AnimatedRoutes() {
             <Route path="/simulations" component={Simulations} />
             <Route path="/simulators/arduino-studio" component={ArduinoStudioPage} />
             <Route path="/about" component={About} />
+            <Route path="/privacy" component={Privacy} />
             <Route path="/privacy-policy" component={PrivacyPolicy} />
+            <Route path="/terms" component={Terms} />
             <Route path="/terms-of-service" component={TermsOfService} />
             <Route path="/attribution-policy" component={AttributionPolicy} />
             {!import.meta.env.PROD && <Route path="/_dev/symbols" component={HiddenSymbolDesigner} />}

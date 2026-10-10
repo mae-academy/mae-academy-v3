@@ -31,6 +31,26 @@
       "title": "Updates & Contact",
       "p1": "We reserve the right to revise this policy to reflect operational, legal, or regulatory modifications. We encourage visitors to review this page periodically.",
       "p2": "For any legal or privacy inquiries, please contact us at: <a href=\"mailto:maeacademy2026@gmail.com\" class=\"font-medium text-violet-600 dark:text-violet-400 underline underline-offset-4 hover:text-violet-700\">maeacademy2026@gmail.com</a>"
+    },
+    "instagram": {
+      "title": "Instagram Automation & Educational Resource Integration",
+      "p1": "MAE Academy operates an automated Instagram comment-to-DM integration designed exclusively to deliver requested engineering simulation links, tutorials, and educational resources.",
+      "p2": "When you post a public comment containing designated trigger keywords on official MAE Academy Instagram posts, our automated integration receives a secure webhook from Meta's Graph API. The system transiently processes the public comment ID, media ID, and Instagram username solely to dispatch the requested resource link directly to your Direct Messages (via Meta Private Reply) or provide a helpful public comment reply.",
+      "p3": "<strong class=\"font-semibold text-slate-900 dark:text-white\">In-Memory Deduplication Only (No Persistent Storage):</strong> We do not store, harvest, or maintain personal profile data, usernames, or message contents in permanent databases. The system utilizes strictly ephemeral, in-memory deduplication (automatically purged within one hour) solely to avoid sending duplicate automated replies to the same comment."
+    },
+    "dataDeletion": {
+      "title": "User Data Deletion Instructions",
+      "badge": "Meta Platform Policy Compliance",
+      "p1": "In accordance with Meta Platform Terms and global data protection standards, users have the right to request the deletion of any data, interaction records, or identifiers associated with their Instagram account.",
+      "p2": "Because MAE Academy does not operate persistent user accounts or maintain databases of Instagram user data (processing data transiently in memory only), your personal data is by default not stored beyond the immediate processing of your request. However, if you wish to formally submit a data deletion request or verify that no residual server records remain, please follow the instructions below:",
+      "step1Title": "1. Submit an Email Deletion Request",
+      "step1Desc": "Send an email to our designated compliance address: <a href=\"mailto:maeacademy2026@gmail.com\" class=\"font-medium text-violet-600 dark:text-violet-400 underline underline-offset-4 hover:text-violet-700\">maeacademy2026@gmail.com</a> with the subject line <strong>\"Data Deletion Request - Instagram Automation\"</strong>.",
+      "step2Title": "2. Provide Required Identifier",
+      "step2Desc": "Include your public Instagram handle/username (@username) and the approximate date/time or post of your interaction so we can verify our temporary server logs.",
+      "step3Title": "3. Revoke Permissions via Instagram Settings",
+      "step3Desc": "You can also revoke application interaction permissions at any time directly through your Instagram account: Navigate to <em>Settings and activity &rarr; Website permissions &rarr; Apps and websites</em>, locate MAE Academy, and click <strong>Remove</strong>.",
+      "window": "<strong class=\"font-semibold text-slate-900 dark:text-white\">Deletion Window:</strong> All verified data deletion requests are reviewed and fulfilled within a maximum of <strong>30 days</strong> from the receipt of the request. A confirmation email will be issued once the verification and deletion process is finalized.",
+      "jurisdiction": "<strong class=\"font-semibold text-slate-900 dark:text-white\">Governing Jurisdiction:</strong> All data processing, privacy practices, and deletion policies are governed exclusively by the laws and regulations of the <strong>Hashemite Kingdom of Jordan</strong>."
     }
   },
   "terms": {
@@ -62,6 +82,12 @@
     "contact": {
       "title": "Contact Information",
       "p1": "For any legal inquiries, copyright concerns, or questions regarding these terms, please contact: <a href=\"mailto:maeacademy2026@gmail.com\" class=\"font-medium text-violet-600 dark:text-violet-400 underline underline-offset-4 hover:text-violet-700\">maeacademy2026@gmail.com</a>"
+    },
+    "instagram": {
+      "title": "Automated Instagram Services & Resource Delivery",
+      "p1": "MAE Academy provides automated social media integrations (including Instagram comment-to-DM delivery) to facilitate seamless, free access to open educational simulation tools and academic references.",
+      "p2": "Users agree to interact with these automated systems solely for bona fide educational purposes. Any attempt to flood, exploit, spam, reverse-engineer, or disrupt the automated messaging infrastructure or Meta Graph API endpoints is strictly prohibited.",
+      "p3": "MAE Academy reserves the right to rate-limit or suspend automated interactions for any user or account exhibiting abusive or automated bot activity."
     }
   },
   "attribution": {

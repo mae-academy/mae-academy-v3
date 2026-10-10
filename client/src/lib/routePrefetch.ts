@@ -31,7 +31,9 @@ const routeChunks: Record<string, () => Promise<unknown>> = {
   "/library":             () => import("../pages/AcademicLibrary"),
   "/simulations":         () => import("../pages/Simulations"),
   "/about":               () => import("../pages/About"),
+  "/privacy":             () => import("../pages/Privacy"),
   "/privacy-policy":      () => import("../pages/PrivacyPolicy"),
+  "/terms":               () => import("../pages/Terms"),
   "/terms-of-service":    () => import("../pages/TermsOfService"),
   "/attribution-policy":  () => import("../pages/AttributionPolicy"),
 };
