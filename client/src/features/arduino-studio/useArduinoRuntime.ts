@@ -40,6 +40,8 @@ export interface ArduinoStudioRuntime {
   setSpeed: (speed: ArduinoSpeed) => void;
   setDigitalInput: (pin: number, level: 0 | 1) => void;
   setAnalogInput: (channel: number, value: number) => void;
+  /** HIGH pulse width (us) `pulseIn` measures on an echo pin; null unmounts the sensor. */
+  setEchoPulse: (pin: number, us: number | null) => void;
   sendSerial: (text: string) => void;
   setLcdContrast: (value: number) => void;
   clearSerial: () => void;
@@ -172,6 +174,7 @@ export function useArduinoRuntime(): ArduinoStudioRuntime {
       setSpeed,
       setDigitalInput: (pin, level) => getRuntime().setDigitalInput(pin, level),
       setAnalogInput: (channel, value) => getRuntime().setAnalogInput(channel, value),
+      setEchoPulse: (pin, us) => getRuntime().setEchoPulse(pin, us),
       sendSerial: text => getRuntime().sendSerial(text),
       setLcdContrast: value => getRuntime().setLcdContrast(value),
       clearSerial: () => {

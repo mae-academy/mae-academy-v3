@@ -157,4 +157,46 @@ describe("static pin analysis", () => {
     const arr = analyzeSketch("int pins[] = {2, 3, 4, 5}; void setup(){ for (int i = 0; i < 4; i++) pinMode(pins[i], OUTPUT); } void loop(){ digitalWrite(pins[1], HIGH); }");
     expect(arr?.outputs).toEqual([2, 3, 4, 5]);
   });
+
+  it("pulseIn returns the mounted sensor's echo width, 0 with no sensor or past the timeout", async () => {
+    const src = `
+      void setup() {
+        Serial.begin(9600);
+        pinMode(10, INPUT);
+        long a = pulseIn(10, HIGH);
+        long b = pulseIn(10, HIGH, 3000);
+        long c = pulseIn(11, HIGH);
+        long d = pulseIn(10, LOW);
+        Serial.println(a);
+        Serial.println(b);
+        Serial.println(c);
+        Serial.println(d);
+      }
+      void loop() {}`;
+    const { out, errors } = await run(src, { inputs: rt => rt.setEchoPulse(10, 5820) });
+    expect(errors).toEqual([]);
+    expect(out.trim().split(/\r?\n/)).toEqual(["5820", "0", "0", "0"]);
+  });
+
+  it("pulseIn advances the simulated clock by the pulse width and keeps the stimulus across Reset", async () => {
+    const src = `
+      void setup() {
+        Serial.begin(9600);
+        unsigned long t0 = micros();
+        pulseIn(10, HIGH);
+        Serial.println(micros() - t0 >= 5820);
+      }
+      void loop() {}`;
+    const { out, rt } = await run(src, { inputs: r => r.setEchoPulse(10, 5820) });
+    expect(out.trim()).toBe("1");
+    rt.reset();
+    expect(rt.pulseIn(10, 1, 1_000_000)).toBe(5820);
+    rt.setEchoPulse(10, null);
+    expect(rt.pulseIn(10, 1, 1000)).toBe(0);
+  });
+
+  it("reports a pulseIn pin as a digital input in the static layout", async () => {
+    const { analyzeSketch } = await import("../../../../api/_lib/code/arduino/arduinoCompiler");
+    expect(analyzeSketch("void loop(){ long d = pulseIn(10, HIGH); }")?.digitalInputs).toEqual([10]);
+  });
 });

@@ -1,5 +1,6 @@
 import type { ComponentType } from "react";
 import { VectorLed } from "./VectorLed";
+import { VectorIrObstacle, VectorLdr, VectorLm35, VectorPir, VectorUltrasonic } from "./VectorSensors";
 import { VectorPotentiometer } from "./VectorPotentiometer";
 import { VectorPushButton } from "./VectorPushButton";
 import { VectorResistor } from "./VectorResistor";
@@ -8,6 +9,14 @@ export { VectorLed, LED_W, LED_H, LED_ANODE_TIP, LED_CATHODE_TIP, type VectorLed
 export { VectorResistor, resistorBands, RES_W, RES_H, RES_LEFT_TIP, RES_RIGHT_TIP, type VectorResistorProps } from "./VectorResistor";
 export { VectorPotentiometer, POT_W, POT_H, POT_PINS, type VectorPotentiometerProps } from "./VectorPotentiometer";
 export { VectorPushButton, BTN_W, BTN_H, BTN_LEGS, type VectorPushButtonProps } from "./VectorPushButton";
+export {
+  VectorLdr,
+  VectorLm35,
+  VectorPir,
+  VectorIrObstacle,
+  VectorUltrasonic,
+  LDR_W, LDR_H, LDR_PINS, LM35_W, LM35_H, LM35_PINS, PIR_W, PIR_H, PIR_PINS, IR_W, IR_H, IR_PINS, US_W, US_H, US_PINS,
+} from "./VectorSensors";
 export { orientFrame, type Orientation, type CircuitComponentProps } from "./orientation";
 
 /**
@@ -19,6 +28,11 @@ export const circuitRegistry = {
   resistor: VectorResistor,
   potentiometer: VectorPotentiometer,
   pushButton: VectorPushButton,
+  ldr: VectorLdr,
+  lm35: VectorLm35,
+  pir: VectorPir,
+  irObstacle: VectorIrObstacle,
+  ultrasonic: VectorUltrasonic,
 } as const satisfies Record<string, ComponentType<never>>;
 
 export type CircuitComponentKey = keyof typeof circuitRegistry;

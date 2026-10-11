@@ -806,7 +806,7 @@ const CONSTANTS: Record<string, { v: string; ty: Ty }> = {
   Serial: { v: "true", ty: "bool" }, Wire: { v: "true", ty: "bool" },
 };
 
-const UNSUPPORTED_CALLS = new Set(["tone", "noTone", "pulseIn", "pulseInLong", "attachInterrupt", "detachInterrupt", "shiftOut", "shiftIn", "analogReference", "sprintf", "snprintf", "dtostrf", "memcpy", "memset", "strlen", "strcpy", "strcmp"]);
+const UNSUPPORTED_CALLS = new Set(["tone", "noTone", "attachInterrupt", "detachInterrupt", "shiftOut", "shiftIn", "analogReference", "sprintf", "snprintf", "dtostrf", "memcpy", "memset", "strlen", "strcpy", "strcmp"]);
 const FLOAT_FUNCS: Record<string, string> = {
   sqrt: "Math.sqrt", sin: "Math.sin", cos: "Math.cos", tan: "Math.tan", asin: "Math.asin", acos: "Math.acos", atan: "Math.atan",
   log: "Math.log", log10: "Math.log10", exp: "Math.exp", floor: "Math.floor", ceil: "Math.ceil", fabs: "Math.abs", trunc: "Math.trunc",
@@ -1299,6 +1299,7 @@ class Codegen {
       case "digitalRead": argc(1); return mk(`$rt.digitalRead(${num(0)})`, "int16");
       case "analogWrite": argc(2); return mk(`$rt.analogWrite(${num(0)},${num(1)})`, "void");
       case "analogRead": argc(1); return mk(`$rt.analogRead(${num(0)})`, "int16");
+      case "pulseIn": case "pulseInLong": argc([2, 3]); return mk(`$rt.pulseIn(${num(0)},${num(1)},${a.length > 2 ? num(2, "uint32") : "1000000"})`, "uint32");
       case "analogReadResolution": case "analogWriteResolution": return this.err(`${name}() is not available on the Arduino UNO`);
       case "delay": argc(1); return mk(`(yield* $rt.delay(${num(0, "uint32")}))`, "void");
       case "delayMicroseconds": argc(1); return mk(`(yield* $rt.delayUs(${num(0, "uint32")}))`, "void");
@@ -1701,7 +1702,7 @@ export function analyzeSketch(source: string): PinUsage | null {
             usage.din.add(pin);
             if (mode === 2) usage.pull.add(pin);
           }
-        } else if (name === "digitalRead") usage.din.add(pin);
+        } else if (name === "digitalRead" || name === "pulseIn" || name === "pulseInLong") usage.din.add(pin);
         else if (name === "digitalWrite" || name === "analogWrite") usage.out.add(pin);
       }
     }

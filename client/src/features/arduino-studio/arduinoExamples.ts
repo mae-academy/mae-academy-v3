@@ -185,39 +185,186 @@ void loop() {
 `,
   },
   {
-    id: "ultrasonic",
-    label: "Ultrasonic Sensor Simulation (HC-SR04)",
-    source: `#include <Arduino.h>
+    id: "hcsr04-distance",
+    label: "HC-SR04 Ultrasonic Distance Finder (Serial + LCD)",
+    source: `#include <LiquidCrystal.h>
 
-// HC-SR04 model: the A0 slider stands in for the echo pulse width (pulseIn result).
-// distance = duration * speed_of_sound / 2  (0.0343 cm/us)
+// HC-SR04 ranger: drag the distance slider on the sensor (2-400 cm).
+// Trig = D9, Echo = D10. pulseIn() returns the echo time: 58.2 us per cm of range
+// (sound covers 0.0343 cm/us, there and back).
 const int trigPin = 9;
-const int warnPin = LED_BUILTIN;
+const int echoPin = 10;
+const int rs = 12, en = 11, d4 = 5, d5 = 4, d6 = 3, d7 = 2;
+LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
 
 void setup() {
   pinMode(trigPin, OUTPUT);
-  pinMode(warnPin, OUTPUT);
+  pinMode(echoPin, INPUT);
   Serial.begin(9600);
+  lcd.begin(16, 2);
+  lcd.print("Distance:");
 }
 
 void loop() {
-  // 10 us trigger pulse
+  // 10 us trigger pulse starts a measurement
   digitalWrite(trigPin, LOW);
   delayMicroseconds(2);
   digitalWrite(trigPin, HIGH);
   delayMicroseconds(10);
   digitalWrite(trigPin, LOW);
 
-  // Simulated echo time: 116 us (2 cm) .. 23200 us (400 cm)
-  long duration = map(analogRead(A0), 0, 1023, 116, 23200);
-  float distance = duration * 0.0343 / 2.0;
+  long duration = pulseIn(echoPin, HIGH);
+  float distance = duration / 58.2;
 
-  digitalWrite(warnPin, distance < 50.0 ? HIGH : LOW);
   Serial.print("distance_cm:");
-  Serial.print(distance, 1);
+  Serial.println(distance, 1);
+
+  lcd.setCursor(0, 1);
+  if (duration == 0) {
+    lcd.print("Out of range   ");
+  } else {
+    lcd.print(distance, 1);
+    lcd.print(" cm        ");
+  }
+  delay(200);
+}
+`,
+  },
+  {
+    id: "ldr-night-lamp",
+    label: "LDR Automatic Night Lamp",
+    ledColors: { 8: "#F59E0B" },
+    source: `#include <Arduino.h>
+
+// Photoresistor on A0 (10k divider): brighter light = higher reading.
+// Drag the Lux slider down below ~4 lux and the lamp on D8 switches on.
+const int ldrPin = A0;
+const int lampPin = 8;
+const int darkLevel = 350;
+
+void setup() {
+  pinMode(lampPin, OUTPUT);
+  Serial.begin(9600);
+}
+
+void loop() {
+  int ldrValue = analogRead(ldrPin);
+  bool night = ldrValue < darkLevel;
+  digitalWrite(lampPin, night ? HIGH : LOW);
+
+  Serial.print("ldr:");
+  Serial.print(ldrValue);
   Serial.print(",threshold:");
-  Serial.println(50);
+  Serial.println(darkLevel);
   delay(100);
+}
+`,
+  },
+  {
+    id: "lm35-thermometer",
+    label: "LM35 Digital Thermometer",
+    ledColors: { 7: "#EF4444" },
+    source: `#include <Arduino.h>
+
+// LM35 on A1 outputs 10 mV per degree Celsius. Drag the temperature slider;
+// the warning LED on D7 lights above 30 C.
+const int sensorPin = A1;
+const int warnPin = 7;
+const float warnAt = 30.0;
+
+void setup() {
+  pinMode(warnPin, OUTPUT);
+  Serial.begin(9600);
+}
+
+void loop() {
+  int reading = analogRead(sensorPin);
+  float millivolts = reading * (5000.0 / 1023.0);
+  float celsius = millivolts / 10.0;
+
+  digitalWrite(warnPin, celsius > warnAt ? HIGH : LOW);
+
+  Serial.print("celsius:");
+  Serial.print(celsius, 1);
+  Serial.print(",warn_at:");
+  Serial.println(warnAt, 1);
+  delay(200);
+}
+`,
+  },
+  {
+    id: "pir-alarm",
+    label: "PIR Intrusion Security Alarm",
+    ledColors: { 8: "#EF4444" },
+    source: `#include <Arduino.h>
+
+// PIR motion sensor on D2. Press "Trigger Motion" on the sensor: its output goes HIGH for the hold time
+// and the alarm LED on D8 flashes for 3 seconds after the last movement.
+const int pirPin = 2;
+const int alarmPin = 8;
+int pirState = LOW;
+unsigned long alarmUntil = 0;
+
+void setup() {
+  pinMode(pirPin, INPUT);
+  pinMode(alarmPin, OUTPUT);
+  Serial.begin(9600);
+  Serial.println("Armed. Waiting for motion...");
+}
+
+void loop() {
+  int motion = digitalRead(pirPin);
+
+  if (motion == HIGH && pirState == LOW) {
+    Serial.println("INTRUDER detected!");
+    pirState = HIGH;
+  } else if (motion == LOW && pirState == HIGH) {
+    Serial.println("Motion ended.");
+    pirState = LOW;
+  }
+
+  if (motion == HIGH) {
+    alarmUntil = millis() + 3000;
+  }
+  if (millis() < alarmUntil) {
+    digitalWrite(alarmPin, (millis() / 150) % 2);
+  } else {
+    digitalWrite(alarmPin, LOW);
+  }
+  delay(10);
+}
+`,
+  },
+  {
+    id: "ir-obstacle-counter",
+    label: "IR Obstacle Avoidance Counter",
+    ledColors: { 8: "#22C55E" },
+    source: `#include <Arduino.h>
+
+// FC-51 infrared sensor on D3. The output is active LOW: it pulls to ground while something is
+// closer than the sensitivity threshold. Move the distance slider in and out to count objects.
+const int irPin = 3;
+const int ledPin = 8;
+int obstacleCount = 0;
+int lastState = HIGH;
+
+void setup() {
+  pinMode(irPin, INPUT);
+  pinMode(ledPin, OUTPUT);
+  Serial.begin(9600);
+}
+
+void loop() {
+  int state = digitalRead(irPin);
+  digitalWrite(ledPin, state == LOW ? HIGH : LOW);
+
+  if (state == LOW && lastState == HIGH) {
+    obstacleCount++;
+    Serial.print("Obstacle #");
+    Serial.println(obstacleCount);
+  }
+  lastState = state;
+  delay(10);
 }
 `,
   },

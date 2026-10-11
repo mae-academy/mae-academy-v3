@@ -69,6 +69,8 @@ export class ArduinoRuntime {
   private inputLevels = new Map<number, 0 | 1>();
   private touchedInputs = new Set<number>();
   private analogValues = new Map<number, number>();
+  /** Echo pulse width (us) a mounted ranging sensor returns on each pin; survives Reset like the other stimuli. */
+  private echoPulses = new Map<number, number>();
   private rx: number[] = [];
   private txCount = 0;
   private rxCount = 0;
@@ -148,6 +150,12 @@ export class ArduinoRuntime {
   setAnalogInput(channel: number, value: number): void {
     this.analogValues.set(channel, Math.max(0, Math.min(1023, Math.round(value))));
     this.markDirty();
+  }
+
+  /** Sets the HIGH pulse width `pulseIn(pin, HIGH)` measures on `pin` (an HC-SR04 echo line); null removes the sensor. */
+  setEchoPulse(pin: number, us: number | null): void {
+    if (us === null) this.echoPulses.delete(pin);
+    else this.echoPulses.set(pin, Math.max(0, Math.round(us)));
   }
 
   sendSerial(text: string): void {
@@ -363,6 +371,21 @@ export class ArduinoRuntime {
       this.markDirty();
     }
     return this.analogValues.get(ch) ?? 0;
+  }
+
+  /**
+   * Times a pulse on `pin`. Only a sensor stimulus can produce one: with nothing mounted, or a pulse longer than the
+   * timeout, it returns 0 exactly as the real call does. A measured pulse advances the simulated clock by its width.
+   */
+  pulseIn(n: number, level: number, timeoutUs: number): number {
+    this.poll();
+    const us = level ? this.echoPulses.get(n) : undefined;
+    if (!us || us > timeoutUs) {
+      this.clockBase += timeoutUs; // the real call blocks until it gives up
+      return 0;
+    }
+    this.clockBase += us;
+    return us;
   }
 
   millis(): number {

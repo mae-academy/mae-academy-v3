@@ -7,7 +7,10 @@ import { useTranslation } from "react-i18next";
 import unoRaw from "./arduinoUno.svg?raw";
 import { ANALOG_HEADER_Y, DIGITAL_HEADER_Y, HEADER_PINS, LEDS, VIEW_H, VIEW_W, analogPinX, digitalPinX, pinName } from "./arduinoBoardGeometry";
 import type { PinUsage } from "@shared/code/arduinoTypes";
-import { BTN_H, BTN_W, LED_H, LED_W, LCD_HOLE_Y, LcdWires, POT_H, POT_W, RES_H, RES_W, VectorLed, VectorPotentiometer, VectorPushButton, VectorResistor, buildLcdHarness, simplify, type HarnessWire } from "./components/circuit";
+import { BTN_H, BTN_W, IR_H, IR_PINS, IR_W, LED_H, LED_W, LCD_HOLE_Y, LDR_PINS, LM35_PINS, LcdWires, PIR_H, PIR_PINS, PIR_W, POT_H, POT_W, RES_H, RES_W, US_H, US_PINS, US_W, VectorIrObstacle, VectorLdr, VectorLed, VectorLm35, VectorPir, VectorPotentiometer, VectorPushButton, VectorResistor, VectorUltrasonic, buildLcdHarness, simplify, type HarnessWire } from "./components/circuit";
+import { EMPTY_SENSOR_CONTEXT, type SensorContext } from "./codeContextAnalyzer";
+import { resolveAnalogKind, sensorKey, sensorOwnedPins, sensorValue, type AnalogOverrides, type SensorValues } from "./sensorMounts";
+import { ANALOG_SENSOR_KINDS, IR_DIST_MAX_CM, IR_DIST_MIN_CM, LDR_LUX_MAX, LDR_LUX_MIN, LM35_MAX_C, PIR_HOLD_MAX_S, PIR_HOLD_MIN_S, US_DIST_MAX_CM, US_DIST_MIN_CM, US_US_PER_CM, adcToVolts, echoMicros, irLevel, ldrAdc, lm35Adc, luxFromPosition, positionFromLux, type AnalogSensorKind } from "./sensorModels";
 import { LcdDisplay, TRIMMER } from "./components/LcdDisplay";
 import { LcdContrastKnob } from "./components/LcdContrastKnob";
 import { lcdHoleX } from "./components/circuit/lcdGeometry";
@@ -44,6 +47,11 @@ const OUT_C = { w: 150, h: 86, ledX: 12, ledY: 4, resX: 44, resY: 64, resS: 0.8 
 const IN_C = { w: 132, h: 72, btnX: 8, btnY: 8, btnS: 46 / BTN_W };
 const AN_C = { w: 270, h: 88, potX: 196, potY: 12, potS: 0.72 };
 const GAP_TOP = 32;
+/** Sensor cards on the top row: graphic on the left, live controls on the right, header pins along the bottom edge. */
+const SENS_C = { pir: { w: 168 }, ir: { w: 168 }, us: { w: 216 }, h: 100, gx: 4, gy: 6, ctlX: 76 } as const;
+/** The 5V jumper to a top-row sensor detours around the board's right edge, outside the LCD harness's own risers. */
+const SENSOR_RISER_X = 46;
+const SENSOR_RISER_STEP = 8;
 const GAP_BOTTOM = 18;
 const MOD_SPACING = 14;
 const WIRE = { signalIn: "#06B6D4", signalOut: "#7C3AED", vcc: "#DC2626", series: "#F59E0B" } as const;
@@ -142,19 +150,31 @@ interface Props {
   lcdVisible?: boolean;
   /** Turns the LCD's V0 contrast trimmer (0..1). */
   onLcdContrast?: (value: number) => void;
+  /** Sensors the code analyzer found in the sketch; each is mounted and auto-wired on the canvas. */
+  sensors?: SensorContext;
+  /** Manual per-channel component choices (potentiometer / LDR / LM35). */
+  analogOverrides?: AnalogOverrides;
+  /** Physical sensor values (lux, degrees C, cm, seconds). */
+  sensorValues?: SensorValues;
+  onSensorValue?: (key: string, value: number) => void;
+  /** Quick-morph: swap what an analog channel's component is, without touching the sketch. */
+  onAnalogMorph?: (channel: number, kind: AnalogSensorKind) => void;
+  /** "Trigger Motion" on the PIR module. */
+  onPirTrigger?: (pin: number) => void;
 }
 
 const EMPTY_LAYOUT: PinUsage = { digitalInputs: [], pullups: [], analogInputs: [], outputs: [] };
 const uniqSorted = (xs: number[]): number[] => Array.from(new Set(xs)).sort((a, b) => a - b);
 
-type TopModule = { kind: "in" | "out"; pin: number };
+type TopModule = { kind: "in" | "out" | "pir" | "ir"; pin: number } | { kind: "us"; pin: number; trig: number };
 
-export function ArduinoBoard({ snapshot, onDigitalInput, onAnalogInput, layout = EMPTY_LAYOUT, ledColors = {}, onLedColorChange, lcdVisible = false, onLcdContrast }: Props) {
+export function ArduinoBoard({ snapshot, onDigitalInput, onAnalogInput, layout = EMPTY_LAYOUT, ledColors = {}, onLedColorChange, lcdVisible = false, onLcdContrast, sensors = EMPTY_SENSOR_CONTEXT, analogOverrides = {}, sensorValues = {}, onSensorValue, onAnalogMorph, onPirTrigger }: Props) {
   const { t } = useTranslation("simulators");
   const ledColorOptions = useLedColorOptions();
   const [boxRef, box] = useElementSize<HTMLDivElement>();
   const [internalLedColors, setInternalLedColors] = useState<Record<number, string>>({});
   const [openPickerPin, setOpenPickerPin] = useState<number | null>(null);
+  const [openMorphCh, setOpenMorphCh] = useState<number | null>(null);
 
   const activeLedColors = { ...ledColors, ...internalLedColors };
 
@@ -164,6 +184,13 @@ export function ArduinoBoard({ snapshot, onDigitalInput, onAnalogInput, layout =
     window.addEventListener("click", handleClickOutside);
     return () => window.removeEventListener("click", handleClickOutside);
   }, [openPickerPin]);
+
+  useEffect(() => {
+    if (openMorphCh === null) return;
+    const close = () => setOpenMorphCh(null);
+    window.addEventListener("click", close);
+    return () => window.removeEventListener("click", close);
+  }, [openMorphCh]);
 
   const handleSelectColor = (pin: number, color: string) => {
     setInternalLedColors(prev => ({ ...prev, [pin]: color }));
@@ -182,23 +209,27 @@ export function ArduinoBoard({ snapshot, onDigitalInput, onAnalogInput, layout =
   const lcdMode = lcdWiring?.mode ?? "parallel";
   const lcdPins = lcdWiring?.mode === "i2c" ? [] : lcdWiring?.pins ?? DEFAULT_LCD_PINS;
   const lcdOwned = new Set<number>(lcdVisible ? lcdPins : []);
-  const runtimeOutputs = snapshot.pins.map((p, i) => (p.mode === "OUTPUT" && i <= 13 && !lcdOwned.has(i) ? i : -1)).filter(i => i >= 0);
-  const allOutputs = uniqSorted([...layout.outputs.filter(p => !lcdOwned.has(p)), ...runtimeOutputs]);
+  // Mounted sensors own their pins too: the HC-SR04 trigger is not a bare LED, the PIR output not a bare push-button.
+  const sensorOwned = new Set<number>(sensorOwnedPins(sensors));
+  const owned = (p: number): boolean => lcdOwned.has(p) || sensorOwned.has(p);
+  const runtimeOutputs = snapshot.pins.map((p, i) => (p.mode === "OUTPUT" && i <= 13 && !owned(i) ? i : -1)).filter(i => i >= 0);
+  const allOutputs = uniqSorted([...layout.outputs.filter(p => !owned(p)), ...runtimeOutputs]);
   // Pin 13 is the built-in L LED; it only gets an external circuit when the sketch drives other outputs too.
   const outputs = allOutputs.filter(p => p < 13 || allOutputs.length > 1);
-  const digitalInputs = uniqSorted([...layout.digitalInputs, ...snapshot.digitalInputs]).filter(p => !allOutputs.includes(p) && p !== 13 && !lcdOwned.has(p));
-  const analogInputs = uniqSorted([...layout.analogInputs, ...snapshot.analogInputs]).filter(ch => !lcdOwned.has(ch + 14));
-  const topModules: TopModule[] = [...digitalInputs.map((pin): TopModule => ({ kind: "in", pin })), ...outputs.map((pin): TopModule => ({ kind: "out", pin }))].sort((a, b) => digitalPinX(a.pin) - digitalPinX(b.pin));
+  const digitalInputs = uniqSorted([...layout.digitalInputs, ...snapshot.digitalInputs]).filter(p => !allOutputs.includes(p) && p !== 13 && !owned(p));
+  // The analyzer mounts an LDR / LM35 the moment the code names one, without waiting for the serverless pin analysis.
+  const analogInputs = uniqSorted([...layout.analogInputs, ...snapshot.analogInputs, ...Object.keys(sensors.analog).map(Number)]).filter(ch => !lcdOwned.has(ch + 14));
+  const sensorModules: TopModule[] = [
+    ...(sensors.ultrasonic ? [{ kind: "us", pin: sensors.ultrasonic.echo, trig: sensors.ultrasonic.trig } as const] : []),
+    ...(sensors.pir !== null ? [{ kind: "pir", pin: sensors.pir } as const] : []),
+    ...(sensors.ir !== null ? [{ kind: "ir", pin: sensors.ir } as const] : []),
+  ];
+  const hasTopSensor = sensorModules.length > 0;
+  const topModules: TopModule[] = [...digitalInputs.map((pin): TopModule => ({ kind: "in", pin })), ...outputs.map((pin): TopModule => ({ kind: "out", pin })), ...sensorModules].sort((a, b) => digitalPinX(a.pin) - digitalPinX(b.pin));
 
   const s = S_BOARD;
   const boardH = BOARD_H;
   const P = (x: number, y: number): Pt => ({ x: x * s, y: y * s });
-
-  // Vertical layout: the canvas origin is the board's top-left corner offset by `boardY`.
-  const lcdHoleY = lcdVisible ? -(topModules.length > 0 ? LCD_HOLE_ABOVE.withModules : LCD_HOLE_ABOVE.bare) : 0;
-  const lcdOriginY = lcdHoleY - LCD_HOLE_Y;
-  const boardY = lcdVisible ? LCD_TOP_MARGIN - lcdOriginY : BOARD_Y;
-  const canvasH = lcdVisible ? boardY + BOARD_H + (analogInputs.length > 0 ? GAP_BOTTOM + AN_C.h + 12 : LCD_BOTTOM_ROOM) : CANVAS_H;
 
   const pin13 = snapshot.pins[13];
   const lBrightness = pin13.mode === "OUTPUT" ? (pin13.pwm !== null ? pin13.pwm / 255 : pin13.level) : 0;
@@ -219,8 +250,13 @@ export function ArduinoBoard({ snapshot, onDigitalInput, onAnalogInput, layout =
   const maxRowWidth = maxX - minX;
   const fitScale = (total: number): number => (total > maxRowWidth ? maxRowWidth / total : 1);
   const placeRow = (total: number, anchorX: number): number => Math.max(minX, Math.min(maxX - total, anchorX - total / 2));
-  const modW = (m: TopModule): number => (m.kind === "in" ? IN_C.w : OUT_C.w);
-  const modH = (m: TopModule): number => (m.kind === "in" ? IN_C.h : OUT_C.h);
+  const modW = (m: TopModule): number => (m.kind === "in" ? IN_C.w : m.kind === "out" ? OUT_C.w : m.kind === "us" ? SENS_C.us.w : SENS_C[m.kind].w);
+  const modH = (m: TopModule): number => (m.kind === "in" ? IN_C.h : m.kind === "out" ? OUT_C.h : SENS_C.h);
+  // Top-row jumper lanes: one per signal plus one per 5V detour. Sensor rows get a gap deep enough to hold them all.
+  const topSignalLanes = topModules.reduce((n, m) => n + (m.kind === "us" ? 2 : 1), 0);
+  const sensorVccCount = sensorModules.length;
+  const gapTop = hasTopSensor ? Math.max(GAP_TOP, 3 + LANE_STEP * (topSignalLanes + sensorVccCount) + 12) : GAP_TOP;
+  const gapBottom = GAP_BOTTOM + (hasTopSensor ? LANE_STEP * sensorVccCount : 0);
 
   const topTotal = topModules.reduce((acc, m) => acc + modW(m), 0) + Math.max(0, topModules.length - 1) * MOD_SPACING;
   const kTop = fitScale(topTotal);
@@ -229,13 +265,25 @@ export function ArduinoBoard({ snapshot, onDigitalInput, onAnalogInput, layout =
   const topLayout = topModules.map(m => {
     const x = cursor;
     cursor += (modW(m) + MOD_SPACING) * kTop;
-    return { ...m, x, y: -(GAP_TOP + modH(m) * kTop), k: kTop };
+    return { ...m, x, y: -(gapTop + modH(m) * kTop), k: kTop };
   });
   const aTotal = analogInputs.length * AN_C.w + Math.max(0, analogInputs.length - 1) * MOD_SPACING;
   const kA = fitScale(aTotal);
   const aStart = placeRow(aTotal * kA, ((V5.x + analogPinX(analogInputs[0] ?? 0)) / 2) * s);
   const aStep = (AN_C.w + MOD_SPACING) * kA;
-  const aY = boardH + GAP_BOTTOM;
+  const aY = boardH + gapBottom;
+
+  // Vertical layout: the canvas origin is the board's top-left corner offset by `boardY`. Sensor cards can stand taller than
+  // the LED / button modules, so the canvas grows to hold them (and the LCD row rises above them).
+  const topExtent = topLayout.reduce((acc, m) => Math.max(acc, -m.y), 0);
+  const lcdHoleY = lcdVisible ? -(topModules.length > 0 ? Math.max(LCD_HOLE_ABOVE.withModules, hasTopSensor ? topExtent + 78 : 0) : LCD_HOLE_ABOVE.bare) : 0;
+  const lcdOriginY = lcdHoleY - LCD_HOLE_Y;
+  const boardY = lcdVisible ? LCD_TOP_MARGIN - lcdOriginY : hasTopSensor ? Math.max(BOARD_Y, topExtent + 10) : BOARD_Y;
+  const canvasH = lcdVisible
+    ? boardY + BOARD_H + (analogInputs.length > 0 ? gapBottom + AN_C.h + 12 : LCD_BOTTOM_ROOM + (hasTopSensor ? LANE_STEP * sensorVccCount : 0))
+    : hasTopSensor
+      ? Math.max(CANVAS_H, boardY + BOARD_H + (analogInputs.length > 0 ? gapBottom + AN_C.h + 12 : LCD_BOTTOM_ROOM))
+      : CANVAS_H;
 
   // Cables: each plug sits flush on its jack face, then runs horizontally to (and past) the canvas left edge.
   const cableEnd = -BOARD_X - CABLE_EXTENT;
@@ -258,6 +306,8 @@ export function ArduinoBoard({ snapshot, onDigitalInput, onAnalogInput, layout =
     color: string;
   }
   const wireSpecs: WireSpec[] = [];
+  /** 5V feeds for top-row sensors: their pad is on the bottom header, so they detour around the board's right edge. */
+  const vccTop: { label: string; lead: Pt }[] = [];
   const addWire = (label: string, from: Pt, to: Pt, net: HarnessWire["net"], color?: string): void => {
     wireSpecs.push({ label, a: from, b: to, net, color: color ?? "#1E293B" });
   };
@@ -273,6 +323,7 @@ export function ArduinoBoard({ snapshot, onDigitalInput, onAnalogInput, layout =
       const mid = (w.a.x + w.b.x) / 2;
       wireList.push({ id: w.label, pin: w.label, from: w.label, net: w.net, color: w.color, points: simplify([w.a, { x: mid, y: w.a.y }, { x: mid, y: w.b.y }, w.b]) });
     }
+    const usedLanes = { top: 0, bottom: 0 };
     for (const side of ["top", "bottom"] as const) {
       const group = wireSpecs.filter(w => !w.label.endsWith("-series") && (Math.min(w.a.y, w.b.y) < 0 ? "top" : "bottom") === side);
       const ends = (w: WireSpec): { pin: Pt; lead: Pt } => {
@@ -284,12 +335,21 @@ export function ArduinoBoard({ snapshot, onDigitalInput, onAnalogInput, layout =
       const left = signals.filter(w => ends(w).lead.x < ends(w).pin.x).sort((p, q) => ends(p).pin.x - ends(q).pin.x);
       const laneOf = new Map<WireSpec, number>();
       [...right, ...left].forEach((w, i) => laneOf.set(w, i + 1));
+      usedLanes[side] = right.length + left.length;
       for (const w of group) {
         const { pin, lead } = ends(w);
         const y = lane(side, w.net === "GND" ? 0 : (laneOf.get(w) ?? 1));
         wireList.push({ id: w.label, pin: w.label, from: w.label, net: w.net, color: w.color, points: simplify([pin, { x: pin.x, y }, { x: lead.x, y }, lead]) });
       }
     }
+    // Each 5V detour takes the next free lane under the board, the next riser out, and the next free lane above it.
+    const v5Pt = P(V5.x, V5.y);
+    vccTop.forEach((v, i) => {
+      const riserX = BOARD_W + SENSOR_RISER_X + i * SENSOR_RISER_STEP;
+      const yBottom = lane("bottom", usedLanes.bottom + 1 + i);
+      const yTop = lane("top", usedLanes.top + 1 + i);
+      wireList.push({ id: v.label, pin: v.label, from: "5V", net: "5V", color: WIRE.vcc, points: simplify([v5Pt, { x: v5Pt.x, y: yBottom }, { x: riserX, y: yBottom }, { x: riserX, y: yTop }, { x: v.lead.x, y: yTop }, v.lead]) });
+    });
   };
 
   topLayout.forEach(m => {
@@ -381,6 +441,79 @@ export function ArduinoBoard({ snapshot, onDigitalInput, onAnalogInput, layout =
           )}
         </div>,
       );
+    } else if (m.kind === "pir") {
+      const high = (snapshot.inputLevels[m.pin] ?? 0) === 1;
+      const hold = sensorValue(sensorValues, "pir", m.pin, "hold");
+      const tip = (lx: number): Pt => at(SENS_C.gx + lx, SENS_C.gy + 76);
+      addWire(`D${m.pin}-signal`, pinPt, tip(PIR_PINS[1]), "signal", WIRE.signalIn);
+      addWire(`D${m.pin}-gnd`, gndPt, tip(PIR_PINS[2]), "GND", undefined);
+      vccTop.push({ label: `D${m.pin}-5v`, lead: tip(PIR_PINS[0]) });
+      art.push(
+        <g key={`pir${m.pin}`} data-module={`PIR${m.pin}`} data-sensor="pir" data-high={high ? "1" : "0"} transform={xf}>
+          <VectorPir x={SENS_C.gx} y={SENS_C.gy} width={PIR_W} height={PIR_H} triggered={high} />
+          <text x={SENS_C.ctlX} y={14} fontSize={9} fontWeight={700} className="fill-slate-700 dark:fill-slate-200">{t("arduino.pirLabel", "PIR Motion Sensor")}</text>
+          <text x={SENS_C.ctlX} y={26} fontSize={8.5} fontFamily="ui-monospace, monospace" className="fill-slate-500 dark:fill-slate-400">{pinName(m.pin)}{high ? " · HIGH" : " · LOW"}</text>
+        </g>,
+      );
+      overlays.push(
+        <div key={`pirc${m.pin}`} data-sensor-controls={`PIR${m.pin}`} className="absolute" style={{ left: at(SENS_C.ctlX, 0).x, top: at(0, 33).y, width: SENS_C.pir.w - SENS_C.ctlX - 4, transform: `scale(${m.k})`, transformOrigin: "0 0" }}>
+          <button
+            type="button"
+            data-testid={`pir-trigger-${m.pin}`}
+            onClick={() => onPirTrigger?.(m.pin)}
+            className="h-6 w-full cursor-pointer rounded-md border border-emerald-500/60 bg-emerald-500/10 text-[10px] font-bold text-emerald-700 transition hover:bg-emerald-500/20 active:scale-[.97] dark:text-emerald-300"
+          >
+            {t("arduino.triggerMotion", "Trigger Motion")}
+          </button>
+          <div className="mt-1 font-mono text-[8.5px] text-slate-500 dark:text-slate-400">{t("arduino.pirHold", "hold {{seconds}} s", { seconds: hold.toFixed(1) })}</div>
+          <StudioSlider min={PIR_HOLD_MIN_S} max={PIR_HOLD_MAX_S} step={0.5} value={hold} aria-label={t("arduino.pirHoldAria", "PIR hold time")} onChange={v => onSensorValue?.(sensorKey("pir", m.pin, "hold"), v)} hideHeader className="w-full" />
+        </div>,
+      );
+    } else if (m.kind === "ir") {
+      const dist = sensorValue(sensorValues, "ir", m.pin, "distance");
+      const thr = sensorValue(sensorValues, "ir", m.pin, "threshold");
+      const blocked = irLevel(dist, thr) === 0;
+      const tip = (lx: number): Pt => at(SENS_C.gx + lx, SENS_C.gy + 76);
+      addWire(`D${m.pin}-signal`, pinPt, tip(IR_PINS[0]), "signal", WIRE.signalIn);
+      addWire(`D${m.pin}-gnd`, gndPt, tip(IR_PINS[1]), "GND", undefined);
+      vccTop.push({ label: `D${m.pin}-5v`, lead: tip(IR_PINS[2]) });
+      art.push(
+        <g key={`ir${m.pin}`} data-module={`IR${m.pin}`} data-sensor="ir" data-obstacle={blocked ? "1" : "0"} transform={xf}>
+          <VectorIrObstacle x={SENS_C.gx} y={SENS_C.gy} width={IR_W} height={IR_H} obstacle={blocked} />
+          <text x={SENS_C.ctlX} y={14} fontSize={9} fontWeight={700} className="fill-slate-700 dark:fill-slate-200">{t("arduino.irLabel", "IR Obstacle Sensor")}</text>
+          <text x={SENS_C.ctlX} y={26} fontSize={8.5} fontFamily="ui-monospace, monospace" className="fill-slate-500 dark:fill-slate-400">{pinName(m.pin)}{blocked ? " · LOW · obstacle" : " · HIGH · clear"}</text>
+        </g>,
+      );
+      overlays.push(
+        <div key={`irc${m.pin}`} data-sensor-controls={`IR${m.pin}`} className="absolute" style={{ left: at(SENS_C.ctlX, 0).x, top: at(0, 30).y, width: SENS_C.ir.w - SENS_C.ctlX - 4, transform: `scale(${m.k})`, transformOrigin: "0 0" }}>
+          <div className="font-mono text-[8.5px] text-slate-500 dark:text-slate-400">{t("arduino.irDistance", "distance {{cm}} cm", { cm: dist.toFixed(1) })}</div>
+          <StudioSlider min={IR_DIST_MIN_CM} max={IR_DIST_MAX_CM} step={0.5} value={dist} aria-label={t("arduino.irDistanceAria", "Obstacle distance")} onChange={v => onSensorValue?.(sensorKey("ir", m.pin, "distance"), v)} hideHeader className="w-full" />
+          <div className="font-mono text-[8.5px] text-slate-500 dark:text-slate-400">{t("arduino.irThreshold", "sensitivity ≤ {{cm}} cm", { cm: thr.toFixed(1) })}</div>
+          <StudioSlider min={2} max={IR_DIST_MAX_CM} step={0.5} value={thr} aria-label={t("arduino.irThresholdAria", "Sensitivity threshold")} onChange={v => onSensorValue?.(sensorKey("ir", m.pin, "threshold"), v)} hideHeader className="w-full" trackGradient={["#3B82F6", "#8B5CF6"]} />
+        </div>,
+      );
+    } else if (m.kind === "us") {
+      const cm = sensorValue(sensorValues, "ultrasonic", m.pin);
+      const tip = (lx: number): Pt => at(SENS_C.gx + lx, SENS_C.gy + 76);
+      const trigPt = P(digitalPinX(m.trig), DIGITAL_HEADER_Y);
+      addWire(`D${m.trig}-signal`, trigPt, tip(US_PINS[1]), "signal", WIRE.signalOut);
+      addWire(`D${m.pin}-signal`, pinPt, tip(US_PINS[2]), "signal", WIRE.signalIn);
+      addWire(`D${m.pin}-gnd`, gndPt, tip(US_PINS[3]), "GND", undefined);
+      vccTop.push({ label: `D${m.pin}-5v`, lead: tip(US_PINS[0]) });
+      art.push(
+        <g key={`us${m.pin}`} data-module={`US${m.pin}`} data-sensor="ultrasonic" transform={xf}>
+          <VectorUltrasonic x={SENS_C.gx} y={SENS_C.gy} width={US_W} height={US_H} range={(cm - US_DIST_MIN_CM) / (US_DIST_MAX_CM - US_DIST_MIN_CM)} />
+          <text x={SENS_C.ctlX + 44} y={14} fontSize={9} fontWeight={700} className="fill-slate-700 dark:fill-slate-200">{t("arduino.ultrasonicLabel", "HC-SR04 Ultrasonic")}</text>
+          <text x={SENS_C.ctlX + 44} y={26} fontSize={8.5} fontFamily="ui-monospace, monospace" className="fill-slate-500 dark:fill-slate-400">{`Trig ${pinName(m.trig)} · Echo ${pinName(m.pin)}`}</text>
+        </g>,
+      );
+      overlays.push(
+        <div key={`usc${m.pin}`} data-sensor-controls={`US${m.pin}`} className="absolute" style={{ left: at(SENS_C.ctlX + 44, 0).x, top: at(0, 33).y, width: SENS_C.us.w - SENS_C.ctlX - 48, transform: `scale(${m.k})`, transformOrigin: "0 0" }}>
+          <div className="font-mono text-[8.5px] text-slate-500 dark:text-slate-400">{t("arduino.ultrasonicDistance", "obstacle {{cm}} cm", { cm: cm.toFixed(0) })}</div>
+          <StudioSlider min={US_DIST_MIN_CM} max={US_DIST_MAX_CM} step={1} value={cm} aria-label={t("arduino.ultrasonicDistanceAria", "Obstacle distance")} onChange={v => onSensorValue?.(sensorKey("ultrasonic", m.pin), v)} hideHeader className="w-full" trackGradient={["#8B5CF6", "#3B82F6"]} />
+          <div className="font-mono text-[8.5px] tabular-nums text-slate-500 dark:text-slate-400">{t("arduino.ultrasonicEcho", "echo {{us}} µs · {{per}} µs/cm", { us: echoMicros(cm), per: US_US_PER_CM })}</div>
+        </div>,
+      );
     } else {
       const pullup = layout.pullups.includes(m.pin) || snapshot.pins[m.pin].mode === "INPUT_PULLUP";
       const level: 0 | 1 = snapshot.inputLevels[m.pin] ?? (pullup ? 1 : 0);
@@ -416,38 +549,139 @@ export function ArduinoBoard({ snapshot, onDigitalInput, onAnalogInput, layout =
     const ax = aStart + i * aStep;
     const at = (lx: number, ly: number): Pt => ({ x: ax + lx * kA, y: aY + ly * kA });
     const pinTip = (n: number): Pt => at(AN_C.potX + [20, 32, 44][n] * AN_C.potS, AN_C.potY);
+    const kind = resolveAnalogKind(sensors, analogOverrides, ch);
+    const auto = kind !== "pot" && sensors.analog[ch] === kind;
     const value = snapshot.analogValues[ch] ?? 512;
+    // The LDR, LM35 and potentiometer share one footprint and pin order (5V, signal, GND), so only the part and its controls change.
     addWire(`A${ch}-gnd`, P(BOTTOM_GND.x, BOTTOM_GND.y), pinTip(2), "GND", undefined);
     addWire(`A${ch}-5v`, P(V5.x, V5.y), pinTip(0), "5V", WIRE.vcc);
     addWire(`A${ch}-signal`, P(analogPinX(ch), ANALOG_HEADER_Y), pinTip(1), "signal", WIRE.signalIn);
+    const partProps = { x: AN_C.potX, y: AN_C.potY, width: POT_W * AN_C.potS, height: POT_H * AN_C.potS };
+    const lux = sensorValue(sensorValues, "ldr", ch);
+    const celsius = sensorValue(sensorValues, "lm35", ch);
     art.push(
-      <g key={`aa${ch}`} transform={`translate(${ax} ${aY}) scale(${kA})`}>
-        <VectorPotentiometer x={AN_C.potX} y={AN_C.potY} width={POT_W * AN_C.potS} height={POT_H * AN_C.potS} value={value} />
+      <g key={`aa${ch}`} data-module={`A${ch}-${kind}`} data-sensor={kind} transform={`translate(${ax} ${aY}) scale(${kA})`}>
+        {kind === "ldr" ? <VectorLdr {...partProps} light={positionFromLux(lux)} lux={lux} /> : kind === "lm35" ? <VectorLm35 {...partProps} celsius={celsius} /> : <VectorPotentiometer {...partProps} value={value} />}
       </g>,
     );
+    const kindLabel: Record<AnalogSensorKind, string> = {
+      pot: t("arduino.analogInputLabel", "Analog Input"),
+      ldr: t("arduino.ldrLabel", "LDR Light Sensor"),
+      lm35: t("arduino.lm35Label", "LM35 Temp Sensor"),
+    };
+    const kindOption: Record<AnalogSensorKind, string> = {
+      pot: t("arduino.morphPot", "Potentiometer"),
+      ldr: t("arduino.morphLdr", "LDR Light Sensor"),
+      lm35: t("arduino.morphLm35", "LM35 Temp Sensor"),
+    };
+    const adc = kind === "ldr" ? ldrAdc(lux) : kind === "lm35" ? lm35Adc(celsius) : value;
+    const partBox = { left: at(AN_C.potX, 0).x, top: at(0, AN_C.potY).y, width: POT_W * AN_C.potS * kA, height: POT_H * AN_C.potS * kA };
     overlays.push(
-      <div key={`ac${ch}`} data-module={`A${ch}`} className="absolute" style={{ left: ax, top: aY + 22 * kA, width: 176, transform: `scale(${kA})`, transformOrigin: "0 0" }}>
-        <div className="text-[10px] font-bold text-slate-700 dark:text-slate-200">
-          {t("arduino.analogInputLabel", "Analog Input")} <span className="ms-1 font-mono font-medium text-slate-500 dark:text-slate-400">A{ch}</span>
+      <div key={`ac${ch}`} data-module={`A${ch}`} data-sensor-kind={kind} className="absolute" style={{ left: ax, top: aY + 22 * kA, width: 176, transform: `scale(${kA})`, transformOrigin: "0 0" }}>
+        <div className="flex items-center gap-1 text-[10px] font-bold text-slate-700 dark:text-slate-200">
+          <span>{kindLabel[kind]}</span>
+          <span className="ms-1 font-mono font-medium text-slate-500 dark:text-slate-400">A{ch}</span>
+          {auto && (
+            <span data-testid={`sensor-auto-${ch}`} title={t("arduino.autoMountedTitle", "Mounted automatically from your sketch")} className="rounded-full bg-violet-500/15 px-1.5 text-[8px] font-bold uppercase tracking-wide text-violet-600 dark:text-violet-300">
+              {t("arduino.autoBadge", "auto")}
+            </span>
+          )}
         </div>
-        <StudioSlider
-          min={0}
-          max={1023}
-          step={1}
-          value={value}
-          aria-label={t("arduino.analogInputAria", "Analog input {{channel}}", { channel: `A${ch}` })}
-          onChange={val => onAnalogInput(ch, val)}
-          hideHeader
-          className="my-1.5 w-full"
-        />
-        <div className="flex justify-between font-mono text-[8px] text-slate-400">
-          <span>0</span>
-          <span>512</span>
-          <span>1023</span>
-        </div>
-        <div className="mt-1 font-mono text-[10px] font-semibold tabular-nums text-slate-600 dark:text-slate-300">
-          {t("arduino.analogRawLabel", "raw {{value}} · {{voltage}} V", { value, voltage: ((value * 5) / 1023).toFixed(2) })}
-        </div>
+        {kind === "ldr" ? (
+          <>
+            <StudioSlider min={0} max={1000} step={1} value={Math.round(positionFromLux(lux) * 1000)} aria-label={t("arduino.ldrAria", "Light level {{channel}}", { channel: `A${ch}` })} onChange={v => onSensorValue?.(sensorKey("ldr", ch), luxFromPosition(v / 1000))} hideHeader className="my-1.5 w-full" trackGradient={["#1E293B", "#F59E0B", "#FEF08A"]} />
+            <div className="flex justify-between font-mono text-[8px] text-slate-400">
+              <span>{LDR_LUX_MIN} lx</span>
+              <span>10 lx</span>
+              <span>{LDR_LUX_MAX / 1000}k lx</span>
+            </div>
+            <div className="mt-1 font-mono text-[10px] font-semibold tabular-nums text-slate-600 dark:text-slate-300">
+              {t("arduino.ldrReadout", "{{lux}} lx · raw {{value}} · {{voltage}} V", { lux: lux < 10 ? lux.toFixed(1) : Math.round(lux), value: adc, voltage: adcToVolts(adc).toFixed(2) })}
+            </div>
+          </>
+        ) : kind === "lm35" ? (
+          <>
+            <StudioSlider min={0} max={LM35_MAX_C} step={0.5} value={celsius} aria-label={t("arduino.lm35Aria", "Temperature {{channel}}", { channel: `A${ch}` })} onChange={v => onSensorValue?.(sensorKey("lm35", ch), v)} hideHeader className="my-1.5 w-full" trackGradient={["#38BDF8", "#FBBF24", "#EF4444"]} />
+            <div className="flex justify-between font-mono text-[8px] text-slate-400">
+              <span>0 °C</span>
+              <span>50 °C</span>
+              <span>100 °C</span>
+            </div>
+            <div className="mt-1 font-mono text-[10px] font-semibold tabular-nums text-slate-600 dark:text-slate-300">
+              {t("arduino.lm35Readout", "{{celsius}} °C · {{mv}} mV · raw {{value}}", { celsius: celsius.toFixed(1), mv: (celsius * 10).toFixed(0), value: adc })}
+            </div>
+          </>
+        ) : (
+          <>
+            <StudioSlider
+              min={0}
+              max={1023}
+              step={1}
+              value={value}
+              aria-label={t("arduino.analogInputAria", "Analog input {{channel}}", { channel: `A${ch}` })}
+              onChange={val => onAnalogInput(ch, val)}
+              hideHeader
+              className="my-1.5 w-full"
+            />
+            <div className="flex justify-between font-mono text-[8px] text-slate-400">
+              <span>0</span>
+              <span>512</span>
+              <span>1023</span>
+            </div>
+            <div className="mt-1 font-mono text-[10px] font-semibold tabular-nums text-slate-600 dark:text-slate-300">
+              {t("arduino.analogRawLabel", "raw {{value}} · {{voltage}} V", { value, voltage: ((value * 5) / 1023).toFixed(2) })}
+            </div>
+          </>
+        )}
+      </div>,
+      <div key={`am${ch}`}>
+        {/* Quick-morph: click the part to swap it for another analog sensor without touching the sketch. */}
+        <button
+          type="button"
+          data-testid={`sensor-morph-${ch}`}
+          aria-haspopup="menu"
+          aria-expanded={openMorphCh === ch}
+          aria-label={t("arduino.morphAria", "Change component on {{channel}} (currently {{kind}})", { channel: `A${ch}`, kind: kindOption[kind] })}
+          title={t("arduino.morphTitle", "Click to switch this component")}
+          onClick={e => {
+            e.stopPropagation();
+            setOpenMorphCh(prev => (prev === ch ? null : ch));
+          }}
+          className="group absolute cursor-pointer rounded-lg focus:outline-none"
+          style={partBox}
+        >
+          <span className="pointer-events-none absolute inset-0 rounded-lg border-2 border-transparent transition-all group-hover:border-violet-400/80 group-hover:shadow-[0_0_8px_rgba(167,139,250,0.6)] group-focus-visible:border-violet-500" />
+        </button>
+        {openMorphCh === ch && (
+          <div
+            data-testid={`sensor-menu-${ch}`}
+            role="menu"
+            aria-label={t("arduino.morphMenuAria", "Switch component on {{channel}}", { channel: `A${ch}` })}
+            className="absolute z-50 w-44 rounded-xl border border-slate-700/80 bg-slate-900/95 p-1.5 shadow-xl backdrop-blur-md animate-in fade-in zoom-in-95 duration-100"
+            style={{ left: partBox.left + partBox.width / 2, top: partBox.top - 6, transform: "translate(-50%, -100%)" }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="px-1.5 pb-1 pt-0.5 text-[9px] font-bold uppercase tracking-wide text-slate-400">{t("arduino.morphHeading", "Switch component to")}</div>
+            {ANALOG_SENSOR_KINDS.map(opt => (
+              <button
+                key={opt}
+                type="button"
+                role="menuitemradio"
+                aria-checked={opt === kind}
+                data-kind={opt}
+                onClick={e => {
+                  e.stopPropagation();
+                  onAnalogMorph?.(ch, opt);
+                  setOpenMorphCh(null);
+                }}
+                className={`flex w-full cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-start text-[11px] font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 ${opt === kind ? "bg-violet-500/25 text-white" : "text-slate-200 hover:bg-slate-700/70"}`}
+              >
+                <span className={`h-2 w-2 shrink-0 rounded-full ${opt === kind ? "bg-violet-400" : "bg-slate-600"}`} />
+                {kindOption[opt]}
+              </button>
+            ))}
+          </div>
+        )}
       </div>,
     );
   });

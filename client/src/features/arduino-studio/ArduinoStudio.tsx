@@ -3,7 +3,7 @@
  * Layout mirrors the Code Studio split panes: ribbon on top, sketch editor left, board canvas + serial monitor right.
  */
 import { BookOpen, Check, ChevronDown, Clipboard, Code, Copy, Cpu, Download, Pause, Play, Redo2, RotateCcw, Trash2, Undo2, Upload } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useTranslation } from "react-i18next";
 import { cpp } from "@codemirror/lang-cpp";
@@ -15,6 +15,9 @@ import type { PinUsage } from "@shared/code/arduinoTypes";
 import { analyzeSketchRemote } from "@/services/codeClient";
 import { useRemoteQuery } from "@/lib/useRemoteQuery";
 import { ARDUINO_EXAMPLES, DEFAULT_SKETCH } from "./arduinoExamples";
+import { analyzeSensorContext, sensorContextKey, type SensorContext } from "./codeContextAnalyzer";
+import { clampPirHold, type AnalogSensorKind } from "./sensorModels";
+import { hardwareDrive, sensorValue, type AnalogOverrides, type SensorValues } from "./sensorMounts";
 import type { ArduinoSpeed } from "./arduinoRuntime";
 import { SerialConsole } from "./SerialConsole";
 import { useArduinoRuntime } from "./useArduinoRuntime";
@@ -92,6 +95,14 @@ export function ArduinoStudio() {
     if (parsed) lastLayout.current = parsed;
     return parsed ?? lastLayout.current;
   }, [layoutQuery.data]);
+  // Sensors the sketch talks to are mounted and wired automatically. The analysis is local and synchronous; the deferred
+  // value keeps typing responsive, and the key keeps the context referentially stable while the answer is unchanged.
+  const deferredCode = useDeferredValue(code);
+  const analysis = useMemo(() => analyzeSensorContext(deferredCode), [deferredCode]);
+  const contextKey = sensorContextKey(analysis);
+  const sensorContext: SensorContext = useMemo(() => analysis, [contextKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [analogOverrides, setAnalogOverrides] = useState<AnalogOverrides>({});
+  const [sensorValues, setSensorValues] = useState<SensorValues>({});
   const [activeLine, setActiveLine] = useState(1);
   const [history, setHistory] = useState<string[]>([DEFAULT_SKETCH]);
   const [historyIndex, setHistoryIndex] = useState(0);
@@ -109,6 +120,55 @@ export function ArduinoStudio() {
 
   // The LCD is part of the sketch: it is on the canvas, fully wired, exactly while the code declares a LiquidCrystal object.
   const lcdVisible = Boolean(layout?.lcd) || rt.snapshot.lcd.wiring !== null;
+  const rtRef = useRef(rt);
+  useEffect(() => {
+    rtRef.current = rt;
+  });
+
+  // What the mounted sensors present to the sketch (ADC counts, the IR output level, the HC-SR04 echo width). Keyed by the
+  // channel list as a string: the snapshot's own array changes every frame and would re-fire this effect in a loop.
+  const analogChannelKey = Array.from(new Set([...(layout?.analogInputs ?? []), ...rt.snapshot.analogInputs, ...Object.keys(sensorContext.analog).map(Number)]))
+    .sort((a, b) => a - b)
+    .join(",");
+  const echoPin = useRef<number | null>(null);
+  useEffect(() => {
+    const channels = analogChannelKey ? analogChannelKey.split(",").map(Number) : [];
+    const drive = hardwareDrive(sensorContext, analogOverrides, channels, sensorValues);
+    const live = rtRef.current;
+    for (const a of drive.analog) live.setAnalogInput(a.channel, a.value);
+    for (const d of drive.digital) live.setDigitalInput(d.pin, d.level);
+    for (const e of drive.echo) live.setEchoPulse(e.pin, e.us);
+    const nextEcho = drive.echo[0]?.pin ?? null;
+    if (echoPin.current !== null && echoPin.current !== nextEcho) live.setEchoPulse(echoPin.current, null);
+    echoPin.current = nextEcho;
+  }, [analogChannelKey, sensorContext, analogOverrides, sensorValues]);
+
+  // PIR output idles LOW; "Trigger Motion" raises it for the hold time (a repeat press re-arms the hold, like retrigger mode).
+  const pirTimer = useRef<number | null>(null);
+  useEffect(() => {
+    if (sensorContext.pir !== null) rtRef.current.setDigitalInput(sensorContext.pir, 0);
+    return () => {
+      if (pirTimer.current !== null) window.clearTimeout(pirTimer.current);
+      pirTimer.current = null;
+    };
+  }, [sensorContext.pir]);
+  const onPirTrigger = useCallback(
+    (pin: number) => {
+      rtRef.current.setDigitalInput(pin, 1);
+      if (pirTimer.current !== null) window.clearTimeout(pirTimer.current);
+      pirTimer.current = window.setTimeout(() => {
+        pirTimer.current = null;
+        rtRef.current.setDigitalInput(pin, 0);
+      }, clampPirHold(sensorValue(sensorValues, "pir", pin, "hold")) * 1000);
+    },
+    [sensorValues],
+  );
+  const onSensorValue = useCallback((key: string, value: number) => setSensorValues(prev => ({ ...prev, [key]: value })), []);
+  const onAnalogMorph = useCallback(
+    (channel: number, kind: AnalogSensorKind) => setAnalogOverrides(prev => ({ ...prev, [channel]: { kind, detected: sensorContext.analog[channel] ?? "pot" } })),
+    [sensorContext],
+  );
+
   const { status } = rt.snapshot;
   const running = status === "running";
   const lines = useMemo(() => code.split("\n").length, [code]);
@@ -137,6 +197,8 @@ export function ArduinoStudio() {
     if (!ex) return;
     rt.reset();
     started.current = false;
+    setAnalogOverrides({});
+    setSensorValues({});
     setExampleId(id);
     commit(ex.source);
   };
@@ -361,7 +423,7 @@ export function ArduinoStudio() {
                     className="relative min-h-0 flex-1 overflow-hidden bg-slate-50 dark:bg-[#07080a]"
                     style={{ backgroundImage: "radial-gradient(circle, rgba(148,163,184,.25) 1px, transparent 1px)", backgroundSize: "20px 20px" }}
                   >
-                    <ArduinoBoard snapshot={rt.snapshot} onDigitalInput={rt.setDigitalInput} onAnalogInput={rt.setAnalogInput} layout={layout} ledColors={ARDUINO_EXAMPLES.find(e => e.id === exampleId)?.ledColors} lcdVisible={lcdVisible} onLcdContrast={rt.setLcdContrast} />
+                    <ArduinoBoard snapshot={rt.snapshot} onDigitalInput={rt.setDigitalInput} onAnalogInput={rt.setAnalogInput} layout={layout} ledColors={ARDUINO_EXAMPLES.find(e => e.id === exampleId)?.ledColors} lcdVisible={lcdVisible} onLcdContrast={rt.setLcdContrast} sensors={sensorContext} analogOverrides={analogOverrides} sensorValues={sensorValues} onSensorValue={onSensorValue} onAnalogMorph={onAnalogMorph} onPirTrigger={onPirTrigger} />
                   </div>
                 </section>
               </ResizablePanel>
