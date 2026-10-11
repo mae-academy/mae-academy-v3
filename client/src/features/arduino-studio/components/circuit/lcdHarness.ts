@@ -132,7 +132,8 @@ export function buildLcdHarness(input: HarnessInput): HarnessWire[] {
   const laneIndex = new Map<string, number>();
   const laneKey = (s: Spec): string => (s.net === "GND" && s.route === "direct" ? "gnd-bus" : s.pin);
   for (const s of [...rightJogs, ...leftJogs, ...rightDetours, ...leftDetours]) if (!laneIndex.has(laneKey(s))) laneIndex.set(laneKey(s), laneIndex.size);
-  const depthBase = boardH + 12;
+  // Below the analog-input lanes (they occupy the first ~30px under the board).
+  const depthBase = boardH + 30;
 
   return specs.map((s): HarnessWire => {
     const y = lane(laneIndex.get(laneKey(s)) ?? 0);
@@ -160,7 +161,7 @@ export function buildLcdHarness(input: HarnessInput): HarnessWire[] {
  */
 export function findHops(wires: HarnessWire[]): Map<string, number[]> {
   const hops = new Map<string, number[]>();
-  const margin = 7;
+  const margin = HOP_CLEARANCE;
   wires.forEach((h, hw) => {
     h.points.slice(1).forEach((hb, si) => {
       const ha = h.points[si];
@@ -172,8 +173,12 @@ export function findHops(wires: HarnessWire[]): Map<string, number[]> {
         v.points.slice(1).forEach((vb, vi) => {
           const va = v.points[vi];
           if (va.x !== vb.x) return;
-          const crosses = va.x > lo + margin && va.x < hi - margin && ha.y > Math.min(va.y, vb.y) + 1 && ha.y < Math.max(va.y, vb.y) - 1;
-          if (crosses) hops.set(`${h.id}:${si}`, [...(hops.get(`${h.id}:${si}`) ?? []), va.x]);
+          const crosses = va.x > lo + margin && va.x < hi - margin && ha.y > Math.min(va.y, vb.y) + margin && ha.y < Math.max(va.y, vb.y) - margin;
+          if (!crosses) return;
+          // Two hops closer than an arc width would merge into a squiggle: keep the first, the rest cross plainly.
+          const key = `${h.id}:${si}`;
+          const have = hops.get(key) ?? [];
+          if (have.every(x => Math.abs(x - va.x) > 2 * HOP_R + 3)) hops.set(key, [...have, va.x]);
         });
       });
     });
@@ -181,8 +186,10 @@ export function findHops(wires: HarnessWire[]): Map<string, number[]> {
   return hops;
 }
 
-export const HOP_R = 4.2;
+export const HOP_R = 3.2;
 const CORNER_R = 5;
+/** Clear room a hop needs on both wires: past the rounded corners, so an arc never merges with a bend. */
+const HOP_CLEARANCE = CORNER_R + HOP_R + 1;
 
 /** SVG path for one wire: rounded corners, semicircular hops over crossing vertical runs. */
 export function wirePath(points: Pt[], hops: Map<string, number[]>, id: string): string {

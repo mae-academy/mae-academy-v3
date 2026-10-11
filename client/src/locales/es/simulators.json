@@ -488,10 +488,6 @@
   },
   "arduino": {
     "sketchAria": "Sketch de Arduino",
-    "addLcd": "Añadir LCD 16x2",
-    "lcdOn": "LCD 16x2",
-    "addLcdTitle": "Mostrar el LCD 16x2 junto a la placa con sus cables ya conectados",
-    "removeLcdTitle": "Ocultar el LCD 16x2 y sus cables",
     "lcdContrastAria": "Contraste del LCD (potenciómetro V0)",
     "lineError": "Línea {{line}}: {{message}}",
     "runtimeError": "Error en tiempo de ejecución: {{error}}",

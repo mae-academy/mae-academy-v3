@@ -488,10 +488,6 @@
   },
   "arduino": {
     "sketchAria": "Arduino sketch",
-    "addLcd": "Add 16x2 LCD",
-    "lcdOn": "LCD 16x2",
-    "addLcdTitle": "Show the 16x2 LCD next to the board with its jumpers auto-wired",
-    "removeLcdTitle": "Hide the 16x2 LCD and its jumpers",
     "lcdContrastAria": "LCD contrast (V0 trimmer)",
     "lineError": "Line {{line}}: {{message}}",
     "runtimeError": "Runtime error: {{error}}",

@@ -488,10 +488,6 @@
   },
   "arduino": {
     "sketchAria": "سكتش الأردوينو",
-    "addLcd": "إضافة شاشة LCD 16x2",
-    "lcdOn": "شاشة LCD 16x2",
-    "addLcdTitle": "عرض شاشة LCD 16x2 بجانب اللوحة مع توصيل الأسلاك تلقائياً",
-    "removeLcdTitle": "إخفاء شاشة LCD 16x2 وأسلاكها",
     "lcdContrastAria": "تباين شاشة LCD (مقاوم V0)",
     "lineError": "السطر {{line}}: {{message}}",
     "runtimeError": "خطأ في وقت التشغيل: {{error}}",

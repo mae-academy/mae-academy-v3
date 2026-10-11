@@ -7,7 +7,7 @@ import { useTranslation } from "react-i18next";
 import unoRaw from "./arduinoUno.svg?raw";
 import { ANALOG_HEADER_Y, DIGITAL_HEADER_Y, HEADER_PINS, LEDS, VIEW_H, VIEW_W, analogPinX, digitalPinX, pinName } from "./arduinoBoardGeometry";
 import type { PinUsage } from "@shared/code/arduinoTypes";
-import { BTN_H, BTN_W, LED_H, LED_W, LCD_HOLE_Y, LcdWires, POT_H, POT_W, RES_H, RES_W, VectorLed, VectorPotentiometer, VectorPushButton, VectorResistor, buildLcdHarness } from "./components/circuit";
+import { BTN_H, BTN_W, LED_H, LED_W, LCD_HOLE_Y, LcdWires, POT_H, POT_W, RES_H, RES_W, VectorLed, VectorPotentiometer, VectorPushButton, VectorResistor, buildLcdHarness, simplify, type HarnessWire } from "./components/circuit";
 import { LcdDisplay, TRIMMER } from "./components/LcdDisplay";
 import { LcdContrastKnob } from "./components/LcdContrastKnob";
 import { lcdHoleX } from "./components/circuit/lcdGeometry";
@@ -27,7 +27,9 @@ const CANVAS_H = 600;
 /** With the LCD on, the canvas grows upward: LCD row, jumper lanes, then (optionally) the module row above the board. */
 const LCD_HOLE_ABOVE = { withModules: 196, bare: 80 } as const;
 const LCD_TOP_MARGIN = 12;
-const LCD_BOTTOM_ROOM = 58;
+const LCD_BOTTOM_ROOM = 70;
+/** Spacing between wire lanes in the gaps above and below the board. */
+const LANE_STEP = 6;
 const DEFAULT_LCD_PINS = [12, 11, 5, 4, 3, 2];
 
 /** Board scaling and coordinates within the 800x600 canvas */
@@ -35,13 +37,13 @@ const S_BOARD = 1.75;
 const BOARD_W = VIEW_W * S_BOARD; // 499.1
 const BOARD_H = VIEW_H * S_BOARD; // 365.75
 const BOARD_X = 142;
-const BOARD_Y = 120;
+const BOARD_Y = 128;
 
 /** Peripheral footprints (px). Components are drawn inside these local frames. */
 const OUT_C = { w: 150, h: 86, ledX: 12, ledY: 4, resX: 44, resY: 64, resS: 0.8 };
 const IN_C = { w: 132, h: 72, btnX: 8, btnY: 8, btnS: 46 / BTN_W };
 const AN_C = { w: 270, h: 88, potX: 196, potY: 12, potS: 0.72 };
-const GAP_TOP = 24;
+const GAP_TOP = 32;
 const GAP_BOTTOM = 18;
 const MOD_SPACING = 14;
 const WIRE = { signalIn: "#06B6D4", signalOut: "#7C3AED", vcc: "#DC2626", series: "#F59E0B" } as const;
@@ -105,23 +107,6 @@ const StaticBoardSvg = memo(function StaticBoardSvg() {
 });
 
 type Pt = { x: number; y: number };
-
-/** Flat vector wire: 3 px solid stroke on a perfect cubic bezier with vertical end tangents, no shadow. */
-function Wire({ from, to, color, label, ground = false }: { from: Pt; to: Pt; color?: string; label: string; ground?: boolean }) {
-  const dy = to.y - from.y;
-  const dir = dy >= 0 ? 1 : -1;
-  const k = Math.max(20, Math.abs(dy) * 0.5);
-  const d = `M ${from.x} ${from.y} C ${from.x} ${from.y + dir * k}, ${to.x} ${to.y - dir * k}, ${to.x} ${to.y}`;
-  const stroke = ground ? "stroke-slate-800 dark:stroke-slate-500" : undefined;
-  const fill = ground ? "fill-slate-800 dark:fill-slate-500" : undefined;
-  return (
-    <g data-wire={label}>
-      <path d={d} fill="none" stroke={color} className={stroke} strokeWidth={3} strokeLinecap="round" />
-      <circle cx={from.x} cy={from.y} r={2.6} fill={color} className={fill} />
-      <circle cx={to.x} cy={to.y} r={2.6} fill={color} className={fill} />
-    </g>
-  );
-}
 
 export const LED_COLOR_OPTIONS = [
   { label: "Red", color: "#EF4444" },
@@ -261,11 +246,51 @@ export function ArduinoBoard({ snapshot, onDigitalInput, onAnalogInput, layout =
   const bootLen = 16;
 
   // Wires are collected per layer: ground returns at the bottom, then power/series, then signals.
-  const gnd: React.ReactNode[] = [];
-  const mid: React.ReactNode[] = [];
-  const signal: React.ReactNode[] = [];
+  // Every wire on the canvas (peripherals and LCD alike) goes through one list so routing, stroke and crossings are uniform.
   const art: React.ReactNode[] = [];
   const overlays: React.ReactNode[] = [];
+  const wireList: HarnessWire[] = [];
+  interface WireSpec {
+    label: string;
+    a: Pt;
+    b: Pt;
+    net: HarnessWire["net"];
+    color: string;
+  }
+  const wireSpecs: WireSpec[] = [];
+  const addWire = (label: string, from: Pt, to: Pt, net: HarnessWire["net"], color?: string): void => {
+    wireSpecs.push({ label, a: from, b: to, net, color: color ?? "#1E293B" });
+  };
+  /**
+   * Routes every peripheral wire: header pad -> straight to a private lane in the gap beside the board -> sideways -> onto
+   * the component lead. Lanes nest so wires do not cross unnecessarily; ground wires share one bus lane. Wires inside a
+   * component (LED -> resistor) take a short Z-route.
+   */
+  const routeWires = (): void => {
+    const lane = (side: "top" | "bottom", i: number): number => (side === "top" ? -(3 + LANE_STEP * i) : boardH + 3 + LANE_STEP * i);
+    const local = wireSpecs.filter(w => w.label.endsWith("-series"));
+    for (const w of local) {
+      const mid = (w.a.x + w.b.x) / 2;
+      wireList.push({ id: w.label, pin: w.label, from: w.label, net: w.net, color: w.color, points: simplify([w.a, { x: mid, y: w.a.y }, { x: mid, y: w.b.y }, w.b]) });
+    }
+    for (const side of ["top", "bottom"] as const) {
+      const group = wireSpecs.filter(w => !w.label.endsWith("-series") && (Math.min(w.a.y, w.b.y) < 0 ? "top" : "bottom") === side);
+      const ends = (w: WireSpec): { pin: Pt; lead: Pt } => {
+        const aIsPin = side === "top" ? w.a.y >= w.b.y : w.a.y <= w.b.y;
+        return aIsPin ? { pin: w.a, lead: w.b } : { pin: w.b, lead: w.a };
+      };
+      const signals = group.filter(w => w.net !== "GND");
+      const right = signals.filter(w => ends(w).lead.x >= ends(w).pin.x).sort((p, q) => ends(q).pin.x - ends(p).pin.x);
+      const left = signals.filter(w => ends(w).lead.x < ends(w).pin.x).sort((p, q) => ends(p).pin.x - ends(q).pin.x);
+      const laneOf = new Map<WireSpec, number>();
+      [...right, ...left].forEach((w, i) => laneOf.set(w, i + 1));
+      for (const w of group) {
+        const { pin, lead } = ends(w);
+        const y = lane(side, w.net === "GND" ? 0 : (laneOf.get(w) ?? 1));
+        wireList.push({ id: w.label, pin: w.label, from: w.label, net: w.net, color: w.color, points: simplify([pin, { x: pin.x, y }, { x: lead.x, y }, lead]) });
+      }
+    }
+  };
 
   topLayout.forEach(m => {
     const at = (lx: number, ly: number): Pt => ({ x: m.x + lx * m.k, y: m.y + ly * m.k });
@@ -281,9 +306,9 @@ export function ArduinoBoard({ snapshot, onDigitalInput, onAnalogInput, layout =
       const resL = at(OUT_C.resX, OUT_C.resY + 12 * OUT_C.resS);
       const resR = at(OUT_C.resX + RES_W * OUT_C.resS, OUT_C.resY + 12 * OUT_C.resS);
       const currentColor = activeLedColors[m.pin] ?? "#EF4444";
-      signal.push(<Wire key={`o${m.pin}s`} label={`D${m.pin}-signal`} from={pinPt} to={anode} color={WIRE.signalOut} />);
-      mid.push(<Wire key={`o${m.pin}m`} label={`D${m.pin}-series`} from={cathode} to={resL} color={WIRE.series} />);
-      gnd.push(<Wire key={`o${m.pin}g`} label={`D${m.pin}-gnd`} from={resR} to={gndPt} ground />);
+      addWire(`D${m.pin}-signal`, pinPt, anode, "signal", WIRE.signalOut);
+      addWire(`D${m.pin}-series`, cathode, resL, "signal", WIRE.series);
+      addWire(`D${m.pin}-gnd`, resR, gndPt, "GND", undefined);
       art.push(
         <g key={`oa${m.pin}`} data-module={`O${m.pin}`} data-lit={lit ? "1" : "0"} transform={xf} className="cursor-pointer">
           <VectorLed x={OUT_C.ledX} y={OUT_C.ledY} width={LED_W} height={LED_H} state={brightness} color={currentColor} />
@@ -362,8 +387,8 @@ export function ArduinoBoard({ snapshot, onDigitalInput, onAnalogInput, layout =
       const high = level === 1;
       const legL = at(IN_C.btnX, IN_C.btnY + 42 * IN_C.btnS);
       const legR = at(IN_C.btnX + 56 * IN_C.btnS, IN_C.btnY + 14 * IN_C.btnS);
-      signal.push(<Wire key={`i${m.pin}s`} label={`D${m.pin}-signal`} from={pinPt} to={legR} color={WIRE.signalIn} />);
-      gnd.push(<Wire key={`i${m.pin}g`} label={`D${m.pin}-gnd`} from={gndPt} to={legL} ground />);
+      addWire(`D${m.pin}-signal`, pinPt, legR, "signal", WIRE.signalIn);
+      addWire(`D${m.pin}-gnd`, gndPt, legL, "GND", undefined);
       art.push(
         <g key={`ia${m.pin}`} data-module={`D${m.pin}`} transform={xf}>
           <VectorPushButton x={IN_C.btnX} y={IN_C.btnY} width={IN_C.btnS * BTN_W} height={IN_C.btnS * BTN_H} state={high} color={high ? "#0E7490" : "#1F2937"} />
@@ -392,9 +417,9 @@ export function ArduinoBoard({ snapshot, onDigitalInput, onAnalogInput, layout =
     const at = (lx: number, ly: number): Pt => ({ x: ax + lx * kA, y: aY + ly * kA });
     const pinTip = (n: number): Pt => at(AN_C.potX + [20, 32, 44][n] * AN_C.potS, AN_C.potY);
     const value = snapshot.analogValues[ch] ?? 512;
-    gnd.push(<Wire key={`ag${ch}`} label={`A${ch}-gnd`} from={P(BOTTOM_GND.x, BOTTOM_GND.y)} to={pinTip(2)} ground />);
-    mid.push(<Wire key={`av${ch}`} label={`A${ch}-5v`} from={P(V5.x, V5.y)} to={pinTip(0)} color={WIRE.vcc} />);
-    signal.push(<Wire key={`as${ch}`} label={`A${ch}-signal`} from={P(analogPinX(ch), ANALOG_HEADER_Y)} to={pinTip(1)} color={WIRE.signalIn} />);
+    addWire(`A${ch}-gnd`, P(BOTTOM_GND.x, BOTTOM_GND.y), pinTip(2), "GND", undefined);
+    addWire(`A${ch}-5v`, P(V5.x, V5.y), pinTip(0), "5V", WIRE.vcc);
+    addWire(`A${ch}-signal`, P(analogPinX(ch), ANALOG_HEADER_Y), pinTip(1), "signal", WIRE.signalIn);
     art.push(
       <g key={`aa${ch}`} transform={`translate(${ax} ${aY}) scale(${kA})`}>
         <VectorPotentiometer x={AN_C.potX} y={AN_C.potY} width={POT_W * AN_C.potS} height={POT_H * AN_C.potS} value={value} />
@@ -427,6 +452,7 @@ export function ArduinoBoard({ snapshot, onDigitalInput, onAnalogInput, layout =
     );
   });
 
+  routeWires();
   let lcdLayer: React.ReactNode = null;
   if (lcdVisible) {
     const padOf = (id: string): Pt => {
@@ -450,11 +476,11 @@ export function ArduinoBoard({ snapshot, onDigitalInput, onAnalogInput, layout =
       sda: padOf("SDA"),
       scl: padOf("SCL"),
     });
+    wireList.push(...wires);
     const powered = snapshot.status !== "idle";
     lcdLayer = (
       <>
         <LcdDisplay lcd={snapshot.lcd} powered={powered} mode={lcdMode} x={origin.x} y={origin.y} />
-        <LcdWires wires={wires} />
       </>
     );
     overlays.push(
@@ -596,11 +622,9 @@ export function ArduinoBoard({ snapshot, onDigitalInput, onAnalogInput, layout =
                 <rect data-dc-tip x={dc.x - 8} y={dc.y - dcPlugH * 0.2} width={8} height={dcPlugH * 0.4} rx={1} fill="#94A3B8" />
               </g>
             </g>
-            {gnd}
-            {mid}
             {lcdLayer}
             {art}
-            {signal}
+            <LcdWires wires={wireList} />
           </svg>
           {overlays}
         </div>

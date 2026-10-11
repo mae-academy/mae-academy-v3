@@ -1110,6 +1110,17 @@
 }
 
 @layer components {
+  /* Sliding indicator driven by framer-motion layout animation: must not carry a CSS transition,
+     otherwise it fights the spring-driven transform and the slide stutters. */
+  .brand-sliding-pill {
+    background: linear-gradient(to right, var(--slider-blue, #2563EB), var(--slider-violet, #7C3AED), var(--slider-red, #EC4899));
+    border-radius: 9999px;
+    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+    transition: none !important;
+    will-change: transform;
+    backface-visibility: hidden;
+  }
+
   .brand-active-pill,
   .btn-active-brand {
     background: linear-gradient(to right, var(--slider-blue, #2563EB), var(--slider-violet, #7C3AED), var(--slider-red, #EC4899)) !important;

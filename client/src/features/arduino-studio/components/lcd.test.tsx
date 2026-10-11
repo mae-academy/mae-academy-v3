@@ -253,7 +253,7 @@ describe("LCD jumper harness", () => {
     const hops = findHops([a, b]);
     expect(hops.get("a:0")).toEqual([50]);
     expect(hops.get("b:0")).toBeUndefined();
-    expect(wirePath(a.points, hops, "a")).toContain("A4.2 4.2");
+    expect(wirePath(a.points, hops, "a")).toContain("A3.2 3.2");
     expect(wirePath(b.points, hops, "b")).not.toContain("A");
     // same power net: wires merge into a bus, no hop
     expect(findHops([{ ...a, net: "GND" }, { ...b, net: "GND" }]).size).toBe(0);
@@ -265,7 +265,7 @@ describe("LCD jumper harness", () => {
     const arcs = hopArcs([a, b], findHops([a, b]));
     expect(arcs).toHaveLength(1);
     expect(arcs[0].color).toBe("#f00");
-    expect(arcs[0].d).toMatch(/^M45\.8 50 A4\.2 4\.2 0 0 1 54\.2 50$/);
+    expect(arcs[0].d).toBe("M46.8 50 A3.2 3.2 0 0 1 53.2 50");
     // the real harness: every hop in the DOM sits after (above) every wire group
     const { container } = render(<svg><LcdWires wires={buildLcdHarness(input())} /></svg>);
     const hopLayer = container.querySelector('[data-layer="lcd-hops"]')!;

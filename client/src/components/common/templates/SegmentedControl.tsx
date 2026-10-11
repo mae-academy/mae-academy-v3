@@ -78,8 +78,8 @@ export function SegmentedControl<T extends string | number | boolean = string>({
             {isActive && layoutId && (
               <motion.div
                 layoutId={layoutId}
-                className="absolute inset-0 rounded-full btn-active-brand brand-active-pill"
-                transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                className="absolute inset-0 rounded-full brand-sliding-pill"
+                transition={{ type: "spring", stiffness: 380, damping: 30, mass: 0.8 }}
               />
             )}
             {option.icon && (
@@ -104,7 +104,7 @@ export function SegmentedControl<T extends string | number | boolean = string>({
         );
 
         const pillClasses = cn(
-          "relative rounded-full transition-colors duration-200 cursor-pointer inline-flex items-center justify-center gap-1.5 whitespace-nowrap select-none disabled:cursor-not-allowed disabled:opacity-40",
+          "relative rounded-full transition-colors duration-150 cursor-pointer inline-flex items-center justify-center gap-1.5 whitespace-nowrap select-none disabled:cursor-not-allowed disabled:opacity-40",
           currentSize.pill,
           fullWidth && "flex-1",
           layoutId
