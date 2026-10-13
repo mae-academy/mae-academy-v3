@@ -31,6 +31,7 @@ const LibraryDetail = lazyRetry(() => import("./pages/LibraryDetail"));
 const Simulations = lazyRetry(() => import("./pages/Simulations"));
 const SimulationDetail = lazyRetry(() => import("./pages/SimulationDetail"));
 const About = lazyRetry(() => import("./pages/About"));
+const Contact = lazyRetry(() => import("./pages/Contact"));
 const PrivacyPolicy = lazyRetry(() => import("./pages/PrivacyPolicy"));
 const TermsOfService = lazyRetry(() => import("./pages/TermsOfService"));
 const Privacy = lazyRetry(() => import("./pages/Privacy"));
@@ -108,6 +109,7 @@ function AnimatedRoutes() {
             <Route path="/simulations" component={Simulations} />
             <Route path="/simulators/arduino-studio" component={ArduinoStudioPage} />
             <Route path="/about" component={About} />
+            <Route path="/contact" component={Contact} />
             <Route path="/privacy" component={Privacy} />
             <Route path="/privacy-policy" component={PrivacyPolicy} />
             <Route path="/terms" component={Terms} />

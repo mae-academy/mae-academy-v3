@@ -4,7 +4,8 @@
     "01": "Investigación Académica",
     "02": "Biblioteca Académica",
     "03": "Simulaciones Prácticas",
-    "04": "Acerca de"
+    "04": "Acerca de",
+    "05": "Contacto"
   },
   "languageSelector": {
     "en": "English",
@@ -31,6 +32,36 @@
     "termsOfService": "Términos de Servicio",
     "attributionPolicy": "Política de Atribución",
     "supportOurMission": "Apoya Nuestra Misión",
-    "copyright": "© {{year}} MAE Academy. Todos los derechos reservados."
+    "copyright": "© {{year}} MAE Academy. Todos los derechos reservados.",
+    "contactUs": "Contáctenos",
+    "aboutUs": "Acerca de nosotros"
+  },
+  "contact": {
+    "title": "Contáctenos",
+    "subtitle": "¿Preguntas, comentarios o ideas de colaboración? Envíenos un mensaje y le responderemos.",
+    "name": "Nombre",
+    "email": "Correo electrónico",
+    "topic": "Asunto",
+    "message": "Mensaje",
+    "send": "Enviar mensaje",
+    "topics": {
+      "general": "Pregunta general",
+      "support": "Soporte técnico",
+      "feedback": "Comentarios",
+      "partnership": "Colaboración",
+      "legal": "Privacidad / legal"
+    },
+    "errName": "Introduzca su nombre.",
+    "errEmail": "Introduzca un correo electrónico válido.",
+    "errMessage": "El mensaje debe tener al menos 10 caracteres.",
+    "success": "¡Mensaje enviado! Responderemos en 24–48 horas.",
+    "infoTitle": "Contacto directo",
+    "supportEmail": "Correo de soporte",
+    "hours": "Tiempo de respuesta",
+    "hoursValue": "Normalmente respondemos en 24–48 horas.",
+    "social": "Síganos",
+    "privacyNote": "Solo usamos sus datos para responder a su consulta. Consulte nuestra Política de Privacidad.",
+    "sending": "Enviando…",
+    "errSend": "No se pudo enviar su mensaje. Inténtelo de nuevo o escríbanos por correo."
   }
 }

@@ -11,7 +11,7 @@ export type PlatformRoute = {
 };
 
 export const platformRoutes: PlatformRoute[] = [
-  { href: "/", index: "00" }, { href: "/research", index: "01" }, { href: "/library", index: "02" }, { href: "/simulations", index: "03" }, { href: "/about", index: "04" },
+  { href: "/", index: "00" }, { href: "/research", index: "01" }, { href: "/library", index: "02" }, { href: "/simulations", index: "03" }, { href: "/about", index: "04" }, { href: "/contact", index: "05" },
 ];
 
 export type HomeGatewayMeta = {

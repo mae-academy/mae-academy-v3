@@ -4,7 +4,8 @@
     "01": "Academic Research",
     "02": "Academic Library",
     "03": "Practical Simulations",
-    "04": "About"
+    "04": "About",
+    "05": "Contact"
   },
   "languageSelector": {
     "en": "English",
@@ -31,6 +32,36 @@
     "termsOfService": "Terms of Service",
     "attributionPolicy": "Attribution Policy",
     "supportOurMission": "Support Our Mission",
-    "copyright": "© {{year}} MAE Academy. All rights reserved."
+    "copyright": "© {{year}} MAE Academy. All rights reserved.",
+    "contactUs": "Contact Us",
+    "aboutUs": "About Us"
+  },
+  "contact": {
+    "title": "Contact Us",
+    "subtitle": "Questions, feedback, or partnership ideas? Send us a message and we'll get back to you.",
+    "name": "Name",
+    "email": "Email",
+    "topic": "Topic",
+    "message": "Message",
+    "send": "Send message",
+    "topics": {
+      "general": "General question",
+      "support": "Technical support",
+      "feedback": "Feedback",
+      "partnership": "Partnership",
+      "legal": "Privacy / legal"
+    },
+    "errName": "Please enter your name.",
+    "errEmail": "Please enter a valid email address.",
+    "errMessage": "Message must be at least 10 characters.",
+    "success": "Message sent! We'll reply within 24–48 hours.",
+    "infoTitle": "Direct contact",
+    "supportEmail": "Support email",
+    "hours": "Response time",
+    "hoursValue": "We usually reply within 24–48 hours.",
+    "social": "Follow us",
+    "privacyNote": "We only use your details to reply to your inquiry. See our Privacy Policy.",
+    "sending": "Sending…",
+    "errSend": "Couldn't send your message. Please try again or email us directly."
   }
 }

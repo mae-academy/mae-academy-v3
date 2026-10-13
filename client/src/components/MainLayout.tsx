@@ -4,7 +4,7 @@
  */
 import { ReactNode, useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
-import { BookOpen, Compass, Cpu, FileText, Heart, Mail, ShieldCheck } from "lucide-react";
+import { BookOpen, Compass, Cpu, FileText, Heart, Info, Mail, MessageSquare, ShieldCheck } from "lucide-react";
 import Header, { Locale } from "./Header";
 import SocialLinks from "@/components/SocialLinks";
 import { LocaleProvider } from "@/contexts/LocaleContext";
@@ -119,6 +119,20 @@ export default function MainLayout({ children }: MainLayoutProps) {
             </p>
             <nav className="mt-4 flex flex-col gap-3 text-sm">
               <Link
+                href="/contact"
+                className="group inline-flex items-center gap-2.5 text-slate-600 transition-colors hover:text-violet-600 dark:text-slate-400 dark:hover:text-violet-300"
+              >
+                <MessageSquare className="h-4 w-4 text-slate-400 transition-colors group-hover:text-violet-600 dark:text-slate-500 dark:group-hover:text-violet-300" />
+                <span className="font-medium">{t("footer.contactUs")}</span>
+              </Link>
+              <Link
+                href="/about"
+                className="group inline-flex items-center gap-2.5 text-slate-600 transition-colors hover:text-violet-600 dark:text-slate-400 dark:hover:text-violet-300"
+              >
+                <Info className="h-4 w-4 text-slate-400 transition-colors group-hover:text-violet-600 dark:text-slate-500 dark:group-hover:text-violet-300" />
+                <span className="font-medium">{t("footer.aboutUs")}</span>
+              </Link>
+              <Link
                 href="/privacy"
                 className="group inline-flex items-center gap-2.5 text-slate-600 transition-colors hover:text-violet-600 dark:text-slate-400 dark:hover:text-violet-300"
               >
@@ -203,6 +217,10 @@ export default function MainLayout({ children }: MainLayoutProps) {
               className="hover:text-violet-600 dark:hover:text-violet-400 transition-colors"
             >
               {t("footer.termsOfService")}
+            </Link>
+            <span>·</span>
+            <Link href="/contact" className="hover:text-violet-600 dark:hover:text-violet-400 transition-colors">
+              {t("footer.contactUs")}
             </Link>
             <span>·</span>
             <Link
