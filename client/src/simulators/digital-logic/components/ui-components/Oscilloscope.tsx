@@ -97,27 +97,27 @@ export const Oscilloscope: React.FC<OscilloscopeProps> = ({ isOpen, onClose, cha
 
   return (
     <div
-      className="fixed z-50 select-none"
-      style={{ top: 20, right: 20, width: W + 160, background: '#111', borderRadius: 12, border: '2px solid #333', boxShadow: '0 8px 40px rgba(0,0,0,0.8)' }}
+      className="fixed z-50 select-none top-20 right-2 sm:top-5 sm:right-5 max-h-[calc(100svh-6rem)] overflow-y-auto overscroll-contain"
+      style={{ width: `min(${W + 160}px, calc(100vw - 16px))`, background: '#111', borderRadius: 12, border: '2px solid #333', boxShadow: '0 8px 40px rgba(0,0,0,0.8)' }}
     >
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2" style={{ borderBottom: '1px solid #333' }}>
         <span style={{ color: '#888', fontSize: 11, fontWeight: 'bold', letterSpacing: 2 }}>OSCILLOSCOPE</span>
-        <button onClick={onClose} style={{ color: '#666', background: 'none', border: 'none', cursor: 'pointer' }}>
+        <button onClick={onClose} aria-label="Close oscilloscope" className="touch-target" style={{ color: '#666', background: 'none', border: 'none', cursor: 'pointer' }}>
           <X size={14} />
         </button>
       </div>
 
-      <div className="flex">
+      <div className="flex flex-col sm:flex-row">
         {/* Screen */}
-        <div style={{ padding: 8 }}>
-          <canvas ref={canvasRef} width={W} height={H} style={{ display: 'block', borderRadius: 4, border: '1px solid #333' }} />
+        <div className="min-w-0 flex-1" style={{ padding: 8 }}>
+          <canvas ref={canvasRef} width={W} height={H} style={{ display: 'block', width: '100%', height: 'auto', aspectRatio: `${W} / ${H}`, borderRadius: 4, border: '1px solid #333' }} />
           {/* Time scale */}
-          <div className="flex items-center gap-2 mt-2">
-            <span style={{ color: '#666', fontSize: 9 }}>TIME/DIV</span>
-            <button onClick={() => setTimeScale(t => Math.max(1, t / 2))} style={{ color: '#888', background: '#222', border: '1px solid #444', borderRadius: 3, padding: '1px 5px', cursor: 'pointer', fontSize: 10 }}><Minus size={10} /></button>
+          <div className="flex flex-wrap items-center gap-2 mt-2">
+            <span style={{ color: '#666', fontSize: 10 }}>TIME/DIV</span>
+            <button onClick={() => setTimeScale(t => Math.max(1, t / 2))} aria-label="Decrease time per division" className="touch-target" style={{ color: '#888', background: '#222', border: '1px solid #444', borderRadius: 3, padding: '1px 5px', cursor: 'pointer', fontSize: 10 }}><Minus size={10} /></button>
             <span style={{ color: '#aaa', fontSize: 10, minWidth: 40, textAlign: 'center' }}>{timeScale}ms</span>
-            <button onClick={() => setTimeScale(t => Math.min(500, t * 2))} style={{ color: '#888', background: '#222', border: '1px solid #444', borderRadius: 3, padding: '1px 5px', cursor: 'pointer', fontSize: 10 }}><Plus size={10} /></button>
+            <button onClick={() => setTimeScale(t => Math.min(500, t * 2))} aria-label="Increase time per division" className="touch-target" style={{ color: '#888', background: '#222', border: '1px solid #444', borderRadius: 3, padding: '1px 5px', cursor: 'pointer', fontSize: 10 }}><Plus size={10} /></button>
             <span style={{ color: '#666', fontSize: 9, marginLeft: 8 }}>TRIG</span>
             <StudioSlider
               min={-5}
@@ -134,12 +134,13 @@ export const Oscilloscope: React.FC<OscilloscopeProps> = ({ isOpen, onClose, cha
         </div>
 
         {/* Channel Controls */}
-        <div style={{ padding: 8, width: 150, borderLeft: '1px solid #333' }}>
+        <div className="w-full shrink-0 border-t border-[#333] sm:w-[150px] sm:border-t-0 sm:border-l" style={{ padding: 8 }}>
           {CH_NAMES.map((name, ci) => (
             <div key={ci} style={{ marginBottom: 12, borderBottom: '1px solid #222', paddingBottom: 8 }}>
               <div className="flex items-center gap-2 mb-1">
                 <button
                   onClick={() => setEnabled(e => e.map((v, i) => i === ci ? !v : v))}
+                  className="touch-target"
                   style={{
                     background: enabled[ci] ? CH_COLORS[ci] : '#333',
                     color: enabled[ci] ? '#000' : '#666',
@@ -154,8 +155,8 @@ export const Oscilloscope: React.FC<OscilloscopeProps> = ({ isOpen, onClose, cha
                 <>
                   <div className="flex items-center gap-1 mb-1">
                     <span style={{ color: '#555', fontSize: 8 }}>V/div</span>
-                    <button onClick={() => setVScale(s => s.map((v, i) => i === ci ? Math.max(0.1, v / 2) : v))} style={{ color: '#888', background: '#222', border: '1px solid #333', borderRadius: 2, padding: '0 3px', cursor: 'pointer', fontSize: 9 }}>−</button>
-                    <button onClick={() => setVScale(s => s.map((v, i) => i === ci ? Math.min(50, v * 2) : v))} style={{ color: '#888', background: '#222', border: '1px solid #333', borderRadius: 2, padding: '0 3px', cursor: 'pointer', fontSize: 9 }}>+</button>
+                    <button onClick={() => setVScale(s => s.map((v, i) => i === ci ? Math.max(0.1, v / 2) : v))} aria-label={`${name} decrease volts per division`} className="touch-target" style={{ color: '#888', background: '#222', border: '1px solid #333', borderRadius: 2, padding: '0 3px', cursor: 'pointer', fontSize: 9 }}>−</button>
+                    <button onClick={() => setVScale(s => s.map((v, i) => i === ci ? Math.min(50, v * 2) : v))} aria-label={`${name} increase volts per division`} className="touch-target" style={{ color: '#888', background: '#222', border: '1px solid #333', borderRadius: 2, padding: '0 3px', cursor: 'pointer', fontSize: 9 }}>+</button>
                   </div>
                   <div className="flex items-center gap-1">
                     <span style={{ color: '#555', fontSize: 8 }}>Pos</span>

@@ -370,7 +370,7 @@ export function NodeInspector({
                     aria-label="Shift element left"
                     disabled={node.layout.col <= 0}
                     onClick={() => actions.moveNode(networkId, node.id, node.layout.row, node.layout.col - 1)}
-                    className="flex h-6 w-6 items-center justify-center rounded border border-slate-200 text-slate-600 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-30 dark:border-[#1a1d24] dark:text-slate-300 dark:hover:bg-[#13161c]"
+                    className="flex h-6 w-6 max-sm:h-11 max-sm:w-11 items-center justify-center rounded border border-slate-200 text-slate-600 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-30 dark:border-[#1a1d24] dark:text-slate-300 dark:hover:bg-[#13161c]"
                   >
                     <ChevronLeft size={14} aria-hidden="true" />
                   </button>
@@ -378,7 +378,7 @@ export function NodeInspector({
                     type="button"
                     aria-label="Shift element right"
                     onClick={() => actions.moveNode(networkId, node.id, node.layout.row, node.layout.col + 1)}
-                    className="flex h-6 w-6 items-center justify-center rounded border border-slate-200 text-slate-600 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-30 dark:border-[#1a1d24] dark:text-slate-300 dark:hover:bg-[#13161c]"
+                    className="flex h-6 w-6 max-sm:h-11 max-sm:w-11 items-center justify-center rounded border border-slate-200 text-slate-600 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-30 dark:border-[#1a1d24] dark:text-slate-300 dark:hover:bg-[#13161c]"
                   >
                     <ChevronRight size={14} aria-hidden="true" />
                   </button>

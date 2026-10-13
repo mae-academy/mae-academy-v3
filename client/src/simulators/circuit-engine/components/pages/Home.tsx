@@ -50,6 +50,7 @@ import {
 import { nanoid } from 'nanoid';
 import { toast } from 'sonner';
 import { V3Math } from '@/components/ui/V3Math';
+import { WorldHtmlBox } from '@/components/common/schematic/SchematicHtmlOverlay';
 import { KATEX_EMBEDDED_FONT_CSS } from '@/simulators/circuit-engine/models/katexSvgFonts';
 import { AnalysisBox } from '@/simulators/circuit-engine/components/ui-components/AnalysisBox';
 import { SegmentedControl, StudioSlider } from '@/components/common/templates';
@@ -293,7 +294,7 @@ function MeshLoopOverlay({ cycle, tabDUiRefinement, components = [], scale = 1, 
 }
 
 function SvgKaTeXLabel({ x, y, math, color, ariaLabel, width = 64, height = 28 }: { x: number; y: number; math: string; color: string; ariaLabel: string; width?: number; height?: number }) {
-  return <foreignObject x={x - width / 2} y={y - height / 2} width={width} height={height} pointerEvents="none" aria-label={ariaLabel} style={{ overflow: 'visible' }}><div className="flex h-full w-full items-center justify-center whitespace-nowrap" style={{ color, fontSize: 13, fontWeight: 400, lineHeight: 1, overflow: 'visible' }}><V3Math math={math} /></div></foreignObject>;
+  return <WorldHtmlBox x={x - width / 2} y={y - height / 2} width={width} height={height} ariaLabel={ariaLabel}><div className="flex h-full w-full items-center justify-center whitespace-nowrap" style={{ color, fontSize: 13, fontWeight: 400, lineHeight: 1, overflow: 'visible' }}><V3Math math={math} /></div></WorldHtmlBox>;
 }
 
 function ComponentPaletteIcon({ definition, colors, documented, isDark }: { definition: ComponentDef; colors: Palette; documented: boolean; isDark?: boolean }) {
@@ -836,13 +837,13 @@ function valueToLatex(value: string): string {
  * Live-canvas KaTeX label (foreignObject) paired with a hidden SVG <text> fallback that the
  * vector exporters swap in, since foreignObject is dropped by Word/Illustrator/Figma.
  */
-function SvgMathLabel({ x, y, anchor, math, fill, fontSize, canvas, fallback }: { x: number; y: number; anchor: 'start' | 'middle' | 'end'; math: string; fill: string; fontSize: number; canvas: string; fallback: React.ReactNode }) {
+function SvgMathLabel({ x, y, anchor, math, fill, fontSize, canvas, fallback, opacity }: { x: number; y: number; anchor: 'start' | 'middle' | 'end'; math: string; fill: string; fontSize: number; canvas: string; fallback: React.ReactNode; opacity?: number }) {
   const width = 140;
   const height = 28;
   const left = anchor === 'end' ? x - width : anchor === 'middle' ? x - width / 2 : x;
   return (
     <g>
-      <foreignObject className="v3-live-math" x={left} y={y - height / 2} width={width} height={height} style={{ overflow: 'visible' }} pointerEvents="none">
+      <WorldHtmlBox className="v3-live-math" x={left} y={y - height / 2} width={width} height={height} opacity={opacity}>
         <div
           style={{
             display: 'flex',
@@ -859,7 +860,7 @@ function SvgMathLabel({ x, y, anchor, math, fill, fontSize, canvas, fallback }: 
         >
           <V3Math math={math} />
         </div>
-      </foreignObject>
+      </WorldHtmlBox>
       <text
         className="v3-export-math-fallback"
         x={x}
@@ -1770,9 +1771,13 @@ export function V3Home({ createSimulationEngine, tabDUiRefinement = false }: V3H
 
   useEffect(() => {
     window.addEventListener('mouseup', releaseMomentaryControl);
+    window.addEventListener('pointerup', releaseMomentaryControl);
+    window.addEventListener('pointercancel', releaseMomentaryControl);
     window.addEventListener('blur', releaseMomentaryControl);
     return () => {
       window.removeEventListener('mouseup', releaseMomentaryControl);
+      window.removeEventListener('pointerup', releaseMomentaryControl);
+      window.removeEventListener('pointercancel', releaseMomentaryControl);
       window.removeEventListener('blur', releaseMomentaryControl);
     };
   }, [releaseMomentaryControl]);
@@ -2666,6 +2671,8 @@ export function V3Home({ createSimulationEngine, tabDUiRefinement = false }: V3H
     clonedSvg.querySelectorAll('rect[stroke-dasharray="5 4"]').forEach(el => el.remove());
     // Remove wire draft preview path
     clonedSvg.querySelectorAll('path[stroke-dasharray="6 4"]').forEach(el => el.remove());
+    // Remove the live pin-snap magnet indicator
+    clonedSvg.querySelectorAll('.terminal-snap-indicator').forEach(el => el.remove());
     // Remove hidden overlays
     clonedSvg.querySelectorAll('g[opacity="0"], g[style*="opacity: 0"], circle[opacity="0"], circle[style*="opacity: 0"]').forEach(el => el.remove());
     // Strip any solid background rect that was added by previous export iterations
@@ -3385,6 +3392,7 @@ export function V3Home({ createSimulationEngine, tabDUiRefinement = false }: V3H
                 fontSize={13}
                 canvas={colors.canvas}
                 fallback={renderComponentCanvasLabel(component.label, isGround)}
+                opacity={labelOpacity}
               />
             )}
 
@@ -3397,13 +3405,13 @@ export function V3Home({ createSimulationEngine, tabDUiRefinement = false }: V3H
               return (
                 <g>
                   {/* High-fidelity KaTeX HTML/MathML rendering on live canvas */}
-                  <foreignObject
+                  <WorldHtmlBox
                     className="v3-live-math"
                     x={valTextAnchor === 'end' ? valX - 90 : valTextAnchor === 'middle' ? valX - 45 : valX}
                     y={valY - 14}
                     width={90}
                     height={28}
-                    style={{ overflow: 'visible' }}
+                    opacity={labelOpacity}
                   >
                     <div
                       style={{
@@ -3421,7 +3429,7 @@ export function V3Home({ createSimulationEngine, tabDUiRefinement = false }: V3H
                     >
                       <V3Math math={mathStr} />
                     </div>
-                  </foreignObject>
+                  </WorldHtmlBox>
                   {/* Fallback SVG text with KaTeX fonts for pure SVG export / print */}
                   <text
                     className="v3-export-math-fallback"
@@ -3463,6 +3471,7 @@ export function V3Home({ createSimulationEngine, tabDUiRefinement = false }: V3H
                   fontSize={11}
                   canvas={colors.canvas}
                   fallback={renderFormattedValueTspans(value)}
+                  opacity={labelOpacity}
                 />
               );
             })()}

@@ -342,7 +342,7 @@ export function StandardStepPlot({
                     type="button"
                     onClick={() => toggleSeries(s.id)}
                     aria-pressed={!isHidden}
-                    className={`group inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium transition-all select-none ${isHidden
+                    className={`group inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 max-sm:min-h-11 text-xs font-medium transition-all select-none ${isHidden
                       ? "border border-dashed border-slate-300 dark:border-slate-700 bg-slate-100/50 dark:bg-slate-800/40 text-slate-400 opacity-50 hover:opacity-80"
                       : "border border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 shadow-sm hover:border-slate-300 dark:hover:border-slate-600"
                       }`}

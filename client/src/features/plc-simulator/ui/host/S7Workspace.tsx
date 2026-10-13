@@ -153,8 +153,8 @@ export function S7Workspace({ active, profileId, initialNetworks, symbols, runti
                     aria-selected={isActive}
                     onClick={() => onProfileChange(opt.value)}
                     className={`cursor-pointer select-none whitespace-nowrap ${isActive
-                        ? 'rounded-full btn-active-brand brand-active-pill px-4 py-1 text-xs'
-                        : 'rounded-full px-4 py-1 text-xs font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-all'
+                        ? 'rounded-full btn-active-brand brand-active-pill px-4 py-1 text-xs max-sm:min-h-11'
+                        : 'rounded-full px-4 py-1 text-xs max-sm:min-h-11 font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-all'
                       }`}
                   >
                     {opt.label}

@@ -65,7 +65,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
         <div className="grid items-start gap-10 sm:grid-cols-2 lg:grid-cols-[1.3fr_0.8fr_0.9fr_1fr] lg:gap-12">
           {/* Column 1: Brand & Mission */}
           <div>
-            <Link href="/" className="group inline-flex items-center gap-2.5 text-slate-950 dark:text-white">
+            <Link href="/" className="group inline-flex min-h-11 items-center gap-2.5 text-slate-950 dark:text-white">
               <span className="text-xl font-black tracking-tight">
                 MAE <span className="mae-gradient-text font-black">Academy</span>
               </span>
@@ -75,7 +75,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
             </p>
             <a
               href="mailto:maeacademy2026@gmail.com"
-              className="mt-4 inline-flex items-center gap-2 text-xs font-medium text-slate-500 transition-colors hover:text-violet-600 dark:text-slate-400 dark:hover:text-violet-300"
+              className="mt-2 inline-flex min-h-11 items-center gap-2 break-all text-xs font-medium text-slate-500 transition-colors hover:text-violet-600 dark:text-slate-400 dark:hover:text-violet-300"
             >
               <Mail className="h-4 w-4 text-violet-600 dark:text-violet-400" />
               <span>maeacademy2026@gmail.com</span>
@@ -87,24 +87,24 @@ export default function MainLayout({ children }: MainLayoutProps) {
             <p className="text-xs font-semibold tracking-wider text-slate-400 dark:text-slate-500 uppercase">
               {t("footer.platform")}
             </p>
-            <nav className="mt-4 flex flex-col gap-3 text-sm">
+            <nav className="mt-2 flex flex-col gap-0 text-sm">
               <PrefetchLink
                 href="/research"
-                className="group inline-flex items-center gap-2.5 text-slate-600 transition-colors hover:text-violet-600 dark:text-slate-400 dark:hover:text-violet-300"
+                className="group inline-flex min-h-11 items-center gap-2.5 text-slate-600 transition-colors hover:text-violet-600 dark:text-slate-400 dark:hover:text-violet-300"
               >
                 <Compass className="h-4 w-4 text-slate-400 transition-colors group-hover:text-violet-600 dark:text-slate-500 dark:group-hover:text-violet-300" />
                 <span className="font-medium">{t("footer.research")}</span>
               </PrefetchLink>
               <PrefetchLink
                 href="/library"
-                className="group inline-flex items-center gap-2.5 text-slate-600 transition-colors hover:text-violet-600 dark:text-slate-400 dark:hover:text-violet-300"
+                className="group inline-flex min-h-11 items-center gap-2.5 text-slate-600 transition-colors hover:text-violet-600 dark:text-slate-400 dark:hover:text-violet-300"
               >
                 <BookOpen className="h-4 w-4 text-slate-400 transition-colors group-hover:text-violet-600 dark:text-slate-500 dark:group-hover:text-violet-300" />
                 <span className="font-medium">{t("footer.library")}</span>
               </PrefetchLink>
               <PrefetchLink
                 href="/simulations"
-                className="group inline-flex items-center gap-2.5 text-slate-600 transition-colors hover:text-violet-600 dark:text-slate-400 dark:hover:text-violet-300"
+                className="group inline-flex min-h-11 items-center gap-2.5 text-slate-600 transition-colors hover:text-violet-600 dark:text-slate-400 dark:hover:text-violet-300"
               >
                 <Cpu className="h-4 w-4 text-slate-400 transition-colors group-hover:text-violet-600 dark:text-slate-500 dark:group-hover:text-violet-300" />
                 <span className="font-medium">{t("footer.simulations")}</span>
@@ -117,24 +117,24 @@ export default function MainLayout({ children }: MainLayoutProps) {
             <p className="text-xs font-semibold tracking-wider text-slate-400 dark:text-slate-500 uppercase">
               {t("footer.legalAndCompliance")}
             </p>
-            <nav className="mt-4 flex flex-col gap-3 text-sm">
+            <nav className="mt-2 flex flex-col gap-0 text-sm">
               <Link
                 href="/contact"
-                className="group inline-flex items-center gap-2.5 text-slate-600 transition-colors hover:text-violet-600 dark:text-slate-400 dark:hover:text-violet-300"
+                className="group inline-flex min-h-11 items-center gap-2.5 text-slate-600 transition-colors hover:text-violet-600 dark:text-slate-400 dark:hover:text-violet-300"
               >
                 <MessageSquare className="h-4 w-4 text-slate-400 transition-colors group-hover:text-violet-600 dark:text-slate-500 dark:group-hover:text-violet-300" />
                 <span className="font-medium">{t("footer.contactUs")}</span>
               </Link>
               <Link
                 href="/about"
-                className="group inline-flex items-center gap-2.5 text-slate-600 transition-colors hover:text-violet-600 dark:text-slate-400 dark:hover:text-violet-300"
+                className="group inline-flex min-h-11 items-center gap-2.5 text-slate-600 transition-colors hover:text-violet-600 dark:text-slate-400 dark:hover:text-violet-300"
               >
                 <Info className="h-4 w-4 text-slate-400 transition-colors group-hover:text-violet-600 dark:text-slate-500 dark:group-hover:text-violet-300" />
                 <span className="font-medium">{t("footer.aboutUs")}</span>
               </Link>
               <Link
                 href="/privacy"
-                className="group inline-flex items-center gap-2.5 text-slate-600 transition-colors hover:text-violet-600 dark:text-slate-400 dark:hover:text-violet-300"
+                className="group inline-flex min-h-11 items-center gap-2.5 text-slate-600 transition-colors hover:text-violet-600 dark:text-slate-400 dark:hover:text-violet-300"
               >
                 <ShieldCheck className="h-4 w-4 text-slate-400 transition-colors group-hover:text-violet-600 dark:text-slate-500 dark:group-hover:text-violet-300" />
                 <span className="font-medium">
@@ -143,7 +143,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
               </Link>
               <Link
                 href="/terms"
-                className="group inline-flex items-center gap-2.5 text-slate-600 transition-colors hover:text-violet-600 dark:text-slate-400 dark:hover:text-violet-300"
+                className="group inline-flex min-h-11 items-center gap-2.5 text-slate-600 transition-colors hover:text-violet-600 dark:text-slate-400 dark:hover:text-violet-300"
               >
                 <FileText className="h-4 w-4 text-slate-400 transition-colors group-hover:text-violet-600 dark:text-slate-500 dark:group-hover:text-violet-300" />
                 <span className="font-medium">
@@ -152,7 +152,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
               </Link>
               <Link
                 href="/attribution-policy"
-                className="group inline-flex items-center gap-2.5 text-slate-600 transition-colors hover:text-violet-600 dark:text-slate-400 dark:hover:text-violet-300"
+                className="group inline-flex min-h-11 items-center gap-2.5 text-slate-600 transition-colors hover:text-violet-600 dark:text-slate-400 dark:hover:text-violet-300"
               >
                 <ShieldCheck className="h-4 w-4 text-slate-400 transition-colors group-hover:text-violet-600 dark:text-slate-500 dark:group-hover:text-violet-300" />
                 <span className="font-medium">
@@ -189,7 +189,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
                   href={SUPPORT_URL}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 rounded-lg border border-slate-200/90 bg-white/70 px-3.5 py-1.5 text-xs font-medium text-slate-600 shadow-2xs backdrop-blur-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-rose-300 hover:bg-white hover:text-rose-600 dark:border-white/15 dark:bg-white/5 dark:text-slate-300 dark:hover:border-rose-400 dark:hover:bg-white/10 dark:hover:text-rose-300"
+                  className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-slate-200/90 bg-white/70 px-3.5 py-1.5 text-xs font-medium text-slate-600 shadow-2xs backdrop-blur-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-rose-300 hover:bg-white hover:text-rose-600 dark:border-white/15 dark:bg-white/5 dark:text-slate-300 dark:hover:border-rose-400 dark:hover:bg-white/10 dark:hover:text-rose-300"
                 >
                   <Heart className="h-3.5 w-3.5 text-rose-500 dark:text-rose-400" />
                   <span>{t("footer.supportOurMission")}</span>
@@ -204,28 +204,28 @@ export default function MainLayout({ children }: MainLayoutProps) {
           <p>
             {t("footer.copyright", { year: new Date().getFullYear() })}
           </p>
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center justify-center gap-x-1 sm:justify-end">
             <Link
               href="/privacy"
-              className="hover:text-violet-600 dark:hover:text-violet-400 transition-colors"
+              className="inline-flex min-h-11 items-center px-2 hover:text-violet-600 dark:hover:text-violet-400 transition-colors"
             >
               {t("footer.privacyPolicy")}
             </Link>
-            <span>·</span>
+            <span aria-hidden="true">·</span>
             <Link
               href="/terms"
-              className="hover:text-violet-600 dark:hover:text-violet-400 transition-colors"
+              className="inline-flex min-h-11 items-center px-2 hover:text-violet-600 dark:hover:text-violet-400 transition-colors"
             >
               {t("footer.termsOfService")}
             </Link>
-            <span>·</span>
-            <Link href="/contact" className="hover:text-violet-600 dark:hover:text-violet-400 transition-colors">
+            <span aria-hidden="true">·</span>
+            <Link href="/contact" className="inline-flex min-h-11 items-center px-2 hover:text-violet-600 dark:hover:text-violet-400 transition-colors">
               {t("footer.contactUs")}
             </Link>
-            <span>·</span>
+            <span aria-hidden="true">·</span>
             <Link
               href="/attribution-policy"
-              className="hover:text-violet-600 dark:hover:text-violet-400 transition-colors"
+              className="inline-flex min-h-11 items-center px-2 hover:text-violet-600 dark:hover:text-violet-400 transition-colors"
             >
               {t("footer.attributionPolicy")}
             </Link>

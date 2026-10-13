@@ -45,6 +45,8 @@ export interface UseWireRoutingArgs<C extends SchematicComponent> {
   cursor: SchematicPoint;
   /** Suppresses the live snap ring while the viewport is being panned. */
   panning: boolean;
+  /** Pin the pointer is currently magnetised to; the draft wire ends exactly on it. */
+  terminalSnap?: TerminalHit | null;
 }
 
 export interface WireRouting {
@@ -71,6 +73,7 @@ export function useWireRouting<C extends SchematicComponent>({
   snapEnabled,
   cursor,
   panning,
+  terminalSnap = null,
 }: UseWireRoutingArgs<C>): WireRouting {
   const [wiring, setWiring] = useState<SchematicWiringState>({});
   const { components, wires, setWires, setSelection, setMarqueeIds, commit } = document;
@@ -209,12 +212,12 @@ export function useWireRouting<C extends SchematicComponent>({
   const draftPath = useMemo(() => {
     const from = wiring.from;
     if (!from) return null;
-    const target = snapProjection?.point ?? (snapEnabled ? snapPointToGrid(cursor, gridSize) : cursor);
+    const target = terminalSnap?.position ?? snapProjection?.point ?? (snapEnabled ? snapPointToGrid(cursor, gridSize) : cursor);
     if (wiring.lockedCorners && wiring.lockedCorners.length > 0) {
       return orthogonalDraftPath(from.position, target, wiring.lockedCorners, from.axis);
     }
     return library.route(from.position, target, components, new Set([from.componentId]), from.axis);
-  }, [components, cursor, gridSize, library, snapEnabled, snapProjection, wiring.from, wiring.lockedCorners]);
+  }, [components, cursor, gridSize, library, snapEnabled, snapProjection, terminalSnap, wiring.from, wiring.lockedCorners]);
 
   return {
     wiring,

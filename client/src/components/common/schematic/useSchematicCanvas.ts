@@ -2,10 +2,9 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import type React from 'react';
 import { nanoid } from 'nanoid';
 import { toast } from 'sonner';
-import { TERMINAL_HIT_RADIUS } from '@/simulators/shared/workspace/workspaceCanvasMechanics';
+import { isCoarsePointer, terminalHitRadius } from '@/simulators/shared/workspace/workspaceCanvasMechanics';
 import {
   defaultContentBounds,
-  isNearTerminal,
   refreshWireEndpoints,
   resolveWireEndpoints,
   routePath,
@@ -34,6 +33,12 @@ import type {
 
 /** World-unit travel below which a press/release on a component counts as a click. */
 export const CLICK_DRAG_TOLERANCE = 3;
+/** Fingertip-sized wire pick radius (world units) used instead of WIRE_HIT_THRESHOLD for touch. */
+export const WIRE_HIT_THRESHOLD_COARSE = 24;
+/** Screen pixels a pin-press must travel before releasing over another pin counts as a drag-to-connect. */
+export const WIRE_DRAG_MIN_PX = 12;
+export const DOUBLE_TAP_MS = 350;
+export const DOUBLE_TAP_SLOP_PX = 28;
 
 export interface UseSchematicCanvasOptions<C extends SchematicComponent> {
   library: SchematicComponentLibrary<C>;
@@ -74,7 +79,12 @@ export interface SchematicCanvasController<C extends SchematicComponent> {
   cursor: SchematicPoint;
   hoveredComponentId: string | null;
   setHoveredComponentId: React.Dispatch<React.SetStateAction<string | null>>;
-  findTerminalAt: (point: SchematicPoint) => TerminalHit | null;
+  /** Nearest pin within the snap radius; `coarse` selects the >=20px touch radius. */
+  findTerminalAt: (point: SchematicPoint, coarse?: boolean) => TerminalHit | null;
+  /** Pin currently magnetised by the pointer while a wire is being drawn (drives the snap indicator). */
+  terminalSnap: TerminalHit | null;
+  /** World-unit radius within which a pin captures the pointer for the current input type. */
+  snapRadius: number;
   findComponentAt: (point: SchematicPoint) => C | null;
   wireEndpoints: (wire: SchematicWire, components?: C[]) => WireEndpoints | null;
   refreshWires: (wires: SchematicWire[], components: C[], movedIds?: ReadonlySet<string>) => SchematicWire[];
@@ -91,14 +101,15 @@ export interface SchematicCanvasController<C extends SchematicComponent> {
   zoomToFit: () => void;
   loadDocument: (document: SchematicDocument<C>, options?: { resetHistory?: boolean }) => void;
   handlers: {
-    onCanvasMouseDown: (event: React.MouseEvent<SVGSVGElement>) => void;
-    onCanvasMouseMove: (event: React.MouseEvent<SVGSVGElement>) => void;
-    onCanvasMouseUp: () => void;
+    onCanvasPointerDown: (event: React.PointerEvent<SVGSVGElement>) => void;
+    onCanvasPointerMove: (event: React.PointerEvent<SVGSVGElement>) => void;
+    onCanvasPointerUp: (event: React.PointerEvent<SVGSVGElement>) => void;
+    onCanvasPointerCancel: (event: React.PointerEvent<SVGSVGElement>) => void;
     onCanvasDrop: (event: React.DragEvent<SVGSVGElement>) => void;
-    onWireMouseDown: (event: React.MouseEvent<SVGPathElement>, wire: SchematicWire) => void;
-    onWireDoubleClick: (event: React.MouseEvent<SVGPathElement>, wire: SchematicWire) => void;
-    onWireCornerMouseDown: (event: React.MouseEvent<SVGCircleElement>, wire: SchematicWire, corner: number) => void;
-    onTextMouseDown: (event: React.MouseEvent<SVGGElement>, text: SchematicText) => void;
+    onWirePointerDown: (event: React.PointerEvent<Element>, wire: SchematicWire) => void;
+    onWireDoubleClick: (event: React.MouseEvent<Element>, wire: SchematicWire) => void;
+    onWireCornerPointerDown: (event: React.PointerEvent<Element>, wire: SchematicWire, corner: number) => void;
+    onTextPointerDown: (event: React.PointerEvent<Element>, text: SchematicText) => void;
   };
 }
 
@@ -116,7 +127,8 @@ export function useSchematicCanvas<C extends SchematicComponent>({
   defaultText = 'Text label',
 }: UseSchematicCanvasOptions<C>): SchematicCanvasController<C> {
   const document = useSchematicDocument<C>();
-  const viewport = useSchematicViewport();
+  const cancelInteractionRef = useRef<() => void>(() => undefined);
+  const viewport = useSchematicViewport({ onPinchStart: () => cancelInteractionRef.current() });
   const [gridMode, setGridMode] = useState<SchematicGridMode>('dots');
   const [snapEnabled, setSnapEnabled] = useState(true);
   const [dragState, setDragState] = useState<SchematicDragState>(null);
@@ -125,8 +137,13 @@ export function useSchematicCanvas<C extends SchematicComponent>({
   const dragStartRef = useRef<SchematicDocument<C> | null>(null);
   const lastDragDeltaRef = useRef<SchematicPoint | null>(null);
   const pendingClickRef = useRef<{ id: string; origin: SchematicPoint } | null>(null);
+  /** A press that armed a wire at a pin: releasing over another pin after a drag completes it. */
+  const wireGestureRef = useRef<{ pointerId: number; origin: SchematicPoint } | null>(null);
+  const lastWireTapRef = useRef<{ id: string; time: number; client: SchematicPoint } | null>(null);
+  const [terminalSnap, setTerminalSnap] = useState<TerminalHit | null>(null);
+  const [coarseInput, setCoarseInput] = useState(false);
 
-  const routing = useWireRouting({ library, document, gridSize, snapEnabled, cursor, panning: dragState?.kind === 'pan' });
+  const routing = useWireRouting({ library, document, gridSize, snapEnabled, cursor, panning: dragState?.kind === 'pan', terminalSnap });
   const clipboard = useSchematicClipboard(document, library, viewport.viewportCenter, gridSize, snapEnabled);
 
   const { components, wires, texts, selection, marqueeIds, setComponents, setWires, setTexts, setSelection, setMarqueeIds, commit, componentsRef, wiresRef, textsRef } = document;
@@ -143,16 +160,21 @@ export function useSchematicCanvas<C extends SchematicComponent>({
   const wireEndpoints = useCallback((wire: SchematicWire, source?: C[]) =>
     resolveWireEndpoints(library, wire, source ?? componentsRef.current), [componentsRef, library]);
 
-  const findTerminalAt = useCallback((point: SchematicPoint): TerminalHit | null => {
+  const snapRadius = terminalHitRadius(viewport.zoom, coarseInput || isCoarsePointer());
+
+  const findTerminalAt = useCallback((point: SchematicPoint, coarse = isCoarsePointer()): TerminalHit | null => {
+    const radius = terminalHitRadius(viewport.zoom, coarse);
+    let best: { hit: TerminalHit; distance: number } | null = null;
     for (const component of [...componentsRef.current].reverse()) {
       for (const terminal of library.getTerminals(component)) {
-        if (isNearTerminal(point[0], point[1], terminal.position[0], terminal.position[1], TERMINAL_HIT_RADIUS)) {
-          return { componentId: component.id, terminalId: terminal.id, position: terminal.position, axis: terminalAxis(terminal.position, [component.x, component.y]) };
+        const distance = Math.hypot(point[0] - terminal.position[0], point[1] - terminal.position[1]);
+        if (distance <= radius && (!best || distance < best.distance)) {
+          best = { distance, hit: { componentId: component.id, terminalId: terminal.id, position: terminal.position, axis: terminalAxis(terminal.position, [component.x, component.y]) } };
         }
       }
     }
-    return null;
-  }, [componentsRef, library]);
+    return best?.hit ?? null;
+  }, [componentsRef, library, viewport.zoom]);
 
   const findComponentAt = useCallback((point: SchematicPoint): C | null => {
     for (const component of [...componentsRef.current].reverse()) {
@@ -255,19 +277,60 @@ export function useSchematicCanvas<C extends SchematicComponent>({
     lastDragDeltaRef.current = null;
   }, [document]);
 
-  const onCanvasMouseDown = useCallback((event: React.MouseEvent<SVGSVGElement>) => {
+  /** Touch/pen get the generous snap radius and pan-on-empty-space; mouse keeps the precise legacy behaviour. */
+  const isCoarseEvent = useCallback((event: { pointerType?: string }) => event.pointerType === 'touch' || isCoarsePointer(), []);
+
+  /** Route every later event of this pointer to the canvas, even when it leaves the element or the window. */
+  const captureCanvas = useCallback((pointerId: number) => {
+    try {
+      viewport.svgRef.current?.setPointerCapture(pointerId);
+    } catch {
+      // Unsupported (jsdom) or the pointer already ended: events still bubble normally.
+    }
+  }, [viewport.svgRef]);
+
+  /** Abandons a drag in progress and restores the pre-drag document (a second finger landing, or the OS cancelling the touch). */
+  const cancelInteraction = useCallback(() => {
+    pendingClickRef.current = null;
+    wireGestureRef.current = null;
+    const base = dragStartRef.current;
+    if (base) {
+      setComponents(base.components);
+      setWires(base.wires);
+      setTexts(base.texts);
+      dragStartRef.current = null;
+    }
+    setDragState(null);
+    setTerminalSnap(null);
+    onPointerRelease?.();
+  }, [onPointerRelease, setComponents, setTexts, setWires]);
+  cancelInteractionRef.current = cancelInteraction;
+
+  const onCanvasPointerDown = useCallback((event: React.PointerEvent<SVGSVGElement>) => {
+    // Extra fingers belong to the pinch gesture; ignore them here.
+    if (!event.isPrimary || viewport.isPinching()) return;
+    const coarse = isCoarseEvent(event);
+    setCoarseInput(coarse);
     const point = clientToWorld(event.clientX, event.clientY);
     setCursor(point);
     if (event.button === 1 || event.button === 2 || event.altKey) {
       event.preventDefault();
+      captureCanvas(event.pointerId);
       setDragState({ kind: 'pan', client: [event.clientX, event.clientY] });
       return;
     }
     if (event.button !== 0) return;
 
-    const terminal = findTerminalAt(point);
+    const terminal = findTerminalAt(point, coarse);
     if (terminal) {
+      const completing = Boolean(routing.wiring.from);
       routing.handleTerminal(terminal);
+      setTerminalSnap(null);
+      if (!completing) {
+        // Pressing a pin arms the wire; dragging to another pin and releasing completes it.
+        wireGestureRef.current = { pointerId: event.pointerId, origin: [event.clientX, event.clientY] };
+        captureCanvas(event.pointerId);
+      }
       return;
     }
 
@@ -288,11 +351,12 @@ export function useSchematicCanvas<C extends SchematicComponent>({
       if (onComponentPress?.(component)) return;
       pendingClickRef.current = { id: component.id, origin: point };
       beginDragSnapshot();
+      captureCanvas(event.pointerId);
       setDragState({ kind: 'component', id: component.id, offset: [point[0] - component.x, point[1] - component.y], origin: [component.x, component.y], ids: group });
       return;
     }
 
-    const hit = routing.findWireNear(point);
+    const hit = routing.findWireNear(point, coarse ? WIRE_HIT_THRESHOLD_COARSE : undefined);
     if (hit) {
       setMarqueeIds([]);
       setSelection({ kind: 'wire', id: hit.wire.id });
@@ -301,8 +365,11 @@ export function useSchematicCanvas<C extends SchematicComponent>({
 
     setSelection(null);
     setMarqueeIds([]);
-    setDragState({ kind: 'marquee', start: point, end: point });
-  }, [beginDragSnapshot, clientToWorld, findComponentAt, findTerminalAt, marqueeIds, onComponentPress, routing, setMarqueeIds, setSelection]);
+    captureCanvas(event.pointerId);
+    // A finger on empty canvas pans (marquee selection is impractical by touch); a mouse draws the marquee.
+    if (event.pointerType === 'touch') setDragState({ kind: 'pan', client: [event.clientX, event.clientY] });
+    else setDragState({ kind: 'marquee', start: point, end: point });
+  }, [beginDragSnapshot, captureCanvas, clientToWorld, findComponentAt, findTerminalAt, isCoarseEvent, marqueeIds, onComponentPress, routing, setMarqueeIds, setSelection, viewport]);
 
   const dragComponents = useCallback((state: Extract<SchematicDragState, { kind: 'component' }>, point: SchematicPoint) => {
     const base = dragStartRef.current;
@@ -327,9 +394,19 @@ export function useSchematicCanvas<C extends SchematicComponent>({
     if (ids.size > 1) setTexts(base.texts.map(t => (ids.has(t.id) ? { ...t, x: t.x + delta[0], y: t.y + delta[1] } : t)));
   }, [refreshWires, setComponents, setTexts, setWires, snap]);
 
-  const onCanvasMouseMove = useCallback((event: React.MouseEvent<SVGSVGElement>) => {
+  const onCanvasPointerMove = useCallback((event: React.PointerEvent<SVGSVGElement>) => {
+    if (!event.isPrimary || viewport.isPinching()) return;
     const point = clientToWorld(event.clientX, event.clientY);
     setCursor(point);
+    const wiringFrom = routing.wiring.from;
+    if (wiringFrom) {
+      // Magnetise the nearest pin so the user sees the wire will land there before releasing.
+      const candidate = findTerminalAt(point, isCoarseEvent(event));
+      const target = candidate && !(candidate.componentId === wiringFrom.componentId && candidate.terminalId === wiringFrom.terminalId) ? candidate : null;
+      setTerminalSnap(previous => (previous?.componentId === target?.componentId && previous?.terminalId === target?.terminalId ? previous : target));
+    } else if (terminalSnap) {
+      setTerminalSnap(null);
+    }
     const pending = pendingClickRef.current;
     if (pending && Math.hypot(point[0] - pending.origin[0], point[1] - pending.origin[1]) > CLICK_DRAG_TOLERANCE) {
       pendingClickRef.current = null;
@@ -357,9 +434,21 @@ export function useSchematicCanvas<C extends SchematicComponent>({
       default:
         return;
     }
-  }, [clientToWorld, dragComponents, dragState, routing, setTexts, snap, viewport]);
+  }, [clientToWorld, dragComponents, dragState, findTerminalAt, isCoarseEvent, routing, setTexts, snap, terminalSnap, viewport]);
 
-  const onCanvasMouseUp = useCallback(() => {
+  const onCanvasPointerUp = useCallback((event: React.PointerEvent<SVGSVGElement>) => {
+    if (!event.isPrimary) return;
+    const gesture = wireGestureRef.current;
+    wireGestureRef.current = null;
+    const wiringFrom = routing.wiring.from;
+    if (gesture && gesture.pointerId === event.pointerId && wiringFrom && !viewport.isPinching()) {
+      const travelled = Math.hypot(event.clientX - gesture.origin[0], event.clientY - gesture.origin[1]);
+      if (travelled > WIRE_DRAG_MIN_PX) {
+        const target = findTerminalAt(clientToWorld(event.clientX, event.clientY), isCoarseEvent(event));
+        if (target && !(target.componentId === wiringFrom.componentId && target.terminalId === wiringFrom.terminalId)) routing.handleTerminal(target);
+      }
+    }
+    setTerminalSnap(null);
     onPointerRelease?.();
     const pending = pendingClickRef.current;
     pendingClickRef.current = null;
@@ -384,7 +473,11 @@ export function useSchematicCanvas<C extends SchematicComponent>({
       setSelection(ids.length === 1 && componentIds.length === 1 ? { kind: 'component', id: componentIds[0] } : null);
     }
     setDragState(null);
-  }, [commit, componentsRef, document, dragState, onComponentClick, onPointerRelease, setMarqueeIds, setSelection, textsRef, wiresRef]);
+  }, [clientToWorld, commit, componentsRef, document, dragState, findTerminalAt, isCoarseEvent, onComponentClick, onPointerRelease, routing, setMarqueeIds, setSelection, textsRef, viewport, wiresRef]);
+
+  const onCanvasPointerCancel = useCallback((event: React.PointerEvent<SVGSVGElement>) => {
+    if (event.isPrimary) cancelInteraction();
+  }, [cancelInteraction]);
 
   const onCanvasDrop = useCallback((event: React.DragEvent<SVGSVGElement>) => {
     event.preventDefault();
@@ -393,38 +486,52 @@ export function useSchematicCanvas<C extends SchematicComponent>({
     addComponent(type, clientToWorld(event.clientX, event.clientY));
   }, [addComponent, clientToWorld]);
 
-  const onWireMouseDown = useCallback((event: React.MouseEvent<SVGPathElement>, wire: SchematicWire) => {
-    if (event.button !== 0 || event.altKey) return;
+  const onWirePointerDown = useCallback((event: React.PointerEvent<Element>, wire: SchematicWire) => {
+    if (!event.isPrimary || event.button !== 0 || event.altKey) return;
     event.stopPropagation();
     if (routing.wiring.from) {
       routing.connectToWire(wire, clientToWorld(event.clientX, event.clientY));
       return;
     }
+    if (event.pointerType === 'touch') {
+      // iOS never delivers dblclick for taps on the canvas, so a quick second tap inserts a bend point.
+      const now = event.timeStamp;
+      const last = lastWireTapRef.current;
+      if (last && last.id === wire.id && now - last.time < DOUBLE_TAP_MS && Math.hypot(event.clientX - last.client[0], event.clientY - last.client[1]) < DOUBLE_TAP_SLOP_PX) {
+        lastWireTapRef.current = null;
+        routing.insertCorner(wire, clientToWorld(event.clientX, event.clientY));
+        return;
+      }
+      lastWireTapRef.current = { id: wire.id, time: now, client: [event.clientX, event.clientY] };
+    }
     setMarqueeIds([]);
     setSelection({ kind: 'wire', id: wire.id });
   }, [clientToWorld, routing, setMarqueeIds, setSelection]);
 
-  const onWireDoubleClick = useCallback((event: React.MouseEvent<SVGPathElement>, wire: SchematicWire) => {
+  const onWireDoubleClick = useCallback((event: React.MouseEvent<Element>, wire: SchematicWire) => {
     event.stopPropagation();
     routing.insertCorner(wire, clientToWorld(event.clientX, event.clientY));
   }, [clientToWorld, routing]);
 
-  const onWireCornerMouseDown = useCallback((event: React.MouseEvent<SVGCircleElement>, wire: SchematicWire, corner: number) => {
-    if (event.button !== 0) return;
+  const onWireCornerPointerDown = useCallback((event: React.PointerEvent<Element>, wire: SchematicWire, corner: number) => {
+    if (!event.isPrimary || event.button !== 0) return;
     event.stopPropagation();
+    captureCanvas(event.pointerId);
     beginDragSnapshot();
     setDragState({ kind: 'wireCorner', id: wire.id, corner });
-  }, [beginDragSnapshot]);
+  }, [beginDragSnapshot, captureCanvas]);
 
-  const onTextMouseDown = useCallback((event: React.MouseEvent<SVGGElement>, text: SchematicText) => {
-    if (event.button !== 0 || event.altKey) return;
+  const onTextPointerDown = useCallback((event: React.PointerEvent<Element>, text: SchematicText) => {
+    if (!event.isPrimary || event.button !== 0 || event.altKey) return;
     event.stopPropagation();
+    event.preventDefault();
     const point = clientToWorld(event.clientX, event.clientY);
+    captureCanvas(event.pointerId);
     setMarqueeIds([]);
     setSelection({ kind: 'text', id: text.id });
     beginDragSnapshot();
     setDragState({ kind: 'text', id: text.id, offset: [point[0] - text.x, point[1] - text.y] });
-  }, [beginDragSnapshot, clientToWorld, setMarqueeIds, setSelection]);
+  }, [beginDragSnapshot, captureCanvas, clientToWorld, setMarqueeIds, setSelection]);
 
   const hasSelection = Boolean(selection) || marqueeIds.length > 0;
 
@@ -466,15 +573,16 @@ export function useSchematicCanvas<C extends SchematicComponent>({
   useSchematicShortcuts({ step: snapEnabled ? gridSize : 1, onAction, onUnhandledKey });
 
   const handlers = useMemo(() => ({
-    onCanvasMouseDown,
-    onCanvasMouseMove,
-    onCanvasMouseUp,
+    onCanvasPointerDown,
+    onCanvasPointerMove,
+    onCanvasPointerUp,
+    onCanvasPointerCancel,
     onCanvasDrop,
-    onWireMouseDown,
+    onWirePointerDown,
     onWireDoubleClick,
-    onWireCornerMouseDown,
-    onTextMouseDown,
-  }), [onCanvasDrop, onCanvasMouseDown, onCanvasMouseMove, onCanvasMouseUp, onTextMouseDown, onWireCornerMouseDown, onWireDoubleClick, onWireMouseDown]);
+    onWireCornerPointerDown,
+    onTextPointerDown,
+  }), [onCanvasDrop, onCanvasPointerCancel, onCanvasPointerDown, onCanvasPointerMove, onCanvasPointerUp, onTextPointerDown, onWireCornerPointerDown, onWireDoubleClick, onWirePointerDown]);
 
   return {
     library,
@@ -500,6 +608,8 @@ export function useSchematicCanvas<C extends SchematicComponent>({
     hoveredComponentId,
     setHoveredComponentId,
     findTerminalAt,
+    terminalSnap,
+    snapRadius,
     findComponentAt,
     wireEndpoints,
     refreshWires,

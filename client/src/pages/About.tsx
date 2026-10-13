@@ -99,7 +99,7 @@ export default function About() {
             </p>
             <span className="h-px w-16 bg-brand-gradient" />
           </div>
-          <h1 className="max-w-3xl text-3xl lg:text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white">
+          <h1 className="max-w-3xl break-words text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white">
             {t("header.title")}
           </h1>
         </div>
@@ -461,8 +461,8 @@ export default function About() {
                           </div>
 
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between gap-2">
-                              <h4 className="font-semibold text-slate-900 dark:text-white text-base truncate">
+                            <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+                              <h4 className="min-w-0 font-semibold text-slate-900 dark:text-white text-base break-words">
                                 {role.organization[locale === "ar" ? "ar" : "en"]}
                               </h4>
                               <span
@@ -629,15 +629,15 @@ export default function About() {
 
                 {/* Interactive Address Row with Copy & Mailto Buttons */}
                 <div className="mt-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-t border-slate-200/60 pt-4 dark:border-white/[0.04]">
-                  <span className="text-xs font-medium text-slate-800 dark:text-slate-200 select-all truncate">
+                  <span className="min-w-0 break-all text-xs font-medium text-slate-800 dark:text-slate-200 select-all">
                     {channel.address}
                   </span>
 
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
                     <button
                       type="button"
                       onClick={() => handleCopyEmail(channel.address)}
-                      className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-medium text-slate-700 shadow-2xs transition hover:bg-slate-50 active:scale-95 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-slate-200 dark:hover:bg-white/[0.08]"
+                      className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-medium text-slate-700 shadow-2xs transition hover:bg-slate-50 active:scale-95 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-slate-200 dark:hover:bg-white/[0.08]"
                       title="Copy email to clipboard"
                     >
                       {isCopied ? (
@@ -657,7 +657,7 @@ export default function About() {
 
                     <a
                       href={channel.href}
-                      className="inline-flex items-center gap-1.5 rounded-full brand-active-pill px-4 py-1.5 text-xs font-semibold shadow-sm transition hover:opacity-95 hover:shadow active:scale-95"
+                      className="inline-flex min-h-11 items-center gap-1.5 rounded-full brand-active-pill px-4 py-1.5 text-xs font-semibold shadow-sm transition hover:opacity-95 hover:shadow active:scale-95"
                     >
                       <Mail className="h-3.5 w-3.5" />
                       <span>{t("contact.mail")}</span>

@@ -160,7 +160,7 @@ export const StudioSlider = forwardRef<HTMLInputElement, StudioSliderProps>(
               }}
               data-math-input="true"
               style={{ fontFamily: "'KaTeX_Main', 'Times New Roman', serif" }}
-              className="h-8 w-24 rounded-md border border-slate-200 bg-slate-50 px-2 text-right text-slate-800 text-lg tracking-wide focus:outline-blue-500 dark:border-slate-800 dark:bg-slate-950 dark:text-white [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [-moz-appearance:textfield] m-0"
+              className="h-11 sm:h-8 w-24 rounded-md border border-slate-200 bg-slate-50 px-2 text-right text-slate-800 text-lg tracking-wide focus:outline-blue-500 dark:border-slate-800 dark:bg-slate-950 dark:text-white [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [-moz-appearance:textfield] m-0"
             />
           ) : (
             <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800">
@@ -172,7 +172,7 @@ export const StudioSlider = forwardRef<HTMLInputElement, StudioSliderProps>(
     };
 
     const renderTrack = () => (
-      <span className="relative flex h-5 items-center flex-1 min-w-0">
+      <span className="relative flex h-11 sm:h-5 items-center flex-1 min-w-0">
         <span className="h-2 w-full bg-slate-200/80 dark:bg-slate-700/80 rounded-full relative overflow-hidden shadow-inner">
           <span
             className="block h-full rounded-full transition-[width] duration-75"
@@ -197,7 +197,7 @@ export const StudioSlider = forwardRef<HTMLInputElement, StudioSliderProps>(
           onChange={handleInput}
           onInput={handleInput}
           disabled={disabled}
-          className="peer absolute inset-0 h-full w-full cursor-pointer opacity-0 z-10"
+          className="peer absolute inset-0 h-full w-full cursor-pointer touch-pan-y opacity-0 z-10"
           {...props}
         />
         <span

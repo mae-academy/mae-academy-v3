@@ -178,8 +178,8 @@ export function SerialConsole({ serial, baud, collapsed, onToggleCollapsed, onSe
 
   return (
     <section className={`flex h-full w-full min-h-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs dark:border-[#1a1d24] dark:bg-[#0d0f12] ${className ?? ""}`}>
-      <div className="flex shrink-0 items-center justify-between border-b border-slate-200 bg-slate-50 px-3 py-2 dark:border-[#1a1d24] dark:bg-[#0d0f12]">
-        <button type="button" onClick={onToggleCollapsed} aria-expanded={!collapsed} className="flex cursor-pointer items-center gap-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b border-slate-200 bg-slate-50 px-3 py-2 dark:border-[#1a1d24] dark:bg-[#0d0f12]">
+        <button type="button" onClick={onToggleCollapsed} aria-expanded={!collapsed} className="flex min-h-11 sm:min-h-0 cursor-pointer items-center gap-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300">
           <div className="me-1 flex items-center gap-1.5">
             <span className="h-2.5 w-2.5 rounded-full border border-[#E0443E]/40 bg-[#FF5F56]" />
             <span className="h-2.5 w-2.5 rounded-full border border-[#DEA123]/40 bg-[#FFBD2E]" />
@@ -189,13 +189,13 @@ export function SerialConsole({ serial, baud, collapsed, onToggleCollapsed, onSe
           <span className="font-mono tracking-wider">serial.monitor</span>
           {collapsed ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
         </button>
-        <div className="flex items-center gap-3 font-mono text-[10px] text-slate-400 dark:text-slate-500">
+        <div className="flex flex-wrap items-center gap-x-3 font-mono text-[11px] text-slate-500 dark:text-slate-400">
           <span>{baud ? t("arduino.baudSuffix", "{{baud}} baud", { baud }) : t("arduino.portClosed", "port closed")}</span>
-          <label className="flex cursor-pointer items-center gap-1">
-            <input type="checkbox" checked={autoscroll} onChange={e => setAutoscroll(e.target.checked)} className="accent-violet-500" />
+          <label className="flex min-h-11 sm:min-h-0 cursor-pointer items-center gap-1.5">
+            <input type="checkbox" checked={autoscroll} onChange={e => setAutoscroll(e.target.checked)} className="h-4 w-4 accent-violet-500" />
             {t("arduino.autoscroll", "autoscroll")}
           </label>
-          <button type="button" onClick={onClear} title={t("arduino.clearSerialOutput", "Clear serial output")} className="cursor-pointer p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+          <button type="button" onClick={onClear} title={t("arduino.clearSerialOutput", "Clear serial output")} className="touch-target cursor-pointer p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
             <Trash2 size={12} />
           </button>
         </div>
@@ -227,9 +227,9 @@ export function SerialConsole({ serial, baud, collapsed, onToggleCollapsed, onSe
                 value={input}
                 onChange={e => setInput(e.target.value)}
                 placeholder={t("assembler.keyboardEntry", "Keyboard entry (stdin buffer)…")}
-                className="min-w-0 flex-1 bg-transparent px-2 py-1 font-mono text-xs text-slate-800 outline-none placeholder:text-slate-400 dark:text-slate-100 dark:placeholder:text-slate-600"
+                className="min-h-11 sm:min-h-0 min-w-0 flex-1 bg-transparent px-2 py-1 font-mono text-xs text-slate-800 outline-none placeholder:text-slate-400 dark:text-slate-100 dark:placeholder:text-slate-600"
               />
-              <button type="submit" className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 transition hover:bg-slate-100 dark:border-[#1a1d24] dark:bg-[#13161c] dark:text-slate-300 dark:hover:bg-[#1b2028] dark:hover:text-white">
+              <button type="submit" className="inline-flex min-h-11 sm:min-h-0 cursor-pointer items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 transition hover:bg-slate-100 dark:border-[#1a1d24] dark:bg-[#13161c] dark:text-slate-300 dark:hover:bg-[#1b2028] dark:hover:text-white">
                 <CornerDownLeft className="h-3 w-3" />
                 {t("arduino.send", "Send")}
               </button>

@@ -173,7 +173,7 @@ export default function LibraryDetail({ params }: any) {
               e.currentTarget.style.display = "none";
             }}
           />}
-          <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight text-slate-900 dark:text-white leading-snug">
+          <h1 className="break-words text-2xl sm:text-5xl lg:text-6xl font-black tracking-tight text-slate-900 dark:text-white leading-snug">
             {book.title}
           </h1>
         </div>

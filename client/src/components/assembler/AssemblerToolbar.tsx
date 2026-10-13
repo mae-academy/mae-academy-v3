@@ -94,7 +94,7 @@ export function ToolbarPillButton({
       title={title}
       onClick={onClick}
       disabled={disabled}
-      className={`h-9 inline-flex items-center justify-center gap-1.5 ${label ? "px-2.5" : "w-9 px-0"} text-xs font-medium transition active:scale-[.98] whitespace-nowrap shrink-0 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 ${
+      className={`h-11 sm:h-9 inline-flex items-center justify-center gap-1.5 ${label ? "px-2.5" : "w-11 sm:w-9 px-0"} text-xs font-medium transition active:scale-[.98] whitespace-nowrap shrink-0 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 ${
         isActive
           ? "btn-active-brand font-semibold"
           : "rounded-full border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 hover:border-slate-300 dark:border-[#1a1d24] dark:bg-[#090a0d] dark:text-slate-300 dark:hover:bg-[#13161c]"
@@ -212,7 +212,7 @@ export function AssemblerToolbar({
 
           {/* Simplified Examples Selector Pill */}
           <div
-            className="relative h-9 inline-flex items-center gap-1.5 rounded-full border border-slate-200/80 bg-slate-200/60 px-3 text-xs font-medium text-slate-700 hover:bg-slate-300/50 dark:border-[#1a1d24] dark:bg-[#13161c] dark:text-slate-300 dark:hover:bg-[#1a1d24] cursor-pointer transition shrink-0"
+            className="relative h-11 sm:h-9 inline-flex items-center gap-1.5 rounded-full border border-slate-200/80 bg-slate-200/60 px-3 text-xs font-medium text-slate-700 hover:bg-slate-300/50 dark:border-[#1a1d24] dark:bg-[#13161c] dark:text-slate-300 dark:hover:bg-[#1a1d24] cursor-pointer transition shrink-0"
             title={t('assembler.activeExample', 'Active: {{template}} (Click to switch example)', { template: selectedTemplate })}
           >
             <BookOpen className="h-3.5 w-3.5 text-violet-600 dark:text-violet-400 shrink-0 pointer-events-none" />
@@ -248,7 +248,7 @@ export function AssemblerToolbar({
               onClick={onRun}
               disabled={busy}
               title={running ? t('toolbar.pauseTooltip', 'Pause execution') : t('toolbar.runTooltip', 'Assemble and run immediately (Ctrl+Enter)')}
-              className={`h-9 inline-flex items-center justify-center gap-1.5 px-3.5 text-xs font-semibold cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 whitespace-nowrap shrink-0 ${
+              className={`h-11 sm:h-9 inline-flex items-center justify-center gap-1.5 px-3.5 text-xs font-semibold cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 whitespace-nowrap shrink-0 ${
                 !running && hasStartedRef.current
                   ? "brand-pill-active-rev"
                   : "btn-active-brand"
@@ -373,7 +373,7 @@ export function AssemblerToolbar({
           <ToolbarDivider />
 
           {/* Custom Stepper Input: Step [ X ] / [ Total ] */}
-          <div className="h-9 inline-flex items-center gap-1 rounded-full border border-slate-200/80 bg-slate-200/60 px-2.5 text-[11px] font-mono font-medium text-slate-700 dark:border-[#1a1d24] dark:bg-[#13161c] dark:text-slate-300 shrink-0">
+          <div className="h-11 sm:h-9 inline-flex items-center gap-1 rounded-full border border-slate-200/80 bg-slate-200/60 px-2.5 text-[11px] font-mono font-medium text-slate-700 dark:border-[#1a1d24] dark:bg-[#13161c] dark:text-slate-300 shrink-0">
             <span className="text-[10px] font-sans font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               {t('assembler.step', 'Step')}
             </span>

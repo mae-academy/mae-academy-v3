@@ -14,9 +14,9 @@ export function GradientButton({
   ...props
 }: GradientButtonProps) {
   const sizeClasses = {
-    sm: "px-3 py-1.5 text-xs",
-    md: "px-5 py-2 text-xs",
-    lg: "px-6 py-2.5 text-sm",
+    sm: "max-sm:min-h-11 px-3 py-1.5 text-xs",
+    md: "max-sm:min-h-11 px-5 py-2 text-xs",
+    lg: "max-sm:min-h-11 px-6 py-2.5 text-sm",
   }[size];
 
   const variantClasses = {

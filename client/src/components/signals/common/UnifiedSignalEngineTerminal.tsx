@@ -51,8 +51,8 @@ type Props = {
 
 type CalculusStatus = { tone: "info" | "warn" | "error"; text: string } | null;
 
-const key = "inline-flex h-10 min-w-0 items-center justify-center rounded-xl border border-slate-200/80 bg-white/90 px-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-violet-400 hover:text-violet-700 active:scale-95 dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-200 dark:hover:border-violet-500 dark:hover:text-violet-200 cursor-pointer";
-const chip = "inline-flex h-10 items-center justify-center rounded-xl border border-slate-200/80 bg-white/90 px-3 text-xs font-medium text-slate-700 shadow-sm transition hover:border-violet-400 active:scale-95 dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-200 dark:hover:border-violet-500 cursor-pointer";
+const key = "inline-flex h-11 min-w-11 items-center justify-center rounded-xl border border-slate-200/80 bg-white/90 px-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-violet-400 hover:text-violet-700 active:scale-95 dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-200 dark:hover:border-violet-500 dark:hover:text-violet-200 cursor-pointer";
+const chip = "inline-flex h-11 min-w-11 items-center justify-center rounded-xl border border-slate-200/80 bg-white/90 px-3 text-xs font-medium text-slate-700 shadow-sm transition hover:border-violet-400 active:scale-95 dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-200 dark:hover:border-violet-500 cursor-pointer";
 const sectionLabel = "text-[10px] font-bold uppercase tracking-[0.17em] text-slate-500 dark:text-slate-400";
 const rowIdle = "border-slate-200 bg-white/50 dark:border-slate-800 dark:bg-slate-900/50";
 const rowActive = {

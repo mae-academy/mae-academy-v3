@@ -504,7 +504,7 @@ export function ComplexPlanePlot({
       style={height !== undefined ? { height: typeof height === "number" ? `${height}px` : height } : undefined}
     >
       {/* Plot Top Header & Controls */}
-      <div className="flex items-center justify-between gap-2 pb-2">
+      <div className="flex flex-wrap items-center justify-between gap-2 pb-2">
         <div className="flex items-center gap-2">
           {title && (
             <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-white">
@@ -517,7 +517,7 @@ export function ComplexPlanePlot({
         </div>
 
         {/* View Controls Toolbar */}
-        <div className="flex items-center gap-2" role="toolbar" aria-label="Complex plane tools">
+        <div className="flex flex-wrap items-center gap-2" role="toolbar" aria-label="Complex plane tools">
           {/* Platform Standard Pill Segmented Control */}
           <div
             role="tablist"
@@ -532,7 +532,7 @@ export function ComplexPlanePlot({
                 setGridMode("cartesian");
                 onGridModeChange?.("cartesian");
               }}
-              className={`cursor-pointer select-none whitespace-nowrap transition-all inline-flex items-center rounded-full px-3.5 py-1 text-xs ${gridMode === "cartesian"
+              className={`cursor-pointer select-none whitespace-nowrap transition-all inline-flex items-center rounded-full px-3.5 py-1 max-sm:min-h-11 text-xs ${gridMode === "cartesian"
                 ? "btn-active-brand brand-active-pill"
                 : "font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
                 }`}
@@ -547,7 +547,7 @@ export function ComplexPlanePlot({
                 setGridMode("polar");
                 onGridModeChange?.("polar");
               }}
-              className={`cursor-pointer select-none whitespace-nowrap transition-all inline-flex items-center rounded-full px-3.5 py-1 text-xs ${gridMode === "polar"
+              className={`cursor-pointer select-none whitespace-nowrap transition-all inline-flex items-center rounded-full px-3.5 py-1 max-sm:min-h-11 text-xs ${gridMode === "polar"
                 ? "btn-active-brand brand-active-pill"
                 : "font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
                 }`}
@@ -563,7 +563,7 @@ export function ComplexPlanePlot({
               onClick={resetView}
               title="Reset Zoom & Pan"
               aria-label="Reset zoom and pan"
-              className="inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium border border-slate-200/60 dark:border-slate-700/50 bg-slate-100/80 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 hover:bg-slate-200/80 dark:hover:bg-slate-700 transition-colors"
+              className="inline-flex items-center gap-1 rounded-full px-3 py-1 max-sm:min-h-11 text-xs font-medium border border-slate-200/60 dark:border-slate-700/50 bg-slate-100/80 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 hover:bg-slate-200/80 dark:hover:bg-slate-700 transition-colors"
             >
               <RotateCcw className="h-3.5 w-3.5" />
               <span>Reset</span>

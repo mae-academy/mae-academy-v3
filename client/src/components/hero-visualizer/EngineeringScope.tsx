@@ -395,7 +395,7 @@ export default function EngineeringScope({ className = "" }: EngineeringScopePro
           onPointerDown={handlePointerMove}
           onPointerLeave={handlePointerLeave}
           onPointerUp={handlePointerLeave}
-          className="w-full h-full block cursor-crosshair touch-none relative z-10"
+          className="w-full h-full block cursor-crosshair touch-pan-y relative z-10"
         />
 
         {/* KaTeX Mathematical Cursor Tooltip Overlay */}

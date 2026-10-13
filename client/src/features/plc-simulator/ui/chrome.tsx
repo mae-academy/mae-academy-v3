@@ -22,9 +22,9 @@ export const CANVAS_DOTS_STYLE = {
 } as const;
 
 export const PILL_BUTTON =
-  'h-9 inline-flex items-center justify-center gap-1.5 px-2.5 text-xs font-medium transition active:scale-[.98] whitespace-nowrap shrink-0 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 rounded-full border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 hover:border-slate-300 dark:border-[#1a1d24] dark:bg-[#090a0d] dark:text-slate-300 dark:hover:bg-[#13161c]';
+  'h-11 sm:h-9 inline-flex items-center justify-center gap-1.5 px-2.5 text-xs font-medium transition active:scale-[.98] whitespace-nowrap shrink-0 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 rounded-full border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 hover:border-slate-300 dark:border-[#1a1d24] dark:bg-[#090a0d] dark:text-slate-300 dark:hover:bg-[#13161c]';
 
-export const ICON_PILL_BUTTON = `${PILL_BUTTON} w-9 px-0`;
+export const ICON_PILL_BUTTON = `${PILL_BUTTON} w-11 sm:w-9 px-0`;
 
 export const FIELD_INPUT =
   'h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-900 outline-none focus:border-violet-500 dark:border-[#1a1d24] dark:bg-[#090a0d] dark:text-slate-100';

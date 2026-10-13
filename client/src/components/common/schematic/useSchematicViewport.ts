@@ -34,6 +34,23 @@ export function screenToWorld(view: ViewState, screen: SchematicPoint): Schemati
   return [(screen[0] - view.pan[0]) / view.zoom, (screen[1] - view.pan[1]) / view.zoom];
 }
 
+/** Exact inverse of `screenToWorld`: the projection every renderer (SVG and HTML overlay) must share. */
+export function worldToScreen(view: ViewState, world: SchematicPoint): SchematicPoint {
+  return [world[0] * view.zoom + view.pan[0], world[1] * view.zoom + view.pan[1]];
+}
+
+/**
+ * The single world->screen matrix, expressed for both renderers. `svg` is the attribute for the
+ * canvas `<g>`; `css` is the identical matrix for an HTML layer whose children use world units.
+ */
+export function viewTransforms(view: ViewState): { svg: string; css: string } {
+  const [px, py] = view.pan;
+  return {
+    svg: `translate(${px},${py}) scale(${view.zoom})`,
+    css: `translate(${px}px, ${py}px) scale(${view.zoom})`,
+  };
+}
+
 export interface SchematicViewport {
   svgRef: React.RefObject<SVGSVGElement | null>;
   zoom: number;
@@ -49,13 +66,24 @@ export interface SchematicViewport {
   resetZoom: () => void;
   fitBounds: (bounds: SchematicBounds | null) => void;
   panBy: (dx: number, dy: number) => void;
+  /** True from the moment a second finger lands until every finger has lifted. */
+  isPinching: () => boolean;
+}
+
+export interface UseSchematicViewportOptions {
+  /** Fired when a second finger lands, so the host can abandon a one-finger drag in progress. */
+  onPinchStart?: () => void;
 }
 
 /**
  * Canonical viewport math: wheel zoom about the cursor, Shift/horizontal-wheel pan,
- * trackpad pinch (ctrl+wheel) and two-finger touch pinch/pan.
+ * trackpad pinch (ctrl+wheel) and two-finger touch pinch/pan driven by Pointer Events.
  */
-export function useSchematicViewport(): SchematicViewport {
+export function useSchematicViewport({ onPinchStart }: UseSchematicViewportOptions = {}): SchematicViewport {
+  const onPinchStartRef = useRef(onPinchStart);
+  onPinchStartRef.current = onPinchStart;
+  const pinchingRef = useRef(false);
+  const isPinching = useCallback(() => pinchingRef.current, []);
   const svgRef = useRef<SVGSVGElement | null>(null);
   const [view, setViewState] = useState<ViewState>({ zoom: 1, pan: [0, 0] });
   const viewRef = useRef(view);
@@ -128,45 +156,60 @@ export function useSchematicViewport(): SchematicViewport {
       setView(zoomViewAt(viewRef.current, tabDGentleWheelZoomFactor(event.deltaY), [event.clientX - rect.left, event.clientY - rect.top]));
     };
 
+    // Two-finger pinch/pan from Pointer Events: one model for touch, pen and mouse.
+    const touches = new Map<number, SchematicPoint>();
     let pinch: { distance: number; center: SchematicPoint } | null = null;
-    const pinchGeometry = (touches: TouchList): { distance: number; center: SchematicPoint } => {
+    const pinchGeometry = (): { distance: number; center: SchematicPoint } => {
       const rect = canvas.getBoundingClientRect();
-      const a = touches[0];
-      const b = touches[1];
+      const [a, b] = Array.from(touches.values());
       return {
-        distance: Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY) || 1,
-        center: [(a.clientX + b.clientX) / 2 - rect.left, (a.clientY + b.clientY) / 2 - rect.top],
+        distance: Math.hypot(b[0] - a[0], b[1] - a[1]) || 1,
+        center: [(a[0] + b[0]) / 2 - rect.left, (a[1] + b[1]) / 2 - rect.top],
       };
     };
-    const handleTouchStart = (event: TouchEvent) => {
-      if (event.touches.length === 2) {
-        event.preventDefault();
-        pinch = pinchGeometry(event.touches);
+    const handlePointerDown = (event: PointerEvent) => {
+      if (event.pointerType !== 'touch') return;
+      touches.set(event.pointerId, [event.clientX, event.clientY]);
+      if (touches.size === 2) {
+        pinchingRef.current = true;
+        pinch = pinchGeometry();
+        onPinchStartRef.current?.();
       }
     };
-    const handleTouchMove = (event: TouchEvent) => {
-      if (!pinch || event.touches.length !== 2) return;
+    const handlePointerMove = (event: PointerEvent) => {
+      if (!touches.has(event.pointerId)) return;
+      touches.set(event.pointerId, [event.clientX, event.clientY]);
+      if (!pinch || touches.size < 2) return;
       event.preventDefault();
-      const next = pinchGeometry(event.touches);
+      const next = pinchGeometry();
       const zoomed = zoomViewAt(viewRef.current, next.distance / pinch.distance, next.center);
       setView({ zoom: zoomed.zoom, pan: [zoomed.pan[0] + next.center[0] - pinch.center[0], zoomed.pan[1] + next.center[1] - pinch.center[1]] });
       pinch = next;
     };
-    const handleTouchEnd = (event: TouchEvent) => {
-      if (event.touches.length < 2) pinch = null;
+    const handlePointerEnd = (event: PointerEvent) => {
+      if (!touches.delete(event.pointerId)) return;
+      if (touches.size < 2) pinch = null;
+      // A lone finger left over from a pinch must not start dragging; wait for a full release.
+      if (touches.size === 0) pinchingRef.current = false;
     };
+    // iOS Safari reports page pinch as gesture events; the canvas owns that gesture.
+    const swallowGesture = (event: Event) => event.preventDefault();
 
     canvas.addEventListener('wheel', handleWheel, { passive: false });
-    canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
-    canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
-    canvas.addEventListener('touchend', handleTouchEnd);
-    canvas.addEventListener('touchcancel', handleTouchEnd);
+    canvas.addEventListener('pointerdown', handlePointerDown);
+    canvas.addEventListener('pointermove', handlePointerMove);
+    canvas.addEventListener('pointerup', handlePointerEnd);
+    canvas.addEventListener('pointercancel', handlePointerEnd);
+    canvas.addEventListener('gesturestart', swallowGesture);
+    canvas.addEventListener('gesturechange', swallowGesture);
     return () => {
       canvas.removeEventListener('wheel', handleWheel);
-      canvas.removeEventListener('touchstart', handleTouchStart);
-      canvas.removeEventListener('touchmove', handleTouchMove);
-      canvas.removeEventListener('touchend', handleTouchEnd);
-      canvas.removeEventListener('touchcancel', handleTouchEnd);
+      canvas.removeEventListener('pointerdown', handlePointerDown);
+      canvas.removeEventListener('pointermove', handlePointerMove);
+      canvas.removeEventListener('pointerup', handlePointerEnd);
+      canvas.removeEventListener('pointercancel', handlePointerEnd);
+      canvas.removeEventListener('gesturestart', swallowGesture);
+      canvas.removeEventListener('gesturechange', swallowGesture);
     };
   }, [setView]);
 
@@ -184,5 +227,6 @@ export function useSchematicViewport(): SchematicViewport {
     resetZoom,
     fitBounds,
     panBy,
-  }), [clientToWorld, fitBounds, panBy, resetZoom, setPan, setView, setZoom, view, viewportCenter, zoomIn, zoomOut]);
+    isPinching,
+  }), [clientToWorld, fitBounds, isPinching, panBy, resetZoom, setPan, setView, setZoom, view, viewportCenter, zoomIn, zoomOut]);
 }

@@ -121,7 +121,7 @@ export function CutawayViewer({ component, snapshot, medium, colors, isDark, con
                 <span>{control.label}</span>
                 <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 700 }}>{control.value} {control.unit}</span>
               </span>
-              <input type="range" aria-label={control.label} min={control.min} max={control.max} step={control.step} value={control.value} onChange={event => control.onChange(Number(event.target.value))} style={{ width: '100%', accentColor: colors.selection }} />
+              <input type="range" className="h-11 touch-pan-y sm:h-auto" aria-label={control.label} min={control.min} max={control.max} step={control.step} value={control.value} onChange={event => control.onChange(Number(event.target.value))} style={{ width: '100%', accentColor: colors.selection }} />
             </label>
           ))}
         </div>

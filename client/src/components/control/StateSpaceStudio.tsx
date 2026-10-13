@@ -25,7 +25,7 @@ const PENDING_ANALYSIS: StateSpaceAnalysis = { error: "…" };
 type SystemModel = { A: Matrix; B: Matrix; C: Matrix; D: Matrix };
 type Order = 2 | 3;
 type LocaleCode = "en" | "ar" | "es";
-const MATRIX_INPUT = "w-12 h-9 text-center font-serif text-sm bg-slate-100/70 dark:bg-slate-800/70 hover:bg-slate-200/60 dark:hover:bg-slate-700/60 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 border-none text-slate-800 dark:text-slate-100 transition-colors [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [-moz-appearance:textfield] m-0";
+const MATRIX_INPUT = "w-12 h-11 sm:h-9 text-center font-serif text-sm bg-slate-100/70 dark:bg-slate-800/70 hover:bg-slate-200/60 dark:hover:bg-slate-700/60 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 border-none text-slate-800 dark:text-slate-100 transition-colors [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [-moz-appearance:textfield] m-0";
 const MATRIX_BRACKETS = "border-l-2 border-r-2 border-slate-800 dark:border-slate-300 px-2 py-1.5";
 
 const initialSystem = (order: Order): SystemModel => order === 2

@@ -165,7 +165,7 @@ export function ExecutiveToolbar({
                 onClick={handleRunClick}
                 aria-label={running ? t('toolbar.pause', 'Pause') : paused ? t('plc.resume', 'Resume') : t('toolbar.run', 'Run')}
                 title={running ? t('toolbar.pauseTooltip', 'Pause execution') : paused ? t('plc.resumeExecutionTooltip', 'Resume execution') : t('plc.runExecutionTooltip', 'Run execution')}
-                className={`inline-flex h-9 shrink-0 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap px-3.5 text-xs font-semibold active:scale-[.98] ${paused ? 'brand-pill-active-rev' : 'btn-active-brand'
+                className={`inline-flex h-11 sm:h-9 shrink-0 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap px-3.5 text-xs font-semibold active:scale-[.98] ${paused ? 'brand-pill-active-rev' : 'btn-active-brand'
                   }`}
               >
                 {running ? (
@@ -182,7 +182,7 @@ export function ExecutiveToolbar({
               onClick={onReset ?? onStop}
               aria-label={t('plc.stopAria', 'Stop')}
               title={t('plc.resetStopTooltip', 'Reset / Stop execution state')}
-              className={`${PILL_BUTTON} w-9 px-0`}
+              className={`${PILL_BUTTON} w-11 sm:w-9 px-0`}
             >
               <RotateCcw className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" aria-hidden="true" />
             </button>
@@ -199,7 +199,7 @@ export function ExecutiveToolbar({
                 aria-label={t('plc.undoAria', 'Undo')}
                 onClick={onUndo}
                 disabled={!canUndo || running}
-                className={`${PILL_BUTTON} w-9 px-0`}
+                className={`${PILL_BUTTON} w-11 sm:w-9 px-0`}
               >
                 <Undo2 size={13} aria-hidden="true" />
               </button>
@@ -211,7 +211,7 @@ export function ExecutiveToolbar({
                 aria-label={t('plc.redoAria', 'Redo')}
                 onClick={onRedo}
                 disabled={!canRedo || running}
-                className={`${PILL_BUTTON} w-9 px-0`}
+                className={`${PILL_BUTTON} w-11 sm:w-9 px-0`}
               >
                 <Redo2 size={13} aria-hidden="true" />
               </button>
@@ -222,7 +222,7 @@ export function ExecutiveToolbar({
                 title={copied ? t('plc.copiedTooltip', 'Copied!') : t('plc.copyTooltip', 'Copy code / diagram')}
                 aria-label={t('plc.copyAria', 'Copy')}
                 onClick={handleCopy}
-                className={`${PILL_BUTTON} w-9 px-0`}
+                className={`${PILL_BUTTON} w-11 sm:w-9 px-0`}
               >
                 {copied ? (
                   <Check size={13} className="text-violet-600 dark:text-violet-400" aria-hidden="true" />
@@ -238,7 +238,7 @@ export function ExecutiveToolbar({
                 aria-label={t('plc.pasteAria', 'Paste')}
                 onClick={onPaste}
                 disabled={running}
-                className={`${PILL_BUTTON} w-9 px-0`}
+                className={`${PILL_BUTTON} w-11 sm:w-9 px-0`}
               >
                 <Clipboard size={13} aria-hidden="true" />
               </button>
@@ -250,7 +250,7 @@ export function ExecutiveToolbar({
                 aria-label={t('plc.deleteAria', 'Delete')}
                 onClick={onDelete}
                 disabled={running}
-                className={`${PILL_BUTTON} w-9 px-0 hover:text-rose-500 dark:hover:text-rose-400`}
+                className={`${PILL_BUTTON} w-11 sm:w-9 px-0 hover:text-rose-500 dark:hover:text-rose-400`}
               >
                 <Trash2 size={13} aria-hidden="true" />
               </button>
@@ -266,7 +266,7 @@ export function ExecutiveToolbar({
                   aria-label={t('toolbar.import', 'Import')}
                   onClick={() => fileInput.current?.click()}
                   disabled={running}
-                  className={`${PILL_BUTTON} w-9 px-0`}
+                  className={`${PILL_BUTTON} w-11 sm:w-9 px-0`}
                 >
                   <Upload size={13} aria-hidden="true" />
                 </button>
@@ -287,7 +287,7 @@ export function ExecutiveToolbar({
                 title={resolvedExportTitle}
                 aria-label={t('toolbar.export', 'Export')}
                 onClick={onExport}
-                className={`${PILL_BUTTON} w-9 px-0`}
+                className={`${PILL_BUTTON} w-11 sm:w-9 px-0`}
               >
                 <Download size={13} aria-hidden="true" />
               </button>

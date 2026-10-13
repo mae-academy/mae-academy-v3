@@ -163,7 +163,7 @@ export function DigitalLogicAnalysisBox({
           className="mb-5"
           title="Universal Boolean Expression"
           actionSlot={
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               {outputs.length > 1 ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>

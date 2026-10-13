@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Search, Keyboard } from 'lucide-react';
 import SegmentedControl from '@/components/ui/SegmentedControl';
 import type { Palette } from '@/simulators/shared/workspace/workspaceTheme';
+import { viewTransforms } from '@/components/common/schematic/useSchematicViewport';
 import { CONTROL_SYSTEMS_HEADING, INSPECTOR_EMPTY_STATE_TEXT, WORKSPACE_SHORTCUTS, type WorkspaceShortcut } from '@/simulators/shared/workspace/workspaceChrome';
 
 export interface WorkspaceTab {
@@ -46,9 +47,10 @@ export interface UnifiedWorkspaceShellProps {
   gridMode: WorkspaceGridMode;
   gridSize: number;
   canvasCursor?: string;
-  onCanvasMouseDown?: (event: React.MouseEvent<SVGSVGElement>) => void;
-  onCanvasMouseMove?: (event: React.MouseEvent<SVGSVGElement>) => void;
-  onCanvasMouseUp?: (event: React.MouseEvent<SVGSVGElement>) => void;
+  onCanvasPointerDown?: (event: React.PointerEvent<SVGSVGElement>) => void;
+  onCanvasPointerMove?: (event: React.PointerEvent<SVGSVGElement>) => void;
+  onCanvasPointerUp?: (event: React.PointerEvent<SVGSVGElement>) => void;
+  onCanvasPointerCancel?: (event: React.PointerEvent<SVGSVGElement>) => void;
   onCanvasContextMenu?: (event: React.MouseEvent<SVGSVGElement>) => void;
   onCanvasDragOver?: (event: React.DragEvent<SVGSVGElement>) => void;
   onCanvasDrop?: (event: React.DragEvent<SVGSVGElement>) => void;
@@ -56,6 +58,8 @@ export interface UnifiedWorkspaceShellProps {
   canvasDefs?: React.ReactNode;
   /** Rendered inside the pan/zoom transform group, above the grid background. */
   canvasContent: React.ReactNode;
+  /** HTML layer pinned exactly over the <svg>; must carry the same pan/zoom matrix (see SchematicHtmlLayer). */
+  canvasHtmlOverlay?: React.ReactNode;
   /** Rendered as an absolutely-positioned sibling of the <svg>, e.g. an empty-canvas hint. */
   canvasEmptyOverlay?: React.ReactNode;
 
@@ -181,14 +185,16 @@ export function UnifiedWorkspaceShell({
   gridMode,
   gridSize,
   canvasCursor,
-  onCanvasMouseDown,
-  onCanvasMouseMove,
-  onCanvasMouseUp,
+  onCanvasPointerDown,
+  onCanvasPointerMove,
+  onCanvasPointerUp,
+  onCanvasPointerCancel,
   onCanvasContextMenu,
   onCanvasDragOver,
   onCanvasDrop,
   canvasDefs,
   canvasContent,
+  canvasHtmlOverlay,
   canvasEmptyOverlay,
   analysisTitle,
   analysisContent,
@@ -200,13 +206,13 @@ export function UnifiedWorkspaceShell({
 }: UnifiedWorkspaceShellProps) {
   const { t } = useTranslation(['simulators']);
   const [cursor, setCursor] = React.useState<[number, number]>([0, 0]);
-  const handleMouseMove = (event: React.MouseEvent<SVGSVGElement>) => {
+  const handlePointerMove = (event: React.PointerEvent<SVGSVGElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
     setCursor([
       Math.round((event.clientX - rect.left - pan[0]) / zoom),
       Math.round((event.clientY - rect.top - pan[1]) / zoom),
     ]);
-    onCanvasMouseMove?.(event);
+    onCanvasPointerMove?.(event);
   };
   return (
     <div dir="ltr" className="v3-mae-layout mae-simulator-shell font-sans text-slate-900 dark:text-slate-100" style={{ minHeight: 760, color: colors.text }}>
@@ -236,7 +242,7 @@ export function UnifiedWorkspaceShell({
         <div className="flex-1 min-w-0 flex flex-col gap-4 w-full">
           {/* The library and the canvas share one height token, so the palette can never outgrow the canvas. */}
           <div className="flex flex-col md:flex-row gap-4 items-start w-full" style={{ ['--workspace-canvas-height' as string]: `${WORKSPACE_CANVAS_HEIGHT}px` }}>
-            <aside className="w-full md:w-64 shrink-0 min-h-0 overflow-hidden rounded-2xl border shadow-sm border-slate-200 bg-white dark:border-[#1a1d24] dark:bg-[#0d0f12]" style={{ background: colors.panel, borderColor: colors.line, display: 'flex', flexDirection: 'column', height: 'var(--workspace-canvas-height)', maxHeight: 'var(--workspace-canvas-height)' }}>
+            <aside className="w-full md:w-64 shrink-0 min-h-0 max-md:h-[min(60svh,520px)]! max-md:max-h-[60svh]! overflow-hidden rounded-2xl border shadow-sm border-slate-200 bg-white dark:border-[#1a1d24] dark:bg-[#0d0f12]" style={{ background: colors.panel, borderColor: colors.line, display: 'flex', flexDirection: 'column', height: 'var(--workspace-canvas-height)', maxHeight: 'var(--workspace-canvas-height)' }}>
               <div className="border-b px-3 py-2" style={{ borderColor: colors.line }}>
                 <div className={CONTROL_SYSTEMS_HEADING}>{t('simulators:shell.componentLibrary')}</div>
               </div>
@@ -248,6 +254,7 @@ export function UnifiedWorkspaceShell({
                     onChange={event => onLibrarySearchChange(event.target.value)}
                     placeholder={t('simulators:shell.searchComponents')}
                     style={{ width: '100%', boxSizing: 'border-box', border: `1px solid ${colors.line}`, outline: 'none', background: colors.input, color: colors.text, borderRadius: 7, padding: '8px 9px 8px 29px', fontSize: 11 }}
+                    className="max-sm:min-h-11 max-sm:text-base!"
                   />
                 </div>
               </div>
@@ -256,7 +263,7 @@ export function UnifiedWorkspaceShell({
               </div>
             </aside>
 
-            <main className="relative flex-1 min-w-0 overflow-hidden rounded-2xl border shadow-sm border-slate-200 bg-white dark:border-[#1a1d24] dark:bg-[#07080a]" style={{ background: colors.canvas, borderColor: colors.line, height: 'var(--workspace-canvas-height)' }}>
+            <main className="relative w-full flex-none md:w-auto md:flex-1 min-w-0 max-md:h-[65svh]! max-md:min-h-[360px] overflow-hidden rounded-2xl border shadow-sm border-slate-200 bg-white dark:border-[#1a1d24] dark:bg-[#07080a]" style={{ background: colors.canvas, borderColor: colors.line, height: 'var(--workspace-canvas-height)' }}>
               <div className="flex items-start justify-between border-b px-4 py-2 mae-card-header-row panel-header" data-slot="card-header" style={{ borderColor: colors.line }}>
                 <div>
                   <div className={CONTROL_SYSTEMS_HEADING}>{canvasTitle}</div>
@@ -271,12 +278,14 @@ export function UnifiedWorkspaceShell({
                 </div>
               </div>
 
+              {/* The wrapper is exactly the <svg> box, so the HTML overlay and the SVG share one origin. */}
+              <div style={{ position: 'relative', width: '100%', height: '100%' }}>
               <svg
                 ref={svgRef}
-                onMouseDown={onCanvasMouseDown}
-                onMouseMove={handleMouseMove}
-                onMouseUp={onCanvasMouseUp}
-                onMouseLeave={onCanvasMouseUp}
+                onPointerDown={onCanvasPointerDown}
+                onPointerMove={handlePointerMove}
+                onPointerUp={onCanvasPointerUp}
+                onPointerCancel={onCanvasPointerCancel}
                 onContextMenu={onCanvasContextMenu ?? (event => event.preventDefault())}
                 onDragOver={onCanvasDragOver ?? (event => event.preventDefault())}
                 onDrop={onCanvasDrop}
@@ -286,6 +295,9 @@ export function UnifiedWorkspaceShell({
                   display: 'block',
                   cursor: canvasCursor ?? 'default',
                   touchAction: 'none',
+                  userSelect: 'none',
+                  WebkitUserSelect: 'none',
+                  WebkitTouchCallout: 'none',
                 }}
               >
                 <defs>
@@ -329,13 +341,15 @@ export function UnifiedWorkspaceShell({
                   {canvasDefs}
                 </defs>
 
-                <g transform={`translate(${pan[0]},${pan[1]}) scale(${zoom})`}>
+                <g transform={viewTransforms({ zoom, pan }).svg}>
                   {gridMode !== 'hidden' && (
                     <rect x={-5000} y={-5000} width={10000} height={10000} fill={`url(#workspace-grid-${gridMode})`} />
                   )}
                   {canvasContent}
                 </g>
               </svg>
+              {canvasHtmlOverlay}
+              </div>
 
               {canvasEmptyOverlay}
 

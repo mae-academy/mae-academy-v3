@@ -62,7 +62,7 @@ const InputSwitch = memo(function InputSwitch({
 
   const cell = (active: boolean, tone: 'on' | 'off' | 'push'): string => {
     const base =
-      'h-4.5 w-full rounded font-sans text-[7.5px] font-bold leading-none outline-none transition-all focus-visible:ring-1 focus-visible:ring-violet-400 px-0.5';
+      'h-4.5 max-sm:h-11 w-full rounded font-sans text-[7.5px] max-sm:text-xs font-bold leading-none outline-none transition-all focus-visible:ring-1 focus-visible:ring-violet-400 px-0.5';
     if (!active) {
       return `${base} bg-slate-100 text-slate-600 hover:bg-slate-200/80 hover:text-slate-800 dark:bg-[#1a1d24] dark:text-slate-400 dark:hover:bg-[#222731] dark:hover:text-slate-200`;
     }
@@ -155,7 +155,7 @@ function LedBank({
         const bitsInByte = Math.min(8, bits - byte * 8);
         return (
           <div key={byte} className="flex flex-col gap-1" data-bank={`${area}${byte}`}>
-            <div className="grid grid-cols-8 gap-1">
+            <div className="grid grid-cols-4 gap-1 sm:grid-cols-8 sm:gap-1">
               {Array.from({ length: 8 }, (_, bit) => {
                 const index = byte * 8 + bit;
                 if (bit < bitsInByte) {
@@ -165,7 +165,7 @@ function LedBank({
                   <div
                     key={`empty-${index}`}
                     aria-hidden="true"
-                    className="flex flex-col items-center justify-center p-1 opacity-0 pointer-events-none"
+                    className="flex flex-col items-center justify-center p-1 opacity-0 pointer-events-none max-sm:hidden"
                   />
                 );
               })}
@@ -250,7 +250,7 @@ export function S7200Hardware({
                   key={byte}
                   className="flex flex-col gap-1 rounded-lg border border-slate-200/80 bg-slate-50/70 p-1.5 dark:border-[#1a1d24] dark:bg-[#0d0f12]"
                 >
-                  <div className="grid grid-cols-8 gap-1">
+                  <div className="grid grid-cols-4 gap-1 sm:grid-cols-8 sm:gap-1">
                     {Array.from({ length: 8 }, (_, bit) => {
                       const index = byte * 8 + bit;
                       if (bit < bitsInByte) {
@@ -260,7 +260,7 @@ export function S7200Hardware({
                         <div
                           key={`empty-${index}`}
                           aria-hidden="true"
-                          className="flex flex-col items-center justify-center p-0.5 opacity-0 pointer-events-none"
+                          className="flex flex-col items-center justify-center p-0.5 opacity-0 pointer-events-none max-sm:hidden"
                         />
                       );
                     })}

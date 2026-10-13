@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import {
   ChevronDown,
@@ -32,6 +33,8 @@ import {
 import { LIBRARY_DRAG_MIME, type SchematicCanvasController } from '@/components/common/schematic/useSchematicCanvas';
 import type { SchematicComponent, SchematicGridMode, SchematicPoint, SchematicWire } from '@/components/common/schematic/schematicTypes';
 import { renderComponentCanvasLabel } from '@/components/common/schematic/schematicLabel';
+import { SchematicHtmlLayer, SchematicOverlayContext } from '@/components/common/schematic/SchematicHtmlOverlay';
+import { useCoarsePointer } from '@/components/common/schematic/useCoarsePointer';
 
 export interface SchematicLibraryItem {
   id: string;
@@ -123,16 +126,141 @@ interface SchematicLibraryPanelProps<I extends SchematicLibraryItem> {
   categories: Record<string, I[]>;
   renderIcon: (item: I) => React.ReactNode;
   onAdd: (type: string) => void;
+  /** Touch/pen drag-to-place: called with the drop point (client px) when a tile is released over `dropTargetRef`. */
+  onDropAt?: (type: string, clientX: number, clientY: number) => void;
+  dropTargetRef?: React.RefObject<Element | null>;
+}
+
+/** Touch/pen must hold a tile this long before it lifts; a quicker swipe scrolls the palette instead. */
+const TILE_LONG_PRESS_MS = 200;
+const TILE_TOUCH_SLOP_PX = 8;
+const TILE_MOUSE_SLOP_PX = 6;
+/** The ghost floats above the fingertip so the finger never hides where the part will land. */
+const TILE_TOUCH_LIFT_PX = 56;
+
+interface TileDragSession<I> {
+  item: I;
+  pointerId: number;
+  pointerType: string;
+  startX: number;
+  startY: number;
+  lastX: number;
+  lastY: number;
+  active: boolean;
+  timer: number | null;
 }
 
 /** Shared tile grid for every studio's component catalog (drag-to-place or click-to-add). */
 /** Legacy/default annotation colours that follow the active theme instead of staying frozen at creation time. */
 const ADAPTIVE_TEXT_COLORS = new Set(['#000', '#000000', '#0f172a', '#172033', '#e2e8f0', '#f8fafc', '#fff', '#ffffff']);
 
-export function SchematicLibraryPanel<I extends SchematicLibraryItem>({ colors, categories, renderIcon, onAdd }: SchematicLibraryPanelProps<I>) {
+export function SchematicLibraryPanel<I extends SchematicLibraryItem>({ colors, categories, renderIcon, onAdd, onDropAt, dropTargetRef }: SchematicLibraryPanelProps<I>) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const coarse = useCoarsePointer();
+  const [ghost, setGhost] = useState<{ item: I; x: number; y: number; lift: number; over: boolean } | null>(null);
+  const session = useRef<TileDragSession<I> | null>(null);
+  const scrollLock = useRef(false);
+  const suppressClickUntil = useRef(0);
+  const onDropAtRef = useRef(onDropAt);
+  onDropAtRef.current = onDropAt;
+  const dropTargetRefRef = useRef(dropTargetRef);
+  dropTargetRefRef.current = dropTargetRef;
+  const liftTile = useRef<(current: TileDragSession<I>, captureTarget?: Element) => void>(() => undefined);
+
+  useEffect(() => {
+    const isOverTarget = (x: number, y: number) => {
+      const rect = dropTargetRefRef.current?.current?.getBoundingClientRect();
+      return Boolean(rect) && x >= rect!.left && x <= rect!.right && y >= rect!.top && y <= rect!.bottom;
+    };
+    const liftOf = (current: TileDragSession<I>) => (current.pointerType === 'mouse' ? 0 : TILE_TOUCH_LIFT_PX);
+    const end = () => {
+      const current = session.current;
+      if (current?.timer) window.clearTimeout(current.timer);
+      session.current = null;
+      scrollLock.current = false;
+      setGhost(null);
+    };
+    const lift = (current: TileDragSession<I>, captureTarget?: Element) => {
+      if (captureTarget) {
+        try { captureTarget.setPointerCapture(current.pointerId); } catch { /* pointer already gone */ }
+      }
+      current.active = true;
+      current.timer = null;
+      scrollLock.current = true;
+      const l = liftOf(current);
+      setGhost({ item: current.item, x: current.lastX, y: current.lastY, lift: l, over: isOverTarget(current.lastX, current.lastY - l) });
+      if (current.pointerType !== 'mouse') navigator.vibrate?.(8);
+    };
+    liftTile.current = lift;
+    const move = (event: PointerEvent) => {
+      const current = session.current;
+      if (!current || event.pointerId !== current.pointerId) return;
+      current.lastX = event.clientX;
+      current.lastY = event.clientY;
+      if (!current.active) {
+        const travelled = Math.hypot(event.clientX - current.startX, event.clientY - current.startY);
+        if (current.pointerType === 'mouse') { if (travelled > TILE_MOUSE_SLOP_PX) lift(current); }
+        else if (travelled > TILE_TOUCH_SLOP_PX) end(); // moved before the long-press: it is a scroll
+        return;
+      }
+      const l = liftOf(current);
+      setGhost(previous => (previous ? { ...previous, x: event.clientX, y: event.clientY, over: isOverTarget(event.clientX, event.clientY - l) } : previous));
+    };
+    const up = (event: PointerEvent) => {
+      const current = session.current;
+      if (!current || event.pointerId !== current.pointerId) return;
+      const wasActive = current.active;
+      const dropY = event.clientY - liftOf(current);
+      const { item } = current;
+      end();
+      if (!wasActive) return;
+      suppressClickUntil.current = performance.now() + 400;
+      if (isOverTarget(event.clientX, dropY)) onDropAtRef.current?.(item.id, event.clientX, dropY);
+    };
+    const cancel = (event: PointerEvent) => {
+      if (session.current && event.pointerId === session.current.pointerId) end();
+    };
+    // Once a tile is lifted the palette must not scroll under the finger. The listener has to exist
+    // before the touch starts (iOS), so it is permanent and gated by a ref.
+    const blockScroll = (event: TouchEvent) => { if (scrollLock.current && event.cancelable) event.preventDefault(); };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', cancel);
+    document.addEventListener('touchmove', blockScroll, { passive: false });
+    return () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', cancel);
+      document.removeEventListener('touchmove', blockScroll);
+      if (session.current?.timer) window.clearTimeout(session.current.timer);
+    };
+  }, []);
+
+  const pressTile = (event: React.PointerEvent<HTMLButtonElement>, item: I) => {
+    // Fine pointers keep native HTML5 drag-and-drop; touch, pen (and a mouse on a touch-first device) use pointer drag.
+    if (!onDropAt || !event.isPrimary || event.button !== 0) return;
+    if (event.pointerType === 'mouse' && !coarse) return;
+    const next: TileDragSession<I> = { item, pointerId: event.pointerId, pointerType: event.pointerType, startX: event.clientX, startY: event.clientY, lastX: event.clientX, lastY: event.clientY, active: false, timer: null };
+    session.current = next;
+    if (event.pointerType !== 'mouse') {
+      const target = event.currentTarget;
+      next.timer = window.setTimeout(() => {
+        if (session.current === next) liftTile.current(next, target);
+      }, TILE_LONG_PRESS_MS);
+    }
+  };
+
   return (
     <>
+      {ghost && typeof document !== 'undefined' && createPortal(
+        <div
+          aria-hidden="true"
+          style={{ position: 'fixed', left: ghost.x - 40, top: ghost.y - ghost.lift - 40, width: 80, height: 80, zIndex: 9999, pointerEvents: 'none', borderRadius: 12, padding: 6, background: colors.panel, border: `2px solid ${ghost.over ? colors.accent : colors.line}`, boxShadow: '0 12px 32px rgba(0,0,0,0.35)', opacity: ghost.over ? 1 : 0.7, transform: `scale(${ghost.over ? 1.08 : 1})`, transition: 'transform 0.12s ease, opacity 0.12s ease' }}
+        >
+          {renderIcon(ghost.item)}
+        </div>,
+        document.body,
+      )}
       {Object.entries(categories).map(([category, items]) => {
         const isCollapsed = collapsed.has(category);
         return (
@@ -155,14 +283,19 @@ export function SchematicLibraryPanel<I extends SchematicLibraryItem>({ colors, 
                 {items.map(item => (
                   <button
                     key={item.id}
-                    draggable
+                    draggable={!coarse}
                     onDragStart={event => {
                       event.dataTransfer.setData(LIBRARY_DRAG_MIME, item.id);
                       event.dataTransfer.effectAllowed = 'copy';
                     }}
-                    onClick={() => onAdd(item.id)}
-                    className="flex h-[110px] flex-col overflow-hidden rounded-md border transition-all active:scale-[.97]"
-                    style={{ borderColor: colors.line, background: colors.panel, cursor: 'grab' }}
+                    onPointerDown={event => pressTile(event, item)}
+                    onContextMenu={event => { if (coarse) event.preventDefault(); }}
+                    onClick={event => {
+                      if (performance.now() < suppressClickUntil.current) { event.preventDefault(); return; }
+                      onAdd(item.id);
+                    }}
+                    className="flex h-[110px] flex-col overflow-hidden rounded-md border transition-all active:scale-[.97] select-none"
+                    style={{ borderColor: colors.line, background: colors.panel, cursor: 'grab', WebkitTouchCallout: 'none' }}
                     onMouseEnter={event => { event.currentTarget.style.background = colors.panelAlt; }}
                     onMouseLeave={event => { event.currentTarget.style.background = colors.panel; }}
                   >
@@ -224,7 +357,10 @@ export function BaseSchematicCanvas<C extends SchematicComponent, I extends Sche
 }: BaseSchematicCanvasProps<C, I>) {
   const { t } = useTranslation('simulators');
   const [search, setSearch] = useState('');
-  const { library, gridSize, isDark, components, wires, texts, document, viewport, routing, clipboard, handlers, dragState, hoveredComponentId, setHoveredComponentId, selectedComponent } = canvas;
+  const coarse = useCoarsePointer();
+  /** HTML layer for KaTeX labels; null until mounted (and on the server), when labels fall back to foreignObject. */
+  const [overlayHost, setOverlayHost] = useState<HTMLDivElement | null>(null);
+  const { library, gridSize, isDark, components, wires, texts, document, viewport, routing, clipboard, handlers, dragState, hoveredComponentId, setHoveredComponentId, selectedComponent, terminalSnap, snapRadius } = canvas;
   const { selection, marqueeIds } = document;
   const wiringActive = Boolean(routing.wiring.from);
 
@@ -255,6 +391,7 @@ export function BaseSchematicCanvas<C extends SchematicComponent, I extends Sche
   const nothingSelected = !canvas.hasSelection;
 
   return (
+    <SchematicOverlayContext.Provider value={overlayHost}>
     <UnifiedWorkspaceShell
       colors={colors}
       isDark={isDark}
@@ -291,7 +428,14 @@ export function BaseSchematicCanvas<C extends SchematicComponent, I extends Sche
       toolbarRow2={toolbarRow2}
       librarySearchValue={search}
       onLibrarySearchChange={setSearch}
-      libraryContent={<SchematicLibraryPanel colors={colors} categories={filteredLibrary} renderIcon={renderLibraryIcon} onAdd={type => { canvas.addComponent(type); }} />}
+      libraryContent={<SchematicLibraryPanel
+        colors={colors}
+        categories={filteredLibrary}
+        renderIcon={renderLibraryIcon}
+        onAdd={type => { canvas.addComponent(type); }}
+        onDropAt={(type, clientX, clientY) => { canvas.addComponent(type, viewport.clientToWorld(clientX, clientY)); }}
+        dropTargetRef={viewport.svgRef}
+      />}
       canvasTitle={canvasTitle}
       componentCount={components.length}
       netCount={wires.length}
@@ -304,10 +448,12 @@ export function BaseSchematicCanvas<C extends SchematicComponent, I extends Sche
       gridMode={canvas.gridMode}
       gridSize={gridSize}
       canvasCursor={dragState?.kind === 'pan' ? 'grabbing' : wiringActive ? 'crosshair' : 'default'}
-      onCanvasMouseDown={handlers.onCanvasMouseDown}
-      onCanvasMouseMove={handlers.onCanvasMouseMove}
-      onCanvasMouseUp={handlers.onCanvasMouseUp}
+      onCanvasPointerDown={handlers.onCanvasPointerDown}
+      onCanvasPointerMove={handlers.onCanvasPointerMove}
+      onCanvasPointerUp={handlers.onCanvasPointerUp}
+      onCanvasPointerCancel={handlers.onCanvasPointerCancel}
       onCanvasDrop={handlers.onCanvasDrop}
+      canvasHtmlOverlay={<SchematicHtmlLayer view={{ zoom: viewport.zoom, pan: viewport.pan }} hostRef={setOverlayHost} />}
       canvasDefs={canvasDefs}
       canvasContent={<>
         {dragState?.kind === 'marquee' && (
@@ -327,11 +473,15 @@ export function BaseSchematicCanvas<C extends SchematicComponent, I extends Sche
         <g id="circuit-elements-layer">
           {wireRender.map(({ wire, selected, path, hitPath, renderPath, stroke, halo, dashed }) => (
             <g key={wire.id} data-wire-id={wire.id}>
-              <path d={hitPath} fill="none" stroke="transparent" strokeWidth={19} strokeLinecap="round" strokeLinejoin="round" onMouseDown={event => handlers.onWireMouseDown(event, wire)} onDoubleClick={event => handlers.onWireDoubleClick(event, wire)} style={{ cursor: 'pointer' }} />
+              <path d={hitPath} fill="none" stroke="transparent" strokeWidth={coarse ? 32 : 19} strokeLinecap="round" strokeLinejoin="round" onPointerDown={event => handlers.onWirePointerDown(event, wire)} onDoubleClick={event => handlers.onWireDoubleClick(event, wire)} style={{ cursor: 'pointer' }} />
               {halo && <path className="wire-selection-halo" d={renderPath} fill="none" stroke={halo} strokeOpacity={0.5} strokeWidth={(library.wireStrokeWidth ?? 2) + 4} strokeLinecap="round" strokeLinejoin="round" pointerEvents="none" />}
               <path className="wire-core" ref={wirePathRef ? element => wirePathRef(wire.id, element) : undefined} d={renderPath} fill="none" stroke={stroke} strokeWidth={library.wireStrokeWidth ?? 2} strokeDasharray={dashed ? '3 3' : undefined} strokeLinecap="round" strokeLinejoin="round" pointerEvents="none" />
               {selected && path.length > 2 && path.slice(1, -1).map((corner, index) => (
-                <circle key={`${wire.id}-${index + 1}`} cx={corner[0]} cy={corner[1]} {...cornerHandle} onMouseDown={event => handlers.onWireCornerMouseDown(event, wire, index + 1)} style={{ cursor: 'move' }} />
+                <g key={`${wire.id}-${index + 1}`}>
+                  <circle cx={corner[0]} cy={corner[1]} {...cornerHandle} pointerEvents="none" style={{ cursor: 'move' }} />
+                  {/* Finger-sized, screen-constant grab area around the visible handle. */}
+                  <circle cx={corner[0]} cy={corner[1]} r={Math.max(cornerHandle.r + 4, (coarse ? 22 : 10) / viewport.zoom)} fill="transparent" onPointerDown={event => handlers.onWireCornerPointerDown(event, wire, index + 1)} style={{ cursor: 'move' }} />
+                </g>
               ))}
             </g>
           ))}
@@ -345,6 +495,16 @@ export function BaseSchematicCanvas<C extends SchematicComponent, I extends Sche
           )}
           {routing.snapProjection && (
             <circle cx={routing.snapProjection.point[0]} cy={routing.snapProjection.point[1]} r={6} fill="none" stroke="#7C3AED" strokeWidth={2} pointerEvents="none" />
+          )}
+          {terminalSnap && (
+            <g className="terminal-snap-indicator" transform={`translate(${terminalSnap.position[0]},${terminalSnap.position[1]})`} pointerEvents="none">
+              {/* Capture zone: shows how far the pin pulls, so a near-miss never feels random. */}
+              <circle r={snapRadius} fill="#7C3AED" fillOpacity={0.1} stroke="#7C3AED" strokeOpacity={0.4} strokeWidth={1 / viewport.zoom} strokeDasharray={`${4 / viewport.zoom} ${3 / viewport.zoom}`} />
+              <circle r={Math.max(TERMINAL_RADIUS + 3, 11 / viewport.zoom)} fill="none" stroke="#7C3AED" strokeWidth={2.5 / viewport.zoom}>
+                <animate attributeName="stroke-opacity" values="1;0.35;1" dur="0.9s" repeatCount="indefinite" />
+              </circle>
+              <circle r={TERMINAL_RADIUS + 1.5} fill="#7C3AED" />
+            </g>
           )}
           {routing.wiring.lockedCorners?.map((corner, index) => (
             <circle key={`corner-${index}`} cx={corner[0]} cy={corner[1]} r={3} fill="#7C3AED" stroke="#ffffff" strokeWidth={1.5} pointerEvents="none" />
@@ -377,8 +537,9 @@ export function BaseSchematicCanvas<C extends SchematicComponent, I extends Sche
                   const starting = routing.wiring.from?.componentId === component.id && routing.wiring.from.terminalId === terminal.id;
                   return (
                     <g key={terminal.id}>
-                      <circle cx={x} cy={y} r={TERMINAL_HIT_RADIUS} fill="transparent" style={{ cursor: 'crosshair' }} />
-                      <g style={{ opacity: showTerminals ? 1 : 0, transition: 'opacity 0.2s ease-in-out' }} pointerEvents="none">
+                      <circle cx={x} cy={y} r={Math.max(TERMINAL_HIT_RADIUS, snapRadius)} fill="transparent" style={{ cursor: 'crosshair' }} />
+                      {/* No hover on touch screens, so pins stay faintly visible to be found and tapped. */}
+                      <g style={{ opacity: showTerminals ? 1 : coarse ? 0.55 : 0, transition: 'opacity 0.2s ease-in-out' }} pointerEvents="none">
                         <circle cx={x} cy={y} r={TERMINAL_RADIUS} fill={starting ? colors.accent : terminalFill?.(component, terminal.id) ?? colors.panel} stroke={wiringActive ? '#7C3AED' : colors.muted} strokeWidth={1.4} />
                         {terminal.label && (
                           <text
@@ -414,14 +575,30 @@ export function BaseSchematicCanvas<C extends SchematicComponent, I extends Sche
 
           {texts.map(text => {
             const selected = (selection?.kind === 'text' && selection.id === text.id) || marqueeIds.includes(text.id);
+            const body = (
+              <div style={{ width: 'max-content', color: ADAPTIVE_TEXT_COLORS.has((text.color ?? '').toLowerCase()) || !text.color ? (isDark ? '#F8FAFC' : '#0F172A') : text.color, fontSize: text.fontSize, fontWeight: 400, userSelect: 'none', display: 'flex', border: selected ? `1px dashed ${colors.selection}` : 'none', padding: 4, transform: 'translate(-4px, -4px)' }}>
+                <V3Math math={text.text} />
+              </div>
+            );
             return (
-              <g key={text.id} data-text-id={text.id} transform={`translate(${text.x},${text.y}) rotate(${text.rotation})`} onMouseDown={event => handlers.onTextMouseDown(event, text)} style={{ cursor: 'move' }}>
-                <foreignObject x={0} y={0} width={1} height={1} style={{ overflow: 'visible', pointerEvents: 'auto' }}>
-                  <div style={{ width: 'max-content', color: ADAPTIVE_TEXT_COLORS.has((text.color ?? '').toLowerCase()) || !text.color ? (isDark ? '#F8FAFC' : '#0F172A') : text.color, fontSize: text.fontSize, fontWeight: 400, userSelect: 'none', display: 'flex', border: selected ? `1px dashed ${colors.selection}` : 'none', padding: 4, transform: 'translate(-4px, -4px)' }}>
-                    <V3Math math={text.text} />
-                  </div>
-                </foreignObject>
-              </g>
+              <React.Fragment key={text.id}>
+                {/* Kept in the SVG either way: the vector exporter finds `g[data-text-id] foreignObject` and swaps in <text>. */}
+                <g data-text-id={text.id} transform={`translate(${text.x},${text.y}) rotate(${text.rotation})`} onPointerDown={overlayHost ? undefined : event => handlers.onTextPointerDown(event, text)} style={{ cursor: 'move' }}>
+                  <foreignObject x={0} y={0} width={1} height={1} style={{ overflow: 'visible', pointerEvents: overlayHost ? 'none' : 'auto', visibility: overlayHost ? 'hidden' : 'visible' }}>
+                    {overlayHost ? null : body}
+                  </foreignObject>
+                </g>
+                {overlayHost && createPortal(
+                  <div
+                    data-text-overlay-id={text.id}
+                    onPointerDown={event => handlers.onTextPointerDown(event, text)}
+                    style={{ position: 'absolute', left: text.x, top: text.y, transformOrigin: '0 0', transform: `rotate(${text.rotation}deg)`, pointerEvents: 'auto', cursor: 'move', touchAction: 'none' }}
+                  >
+                    {body}
+                  </div>,
+                  overlayHost,
+                )}
+              </React.Fragment>
             );
           })}
         </g>
@@ -447,5 +624,6 @@ export function BaseSchematicCanvas<C extends SchematicComponent, I extends Sche
     >
       {children}
     </UnifiedWorkspaceShell>
+    </SchematicOverlayContext.Provider>
   );
 }

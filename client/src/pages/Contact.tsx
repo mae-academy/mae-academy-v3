@@ -16,7 +16,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 type Errors = Partial<Record<"name" | "email" | "message", string>>;
 
 const fieldClass =
-  "mt-1.5 block w-full min-w-0 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition-colors placeholder:text-slate-400 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/30 dark:border-white/10 dark:bg-white/[0.04] dark:text-zinc-100";
+  "mt-1.5 block w-full min-w-0 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 min-h-11 text-base sm:text-sm text-slate-900 outline-none transition-colors placeholder:text-slate-400 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/30 dark:border-white/10 dark:bg-white/[0.04] dark:text-zinc-100";
 
 export default function Contact() {
   const { t } = useTranslation("common");
@@ -74,7 +74,7 @@ export default function Contact() {
   return (
     <section dir={isRtl ? "rtl" : "ltr"} lang={locale} className="mx-auto w-full max-w-[1380px] px-4 py-12 sm:px-6 sm:py-16 lg:px-8">
       <header className="mb-10 max-w-3xl">
-        <h1 className="text-3xl font-black tracking-tight sm:text-4xl">{t("contact.title")}</h1>
+        <h1 className="break-words text-2xl font-black tracking-tight sm:text-4xl">{t("contact.title")}</h1>
         <p className="mt-3 text-slate-600 dark:text-slate-400">{t("contact.subtitle")}</p>
       </header>
 
@@ -103,7 +103,7 @@ export default function Contact() {
             <textarea id="c-message" rows={6} value={form.message} onChange={set("message")} aria-invalid={!!errors.message} aria-describedby={errors.message ? "c-message-err" : undefined} className={`${fieldClass} resize-y`} />
             {err(errors.message, "c-message-err")}
           </div>
-          <button type="submit" disabled={sending} aria-busy={sending} className="btn-brand-primary min-h-[44px] w-full justify-center gap-2 px-6 py-3 text-xs font-semibold disabled:cursor-wait disabled:opacity-70 sm:w-auto sm:px-8 sm:text-sm">
+          <button type="submit" disabled={sending} aria-busy={sending} className="btn-brand-primary min-h-[44px] w-full justify-center gap-2 px-6 py-3 text-sm font-semibold disabled:cursor-wait disabled:opacity-70 sm:w-auto sm:px-8">
             {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4 rtl:-scale-x-100" />}
             {sending ? t("contact.sending") : t("contact.send")}
           </button>
@@ -130,7 +130,7 @@ export default function Contact() {
           </div>
           <div className="flex items-start gap-3">
             <Clock className="mt-0.5 h-5 w-5 shrink-0 text-violet-600 dark:text-violet-400" />
-            <div>
+            <div className="min-w-0">
               <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">{t("contact.hours")}</p>
               <p className="text-sm">{t("contact.hoursValue")}</p>
             </div>

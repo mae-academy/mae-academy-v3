@@ -29,17 +29,17 @@ export interface SegmentedControlProps<T extends string | number | boolean = str
 const sizeStyles = {
   sm: {
     container: "p-0.5 gap-0.5",
-    pill: "h-6 px-2.5 py-1 text-[11px]",
+    pill: "h-11 sm:h-6 px-3 sm:px-2.5 py-1 text-xs sm:text-[11px]",
     icon: "h-3 w-3",
   },
   md: {
     container: "p-1 gap-1",
-    pill: "h-7.5 px-2.5 sm:px-3.5 py-1 text-[11px] sm:text-xs",
+    pill: "h-11 sm:h-7.5 px-3 sm:px-3.5 py-1 text-xs",
     icon: "h-3.5 w-3.5",
   },
   lg: {
     container: "p-1.5 gap-1.5",
-    pill: "h-9 px-4 text-sm",
+    pill: "h-11 sm:h-9 px-4 text-sm",
     icon: "h-4 w-4",
   },
 };
@@ -104,7 +104,7 @@ export function SegmentedControl<T extends string | number | boolean = string>({
         );
 
         const pillClasses = cn(
-          "relative rounded-full transition-colors duration-150 cursor-pointer inline-flex items-center justify-center gap-1.5 whitespace-nowrap select-none disabled:cursor-not-allowed disabled:opacity-40",
+          "relative shrink-0 max-sm:min-w-11 rounded-full transition-colors duration-150 cursor-pointer inline-flex items-center justify-center gap-1.5 whitespace-nowrap select-none disabled:cursor-not-allowed disabled:opacity-40",
           currentSize.pill,
           fullWidth && "flex-1",
           layoutId

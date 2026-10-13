@@ -42,7 +42,7 @@ export function ToolbarButton({ colors, icon, label, title, onClick, active, dis
       aria-pressed={active === undefined ? undefined : isActive}
       onClick={onClick}
       disabled={disabled}
-      className={isActive ? "btn-active-brand" : ""}
+      className={`max-sm:min-h-11! max-sm:min-w-11! justify-center ${isActive ? "btn-active-brand" : ""}`.trim()}
       style={{
         border: isActive ? 'none' : `1px solid ${colors.line}`,
         background: isActive ? undefined : colors.panelAlt,
@@ -105,6 +105,7 @@ export function InspectorButton({ colors, children, onClick, danger, active, dis
     <button
       onClick={onClick}
       disabled={disabled}
+      className="max-sm:min-h-11!"
       style={{
         flex: 1,
         minHeight: 30,

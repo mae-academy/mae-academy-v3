@@ -55,7 +55,7 @@ export function DiscreteInputPanel({ expression, onExpressionChange }: PanelProp
               data-testid={`discrete-preset-${index}`}
               type="button"
               onClick={() => onExpressionChange(preset.latex)}
-              className="flex min-h-10 items-center rounded-xl border border-slate-200 px-3 text-left text-xs font-bold text-slate-600 transition hover:border-violet-300 hover:text-violet-700 active:scale-[0.97] dark:border-slate-800 dark:text-slate-300 dark:hover:border-violet-500 dark:hover:text-violet-200"
+              className="flex min-h-11 items-center rounded-xl border border-slate-200 px-3 text-left text-xs font-bold text-slate-600 transition hover:border-violet-300 hover:text-violet-700 active:scale-[0.97] dark:border-slate-800 dark:text-slate-300 dark:hover:border-violet-500 dark:hover:text-violet-200"
             >
               <KatexMath math={preset.label} />
             </button>
@@ -138,7 +138,7 @@ export function DiscreteResults({ expression }: { expression: string }) {
   const analysis = useMemo(() => (parsed.ok ? analyzeSequence((n) => evaluateDiscrete(parsed.node, n)) : null), [parsed]);
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(21rem,0.65fr)]">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(21rem,0.65fr)]">
       <StudioCard>
         <h4 className="mb-4 text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-white">{t('signals.discreteSignalView', 'Discrete signal view')}</h4>
         {parsed.ok ? (

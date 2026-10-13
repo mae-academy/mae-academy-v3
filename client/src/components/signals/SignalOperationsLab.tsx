@@ -104,7 +104,7 @@ export function SignalOperationsLab() {
                   key={preset.latex}
                   type="button"
                   onClick={() => setExpression(preset.latex)}
-                  className="flex min-h-10 items-center rounded-xl border border-slate-200 px-3 text-left text-xs font-bold text-slate-600 transition hover:border-violet-300 hover:text-violet-700 active:scale-[0.97] dark:border-slate-800 dark:text-slate-300 dark:hover:border-violet-500 dark:hover:text-violet-200"
+                  className="flex min-h-11 items-center rounded-xl border border-slate-200 px-3 text-left text-xs font-bold text-slate-600 transition hover:border-violet-300 hover:text-violet-700 active:scale-[0.97] dark:border-slate-800 dark:text-slate-300 dark:hover:border-violet-500 dark:hover:text-violet-200"
                 >
                   <KatexMath math={preset.label} />
                 </button>
@@ -116,7 +116,7 @@ export function SignalOperationsLab() {
 
       {/* Main Workspace Grid: Composite Signal View & Academic Analysis */}
       {domain === "dt" && <DiscreteResults expression={discreteExpression} />}
-      {domain === "ct" && <div className="grid gap-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(21rem,0.65fr)]">
+      {domain === "ct" && <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(21rem,0.65fr)]">
         {/* Left Scope: Composite Signal View */}
         <StudioCard>
           <h4 className="mb-4 text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-white">{t('signals.compositeSignalView', 'COMPOSITE SIGNAL VIEW')}</h4>

@@ -145,7 +145,7 @@ export default function ResearchDetail({ params }: any) {
           </span>
         </div>
         
-        <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight text-slate-900 dark:text-white mb-6 leading-snug">
+        <h1 className="break-words text-2xl sm:text-5xl lg:text-6xl font-black tracking-tight text-slate-900 dark:text-white mb-6 leading-snug">
           {paper.title}
         </h1>
         

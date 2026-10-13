@@ -1180,6 +1180,75 @@
   display: none;
 }
 
+/* Wide-by-nature content (equations, code, tables): scrolls inside its own box
+   so the page body never gains a horizontal scrollbar. */
+.scroll-x {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x pan-y;
+  scrollbar-width: thin;
+  scrollbar-color: rgb(148 163 184 / 0.55) transparent;
+}
+
+.scroll-x::-webkit-scrollbar {
+  height: 6px;
+}
+
+.scroll-x::-webkit-scrollbar-thumb {
+  background: rgb(148 163 184 / 0.55);
+  border-radius: 9999px;
+}
+
+/* Compact controls (tiny +/- steppers, icon buttons) get a 44x44 hit area on
+   phones without changing their desktop footprint. */
+@media (max-width: 639px) {
+  .touch-target {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
+/* Simulator toolbars set `min-height: 28-32px` inline on several local button
+   copies; lift every one of them to a 44px hit area on phones. */
+@media (max-width: 639px) {
+  .mae-simulator-shell button[style*="min-height: 28px"],
+  .mae-simulator-shell button[style*="min-height: 30px"],
+  .mae-simulator-shell button[style*="min-height: 32px"],
+  .mae-simulator-shell button[style*="min-height:28px"],
+  .mae-simulator-shell button[style*="min-height:30px"],
+  .mae-simulator-shell button[style*="min-height:32px"] {
+    min-height: 44px !important;
+  }
+}
+
+/* iOS Safari zooms the page when a field under 16px is focused. The viewport no
+   longer disables zoom, so form controls must be 16px on touch-sized screens. */
+@media (max-width: 639px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
+  select,
+  textarea,
+  .cm-editor .cm-content {
+    font-size: max(16px, 1em);
+  }
+}
+
+@media (max-width: 639px) {
+  input:not([type]),
+  input[type="text"],
+  input[type="search"],
+  input[type="email"],
+  input[type="number"],
+  select {
+    min-height: 44px;
+  }
+}
+
 /* ==========================================================================
    Unbreakable site-wide Arabic typography enforcement (outside of @layer)
    ========================================================================== */

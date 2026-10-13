@@ -166,7 +166,7 @@ export function LogicAnalyzer({ expression, onExpressionChange }: LogicAnalyzerP
                         type="button"
                         onClick={() => toggleOutput(row)}
                         aria-label={`Toggle output for minterm ${row.index}`}
-                        className={`inline-flex items-center justify-center rounded-full px-2.5 py-0.5 text-xs font-mono font-bold tabular-nums transition-all duration-200 cursor-pointer ${
+                        className={`inline-flex items-center justify-center rounded-full px-2.5 py-0.5 max-sm:min-h-11 max-sm:min-w-11 text-xs font-mono font-bold tabular-nums transition-all duration-200 cursor-pointer ${
                           row.value
                             ? 'bg-blue-600 text-white shadow-xs hover:bg-blue-500 active:scale-95'
                             : 'bg-slate-100 text-slate-500 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700 active:scale-95'

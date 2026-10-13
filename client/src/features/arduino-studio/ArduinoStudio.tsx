@@ -69,7 +69,7 @@ function useSpeedOptions() {
 }
 
 const pillButton =
-  "h-9 inline-flex items-center justify-center gap-1.5 px-2.5 text-xs font-medium transition active:scale-[.98] whitespace-nowrap shrink-0 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 rounded-full border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 hover:border-slate-300 dark:border-[#1a1d24] dark:bg-[#090a0d] dark:text-slate-300 dark:hover:bg-[#13161c]";
+  "h-11 sm:h-9 inline-flex items-center justify-center gap-1.5 px-2.5 text-xs font-medium transition active:scale-[.98] whitespace-nowrap shrink-0 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 rounded-full border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 hover:border-slate-300 dark:border-[#1a1d24] dark:bg-[#090a0d] dark:text-slate-300 dark:hover:bg-[#13161c]";
 
 const STATUS_STYLE = {
   idle: "bg-slate-400",
@@ -276,15 +276,15 @@ export function ArduinoStudio() {
       : null;
 
   return (
-    <div className="arduino-studio flex h-[calc(100vh-15rem)] min-h-[600px] w-full select-none flex-col gap-2.5 overflow-hidden font-sans text-slate-800 dark:text-slate-200">
+    <div className="arduino-studio flex h-[1100px] lg:h-[calc(100vh-15rem)] min-h-[600px] w-full select-none flex-col gap-2.5 overflow-hidden font-sans text-slate-800 dark:text-slate-200">
       {/* ------------------------------------------------------------------ */}
       {/* Header ribbon                                                       */}
       {/* ------------------------------------------------------------------ */}
       <section className="w-full shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs dark:border-[#1a1d24] dark:bg-[#0d0f12]">
-        <header className="scrollbar-none flex w-full flex-nowrap items-center justify-between gap-1.5 overflow-x-auto p-1.5 text-xs">
+        <header className="scrollbar-none scroll-x flex w-full flex-nowrap items-center justify-between gap-1.5 overflow-x-auto p-1.5 text-xs">
           <div className="flex shrink-0 items-center gap-1">
             <div
-              className="relative inline-flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-slate-200/80 bg-slate-200/60 px-3 text-xs font-medium text-slate-700 transition hover:bg-slate-300/50 dark:border-[#1a1d24] dark:bg-[#13161c] dark:text-slate-300 dark:hover:bg-[#1a1d24]"
+              className="relative inline-flex h-11 sm:h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-slate-200/80 bg-slate-200/60 px-3 text-xs font-medium text-slate-700 transition hover:bg-slate-300/50 dark:border-[#1a1d24] dark:bg-[#13161c] dark:text-slate-300 dark:hover:bg-[#1a1d24]"
               title={t("assembler.activeExample", "Active: {{template}} (Click to switch example)", {
                 template: ARDUINO_EXAMPLES.find(e => e.id === exampleId)?.label ?? t("arduino.customSketch", "Custom sketch"),
               })}
@@ -315,12 +315,12 @@ export function ArduinoStudio() {
                       ? t("arduino.resumeTooltip", "Resume execution")
                       : t("arduino.runTooltip", "Run execution")
                 }
-                className={`inline-flex h-9 shrink-0 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap px-3.5 text-xs font-semibold ${!running && started.current ? "brand-pill-active-rev" : "btn-active-brand"}`}
+                className={`inline-flex h-11 sm:h-9 shrink-0 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap px-3.5 text-xs font-semibold ${!running && started.current ? "brand-pill-active-rev" : "btn-active-brand"}`}
               >
                 {running ? <Pause className="h-3.5 w-3.5 fill-current" /> : <Play className="h-3.5 w-3.5 fill-current" />}
                 <span>{running ? t("toolbar.pause", "Pause") : status === "paused" ? t("arduino.resume", "Resume") : t("toolbar.run", "Run")}</span>
               </button>
-              <button type="button" onClick={onReset} title={t("arduino.resetTooltip", "Reset execution state")} className={`${pillButton} w-9 px-0`}>
+              <button type="button" onClick={onReset} title={t("arduino.resetTooltip", "Reset execution state")} className={`${pillButton} w-11 sm:w-9 px-0`}>
                 <RotateCcw className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" />
               </button>
             </div>
@@ -328,29 +328,29 @@ export function ArduinoStudio() {
             <span className="mx-1 h-5 w-px shrink-0 self-center bg-slate-200 dark:bg-[#1a1d24]" />
 
             <div className="flex shrink-0 items-center gap-1">
-              <button type="button" title={t("toolbar.undo", "Undo (Ctrl/Cmd+Z)")} onClick={handleUndo} disabled={historyIndex <= 0} className={`${pillButton} w-9 px-0`}>
+              <button type="button" title={t("toolbar.undo", "Undo (Ctrl/Cmd+Z)")} onClick={handleUndo} disabled={historyIndex <= 0} className={`${pillButton} w-11 sm:w-9 px-0`}>
                 <Undo2 size={13} />
               </button>
-              <button type="button" title={t("toolbar.redo", "Redo (Ctrl/Cmd+Shift+Z)")} onClick={handleRedo} disabled={historyIndex >= history.length - 1} className={`${pillButton} w-9 px-0`}>
+              <button type="button" title={t("toolbar.redo", "Redo (Ctrl/Cmd+Shift+Z)")} onClick={handleRedo} disabled={historyIndex >= history.length - 1} className={`${pillButton} w-11 sm:w-9 px-0`}>
                 <Redo2 size={13} />
               </button>
-              <button type="button" title={copied ? t("assembler.copied", "Copied!") : t("toolbar.copy", "Copy (Ctrl/Cmd+C)")} onClick={handleCopy} className={`${pillButton} w-9 px-0`}>
+              <button type="button" title={copied ? t("assembler.copied", "Copied!") : t("toolbar.copy", "Copy (Ctrl/Cmd+C)")} onClick={handleCopy} className={`${pillButton} w-11 sm:w-9 px-0`}>
                 {copied ? <Check size={13} className="text-violet-600 dark:text-violet-400" /> : <Copy size={13} />}
               </button>
-              <button type="button" title={t("toolbar.paste", "Paste (Ctrl/Cmd+V)")} onClick={handlePaste} className={`${pillButton} w-9 px-0`}>
+              <button type="button" title={t("toolbar.paste", "Paste (Ctrl/Cmd+V)")} onClick={handlePaste} className={`${pillButton} w-11 sm:w-9 px-0`}>
                 <Clipboard size={13} />
               </button>
-              <button type="button" title={t("toolbar.delete", "Delete (Del/Backspace)")} onClick={handleDelete} className={`${pillButton} w-9 px-0`}>
+              <button type="button" title={t("toolbar.delete", "Delete (Del/Backspace)")} onClick={handleDelete} className={`${pillButton} w-11 sm:w-9 px-0`}>
                 <Trash2 size={13} />
               </button>
 
               <span className="mx-1 h-5 w-px shrink-0 self-center bg-slate-200 dark:bg-[#1a1d24]" />
 
-              <button type="button" title={t("arduino.importTooltip", "Import file (.ino, .cpp, .c)")} onClick={() => fileInputRef.current?.click()} className={`${pillButton} w-9 px-0`}>
+              <button type="button" title={t("arduino.importTooltip", "Import file (.ino, .cpp, .c)")} onClick={() => fileInputRef.current?.click()} className={`${pillButton} w-11 sm:w-9 px-0`}>
                 <Upload size={13} />
               </button>
               <input ref={fileInputRef} type="file" accept=".ino,.cpp,.cc,.c,.h,.txt" onChange={handleImport} className="hidden" />
-              <button type="button" title={t("arduino.exportTooltip", "Export / Download file (.ino)")} onClick={handleExport} className={`${pillButton} w-9 px-0`}>
+              <button type="button" title={t("arduino.exportTooltip", "Export / Download file (.ino)")} onClick={handleExport} className={`${pillButton} w-11 sm:w-9 px-0`}>
                 <Download size={13} />
               </button>
             </div>

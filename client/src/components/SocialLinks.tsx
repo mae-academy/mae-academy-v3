@@ -60,7 +60,7 @@ export interface SocialLinksProps {
 
 export default function SocialLinks({ className = "" }: SocialLinksProps) {
   return (
-    <div className={`flex items-center gap-4.5 ${className}`.trim()}>
+    <div className={`flex flex-wrap items-center gap-x-2 gap-y-1 ${className}`.trim()}>
       {SOCIAL_LINKS.map((item) => (
         <a
           key={item.name}
@@ -68,7 +68,7 @@ export default function SocialLinks({ className = "" }: SocialLinksProps) {
           target="_blank"
           rel="noopener noreferrer"
           aria-label={item.name}
-          className="text-muted-foreground hover:text-foreground transition-all duration-200 hover:-translate-y-0.5"
+          className="inline-flex h-11 w-11 items-center justify-center text-muted-foreground hover:text-foreground transition-all duration-200 hover:-translate-y-0.5"
         >
           <item.icon className="h-5.5 w-5.5" aria-hidden="true" />
         </a>

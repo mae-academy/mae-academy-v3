@@ -509,7 +509,7 @@ export function FluidSimulatorApp() {
           type="button"
           onClick={running ? bridge.pause : bridge.run}
           title={running ? tr('pauseTip') : tr('runTip')}
-          className={bridge.status === 'PAUSED' ? 'brand-pill-active-rev' : 'btn-active-brand'}
+          className={`max-sm:min-h-11! ${bridge.status === 'PAUSED' ? 'brand-pill-active-rev' : 'btn-active-brand'}`}
           style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 14px', minHeight: 32, fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap' }}
         >
           {running ? <Pause size={14} /> : <Play size={14} />}

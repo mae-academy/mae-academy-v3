@@ -242,7 +242,7 @@ export function LadderCanvas({ editor, profile, symbols = NO_SYMBOLS, readOnly =
                     event.stopPropagation();
                     if (event.key === 'Enter') event.currentTarget.blur();
                   }}
-                  className="h-6 w-56 rounded border border-transparent bg-transparent px-1.5 font-sans text-xs hover:border-slate-300 focus:border-sky-500 focus:outline-none dark:hover:border-slate-600"
+                  className="h-6 w-56 max-w-full max-sm:min-h-11 rounded border border-transparent bg-transparent px-1.5 font-sans text-xs hover:border-slate-300 focus:border-sky-500 focus:outline-none dark:hover:border-slate-600"
                 />
                 {interactive && (
                   <span className="ml-auto flex items-center gap-1">
@@ -250,7 +250,7 @@ export function LadderCanvas({ editor, profile, symbols = NO_SYMBOLS, readOnly =
                       type="button"
                       aria-label={`Add a rung inside network ${index + 1}`}
                       onClick={() => actions.addRung(network.id)}
-                      className="inline-flex h-6 items-center gap-1 rounded px-1.5 hover:bg-slate-200 dark:hover:bg-slate-700"
+                      className="inline-flex h-6 max-sm:min-h-11 items-center gap-1 rounded px-1.5 hover:bg-slate-200 dark:hover:bg-slate-700"
                     >
                       <Plus className="h-3 w-3" aria-hidden="true" /> rung
                     </button>
@@ -258,7 +258,7 @@ export function LadderCanvas({ editor, profile, symbols = NO_SYMBOLS, readOnly =
                       type="button"
                       aria-label={`Add a network below network ${index + 1}`}
                       onClick={() => actions.addNetwork(network.id)}
-                      className="inline-flex h-6 items-center gap-1 rounded px-1.5 hover:bg-slate-200 dark:hover:bg-slate-700"
+                      className="inline-flex h-6 max-sm:min-h-11 items-center gap-1 rounded px-1.5 hover:bg-slate-200 dark:hover:bg-slate-700"
                     >
                       <Plus className="h-3 w-3" aria-hidden="true" /> network
                     </button>
@@ -267,7 +267,7 @@ export function LadderCanvas({ editor, profile, symbols = NO_SYMBOLS, readOnly =
                       aria-label={`Delete network ${index + 1}`}
                       disabled={networks.length <= 1}
                       onClick={() => actions.deleteNetwork(network.id)}
-                      className="inline-flex h-6 w-6 items-center justify-center rounded hover:bg-red-100 disabled:opacity-40 dark:hover:bg-red-950/60"
+                      className="inline-flex h-6 w-6 max-sm:h-11 max-sm:w-11 items-center justify-center rounded hover:bg-red-100 disabled:opacity-40 dark:hover:bg-red-950/60"
                     >
                       <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                     </button>

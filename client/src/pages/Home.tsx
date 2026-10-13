@@ -44,7 +44,7 @@ export default function Home() {
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-16">
           {/* Left Column (Text & CTAs): Span 7 columns */}
-          <div className="lg:col-span-7 flex flex-col items-start space-y-6 z-10 text-left rtl:text-right">
+          <div className="min-w-0 lg:col-span-7 flex flex-col items-start space-y-6 z-10 text-left rtl:text-right">
             <motion.span
               variants={itemVariants}
               className="text-sm sm:text-base font-semibold text-slate-900 dark:text-white tracking-wide"
@@ -54,14 +54,14 @@ export default function Home() {
 
             <motion.h1
               variants={itemVariants}
-              className="text-2xl sm:text-3xl lg:text-[2.25rem] xl:text-[2.6rem] font-bold tracking-tight text-slate-900 dark:text-white whitespace-nowrap text-left rtl:text-right leading-tight"
+              className="max-w-full text-2xl sm:text-3xl lg:text-[2.25rem] xl:text-[2.6rem] font-bold tracking-tight text-slate-900 dark:text-white break-words text-balance text-left rtl:text-right leading-tight"
             >
               <span className="text-brand-gradient">{t("hero.headlineSecondary")}</span>
             </motion.h1>
 
             <motion.p
               variants={itemVariants}
-              className="text-slate-600 dark:text-slate-400 text-xs sm:text-sm max-w-lg leading-relaxed text-left rtl:text-right"
+              className="text-slate-600 dark:text-slate-400 text-sm max-w-lg leading-relaxed text-left rtl:text-right break-words"
             >
               {t("hero.description")}
             </motion.p>
@@ -118,7 +118,7 @@ export default function Home() {
         <div className="max-w-[1380px] mx-auto px-4 sm:px-6 lg:px-8 w-full">
           <motion.div
             variants={itemVariants}
-            className="relative overflow-hidden rounded-2xl border border-slate-200/90 bg-slate-50/80 p-8 lg:p-10 shadow-sm dark:border-white/[0.08] dark:bg-[#08080A]"
+            className="relative overflow-hidden rounded-2xl border border-slate-200/90 bg-slate-50/80 p-5 sm:p-8 lg:p-10 shadow-sm dark:border-white/[0.08] dark:bg-[#08080A]"
           >
             {/* Subtle brand gradient bottom line */}
             <div className="absolute bottom-0 left-[10%] h-0.5 w-[80%] bg-gradient-to-r from-transparent via-[#2563EB]/40 via-[#7C3AED]/60 to-[#E11D48]/50" />
@@ -135,7 +135,7 @@ export default function Home() {
               </div>
 
               {/* Right Column (lg:col-span-5): Founder Profile Summary, Image Placeholder, Slogan Gradient & Action Link */}
-              <div className="lg:col-span-5 flex flex-col justify-between p-6 sm:p-7 rounded-xl border border-slate-200/80 bg-white/90 dark:border-white/[0.08] dark:bg-[#08080A] space-y-5">
+              <div className="min-w-0 lg:col-span-5 flex flex-col justify-between p-4 sm:p-7 rounded-xl border border-slate-200/80 bg-white/90 dark:border-white/[0.08] dark:bg-[#08080A] space-y-5">
                 <div className="flex items-center gap-4">
                   {/* Clean, borderless container slot ready for future headshot */}
                   <div className="aspect-square w-20 h-20 sm:w-24 sm:h-24 max-w-[120px] rounded-2xl border border-slate-200/80 bg-slate-100/50 flex items-center justify-center overflow-hidden shrink-0 dark:border-white/[0.08] dark:bg-white/[0.02]">
@@ -143,15 +143,15 @@ export default function Home() {
                       <FounderArchiveSeal />
                     </div>
                   </div>
-                  <div>
-                    <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                  <div className="min-w-0">
+                    <h3 className="text-base font-bold text-slate-900 dark:text-white break-words">
                       {t("founder.name")}
                     </h3>
                     <p className="text-xs text-slate-500 dark:text-slate-400">
                       {t("founder.role")}
                     </p>
                     {/* Brand Slogan Gradient: Model (Blue) · Analyze (Violet) · Engineering (Warm Rose/Red) */}
-                    <p className="mt-1.5 text-xs font-semibold tracking-wide">
+                    <p className="mt-1.5 flex flex-wrap items-center gap-y-0.5 text-xs font-semibold tracking-wide">
                       <span className="text-[#2563EB]">Model</span>
                       <span className="text-slate-400 mx-1.5">·</span>
                       <span className="text-[#7C3AED]">Analyze</span>

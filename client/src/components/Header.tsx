@@ -21,7 +21,7 @@ const localeLabel: Record<Locale, string> = { en: "EN", ar: "AR", es: "ES" };
 function BrandMark() {
   return (
     <div
-      className="w-11 h-11 md:w-12 md:h-12 shrink-0 mae-logo-mask"
+      className="w-10 h-10 sm:w-11 sm:h-11 md:w-12 md:h-12 shrink-0 mae-logo-mask"
       style={{ background: "var(--brand-gradient)" }}
       role="img"
       aria-label="MAE Academy logo"
@@ -38,11 +38,11 @@ function Header({ locale, onLocaleChange, isLocaleTransitioning, isDark, onTheme
 
   return (
     <header className="sticky top-0 z-50 border-b border-slate-200/70 bg-white/85 backdrop-blur-md dark:border-white/[0.08] dark:bg-[#0D0D11]/90 w-full max-w-full">
-      <div className="max-w-[1380px] mx-auto px-4 sm:px-6 lg:px-8 w-full flex h-[68px] sm:h-[72px] md:h-[76px] items-center justify-between gap-3">
-        <Link href="/" className="group flex items-center gap-2.5 sm:gap-3 text-slate-950 transition-transform duration-200 hover:scale-[1.02] active:scale-[.98] dark:text-white" aria-label={t("controls.home")}>
+      <div className="max-w-[1380px] mx-auto px-4 sm:px-6 lg:px-8 w-full flex h-[68px] sm:h-[72px] md:h-[76px] items-center justify-between gap-2 sm:gap-3">
+        <Link href="/" className="group flex min-h-11 min-w-0 items-center gap-2 sm:gap-3 text-slate-950 transition-transform duration-200 hover:scale-[1.02] active:scale-[.98] dark:text-white" aria-label={t("controls.home")}>
           <BrandMark />
-          <div className="flex flex-col justify-center leading-none">
-            <span className="text-xl md:text-2xl font-bold tracking-tight bg-gradient-to-r from-[#2563EB] via-[#7C3AED] to-[#EC4899] bg-clip-text text-transparent">
+          <div className="flex min-w-0 flex-col justify-center leading-none">
+            <span className="truncate text-lg sm:text-xl md:text-2xl font-bold tracking-tight bg-gradient-to-r from-[#2563EB] via-[#7C3AED] to-[#EC4899] bg-clip-text text-transparent">
               Academy
             </span>
             <span className="text-[11px] font-['Poppins'] font-medium text-slate-500 tracking-wider block mt-0.5">
@@ -50,7 +50,7 @@ function Header({ locale, onLocaleChange, isLocaleTransitioning, isDark, onTheme
             </span>
           </div>
         </Link>
-        <div className="flex items-center gap-1.5 sm:gap-2">
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
 
           {/* Language Selector */}
           <div className="relative">
@@ -58,13 +58,13 @@ function Header({ locale, onLocaleChange, isLocaleTransitioning, isDark, onTheme
               onClick={() => {
                 setLanguageOpen((value) => !value);
               }}
-              className="flex h-10 items-center gap-1 rounded-full border border-slate-200 bg-white px-3 text-xs font-bold tracking-[0.1em] text-slate-700 transition-all duration-200 hover:scale-105 hover:border-violet-300 hover:text-violet-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600 active:scale-95 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-zinc-200 dark:hover:border-violet-400 dark:hover:text-violet-300"
+              className="flex h-11 min-w-11 justify-center sm:h-10 items-center gap-1 rounded-full border border-slate-200 bg-white px-2 sm:px-3 text-xs font-bold tracking-[0.1em] text-slate-700 transition-all duration-200 hover:scale-105 hover:border-violet-300 hover:text-violet-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600 active:scale-95 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-zinc-200 dark:hover:border-violet-400 dark:hover:text-violet-300"
               aria-label={t("controls.language")}
               aria-haspopup="listbox"
               aria-expanded={languageOpen}
             >
               <span>{localeLabel[locale]}</span>
-              <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-200 ${languageOpen ? "rotate-180" : ""}`} />
+              <ChevronDown className={`hidden sm:block h-3.5 w-3.5 transition-transform duration-200 ${languageOpen ? "rotate-180" : ""}`} />
             </button>
             {languageOpen && (
               <div
@@ -81,7 +81,7 @@ function Header({ locale, onLocaleChange, isLocaleTransitioning, isDark, onTheme
                       onLocaleChange(option);
                       setLanguageOpen(false);
                     }}
-                    className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-xs font-semibold transition-colors duration-200 disabled:cursor-wait disabled:opacity-60 ${
+                    className={`flex min-h-11 w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-xs font-semibold transition-colors duration-200 disabled:cursor-wait disabled:opacity-60 ${
                       locale === option
                         ? "bg-violet-50 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300"
                         : "text-slate-600 hover:bg-slate-100 dark:text-zinc-300 dark:hover:bg-white/10"
@@ -97,15 +97,15 @@ function Header({ locale, onLocaleChange, isLocaleTransitioning, isDark, onTheme
             )}
           </div>
           {/* Theme Toggle */}
-          <button onClick={onThemeToggle} className="grid h-10 w-10 place-items-center rounded-full border border-slate-200 bg-white text-slate-700 transition-all duration-200 hover:scale-105 hover:border-violet-300 hover:text-violet-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600 active:scale-95 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-zinc-200 dark:hover:border-violet-400 dark:hover:text-violet-300" aria-label={isDark ? t("controls.themeToLight") : t("controls.themeToDark")}>{isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}</button>
+          <button onClick={onThemeToggle} className="grid h-11 w-11 sm:h-10 sm:w-10 place-items-center rounded-full border border-slate-200 bg-white text-slate-700 transition-all duration-200 hover:scale-105 hover:border-violet-300 hover:text-violet-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600 active:scale-95 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-zinc-200 dark:hover:border-violet-400 dark:hover:text-violet-300" aria-label={isDark ? t("controls.themeToLight") : t("controls.themeToDark")}>{isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}</button>
           {/* Mobile Hamburger Drawer Toggle */}
-          <button onClick={() => setMobileMenuOpen((open) => !open)} className="grid h-10 w-10 md:hidden place-items-center rounded-full border border-slate-200 bg-white text-slate-700 transition-all duration-200 hover:scale-105 hover:border-violet-300 hover:text-violet-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600 active:scale-95 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-zinc-200 dark:hover:border-violet-400 dark:hover:text-violet-300" aria-label="Toggle navigation menu" aria-expanded={mobileMenuOpen}>{mobileMenuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}</button>
+          <button onClick={() => setMobileMenuOpen((open) => !open)} className="grid h-11 w-11 sm:h-10 sm:w-10 md:hidden place-items-center rounded-full border border-slate-200 bg-white text-slate-700 transition-all duration-200 hover:scale-105 hover:border-violet-300 hover:text-violet-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600 active:scale-95 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-zinc-200 dark:hover:border-violet-400 dark:hover:text-violet-300" aria-label="Toggle navigation menu" aria-expanded={mobileMenuOpen}>{mobileMenuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}</button>
         </div>
       </div>
 
       {/* Mobile Drawer (Only on screens < md) */}
       {mobileMenuOpen && (
-        <div className="md:hidden border-t border-slate-200/80 bg-white/95 backdrop-blur-xl px-4 py-4 dark:border-white/[0.08] dark:bg-[#0D0D11]/95 motion-safe:animate-in motion-safe:slide-in-from-top-2">
+        <div className="md:hidden max-h-[calc(100svh-4.5rem)] overflow-y-auto overscroll-contain border-t border-slate-200/80 bg-white/95 backdrop-blur-xl px-4 py-4 dark:border-white/[0.08] dark:bg-[#0D0D11]/95 motion-safe:animate-in motion-safe:slide-in-from-top-2">
           <nav className="flex flex-col gap-1.5" aria-label="Mobile Navigation">
             {platformRoutes.map((route) => {
               const active = isRouteActive(location, route.href);
