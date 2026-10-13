@@ -3,7 +3,11 @@
     "principles": "Principios y ecuaciones que los gobiernan",
     "parameters": "Parámetros y definiciones de control",
     "experiments": "Experimentos de laboratorio paso a paso",
-    "applications": "Aplicaciones industriales y normas"
+    "applications": "Aplicaciones industriales y normas",
+    "purpose": "Propósito y significado",
+    "model": "Modelo matemático",
+    "mapping": "Mapeo de parámetros y controles",
+    "example": "Ejemplo numérico resuelto"
   },
   "labels": {
     "equations": "Ecuaciones que gobiernan el sistema"

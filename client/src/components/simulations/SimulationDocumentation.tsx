@@ -2,13 +2,17 @@ import { useId } from "react";
 import { useTranslation } from "react-i18next";
 import { KatexMath } from "@/components/ui/KatexMath";
 import { useLocale } from "@/contexts/LocaleContext";
+import { RichMathText } from "./toolDocs/RichMathText";
+import { useActiveDocsTool } from "./toolDocs/activeToolStore";
+import { getToolDoc, resolveToolId, toolEquations } from "./toolDocs/registry";
+import type { SimulationDocsTopic } from "./toolDocs/types";
 
 /**
  * Visible theory section rendered below a studio workbench. Prose lives in
  * `locales/<language>/simulationDocs.json`; the governing equations are language-neutral LaTeX and are
  * kept here, paired by index with each topic's `equations` captions.
  */
-export type SimulationDocsTopic = "circuits" | "signals" | "control" | "fluid" | "logic" | "plc" | "arduino" | "powerElectronics" | "codeStudio";
+export type { SimulationDocsTopic };
 
 export const EQUATIONS: Record<SimulationDocsTopic, string[]> = {
   circuits: [
@@ -97,6 +101,8 @@ export function docsTopicForSlug(slug: string | undefined): SimulationDocsTopic 
 
 interface SimulationDocumentationProps {
   topic: SimulationDocsTopic;
+  /** Active segmented-control tool id; when omitted, the tool the studio published via `publishDocsTool`. */
+  tool?: string;
 }
 
 const sectionClass = "mt-10 border-t border-slate-200/80 pt-8 dark:border-white/[0.08]";
@@ -104,7 +110,117 @@ const headingClass = "text-xl font-bold tracking-tight text-slate-900 dark:text-
 const subheadingClass = "mt-6 text-base font-semibold text-slate-900 dark:text-slate-100 break-words";
 const bodyClass = "mt-2 text-sm leading-relaxed text-slate-700 dark:text-slate-300 break-words";
 
-export default function SimulationDocumentation({ topic }: SimulationDocumentationProps) {
+export default function SimulationDocumentation({ topic, tool }: SimulationDocumentationProps) {
+  const published = useActiveDocsTool(topic);
+  const { locale } = useLocale();
+  const toolId = resolveToolId(topic, tool ?? published);
+  const toolDoc = toolId ? getToolDoc(topic, toolId, locale) : null;
+  if (toolId && toolDoc) return <ToolDocumentation topic={topic} toolId={toolId} doc={toolDoc} />;
+  return <TopicDocumentation topic={topic} />;
+}
+
+function ToolDocumentation({ topic, toolId, doc }: { topic: SimulationDocsTopic; toolId: string; doc: NonNullable<ReturnType<typeof getToolDoc>> }) {
+  const { t } = useTranslation("simulationDocs");
+  const { locale, isRtl } = useLocale();
+  const uid = useId();
+  const equations = toolEquations(topic, toolId);
+
+  return (
+    <article
+      key={`${topic}:${toolId}`}
+      lang={locale}
+      dir={isRtl ? "rtl" : "ltr"}
+      data-docs-topic={topic}
+      data-docs-tool={toolId}
+      aria-labelledby={`${uid}-title`}
+      className="mx-auto mt-10 w-full max-w-[1380px] text-start"
+    >
+      <header>
+        <h2 id={`${uid}-title`} className="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white break-words sm:text-3xl">
+          <RichMathText text={doc.title} />
+        </h2>
+        <p className={`${bodyClass} max-w-3xl`}><RichMathText text={doc.intro} /></p>
+      </header>
+
+      <section aria-labelledby={`${uid}-purpose`} className={sectionClass}>
+        <h3 id={`${uid}-purpose`} className={headingClass}>{t("sections.purpose")}</h3>
+        <p className={bodyClass}><RichMathText text={doc.purpose} /></p>
+      </section>
+
+      <section aria-labelledby={`${uid}-model`} className={sectionClass}>
+        <h3 id={`${uid}-model`} className={headingClass}>{t("sections.model")}</h3>
+        {doc.model.map((item) => (
+          <div key={item.heading}>
+            <h4 className={subheadingClass}><RichMathText text={item.heading} /></h4>
+            <p className={bodyClass}><RichMathText text={item.body} /></p>
+          </div>
+        ))}
+        <div className="mt-6 space-y-4">
+          <h4 className={subheadingClass}>{t("labels.equations")}</h4>
+          {equations.map((tex, index) => (
+            <figure
+              key={tex}
+              dir="ltr"
+              className="overflow-x-auto touch-pan-x rounded-xl border border-slate-200/80 bg-slate-50/70 px-4 py-4 text-center dark:border-white/[0.08] dark:bg-white/[0.03]"
+            >
+              <div className="text-base text-slate-900 dark:text-slate-100">
+                <KatexMath math={tex} displayMode />
+              </div>
+              <figcaption dir={isRtl ? "rtl" : "ltr"} className="mt-2 text-xs text-slate-600 dark:text-slate-400 break-words">
+                <RichMathText text={doc.equations[index] ?? ""} />
+              </figcaption>
+            </figure>
+          ))}
+        </div>
+      </section>
+
+      <section aria-labelledby={`${uid}-mapping`} className={sectionClass}>
+        <h3 id={`${uid}-mapping`} className={headingClass}>{t("sections.mapping")}</h3>
+        <dl className="mt-4 grid gap-4 sm:grid-cols-2">
+          {doc.mapping.map((item) => (
+            <div key={item.term} className="min-w-0 rounded-xl border border-slate-200/80 p-4 dark:border-white/[0.08]">
+              <dt className="text-sm font-semibold text-slate-900 dark:text-slate-100 break-words"><RichMathText text={item.term} /></dt>
+              <dd className={bodyClass}><RichMathText text={item.body} /></dd>
+            </div>
+          ))}
+        </dl>
+      </section>
+
+      <section aria-labelledby={`${uid}-example`} className={sectionClass}>
+        <h3 id={`${uid}-example`} className={headingClass}>{t("sections.example")}</h3>
+        <h4 className={subheadingClass}><RichMathText text={doc.example.title} /></h4>
+        <p className={bodyClass}><RichMathText text={doc.example.problem} /></p>
+        <ol className="mt-4 list-decimal space-y-3 ps-5">
+          {doc.example.steps.map((step, index) => (
+            <li key={index} className="ps-1">
+              <p className={bodyClass}><RichMathText text={step.text} /></p>
+              {step.tex && (
+                <div dir="ltr" className="my-2 overflow-x-auto touch-pan-x text-center text-slate-900 dark:text-slate-100">
+                  <KatexMath math={step.tex} displayMode />
+                </div>
+              )}
+            </li>
+          ))}
+        </ol>
+        <p className={`${bodyClass} font-medium`}><RichMathText text={doc.example.result} /></p>
+      </section>
+
+      <section aria-labelledby={`${uid}-applications`} className={sectionClass}>
+        <h3 id={`${uid}-applications`} className={headingClass}>{t("sections.applications")}</h3>
+        <dl className="mt-4 grid gap-4 sm:grid-cols-2">
+          {doc.applications.map((item) => (
+            <div key={item.field} className="min-w-0 rounded-xl border border-slate-200/80 p-4 dark:border-white/[0.08]">
+              <dt className="text-sm font-semibold text-violet-700 dark:text-violet-300 break-words"><RichMathText text={item.field} /></dt>
+              <dd className={bodyClass}><RichMathText text={item.body} /></dd>
+            </div>
+          ))}
+        </dl>
+      </section>
+    </article>
+  );
+}
+
+function TopicDocumentation({ topic }: { topic: SimulationDocsTopic }) {
   const { t } = useTranslation("simulationDocs");
   const { locale, isRtl } = useLocale();
   const uid = useId();

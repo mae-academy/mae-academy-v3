@@ -95,6 +95,11 @@ export default function SimulationDetail() {
 
   const simulation = copy.collections.simulations.cards[meta.index];
   const docsTopic = docsTopicForSlug(meta.slug);
+  // Studios switched by URL segment pass it straight through; the rest publish their internal tool via publishDocsTool.
+  const docsToolForRoute = (studio: string, segment: string | undefined) =>
+    studio === "signals-and-systems"
+      ? ({ a: "signal-operations-and-properties", b: "system-classification", c: "convolution-engine", d: "fourier-analysis", e: "laplace-s-plane" } as Record<string, string>)[segment ?? ""] ?? segment
+      : studio === "control-systems" || studio === "power-electronics" ? segment : undefined;
   const isControlSystems = meta.slug === "control-systems";
   const isPowerElectronics = meta.slug === "power-electronics";
   const isSignalsAndSystems = meta.slug === "signals-and-systems";
@@ -212,7 +217,7 @@ export default function SimulationDetail() {
           {toolContent}
         </div>
       </motion.div>
-      {docsTopic && <SimulationDocumentation topic={docsTopic} />}
+      {docsTopic && <SimulationDocumentation topic={docsTopic} tool={docsToolForRoute(meta.slug, tool)} />}
     </SimulatorLayout>
   </motion.div>;
 }
