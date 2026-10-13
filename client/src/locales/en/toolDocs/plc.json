@@ -1,0 +1,122 @@
+{
+  "ladder-s7-200": {
+    "title": "Ladder logic on the Siemens Simatic S7-200",
+    "intro": "A programmable logic controller does not run a program once; it repeats a fixed cycle forever. This tool lets you build relay ladder rungs and watch that cycle evaluate them.",
+    "purpose": "This mode executes a ladder diagram against a model of an S7-200 CPU. You place contacts, coils, timers and counters on rungs, drive the physical inputs $\\texttt{I0.0}$ to $\\texttt{I0.7}$, and watch the outputs $\\texttt{Q0.0}$ to $\\texttt{Q0.7}$ respond. The same program can be shown as statement list instructions, so each rung is seen both as a diagram and as the boolean stack code the CPU really runs.",
+    "model": [
+      {
+        "heading": "Memory areas and addressing",
+        "body": "An address is an area letter, an optional size letter and a byte index, followed by a bit index for single bits. Inputs $\\texttt{I}$ mirror the field terminals and outputs $\\texttt{Q}$ drive the load terminals. Variable memory $\\texttt{V}$ holds general data, markers $\\texttt{M}$ hold internal bits, timers $\\texttt{T}$ and counters $\\texttt{C}$ are addressed by instance number such as $\\texttt{T37}$ or $\\texttt{C0}$. A bit address needs a bit index from $0$ to $7$, so $\\texttt{I0.7}$ is legal while $\\texttt{I0.8}$ is not."
+      },
+      {
+        "heading": "The scan cycle",
+        "body": "The CPU repeats four phases: copy the physical inputs into the input image, evaluate every rung in order against that image, latch the output image onto the terminals, then perform housekeeping such as communications. The scan time is the sum $T_{scan}$ of the four phase durations. Because inputs are frozen during evaluation, a contact reads the same value in every rung of one scan. A change can wait for one full scan before it is read, and its effect is latched within the next, so the worst case response is about $2\\,T_{scan}$."
+      },
+      {
+        "heading": "Contacts, coils, set and reset",
+        "body": "A normally open contact (instructions $\\texttt{LD}$ and $\\texttt{A}$) passes power when its bit is $1$. A normally closed contact ($\\texttt{LDN}$ and $\\texttt{AN}$) passes power when the bit is $0$. The coil $\\texttt{=}$ copies rung power into its bit every scan. Set $\\texttt{S}$ and reset $\\texttt{R}$ act only while power flows and then hold their result, and when both act in one scan the later rung wins. The cases are summarised in the equation list below."
+      },
+      {
+        "heading": "Timers, counters and edges",
+        "body": "A TON timer counts ticks while its input is true and raises its output once the elapsed value $ET$ reaches the preset $PT$. The delay is $PT$ multiplied by the time base of $1$, $10$ or $100\\ \\mathrm{ms}$; dropping the input clears the timer. A CTU counter increments on each rising edge of its count input, saturates at $32767$, clears on reset, and raises its output when the count value $CV$ reaches $PV$. The edge triggers $\\texttt{EU}$ and $\\texttt{ED}$ pass one scan of power on a rising or falling transition by comparing the present value with the one stored from the previous scan."
+      }
+    ],
+    "equations": [
+      "Scan time as the sum of input copy, program evaluation, output latch and housekeeping durations.",
+      "Worst case input to output response, bounded by two scan times.",
+      "Seal-in motor rung: start OR own output, AND NOT stop.",
+      "Set and reset coil behaviour with the held state.",
+      "TON delay equals preset times time base, for the three available bases.",
+      "TON output and the saturating elapsed value.",
+      "CTU rising-edge count with saturation and the done condition.",
+      "Rising edge EU and falling edge ED detectors."
+    ],
+    "mapping": [
+      { "term": "Input and output indicators", "body": "The input switches and output lamps display the images of $\\texttt{I0.0}$ to $\\texttt{I0.7}$ and $\\texttt{Q0.0}$ to $\\texttt{Q0.7}$. The hardware profile limits which bytes exist, for example the larger CPU offers more input bytes." },
+      { "term": "Contact variants", "body": "Choosing normal open or normal closed selects the polarity $b$ or $\\overline{b}$ in the rung. The positive and negative edge contacts implement the $EU$ and $ED$ equations." },
+      { "term": "Output and internal coils", "body": "An output coil writes a $\\texttt{Q}$ bit and an internal coil writes an $\\texttt{M}$ bit, which is invisible to the field but readable by later rungs." },
+      { "term": "Set and reset coils", "body": "The count field of a set or reset coil gives the number of consecutive bits $n$ starting at the target address that are forced together." },
+      { "term": "Timer block", "body": "The time base choice of $1$, $10$ or $100\\ \\mathrm{ms}$ and the preset operand $PT$ determine $T_{d}$. TON, TOF and TONR variants are available, and the instance such as $\\texttt{T37}$ names the register." },
+      { "term": "Counter block", "body": "The preset $PV$ sets the done threshold. The CU pin is driven by rung power and the reset pin by the row beneath, giving the CTU equation." },
+      { "term": "Run control and views", "body": "Running the program repeats the scan; the statement list editor and register monitor show the same rungs as stack code and the current values of $CV$ and $ET$." }
+    ],
+    "example": {
+      "title": "Conveyor with start-up delay and batch counter",
+      "problem": "A conveyor uses start $\\texttt{I0.0}$, a stop input $\\texttt{I0.1}$ and motor $\\texttt{Q0.0}$. A TON timer with a time base of $100\\ \\mathrm{ms}$ and $PT = 50$ delays a horn. A CTU counter with $PV = 12$ counts parts, and the phases of the CPU last $t_{in} = 1\\ \\mathrm{ms}$, $t_{prog} = 5\\ \\mathrm{ms}$, $t_{out} = 1\\ \\mathrm{ms}$ and $t_{hk} = 1\\ \\mathrm{ms}$. Find the scan time, the worst response, the horn delay and the number of full batches in $60$ parts.",
+      "steps": [
+        { "text": "Add the four phase durations to obtain the scan time.", "tex": "T_{scan} = 1 + 5 + 1 + 1 = 8\\ \\mathrm{ms}" },
+        { "text": "A change just after the input copy waits one scan to be read and is latched in the next.", "tex": "t_{resp,\\max} \\approx 2 \\times 8 = 16\\ \\mathrm{ms}" },
+        { "text": "Press start with $\\texttt{I0.0} = 1$ and $\\texttt{I0.1} = 0$, then release it. The seal-in keeps the motor on until stop is pressed.", "tex": "\\texttt{Q0.0} = (1 + 0)\\cdot 1 = 1, \\qquad (0 + 1)\\cdot 1 = 1, \\qquad (0 + 1)\\cdot 0 = 0" },
+        { "text": "Multiply the preset by the time base for the horn delay.", "tex": "T_{d} = 50 \\times 100\\ \\mathrm{ms} = 5000\\ \\mathrm{ms} = 5\\ \\mathrm{s}" },
+        { "text": "Each batch needs $PV = 12$ rising edges, so the sixty parts fill whole batches as follows.", "tex": "\\frac{60}{12} = 5" }
+      ],
+      "result": "The scan lasts $8\\ \\mathrm{ms}$, the response is at most $16\\ \\mathrm{ms}$, the horn waits $5\\ \\mathrm{s}$, and the counter completes $5$ batches."
+    },
+    "applications": [
+      { "field": "Manufacturing lines", "body": "Seal-in motor starters, interlocks and batch counters on packaging and assembly conveyors." },
+      { "field": "Robot cells", "body": "Cell safety sequencing where guard inputs, a start edge and a part counter release the robot controller." },
+      { "field": "Water and energy utilities", "body": "Pump alternation and start-up delays using timers, with set and reset memory for alarm latching." },
+      { "field": "Building automation", "body": "Lighting and ventilation staging driven by timers and edge-triggered push buttons." }
+    ]
+  },
+  "logo": {
+    "title": "LOGO! smart relay",
+    "intro": "The LOGO! is a compact logic module that replaces a handful of relays, timers and counters with wired function blocks. Behaviour is programmed by connecting blocks rather than by writing rungs.",
+    "purpose": "This mode edits and runs a LOGO! block program. Digital inputs, outputs and flags are wired to numbered function blocks such as gates, on-delay, off-delay, latching relay, pulse relay and counters. The block diagram is solved every cycle in run mode. The analog scaling, threshold and time switch functions described below are the device-level behaviour that the same module offers for analog and calendar duties.",
+    "model": [
+      {
+        "heading": "Modular architecture",
+        "body": "A base module offers inputs $\\texttt{I1}$ onward and outputs $\\texttt{Q1}$ onward, and expansion modules extend the address space to $24$ inputs and $16$ outputs, with $24$ flags $\\texttt{M}$. Each block has a number such as $\\texttt{B001}$, and an input may be wired to a terminal, a flag, a constant level or another block output. An unconnected pin takes the default of its block."
+      },
+      {
+        "heading": "Timer blocks",
+        "body": "The on-delay block $\\texttt{B001}$ raises its output only after the trigger has stayed high for the time $T$. The off-delay holds the output high for $T$ after the trigger falls, and a reset input ends it at once. A time parameter is an integer $N$ in a time base of $10\\ \\mathrm{ms}$, $1\\ \\mathrm{s}$ or $1\\ \\mathrm{min}$, so $N$ is converted to milliseconds by the first equation of the list."
+      },
+      {
+        "heading": "Latching and time switches",
+        "body": "The latching relay stores a bit with set $S$ and reset $R$ and gives priority to reset. The pulse relay toggles on each trigger edge. Weekly and yearly time switches enable the output when the calendar day lies in a selected set $D$ and the clock time is inside the on and off window."
+      },
+      {
+        "heading": "Analog values and thresholds",
+        "body": "An analog input is digitised to an internal integer between $0$ and $1000$ units. A voltage input of $0$ to $10\\ \\mathrm{V}$ maps linearly, while a current loop of $4$ to $20\\ \\mathrm{mA}$ maps from its live zero. The scaled value is then $\\mathrm{Output} = (\\mathrm{Input}\\times\\mathrm{Gain}) + \\mathrm{Offset}$, giving engineering units. A threshold trigger compares the value with an on level and an off level, and the gap between them is the hysteresis that prevents chatter."
+      }
+    ],
+    "equations": [
+      "Conversion of a time parameter to milliseconds for the three time bases.",
+      "On-delay output: trigger high and elapsed time at least the preset.",
+      "Latching relay next state with reset priority.",
+      "Voltage input mapped to internal units.",
+      "Current loop input mapped from the live zero to internal units.",
+      "Linear scaling with gain and offset.",
+      "Threshold trigger with hysteresis.",
+      "Weekly time switch as a day set and a time window."
+    ],
+    "mapping": [
+      { "term": "Inputs, outputs and flags", "body": "Terminals $\\texttt{I1}$ onward, $\\texttt{Q1}$ onward and flags $\\texttt{M}$ are the sources and sinks of the program. The startup flag $\\texttt{M8}$ is high during the first cycle after run." },
+      { "term": "Block number", "body": "Each block carries a number such as $\\texttt{B001}$. Wiring a pin to a block number reuses that output, as no named nets exist." },
+      { "term": "Time parameter T", "body": "The value and the time base choice of $10\\ \\mathrm{ms}$, $1\\ \\mathrm{s}$ or $1\\ \\mathrm{min}$ give the time $N_{ms}$, and the live elapsed value $T_{a}$ is shown beside it." },
+      { "term": "Trigger and reset pins", "body": "$Trg$, $S$ and $R$ pins feed the timing and latching equations. An inverted wire applies $\\overline{x}$ at the consumer only." },
+      { "term": "Counter thresholds", "body": "The counter has on and off count values, so its output follows a hysteresis rule similar to the threshold equation." },
+      { "term": "Retentive and protected flags", "body": "The retentive option keeps the dynamic state over power loss, and the protection option hides a block from parameter assignment mode." },
+      { "term": "Analog and calendar functions", "body": "Gain, offset, on level, off level, the day set $D$ and the window $t_{on}$ to $t_{off}$ are the parameters of the scaling, threshold and time switch equations." }
+    ],
+    "example": {
+      "title": "Temperature-controlled fan with start delay",
+      "problem": "A sensor outputs $0$ to $10\\ \\mathrm{V}$ for a range of $-30$ to $70\\ \\mathrm{^\\circ C}$. Define gain $0.1$ and offset $-30$. A threshold turns the fan on at $x_{on} = 30\\ \\mathrm{^\\circ C}$ and off at $x_{off} = 25\\ \\mathrm{^\\circ C}$, followed by an on-delay of $N = 500$ with a base of $10\\ \\mathrm{ms}$. The sensor reads $V_{in} = 6\\ \\mathrm{V}$. Find the output state and the delay.",
+      "steps": [
+        { "text": "Convert the voltage to internal units.", "tex": "x_{V} = 100 \\times 6 = 600\\ \\mathrm{units}" },
+        { "text": "Apply gain and offset to get engineering units.", "tex": "\\mathrm{Output} = 600 \\times 0.1 + (-30) = 30" },
+        { "text": "Compare with the thresholds. Since $30 \\ge 30$ the trigger switches on, and it will stay on until the value falls to $25$ or below.", "tex": "Q_{thr} = [\\,30 \\ge 30\\,] = 1" },
+        { "text": "Convert the delay parameter to milliseconds.", "tex": "N_{ms} = 500 \\times 10\\ \\mathrm{ms} = 5000\\ \\mathrm{ms}" },
+        { "text": "For comparison, a loop current $I_{in} = 12\\ \\mathrm{mA}$ would give the same midrange value.", "tex": "x_{mA} = 62.5\\,(12 - 4) = 500" }
+      ],
+      "result": "The scaled value is $30$, the threshold is on, and the fan starts after $5\\ \\mathrm{s}$. A $12\\ \\mathrm{mA}$ signal corresponds to $500$ units."
+    },
+    "applications": [
+      { "field": "Building services", "body": "Staged fan and pump control with hysteresis from analog temperature sensors and weekly schedules." },
+      { "field": "Small machines", "body": "Replacing relay and timer panels in presses, doors and gates with delay and latching blocks." },
+      { "field": "Agriculture and greenhouses", "body": "Climate control that scales a transmitter signal to engineering units and switches actuators with an on and off band." },
+      { "field": "Lighting and facilities", "body": "Yearly and weekly time switches with a pulse relay for staircase or street lighting." }
+    ]
+  }
+}

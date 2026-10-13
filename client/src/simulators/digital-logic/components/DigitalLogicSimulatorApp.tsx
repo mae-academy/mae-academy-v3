@@ -11,6 +11,7 @@ import { useTranslation } from 'react-i18next';
 import { useLocale } from '@/contexts/LocaleContext';
 import SimulationPageHeader from '@/components/SimulationPageHeader';
 import { SegmentedControl } from '@/components/common/templates';
+import { publishDocsTool } from '@/components/simulations/toolDocs/activeToolStore';
 
 /**
  * Luminous Technical Atelier: Power Electronics-style white segmented controls;
@@ -47,6 +48,7 @@ export function DigitalLogicSimulatorApp() {
     url.searchParams.set('tool', activeTool);
     window.history.replaceState(window.history.state, '', url);
   }, [activeTool]);
+  useEffect(() => { publishDocsTool('logic', activeTool); }, [activeTool]);
   const activeLabel =DIGITAL_LOGIC_TOOLS.find(tool => tool.id === activeTool)?.label ?? t('digital.labTitle', 'Digital Logic Lab');
   return <div className="v3-simulator-root simulator-theme-b" data-simulator-theme="b">
     <SimulationPageHeader

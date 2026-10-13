@@ -1,0 +1,609 @@
+{
+  "schematic": {
+    "title": "Logic Gate Schematic Workspace",
+    "intro": "A drag-and-drop canvas where Boolean functions become wired hardware: gates, multiplexers, decoders, clocks and flip-flops evaluated live.",
+    "purpose": "This workspace is the main bench of the studio. You place gates, multiplexers, decoders, input switches, clocks, LEDs and flip-flops from the placement menu, wire their pins together, and the engine propagates the logic levels $0$ and $1$ through the netlist after every edit. Combinational parts follow Boolean equations instantly, while sequential parts store a state bit $Q$ that changes only when their control inputs allow it. The analysis box derives the Boolean expression of the circuit you built, so the schematic and the algebra always stay linked.",
+    "model": [
+      {
+        "heading": "Boolean algebra and gates",
+        "body": "Every combinational gate realizes a Boolean function on the set $\\{0,1\\}$. The postulates are identity $A+0=A$ and $A\\cdot 1=A$, complement $A+\\overline A=1$ and $A\\cdot\\overline A=0$, together with commutativity, associativity and distributivity. They imply idempotence $A+A=A$ and absorption $A+AB=A$. The XOR gate is addition modulo two, $A\\oplus B$, and XNOR is its complement."
+      },
+      {
+        "heading": "De Morgan and universal gates",
+        "body": "Complementing a product gives a sum of complements, and complementing a sum gives a product of complements: $\\overline{A\\cdot B}=\\overline A+\\overline B$ and $\\overline{A+B}=\\overline A\\cdot\\overline B$. On the canvas this means a NAND gate behaves like an OR gate with inverted inputs, and a NOR gate like an AND gate with inverted inputs, so an inversion bubble can be pushed through a gate while its type flips between AND and OR."
+      },
+      {
+        "heading": "Multiplexers and decoders",
+        "body": "A $2^n$-to-$1$ multiplexer with select lines $S_{n-1},\\dots,S_0$ forwards the data input whose index equals the binary number on the selects, so $Y=I_k$ with $k=\\sum_j S_j 2^j$. As a sum of products, each data input is gated by one minterm of the selects. A decoder is the dual device: while the enable $EN$ is active it raises exactly one of its $2^n$ outputs, the minterm of the address, and holds all others at $0$. Since a multiplexer generates every minterm, tying its data inputs to constants $0$ or $1$ implements any function of the $n$ select variables."
+      },
+      {
+        "heading": "Latches and flip-flops",
+        "body": "Sequential cells add the state bit $Q$. The D flip-flop copies its input at the active clock edge, $Q_{next}=D$. The JK cell obeys $Q_{next}=J\\overline Q+\\overline K Q$: $J=K=0$ holds, $J=1,K=0$ sets, $J=0,K=1$ resets and $J=K=1$ toggles. The SR cell obeys $Q_{next}=S+\\overline R Q$ and forbids $S=R=1$, and the T cell obeys $Q_{next}=T\\oplus Q$. A latch is level-sensitive and transparent while its enable is high, whereas a flip-flop samples only on a clock edge."
+      }
+    ],
+    "equations": [
+      "Gate functions: AND, OR, NOT and XOR as Boolean expressions.",
+      "De Morgan, first law: the complement of a product.",
+      "De Morgan, second law: the complement of a sum.",
+      "Two-input multiplexer with one select line.",
+      "Four-input multiplexer as a sum of select minterms.",
+      "Decoder output as an enabled minterm of the address.",
+      "D flip-flop characteristic equation.",
+      "JK flip-flop characteristic equation.",
+      "SR and T characteristic equations."
+    ],
+    "mapping": [
+      {
+        "term": "Placement menu",
+        "body": "Choose a gate type ($\\texttt{AND}$, $\\texttt{OR}$, $\\texttt{NAND}$, $\\texttt{NOR}$, $\\texttt{XOR}$, $\\texttt{XNOR}$, $\\texttt{NOT}$), a multiplexer, a decoder, a clock or a flip-flop; the type selects the function $Y=f(\\text{inputs})$ that the placed instance evaluates."
+      },
+      {
+        "term": "Input switches",
+        "body": "Each switch sets one primary variable, such as $A$ or $B$, to $0$ or $1$. Flipping it moves the circuit to another row of its truth table."
+      },
+      {
+        "term": "Wires",
+        "body": "A wire joins one output pin to input pins and has no logic of its own, so every connected pin carries the same level. The netlist is therefore a directed graph of Boolean functions."
+      },
+      {
+        "term": "Clock source",
+        "body": "Produces a square wave of period $T_{clk}$. Flip-flops sample their data input on the rising transition, which is the instant $Q_{next}$ is computed."
+      },
+      {
+        "term": "Select and enable pins",
+        "body": "On a multiplexer the select pins form the binary index $k$. On a decoder the address pins together with $EN$ choose the single active output $Y_i$."
+      },
+      {
+        "term": "LED and probes",
+        "body": "Display the level of a net; a lit LED means the connected signal is $1$."
+      },
+      {
+        "term": "Analysis box",
+        "body": "Reports the Boolean expression extracted from the wired circuit, which you can compare with the identities above to confirm that two different drawings are the same function."
+      }
+    ],
+    "example": {
+      "title": "De Morgan check and a toggling JK cell",
+      "problem": "With $A=1$ and $B=0$, compare a NAND gate with an OR gate fed by inverted inputs. Then clock a JK flip-flop with $J=K=1$ starting from $Q=0$ for two edges.",
+      "steps": [
+        {
+          "text": "Evaluate the NAND gate. The product is $A\\cdot B=0$, so its complement is $1$.",
+          "tex": "\\overline{A\\cdot B}=\\overline{1\\cdot 0}=\\overline 0=1"
+        },
+        {
+          "text": "Evaluate the OR gate with inverted inputs. Here $\\overline A=0$ and $\\overline B=1$, so the sum is $1$, identical to the NAND output as De Morgan predicts.",
+          "tex": "\\overline A+\\overline B=0+1=1"
+        },
+        {
+          "text": "First clock edge with $Q=0$, $J=1$ and $K=1$.",
+          "tex": "Q_{next}=J\\overline Q+\\overline K Q=1\\cdot 1+0\\cdot 0=1"
+        },
+        {
+          "text": "Second clock edge, now with $Q=1$.",
+          "tex": "Q_{next}=1\\cdot 0+0\\cdot 1=0"
+        },
+        {
+          "text": "The output toggles on every edge, so one full output period spans two clock periods.",
+          "tex": "f_Q=\\frac{f_{clk}}{2}"
+        }
+      ],
+      "result": "Both gate forms output $1$, and the JK cell with $J=K=1$ produces $0,1,0,1,\\dots$ on $Q$: a divide-by-two counter stage."
+    },
+    "applications": [
+      {
+        "field": "Industrial safety interlocks",
+        "body": "Machine guards and emergency-stop chains are built from AND, OR and latch cells so that a single open contact forces the outputs to a safe state."
+      },
+      {
+        "field": "Robotics and microcontroller buses",
+        "body": "Address decoders select which motor driver, encoder counter or sensor chip answers on a shared bus, exactly the decoder equation above."
+      },
+      {
+        "field": "Aerospace redundancy",
+        "body": "Triple-redundant channels feed a majority voter $Y=AB+BC+AC$ so that one failed sensor is outvoted by the other two."
+      },
+      {
+        "field": "Power-grid protection",
+        "body": "Relay trip logic combines gates with a latch that holds the fault flag until an operator resets it."
+      }
+    ]
+  },
+  "analyzer": {
+    "title": "Logic Analyzer and Truth Table Generator",
+    "intro": "Type a Boolean expression and read its complete truth table, from which the canonical minterms and maxterms follow, or click outputs to design a function from its table.",
+    "purpose": "This mode converts between the three equivalent descriptions of a combinational function: the algebraic expression, the truth table and the canonical forms. You enter an expression such as $A\\cdot B+C$ over at most $8$ variables $A$ to $H$. The table then lists all $2^n$ input rows with their decimal index, evaluates the function in every row, and lets you flip individual output cells so the function is rewritten from the table you edited.",
+    "model": [
+      {
+        "heading": "Postulates and identities",
+        "body": "The parser evaluates expressions using the Boolean postulates: identity $A+0=A$ and $A\\cdot 1=A$, complement $A+\\overline A=1$ and $A\\cdot\\overline A=0$, plus idempotence, absorption and the useful reduction $A+\\overline A B=A+B$. Every identity has a dual obtained by swapping $+$ with $\\cdot$ and $0$ with $1$, which halves the number of rules to remember."
+      },
+      {
+        "heading": "De Morgan's laws",
+        "body": "Complement distributes over a product or a sum by flipping the operator: $\\overline{A\\cdot B}=\\overline A+\\overline B$ and $\\overline{A+B}=\\overline A\\cdot\\overline B$. They extend to any number of variables and are the tool that converts a sum of products into a product of sums when you move between the two canonical forms."
+      },
+      {
+        "heading": "Table size and row index",
+        "body": "A function of $n$ variables has $N=2^n$ rows. Row $i$ is the decimal value of the input bits with $A$ as the most significant bit, so $i=\\sum_j b_j 2^j$. The limit of $8$ variables therefore bounds the table at $256$ rows."
+      },
+      {
+        "heading": "Canonical forms",
+        "body": "A minterm $m_i$ is the product of all variables, each true where its bit is $1$ and complemented where it is $0$; it equals $1$ only in row $i$. The canonical sum of products is the OR of the minterms of the rows where $F=1$. A maxterm $M_j=\\overline{m_j}$ is a sum that equals $0$ only in row $j$, and the canonical product of sums is the AND of the maxterms of the rows where $F=0$. The two lists partition the $2^n$ rows, so their sizes always add up to $2^n$."
+      }
+    ],
+    "equations": [
+      "Identity and complement postulates.",
+      "Idempotence, absorption and the reduction rule.",
+      "De Morgan's laws for two variables.",
+      "Truth-table size and row index.",
+      "Canonical sum of minterms.",
+      "Canonical product of maxterms.",
+      "Shannon expansion about variable $A$."
+    ],
+    "mapping": [
+      {
+        "term": "Expression field",
+        "body": "Accepts product, sum, complement and exclusive-or notation. The text is parsed into a function $F(A,B,\\dots)$ and the variable set determines $n$."
+      },
+      {
+        "term": "Decimal row index",
+        "body": "The first table column shows the index $i$ of each row, with $A$ as the most significant bit."
+      },
+      {
+        "term": "Input columns",
+        "body": "One column per variable holds the bits $b_j$ of that row, enumerating all $2^n$ combinations in counting order."
+      },
+      {
+        "term": "Output column",
+        "body": "Shows $F_i$ for each row. Clicking a cell toggles that minterm, which changes which $m_i$ appear in the canonical sum."
+      },
+      {
+        "term": "Variable limit badge",
+        "body": "Warns when more than $8$ variables are used; the table is then truncated to the first $8$ letters."
+      },
+      {
+        "term": "Reading the canonical forms",
+        "body": "Rows whose output is $1$ give the minterm set $\\{i:F_i=1\\}$ and rows whose output is $0$ give the maxterm set $\\{j:F_j=0\\}$, read directly from the output column."
+      }
+    ],
+    "example": {
+      "title": "Canonical forms of A·B + C",
+      "problem": "Analyze $F=AB+C$. Find the table size, the minterm list and the maxterm list, and write the canonical product of sums.",
+      "steps": [
+        {
+          "text": "There are $n=3$ variables, so the table has eight rows indexed $i=4A+2B+C$.",
+          "tex": "N_{rows}=2^3=8"
+        },
+        {
+          "text": "The term $C$ is true in rows $1,3,5,7$ and the term $AB$ is true in rows $6,7$. Their union gives the minterms.",
+          "tex": "F=\\sum m(1,3,5,6,7)"
+        },
+        {
+          "text": "The remaining rows are the zeros of the function, so the maxterm list is the complement set and the counts add up to $5+3=8$.",
+          "tex": "F=\\prod M(0,2,4)"
+        },
+        {
+          "text": "Expand each maxterm: a variable appears complemented where its bit is $1$. For rows $0$, $2$ and $4$ this gives the canonical product of sums.",
+          "tex": "F=(A+B+C)(A+\\overline B+C)(\\overline A+B+C)"
+        }
+      ],
+      "result": "$F$ has five minterms and three maxterms; both canonical forms describe exactly the same eight-row truth table."
+    },
+    "applications": [
+      {
+        "field": "PLC program verification",
+        "body": "Engineers tabulate the interlock expression behind a ladder rung to confirm that every unsafe input combination drives the output to $0$."
+      },
+      {
+        "field": "Robotics sensor fusion",
+        "body": "Truth tables of limit-switch and proximity-sensor combinations define which gripper states are legal."
+      },
+      {
+        "field": "Automotive control units",
+        "body": "Fault-code logic combining several diagnostic flags is checked exhaustively in a table before it is coded."
+      },
+      {
+        "field": "Grid protection coordination",
+        "body": "Trip conditions from several relays are written as minterms to expose gaps and overlaps in the scheme."
+      }
+    ]
+  },
+  "kmap": {
+    "title": "Karnaugh Map Solver and Boolean Minimizer",
+    "intro": "Click cells of a two, three or four variable Karnaugh map and obtain the minimal sum-of-products expression with the groups it is built from.",
+    "purpose": "This mode minimizes a Boolean function graphically. A Karnaugh map rearranges the truth table in Gray-code order so that cells which are logical neighbours are also physical neighbours. Setting cells to $0$, $1$ or don't-care lets you see the rectangles of ones that merge into a smaller product term, and the panel shows the resulting simplified expression.",
+    "model": [
+      {
+        "heading": "Map size and Gray ordering",
+        "body": "A map for $n$ variables has $2^n$ cells, which is $4$, $8$ or $16$ for the three supported sizes. Rows and columns are labelled in Gray code, where successive labels differ in exactly one bit, so any two edge-adjacent cells differ in a single variable. The map also wraps around: the left and right edges are adjacent, as are the top and bottom edges, and the four corners of a four-variable map are mutual neighbours."
+      },
+      {
+        "heading": "Why grouping simplifies",
+        "body": "Two adjacent minterms differ in one variable, and the postulates merge them: $AB+A\\overline B=A(B+\\overline B)=A$. A group of $2^k$ cells that forms a rectangle eliminates the $k$ variables that change inside it and leaves $n-k$ literals. Larger groups therefore give shorter product terms."
+      },
+      {
+        "heading": "Prime implicants and cover",
+        "body": "A prime implicant is a group that cannot be enlarged. The minimal expression is a smallest set of prime implicants that covers every required one, always starting with the essential implicants that are the only cover of some cell. Groups must be rectangles whose side lengths are powers of two, and overlapping is allowed because $A+A=A$."
+      },
+      {
+        "heading": "Don't-care cells",
+        "body": "Input combinations that never occur can be marked don't-care, written $d$. They may be included in a group when that enlarges it, but they never have to be covered, so they reduce the final expression without changing any specified output."
+      }
+    ],
+    "equations": [
+      "Number of cells for $n$ variables.",
+      "Gray code rule: neighbouring labels differ in one bit.",
+      "Merging two adjacent minterms removes one variable.",
+      "A group of $2^k$ cells leaves $n-k$ literals.",
+      "Minimal cover as a sum of prime implicants.",
+      "Corner group of a four-variable map."
+    ],
+    "mapping": [
+      {
+        "term": "Variable count selector",
+        "body": "The segmented control chooses $n=2$, $3$ or $4$, which sets the number of cells to $4$, $8$ or $16$ and the Gray-code labels on the axes."
+      },
+      {
+        "term": "Map cells",
+        "body": "Each cell represents one minterm $m_i$. Clicking cycles its value between $0$, $1$ and don't-care."
+      },
+      {
+        "term": "Axis labels",
+        "body": "Show the variable values of each row and column in Gray order, so you can read the minterm index of any cell."
+      },
+      {
+        "term": "Highlighted groups",
+        "body": "Coloured rectangles mark the prime implicants chosen for the cover, each of size $2^k$."
+      },
+      {
+        "term": "Simplified expression",
+        "body": "Displays $F_{min}$ as a sum of the products that the groups define."
+      }
+    ],
+    "example": {
+      "title": "Four-variable minimization",
+      "problem": "Minimize $F(A,B,C,D)=\\sum m(0,1,2,5,8,9,10)$ using a four-variable map, where the index is $8A+4B+2C+D$.",
+      "steps": [
+        {
+          "text": "The map has sixteen cells and seven of them hold a one.",
+          "tex": "N_{cells}=2^4=16"
+        },
+        {
+          "text": "Minterms $0,1,8,9$ form a quad in which only $A$ and $D$ change while $B$ and $C$ stay at $0$, leaving $\\overline B\\,\\overline C$.",
+          "tex": "m_0+m_1+m_8+m_9=\\overline B\\,\\overline C"
+        },
+        {
+          "text": "Minterms $0,2,8,10$ are the four corners and form a second quad that eliminates $A$ and $C$.",
+          "tex": "m_0+m_2+m_8+m_{10}=\\overline B\\,\\overline D"
+        },
+        {
+          "text": "Minterm $5$ is only adjacent to $1$, so a pair is used, eliminating $B$ and leaving three literals.",
+          "tex": "m_1+m_5=\\overline A\\,\\overline C\\,D"
+        },
+        {
+          "text": "The sum of the three groups is the minimal cover.",
+          "tex": "F_{min}=\\overline B\\,\\overline C+\\overline B\\,\\overline D+\\overline A\\,\\overline C\\,D"
+        }
+      ],
+      "result": "The seven minterms collapse to three product terms with $7$ literals in total, instead of seven terms with $28$ literals."
+    },
+    "applications": [
+      {
+        "field": "Hardwired machine controllers",
+        "body": "Minimal logic lowers gate count and propagation delay in relay or gate-based sequencing of conveyors and presses."
+      },
+      {
+        "field": "Robot joint decoding",
+        "body": "Encoder state decoding with unused code words as don't-cares yields smaller decoders."
+      },
+      {
+        "field": "Avionics discrete logic",
+        "body": "Fewer gates mean fewer failure points and less weight in certified discrete circuits."
+      },
+      {
+        "field": "Energy metering",
+        "body": "Compact tariff-selection logic in meters is minimized before it is committed to a programmable device."
+      }
+    ]
+  },
+  "synthesis": {
+    "title": "Universal Gate Synthesis",
+    "intro": "Convert a Boolean expression into a circuit built only from NAND gates or only from NOR gates and load it onto the canvas.",
+    "purpose": "NAND and NOR are universal: each alone can build every Boolean function. This mode takes the expression, forms its canonical sum of products or product of sums, and rewrites it with De Morgan's laws into a two-level network of a single gate type. It reports the resulting structure and gate count and can place the finished schematic on the canvas for live simulation.",
+    "model": [
+      {
+        "heading": "Universality of NAND",
+        "body": "Tying both inputs of a NAND together gives an inverter, $\\overline A=\\overline{A\\cdot A}$. Inverting the output of a NAND gives AND, and applying De Morgan to inverted inputs gives OR, $A+B=\\overline{\\overline A\\cdot\\overline B}$. Since AND, OR and NOT suffice for any function, NAND alone does too."
+      },
+      {
+        "heading": "Universality of NOR",
+        "body": "The dual statements hold for NOR: $\\overline A=\\overline{A+A}$, $A+B=\\overline{\\overline{A+B}+\\overline{A+B}}$ and $A\\cdot B=\\overline{\\overline A+\\overline B}$. NOR is therefore equally complete, and the construction is the dual of the NAND one."
+      },
+      {
+        "heading": "NAND-NAND from a sum of products",
+        "body": "Applying De Morgan twice turns a sum of products into a two-level NAND network: $F=P_1+\\dots+P_k=\\overline{\\overline{P_1}\\cdots\\overline{P_k}}$. The first level NANDs each product term, the second level NANDs the results. A single-literal term needs only an inverter, built from a shorted NAND."
+      },
+      {
+        "heading": "NOR-NOR from a product of sums",
+        "body": "Dually, a product of sums $F=S_1\\cdots S_k$ equals $\\overline{\\overline{S_1}+\\dots+\\overline{S_k}}$, which is a first level of NOR gates, one per sum term, followed by a second-level NOR. This is why the canonical form chosen decides which universal gate is cheaper."
+      }
+    ],
+    "equations": [
+      "Building NOT, AND and OR from NAND gates.",
+      "Building NOT, OR and AND from NOR gates.",
+      "NAND-NAND implementation of a sum of products.",
+      "NOR-NOR implementation of a product of sums.",
+      "Gate count of a two-level NAND network."
+    ],
+    "mapping": [
+      {
+        "term": "Target architecture selector",
+        "body": "Chooses All-NAND, which uses the sum of products $\\sum P_i$, or All-NOR, which uses the product of sums $\\prod S_i$."
+      },
+      {
+        "term": "Input expression",
+        "body": "The function $F$ to be converted. Its variables determine the primary inputs of the generated network."
+      },
+      {
+        "term": "Canonical alternative",
+        "body": "Shows the equivalent canonical sum of products or product of sums, so you can see which form the synthesis starts from."
+      },
+      {
+        "term": "Gate count",
+        "body": "Reports $G$, the number of two-input gates in the generated network, including shorted-input inverters."
+      },
+      {
+        "term": "Load circuit to canvas",
+        "body": "Places the synthesized schematic in the Schematic Workspace so that switches and LEDs can verify it against the original truth table."
+      }
+    ],
+    "example": {
+      "title": "$F=AB+C$ in NAND and NOR form",
+      "problem": "Implement $F=AB+C$ using only two-input NAND gates, then using only two-input NOR gates, and count the gates.",
+      "steps": [
+        {
+          "text": "Apply De Morgan to the sum of two product terms $P_1=AB$ and $P_2=C$.",
+          "tex": "F=AB+C=\\overline{\\overline{AB}\\cdot\\overline{C}}"
+        },
+        {
+          "text": "Three NAND gates are needed: one for $\\overline{AB}$, one shorted-input gate for $\\overline C$, and the output gate.",
+          "tex": "G_{NAND}=1+1+1=3"
+        },
+        {
+          "text": "For NOR start from the product of sums, since $AB+C=(A+C)(B+C)$.",
+          "tex": "F=(A+C)(B+C)"
+        },
+        {
+          "text": "Use $S_1\\cdot S_2=\\overline{\\overline{S_1}+\\overline{S_2}}$ with $S_1=A+C$ and $S_2=B+C$. Two first-level NOR gates plus one output NOR give three gates.",
+          "tex": "F=\\overline{\\overline{A+C}+\\overline{B+C}}"
+        }
+      ],
+      "result": "Both realizations need $3$ gates of a single type, and loading either onto the canvas reproduces the original truth table."
+    },
+    "applications": [
+      {
+        "field": "Gate-array and ASIC design",
+        "body": "Standard-cell libraries are often NAND-dominated, so logic is mapped to a single gate type to simplify layout."
+      },
+      {
+        "field": "Rad-hard flight electronics",
+        "body": "Using one repeated gate type reduces the qualified parts list and simplifies redundancy."
+      },
+      {
+        "field": "Discrete relay and chip control panels",
+        "body": "A single quad-NAND package can implement a whole interlock, saving board area and cost."
+      },
+      {
+        "field": "Teaching and verification",
+        "body": "Proving a design equivalent after conversion is a standard consistency check in digital design flows."
+      }
+    ]
+  },
+  "timing": {
+    "title": "Timing Diagram Analyzer",
+    "intro": "Edit input waveforms on a clock-aligned grid and watch the output of a Boolean expression follow them, then relate the picture to setup and hold limits.",
+    "purpose": "This mode shows how a Boolean function behaves over time. Each input variable has an editable track of high and low levels per clock cycle, the output track is computed by the expression and cannot be edited, and a moving playhead scans the cycles. The rendered waveform is ideal, with zero delay, so it shows the logical timing relationships; the equations below describe the real-hardware limits that a physical register must respect.",
+    "model": [
+      {
+        "heading": "Combinational response",
+        "body": "With ideal gates the output at every instant is a pure function of the present inputs, $Y(t)=f(A(t),B(t))$. For the default expression $A\\oplus B$ the output is high exactly when the two inputs differ. Any input edge can produce an output edge, and when two inputs change in the same cycle the output can pulse briefly high or low in a real circuit, which is called a glitch."
+      },
+      {
+        "heading": "Edge-triggered storage",
+        "body": "A D flip-flop samples its input at a rising clock edge and holds the value for a whole period: $Q_{next}=D$. Between edges the stored output ignores changes of $D$, which is why registers filter glitches and make a synchronous design predictable."
+      },
+      {
+        "heading": "Setup and hold",
+        "body": "Data must be stable for a setup time $t_{su}$ before the active edge and a hold time $t_h$ after it. Along a path from one register to the next the clock-to-output delay $t_{cq}$ and the logic delay $t_{pd}$ must satisfy $T_{clk}\\ge t_{cq}+t_{pd,max}+t_{su}$ for setup, and $t_{cq}+t_{pd,min}\\ge t_h$ for hold, ignoring clock skew. Setup is fixed by slowing the clock; hold cannot be fixed that way and needs added delay."
+      },
+      {
+        "heading": "Slack and maximum frequency",
+        "body": "The setup slack $t_{slack}=T_{clk}-(t_{cq}+t_{pd}+t_{su})$ is positive when timing is met. The shortest legal period $T_{min}$ sets the maximum clock frequency $f_{max}=1/T_{min}$, so the slowest path in a design limits its speed."
+      }
+    ],
+    "equations": [
+      "Ideal combinational response for the exclusive-or expression.",
+      "Edge-triggered sampling of the D input.",
+      "Setup constraint on the clock period.",
+      "Hold constraint on the shortest path.",
+      "Setup slack and maximum clock frequency."
+    ],
+    "mapping": [
+      {
+        "term": "Expression field",
+        "body": "Defines the output function $Y$ and the input tracks, starting from $A\\oplus B$."
+      },
+      {
+        "term": "Input tracks",
+        "body": "One editable track per variable. Clicking a cycle sets its level to $0$ or $1$, which defines $A(t)$ and $B(t)$ per tick."
+      },
+      {
+        "term": "Output track",
+        "body": "Read-only. It shows $Y(t)$ computed from the inputs in every cycle."
+      },
+      {
+        "term": "Play and pause",
+        "body": "Advance the playhead through the cycles, one tick at a time, to follow cause and effect."
+      },
+      {
+        "term": "Reset",
+        "body": "Returns the playhead to the first cycle."
+      },
+      {
+        "term": "Add cycle",
+        "body": "Extends the grid by one tick; the demo starts with $12$ cycles."
+      },
+      {
+        "term": "Clock guides",
+        "body": "Vertical markers at the rising edges $t_k$, the instants where a register would sample."
+      }
+    ],
+    "example": {
+      "title": "Maximum clock frequency of a register path",
+      "problem": "A path has $t_{cq}=0.5\\text{ ns}$, worst logic delay $t_{pd,max}=2.3\\text{ ns}$, best logic delay $t_{pd,min}=0.4\\text{ ns}$, $t_{su}=0.2\\text{ ns}$ and $t_h=0.3\\text{ ns}$. Find the fastest clock and check hold.",
+      "steps": [
+        {
+          "text": "The minimum period is the sum of the three setup-path delays.",
+          "tex": "T_{min}=0.5+2.3+0.2=3.0\\text{ ns}"
+        },
+        {
+          "text": "The maximum frequency is the reciprocal of this period.",
+          "tex": "f_{max}=\\frac{1}{3.0\\text{ ns}}\\approx 333\\text{ MHz}"
+        },
+        {
+          "text": "Check hold on the fastest path: the data arrives after the hold window closes.",
+          "tex": "t_{cq}+t_{pd,min}=0.9\\text{ ns}\\ge t_h=0.3\\text{ ns}"
+        },
+        {
+          "text": "At a $250\\text{ MHz}$ clock the period is $4.0\\text{ ns}$, so the setup slack is positive.",
+          "tex": "t_{slack}=4.0-3.0=1.0\\text{ ns}"
+        }
+      ],
+      "result": "The path runs up to about $333\\text{ MHz}$, hold is met with $0.6\\text{ ns}$ of margin, and at $250\\text{ MHz}$ there is $1.0\\text{ ns}$ of setup slack."
+    },
+    "applications": [
+      {
+        "field": "Motor-drive controllers",
+        "body": "Gate-level timing of PWM dead-time logic decides whether the upper and lower switches can ever overlap."
+      },
+      {
+        "field": "High-speed data acquisition",
+        "body": "Registers capturing converter output must meet setup and hold at the sampling clock."
+      },
+      {
+        "field": "Aerospace bus interfaces",
+        "body": "Timing margins across temperature are verified before devices are qualified."
+      },
+      {
+        "field": "FPGA design",
+        "body": "Static timing analysis reports exactly the slack and maximum frequency defined here."
+      }
+    ]
+  },
+  "state-machine": {
+    "title": "FSM State Machine Designer",
+    "intro": "Draw a Moore or Mealy finite state machine, then read its state table, flip-flop excitation matrix and minimized next-state equations.",
+    "purpose": "This mode designs sequential logic from the state diagram down to equations. You add states and transitions on an interactive diagram, choose the machine type, the flip-flop kind and the state encoding, and the tool derives the state table, the excitation values needed by the chosen flip-flops and the minimized Boolean equations that would be wired into a schematic.",
+    "model": [
+      {
+        "heading": "Moore and Mealy machines",
+        "body": "A finite state machine has a state $Q$, an input $X$ and an output $Z$. The next state is $Q^{+}=\\delta(Q,X)$ in both types. In a Moore machine the output depends on the state alone, $Z=\\lambda(Q)$, so it is attached to the state and changes only at clock edges. In a Mealy machine the output also depends on the input, $Z=\\lambda(Q,X)$, so it is attached to the transition and may need fewer states but can change between edges."
+      },
+      {
+        "heading": "State encoding",
+        "body": "With $N_s$ states, binary encoding needs $n_{FF}=\\lceil\\log_2 N_s\\rceil$ flip-flops and leaves $2^{n_{FF}}-N_s$ unused codes that act as don't-cares. One-hot encoding uses one flip-flop per state, $n_{FF}=N_s$, with simpler equations but more storage."
+      },
+      {
+        "heading": "Flip-flop characteristic equations",
+        "body": "The D cell obeys $Q_{next}=D$, the T cell $Q_{next}=T\\oplus Q$, the JK cell $Q_{next}=J\\overline Q+\\overline K Q$ and the SR cell $Q_{next}=S+\\overline R Q$ with $S\\cdot R=0$. These describe what each device does for given inputs."
+      },
+      {
+        "heading": "Excitation tables",
+        "body": "Design runs the other way: given the wanted change $Q\\to Q^{+}$, the excitation table lists the inputs required. For D it is $D=Q^{+}$ and for T it is $T=Q\\oplus Q^{+}$. For JK, a change $0\\to 1$ needs $J=1$ with $K$ free, and $1\\to 0$ needs $K=1$ with $J$ free. The free entries are don't-cares, which is why JK and SR designs often minimize to smaller equations than D."
+      }
+    ],
+    "equations": [
+      "Moore machine: output depends on the state.",
+      "Mealy machine: output depends on state and input.",
+      "Flip-flop count for binary and one-hot encodings.",
+      "D and T characteristic equations.",
+      "JK and SR characteristic equations.",
+      "D and T excitation equations.",
+      "JK excitation table with don't-care entries."
+    ],
+    "mapping": [
+      {
+        "term": "Machine type selector",
+        "body": "Chooses Moore, with outputs on the states and $Z=\\lambda(Q)$, or Mealy, with outputs on transitions and $Z=\\lambda(Q,X)$."
+      },
+      {
+        "term": "Flip-flop selector",
+        "body": "Chooses D, T, JK or SR, which decides the excitation columns of the matrix."
+      },
+      {
+        "term": "Encoding selector",
+        "body": "Chooses Binary, Gray or One-Hot state assignment, which fixes $n_{FF}$ and the unused-code don't-cares."
+      },
+      {
+        "term": "Add state and add transition",
+        "body": "Build the diagram: nodes are states $S_i$, arrows are transitions labelled by the input value $X$."
+      },
+      {
+        "term": "State diagram canvas",
+        "body": "Pan and zoom the diagram; the zoom controls change only the view, not the machine."
+      },
+      {
+        "term": "State table",
+        "body": "Lists $Q$, $X$, $Q^{+}$ and $Z$ for every row, the tabular form of $\\delta$ and $\\lambda$."
+      },
+      {
+        "term": "Excitation matrix",
+        "body": "Shows the inputs of the chosen flip-flop required for each transition, such as $T=Q\\oplus Q^{+}$."
+      },
+      {
+        "term": "Minimized equations",
+        "body": "Gives the simplified expression for each flip-flop input and for the output $Z$."
+      }
+    ],
+    "example": {
+      "title": "Modulo-4 counter with T flip-flops",
+      "problem": "Design a counter that cycles $00\\to 01\\to 10\\to 11\\to 00$ using T flip-flops $Q_1Q_0$.",
+      "steps": [
+        {
+          "text": "There are $N_s=4$ states, so binary encoding needs two flip-flops and leaves no unused codes.",
+          "tex": "n_{FF}=\\lceil\\log_2 4\\rceil=2"
+        },
+        {
+          "text": "Apply the T excitation $T=Q\\oplus Q^{+}$ to each bit for the sequence $00\\to01$, $01\\to10$, $10\\to11$, $11\\to00$. Bit $Q_0$ changes in every step.",
+          "tex": "T_0=1"
+        },
+        {
+          "text": "Bit $Q_1$ changes only when $Q_0=1$, in the steps $01\\to10$ and $11\\to00$.",
+          "tex": "T_1=Q_0"
+        },
+        {
+          "text": "Check the first step with the characteristic equation: from $Q_1Q_0=01$ the inputs are $T_1=1$ and $T_0=1$, which toggle both bits.",
+          "tex": "Q_1^{+}=1\\oplus 0=1,\\quad Q_0^{+}=1\\oplus 1=0"
+        }
+      ],
+      "result": "The counter needs only $T_0=1$ and $T_1=Q_0$, and the outputs run $00,01,10,11,00,\\dots$ with a repeat every $4$ clock edges."
+    },
+    "applications": [
+      {
+        "field": "Industrial sequencers",
+        "body": "Bottling, packaging and press lines are state machines whose states are process steps and whose inputs are sensors."
+      },
+      {
+        "field": "Robot behaviour control",
+        "body": "Gait phases and gripper sequences are modelled as Moore machines so that actuator commands change only at clock edges."
+      },
+      {
+        "field": "Communication protocols",
+        "body": "Mealy machines detect bit patterns and frame headers in serial links."
+      },
+      {
+        "field": "Traffic and rail signalling",
+        "body": "Interlocking logic uses finite state machines with verified safe transitions."
+      }
+    ]
+  }
+}

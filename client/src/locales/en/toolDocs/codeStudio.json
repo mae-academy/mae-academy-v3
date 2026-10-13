@@ -1,0 +1,427 @@
+{
+  "masm8086": {
+    "title": "MASM 8086 Mode: Bit Manipulation, Registers and Segments",
+    "intro": "This mode assembles and single-steps real-mode 8086 assembly, so every bit operation is visible as a change in a register, a flag or a memory byte.",
+    "purpose": "The editor executes MASM source one instruction at a time and shows the result in the Registers and Flags, Execution Trace, Stack and Main Memory tabs. Bit manipulation on the 8086 is done with the logic instructions $\\texttt{OR}$, $\\texttt{AND}$, $\\texttt{XOR}$, $\\texttt{TEST}$, $\\texttt{SHL}$ and $\\texttt{SHR}$, which are the direct hardware counterparts of the C idioms for set, clear, toggle and read: $\\texttt{REG |= (1UL << n)}$ is an $\\texttt{OR}$, $\\texttt{REG \\&= \\textasciitilde(1UL << n)}$ is an $\\texttt{AND}$ with the complement mask, $\\texttt{REG \\textasciicircum= (1UL << n)}$ is an $\\texttt{XOR}$, and $\\texttt{(REG >> n) \\& 1UL}$ is a $\\texttt{SHR}$ or a $\\texttt{TEST}$.",
+    "model": [
+      {
+        "heading": "Mask algebra on a register",
+        "body": "A single bit position $n$ is selected by the mask $2^{n}$. Setting uses a bitwise OR, clearing uses an AND with the complement $\\sim 2^{n}$, and toggling uses an XOR, so each operation touches exactly one bit and leaves the other bits of the operand unchanged. For an eight-bit register the valid range is $0 \\le n \\le 7$, and for a sixteen-bit register it is $0 \\le n \\le 15$."
+      },
+      {
+        "heading": "Flags as the observable result",
+        "body": "After a logic instruction the processor clears $CF$ and $OF$ and updates $ZF$, $SF$ and $PF$ from the result. $\\texttt{TEST}$ performs the AND but discards the result, so only the flags change; $ZF$ is $1$ when the tested bit is clear. A shift moves the last bit that leaves the register into $CF$, which turns $\\texttt{SHR}$ into a bit reader."
+      },
+      {
+        "heading": "Shift counts on the 8086",
+        "body": "The original 8086 accepts an immediate shift count of $1$ only. Any larger count must be placed in $\\texttt{CL}$, for example $\\texttt{MOV CL, 6}$ followed by $\\texttt{SHR AL, CL}$. Boundary case: a count of $0$ leaves the operand and the flags untouched."
+      },
+      {
+        "heading": "Segments, stack and memory",
+        "body": "Memory is addressed as a segment and an offset, and the physical address is formed by shifting the segment left by four bits and adding the offset, so the space is $2^{20}$ bytes. The stack grows downward: $\\texttt{PUSH}$ decrements $\\texttt{SP}$ by $2$ before storing a word, and $\\texttt{POP}$ increments it after loading. Code lives in the code segment, initialised data in the data segment, and the stack in its own segment, which is the 8086 analogue of the .text, .data and stack regions."
+      }
+    ],
+    "equations": [
+      "Set a bit with OR and a single-bit mask.",
+      "Clear a bit with AND and the complemented mask.",
+      "Toggle a bit with XOR.",
+      "TEST sets the zero flag from the masked bit without changing the register.",
+      "Read a bit with a right shift and a mask, or through the carry flag.",
+      "Physical address from segment and offset (twenty-bit space).",
+      "Stack pointer behaviour of PUSH and POP for word operands."
+    ],
+    "mapping": [
+      {
+        "term": "Language selector (MASM 8086)",
+        "body": "Chooses the real-mode 8086 engine. The editor then offers the low-level inspector tabs instead of the variable view."
+      },
+      {
+        "term": "Registers and Flags tab",
+        "body": "Shows $\\texttt{AX}$, $\\texttt{BX}$, $\\texttt{CX}$, $\\texttt{DX}$ and the pointer and segment registers; the HEX, DEC and BIN selector changes the radix so the individual bits $b_n$ of the result can be read directly."
+      },
+      {
+        "term": "Flag indicators",
+        "body": "$ZF$, $CF$, $SF$, $OF$ and $PF$ light up according to the last instruction, giving the result of $\\texttt{TEST}$ and of the bit shifted out by $\\texttt{SHR}$."
+      },
+      {
+        "term": "Run, Step and speed controls",
+        "body": "Single-stepping executes one instruction, so the transformation $AL \\to AL'$ of each equation can be checked line by line; breakpoints stop at a chosen instruction."
+      },
+      {
+        "term": "Stack tab",
+        "body": "Lists the words pushed at $\\texttt{SS:SP}$ and shows the stack pointer moving by $2$ per word."
+      },
+      {
+        "term": "Main Memory tab",
+        "body": "Displays bytes at a chosen reference address in hex, decimal or binary, so a memory-mapped style byte can be modified with the same mask idioms."
+      },
+      {
+        "term": "Execution Trace tab",
+        "body": "Records each executed instruction with the register changes, which documents the sequence of mask operations."
+      }
+    ],
+    "example": {
+      "title": "Edit the byte $\\texttt{AL}$ with four mask instructions",
+      "problem": "Start from $AL = \\texttt{0A5h}$. Set bit $3$, clear bit $2$, toggle bit $7$, then test bit $5$ and read it through the carry flag.",
+      "steps": [
+        {
+          "text": "Set bit $3$: the mask is $2^{3} = \\texttt{08h}$, and $\\texttt{OR AL, 08h}$ gives",
+          "tex": "\\texttt{A5h} \\mathbin{|} \\texttt{08h} = 10100101_2 \\mathbin{|} 00001000_2 = 10101101_2 = \\texttt{ADh}"
+        },
+        {
+          "text": "Clear bit $2$: the complement of $2^{2} = \\texttt{04h}$ is $\\texttt{0FBh}$, and $\\texttt{AND AL, 0FBh}$ gives",
+          "tex": "\\texttt{ADh} \\mathbin{\\&} \\texttt{FBh} = 10101101_2 \\mathbin{\\&} 11111011_2 = 10101001_2 = \\texttt{A9h}"
+        },
+        {
+          "text": "Toggle bit $7$: the mask is $2^{7} = \\texttt{80h}$, and $\\texttt{XOR AL, 80h}$ gives",
+          "tex": "\\texttt{A9h} \\oplus \\texttt{80h} = 10101001_2 \\oplus 10000000_2 = 00101001_2 = \\texttt{29h}"
+        },
+        {
+          "text": "Test bit $5$ with $\\texttt{TEST AL, 20h}$: the AND result is $\\texttt{29h} \\mathbin{\\&} \\texttt{20h} = \\texttt{20h}$, which is non-zero, so $ZF = 0$ and the bit is set."
+        },
+        {
+          "text": "Read the same bit through the carry: after $\\texttt{MOV CL, 6}$ and $\\texttt{SHR AL, CL}$ the last bit shifted out is $b_5$, so $CF = 1$ and $AL = \\texttt{00h}$."
+        }
+      ],
+      "result": "The byte evolves $\\texttt{A5h} \\to \\texttt{ADh} \\to \\texttt{A9h} \\to \\texttt{29h}$, the test reports $ZF = 0$, and the shift leaves $CF = 1$ and $AL = \\texttt{00h}$."
+    },
+    "applications": [
+      {
+        "field": "Legacy industrial controllers",
+        "body": "Many installed PC-based machine controllers and boot firmware still use real-mode assembly, where output ports are driven by setting and clearing single bits of a byte."
+      },
+      {
+        "field": "Bootloaders and BIOS routines",
+        "body": "Early boot code configures hardware through masked read-modify-write sequences on port registers, exactly the $\\texttt{OR}$ and $\\texttt{AND}$ patterns shown here."
+      },
+      {
+        "field": "Microcontroller education",
+        "body": "The register, flag and stack model transfers directly to embedded cores, which makes the 8086 a clear first model of a processor."
+      },
+      {
+        "field": "Reverse engineering and diagnostics",
+        "body": "Reading status bytes with $\\texttt{TEST}$ and decoding flag words is the daily work of firmware debugging and fault analysis."
+      }
+    ]
+  },
+  "python": {
+    "title": "Python Mode: Integer Bit Operations and the Memory Model",
+    "intro": "This mode runs Python and traces each statement, so bit operations on integers and the objects behind variables can be watched step by step.",
+    "purpose": "The editor executes a Python script and reports variables, the execution trace and telemetry. Because Python integers are objects of unlimited width, the bit idioms used for registers in C carry over unchanged in form, $\\texttt{x |= (1 << n)}$, $\\texttt{x \\&= \\textasciitilde(1 << n)}$, $\\texttt{x \\textasciicircum= (1 << n)}$ and $\\texttt{(x >> n) \\& 1}$, but the meaning of the complement and of overflow is different, and fixed-width hardware registers must be emulated explicitly.",
+    "model": [
+      {
+        "heading": "Bitwise operators on arbitrary-precision integers",
+        "body": "An integer $x$ is treated as an infinite two's complement bit string, so the operators $\\texttt{|}$, $\\texttt{\\&}$, $\\texttt{<<}$ and $\\texttt{>>}$ never overflow. A left shift by $n$ multiplies by $2^{n}$ and a right shift floors the division by $2^{n}$, including for negative numbers."
+      },
+      {
+        "heading": "The complement is negative",
+        "body": "The operator $\\sim$ obeys $\\sim x = -x - 1$, so $\\sim 0$ is $-1$ and not a mask of ones with a fixed width. Clearing a bit with $x \\mathbin{\\&} \\sim(1 \\ll n)$ still works because the infinite sign extension supplies ones above the mask, but printing the complement alone yields a negative number."
+      },
+      {
+        "heading": "Emulating a fixed-width register",
+        "body": "To model a register of $w$ bits, apply the mask $2^{w} - 1$ after every operation. Boundary case: for $w = 8$ the mask is $255$, so $\\sim 54$ becomes $201$ after masking."
+      },
+      {
+        "heading": "Memory model and ctypes",
+        "body": "Names are references to heap objects and the call stack holds frames, so there is no direct control of sections or addresses. For memory-mapped style experiments the standard module $\\texttt{ctypes}$ offers fixed-width types such as $\\texttt{c\\_uint8}$ and structures with bit fields, which pack the bits $b_i$ into the layout given by the sum of $b_i \\, 2^{i}$."
+      }
+    ],
+    "equations": [
+      "Set bit n with OR.",
+      "Clear bit n with AND and the complemented mask.",
+      "Toggle bit n with XOR.",
+      "Read bit n by shifting and masking.",
+      "Python complement identity and masking to a fixed width w.",
+      "Positional expansion of an integer and the population count."
+    ],
+    "mapping": [
+      {
+        "term": "Language selector (Python)",
+        "body": "Switches to the Python engine; the inspector shows the Variables View, Execution Trace, Telemetry and Insights, and Quick Reference tabs."
+      },
+      {
+        "term": "Variables View",
+        "body": "Displays the current value of each name, so the effect of each mask expression on $x$ appears after every step."
+      },
+      {
+        "term": "Execution Trace",
+        "body": "Lists the statements in execution order, which is the sequence of the operations $x \\to x'$."
+      },
+      {
+        "term": "Telemetry and Insights",
+        "body": "Summarises the run, so the cost of loops that scan all bits $b_i$ can be compared with a single mask operation."
+      },
+      {
+        "term": "Quick Reference",
+        "body": "Collects the operator syntax used above for fast lookup while writing the script."
+      },
+      {
+        "term": "Run, Step and speed controls",
+        "body": "Stepping allows each of the four idioms to be inspected separately, with breakpoints on chosen lines."
+      },
+      {
+        "term": "Standard input field",
+        "body": "Supplies values read by $\\texttt{input()}$, so the bit index $n$ and the word $x$ can be varied without editing the code."
+      }
+    ],
+    "example": {
+      "title": "Edit an eight-bit value held in an integer",
+      "problem": "Let $x = 178 = 10110010_2$. Set bit $0$, clear bit $7$, toggle bit $2$, read bit $4$, and finally complement the result within $w = 8$ bits.",
+      "steps": [
+        {
+          "text": "Set bit $0$ with the mask $1 \\ll 0 = 1$:",
+          "tex": "178 \\mathbin{|} 1 = 10110010_2 \\mathbin{|} 00000001_2 = 10110011_2 = 179"
+        },
+        {
+          "text": "Clear bit $7$ from the original value $x = 178$ using the mask $128$:",
+          "tex": "178 \\mathbin{\\&} \\sim 128 = 10110010_2 \\mathbin{\\&} 01111111_2 = 00110010_2 = 50"
+        },
+        {
+          "text": "Toggle bit $2$ of $50$ with the mask $4$:",
+          "tex": "50 \\oplus 4 = 00110010_2 \\oplus 00000100_2 = 00110110_2 = 54"
+        },
+        {
+          "text": "Read bit $4$ of $54$: the shift gives $54 \\gg 4 = 3$, and the mask $1$ yields $3 \\mathbin{\\&} 1 = 1$."
+        },
+        {
+          "text": "Complement within eight bits: $\\sim 54 = -55$, and masking with $255$ gives",
+          "tex": "-55 \\mathbin{\\&} 255 = 256 - 55 = 201"
+        }
+      ],
+      "result": "The chain gives $179$, $50$, $54$, bit $4$ equal to $1$, and the eight-bit complement $201$, which equals $255 - 54$."
+    },
+    "applications": [
+      {
+        "field": "Test benches for embedded firmware",
+        "body": "Engineers prototype register-handling logic in Python before porting it to C, using integer masks to model status and control registers."
+      },
+      {
+        "field": "Industrial protocol tooling",
+        "body": "Fieldbus and sensor frames pack flags into bytes, and Python scripts decode them with shifts and masks in commissioning tools."
+      },
+      {
+        "field": "Robotics data pipelines",
+        "body": "Encoders and inertial sensors deliver packed words that are unpacked with the same bitwise expressions."
+      },
+      {
+        "field": "Hardware-in-the-loop automation",
+        "body": "Test scripts drive digital outputs and read status bits of a device under test through masked operations."
+      }
+    ]
+  },
+  "cpp": {
+    "title": "C++ Mode: Typed Bit Manipulation and Zero-Cost Registers",
+    "intro": "This mode compiles and steps through C++ programs, where the same bit idioms are wrapped in types, constants and templates without extra run-time cost.",
+    "purpose": "The editor executes a C++ program and shows its variables, trace and telemetry. The register idioms are identical to C: set $\\texttt{REG |= (1UL << n)}$, clear $\\texttt{REG \\&= \\textasciitilde(1UL << n)}$, toggle $\\texttt{REG \\textasciicircum= (1UL << n)}$ and read $\\texttt{(REG >> n) \\& 1UL}$. C++ adds tools that make them safer, namely $\\texttt{constexpr}$ masks, scoped enumerations, $\\texttt{std::bitset}$ and template wrappers around a $\\texttt{volatile}$ pointer.",
+    "model": [
+      {
+        "heading": "Masks evaluated at compile time",
+        "body": "A $\\texttt{constexpr}$ function can compute the mask $M$ of a set of bit positions $S$ as the sum of the powers $2^{i}$, so the generated code contains a single constant. Using a mask for several bits at once lets one OR, AND or XOR change the whole set, and the number of affected bits equals the cardinality $\\vert S \\vert$."
+      },
+      {
+        "heading": "Typed access to hardware",
+        "body": "A register can be modelled as a class holding a $\\texttt{volatile}$ pointer obtained from an integer address, as in $\\texttt{reinterpret\\_cast<volatile uint32\\_t*>(0x40020014)}$. Every member function performs one read-modify-write. Because the qualifier is kept, the optimiser still may not cache or drop accesses."
+      },
+      {
+        "heading": "Bit containers and shift limits",
+        "body": "The container $\\texttt{std::bitset}$ provides $\\texttt{set}$, $\\texttt{reset}$, $\\texttt{flip}$ and $\\texttt{test}$, which map one to one onto the four idioms. As in C, a shift by $n \\ge w$ on a type of $w$ bits is undefined, so the index must stay in $0 \\le n \\le w - 1$."
+      },
+      {
+        "heading": "Sections, stack and heap",
+        "body": "Objects with static storage are placed in $\\texttt{.data}$ or $\\texttt{.bss}$, and $\\texttt{constexpr}$ tables go to $\\texttt{.rodata}$. Automatic objects use the stack, while $\\texttt{new}$ uses the heap. Constructors of global objects run before $\\texttt{main}$, which costs start-up time and RAM that the budget equation must include."
+      }
+    ],
+    "equations": [
+      "Set bit n of a register object.",
+      "Clear bit n of a register object.",
+      "Toggle bit n of a register object.",
+      "Read bit n of a register object.",
+      "Compile-time mask for a set of bit positions and its population count.",
+      "RAM budget from the memory sections."
+    ],
+    "mapping": [
+      {
+        "term": "Language selector (C++)",
+        "body": "Selects the C++ engine and the $\\texttt{main.cpp}$ buffer, saved separately from the other languages."
+      },
+      {
+        "term": "Template picker",
+        "body": "Loads C++ examples, which supply classes and containers to apply the idioms to."
+      },
+      {
+        "term": "Variables View",
+        "body": "Shows the members and locals after each step, so the change $\\texttt{REG} \\to \\texttt{REG}'$ is traceable."
+      },
+      {
+        "term": "Execution Trace",
+        "body": "Lists calls and lines in order, including constructors that run before the program body."
+      },
+      {
+        "term": "Telemetry and Insights",
+        "body": "Provides run statistics that help to compare a bitset-based and a mask-based implementation."
+      },
+      {
+        "term": "Quick Reference",
+        "body": "Summarises the operators and container members used in the model."
+      },
+      {
+        "term": "Run, Step, speed and breakpoints",
+        "body": "Stepping into a wrapper function shows how a typed call reduces to one mask operation."
+      }
+    ],
+    "example": {
+      "title": "A multi-bit mask on a status register",
+      "problem": "Let the bit set be $S = \\{1, 4, 6\\}$ and the register $\\texttt{REG} = \\texttt{0x0F} = 15$. Build $M$, then set, clear and toggle all three bits at once.",
+      "steps": [
+        {
+          "text": "Build the mask from the powers of two:",
+          "tex": "M = 2^{1} + 2^{4} + 2^{6} = 2 + 16 + 64 = 82 = \\texttt{0x52}"
+        },
+        {
+          "text": "Set all bits of the set with one OR:",
+          "tex": "\\texttt{0x0F} \\mathbin{|} \\texttt{0x52} = 00001111_2 \\mathbin{|} 01010010_2 = 01011111_2 = \\texttt{0x5F} = 95"
+        },
+        {
+          "text": "Clear them with the complement $\\sim M = \\texttt{0xAD}$ in eight bits:",
+          "tex": "\\texttt{0x0F} \\mathbin{\\&} \\texttt{0xAD} = 00001111_2 \\mathbin{\\&} 10101101_2 = 00001101_2 = \\texttt{0x0D} = 13"
+        },
+        {
+          "text": "Toggle them with one XOR:",
+          "tex": "\\texttt{0x0F} \\oplus \\texttt{0x52} = 00001111_2 \\oplus 01010010_2 = 01011101_2 = \\texttt{0x5D} = 93"
+        },
+        {
+          "text": "The population count of the mask is $\\vert S \\vert = 3$, which matches the three bit positions that differ in the toggle case, since $\\texttt{0x0F}$ and $\\texttt{0x5D}$ differ in bits $1$, $4$ and $6$."
+        }
+      ],
+      "result": "The mask is $M = \\texttt{0x52}$, and the three operations give $\\texttt{0x5F}$, $\\texttt{0x0D}$ and $\\texttt{0x5D}$, each in a single instruction on a $\\texttt{volatile}$ register."
+    },
+    "applications": [
+      {
+        "field": "Hardware abstraction layers",
+        "body": "Template register wrappers give compile-time checked access to peripherals with the same machine code as hand-written C."
+      },
+      {
+        "field": "Robot controllers",
+        "body": "Real-time frameworks use typed flag sets to represent drive states and fault words without run-time overhead."
+      },
+      {
+        "field": "Aerospace flight software",
+        "body": "Restricted C++ subsets use constants and strong types to prevent mixing of register widths and offsets."
+      },
+      {
+        "field": "Automation gateways",
+        "body": "Bit containers decode packed digital input words from field devices into named signals."
+      }
+    ]
+  },
+  "c": {
+    "title": "C Mode: Register Bit Manipulation and Memory Sections",
+    "intro": "This mode compiles and steps through C programs, which makes it the natural place to practise the bit idioms and the memory layout of embedded firmware.",
+    "purpose": "The editor executes a C program and presents its variables, execution trace, telemetry and a quick reference. The four fundamental register idioms are set $\\texttt{REG |= (1UL << n)}$, clear $\\texttt{REG \\&= \\textasciitilde(1UL << n)}$, toggle $\\texttt{REG \\textasciicircum= (1UL << n)}$ and read $\\texttt{(REG >> n) \\& 1UL}$. Around them sit the concepts that decide whether such code is correct on a real microcontroller: the qualifier $\\texttt{volatile}$, memory-mapped pointers, the program sections and the split between stack and heap.",
+    "model": [
+      {
+        "heading": "Read-modify-write with a mask",
+        "body": "Each idiom builds a mask $1 \\ll n$ with an unsigned constant so that the shift is not performed on a signed type. Boundary case: shifting by $n \\ge w$ for a type of $w$ bits is undefined, so $n$ must satisfy $0 \\le n \\le w - 1$. Multi-bit fields are inserted with the width mask $M_w = 2^{w} - 1$ after clearing the old field."
+      },
+      {
+        "heading": "volatile and memory-mapped I/O",
+        "body": "A peripheral register is reached through a fixed address, for example $\\texttt{*(volatile uint32\\_t*)0x40020014}$. The qualifier $\\texttt{volatile}$ forbids the compiler from caching the value in a CPU register or removing accesses, because the hardware may change the content at any time and each write has a side effect. In this simulator such addresses are illustrative, since the program runs on an emulated engine and not on a physical peripheral."
+      },
+      {
+        "heading": "Program sections",
+        "body": "The linker places instructions in $\\texttt{.text}$ and constants in $\\texttt{.rodata}$, both in flash. Initialised globals live in $\\texttt{.data}$, whose initial image is stored in flash and copied to RAM at start-up, while zero-initialised globals live in $\\texttt{.bss}$ and are cleared. The sums above show that $\\texttt{.data}$ is counted in both memories."
+      },
+      {
+        "heading": "Stack versus heap",
+        "body": "Local variables and return addresses use the stack, which grows toward the heap in the same RAM. Dynamic allocation uses the heap and can fragment, so embedded designs bound $S_{stack}$ and often avoid the heap. A collision of the two regions corrupts data silently."
+      }
+    ],
+    "equations": [
+      "Set bit n of a register.",
+      "Clear bit n of a register.",
+      "Toggle bit n of a register.",
+      "Read bit n of a register.",
+      "Insert a multi-bit field of width w at position n.",
+      "Address of the k-th 32-bit register from a peripheral base address.",
+      "RAM and flash budgets from the memory sections."
+    ],
+    "mapping": [
+      {
+        "term": "Language selector (C)",
+        "body": "Selects the C engine and the $\\texttt{main.c}$ buffer; each language keeps its own saved code."
+      },
+      {
+        "term": "Template picker",
+        "body": "Loads example programs, which are a convenient source of register-style variables to experiment on."
+      },
+      {
+        "term": "Variables View",
+        "body": "Shows the value of each variable after every step, so the transformation $\\texttt{REG} \\to \\texttt{REG}'$ is visible; switching the display radix reveals the bits $b_n$."
+      },
+      {
+        "term": "Execution Trace",
+        "body": "Records the executed lines in order, documenting the read-modify-write sequence."
+      },
+      {
+        "term": "Telemetry and Insights",
+        "body": "Summarises the run and helps compare the cost of a masked update with a loop over all bits."
+      },
+      {
+        "term": "Quick Reference",
+        "body": "Lists the operators and idioms used in the equations."
+      },
+      {
+        "term": "Run, Step, speed and breakpoints",
+        "body": "Single-stepping separates the read, the mask operation and the write of one idiom."
+      },
+      {
+        "term": "Standard input field",
+        "body": "Feeds values to $\\texttt{scanf}$, so $n$ and the initial word can be changed without editing."
+      }
+    ],
+    "example": {
+      "title": "Four idioms on one status word",
+      "problem": "Let $\\texttt{REG} = \\texttt{0xA5} = 165$. Set bit $3$, clear bit $2$, toggle bit $7$, then read bit $5$.",
+      "steps": [
+        {
+          "text": "Set bit $3$ with the mask $1 \\ll 3 = \\texttt{0x08}$:",
+          "tex": "\\texttt{0xA5} \\mathbin{|} \\texttt{0x08} = 10100101_2 \\mathbin{|} 00001000_2 = 10101101_2 = \\texttt{0xAD} = 173"
+        },
+        {
+          "text": "Clear bit $2$ with the complemented mask $\\sim(1 \\ll 2) = \\texttt{0xFB}$ in eight bits:",
+          "tex": "\\texttt{0xAD} \\mathbin{\\&} \\texttt{0xFB} = 10101101_2 \\mathbin{\\&} 11111011_2 = 10101001_2 = \\texttt{0xA9} = 169"
+        },
+        {
+          "text": "Toggle bit $7$ with the mask $\\texttt{0x80}$:",
+          "tex": "\\texttt{0xA9} \\oplus \\texttt{0x80} = 10101001_2 \\oplus 10000000_2 = 00101001_2 = \\texttt{0x29} = 41"
+        },
+        {
+          "text": "Read bit $5$: the shift gives $\\texttt{0x29} \\gg 5 = 1$, and the mask yields $1 \\mathbin{\\&} 1 = 1$, so the bit is set."
+        },
+        {
+          "text": "Budget check: with $S_{\\texttt{.data}} = 1.5\\text{ kB}$, $S_{\\texttt{.bss}} = 2.5\\text{ kB}$, $S_{heap} = 4\\text{ kB}$ and $S_{stack} = 2\\text{ kB}$, the RAM use is",
+          "tex": "S_{RAM} = 1.5 + 2.5 + 4 + 2 = 10\\text{ kB}"
+        }
+      ],
+      "result": "The register passes through $\\texttt{0xAD}$, $\\texttt{0xA9}$ and $\\texttt{0x29}$, bit $5$ reads as $1$, and the example firmware needs $S_{RAM} = 10\\text{ kB}$ of RAM."
+    },
+    "applications": [
+      {
+        "field": "Microcontroller firmware",
+        "body": "GPIO, timer and UART peripherals are configured by masked updates of memory-mapped registers declared $\\texttt{volatile}$."
+      },
+      {
+        "field": "Automotive and motion control",
+        "body": "Engine and drive controllers pack status flags into words that are set, cleared and polled by the idioms shown here."
+      },
+      {
+        "field": "Aerospace and safety-critical code",
+        "body": "Coding standards demand bounded stack use, no heap, and explicit unsigned masks, which follow directly from the memory model."
+      },
+      {
+        "field": "Industrial communication stacks",
+        "body": "Protocol headers and control words are built from bit fields inserted with width masks."
+      }
+    ]
+  }
+}

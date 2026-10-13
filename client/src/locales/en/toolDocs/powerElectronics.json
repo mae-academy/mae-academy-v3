@@ -1,0 +1,444 @@
+{
+  "rectifier": {
+    "title": "Rectifiers: Diode and Thyristor AC-DC Conversion",
+    "intro": "The Rectifier studio converts a sinusoidal supply into a unidirectional load voltage and reports the quantities that define converter quality: average output, RMS output, form factor and ripple factor.",
+    "purpose": "This tool simulates single-phase and three-phase rectifiers, from uncontrolled diode circuits (firing angle $\\alpha = 0^\\circ$) to phase-controlled thyristor (SCR) converters. It draws the source, the output voltage and the load current on the scope for resistive, inductive, capacitive and back-EMF loads, with or without a freewheeling diode, and computes $V_{dc}$, $V_{rms}$, $FF$, $RF$, power factor and efficiency from the sampled waveforms.",
+    "model": [
+      {
+        "heading": "Average output voltage",
+        "body": "For a single-phase fully-controlled bridge with continuous conduction (a highly inductive load that keeps the current non-zero), the average output is $V_{dc} = \\frac{2V_m}{\\pi}\\cos\\alpha$. Setting $\\alpha = 0^\\circ$ gives the diode bridge value $\\frac{2V_m}{\\pi}$, and $\\alpha > 90^\\circ$ makes $V_{dc}$ negative, which is inverter-mode operation when the load supplies energy (for example a back-EMF source). A resistive load enters discontinuous conduction and gives $V_{dc} = \\frac{V_m}{\\pi}(1 + \\cos\\alpha)$ instead."
+      },
+      {
+        "heading": "RMS value, form factor and ripple factor",
+        "body": "With continuous conduction the output waveform is a rectified, shifted sine whose RMS value stays $V_{rms} = \\frac{V_m}{\\sqrt{2}}$ for every $\\alpha$, so only the average moves. The form factor is $FF = V_{rms}/V_{dc}$ and the ripple factor $RF = \\sqrt{(V_{rms}/V_{dc})^2 - 1}$ measures the AC content relative to the DC content. Both grow quickly as $\\alpha$ approaches $90^\\circ$ because $V_{dc}$ shrinks while $V_{rms}$ does not."
+      },
+      {
+        "heading": "Three-phase bridge",
+        "body": "The six-pulse bridge with peak phase voltage $V_m$ gives $V_{dc} = \\frac{3\\sqrt{3}\\,V_m}{\\pi}\\cos\\alpha$ under continuous conduction, and the output ripple frequency rises to $6f$. The higher pulse number gives a much lower $RF$ than the single-phase circuit and needs far less filtering."
+      },
+      {
+        "heading": "Freewheeling diode and commutation",
+        "body": "With an inductive load, the output voltage would go negative once the supply reverses. A freewheeling diode clamps the output to zero at that moment and carries the load current, so the thyristors turn off naturally and $V_{dc}$ follows $\\frac{V_m}{\\pi}(1 + \\cos\\alpha)$. Source inductance $L_s$ delays current transfer between devices by an overlap angle $\\mu$, described by $\\cos\\alpha - \\cos(\\alpha + \\mu) = \\frac{2\\omega L_s I_d}{V_m}$, and removes the average voltage $\\Delta V_{dc} = \\frac{2\\omega L_s}{\\pi} I_d$."
+      }
+    ],
+    "equations": [
+      "Average DC output of the single-phase fully-controlled bridge, continuous conduction.",
+      "RMS output voltage under continuous conduction, independent of the firing angle.",
+      "Form factor: ratio of RMS to average output voltage.",
+      "Ripple factor derived from the form factor.",
+      "Average output with a freewheeling diode or a resistive load.",
+      "Average output of the three-phase six-pulse controlled bridge.",
+      "Commutation overlap angle caused by the source inductance.",
+      "Average voltage drop due to commutation overlap."
+    ],
+    "mapping": [
+      {
+        "term": "Phase (1-Φ / 3-Φ)",
+        "body": "Selects between the single-phase relations with $2V_m/\\pi$ and the three-phase relation with $3\\sqrt{3}V_m/\\pi$, and sets the pulse number of the output."
+      },
+      {
+        "term": "Rectifier Type and Full-Wave Subtype",
+        "body": "Half-wave, full-wave bridge or center-tapped. Half-wave has a single pulse per cycle, so its average is $V_m/\\pi$ at $\\alpha = 0^\\circ$; the full-wave circuits double the pulse count."
+      },
+      {
+        "term": "Voltage Format and $V_{in}$",
+        "body": "The input is read either as an RMS value or as the peak $V_m$. Internally $V_m = \\sqrt{2}\\,V_{RMS}$ is used in every formula."
+      },
+      {
+        "term": "$f$ [Hz]",
+        "body": "The supply frequency sets $\\omega = 2\\pi f$, shown in the panel, and the period of the scope. It also scales the overlap term $\\omega L_s$."
+      },
+      {
+        "term": "$\\alpha$ slider ($0^\\circ$ to $180^\\circ$)",
+        "body": "The thyristor firing delay. At $\\alpha = 0^\\circ$ the circuit behaves as a diode rectifier; the metric $V_{DC}$ follows $\\cos\\alpha$."
+      },
+      {
+        "term": "Load Type (R, RL, RC, RLC, RLE)",
+        "body": "Chooses which of $R$, $L$, $C$ and $E$ are active. Inductance gives continuous current, capacitance gives a peak-charging waveform with large ripple, and $E$ creates a conduction blocking threshold."
+      },
+      {
+        "term": "Free-Wheeling Diode",
+        "body": "Available for inductive loads. Switching it on clamps negative output segments and replaces the continuous-conduction formula with the $(1 + \\cos\\alpha)$ form."
+      },
+      {
+        "term": "Metrics panel",
+        "body": "Displays $V_{RMS}$, $V_{DC}$, $I_{RMS}$, $I_{DC}$, $P_{DC}$, $P_{AC}$, $V_{ripple}$, $FF$, $RF$, $PF$ and $\\eta$, all computed from the waveform samples."
+      }
+    ],
+    "example": {
+      "title": "Single-phase controlled bridge, highly inductive load",
+      "problem": "A single-phase fully-controlled bridge is fed with a peak voltage $V_m = 100\\text{ V}$, fires at $\\alpha = 60^\\circ$ and supplies a load of $R = 10\\text{ }\\Omega$ whose inductance keeps the current continuous. Find the output quality figures.",
+      "steps": [
+        {
+          "text": "Compute the average output voltage from the continuous-conduction formula.",
+          "tex": "V_{dc} = \\frac{2 \\cdot 100}{\\pi}\\cos 60^\\circ = 63.66 \\times 0.5 = 31.83\\text{ V}"
+        },
+        {
+          "text": "The RMS value does not depend on $\\alpha$ in continuous conduction.",
+          "tex": "V_{rms} = \\frac{100}{\\sqrt{2}} = 70.71\\text{ V}"
+        },
+        {
+          "text": "Form factor from the two voltages.",
+          "tex": "FF = \\frac{70.71}{31.83} = 2.221"
+        },
+        {
+          "text": "Ripple factor from the form factor.",
+          "tex": "RF = \\sqrt{2.221^2 - 1} = \\sqrt{3.935} = 1.984"
+        },
+        {
+          "text": "Average load current and DC power, using $I_{dc} = V_{dc}/R$.",
+          "tex": "I_{dc} = \\frac{31.83}{10} = 3.183\\text{ A}, \\qquad P_{dc} = 31.83 \\times 3.183 = 101.3\\text{ W}"
+        }
+      ],
+      "result": "$V_{dc} = 31.83\\text{ V}$, $V_{rms} = 70.71\\text{ V}$, $FF = 2.221$ and $RF = 1.984$. Raising $\\alpha$ toward $90^\\circ$ drives $V_{dc}$ to zero and the ripple factor to infinity, which is why the converter is used with a filter or a freewheeling path."
+    },
+    "applications": [
+      {
+        "field": "DC motor drives",
+        "body": "Phase-controlled bridges regulate armature voltage in rolling mills, cranes and machine-tool spindles, and inverter mode allows regenerative braking."
+      },
+      {
+        "field": "Battery charging and electrolysis",
+        "body": "Controlled rectifiers supply adjustable DC to chargers, electroplating and electrochemical plants, where the average current must be tuned precisely."
+      },
+      {
+        "field": "HVDC and renewable grids",
+        "body": "Large three-phase thyristor bridges convert at transmission level, with commutation overlap setting the voltage regulation of the link."
+      },
+      {
+        "field": "Welding and industrial heating",
+        "body": "Phase control sets the output energy of resistance welders and induction furnace supplies from the same three-phase source."
+      }
+    ]
+  },
+  "inverter": {
+    "title": "Inverters: Single-Phase and Three-Phase Voltage Source Inverters",
+    "intro": "The Inverter studio synthesizes an AC waveform from a DC bus using switch gating patterns and measures the fundamental amplitude and the harmonic distortion of the result.",
+    "purpose": "This tool simulates a single-phase half-bridge or full-bridge inverter and a three-phase six-switch voltage source inverter with $180^\\circ$ or $120^\\circ$ conduction. The switching technique can be square wave, single-pulse, multi-pulse or sinusoidal PWM (SPWM). The scope shows the gate pattern, the pole and load voltages and the load current, and the metrics report $V_1$, $THD$, power factor and power.",
+    "model": [
+      {
+        "heading": "Sinusoidal PWM definitions",
+        "body": "SPWM compares a sinusoidal control signal with a triangular carrier. The amplitude modulation index is $m_a = V_{control}/V_{tri}$ and the frequency modulation ratio is $m_f = f_s/f_1$, where $f_s$ is the carrier frequency and $f_1$ the fundamental. The linear range is $m_a \\le 1$; beyond it the converter enters overmodulation and approaches a square wave."
+      },
+      {
+        "heading": "Fundamental voltage",
+        "body": "For a full-bridge with bipolar switching in the linear range, the fundamental RMS voltage is $V_{1,rms} = \\frac{m_a V_{dc}}{\\sqrt{2}}$. A half-bridge produces only $\\pm V_{dc}/2$, so its fundamental is halved. A square-wave full bridge gives $V_{1,rms} = \\frac{4V_{dc}}{\\pi\\sqrt{2}} \\approx 0.9V_{dc}$."
+      },
+      {
+        "heading": "Six-step operation and harmonics",
+        "body": "The three-phase six-step inverter gives a line-to-line fundamental $V_{LL,1,rms} = \\frac{\\sqrt{6}}{\\pi}V_{dc}$ and contains only harmonics of order $6k \\pm 1$. The distortion is $THD = \\frac{\\sqrt{\\sum_{n=2}^{\\infty}V_n^2}}{V_1}\\times 100\\%$. PWM moves the harmonics to sidebands around $m_f$ and its multiples, where a small filter can remove them."
+      },
+      {
+        "heading": "Dead time and shoot-through",
+        "body": "The two switches of a leg must never conduct together, because the DC bus would be shorted. A blanking interval $t_d \\ge t_{off,max} - t_{on,min}$ is inserted at every transition. It causes a voltage error of about $|\\Delta V_{pole}| \\approx V_{dc}t_d f_s$ per leg and adds low-order harmonics, so $t_d$ is kept as short as the devices allow."
+      }
+    ],
+    "equations": [
+      "Amplitude modulation index of SPWM.",
+      "Frequency modulation ratio of SPWM.",
+      "Fundamental RMS voltage of a full-bridge in the linear range, $m_a \\le 1$.",
+      "Total harmonic distortion of the output voltage.",
+      "Fundamental RMS voltage of the square-wave full-bridge.",
+      "Line-to-line fundamental RMS voltage of the three-phase six-step inverter.",
+      "Dead-time constraint to avoid shoot-through.",
+      "Approximate pole voltage error caused by dead time."
+    ],
+    "mapping": [
+      {
+        "term": "Inverter Phase (1-Φ / 3-Φ)",
+        "body": "Switches between the single-phase bridge and the three-leg bridge with its $120^\\circ$-shifted pole voltages."
+      },
+      {
+        "term": "1-Φ Sub-Type (Half-Bridge / Full-Bridge)",
+        "body": "Half-bridge swings $\\pm V_{dc}/2$ while the full-bridge swings $\\pm V_{dc}$, so the fundamental of the half-bridge is half as large."
+      },
+      {
+        "term": "3-Φ Conduction Mode ($180^\\circ$ / $120^\\circ$)",
+        "body": "Selects how long each switch conducts. The $180^\\circ$ mode gives the standard six-step line voltage; the $120^\\circ$ mode leaves one phase floating at any instant."
+      },
+      {
+        "term": "Switching Technique",
+        "body": "Square, Single-P, Multi-P or SPWM. Square has a fixed $V_1$ and $THD$; the pulse-based modes trade harmonics through the pulse width, and SPWM uses $m_a$ and $m_f$."
+      },
+      {
+        "term": "$f_o$ and $f_c$ [Hz]",
+        "body": "The output frequency $f_o$ is the fundamental $f_1$; the carrier $f_c$ is the switching frequency $f_s$ and exists only in PWM modes, so $m_f = f_c/f_o$."
+      },
+      {
+        "term": "Modulation index slider ($0$ to $1.2$)",
+        "body": "Sets $m_a$. Values up to $1$ give a proportional fundamental; above $1$ the waveform saturates and the $THD$ climbs."
+      },
+      {
+        "term": "$V_{dc}$, Load Set and PROTECTION TEST",
+        "body": "$V_{dc}$ scales every output. The load $R$, $RL$ or $RLE$ shapes the current, and the protection test exercises a shoot-through fault to show why dead time is required."
+      },
+      {
+        "term": "Metrics panel",
+        "body": "Reports $V_{RMS}$, $V_1$, $I_{RMS}$, $I_1$, $THD_v$, $THD_i$, $DF$, $HF$, $P$, $S$ and $PF$."
+      }
+    ],
+    "example": {
+      "title": "Full-bridge SPWM inverter design check",
+      "problem": "A single-phase full-bridge inverter runs from $V_{dc} = 400\\text{ V}$ with $m_a = 0.8$, a carrier $f_s = 2.5\\text{ kHz}$ and an output $f_1 = 50\\text{ Hz}$. The gate driver uses a dead time $t_d = 2\\text{ }\\mu\\text{s}$. Evaluate the design.",
+      "steps": [
+        {
+          "text": "Find the frequency modulation ratio.",
+          "tex": "m_f = \\frac{2500}{50} = 50"
+        },
+        {
+          "text": "The modulation index is below unity, so the linear formula applies. Compute the fundamental RMS voltage.",
+          "tex": "V_{1,rms} = \\frac{0.8 \\times 400}{\\sqrt{2}} = \\frac{320}{1.4142} = 226.3\\text{ V}"
+        },
+        {
+          "text": "Estimate the pole voltage error due to dead time.",
+          "tex": "|\\Delta V_{pole}| \\approx 400 \\times 2\\times 10^{-6} \\times 2500 = 2\\text{ V}"
+        },
+        {
+          "text": "Compare with the square-wave operation of the same bridge, which has a larger fundamental but poor quality.",
+          "tex": "V_{1,rms} = 0.9 \\times 400 = 360\\text{ V}, \\qquad THD = \\sqrt{\\frac{\\pi^2}{8} - 1}\\times 100\\% = 48.3\\%"
+        }
+      ],
+      "result": "The SPWM output has $m_f = 50$ and $V_{1,rms} = 226.3\\text{ V}$, with dead-time error of about $2\\text{ V}$ per leg. The square wave gives a higher $360\\text{ V}$ but $THD = 48.3\\%$, while SPWM pushes its harmonics near $2.5\\text{ kHz}$ where a small LC filter removes them."
+    },
+    "applications": [
+      {
+        "field": "Variable-frequency motor drives",
+        "body": "Three-phase SPWM inverters control speed and torque of induction and permanent-magnet motors in robots, conveyors and machine tools."
+      },
+      {
+        "field": "Solar and wind converters",
+        "body": "Grid-tied inverters turn the DC link into sinusoidal current with low $THD$ to meet grid-code limits."
+      },
+      {
+        "field": "Uninterruptible power supplies",
+        "body": "Full-bridge inverters rebuild the AC bus from batteries for data centers and critical manufacturing lines."
+      },
+      {
+        "field": "Electric traction and aerospace",
+        "body": "Compact inverters feed traction motors and aircraft actuators, where dead time and switching loss decide efficiency."
+      }
+    ]
+  },
+  "acvc": {
+    "title": "AC Voltage Controller: Phase and Integral-Cycle Control",
+    "intro": "The AC Voltage Controller studio regulates the RMS voltage applied to a load by chopping the AC supply directly with thyristors, without any DC stage or frequency change.",
+    "purpose": "This tool models a single-phase or three-phase AC regulator built from antiparallel thyristors or a bidirectional TRIAC. It supports phase-angle control and integral-cycle control with resistive or inductive loads, and shows the source voltage, load voltage, load current, gate pulses and conduction angles, together with $V_{o,rms}$, power factor and harmonic distortion.",
+    "model": [
+      {
+        "heading": "Phase-angle control, resistive load",
+        "body": "A thyristor pair is fired at the angle $\\alpha$ in each half-cycle, so the load sees the supply only from $\\alpha$ to $\\pi$. For a resistive load the output RMS voltage is $V_{rms} = V_s\\sqrt{\\frac{1}{\\pi}\\left(\\pi - \\alpha + \\frac{\\sin 2\\alpha}{2}\\right)}$ with $V_s$ the RMS supply voltage and $0 \\le \\alpha \\le \\pi$. The input power factor equals the same square root, so $PF$ falls as $\\alpha$ increases."
+      },
+      {
+        "heading": "Inductive load",
+        "body": "With a load angle $\\varphi$ the current continues after the supply voltage crosses zero until the extinction angle $\\beta$, found from $\\sin(\\beta - \\varphi) = \\sin(\\alpha - \\varphi)e^{-(\\beta - \\alpha)/\\tan\\varphi}$. The conduction angle is $\\gamma = \\beta - \\alpha$. Control exists only for $\\alpha \\ge \\varphi$; for $\\alpha < \\varphi$ the output is the full sine and the controller loses authority."
+      },
+      {
+        "heading": "Integral-cycle control",
+        "body": "Instead of cutting each cycle, whole cycles are passed or blocked: $n_{ON}$ cycles on and $m_{OFF}$ cycles off. The duty ratio is $k = n_{ON}/(n_{ON} + m_{OFF})$ and $V_{rms} = V_s\\sqrt{k}$. Switching occurs at zero crossings, so the method gives no steep current edges and no radio interference, but it produces subharmonic flicker and suits only slow thermal loads."
+      },
+      {
+        "heading": "Harmonic current",
+        "body": "Phase control creates odd harmonics of the load current. For a resistive load the fundamental has coefficients $b_1 = \\frac{V_m}{\\pi R}\\left(\\pi - \\alpha + \\frac{\\sin 2\\alpha}{2}\\right)$ and $a_1 = -\\frac{V_m}{\\pi R}\\sin^2\\alpha$, and the lagging component $a_1$ makes the supply current displaced even for a resistive load. A unidirectional circuit also injects a DC component and even harmonics."
+      }
+    ],
+    "equations": [
+      "RMS output voltage of the single-phase phase-angle controller with resistive load.",
+      "Input power factor for the same circuit.",
+      "RMS output voltage of integral-cycle control.",
+      "Extinction angle of an inductive load.",
+      "Fourier coefficients of the fundamental load current, resistive load.",
+      "Active and apparent power of the load."
+    ],
+    "mapping": [
+      {
+        "term": "Phase (1-Φ / 3-Φ) and connection",
+        "body": "Chooses the single-phase circuit or a three-phase controller as a star connection with three wires, a star connection with four wires, or a delta connection, each with its own conduction intervals."
+      },
+      {
+        "term": "Unidirectional / Bidirectional (TRIAC)",
+        "body": "A unidirectional circuit conducts only one half-cycle and adds DC and even harmonics; the bidirectional or TRIAC circuit is symmetrical and has only odd harmonics."
+      },
+      {
+        "term": "Control mode (Phase-Angle / Integral-Cycle)",
+        "body": "Phase-Angle uses $\\alpha$; Integral-Cycle uses $n_{ON}$ and $m_{OFF}$ and reports the ratio $k$."
+      },
+      {
+        "term": "$\\alpha$ slider ($0^\\circ$ to $180^\\circ$)",
+        "body": "The firing angle in the formulas above. The metrics also show the extinction angle $\\beta$ and conduction angle $\\gamma$."
+      },
+      {
+        "term": "$n_{ON}$ and $m_{OFF}$ ($1$ to $12$)",
+        "body": "Number of conducting and blocked supply cycles in one control period, which give $k$ and $V_{rms} = V_s\\sqrt{k}$."
+      },
+      {
+        "term": "$V_s$ and $f$",
+        "body": "The supply RMS voltage or peak (selected by the voltage format) and frequency; $f$ sets the time axis of the scope."
+      },
+      {
+        "term": "Load ($R$, $RL$), $R$ and $L$",
+        "body": "$L$ in millihenry sets $\\varphi = \\arctan(\\omega L/R)$ and with it $\\beta$."
+      },
+      {
+        "term": "Overlay (Standard / $V_T$ / Gate)",
+        "body": "Optionally draws the thyristor voltage or the gate pulses on the scope so that turn-on and turn-off instants can be seen."
+      }
+    ],
+    "example": {
+      "title": "Resistive load at a firing angle of sixty degrees",
+      "problem": "A single-phase bidirectional controller is fed from $V_s = 230\\text{ V}$ and supplies $R = 10\\text{ }\\Omega$ with phase control at $\\alpha = 60^\\circ$. Calculate the output voltage, power and power factor.",
+      "steps": [
+        {
+          "text": "Evaluate the bracket in radians, using $\\alpha = \\pi/3$.",
+          "tex": "\\pi - \\frac{\\pi}{3} + \\frac{\\sin 120^\\circ}{2} = 2.0944 + 0.4330 = 2.5274"
+        },
+        {
+          "text": "Divide by $\\pi$ and take the square root to obtain the voltage ratio, which is also the power factor.",
+          "tex": "PF = \\sqrt{\\frac{2.5274}{\\pi}} = \\sqrt{0.8045} = 0.897"
+        },
+        {
+          "text": "Multiply by the supply voltage.",
+          "tex": "V_{rms} = 230 \\times 0.897 = 206.3\\text{ V}"
+        },
+        {
+          "text": "Load current, active power and apparent power.",
+          "tex": "I_{rms} = \\frac{206.3}{10} = 20.63\\text{ A}, \\quad P = 206.3 \\times 20.63 = 4256\\text{ W}, \\quad S = 230 \\times 20.63 = 4745\\text{ VA}"
+        },
+        {
+          "text": "For comparison, integral-cycle control with $n_{ON} = 3$ and $m_{OFF} = 1$ gives a ratio $k = 3/4 = 0.75$.",
+          "tex": "V_{rms} = 230\\sqrt{0.75} = 199.2\\text{ V}"
+        }
+      ],
+      "result": "At $\\alpha = 60^\\circ$ the controller delivers $V_{rms} = 206.3\\text{ V}$ and $P = 4256\\text{ W}$ with $PF = 0.897$ (check: $P/S = 4256/4745 = 0.897$). Integral-cycle control reaches a similar voltage with unity displacement but with cycle-skipping."
+    },
+    "applications": [
+      {
+        "field": "Lighting and heating control",
+        "body": "Dimmers and electric furnaces use phase control; slow thermal loads also allow integral-cycle control without interference."
+      },
+      {
+        "field": "Induction motor soft starters",
+        "body": "Three-phase controllers ramp the stator voltage to limit starting current and mechanical shock on pumps, fans and conveyors."
+      },
+      {
+        "field": "Industrial heaters and ovens",
+        "body": "Zero-crossing triggering keeps harmonic emission within grid limits for large resistive heater banks."
+      },
+      {
+        "field": "Transformer tap-less regulation",
+        "body": "AC regulators stabilize line voltage for sensitive laboratory and process equipment without moving parts."
+      }
+    ]
+  },
+  "chopper": {
+    "title": "Choppers: Buck, Boost and Buck-Boost DC-DC Converters",
+    "intro": "The Chopper studio converts a fixed DC input into a different DC output level by switching a transistor with duty cycle $D$ and smoothing the result with an inductor and a capacitor.",
+    "purpose": "This tool simulates the three basic non-isolated DC-DC topologies, selected by the Buck, Boost and Buck-Boost modes, and the chopper classes A to E for one-, two- and four-quadrant operation. The scope shows the switch signal, inductor current and output voltage under PWM or frequency-modulation control and the metrics report $V_{dc}$, ripple current, $L_c$, power and efficiency.",
+    "model": [
+      {
+        "heading": "Buck converter",
+        "body": "In continuous conduction the buck steps the voltage down with $V_o/V_{in} = D$. The inductor current ripple is $\\Delta I_L = \\frac{(V_{in} - V_o)D}{f_s L}$, and the boundary of continuous conduction is the critical inductance $L_{crit} = \\frac{(1 - D)R}{2f_s}$. For $L < L_{crit}$ the current reaches zero (discontinuous conduction, DCM) and the gain rises above $D$, following $V_o/V_{in} = 2/(1 + \\sqrt{1 + 4K/D^2})$ with $K = 2Lf_s/R$."
+      },
+      {
+        "heading": "Boost converter",
+        "body": "The boost steps the voltage up with $V_o/V_{in} = \\frac{1}{1 - D}$ in continuous conduction. The inductor current ripple is $\\Delta I_L = V_{in}D/(f_s L)$ and the output capacitor supplies the load while the switch is on, giving a voltage ripple $\\Delta V_o = \\frac{I_o D}{f_s C}$. The critical inductance is $L_{crit} = \\frac{D(1 - D)^2R}{2f_s}$, and the gain theoretically diverges as $D \\to 1$ but real losses limit it."
+      },
+      {
+        "heading": "Buck-boost converter",
+        "body": "The buck-boost produces an inverted output with $V_o/V_{in} = -\\frac{D}{1 - D}$, so it steps down for $D < 0.5$ and up for $D > 0.5$. Its critical inductance is $L_{crit} = \\frac{(1 - D)^2R}{2f_s}$ and its capacitor ripple is $\\Delta V_o = I_oD/(f_s C)$. Energy is stored in the inductor during the on-time and delivered to the load during the off-time."
+      },
+      {
+        "heading": "CCM, DCM and control",
+        "body": "Continuous conduction mode (CCM) holds the gain independent of the load, while DCM makes it load dependent. In pulse-width control the period is constant and $D$ varies; in frequency modulation the on-time is fixed and $f_s$ varies, so $D = t_{on}f_s$."
+      }
+    ],
+    "equations": [
+      "Buck voltage gain in continuous conduction.",
+      "Buck inductor current ripple.",
+      "Buck critical inductance for the CCM/DCM boundary.",
+      "Boost voltage gain.",
+      "Boost output voltage ripple.",
+      "Buck-boost voltage gain, inverting.",
+      "Critical inductance of the boost and the buck-boost converters.",
+      "Buck gain in discontinuous conduction mode."
+    ],
+    "mapping": [
+      {
+        "term": "Converter mode (Buck / Boost / Buck-Boost)",
+        "body": "Selects the topology and with it the gain law, the ripple formula and the critical inductance."
+      },
+      {
+        "term": "Chopper class (A to E)",
+        "body": "Chooses the quadrant of operation: A and B are single-quadrant, C and D are two-quadrant and E is the four-quadrant bridge that can reverse voltage and current."
+      },
+      {
+        "term": "Control (PWM / Frequency Mod.)",
+        "body": "PWM changes $D$ at fixed $f_s$; frequency modulation keeps the on-time constant and varies $f_s$."
+      },
+      {
+        "term": "Duty cycle $D$ ($0$ to $1$)",
+        "body": "Slider and field for the duty cycle; the gain laws above are evaluated directly from it."
+      },
+      {
+        "term": "$f_s$ [Hz] and $V_s$ [V]",
+        "body": "The switching frequency (minimum $50\\text{ Hz}$) and the source voltage. Increasing $f_s$ reduces $\\Delta I_L$ and $L_{crit}$."
+      },
+      {
+        "term": "Load ($R$, $RL$, $RLE$), $R$, $L$ and $E$",
+        "body": "$R$ and $L$ (in millihenry) set the ripple and whether the circuit is in CCM; $E$ models a motor back-EMF or battery."
+      },
+      {
+        "term": "Metrics $V_{dc}$, $\\Delta I$, $I_{max}$, $I_{min}$, $L_c$",
+        "body": "Show the output average, current ripple, current peaks and the critical inductance in millihenry; $I_{min} > 0$ confirms CCM."
+      },
+      {
+        "term": "$P_{in}$, $P_{out}$ and $\\eta$",
+        "body": "Power balance and efficiency of the simulated converter, including the switching and conduction losses of the model."
+      }
+    ],
+    "example": {
+      "title": "Sizing buck and boost stages at twenty kilohertz",
+      "problem": "Both converters switch at $f_s = 20\\text{ kHz}$. The buck has $V_{in} = 48\\text{ V}$, $D = 0.75$, $R = 6\\text{ }\\Omega$ and $L = 300\\text{ }\\mu\\text{H}$. The boost has $V_{in} = 12\\text{ V}$, $D = 0.6$, $R = 15\\text{ }\\Omega$ and $C = 100\\text{ }\\mu\\text{F}$. Find outputs, ripple and operating mode.",
+      "steps": [
+        {
+          "text": "Buck output voltage and load current.",
+          "tex": "V_o = 0.75 \\times 48 = 36\\text{ V}, \\qquad I_o = \\frac{36}{6} = 6\\text{ A}"
+        },
+        {
+          "text": "Buck inductor ripple and current extremes.",
+          "tex": "\\Delta I_L = \\frac{(48 - 36)\\times 0.75}{20000 \\times 300\\times 10^{-6}} = \\frac{9}{6} = 1.5\\text{ A}, \\quad I_{max} = 6.75\\text{ A}, \\; I_{min} = 5.25\\text{ A}"
+        },
+        {
+          "text": "Buck critical inductance, confirming CCM since $L$ exceeds it.",
+          "tex": "L_{crit} = \\frac{(1 - 0.75)\\times 6}{2 \\times 20000} = 37.5\\text{ }\\mu\\text{H}"
+        },
+        {
+          "text": "Boost output voltage and current, then capacitor ripple.",
+          "tex": "V_o = \\frac{12}{1 - 0.6} = 30\\text{ V}, \\quad I_o = \\frac{30}{15} = 2\\text{ A}, \\quad \\Delta V_o = \\frac{2 \\times 0.6}{20000 \\times 100\\times 10^{-6}} = 0.6\\text{ V}"
+        },
+        {
+          "text": "Boost critical inductance, and the buck-boost output for the same $V_{in}$ and $D$ for comparison.",
+          "tex": "L_{crit} = \\frac{0.6 \\times 0.4^2 \\times 15}{2 \\times 20000} = 36\\text{ }\\mu\\text{H}, \\qquad V_o = -\\frac{0.6}{0.4}\\times 12 = -18\\text{ V}"
+        }
+      ],
+      "result": "The buck delivers $36\\text{ V}$ at $6\\text{ A}$ with $\\Delta I_L = 1.5\\text{ A}$ in CCM, and the boost delivers $30\\text{ V}$ at $2\\text{ A}$ with $\\Delta V_o = 0.6\\text{ V}$. The buck-boost would output $-18\\text{ V}$ from the same source."
+    },
+    "applications": [
+      {
+        "field": "Battery-powered robots and drones",
+        "body": "Buck converters step a pack voltage down to logic and motor rails with high efficiency."
+      },
+      {
+        "field": "Photovoltaic and fuel-cell systems",
+        "body": "Boost stages raise the low panel voltage to the DC link and track the maximum power point through $D$."
+      },
+      {
+        "field": "Electric vehicles and regenerative drives",
+        "body": "Class C, D and E choppers move energy in both directions between the battery and the motor during braking."
+      },
+      {
+        "field": "Telecom and avionics supplies",
+        "body": "Buck-boost converters keep a regulated rail while the input varies above and below the output level."
+      }
+    ]
+  }
+}

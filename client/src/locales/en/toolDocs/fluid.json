@@ -1,0 +1,131 @@
+{
+  "pneumatics": {
+    "title": "Pneumatics: compressed-air actuation",
+    "intro": "Pneumatic circuits move loads with compressed air. Because air is compressible, force, speed and timing must be reasoned about separately: pressure sets force, flow sets speed.",
+    "purpose": "In Pneumatic mode the schematic canvas solves a compressed-air network: a pressure source or service unit feeds directional valves, flow controls and cylinders, and every pipe is coloured by its live pressure. The solver reports cylinder position, port pressures and valve states while you operate the push buttons, so you can verify a sequence such as extend, dwell and retract against the circuit you drew.",
+    "model": [
+      {
+        "heading": "Gas state and supply pressure",
+        "body": "Air behaves as an ideal gas, $PV = mR_sT$, with specific gas constant $R_s = 287\\text{ J/(kg}\\cdot\\text{K)}$ for dry air. Here $P$ is absolute pressure, $V$ is volume, $m$ is mass and $T$ is absolute temperature. Industrial networks are normally run near $P_{sys} \\approx 6\\text{ bar} = 600\\text{ kPa}$ gauge, which is the default operating pressure of the supply components. Gauge pressure $P_{gauge}$ is measured above atmosphere, so $P = P_{gauge} + P_{atm}$ with $P_{atm} \\approx 101.3\\text{ kPa}$."
+      },
+      {
+        "heading": "Cylinder force",
+        "body": "A single-acting cylinder has a return spring, so the available extension force is reduced by the spring: $F_{ext} = PA_{piston} - F_{spring}$, and the pressure must first exceed $F_{spring}/A_{piston}$ before the rod moves. A double-acting cylinder with bore $D$ and rod diameter $d$ produces $F_{ext} = P\\pi D^2/4$ on the full piston face and $F_{ret} = P\\pi(D^2 - d^2)/4$ on the annular rod side, so the return force is always smaller. Friction and back pressure are subtracted in practice, typically costing $5$ to $20$ percent of the ideal figure."
+      },
+      {
+        "heading": "Air consumption and free air delivery",
+        "body": "Compressors are sized in free air, the volume the air would occupy at atmospheric pressure. For a swept volume $V_{cyl}$ per cycle, $Q_{FAD} = V_{cyl}\\dfrac{P_{gauge} + P_{atm}}{P_{atm}}n_{cycles}$, where $n_{cycles}$ is the cycle rate. The compression ratio multiplies the swept volume, which is why a modest cylinder run at $6\\text{ bar}$ consumes about seven times its swept volume in free air."
+      },
+      {
+        "heading": "Directional valves",
+        "body": "Valves are named by ports and positions. A $3/2$ valve (three ports, two positions) drives a single-acting cylinder, a $5/2$ valve drives a double-acting cylinder, and a $5/3$ valve adds a centre position that closes, exhausts or pressurizes both work ports. A valve returns by spring or is held by a pilot or detent, and the symbol shows the current position as the active cell."
+      },
+      {
+        "heading": "Speed control with throttle check valves",
+        "body": "Cylinder speed follows $v = Q/A$. A throttle check valve restricts flow in one direction only, through an adjustable orifice, and lets air pass freely the other way. Meter-in throttles the supply to the cylinder, and the load can then run ahead of the flow when it pulls. Meter-out throttles the exhaust, which keeps back pressure $P_2$ on the rod side so that $P_1A_1 - P_2A_2 = F_{load}$ and motion is stable. Orifice flow becomes choked when $P_2/P_1$ falls below about $0.528$, after which a lower downstream pressure no longer increases the flow."
+      }
+    ],
+    "equations": [
+      "Ideal gas law with the specific gas constant of dry air.",
+      "Single-acting extension force reduced by the return spring.",
+      "Double-acting extension force on the full piston face.",
+      "Double-acting retraction force on the annular rod side.",
+      "Free air delivery needed for a given swept volume and cycle rate.",
+      "Piston speed from flow and piston area.",
+      "Force balance of a meter-out circuit with back pressure.",
+      "Critical pressure ratio at which orifice flow chokes."
+    ],
+    "mapping": [
+      { "term": "Medium switch (Pneumatic)", "body": "Selects air as the working fluid and loads the pneumatic part library. Switching clears the schematic, because the symbols and ratings differ." },
+      { "term": "Operating Pressure", "body": "The supply setting of the pressure source, default $6\\text{ bar}$. It is the gauge pressure $P$ in every force equation." },
+      { "term": "Bore and Stroke", "body": "The advanced cylinder geometry, defaults $D = 25\\text{ mm}$ and $100\\text{ mm}$ stroke. Bore fixes the areas $A_{piston}$ and $\\pi D^2/4$, and stroke fixes the swept volume $V_{cyl}$." },
+      { "term": "Throttle Opening", "body": "A slider from $1$ to $100$ percent on flow control valves. It scales the effective orifice area and therefore the flow $Q$ and speed $v$." },
+      { "term": "Set Pressure and Switching Pressure", "body": "The setting of regulators, relief valves and sequence valves. The regulator holds its outlet at this value whatever the inlet pressure above it." },
+      { "term": "Reservoir Volume", "body": "Vessel volume of an air reservoir or time-delay chamber, from $10$ to $100000\\text{ cm}^3$. A larger $V$ slows the pressure change in the ideal gas relation and lengthens the delay." },
+      { "term": "Push buttons and Latch", "body": "Operators that shift a valve to its active cell. Latch holds the input on, which models a detented lever." },
+      { "term": "Simulation speed", "body": "A slider from $0.1$ to $4$ times real time that scales how fast the solver advances the animation." }
+    ],
+    "example": {
+      "title": "Sizing a double-acting cylinder and its air consumption",
+      "problem": "A double-acting cylinder has bore $D = 50\\text{ mm}$, rod $d = 20\\text{ mm}$ and stroke $100\\text{ mm}$ at $P = 6\\text{ bar}$ gauge. Find both forces and the free air needed at $n_{cycles} = 30\\text{ min}^{-1}$.",
+      "steps": [
+        { "text": "Piston area and extension force with $P = 600\\text{ kPa}$.", "tex": "A = \\frac{\\pi (0.05)^2}{4} = 1.9635\\times10^{-3}\\text{ m}^2,\\quad F_{ext} = 600\\,000 \\times 1.9635\\times10^{-3} = 1178\\text{ N}" },
+        { "text": "Annular area on the rod side and retraction force.", "tex": "A_r = \\frac{\\pi (0.05^2 - 0.02^2)}{4} = 1.6493\\times10^{-3}\\text{ m}^2,\\quad F_{ret} = 600\\,000 \\times 1.6493\\times10^{-3} = 990\\text{ N}" },
+        { "text": "Swept volume of one full cycle, extend plus retract, with a stroke of $0.1\\text{ m}$.", "tex": "V_{cyl} = (1.9635 + 1.6493)\\times10^{-3} \\times 0.1 = 3.613\\times10^{-4}\\text{ m}^3" },
+        { "text": "Compression ratio with $P_{atm} = 1.01325\\text{ bar}$, then free air delivery.", "tex": "\\frac{6 + 1.01325}{1.01325} = 6.92,\\quad Q_{FAD} = 3.613\\times10^{-4} \\times 6.92 \\times 30 = 0.0750\\text{ m}^3/\\text{min}" }
+      ],
+      "result": "The cylinder pushes with $F_{ext} \\approx 1178\\text{ N}$, pulls with $F_{ret} \\approx 990\\text{ N}$, and needs $Q_{FAD} \\approx 75\\text{ L/min}$ of free air."
+    },
+    "applications": [
+      { "field": "Assembly automation", "body": "Pick-and-place units, clamps and part feeders use $5/2$ valves and double-acting cylinders because air is clean, fast and cheap to distribute." },
+      { "field": "Packaging and food lines", "body": "Washdown-safe cylinders push, divert and seal products; meter-out throttles set gentle, repeatable stroke speeds." },
+      { "field": "Robotic end effectors", "body": "Pneumatic grippers and vacuum cups give a compliant grip, and the spring-return $3/2$ valve fails safe by releasing or holding on air loss." },
+      { "field": "Process and mining plant", "body": "Pneumatic actuators operate valves and dampers in explosive atmospheres, where air avoids the spark risk of electric drives." }
+    ]
+  },
+  "hydraulics": {
+    "title": "Hydraulics: oil power transmission",
+    "intro": "Hydraulic circuits transmit large forces through nearly incompressible oil. Pressure is generated by resistance to flow, so the pump supplies flow and the load decides the pressure.",
+    "purpose": "In Hydraulic mode the same schematic canvas models an oil circuit: a pump or oil service unit with tank and relief valve feeds directional valves, flow controls, cylinders and motors, and the solver shows line pressure, flow to the tank and actuator motion. It lets you see how the relief valve protects the system and how the flow split decides speed.",
+    "model": [
+      {
+        "heading": "Pascal's law and force multiplication",
+        "body": "Pressure in a confined fluid is the same everywhere, so $P = F_1/A_1 = F_2/A_2$ and a small piston force is multiplied into $F_2 = F_1A_2/A_1$ on a larger area. Industrial ratings span roughly $50$ to $350\\text{ bar}$, i.e. $5$ to $35\\text{ MPa}$, which is why hydraulics dominates heavy lifting and pressing. The default pump pressure in the library is $50\\text{ bar}$."
+      },
+      {
+        "heading": "Continuity and actuator speed",
+        "body": "Oil is treated as incompressible in steady flow, so the volume flow rate is $Q = A_1v_1 = A_2v_2$. Speed is therefore set by flow and area, $v = Q/A$, while force is set by pressure and area. Power is conserved, which is why the larger piston moves slower than the smaller one."
+      },
+      {
+        "heading": "Pump flow and power",
+        "body": "A fixed-displacement pump with displacement $V_d$ per revolution and shaft speed $n$ delivers $Q = V_dn\\eta_{vol}$, where $\\eta_{vol}$ accounts for internal leakage. The hydraulic power is $P_{hyd} = PQ$ and the shaft power is $P_{mech} = PQ/\\eta_{total}$, with $\\eta_{total}$ the product of the volumetric and mechanical efficiencies. The difference is lost as heat in the oil."
+      },
+      {
+        "heading": "Line losses",
+        "body": "The Reynolds number $Re = \\rho vD/\\mu$ separates laminar flow, below roughly $Re \\approx 2300$, from turbulent flow. The Darcy–Weisbach law gives the pressure drop of a line of length $L$ and diameter $D$ as $\\Delta P = f(L/D)\\rho v^2/2$. For laminar flow of mineral oil, with typical $\\rho \\approx 870\\text{ kg/m}^3$ and a dynamic viscosity $\\mu$ in the range of tens of $\\text{mPa}\\cdot\\text{s}$, the friction factor is $f = 64/Re$."
+      },
+      {
+        "heading": "Pressure relief dynamics",
+        "body": "A pilot-operated relief valve keeps a small pilot poppet closed by a spring set to $P_{set}$. When the system pressure exceeds it, the pilot flow creates a pressure drop across the main stage, which lifts the main poppet and diverts the pump flow to the tank. The flow through the opened valve follows the orifice law with discharge coefficient $C_d$ and opening area $A_{rv}$, so the pressure rises slightly with flow above $P_{set}$ (pressure override). Because oil has a finite bulk modulus, the pressure transient between closed and open states is fast but not instantaneous."
+      }
+    ],
+    "equations": [
+      "Pascal's law and the resulting force multiplication.",
+      "Continuity of volume flow between two areas.",
+      "Pump flow from displacement, speed and volumetric efficiency.",
+      "Hydraulic power delivered to the fluid.",
+      "Shaft power including the total efficiency.",
+      "Reynolds number for the oil in a line.",
+      "Darcy–Weisbach pressure drop with the laminar friction factor.",
+      "Orifice flow through an opened relief valve."
+    ],
+    "mapping": [
+      { "term": "Medium switch (Hydraulic)", "body": "Selects oil as the fluid and loads the hydraulic library: pump, tank, relief valve, $4/2$ and $4/3$ valves and the hydraulic motor." },
+      { "term": "Operating Pressure", "body": "The pressure setting of the hydraulic pump or pressure supply, default $50\\text{ bar}$. This is $P$ in the power and force equations." },
+      { "term": "Flow Rate", "body": "The pump delivery in $\\text{L/min}$, default $60\\text{ L/min}$. It plays the role of $Q = V_dn\\eta_{vol}$ and sets actuator speed through $v = Q/A$." },
+      { "term": "Set Pressure on the relief valve", "body": "The cracking pressure $P_{set}$ of the relief valve and oil service unit, default $60\\text{ bar}$. It must sit above the working pressure." },
+      { "term": "Bore and Stroke", "body": "Cylinder geometry, defaults $25\\text{ mm}$ and $100\\text{ mm}$. Bore gives the areas $A_1$ and $A_2$ in Pascal's law and in continuity." },
+      { "term": "Throttle Opening", "body": "A slider from $1$ to $100$ percent on flow control valves, which restricts $Q$ to the actuator and diverts the excess over the relief valve." },
+      { "term": "Rated Speed on the hydraulic motor", "body": "Sets the shaft speed in $\\text{rpm}$, default $1500\\text{ rpm}$, and the flow directions option allows one or both rotation senses." },
+      { "term": "Main Shut-off and Simulation speed", "body": "The shut-off switch of the oil service unit isolates the supply bus; the speed slider runs the solver from $0.1$ to $4$ times real time." }
+    ],
+    "example": {
+      "title": "Pump, press cylinder and supply line",
+      "problem": "A pump with $V_d = 20\\text{ cm}^3$ per revolution runs at $n = 1450\\text{ rpm}$ with $\\eta_{vol} = 0.95$ and $\\eta_{total} = 0.85$ at $P = 150\\text{ bar}$. It drives a cylinder of area $A_2 = 50\\text{ cm}^2$ through a line of $D = 16\\text{ mm}$ and $L = 5\\text{ m}$ carrying oil with $\\rho = 870\\text{ kg/m}^3$ and $\\mu = 0.03\\text{ Pa}\\cdot\\text{s}$.",
+      "steps": [
+        { "text": "Pump flow, converting $1450\\text{ rpm}$ to a flow in $\\text{m}^3/\\text{s}$.", "tex": "Q = 20\\times10^{-6} \\times \\frac{1450}{60} \\times 0.95 = 4.592\\times10^{-4}\\text{ m}^3/\\text{s} = 27.55\\text{ L/min}" },
+        { "text": "Hydraulic and shaft power at $P = 15\\text{ MPa}$.", "tex": "P_{hyd} = 15\\times10^{6} \\times 4.592\\times10^{-4} = 6888\\text{ W},\\quad P_{mech} = \\frac{6888}{0.85} = 8103\\text{ W}" },
+        { "text": "Cylinder speed from continuity with $A_2 = 5\\times10^{-3}\\text{ m}^2$, and the force at this pressure.", "tex": "v_2 = \\frac{4.592\\times10^{-4}}{5\\times10^{-3}} = 0.0918\\text{ m/s},\\quad F_2 = 15\\times10^{6} \\times 5\\times10^{-3} = 75\\text{ kN}" },
+        { "text": "Line velocity and Reynolds number with $A = 2.011\\times10^{-4}\\text{ m}^2$.", "tex": "v = \\frac{4.592\\times10^{-4}}{2.011\\times10^{-4}} = 2.284\\text{ m/s},\\quad Re = \\frac{870 \\times 2.284 \\times 0.016}{0.03} = 1060" },
+        { "text": "The flow is laminar, so $f = 64/Re = 0.0604$, and the Darcy–Weisbach drop follows.", "tex": "\\Delta P = 0.0604 \\times \\frac{5}{0.016} \\times \\frac{870 \\times 2.284^2}{2} = 4.28\\times10^{4}\\text{ Pa} = 0.43\\text{ bar}" }
+      ],
+      "result": "The pump delivers $Q \\approx 27.6\\text{ L/min}$ and needs $P_{mech} \\approx 8.1\\text{ kW}$. The cylinder moves at $v_2 \\approx 9.2\\text{ cm/s}$ against $F_2 \\approx 75\\text{ kN}$, and the laminar line loses only $\\Delta P \\approx 0.43\\text{ bar}$."
+    },
+    "applications": [
+      { "field": "Construction and mining machinery", "body": "Excavator booms and press-style loaders use cylinders at the upper end of the $350\\text{ bar}$ range for very high force in a compact package." },
+      { "field": "Metal forming and injection moulding", "body": "Presses combine relief-protected pumps with proportional valves to hold exact pressure during forming." },
+      { "field": "Aerospace actuation", "body": "Flight control surfaces and landing gear use redundant hydraulic circuits for high power-to-weight ratio." },
+      { "field": "Industrial robotics and test rigs", "body": "Heavy manipulators and fatigue rigs use servo-hydraulic control, where continuity gives precise speed from valve flow." }
+    ]
+  }
+}

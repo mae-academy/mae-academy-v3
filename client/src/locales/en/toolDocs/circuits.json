@@ -1,0 +1,119 @@
+{
+  "workspace": {
+    "title": "Circuit Workspace: MNA Solver and Analysis Methods",
+    "intro": "The circuit studio is a single interactive schematic canvas. You place sources, passive parts, semiconductors and instruments, wire them together, and a server-side modified nodal analysis engine solves the network while the canvas animates currents and voltages.",
+    "purpose": "This workspace models lumped electrical networks in the steady state (DC and phasor AC) and in the time domain (transients, oscilloscope traces). Every wire junction becomes a node, every part becomes a stamp in one linear system, and the analysis panel can replay the same answer as a human-readable derivation by nodal, mesh, superposition, source transformation or Thévenin methods.",
+    "model": [
+      {
+        "heading": "Kirchhoff's laws as the foundation",
+        "body": "Kirchhoff's current law states that the algebraic sum of currents leaving any node is zero, $\\sum I = 0$, because charge cannot accumulate at a lumped node. Kirchhoff's voltage law states that the sum of branch voltages around any closed loop is zero, $\\sum V = 0$, because the electric field of a lumped circuit is conservative. Together with each element's constitutive relation, such as $v = iR$ for a resistor, they give exactly as many independent equations as unknowns."
+      },
+      {
+        "heading": "Modified nodal analysis",
+        "body": "The solver assembles the block system $\\mathbf A\\mathbf x = \\mathbf z$ with $\\mathbf A = \\begin{bmatrix}\\mathbf G&\\mathbf B\\\\\\mathbf C&\\mathbf D\\end{bmatrix}$. The matrix $\\mathbf G$ holds conductance stamps: a diagonal entry $G_{ii}$ sums the conductances touching node $i$, and an off-diagonal entry $G_{ij}$ is the negative of the conductance joining nodes $i$ and $j$. The blocks $\\mathbf B$ and $\\mathbf C$ couple ideal voltage sources and other branch-current unknowns $\\mathbf j$ to the node voltages $\\mathbf v$, while $\\mathbf i$ collects injected source currents and $\\mathbf e$ the source voltages. The ground part fixes the reference node so the matrix is non-singular; a floating sub-circuit or an open loop of current sources makes $\\mathbf A$ singular and is reported instead of solved."
+      },
+      {
+        "heading": "Phasors and complex impedance",
+        "body": "For sinusoidal sources at angular frequency $\\omega = 2\\pi f$ the same stamps are used with complex values. A resistor stays $R$, an inductor contributes $j\\omega L$ and a capacitor $\\frac{1}{j\\omega C}$, so a series branch has $\\mathbf Z = R + j\\left(\\omega L - \\frac{1}{\\omega C}\\right)$. The phasor current is $\\hat I = \\hat V / \\mathbf Z$ and the admittance $\\mathbf Y = 1/\\mathbf Z = G + jB$ is what enters $\\mathbf G$. Resonance occurs where the reactive term vanishes, $\\omega_0 = 1/\\sqrt{LC}$, and the impedance magnitude is then minimal and equal to $R$."
+      },
+      {
+        "heading": "Thévenin equivalents and maximum power",
+        "body": "Seen from a chosen pair of terminals, any linear network reduces to a source $V_{th}$ in series with $R_{th}$. The voltage $V_{th}$ is the open-circuit terminal voltage and $R_{th}$ is $V_{oc}/I_{sc}$, or the resistance seen after all independent sources are zeroed. A load receives the maximum power $P = V_{th}^2/(4R_{th})$ only when its resistance equals $R_{th}$, at which point the efficiency is just one half."
+      },
+      {
+        "heading": "Transients and time stepping",
+        "body": "A first-order network moves exponentially from its initial value $v_0$ to its final value $V_\\infty$ with time constant $\\tau = RC$ for capacitors or $\\tau = L/R$ for inductors. After $t = 5\\tau$ the response is within about $0.7\\%$ of the final value. In the time domain each reactive part is replaced by a companion model: backward Euler turns a capacitor into a conductance $g_C = C/\\Delta t$ in parallel with a history current source, so the same linear solve advances the circuit one step at a time."
+      }
+    ],
+    "equations": [
+      "Kirchhoff's current and voltage laws: the node-sum and loop-sum constraints that every solved circuit satisfies.",
+      "The modified nodal analysis block system with conductance, incidence and source blocks.",
+      "Conductance stamps: diagonal entries sum attached conductances, off-diagonal entries subtract the shared one.",
+      "Complex series impedance with inductive and capacitive reactance at angular frequency $\\omega$.",
+      "Ohm's law in phasor form and the admittance used in the nodal matrix.",
+      "Thévenin parameters from open-circuit voltage and short-circuit current, plus the maximum power transfer result.",
+      "First-order capacitor transient toward its final value with $\\tau = RC$.",
+      "Inductor current rise with $\\tau = L/R$.",
+      "Backward Euler companion model of a capacitor used for each transient time step."
+    ],
+    "mapping": [
+      {
+        "term": "Sources: DC voltage, DC rail, AC voltage, DC and AC current, 3-phase",
+        "body": "A DC voltage source adds a row to $\\mathbf B$, $\\mathbf C$ and a value to $\\mathbf e$, with an adjustable internal resistance. AC sources take magnitude, phase, offset and a frequency between $0.001\\text{ Hz}$ and $1\\text{ MHz}$ plus a sine, square, sawtooth or triangle waveform; magnitude and phase become the complex entry of $\\mathbf e$. Current sources write directly into $\\mathbf i$."
+      },
+      {
+        "term": "Resistor, capacitor, inductor properties",
+        "body": "The resistance field (from $0.001\\text{ }\\Omega$ up to $10^{9}\\text{ }\\Omega$) sets the stamp $1/R$ in $\\mathbf G$. Tolerance and power rating do not change the nominal solve but flag overdissipation. Capacitance and inductance set $\\tau$ and the companion conductances."
+      },
+      {
+        "term": "Ground part",
+        "body": "Placing a ground fixes one node voltage to $0$ and removes its row from the system. Without it the matrix has a free common-mode level and the solve cannot be completed."
+      },
+      {
+        "term": "Run, pause, reset and time readout",
+        "body": "The toolbar advances the transient clock $t$ in steps of $\\Delta t$ and displays the elapsed time. Reset restores every reactive state to $v_0$ and $i_0$, which sets the initial condition of the exponentials."
+      },
+      {
+        "term": "Simulation speed slider",
+        "body": "The slider scales wall-clock time into simulated time between $0.1\\times$ and $4\\times$ in steps of $0.05$. It changes how fast the animation plays, not the physics: $\\tau$ is unchanged."
+      },
+      {
+        "term": "Analysis panel: nodal, mesh, superposition, transform, Thévenin",
+        "body": "Each method re-derives the solution that $\\mathbf A\\mathbf x = \\mathbf z$ gives. Nodal lists node-voltage KCL equations, mesh colours loops and applies KVL, superposition solves once per independent source, and Thévenin reduces the network seen by a target load picked with the load selector to $V_{th}$ and $R_{th}$."
+      },
+      {
+        "term": "Oscilloscope and multimeter",
+        "body": "The oscilloscope samples node voltages versus time from the transient solver, so a charging capacitor appears as the curve $v_C(t)$. The multimeter reads the solved DC or RMS value at its probes."
+      }
+    ],
+    "example": {
+      "title": "Thévenin equivalent and RC charging",
+      "problem": "A $12\\text{ V}$ DC source drives $R_1 = 4\\text{ k}\\Omega$ in series, followed by $R_2 = 12\\text{ k}\\Omega$ to ground. A capacitor $C = 10\\text{ }\\mu\\text{F}$, initially discharged, is connected across $R_2$. Find the Thévenin equivalent seen by the capacitor, the time constant, and the capacitor voltage at $t = 60\\text{ ms}$.",
+      "steps": [
+        {
+          "text": "Remove the capacitor and compute the open-circuit voltage with the voltage divider.",
+          "tex": "V_{th} = 12\\cdot\\frac{12}{4+12} = 9\\text{ V}"
+        },
+        {
+          "text": "Zero the source (a short circuit) so $R_1$ and $R_2$ appear in parallel.",
+          "tex": "R_{th} = \\frac{4\\cdot 12}{4+12} = 3\\text{ k}\\Omega"
+        },
+        {
+          "text": "The time constant follows from the Thévenin resistance and the capacitance.",
+          "tex": "\\tau = R_{th}C = 3000\\cdot 10\\times10^{-6} = 30\\text{ ms}"
+        },
+        {
+          "text": "With $v_0 = 0$ and $V_\\infty = 9\\text{ V}$ evaluate the charging law at $t = 60\\text{ ms} = 2\\tau$, using $e^{-2} \\approx 0.1353$.",
+          "tex": "v_C(60\\text{ ms}) = 9\\left(1 - e^{-2}\\right) \\approx 9\\cdot 0.8647 \\approx 7.78\\text{ V}"
+        },
+        {
+          "text": "The initial charging current is $V_{th}/R_{th}$, which the oscilloscope shows as the steepest slope.",
+          "tex": "i(0^+) = \\frac{9}{3000} = 3\\text{ mA}"
+        }
+      ],
+      "result": "The equivalent is $V_{th} = 9\\text{ V}$ with $R_{th} = 3\\text{ k}\\Omega$, giving $\\tau = 30\\text{ ms}$ and $v_C \\approx 7.78\\text{ V}$ after $60\\text{ ms}$, about $86\\%$ of the final value."
+    },
+    "applications": [
+      {
+        "field": "Power distribution",
+        "body": "Steady-state phasor analysis with $\\mathbf Z$ sizes feeders, checks voltage drop and evaluates power factor correction on three-phase supplies."
+      },
+      {
+        "field": "Sensor interfaces for robotics",
+        "body": "Thévenin models of divider-based sensors predict loading error on analog inputs, and $\\tau = RC$ sets the cut-off of anti-alias filters."
+      },
+      {
+        "field": "Motor drive and solenoid control",
+        "body": "The rise of coil current with $\\tau = L/R$ determines actuation time of contactors, valves and brushed motors."
+      },
+      {
+        "field": "Embedded hardware design",
+        "body": "MNA-based simulation verifies bias networks, pull-up values and decoupling transients before a board is fabricated."
+      },
+      {
+        "field": "Aerospace power buses",
+        "body": "Maximum power transfer and source impedance analysis guide battery, regulator and load matching on constrained supplies."
+      }
+    ]
+  }
+}

@@ -1,0 +1,65 @@
+{
+  "studio": {
+    "title": "Arduino Studio: ATmega328P Firmware, ADC, PWM and UART",
+    "intro": "Arduino Studio runs your sketch against a virtual Uno board with LEDs, a push button, a potentiometer, sensors, an LCD and a serial console. Behind every call such as analogRead or analogWrite sits a peripheral of the ATmega328P with its own arithmetic.",
+    "purpose": "The studio has a single workspace rather than separate modes: a code editor, the board canvas with mountable sensors, a speed selector ($0.5\\times$, $1\\times$, $2\\times$ or instant) and a serial console. This document explains the hardware that your code controls, so you can predict pin levels, ADC counts, PWM frequencies and baud rates before you run the sketch.",
+    "model": [
+      {
+        "heading": "ATmega328P architecture",
+        "body": "The Uno uses an 8-bit AVR core with a Harvard architecture, clocked by a crystal at $f_{clk} = 16\\text{ MHz}$, so one machine cycle lasts $t_{clk} = 62.5\\text{ ns}$. It offers $32\\text{ KB}$ of flash for the program, $2\\text{ KB}$ of SRAM and $1\\text{ KB}$ of EEPROM. Three timers ($\\texttt{Timer0}$, $\\texttt{Timer1}$, $\\texttt{Timer2}$), a 10-bit ADC with six channels, a USART and two external interrupt pins ($\\texttt{INT0}$ on pin $2$ and $\\texttt{INT1}$ on pin $3$) are the peripherals the studio models."
+      },
+      {
+        "heading": "10-bit successive-approximation ADC",
+        "body": "The converter compares the input with a binary-weighted reference, one bit per clock, over ten steps. With a reference $V_{ref} = 5\\text{ V}$ one step is $V_{step} = V_{ref}/1024 \\approx 4.88\\text{ mV}$, and the datasheet code is $\\lfloor 1024\\,V_{in}/V_{ref} \\rfloor$ saturated at $1023$. A convention matters here: the studio, like many teaching tools, maps full scale to code $1023$ using $\\lfloor V_{in} \\cdot 1023/V_{ref} \\rfloor$, so $V_{in} = 5\\text{ V}$ gives exactly $1023$. The two forms differ by at most one count. Both truncate, never round, so the quantization error is between $0$ and $-1$ LSB."
+      },
+      {
+        "heading": "Timer PWM modes and prescaler",
+        "body": "analogWrite loads the compare register $\\texttt{OCRnA}$ or $\\texttt{OCRnB}$ with a value from $0$ to $255$. In Fast PWM the counter climbs to $255$ and resets, so $f = f_{clk}/(N \\cdot 256)$ and the duty cycle is $(\\texttt{OCRnx}+1)/256$. In Phase-Correct PWM the counter climbs and then falls, which gives $f = f_{clk}/(N \\cdot 510)$ and a duty cycle of $\\texttt{OCRnx}/255$, with symmetric pulses and less switching noise. The prescaler divides the clock by $N \\in \\{1, 8, 64, 256, 1024\\}$. On an Uno the Arduino core selects $N = 64$ for the timers it uses for analogWrite: pins $5$ and $6$ run Fast PWM at about $977\\text{ Hz}$, and pins $9$ and $10$ run Phase-Correct at about $490\\text{ Hz}$, as do pins $3$ and $11$."
+      },
+      {
+        "heading": "External interrupts and UART",
+        "body": "attachInterrupt links an ISR to a pin edge on $\\texttt{INT0}$ or $\\texttt{INT1}$. The hardware needs at least four cycles, about $0.25\\text{ }\\mu\\text{s}$, before the first ISR instruction, and variables shared with loop must be declared $\\texttt{volatile}$. The USART divides the clock with $\\text{UBRR} = f_{osc}/(16 \\cdot \\text{Baud}) - 1$, rounded to an integer, so the real rate differs from the request by the error $e$ shown above. Errors beyond roughly $2\\text{ percent}$ make frames unreliable. The studio models the serial console and reports the baud passed to Serial.begin; its interrupt handling is a concept to practise on real hardware."
+      }
+    ],
+    "equations": [
+      "Step size and datasheet ADC code",
+      "Studio convention with full scale at code 1023 and reconstructed voltage",
+      "Fast PWM frequency and duty cycle",
+      "Phase-Correct PWM frequency and duty cycle",
+      "Average pin voltage and the prescaler set",
+      "UART baud register",
+      "Actual baud rate and percentage error",
+      "Sensor transfer functions used by the studio",
+      "Clock period and minimum interrupt latency"
+    ],
+    "mapping": [
+      { "term": "Potentiometer on $\\texttt{A0}$", "body": "Sweeping the knob changes $V_{in}$ from $0$ to $V_{ref}$, and analogRead returns $\\lfloor V_{in} \\cdot 1023/V_{ref} \\rfloor$." },
+      { "term": "LM35 temperature sensor", "body": "Ranges from $0$ to $100\\,^\\circ\\text{C}$ at $10\\text{ mV}/{}^\\circ\\text{C}$, so each ADC count is about $0.49\\,^\\circ\\text{C}$." },
+      { "term": "LDR light sensor", "body": "A logarithmic slider from $0.1$ to $10000\\text{ lux}$ sets $R_{LDR}$, forming a divider with a $10\\text{ k}\\Omega$ resistor to ground." },
+      { "term": "HC-SR04 ultrasonic sensor", "body": "Distance from $2$ to $400\\text{ cm}$ becomes an echo pulse of $58.2\\text{ }\\mu\\text{s}$ per centimetre, which pulseIn measures." },
+      { "term": "PIR and IR obstacle sensors", "body": "The PIR output is HIGH for a hold time of $1$ to $5\\text{ s}$; the IR output is active LOW at or inside a threshold from $1$ to $30\\text{ cm}$." },
+      { "term": "PWM pins $3, 5, 6, 9, 10, 11$", "body": "analogWrite accepts $0$ to $255$; the board shows the duty $\\texttt{OCRnx}/255$ as LED brightness and in the pin tooltip." },
+      { "term": "Serial console", "body": "Shows the baud given to Serial.begin, such as $9600$ or $115200$, and lets you send text back to the sketch." },
+      { "term": "Speed selector", "body": "Scales sketch execution by $0.5\\times$, $1\\times$ or $2\\times$ so you can follow delay-based timing, or runs instantly." }
+    ],
+    "example": {
+      "title": "LM35 reading, PWM rate and baud choice",
+      "problem": "An LM35 at $T = 25\\,^\\circ\\text{C}$ feeds $\\texttt{A0}$ with $V_{ref} = 5\\text{ V}$. Find the ADC count, the temperature the sketch recovers, the PWM frequencies on pins $6$ and $9$, and the UART setting for $9600$ baud at $16\\text{ MHz}$.",
+      "steps": [
+        { "text": "Sensor voltage at $10\\text{ mV}/{}^\\circ\\text{C}$:", "tex": "V_{in} = 0.01 \\cdot 25 = 0.25\\text{ V}" },
+        { "text": "Studio ADC code with the $1023$ convention, truncated:", "tex": "\\text{ADC} = \\left\\lfloor \\frac{0.25}{5} \\cdot 1023 \\right\\rfloor = \\lfloor 51.15 \\rfloor = 51" },
+        { "text": "Recovered voltage and temperature in the sketch:", "tex": "\\hat{V} = 51 \\cdot \\frac{5}{1023} = 0.2493\\text{ V} \\;\\Rightarrow\\; \\hat{T} = 24.9\\,^\\circ\\text{C}" },
+        { "text": "PWM with $N = 64$: pin $6$ is Fast PWM and pin $9$ is Phase-Correct.", "tex": "f_6 = \\frac{16\\times10^6}{64 \\cdot 256} = 976.6\\text{ Hz}, \\qquad f_9 = \\frac{16\\times10^6}{64 \\cdot 510} = 490.2\\text{ Hz}" },
+        { "text": "UART at $9600$ baud, then rounding $\\text{UBRR}$ to $103$ and computing the error:", "tex": "\\text{UBRR} = \\frac{16\\times10^6}{16 \\cdot 9600} - 1 = 103.17 \\;\\Rightarrow\\; 103, \\quad \\text{Baud}_{real} = \\frac{16\\times10^6}{16 \\cdot 104} = 9615.4, \\quad e = +0.16\\%" }
+      ],
+      "result": "The sketch sees $\\text{ADC} = 51$, which it converts to $24.9\\,^\\circ\\text{C}$ (a $0.1\\,^\\circ\\text{C}$ truncation loss). Pin $6$ switches at $976.6\\text{ Hz}$ and pin $9$ at $490.2\\text{ Hz}$. Setting $\\text{UBRR} = 103$ gives an error of only $+0.16\\%$, so $9600$ baud is reliable. By contrast $115200$ baud rounds to $\\text{UBRR} = 8$ with $e = -3.55\\%$, which is too large."
+    },
+    "applications": [
+      { "field": "Robotics", "body": "Ultrasonic and IR sensors on an AVR give obstacle distance, and PWM drives motor speed through an H-bridge." },
+      { "field": "Building automation", "body": "LM35 and LDR readings control fans and lamps, with thresholds set on the ADC code." },
+      { "field": "Industrial monitoring", "body": "Serial links at a verified baud rate stream sensor data to a supervisory computer." },
+      { "field": "Power conversion", "body": "Timer PWM at a chosen $N$ generates the switching signal of a buck converter controller." },
+      { "field": "Security systems", "body": "A PIR sensor wired to an external interrupt wakes the microcontroller only when motion occurs, saving energy." }
+    ]
+  }
+}

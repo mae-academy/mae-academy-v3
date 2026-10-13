@@ -20,6 +20,7 @@ import type { Palette } from '@/simulators/shared/workspace/workspaceTheme';
 import { OPERATOR_PROP, isMechanicalOperator } from '@shared/fluid/engine/componentSolvers';
 import { sensorId } from '@shared/fluid/engine/FluidEngine';
 import type { EngineMedium, OperatorSide } from '@shared/fluid/engine/types';
+import { publishDocsTool } from '@/components/simulations/toolDocs/activeToolStore';
 import { useFluidEngineBridge } from '../hooks/useFluidEngineBridge';
 import { useFunctionDiagram } from '../hooks/useFunctionDiagram';
 import { useRelayLadder } from '../hooks/useRelayLadder';
@@ -95,6 +96,7 @@ export function FluidSimulatorApp() {
   const textDir = i18n?.language === 'ar' ? 'rtl' : 'ltr';
   const [isDark, setIsDark] = useState(false);
   const [medium, setMedium] = useState<FluidMedium>('PNEUMATIC');
+  useEffect(() => { publishDocsTool('fluid', medium === 'PNEUMATIC' ? 'pneumatics' : 'hydraulics'); }, [medium]);
   const [simulationSpeed, setSimulationSpeed] = useState(1);
   const held = useRef<Array<{ id: string; side: OperatorSide }>>([]);
   /** Inputs locked on with the Latch toggle, keyed `componentId:side`. A held Push never releases a latched input. */

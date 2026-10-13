@@ -1,0 +1,302 @@
+{
+  "root-locus": {
+    "title": "Root Locus",
+    "intro": "The root locus shows how the closed-loop poles of a feedback system migrate across the complex plane as a single loop gain $K$ is swept from zero to a large value. It turns a stability question into a geometric one.",
+    "purpose": "This tool plots the locus of the roots of $1 + K\\,G(s)H(s) = 0$ for the transfer function you enter, draws the asymptotes, breakaway points and imaginary-axis crossings, and marks the closed-loop poles that correspond to the current gain. A second plot shows the closed-loop step response for that same $K$, so you can watch pole position turn into damping, overshoot and speed.",
+    "model": [
+      {
+        "heading": "Characteristic equation and the two criteria",
+        "body": "With the open-loop transfer function written as $G(s)H(s) = N(s)/D(s)$, the closed-loop poles are the roots of $D(s) + K\\,N(s) = 0$. A point $s$ lies on the locus if and only if it satisfies both the angle criterion and the magnitude criterion. The angle criterion, $\\sum \\theta_{zeros} - \\sum \\theta_{poles} = (2k+1)180^\\circ$, selects the geometry of the branches and does not depend on $K$. The magnitude criterion, $|K\\,G(s)H(s)| = 1$, then assigns a unique gain $K$ to every point of a branch."
+      },
+      {
+        "heading": "Branches, endpoints and asymptotes",
+        "body": "For $n$ open-loop poles and $m$ zeros, the locus has $n$ branches. Each branch starts at a pole when $K = 0$ and ends at a zero, or at infinity, when $K \\to \\infty$. The $n - m$ branches that escape follow asymptotes with real-axis centroid $\\sigma_a = (\\sum p_i - \\sum z_i)/(n - m)$ and angles $\\theta_a = (2k+1)\\pi/(n - m)$. On the real axis, a segment belongs to the locus when the total number of real poles and zeros to its right is odd."
+      },
+      {
+        "heading": "Breakaway and break-in points",
+        "body": "Where two branches meet on the real axis and leave it, the gain $K(s) = -D(s)/N(s)$ passes through an extremum along the axis. Solving $dK/ds = 0$ gives candidate points, and only those whose gain $K$ is real and positive and which lie on a valid real-axis segment are true breakaway (leaving) or break-in (entering) points."
+      },
+      {
+        "heading": "Imaginary-axis crossings and stability",
+        "body": "The gain at which the locus enters the right half-plane follows from the Routh-Hurwitz array of $D(s) + K\\,N(s)$. Setting the first-column entry of the $s^1$ row to zero gives the critical gain $K_{cr}$. The auxiliary polynomial of the preceding row, evaluated at that gain, gives the crossing frequency $\\omega_{cr}$. For gains below $K_{cr}$ all poles stay in the left half-plane and the loop is stable."
+      }
+    ],
+    "equations": [
+      "Closed-loop characteristic equation whose roots form the locus.",
+      "Angle criterion: decides whether a test point belongs to the locus.",
+      "Magnitude criterion: gives the gain at a point on the locus.",
+      "Asymptote centroid on the real axis.",
+      "Asymptote angles for the branches that go to infinity.",
+      "Breakaway and break-in condition from the stationary points of the gain.",
+      "Routh-Hurwitz result for a cubic: critical gain and crossing frequency."
+    ],
+    "mapping": [
+      { "term": "Transfer function input", "body": "The numerator and denominator polynomials define $N(s)$ and $D(s)$. Their roots are drawn as zeros and poles, and their orders fix $m$, $n$ and the number of asymptotes $n - m$." },
+      { "term": "Gain Calibration slider $K$", "body": "Moves the closed-loop poles along the branches. The slider range is bounded by the editable limits $K_{min}$ and $K_{max}$, which default to $0.01$ and $10$." },
+      { "term": "S-plane plot", "body": "Shows the branches, the asymptotes with their centroid $\\sigma_a$, and the current closed-loop poles. The grid can be switched between Cartesian and polar so that lines of constant $\\zeta$ and $\\omega_n$ are visible." },
+      { "term": "Analytical steps panel", "body": "Lists the zeros, the poles, the asymptote data, the breakaway points from $dK/ds = 0$ and the imaginary-axis crossings. Selecting a step highlights it on the plot." },
+      { "term": "Closed-loop step response", "body": "Simulates the step response for the current $K$ over the chosen horizon, with a default of $10\\text{ s}$, so you can relate pole damping to the response." },
+      { "term": "Transient metrics and closed-loop poles", "body": "Report $M_p$, $t_r$, $t_s$ and the numerical pole locations that correspond to the slider setting." }
+    ],
+    "example": {
+      "title": "Root locus of a type-1 third-order loop",
+      "problem": "Sketch the root locus for $G(s)H(s) = 1/\\left(s(s+2)(s+4)\\right)$ and find the asymptotes, the breakaway point and the critical gain.",
+      "steps": [
+        {
+          "text": "The loop has $n = 3$ poles at $0$, $-2$ and $-4$ and no zeros, so $m = 0$ and there are $3$ asymptotes. The centroid is:",
+          "tex": "\\sigma_a = \\frac{(0 - 2 - 4) - 0}{3 - 0} = -2"
+        },
+        {
+          "text": "The asymptote angles follow from $k = 0, 1, 2$:",
+          "tex": "\\theta_a = \\frac{(2k+1)\\pi}{3} = 60^\\circ,\\; 180^\\circ,\\; 300^\\circ"
+        },
+        {
+          "text": "The gain along the real axis is $K(s) = -(s^3 + 6s^2 + 8s)$. Setting $dK/ds = 0$ gives a quadratic with two roots, and only the one inside the segment between $0$ and $-2$ is a breakaway point:",
+          "tex": "3s^2 + 12s + 8 = 0 \\;\\Rightarrow\\; s = \\frac{-12 \\pm \\sqrt{48}}{6} = -0.845,\\; -3.155"
+        },
+        {
+          "text": "The root $s = -3.155$ lies between $-2$ and $-4$, where two real poles are to its right, an even count, so it is not on the locus and is rejected. The gain at the accepted point is:",
+          "tex": "K = \\left|s\\right|\\left|s+2\\right|\\left|s+4\\right| = 0.845 \\times 1.155 \\times 3.155 \\approx 3.08"
+        },
+        {
+          "text": "The characteristic polynomial is $s^3 + 6s^2 + 8s + K$. The $s^1$ row of the Routh array is $(48 - K)/6$, which vanishes at the critical gain. The auxiliary polynomial $6s^2 + K$ then gives the crossing frequency:",
+          "tex": "K_{cr} = 6 \\times 8 = 48,\\qquad s = \\pm j\\sqrt{8} = \\pm j\\,2.83"
+        }
+      ],
+      "result": "The asymptotes meet at $\\sigma_a = -2$ with angles $60^\\circ$, $180^\\circ$ and $300^\\circ$, the branches break away at $s \\approx -0.845$ for $K \\approx 3.08$, and the loop is stable only for $0 < K < 48$, crossing the imaginary axis at $\\omega_{cr} \\approx 2.83\\text{ rad/s}$."
+    },
+    "applications": [
+      { "field": "Robotics", "body": "Choosing the proportional gain of a joint position loop so that the dominant poles stay well damped and away from the imaginary axis." },
+      { "field": "Aerospace", "body": "Studying how an autopilot gain moves the short-period and phugoid poles, and finding the gain at which flutter-like oscillation begins." },
+      { "field": "Manufacturing", "body": "Tuning the loop gain of a motorised conveyor or press drive to avoid sustained oscillation when load inertia changes." },
+      { "field": "Power systems", "body": "Setting automatic voltage regulator gain so that generator excitation control stays stable across operating points." }
+    ]
+  },
+  "pid": {
+    "title": "PID Controller",
+    "intro": "A PID controller combines proportional, integral and derivative action on the error signal. It remains the most widely deployed feedback law in industrial automation because each term has a clear physical meaning.",
+    "purpose": "This tool closes a feedback loop around the plant transfer function you enter, using a P, I, D, PI, PD or PID controller in one of several forms. It simulates the response to the selected reference signal and reports overshoot, peak time, settling time and steady-state error, so you can see directly what each gain does.",
+    "model": [
+      {
+        "heading": "Parallel and ISA standard forms",
+        "body": "In the parallel form the control signal is $u(t) = K_p e(t) + K_i \\int_0^t e(\\tau)d\\tau + K_d\\,de(t)/dt$ with independent gains. The standard ISA form factors out the proportional gain, $C(s) = K_p\\left(1 + 1/(T_i s) + T_d s/\\left((T_d/N)s + 1\\right)\\right)$, so that $T_i$ and $T_d$ are times. The two forms are equivalent when $K_i = K_p/T_i$ and $K_d = K_p T_d$."
+      },
+      {
+        "heading": "Derivative filter",
+        "body": "A pure derivative is not realisable and amplifies measurement noise. The filter coefficient $N$ adds a pole at $s = -N/T_d$ and limits the high-frequency gain of the controller to $K_p(1 + N)$. Typical values lie between $5$ and $20$, and a larger $N$ gives a faster derivative at the price of more noise."
+      },
+      {
+        "heading": "Integrator anti-windup",
+        "body": "When the actuator saturates, the integral state keeps growing and later causes a long overshoot. Clamping freezes the integrator whenever the unsaturated command $v$ lies outside $[u_{min}, u_{max}]$ and the error has the same sign as $v$. The integrator resumes as soon as the error drives the command back into range."
+      },
+      {
+        "heading": "Transient metrics",
+        "body": "For a dominant second-order closed loop with damping ratio $\\zeta$ and natural frequency $\\omega_n$, the percent overshoot is $M_p = e^{-\\pi\\zeta/\\sqrt{1-\\zeta^2}} \\times 100\\%$ and the two percent settling time is $t_s \\approx 4/(\\zeta\\omega_n)$. The rise time is approximated by $t_r \\approx (\\pi - \\arccos\\zeta)/(\\omega_n\\sqrt{1-\\zeta^2})$. Raising $K_p$ shortens $t_r$, adding $K_i$ removes steady-state error to a step, and adding $K_d$ increases damping."
+      }
+    ],
+    "equations": [
+      "Parallel PID control law in the time domain.",
+      "ISA standard form with derivative filter coefficient $N$.",
+      "Conversion between standard and parallel gains, and the filter pole.",
+      "Closed-loop transfer function with the controller $C(s)$ and plant $G(s)$.",
+      "Anti-windup by conditional integration (clamping) with actuator saturation.",
+      "Percent overshoot as a function of the damping ratio.",
+      "Settling time and peak time for a second-order response.",
+      "Rise time approximation for a second-order response."
+    ],
+    "mapping": [
+      { "term": "Plant transfer function", "body": "The numerator and denominator you enter define $G(s)$. The closed loop is built as $C(s)G(s)/(1 + C(s)G(s))$." },
+      { "term": "Controller Architecture: P, I, D, PI, PD, PID", "body": "Selects which terms are active. Only the gain sliders that apply to the chosen structure are shown, for example $K_i$ is hidden for P and PD." },
+      { "term": "Controller Form", "body": "Chooses between the parallel, series, parallel standard, parallel modified, series standard and series modified forms, which change how $K_p$, $T_i$ and $T_d$ interact." },
+      { "term": "Gain sliders $K_p$, $K_i$, $K_d$, $N$", "body": "Set the controller coefficients. The defaults are $K_p = 2$, $K_i = 1$, $K_d = 0.2$ and $N = 100$, with $N$ limited to the range from $1$ to $500$." },
+      { "term": "Reference signal", "body": "Impulse, step, ramp, parabolic, exponential, sine or cosine, with a magnitude and a parameter. Ramp and parabolic inputs expose steady-state error of higher system types." },
+      { "term": "Interactive scope", "body": "Plots $r(t)$ and $y(t)$ over a horizon of $1$ to $60$ seconds, starting at $12\\text{ s}$." },
+      { "term": "Design by Specs", "body": "Takes a target $\\zeta$ in the range $0.01$ to $2$ and a target $\\omega_n$, and proposes gains for the second-order specification." },
+      { "term": "Transient Metrics card", "body": "Reports the measured overshoot, peak time, settling time and steady-state error from the simulated response." }
+    ],
+    "example": {
+      "title": "Converting ISA settings and predicting the response",
+      "problem": "An ISA controller uses $K_p = 2$, $T_i = 0.5\\text{ s}$, $T_d = 0.1\\text{ s}$ and $N = 10$. Find the parallel gains and the filter pole, then predict the transient metrics when the closed loop behaves as a second-order system with $\\zeta = 0.5$ and $\\omega_n = 4\\text{ rad/s}$.",
+      "steps": [
+        {
+          "text": "Convert to parallel gains using $K_i = K_p/T_i$ and $K_d = K_p T_d$:",
+          "tex": "K_i = \\frac{2}{0.5} = 4,\\qquad K_d = 2 \\times 0.1 = 0.2"
+        },
+        {
+          "text": "The derivative filter pole sits at $-N/T_d$, and the high-frequency gain is $K_p(1 + N)$:",
+          "tex": "p_f = -\\frac{10}{0.1} = -100\\text{ rad/s},\\qquad K_p(1+N) = 2 \\times 11 = 22"
+        },
+        {
+          "text": "The percent overshoot for $\\zeta = 0.5$ uses $\\sqrt{1 - 0.25} = 0.866$:",
+          "tex": "M_p = e^{-\\frac{\\pi \\times 0.5}{0.866}} \\times 100\\% = e^{-1.814} \\times 100\\% \\approx 16.3\\%"
+        },
+        {
+          "text": "The settling time and peak time follow from $\\zeta\\omega_n = 2$ and the damped frequency $\\omega_d = 4 \\times 0.866 = 3.464\\text{ rad/s}$:",
+          "tex": "t_s \\approx \\frac{4}{2} = 2\\text{ s},\\qquad t_p = \\frac{\\pi}{3.464} \\approx 0.907\\text{ s}"
+        },
+        {
+          "text": "Because $\\arccos 0.5 = 1.047$, the rise time approximation gives:",
+          "tex": "t_r \\approx \\frac{\\pi - 1.047}{3.464} \\approx 0.605\\text{ s}"
+        }
+      ],
+      "result": "The parallel gains are $K_i = 4$ and $K_d = 0.2$, the filter pole is at $-100\\text{ rad/s}$, and the loop is expected to show $M_p \\approx 16.3\\%$, $t_s \\approx 2\\text{ s}$, $t_p \\approx 0.907\\text{ s}$ and $t_r \\approx 0.605\\text{ s}$."
+    },
+    "applications": [
+      { "field": "Motor drives", "body": "Speed and current loops of servo drives, where anti-windup protects against voltage and current limits during acceleration." },
+      { "field": "Process industry", "body": "Temperature, flow and level control, where PI action dominates and the derivative term is used sparingly with a strong filter." },
+      { "field": "Robotics", "body": "Joint position control, where the derivative term supplies damping and the filter coefficient $N$ limits encoder noise." },
+      { "field": "Aerospace", "body": "Attitude and altitude hold loops that use gain scheduling around PID controllers across the flight envelope." },
+      { "field": "Energy systems", "body": "Inverter and converter regulators, as well as turbine speed governors, tuned for a specified overshoot and settling time." }
+    ]
+  },
+  "frequency-response": {
+    "title": "Frequency Response",
+    "intro": "Frequency response describes how a linear system scales and shifts sinusoids of every frequency. From the open-loop response alone, stability margins of the closed loop can be read without solving for any pole.",
+    "purpose": "This tool evaluates $G(j\\omega)$ for the transfer function you enter and displays it as a Bode plot, a Nyquist plot or a Nichols chart. It marks the gain and phase crossover frequencies, reports the gain and phase margins, decomposes the response into first-order and second-order factors, and correlates the margins with the closed-loop step response.",
+    "model": [
+      {
+        "heading": "Magnitude and phase",
+        "body": "Setting $s = j\\omega$ gives a complex number whose magnitude in decibels is $|G(j\\omega)|_{dB} = 20\\log_{10}|G(j\\omega)|$ and whose phase is $\\angle G(j\\omega)$. For a product of factors, the decibel magnitudes and the phases simply add, which is why asymptotic Bode sketches are built from straight-line segments. Each simple pole bends the magnitude slope by $-20\\text{ dB/decade}$ and the phase by $-90^\\circ$, and each simple zero does the opposite."
+      },
+      {
+        "heading": "Crossover frequencies",
+        "body": "The gain crossover frequency $\\omega_{gc}$ is where the magnitude crosses unity, so $|G(j\\omega_{gc})| = 1$, which is $0\\text{ dB}$. The phase crossover frequency $\\omega_{pc}$ is where the phase equals $-180^\\circ$, so $\\angle G(j\\omega_{pc}) = -180^\\circ$. These two points anchor every stability margin."
+      },
+      {
+        "heading": "Gain margin and phase margin",
+        "body": "The gain margin is the extra loop gain that brings the system to the edge of instability, $GM = -20\\log_{10}|G(j\\omega_{pc})|\\text{ dB}$. The phase margin is the extra phase lag tolerated at the gain crossover, $PM = 180^\\circ + \\angle G(j\\omega_{gc})$. For a stable minimum-phase loop both must be positive. A phase margin near $60^\\circ$ typically gives a well damped step response."
+      },
+      {
+        "heading": "Closed-loop bandwidth",
+        "body": "With $T(s) = G(s)/(1 + G(s))$, the closed-loop bandwidth $\\omega_b$ is the frequency at which $|T(j\\omega)|$ falls to $1/\\sqrt{2}$ of its low-frequency value, that is $-3\\text{ dB}$. Bandwidth indicates how quickly the loop can follow commands, and it is close to $\\omega_{gc}$ for loops with a moderate phase margin."
+      }
+    ],
+    "equations": [
+      "Magnitude in decibels and phase of the frequency response.",
+      "Product rule: decibel magnitudes and phases of cascaded factors add.",
+      "Gain crossover condition (unity magnitude).",
+      "Phase crossover condition.",
+      "Gain margin from the magnitude at the phase crossover.",
+      "Phase margin from the phase at the gain crossover.",
+      "Closed-loop bandwidth at the half-power point."
+    ],
+    "mapping": [
+      { "term": "Transfer function input", "body": "Defines $G(s)$ from its numerator and denominator. The plotted curve is $G(j\\omega)$ swept over a logarithmic frequency axis in $\\text{rad/s}$." },
+      { "term": "Bode, Nyquist, Nichols selector", "body": "Switches the primary view. Bode shows $|G|_{dB}$ and $\\angle G$ against $\\omega$, Nyquist shows the polar locus with the critical point $-1$, and Nichols shows $|G|_{dB}$ against $\\angle G$." },
+      { "term": "Gain Compensation slider", "body": "Multiplies the loop by a constant $K$ from $0.01$ to $10$. It shifts the magnitude curve vertically by $20\\log_{10}K$ and leaves the phase unchanged, so the gain margin changes while $\\omega_{pc}$ stays fixed." },
+      { "term": "Margin markers", "body": "Show $\\omega_{gc}$, $\\omega_{pc}$, $GM$ and $PM$ directly on the plot." },
+      { "term": "Factor selection", "body": "Lets you toggle individual first-order and second-order factors to see their separate contributions to magnitude slope and phase." },
+      { "term": "Step response horizon", "body": "Sets the simulated window, from $1$ to $100$ seconds, for the closed-loop step plot." },
+      { "term": "Time-domain correlation", "body": "Reports $M_p$, $t_r$, $t_s$ and $e_{ss}$ so you can compare them with the margins." },
+      { "term": "Step-by-step sketch tutor", "body": "Lists the corner frequencies $\\omega_c$ in order and the slope change at each one." }
+    ],
+    "example": {
+      "title": "Margins of a third-order loop",
+      "problem": "For $G(s) = 20/\\left(s(s+2)(s+5)\\right)$ find the phase crossover frequency, the gain margin, the gain crossover frequency and the phase margin.",
+      "steps": [
+        {
+          "text": "The phase is $-90^\\circ - \\arctan(\\omega/2) - \\arctan(\\omega/5)$. Setting it to $-180^\\circ$ requires the two arctangents to sum to $90^\\circ$, which means their tangents multiply to one:",
+          "tex": "\\frac{\\omega}{2}\\cdot\\frac{\\omega}{5} = 1 \\;\\Rightarrow\\; \\omega_{pc} = \\sqrt{10} = 3.162\\text{ rad/s}"
+        },
+        {
+          "text": "The magnitude at that frequency is:",
+          "tex": "\\left|G(j\\omega_{pc})\\right| = \\frac{20}{3.162\\sqrt{14}\\sqrt{35}} = \\frac{20}{70} = 0.2857"
+        },
+        {
+          "text": "The gain margin is therefore:",
+          "tex": "GM = -20\\log_{10}(0.2857) = 10.88\\text{ dB}"
+        },
+        {
+          "text": "For the gain crossover, solve $\\omega\\sqrt{\\omega^2+4}\\sqrt{\\omega^2+25} = 20$ numerically. At $\\omega = 1.52$ the left side is $19.96$, and at $\\omega = 1.523$ it is $20.01$, so:",
+          "tex": "\\omega_{gc} \\approx 1.52\\text{ rad/s}"
+        },
+        {
+          "text": "The phase at $\\omega_{gc}$ and the resulting phase margin are:",
+          "tex": "\\angle G = -90^\\circ - 37.3^\\circ - 16.9^\\circ = -144.2^\\circ,\\qquad PM = 180^\\circ - 144.2^\\circ = 35.8^\\circ"
+        }
+      ],
+      "result": "The loop has $\\omega_{pc} = 3.16\\text{ rad/s}$, $GM = 10.88\\text{ dB}$, $\\omega_{gc} \\approx 1.52\\text{ rad/s}$ and $PM \\approx 35.8^\\circ$. It is stable but lightly damped, so a step response with noticeable overshoot should be expected."
+    },
+    "applications": [
+      { "field": "Servo systems", "body": "Verifying that a motion-control loop keeps a phase margin above $45^\\circ$ despite mechanical resonances and sensor delay." },
+      { "field": "Aerospace", "body": "Certifying flight control loops by demonstrating required gain and phase margins across the flight envelope." },
+      { "field": "Power electronics", "body": "Shaping the open-loop gain of converter voltage loops so that the crossover is placed well below the switching frequency." },
+      { "field": "Active vibration control", "body": "Choosing a bandwidth that rejects structural disturbances without exciting flexible modes." }
+    ]
+  },
+  "state-space": {
+    "title": "State Space",
+    "intro": "State-space modelling describes a dynamic system through first-order differential equations in a vector of internal states. It handles multi-input multi-output systems naturally and underlies modern control design.",
+    "purpose": "This tool lets you edit the matrices $\\mathbf{A}$, $\\mathbf{B}$, $\\mathbf{C}$ and $D$ of a second-order or third-order system and computes the characteristic polynomial, the open-loop eigenvalues, the controllability and observability matrices with their ranks, and a state-feedback gain that places the closed-loop poles where you request. Phase portraits show the resulting state trajectories.",
+    "model": [
+      {
+        "heading": "State and output equations",
+        "body": "The model is $\\dot{\\mathbf{x}} = \\mathbf{A}\\mathbf{x} + \\mathbf{B}u$ and $y = \\mathbf{C}\\mathbf{x} + D u$, where $\\mathbf{x}$ has $n$ components. The transfer function is $G(s) = \\mathbf{C}(s\\mathbf{I} - \\mathbf{A})^{-1}\\mathbf{B} + D$, and its poles are the eigenvalues of $\\mathbf{A}$, found from the characteristic equation $\\det(s\\mathbf{I} - \\mathbf{A}) = 0$."
+      },
+      {
+        "heading": "State transition matrix",
+        "body": "With $u = 0$ the solution is $\\mathbf{x}(t) = \\mathbf{\\Phi}(t)\\mathbf{x}(0)$ with $\\mathbf{\\Phi}(t) = e^{\\mathbf{A}t}$. It equals the inverse Laplace transform of $(s\\mathbf{I} - \\mathbf{A})^{-1}$. The system is asymptotically stable when every eigenvalue of $\\mathbf{A}$ has a negative real part."
+      },
+      {
+        "heading": "Controllability and observability",
+        "body": "The pair $(\\mathbf{A}, \\mathbf{B})$ is controllable when the matrix $\\mathcal{C}$ has rank $n$, meaning the input can steer the state anywhere. The pair $(\\mathbf{A}, \\mathbf{C})$ is observable when $\\mathcal{O}$ has rank $n$, meaning the state can be reconstructed from the output. A rank deficiency reveals a mode that the input cannot move or the output cannot see."
+      },
+      {
+        "heading": "Pole placement and Ackermann's formula",
+        "body": "With full-state feedback $u = -\\mathbf{K}\\mathbf{x}$ the closed-loop matrix is $\\mathbf{A} - \\mathbf{B}\\mathbf{K}$. If the system is controllable, any set of desired poles $\\lambda_i^{d}$ can be assigned. For a single input, Ackermann's formula gives $\\mathbf{K} = [0\\ \\cdots\\ 0\\ 1]\\,\\mathcal{C}^{-1}\\varphi(\\mathbf{A})$, where $\\varphi$ is the desired characteristic polynomial evaluated at the matrix $\\mathbf{A}$."
+      }
+    ],
+    "equations": [
+      "State and output equations.",
+      "Characteristic equation and the transfer function of the state-space model.",
+      "State transition matrix as a matrix exponential.",
+      "Controllability matrix and its rank condition.",
+      "Observability matrix and its rank condition.",
+      "State feedback and the desired closed-loop characteristic polynomial.",
+      "Ackermann's formula for the feedback gain vector."
+    ],
+    "mapping": [
+      { "term": "System order $n$", "body": "A selector for $n = 2$ or $n = 3$. Changing it resets the matrices to a default system of that size." },
+      { "term": "Matrix inputs $\\mathbf{A}$, $\\mathbf{B}$, $\\mathbf{C}$, $D$", "body": "Each entry is editable. The defaults for $n = 2$ are $\\mathbf{A}$ with rows $(0, 1)$ and $(-2, -3)$, $\\mathbf{B} = [0\\ 1]^T$ and $\\mathbf{C} = [1\\ 0]$." },
+      { "term": "Characteristic polynomial and eigenvalues", "body": "Display $\\det(s\\mathbf{I} - \\mathbf{A})$ and its roots, so stability is visible at once." },
+      { "term": "Controllability and observability cards", "body": "Show $\\mathcal{C}$ and $\\mathcal{O}$ with a rank badge. A deficient rank is flagged as a warning." },
+      { "term": "Desired poles", "body": "One input per pole, with defaults $-4$ and $-5$ for $n = 2$ and $-4$, $-5$, $-6$ for $n = 3$. These form $\\varphi(s)$." },
+      { "term": "Feedback result", "body": "Shows the computed $\\mathbf{K}$, the desired characteristic polynomial and the closed-loop matrix $\\mathbf{A} - \\mathbf{B}\\mathbf{K}$. It is available only when the system is controllable." },
+      { "term": "Phase portraits", "body": "Plot trajectories of the open-loop and the closed-loop system in state space, showing how the eigenvalues shape convergence." }
+    ],
+    "example": {
+      "title": "Pole placement for a second-order plant",
+      "problem": "For $\\mathbf{A} = \\begin{bmatrix} 0 & 1 \\\\ -2 & -3 \\end{bmatrix}$, $\\mathbf{B} = \\begin{bmatrix} 0 \\\\ 1 \\end{bmatrix}$ and $\\mathbf{C} = \\begin{bmatrix} 1 & 0 \\end{bmatrix}$, check controllability and observability, then place the closed-loop poles at $-4$ and $-5$.",
+      "steps": [
+        {
+          "text": "The characteristic polynomial and open-loop eigenvalues are:",
+          "tex": "\\det(s\\mathbf{I} - \\mathbf{A}) = s^2 + 3s + 2 = (s+1)(s+2),\\qquad \\lambda = -1,\\; -2"
+        },
+        {
+          "text": "Since $\\mathbf{A}\\mathbf{B} = [1\\ -3]^T$, the controllability matrix has a nonzero determinant, so the pair is controllable:",
+          "tex": "\\mathcal{C} = \\begin{bmatrix} 0 & 1 \\\\ 1 & -3 \\end{bmatrix},\\qquad \\det\\mathcal{C} = -1"
+        },
+        {
+          "text": "Because $\\mathbf{C}\\mathbf{A} = [0\\ 1]$, the observability matrix is the identity and the pair is observable:",
+          "tex": "\\mathcal{O} = \\begin{bmatrix} 1 & 0 \\\\ 0 & 1 \\end{bmatrix},\\qquad \\operatorname{rank}\\mathcal{O} = 2"
+        },
+        {
+          "text": "The desired polynomial is $\\varphi(s) = (s+4)(s+5) = s^2 + 9s + 20$. Evaluating it at $\\mathbf{A}$ with $\\mathbf{A}^2 = \\begin{bmatrix} -2 & -3 \\\\ 6 & 7 \\end{bmatrix}$ gives:",
+          "tex": "\\varphi(\\mathbf{A}) = \\mathbf{A}^2 + 9\\mathbf{A} + 20\\mathbf{I} = \\begin{bmatrix} 18 & 6 \\\\ -12 & 0 \\end{bmatrix}"
+        },
+        {
+          "text": "Applying Ackermann's formula with $\\mathcal{C}^{-1} = \\begin{bmatrix} 3 & 1 \\\\ 1 & 0 \\end{bmatrix}$:",
+          "tex": "\\mathbf{K} = \\begin{bmatrix} 0 & 1 \\end{bmatrix}\\mathcal{C}^{-1}\\varphi(\\mathbf{A}) = \\begin{bmatrix} 1 & 0 \\end{bmatrix}\\begin{bmatrix} 18 & 6 \\\\ -12 & 0 \\end{bmatrix} = \\begin{bmatrix} 18 & 6 \\end{bmatrix}"
+        }
+      ],
+      "result": "The system is controllable and observable, and the gain $\\mathbf{K} = [18\\ 6]$ gives the closed-loop polynomial $s^2 + 9s + 20$, with poles at $-4$ and $-5$, which can be confirmed since $\\det(s\\mathbf{I} - \\mathbf{A} + \\mathbf{B}\\mathbf{K}) = s^2 + (3 + 6)s + (2 + 18)$."
+    },
+    "applications": [
+      { "field": "Aerospace", "body": "Full-state feedback for aircraft and spacecraft attitude control with several coupled axes." },
+      { "field": "Robotics", "body": "Balancing robots and inverted pendulums, where the state holds angle, angular rate, position and velocity." },
+      { "field": "Energy systems", "body": "Multivariable control of microgrids and converters, with observers estimating unmeasured currents." },
+      { "field": "Manufacturing", "body": "Multi-axis motion platforms, where controllability analysis shows whether every axis can be commanded independently." },
+      { "field": "Automotive", "body": "Active suspension and lane keeping, using observability to decide which sensors are needed." }
+    ]
+  }
+}

@@ -1,4 +1,5 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { publishDocsTool } from "@/components/simulations/toolDocs/activeToolStore";
 import SimulatorLayout from "@/components/SimulatorLayout";
 import SimulationDocumentation from "@/components/simulations/SimulationDocumentation";
 import { useLocale } from "@/contexts/LocaleContext";
@@ -16,6 +17,9 @@ const initialPlatform = (): PlcPlatform =>
 export default function PlcSimulatorPage() {
   const { copy, isRtl } = useLocale();
   const [platform, setPlatform] = useState<PlcPlatform>(initialPlatform);
+  useEffect(() => {
+    publishDocsTool("plc", platform === "logo" ? "logo" : "ladder-s7-200");
+  }, [platform]);
   // Ladder / S7-200 and LOGO! FBD are separate environments, each with its own title, meta and docs.
   useSimulatorSeo(platform === "logo" ? "plc-logo" : "plc-ladder");
 

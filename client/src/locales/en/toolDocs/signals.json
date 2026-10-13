@@ -1,0 +1,296 @@
+{
+  "signal-operations-and-properties": {
+    "title": "Signal Operations and Properties",
+    "intro": "This lab builds a signal from canonical pieces and reports its classification, period, energy and power. It is the vocabulary on which every other signals tool depends.",
+    "purpose": "The tool lets you type any additive, subtractive or multiplicative combination of canonical signals such as steps, ramps, rectangles, sinusoids and Dirac impulses in terms of $t$ or $n$. It plots the composite waveform and computes the quantities that classify it: whether it is an energy signal, a power signal or neither, whether it is periodic, what its fundamental period $T_0$ is, and the numerical values of $E_\\infty$ and $P_\\infty$. Impulses are tracked symbolically so that their weights are never lost to plotting resolution.",
+    "model": [
+      {
+        "heading": "Elementary transformations of the independent variable",
+        "body": "Replacing $t$ by $t - t_0$ delays the waveform by $t_0$ without changing its shape, replacing $t$ by $-t$ mirrors it about the vertical axis, and replacing $t$ by $at$ compresses it when $\\lvert a\\rvert > 1$ and stretches it when $\\lvert a\\rvert < 1$. When these are combined into $x(at - b)$, the order matters: the safe procedure is to rewrite the argument as $a(t - b/a)$, so the signal is first scaled by $a$ and then delayed by $b/a$. Applying the shift first and the scaling second is the classic source of error, because the delay then becomes $b$ instead of $b/a$."
+      },
+      {
+        "heading": "Even and odd decomposition",
+        "body": "Every signal splits uniquely into an even part satisfying $x_e(-t) = x_e(t)$ and an odd part satisfying $x_o(-t) = -x_o(t)$. The even part is the average of the signal and its mirror image, the odd part is half their difference. Cosines and constants are even, sines and ramps through the origin are odd, and a product of two even or two odd signals is even while a mixed product is odd. At $t = 0$ an odd signal must vanish unless it contains an impulse-like singularity."
+      },
+      {
+        "heading": "Energy, power and signal classes",
+        "body": "A signal is an energy signal when $0 < E_\\infty < \\infty$, which forces $P_\\infty = 0$; pulses and decaying exponentials belong here. It is a power signal when $0 < P_\\infty < \\infty$, which forces $E_\\infty = \\infty$; periodic signals and the unit step belong here. A signal such as a growing exponential or a ramp is neither. For a periodic signal the limit collapses to an average over one fundamental period $T_0$, and for a sum of sinusoids with distinct frequencies the powers of the components simply add. When the fundamental period does not exist, the tool integrates over the observation window set by the two boundary fields."
+      },
+      {
+        "heading": "Singularity functions and the complex exponential",
+        "body": "The Dirac delta is defined by its sifting property: integrating $x(t)\\delta(t - t_0)$ returns $x(t_0)$, and it has unit area. Its running integral is the unit step $u(t)$, equivalently $\\delta(t) = du(t)/dt$ in the generalized sense. The complex exponential $e^{(\\sigma + j\\omega_0)t}$ unifies the family: $\\sigma = 0$ gives a pure rotating phasor, $\\sigma < 0$ a decaying spiral and $\\sigma > 0$ a growing one. A sum of two periodic components is periodic only when the ratio $T_1/T_2$ is rational, and then $T_0$ is their least common multiple."
+      }
+    ],
+    "equations": [
+      "Combined shift and scale. Factor the coefficient of $t$ out of the argument to read the delay correctly.",
+      "Even and odd components, and their sum reconstructing the original signal.",
+      "Total energy of a signal; finite for pulses and decaying signals.",
+      "Average power over the whole time axis; finite and nonzero for periodic signals.",
+      "Sifting property of the impulse and the definition of the unit step as its running integral.",
+      "Complex exponential with growth rate $\\sigma$ and angular frequency $\\omega_0$.",
+      "Fundamental period of a sum of two sinusoids as the least common multiple of the component periods."
+    ],
+    "mapping": [
+      { "term": "Continuous-Time / Discrete-Time switch", "body": "Selects whether the argument is the real variable $t$ or the integer index $n \\in \\mathbb{Z}$. In discrete time the energy becomes a sum of $\\lvert x[n]\\rvert^2$ and the shift, reversal and scaling operate on integer indices." },
+      { "term": "Signal expression terminal", "body": "The input field for $x(t)$. Typing $\\text{rect}(t)$, $u(t-1)$ or $\\cos(2t)$ builds the composite waveform, and the transformations $x(at - b)$ are realized by editing the argument directly." },
+      { "term": "Academic test signals", "body": "One-click presets that load canonical examples so that you can study how an operation on the argument changes the plot and the verdict." },
+      { "term": "Classification badge", "body": "Reports Energy Signal, Power Signal or Neither, which is the verdict on $E_\\infty$ and $P_\\infty$ from the model above." },
+      { "term": "Periodic / Aperiodic override", "body": "Starts from the automatic decision and lets you force the opposite. The fundamental period panel then lists $\\omega_i$, $T_i$ and $T_0$ for each detected component." },
+      { "term": "Observation window fields", "body": "The boundary values $t_1$ and $t_2$ appear for aperiodic signals. They set the integration limits used for the displayed energy and power values." },
+      { "term": "Symbolic Dirac entity", "body": "Lists each impulse with its time location and weight, because an impulse has area but no height that a plot could show." }
+    ],
+    "example": {
+      "title": "Period, power and parity of a two-tone signal",
+      "problem": "Analyze $x(t) = 2\\cos(4t) + \\sin(6t)$ for its fundamental period, average power and even and odd parts.",
+      "steps": [
+        { "text": "Find the component periods from $T_i = 2\\pi/\\omega_i$ with $\\omega_1 = 4\\text{ rad/s}$ and $\\omega_2 = 6\\text{ rad/s}$.", "tex": "T_1 = \\frac{2\\pi}{4} = \\frac{\\pi}{2}\\text{ s}, \\qquad T_2 = \\frac{2\\pi}{6} = \\frac{\\pi}{3}\\text{ s}" },
+        { "text": "The ratio $T_1/T_2 = 3/2$ is rational, so the sum is periodic. Since $2T_1 = 3T_2 = \\pi\\text{ s}$, the least common multiple is $T_0 = \\pi\\text{ s}$.", "tex": "T_0 = \\operatorname{LCM}\\!\\left(\\frac{\\pi}{2}, \\frac{\\pi}{3}\\right) = \\pi\\text{ s}, \\qquad \\omega_0 = \\frac{2\\pi}{\\pi} = 2\\text{ rad/s}" },
+        { "text": "The two tones are at different frequencies, so their powers add. Each sinusoid of amplitude $A$ carries power $A^2/2$.", "tex": "P_\\infty = \\frac{2^2}{2} + \\frac{1^2}{2} = 2 + 0.5 = 2.5" },
+        { "text": "The cosine is even and the sine is odd, so the decomposition can be read off directly without evaluating $x(-t)$.", "tex": "x_e(t) = 2\\cos(4t), \\qquad x_o(t) = \\sin(6t)" }
+      ],
+      "result": "The signal is a power signal with $T_0 = \\pi\\text{ s}$, $\\omega_0 = 2\\text{ rad/s}$ and $P_\\infty = 2.5$; its energy $E_\\infty$ is infinite, as required for a periodic signal."
+    },
+    "applications": [
+      { "field": "Vibration monitoring", "body": "Rotating machinery produces several harmonically unrelated tones; the period and power computation tells whether the composite vibration repeats and how much energy each component contributes." },
+      { "field": "Power systems", "body": "Average power of distorted voltage and current waveforms is a power-signal computation, and the even and odd split separates cosine-phase from sine-phase content." },
+      { "field": "Radar and sonar", "body": "A transmitted pulse is an energy signal, and delayed, time-scaled echoes obey the $x(at - b)$ law, with the delay giving range and the scaling giving Doppler." },
+      { "field": "Robot motion profiles", "body": "Step, ramp and impulse test inputs are the canonical commands used to characterize actuators and trajectory generators." }
+    ]
+  },
+  "system-classification": {
+    "title": "System Classification",
+    "intro": "This lab decides, with a constructive proof for each case, whether a system is linear, time-invariant, causal, memoryless and stable.",
+    "purpose": "You enter a system as an equation $y(t) = \\dots$ written in terms of the input $x(t)$, and the tool evaluates five classification pillars: linearity, time-invariance, causality, memory and BIBO stability. Each pillar is an accordion with a plot that overlays the direct system test against its comparison construction, together with a step by step derivation. When the two curves coincide the property holds; any visible gap is a counterexample you can read off the graph.",
+    "model": [
+      {
+        "heading": "Linearity and superposition",
+        "body": "A system $T$ is linear when it satisfies both homogeneity and additivity, summarized as superposition: the response to $a\\,x_1 + b\\,x_2$ equals $a\\,y_1 + b\\,y_2$ for all constants $a$ and $b$. Any additive offset such as $x(t) + 5$ violates the test because a zero input does not produce a zero output. Nonlinear operations such as squaring or taking an absolute value also fail, whereas scaling, shifting, reflecting, differentiating and integrating the input all pass."
+      },
+      {
+        "heading": "Time-invariance",
+        "body": "A system is time-invariant when delaying the input only delays the output by the same amount: $T\\{x(t - t_0)\\} = y(t - t_0)$. The test compares two paths: delay first and then apply the system, versus apply the system first and then delay. Explicit time dependence in the coefficients, as in $t\\,x(t)$, breaks the equality, and so does time scaling: for $y(t) = x(2t)$ the delayed input gives $x(2t - t_0)$, whereas delaying the output gives $x(2t - 2t_0)$, and the two differ."
+      },
+      {
+        "heading": "Causality and memory",
+        "body": "A system is causal when the output at time $t_1$ depends only on inputs at times $\\tau \\le t_1$. Using $x(t+1)$ or $x(-t)$ looks into the future for some values of $t$ and is non-causal. A system is memoryless when $y(t_1)$ depends only on $x(t_1)$, as in $y(t) = x^2(t)$; integrators, delays and differentiators have memory. Every memoryless system is causal, but the converse fails."
+      },
+      {
+        "heading": "BIBO stability and the LTI special case",
+        "body": "A system is bounded-input bounded-output stable when every bounded input yields a bounded output. The tool drives the system with a bounded unit step and watches whether the output stays finite. For linear time-invariant systems the criterion reduces to absolute integrability of the impulse response, and the output is the convolution of $x$ with $h$. Properties like causality become a one-line test, $h(t) = 0$ for $t < 0$."
+      }
+    ],
+    "equations": [
+      "Superposition test combining homogeneity and additivity.",
+      "Time-invariance test: the delayed-input response equals the delayed output.",
+      "Causality condition, and its equivalent form for the impulse response of an LTI system.",
+      "BIBO stability: bounded inputs give bounded outputs exactly when the impulse response is absolutely integrable.",
+      "Input-output relation of an LTI system through its impulse response $h(t)$.",
+      "Memoryless mapping versus a system with memory such as the running integral."
+    ],
+    "mapping": [
+      { "term": "System equation terminal", "body": "Accepts the right-hand side of $y(t) = \\dots$ using the input tokens $x(t)$, $x(2t)$, $x(t-1)$, $x(-t)$, $x^2(t)$, $t\\,x(t)$ and $u(t)$, plus operators and calculus keys for integrals and derivatives." },
+      { "term": "Academic test systems", "body": "Presets such as $y(t) = x(2t)$, $y(t) = t\\,x(t)$, $y(t) = x(t) + 5$, $y(t) = x^2(t)$ and the running integral, each with a known verdict, for calibrating your expectations." },
+      { "term": "Linearity pillar sliders $a$ and $b$", "body": "Two sliders from $-2$ to $2$ in steps of $0.1$ choose the weights in the superposition test. The solid curve is $T\\{a\\,x_1 + b\\,x_2\\}$ and the dashed curve is $a\\,y_1 + b\\,y_2$." },
+      { "term": "Time-invariance slider $t_0$", "body": "A slider from $-2$ to $2$ sets the delay $t_0$. Overlap of the two curves means $T\\{x(t - t_0)\\} = y(t - t_0)$ for that shift." },
+      { "term": "Causality pillar", "body": "The red region marks future input samples relative to the marked output instant; any dependence on that region proves non-causality." },
+      { "term": "Memory and stability pillars", "body": "Memory plots the dashed input $x(t)$ against the solid output; stability applies a bounded step $u(t)$ and shows whether the response stays bounded." },
+      { "term": "Verdict badges", "body": "Each pillar shows a pass or fail badge together with its derivation card, containing the symbolic reasoning for the verdict." }
+    ],
+    "example": {
+      "title": "Classifying the system $y(t) = t\\,x(t)$",
+      "problem": "Classify the system $y(t) = t\\,x(t)$ using the five pillars, taking $x(t) = u(t)$ and $t_0 = 1\\text{ s}$ for the time-invariance check.",
+      "steps": [
+        { "text": "Linearity: the response to a weighted sum is formed by multiplying through by $t$, so superposition holds with any $a$ and $b$.", "tex": "T\\{a\\,x_1 + b\\,x_2\\} = t\\,(a\\,x_1 + b\\,x_2) = a\\,t\\,x_1 + b\\,t\\,x_2" },
+        { "text": "Time-invariance: delay the input first, then delay the output, and compare them at $t = 2\\text{ s}$.", "tex": "T\\{x(t-1)\\} = t\\,u(t-1), \\qquad y(t-1) = (t-1)\\,u(t-1)" },
+        { "text": "At $t = 2\\text{ s}$ the two paths give $2$ and $1$, which differ, so the system is time-varying because of the explicit factor $t$." },
+        { "text": "Causality and memory: the output at $t_1$ uses only $x(t_1)$, so the system is causal and memoryless.", "tex": "y(t_1) = t_1\\,x(t_1)" },
+        { "text": "Stability: the bounded step $u(t)$ with $\\lvert u\\rvert \\le 1$ produces the output below, which grows without bound.", "tex": "y(t) = t\\,u(t) \\to \\infty \\quad \\text{as } t \\to \\infty" }
+      ],
+      "result": "The system $y(t) = t\\,x(t)$ is linear, time-varying, causal, memoryless and BIBO unstable."
+    },
+    "applications": [
+      { "field": "Control design", "body": "Linear time-invariant models are required before transfer functions and Bode analysis apply; this test confirms whether a plant model qualifies." },
+      { "field": "Sensor signal chains", "body": "Offsets and squaring detectors break linearity, which explains harmonic distortion and tells you when calibration needs to be nonlinear." },
+      { "field": "Real-time embedded systems", "body": "Only causal systems can be implemented online; a non-causal specification must be delayed until it becomes causal." },
+      { "field": "Time-varying drives", "body": "Gain-scheduled amplifiers and parameter-varying actuators behave like $t\\,x(t)$, so they require time-varying analysis rather than convolution." }
+    ]
+  },
+  "convolution-engine": {
+    "title": "Convolution Engine",
+    "intro": "This lab animates the four-step graphical procedure behind convolution for both continuous-time and discrete-time signals.",
+    "purpose": "The tool computes the output of a linear time-invariant system from the input $x$ and the impulse response $h$. In continuous time it slides the folded kernel across the input and integrates the overlap at each shift, drawing the growing output curve on a three-tier canvas. In discrete time it does the same with stems and builds a convolution table. The piecewise closed form valid at the current shift is shown beside the numerical value, so you see both the picture and the algebra.",
+    "model": [
+      {
+        "heading": "The convolution integral and sum",
+        "body": "An LTI system is completely described by its impulse response. Writing the input as a weighted superposition of shifted impulses and using linearity and time-invariance gives the integral for $y(t)$ in continuous time and the sum for $y[n]$ in discrete time. The output value at one instant is the area, or sum, of a product of two functions of the dummy variable $\\tau$ or $k$, so each output point costs one whole overlap evaluation."
+      },
+      {
+        "heading": "The four graphical operations",
+        "body": "To evaluate at a fixed $t$, first fold the kernel into $h(-\\tau)$, then shift it by $t$ to obtain $h(t - \\tau)$, then multiply it pointwise by $x(\\tau)$, and finally integrate the product. As $t$ increases the folded kernel slides to the right. The output is zero while the supports do not overlap, rises as they begin to overlap, and returns to zero when they separate, which gives the regime boundaries of the piecewise solution."
+      },
+      {
+        "heading": "Algebraic properties",
+        "body": "Convolution is commutative, associative and distributive over addition. Commutativity means either signal may be folded, and the simpler one should be chosen. Associativity means cascaded systems combine into one with impulse response $h_1 * h_2$, and distributivity means parallel systems combine into $h_1 + h_2$. Convolving with a shifted impulse shifts the signal, and the support of the output spans the sum of the two supports."
+      },
+      {
+        "heading": "Step response, length and area rules",
+        "body": "The step response is the running integral of $h$, and conversely $h$ is the derivative of $s$. For finite sequences of lengths $L_x$ and $L_h$ the output has length $L_x + L_h - 1$. The sum of all output samples equals the product of the input sum and the kernel sum, which is an excellent arithmetic check and corresponds to the DC gain of the system."
+      }
+    ],
+    "equations": [
+      "Continuous-time convolution integral.",
+      "Discrete-time convolution sum.",
+      "The four operations applied to the kernel at a fixed shift $t$.",
+      "Commutative, associative and distributive properties.",
+      "Step response as the running integral of the impulse response.",
+      "Convolution with a shifted impulse, and the output length of two finite sequences.",
+      "Sum rule: the total of the output equals the product of the totals of the input and kernel."
+    ],
+    "mapping": [
+      { "term": "Continuous-Time / Discrete-Time switch", "body": "Chooses between the integral on the real line and the sum over integer indices, each with its own canvas." },
+      { "term": "Signal terminals for $x(t)$ and $h(t)$", "body": "Two input fields, one colored blue for the input and one rose for the kernel, accepting functions such as $\\text{rect}(t)$, $u(t)$, $r(t)$ and $\\delta(t-1)$." },
+      { "term": "Quick experiments", "body": "Presets including the rectangular pulse pair, step with ramp, the delta scan and a sinc filter." },
+      { "term": "Shift parameter slider $t$", "body": "Sets the current shift of the folded kernel between the computed window limits. Its readout displays $y(t)$ at the chosen value." },
+      { "term": "Play, Pause, Fast forward, Rewind, Fine step", "body": "Animate the shift automatically or advance it in increments of $0.45$ backward and $0.05$ forward." },
+      { "term": "Sample fields $x[n]$ and $h[n]$", "body": "Comma-separated sequences starting at $n = 0$, as in $1, 2, 1$ and $1, -1, 2$, with discrete presets such as the moving average and the echo." },
+      { "term": "Index slider $n$ and convolution table", "body": "Choose the output index and highlight the corresponding row of products $x[k]\\,h[n-k]$ that sum to $y[n]$." },
+      { "term": "Analysis card", "body": "Shows the piecewise regime and symbolic expression of $y(t)$ valid for the current shift." }
+    ],
+    "example": {
+      "title": "Discrete convolution of two short sequences",
+      "problem": "Compute $y[n] = x[n] * h[n]$ for $x[n] = \\{1, 2, 1\\}$ and $h[n] = \\{1, -1, 2\\}$, both starting at $n = 0$.",
+      "steps": [
+        { "text": "Both sequences have length $3$, so the output has $L_y = 3 + 3 - 1 = 5$ samples, for $n = 0, 1, 2, 3, 4$.", "tex": "L_y = L_x + L_h - 1 = 5" },
+        { "text": "Evaluate the first three outputs by summing the overlapping products.", "tex": "y[0] = 1, \\quad y[1] = 1\\cdot(-1) + 2\\cdot 1 = 1, \\quad y[2] = 1\\cdot 2 + 2\\cdot(-1) + 1\\cdot 1 = 1" },
+        { "text": "Evaluate the remaining outputs where the kernel slides off the end of the input.", "tex": "y[3] = 2\\cdot 2 + 1\\cdot(-1) = 3, \\qquad y[4] = 1\\cdot 2 = 2" },
+        { "text": "Check with the sum rule. The input sums to $4$ and the kernel sums to $2$, so the output must sum to $8$.", "tex": "1 + 1 + 1 + 3 + 2 = 8 = 4 \\times 2" }
+      ],
+      "result": "The output is $y[n] = \\{1, 1, 1, 3, 2\\}$ for $n = 0, \\dots, 4$, and its total of $8$ confirms the arithmetic."
+    },
+    "applications": [
+      { "field": "Digital filtering", "body": "FIR filters in motor-drive and audio firmware compute exactly this sum; the moving average preset is a low-pass smoother for noisy encoder signals." },
+      { "field": "Structural testing", "body": "The response of a machine frame to an arbitrary force is the convolution of the force history with the measured impulse response." },
+      { "field": "Radar and ultrasonic ranging", "body": "Echoes are modeled as a delta train convolved with the pulse shape, as in the echo and multipath preset, and matched filtering is a correlation of the same kind." },
+      { "field": "Image and vision systems", "body": "Edge detection and blurring in machine vision are two-dimensional convolutions that generalize the same fold, shift, multiply and sum procedure." }
+    ]
+  },
+  "fourier-analysis": {
+    "title": "3D Fourier Analysis",
+    "intro": "This lab decomposes signals into complex exponentials, showing magnitude and phase spectra, harmonic synthesis and a three-dimensional spectral view.",
+    "purpose": "Two modes cover the two Fourier regimes. Periodic / FS expands a periodic signal into its harmonic series and lets you rebuild it harmonic by harmonic. Aperiodic / FT computes the continuous-time Fourier transform of a pulse-like signal, or the inverse transform of a spectrum you type. In both modes the complex spectrum is drawn as a three-dimensional surface along the frequency axis, together with magnitude and phase plots and the time trace, so each complex value is seen as a point with both length and angle.",
+    "model": [
+      {
+        "heading": "Fourier transform pair",
+        "body": "For an absolutely integrable signal, $X(j\\omega)$ measures how much of the exponential $e^{j\\omega t}$ is contained in $x(t)$, and the inverse integral reassembles the signal from all frequencies with the weight $1/2\\pi$. Time scaling by $a$ compresses the spectrum by the same factor, so a narrow pulse has a wide spectrum. Periodic signals and constants produce impulses in $\\omega$, whose areas are the strengths of the lines."
+      },
+      {
+        "heading": "Magnitude and phase in three dimensions",
+        "body": "The spectrum is complex, so the surface carries two numbers per frequency: the magnitude $\\lvert X(j\\omega)\\rvert$ and the phase $\\angle X(j\\omega)$. Computing the phase as $\\arctan(\\text{Im}/\\text{Re})$ alone gives only values between $-\\pi/2$ and $\\pi/2$ and confuses opposite quadrants, so the tool uses the quadrant-aware two-argument arctangent, atan2, which returns an angle on the full circle. Where the magnitude is near zero the phase is poorly defined and is drawn faintly."
+      },
+      {
+        "heading": "Fourier series synthesis and analysis",
+        "body": "A periodic signal with period $T$ and fundamental frequency $\\omega_0 = 2\\pi/T$ is a sum of harmonics with complex coefficients $a_k$. The analysis integral over any single period extracts each coefficient; $a_0$ is the average value and a real signal satisfies $a_{-k} = a_k^*$. Truncating at $N$ harmonics gives the partial sum, and at a jump discontinuity the overshoot does not vanish as $N$ grows, which is the Gibbs phenomenon."
+      },
+      {
+        "heading": "Parseval and spectral energy",
+        "body": "Parseval's relation states that the mean-square value over a period equals the sum of $\\lvert a_k\\rvert^2$, so power is distributed across harmonics without loss. Comparing the partial-sum power with the total tells you how many harmonics are needed for a given accuracy. For the transform, the equivalent statement relates the total energy to the integral of $\\lvert X(j\\omega)\\rvert^2$ divided by $2\\pi$."
+      }
+    ],
+    "equations": [
+      "Forward continuous-time Fourier transform.",
+      "Inverse Fourier transform synthesizing the signal from its spectrum.",
+      "Magnitude and phase of the complex spectrum, with the quadrant-aware arctangent.",
+      "Fourier series synthesis with fundamental frequency $\\omega_0$.",
+      "Fourier series analysis integral over one period.",
+      "Parseval's relation for periodic signals.",
+      "Truncated partial sum, and the line spectrum that a periodic signal produces in the transform domain."
+    ],
+    "mapping": [
+      { "term": "Periodic / FS and Aperiodic / FT switch", "body": "Selects between series coefficients $a_k$ and the continuous transform $X(j\\omega)$." },
+      { "term": "Time-Domain and Frequency-Domain switch", "body": "Available in the transform mode: the first solves the forward transform of $x(t)$, the second solves the inverse transform of a spectrum $X(j\\omega)$ that you type." },
+      { "term": "Signal terminal and examples", "body": "Examples include $\\text{rect}(t)$, $e^{-2t}u(t)$, $\\cos(4t)$ and $\\text{tri}(t)$; the spectral examples include $1/(3 + j\\omega)$, $2\\pi\\delta(\\omega)$ and an ideal low-pass rectangle." },
+      { "term": "Fundamental period slider", "body": "Sets $T$ between $0.1$ and $20$, and therefore $\\omega_0 = 2\\pi/T$. The tool suggests a period from the signal's structure when you enter a new expression." },
+      { "term": "Number of harmonics slider", "body": "Sets $N$ from $1$ to $50$, which is the truncation in the partial sum $x_N(t)$." },
+      { "term": "Observation window", "body": "The 1 Period and 2 Periods presets choose how much of the time axis is plotted." },
+      { "term": "Time scale slider", "body": "In transform mode it rescales the argument to $x(at)$, so you can see the spectrum stretch or shrink inversely." },
+      { "term": "3D waterfall and spectrum plots", "body": "The surface shows magnitude along its height with the phase encoded across frequency, and the harmonic builder shows the partial sum converging." }
+    ],
+    "example": {
+      "title": "Series coefficients and Parseval check",
+      "problem": "Find the Fourier series of $x(t) = 2 + 3\\cos(2t) + \\sin(2t)$ and verify Parseval's relation.",
+      "steps": [
+        { "text": "The fundamental angular frequency is $\\omega_0 = 2\\text{ rad/s}$, so the period is $T = \\pi\\text{ s}$ and only $k = 0, \\pm 1$ appear.", "tex": "\\omega_0 = 2\\text{ rad/s}, \\qquad T = \\frac{2\\pi}{\\omega_0} = \\pi\\text{ s}" },
+        { "text": "Expand the sinusoids with Euler's formula, using $\\sin\\theta = (e^{j\\theta} - e^{-j\\theta})/(2j)$, and read off the coefficients.", "tex": "a_0 = 2, \\qquad a_1 = \\frac{3}{2} - \\frac{j}{2}, \\qquad a_{-1} = \\frac{3}{2} + \\frac{j}{2}" },
+        { "text": "The magnitude and phase of the first harmonic follow from the real and imaginary parts, with atan2 handling the quadrant.", "tex": "|a_1| = \\sqrt{2.5} \\approx 1.581, \\qquad \\angle a_1 = \\operatorname{atan2}\\!\\left(-\\tfrac{1}{2}, \\tfrac{3}{2}\\right) \\approx -0.322\\text{ rad}" },
+        { "text": "Sum the squared magnitudes of all coefficients.", "tex": "\\sum_k |a_k|^2 = 2^2 + 2.5 + 2.5 = 9" },
+        { "text": "Compute the mean-square value directly: the constant contributes its square and each sinusoid contributes half its squared amplitude.", "tex": "\\frac{1}{T}\\int_T |x|^2\\,dt = 2^2 + \\frac{3^2 + 1^2}{2} = 4 + 5 = 9" }
+      ],
+      "result": "Both sides of Parseval's relation equal $9$, so the series is correct and all the signal power lies in $k = 0, \\pm 1$."
+    },
+    "applications": [
+      { "field": "Machinery diagnostics", "body": "Spectral lines at multiples of the shaft speed reveal imbalance, misalignment and bearing defects long before failure." },
+      { "field": "Power quality", "body": "Harmonic coefficients of grid currents are checked against distortion limits, and Parseval's relation yields total harmonic distortion." },
+      { "field": "Telecommunications", "body": "Bandwidth of a pulse is read from its transform, and the inverse relation between time width and frequency width sets channel requirements." },
+      { "field": "Noise and vibration control", "body": "Magnitude and phase spectra of a plant guide notch filter placement and active noise cancellation." }
+    ]
+  },
+  "laplace-s-plane": {
+    "title": "3D Laplace and S-Plane",
+    "intro": "This lab connects a transfer function to its pole-zero geometry, its region of convergence, its three-dimensional magnitude surface and its time response.",
+    "purpose": "The tool takes a transfer function $H(s)$, or an impulse response $h(t)$ from which it derives $H(s)$, and draws the Cartesian s-plane with draggable poles and zeros. It shades the region of convergence, reports causality and BIBO stability, and renders the magnitude $\\lvert H(\\sigma + j\\omega)\\rvert$ as a landscape in which poles are tall peaks and zeros are dips to the floor. A Discrete / Z-Transform mode offers the analogous unit-circle picture, but this article concerns the continuous Laplace mode.",
+    "model": [
+      {
+        "heading": "The bilateral Laplace transform",
+        "body": "The transform generalizes the Fourier transform by replacing $j\\omega$ with the complex variable $s = \\sigma + j\\omega$. It equals the Fourier transform of $x(t)e^{-\\sigma t}$, so the real part $\\sigma$ acts as an exponential weight that can make a divergent signal integrable. The set of $\\sigma$ values for which the integral converges is the region of convergence, and the transform is incomplete without it, since different signals can share the same algebraic expression."
+      },
+      {
+        "heading": "Poles, zeros and the magnitude surface",
+        "body": "A rational transform is characterized by its gain $K$, zeros $z_i$ and poles $p_l$. The surface $\\lvert H(\\sigma + j\\omega)\\rvert$ diverges at each pole and drops to zero at each zero. Cutting the surface along $\\sigma = 0$ gives the frequency response curve $\\lvert H(j\\omega)\\rvert$, so a pole near the imaginary axis creates a resonance peak at its frequency. Poles of real systems appear in complex conjugate pairs."
+      },
+      {
+        "heading": "Region of convergence properties",
+        "body": "The region of convergence is a vertical strip, or half-plane, and contains no poles. For a right-sided signal it extends to the right of the rightmost pole; for a left-sided signal it extends to the left of the leftmost pole; for a two-sided signal it is a strip between poles, or empty. This is why the tool offers Right-sided, Left-sided and Two-sided choices for the same $H(s)$."
+      },
+      {
+        "heading": "Causality and stability",
+        "body": "A causal system has a right-sided impulse response, hence a region of convergence to the right of all poles, $\\text{Re}\\{s\\} > \\sigma_{max}$, where $\\sigma_{max}$ is the real part of the rightmost pole. A system is BIBO stable exactly when the imaginary axis lies inside the region of convergence. A causal rational system is therefore stable when all poles have negative real part, while a pole in the right half-plane forces a choice between causal and unstable, or non-causal and stable."
+      }
+    ],
+    "equations": [
+      "Bilateral Laplace transform with complex frequency $s$.",
+      "The transform as a Fourier transform of an exponentially weighted signal, and the $\\sigma = 0$ slice.",
+      "Pole-zero form: the magnitude blows up at poles and vanishes at zeros.",
+      "Region of convergence of a causal signal lies to the right of the rightmost pole.",
+      "BIBO stability as absolute integrability, equivalent to the $j\\omega$ axis lying in the ROC.",
+      "Inverse Laplace transform along a vertical line inside the ROC.",
+      "A transform pair for a damped sinusoid, the standard complex-pole pair."
+    ],
+    "mapping": [
+      { "term": "Continuous / Laplace and Discrete / Z-Transform switch", "body": "Picks the s-plane with its imaginary axis or the z-plane with its unit circle." },
+      { "term": "s-Domain $H(s)$ and Time-Domain $h(t)$ switch", "body": "Choose whether you type the transfer function or the impulse response, with presets such as $1/(s^2+4s+13)$, $1/(s+2)$, $1/(s-1)$, $e^{-3t}u(t)$ and $\\sin(2t)u(t)$." },
+      { "term": "Region of convergence selector", "body": "Right-sided / Causal, Left-sided / Anti-causal and Two-sided / Non-causal. The shaded region and the stability badge update, and the badge reports whether the ROC includes the $j\\omega$ axis." },
+      { "term": "Cartesian s-plane", "body": "Poles are drawn as crosses and zeros as circles. Dragging a root changes the coefficients of $H(s)$ and the terminal text updates when the root is released." },
+      { "term": "Solved poles and zeros panel", "body": "Lists the numeric roots $p_l$ and $z_i$, so you can read $\\sigma_{max}$ directly." },
+      { "term": "3D landscape", "body": "Plots $\\lvert H(\\sigma + j\\omega)\\rvert$ with peaks at the poles and dips at the zeros, and the slice at $\\sigma = 0$ highlights the frequency response." },
+      { "term": "System responses", "body": "Shows the Bode-style frequency response and the impulse response $h(t)$ for the current roots." },
+      { "term": "Derivation card", "body": "Shows the forward or inverse transform steps, such as partial fractions, for the current expression." }
+    ],
+    "example": {
+      "title": "Causality and stability of a damped second-order system",
+      "problem": "Analyze $H(s) = 1/(s^2 + 4s + 13)$ with a right-sided region of convergence.",
+      "steps": [
+        { "text": "Solve the characteristic polynomial for the poles.", "tex": "s^2 + 4s + 13 = 0 \\ \\Rightarrow \\ s = \\frac{-4 \\pm \\sqrt{16 - 52}}{2} = -2 \\pm j3" },
+        { "text": "The rightmost real part is $\\sigma_{max} = -2$, so the causal region of convergence is $\\text{Re}\\{s\\} > -2$. It contains the $j\\omega$ axis, so the system is stable.", "tex": "\\text{ROC}: \\ \\operatorname{Re}\\{s\\} > -2 \\ \\supset \\ \\operatorname{Re}\\{s\\} = 0" },
+        { "text": "Match the damped-sine pair with $a = 2$ and $b = 3$, and divide by $b$ to restore unit numerator.", "tex": "h(t) = \\frac{1}{3}\\,e^{-2t}\\sin(3t)\\,u(t)" },
+        { "text": "The frequency response squared magnitude is the denominator evaluated on the axis. Setting its derivative with respect to $\\omega^2$ to zero gives the resonance at $\\omega = \\sqrt{5}\\text{ rad/s}$.", "tex": "|H(j\\omega)|^2 = \\frac{1}{(13 - \\omega^2)^2 + 16\\omega^2}, \\qquad |H(j\\sqrt{5})| = \\frac{1}{12} \\approx 0.0833" }
+      ],
+      "result": "The poles are at $s = -2 \\pm j3$, the system is causal and BIBO stable, $h(t) = \\tfrac{1}{3}e^{-2t}\\sin(3t)u(t)$, and the magnitude peaks at $1/12$ near $\\omega = \\sqrt{5}\\text{ rad/s}$."
+    },
+    "applications": [
+      { "field": "Servo and robot control", "body": "Pole locations set the settling time and overshoot of a joint controller, and dragging poles in the plane is the basis of pole placement." },
+      { "field": "Power electronics", "body": "Converter loop transfer functions are checked for right-half-plane poles and zeros that limit achievable bandwidth." },
+      { "field": "Flight control", "body": "Short-period and phugoid modes are complex pole pairs whose damping is read from their angle to the real axis." },
+      { "field": "Analog filter design", "body": "Butterworth and Chebyshev filters are specified by placing poles on circles or ellipses in the left half-plane, giving a stable causal realization." }
+    ]
+  }
+}

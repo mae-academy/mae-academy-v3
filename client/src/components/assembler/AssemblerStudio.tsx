@@ -33,6 +33,7 @@ import { prewarmRemote } from "@/features/code-studio/executionCache";
 import { TerminalSurface } from "@/features/code-studio/components/Terminal";
 import { toast } from "sonner";
 import { useSimulatorSeo } from "@/seo/useSimulatorSeo";
+import { publishDocsTool } from "@/components/simulations/toolDocs/activeToolStore";
 import { useLocation } from "wouter";
 import {
   AlertDialog,
@@ -468,6 +469,11 @@ export function AssemblerStudio() {
 
   // Synchronize document title and search engine meta descriptions reactively
   useSimulatorSeo(`code-${language}`);
+
+  // Publish the active language so the per-tool documentation follows the selector
+  useEffect(() => {
+    publishDocsTool("codeStudio", language);
+  }, [language]);
 
   // Synchronize with external route changes (e.g. browser back/forward)
   useEffect(() => {
