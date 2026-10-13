@@ -29,6 +29,7 @@ import {
   simulationRouteMeta,
 } from "@/data/platform";
 import SimulatorDocumentation from "@/components/SimulatorDocumentation";
+import SimulationDocumentation, { docsTopicForSlug } from "@/components/simulations/SimulationDocumentation";
 import { seoKeyForRoute } from "@/seo/simulatorSeoData";
 import { useSimulatorSeo } from "@/seo/useSimulatorSeo";
 import NotFound from "./NotFound";
@@ -94,6 +95,7 @@ export default function SimulationDetail() {
   if (!meta) return <NotFound />;
 
   const simulation = copy.collections.simulations.cards[meta.index];
+  const docsTopic = docsTopicForSlug(meta.slug);
   const isControlSystems = meta.slug === "control-systems";
   const isPowerElectronics = meta.slug === "power-electronics";
   const isSignalsAndSystems = meta.slug === "signals-and-systems";
@@ -211,7 +213,7 @@ export default function SimulationDetail() {
           {toolContent}
         </div>
       </motion.div>
-      <SimulatorDocumentation />
+      {docsTopic ? <SimulationDocumentation topic={docsTopic} /> : <SimulatorDocumentation />}
     </SimulatorLayout>
   </motion.div>;
 }

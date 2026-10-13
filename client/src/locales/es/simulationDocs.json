@@ -1,0 +1,606 @@
+{
+  "sections": {
+    "principles": "Principios y ecuaciones que los gobiernan",
+    "parameters": "Parámetros y definiciones de control",
+    "experiments": "Experimentos de laboratorio paso a paso",
+    "applications": "Aplicaciones industriales y normas"
+  },
+  "labels": {
+    "equations": "Ecuaciones que gobiernan el sistema"
+  },
+  "topics": {
+    "circuits": {
+      "title": "Circuitos eléctricos: teoría y guía de laboratorio",
+      "intro": "Este estudio resuelve circuitos de corriente continua y alterna con el mismo método nodal que usan los ingenieros en una primera revisión de diseño. Coloque fuentes, resistencias, condensadores, bobinas y medidores, conéctelos entre sí y el solucionador calculará el voltaje de cada nodo y la corriente de cada rama. La teoría siguiente explica lo que hace el solucionador, para que pueda predecir un resultado a mano y luego comprobarlo en el lienzo.",
+      "principles": [
+        {
+          "heading": "Leyes de Ohm y de Kirchhoff",
+          "body": "La ley de Ohm relaciona voltaje, corriente y resistencia en un elemento lineal. La ley de corrientes de Kirchhoff establece que las corrientes que entran en un nodo suman cero, lo que es la conservación de la carga. La ley de voltajes de Kirchhoff establece que la suma de subidas y caídas de voltaje alrededor de cualquier lazo cerrado es cero, lo que es la conservación de la energía. Junto con la ley de Ohm, estas dos leyes resuelven cualquier red resistiva lineal."
+        },
+        {
+          "heading": "Análisis nodal modificado (MNA)",
+          "body": "El solucionador escribe la ley de corrientes de Kirchhoff en cada nodo y reúne los resultados en una ecuación matricial G·v = i. G es la matriz de conductancias, v contiene los voltajes nodales desconocidos e i contiene las inyecciones de corriente conocidas. Una fuente de voltaje ideal no puede escribirse como una conductancia, así que el MNA añade una incógnita por fuente, su corriente de rama, y una ecuación que fija su voltaje. El sistema resultante se resuelve en un paso para corriente continua y en cada frecuencia para corriente alterna."
+        },
+        {
+          "heading": "Fasores de corriente alterna e impedancia",
+          "body": "En régimen sinusoidal permanente, cada voltaje y cada corriente es un fasor con magnitud y ángulo de fase. Una resistencia tiene impedancia Z = R, una bobina Z = jωL y un condensador Z = 1/(jωC). Las impedancias se combinan en serie y en paralelo exactamente como las resistencias, y la ley de Ohm se convierte en V = Z·I. El ángulo de Z es el adelanto o retraso de fase del voltaje respecto de la corriente."
+        },
+        {
+          "heading": "Adaptación de impedancias y potencia máxima",
+          "body": "Una fuente con resistencia interna Rs entrega la máxima potencia a una carga cuando la resistencia de la carga es igual a Rs. La potencia entregada es entonces Vs²/(4Rs). La fuente disipa internamente la misma cantidad, así que solo la mitad de la potencia que genera llega a la carga. Por tanto, la adaptación maximiza la transferencia de potencia, no el rendimiento. En fuentes de corriente alterna, la adaptación conjugada ZL = Zs* transfiere la potencia máxima."
+        },
+        {
+          "heading": "Uso del multímetro digital",
+          "body": "Mida voltaje con el medidor en paralelo con el elemento y corriente con el medidor en serie, lo que obliga a abrir el camino. Mida resistencia solo con el circuito sin alimentación y la pieza aislada. Un medidor de valor medio lee bien las senoidales pero se equivoca con formas de onda distorsionadas, así que use un medidor de valor eficaz verdadero para esos casos. Empiece siempre con un calibre superior al valor esperado."
+        }
+      ],
+      "equations": [
+        "Ley de Ohm",
+        "Ley de corrientes de Kirchhoff en cada nodo",
+        "Ley de voltajes de Kirchhoff alrededor de cada lazo",
+        "Forma nodal del MNA: matriz de conductancias G, voltajes nodales v, corrientes inyectadas i",
+        "Impedancias en régimen sinusoidal permanente",
+        "Transferencia de potencia máxima a una carga resistiva"
+      ],
+      "parameters": [
+        {
+          "term": "Voltaje y frecuencia de la fuente",
+          "body": "Ajuste el nivel de continua o la amplitud y frecuencia de la alterna. Las reactancias cambian con la frecuencia, así que un condensador que bloquea 50 Hz puede dejar pasar 5 kHz casi sin cambios."
+        },
+        {
+          "term": "Tolerancia y potencia nominal de las resistencias",
+          "body": "Las resistencias reales tienen tolerancias del 1 al 10 por ciento, así que una pieza de 1 kΩ con ±5 por ciento puede medir entre 950 Ω y 1050 Ω. Compruebe la potencia disipada P = I²R frente a la potencia nominal, normalmente 0,25 W o 0,5 W en piezas de orificio pasante."
+        },
+        {
+          "term": "Constantes de tiempo",
+          "body": "Un circuito RC tiene τ = RC y un circuito RL tiene τ = L/R. Una resistencia de 10 kΩ con un condensador de 100 µF tiene τ = 1 s, así que el condensador necesita unas cinco constantes de tiempo para alcanzar el 99 por ciento de su voltaje final. Haga la ventana de simulación varias veces más larga que la mayor constante de tiempo."
+        },
+        {
+          "term": "Carga que introduce el medidor",
+          "body": "Un voltímetro ideal tiene resistencia de entrada infinita. Un medidor real con entrada de 10 MΩ puede cargar un nodo de alta impedancia y cambiar la lectura. Tenga esto en cuenta al medir a través de resistencias grandes."
+        },
+        {
+          "term": "Límites numéricos",
+          "body": "Valores muy alejados de un rango práctico pueden volver mal condicionada la matriz nodal. Si un resultado parece erróneo, busque un nodo flotante sin camino de continua a tierra, porque su voltaje no está definido de forma única."
+        }
+      ],
+      "experiments": [
+        {
+          "title": "Verificar la ley de Ohm",
+          "body": "Conecte una sola resistencia a una fuente de 5 V. Prediga la corriente con I = V/R y luego lea el amperímetro. Cambie R a 2,2 kΩ y repita. Dibuje el voltaje frente a la corriente; la pendiente de la recta debe ser igual a R."
+        },
+        {
+          "title": "Divisor de voltaje y carga",
+          "body": "Construya un divisor con dos resistencias de 10 kΩ y prediga el voltaje del punto medio, que es la mitad de la alimentación. Añada una carga de 10 kΩ en paralelo con la resistencia inferior y prediga de nuevo. Mida el nuevo valor y explique la caída en función de la combinación en paralelo."
+        },
+        {
+          "title": "Cargar un circuito RC",
+          "body": "Conecte una resistencia de 10 kΩ, un condensador de 100 µF y una fuente escalón. Prediga el tiempo para alcanzar el 63 por ciento del voltaje final, que equivale a una constante de tiempo de 1 s. Mida el transitorio y compare ambos valores."
+        },
+        {
+          "title": "Resonancia en un circuito RLC serie",
+          "body": "Use L = 10 mH y C = 100 nF. La frecuencia de resonancia es f0 = 1/(2π√LC), unos 5,03 kHz. Barra la frecuencia de la fuente alrededor de f0 y anote la corriente máxima. Repita con una R mayor y explique por qué el pico se aplana."
+        }
+      ],
+      "applications": [
+        {
+          "field": "Sistemas de potencia",
+          "body": "Los estudios de transmisión comienzan con un análisis nodal de la red, y los cálculos de flujo de carga y de fallas parten de la misma matriz nodal con impedancias en por unidad. La norma IEC 60617 y la ANSI/IEEE Std 315 definen los símbolos de los diagramas unifilares."
+        },
+        {
+          "field": "Aviónica",
+          "body": "Los buses de potencia de las aeronaves, los puentes de sensores y los acondicionadores de señal se diseñan con las leyes de Kirchhoff y con análisis de tolerancias en el peor caso. Los equipos embarcados deben superar la calificación ambiental, como RTCA DO-160, que cubre temperatura, vibración e interferencia electromagnética."
+        },
+        {
+          "field": "Mecatrónica",
+          "body": "Los accionamientos de motores, los codificadores y las interfaces analógicas de sensores dependen de la adaptación de impedancias y del diseño de filtros. Los ingenieros verifican la impedancia de entrada de un amplificador o de un convertidor antes de conectar un sensor de alta resistencia, para que el instrumento no distorsione la medida."
+        },
+        {
+          "field": "Robótica",
+          "body": "Una articulación robótica combina la inductancia del devanado del motor, las resistencias de medida de corriente y la resistencia interna de la batería. Los cálculos de caída de voltaje y de potencia de este estudio explican por qué la caída de la batería y los cables largos reducen el par disponible bajo carga."
+        }
+      ]
+    },
+    "signals": {
+      "title": "Señales y sistemas: teoría y guía de laboratorio",
+      "intro": "El estudio de señales y sistemas le permite generar, transformar y filtrar señales, y después medir cómo responde a ellas un sistema lineal. La teoría siguiente relaciona cada gráfica con la integral o la transformada que la describe, de modo que cada experimento puede predecirse antes de realizarlo.",
+      "principles": [
+        {
+          "heading": "Señales continuas y discretas",
+          "body": "Una señal continua x(t) está definida en cada instante. Una señal discreta x[n] existe solo en índices enteros. Al muestrear una señal continua cada Ts segundos se obtiene x[n] = x(nTs). La frecuencia de muestreo debe superar el doble de la frecuencia más alta presente, según el criterio de Nyquist; si no, el aliasing hace que las frecuencias altas se plieguen sobre las bajas."
+        },
+        {
+          "heading": "Convolución",
+          "body": "Un sistema lineal e invariante en el tiempo (LTI) queda descrito por completo por su respuesta al impulso h(t). Su salida para cualquier entrada es la convolución y(t) = ∫ x(τ)h(t−τ) dτ, o y[n] = Σ x[k]h[n−k] en tiempo discreto. Gráficamente, invierta h, deslícela sobre x, multiplique las partes que se solapan y acumule el área."
+        },
+        {
+          "heading": "Descomposición en serie de Fourier",
+          "body": "Una señal periódica de periodo T es una suma de armónicos en múltiplos de ω0 = 2π/T. Sus coeficientes complejos son cn = (1/T)∫ x(t)e^(−jnω0t) dt. Los bordes abruptos requieren muchos armónicos, y truncar la serie produce un sobreimpulso cerca de cada discontinuidad, conocido como fenómeno de Gibbs."
+        },
+        {
+          "heading": "Respuesta en frecuencia",
+          "body": "Un sistema LTI estable excitado por una senoidal de frecuencia ω produce una senoidal de la misma frecuencia, escalada por |H(jω)| y desplazada por el ángulo de H(jω). La función H(jω) es la función de transferencia evaluada sobre el eje imaginario. Los diagramas de Bode de magnitud y fase muestran esta ganancia y este desplazamiento a lo largo de la frecuencia."
+        }
+      ],
+      "equations": [
+        "Integral de convolución para un sistema LTI",
+        "Suma de convolución discreta",
+        "Coeficientes de la serie de Fourier",
+        "Respuesta en frecuencia de un sistema LTI",
+        "Condición de muestreo de Nyquist"
+      ],
+      "parameters": [
+        {
+          "term": "Frecuencia y amplitud",
+          "body": "La frecuencia se ajusta en hercios, es decir, ciclos por segundo, y ω = 2πf en radianes por segundo. La amplitud escala toda la forma de onda. Mantenga la frecuencia de muestreo al menos diez veces mayor que la componente más alta para obtener gráficas suaves e integrales precisas."
+        },
+        {
+          "term": "Ventana de análisis",
+          "body": "La duración de la ventana T fija la resolución en frecuencia, Δf = 1/T. Una ventana corta mezcla frecuencias cercanas. Con muy pocas muestras por periodo se distorsiona la forma de la onda, así que elija una ventana que contenga varios periodos completos."
+        },
+        {
+          "term": "Número de armónicos",
+          "body": "Una suma parcial de Fourier con N términos converge lentamente para señales con saltos. Aumente N y observe cómo el sobreimpulso junto a cada borde se acerca al límite de Gibbs, de alrededor del nueve por ciento del salto."
+        },
+        {
+          "term": "Constante de tiempo del filtro",
+          "body": "En un filtro paso bajo de primer orden la frecuencia de corte es ωc = 1/τ. Una constante de tiempo mayor reduce el ancho de banda y ralentiza la respuesta. Un polo más cercano al origen siempre produce un sistema más lento."
+        }
+      ],
+      "experiments": [
+        {
+          "title": "Muestreo y aliasing",
+          "body": "Genere una senoidal de 1 kHz y muéstrela a 1,5 kHz y después a 5 kHz. En el primer caso, prediga la frecuencia aparente antes de mirar la gráfica: el alias es 1500 − 1000 = 500 Hz. El segundo caso debe reproducir correctamente 1 kHz."
+        },
+        {
+          "title": "Convolucionar dos pulsos",
+          "body": "Convolucione dos pulsos rectangulares de anchura unitaria. Prediga una salida triangular de base 2 y altura de pico 1 en t = 1, y compruebe ambos valores en la gráfica."
+        },
+        {
+          "title": "Construir una onda cuadrada con armónicos",
+          "body": "Sume los armónicos impares de una onda cuadrada de uno en uno, con amplitudes 4/(nπ). Observe cómo se afilan los bordes y que el sobreimpulso junto a cada transición se mantiene cerca del nueve por ciento sin importar cuántos armónicos añada."
+        },
+        {
+          "title": "Leer un diagrama de Bode de magnitud",
+          "body": "Aplique un barrido senoidal a un filtro paso bajo de primer orden con ωc = 100 rad/s. En ω = ωc prediga una ganancia de 0,707, es decir −3 dB, y una fase de −45 grados. Confirme ambos valores en la gráfica."
+        }
+      ],
+      "applications": [
+        {
+          "field": "Sistemas de potencia",
+          "body": "Los relés de protección, el análisis de armónicos y los monitores de calidad de energía usan el análisis de Fourier para separar la componente fundamental de las corrientes armónicas. La norma IEEE Std 519 fija los límites de distorsión armónica para la conexión con la red de la compañía eléctrica."
+        },
+        {
+          "field": "Aviónica",
+          "body": "Los filtros de control de vuelo y los reductores de ruido de los sensores se diseñan como sistemas LTI y se verifican con mediciones de respuesta en frecuencia. El software embarcado que implementa estos algoritmos se certifica con RTCA DO-178C, que exige una verificación trazable."
+        },
+        {
+          "field": "Mecatrónica",
+          "body": "El aislamiento de vibraciones y los lazos de servo se especifican por ancho de banda y retraso de fase. Un filtro paso bajo en un sensor de fuerza intercambia reducción de ruido por retraso de respuesta, y la respuesta en frecuencia cuantifica ese compromiso."
+        },
+        {
+          "field": "Robótica",
+          "body": "Las señales de codificadores y cámaras se muestrean, por lo que el límite de Nyquist fija el movimiento más rápido que puede medirse. Los filtros antialiasing colocados antes del convertidor son una práctica habitual en la percepción robótica."
+        }
+      ]
+    },
+    "control": {
+      "title": "Sistemas de control: teoría y guía de laboratorio",
+      "intro": "El estudio de sistemas de control modela una planta, cierra el lazo y muestra cómo se comporta la respuesta ante pruebas de escalón y de frecuencia. La teoría siguiente explica las funciones de transferencia, los márgenes de estabilidad y las métricas en el dominio del tiempo que muestran las gráficas, para que pueda sintonizar un controlador con cálculos y no por prueba y error.",
+      "principles": [
+        {
+          "heading": "Control en lazo abierto y en lazo cerrado",
+          "body": "En el control en lazo abierto la entrada se fija sin medir la salida, así que las perturbaciones y los errores del modelo no se corrigen. En el control en lazo cerrado (realimentado) el error e = r − y impulsa al controlador, lo que reduce la sensibilidad a perturbaciones y a cambios de parámetros. El costo es que la realimentación puede hacer oscilar al sistema o volverlo inestable."
+        },
+        {
+          "heading": "Funciones de transferencia en el dominio de Laplace",
+          "body": "Un sistema lineal con entrada U(s) y salida Y(s) se describe mediante Y(s)/U(s) = G(s). Con realimentación unitaria y controlador C(s), la función de transferencia en lazo cerrado es T(s) = CG/(1 + CG). La ecuación 1 + CG(s) = 0 es la ecuación característica, y sus raíces son los polos en lazo cerrado."
+        },
+        {
+          "heading": "Ubicación de polos y ceros y estabilidad",
+          "body": "Un sistema es estable cuando cada polo en lazo cerrado tiene parte real negativa, es decir, está en el semiplano izquierdo del plano s. Los polos más cercanos al eje imaginario dan respuestas más lentas y más oscilantes. En el sistema de segundo orden de la ecuación siguiente, la relación de amortiguamiento ζ determina la forma de la respuesta y la frecuencia natural ωn determina su velocidad."
+        },
+        {
+          "heading": "Márgenes de ganancia y de fase",
+          "body": "El margen de ganancia es cuánto puede aumentar la ganancia del lazo antes de que el lazo cerrado se vuelva inestable, y se lee donde la fase cruza −180 grados. El margen de fase es el retraso de fase adicional que tolera la frecuencia de cruce de ganancia, donde la magnitud de la ganancia del lazo vale uno. Un margen de fase de unos 45 a 60 grados suele dar una respuesta bien amortiguada."
+        },
+        {
+          "heading": "Métricas de la respuesta al escalón",
+          "body": "Para un escalón unitario en un sistema de segundo orden subamortiguado, el sobreimpulso porcentual es exp(−ζπ/√(1−ζ²)). El tiempo de subida es el tiempo que va del 10 al 90 por ciento del valor final. El tiempo de establecimiento dentro del 2 por ciento es aproximadamente 4/(ζωn). Estos tres números resumen la mayoría de los requisitos de desempeño."
+        }
+      ],
+      "equations": [
+        "Salida de la planta en lazo abierto",
+        "Función de transferencia en lazo cerrado con realimentación unitaria",
+        "Sistema estándar de segundo orden",
+        "Sobreimpulso fraccionario de la respuesta al escalón",
+        "Margen de fase en la frecuencia de cruce de ganancia",
+        "Tiempo de establecimiento al 2 por ciento"
+      ],
+      "parameters": [
+        {
+          "term": "Ganancia de la planta K y constante de tiempo τ",
+          "body": "K fija el valor estacionario de una planta de primer orden y τ fija la rapidez con que lo alcanza. Aumentar K eleva la ganancia del lazo, lo que mejora el seguimiento pero reduce los márgenes de estabilidad."
+        },
+        {
+          "term": "Ganancias del controlador Kp, Ki y Kd",
+          "body": "La ganancia proporcional reacciona al error presente. La ganancia integral elimina el error en régimen estacionario, pero valores grandes causan sobreimpulso y saturación del integrador cuando el actuador se satura. La ganancia derivativa anticipa el cambio, pero valores grandes amplifican el ruido del sensor."
+        },
+        {
+          "term": "Relación de amortiguamiento ζ",
+          "body": "Use 0 < ζ < 1 para una respuesta subamortiguada. Una relación de amortiguamiento de 0,707 es un objetivo habitual y da alrededor de un 4 por ciento de sobreimpulso. Un ζ de 1 o más no produce sobreimpulso, pero la respuesta es más lenta."
+        },
+        {
+          "term": "Tiempo de muestreo y retardo",
+          "body": "Los controladores digitales muestrean cada Ts segundos, y el retardo de transporte añade retraso de fase. Una regla común es muestrear entre diez y veinte veces más rápido que el ancho de banda deseado del lazo cerrado."
+        }
+      ],
+      "experiments": [
+        {
+          "title": "Medir una respuesta al escalón",
+          "body": "Configure una planta de primer orden con K = 2 y τ = 1 s. Prediga el valor final para un escalón unitario, que es 2, y el tiempo para alcanzar el 63 por ciento de ese valor, que es 1 s. Confirme ambos en la gráfica."
+        },
+        {
+          "title": "Hallar el límite de estabilidad de un controlador proporcional",
+          "body": "Cierre el lazo con una ganancia pura alrededor de una planta de tercer orden. Aumente Kp hasta que la respuesta se vuelva una oscilación sostenida. Registre esa ganancia como ganancia crítica Ku y el periodo de la oscilación como Tu."
+        },
+        {
+          "title": "Sintonizar un lazo PI con Ziegler–Nichols",
+          "body": "A partir de Ku y Tu aplique la tabla clásica para un controlador PI: Kp = 0,45 Ku y tiempo integral Ti = Tu/1,2. Simule la respuesta al escalón, luego reduzca Kp un diez por ciento y observe cómo baja el sobreimpulso."
+        },
+        {
+          "title": "Leer los márgenes en un diagrama de Bode",
+          "body": "Grafique la respuesta en frecuencia del lazo con la ganancia añadida. Localice la frecuencia donde la fase cruza −180 grados y lea el margen de ganancia en decibelios. Después encuentre la frecuencia de cruce de ganancia y lea el margen de fase en el mismo diagrama."
+        }
+      ],
+      "applications": [
+        {
+          "field": "Sistemas de potencia",
+          "body": "Los gobernadores de generadores y los reguladores automáticos de voltaje son sistemas de lazo cerrado sintonizados por margen de fase y ancho de banda. Los códigos de red especifican con qué rapidez deben responder estos controles a las perturbaciones de frecuencia."
+        },
+        {
+          "field": "Aviónica",
+          "body": "Los pilotos automáticos y las leyes de control de vuelo usan realimentación con requisitos de estabilidad estrictos. Su estabilidad y sus cualidades de manejo se verifican frente a criterios de certificación, y el software embarcado sigue la norma RTCA DO-178C."
+        },
+        {
+          "field": "Mecatrónica",
+          "body": "Los accionamientos servo y los ejes de máquina usan lazos PID, a menudo con alimentación directa. La acción derivativa se limita en la práctica porque amplifica el ruido de cuantización del codificador, así que los diseñadores filtran el término derivativo."
+        },
+        {
+          "field": "Robótica",
+          "body": "Los controladores de articulaciones de robots suelen ser lazos en cascada: corriente dentro de velocidad, y velocidad dentro de posición. Cada lazo interno debe ser bastante más rápido que el lazo externo, así que los márgenes se revisan lazo por lazo. Los lazos de seguridad funcional siguen la norma IEC 61508."
+        }
+      ]
+    },
+    "fluid": {
+      "title": "Neumática e hidráulica: teoría y guía de laboratorio",
+      "intro": "El estudio de neumática y accionamiento hidráulico construye circuitos con bombas, válvulas, cilindros y depósitos, y muestra la presión y el caudal en cada punto. La teoría siguiente presenta la ecuación de continuidad, el principio de Pascal y las relaciones de caída de presión que sustentan esas lecturas, y explica cómo las válvulas reguladoras fijan la velocidad del actuador.",
+      "principles": [
+        {
+          "heading": "Aproximaciones de la dinámica de fluidos",
+          "body": "La mayoría de los análisis hidráulicos suponen un fluido incompresible en flujo estacionario. El aceite hidráulico es casi incompresible a presiones normales, lo que justifica la aproximación. El aire es compresible, así que los cálculos neumáticos lo tratan como incompresible solo cuando las caídas de presión son pequeñas y las velocidades quedan muy por debajo de la del sonido. La viscosidad decide si el flujo es laminar o turbulento, lo que se juzga con el número de Reynolds; en tuberías el flujo suele ser laminar por debajo de unos 2300."
+        },
+        {
+          "heading": "Ecuación de continuidad",
+          "body": "La masa se conserva, así que para flujo incompresible el caudal volumétrico Q = A·v es el mismo en cada sección de una línea. Donde el área se estrecha, la velocidad aumenta. Si una válvula reduce a la mitad el área de paso, la velocidad se duplica, y como la presión dinámica depende del cuadrado de la velocidad, se multiplica por cuatro."
+        },
+        {
+          "heading": "Principio de Pascal",
+          "body": "La presión aplicada a un fluido confinado se transmite por igual en todas las direcciones. Un pistón de área A1 empujado con fuerza F1 crea una presión p = F1/A1 que actúa sobre un segundo pistón de área A2, lo que produce F2 = F1·A2/A1. Una fuerza pequeña de entrada se convierte así en una fuerza grande de salida, a costa del recorrido, porque el volumen desplazado en ambos lados es igual."
+        },
+        {
+          "heading": "Caídas de presión y regulación de caudal",
+          "body": "La fricción en líneas y racores provoca una caída de presión, que se estima con la ecuación de Darcy–Weisbach. Un orificio o una válvula deja pasar un caudal Q = Cd·A·√(2Δp/ρ). Una válvula de control de caudal fija la velocidad del cilindro cambiando el área efectiva A, mientras la bomba suministra la presión que exige la carga."
+        }
+      ],
+      "equations": [
+        "Número de Reynolds, laminar por debajo de unos 2300 en tuberías",
+        "Continuidad para flujo incompresible",
+        "Principio de Pascal y multiplicación de fuerza",
+        "Caída de presión de Darcy–Weisbach",
+        "Caudal a través de un orificio",
+        "Potencia hidráulica"
+      ],
+      "parameters": [
+        {
+          "term": "Presión de alimentación",
+          "body": "Las válvulas de alivio fijan la presión máxima. Los sistemas hidráulicos industriales suelen funcionar entre unos 100 y 350 bar, y los neumáticos normalmente entre 6 y 8 bar. Cada componente debe estar calificado por encima del ajuste de alivio."
+        },
+        {
+          "term": "Diámetro del cilindro y del vástago",
+          "body": "En la carrera de salida la fuerza es p·A con el diámetro completo. En la carrera de retorno la fuerza es menor porque el vástago ocupa parte del área. La velocidad es Q/A, así que, con el mismo caudal, un diámetro menor se mueve más rápido."
+        },
+        {
+          "term": "Coeficiente de descarga",
+          "body": "El coeficiente de descarga Cd suele estar entre 0,6 y 0,8 en un orificio de borde afilado. El caudal crece con la raíz cuadrada de la caída de presión, así que duplicar la caída de presión aumenta el caudal alrededor de un 41 por ciento."
+        },
+        {
+          "term": "Viscosidad del aceite y temperatura",
+          "body": "La viscosidad del aceite disminuye al subir la temperatura. Un aceite fluido se filtra más por los sellos y aumenta el desgaste, mientras que un aceite frío y espeso eleva la caída de presión y frena el cilindro. Mantenga el fluido dentro de su rango de temperatura recomendado."
+        }
+      ],
+      "experiments": [
+        {
+          "title": "Continuidad en una línea cónica",
+          "body": "Una sección con la mitad del diámetro de la entrada tiene una cuarta parte del área. Usando A1v1 = A2v2, prediga su velocidad respecto de la entrada, que es cuatro veces mayor. Compare la razón con las velocidades que muestra el simulador."
+        },
+        {
+          "title": "Multiplicador de fuerza de Pascal",
+          "body": "Use un pistón de entrada de 10 mm y un pistón de salida de 50 mm. Prediga la fuerza de salida para una entrada de 100 N: F2 = 100 × (50/10)² = 2500 N. Confirme el valor en el simulador y observe cuánto recorre el pistón de salida en comparación con el de entrada."
+        },
+        {
+          "title": "Control de velocidad con regulador de caudal",
+          "body": "Fije el caudal de la bomba y un cilindro de diámetro conocido. Prediga la velocidad de extensión como v = Q/A. Reduzca la apertura del regulador y verifique que la velocidad baja mientras la presión sigue fijada por la carga."
+        },
+        {
+          "title": "Caída de presión a lo largo de una manguera",
+          "body": "Aumente la longitud de la manguera de 2 m a 10 m con el mismo caudal. Darcy–Weisbach predice que la caída por fricción crece en proporción directa a la longitud, es decir, cinco veces más. Confirme la tendencia y determine la longitud a partir de la cual la caída es significativa."
+        }
+      ],
+      "applications": [
+        {
+          "field": "Mecatrónica",
+          "body": "Las pinzas neumáticas, las prensas y las abrazaderas hidráulicas usan las relaciones de continuidad y de caída de presión para dimensionar líneas y válvulas, de modo que los actuadores alcancen la velocidad requerida. Las normas ISO 1219-1 e ISO 1219-2 definen los símbolos gráficos y los diagramas de circuito empleados en estos diseños."
+        },
+        {
+          "field": "Aviónica",
+          "body": "Los sistemas hidráulicos de las aeronaves accionan los actuadores de control de vuelo, el tren de aterrizaje y los frenos a presiones cercanas a 3000 psi, unos 207 bar. Los diseñadores aplican el mismo razonamiento de caída de presión y seleccionan componentes según normas aeroespaciales como SAE AS4059 para la limpieza del fluido."
+        },
+        {
+          "field": "Robótica",
+          "body": "Los manipuladores hidráulicos de elevación pesada dependen del principio de Pascal para multiplicar la fuerza y del control de caudal para lograr una velocidad articular suave. Las válvulas servo fijan la velocidad con gran ancho de banda, lo que se relaciona directamente con la teoría de realimentación del estudio de control."
+        },
+        {
+          "field": "Sistemas de potencia",
+          "body": "Los gobernadores de las turbinas hidroeléctricas posicionan los álabes directrices con servos hidráulicos. La presión y el caudal se regulan para mantener la velocidad de la turbina y la frecuencia de la red, y las pérdidas en las tuberías calculadas con Darcy–Weisbach determinan la altura disponible."
+        }
+      ]
+    },
+    "logic": {
+      "title": "Lógica digital: teoría y guía de laboratorio",
+      "intro": "El estudio de lógica digital dibuja esquemas a nivel de compuertas, deduce expresiones booleanas a partir de tablas de verdad, las minimiza con mapas de Karnaugh, sintetiza circuitos solo con compuertas NAND y comprueba la temporización y el comportamiento de las máquinas de estados. La teoría siguiente expone el álgebra que hay detrás de cada herramienta, para que pueda verificar la salida del programa con razonamiento.",
+      "principles": [
+        {
+          "heading": "Álgebra de Boole",
+          "body": "Las variables toman los valores 0 o 1. Las operaciones básicas son AND (A·B), OR (A + B) y NOT (el complemento Ā). Entre las identidades útiles están A + Ā = 1 y A·Ā = 0. Las leyes de De Morgan establecen que el complemento de A·B es Ā + B̄, y que el complemento de A + B es Ā·B̄. Estas leyes permiten convertir entre tipos de compuertas, y así se construye cualquier función usando solo compuertas NAND."
+        },
+        {
+          "heading": "Formas canónicas y minimización",
+          "body": "Cada fila de una tabla de verdad cuya salida es 1 da un minitérmino, y la suma de esos minitérminos es la forma canónica de suma de productos. Un mapa de Karnaugh ordena la tabla de modo que las celdas adyacentes difieren en un bit. Los grupos de 2, 4 u 8 unos adyacentes eliminan las variables que cambian dentro del grupo. Las condiciones de no importa pueden agrandar los grupos y acortar el resultado."
+        },
+        {
+          "heading": "Circuitos combinacionales y secuenciales",
+          "body": "Las salidas combinacionales dependen solo de las entradas actuales, como en los sumadores y los multiplexores. Los circuitos secuenciales almacenan estado. Un biestable toma muestra de su entrada en un flanco del reloj, y una máquina de estados finitos pasa entre un conjunto fijo de estados, con una transición definida para cada combinación de entradas."
+        },
+        {
+          "heading": "Retardo de propagación y límites del reloj",
+          "body": "Cada compuerta tarda un tiempo finito en responder, el retardo de propagación. En un diseño síncrono, la trayectoria combinacional más larga debe estabilizarse antes del siguiente flanco del reloj. Esa trayectoria, junto con el tiempo de preparación del biestable, fija la frecuencia máxima del reloj."
+        }
+      ],
+      "equations": [
+        "Operaciones booleanas básicas",
+        "Ley de De Morgan",
+        "Suma canónica de minitérminos, con un ejemplo de tres variables",
+        "Frecuencia máxima aproximada del reloj"
+      ],
+      "parameters": [
+        {
+          "term": "Número de entradas",
+          "body": "Una tabla de verdad con n entradas tiene 2 elevado a n filas. Cinco entradas ya dan 32 filas. Use un mapa de Karnaugh para hasta cuatro variables y apóyese en el analizador para problemas mayores."
+        },
+        {
+          "term": "Fan-out",
+          "body": "Una compuerta solo puede alimentar un número limitado de entradas antes de que su nivel de salida se degrade. Una compuerta TTL estándar alimenta unas diez cargas estándar. Las compuertas CMOS alimentan muchas más cargas, pero se vuelven más lentas al crecer la carga capacitiva."
+        },
+        {
+          "term": "Entradas de no importa",
+          "body": "Marque con X las filas que una entrada real nunca puede producir. Agruparlas puede reducir una expresión, pero nunca asigne una X a una fila que sí puede ocurrir."
+        },
+        {
+          "term": "Periodo del reloj",
+          "body": "El periodo del reloj debe superar el retardo de la trayectoria más larga más el tiempo de preparación. Subir el reloj por encima de la frecuencia máxima hace que los biestables capturen valores que aún no se han estabilizado."
+        }
+      ],
+      "experiments": [
+        {
+          "title": "Verificar la ley de De Morgan",
+          "body": "Construya una compuerta NAND y compare su tabla de verdad con la de un inversor que alimenta una compuerta OR que recibe entradas invertidas. Las expresiones equivalentes producen columnas de salida idénticas, así que ambas tablas deben coincidir fila por fila."
+        },
+        {
+          "title": "Minimizar con un mapa de Karnaugh",
+          "body": "Introduzca F = Σm(1, 3, 5, 7) con las variables A, B y C. Antes de pulsar el minimizador, prediga la respuesta: los cuatro minitérminos tienen C = 1 y juntos cubren todos los valores de A y B, así que F = C. Confirme el resultado."
+        },
+        {
+          "title": "Semisumador y sumador completo",
+          "body": "Construya un semisumador con una compuerta XOR para la suma y una AND para el acarreo. Una dos semisumadores con una compuerta OR para formar un sumador completo, y luego compruebe las ocho combinaciones de entrada frente a la suma binaria."
+        },
+        {
+          "title": "Detector de secuencias",
+          "body": "Diseñe una máquina que emita 1 después de recibir los bits de entrada serie 101. Dibuje primero el diagrama de estados y compruebe que cada estado define un estado siguiente para ambos valores de entrada, antes de construir el circuito."
+        }
+      ],
+      "applications": [
+        {
+          "field": "Mecatrónica",
+          "body": "Los enclavamientos de máquinas y los secuenciadores son redes booleanas. Los enclavamientos de seguridad se diseñan de modo que una entrada de paro fuerce las salidas a su estado seguro sin importar el resto de la lógica, un principio que aparece en las normas de seguridad funcional."
+        },
+        {
+          "field": "Aviónica",
+          "body": "Las interfaces de buses de aviónica y los decodificadores usan lógica combinacional y máquinas de estados finitos para manejar protocolos. La electrónica compleja de las aeronaves se desarrolla según RTCA DO-254, que fija el nivel de garantía de diseño para cada función."
+        },
+        {
+          "field": "Robótica",
+          "body": "Los decodificadores de codificadores, los decodificadores de direcciones y la lógica de conmutación de motores se construyen con compuertas. Contar pulsos de un codificador en cuadratura es en sí una máquina de estados secuencial que detecta el sentido de giro."
+        },
+        {
+          "field": "Sistemas de potencia",
+          "body": "Los relés de protección combinan señales lógicas, como las condiciones de sobrecorriente y diferenciales, para decidir cuándo disparar. Esa lógica de enclavamiento debe ser fiable, así que los diseños siguen el marco de seguridad funcional de la norma IEC 61508."
+        }
+      ]
+    },
+    "plc": {
+      "title": "Programación de PLC en escalera y LOGO!: teoría y guía de laboratorio",
+      "intro": "El estudio de PLC ejecuta lógica en escalera sobre una CPU virtual Siemens S7-200 y programas de bloques de función sobre un módulo LOGO!. Los programas se construyen con contactos, bobinas, temporizadores y contadores, y se ejecutan en un ciclo de escaneo que se repite. La teoría siguiente explica cómo funciona ese ciclo, por qué importa el tiempo de escaneo y cómo se conectan las entradas y salidas a los equipos reales.",
+      "principles": [
+        {
+          "heading": "El ciclo de escaneo",
+          "body": "Un PLC repite un ciclo indefinidamente. Primero copia las entradas físicas en una tabla de imagen de entradas. Después ejecuta el programa de arriba abajo, leyendo de la tabla de imagen y escribiendo los resultados en una tabla de imagen de salidas. Por último copia la imagen de salidas a las salidas físicas. Como toda la lógica lee la misma instantánea de las entradas, el programa se comporta de forma determinista dentro de un escaneo."
+        },
+        {
+          "heading": "La lógica en escalera como lógica booleana",
+          "body": "Un peldaño se lee de izquierda a derecha como flujo de energía. Un contacto normalmente abierto deja pasar la energía cuando su bit vale 1, y un contacto normalmente cerrado la deja pasar cuando su bit vale 0. Los contactos en serie forman AND y las ramas en paralelo forman OR, así que un peldaño puede calcular Q = (I0.0 AND I0.1) OR I0.2. Una bobina copia el estado de energía de su peldaño a su bit de salida. El circuito de enclavamiento (seal-in) es el circuito de memoria básico de la programación en escalera."
+        },
+        {
+          "heading": "Temporizadores y contadores",
+          "body": "El temporizador de retardo a la conexión TON activa su salida después de que su entrada haya estado a verdadero durante el tiempo preestablecido PT. Su tiempo acumulado se cuenta en bases de 1, 10 o 100 ms en el S7-200. El contador ascendente CTU incrementa en cada flanco de subida de su entrada de conteo y activa su salida cuando el conteo alcanza el valor preestablecido."
+        },
+        {
+          "heading": "Tiempo de escaneo",
+          "body": "El tiempo de escaneo es la suma de la lectura de entradas, la ejecución del programa, la escritura de salidas y las tareas internas. Un temporizador no puede ser más preciso que un escaneo, y un programa cuyo escaneo supera el límite del perro guardián provoca un fallo de la CPU. Mantenga el escaneo muy por debajo del evento más rápido al que el proceso debe responder."
+        }
+      ],
+      "equations": [
+        "Lógica de un peldaño, con un ejemplo de tres entradas",
+        "Circuito de enclavamiento (seal-in)",
+        "Tiempo de escaneo como suma de sus fases",
+        "Salida del temporizador tras el tiempo preestablecido"
+      ],
+      "parameters": [
+        {
+          "term": "Base de tiempo y valor preestablecido",
+          "body": "Un TON con base de 100 ms y preestablecido de 50 tiene PT = 5 s. Elija la base de tiempo más pequeña que le dé la precisión necesaria, porque una base más fina acorta el tiempo máximo que puede representar el acumulador."
+        },
+        {
+          "term": "Modelo de CPU y direcciones",
+          "body": "La CPU 224 y la CPU 226 difieren en el número de E/S y en la memoria. Cuente las entradas y salidas digitales antes de escribir un programa, porque cada punto físico necesita una dirección como I0.0 o Q0.0."
+        },
+        {
+          "term": "Tipo de contacto",
+          "body": "Elija contactos normalmente abiertos o normalmente cerrados según el diseño a prueba de fallos del equipo de campo. Un paro de emergencia debe cablearse normalmente cerrado, para que tanto un botón pulsado como un cable roto corten la energía de la máquina."
+        },
+        {
+          "term": "Presupuesto de tiempo de escaneo",
+          "body": "Mida el tiempo de escaneo de su programa y compárelo con el tiempo de respuesta que exige el proceso. Un programa que crece con cada cambio puede acabar perdiendo una entrada rápida, así que revise el tiempo de escaneo cada vez que amplíe el programa."
+        }
+      ],
+      "experiments": [
+        {
+          "title": "Arranque y paro de un motor",
+          "body": "Asigne I0.0 como Arranque (normalmente abierto), I0.1 como Paro (normalmente cerrado) y Q0.0 como motor. Coloque un contacto de Q0.0 en paralelo con Arranque y en serie con Paro. Prediga el comportamiento: al pulsar Arranque el motor queda enclavado, y al pulsar Paro se libera."
+        },
+        {
+          "title": "Luz retardada",
+          "body": "Coloque un TON con PT = 3 s en la entrada I0.2 y use su salida para activar Q0.1. Prediga que Q0.1 se enciende 3 segundos después de cerrar I0.2, y luego verifique el retardo en la línea de tiempo."
+        },
+        {
+          "title": "Contar piezas",
+          "body": "Use un CTU con preestablecido 5 y cuente los flancos de subida de I0.3. Prediga qué escaneo activa Q0.2 tras el quinto flanco. Mantenga la entrada en alto durante muchos escaneos y confirme que solo se registra un conteo."
+        },
+        {
+          "title": "Enclavar una secuencia de dos motores",
+          "body": "El motor 2 solo puede arrancar mientras el motor 1 está en marcha. Coloque el contacto de Q0.0 en serie con el camino de arranque de Q0.1, luego detenga el motor 1 y verifique que el motor 2 se detiene dentro de un escaneo."
+        }
+      ],
+      "applications": [
+        {
+          "field": "Mecatrónica",
+          "body": "Las secuencias de transportadores, las máquinas de envasado y las mezcladoras por lotes son programas de PLC. La norma IEC 61131-3 define los cinco lenguajes de programación que se usan entre fabricantes, entre ellos el diagrama de escalera (LD) y el diagrama de bloques de función (FBD)."
+        },
+        {
+          "field": "Sistemas de potencia",
+          "body": "Las subestaciones usan PLC y unidades terminales remotas para los enclavamientos de interruptores, el deslastre de carga y las alarmas. Como estas funciones deben ser confiables, sus diseños siguen los principios de seguridad funcional de la norma IEC 61508."
+        },
+        {
+          "field": "Aviónica",
+          "body": "Los equipos de apoyo en tierra, los controles de las estaciones de combustible y los bancos de prueba de aviónica suelen estar controlados por PLC. La lógica crítica de vuelo es otra cuestión: se desarrolla como software embarcado certificado según RTCA DO-178C."
+        },
+        {
+          "field": "Robótica",
+          "body": "Las celdas robotizadas usan PLC para secuenciar pinzas, puertas de seguridad y transportadores. Las entradas con clasificación de seguridad se conectan a los paros de emergencia, y el ciclo de escaneo determina con qué rapidez se atiende una solicitud de paro."
+        }
+      ]
+    },
+    "arduino": {
+      "title": "Arduino UNO y E/S de microcontroladores: teoría y guía de laboratorio",
+      "intro": "El estudio de Arduino simula una placa ATmega328P que ejecuta su programa. Los pines digitales, las entradas analógicas y las salidas PWM aparecen en una UNO virtual con LED, botones y sensores. La teoría siguiente cubre los límites eléctricos de los pines GPIO, la conversión analógico-digital, la modulación por ancho de pulso y el antirrebote, para que los resultados del simulador coincidan con lo que hace la placa real.",
+      "principles": [
+        {
+          "heading": "GPIO como interfaz digital",
+          "body": "Un pin de entrada/salida de propósito general se configura como entrada o como salida. Como salida se lleva a alto, cerca de 5 V, o a bajo, 0 V. Como entrada, el chip compara el voltaje con umbrales: una entrada alta necesita aproximadamente 0,6 × VCC o más, y una entrada baja debe estar por debajo de unos 0,3 × VCC. Los voltajes entre esos niveles no son niveles lógicos válidos."
+        },
+        {
+          "heading": "Límites de corriente y control de LED",
+          "body": "El ATmega328P tiene un máximo absoluto de 40 mA por pin de E/S, y 20 mA es el límite continuo recomendado. Un LED necesita una resistencia en serie, R = (Vsuministro − Vf)/I. Con una alimentación de 5 V, un LED rojo con una tensión directa de unos 2 V a 10 mA necesita unos 300 Ω."
+        },
+        {
+          "heading": "Conversión analógico-digital",
+          "body": "La UNO tiene un ADC de 10 bits, así que las lecturas van de 0 a 1023. El voltaje es V = ADC × Vref / 1023. Con una referencia de 5 V, el escalón de cuantización es de unos 4,9 mV. Los sensores de alta impedancia necesitan más tiempo de adquisición, así que léalos más despacio para que el condensador de muestreo se estabilice."
+        },
+        {
+          "heading": "PWM y antirrebote",
+          "body": "analogWrite genera modulación por ancho de pulso. El voltaje medio es D × VCC, donde D es el ciclo de trabajo, es decir, el tiempo encendido dividido entre el periodo. La mayoría de los pines PWM de la UNO funcionan a unos 490 Hz, y los pines 5 y 6 a unos 980 Hz. Los interruptores mecánicos rebotan entre unos 5 y 20 ms, así que hace falta un retardo o un filtro antirrebote antes de contar pulsaciones."
+        }
+      ],
+      "equations": [
+        "Conversión del ADC a voltios",
+        "Resistencia en serie de un LED",
+        "Voltaje medio de la PWM",
+        "Umbrales de entrada lógica del ATmega328P"
+      ],
+      "parameters": [
+        {
+          "term": "Modo del pin",
+          "body": "pinMode configura INPUT, OUTPUT o INPUT_PULLUP. Use INPUT_PULLUP para pulsadores: el pin lee HIGH cuando el botón está abierto y LOW cuando está pulsado, así que no necesita resistencia externa."
+        },
+        {
+          "term": "Corriente por pin",
+          "body": "Mantenga cada pin por debajo de 20 mA en continua. Accionar un motor o un relé directamente desde un pin no es seguro; use un transistor o una etapa controladora."
+        },
+        {
+          "term": "Referencia del ADC",
+          "body": "La referencia predeterminada es VCC, normalmente 5 V. Un potenciómetro de 10 kΩ conectado a 5 V da lecturas que crecen casi linealmente de 0 a 1023 al girar el cursor."
+        },
+        {
+          "term": "Temporización",
+          "body": "delay() bloquea el procesador hasta que termina. Un programa que debe responder a varios eventos debe usar millis() para comparar el tiempo transcurrido sin detener el bucle."
+        }
+      ],
+      "experiments": [
+        {
+          "title": "Parpadeo con periodo conocido",
+          "body": "Cambie el estado de un LED cada 500 ms. Prediga la frecuencia del parpadeo, que es 1 Hz, y el ciclo de trabajo, que es 50 por ciento, antes de ejecutar la simulación."
+        },
+        {
+          "title": "Leer un potenciómetro",
+          "body": "Conecte un potenciómetro a A0 e imprima la lectura. Prediga el valor en la posición central, alrededor de 511 o 512. Convierta después la lectura a voltios con V = ADC × 5 / 1023 y compruebe que está cerca de 2,5 V."
+        },
+        {
+          "title": "Atenuar un LED con PWM",
+          "body": "Use analogWrite en un pin PWM con los valores 0, 64, 128 y 255. Prediga los voltajes medios, que son 0, 1,25, 2,5 y 5 V, y compárelos con el brillo del LED."
+        },
+        {
+          "title": "Eliminar el rebote de un botón",
+          "body": "Lea un botón en un pin configurado como INPUT_PULLUP y cuente las pulsaciones. Añada una espera de 20 ms después de cada cambio de estado y observe que el conteo ya no aumenta cuando el botón rebota."
+        }
+      ],
+      "applications": [
+        {
+          "field": "Mecatrónica",
+          "body": "Los controladores embebidos leen codificadores e interruptores y accionan actuadores mediante PWM. Los ingenieros verifican los límites de voltaje y de corriente de GPIO antes de conectar cualquier carga, y añaden etapas controladoras cuando la carga supera esos límites."
+        },
+        {
+          "field": "Robótica",
+          "body": "Los robots de afición e investigación usan GPIO de microcontrolador para sensores, señales de servomotores e indicadores de estado. Un servomotor estándar espera una señal de 50 Hz cuyo ancho de pulso de 1 a 2 ms fija el ángulo."
+        },
+        {
+          "field": "Sistemas de potencia",
+          "body": "Los nodos de monitoreo y los medidores inteligentes muestrean las señales de línea mediante ADC. Su precisión depende de la estabilidad de la referencia y de la teoría de muestreo que cubre el estudio de señales, incluido el límite de Nyquist."
+        },
+        {
+          "field": "Aviónica",
+          "body": "Los módulos de sensores aeronáuticos usan microcontroladores con ADC y E/S digitales. El equipo de vuelo debe cumplir normas ambientales y de seguridad como RTCA DO-160 para condiciones ambientales y RTCA DO-254 para electrónica compleja."
+        }
+      ]
+    }
+  }
+}

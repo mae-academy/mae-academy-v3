@@ -29,10 +29,14 @@ import simulatorsEn from '../locales/en/simulators.json';
 import simulatorsAr from '../locales/ar/simulators.json';
 import simulatorsEs from '../locales/es/simulators.json';
 
+import simulationDocsEn from '../locales/en/simulationDocs.json';
+import simulationDocsAr from '../locales/ar/simulationDocs.json';
+import simulationDocsEs from '../locales/es/simulationDocs.json';
+
 const resources = {
-  en: { common: commonEn, about: aboutEn, landing: landingEn, legal: legalEn, library: libraryEn, research: researchEn, simulators: simulatorsEn },
-  ar: { common: commonAr, about: aboutAr, landing: landingAr, legal: legalAr, library: libraryAr, research: researchAr, simulators: simulatorsAr },
-  es: { common: commonEs, about: aboutEs, landing: landingEs, legal: legalEs, library: libraryEs, research: researchEs, simulators: simulatorsEs },
+  en: { common: commonEn, about: aboutEn, landing: landingEn, legal: legalEn, library: libraryEn, research: researchEn, simulators: simulatorsEn, simulationDocs: simulationDocsEn },
+  ar: { common: commonAr, about: aboutAr, landing: landingAr, legal: legalAr, library: libraryAr, research: researchAr, simulators: simulatorsAr, simulationDocs: simulationDocsAr },
+  es: { common: commonEs, about: aboutEs, landing: landingEs, legal: legalEs, library: libraryEs, research: researchEs, simulators: simulatorsEs, simulationDocs: simulationDocsEs },
 };
 
 i18n

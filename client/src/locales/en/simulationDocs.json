@@ -1,0 +1,606 @@
+{
+  "sections": {
+    "principles": "Principles and governing equations",
+    "parameters": "Parameters and control definitions",
+    "experiments": "Step-by-step lab experiments",
+    "applications": "Industrial applications and standards"
+  },
+  "labels": {
+    "equations": "Governing equations"
+  },
+  "topics": {
+    "circuits": {
+      "title": "Electrical circuits: theory and lab guide",
+      "intro": "This studio solves DC and AC circuits with the same nodal method that engineers use for a first design pass. Place sources, resistors, capacitors, inductors and meters, wire them together, and the solver computes every node voltage and branch current. The theory below explains what the solver does, so you can predict a result by hand and then check it on the canvas.",
+      "principles": [
+        {
+          "heading": "Ohm's and Kirchhoff's laws",
+          "body": "Ohm's law relates voltage, current and resistance in a linear element. Kirchhoff's current law states that the currents entering a node sum to zero, which is conservation of charge. Kirchhoff's voltage law states that the voltage rises and drops around any closed loop sum to zero, which is conservation of energy. Together with Ohm's law these two laws solve any linear resistive network."
+        },
+        {
+          "heading": "Modified nodal analysis (MNA)",
+          "body": "The solver writes Kirchhoff's current law at every node and collects the results into a matrix equation G·v = i. G is the conductance matrix, v holds the unknown node voltages and i holds the known current injections. An ideal voltage source cannot be written as a conductance, so MNA adds one unknown per source, its branch current, together with one equation that fixes its voltage. The resulting system is solved in one pass for DC and again at each frequency for AC."
+        },
+        {
+          "heading": "AC phasors and impedance",
+          "body": "In sinusoidal steady state every voltage and current is a phasor with a magnitude and a phase angle. A resistor has impedance Z = R, an inductor Z = jωL and a capacitor Z = 1/(jωC). Impedances combine in series and parallel exactly like resistances, and Ohm's law becomes V = Z·I. The angle of Z is the phase lead or lag of voltage relative to current."
+        },
+        {
+          "heading": "Impedance matching and maximum power",
+          "body": "A source with internal resistance Rs delivers the most power to a load when the load resistance equals Rs. The delivered power is then Vs²/(4Rs). The source dissipates the same amount internally, so only half of the power it generates reaches the load. Matching therefore maximises power transfer, not efficiency. For AC sources, the conjugate match ZL = Zs* transfers maximum power."
+        },
+        {
+          "heading": "Using the digital multimeter",
+          "body": "Measure voltage with the meter in parallel with the element and current with the meter in series, which means opening the path. Measure resistance only with the circuit unpowered and the part isolated. An average-responding meter reads sinusoids correctly but misreads distorted waveforms, so use a true-RMS meter for those. Always start on a range above the expected value."
+        }
+      ],
+      "equations": [
+        "Ohm's law",
+        "Kirchhoff's current law at each node",
+        "Kirchhoff's voltage law around each loop",
+        "MNA nodal form: conductance matrix G, node voltages v, injected currents i",
+        "Impedances in sinusoidal steady state",
+        "Maximum power transfer to a resistive load"
+      ],
+      "parameters": [
+        {
+          "term": "Source voltage and frequency",
+          "body": "Set the DC level or the AC amplitude and frequency. Reactances scale with frequency, so a capacitor that blocks 50 Hz may pass 5 kHz almost unchanged."
+        },
+        {
+          "term": "Resistor tolerance and power rating",
+          "body": "Real resistors carry tolerances of 1 to 10 percent, so a 1 kΩ part at ±5 percent can measure anywhere from 950 Ω to 1050 Ω. Check the dissipated power P = I²R against the rating, typically 0.25 W or 0.5 W for through-hole parts."
+        },
+        {
+          "term": "Time constants",
+          "body": "An RC circuit has τ = RC and an RL circuit has τ = L/R. A 10 kΩ resistor with a 100 µF capacitor has τ = 1 s, so the capacitor needs about five time constants to reach 99 percent of its final voltage. Make the simulation window several times longer than the largest time constant."
+        },
+        {
+          "term": "Meter loading",
+          "body": "An ideal voltmeter has infinite input resistance. A real meter with a 10 MΩ input can load a high-impedance node and change the reading. Keep this in mind when measuring across large resistances."
+        },
+        {
+          "term": "Numerical limits",
+          "body": "Values far outside a practical range can make the nodal matrix ill-conditioned. If a result looks wrong, look for a floating node that has no DC path to ground, because its voltage is not uniquely defined."
+        }
+      ],
+      "experiments": [
+        {
+          "title": "Verify Ohm's law",
+          "body": "Connect a single resistor across a 5 V source. Predict the current with I = V/R, then read the ammeter. Change R to 2.2 kΩ and repeat. Plot voltage against current; the slope of the line must equal R."
+        },
+        {
+          "title": "Voltage divider and loading",
+          "body": "Build a divider from two 10 kΩ resistors and predict the midpoint voltage, which is half the supply. Add a 10 kΩ load across the lower resistor and predict again. Measure the new value and explain the drop in terms of the parallel combination."
+        },
+        {
+          "title": "Charge an RC circuit",
+          "body": "Connect a 10 kΩ resistor, a 100 µF capacitor and a step source. Predict the time to reach 63 percent of the final voltage, which equals one time constant of 1 s. Measure the transient and compare the two numbers."
+        },
+        {
+          "title": "Resonance in a series RLC circuit",
+          "body": "Use L = 10 mH and C = 100 nF. The resonant frequency is f0 = 1/(2π√LC), about 5.03 kHz. Sweep the source frequency through f0 and note the peak current. Repeat with a larger R and explain why the peak becomes flatter."
+        }
+      ],
+      "applications": [
+        {
+          "field": "Power systems",
+          "body": "Transmission studies begin with a nodal analysis of the network, and load flow and fault calculations build on the same nodal matrix using per-unit impedances. IEC 60617 and ANSI/IEEE Std 315 define the symbols used on single-line diagrams."
+        },
+        {
+          "field": "Avionics",
+          "body": "Aircraft power buses, sensor bridges and signal conditioners are designed with Kirchhoff's laws and worst-case tolerance analysis. Airborne equipment must pass environmental qualification such as RTCA DO-160, which covers temperature, vibration and electromagnetic interference."
+        },
+        {
+          "field": "Mechatronics",
+          "body": "Motor drives, encoders and analogue sensor interfaces depend on impedance matching and filter design. Engineers check the input impedance of an amplifier or ADC before connecting a high-resistance sensor, so the instrument does not distort the measurement."
+        },
+        {
+          "field": "Robotics",
+          "body": "A robot joint combines motor winding inductance, current-sensing shunts and battery internal resistance. The voltage-drop and power calculations in this studio explain why battery sag and long cable runs reduce available torque under load."
+        }
+      ]
+    },
+    "signals": {
+      "title": "Signals and systems: theory and lab guide",
+      "intro": "The signals and systems studio lets you generate, transform and filter signals, then measure how a linear system responds to them. The theory below connects each plot with the integral or transform that describes it, so every experiment can be predicted before it is run.",
+      "principles": [
+        {
+          "heading": "Continuous and discrete signals",
+          "body": "A continuous-time signal x(t) is defined at every instant. A discrete-time signal x[n] exists only at integer indices. Sampling a continuous signal every Ts seconds gives x[n] = x(nTs). The sampling rate must exceed twice the highest frequency present, the Nyquist criterion, or aliasing folds high frequencies down onto lower ones."
+        },
+        {
+          "heading": "Convolution",
+          "body": "A linear time-invariant (LTI) system is fully described by its impulse response h(t). Its output for any input is the convolution y(t) = ∫ x(τ)h(t−τ) dτ, or y[n] = Σ x[k]h[n−k] in discrete time. Graphically, flip h, slide it across x, multiply the overlapping parts and accumulate the area."
+        },
+        {
+          "heading": "Fourier series decomposition",
+          "body": "A periodic signal with period T is a sum of harmonics at multiples of ω0 = 2π/T. Its complex coefficients are cn = (1/T)∫ x(t)e^(−jnω0t) dt. Sharp edges need many harmonics, and truncating the series produces overshoot near each discontinuity, known as the Gibbs phenomenon."
+        },
+        {
+          "heading": "Frequency response",
+          "body": "A stable LTI system driven by a sinusoid of frequency ω produces a sinusoid of the same frequency, scaled by |H(jω)| and shifted by the angle of H(jω). The function H(jω) is the transfer function evaluated on the imaginary axis. Bode magnitude and phase plots display this gain and shift across frequency."
+        }
+      ],
+      "equations": [
+        "Convolution integral for an LTI system",
+        "Discrete convolution sum",
+        "Fourier series coefficients",
+        "Frequency response of an LTI system",
+        "Nyquist sampling condition"
+      ],
+      "parameters": [
+        {
+          "term": "Frequency and amplitude",
+          "body": "Frequency is set in hertz, where one hertz is one cycle per second, and ω = 2πf in radians per second. Amplitude scales the whole waveform. Keep the sampling rate at least ten times the highest component for smooth plots and accurate integrals."
+        },
+        {
+          "term": "Analysis window",
+          "body": "The window length T sets the frequency resolution, Δf = 1/T. A short window blurs nearby frequencies together. Too few samples per period distort the waveform shape, so choose a window that holds several complete periods."
+        },
+        {
+          "term": "Number of harmonics",
+          "body": "A partial Fourier sum with N terms converges slowly for signals with jumps. Increase N and watch the overshoot near each edge settle toward the Gibbs limit of about nine percent of the jump."
+        },
+        {
+          "term": "Filter time constant",
+          "body": "For a first-order low-pass filter the cutoff frequency is ωc = 1/τ. A larger time constant lowers the bandwidth and slows the response. A pole closer to the origin always gives a slower system."
+        }
+      ],
+      "experiments": [
+        {
+          "title": "Sampling and aliasing",
+          "body": "Generate a 1 kHz sine wave and sample it at 1.5 kHz, then at 5 kHz. For the first case, predict the apparent frequency before reading the plot: the alias is 1500 − 1000 = 500 Hz. The second case must reproduce 1 kHz correctly."
+        },
+        {
+          "title": "Convolve two pulses",
+          "body": "Convolve two rectangular pulses of unit width. Predict a triangular output with base 2 and peak height 1 at t = 1, then check both values against the plot."
+        },
+        {
+          "title": "Build a square wave from harmonics",
+          "body": "Add the odd harmonics of a square wave one at a time, with amplitudes 4/(nπ). Watch the edges sharpen and note that the overshoot beside each transition stays near nine percent however many harmonics you add."
+        },
+        {
+          "title": "Read a Bode magnitude plot",
+          "body": "Apply a sine sweep to a first-order low-pass filter with ωc = 100 rad/s. At ω = ωc, predict a gain of 0.707, which is −3 dB, and a phase of −45 degrees. Confirm both values on the plot."
+        }
+      ],
+      "applications": [
+        {
+          "field": "Power systems",
+          "body": "Protective relays, harmonic analysis and power-quality monitors use Fourier analysis to separate the fundamental from harmonic currents. IEEE Std 519 sets harmonic distortion limits for interconnection with the utility grid."
+        },
+        {
+          "field": "Avionics",
+          "body": "Flight-control filters and sensor noise reducers are designed as LTI systems and verified with frequency-response measurements. Airborne software that implements these algorithms is certified under RTCA DO-178C, which requires traceable verification."
+        },
+        {
+          "field": "Mechatronics",
+          "body": "Vibration isolation and servo loops are specified by bandwidth and phase lag. A low-pass filter on a force sensor trades noise reduction against response delay, and the frequency response quantifies that trade-off."
+        },
+        {
+          "field": "Robotics",
+          "body": "Encoder and camera signals are sampled, so the Nyquist limit sets the fastest motion that can be measured. Anti-aliasing filters placed before the converter are standard practice in robot sensing."
+        }
+      ]
+    },
+    "control": {
+      "title": "Control systems: theory and lab guide",
+      "intro": "The control systems studio models a plant, closes the loop and shows how the response behaves under step and frequency tests. The theory below explains the transfer functions, stability margins and time-domain metrics shown in the plots, so you can tune a controller by calculation rather than by trial and error.",
+      "principles": [
+        {
+          "heading": "Open-loop and closed-loop control",
+          "body": "In open-loop control the input is set without measuring the output, so disturbances and model errors go uncorrected. In closed-loop (feedback) control the error e = r − y drives the controller, which reduces sensitivity to disturbances and parameter changes. The cost is that feedback can make a system oscillate or become unstable."
+        },
+        {
+          "heading": "Laplace-domain transfer functions",
+          "body": "A linear system with input U(s) and output Y(s) is described by Y(s)/U(s) = G(s). For unity feedback with controller C(s), the closed-loop transfer function is T(s) = CG/(1 + CG). The equation 1 + CG(s) = 0 is the characteristic equation, and its roots are the closed-loop poles."
+        },
+        {
+          "heading": "Pole-zero placement and stability",
+          "body": "A system is stable when every closed-loop pole has a negative real part, which places it in the left half of the s-plane. Poles nearer the imaginary axis give slower, more oscillatory responses. For the second-order system in the equation below, the damping ratio ζ sets the shape of the response and the natural frequency ωn sets its speed."
+        },
+        {
+          "heading": "Gain and phase margins",
+          "body": "The gain margin is how much the loop gain can increase before the closed loop becomes unstable, read where the phase crosses −180 degrees. The phase margin is the extra phase lag tolerated at the gain crossover frequency, where the loop gain magnitude equals one. A phase margin of roughly 45 to 60 degrees usually gives a well-damped response."
+        },
+        {
+          "heading": "Step response metrics",
+          "body": "For a unit step on an underdamped second-order system, percent overshoot equals exp(−ζπ/√(1−ζ²)). Rise time is the time from 10 to 90 percent of the final value. Settling time to within two percent is approximately 4/(ζωn). These three numbers summarise most performance requirements."
+        }
+      ],
+      "equations": [
+        "Open-loop plant output",
+        "Closed-loop transfer function with unity feedback",
+        "Standard second-order system",
+        "Fractional percent overshoot of a step response",
+        "Phase margin at the gain crossover frequency",
+        "Two-percent settling time"
+      ],
+      "parameters": [
+        {
+          "term": "Plant gain K and time constant τ",
+          "body": "K sets the steady-state value of a first-order plant and τ sets how quickly it reaches that value. Raising K increases loop gain, which improves tracking but reduces stability margins."
+        },
+        {
+          "term": "Controller gains Kp, Ki and Kd",
+          "body": "The proportional gain reacts to the present error. The integral gain removes steady-state error, but large values cause overshoot and integrator windup when an actuator saturates. The derivative gain anticipates change, but large values amplify sensor noise."
+        },
+        {
+          "term": "Damping ratio ζ",
+          "body": "Use 0 < ζ < 1 for an underdamped response. A damping ratio of 0.707 is a common target and gives about 4 percent overshoot. ζ of 1 or more gives no overshoot but a slower response."
+        },
+        {
+          "term": "Sampling time and delay",
+          "body": "Digital controllers sample every Ts seconds, and transport delay adds phase lag. A common rule is to sample at least ten to twenty times faster than the desired closed-loop bandwidth."
+        }
+      ],
+      "experiments": [
+        {
+          "title": "Measure a step response",
+          "body": "Set a first-order plant with K = 2 and τ = 1 s. Predict the final value for a unit step, which is 2, and the time to reach 63 percent of it, which is 1 s. Confirm both on the plot."
+        },
+        {
+          "title": "Find the stability limit of a proportional controller",
+          "body": "Close the loop with a pure gain around a third-order plant. Raise Kp until the response becomes a sustained oscillation. Record that gain as the ultimate gain Ku and the oscillation period as Tu."
+        },
+        {
+          "title": "Tune a PI loop with Ziegler–Nichols",
+          "body": "From Ku and Tu, apply the classic table for a PI controller: Kp = 0.45 Ku and integral time Ti = Tu/1.2. Simulate the step response, then reduce Kp by ten percent and observe the overshoot fall."
+        },
+        {
+          "title": "Read margins from a Bode plot",
+          "body": "Plot the loop frequency response with the added gain. Locate the frequency where the phase crosses −180 degrees and read the gain margin in decibels. Then find the gain crossover frequency and read the phase margin from the same plot."
+        }
+      ],
+      "applications": [
+        {
+          "field": "Power systems",
+          "body": "Generator governors and automatic voltage regulators are closed-loop systems tuned by phase margin and bandwidth. Grid codes specify how quickly these controls must respond to frequency disturbances."
+        },
+        {
+          "field": "Avionics",
+          "body": "Autopilots and flight-control laws use feedback with strict stability requirements. Their stability and handling-quality performance is verified against certification criteria, and the embedded software follows RTCA DO-178C."
+        },
+        {
+          "field": "Mechatronics",
+          "body": "Servo drives and machine axes use PID loops, often with feedforward. Derivative action is limited in practice because encoder quantisation noise is amplified by it, so designers filter the derivative term."
+        },
+        {
+          "field": "Robotics",
+          "body": "Robot joint controllers are usually cascaded loops: current inside speed, and speed inside position. Each inner loop must be considerably faster than the loop outside it, so margins are checked one loop at a time. Functional-safety loops follow IEC 61508."
+        }
+      ]
+    },
+    "fluid": {
+      "title": "Pneumatics and hydraulics: theory and lab guide",
+      "intro": "The pneumatics and hydraulic drive studio builds circuits from pumps, valves, cylinders and reservoirs and shows pressure and flow at each point. The theory below gives the continuity equation, Pascal's principle and the pressure-drop relations behind those readings, and it explains how flow regulators set actuator speed.",
+      "principles": [
+        {
+          "heading": "Fluid dynamics approximations",
+          "body": "Most hydraulic analysis assumes an incompressible fluid in steady flow. Hydraulic oil is nearly incompressible at normal pressures, which justifies the approximation. Air is compressible, so pneumatic calculations treat it as incompressible only when pressure drops are small and speeds stay well below the speed of sound. Viscosity decides whether flow is laminar or turbulent, judged by the Reynolds number; in pipes the flow is usually laminar below about 2300."
+        },
+        {
+          "heading": "Continuity equation",
+          "body": "Mass is conserved, so for incompressible flow the volume flow rate Q = A·v is the same at every section of a line. Where the area narrows, the velocity rises. If a valve halves the flow area, the velocity doubles, and because the dynamic pressure scales with the square of velocity, it rises fourfold."
+        },
+        {
+          "heading": "Pascal's principle",
+          "body": "Pressure applied to a confined fluid is transmitted equally in all directions. A piston of area A1 pushed with force F1 creates a pressure p = F1/A1 that acts on a second piston of area A2, which produces F2 = F1·A2/A1. A small input force becomes a large output force at the cost of travel, because the volume displaced on both sides is equal."
+        },
+        {
+          "heading": "Pressure drops and flow regulation",
+          "body": "Friction in lines and fittings causes a pressure drop, estimated by the Darcy–Weisbach equation. An orifice or valve passes a flow Q = Cd·A·√(2Δp/ρ). A flow-control valve sets the cylinder speed by changing the effective area A, while the pump supplies whatever pressure the load demands."
+        }
+      ],
+      "equations": [
+        "Reynolds number, laminar below about 2300 in pipes",
+        "Continuity for incompressible flow",
+        "Pascal's principle and force multiplication",
+        "Darcy–Weisbach pressure drop",
+        "Orifice flow rate",
+        "Hydraulic power"
+      ],
+      "parameters": [
+        {
+          "term": "Supply pressure",
+          "body": "Relief valves set the maximum pressure. Industrial hydraulic systems commonly run from about 100 to 350 bar, and pneumatic systems typically at 6 to 8 bar. Every component must be rated above the relief setting."
+        },
+        {
+          "term": "Cylinder bore and rod",
+          "body": "On the extend stroke the force is p·A using the full bore. On the return stroke the rod takes up part of the area, so the force is smaller. Speed equals Q/A, so for the same flow a smaller bore moves faster."
+        },
+        {
+          "term": "Discharge coefficient",
+          "body": "The discharge coefficient Cd is typically between 0.6 and 0.8 for a sharp-edged orifice. Flow rises with the square root of the pressure drop, so doubling the pressure drop raises flow by about 41 percent."
+        },
+        {
+          "term": "Oil viscosity and temperature",
+          "body": "Oil viscosity falls as temperature rises. Thin oil leaks more past seals and increases wear, while thick cold oil raises pressure drop and slows the cylinder. Keep the fluid within its recommended operating temperature range."
+        }
+      ],
+      "experiments": [
+        {
+          "title": "Continuity in a tapered line",
+          "body": "A section with half the diameter of the inlet has one quarter of the area. Using A1v1 = A2v2, predict its velocity relative to the inlet, which is four times higher. Check the ratio against the velocities the simulator reports."
+        },
+        {
+          "title": "Pascal force multiplier",
+          "body": "Use a 10 mm input piston and a 50 mm output piston. Predict the output force for a 100 N input: F2 = 100 × (50/10)² = 2500 N. Confirm the value with the simulator, then note how much the output piston travels compared with the input."
+        },
+        {
+          "title": "Speed control with a flow regulator",
+          "body": "Set the pump flow and a cylinder of known bore. Predict the extend speed as v = Q/A. Reduce the regulator opening and verify that the speed falls while the pressure remains set by the load."
+        },
+        {
+          "title": "Pressure drop along a hose",
+          "body": "Increase the hose length from 2 m to 10 m at the same flow. Darcy–Weisbach predicts that the friction drop rises in direct proportion to length, so it increases fivefold. Confirm the trend and identify the length at which the drop becomes significant."
+        }
+      ],
+      "applications": [
+        {
+          "field": "Mechatronics",
+          "body": "Pneumatic grippers, presses and hydraulic clamps use continuity and pressure-drop relations to size lines and valves so that actuators reach their required speed. ISO 1219-1 and ISO 1219-2 define the graphic symbols and circuit diagrams used in these designs."
+        },
+        {
+          "field": "Avionics",
+          "body": "Aircraft hydraulic systems power flight-control actuators, landing gear and brakes at pressures near 3000 psi, about 207 bar. Designers apply the same pressure-drop reasoning and select components against aerospace standards such as SAE AS4059 for fluid cleanliness."
+        },
+        {
+          "field": "Robotics",
+          "body": "Hydraulic manipulators for heavy lifting depend on Pascal's principle for force multiplication and on flow control for smooth joint speed. Servo valves set velocity with high bandwidth, which connects directly to the feedback theory in the control studio."
+        },
+        {
+          "field": "Power systems",
+          "body": "Hydroelectric governors position guide vanes with hydraulic servos. Pressure and flow are regulated to hold turbine speed and grid frequency, and the pipe losses computed with Darcy–Weisbach determine the available head."
+        }
+      ]
+    },
+    "logic": {
+      "title": "Digital logic: theory and lab guide",
+      "intro": "The digital logic studio draws gate-level schematics, derives Boolean expressions from truth tables, minimises them with Karnaugh maps, synthesises NAND-only circuits, and checks timing and state-machine behaviour. The theory below gives the algebra behind each tool, so you can verify the software output by reasoning.",
+      "principles": [
+        {
+          "heading": "Boolean algebra",
+          "body": "Variables take the values 0 or 1. The basic operations are AND (A·B), OR (A + B) and NOT (A overbar). Useful identities include A + Ā = 1 and A·Ā = 0. De Morgan's laws state that the complement of A·B equals Ā + B̄, and the complement of A + B equals Ā·B̄. These laws let you convert between gate types, which is how any function is built from NAND gates alone."
+        },
+        {
+          "heading": "Canonical forms and minimisation",
+          "body": "Each row of a truth table whose output is 1 gives one minterm, and the sum of those minterms is the canonical sum-of-products form. A Karnaugh map arranges the table so that adjacent cells differ by one bit. Groups of 2, 4 or 8 adjacent ones eliminate the variables that change within the group. Don't-care conditions can enlarge groups and shorten the result."
+        },
+        {
+          "heading": "Combinational and sequential circuits",
+          "body": "Combinational outputs depend only on the present inputs, as in adders and multiplexers. Sequential circuits store state. A flip-flop samples its input on a clock edge, and a finite-state machine moves between a fixed set of states, with a defined transition for every input combination."
+        },
+        {
+          "heading": "Propagation delay and clock limits",
+          "body": "Every gate takes a finite time, the propagation delay, to respond. In a synchronous design the longest combinational path must settle before the next clock edge. That path, together with the flip-flop setup time, sets the maximum clock frequency."
+        }
+      ],
+      "equations": [
+        "Basic Boolean operations",
+        "De Morgan's law",
+        "Canonical sum of minterms, with a three-variable example",
+        "Approximate maximum clock frequency"
+      ],
+      "parameters": [
+        {
+          "term": "Number of inputs",
+          "body": "A truth table with n inputs has 2 to the power n rows. Five inputs already give 32 rows. Use a Karnaugh map for up to four variables, and rely on the analyser for larger problems."
+        },
+        {
+          "term": "Fan-out",
+          "body": "A gate can drive only a limited number of inputs before its output level degrades. A standard TTL gate drives about ten standard loads. CMOS gates drive many more loads but slow down as the capacitive load grows."
+        },
+        {
+          "term": "Don't-care entries",
+          "body": "Mark rows that a real input can never produce as X. Grouping them can shrink an expression, but never assign an X to a row that can actually occur."
+        },
+        {
+          "term": "Clock period",
+          "body": "The clock period must exceed the longest path delay plus the setup time. Pushing the clock above the maximum frequency makes flip-flops capture values that have not settled yet."
+        }
+      ],
+      "experiments": [
+        {
+          "title": "Verify De Morgan's law",
+          "body": "Build a NAND gate and compare its truth table with an inverter feeding an OR gate that receives inverted inputs. Equivalent expressions produce identical output columns, so the two tables must match row for row."
+        },
+        {
+          "title": "Minimise with a Karnaugh map",
+          "body": "Enter F = Σm(1, 3, 5, 7) with variables A, B and C. Before pressing the minimiser, predict the answer: all four minterms have C = 1 and together cover every value of A and B, so F = C. Confirm the result."
+        },
+        {
+          "title": "Half adder and full adder",
+          "body": "Build a half adder from an XOR gate for the sum and an AND gate for the carry. Join two half adders with an OR gate to form a full adder, then check all eight input combinations against binary addition."
+        },
+        {
+          "title": "Sequence detector",
+          "body": "Design a machine that outputs 1 after the serial input bits 101 arrive. Draw the state diagram first, then check that every state defines a next state for both input values before you build the circuit."
+        }
+      ],
+      "applications": [
+        {
+          "field": "Mechatronics",
+          "body": "Machine interlocks and sequencers are Boolean networks. Safety interlocks are designed so that a stop input forces the outputs to their safe state regardless of other logic, a principle that appears in functional-safety standards."
+        },
+        {
+          "field": "Avionics",
+          "body": "Avionics bus interfaces and decoders use combinational logic and finite-state machines to handle protocols. Complex electronic hardware in aircraft is developed to RTCA DO-254, which sets the design assurance level for each function."
+        },
+        {
+          "field": "Robotics",
+          "body": "Encoder decoders, address decoders and motor commutation logic are built from gates. Counting pulses from a quadrature encoder is itself a sequential state machine that detects the direction of rotation."
+        },
+        {
+          "field": "Power systems",
+          "body": "Protection relays combine logic signals, such as overcurrent and differential conditions, to decide when to trip. Such interlock logic must be dependable, so designs follow the functional-safety framework of IEC 61508."
+        }
+      ]
+    },
+    "plc": {
+      "title": "PLC ladder and LOGO! programming: theory and lab guide",
+      "intro": "The PLC studio runs ladder logic on a virtual Siemens S7-200 CPU and function block programs on a LOGO! module. Programs are built from contacts, coils, timers and counters and execute in a repeating scan cycle. The theory below explains how that cycle works, why scan time matters, and how the inputs and outputs connect to real hardware.",
+      "principles": [
+        {
+          "heading": "The scan cycle",
+          "body": "A PLC repeats one cycle indefinitely. First it copies the physical inputs into an input image table. Then it runs the program from top to bottom, reading from the image table and writing results to an output image table. Finally it copies the output image to the physical outputs. Because all the logic reads the same input snapshot, the program behaves deterministically within a single scan."
+        },
+        {
+          "heading": "Ladder logic as Boolean logic",
+          "body": "A rung is read from left to right as power flow. A normally open contact passes power when its bit is 1, and a normally closed contact passes power when its bit is 0. Series contacts form AND and parallel branches form OR, so a rung can compute Q = (I0.0 AND I0.1) OR I0.2. A coil copies the power state of its rung to its output bit. The seal-in latch is the basic memory circuit of ladder programming."
+        },
+        {
+          "heading": "Timers and counters",
+          "body": "The on-delay timer TON sets its output after its input has been true for the preset time PT. Its accumulated time is counted in base ticks of 1, 10 or 100 ms on the S7-200. The up counter CTU increments on each rising edge of its count input and sets its output when the count reaches the preset value."
+        },
+        {
+          "heading": "Scan time",
+          "body": "Scan time is the sum of input reading, program execution, output writing and housekeeping. A timer cannot be more accurate than one scan, and a program whose scan exceeds the watchdog limit faults the CPU. Keep the scan well below the fastest event the process must respond to."
+        }
+      ],
+      "equations": [
+        "Rung logic, with a three-input example",
+        "Seal-in latch",
+        "Scan time as the sum of its phases",
+        "On-delay timer output after the preset time"
+      ],
+      "parameters": [
+        {
+          "term": "Base time and preset",
+          "body": "A TON timer with a 100 ms base and a preset of 50 has PT = 5 s. Choose the smallest base time that gives the accuracy you need, because a finer base shortens the longest time the accumulator can represent."
+        },
+        {
+          "term": "CPU model and addresses",
+          "body": "The CPU 224 and CPU 226 differ in I/O count and memory size. Count the digital inputs and outputs before writing a program, because every physical point needs an address such as I0.0 or Q0.0."
+        },
+        {
+          "term": "Contact type",
+          "body": "Choose normally open or normally closed contacts to match the fail-safe design of the field device. An emergency stop should be wired normally closed, so that a pressed button or a broken wire both remove power from the machine."
+        },
+        {
+          "term": "Scan time budget",
+          "body": "Measure the scan time of your program and compare it with the response time the process requires. A program that grows with each change may eventually miss a fast input, so review scan time whenever the program is extended."
+        }
+      ],
+      "experiments": [
+        {
+          "title": "Motor start and stop",
+          "body": "Assign I0.0 as Start (normally open), I0.1 as Stop (normally closed) and Q0.0 as the motor. Place a Q0.0 contact in parallel with Start and in series with Stop. Predict the behaviour: pressing Start latches the motor on, and pressing Stop releases it."
+        },
+        {
+          "title": "Delayed light",
+          "body": "Place a TON timer with PT = 3 s on the input I0.2 and drive Q0.1 from its output. Predict that Q0.1 turns on 3 seconds after I0.2 closes, then verify the delay on the timeline."
+        },
+        {
+          "title": "Count parts",
+          "body": "Use a CTU counter with preset 5 and count rising edges from I0.3. Predict which scan sets Q0.2 after the fifth edge. Hold the input high for many scans and confirm that only one count is recorded."
+        },
+        {
+          "title": "Interlock a two-motor sequence",
+          "body": "Motor 2 may start only while motor 1 runs. Place the Q0.0 contact in series with the start path of Q0.1, then remove motor 1 and check that motor 2 stops within one scan."
+        }
+      ],
+      "applications": [
+        {
+          "field": "Mechatronics",
+          "body": "Conveyor sequencing, packaging machines and batch mixers are PLC programs. IEC 61131-3 defines the five programming languages used across vendors, including ladder diagram (LD) and function block diagram (FBD)."
+        },
+        {
+          "field": "Power systems",
+          "body": "Substations use PLCs and remote terminal units for breaker interlocks, load shedding and alarms. Because these functions must be dependable, their designs follow IEC 61508 functional-safety principles."
+        },
+        {
+          "field": "Avionics",
+          "body": "Ground support equipment, fuel-farm controls and avionics test rigs are often PLC-controlled. Flight-critical logic is a different matter and is developed as certified airborne software under RTCA DO-178C."
+        },
+        {
+          "field": "Robotics",
+          "body": "Robot cells use PLCs to sequence grippers, safety gates and conveyors. Safety-rated inputs connect to emergency stops, and the scan cycle determines how quickly a stop request is acted upon."
+        }
+      ]
+    },
+    "arduino": {
+      "title": "Arduino UNO and microcontroller I/O: theory and lab guide",
+      "intro": "The Arduino studio simulates an ATmega328P board running your sketch. Digital pins, analog inputs and PWM outputs appear on a virtual UNO with LEDs, buttons and sensors. The theory below covers GPIO electrical limits, analog-to-digital conversion, pulse-width modulation and debouncing, so that the simulator's results match what the real board does.",
+      "principles": [
+        {
+          "heading": "GPIO as a digital interface",
+          "body": "A general-purpose input/output pin is configured as an input or an output. As an output it is driven high, near 5 V, or low, at 0 V. As an input the chip compares the voltage with thresholds: a high input needs about 0.6 × VCC or more, and a low input must be below about 0.3 × VCC. Voltages between those levels are not valid logic levels."
+        },
+        {
+          "heading": "Current limits and LED drive",
+          "body": "The ATmega328P has an absolute maximum of 40 mA per I/O pin, and 20 mA is the recommended continuous limit. An LED needs a series resistor, R = (Vsupply − Vf)/I. With a 5 V supply, a red LED with a forward voltage of about 2 V at 10 mA needs roughly 300 Ω."
+        },
+        {
+          "heading": "Analog-to-digital conversion",
+          "body": "The UNO has a 10-bit ADC, so readings run from 0 to 1023. The voltage is V = ADC × Vref / 1023. With a 5 V reference the step size is about 4.9 mV. High-impedance sensors need more acquisition time, so read them more slowly to let the sampling capacitor settle."
+        },
+        {
+          "heading": "PWM and debouncing",
+          "body": "analogWrite produces pulse-width modulation. The average voltage equals D × VCC, where D is the duty cycle, the on-time divided by the period. Most UNO PWM pins run at about 490 Hz, and pins 5 and 6 run at about 980 Hz. Mechanical switches bounce for roughly 5 to 20 ms, so a debounce delay or filter is needed before counting presses."
+        }
+      ],
+      "equations": [
+        "ADC conversion to volts",
+        "LED series resistor",
+        "PWM average voltage",
+        "Logic input thresholds of the ATmega328P"
+      ],
+      "parameters": [
+        {
+          "term": "Pin mode",
+          "body": "pinMode sets INPUT, OUTPUT or INPUT_PULLUP. Use INPUT_PULLUP for push buttons: the pin reads HIGH when the button is open and LOW when it is pressed, so no external resistor is needed."
+        },
+        {
+          "term": "Current per pin",
+          "body": "Keep each pin below 20 mA continuous. Driving a motor or relay directly from a pin is unsafe, so use a transistor or a driver stage."
+        },
+        {
+          "term": "ADC reference",
+          "body": "The default reference is VCC, which is typically 5 V. A 10 kΩ potentiometer across 5 V gives readings that rise almost linearly from 0 to 1023 as the wiper turns."
+        },
+        {
+          "term": "Timing",
+          "body": "delay() blocks the processor until it returns. A sketch that must respond to several events should use millis() to compare elapsed time without stopping the loop."
+        }
+      ],
+      "experiments": [
+        {
+          "title": "Blink with a known period",
+          "body": "Toggle an LED every 500 ms. Predict the frequency of the blinking, which is 1 Hz, and the duty cycle, which is 50 percent, before you run the simulation."
+        },
+        {
+          "title": "Read a potentiometer",
+          "body": "Connect a potentiometer to A0 and print the reading. Predict the mid-position value, about 511 or 512. Convert the reading back to volts with V = ADC × 5 / 1023 and check that it is close to 2.5 V."
+        },
+        {
+          "title": "Dim an LED with PWM",
+          "body": "Use analogWrite on a PWM pin with the values 0, 64, 128 and 255. Predict the average voltages, which are 0, 1.25, 2.5 and 5 V, and compare them with the brightness of the LED."
+        },
+        {
+          "title": "Debounce a button",
+          "body": "Read a button on a pin configured with INPUT_PULLUP and count presses. Add a 20 ms wait after each change of state, then observe that the count no longer rises when the button bounces."
+        }
+      ],
+      "applications": [
+        {
+          "field": "Mechatronics",
+          "body": "Embedded controllers read encoders and switches and drive actuators through PWM. Engineers verify GPIO voltage and current limits before connecting any load, and they add driver stages where the load exceeds those limits."
+        },
+        {
+          "field": "Robotics",
+          "body": "Hobby and research robots use microcontroller GPIO for sensors, servo signals and status indicators. A standard hobby servo expects a 50 Hz signal whose pulse width of 1 to 2 ms sets the angle."
+        },
+        {
+          "field": "Power systems",
+          "body": "Monitoring nodes and smart meters sample line signals through ADCs. Their accuracy depends on reference stability and on the sampling theory covered in the signals studio, including the Nyquist limit."
+        },
+        {
+          "field": "Avionics",
+          "body": "Avionics sensor modules use microcontrollers with ADCs and digital I/O. Flight hardware must meet environmental and safety standards such as RTCA DO-160 for environmental conditions and RTCA DO-254 for complex electronic hardware."
+        }
+      ]
+    }
+  }
+}

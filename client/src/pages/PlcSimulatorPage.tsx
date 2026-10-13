@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 import SimulatorLayout from "@/components/SimulatorLayout";
-import SimulatorDocumentation from "@/components/SimulatorDocumentation";
+import SimulationDocumentation from "@/components/simulations/SimulationDocumentation";
 import { useLocale } from "@/contexts/LocaleContext";
 import { DEMO_SYMBOLS, createDemoNetworks } from "@/features/plc-simulator/ui/host/demo-program";
 import { PlcSimulatorApp, type PlcPlatform } from "@/features/plc-simulator/ui/host/PlcSimulatorApp";
@@ -39,7 +39,7 @@ export default function PlcSimulatorPage() {
           className="flex flex-1 flex-col"
         />
       </div>
-      <SimulatorDocumentation />
+      <SimulationDocumentation topic="plc" />
     </SimulatorLayout>
   );
 }

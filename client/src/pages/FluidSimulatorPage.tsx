@@ -3,6 +3,7 @@ import { useLocale } from "@/contexts/LocaleContext";
 import { FluidSimulatorApp } from "@/simulators/fluid-engine/components/FluidSimulatorApp";
 import { getSimulationMeta } from "@/config/simulationsMeta";
 import { useEffect } from "react";
+import SimulationDocumentation from "@/components/simulations/SimulationDocumentation";
 
 export default function FluidSimulatorPage() {
   const { copy, isRtl } = useLocale();
@@ -19,6 +20,7 @@ export default function FluidSimulatorPage() {
       <div dir="ltr" className="mt-3 mae-simulator-shell">
         <FluidSimulatorApp />
       </div>
+      <SimulationDocumentation topic="fluid" />
     </SimulatorLayout>
   );
 }

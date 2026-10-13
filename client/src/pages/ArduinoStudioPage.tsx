@@ -1,5 +1,5 @@
 import SimulatorLayout from "@/components/SimulatorLayout";
-import SimulatorDocumentation from "@/components/SimulatorDocumentation";
+import SimulationDocumentation from "@/components/simulations/SimulationDocumentation";
 import { useLocale } from "@/contexts/LocaleContext";
 import { ArduinoStudio } from "@/features/arduino-studio/ArduinoStudio";
 import { useSimulatorSeo } from "@/seo/useSimulatorSeo";
@@ -15,7 +15,7 @@ export default function ArduinoStudioPage() {
       <div dir="ltr" className="mt-3 mae-simulator-shell">
         <ArduinoStudio />
       </div>
-      <SimulatorDocumentation />
+      <SimulationDocumentation topic="arduino" />
     </SimulatorLayout>
   );
 }
