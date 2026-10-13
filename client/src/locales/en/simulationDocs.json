@@ -601,6 +601,178 @@
           "body": "Avionics sensor modules use microcontrollers with ADCs and digital I/O. Flight hardware must meet environmental and safety standards such as RTCA DO-160 for environmental conditions and RTCA DO-254 for complex electronic hardware."
         }
       ]
+    },
+    "powerElectronics": {
+      "title": "Power electronics: theory and lab guide",
+      "intro": "The power electronics studio builds rectifiers, inverters, AC voltage controllers and DC-DC choppers from ideal switches and passive components. The theory below gives the averages and ripple formulas behind the plots, shows how distortion and switching losses limit real converters, and explains why each result can be checked by hand before the simulation runs.",
+      "principles": [
+        {
+          "heading": "Rectifiers and controlled conversion",
+          "body": "A rectifier converts AC to DC. A diode bridge is uncontrolled: its average output follows from the peak input voltage, so for a full-wave bridge V_dc = 2V_m/π. Thyristors add control. Delaying the firing by an angle α reduces the average output to V_dc = (2V_m/π)·cos α, so the output can be adjusted from its full value down to zero. With an inductive load, current keeps flowing after the voltage reverses, which is why a freewheeling diode is often added."
+        },
+        {
+          "heading": "Inverters and pulse-width modulation",
+          "body": "An inverter converts DC to AC by switching a DC bus. A full-bridge square-wave inverter produces a fundamental with peak amplitude 4V_dc/π plus odd harmonics. Sinusoidal PWM compares a sine reference with a triangular carrier. The modulation index m_a = V_ref/V_tri sets the fundamental amplitude in the linear range, and a high carrier frequency moves the harmonics to frequencies the output filter can attenuate."
+        },
+        {
+          "heading": "DC-DC buck and boost converters",
+          "body": "A buck converter steps voltage down: in continuous conduction V_out = D·V_in, where D is the duty cycle. A boost converter steps voltage up: V_out = V_in/(1 − D). Both store energy in an inductor. The buck inductor ripple is ΔI_L = V_out(1 − D)/(L·f_s), so a larger inductance or a higher switching frequency gives a smoother current."
+        },
+        {
+          "heading": "Total harmonic distortion",
+          "body": "THD measures how much of a waveform's energy lies in harmonics: THD = √(Σ V_n²)/V_1, summed over n ≥ 2. A square wave has a THD of about 48 percent, while a well-filtered sine wave is a few percent or less. Grid codes and equipment standards limit harmonic distortion, so filter design is judged by the THD it achieves."
+        },
+        {
+          "heading": "Switching losses",
+          "body": "Each switching transition takes a finite time, during which voltage and current overlap and dissipate power. For roughly linear transitions the average switching loss is about ½·V·I·(t_r + t_f)·f_sw. Conduction loss adds I_rms² times the on-resistance. Efficiency falls as switching frequency rises, so converter design balances ripple, filter size and losses."
+        }
+      ],
+      "equations": [
+        "Average output of an uncontrolled full-wave bridge",
+        "Average output of a controlled bridge at firing angle α",
+        "Buck converter output in continuous conduction",
+        "Boost converter output in continuous conduction",
+        "Total harmonic distortion",
+        "Switching loss with linear transitions"
+      ],
+      "parameters": [
+        {
+          "term": "Firing angle α",
+          "body": "Set between 0 and 180 degrees for a controlled bridge. Angles beyond 90 degrees make the average output negative, which is only possible when the DC side can return energy to a source, as with a regenerative load."
+        },
+        {
+          "term": "Duty cycle D",
+          "body": "For buck and boost stages, D sets the output. Near D = 1 a boost stage produces very high voltage, so practical designs keep D within a limited range, typically about 0.05 to 0.95, to keep on-times and ripple within design limits."
+        },
+        {
+          "term": "Switching frequency and inductor",
+          "body": "A higher switching frequency reduces ripple and the size of L and C, but it raises switching loss. A common design target is a ripple current of 10 to 30 percent of the average inductor current."
+        },
+        {
+          "term": "Load type",
+          "body": "A resistive load draws current in phase with the voltage. An inductive load keeps current flowing after the voltage reverses. A capacitive filter smooths the output but draws sharp charging currents at each peak, which stresses the diodes."
+        }
+      ],
+      "experiments": [
+        {
+          "title": "Average output of a diode bridge",
+          "body": "Apply a sinusoid with a peak of 325 V, which is 230 V RMS, to a full-wave bridge with a resistive load. Predict the average output as 2V_m/π, about 207 V, then compare with the simulator. Note how the measured value falls slightly below the ideal once diode drops are included."
+        },
+        {
+          "title": "Control the output with a firing angle",
+          "body": "Use a controlled bridge with V_m = 325 V. Predict the average output at α = 60 degrees: 207 × cos 60° ≈ 103 V. Repeat at α = 90 degrees, where the prediction is zero, and confirm both values."
+        },
+        {
+          "title": "Buck converter output",
+          "body": "Set V_in = 48 V and D = 0.25. Predict V_out = 12 V in continuous conduction. Reduce the load until the current becomes discontinuous and observe the output rise above the ideal value, which is a known effect of light loading in a buck stage."
+        },
+        {
+          "title": "Boost converter and high duty cycle",
+          "body": "Set V_in = 12 V and D = 0.5, and predict V_out = 24 V. Raise the duty cycle to 0.75 and predict 48 V. Then note how strongly the output now depends on the load as D increases."
+        }
+      ],
+      "applications": [
+        {
+          "field": "Power systems",
+          "body": "HVDC converters, static VAR compensators and grid-connected inverters are power electronics. Interconnection rules constrain their design: IEEE Std 519 sets harmonic limits, and IEEE Std 1547 governs the connection of distributed energy resources."
+        },
+        {
+          "field": "Avionics",
+          "body": "Aircraft distribute power at 115 V AC at 400 Hz and at DC buses, so converters sit between these systems. They must satisfy the aircraft electrical power characteristics in MIL-STD-704 and the environmental tests of RTCA DO-160."
+        },
+        {
+          "field": "Mechatronics",
+          "body": "Motor drives are inverters under closed-loop control. The PWM frequency is usually chosen above the audible range, often 10 to 20 kHz, to avoid acoustic noise, and switching loss sets the practical upper limit."
+        },
+        {
+          "field": "Robotics",
+          "body": "Battery-powered robots use buck and boost converters to supply motors, sensors and processors from one battery. Converter efficiency directly sets battery runtime, and switching noise must be filtered away from sensitive measurements."
+        }
+      ]
+    },
+    "codeStudio": {
+      "title": "Embedded C and C++: registers, builds and hardware abstraction",
+      "intro": "The code studio compiles and runs C, C++, Python and 8086 assembly in the browser, with a view of memory and registers. The theory below covers what matters for embedded work: changing hardware registers with bit operations, the stages a program passes through before it becomes a binary, and how a hardware abstraction layer keeps application code portable between boards.",
+      "principles": [
+        {
+          "heading": "Bit manipulation and hardware registers",
+          "body": "Peripherals are controlled through memory-mapped registers. They are read and written like variables, but each write changes hardware state. To change one bit without disturbing the rest, use read-modify-write: set bit n with R |= (1u << n), clear it with R &= ~(1u << n), and toggle it with R ^= (1u << n). The u suffix matters, because shifting a plain int 1 into the sign bit is undefined behaviour in C."
+        },
+        {
+          "heading": "Volatile and the compiler",
+          "body": "A register can change without the program writing it, for example when hardware sets a status flag. Declaring the register pointer volatile tells the compiler not to cache reads or remove writes. Without volatile, an optimising compiler may read the register once and reuse the value, so a wait loop never sees the flag change."
+        },
+        {
+          "heading": "The build pipeline",
+          "body": "The preprocessor expands #include and #define. The compiler turns each translation unit into assembly, the assembler produces object code, and the linker combines objects and libraries, resolves symbols and places sections at addresses set by a linker script. Embedded builds add a final step that converts the linked output into the image the chip loads."
+        },
+        {
+          "heading": "Hardware abstraction",
+          "body": "A hardware abstraction layer (HAL) wraps register access in functions such as gpio_write(pin, level). Application code calls the HAL and never touches registers, so the same logic can run on another board by replacing only the HAL implementation. The cost is an extra function call, which the compiler can usually inline, and the gain is portability."
+        }
+      ],
+      "equations": [
+        "Set bit n by read-modify-write",
+        "Clear bit n",
+        "Toggle bit n",
+        "Extract a bit field with mask M and shift s",
+        "Timer period from prescaler, compare value and clock",
+        "Build pipeline from source to binary"
+      ],
+      "parameters": [
+        {
+          "term": "Fixed-width integer types",
+          "body": "Use uint8_t, uint16_t and uint32_t from <stdint.h> for registers. The width of plain int varies between platforms, so a 16-bit register accessed through an int can be silently truncated or sign-extended."
+        },
+        {
+          "term": "Clock and timer prescaler",
+          "body": "A timer counts clock ticks divided by the prescaler. With a 16 MHz clock, a prescaler of 64 and a compare value of 249, the period is 64 × 250 / 16 MHz = 1 ms. Changing any one of the three values changes the period in proportion."
+        },
+        {
+          "term": "Stack and memory size",
+          "body": "Microcontrollers have kilobytes of RAM shared between globals, the heap and the stack. Deep recursion or large local arrays can overflow the stack without warning, so keep call depth shallow and avoid dynamic allocation in interrupt-driven code."
+        },
+        {
+          "term": "Optimisation level",
+          "body": "At -O0 variables stay in memory, which eases debugging. -O2 is common for release builds. Check timing-critical code after optimisation, because a busy-wait loop on a non-volatile variable can be removed entirely."
+        }
+      ],
+      "experiments": [
+        {
+          "title": "Set, toggle and clear bits",
+          "body": "Start with the register at 0x00. Predict its value after R |= (1 << 3), which is 0x08. Then predict R ^= (1 << 0), which gives 0x09, and R &= ~(1 << 3), which gives 0x01. Compare each step with the register view."
+        },
+        {
+          "title": "Extract a bit field",
+          "body": "A status byte stores a three-bit mode in bits 4 to 6. For R = 0x5A, which is binary 0101 1010, predict the mode from (R & 0x70) >> 4. The answer is 5. Change R to 0xA0 and predict the new mode before running it."
+        },
+        {
+          "title": "Compute a timer period",
+          "body": "Use a 16 MHz clock, a prescaler of 8 and a compare value of 1999. Predict the period: 8 × 2000 / 16 MHz = 1 ms. Change the prescaler to 1 and predict the new period, 125 µs, then confirm both values in the simulator."
+        },
+        {
+          "title": "Move a driver behind a HAL",
+          "body": "Write gpio_write(pin, level) so that it hides the register bit. Replace the direct register writes in a blink program with calls to this function and confirm that the LED behaves the same. Then list which lines would change to port the program to another board."
+        }
+      ],
+      "applications": [
+        {
+          "field": "Robotics",
+          "body": "Robot controllers read encoders and drive motors through timers and interrupts. Register-level code hidden behind a HAL lets motor-driver firmware be reused across board revisions without rewriting the control logic."
+        },
+        {
+          "field": "Mechatronics",
+          "body": "Industrial sensors and actuators run firmware written in C. Teams commonly apply the MISRA C guidelines, which restrict constructs whose behaviour is undefined or depends on the implementation, and they run static analysis before release."
+        },
+        {
+          "field": "Avionics",
+          "body": "Airborne software is developed to RTCA DO-178C, and the assurance level sets how much structural coverage testing is required. Avionics teams keep HAL boundaries explicit so that the hardware-dependent code can be verified separately."
+        },
+        {
+          "field": "Power systems",
+          "body": "Protective relays and metering devices run embedded firmware in which timers and interrupts sample line waveforms. Deterministic timing, set by the timer and interrupt configuration, makes protection responses predictable and repeatable."
+        }
+      ]
     }
   }
 }

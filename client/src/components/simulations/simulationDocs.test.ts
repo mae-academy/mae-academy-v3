@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import en from "@/locales/en/simulationDocs.json";
 import ar from "@/locales/ar/simulationDocs.json";
 import es from "@/locales/es/simulationDocs.json";
+import { simulationRouteMeta } from "@/data/platform";
 import { EQUATIONS, docsTopicForSlug, type SimulationDocsTopic } from "./SimulationDocumentation";
 
 type Topic = (typeof en.topics)[keyof typeof en.topics];
@@ -63,15 +64,22 @@ describe("simulation documentation content", () => {
 });
 
 describe("docsTopicForSlug", () => {
-  it("maps the four studio routes that carry the new section", () => {
+  it("maps every studio route to a topic, so no studio is left without a theory section", () => {
+    const unmapped = simulationRouteMeta.map((entry) => entry.slug).filter((slug) => docsTopicForSlug(slug) === null);
+    expect(unmapped).toEqual([]);
+  });
+
+  it("maps each studio route to its own topic", () => {
     expect(docsTopicForSlug("circuit-lab")).toBe("circuits");
     expect(docsTopicForSlug("signals-and-systems")).toBe("signals");
     expect(docsTopicForSlug("control-systems")).toBe("control");
     expect(docsTopicForSlug("digital-logic-design")).toBe("logic");
+    expect(docsTopicForSlug("power-electronics")).toBe("powerElectronics");
+    expect(docsTopicForSlug("code")).toBe("codeStudio");
   });
 
-  it("returns null for other studios so they keep the existing block", () => {
-    expect(docsTopicForSlug("power-electronics")).toBeNull();
+  it("returns null for routes without a studio", () => {
+    expect(docsTopicForSlug("not-a-studio")).toBeNull();
     expect(docsTopicForSlug(undefined)).toBeNull();
   });
 });

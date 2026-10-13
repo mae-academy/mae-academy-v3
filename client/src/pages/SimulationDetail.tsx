@@ -28,7 +28,6 @@ import {
   signalsAndSystemsToolMeta,
   simulationRouteMeta,
 } from "@/data/platform";
-import SimulatorDocumentation from "@/components/SimulatorDocumentation";
 import SimulationDocumentation, { docsTopicForSlug } from "@/components/simulations/SimulationDocumentation";
 import { seoKeyForRoute } from "@/seo/simulatorSeoData";
 import { useSimulatorSeo } from "@/seo/useSimulatorSeo";
@@ -213,7 +212,7 @@ export default function SimulationDetail() {
           {toolContent}
         </div>
       </motion.div>
-      {docsTopic ? <SimulationDocumentation topic={docsTopic} /> : <SimulatorDocumentation />}
+      {docsTopic && <SimulationDocumentation topic={docsTopic} />}
     </SimulatorLayout>
   </motion.div>;
 }

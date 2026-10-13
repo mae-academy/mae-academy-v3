@@ -1,11 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { SIMULATOR_SEO, wordCount } from "./simulatorSeoData";
+import { SIMULATOR_SEO } from "./simulatorSeoData";
 
 describe("simulator SEO registry", () => {
-  it("keeps every docs block between 200 and 300 words", () => {
-    const bad = SIMULATOR_SEO.map((e) => [e.key, wordCount(e.docs)] as const).filter(([, n]) => n < 200 || n > 300);
-    expect(bad).toEqual([]);
-  });
   it("has unique keys, titles and canonical paths", () => {
     for (const field of ["key", "title", "path"] as const) {
       const values = SIMULATOR_SEO.map((e) => e[field]);

@@ -8,7 +8,7 @@ import { useLocale } from "@/contexts/LocaleContext";
  * `locales/<language>/simulationDocs.json`; the governing equations are language-neutral LaTeX and are
  * kept here, paired by index with each topic's `equations` captions.
  */
-export type SimulationDocsTopic = "circuits" | "signals" | "control" | "fluid" | "logic" | "plc" | "arduino";
+export type SimulationDocsTopic = "circuits" | "signals" | "control" | "fluid" | "logic" | "plc" | "arduino" | "powerElectronics" | "codeStudio";
 
 export const EQUATIONS: Record<SimulationDocsTopic, string[]> = {
   circuits: [
@@ -54,6 +54,22 @@ export const EQUATIONS: Record<SimulationDocsTopic, string[]> = {
     "T_{\\text{scan}} = T_{\\text{in}} + T_{\\text{prog}} + T_{\\text{out}} + T_{\\text{ovh}}",
     "Q = 1 \\quad \\text{when} \\quad t_{\\text{acc}} \\ge PT",
   ],
+  powerElectronics: [
+    "V_{dc} = \\frac{2V_m}{\\pi}",
+    "V_{dc} = \\frac{2V_m}{\\pi}\\cos\\alpha",
+    "V_{out} = D\\,V_{in}",
+    "V_{out} = \\frac{V_{in}}{1-D}",
+    "\\mathrm{THD} = \\frac{\\sqrt{\\sum_{n\\ge 2} V_n^{2}}}{V_1}",
+    "P_{sw} \\approx \\tfrac{1}{2}\\,V\\,I\\,(t_r + t_f)\\,f_{sw}",
+  ],
+  codeStudio: [
+    "R \\leftarrow R \\mid (1 \\ll n)",
+    "R \\leftarrow R \\,\\&\\, \\lnot(1 \\ll n)",
+    "R \\leftarrow R \\oplus (1 \\ll n)",
+    "\\mathrm{field} = (R \\,\\&\\, M) \\gg s",
+    "T = \\frac{N_{\\mathrm{pre}}\\,(\\mathrm{TOP}+1)}{f_{\\mathrm{clk}}}",
+    "\\mathrm{source} \\rightarrow \\mathrm{preprocess} \\rightarrow \\mathrm{compile} \\rightarrow \\mathrm{assemble} \\rightarrow \\mathrm{link} \\rightarrow \\mathrm{binary}",
+  ],
   arduino: [
     "V_{\\text{in}} = \\frac{\\mathrm{ADC} \\cdot V_{\\text{ref}}}{1023}",
     "R = \\frac{V_s - V_f}{I}",
@@ -68,6 +84,11 @@ const TOPIC_BY_SLUG: Record<string, SimulationDocsTopic> = {
   "signals-and-systems": "signals",
   "control-systems": "control",
   "digital-logic-design": "logic",
+  "power-electronics": "powerElectronics",
+  code: "codeStudio",
+  plc: "plc",
+  "arduino-studio": "arduino",
+  "pneumatics-and-hydraulics": "fluid",
 };
 
 export function docsTopicForSlug(slug: string | undefined): SimulationDocsTopic | null {

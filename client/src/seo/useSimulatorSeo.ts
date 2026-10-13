@@ -1,26 +1,8 @@
-import { useEffect, useSyncExternalStore } from "react";
+import { useEffect } from "react";
 import { SEO_BY_KEY, type SimulatorSeoEntry } from "./simulatorSeoData";
 
 export const SITE_ORIGIN = "https://maeacademy.org";
 const JSON_LD_ID = "mae-simulator-jsonld";
-
-let activeKey: string | null = null;
-const listeners = new Set<() => void>();
-const publish = (key: string | null) => {
-  if (activeKey === key) return;
-  activeKey = key;
-  listeners.forEach((l) => l());
-};
-const subscribe = (l: () => void) => {
-  listeners.add(l);
-  return () => void listeners.delete(l);
-};
-
-/** The registry entry for the simulator mode currently on screen (drives SimulatorDocumentation). */
-export function useActiveSimulatorSeo(): SimulatorSeoEntry | null {
-  const key = useSyncExternalStore(subscribe, () => activeKey, () => null);
-  return key ? SEO_BY_KEY[key] ?? null : null;
-}
 
 function setMeta(selector: string, attr: "name" | "property", name: string, content: string) {
   let el = document.head.querySelector<HTMLMetaElement>(selector);
@@ -82,17 +64,15 @@ export function applySimulatorSeo(entry: SimulatorSeoEntry) {
 }
 
 /**
- * Applies title, description, canonical, social tags and JSON-LD for the given registry key and
- * publishes it so SimulatorDocumentation shows matching text. Pass null to do nothing.
+ * Applies title, description, canonical, social tags and JSON-LD for the given registry key.
+ * Pass null to do nothing.
  */
 export function useSimulatorSeo(key: string | null | undefined) {
   useEffect(() => {
     const entry = key ? SEO_BY_KEY[key] : undefined;
     if (!entry) return;
     applySimulatorSeo(entry);
-    publish(entry.key);
     return () => {
-      if (activeKey === entry.key) publish(null);
       document.getElementById(JSON_LD_ID)?.remove();
     };
   }, [key]);

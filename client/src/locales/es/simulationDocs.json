@@ -601,6 +601,178 @@
           "body": "Los módulos de sensores aeronáuticos usan microcontroladores con ADC y E/S digitales. El equipo de vuelo debe cumplir normas ambientales y de seguridad como RTCA DO-160 para condiciones ambientales y RTCA DO-254 para electrónica compleja."
         }
       ]
+    },
+    "powerElectronics": {
+      "title": "Electrónica de potencia: teoría y guía de laboratorio",
+      "intro": "El estudio de electrónica de potencia construye rectificadores, inversores, controladores de voltaje alterno y chopper de continua con interruptores ideales y componentes pasivos. La teoría siguiente expone los promedios y las fórmulas de rizado que hay detrás de las gráficas, muestra cómo la distorsión y las pérdidas de conmutación limitan a los convertidores reales, y explica por qué cada resultado puede comprobarse a mano antes de ejecutar la simulación.",
+      "principles": [
+        {
+          "heading": "Rectificadores y conversión controlada",
+          "body": "Un rectificador convierte corriente alterna en continua. Un puente de diodos no está controlado: su promedio de salida depende del voltaje máximo de entrada, por lo que en un puente de onda completa V_dc = 2V_m/π. Los tiristores añaden control. Retrasar el disparo un ángulo α reduce el promedio a V_dc = (2V_m/π)·cos α, de modo que la salida puede ajustarse desde su valor completo hasta cero. Con carga inductiva la corriente sigue circulando después de que el voltaje se invierte, por eso suele añadirse un diodo de libre circulación."
+        },
+        {
+          "heading": "Inversores y modulación por ancho de pulso",
+          "body": "Un inversor convierte continua en alterna conmutando un bus de continua. Un inversor de onda cuadrada en puente completo produce una fundamental de amplitud máxima 4V_dc/π, además de armónicos impares. El PWM sinusoidal compara una referencia senoidal con una portadora triangular. El índice de modulación m_a = V_ref/V_tri fija la amplitud de la fundamental en la zona lineal, y una frecuencia de portadora alta desplaza los armónicos a frecuencias que el filtro de salida puede atenuar."
+        },
+        {
+          "heading": "Convertidores CC-CC reductor y elevador",
+          "body": "Un convertidor reductor (buck) baja el voltaje: en conducción continua V_out = D·V_in, donde D es el ciclo de trabajo. Un convertidor elevador (boost) lo sube: V_out = V_in/(1 − D). Ambos almacenan energía en una bobina. El rizado de corriente de la bobina del reductor es ΔI_L = V_out(1 − D)/(L·f_s), así que una inductancia mayor o una frecuencia de conmutación más alta dan una corriente más suave."
+        },
+        {
+          "heading": "Distorsión armónica total",
+          "body": "La THD mide qué parte de la energía de una forma de onda está en los armónicos: THD = √(Σ V_n²)/V_1, sumando para n ≥ 2. Una onda cuadrada tiene una THD de alrededor del 48 por ciento, mientras que una senoidal bien filtrada está en unos pocos por ciento o menos. Los códigos de red y las normas de equipos limitan la distorsión armónica, por lo que el diseño del filtro se juzga por la THD que consigue."
+        },
+        {
+          "heading": "Pérdidas por conmutación",
+          "body": "Cada transición de conmutación tarda un tiempo finito, durante el cual el voltaje y la corriente se solapan y disipan potencia. Para transiciones aproximadamente lineales, la pérdida media de conmutación es de unos ½·V·I·(t_r + t_f)·f_sw. A esto se suma la pérdida de conducción, igual a la corriente eficaz al cuadrado por la resistencia en conducción. El rendimiento baja al subir la frecuencia de conmutación, así que el diseño del convertidor equilibra el rizado, el tamaño del filtro y las pérdidas."
+        }
+      ],
+      "equations": [
+        "Promedio de salida de un puente de onda completa no controlado",
+        "Promedio de salida de un puente controlado con ángulo de disparo α",
+        "Salida del convertidor reductor en conducción continua",
+        "Salida del convertidor elevador en conducción continua",
+        "Distorsión armónica total",
+        "Pérdida por conmutación con transiciones lineales"
+      ],
+      "parameters": [
+        {
+          "term": "Ángulo de disparo α",
+          "body": "Se ajusta entre 0 y 180 grados en un puente controlado. Los ángulos mayores de 90 grados hacen que el promedio de salida sea negativo, algo posible solo si el lado de continua puede devolver energía a una fuente, como ocurre con una carga regenerativa."
+        },
+        {
+          "term": "Ciclo de trabajo D",
+          "body": "En las etapas reductora y elevadora, D fija la salida. Cerca de D = 1, una etapa elevadora produce un voltaje muy alto, así que los diseños prácticos limitan D a un rango acotado, típicamente de 0,05 a 0,95, para mantener los tiempos de conducción y el rizado dentro de los límites de diseño."
+        },
+        {
+          "term": "Frecuencia de conmutación y bobina",
+          "body": "Una frecuencia de conmutación mayor reduce el rizado y el tamaño de L y C, pero eleva las pérdidas por conmutación. Un objetivo de diseño habitual es un rizado de corriente de entre el 10 y el 30 por ciento de la corriente media de la bobina."
+        },
+        {
+          "term": "Tipo de carga",
+          "body": "Una carga resistiva consume corriente en fase con el voltaje. Una carga inductiva mantiene la corriente después de que el voltaje se invierte. Un filtro capacitivo suaviza la salida, pero toma corrientes de carga bruscas en cada pico, lo que somete a esfuerzo a los diodos."
+        }
+      ],
+      "experiments": [
+        {
+          "title": "Promedio de salida de un puente de diodos",
+          "body": "Aplique una senoidal de pico 325 V, es decir 230 V eficaces, a un puente de onda completa con carga resistiva. Prediga el promedio de salida como 2V_m/π, unos 207 V, y compárelo con el simulador. Observe que el valor medido queda ligeramente por debajo del ideal al incluir las caídas de los diodos."
+        },
+        {
+          "title": "Controlar la salida con el ángulo de disparo",
+          "body": "Use un puente controlado con V_m = 325 V. Prediga el promedio de salida con α = 60 grados: 207 × cos 60° ≈ 103 V. Repita con α = 90 grados, donde la predicción es cero, y confirme ambos valores."
+        },
+        {
+          "title": "Salida de un convertidor reductor",
+          "body": "Fije V_in = 48 V y D = 0,25. Prediga V_out = 12 V en conducción continua. Reduzca la carga hasta que la corriente sea discontinua y observe cómo la salida sube por encima del valor ideal, un efecto conocido de la carga ligera en una etapa reductora."
+        },
+        {
+          "title": "Convertidor elevador y ciclo de trabajo alto",
+          "body": "Fije V_in = 12 V y D = 0,5, y prediga V_out = 24 V. Suba el ciclo de trabajo a 0,75 y prediga 48 V. Después observe cuánto depende la salida de la carga a medida que D aumenta."
+        }
+      ],
+      "applications": [
+        {
+          "field": "Sistemas de potencia",
+          "body": "Los convertidores HVDC, los compensadores estáticos de VAR y los inversores conectados a la red son electrónica de potencia. Las reglas de conexión limitan su diseño: la norma IEEE Std 519 fija los límites armónicos, y la IEEE Std 1547 regula la conexión de recursos energéticos distribuidos."
+        },
+        {
+          "field": "Aviónica",
+          "body": "Las aeronaves distribuyen energía con corriente alterna de 115 V a 400 Hz y con buses de continua, así que los convertidores se sitúan entre esos sistemas. Deben cumplir las características de energía eléctrica de la aeronave de MIL-STD-704 y las pruebas ambientales de RTCA DO-160."
+        },
+        {
+          "field": "Mecatrónica",
+          "body": "Los accionamientos de motor son inversores bajo control de lazo cerrado. La frecuencia PWM suele elegirse por encima del rango audible, a menudo entre 10 y 20 kHz, para evitar el ruido acústico, y la pérdida por conmutación fija el límite práctico superior."
+        },
+        {
+          "field": "Robótica",
+          "body": "Los robots alimentados por batería usan convertidores reductores y elevadores para alimentar motores, sensores y procesadores desde una sola batería. El rendimiento del convertidor determina directamente la autonomía de la batería, y el ruido de conmutación debe filtrarse lejos de las medidas sensibles."
+        }
+      ]
+    },
+    "codeStudio": {
+      "title": "C y C++ embebidos: registros, compilación y abstracción de hardware",
+      "intro": "El estudio de código compila y ejecuta C, C++, Python y ensamblador 8086 en el navegador, con una vista de la memoria y de los registros. La teoría siguiente cubre lo que importa en el trabajo embebido: modificar registros de hardware con operaciones de bits, las etapas por las que pasa un programa antes de convertirse en binario, y cómo una capa de abstracción de hardware mantiene portable el código de aplicación entre placas.",
+      "principles": [
+        {
+          "heading": "Manipulación de bits y registros de hardware",
+          "body": "Los periféricos se controlan mediante registros mapeados en memoria. Se leen y escriben como variables, pero cada escritura cambia el estado del hardware. Para cambiar un bit sin alterar el resto, use lectura, modificación y escritura: para activar el bit n use R |= (1u << n), para desactivarlo R &= ~(1u << n) y para invertirlo R ^= (1u << n). El sufijo u importa, porque desplazar un int normal con valor 1 hasta el bit de signo es comportamiento indefinido en C."
+        },
+        {
+          "heading": "Volatile y el compilador",
+          "body": "Un registro puede cambiar sin que el programa lo escriba, por ejemplo cuando el hardware activa una bandera de estado. Declarar el puntero al registro como volatile indica al compilador que no guarde en caché las lecturas ni elimine las escrituras. Sin volatile, un compilador optimizador puede leer el registro una sola vez y reutilizar el valor, de modo que un bucle de espera nunca ve cambiar la bandera."
+        },
+        {
+          "heading": "El flujo de compilación",
+          "body": "El preprocesador expande #include y #define. El compilador convierte cada unidad de traducción en ensamblador, el ensamblador produce código objeto, y el enlazador combina objetos y bibliotecas, resuelve símbolos y coloca las secciones en direcciones definidas por un script de enlace. Las compilaciones embebidas añaden un último paso que convierte la salida enlazada en la imagen que carga el chip."
+        },
+        {
+          "heading": "Abstracción de hardware",
+          "body": "Una capa de abstracción de hardware (HAL) envuelve el acceso a registros en funciones como gpio_write(pin, level). El código de aplicación llama a la HAL y nunca toca los registros, así que la misma lógica puede ejecutarse en otra placa cambiando solo la implementación de la HAL. El costo es una llamada a función adicional, que el compilador suele poder integrar en línea, y la ganancia es la portabilidad."
+        }
+      ],
+      "equations": [
+        "Activar el bit n mediante lectura, modificación y escritura",
+        "Desactivar el bit n",
+        "Invertir el bit n",
+        "Extraer un campo de bits con máscara M y desplazamiento s",
+        "Periodo del temporizador a partir del preescalador, el valor de comparación y el reloj",
+        "Flujo de compilación desde el código fuente hasta el binario"
+      ],
+      "parameters": [
+        {
+          "term": "Enteros de ancho fijo",
+          "body": "Use uint8_t, uint16_t y uint32_t de <stdint.h> para los registros. El ancho de int varía entre plataformas, así que un registro de 16 bits accedido a través de un int puede truncarse o extenderse con signo sin aviso."
+        },
+        {
+          "term": "Reloj y preescalador del temporizador",
+          "body": "Un temporizador cuenta los pulsos de reloj divididos entre el preescalador. Con un reloj de 16 MHz, un preescalador de 64 y un valor de comparación de 249, el periodo es 64 × 250 / 16 MHz = 1 ms. Cambiar cualquiera de los tres valores cambia el periodo en proporción directa."
+        },
+        {
+          "term": "Pila y tamaño de memoria",
+          "body": "Los microcontroladores tienen kilobytes de RAM compartidos entre las variables globales, el montículo y la pila. La recursión profunda o los arreglos locales grandes pueden desbordar la pila sin avisar, así que mantenga poca profundidad de llamadas y evite la asignación dinámica en código dirigido por interrupciones."
+        },
+        {
+          "term": "Nivel de optimización",
+          "body": "Con -O0 las variables permanecen en memoria, lo que facilita la depuración. -O2 es habitual en las versiones de publicación. Verifique el código sensible al tiempo después de optimizar, porque un bucle de espera ocupada sobre una variable que no es volatile puede eliminarse por completo."
+        }
+      ],
+      "experiments": [
+        {
+          "title": "Activar, invertir y desactivar bits",
+          "body": "Empiece con el registro en 0x00. Prediga su valor después de R |= (1 << 3), que es 0x08. Después prediga R ^= (1 << 0), que da 0x09, y R &= ~(1 << 3), que da 0x01. Compare cada paso con la vista del registro."
+        },
+        {
+          "title": "Extraer un campo de bits",
+          "body": "Un byte de estado guarda un modo de tres bits en los bits 4 a 6. Para R = 0x5A, que en binario es 0101 1010, prediga el modo a partir de (R & 0x70) >> 4. La respuesta es 5. Cambie R a 0xA0 y prediga el nuevo modo antes de ejecutarlo."
+        },
+        {
+          "title": "Calcular el periodo de un temporizador",
+          "body": "Use un reloj de 16 MHz, un preescalador de 8 y un valor de comparación de 1999. Prediga el periodo: 8 × 2000 / 16 MHz = 1 ms. Cambie el preescalador a 1 y prediga el nuevo periodo, 125 µs. Confirme ambos valores en el simulador."
+        },
+        {
+          "title": "Trasladar un controlador detrás de una HAL",
+          "body": "Escriba gpio_write(pin, level) de modo que oculte el bit del registro. Sustituya las escrituras directas al registro de un programa de parpadeo por llamadas a esta función y confirme que el LED se comporta igual. Después enumere qué líneas cambiarían para portar el programa a otra placa."
+        }
+      ],
+      "applications": [
+        {
+          "field": "Robótica",
+          "body": "Los controladores de robot leen codificadores y accionan motores mediante temporizadores e interrupciones. El código a nivel de registros oculto tras una HAL permite reutilizar el firmware del controlador del motor entre revisiones de placa sin reescribir la lógica de control."
+        },
+        {
+          "field": "Mecatrónica",
+          "body": "Los sensores y actuadores industriales ejecutan firmware escrito en C. Los equipos suelen aplicar las directrices MISRA C, que restringen las construcciones cuyo comportamiento no está definido o depende de la implementación, y ejecutan análisis estático antes de la publicación."
+        },
+        {
+          "field": "Aviónica",
+          "body": "El software embarcado se desarrolla según RTCA DO-178C, y el nivel de garantía determina cuánto cubrimiento estructural de pruebas se exige. Los equipos de aviónica mantienen límites de HAL explícitos para que el código dependiente del hardware pueda verificarse por separado."
+        },
+        {
+          "field": "Sistemas de potencia",
+          "body": "Los relés de protección y los dispositivos de medida ejecutan firmware embebido en el que temporizadores e interrupciones muestrean las formas de onda de la línea. El tiempo determinista, fijado por la configuración de temporizadores e interrupciones, hace que las respuestas de protección sean predecibles y repetibles."
+        }
+      ]
     }
   }
 }
