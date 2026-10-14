@@ -5,7 +5,7 @@ import remarkMath from "remark-math";
 import { KatexMath } from "@/components/ui/KatexMath";
 import { CodeBlock } from "./CodeBlock";
 import { normalizeMathDelimiters } from "./mathDelimiters";
-import { PENDING_DIAGRAM_LANG, isSvgFence, markPendingDiagram } from "./svgFence";
+import { PENDING_DIAGRAM_LANG, isSvgFence, markPendingDiagram, stripHtmlComments } from "./svgFence";
 import { SvgDiagram, SvgDiagramPending } from "./SvgDiagram";
 
 const REMARK_PLUGINS = [remarkGfm, remarkMath];
@@ -97,7 +97,7 @@ class MarkdownBoundary extends Component<{ content: string; children: ReactNode 
 
 function AiMarkdownImpl({ content, streaming = false }: { content: string; streaming?: boolean }) {
   // While streaming, a diagram fence that has not closed yet becomes a "drawing" placeholder instead of a growing code block.
-  const source = useMemo(() => normalizeMathDelimiters(streaming ? markPendingDiagram(content) : content), [content, streaming]);
+  const source = useMemo(() => normalizeMathDelimiters(stripHtmlComments(streaming ? markPendingDiagram(content) : content)), [content, streaming]);
   return (
     <div className="min-w-0 break-words">
       <MarkdownBoundary content={content}>

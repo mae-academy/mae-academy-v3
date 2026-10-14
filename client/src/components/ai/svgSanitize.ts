@@ -130,6 +130,34 @@ class LimitError extends Error {}
  * Parses `source` and returns a sanitized, standalone copy, or null when it is not a usable SVG (not
  * well-formed XML, not an `<svg>` root, too large, too many nodes, nested too deep).
  */
+/** The presentation attribute's value on `element` or the nearest ancestor that sets it, or null if none does. */
+function inheritedAttribute(element: Element, name: string): string | null {
+  for (let node: Node | null = element; node && node.nodeType === 1; node = node.parentNode) {
+    const value = (node as Element).getAttribute(name);
+    if (value !== null) return value;
+  }
+  return null;
+}
+
+/**
+ * Models often draw wires as `<line x1=... />` with no `stroke`, which SVG renders as nothing at all, or leave a
+ * polyline unfilled-by-attribute so it fills black. Give such shapes the schematic default (2 px black line, no fill)
+ * unless the element or an ancestor already says otherwise, so a styled `<g>` is never overridden.
+ */
+function applyVisibleDefaults(element: Element): void {
+  const name = element.localName;
+  const isWire = name === "line" || name === "polyline";
+  const isShape = isWire || name === "path" || name === "rect" || name === "circle" || name === "ellipse" || name === "polygon";
+  if (!isShape) return;
+  if (name === "polyline" && inheritedAttribute(element, "fill") === null) element.setAttribute("fill", "none");
+  const fill = inheritedAttribute(element, "fill");
+  // A wire always needs a stroke; any other shape only when its fill is none, since otherwise the fill is visible.
+  const invisible = isWire || (fill !== null && fill.trim().toLowerCase() === "none");
+  if (!invisible || inheritedAttribute(element, "stroke") !== null) return;
+  element.setAttribute("stroke", "#000");
+  if (inheritedAttribute(element, "stroke-width") === null) element.setAttribute("stroke-width", "2");
+}
+
 export function sanitizeSvg(source: string): SanitizedSvg | null {
   if (typeof source !== "string") return null;
   const trimmed = source.trim();
@@ -175,6 +203,7 @@ export function sanitizeSvg(source: string): SanitizedSvg | null {
         const copy = output.createElementNS(SVG_NS, element.localName);
         copyAttributes(element, copy, false);
         to.appendChild(copy);
+        applyVisibleDefaults(copy);
         walk(element, copy, depth + 1);
         if (element.localName === "title" && title === undefined && element.parentNode === sourceRoot) title = copy.textContent?.trim() || undefined;
       } else if ((child.nodeType === 3 || child.nodeType === 4) && keepText) {

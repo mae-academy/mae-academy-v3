@@ -245,3 +245,45 @@ describe("sanitizeSvg refusals and limits", () => {
     expect(twice.svg).toBe(once.svg);
   });
 });
+
+describe("visible defaults for shapes the model left unstyled", () => {
+  const attr = (svg: string, selector: string, name: string) => reparse(svg).querySelector(selector)?.getAttribute(name) ?? null;
+
+  it("gives a <line> with no stroke a 2 px black stroke (an unstroked line renders nothing)", () => {
+    const { svg } = clean(wrap('<line x1="0" y1="0" x2="100" y2="0"/>'));
+    expect(attr(svg, "line", "stroke")).toBe("#000");
+    expect(attr(svg, "line", "stroke-width")).toBe("2");
+  });
+  it("gives a <polyline> a stroke and no fill (it would otherwise fill black)", () => {
+    const { svg } = clean(wrap('<polyline points="0,0 100,0 100,100"/>'));
+    expect(attr(svg, "polyline", "stroke")).toBe("#000");
+    expect(attr(svg, "polyline", "fill")).toBe("none");
+  });
+  it("gives an outline-only shape (fill none, no stroke) a stroke, and leaves filled shapes alone", () => {
+    const { svg } = clean(wrap('<rect id="a" width="40" height="20" fill="none"/><circle id="b" cx="5" cy="5" r="3"/><polygon id="c" points="0,0 4,0 2,4" fill="#000"/>'));
+    expect(attr(svg, "#a", "stroke")).toBe("#000");
+    expect(attr(svg, "#b", "stroke")).toBeNull(); // a plain circle is a visible black dot already
+    expect(attr(svg, "#c", "stroke")).toBeNull();
+  });
+  it("keeps explicit values, including an intentional stroke of none and a custom width", () => {
+    const { svg } = clean(wrap('<line id="a" x1="0" y1="0" x2="9" y2="0" stroke="#c00" stroke-width="5"/><line id="b" x1="0" y1="0" x2="9" y2="0" stroke="none"/>'));
+    expect(attr(svg, "#a", "stroke")).toBe("#c00");
+    expect(attr(svg, "#a", "stroke-width")).toBe("5");
+    expect(attr(svg, "#b", "stroke")).toBe("none");
+  });
+  it("does not override what an ancestor <g> or the root already provides", () => {
+    const grouped = clean(wrap('<g stroke="#00f" stroke-width="3" fill="none"><line id="a" x1="0" y1="0" x2="9" y2="0"/><polyline id="b" points="0,0 9,9"/></g>'));
+    for (const id of ["#a", "#b"]) {
+      expect(attr(grouped.svg, id, "stroke")).toBeNull();
+      expect(attr(grouped.svg, id, "stroke-width")).toBeNull();
+    }
+    const rooted = clean(wrap('<line id="a" x1="0" y1="0" x2="9" y2="0"/>', 'viewBox="0 0 800 500" stroke="#333"'));
+    expect(attr(rooted.svg, "#a", "stroke")).toBeNull();
+  });
+  it("makes the unstyled PID sketch the model produced visible end to end", () => {
+    const { svg } = clean(wrap('<line x1="40" y1="100" x2="100" y2="100"/><polygon points="95,96 103,100 95,104" fill="#000"/><rect x="200" y="80" width="80" height="40" fill="none" stroke="#000" stroke-width="2"/>'));
+    const doc = reparse(svg);
+    expect(doc.querySelector("line")?.getAttribute("stroke")).toBe("#000");
+    expect(doc.querySelector("rect")?.getAttribute("stroke")).toBe("#000");
+  });
+});

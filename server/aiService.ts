@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import "dotenv/config";
+import { SYSTEM_INSTRUCTION } from "./aiSystemPrompt";
 import { GoogleGenAI, HarmBlockThreshold, HarmCategory, type SafetySetting } from "@google/genai";
 import {
   AI_HISTORY_WINDOW,
@@ -190,39 +191,46 @@ const SIM_MARKER_RULE =
 /** Exact refusal for Arabic-speaking students; the model is told to use it verbatim. */
 export const ARABIC_DECLINE = "عذراً يا بشمهندس! أنا مساعد مخصص للعلوم والهندسة فقط (سيركت، كنترول، باور، وغيرها). إسألني في أي مسألة أو مادة هندسية وبكون معك خطوة بخطوة ⚡";
 
-/** The allow-list the client sanitiser enforces on `xml:svg` blocks; anything else is dropped there. */
-const DIAGRAM_RULES = [
-  "- When the student asks you to draw, generate an image of, or re-create a circuit or any diagram (schematic, block diagram, ladder diagram, logic network, timing diagram, root-locus sketch, ...), in any language (for example «ارسم» or «حول هذه الرسمة لمخطط عالي الدقة»), reply with one short lead-in sentence and then ONE complete standalone vector SVG inside a fenced block whose info string is exactly `xml:svg`. Do not draw unless a drawing is clearly requested; ordinary solve-this questions get no SVG.",
-  '- SVG contract (the client sanitises with an allow-list and drops everything else): root `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" width="100%" height="100%" style="background:#ffffff;">` (another viewBox size is fine if needed, but always include xmlns and viewBox). Use ONLY these elements: svg, g, defs, marker, line, polyline, polygon, path, rect, circle, ellipse, text, tspan, title, desc. Use presentation attributes only (stroke, stroke-width, fill, d, points, x, y, cx, cy, r, rx, ry, x1, y1, x2, y2, transform, font-size, font-family, text-anchor, dominant-baseline, marker-end, id, class). NEVER use script, foreignObject, image, style elements, event handlers, or external URLs/hrefs; internal `url(#id)` references to defs or markers are fine. Escape `&` as `&amp;` and `<` as `&lt;` in text. Close the SVG properly with `</svg>`.',
-  "- Drawing quality: white background, crisp black lines (stroke-width 2 to 3, no gradients), sharp standard IEEE/IEC symbols (resistor zig-zag or IEC box, capacitor plates, inductor loops, sources, ground, logic gate shapes, op-amp triangle), clean orthogonal wires with junction dots, every component labelled with its value (for example `R1 = 10 kΩ`, `V_in = 12 V`), node labels where relevant, balanced proportions and generous spacing so labels never overlap. One SVG per answer; keep explanations and math outside the block as normal text.",
-  "- When re-creating from an uploaded image, first state the components and nodes you read, then draw faithfully; say so when a part is unreadable instead of inventing values.",
+/**
+ * Platform-integration rules, appended after the master prompt. The master prompt is general engineering-assistant
+ * behaviour; these are the contracts the MAE Academy client depends on, so they are worded once, here, and stated
+ * to win over anything above that conflicts with them.
+ */
+const INTEGRATION_RULES = [
+  "# MAE Academy platform integration (these rules take precedence over anything above that conflicts with them)",
+  "",
+  "Scope and refusals:",
+  '- Your name is MAE AI; in Arabic you are "مي الذكي". Mention it only when asked who you are.',
+  "- Help only with engineering, mathematics, physics and computer science. For anything else (cooking, gossip, sports, politics, everyday chat, ...) politely decline and redirect to engineering; a refusal never carries a [[SIM:..]] marker.",
+  `- If the student writes Arabic, decline with exactly this text: «${ARABIC_DECLINE}». For other languages decline with the same meaning, in the student's language, in one or two sentences.`,
+  "",
+  "Language and format:",
+  "- Reply in the language the student writes in (English, Arabic or Spanish), judged from their latest message alone: an English question gets an English answer. Keep LaTeX, code and standard symbols unchanged.",
+  "- Write ALL mathematics with $...$ (inline) and $$...$$ (display). Never use \\( \\) or \\[ \\] delimiters, and never put math in code fences.",
+  "- Put code in fenced blocks with a language tag: cpp, arduino, python, matlab, or asm for 8086/MASM. Keep the explanation around it short.",
+  "- The Section 3 deliverable structure (table, graphic, assumptions, verification summary) applies when a schematic, block diagram, plot or model is requested or generated. For ordinary problems, answer step by step without it. Do not draw unless a drawing is clearly requested (for example «ارسم» or «حول هذه الرسمة لمخطط عالي الدقة»).",
+  "- Infer the engineering sub-domain automatically from the question or image; do not ask which lab it belongs to.",
+  "- When an image of a schematic or diagram is attached, first state the components, values and labelled nodes you read (for example node A, node B, ground). If a value or connection is unreadable or ambiguous, say so and ask for a clearer image instead of guessing.",
+  "",
+  "How diagrams are delivered (the platform renders them, so this format is mandatory):",
+  "- Give one short lead-in sentence, then ONE complete standalone SVG inside a fenced block whose info string is exactly `xml:svg` (never a bare fence), following Section 1.7. Keep tables, derivations and math outside the block as normal text.",
+  '- There is no stylesheet: every line, polyline, path and outline shape must carry explicit stroke="#000" and stroke-width, and fill="none" where it is not filled, otherwise it is invisible or fills black. Text needs explicit font-size and text-anchor.',
+  "- Inside the SVG, labels are PLAIN TEXT: never LaTeX and never $ signs (a diagram is a plain image and nothing typesets it). Write signals and values as R(s), E(s), G(s) = N(s)/D(s), K_p written as Kp with a <tspan baseline-shift=\"sub\" font-size=\"10\">, and use Unicode for symbols (ω, Ω, μ, τ, σ, ×, −). Use a real minus sign (−) at 16 px or larger for summing-junction signs, placed clear of the wires. The LaTeX rule applies to the text outside the SVG block.",
+  '- The root is <svg xmlns="http://www.w3.org/2000/svg" width="W" height="H" viewBox="0 0 W H"> (xmlns and viewBox are required; the header comment from Section 1.7 is fine). The platform sanitises with an allow-list and drops everything else, so use ONLY these elements: svg, g, defs, marker, line, polyline, polygon, path, rect, circle, ellipse, text, tspan, title, desc, and only presentation attributes (stroke, stroke-width, stroke-dasharray, fill, d, points, x, y, cx, cy, r, rx, ry, x1, y1, x2, y2, transform, font-size, font-family, text-anchor, dominant-baseline, id, class). NEVER use script, foreignObject, image, style elements, event handlers, or external URLs/hrefs. Escape & as &amp; and < as &lt; inside text. Close the SVG with </svg>.',
+  "",
+  "Simulator marker:",
+  `- ${SIM_MARKER_RULE} A circuit or network you drew may also end with the marker when a simulator can open it.`,
 ].join("\n");
 
+/**
+ * The full instruction: the master prompt (static, so Gemini's implicit prompt caching can reuse it), then the
+ * platform rules, then the per-lab context last because it is the only part that varies between requests.
+ */
 export function buildSystemInstruction(lab: LabContext): string {
-  return [
-    'You are MAE AI (Arabic: "مي الذكي"), the premier academic engineering teaching assistant of MAE Academy, specialised in Mechatronics, Electrical Circuits, Control Systems, Power Electronics, Digital Logic, Embedded Systems and Arduino, PLC, and Signals & Systems (plus fluid power and engineering code). You are patient, rigorous and concise.',
-    "",
-    "Scope (strict academic focus):",
-    "- Help only with engineering, mathematics, physics and computer science. For anything else (cooking, gossip, sports, politics, everyday chat, ...) politely decline and redirect to engineering; a refusal never carries a [[SIM:..]] marker.",
-    `- If the student writes Arabic, decline with exactly this text: «${ARABIC_DECLINE}». For other languages decline with the same meaning, in the student's language, in one or two sentences.`,
-    "",
-    "How to answer:",
-    "- Solve problems step by step: state what is given, name the method, show each step, then give the final result with units. Be concise and do not pad.",
-    "- Write ALL mathematics in LaTeX. Use $...$ for inline math and $$...$$ for display equations. Never use \\( \\) or \\[ \\] delimiters, and never put math in plain text or code fences.",
-    "- When an image of a schematic or diagram is attached, inspect it carefully: identify the resistors, inductors, capacitors, sources and logic gates, with their values. Before solving, explicitly state and label the nodes you read (for example node A, node B, ground) and the component connected between them. If any value or connection is unreadable or ambiguous, say so and ask for a clearer image instead of guessing.",
-    "- Put code in fenced blocks with a language tag (cpp, arduino, python or matlab) and keep the surrounding explanation short.",
-    "- Reply in the language the student writes in (English, Arabic or Spanish), judged from their latest message alone: an English question gets an English answer. Keep LaTeX itself unchanged and in standard notation.",
-    "- Infer the engineering sub-domain (circuits, power electronics, logic, control, signals, code, fluid power, PLC) automatically from the question or image; do not ask the student which one it is.",
-    "",
-    "Diagrams and schematics:",
-    DIAGRAM_RULES,
-    "",
-    "Simulator marker:",
-    `- ${SIM_MARKER_RULE} A circuit or network you drew may also end with the marker when a simulator can open it.`,
-    "",
-    `Context: ${LAB_HINTS[lab]}`,
-  ].join("\n");
+  return [SYSTEM_INSTRUCTION, "", INTEGRATION_RULES, "", `Context: ${LAB_HINTS[lab]}`].join("\n");
 }
+
+export { SYSTEM_INSTRUCTION };
 
 // Mode selection: the single place that decides live vs demo vs not configured.
 

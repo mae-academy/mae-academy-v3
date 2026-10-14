@@ -27,6 +27,7 @@ import {
   mockReply,
   resolveAiMode,
   sanitizeChatRequest,
+  SYSTEM_INSTRUCTION,
   windowMessages,
   withModelFallback,
 } from "./aiService";
@@ -129,7 +130,7 @@ describe("system instruction", () => {
   });
 
   it("tells the model to label nodes read from a schematic and admit unreadable parts", () => {
-    expect(prompt).toMatch(/label the nodes/i);
+    expect(prompt).toMatch(/labelled nodes you read/i);
     expect(prompt).toMatch(/unreadable/i);
   });
 
@@ -158,7 +159,7 @@ describe("system instruction", () => {
   it("names the assistant and restricts it to academic topics", () => {
     expect(prompt).toContain("MAE AI");
     expect(prompt).toContain("مي الذكي");
-    expect(prompt).toMatch(/premier academic engineering teaching assistant of MAE Academy/);
+    expect(prompt).toMatch(/principal systems architect and senior professor of mechatronics/);
     expect(prompt).toMatch(/only with engineering, mathematics, physics and computer science/);
     expect(prompt).toMatch(/a refusal never carries a \[\[SIM:\.\.\]\] marker/);
   });
@@ -170,22 +171,89 @@ describe("system instruction", () => {
 
   it("specifies the xml:svg diagram contract with its allow-list", () => {
     expect(prompt).toContain("`xml:svg`");
-    expect(prompt).toContain('xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500"');
+    expect(prompt).toContain('xmlns="http://www.w3.org/2000/svg" width="W" height="H" viewBox="0 0 W H"');
     expect(prompt).toContain("ONLY these elements: svg, g, defs, marker, line, polyline, polygon, path, rect, circle, ellipse, text, tspan, title, desc");
     expect(prompt).toMatch(/NEVER use script, foreignObject, image, style elements, event handlers, or external URLs/);
-    expect(prompt).toContain("Escape `&` as `&amp;`");
+    expect(prompt).toContain("Escape & as &amp;");
+    expect(prompt).toMatch(/info string is exactly `xml:svg` \(never a bare fence\)/);
+    expect(prompt).toMatch(/There is no stylesheet: every line, polyline, path and outline shape must carry explicit stroke="#000"/);
+    expect(prompt).toMatch(/Inside the SVG, labels are PLAIN TEXT: never LaTeX and never \$ signs/);
+    expect(prompt).toMatch(/real minus sign/);
     expect(prompt).toContain("ارسم");
     expect(prompt).toMatch(/Do not draw unless/);
-    expect(prompt).toMatch(/say so when a part is unreadable/);
+    expect(prompt).toMatch(/If a value or connection is unreadable or ambiguous, say so/);
   });
 
   it("keeps the marker usable after a drawing", () => {
     expect(prompt).toMatch(/drew may also end with the marker/);
   });
 
-  it("stays compact and is a function of the lab", () => {
-    expect(prompt.length).toBeLessThan(6000);
-    expect(buildSystemInstruction("control")).not.toBe(prompt);
+  it("is a function of the lab, with the static master text first and the lab context last (cache-friendly)", () => {
+    const control = buildSystemInstruction("control");
+    expect(control).not.toBe(prompt);
+    for (const text of [prompt, control]) expect(text.startsWith(SYSTEM_INSTRUCTION)).toBe(true);
+    expect(control.indexOf("Context:")).toBeGreaterThan(control.indexOf("# MAE Academy platform integration"));
+    // everything before the context line is identical across labs
+    expect(control.slice(0, control.lastIndexOf("Context:"))).toBe(prompt.slice(0, prompt.lastIndexOf("Context:")));
+  });
+
+  it("keeps the platform contract after the master text and says it takes precedence", () => {
+    const integration = prompt.indexOf("# MAE Academy platform integration");
+    expect(integration).toBeGreaterThan(SYSTEM_INSTRUCTION.length - 1);
+    expect(prompt).toMatch(/these rules take precedence over anything above that conflicts with them/);
+    for (const needle of ["`xml:svg`", "[[SIM:<lab>]]", ARABIC_DECLINE]) expect(prompt.indexOf(needle, integration)).toBeGreaterThan(-1);
+  });
+
+  it("limits the Section 3 deliverable structure to schematic requests so ordinary answers stay lean", () => {
+    expect(prompt).toMatch(/applies when a schematic, block diagram, plot or model is requested or generated/);
+    expect(prompt).toMatch(/For ordinary problems, answer step by step without it/);
+  });
+
+  it("stays within a sane size for a prompt sent on every request", () => {
+    expect(prompt.length).toBeGreaterThan(30_000);
+    expect(prompt.length).toBeLessThan(60_000);
+  });
+});
+
+describe("master system instruction text", () => {
+  it("covers every discipline the platform has a lab for", () => {
+    for (const heading of ["5.1 Electrical and Electronic Circuits", "5.2 Power Electronics", "5.3 Digital Logic", "5.4 Fluid Power", "5.5 Industrial Automation", "5.6 Control Systems", "5.7 Signals and Systems", "5.8 Computer Architecture"]) {
+      expect(SYSTEM_INSTRUCTION).toContain(heading);
+    }
+    expect(SYSTEM_INSTRUCTION).toMatch(/Intel 8086 \/ MASM/);
+  });
+
+  it("keeps LaTeX backslashes literal (String.raw), with no control characters from accidental escapes", () => {
+    expect(SYSTEM_INSTRUCTION).toContain("\\frac{N(s)}{D(s)}");
+    expect(SYSTEM_INSTRUCTION).toContain("\\bar{V}");
+    expect(SYSTEM_INSTRUCTION).toContain("\\text{k}\\Omega");
+    expect(SYSTEM_INSTRUCTION).toContain("\\dashv\\not\\vdash");
+    // eslint-disable-next-line no-control-regex
+    expect(SYSTEM_INSTRUCTION).not.toMatch(/[\u0000-\u0008\u000b-\u001f]/);
+  });
+
+  it("keeps its backticks (spliced in) and leaves no placeholder behind", () => {
+    expect(SYSTEM_INSTRUCTION).toContain("`.MODEL SMALL`");
+    expect(SYSTEM_INSTRUCTION).toContain("`stroke-dasharray=\"8 4\"`");
+    expect(SYSTEM_INSTRUCTION).not.toContain("${BT}");
+    expect(SYSTEM_INSTRUCTION).not.toContain("${");
+  });
+
+  it("has the repaired math spacing and a properly fenced SVG template", () => {
+    expect(SYSTEM_INSTRUCTION).toContain("$V_o = D\\,V_{in}$");
+    expect(SYSTEM_INSTRUCTION).toContain("$4.7\\,\\text{k}\\Omega$");
+    expect(SYSTEM_INSTRUCTION).toContain("[i_L \\;\\; v_C]");
+    expect(SYSTEM_INSTRUCTION).toContain("<!-- Standard: IEC 60617 | Pitch P = 20 px");
+    expect((SYSTEM_INSTRUCTION.match(/^```/gm) ?? []).length % 2).toBe(0); // every fence is closed
+  });
+
+  it("only draws with elements and attributes the client sanitiser keeps", () => {
+    // the master prompt's permitted elements are a subset of the client allow-list quoted in the integration rules
+    const allowed = new Set(["svg", "g", "defs", "marker", "line", "polyline", "polygon", "path", "rect", "circle", "ellipse", "text", "tspan", "title", "desc"]);
+    const section = SYSTEM_INSTRUCTION.slice(SYSTEM_INSTRUCTION.indexOf("### 1.4 Permitted SVG Elements"), SYSTEM_INSTRUCTION.indexOf("**Forbidden:**"));
+    const named = Array.from(section.matchAll(/^- `<([a-z]+)>`/gm), (m) => m[1]);
+    expect(named.length).toBeGreaterThanOrEqual(7);
+    for (const element of named) expect(allowed.has(element)).toBe(true);
   });
 });
 

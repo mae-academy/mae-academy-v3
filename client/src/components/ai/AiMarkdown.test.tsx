@@ -99,6 +99,22 @@ describe("AiMarkdown diagrams", () => {
     expect(container.querySelectorAll(".katex")).toHaveLength(1);
   });
 
+  it("does not show the template's header comment as text when the model writes it outside the fence", () => {
+    const comment = "<!-- Standard: ISO/IEEE Control Block Diagram | Pitch P = 20 px | Signal stroke 2 px -->";
+    const { container } = render(<AiMarkdown content={`PID loop:\n${comment}\n\n\`\`\`xml:svg\n${SVG}\n\`\`\`\n\nDone.`} />);
+    expect(container.textContent).not.toContain("<!--");
+    expect(container.textContent).not.toContain("Standard: ISO");
+    expect(container.querySelector("figure img")).toBeTruthy();
+    expect(container.textContent).toContain("PID loop:");
+  });
+
+  it("recognises a diagram in an untyped fence that opens with the header comment", () => {
+    const body = `<!-- Standard: IEC 60617 | Pitch P = 20 px -->\n${SVG}`;
+    const { container } = render(<AiMarkdown content={`\`\`\`\n${body}\n\`\`\``} />);
+    expect(container.querySelector("figure img")).toBeTruthy();
+    expect(container.querySelector("pre")).toBeNull();
+  });
+
   it("also renders svg fences and xml fences whose body is an <svg", () => {
     for (const lang of ["svg", "xml", ""]) {
       const { container, unmount } = render(<AiMarkdown content={`\`\`\`${lang}\n${SVG}\n\`\`\``} />);

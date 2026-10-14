@@ -70,15 +70,61 @@ function scanFences(text: string): FenceBlock[] {
   return blocks;
 }
 
+/**
+ * Removes HTML comments from the prose of a message (code fences and inline code are left alone, a comment that is
+ * still streaming in is hidden too). Raw HTML is never rendered, so without this a model that writes the SVG template's
+ * `<!-- Standard: ... -->` header outside the fence would show it to the student as literal text.
+ */
+export function stripHtmlComments(text: string): string {
+  if (!text.includes("<!--")) return text;
+  const clean = (segment: string, isTail: boolean): string => {
+    // Inline code spans are matched first so a comment quoted in backticks survives.
+    let out = segment.replace(/(`+[^`\n]*`+)|<!--[\s\S]*?-->[ \t]*\r?\n?/g, (match, code: string | undefined) => (code ? match : ""));
+    if (isTail) out = out.replace(/<!--(?![\s\S]*-->)[\s\S]*$/, "");
+    return out;
+  };
+  let out = "";
+  let cursor = 0;
+  for (const block of scanFences(text)) {
+    out += clean(text.slice(cursor, block.start), false) + text.slice(block.start, block.end);
+    cursor = block.end;
+  }
+  return out + clean(text.slice(cursor), true);
+}
+
 function firstToken(info: string): string {
   return info.trim().split(/\s+/)[0]?.toLowerCase() ?? "";
+}
+
+/**
+ * Whether a body is an `<svg` document once any XML prolog and leading comments are skipped. The platform's own SVG
+ * template opens with a header comment (`<!-- Standard: IEC 60617 | Pitch P = 20 px ... -->`), and models do not
+ * always tag the fence, so an untyped block has to be recognised by what it contains, not by its first characters.
+ */
+/** `<!-- Standard: ...` (the header comment of the platform's SVG template), including while "Standard" is still being typed. */
+const STANDARD_HEADER = /^<!--\s*(?:Standard\b|(?:S(?:t(?:a(?:n(?:d(?:a(?:r(?:d)?)?)?)?)?)?)?)?$)/i;
+
+function skipPrelude(body: string): { rest: string; hadPrelude: boolean } {
+  let rest = body.trimStart();
+  let hadPrelude = false;
+  for (;;) {
+    const skipped = rest.replace(/^(?:<\?xml[\s\S]*?\?>|<!--[\s\S]*?-->)\s*/i, "");
+    if (skipped === rest) break;
+    rest = skipped;
+    hadPrelude = true;
+  }
+  return { rest, hadPrelude };
+}
+
+function bodyIsSvg(body: string): boolean {
+  return /^<svg[\s>/]/i.test(skipPrelude(body).rest);
 }
 
 /** Whether a finished fence is a diagram: explicit `xml:svg` / `svg`, or an XML-ish/untyped block whose body is an `<svg`. */
 export function isSvgFence(language: string | undefined, body: string): boolean {
   const lang = (language ?? "").toLowerCase();
   if (lang === "xml:svg" || lang === "svg") return true;
-  if (lang === "" || lang === "xml" || lang === "html") return /^\s*<svg[\s>/]/i.test(body);
+  if (lang === "" || lang === "xml" || lang === "html") return bodyIsSvg(body);
   return false;
 }
 
@@ -87,7 +133,14 @@ function looksLikeOpenDiagram(block: FenceBlock): boolean {
   const lang = firstToken(block.info);
   if (lang === "xml:svg" || lang === "svg") return true;
   const body = block.body.trimStart();
-  const svgStart = body !== "" && ("<svg".startsWith(body.toLowerCase()) || /^<svg[\s>/]/i.test(body));
+  const { rest, hadPrelude } = skipPrelude(body);
+  // The platform template opens with an XML prolog or a `<!-- Standard: ... -->` header. While that prelude is still
+  // arriving, or has finished with nothing after it yet, an `<svg` is about to follow: hold the placeholder rather
+  // than flash a code block. Ordinary XML/HTML fences that merely start with a comment are left alone.
+  const unclosedPrelude = /^<\?xml(?![\s\S]*?\?>)/i.test(rest) || (/^<!--(?![\s\S]*?-->)/.test(rest) && STANDARD_HEADER.test(rest));
+  const awaitingSvg = hadPrelude && rest === "" && (/^<\?xml/i.test(body) || STANDARD_HEADER.test(body));
+  const partialSvg = rest !== "" && "<svg".startsWith(rest.toLowerCase()); // `<`, `<s`, `<sv` still arriving
+  const svgStart = body !== "" && (partialSvg || /^<svg[\s>/]/i.test(rest) || unclosedPrelude || awaitingSvg);
   if (lang === "" || lang === "xml" || lang === "html") {
     if (lang !== "" && body === "") return true;
     return svgStart;
