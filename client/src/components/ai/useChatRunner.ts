@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { markSessionMessage } from "./schematicClient";
+import { markSessionMessage } from "./sessionMessages";
 import type { ChatMessage, LabContext } from "@shared/aiTypes";
 import { newId } from "./chatThreads";
 import { ChatStreamError, streamChat, type ChatErrorKind } from "./streamChat";
@@ -86,7 +86,7 @@ export function useChatRunner({ mascot, getLab, updateMessages }: ChatRunnerOpti
     pendingRef.current = "";
 
     const reply: ChatMessage = { id: newId(), role: "model", content: "", timestamp: Date.now() };
-    markSessionMessage(reply.id); // its schematic image (if any) may generate without a click
+    markSessionMessage(reply.id); // its schematic (if any) may auto-verify and auto-repair without a click
     updateMessages(threadId, () => [...history, reply]);
     setActive({ threadId, replyId: reply.id, phase: "waiting" });
     setError(null);

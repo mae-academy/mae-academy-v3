@@ -8,13 +8,15 @@ import {
   AI_MAX_MESSAGE_CHARS,
   AI_MAX_MODEL_MESSAGE_CHARS,
   LAB_CONTEXTS,
-  splitSchematicTag,
   splitSimMarker,
+  stripLegacySchematicTag,
   stripSvgDiagrams,
   type ChatMessage,
   type LabContext,
   type SimLab,
 } from "../shared/aiTypes";
+import { SCHEMATIC_FENCE, SCHEMATIC_GATES_SUMMARY, SCHEMATIC_SPEC_DOC } from "../shared/schematic";
+import { BJT_CE_STAGE, BUCK_CONVERTER, PID_LOOP, VOLTAGE_DIVIDER } from "../shared/schematic/fixtures";
 
 const nvidiaClient = new OpenAI({
   apiKey: process.env.NVIDIA_API_KEY ?? "",
@@ -98,10 +100,56 @@ export function windowMessages(messages: readonly ChatMessage[]): ChatMessage[] 
   return tail;
 }
 
-/** A model turn as it is resent to the model: no SVG (old chats still hold some), no schematic tag, no trailing simulator marker, bounded length, never empty. */
+const SCHEMATIC_FENCE_RE = new RegExp("(^|\\n)([ \\t]{0,3}```" + SCHEMATIC_FENCE + "[ \\t]*\\r?\\n[\\s\\S]*?)(\\r?\\n[ \\t]{0,3}```[ \\t]*(?=\\r?\\n|$)|$)", "g");
+const SCHEMATIC_OMITTED = "[earlier schematic omitted]";
+
+/**
+ * Bounds a model turn to `cap` characters without ever cutting a ```schematic fence in half: the model needs its
+ * previous spec to apply "change R1 to 5 kΩ". Only the newest complete fence is kept (older and unterminated ones become a
+ * short literal); the prose before it is truncated first, then the prose after it. A fence too large to fit is dropped whole.
+ */
+export function limitModelTurn(text: string, cap: number = AI_MAX_MODEL_MESSAGE_CHARS): string {
+  const fences: Array<{ start: number; end: number; closed: boolean }> = [];
+  const re = new RegExp(SCHEMATIC_FENCE_RE.source, "g");
+  for (let m = re.exec(text); m !== null; m = re.exec(text)) {
+    fences.push({ start: m.index + m[1].length, end: m.index + m[0].length, closed: m[3].length > 0 });
+    if (m[0].length === 0) re.lastIndex++;
+  }
+  if (fences.length === 0) return text.length > cap ? `${text.slice(0, cap - 1)}…` : text;
+
+  const keep = fences[fences.length - 1].closed ? fences[fences.length - 1] : undefined;
+  let out = "";
+  let cursor = 0;
+  let pre = "";
+  let post = "";
+  for (const f of fences) {
+    const prose = text.slice(cursor, f.start);
+    if (f === keep) pre = out + prose;
+    else out += prose + SCHEMATIC_OMITTED;
+    cursor = f.end;
+  }
+  post = text.slice(cursor);
+  if (!keep) {
+    const joined = out + post;
+    return joined.length > cap ? `${joined.slice(0, cap - 1)}…` : joined;
+  }
+  const fence = text.slice(keep.start, keep.end);
+  if (pre.length + fence.length + post.length <= cap) return pre + fence + post;
+  if (fence.length > cap - 400) {
+    const joined = pre + SCHEMATIC_OMITTED + post;
+    return joined.length > cap ? `${joined.slice(0, cap - 1)}…` : joined;
+  }
+  const budget = cap - fence.length - 2;
+  const postKeep = Math.min(post.length, Math.floor(budget / 4));
+  const preKeep = Math.min(pre.length, budget - postKeep);
+  const head = pre.length > preKeep ? `${pre.slice(0, Math.max(0, preKeep - 2)).trimEnd()}…\n\n` : pre;
+  const tail = post.length > postKeep ? `${post.slice(0, Math.max(0, postKeep - 1))}…` : post;
+  return head + fence + tail;
+}
+
+/** A model turn as it is resent to the model: no SVG (old chats still hold some), no legacy tag, no trailing simulator marker, bounded length (schematic fences stay whole), never empty. */
 export function cleanModelTurn(content: string): string {
-  const text = splitSchematicTag(splitSimMarker(stripSvgDiagrams(content)).text).text;
-  if (text.length > AI_MAX_MODEL_MESSAGE_CHARS) return `${text.slice(0, AI_MAX_MODEL_MESSAGE_CHARS - 1)}…`;
+  const text = limitModelTurn(stripLegacySchematicTag(splitSimMarker(stripSvgDiagrams(content)).text));
   return text.trim() ? text : "[empty reply]";
 }
 
@@ -213,12 +261,30 @@ const INTEGRATION_RULES = [
   "- Infer the engineering sub-domain automatically from the question or image; do not ask which lab it belongs to.",
   "- When an image of a schematic or diagram is attached, first state the components, values and labelled nodes you read (for example node A, node B, ground). If a value or connection is unreadable or ambiguous, say so and ask for a clearer image instead of guessing.",
   "",
-  "Schematic images (the platform turns a tag into a picture, so this format is mandatory):",
-  "- Do not emit SVG or ```xml:svg blocks; diagrams are produced by the image tag below, so ignore the SVG construction rules above and give the netlist/block table instead.",
-  "- When the student asks you to draw, visualize or generate a circuit schematic or engineering diagram: give the academic explanation, the equations and a node netlist or block table in text and LaTeX first. Then, as the LAST content of the reply (just before the optional [[SIM:..]] line), append exactly one tag on its own line: [GENERATE_SCHEMATIC: <detailed text-to-image prompt>].",
-  "- The prompt describes a crisp black-and-white IEEE/IEC textbook schematic on a white background, high contrast, clean orthogonal wiring and generous component spacing, labeled nodes, and lists every component with its value and the topology in words. It is ONE line, written in English even for Arabic or Spanish students, with no square brackets and no line breaks inside, under 900 characters.",
-  "- Example: [GENERATE_SCHEMATIC: A crisp high-contrast black-and-white electrical schematic of a 5V Buck converter, textbook style, showing DC source 12V, controlled switch S1, diode D1, inductor 50uH, capacitor 47uF, and load 2.5 ohms, clean orthogonal wiring, white background, technical line art]",
-  "- Never emit the tag unless a drawing is clearly requested. At most one tag per reply, never inside a code fence, and never in a refusal.",
+  "Schematic drawings (the platform draws them from a JSON spec, so this format is mandatory):",
+  "- The master prompt's SVG rules (Sections 1.4, 1.7 and the SVG form of 3.2) do NOT apply here. Never emit SVG, ```xml:svg blocks, ASCII art, Mermaid or image tags. A deterministic engine draws the symbols from a validated library and enforces the 10 verification gates below; your job is a correct, grid-snapped spec.",
+  "- Only when a drawing, schematic or block diagram is clearly requested (for example «ارسم» or «draw»): first give the academic explanation, the equations and the node netlist or block table as text and LaTeX. THEN append exactly ONE fenced block whose info string is exactly `schematic` and whose content is ONLY the JSON spec (no prose inside, strict JSON: double quotes, no comments, no trailing commas). It is the LAST content of the reply, just before the optional [[SIM:..]] line. Never emit it for ordinary questions, refusals or when only an explanation is wanted. At most one per reply; for a change request (\"make R1 5 kΩ\") re-emit the complete corrected spec, starting from your previous ```schematic block in the conversation.",
+  "- Before writing the spec, mentally run Phase A (topology and node extraction), Phase B (grid alignment and clearance) and Phase C (engineering sanity) of the master prompt and then ALL 10 gates below. Fix your own errors first; the spec you emit must already pass every gate. Gates:",
+  ...SCHEMATIC_GATES_SUMMARY.map((gate) => `  ${gate}`),
+  "- Practical rules: all coordinates are integers in grid units. Compute every wire endpoint from the terminal offsets table (position + rotated offset), never by eye. Give every part a value with a unit (blocks carry their transfer function or name). Draw ground at node 0. Put a wire between parts instead of letting them touch, keep parts at least one grid unit apart, and run wires between perpendicular terminals with an explicit bend point. Keep the figure compact (about 40 x 24 grid units at most) and place labels in free space.",
+  "- Write the text in the student's language; keep identifiers, designators and units in the spec in standard notation. If the circuit is too complex to draw faithfully, say so and draw the essential core instead of guessing.",
+  "",
+  "Spec format (reference; the engine reads exactly this):",
+  SCHEMATIC_SPEC_DOC,
+  "",
+  "Verified reference specs (they pass all 10 gates; copy their conventions: switch/diode orientation, rails, ground at the bottom, labels, a feedback tap that starts ON the output wire):",
+  "Buck converter (series switch, freewheeling diode, LC filter, load):",
+  "```" + SCHEMATIC_FENCE,
+  JSON.stringify(BUCK_CONVERTER),
+  "```",
+  "Unity-feedback loop (a block diagram has NO ground, rails or values on the sum; the feedback wire ends on the sum's S terminal and begins at a vertex on the output wire):",
+  "```" + SCHEMATIC_FENCE,
+  JSON.stringify(PID_LOOP),
+  "```",
+  "Common-emitter BJT stage with divider bias and bypass capacitor (rails repeated per branch, one ground per branch, ports for input/output):",
+  "```" + SCHEMATIC_FENCE,
+  JSON.stringify(BJT_CE_STAGE),
+  "```",
   "",
   "Simulator marker:",
   `- ${SIM_MARKER_RULE} A circuit or network you drew may also end with the marker when a simulator can open it.`,
@@ -334,11 +400,15 @@ export function blockedReason(chunk: ChunkVerdictInput): string | undefined {
   return finish && BLOCKING_FINISH_REASONS.has(finish) ? `finish:${finish}` : undefined;
 }
 
+/** Models tried in order for any Gemini text call: the chosen one twice (a spike usually passes), then a lighter one as a last resort. */
+export function modelChain(env: NodeJS.ProcessEnv = process.env): string[] {
+  const primary = env.GEMINI_MODEL?.trim() || DEFAULT_MODEL;
+  return primary === FALLBACK_MODEL ? [primary, primary] : [primary, primary, FALLBACK_MODEL];
+}
+
 /** Streams the model's reply as text deltas. Aborting `signal` stops reading from the upstream stream. Throws AiBlockedError when the answer is blocked or empty. */
 export async function* streamChat(request: SanitizedChat, signal?: AbortSignal): AsyncGenerator<string> {
-  const primary = process.env.GEMINI_MODEL?.trim() || DEFAULT_MODEL;
-  // Try the chosen model twice (a spike usually passes), then a lighter one as a last resort.
-  const models = primary === FALLBACK_MODEL ? [primary, primary] : [primary, primary, FALLBACK_MODEL];
+  const models = modelChain();
   const client = getGeminiClient();
   const stream = await withModelFallback(
     models,
@@ -447,19 +517,57 @@ const MOCK_REPLIES: Record<MockTopic, string> = {
   ].join("\n"),
 };
 
-const MOCK_DRAW_REPLY = [
-  "Here is a voltage divider: a 12 V source feeding R1 and R2 in series, with the output taken across R2.",
-  "",
-  "| Node | Connection |",
-  "| --- | --- |",
-  "| A | Vin+ to R1 |",
-  "| B | R1 to R2 (Vout) |",
-  "| GND | R2 and Vin- |",
-  "",
-  "With these values $V_{out} = 12 \\cdot \\frac{2}{3} = 8\\,\\text{V}$.",
-  "",
-  "[GENERATE_SCHEMATIC: A crisp high-contrast black-and-white electrical schematic of a voltage divider, textbook style, showing DC source Vin 12V, resistor R1 1k ohm in series with resistor R2 2k ohm, output node Vout between R1 and R2, ground symbol at the bottom, clean orthogonal wiring, labeled nodes, white background, technical line art]",
-].join("\n");
+const mockFence = (spec: unknown): string => ["```" + SCHEMATIC_FENCE, JSON.stringify(spec), "```"].join("\n");
+
+const MOCK_DRAWINGS: ReadonlyArray<{ pattern: RegExp; reply: string }> = [
+  {
+    pattern: /buck|converter|smps/i,
+    reply: [
+      "A 5 V buck converter: the switch S1 chops the 12 V source, the diode D1 freewheels the inductor current and L1/C1 filter it for the load.",
+      "",
+      "| Node | Connection |",
+      "| --- | --- |",
+      "| Vin | V1+ to S1 |",
+      "| SW | S1, D1 cathode and L1 |",
+      "| Vout | L1, C1 and R1 |",
+      "| 0 (GND) | V1-, D1 anode, C1 and R1 |",
+      "",
+      "In continuous conduction $D = V_o / V_{in} = 5/12 \\approx 0.42$.",
+      "",
+      mockFence(BUCK_CONVERTER),
+    ].join("\n"),
+  },
+  {
+    pattern: /\bpid\b|block diagram|feedback|loop|مخطط صندوقي/i,
+    reply: [
+      "A unity-feedback loop: the error $e = r - y$ drives the PID controller $C(s)$, whose output $u$ drives the plant $G(s)$.",
+      "",
+      "| Block | Input | Output |",
+      "| --- | --- | --- |",
+      "| Sum | r(t), y(t) | e(t) |",
+      "| C(s) | e(t) | u(t) |",
+      "| G(s) | u(t) | y(t) |",
+      "",
+      mockFence(PID_LOOP),
+    ].join("\n"),
+  },
+  {
+    pattern: /./,
+    reply: [
+      "Here is a voltage divider: a 10 V source feeding R1 and R2 in series, with the output taken across R2.",
+      "",
+      "| Node | Connection |",
+      "| --- | --- |",
+      "| A | V1+ to R1 |",
+      "| Vout | R1 to R2 |",
+      "| 0 (GND) | R2 and V1- |",
+      "",
+      "$V_{out} = 10 \\cdot \\frac{10}{10 + 10} = 5\\,\\text{V}$.",
+      "",
+      mockFence(VOLTAGE_DIVIDER),
+    ].join("\n"),
+  },
+];
 
 /** Asks for a drawing (English or Arabic); checked before the topic keywords so "draw a voltage divider" draws. */
 const MOCK_DRAW = /\b(draw|diagram|schematic)\b|ارسم|رسم|مخطط/;
@@ -480,7 +588,10 @@ const MOCK_TOPICS: ReadonlyArray<readonly [MockTopic, RegExp]> = [
 /** The complete demo reply (note, answer, trailing simulator marker where relevant) for one user message. */
 export function mockReply(content: string, hasImage = false): string {
   const text = content.toLowerCase();
-  if (MOCK_DRAW.test(text)) return `${MOCK_NOTE}\n\n${MOCK_DRAW_REPLY}\n\n[[SIM:circuits]]`;
+  if (MOCK_DRAW.test(text)) {
+    const drawing = MOCK_DRAWINGS.find((d) => d.pattern.test(text)) ?? MOCK_DRAWINGS[MOCK_DRAWINGS.length - 1];
+    return `${MOCK_NOTE}\n\n${drawing.reply}\n\n[[SIM:${drawing === MOCK_DRAWINGS[1] ? "control" : drawing === MOCK_DRAWINGS[0] ? "power" : "circuits"}]]`;
+  }
   const topic = MOCK_TOPICS.find(([, pattern]) => pattern.test(text))?.[0];
   if (!topic) {
     const imageNote = hasImage ? "\n\nI can see you attached an image, but reading images needs the real Gemini key; set `GEMINI_API_KEY` to try that." : "";
@@ -519,7 +630,7 @@ export async function* mockChatStream(request: SanitizedChat, signal?: AbortSign
   const marker = cut < 0 ? "" : reply.slice(cut);
   const chunks: string[] = [];
   let pending = "";
-  for (const word of body.match(/\S+\s*/g) ?? []) {
+  for (const word of body.match(/\S{1,40}\s*/g) ?? []) {
     pending += word;
     if (pending.length < 16) continue;
     chunks.push(pending);

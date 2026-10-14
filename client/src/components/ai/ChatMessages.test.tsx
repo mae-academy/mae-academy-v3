@@ -12,18 +12,18 @@ const renderAssistant = (content: string, streaming: boolean, live = true) =>
 
 describe("assistantView", () => {
   it("hides complete and partial markers and only reports the lab for finished answers", () => {
-    expect(assistantView("Use KVL.\n[[SIM:circuits]]", false)).toEqual({ text: "Use KVL.", lab: "circuits", schematic: null });
-    expect(assistantView("Use KVL.\n[[SIM:circuits]]", true)).toEqual({ text: "Use KVL.", lab: null, schematic: null });
+    expect(assistantView("Use KVL.\n[[SIM:circuits]]", false)).toEqual({ text: "Use KVL.", lab: "circuits" });
+    expect(assistantView("Use KVL.\n[[SIM:circuits]]", true)).toEqual({ text: "Use KVL.", lab: null });
     for (const partial of ["Use KVL.\n[[", "Use KVL.\n[[SIM:", "Use KVL.\n[[SIM:circ"]) {
-      expect(assistantView(partial, true)).toEqual({ text: "Use KVL.", lab: null, schematic: null });
+      expect(assistantView(partial, true)).toEqual({ text: "Use KVL.", lab: null });
     }
-    expect(assistantView("No simulator here.", false)).toEqual({ text: "No simulator here.", lab: null, schematic: null });
+    expect(assistantView("No simulator here.", false)).toEqual({ text: "No simulator here.", lab: null });
   });
 
-  it("hides the schematic tag (complete or partial) and exposes its prompt only for finished answers", () => {
+  it("strips a stray legacy GENERATE_SCHEMATIC tag from old stored messages, complete or partial", () => {
     const full = "Netlist below.\n\n[GENERATE_SCHEMATIC: A buck converter schematic, white background]\n[[SIM:power]]";
-    expect(assistantView(full, false)).toEqual({ text: "Netlist below.", lab: "power", schematic: "A buck converter schematic, white background" });
-    expect(assistantView(full, true)).toEqual({ text: "Netlist below.", lab: null, schematic: null });
+    expect(assistantView(full, false)).toEqual({ text: "Netlist below.", lab: "power" });
+    expect(assistantView(full, true)).toEqual({ text: "Netlist below.", lab: null });
     for (const partial of ["Netlist below.\n\n[GENERATE_", "Netlist below.\n\n[GENERATE_SCHEMATIC: A buck conv", "Netlist below.\n\n[GENERATE_SCHEMATIC: A buck converter]\n[[SI"]) {
       expect(assistantView(partial, true).text, partial).toBe("Netlist below.");
     }
@@ -62,18 +62,26 @@ describe("AssistantMessage simulator action", () => {
     }
   });
 
-  it("never shows the tag text, mid-stream or finished, and the image card appears only when finished", () => {
+  it("never shows legacy tag text from an old stored message, and offers no image button", () => {
     const tag = "[GENERATE_SCHEMATIC: A buck converter schematic, white background]";
-    for (const partial of ["Netlist.\n\n[GENERATE_SCH", `Netlist.\n\n${tag}`]) {
-      const { container, unmount } = renderAssistant(partial, true);
+    for (const [content, streaming] of [["Netlist.\n\n[GENERATE_SCH", true], [`Netlist.\n\n${tag}`, true], [`Netlist.\n\n${tag}`, false]] as const) {
+      const { container, unmount } = renderAssistant(content, streaming);
       expect(container.textContent).not.toContain("GENERATE");
-      expect(screen.queryByText("Generating schematic…")).toBeNull();
+      expect(screen.queryByRole("button", { name: /schematic/i })).toBeNull();
       unmount();
     }
-    const { container } = renderAssistant(`Netlist.\n\n${tag}`, false);
-    expect(container.textContent).not.toContain("GENERATE");
-    // not created in this session: a button, no request
-    expect(screen.getByRole("button", { name: "Generate schematic image" })).toBeTruthy();
+  });
+
+  it("renders a schematic fence inline in the message once complete, and a placeholder while it streams", () => {
+    const spec = JSON.stringify({ title: "Divider", parts: [{ id: "R1", type: "resistor", value: "1 kΩ", at: [2, 2] }, { id: "R2", type: "resistor", value: "2 kΩ", at: [8, 2] }, { id: "GND1", type: "ground", at: [5, 6] }], wires: [] });
+    const body = `Netlist.\n\n\`\`\`schematic\n${spec}\n\`\`\`\n[[SIM:circuits]]`;
+    const streaming = renderAssistant(body.slice(0, body.indexOf("\n[[SIM") - 30), true);
+    expect(screen.getByText("Drawing schematic…")).toBeTruthy();
+    streaming.unmount();
+    const done = renderAssistant(body, false);
+    expect(done.container.querySelector("img[src^='data:image/svg+xml']")).toBeTruthy();
+    expect(done.container.textContent).not.toContain("SIM:");
+    expect(screen.getByRole("link", { name: /Open in Interactive Simulator/ })).toBeTruthy();
   });
 
   it("shows no action for a completed answer without a marker", () => {

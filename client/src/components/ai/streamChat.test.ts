@@ -117,7 +117,7 @@ describe("buildRequestMessages", () => {
     expect(JSON.stringify(out).length).toBeLessThan(400);
   });
 
-  it("strips the schematic tag from earlier model answers but keeps a user's literal text", () => {
+  it("strips a legacy schematic tag from earlier model answers but keeps a user's literal text", () => {
     const out = buildRequestMessages([
       msg("1", "user", "draw a buck"),
       msg("2", "model", "Netlist: ...\n\n[GENERATE_SCHEMATIC: A buck converter, white background]\n[[SIM:power]]"),
@@ -126,6 +126,12 @@ describe("buildRequestMessages", () => {
     expect(out[1].content).toBe("Netlist: ...");
     expect(out[2].content).toBe("type [GENERATE_SCHEMATIC: x] literally");
     expect(JSON.stringify(out.slice(0, 2))).not.toContain("GENERATE_SCHEMATIC");
+  });
+
+  it("keeps a schematic spec in earlier model answers so the model can edit it", () => {
+    const fence = "```schematic\n{\"title\":\"Divider\",\"parts\":[]}\n```";
+    const out = buildRequestMessages([msg("1", "user", "draw a divider"), msg("2", "model", `Netlist.\n\n${fence}\n[[SIM:circuits]]`), msg("3", "user", "make R1 5 k")]);
+    expect(out[1].content).toBe(`Netlist.\n\n${fence}`);
   });
 
   it("drops a model turn that was only a marker", () => {

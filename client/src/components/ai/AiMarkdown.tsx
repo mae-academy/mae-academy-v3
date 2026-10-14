@@ -5,7 +5,8 @@ import remarkMath from "remark-math";
 import { KatexMath } from "@/components/ui/KatexMath";
 import { CodeBlock } from "./CodeBlock";
 import { normalizeMathDelimiters } from "./mathDelimiters";
-import { stripHtmlComments } from "./svgFence";
+import { SchematicDiagram, SchematicPending } from "./SchematicDiagram";
+import { PENDING_SCHEMATIC_LANG, markPendingSchematic, stripHtmlComments } from "./svgFence";
 
 const REMARK_PLUGINS = [remarkGfm, remarkMath];
 /** Only these schemes may be linked; everything else (javascript:, data:, ...) renders as plain text. */
@@ -41,6 +42,8 @@ const components: Components = {
     }
     // `:` stays in the language name so a legacy `xml:svg` fence is just an ordinary code block.
     const language = /language-([\w+#.:-]+)/.exec(className)?.[1];
+    if (language === PENDING_SCHEMATIC_LANG) return <SchematicPending />;
+    if (language?.toLowerCase() === "schematic") return <SchematicDiagram text={text} />;
     return <CodeBlock code={text} language={language} />;
   },
   a({ href, children }) {
@@ -92,8 +95,8 @@ class MarkdownBoundary extends Component<{ content: string; children: ReactNode 
   }
 }
 
-function AiMarkdownImpl({ content }: { content: string; streaming?: boolean }) {
-  const source = useMemo(() => normalizeMathDelimiters(stripHtmlComments(content)), [content]);
+function AiMarkdownImpl({ content, streaming }: { content: string; streaming?: boolean }) {
+  const source = useMemo(() => normalizeMathDelimiters(stripHtmlComments(streaming ? markPendingSchematic(content) : content)), [content, streaming]);
   return (
     <div className="min-w-0 break-words">
       <MarkdownBoundary content={content}>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { OMITTED_DIAGRAM, isSvgFence, stripHtmlComments, stripSvgFences } from "./svgFence";
+import { OMITTED_DIAGRAM, PENDING_SCHEMATIC_LANG, isSvgFence, markPendingSchematic, stripHtmlComments, stripSvgFences } from "./svgFence";
 
 const SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500"><rect width="10" height="10"/></svg>';
 
@@ -93,5 +93,32 @@ describe("diagrams that open with the platform's header comment", () => {
   it("strips such a fence from history like any other diagram", () => {
     const text = `Here:\n\`\`\`\n${HEADER}\n${SVG}\n\`\`\`\nDone.`;
     expect(stripSvgFences(text)).toBe(`Here:\n${OMITTED_DIAGRAM}\nDone.`);
+  });
+});
+
+describe("markPendingSchematic", () => {
+  const T = "```";
+  const closed = `${T}schematic\n{"title":"x"}\n${T}`;
+
+  it("swaps an unterminated schematic fence for the pending placeholder fence, however little has arrived", () => {
+    for (const open of [`${T}schematic`, `${T}schematic\n`, `${T}schematic\n{"ti`, `${T}schematic\n{"title":"x",\n"parts":[`, `${T}sch`, `${T}Schematic \n{`]) {
+      expect(markPendingSchematic(`Netlist.\n\n${open}`), open).toBe(`Netlist.\n\n${T}${PENDING_SCHEMATIC_LANG}\n${T}`);
+    }
+  });
+
+  it("never shows raw JSON for a fence whose closing line is still arriving", () => {
+    expect(markPendingSchematic(`A\n${T}schematic\n{"a":1}\n\`\``)).toContain(PENDING_SCHEMATIC_LANG);
+  });
+
+  it("leaves finished fences, other languages, and text without fences alone", () => {
+    for (const text of [`Done.\n${closed}\n[[SIM:power]]`, "plain text", `${T}cpp\nint x;`, `${T}json\n{"a":`, `${T}sql\nselect`, `${T}s`, `${T}sc`, `${T}xml:svg\n<svg`]) {
+      expect(markPendingSchematic(text), text).toBe(text);
+    }
+  });
+
+  it("only touches the last fence: an earlier closed one stays", () => {
+    const out = markPendingSchematic(`${closed}\n\nAnd now:\n${T}schematic\n{"t`);
+    expect(out.startsWith(closed)).toBe(true);
+    expect(out.endsWith(`${T}${PENDING_SCHEMATIC_LANG}\n${T}`)).toBe(true);
   });
 });

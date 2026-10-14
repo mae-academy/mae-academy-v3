@@ -2,23 +2,23 @@ import { memo } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { Zap } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { splitSchematicTag, splitSimMarker, type ChatMessage, type MascotState, type SimLab } from "@shared/aiTypes";
+import { splitSimMarker, stripLegacySchematicTag, type ChatMessage, type MascotState, type SimLab } from "@shared/aiTypes";
 import PrefetchLink from "@/components/common/PrefetchLink";
 import { simulatorPathForLab } from "@/lib/aiLab";
 import AiMarkdown from "./AiMarkdown";
 import MaiMascot from "./MaiMascot";
-import SchematicImage from "./SchematicImage";
-import { isSessionMessage } from "./schematicClient";
+import { SchematicAutoRepairContext } from "./SchematicDiagram";
+import { isSessionMessage } from "./sessionMessages";
 
 /**
- * What an assistant message shows: the text without the trailing `[[SIM:<lab>]]` marker and the
- * `[GENERATE_SCHEMATIC: ...]` tag, plus the lab and the schematic prompt once the answer is complete.
- * Mid-stream both are simply hidden, even when only half of one has arrived. The stored content keeps both.
+ * What an assistant message shows: the text without the trailing `[[SIM:<lab>]]` marker (and without the stray legacy
+ * text-to-image tag that chats stored before the schematic spec format may still contain; see stripLegacySchematicTag), plus the lab
+ * once the answer is complete. Mid-stream the marker is hidden even when only half of it has arrived. The stored content
+ * keeps both. A schematic is a fenced ```schematic block inside the text and renders where it sits.
  */
-export function assistantView(content: string, streaming: boolean): { text: string; lab: SimLab | null; schematic: string | null } {
+export function assistantView(content: string, streaming: boolean): { text: string; lab: SimLab | null } {
   const { text: withoutMarker, lab } = splitSimMarker(content);
-  const { text, prompt } = splitSchematicTag(withoutMarker);
-  return { text, lab: streaming ? null : lab, schematic: streaming ? null : prompt };
+  return { text: stripLegacySchematicTag(withoutMarker), lab: streaming ? null : lab };
 }
 
 /** Shared-layout transition from the empty-state hero to the first assistant avatar. */
@@ -103,14 +103,19 @@ export interface AssistantMessageProps extends MessageProps {
 
 export const AssistantMessage = memo(function AssistantMessage({ message, streaming, live, mascotState, stateLabels, sharedAvatar }: Omit<AssistantMessageProps, "onImageLoad"> & { onImageLoad?: () => void }) {
   const { t } = useTranslation("ai");
-  const { text, lab, schematic } = assistantView(message.content, streaming);
+  const { text, lab } = assistantView(message.content, streaming);
   return (
     <div className="flex items-start gap-3 sm:gap-4">
       <AssistantAvatar live={live} state={mascotState} stateLabels={stateLabels} shared={sharedAvatar} />
       <div className="min-w-0 flex-1 text-base leading-7 text-slate-800 dark:text-zinc-100">
         <span className="sr-only">{t("chat.assistant")}: </span>
-        {text ? <AiMarkdown content={text} streaming={streaming} /> : streaming ? <TypingDots /> : null}
-        {schematic ? <SchematicImage prompt={schematic} autoStart={isSessionMessage(message.id)} /> : null}
+        {text ? (
+          <SchematicAutoRepairContext.Provider value={isSessionMessage(message.id)}>
+            <AiMarkdown content={text} streaming={streaming} />
+          </SchematicAutoRepairContext.Provider>
+        ) : streaming ? (
+          <TypingDots />
+        ) : null}
         {lab ? <SimulatorAction lab={lab} /> : null}
       </div>
     </div>

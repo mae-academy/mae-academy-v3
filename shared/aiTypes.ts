@@ -78,31 +78,20 @@ export function splitSimMarker(text: string): { text: string; lab: SimLab | null
   return { text, lab: null };
 }
 
-/** Longest text-to-image prompt the schematic route accepts (the model is told to stay well under this). */
-export const MAX_SCHEMATIC_PROMPT_CHARS = 1200;
-
-const SCHEMATIC_OPEN = '[GENERATE_SCHEMATIC:';
+const LEGACY_TAG_OPEN = '[GENERATE_SCHEMATIC:';
 
 /**
- * A complete, single-line `[GENERATE_SCHEMATIC: <prompt>]` tag. The model appends exactly one when a circuit schematic
- * or engineering diagram is requested; the UI hides it and turns it into an image. Use `splitSchematicTag` to strip it.
+ * Chats stored before schematics became a validated JSON spec may end with a text-to-image tag
+ * `[GENERATE_SCHEMATIC: ...]`. It is dead text now: this strips it (complete, or still unclosed to the end of the
+ * text) so old messages never show it. Only at the start of the text or after whitespace. Pure and idempotent.
  */
-export const SCHEMATIC_TAG_REGEX = /\[GENERATE_SCHEMATIC:[^\r\n]*\]/;
-
-/**
- * Removes the schematic tag from streamed or final text and returns its prompt (the last one when, against the rules,
- * there are several). A complete tag is cut wherever it sits; a tag that is still arriving (`[GENERATE_`, or an
- * opening without its closing `]`) is dropped to the end of the text, so a streaming UI never flashes half a tag.
- * Brackets inside the prompt are tolerated: the tag closes at the last `]` of its line. Call after `splitSimMarker`.
- */
-export function splitSchematicTag(text: string): { text: string; prompt: string | null } {
+export function stripLegacySchematicTag(text: string): string {
+  if (!text.includes('[')) return text;
   let out = text;
-  let prompt: string | null = null;
   let from = 0;
   for (;;) {
-    const start = out.indexOf(SCHEMATIC_OPEN, from);
+    const start = out.indexOf(LEGACY_TAG_OPEN, from);
     if (start === -1) break;
-    // Only at the start of the text or after whitespace, so a quoted `x[GENERATE_SCHEMATIC:` in prose is never touched.
     if (start > 0 && !/\s/.test(out[start - 1])) {
       from = start + 1;
       continue;
@@ -110,32 +99,21 @@ export function splitSchematicTag(text: string): { text: string; prompt: string 
     const lineEnd = out.indexOf('\n', start);
     const line = out.slice(start, lineEnd === -1 ? out.length : lineEnd);
     const close = line.lastIndexOf(']');
-    let end: number;
-    if (close !== -1) {
-      end = start + close + 1;
-    } else {
-      const later = lineEnd === -1 ? -1 : out.indexOf(']', lineEnd);
-      if (later === -1) {
-        // Still streaming (or never closed): hide everything from the opening on.
-        out = out.slice(0, start).trimEnd();
-        break;
-      }
-      end = later + 1;
+    if (close === -1) {
+      out = out.slice(0, start).trimEnd();
+      break;
     }
-    const inner = out.slice(start + SCHEMATIC_OPEN.length, end - 1).replace(/\s+/g, ' ').trim();
-    if (inner) prompt = inner.slice(0, MAX_SCHEMATIC_PROMPT_CHARS);
+    const end = start + close + 1;
     out = (out.slice(0, start).trimEnd() + (out.slice(end).trim() ? '\n\n' + out.slice(end).trimStart() : '')).trimEnd();
     from = 0;
   }
-
-  // A trailing partial opening: `[`, `[GEN`, `[GENERATE_SCHEMATIC` (the colon not yet arrived).
-  for (let length = Math.min(out.length, SCHEMATIC_OPEN.length - 1); length >= 1; length--) {
+  for (let length = Math.min(out.length, LEGACY_TAG_OPEN.length - 1); length >= 1; length--) {
     const tail = out.slice(-length);
-    if (!tail.startsWith('[') || !SCHEMATIC_OPEN.startsWith(tail)) continue;
+    if (!tail.startsWith('[') || !LEGACY_TAG_OPEN.startsWith(tail)) continue;
     const before = out.slice(0, out.length - length);
-    if (before === '' || /\s$/.test(before)) return { text: before.trimEnd(), prompt };
+    if (before === '' || /\s$/.test(before)) return before.trimEnd();
   }
-  return { text: out, prompt };
+  return out;
 }
 
 /** What a vector diagram is replaced with when a model turn is resent as history. */

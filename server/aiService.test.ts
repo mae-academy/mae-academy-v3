@@ -7,7 +7,7 @@ import {
   DIAGRAM_OMITTED,
   SIM_MARKER_REGEX,
   splitSimMarker,
-  splitSchematicTag,
+  stripLegacySchematicTag,
   stripSvgDiagrams,
   type ChatMessage,
 } from "../shared/aiTypes";
@@ -23,6 +23,7 @@ import {
   buildContents,
   buildSystemInstruction,
   cleanModelTurn,
+  limitModelTurn,
   geminiApiKey,
   mockChatStream,
   mockReply,
@@ -32,6 +33,8 @@ import {
   windowMessages,
   withModelFallback,
 } from "./aiService";
+import { SCHEMATIC_GATES_SUMMARY, SCHEMATIC_SPEC_DOC, validateSchematic } from "../shared/schematic";
+import { BUCK_CONVERTER } from "../shared/schematic/fixtures";
 
 const PNG = "data:image/png;base64,iVBORw0KGgo=";
 const msg = (n: number, role: "user" | "model", extra: Partial<ChatMessage> = {}): ChatMessage => ({ id: String(n), role, content: `m${n}`, timestamp: n, ...extra });
@@ -170,15 +173,19 @@ describe("system instruction", () => {
     expect(prompt).toContain(`«${ARABIC_DECLINE}»`);
   });
 
-  it("retires SVG output and specifies the schematic image tag contract", () => {
+  it("retires SVG output and specifies the schematic spec contract", () => {
     const integration = prompt.slice(prompt.indexOf("# MAE Academy platform integration"));
-    expect(integration).toContain("Do not emit SVG or ```xml:svg blocks; diagrams are produced by the image tag below, so ignore the SVG construction rules above and give the netlist/block table instead.");
-    expect(integration).not.toMatch(/ONLY these elements|There is no stylesheet|PLAIN TEXT|real minus sign|How diagrams are delivered/);
-    expect(integration).toContain("[GENERATE_SCHEMATIC: <detailed text-to-image prompt>]");
-    expect(integration).toContain("[GENERATE_SCHEMATIC: A crisp high-contrast black-and-white electrical schematic of a 5V Buck converter");
-    expect(integration).toMatch(/LAST content of the reply \(just before the optional \[\[SIM:\.\.\]\] line\)/);
-    expect(integration).toMatch(/English even for Arabic or Spanish students/);
-    expect(integration).toMatch(/Never emit the tag unless a drawing is clearly requested\. At most one tag per reply/);
+    expect(integration).toMatch(/Sections 1\.4, 1\.7 and the SVG form of 3\.2\) do NOT apply/);
+    expect(integration).toMatch(/Never emit SVG, ```xml:svg blocks, ASCII art, Mermaid or image tags/);
+    expect(integration).not.toMatch(/GENERATE_SCHEMATIC|text-to-image|ONLY these elements|There is no stylesheet|real minus sign/);
+    expect(integration).toMatch(/info string is exactly `schematic`/);
+    expect(integration).toMatch(/LAST content of the reply, just before the optional \[\[SIM:\.\.\]\] line/);
+    expect(integration).toMatch(/Phase A .* Phase B .* Phase C .* ALL 10 gates/);
+    expect(integration).toMatch(/no comments, no trailing commas/);
+    expect(integration).toMatch(/Compute every wire endpoint from the terminal offsets table/);
+    expect(integration).toMatch(/Draw ground at node 0/);
+    for (const gate of SCHEMATIC_GATES_SUMMARY) expect(integration).toContain(gate);
+    expect(integration).toContain(SCHEMATIC_SPEC_DOC);
     expect(prompt).toContain("ارسم");
     expect(prompt).toMatch(/Do not draw unless/);
     expect(prompt).toMatch(/If a value or connection is unreadable or ambiguous, say so/);
@@ -201,7 +208,7 @@ describe("system instruction", () => {
     const integration = prompt.indexOf("# MAE Academy platform integration");
     expect(integration).toBeGreaterThan(SYSTEM_INSTRUCTION.length - 1);
     expect(prompt).toMatch(/these rules take precedence over anything above that conflicts with them/);
-    for (const needle of ["[GENERATE_SCHEMATIC:", "[[SIM:<lab>]]", ARABIC_DECLINE]) expect(prompt.indexOf(needle, integration)).toBeGreaterThan(-1);
+    for (const needle of ["```schematic", "[[SIM:<lab>]]", ARABIC_DECLINE]) expect(prompt.indexOf(needle, integration)).toBeGreaterThan(-1);
   });
 
   it("limits the Section 3 deliverable structure to schematic requests so ordinary answers stay lean", () => {
@@ -211,7 +218,7 @@ describe("system instruction", () => {
 
   it("stays within a sane size for a prompt sent on every request", () => {
     expect(prompt.length).toBeGreaterThan(30_000);
-    expect(prompt.length).toBeLessThan(60_000);
+    expect(prompt.length).toBeLessThan(75_000);
   });
 });
 
@@ -457,19 +464,28 @@ describe("demo stream", () => {
     }
   });
 
-  it("answers a draw request with text, a netlist and one schematic tag, and no SVG", () => {
-    for (const prompt of ["draw a voltage divider", "Generate a schematic diagram", "ارسم دائرة مقسم جهد"]) {
+  it("answers a draw request with a netlist table, one valid schematic fence and no SVG", () => {
+    const cases: Array<[string, string, string, string]> = [
+      ["draw a voltage divider", "Voltage divider", "circuits", "| Node | Connection |"],
+      ["Generate a schematic diagram", "Voltage divider", "circuits", "| Node | Connection |"],
+      ["ارسم دائرة مقسم جهد", "Voltage divider", "circuits", "| Node | Connection |"],
+      ["Draw a 5V buck converter", "5 V buck converter", "power", "| Node | Connection |"],
+      ["draw the block diagram of a unity-feedback PID loop", "Unity-feedback PID loop", "control", "| Block | Input | Output |"],
+    ];
+    for (const [prompt, title, lab, table] of cases) {
       const reply = mockReply(prompt);
       expect(reply.startsWith("*Demo mode"), prompt).toBe(true);
-      expect(reply).not.toMatch(/<svg|xml:svg/);
-      expect(reply.match(/\[GENERATE_SCHEMATIC:/g)).toHaveLength(1);
-      const { text, lab } = splitSimMarker(reply);
-      expect(lab).toBe("circuits");
-      const split = splitSchematicTag(text);
-      expect(split.prompt).toMatch(/voltage divider/);
-      expect(split.prompt).not.toMatch(/[\[\]\n]/);
-      expect(split.text).toContain("| Node | Connection |");
-      expect(cleanModelTurn(reply)).not.toContain("GENERATE_SCHEMATIC");
+      expect(reply).not.toMatch(/<svg|xml:svg|GENERATE_SCHEMATIC/);
+      expect(reply).toContain(table);
+      expect(reply.match(/```schematic\n/g)).toHaveLength(1);
+      const { text, lab: got } = splitSimMarker(reply);
+      expect(got, prompt).toBe(lab);
+      expect(text.trimEnd().endsWith("```"), "fence is the last content before the marker").toBe(true);
+      const body = /```schematic\n([\s\S]*?)\n```/.exec(text)![1];
+      const verdict = validateSchematic(body);
+      expect(verdict.errors, prompt).toEqual([]);
+      expect(verdict.spec?.title).toBe(title);
+      expect(cleanModelTurn(reply)).toContain("```schematic");
     }
   });
 
@@ -656,5 +672,65 @@ describe("withModelFallback", () => {
     });
     await expect(withModelFallback(["a", "a", "b"], aborted, { signal: controller.signal, sleep: noSleep })).rejects.toMatchObject({ status: 503 });
     expect(aborted).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("model turns that carry a schematic spec", () => {
+  const spec = JSON.stringify(BUCK_CONVERTER);
+  const fenceOf = (json: string) => "```schematic\n" + json + "\n```";
+  const ticks = "```";
+
+  it("keeps the schematic fence in history and still strips the marker and legacy xml:svg fences", () => {
+    const turn = `Netlist...\n\n${fenceOf(spec)}\n\n${ticks}xml:svg\n<svg/>\n${ticks}\n[[SIM:power]]`;
+    const out = cleanModelTurn(turn);
+    expect(out).toContain(fenceOf(spec));
+    expect(out).not.toContain("<svg");
+    expect(out).not.toContain("SIM:");
+  });
+
+  it("strips a stray legacy GENERATE_SCHEMATIC tag from old stored turns", () => {
+    expect(cleanModelTurn("Netlist.\n\n[GENERATE_SCHEMATIC: A buck converter]\n[[SIM:power]]")).toBe("Netlist.");
+    expect(stripLegacySchematicTag("x")).toBe("x");
+  });
+
+  it("truncates the prose around an oversized turn but never the JSON", () => {
+    const prose = "Explanation. ".repeat(2000);
+    const turn = `${prose}\n\n${fenceOf(spec)}\n\n${prose}`;
+    expect(turn.length).toBeGreaterThan(AI_MAX_MODEL_MESSAGE_CHARS);
+    const out = limitModelTurn(turn);
+    expect(out.length).toBeLessThanOrEqual(AI_MAX_MODEL_MESSAGE_CHARS);
+    expect(out).toContain(fenceOf(spec));
+    const body = /```schematic\n([\s\S]*?)\n```/.exec(out)![1];
+    expect(JSON.parse(body)).toEqual(BUCK_CONVERTER);
+    expect(out.startsWith("Explanation.")).toBe(true);
+    expect(out).toContain("…");
+  });
+
+  it("through sanitizeChatRequest the spec survives a long model turn", () => {
+    const turn = `${"p ".repeat(12000)}\n${fenceOf(spec)}`;
+    const { messages } = sanitizeChatRequest({ messages: [{ id: "u", role: "user", content: "draw", timestamp: 1 }, { id: "m", role: "model", content: turn, timestamp: 2 }, { id: "u2", role: "user", content: "change R1 to 5 ohm", timestamp: 3 }] });
+    expect(messages[1].content.length).toBeLessThanOrEqual(AI_MAX_MODEL_MESSAGE_CHARS);
+    expect(messages[1].content).toContain(fenceOf(spec));
+  });
+
+  it("keeps only the newest of several fences, replacing older ones with a literal", () => {
+    const out = limitModelTurn(`A\n${fenceOf('{"title":"old"}')}\nB\n${fenceOf(spec)}\nC`);
+    expect(out).toContain("[earlier schematic omitted]");
+    expect(out).not.toContain('"old"');
+    expect(out).toContain(fenceOf(spec));
+  });
+
+  it("drops an unterminated fence and an impossibly large one whole", () => {
+    expect(limitModelTurn(`Intro\n${ticks}schematic\n{"title":"cut`)).toBe("Intro\n[earlier schematic omitted]");
+    const huge = fenceOf(JSON.stringify({ title: "x".repeat(AI_MAX_MODEL_MESSAGE_CHARS) }));
+    const out = limitModelTurn(`Lead.\n${huge}\nTail.`);
+    expect(out.length).toBeLessThanOrEqual(AI_MAX_MODEL_MESSAGE_CHARS);
+    expect(out).not.toContain("```schematic");
+    expect(out).toContain("Lead.");
+  });
+
+  it("leaves a short turn unchanged", () => {
+    const turn = `Short.\n\n${fenceOf(spec)}`;
+    expect(limitModelTurn(turn)).toBe(turn);
   });
 });

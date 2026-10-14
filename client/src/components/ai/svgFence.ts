@@ -1,7 +1,8 @@
 /**
- * Legacy SVG handling. Diagrams are now text-to-image (see SchematicImage), but chats stored before that still hold
- * fenced `xml:svg` blocks. They render as ordinary code blocks; this module only keeps them out of requests sent back
- * to the model, and strips HTML comments from prose. Pure string work.
+ * Fence helpers. Schematics are now a fenced JSON ```schematic spec (see SchematicDiagram); chats stored before the
+ * spec format may still hold fenced `xml:svg` blocks. Those render as ordinary code blocks; this module keeps them out
+ * of requests sent back to the model, strips HTML comments from prose, and hides a ```schematic fence while it is
+ * still streaming. Pure string work.
  */
 
 export const OMITTED_DIAGRAM = "[diagram omitted]";
@@ -134,4 +135,30 @@ export function stripSvgFences(text: string, replacement: string = OMITTED_DIAGR
     cursor = block.end;
   }
   return out + text.slice(cursor);
+}
+
+/** Info string of the fenced JSON spec (matches SCHEMATIC_FENCE in shared/schematic). */
+const SCHEMATIC_LANG = "schematic";
+
+/** Language the streaming pre-pass gives an unfinished schematic fence; the renderer shows a "drawing" placeholder for it. */
+export const PENDING_SCHEMATIC_LANG = `mae-schematic-pending-${Math.random().toString(36).slice(2, 10)}`;
+
+/** An unterminated fence whose language is `schematic`, or the first letters of it while the info line is still arriving. */
+function looksLikeOpenSchematic(block: FenceBlock): boolean {
+  const lang = firstToken(block.info);
+  if (lang === SCHEMATIC_LANG) return true;
+  return !block.hasBody && lang.length >= 3 && SCHEMATIC_LANG.startsWith(lang);
+}
+
+/**
+ * While an answer streams, markdown would show an unterminated ```schematic fence as a code block that grows by the
+ * line (raw JSON). Swap that open fence for a closed, empty one in the pending language so the renderer can show a
+ * "Drawing schematic" placeholder instead. Text with no open schematic fence is returned untouched.
+ */
+export function markPendingSchematic(text: string): string {
+  if (!text.includes("```") && !text.includes("~~~")) return text;
+  const blocks = scanFences(text);
+  const last = blocks[blocks.length - 1];
+  if (!last || last.closed || !looksLikeOpenSchematic(last)) return text;
+  return `${text.slice(0, last.start)}\`\`\`${PENDING_SCHEMATIC_LANG}\n\`\`\``;
 }
