@@ -12,6 +12,7 @@ import {
   resolveAiMode,
   sanitizeChatRequest,
   windowMessages,
+  withModelFallback,
 } from "./aiService";
 
 const PNG = "data:image/png;base64,iVBORw0KGgo=";
@@ -315,5 +316,68 @@ describe("splitSimMarker", () => {
   it("returns plain text unchanged", () => {
     expect(splitSimMarker("")).toEqual({ text: "", lab: null });
     expect(splitSimMarker("Just an answer.\n")).toEqual({ text: "Just an answer.\n", lab: null });
+  });
+});
+
+describe("withModelFallback", () => {
+  const upstream = (status: number) => Object.assign(new Error(`upstream ${status}`), { status });
+  const noSleep = async () => {};
+
+  it("returns the first success without retrying", async () => {
+    const attempt = vi.fn(async (model: string) => model);
+    await expect(withModelFallback(["a", "a", "b"], attempt, { sleep: noSleep })).resolves.toBe("a");
+    expect(attempt).toHaveBeenCalledTimes(1);
+  });
+
+  it("retries a 503 on the same model, then falls back to the last model", async () => {
+    const seen: string[] = [];
+    const attempt = async (model: string) => {
+      seen.push(model);
+      if (model !== "lite") throw upstream(503);
+      return "ok";
+    };
+    await expect(withModelFallback(["main", "main", "lite"], attempt, { sleep: noSleep })).resolves.toBe("ok");
+    expect(seen).toEqual(["main", "main", "lite"]);
+  });
+
+  it("pauses between attempts with a growing delay", async () => {
+    const delays: number[] = [];
+    const attempt = vi.fn().mockRejectedValueOnce(upstream(503)).mockRejectedValueOnce(upstream(500)).mockResolvedValue("ok");
+    await withModelFallback(["a", "a", "b"], attempt, { delayMs: 100, sleep: async (ms) => void delays.push(ms) });
+    expect(delays).toEqual([100, 200]);
+  });
+
+  it("throws the last error once every model has failed", async () => {
+    const attempt = vi.fn(async () => {
+      throw upstream(503);
+    });
+    await expect(withModelFallback(["a", "b"], attempt, { sleep: noSleep })).rejects.toMatchObject({ status: 503 });
+    expect(attempt).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not retry client or auth errors", async () => {
+    for (const status of [400, 401, 403, 404, 429]) {
+      const attempt = vi.fn(async () => {
+        throw upstream(status);
+      });
+      await expect(withModelFallback(["a", "a", "b"], attempt, { sleep: noSleep })).rejects.toMatchObject({ status });
+      expect(attempt).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  it("does not retry errors without a status, or after the request was aborted", async () => {
+    const plain = vi.fn(async () => {
+      throw new Error("network");
+    });
+    await expect(withModelFallback(["a", "b"], plain, { sleep: noSleep })).rejects.toThrow("network");
+    expect(plain).toHaveBeenCalledTimes(1);
+
+    const controller = new AbortController();
+    controller.abort();
+    const aborted = vi.fn(async () => {
+      throw upstream(503);
+    });
+    await expect(withModelFallback(["a", "a", "b"], aborted, { signal: controller.signal, sleep: noSleep })).rejects.toMatchObject({ status: 503 });
+    expect(aborted).toHaveBeenCalledTimes(1);
   });
 });

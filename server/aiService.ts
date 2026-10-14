@@ -209,18 +209,56 @@ function getClient(): GoogleGenAI {
   return client;
 }
 
+// Aliases, not versioned names: Google retires versioned Flash models for new keys (2.5-flash already 404s).
+const DEFAULT_MODEL = "gemini-flash-latest";
+const FALLBACK_MODEL = "gemini-flash-lite-latest";
+/** Transient upstream failures worth another attempt ("model is experiencing high demand" is a 503). */
+const RETRYABLE_STATUS = new Set([500, 503, 504]);
+
+/**
+ * Runs `attempt` against each model in turn, pausing between tries, but only for transient upstream
+ * errors that happen before any output exists. Anything else (bad request, auth, 404) is thrown at once.
+ */
+export async function withModelFallback<T>(
+  models: readonly string[],
+  attempt: (model: string) => Promise<T>,
+  options: { signal?: AbortSignal; delayMs?: number; sleep?: (ms: number) => Promise<void> } = {},
+): Promise<T> {
+  const { signal, delayMs = 600, sleep = (ms) => new Promise<void>((resolve) => setTimeout(resolve, ms)) } = options;
+  for (let i = 0; ; i++) {
+    try {
+      return await attempt(models[i]);
+    } catch (error) {
+      const status = (error as { status?: unknown } | null)?.status;
+      const retryable = typeof status === "number" && RETRYABLE_STATUS.has(status);
+      if (!retryable || i >= models.length - 1 || signal?.aborted) throw error;
+      await sleep(delayMs * (i + 1));
+      if (signal?.aborted) throw error;
+    }
+  }
+}
+
 /** Streams the model's reply as text deltas. Aborting `signal` stops reading from the upstream stream. */
 export async function* streamChat(request: SanitizedChat, signal?: AbortSignal): AsyncGenerator<string> {
-  const stream = await getClient().models.generateContentStream({
-    model: process.env.GEMINI_MODEL ?? "gemini-2.5-flash",
-    contents: buildContents(request.messages),
-    config: {
-      systemInstruction: buildSystemInstruction(request.lab),
-      temperature: 0.3,
-      maxOutputTokens: 8192, // thinking tokens count against this on 2.5 models, so leave headroom
-      abortSignal: signal,
-    },
-  });
+  const primary = process.env.GEMINI_MODEL?.trim() || DEFAULT_MODEL;
+  // Try the chosen model twice (a spike usually passes), then a lighter one as a last resort.
+  const models = primary === FALLBACK_MODEL ? [primary, primary] : [primary, primary, FALLBACK_MODEL];
+  const client = getClient();
+  const stream = await withModelFallback(
+    models,
+    (model) =>
+      client.models.generateContentStream({
+        model,
+        contents: buildContents(request.messages),
+        config: {
+          systemInstruction: buildSystemInstruction(request.lab),
+          temperature: 0.3,
+          maxOutputTokens: 8192, // thinking tokens count against this on 2.5 models, so leave headroom
+          abortSignal: signal,
+        },
+      }),
+    { signal },
+  );
   for await (const chunk of stream) {
     if (signal?.aborted) return;
     const text = chunk.text;
