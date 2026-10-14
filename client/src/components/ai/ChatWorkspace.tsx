@@ -310,7 +310,7 @@ export function ChatWorkspace({ lab, className }: ChatWorkspaceProps) {
               <motion.div
                 layoutId={reduceMotion ? undefined : MAI_LAYOUT_ID}
                 transition={spring}
-                className="w-[clamp(4.5rem,15dvh,11.5rem)]"
+                className="w-[clamp(5rem,22dvh,13.5rem)]"
               >
                 <MaiMascot variant="hero" state={mascot.state} stateLabels={stateLabels} />
               </motion.div>

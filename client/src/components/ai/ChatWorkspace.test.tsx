@@ -57,7 +57,7 @@ describe("ChatWorkspace", () => {
     render(<ChatWorkspace lab="general" />);
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("What can I help you calculate or build today?");
-    expect(document.querySelector('svg[data-variant="hero"]')).toBeTruthy();
+    expect(document.querySelector('[data-variant="hero"]')).toBeTruthy();
     expect(screen.getByRole("list", { name: "Suggested prompts" }).querySelectorAll("button")).toHaveLength(4);
     expect(screen.queryByRole("tab")).toBeNull();
     expect(screen.queryByText(/What MAE AI can do/i)).toBeNull();
@@ -77,7 +77,7 @@ describe("ChatWorkspace", () => {
 
     // The invisible lab hint rode along; the empty-state hero gave way to the transcript and a hidden h1.
     expect(requestBodies(fetchMock)[0]).toMatchObject({ lab: "control", messages: [{ role: "user", content: "Analyze this KVL circuit" }] });
-    expect(document.querySelector('svg[data-variant="hero"]')).toBeNull();
+    expect(document.querySelector('[data-variant="hero"]')).toBeNull();
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
     expect(screen.getByRole("heading", { level: 1 }).className).toContain("sr-only");
     // The thread is titled after the first message and highlighted in the sidebar.

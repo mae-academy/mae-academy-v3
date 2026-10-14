@@ -2,6 +2,8 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import type { MascotState } from "@shared/aiTypes";
+import fs from "node:fs";
+import path from "node:path";
 import MaiMascot, { MaiMascot as NamedMaiMascot } from "./MaiMascot";
 
 afterEach(cleanup);
@@ -13,6 +15,13 @@ const DEFAULT_LABELS: Record<MascotState, string> = {
   thinking: "Mai is thinking",
   eureka: "Mai has an answer",
   talking: "Mai is answering",
+};
+const POSE_FOR_STATE: Record<MascotState, string> = {
+  idle: "idle",
+  listening: "idle",
+  thinking: "thinking",
+  eureka: "eureka",
+  talking: "talking",
 };
 
 describe("MaiMascot", () => {
@@ -28,22 +37,41 @@ describe("MaiMascot", () => {
         expect(root.getAttribute("data-state")).toBe(state);
         expect(root.getAttribute("data-variant")).toBe(variant);
         expect(root.classList.contains("mai-root")).toBe(true);
-        // exactly one image role: the SVG internals are presentational
+        // exactly one image role: the artwork <img>s are presentational
         expect(container.querySelectorAll('[role="img"]')).toHaveLength(1);
-        expect(container.querySelector("svg path")).toBeTruthy();
+        for (const img of Array.from(container.querySelectorAll("img"))) {
+          expect(img.getAttribute("alt")).toBe("");
+          expect(img.getAttribute("aria-hidden")).toBe("true");
+        }
       });
     }
   }
 
-  it("defaults to the hero variant (an svg root) and the avatar is a round frame around the same art", () => {
-    const hero = render(<MaiMascot state="idle" />);
-    expect(hero.container.firstElementChild?.tagName.toLowerCase()).toBe("svg");
-    expect(hero.container.firstElementChild?.getAttribute("data-variant")).toBe("hero");
-    cleanup();
-    const avatar = render(<MaiMascot state="idle" variant="avatar" />);
-    const root = avatar.container.firstElementChild as HTMLElement;
+  it("mounts the real artwork files, never procedural paths", () => {
+    const { container } = render(<MaiMascot state="thinking" />);
+    expect(container.querySelector("svg")).toBeNull();
+    const srcs = Array.from(container.querySelectorAll("img")).map((i) => i.getAttribute("src"));
+    expect(srcs.sort()).toEqual(["/mascot/eureka.svg", "/mascot/idle.svg", "/mascot/talking.svg", "/mascot/thinking.svg"]);
+  });
+
+  it("shows the pose for the state and hides the others (listening reuses idle)", () => {
+    for (const state of STATES) {
+      const { container, unmount } = render(<MaiMascot state={state} />);
+      const visible = Array.from(container.querySelectorAll("img"))
+        .filter((i) => i.classList.contains("opacity-100"))
+        .map((i) => i.getAttribute("src"));
+      expect(visible).toEqual([`/mascot/${POSE_FOR_STATE[state]}.svg`]);
+      unmount();
+    }
+  });
+
+  it("avatar loads only the current pose, cropped to the head inside a round frame", () => {
+    const { container } = render(<MaiMascot state="talking" variant="avatar" />);
+    const root = container.firstElementChild as HTMLElement;
     expect(root.classList.contains("mai-avatar")).toBe(true);
-    expect(root.querySelector("svg")?.getAttribute("viewBox")).not.toBe(hero.container.querySelector("svg")?.getAttribute("viewBox"));
+    const imgs = container.querySelectorAll("img");
+    expect(imgs).toHaveLength(1);
+    expect(imgs[0].getAttribute("src")).toBe("/mascot/talking.svg");
   });
 
   it("lets stateLabels override per state and label override everything", () => {
@@ -55,7 +83,7 @@ describe("MaiMascot", () => {
     expect(screen.getByRole("img", { name: "Custom" })).toBeTruthy();
   });
 
-  it("only shows the lightbulb in eureka and the thought dots when thinking (hero)", () => {
+  it("only shows the glowing bulb in eureka and the pulsing thought dots when thinking (hero)", () => {
     const { container, rerender } = render(<MaiMascot state="idle" />);
     expect(container.querySelector(".mai-bulb")).toBeNull();
     expect(container.querySelector(".mai-dot")).toBeNull();
@@ -63,21 +91,21 @@ describe("MaiMascot", () => {
     expect(container.querySelector(".mai-bulb")).toBeTruthy();
     rerender(<MaiMascot state="thinking" />);
     expect(container.querySelector(".mai-bulb")).toBeNull();
-    expect(container.querySelectorAll(".mai-dot")).toHaveLength(3);
+    const dots = container.querySelectorAll(".mai-dot");
+    expect(dots).toHaveLength(3);
+    for (const dot of Array.from(dots)) expect(dot.classList.contains("animate-pulse")).toBe(true);
   });
 
-  it("animates the mouth only while talking and injects its scoped, reduced-motion-aware CSS once", () => {
-    const { container, rerender } = render(<MaiMascot state="talking" />);
-    expect(container.querySelector(".mai-talk-mouth")).toBeTruthy();
-    rerender(<MaiMascot state="idle" />);
-    expect(container.querySelector(".mai-talk-mouth")).toBeNull();
+  it("injects its scoped, reduced-motion-aware CSS once", () => {
+    render(<MaiMascot state="talking" />);
     render(<MaiMascot state="idle" variant="avatar" />);
     const styles = document.querySelectorAll("#mai-mascot-css");
     expect(styles).toHaveLength(1);
     expect(styles[0].textContent).toContain("prefers-reduced-motion: reduce");
+    expect(styles[0].textContent).toContain("mai-bob");
   });
 
-  it("is animated by default and freezes with animated={false} (older transcript avatars), in the shared stylesheet too", () => {
+  it("is animated by default and freezes with animated={false} (older transcript avatars)", () => {
     for (const variant of ["hero", "avatar"] as const) {
       const live = render(<MaiMascot state="idle" variant={variant} />);
       expect(screen.getByRole("img").classList.contains("mai-static")).toBe(false);
@@ -96,4 +124,21 @@ describe("MaiMascot", () => {
     expect(root.classList.contains("size-14")).toBe(true);
     expect(root.classList.contains("size-10")).toBe(false);
   });
+});
+
+describe("mascot artwork files", () => {
+  const dir = path.resolve(__dirname, "../../../public/mascot");
+
+  for (const pose of ["idle", "thinking", "eureka", "talking"]) {
+    it(`${pose}.svg is a transparent keyed asset, not the green-screen original`, () => {
+      const svg = fs.readFileSync(path.join(dir, `${pose}.svg`), "utf8");
+      expect(svg.startsWith("<svg")).toBe(true);
+      expect(svg).toContain("data:image/webp;base64,");
+      // the keyed export is a single transparent image: no background rect, no chroma-green fill
+      expect(svg).not.toMatch(/<rect/);
+      expect(svg).not.toMatch(/#00ff00/i);
+      // ~60 KB each; the green-screen originals were ~650 KB
+      expect(svg.length).toBeLessThan(150 * 1024);
+    });
+  }
 });
