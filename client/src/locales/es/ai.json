@@ -103,6 +103,29 @@
     "fitShort": "Ajustar",
     "lightboxHint": "Usa los botones de zoom o las teclas + y - para inspeccionar el esquema. Pulsa Escape para cerrar."
   },
+  "illustration": {
+    "label": "Ilustración",
+    "alt": "Ilustración generada por IA: {{prompt}}",
+    "generate": "Generar ilustración",
+    "generating": "Generando ilustración…",
+    "actions": "Acciones de la ilustración",
+    "expand": "Ampliar ilustración",
+    "open": "Abrir la ilustración en grande",
+    "download": "Descargar PNG",
+    "regenerate": "Regenerar",
+    "close": "Cerrar",
+    "zoom": "Zoom",
+    "zoomIn": "Acercar",
+    "zoomOut": "Alejar",
+    "fit": "Ajustar a la pantalla",
+    "fitShort": "Ajustar",
+    "lightboxHint": "Usa los botones de zoom o las teclas + y - para inspeccionar la ilustración. Pulsa Escape para cerrar.",
+    "disclaimer": "Ilustración generada por IA — contrástala con la explicación",
+    "downloadFailed": "No se pudo iniciar la descarga.",
+    "unavailable": "La generación de ilustraciones no está disponible ahora mismo",
+    "serviceHint": "Hay que activar el servicio de imágenes para poder generar ilustraciones.",
+    "retry": "Reintentar"
+  },
   "demo": {
     "short": "Modo demo",
     "full": "Modo demo — añade GEMINI_API_KEY para respuestas reales",
@@ -138,6 +161,36 @@
     "interrupted": "La respuesta se interrumpió.",
     "empty": "MAE AI devolvió una respuesta vacía. Inténtalo de nuevo.",
     "generic": "Algo salió mal. Inténtalo de nuevo."
+  },
+  "voice": {
+    "start": "Dictar un mensaje",
+    "cancel": "Cancelar grabación",
+    "send": "Detener y enviar",
+    "recording": "Grabando. Pulsa Intro para enviar o Escape para cancelar.",
+    "listening": "Escuchando…",
+    "silent": "Todavía no oigo nada. Comprueba que el micrófono esté activado.",
+    "empty": "No te he entendido. Inténtalo de nuevo, algo más cerca del micrófono.",
+    "truncated": "Tu mensaje se acortó a {{max}} caracteres.",
+    "noticeTitle": "Antes de dictar",
+    "notice": "El servicio de voz de tu navegador transcribe el habla (en Chrome es el de Google). MAE Academy no guarda tu audio.",
+    "noticeContinue": "Continuar",
+    "noticeCancel": "Ahora no",
+    "errors": {
+      "blocked": "El acceso al micrófono está bloqueado. Haz clic en el icono del candado de la barra de direcciones, permite el micrófono para este sitio e inténtalo de nuevo.",
+      "noMic": "No se encontró ningún micrófono. Conecta uno e inténtalo de nuevo.",
+      "network": "No se pudo acceder al servicio de voz. Comprueba tu conexión e inténtalo de nuevo.",
+      "language": "Tu navegador no puede transcribir este idioma por voz.",
+      "failed": "La entrada de voz se detuvo de forma inesperada. Inténtalo de nuevo."
+    }
+  },
+  "message": {
+    "copy": "Copiar mensaje",
+    "copied": "Copiado",
+    "regenerate": "Regenerar respuesta",
+    "readAloud": "Leer en voz alta",
+    "stopReading": "Dejar de leer",
+    "noVoice": "No hay ninguna voz instalada para este idioma en tu dispositivo.",
+    "speakFailed": "No se pudo leer en voz alta. Inténtalo de nuevo."
   },
   "image": {
     "type": "Solo se pueden adjuntar imágenes PNG, JPEG o WebP.",

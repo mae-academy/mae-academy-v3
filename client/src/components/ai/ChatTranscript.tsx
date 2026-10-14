@@ -19,10 +19,14 @@ export interface ChatTranscriptProps {
   sharedAvatar: boolean;
   error: ChatError | null;
   onRetry: () => void;
+  /** Regenerates the final assistant message (it replaces that message; no user message is added). */
+  onRegenerate: (assistantId: string) => void;
+  /** A reply is being produced; regenerate is disabled meanwhile. */
+  busy: boolean;
 }
 
 /** The scrolling message column: follows the stream only while the reader is at the bottom, with a jump-to-latest pill otherwise. */
-export function ChatTranscript({ messages, streamingId, mascotState, stateLabels, sharedAvatar, error, onRetry }: ChatTranscriptProps) {
+export function ChatTranscript({ messages, streamingId, mascotState, stateLabels, sharedAvatar, error, onRetry, onRegenerate, busy }: ChatTranscriptProps) {
   const { t } = useTranslation("ai");
   const reduceMotion = useReducedMotion();
   const scrollerRef = useRef<HTMLDivElement>(null);
@@ -31,6 +35,15 @@ export function ChatTranscript({ messages, streamingId, mascotState, stateLabels
 
   const visible = useMemo(() => messages.filter((m) => m.role === "user" || m.content.trim() !== "" || m.id === streamingId), [messages, streamingId]);
   const latestAssistantId = useMemo(() => [...visible].reverse().find((m) => m.role === "model")?.id ?? null, [visible]);
+
+  const lastId = visible.length > 0 ? visible[visible.length - 1].id : null;
+  // A stable callback keeps memoized messages from re-rendering on every streamed token.
+  const regenerateRef = useRef({ onRegenerate, id: latestAssistantId });
+  regenerateRef.current = { onRegenerate, id: latestAssistantId };
+  const regenerateLatest = useCallback(() => {
+    const { onRegenerate: run, id } = regenerateRef.current;
+    if (id) run(id);
+  }, []);
 
   const scrollToEnd = useCallback(
     (smooth: boolean) => {
@@ -89,6 +102,9 @@ export function ChatTranscript({ messages, streamingId, mascotState, stateLabels
                 mascotState={message.id === latestAssistantId ? mascotState : "idle"}
                 stateLabels={stateLabels}
                 sharedAvatar={sharedAvatar && message.id === latestAssistantId}
+                canRegenerate={message.id === latestAssistantId && message.id === lastId}
+                busy={busy}
+                onRegenerate={regenerateLatest}
               />
             ),
           )}

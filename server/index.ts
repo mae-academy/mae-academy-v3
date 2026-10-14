@@ -5,6 +5,7 @@ import { fileURLToPath } from "url";
 import "dotenv/config";
 import { AiBlockedError, AiNotConfiguredError,AiRequestError, assertAiConfigured, generateCircuitAnalysis, mockChatStream, sanitizeChatRequest, streamChat } from "./aiService";
 import { schematicRepairHandler } from "./aiSchematic";
+import { generateImageHandler } from "./aiImage";
 import type { AiStreamEvent } from "../shared/aiTypes";
 import { libraryCoverHandler } from "./libraryCover";
 import { libraryDoabHandler, libraryDoabItemHandler } from "./libraryDoab";
@@ -47,6 +48,8 @@ async function startServer() {
         ? "ai"
         : path === "/ai/schematic-repair"
         ? "ai-repair"
+        : path === "/ai/generate-image"
+        ? "ai-image"
         : /^\/(pdf-thumb|pdf-proxy|pdf-download|library\/cover)/.test(path)
         ? "assets"
         : "general";
@@ -220,6 +223,9 @@ async function startServer() {
 
   // Schematic auto-repair: small JSON body (a spec of at most 20k chars plus error messages), own tier and a per-IP concurrency cap of one.
   app.post("/api/ai/schematic-repair", express.json({ limit: "64kb" }), schematicRepairHandler);
+
+  // Illustration generation: tiny JSON body (a prompt), strict tier and a per-IP concurrency cap of one.
+  app.post("/api/ai/generate-image", express.json({ limit: "8kb" }), generateImageHandler);
 
   app.use(express.json());
 

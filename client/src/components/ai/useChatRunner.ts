@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { markSessionMessage } from "./sessionMessages";
 import type { ChatMessage, LabContext } from "@shared/aiTypes";
-import { newId } from "./chatThreads";
+import { newId, regenerateHistory } from "./chatThreads";
 import { ChatStreamError, streamChat, type ChatErrorKind } from "./streamChat";
 import type { MascotStateApi } from "./useMascotState";
 
@@ -39,6 +39,11 @@ export interface ChatRunner {
   mode: "live" | "mock" | null;
   /** Streams a reply to `history` (which ends with the user's message) into thread `threadId`. */
   send: (threadId: string, history: ChatMessage[]) => void;
+  /**
+   * Replaces assistant message `assistantId` (the final message of `messages`) with a fresh reply to the same user message,
+   * without adding a user message. Aborts any running stream first. Returns false when there is nothing to regenerate.
+   */
+  regenerate: (threadId: string, messages: ChatMessage[], assistantId: string) => boolean;
   /** Aborts the in-flight request, keeping whatever text already arrived. Safe to call when idle. */
   stop: () => void;
   clearError: () => void;
@@ -151,7 +156,14 @@ export function useChatRunner({ mascot, getLab, updateMessages }: ChatRunnerOpti
     })();
   }, [onError, onSend, onStreamEnd, onToken, updateMessages]);
 
+  const regenerate = useCallback((threadId: string, messages: ChatMessage[], assistantId: string) => {
+    const history = regenerateHistory(messages, assistantId);
+    if (!history) return false;
+    send(threadId, history);
+    return true;
+  }, [send]);
+
   const clearError = useCallback(() => setError(null), []);
 
-  return { active, error, mode, send, stop, clearError };
+  return { active, error, mode, send, regenerate, stop, clearError };
 }

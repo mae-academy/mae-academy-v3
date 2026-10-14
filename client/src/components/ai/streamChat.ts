@@ -1,4 +1,4 @@
-import { AI_HISTORY_WINDOW, splitSimMarker, stripLegacySchematicTag, type AiStreamEvent, type ChatMessage, type LabContext } from "@shared/aiTypes";
+import { AI_HISTORY_WINDOW, splitImageTag, splitSimMarker, stripLegacySchematicTag, type AiStreamEvent, type ChatMessage, type LabContext } from "@shared/aiTypes";
 
 import { stripSvgFences } from "./svgFence";
 
@@ -97,7 +97,7 @@ export function buildRequestMessages(messages: readonly ChatMessage[]): ChatMess
   const merged: ChatMessage[] = [];
   for (const original of messages.slice(-AI_HISTORY_WINDOW)) {
     // The simulator marker and a legacy schematic tag are UI plumbing, and legacy SVG diagrams are large: none of it goes back to the model. ```schematic specs stay (the model edits its own previous spec).
-    const message = original.role === "model" ? { ...original, content: stripSvgFences(stripLegacySchematicTag(splitSimMarker(original.content).text)) } : original;
+    const message = original.role === "model" ? { ...original, content: stripSvgFences(stripLegacySchematicTag(splitImageTag(splitSimMarker(original.content).text).text)) } : original;
     if (message.role === "model" && !message.content.trim()) continue;
     const previous = merged[merged.length - 1];
     if (previous && previous.role === message.role) {

@@ -1,11 +1,14 @@
-import { useCallback, useImperativeHandle, useLayoutEffect, useRef, useState, type ClipboardEvent, type FormEvent, type KeyboardEvent, type Ref } from "react";
-import { ArrowUp, Paperclip, Square, X } from "lucide-react";
+import { useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type ClipboardEvent, type FormEvent, type KeyboardEvent, type Ref } from "react";
+import { ArrowUp, Mic, Paperclip, Square, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { AI_MAX_MESSAGE_CHARS } from "@shared/aiTypes";
 import { cn } from "@/lib/utils";
 import { ACCEPTED_IMAGE_TYPES, ImageError, prepareImageForChat } from "./imageUtils";
 import type { RunPhase } from "./useChatRunner";
+import { useVoiceInput } from "./useVoiceInput";
+import { VoiceWaveform } from "./VoiceWaveform";
+import { acceptVoiceNotice, formatElapsed, hasAcceptedVoiceNotice, isVoiceInputSupported, joinText, recognitionLang, truncateTranscript } from "./voiceInput";
 
 const COUNTER_FROM = Math.floor(AI_MAX_MESSAGE_CHARS * 0.8);
 /** Eight lines of `leading-6`; the textarea scrolls beyond that. */
@@ -39,22 +42,21 @@ export interface ChatComposerProps {
 
 /** The message box: auto-growing textarea, image attach (picker / paste), send / stop with an in-flight spinner. */
 export function ChatComposer({ phase, onSubmit, onStop, onActivity, large = false, className, ref }: ChatComposerProps) {
-  const { t } = useTranslation("ai");
+  const { t, i18n } = useTranslation("ai");
   const [draft, setDraft] = useState("");
   const [image, setImage] = useState<string | null>(null);
   const [preparing, setPreparing] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  const [voiceSupported] = useState(() => isVoiceInputSupported());
+  const [noticeOpen, setNoticeOpen] = useState(false);
+  const [voiceMessage, setVoiceMessage] = useState<{ tone: "error" | "info"; text: string } | null>(null);
+  const recordingRef = useRef<HTMLDivElement>(null);
+  const continueRef = useRef<HTMLButtonElement>(null);
+
   const busy = phase !== "idle";
   const canSend = !busy && !preparing && (draft.trim().length > 0 || image !== null);
-
-  useLayoutEffect(() => {
-    const el = textareaRef.current;
-    if (!el) return;
-    el.style.height = "auto";
-    el.style.height = `${Math.min(el.scrollHeight, MAX_TEXTAREA_PX)}px`;
-  }, [draft]);
 
   const focus = useCallback(() => {
     requestAnimationFrame(() => {
@@ -95,6 +97,74 @@ export function ChatComposer({ phase, onSubmit, onStop, onActivity, large = fals
     }),
     [attachFile, focus, onActivity],
   );
+
+  const voice = useVoiceInput({
+    lang: recognitionLang(i18n.language),
+    onActivity,
+    onResult: (spoken) => {
+      if (!spoken.trim()) {
+        setVoiceMessage({ tone: "info", text: t("voice.empty") });
+        focus();
+        return;
+      }
+      const { text, truncated } = truncateTranscript(joinText(draft, spoken), AI_MAX_MESSAGE_CHARS);
+      if (truncated) setVoiceMessage({ tone: "info", text: t("voice.truncated", { max: AI_MAX_MESSAGE_CHARS }) });
+      if (busy) {
+        // A reply started meanwhile: keep the words in the box rather than sending over it.
+        setDraft(text);
+        focus();
+        return;
+      }
+      setDraft("");
+      setImage(null);
+      onSubmit({ text, image });
+      focus();
+    },
+  });
+  const recording = voice.status !== "idle";
+
+  useLayoutEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, MAX_TEXTAREA_PX)}px`;
+  }, [draft, recording]);
+
+  useEffect(() => {
+    if (voice.error) setVoiceMessage({ tone: "error", text: t(`voice.errors.${voice.error}`) });
+  }, [voice.error, t]);
+  useEffect(() => {
+    if (voice.status === "recording") recordingRef.current?.focus();
+  }, [voice.status]);
+  useEffect(() => {
+    if (noticeOpen) continueRef.current?.focus();
+  }, [noticeOpen]);
+
+  const startVoice = () => {
+    setVoiceMessage(null);
+    if (!hasAcceptedVoiceNotice()) {
+      setNoticeOpen(true);
+      return;
+    }
+    voice.start();
+  };
+
+  const confirmNotice = () => {
+    acceptVoiceNotice();
+    setNoticeOpen(false);
+    voice.start();
+  };
+
+  const onRecordingKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      voice.cancel();
+      focus();
+    } else if (event.key === "Enter" && !(event.target instanceof HTMLButtonElement)) {
+      event.preventDefault();
+      voice.confirm();
+    }
+  };
 
   const submit = () => {
     if (!canSend) return;
@@ -162,6 +232,70 @@ export function ChatComposer({ phase, onSubmit, onStop, onActivity, large = fals
         </div>
       ) : null}
 
+      {voiceMessage ? (
+        <p
+          role={voiceMessage.tone === "error" ? "alert" : "status"}
+          dir="auto"
+          className={cn("mx-4 mt-3 rounded-xl px-3 py-2 text-sm", voiceMessage.tone === "error" ? "bg-rose-50 text-rose-800 dark:bg-rose-500/10 dark:text-rose-200" : "bg-slate-100 text-slate-700 dark:bg-white/[0.06] dark:text-zinc-300")}
+        >
+          {voiceMessage.text}
+        </p>
+      ) : null}
+
+      {noticeOpen ? (
+        <div role="group" aria-label={t("voice.noticeTitle")} className="mx-4 mt-3 rounded-2xl border border-violet-200 bg-violet-50/70 p-3 text-sm text-slate-700 dark:border-violet-400/25 dark:bg-violet-500/10 dark:text-zinc-200">
+          <p className="font-semibold text-slate-900 dark:text-white">{t("voice.noticeTitle")}</p>
+          <p className="mt-1" dir="auto">{t("voice.notice")}</p>
+          <div className="mt-3 flex flex-wrap justify-end gap-2">
+            <button type="button" onClick={() => setNoticeOpen(false)} className="min-h-11 rounded-full px-4 text-sm font-medium text-slate-700 hover:bg-white/70 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-blue-600 dark:text-zinc-200 dark:hover:bg-white/[0.08]">
+              {t("voice.noticeCancel")}
+            </button>
+            <button ref={continueRef} type="button" onClick={confirmNotice} className="min-h-11 rounded-full bg-gradient-to-br from-blue-600 to-violet-600 px-5 text-sm font-semibold text-white shadow-sm hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">
+              {t("voice.noticeContinue")}
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {recording ? (
+        <div
+          ref={recordingRef}
+          tabIndex={-1}
+          onKeyDown={onRecordingKeyDown}
+          aria-busy={voice.status === "finishing"}
+          className="px-2.5 pb-2.5 pt-3 outline-none"
+        >
+          <span className="sr-only" role="status">{t("voice.recording")}</span>
+          <p dir="auto" aria-hidden="true" className="min-h-6 px-3 pb-2 text-base leading-6 text-slate-600 dark:text-zinc-300">
+            {voice.preview || <span className="text-slate-400 dark:text-zinc-500">{voice.silent ? t("voice.silent") : t("voice.listening")}</span>}
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => { voice.cancel(); focus(); }}
+              disabled={voice.status === "finishing"}
+              aria-label={t("voice.cancel")}
+              title={t("voice.cancel")}
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-blue-600 disabled:opacity-50 dark:text-zinc-400 dark:hover:bg-white/[0.08] dark:hover:text-white"
+            >
+              <X className="h-5 w-5" aria-hidden="true" />
+            </button>
+            <VoiceWaveform analyser={voice.analyser} className="h-11 min-w-0 flex-1" />
+            <span aria-live="off" className="w-12 shrink-0 text-center text-sm font-medium tabular-nums text-slate-600 dark:text-zinc-300">{formatElapsed(voice.elapsedMs)}</span>
+            <button
+              type="button"
+              onClick={voice.confirm}
+              disabled={voice.status === "finishing"}
+              aria-label={t("voice.send")}
+              title={t("voice.send")}
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-600 to-violet-600 text-white shadow-sm transition-[opacity,transform] hover:opacity-90 active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:opacity-60"
+            >
+              <ArrowUp className="h-5 w-5" aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
       <textarea
         ref={textareaRef}
         value={draft}
@@ -199,6 +333,20 @@ export function ChatComposer({ phase, onSubmit, onStop, onActivity, large = fals
           ) : null}
         </div>
 
+        {voiceSupported ? (
+          <button
+            type="button"
+            onClick={startVoice}
+            disabled={busy || preparing}
+            aria-label={t("voice.start")}
+            title={t("voice.start")}
+            data-voice-start
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-blue-600 disabled:cursor-not-allowed disabled:opacity-40 dark:text-zinc-400 dark:hover:bg-white/[0.08] dark:hover:text-white"
+          >
+            <Mic className="h-5 w-5" aria-hidden="true" />
+          </button>
+        ) : null}
+
         {busy ? (
           <button
             type="button"
@@ -224,6 +372,8 @@ export function ChatComposer({ phase, onSubmit, onStop, onActivity, large = fals
           </button>
         )}
       </div>
+        </>
+      )}
     </form>
   );
 }

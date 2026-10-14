@@ -13,6 +13,7 @@ export const TIERS = {
   signals: { limit: 900, windowMs: 60_000 }, // debounced slider-driven transform requests (~10/s) plus on-demand derivations
   ai: { limit: 12, windowMs: 60_000 }, // MAE AI chat: every request spends a paid Gemini call
   'ai-repair': { limit: 10, windowMs: 60_000 }, // MAE AI schematic auto-repair: a short, JSON-only Gemini call (max 2 per diagram)
+  'ai-image': { limit: 6, windowMs: 60_000 }, // MAE AI illustrations: the most expensive Gemini call
 } as const;
 export type Tier = keyof typeof TIERS;
 

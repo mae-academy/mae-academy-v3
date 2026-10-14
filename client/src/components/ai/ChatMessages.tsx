@@ -7,6 +7,7 @@ import PrefetchLink from "@/components/common/PrefetchLink";
 import { simulatorPathForLab } from "@/lib/aiLab";
 import AiMarkdown from "./AiMarkdown";
 import MaiMascot from "./MaiMascot";
+import { MessageActions } from "./MessageActions";
 import { SchematicAutoRepairContext } from "./SchematicDiagram";
 import { isSessionMessage } from "./sessionMessages";
 
@@ -84,12 +85,13 @@ export interface MessageProps {
 export const UserMessage = memo(function UserMessage({ message, onImageLoad }: Omit<MessageProps, "streaming">) {
   const { t } = useTranslation("ai");
   return (
-    <div className="flex justify-end">
+    <div className="group/msg flex flex-col items-end">
       <div className="max-w-[88%] rounded-3xl bg-slate-100 px-4 py-2.5 text-slate-900 dark:bg-white/[0.08] dark:text-zinc-50 sm:max-w-[80%]">
         <span className="sr-only">{t("chat.you")}: </span>
         {message.imageUrl ? <img src={message.imageUrl} alt={t("chat.attachedImage")} onLoad={onImageLoad} className="mb-2 max-h-60 max-w-full rounded-2xl bg-white object-contain" /> : null}
         {message.content ? <p dir="auto" className="whitespace-pre-wrap break-words text-start text-base leading-7">{message.content}</p> : null}
       </div>
+      {message.content ? <MessageActions messageId={message.id} content={message.content} role="user" /> : null}
     </div>
   );
 });
@@ -99,13 +101,18 @@ export interface AssistantMessageProps extends MessageProps {
   mascotState: MascotState;
   stateLabels: Partial<Record<MascotState, string>>;
   sharedAvatar: boolean;
+  /** The latest assistant message can be regenerated (the transcript passes a stable callback). */
+  canRegenerate?: boolean;
+  /** A reply is being produced somewhere: regenerate is disabled. */
+  busy?: boolean;
+  onRegenerate?: () => void;
 }
 
-export const AssistantMessage = memo(function AssistantMessage({ message, streaming, live, mascotState, stateLabels, sharedAvatar }: Omit<AssistantMessageProps, "onImageLoad"> & { onImageLoad?: () => void }) {
+export const AssistantMessage = memo(function AssistantMessage({ message, streaming, live, mascotState, stateLabels, sharedAvatar, canRegenerate, busy, onRegenerate }: Omit<AssistantMessageProps, "onImageLoad"> & { onImageLoad?: () => void }) {
   const { t } = useTranslation("ai");
   const { text, lab } = assistantView(message.content, streaming);
   return (
-    <div className="flex items-start gap-3 sm:gap-4">
+    <div className="group/msg flex items-start gap-3 sm:gap-4">
       <AssistantAvatar live={live} state={mascotState} stateLabels={stateLabels} shared={sharedAvatar} />
       <div className="min-w-0 flex-1 text-base leading-7 text-slate-800 dark:text-zinc-100">
         <span className="sr-only">{t("chat.assistant")}: </span>
@@ -117,6 +124,7 @@ export const AssistantMessage = memo(function AssistantMessage({ message, stream
           <TypingDots />
         ) : null}
         {lab ? <SimulatorAction lab={lab} /> : null}
+        {!streaming && text ? <MessageActions messageId={message.id} content={message.content} role="model" canRegenerate={canRegenerate} busy={busy} onRegenerate={onRegenerate} /> : null}
       </div>
     </div>
   );

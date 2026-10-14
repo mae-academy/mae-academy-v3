@@ -25,6 +25,7 @@ import { isAcceptedImageType } from "./imageUtils";
 import MaiMascot from "./MaiMascot";
 import { SuggestionChips } from "./SuggestionChips";
 import { newId } from "./chatThreads";
+import { stopSpeaking } from "./speech";
 import { useChatRunner, type RunPhase } from "./useChatRunner";
 import { useChatThreads } from "./useChatThreads";
 import { useMascotState } from "./useMascotState";
@@ -130,6 +131,7 @@ export function ChatWorkspace({ lab, className }: ChatWorkspaceProps) {
 
   /** Leaves the current chat: stop any stream (keeping its partial text), settle the mascot. */
   const leaveChat = useCallback(() => {
+    stopSpeaking();
     runner.stop();
     mascot.reset();
   }, [mascot, runner]);
@@ -137,6 +139,7 @@ export function ChatWorkspace({ lab, className }: ChatWorkspaceProps) {
   /* ---- chat actions ---- */
   const handleSubmit = ({ text, image }: ComposerSubmit) => {
     if (runner.active) return;
+    stopSpeaking();
     const message = { id: newId(), role: "user" as const, content: text, timestamp: Date.now(), ...(image ? { imageUrl: image } : {}) };
     if (active.messages.length === 0) setHandoff(true);
     runner.send(active.id, [...active.messages, message]);
@@ -149,6 +152,15 @@ export function ChatWorkspace({ lab, className }: ChatWorkspaceProps) {
     if (lastUser === -1) return;
     runner.send(active.id, active.messages.slice(0, lastUser + 1));
   };
+
+  const handleRegenerate = (assistantId: string) => {
+    if (runner.active) return;
+    stopSpeaking();
+    runner.regenerate(active.id, active.messages, assistantId);
+  };
+
+  // Reading aloud never outlives the page.
+  useEffect(() => stopSpeaking, []);
 
   const handleNewChat = () => {
     leaveChat();
@@ -328,6 +340,8 @@ export function ChatWorkspace({ lab, className }: ChatWorkspaceProps) {
                 sharedAvatar={handoff}
                 error={error}
                 onRetry={handleRetry}
+                onRegenerate={handleRegenerate}
+                busy={runner.active !== null}
               />
             </>
           )}

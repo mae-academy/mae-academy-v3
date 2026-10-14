@@ -1,11 +1,13 @@
-import { Children, Component, isValidElement, memo, useMemo, type ReactElement, type ReactNode } from "react";
+import { Children, Component, isValidElement, memo, useContext, useMemo, type ReactElement, type ReactNode } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
+import { splitImageTag } from "@shared/aiTypes";
 import { KatexMath } from "@/components/ui/KatexMath";
 import { CodeBlock } from "./CodeBlock";
 import { normalizeMathDelimiters } from "./mathDelimiters";
-import { SchematicDiagram, SchematicPending } from "./SchematicDiagram";
+import { IllustrationImage } from "./IllustrationImage";
+import { SchematicAutoRepairContext, SchematicDiagram, SchematicPending } from "./SchematicDiagram";
 import { PENDING_SCHEMATIC_LANG, markPendingSchematic, stripHtmlComments } from "./svgFence";
 
 const REMARK_PLUGINS = [remarkGfm, remarkMath];
@@ -96,14 +98,19 @@ class MarkdownBoundary extends Component<{ content: string; children: ReactNode 
 }
 
 function AiMarkdownImpl({ content, streaming }: { content: string; streaming?: boolean }) {
-  const source = useMemo(() => normalizeMathDelimiters(stripHtmlComments(streaming ? markPendingSchematic(content) : content)), [content, streaming]);
+  // The `[GENERATE_IMAGE: ...]` tag never shows as text, not even half of it mid-stream; the card appears once the reply is complete.
+  const { text, prompt } = useMemo(() => splitImageTag(content), [content]);
+  // True for replies created in this session (ChatMessages provides it); restored chats show a button instead of generating.
+  const autoStart = useContext(SchematicAutoRepairContext);
+  const source = useMemo(() => normalizeMathDelimiters(stripHtmlComments(streaming ? markPendingSchematic(text) : text)), [text, streaming]);
   return (
     <div className="min-w-0 break-words">
-      <MarkdownBoundary content={content}>
+      <MarkdownBoundary content={text}>
         <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={components}>
           {source}
         </ReactMarkdown>
       </MarkdownBoundary>
+      {prompt && !streaming ? <IllustrationImage key={prompt} prompt={prompt} autoStart={autoStart} /> : null}
     </div>
   );
 }

@@ -103,6 +103,29 @@
     "fitShort": "Fit",
     "lightboxHint": "Use the zoom buttons or the + and - keys to inspect the schematic. Press Escape to close."
   },
+  "illustration": {
+    "label": "Illustration",
+    "alt": "AI-generated illustration: {{prompt}}",
+    "generate": "Generate illustration",
+    "generating": "Generating illustration…",
+    "actions": "Illustration actions",
+    "expand": "Expand illustration",
+    "open": "Open illustration larger",
+    "download": "Download PNG",
+    "regenerate": "Regenerate",
+    "close": "Close",
+    "zoom": "Zoom",
+    "zoomIn": "Zoom in",
+    "zoomOut": "Zoom out",
+    "fit": "Fit to screen",
+    "fitShort": "Fit",
+    "lightboxHint": "Use the zoom buttons or the + and - keys to inspect the illustration. Press Escape to close.",
+    "disclaimer": "AI-generated illustration — verify against the explanation",
+    "downloadFailed": "The download could not be started.",
+    "unavailable": "Illustration generation isn't available right now",
+    "serviceHint": "The image service needs to be enabled before illustrations can be generated.",
+    "retry": "Retry"
+  },
   "demo": {
     "short": "Demo mode",
     "full": "Demo mode — add GEMINI_API_KEY for real answers",
@@ -138,6 +161,36 @@
     "interrupted": "The response was interrupted.",
     "empty": "MAE AI returned an empty answer. Please try again.",
     "generic": "Something went wrong. Please try again."
+  },
+  "voice": {
+    "start": "Dictate a message",
+    "cancel": "Cancel recording",
+    "send": "Stop and send",
+    "recording": "Recording. Press Enter to send or Escape to cancel.",
+    "listening": "Listening…",
+    "silent": "I can't hear anything yet. Check that your microphone is on.",
+    "empty": "I didn't catch that. Try again, a little closer to the microphone.",
+    "truncated": "Your message was shortened to {{max}} characters.",
+    "noticeTitle": "Before you dictate",
+    "notice": "Speech is transcribed by your browser's speech service (in Chrome this is Google's). Your audio is not stored by MAE Academy.",
+    "noticeContinue": "Continue",
+    "noticeCancel": "Not now",
+    "errors": {
+      "blocked": "Microphone access is blocked. Click the lock icon in the address bar, allow the microphone for this site, then try again.",
+      "noMic": "No microphone was found. Connect one and try again.",
+      "network": "The speech service could not be reached. Check your connection and try again.",
+      "language": "Your browser can't transcribe this language by voice.",
+      "failed": "Voice input stopped unexpectedly. Please try again."
+    }
+  },
+  "message": {
+    "copy": "Copy message",
+    "copied": "Copied",
+    "regenerate": "Regenerate response",
+    "readAloud": "Read aloud",
+    "stopReading": "Stop reading",
+    "noVoice": "No voice for this language is installed on your device.",
+    "speakFailed": "Reading aloud failed. Please try again."
   },
   "image": {
     "type": "Only PNG, JPEG or WebP images can be attached.",

@@ -8,6 +8,7 @@ import {
   AI_MAX_MESSAGE_CHARS,
   AI_MAX_MODEL_MESSAGE_CHARS,
   LAB_CONTEXTS,
+  splitImageTag,
   splitSimMarker,
   stripLegacySchematicTag,
   stripSvgDiagrams,
@@ -147,9 +148,9 @@ export function limitModelTurn(text: string, cap: number = AI_MAX_MODEL_MESSAGE_
   return head + fence + tail;
 }
 
-/** A model turn as it is resent to the model: no SVG (old chats still hold some), no legacy tag, no trailing simulator marker, bounded length (schematic fences stay whole), never empty. */
+/** A model turn as it is resent to the model: no SVG (old chats still hold some), no legacy tag, no illustration tag, no trailing simulator marker, bounded length (schematic fences stay whole), never empty. */
 export function cleanModelTurn(content: string): string {
-  const text = limitModelTurn(stripLegacySchematicTag(splitSimMarker(stripSvgDiagrams(content)).text));
+  const text = limitModelTurn(stripLegacySchematicTag(splitImageTag(splitSimMarker(stripSvgDiagrams(content)).text).text));
   return text.trim() ? text : "[empty reply]";
 }
 
@@ -262,7 +263,7 @@ const INTEGRATION_RULES = [
   "- When an image of a schematic or diagram is attached, first state the components, values and labelled nodes you read (for example node A, node B, ground). If a value or connection is unreadable or ambiguous, say so and ask for a clearer image instead of guessing.",
   "",
   "Schematic drawings (the platform draws them from a JSON spec, so this format is mandatory):",
-  "- The master prompt's SVG rules (Sections 1.4, 1.7 and the SVG form of 3.2) do NOT apply here. Never emit SVG, ```xml:svg blocks, ASCII art, Mermaid or image tags. A deterministic engine draws the symbols from a validated library and enforces the 10 verification gates below; your job is a correct, grid-snapped spec.",
+  "- The master prompt's SVG rules (Sections 1.4, 1.7 and the SVG form of 3.2) do NOT apply here. Never emit SVG, ```xml:svg blocks, ASCII art, Mermaid or image tags (for a circuit; the separate illustration tag below is the only exception). A deterministic engine draws the symbols from a validated library and enforces the 10 verification gates below; your job is a correct, grid-snapped spec.",
   "- Only when a drawing, schematic or block diagram is clearly requested (for example «ارسم» or «draw»): first give the academic explanation, the equations and the node netlist or block table as text and LaTeX. THEN append exactly ONE fenced block whose info string is exactly `schematic` and whose content is ONLY the JSON spec (no prose inside, strict JSON: double quotes, no comments, no trailing commas). It is the LAST content of the reply, just before the optional [[SIM:..]] line. Never emit it for ordinary questions, refusals or when only an explanation is wanted. At most one per reply; for a change request (\"make R1 5 kΩ\") re-emit the complete corrected spec, starting from your previous ```schematic block in the conversation.",
   "- Before writing the spec, mentally run Phase A (topology and node extraction), Phase B (grid alignment and clearance) and Phase C (engineering sanity) of the master prompt and then ALL 10 gates below. Fix your own errors first; the spec you emit must already pass every gate. Gates:",
   ...SCHEMATIC_GATES_SUMMARY.map((gate) => `  ${gate}`),
@@ -285,6 +286,12 @@ const INTEGRATION_RULES = [
   "```" + SCHEMATIC_FENCE,
   JSON.stringify(BJT_CE_STAGE),
   "```",
+  "- Extra explicit checks before ANY diagram, on top of the 10 gates: (a) in a three-phase circuit label the sources and lines A, B and C consistently, and count the parts (a three-phase full-wave bridge has 6 diodes or SCRs: 3 on the upper rail, 3 on the lower rail, each leg fed by one phase); (b) check the polarity of every diode and SCR: conduction runs anode to cathode, and the cathodes of the upper group join the positive DC rail while the anodes of the lower group join the negative rail; (c) every net ties to a real node, with nothing left floating.",
+  "",
+  "Illustrations (a different tool from schematics; never mix them up):",
+  "- Some requests are best served by an ILLUSTRATION rather than a wiring schematic: classifications and types of machines (for example «أنواع الماشينز» or \"types of electric machines\"), cutaway or construction diagrams, taxonomies, concept maps, conceptual waveform sketches. For these, give the FULL academic explanation in text and LaTeX first, then end the reply with exactly ONE tag on a single line: [GENERATE_IMAGE: <prompt>]. The prompt is ultra-detailed English, one line, at most 1000 characters, with NO square brackets inside, shaped like: \"Publication-grade technical illustration of <topic>, IEEE textbook style, crisp line art, white background, high contrast, labeled components (<list every label>), zero photographic clutter, academic journal quality, 4k resolution.\" The platform draws it with an image model and shows it under your text; your text answer must stay complete without it.",
+  "- Circuits, schematics, rectifiers, converters, block diagrams, ladder logic and anything with electrical connectivity MUST use the ```schematic engine and NEVER the image tag, because the wiring of a schematic is verified by code and an image model cannot guarantee it. If a request needs both, draw the circuit with the schematic engine and skip the tag.",
+  "- At most one image tag per reply; none in refusals, none for ordinary questions or calculations. The tag goes before the optional [[SIM:..]] line, and never inside a code fence.",
   "",
   "Simulator marker:",
   `- ${SIM_MARKER_RULE} A circuit or network you drew may also end with the marker when a simulator can open it.`,

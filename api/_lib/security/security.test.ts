@@ -80,6 +80,8 @@ describe('sliding-window limiter', () => {
     expect(TIERS.ai.limit).toBeLessThan(TIERS.general.limit); // every AI request spends a paid upstream call
     expect(TIERS['ai-repair'].limit).toBe(10);
     expect(TIERS['ai-repair'].limit).toBeLessThanOrEqual(TIERS.ai.limit); // repairs are small, but each one still spends a paid call
+    expect(TIERS['ai-image'].limit).toBe(6);
+    expect(TIERS['ai-image'].limit).toBeLessThan(TIERS.ai.limit); // an image is the most expensive call
   });
 });
 

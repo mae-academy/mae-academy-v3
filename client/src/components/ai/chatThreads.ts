@@ -109,6 +109,20 @@ export function threadsReducer(state: ThreadsState, action: ThreadsAction): Thre
   }
 }
 
+/**
+ * The history to resend when regenerating assistant message `assistantId`: everything up to and including the user message
+ * that prompted it, so the old reply is dropped and no user message is duplicated. Null when there is nothing to
+ * regenerate: the target is not the final message, is not an assistant message, or has no user message before it.
+ */
+export function regenerateHistory(messages: readonly ChatMessage[], assistantId: string): ChatMessage[] | null {
+  const index = messages.findIndex((message) => message.id === assistantId);
+  if (index === -1 || index !== messages.length - 1 || messages[index].role !== "model") return null;
+  for (let i = index - 1; i >= 0; i--) {
+    if (messages[i].role === "user") return messages.slice(0, i + 1);
+  }
+  return null;
+}
+
 export type ThreadGroupKey = "today" | "week" | "older";
 
 export interface ThreadGroup {

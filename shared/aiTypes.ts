@@ -116,6 +116,58 @@ export function stripLegacySchematicTag(text: string): string {
   return out;
 }
 
+/** Longest illustration prompt the tag may carry and the image route accepts. */
+export const MAX_IMAGE_PROMPT_CHARS = 1000;
+
+const IMAGE_TAG_OPEN = '[GENERATE_IMAGE:';
+
+/** A complete, well-formed tag: single line, no brackets inside. Looser tags are still hidden by `splitImageTag`. */
+export const IMAGE_TAG_REGEX = /\[GENERATE_IMAGE:\s*([^[\]\r\n]{1,1000}?)\s*\]/;
+
+/**
+ * When an answer is best served by an illustration (machine taxonomies, cutaways, concept maps) the model ends it
+ * with one `[GENERATE_IMAGE: <english prompt>]` line (before the optional `[[SIM:..]]` line). The UI hides it with
+ * `splitImageTag` and renders an illustration card. Call `splitSimMarker` first. A complete tag yields its prompt
+ * (tolerating CRLF and stray brackets inside, clamped to MAX_IMAGE_PROMPT_CHARS); an unclosed trailing tag or a
+ * trailing partial prefix (`[GENER`) is dropped with no prompt, so a streaming UI never flashes half a tag. Only at
+ * the start of the text or after whitespace. Further tags are removed too; the first one wins.
+ */
+export function splitImageTag(text: string): { text: string; prompt: string | null } {
+  if (!text.includes('[')) return { text, prompt: null };
+  let out = text;
+  let prompt: string | null = null;
+  let from = 0;
+  for (;;) {
+    const start = out.indexOf(IMAGE_TAG_OPEN, from);
+    if (start === -1) break;
+    if (start > 0 && !/\s/.test(out[start - 1])) {
+      from = start + 1;
+      continue;
+    }
+    const lineEnd = out.indexOf('\n', start);
+    const line = out.slice(start, lineEnd === -1 ? out.length : lineEnd).replace(/\r$/, '');
+    const close = line.lastIndexOf(']');
+    if (close === -1) {
+      out = out.slice(0, start).trimEnd();
+      break;
+    }
+    if (prompt === null) {
+      const inner = line.slice(IMAGE_TAG_OPEN.length, close).replace(/[[\]]/g, ' ').replace(/\s+/g, ' ').trim();
+      if (inner) prompt = inner.slice(0, MAX_IMAGE_PROMPT_CHARS);
+    }
+    const end = start + close + 1;
+    out = (out.slice(0, start).trimEnd() + (out.slice(end).trim() ? '\n\n' + out.slice(end).trimStart() : '')).trimEnd();
+    from = 0;
+  }
+  for (let length = Math.min(out.length, IMAGE_TAG_OPEN.length - 1); length >= 1; length--) {
+    const tail = out.slice(-length);
+    if (!tail.startsWith('[') || !IMAGE_TAG_OPEN.startsWith(tail)) continue;
+    const before = out.slice(0, out.length - length);
+    if (before === '' || /\s$/.test(before)) return { text: before.trimEnd(), prompt };
+  }
+  return { text: out, prompt };
+}
+
 /** What a vector diagram is replaced with when a model turn is resent as history. */
 export const DIAGRAM_OMITTED = '[diagram omitted]';
 
