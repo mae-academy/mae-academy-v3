@@ -77,6 +77,7 @@ describe('sliding-window limiter', () => {
     expect(TIERS.plc.limit).toBe(900);
     expect(TIERS.circuit.limit).toBe(900);
     expect(TIERS.assets.limit).toBeGreaterThan(TIERS.general.limit);
+    expect(TIERS.ai.limit).toBeLessThan(TIERS.general.limit); // every AI request spends a paid upstream call
   });
 });
 

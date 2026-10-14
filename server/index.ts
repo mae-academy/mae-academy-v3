@@ -3,7 +3,8 @@ import { createServer } from "http";
 import path from "path";
 import { fileURLToPath } from "url";
 import "dotenv/config";
-import { generateCircuitAnalysis } from "./aiService";
+import { AiNotConfiguredError, AiRequestError, assertAiConfigured, generateCircuitAnalysis, sanitizeChatRequest, streamChat } from "./aiService";
+import type { AiStreamEvent } from "../shared/aiTypes";
 import { libraryCoverHandler } from "./libraryCover";
 import { libraryDoabHandler, libraryDoabItemHandler } from "./libraryDoab";
 import { libraryResolveHandler } from "./libraryResolve";
@@ -16,7 +17,7 @@ import { handleLogic } from "../api/_lib/logic/handler";
 import { handleSignals } from "../api/_lib/signals/handler";
 import { handleControl } from "../api/_lib/control/handler";
 import { handleCode } from "../api/_lib/code/handler";
-import { expressGuard } from "../api/_lib/security/node-adapter";
+import { expressGuard, nodeClientIp } from "../api/_lib/security/node-adapter";
 import type { Tier } from "../api/_lib/security/ratelimit";
 import { pdfCheckHandler, pdfDownloadHandler, pdfProxyHandler } from "./pdfProxy";
 
@@ -41,6 +42,8 @@ async function startServer() {
         ? "control"
         : path.startsWith("/code/")
         ? "code"
+        : path === "/ai/chat"
+        ? "ai"
         : /^\/(pdf-thumb|pdf-proxy|pdf-download|library\/cover)/.test(path)
         ? "assets"
         : "general";
@@ -124,6 +127,81 @@ async function startServer() {
     );
     res.status(response.status).type("application/json").send(await response.text());
   });
+  // MAE AI chat (SSE). Own JSON parser: the global 100kb default would reject schematic images.
+  const MAX_STREAMS_PER_IP = 2;
+  const openStreams = new Map<string, number>();
+  app.post("/api/ai/chat", express.json({ limit: "4mb" }), async (req, res) => {
+    let request;
+    try {
+      request = sanitizeChatRequest(req.body);
+      assertAiConfigured();
+    } catch (error) {
+      if (error instanceof AiNotConfiguredError) {
+        res.status(503).json({ error: error.message });
+      } else if (error instanceof AiRequestError) {
+        res.status(400).json({ error: error.message });
+      } else {
+        console.error("MAE AI request setup failed:", error);
+        res.status(500).json({ error: "Internal error." });
+      }
+      return;
+    }
+
+    const ip = nodeClientIp(req);
+    const active = openStreams.get(ip) ?? 0;
+    if (active >= MAX_STREAMS_PER_IP) {
+      res.status(429).json({ error: "Too many open requests. Wait for the current answers to finish." });
+      return;
+    }
+    openStreams.set(ip, active + 1);
+    const abort = new AbortController();
+    let released = false;
+    const release = () => {
+      if (released) return;
+      released = true;
+      const left = (openStreams.get(ip) ?? 1) - 1;
+      if (left > 0) openStreams.set(ip, left);
+      else openStreams.delete(ip);
+    };
+    // 'close' fires on normal completion too; abort() is then a no-op on a finished stream.
+    res.on("close", () => {
+      abort.abort();
+      release();
+    });
+
+    const send = (event: AiStreamEvent) => {
+      if (!res.writableEnded && !res.destroyed) res.write(`data: ${JSON.stringify(event)}\n\n`);
+    };
+    let started = false;
+    try {
+      const stream = streamChat(request, abort.signal);
+      // Pull the first chunk before committing to SSE so an upstream failure can still be a JSON 502.
+      let first = await stream.next();
+      res.status(200);
+      res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+      res.setHeader("Cache-Control", "no-cache, no-transform");
+      res.setHeader("Connection", "keep-alive");
+      res.setHeader("X-Accel-Buffering", "no");
+      res.flushHeaders();
+      started = true;
+      while (!first.done) {
+        send({ type: "delta", text: first.value });
+        first = await stream.next();
+      }
+      send({ type: "done" });
+      res.end();
+    } catch (error) {
+      if (abort.signal.aborted) return; // the client left; nothing to tell it
+      console.error("MAE AI chat failed:", error);
+      if (started) {
+        send({ type: "error", message: "MAE AI stopped unexpectedly. Please try again." });
+        res.end();
+      } else {
+        res.status(502).json({ error: "MAE AI is unavailable right now. Please try again." });
+      }
+    }
+  });
+
   app.use(express.json());
 
   app.post("/api/ai/analyze", async (req, res) => {

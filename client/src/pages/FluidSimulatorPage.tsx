@@ -15,7 +15,7 @@ export default function FluidSimulatorPage() {
   }, [seo]);
 
   return (
-    <SimulatorLayout title={shellTitle} tabs={[]} activeTab="" routePrefix="/simulations/pneumatics-and-hydraulics" backLabel={copy.footer.simulations} isRtl={isRtl} hideToolNavigation compact>
+    <SimulatorLayout title={shellTitle} tabs={[]} activeTab="" routePrefix="/simulations/pneumatics-and-hydraulics" backLabel={copy.footer.simulations} isRtl={isRtl} hideToolNavigation compact aiLab="fluid">
       {/* The simulator is left-to-right engineering notation regardless of page language. */}
       <div dir="ltr" className="mt-3 mae-simulator-shell">
         <FluidSimulatorApp />

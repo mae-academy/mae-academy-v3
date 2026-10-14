@@ -20,6 +20,7 @@ import { useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { Loader2 } from "lucide-react";
 import SimulatorLayout from "@/components/SimulatorLayout";
+import { labForSimulationSlug } from "@/lib/aiLab";
 import SimulationToolWorkspace from "@/components/SimulationToolWorkspace";
 import { useLocale } from "@/contexts/LocaleContext";
 import {
@@ -211,7 +212,7 @@ export default function SimulationDetail() {
   })();
 
   return <motion.div variants={container} initial="hidden" animate="visible">
-    <SimulatorLayout title={isDigitalLogicDesign ? "" : simulation.title} tabs={tools} activeTab={tool || ""} routePrefix={isDirectCode ? "/code" : `/simulations/${meta.slug}`} backLabel={copy.footer.simulations} isRtl={isRtl} hideToolNavigation={isDigitalLogicDesign || isCircuitLab || isCodeStudio}>
+    <SimulatorLayout title={isDigitalLogicDesign ? "" : simulation.title} tabs={tools} activeTab={tool || ""} routePrefix={isDirectCode ? "/code" : `/simulations/${meta.slug}`} backLabel={copy.footer.simulations} isRtl={isRtl} hideToolNavigation={isDigitalLogicDesign || isCircuitLab || isCodeStudio} aiLab={isDigitalLogicDesign ? undefined /* the Digital Logic workspace renders its own header, which carries the button */ : labForSimulationSlug(meta.slug)}>
       <motion.div variants={item} className="mt-0" dir="ltr">
         <div className="ltr text-left mae-simulator-shell" style={{ direction: 'ltr', textAlign: 'left' }}>
           {toolContent}

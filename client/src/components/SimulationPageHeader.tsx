@@ -1,6 +1,10 @@
-import { ArrowLeft } from "lucide-react";
-import { Link } from "wouter";
+import { ArrowLeft, Sparkles } from "lucide-react";
+import { Link, useLocation } from "wouter";
+import { useTranslation } from "react-i18next";
+import type { LabContext } from "@shared/aiTypes";
 import { SegmentedControl } from "@/components/common/templates";
+import { aiPathForLab } from "@/lib/aiLab";
+import { prefetchRoute } from "@/lib/routePrefetch";
 
 /**
  * A single reusable tool-tab item for the MAE Academy simulator toolbar.
@@ -33,6 +37,8 @@ export interface SimulationPageHeaderProps {
   showTitle?: boolean;
   /** Render the segmented toolbar. Defaults to true. */
   showToolNavigation?: boolean;
+  /** When set, shows a "Chat with MAE AI" button under the title/toolbar that opens the chat preset to this lab. */
+  aiLab?: LabContext;
   /** Custom container class override. */
   className?: string;
 }
@@ -56,8 +62,11 @@ export function SimulationPageHeader({
   showBack = true,
   showTitle = true,
   showToolNavigation = true,
+  aiLab,
   className = "",
 }: SimulationPageHeaderProps) {
+  const { t } = useTranslation("ai");
+  const [, setLocation] = useLocation();
   const hasTools = tools && tools.length > 0 && Boolean(onSelectTool);
 
   return (
@@ -101,6 +110,21 @@ export function SimulationPageHeader({
             aria-label={`${title ?? "Simulation"} tools`}
           />
         </nav>
+      ) : null}
+
+      {aiLab ? (
+        <div className="mb-6 sm:mb-8 flex w-full justify-center px-1">
+          <button
+            type="button"
+            onClick={() => setLocation(aiPathForLab(aiLab))}
+            onMouseEnter={() => prefetchRoute("/ai")}
+            onFocus={() => prefetchRoute("/ai")}
+            className="flex min-h-[44px] shrink-0 items-center gap-2 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-2 text-white shadow-sm transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+          >
+            <Sparkles className="h-4 w-4" aria-hidden="true" />
+            <span>{t("cta", "Chat with MAE AI")}</span>
+          </button>
+        </div>
       ) : null}
     </div>
   );

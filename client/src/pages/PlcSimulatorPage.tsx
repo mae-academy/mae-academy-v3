@@ -32,7 +32,7 @@ export default function PlcSimulatorPage() {
   }, []);
 
   return (
-    <SimulatorLayout title="PLC" tabs={[]} activeTab="" routePrefix="/simulations/plc" backLabel={copy.footer.simulations} isRtl={isRtl} hideToolNavigation compact>
+    <SimulatorLayout title="PLC" tabs={[]} activeTab="" routePrefix="/simulations/plc" backLabel={copy.footer.simulations} isRtl={isRtl} hideToolNavigation compact aiLab="plc">
       {/* The simulator is left-to-right engineering notation regardless of page language. */}
       <div dir="ltr" className="mt-3 flex min-h-[calc(100svh-var(--mae-header-height)-9rem)] flex-col mae-simulator-shell">
         <PlcSimulatorApp

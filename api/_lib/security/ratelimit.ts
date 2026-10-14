@@ -11,6 +11,7 @@ export const TIERS = {
   code: { limit: 600, windowMs: 60_000 }, // one request per Run / sketch compile, plus debounced pin-layout analysis while typing
   control: { limit: 900, windowMs: 60_000 }, // slider-driven control and power-converter studios (debounced, ~10/s)
   signals: { limit: 900, windowMs: 60_000 }, // debounced slider-driven transform requests (~10/s) plus on-demand derivations
+  ai: { limit: 12, windowMs: 60_000 }, // MAE AI chat: every request spends a paid Gemini call
 } as const;
 export type Tier = keyof typeof TIERS;
 

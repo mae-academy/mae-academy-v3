@@ -1,0 +1,169 @@
+{
+  "cta": "Chatear con MAE AI",
+  "page": {
+    "title": "MAE AI",
+    "eyebrow": "Asistente docente con IA",
+    "subtitle": "Pregunta a tu profesor de ingeniería: conceptos, soluciones paso a paso, esquemas y código.",
+    "labsAria": "Contexto del laboratorio"
+  },
+  "labs": {
+    "general": "Todos",
+    "circuits": "Circuitos",
+    "power": "Potencia",
+    "logic": "Lógica",
+    "control": "Control",
+    "code": "Código",
+    "arduino": "Arduino",
+    "signals": "Señales",
+    "fluid": "Fluidos",
+    "plc": "PLC"
+  },
+  "mascot": {
+    "greeting": "¡Lista para ayudarte con tus dudas de ingeniería!",
+    "toggle": "Minimizar la mascota del asistente",
+    "states": {
+      "idle": "Mai, la asistente de MAE AI, está lista",
+      "listening": "Mai está escuchando",
+      "thinking": "Mai está pensando",
+      "eureka": "Mai tiene una respuesta",
+      "talking": "Mai está respondiendo"
+    }
+  },
+  "info": {
+    "title": "Qué puede hacer MAE AI",
+    "items": [
+      "Explicar conceptos con intuición y las matemáticas que los sustentan",
+      "Resolver problemas paso a paso, verificando unidades",
+      "Leer los esquemas y diagramas que subas",
+      "Explicar y depurar tu código"
+    ],
+    "tipsTitle": "Consejos",
+    "tips": [
+      "Indica los valores de los componentes y qué quieres hallar.",
+      "Adjunta una imagen nítida y bien iluminada del esquema.",
+      "Haz preguntas de seguimiento: MAE AI recuerda los últimos mensajes."
+    ],
+    "disclaimer": "La IA puede cometer errores. Verifica los resultados antes de confiar en ellos."
+  },
+  "explore": {
+    "title": "Compruébalo en un simulador",
+    "body": "Prueba cada respuesta en un modelo interactivo en vivo.",
+    "general": "Ver todos los simuladores",
+    "lab": "Abrir el simulador de {{lab}}"
+  },
+  "chat": {
+    "title": "Conversación",
+    "newChat": "Nuevo chat",
+    "confirmTitle": "¿Empezar un chat nuevo?",
+    "confirmBody": "Esto borra la conversación actual de este navegador.",
+    "cancel": "Cancelar",
+    "confirm": "Borrar conversación",
+    "emptyTitle": "¿En qué estás trabajando?",
+    "emptyBody": "Pregunta sobre {{lab}} o prueba una de estas.",
+    "emptyBodyGeneral": "Pregunta sobre cualquier tema de ingeniería o prueba una de estas.",
+    "scrollLatest": "Ir al último",
+    "you": "Tú",
+    "assistant": "MAE AI",
+    "attachedImage": "Imagen adjunta",
+    "retry": "Reintentar",
+    "stopped": "Respuesta detenida.",
+    "responding": "MAE AI está respondiendo",
+    "complete": "Respuesta completa",
+    "copy": "Copiar",
+    "copied": "Copiado",
+    "copyFailed": "No se pudo copiar",
+    "codeLabel": "Código",
+    "dropTitle": "Suelta una imagen para adjuntarla",
+    "dropHint": "PNG, JPEG o WebP"
+  },
+  "composer": {
+    "label": "Mensaje para MAE AI",
+    "placeholder": "Haz una pregunta o pega la imagen de un esquema…",
+    "send": "Enviar",
+    "stop": "Detener",
+    "attach": "Adjuntar imagen",
+    "removeImage": "Quitar la imagen adjunta",
+    "preparing": "Preparando la imagen…",
+    "counter": "{{count}} / {{max}} caracteres",
+    "disclaimer": "La IA puede cometer errores. Verifica los resultados antes de confiar en ellos."
+  },
+  "prompts": {
+    "general": [
+      "Explica la diferencia entre CA y CC en términos simples.",
+      "¿Cómo elijo entre un convertidor reductor y uno elevador?",
+      "¿Qué hace realmente la transformada de Laplace?",
+      "Subí un esquema. Explícame paso a paso qué hace."
+    ],
+    "circuits": [
+      "Halla el equivalente de Thévenin de una fuente de 12 V con resistencias de 4 Ω y 6 Ω.",
+      "Explica el análisis de mallas frente al análisis nodal.",
+      "¿Por qué un circuito RC se carga de forma exponencial?",
+      "Subí el esquema de un circuito. Halla la corriente en cada resistencia."
+    ],
+    "power": [
+      "Explica cómo un convertidor reductor regula la tensión.",
+      "Compara los rectificadores de media onda y de onda completa.",
+      "¿Cómo se relaciona el ciclo de trabajo con la tensión de salida de un convertidor elevador?",
+      "Subí el esquema de un inversor. Explica cómo conmuta."
+    ],
+    "logic": [
+      "Simplifica F = A'B + AB' + AB con un mapa de Karnaugh.",
+      "Explica la diferencia entre un latch y un flip-flop.",
+      "¿Cómo diseño un contador módulo 5?",
+      "Subí un diagrama lógico. ¿Qué expresión booleana implementa?"
+    ],
+    "control": [
+      "Explica cómo leer un diagrama del lugar de las raíces.",
+      "¿Cómo sintonizo un controlador PID para una planta de primer orden?",
+      "¿Qué me dicen los márgenes de ganancia y de fase sobre la estabilidad?",
+      "Subí un diagrama de bloques. Halla la función de transferencia en lazo cerrado."
+    ],
+    "code": [
+      "Explica los punteros en C con un ejemplo breve.",
+      "¿Por qué mi bucle se ejecuta una vez de más?",
+      "¿Qué hace esta instrucción en ensamblador 8086: MOV AX, [BX+SI]?",
+      "Subí una captura de un error. Ayúdame a depurarlo."
+    ],
+    "arduino": [
+      "¿Cómo leo un potenciómetro y regulo un LED con PWM?",
+      "Explica la diferencia entre delay() y millis().",
+      "¿Cómo elimino el rebote de un pulsador?",
+      "Subí mi diagrama de conexiones. Revisa si hay errores."
+    ],
+    "signals": [
+      "Explica la convolución con un ejemplo sencillo.",
+      "¿Qué es la tasa de Nyquist y por qué ocurre el aliasing?",
+      "¿Cómo se relacionan los polos en el plano s con la estabilidad?",
+      "Subí la gráfica de una señal. ¿Cuál es su transformada de Fourier?"
+    ],
+    "fluid": [
+      "¿En qué se diferencia un cilindro de doble efecto de uno de simple efecto?",
+      "Explica cómo funciona una válvula direccional 5/2.",
+      "¿Cómo dimensiono un cilindro hidráulico para una fuerza dada?",
+      "Subí un circuito neumático. Explica la secuencia de movimientos."
+    ],
+    "plc": [
+      "Explica un peldaño de enclavamiento (seal-in) en lógica de escalera.",
+      "¿Cómo funciona un temporizador a la conexión (TON)?",
+      "¿Cómo escribo un circuito de arranque y paro de un motor?",
+      "Subí un diagrama de escalera. Explica qué hace."
+    ]
+  },
+  "errors": {
+    "rate_limit": "Demasiadas solicitudes. Espera un minuto e inténtalo de nuevo.",
+    "not_configured": "MAE AI aún no está configurado. Inténtalo más tarde.",
+    "forbidden": "Se bloqueó esta solicitud. Recarga la página e inténtalo de nuevo.",
+    "bad_request": "No se pudo procesar el mensaje. Prueba a acortarlo o a usar una imagen más pequeña.",
+    "upstream": "MAE AI no está disponible temporalmente. Inténtalo de nuevo en un momento.",
+    "network": "No se pudo conectar con MAE AI. Revisa tu conexión e inténtalo de nuevo.",
+    "interrupted": "La respuesta se interrumpió.",
+    "empty": "MAE AI devolvió una respuesta vacía. Inténtalo de nuevo.",
+    "generic": "Algo salió mal. Inténtalo de nuevo."
+  },
+  "image": {
+    "type": "Solo se pueden adjuntar imágenes PNG, JPEG o WebP.",
+    "source_too_large": "La imagen es demasiado grande (más de 15 MB).",
+    "decode": "No se pudo leer la imagen.",
+    "too_large": "La imagen sigue siendo demasiado grande tras reducirla. Prueba con una más pequeña."
+  }
+}

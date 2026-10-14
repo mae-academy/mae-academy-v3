@@ -1,0 +1,169 @@
+{
+  "cta": "Chat with MAE AI",
+  "page": {
+    "title": "MAE AI",
+    "eyebrow": "AI teaching assistant",
+    "subtitle": "Ask your engineering professor: concepts, step-by-step solutions, schematics and code.",
+    "labsAria": "Lab context"
+  },
+  "labs": {
+    "general": "All",
+    "circuits": "Circuits",
+    "power": "Power",
+    "logic": "Logic",
+    "control": "Control",
+    "code": "Code",
+    "arduino": "Arduino",
+    "signals": "Signals",
+    "fluid": "Fluid",
+    "plc": "PLC"
+  },
+  "mascot": {
+    "greeting": "Ready to help with your engineering questions!",
+    "toggle": "Minimize assistant mascot",
+    "states": {
+      "idle": "Mai, the MAE AI assistant, is ready",
+      "listening": "Mai is listening",
+      "thinking": "Mai is thinking",
+      "eureka": "Mai has an answer",
+      "talking": "Mai is answering"
+    }
+  },
+  "info": {
+    "title": "What MAE AI can do",
+    "items": [
+      "Explain concepts with intuition and the math behind them",
+      "Solve problems step by step, with units checked",
+      "Read schematics and diagrams you upload",
+      "Explain and debug your code"
+    ],
+    "tipsTitle": "Tips",
+    "tips": [
+      "Give component values and say what you need to find.",
+      "Attach a clear, well-lit image of the schematic.",
+      "Ask follow-ups: MAE AI remembers the last few messages."
+    ],
+    "disclaimer": "AI can make mistakes. Verify results before relying on them."
+  },
+  "explore": {
+    "title": "Check it in a simulator",
+    "body": "Test every answer on a live, interactive model.",
+    "general": "Browse all simulators",
+    "lab": "Open the {{lab}} simulator"
+  },
+  "chat": {
+    "title": "Conversation",
+    "newChat": "New chat",
+    "confirmTitle": "Start a new chat?",
+    "confirmBody": "This clears the current conversation from this browser.",
+    "cancel": "Cancel",
+    "confirm": "Clear conversation",
+    "emptyTitle": "What are you working on?",
+    "emptyBody": "Ask about {{lab}}, or try one of these.",
+    "emptyBodyGeneral": "Ask about any engineering topic, or try one of these.",
+    "scrollLatest": "Jump to latest",
+    "you": "You",
+    "assistant": "MAE AI",
+    "attachedImage": "Attached image",
+    "retry": "Retry",
+    "stopped": "Response stopped.",
+    "responding": "MAE AI is responding",
+    "complete": "Response complete",
+    "copy": "Copy",
+    "copied": "Copied",
+    "copyFailed": "Copy failed",
+    "codeLabel": "Code",
+    "dropTitle": "Drop an image to attach it",
+    "dropHint": "PNG, JPEG or WebP"
+  },
+  "composer": {
+    "label": "Message MAE AI",
+    "placeholder": "Ask a question, or paste a schematic image…",
+    "send": "Send",
+    "stop": "Stop",
+    "attach": "Attach image",
+    "removeImage": "Remove attached image",
+    "preparing": "Preparing image…",
+    "counter": "{{count}} / {{max}} characters",
+    "disclaimer": "AI can make mistakes. Verify results before relying on them."
+  },
+  "prompts": {
+    "general": [
+      "Explain the difference between AC and DC in simple terms.",
+      "How do I choose between a buck and a boost converter?",
+      "What does the Laplace transform actually do?",
+      "I uploaded a schematic. Please walk me through what it does."
+    ],
+    "circuits": [
+      "Find the Thevenin equivalent of a 12 V source with 4 Ω and 6 Ω resistors.",
+      "Explain mesh analysis versus nodal analysis.",
+      "Why does an RC circuit charge exponentially?",
+      "I uploaded a circuit schematic. Find the current through each resistor."
+    ],
+    "power": [
+      "Explain how a buck converter regulates voltage.",
+      "Compare half-wave and full-wave rectifiers.",
+      "How is the duty cycle related to the output voltage of a boost converter?",
+      "I uploaded an inverter schematic. Explain how it switches."
+    ],
+    "logic": [
+      "Simplify F = A'B + AB' + AB with a Karnaugh map.",
+      "Explain the difference between a latch and a flip-flop.",
+      "How do I design a mod-5 counter?",
+      "I uploaded a logic diagram. What Boolean expression does it implement?"
+    ],
+    "control": [
+      "Explain how to read a root locus plot.",
+      "How do I tune a PID controller for a first-order plant?",
+      "What do gain and phase margin tell me about stability?",
+      "I uploaded a block diagram. Find the closed-loop transfer function."
+    ],
+    "code": [
+      "Explain pointers in C with a small example.",
+      "Why does my loop run one time too many?",
+      "What does this 8086 assembly instruction do: MOV AX, [BX+SI]?",
+      "I uploaded a screenshot of an error. Help me debug it."
+    ],
+    "arduino": [
+      "How do I read a potentiometer and dim an LED with PWM?",
+      "Explain the difference between delay() and millis().",
+      "How do I debounce a push button?",
+      "I uploaded my wiring diagram. Check it for mistakes."
+    ],
+    "signals": [
+      "Explain convolution with a simple example.",
+      "What is the Nyquist rate and why does aliasing happen?",
+      "How do poles in the s-plane relate to system stability?",
+      "I uploaded a signal plot. What is its Fourier transform?"
+    ],
+    "fluid": [
+      "How does a double-acting cylinder differ from a single-acting one?",
+      "Explain how a 5/2 directional valve works.",
+      "How do I size a hydraulic cylinder for a given force?",
+      "I uploaded a pneumatic circuit. Explain the sequence of motion."
+    ],
+    "plc": [
+      "Explain a latching (seal-in) rung in ladder logic.",
+      "How does an on-delay timer (TON) work?",
+      "How do I write a start/stop motor circuit?",
+      "I uploaded a ladder diagram. Explain what it does."
+    ]
+  },
+  "errors": {
+    "rate_limit": "Too many requests. Please wait a minute and try again.",
+    "not_configured": "MAE AI is not configured yet. Please try again later.",
+    "forbidden": "This request was blocked. Please reload the page and try again.",
+    "bad_request": "That message could not be processed. Try shortening it or using a smaller image.",
+    "upstream": "MAE AI is temporarily unavailable. Please try again in a moment.",
+    "network": "Could not reach MAE AI. Check your connection and try again.",
+    "interrupted": "The response was interrupted.",
+    "empty": "MAE AI returned an empty answer. Please try again.",
+    "generic": "Something went wrong. Please try again."
+  },
+  "image": {
+    "type": "Only PNG, JPEG or WebP images can be attached.",
+    "source_too_large": "That image is too large (over 15 MB).",
+    "decode": "That image could not be read.",
+    "too_large": "That image is still too large after resizing. Try a smaller one."
+  }
+}

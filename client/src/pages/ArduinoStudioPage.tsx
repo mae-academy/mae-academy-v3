@@ -10,7 +10,7 @@ export default function ArduinoStudioPage() {
   useSimulatorSeo("arduino");
 
   return (
-    <SimulatorLayout title={shellTitle} tabs={[]} activeTab="" routePrefix="/simulators/arduino-studio" backLabel={copy.footer.simulations} isRtl={isRtl} hideToolNavigation compact>
+    <SimulatorLayout title={shellTitle} tabs={[]} activeTab="" routePrefix="/simulators/arduino-studio" backLabel={copy.footer.simulations} isRtl={isRtl} hideToolNavigation compact aiLab="arduino">
       {/* The simulator is left-to-right engineering notation regardless of page language. */}
       <div dir="ltr" className="mt-3 mae-simulator-shell">
         <ArduinoStudio />

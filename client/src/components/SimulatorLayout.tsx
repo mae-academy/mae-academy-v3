@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { useLocation } from "wouter";
+import type { LabContext } from "@shared/aiTypes";
 import SimulationPageHeader, { type SimulationPageTool } from "./SimulationPageHeader";
 
 export type SimulatorLayoutTab = {
@@ -17,6 +18,8 @@ type SimulatorLayoutProps = {
   hideToolNavigation?: boolean;
   compact?: boolean;
   station?: { identifier: string; outcome: string; metadata: readonly string[] };
+  /** Shows the "Chat with MAE AI" button in the header, preset to this lab. */
+  aiLab?: LabContext;
   children: ReactNode;
 };
 
@@ -29,7 +32,7 @@ type SimulatorLayoutProps = {
  * <SimulationPageHeader /> so every Practical Simulation shares the exact
  * Control Systems header/toolbar frame (size, colour, spacing).
  */
-export default function SimulatorLayout({ title, tabs, activeTab, routePrefix, backLabel, isRtl = false, hideToolNavigation = false, compact = false, station, children }: SimulatorLayoutProps) {
+export default function SimulatorLayout({ title, tabs, activeTab, routePrefix, backLabel, isRtl = false, hideToolNavigation = false, compact = false, station, aiLab, children }: SimulatorLayoutProps) {
   const [, setLocation] = useLocation();
   const tools: SimulationPageTool[] = tabs.map((tab) => ({ id: tab.slug, label: tab.label }));
   const handleSelectTool = (toolId: string) => setLocation(`${routePrefix}/${toolId}`);
@@ -49,6 +52,7 @@ export default function SimulatorLayout({ title, tabs, activeTab, routePrefix, b
       showBack={!station}
       showTitle={!station && Boolean(title)}
       showToolNavigation={!hideToolNavigation}
+      aiLab={aiLab}
     />
 
     {children}

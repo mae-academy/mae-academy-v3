@@ -59,6 +59,7 @@ export function DigitalLogicSimulatorApp() {
       showBack={false}
       showTitle={true}
       showToolNavigation={false}
+      aiLab="logic"
     />
 
     <div id="digital-logic-panel-schematic" role="tabpanel" aria-labelledby="digital-logic-tab-schematic" style={{ display: activeTool === 'schematic' ? 'block' : 'none' }}>
