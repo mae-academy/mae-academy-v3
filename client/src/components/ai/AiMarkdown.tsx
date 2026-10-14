@@ -5,6 +5,8 @@ import remarkMath from "remark-math";
 import { KatexMath } from "@/components/ui/KatexMath";
 import { CodeBlock } from "./CodeBlock";
 import { normalizeMathDelimiters } from "./mathDelimiters";
+import { PENDING_DIAGRAM_LANG, isSvgFence, markPendingDiagram } from "./svgFence";
+import { SvgDiagram, SvgDiagramPending } from "./SvgDiagram";
 
 const REMARK_PLUGINS = [remarkGfm, remarkMath];
 /** Only these schemes may be linked; everything else (javascript:, data:, ...) renders as plain text. */
@@ -38,7 +40,10 @@ const components: Components = {
         </div>
       );
     }
-    const language = /language-([\w+#.-]+)/.exec(className)?.[1];
+    // `:` is part of the info string (`xml:svg`), so it must survive in the language name.
+    const language = /language-([\w+#.:-]+)/.exec(className)?.[1];
+    if (language === PENDING_DIAGRAM_LANG) return <SvgDiagramPending />;
+    if (isSvgFence(language, text)) return <SvgDiagram source={text} />;
     return <CodeBlock code={text} language={language} />;
   },
   a({ href, children }) {
@@ -90,8 +95,9 @@ class MarkdownBoundary extends Component<{ content: string; children: ReactNode 
   }
 }
 
-function AiMarkdownImpl({ content }: { content: string }) {
-  const source = useMemo(() => normalizeMathDelimiters(content), [content]);
+function AiMarkdownImpl({ content, streaming = false }: { content: string; streaming?: boolean }) {
+  // While streaming, a diagram fence that has not closed yet becomes a "drawing" placeholder instead of a growing code block.
+  const source = useMemo(() => normalizeMathDelimiters(streaming ? markPendingDiagram(content) : content), [content, streaming]);
   return (
     <div className="min-w-0 break-words">
       <MarkdownBoundary content={content}>

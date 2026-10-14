@@ -3,6 +3,7 @@ import type { ChatMessage } from "@shared/aiTypes";
 import {
   ACTIVE_THREAD_KEY,
   LEGACY_CHAT_KEY,
+  MAX_TOTAL_CHARS,
   SIDEBAR_STORAGE_KEY,
   THREADS_STORAGE_KEY,
   clearAllThreads,
@@ -161,6 +162,43 @@ describe("quota fallback across threads", () => {
     storage = new FakeStorage(JSON.stringify({ v: 2, threads: [{ ...long, messages: long.messages.slice(-10) }] }).length);
     expect(saveThreads([long], storage)).toBe("trimmed");
     expect(loadThreads(storage).threads[0].messages).toHaveLength(10);
+  });
+
+  describe("with large diagram answers (20-30 KB of text each)", () => {
+    const diagram = (i: number) => `Here it is.\n\n\`\`\`xml:svg\n<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500">${`<text x="1" y="2" font-size="14">R${i}</text>`.repeat(600)}</svg>\n\`\`\`\n`;
+    const heavy = (id: string, updatedAt: number, base: number): ChatThread =>
+      thread(id, updatedAt, Array.from({ length: 8 }, (_, i) => ({ ...m(base + i), content: i % 2 ? diagram(i) : `question ${i}` })));
+
+    it("round-trips them untouched while under budget", () => {
+      const only = heavy("a", 5, 0);
+      expect(only.messages[1].content.length).toBeGreaterThan(20_000);
+      expect(saveThreads([only], storage)).toBe("saved");
+      expect(loadThreads(storage).threads[0].messages).toEqual(only.messages);
+    });
+
+    it("sheds the oldest chats, newest first kept, when many chats overflow the budget", () => {
+      const threads = Array.from({ length: 30 }, (_, i) => heavy(`t${i}`, 1000 + i, i * 10));
+      expect(JSON.stringify({ v: 2, threads }).length).toBeGreaterThan(MAX_TOTAL_CHARS);
+      expect(saveThreads(threads, storage)).toBe("trimmed");
+      const kept = loadThreads(storage).threads;
+      expect(kept.length).toBeGreaterThan(0);
+      expect(kept.length).toBeLessThan(30);
+      expect(kept[0].id).toBe("t29");
+      expect(storage.getItem(THREADS_STORAGE_KEY)!.length).toBeLessThanOrEqual(MAX_TOTAL_CHARS);
+    });
+
+    it("cuts a single over-quota chat to the newest few messages instead of failing", () => {
+      const only = heavy("only", 5, 0);
+      const size = (messages: number) => JSON.stringify({ v: 2, threads: [{ ...only, messages: only.messages.slice(-messages) }] }).length;
+      // Room for the newest four messages but not ten (the chat has eight, so the first emergency tail still overflows).
+      storage = new FakeStorage(size(4) + 10);
+      expect(saveThreads([only], storage)).toBe("trimmed");
+      expect(loadThreads(storage).threads[0].messages.map((x) => x.id)).toEqual(only.messages.slice(-4).map((x) => x.id));
+
+      storage = new FakeStorage(size(1) + 10);
+      expect(saveThreads([only], storage)).toBe("trimmed");
+      expect(loadThreads(storage).threads[0].messages).toHaveLength(1);
+    });
   });
 
   it("reports failure instead of throwing when nothing can be stored", () => {

@@ -64,6 +64,27 @@
   "actions": {
     "openSimulator": "Abrir en el simulador interactivo"
   },
+  "diagram": {
+    "label": "Diagrama del circuito",
+    "drawing": "Dibujando el diagrama…",
+    "failed": "No se pudo mostrar el diagrama",
+    "open": "Abrir el diagrama en grande: {{title}}",
+    "actions": "Acciones del diagrama",
+    "expand": "Ampliar el diagrama",
+    "downloadSvg": "Descargar SVG",
+    "downloadPng": "Descargar PNG",
+    "copySvg": "Copiar código SVG",
+    "copied": "Código SVG copiado",
+    "downloadFailed": "No se pudo iniciar la descarga.",
+    "pngFailed": "No se pudo crear el PNG. Prueba a descargar el SVG.",
+    "close": "Cerrar",
+    "zoom": "Zoom",
+    "zoomIn": "Acercar",
+    "zoomOut": "Alejar",
+    "fit": "Ajustar a la pantalla",
+    "fitShort": "Ajustar",
+    "lightboxHint": "Usa los botones de zoom o las teclas + y - para inspeccionar el diagrama. Pulsa Escape para cerrar."
+  },
   "demo": {
     "short": "Modo demo",
     "full": "Modo demo — añade GEMINI_API_KEY para respuestas reales",

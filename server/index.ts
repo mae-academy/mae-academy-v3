@@ -3,7 +3,7 @@ import { createServer } from "http";
 import path from "path";
 import { fileURLToPath } from "url";
 import "dotenv/config";
-import { AiNotConfiguredError, AiRequestError, assertAiConfigured, generateCircuitAnalysis, mockChatStream, sanitizeChatRequest, streamChat } from "./aiService";
+import { AiBlockedError, AiNotConfiguredError,AiRequestError, assertAiConfigured, generateCircuitAnalysis, mockChatStream, sanitizeChatRequest, streamChat } from "./aiService";
 import type { AiStreamEvent } from "../shared/aiTypes";
 import { libraryCoverHandler } from "./libraryCover";
 import { libraryDoabHandler, libraryDoabItemHandler } from "./libraryDoab";
@@ -194,6 +194,17 @@ async function startServer() {
       res.end();
     } catch (error) {
       if (abort.signal.aborted) return; // the client left; nothing to tell it
+      if (error instanceof AiBlockedError) {
+        // Safety block or empty answer: a fixed friendly message, never the upstream text (the reason is logged only).
+        console.warn("MAE AI answer blocked:", error.reason);
+        if (started) {
+          send({ type: "error", message: error.message });
+          res.end();
+        } else {
+          res.status(422).json({ error: error.message });
+        }
+        return;
+      }
       console.error("MAE AI chat failed:", error);
       if (started) {
         send({ type: "error", message: "MAE AI stopped unexpectedly. Please try again." });

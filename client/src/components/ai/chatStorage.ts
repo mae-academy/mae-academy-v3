@@ -9,8 +9,8 @@ export const LEGACY_CHAT_KEY = "mae-ai:chat:v1";
 export const SIDEBAR_STORAGE_KEY = "mae-ai:sidebar:v1";
 /** Serialized size budget for all threads (localStorage allows ~5M UTF-16 units; leave room for other keys). */
 export const MAX_TOTAL_CHARS = 3_000_000;
-/** Last-resort tail kept when even one thread does not fit. */
-const EMERGENCY_TAIL = 10;
+/** Last-resort tails (newest messages) tried in turn when even one thread does not fit. */
+const EMERGENCY_TAILS = [10, 4, 2, 1];
 
 type StorageLike = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 
@@ -184,7 +184,11 @@ export function saveThreads(source: readonly ChatThread[], storage: StorageLike 
     working = working.slice(0, -1);
     if (attempt(working)) return "trimmed";
   }
-  return attempt([{ ...working[0], messages: working[0].messages.slice(-EMERGENCY_TAIL) }]) ? "trimmed" : "failed";
+  // A single chat can still be too big when its answers carry diagrams (20-30 KB each): keep ever shorter tails.
+  for (const tail of EMERGENCY_TAILS) {
+    if (attempt([{ ...working[0], messages: working[0].messages.slice(-tail) }])) return "trimmed";
+  }
+  return "failed";
 }
 
 export function saveActiveThreadId(id: string, storage: StorageLike | null = defaultStorage()): void {

@@ -64,6 +64,27 @@
   "actions": {
     "openSimulator": "افتح في المحاكي التفاعلي"
   },
+  "diagram": {
+    "label": "مخطط الدائرة",
+    "drawing": "جارٍ رسم المخطط…",
+    "failed": "تعذّر عرض المخطط",
+    "open": "افتح المخطط بحجم أكبر: {{title}}",
+    "actions": "إجراءات المخطط",
+    "expand": "تكبير المخطط",
+    "downloadSvg": "تنزيل SVG",
+    "downloadPng": "تنزيل PNG",
+    "copySvg": "نسخ شيفرة SVG",
+    "copied": "تم نسخ شيفرة SVG",
+    "downloadFailed": "تعذّر بدء التنزيل.",
+    "pngFailed": "تعذّر إنشاء صورة PNG. جرّب تنزيل SVG بدلًا من ذلك.",
+    "close": "إغلاق",
+    "zoom": "التكبير",
+    "zoomIn": "تكبير",
+    "zoomOut": "تصغير",
+    "fit": "ملاءمة الشاشة",
+    "fitShort": "ملاءمة",
+    "lightboxHint": "استخدم أزرار التكبير أو المفتاحين + و - لفحص المخطط. اضغط Escape للإغلاق."
+  },
   "demo": {
     "short": "وضع تجريبي",
     "full": "وضع تجريبي — أضف GEMINI_API_KEY للحصول على إجابات حقيقية",

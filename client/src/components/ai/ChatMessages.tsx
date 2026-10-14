@@ -103,7 +103,7 @@ export const AssistantMessage = memo(function AssistantMessage({ message, stream
       <AssistantAvatar live={live} state={mascotState} stateLabels={stateLabels} shared={sharedAvatar} />
       <div className="min-w-0 flex-1 text-base leading-7 text-slate-800 dark:text-zinc-100">
         <span className="sr-only">{t("chat.assistant")}: </span>
-        {text ? <AiMarkdown content={text} /> : streaming ? <TypingDots /> : null}
+        {text ? <AiMarkdown content={text} streaming={streaming} /> : streaming ? <TypingDots /> : null}
         {lab ? <SimulatorAction lab={lab} /> : null}
       </div>
     </div>

@@ -1,11 +1,27 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { AI_HISTORY_WINDOW, AI_MAX_IMAGE_BYTES, AI_MAX_MESSAGE_CHARS, SIM_MARKER_REGEX, splitSimMarker, type ChatMessage } from "../shared/aiTypes";
 import {
+  AI_HISTORY_WINDOW,
+  AI_MAX_IMAGE_BYTES,
+  AI_MAX_MESSAGE_CHARS,
+  AI_MAX_MODEL_MESSAGE_CHARS,
+  DIAGRAM_OMITTED,
+  SIM_MARKER_REGEX,
+  splitSimMarker,
+  stripSvgDiagrams,
+  type ChatMessage,
+} from "../shared/aiTypes";
+import {
+  AI_BLOCKED_MESSAGE,
+  ARABIC_DECLINE,
+  AiBlockedError,
   AiNotConfiguredError,
   AiRequestError,
+  SAFETY_SETTINGS,
   assertAiConfigured,
+  blockedReason,
   buildContents,
   buildSystemInstruction,
+  cleanModelTurn,
   geminiApiKey,
   mockChatStream,
   mockReply,
@@ -138,6 +154,171 @@ describe("system instruction", () => {
   it("tells the model to infer the sub-domain itself", () => {
     expect(prompt).toMatch(/Infer the engineering sub-domain/);
   });
+
+  it("names the assistant and restricts it to academic topics", () => {
+    expect(prompt).toContain("MAE AI");
+    expect(prompt).toContain("مي الذكي");
+    expect(prompt).toMatch(/premier academic engineering teaching assistant of MAE Academy/);
+    expect(prompt).toMatch(/only with engineering, mathematics, physics and computer science/);
+    expect(prompt).toMatch(/a refusal never carries a \[\[SIM:\.\.\]\] marker/);
+  });
+
+  it("contains the Arabic decline text verbatim", () => {
+    expect(ARABIC_DECLINE).toBe("عذراً يا بشمهندس! أنا مساعد مخصص للعلوم والهندسة فقط (سيركت، كنترول، باور، وغيرها). إسألني في أي مسألة أو مادة هندسية وبكون معك خطوة بخطوة ⚡");
+    expect(prompt).toContain(`«${ARABIC_DECLINE}»`);
+  });
+
+  it("specifies the xml:svg diagram contract with its allow-list", () => {
+    expect(prompt).toContain("`xml:svg`");
+    expect(prompt).toContain('xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500"');
+    expect(prompt).toContain("ONLY these elements: svg, g, defs, marker, line, polyline, polygon, path, rect, circle, ellipse, text, tspan, title, desc");
+    expect(prompt).toMatch(/NEVER use script, foreignObject, image, style elements, event handlers, or external URLs/);
+    expect(prompt).toContain("Escape `&` as `&amp;`");
+    expect(prompt).toContain("ارسم");
+    expect(prompt).toMatch(/Do not draw unless/);
+    expect(prompt).toMatch(/say so when a part is unreadable/);
+  });
+
+  it("keeps the marker usable after a drawing", () => {
+    expect(prompt).toMatch(/drew may also end with the marker/);
+  });
+
+  it("stays compact and is a function of the lab", () => {
+    expect(prompt.length).toBeLessThan(6000);
+    expect(buildSystemInstruction("control")).not.toBe(prompt);
+  });
+});
+
+describe("safety settings", () => {
+  it("blocks only high-probability harm in at least four categories", () => {
+    expect(SAFETY_SETTINGS.length).toBeGreaterThanOrEqual(4);
+    for (const setting of SAFETY_SETTINGS) expect(setting.threshold).toBe("BLOCK_ONLY_HIGH");
+    const categories = SAFETY_SETTINGS.map((s) => s.category);
+    expect(new Set(categories).size).toBe(categories.length);
+    expect(categories).toEqual(
+      expect.arrayContaining(["HARM_CATEGORY_HARASSMENT", "HARM_CATEGORY_HATE_SPEECH", "HARM_CATEGORY_SEXUALLY_EXPLICIT", "HARM_CATEGORY_DANGEROUS_CONTENT"]),
+    );
+  });
+
+  it("omits deprecated and image-only categories", () => {
+    for (const setting of SAFETY_SETTINGS) expect(setting.category).not.toMatch(/CIVIC|IMAGE|JAILBREAK|UNSPECIFIED/);
+  });
+});
+
+describe("blocked outcomes", () => {
+  it("detects a blocked prompt and policy finish reasons", () => {
+    expect(blockedReason({ promptFeedback: { blockReason: "SAFETY" } })).toBe("prompt:SAFETY");
+    expect(blockedReason({ candidates: [{ finishReason: "PROHIBITED_CONTENT" }] })).toBe("finish:PROHIBITED_CONTENT");
+    for (const reason of ["SAFETY", "RECITATION", "BLOCKLIST", "SPII", "OTHER", "LANGUAGE"]) {
+      expect(blockedReason({ candidates: [{ finishReason: reason }] }), reason).toBe(`finish:${reason}`);
+    }
+  });
+
+  it("ignores normal chunks", () => {
+    expect(blockedReason({})).toBeUndefined();
+    expect(blockedReason({ candidates: [{}] })).toBeUndefined();
+    expect(blockedReason({ candidates: [{ finishReason: "STOP" }] })).toBeUndefined();
+    expect(blockedReason({ candidates: [{ finishReason: "MAX_TOKENS" }] })).toBeUndefined();
+    expect(blockedReason({ promptFeedback: { blockReason: "BLOCKED_REASON_UNSPECIFIED" } })).toBeUndefined();
+  });
+
+  it("carries a fixed friendly message and keeps the upstream reason off it", () => {
+    const error = new AiBlockedError("finish:SAFETY");
+    expect(error).toBeInstanceOf(Error);
+    expect(error.message).toBe(AI_BLOCKED_MESSAGE);
+    expect(error.message).not.toMatch(/SAFETY|finish/);
+    expect(error.reason).toBe("finish:SAFETY");
+    expect(AI_BLOCKED_MESSAGE).toBe("That request couldn't be answered. Try rephrasing it as an engineering question.");
+  });
+});
+
+describe("stripSvgDiagrams", () => {
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><line x1="0" y1="0" x2="1" y2="1"/></svg>';
+  const fence = (info: string, body: string) => ["```" + info, body, "```"].join("\n");
+
+  it("replaces xml:svg and svg fences", () => {
+    expect(stripSvgDiagrams(`Here:\n\n${fence("xml:svg", svg)}\n\nDone.`)).toBe(`Here:\n\n${DIAGRAM_OMITTED}\n\nDone.`);
+    expect(stripSvgDiagrams(fence("svg", svg))).toBe(DIAGRAM_OMITTED);
+    expect(stripSvgDiagrams(fence("SVG", svg))).toBe(DIAGRAM_OMITTED);
+  });
+
+  it("replaces any fence whose body contains <svg, whatever its info string", () => {
+    expect(stripSvgDiagrams(fence("xml", svg))).toBe(DIAGRAM_OMITTED);
+    expect(stripSvgDiagrams(fence("", svg))).toBe(DIAGRAM_OMITTED);
+  });
+
+  it("replaces an unterminated trailing fence", () => {
+    expect(stripSvgDiagrams('Intro\n```xml:svg\n<svg xmlns="x"><line x1="0"')).toBe(`Intro\n${DIAGRAM_OMITTED}`);
+    expect(stripSvgDiagrams("Intro\n```xml:svg")).toBe(`Intro\n${DIAGRAM_OMITTED}`);
+  });
+
+  it("handles several diagrams and leaves other code and math alone", () => {
+    const cpp = fence("cpp", "int x = 1 < 2;");
+    const text = `A\n${fence("xml:svg", svg)}\n${cpp}\nB $a<b$\n${fence("svg", svg)}\nC`;
+    expect(stripSvgDiagrams(text)).toBe(`A\n${DIAGRAM_OMITTED}\n${cpp}\nB $a<b$\n${DIAGRAM_OMITTED}\nC`);
+  });
+
+  it("replaces a bare svg element outside fences", () => {
+    expect(stripSvgDiagrams(`See ${svg} ok`)).toBe(`See ${DIAGRAM_OMITTED} ok`);
+  });
+
+  it("is idempotent and leaves plain text untouched", () => {
+    const once = stripSvgDiagrams(`x\n${fence("xml:svg", svg)}`);
+    expect(stripSvgDiagrams(once)).toBe(once);
+    expect(stripSvgDiagrams("Just text, 1 < 2.")).toBe("Just text, 1 < 2.");
+    expect(stripSvgDiagrams("")).toBe("");
+  });
+});
+
+describe("model turn hygiene", () => {
+  const bigSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500">${'<line x1="0" y1="0" x2="1" y2="1"/>'.repeat(1200)}</svg>`;
+  const fence = (info: string, body: string) => ["```" + info, body, "```"].join("\n");
+  const history = (modelContent: string) => [msg(0, "user", { content: "draw a divider" }), msg(1, "model", { content: modelContent }), msg(2, "user", { content: "now solve it" })];
+
+  it("accepts a follow-up after a huge drawing, with the diagram omitted", () => {
+    const reply = `Here you go.\n\n${fence("xml:svg", bigSvg)}\n\nVout is 8 V.\n[[SIM:circuits]]`;
+    expect(reply.length).toBeGreaterThan(AI_MAX_MODEL_MESSAGE_CHARS);
+    const { messages } = sanitizeChatRequest({ messages: history(reply) });
+    expect(messages[1].content).toBe(`Here you go.\n\n${DIAGRAM_OMITTED}\n\nVout is 8 V.`);
+    expect(JSON.stringify(buildContents(messages))).not.toContain("<svg");
+  });
+
+  it("handles a truncated drawing without a closing fence", () => {
+    const { messages } = sanitizeChatRequest({ messages: history(`Lead-in\n\`\`\`xml:svg\n${bigSvg.slice(0, 5000)}`) });
+    expect(messages[1].content).toBe(`Lead-in\n${DIAGRAM_OMITTED}`);
+  });
+
+  it("truncates, not rejects, a long model turn at the model cap", () => {
+    const { messages } = sanitizeChatRequest({ messages: history("y".repeat(AI_MAX_MODEL_MESSAGE_CHARS * 2)) });
+    expect(messages[1].content.length).toBe(AI_MAX_MODEL_MESSAGE_CHARS);
+    expect(messages[1].content.endsWith("…")).toBe(true);
+    const exact = sanitizeChatRequest({ messages: history("z".repeat(AI_MAX_MODEL_MESSAGE_CHARS)) }).messages[1].content;
+    expect(exact).toBe("z".repeat(AI_MAX_MODEL_MESSAGE_CHARS));
+  });
+
+  it("lets a model turn exceed the user cap but still rejects a long user turn", () => {
+    const long = "w".repeat(AI_MAX_MESSAGE_CHARS + 500);
+    expect(sanitizeChatRequest({ messages: history(long) }).messages[1].content).toBe(long);
+    refused({ messages: [msg(0, "user", { content: long })] });
+    refused({ messages: [msg(0, "user", { content: "q" }), msg(1, "model"), msg(2, "user", { content: long })] });
+  });
+
+  it("leaves user messages untouched, even when they contain svg or a marker", () => {
+    const content = `look: ${fence("xml:svg", "<svg/>")} [[SIM:circuits]]`;
+    expect(sanitizeChatRequest({ messages: [msg(0, "user", { content })] }).messages[0].content).toBe(content);
+  });
+
+  it("strips the trailing simulator marker, idempotently", () => {
+    const { messages } = sanitizeChatRequest({ messages: history("Answer text.\n[[SIM:control]]") });
+    expect(messages[1].content).toBe("Answer text.");
+    expect(cleanModelTurn(cleanModelTurn("Answer text.\n[[SIM:control]]"))).toBe("Answer text.");
+    expect(cleanModelTurn("Answer\n[[SI")).toBe("Answer");
+  });
+
+  it("never produces an empty model turn", () => {
+    expect(cleanModelTurn("[[SIM:plc]]").length).toBeGreaterThan(0);
+    for (const c of buildContents(sanitizeChatRequest({ messages: history("[[SIM:plc]]") }).messages)) expect(c.parts.length).toBeGreaterThan(0);
+  });
 });
 
 describe("key and mode resolution", () => {
@@ -214,6 +395,33 @@ describe("demo stream", () => {
       expect(splitSimMarker(reply).lab, prompt).toBe(lab);
       expect(reply.startsWith("*Demo mode")).toBe(true);
       expect(reply.match(/\[\[SIM:/g)).toHaveLength(1);
+    }
+  });
+
+  it("answers a draw request with a well-formed xml:svg block using only allowed elements", () => {
+    for (const prompt of ["draw a voltage divider", "Generate a schematic diagram", "ارسم دائرة مقسم جهد"]) {
+      const reply = mockReply(prompt);
+      expect(reply.startsWith("*Demo mode"), prompt).toBe(true);
+      const match = /```xml:svg\n([\s\S]*?)\n```/.exec(reply);
+      expect(match, prompt).not.toBeNull();
+      const svg = match![1];
+      expect(svg).toMatch(/^<svg xmlns="http:\/\/www\.w3\.org\/2000\/svg" viewBox="[\d. ]+"/);
+      expect(svg.trimEnd().endsWith("</svg>")).toBe(true);
+      expect(svg).toContain("R1 = 1 kΩ");
+      expect(svg).toContain("R2 = 2 kΩ");
+      expect(svg).toContain("Vin = 12 V");
+      const allowed = new Set(["svg", "g", "defs", "marker", "line", "polyline", "polygon", "path", "rect", "circle", "ellipse", "text", "tspan", "title", "desc"]);
+      const stack: string[] = [];
+      for (const [, closing, name, , selfClosing] of Array.from(svg.matchAll(/<(\/?)([a-zA-Z][\w:-]*)((?:\s+[\w:-]+="[^"<]*")*)\s*(\/?)>/g))) {
+        expect(allowed.has(name), `<${name}>`).toBe(true);
+        if (selfClosing) continue;
+        if (closing) expect(stack.pop()).toBe(name);
+        else stack.push(name);
+      }
+      expect(stack).toEqual([]);
+      expect(svg).not.toMatch(/<(script|foreignObject|image|style)|\son\w+=|href|javascript:/i);
+      expect(svg.replace(/<[^>]*>/g, "")).not.toMatch(/[<&]/); // text content is XML-safe
+      expect(splitSimMarker(reply).lab).toBe("circuits");
     }
   });
 
@@ -356,13 +564,34 @@ describe("withModelFallback", () => {
   });
 
   it("does not retry client or auth errors", async () => {
-    for (const status of [400, 401, 403, 404, 429]) {
+    for (const status of [400, 401, 403, 404]) {
       const attempt = vi.fn(async () => {
         throw upstream(status);
       });
       await expect(withModelFallback(["a", "a", "b"], attempt, { sleep: noSleep })).rejects.toMatchObject({ status });
       expect(attempt).toHaveBeenCalledTimes(1);
     }
+  });
+
+  it("on a 429 (per-model quota) skips straight to the next different model, with no pause", async () => {
+    const seen: string[] = [];
+    const delays: number[] = [];
+    const attempt = async (model: string) => {
+      seen.push(model);
+      if (model === "main") throw upstream(429);
+      return "ok";
+    };
+    await expect(withModelFallback(["main", "main", "lite"], attempt, { sleep: async (ms) => void delays.push(ms) })).resolves.toBe("ok");
+    expect(seen).toEqual(["main", "lite"]);
+    expect(delays).toEqual([]);
+  });
+
+  it("throws the 429 when no different model is left to try", async () => {
+    const attempt = vi.fn(async () => {
+      throw upstream(429);
+    });
+    await expect(withModelFallback(["lite", "lite"], attempt, { sleep: noSleep })).rejects.toMatchObject({ status: 429 });
+    expect(attempt).toHaveBeenCalledTimes(1);
   });
 
   it("does not retry errors without a status, or after the request was aborted", async () => {

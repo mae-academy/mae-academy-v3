@@ -105,6 +105,18 @@ describe("buildRequestMessages", () => {
     expect(JSON.stringify(out)).not.toContain("[[SIM:circuits]]");
   });
 
+  it("replaces diagrams in earlier model answers with a short literal, leaving user text alone", () => {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500">${"<rect width='1' height='1'/>".repeat(500)}</svg>`;
+    const out = buildRequestMessages([
+      msg("1", "user", "draw a divider"),
+      msg("2", "model", `Here you go.\n\n\`\`\`xml:svg\n${svg}\n\`\`\`\n\nR1 and R2 split 12 V.\n[[SIM:circuits]]`),
+      msg("3", "user", "```xml:svg\nI typed this myself\n```"),
+    ]);
+    expect(out[1].content).toBe("Here you go.\n\n[diagram omitted]\n\nR1 and R2 split 12 V.");
+    expect(out[2].content).toBe("```xml:svg\nI typed this myself\n```");
+    expect(JSON.stringify(out).length).toBeLessThan(400);
+  });
+
   it("drops a model turn that was only a marker", () => {
     const out = buildRequestMessages([msg("1", "user", "a"), msg("2", "model", "[[SIM:logic]]"), msg("3", "user", "b")]);
     expect(out).toHaveLength(1);

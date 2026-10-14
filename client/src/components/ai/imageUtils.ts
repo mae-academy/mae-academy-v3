@@ -1,9 +1,8 @@
 import { AI_MAX_IMAGE_BYTES } from "@shared/aiTypes";
 
 export const ACCEPTED_IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp"] as const;
-export const MAX_IMAGE_WIDTH = 1200;
-/** Bound on height so a very tall screenshot cannot allocate an enormous canvas. */
-export const MAX_IMAGE_HEIGHT = 3000;
+/** The longer side of an uploaded image; also keeps a very tall screenshot from allocating an enormous canvas. */
+export const MAX_IMAGE_DIMENSION = 1200;
 /** Refuse absurd inputs before decoding them. */
 export const MAX_SOURCE_BYTES = 15 * 1024 * 1024;
 const JPEG_QUALITIES = [0.8, 0.6] as const;
@@ -21,10 +20,10 @@ export function isAcceptedImageType(type: string): boolean {
   return (ACCEPTED_IMAGE_TYPES as readonly string[]).includes(type);
 }
 
-/** Target size: at most `maxWidth` wide (and `maxHeight` tall), aspect ratio kept, never upscaled. */
-export function fitWithin(width: number, height: number, maxWidth = MAX_IMAGE_WIDTH, maxHeight = MAX_IMAGE_HEIGHT): { width: number; height: number } {
+/** Target size: the longer side at most `maxDimension`, aspect ratio kept, never upscaled. */
+export function fitWithin(width: number, height: number, maxDimension = MAX_IMAGE_DIMENSION): { width: number; height: number } {
   if (!(width > 0) || !(height > 0)) return { width: 1, height: 1 };
-  const scale = Math.min(1, maxWidth / width, maxHeight / height);
+  const scale = Math.min(1, maxDimension / width, maxDimension / height);
   return { width: Math.max(1, Math.round(width * scale)), height: Math.max(1, Math.round(height * scale)) };
 }
 
@@ -68,7 +67,7 @@ async function decode(file: Blob): Promise<Decoded> {
 }
 
 /**
- * Validates and shrinks an image for upload: max 1200px wide, JPEG q0.8 on a white background (so transparent PNGs
+ * Validates and shrinks an image for upload: longer side at most 1200px, JPEG q0.8 on a white background (so transparent PNGs
  * do not turn black), re-encoded once at lower quality if it is still over the server's size cap.
  * Resolves to a `data:image/jpeg;base64,...` URL; rejects with ImageError.
  */

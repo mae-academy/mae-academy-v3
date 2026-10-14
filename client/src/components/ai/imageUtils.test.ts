@@ -4,18 +4,21 @@ import { AI_MAX_IMAGE_BYTES } from "@shared/aiTypes";
 import { ImageError, dataUrlBytes, fitWithin, isAcceptedImageType, prepareImageForChat } from "./imageUtils";
 
 describe("fitWithin", () => {
-  it("shrinks wide images to 1200px keeping the aspect ratio", () => {
+  it("shrinks wide images so the longer side is 1200px, keeping the aspect ratio", () => {
     expect(fitWithin(2400, 1200)).toEqual({ width: 1200, height: 600 });
     expect(fitWithin(4000, 3000)).toEqual({ width: 1200, height: 900 });
+  });
+  it("applies the same cap to tall images", () => {
+    expect(fitWithin(1500, 3000)).toEqual({ width: 600, height: 1200 });
+    expect(fitWithin(900, 1500)).toEqual({ width: 720, height: 1200 });
+    const out = fitWithin(1000, 12000);
+    expect(out.height).toBe(1200);
+    expect(out.width).toBe(100);
   });
   it("never upscales", () => {
     expect(fitWithin(800, 600)).toEqual({ width: 800, height: 600 });
     expect(fitWithin(1200, 10)).toEqual({ width: 1200, height: 10 });
-  });
-  it("also bounds extreme heights", () => {
-    const out = fitWithin(1000, 12000);
-    expect(out.height).toBe(3000);
-    expect(out.width).toBe(250);
+    expect(fitWithin(10, 1200)).toEqual({ width: 10, height: 1200 });
   });
   it("never returns a zero dimension and tolerates bad input", () => {
     expect(fitWithin(10000, 1)).toEqual({ width: 1200, height: 1 });
@@ -73,6 +76,13 @@ describe("prepareImageForChat", () => {
     expect(calls.fill).toEqual(["#ffffff"]);
     expect(ctx.fillRect).toHaveBeenCalledWith(0, 0, 1200, 900);
     expect(calls.qualities).toEqual([0.8]);
+  });
+
+  it("also limits the height of a portrait photo to 1200", async () => {
+    stubBitmap(1800, 2400);
+    const { calls } = stubCanvas([100_000]);
+    await prepareImageForChat(new File(["x"], "a.png", { type: "image/png" }));
+    expect(calls.size).toEqual({ width: 900, height: 1200 });
   });
 
   it("does not upscale small images", async () => {

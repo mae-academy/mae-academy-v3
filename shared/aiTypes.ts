@@ -25,7 +25,8 @@ export interface AiChatRequest {
  *   data: {"type":"done"}                    the answer is complete; no further events
  *   data: {"type":"error","message":"..."}   the stream failed after it started; no further events
  * Failures before the stream starts are plain JSON `{ "error": string }` with status 400 (invalid
- * request), 429 (rate limited or too many open streams), 503 (MAE AI not configured) or 502 (upstream unavailable).
+ * request), 422 (the model declined or the request was blocked by safety filters), 429 (rate limited or too many
+ * open streams), 503 (MAE AI not configured) or 502 (upstream unavailable).
  */
 export type AiStreamEvent =
   | { type: 'delta'; text: string }
@@ -41,6 +42,8 @@ export const AI_HISTORY_WINDOW = 6;
 /** Decoded image size cap; images arrive pre-shrunk, so this is generous. */
 export const AI_MAX_IMAGE_BYTES = 1.5 * 1024 * 1024;
 export const AI_MAX_MESSAGE_CHARS = 4000;
+/** Cap for resent `model` turns (after diagrams are stripped); longer ones are truncated, never rejected. */
+export const AI_MAX_MODEL_MESSAGE_CHARS = 16000;
 
 export const LAB_CONTEXTS: readonly LabContext[] = ['general', 'circuits', 'power', 'logic', 'control', 'code', 'arduino', 'signals', 'fluid', 'plc'];
 
@@ -73,4 +76,19 @@ export function splitSimMarker(text: string): { text: string; lab: SimLab | null
     if (before === '' || /\s$/.test(before)) return { text: before.trimEnd(), lab: null };
   }
   return { text, lab: null };
+}
+
+/** What a vector diagram is replaced with when a model turn is resent as history. */
+export const DIAGRAM_OMITTED = '[diagram omitted]';
+
+/**
+ * Replaces every SVG diagram in a model reply with `[diagram omitted]`: any fenced block (```xml:svg, ```svg, or any
+ * info string) whose info line or body contains `<svg`, including an unterminated trailing one, plus a bare
+ * `<svg ...>...</svg>` outside fences. Other code fences are left untouched. Pure and idempotent.
+ */
+export function stripSvgDiagrams(text: string): string {
+  const fenced = text.replace(/```([^\n`]*)(?:\n([\s\S]*?))?(?:```|$)/g, (whole, info: string, body: string | undefined) =>
+    /^\s*(?:xml:)?svg\b/i.test(info) || /<svg[\s>]/i.test(info + (body ?? '')) ? DIAGRAM_OMITTED : whole,
+  );
+  return fenced.replace(/<svg[\s>][\s\S]*?(?:<\/svg>|$)/gi, DIAGRAM_OMITTED);
 }

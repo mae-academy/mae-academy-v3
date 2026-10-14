@@ -1,5 +1,7 @@
 import { AI_HISTORY_WINDOW, splitSimMarker, type AiStreamEvent, type ChatMessage, type LabContext } from "@shared/aiTypes";
 
+import { stripSvgFences } from "./svgFence";
+
 export type ChatErrorKind =
   | "rate_limit"
   | "not_configured"
@@ -94,7 +96,8 @@ export function createSseParser(onEvent: (event: AiStreamEvent) => void): SsePar
 export function buildRequestMessages(messages: readonly ChatMessage[]): ChatMessage[] {
   const merged: ChatMessage[] = [];
   for (const original of messages.slice(-AI_HISTORY_WINDOW)) {
-    const message = original.role === "model" ? { ...original, content: splitSimMarker(original.content).text } : original;
+    // Diagrams are large and the model does not need to re-read its own drawing.
+    const message = original.role === "model" ? { ...original, content: stripSvgFences(splitSimMarker(original.content).text) } : original;
     if (message.role === "model" && !message.content.trim()) continue;
     const previous = merged[merged.length - 1];
     if (previous && previous.role === message.role) {

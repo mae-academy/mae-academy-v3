@@ -64,6 +64,27 @@
   "actions": {
     "openSimulator": "Open in Interactive Simulator"
   },
+  "diagram": {
+    "label": "Circuit diagram",
+    "drawing": "Drawing diagram…",
+    "failed": "The diagram couldn't be displayed",
+    "open": "Open diagram larger: {{title}}",
+    "actions": "Diagram actions",
+    "expand": "Expand diagram",
+    "downloadSvg": "Download SVG",
+    "downloadPng": "Download PNG",
+    "copySvg": "Copy SVG code",
+    "copied": "SVG code copied",
+    "downloadFailed": "The download could not be started.",
+    "pngFailed": "Couldn't create the PNG. Try downloading the SVG instead.",
+    "close": "Close",
+    "zoom": "Zoom",
+    "zoomIn": "Zoom in",
+    "zoomOut": "Zoom out",
+    "fit": "Fit to screen",
+    "fitShort": "Fit",
+    "lightboxHint": "Use the zoom buttons or the + and - keys to inspect the diagram. Press Escape to close."
+  },
   "demo": {
     "short": "Demo mode",
     "full": "Demo mode — add GEMINI_API_KEY for real answers",
