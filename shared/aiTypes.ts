@@ -43,3 +43,34 @@ export const AI_MAX_IMAGE_BYTES = 1.5 * 1024 * 1024;
 export const AI_MAX_MESSAGE_CHARS = 4000;
 
 export const LAB_CONTEXTS: readonly LabContext[] = ['general', 'circuits', 'power', 'logic', 'control', 'code', 'arduino', 'signals', 'fluid', 'plc'];
+
+/** Labs an answer can be opened in; `general` is only a request hint, never a marker target. */
+export type SimLab = Exclude<LabContext, 'general'>;
+
+/**
+ * When an answer analyzes something that can be opened in an interactive simulator, the model ends it with
+ * one final line `[[SIM:<lab>]]`. The UI strips it with `splitSimMarker` and shows an "Open in simulator" button.
+ */
+export const SIM_MARKER_REGEX = /\n?\[\[SIM:(circuits|power|logic|control|code|arduino|signals|fluid|plc)\]\]\s*$/;
+
+const SIM_LABS: readonly SimLab[] = ['circuits', 'power', 'logic', 'control', 'code', 'arduino', 'signals', 'fluid', 'plc'];
+const SIM_MARKERS = SIM_LABS.map((lab) => `[[SIM:${lab}]]`);
+const SIM_MARKER_MAX = Math.max(...SIM_MARKERS.map((marker) => marker.length));
+
+/**
+ * Splits a trailing simulator marker off streamed or final text. A complete marker yields its lab; a trailing
+ * partial marker (`[[SI`, `[[SIM:con`) is dropped too, so a streaming UI never flashes half a marker.
+ */
+export function splitSimMarker(text: string): { text: string; lab: SimLab | null } {
+  const match = SIM_MARKER_REGEX.exec(text);
+  if (match) return { text: text.slice(0, match.index).trimEnd(), lab: match[1] as SimLab };
+
+  for (let length = Math.min(text.length, SIM_MARKER_MAX - 1); length >= 1; length--) {
+    const tail = text.slice(-length);
+    if (!tail.startsWith('[') || !SIM_MARKERS.some((marker) => marker.startsWith(tail))) continue;
+    const before = text.slice(0, text.length - length);
+    // Only at the start of the text or after whitespace, so `a[` or `x[[` in prose is never touched.
+    if (before === '' || /\s$/.test(before)) return { text: before.trimEnd(), lab: null };
+  }
+  return { text, lab: null };
+}

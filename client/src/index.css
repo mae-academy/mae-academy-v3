@@ -1346,3 +1346,41 @@ html[dir="rtl"] .math-expression-display {
 .mae-palette-scroll::-webkit-scrollbar-thumb:hover {
   background: rgb(100 116 139 / 0.8);
 }
+
+/* MAE AI code blocks: Lezer classHighlighter token classes (see components/ai/codeHighlight.ts), light and dark. */
+.mae-ai-code {
+  --tok-keyword: #6d28d9;
+  --tok-string: #047857;
+  --tok-number: #b45309;
+  --tok-comment: #64748b;
+  --tok-type: #0369a1;
+  --tok-prop: #0e7490;
+  --tok-meta: #a21caf;
+  --tok-punct: #64748b;
+}
+.dark .mae-ai-code {
+  --tok-keyword: #c4b5fd;
+  --tok-string: #6ee7b7;
+  --tok-number: #fcd34d;
+  --tok-comment: #8b93a7;
+  --tok-type: #7dd3fc;
+  --tok-prop: #67e8f9;
+  --tok-meta: #f0abfc;
+  --tok-punct: #94a3b8;
+}
+.mae-ai-code .tok-keyword,
+.mae-ai-code .tok-operator.tok-keyword { color: var(--tok-keyword); }
+.mae-ai-code .tok-string,
+.mae-ai-code .tok-literal { color: var(--tok-string); }
+.mae-ai-code .tok-number,
+.mae-ai-code .tok-bool,
+.mae-ai-code .tok-atom { color: var(--tok-number); }
+.mae-ai-code .tok-comment { color: var(--tok-comment); font-style: italic; }
+.mae-ai-code .tok-typeName,
+.mae-ai-code .tok-className,
+.mae-ai-code .tok-namespace { color: var(--tok-type); }
+.mae-ai-code .tok-propertyName { color: var(--tok-prop); }
+.mae-ai-code .tok-meta,
+.mae-ai-code .tok-macroName { color: var(--tok-meta); }
+.mae-ai-code .tok-punctuation,
+.mae-ai-code .tok-operator { color: var(--tok-punct); }

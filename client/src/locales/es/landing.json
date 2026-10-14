@@ -6,6 +6,11 @@
     "ctaPrimary": "Iniciar una Simulación",
     "ctaSecondary": "Explorar Biblioteca"
   },
+  "aiCallout": {
+    "title": "Chatea con MAE AI",
+    "description": "Sube esquemas, analiza tus trabajos del curso o pregunta cualquier concepto de ingeniería.",
+    "cta": "Empezar a chatear"
+  },
   "founder": {
     "title": "La educación en ingeniería se vuelve potente cuando permanece cerca del sistema real.",
     "description": "Conoce al fundador y la premisa de MAE detrás de la plataforma: Modelar. Analizar. Ingeniería.",

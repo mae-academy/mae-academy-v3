@@ -1,6 +1,7 @@
-import { memo, useEffect, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { Check, Copy } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { highlightToSpans, type HighlightSpan } from "./codeHighlight";
 
 const LANGUAGE_LABELS: Record<string, string> = {
   cpp: "C++", "c++": "C++", cxx: "C++", cc: "C++", hpp: "C++",
@@ -59,6 +60,23 @@ function CodeBlockImpl({ code, language }: { code: string; language?: string }) 
   const timer = useRef<number | undefined>(undefined);
   useEffect(() => () => window.clearTimeout(timer.current), []);
 
+  // Highlighting loads lazily; until it lands (or if it fails) the block is plain text. While an answer streams in,
+  // the previous highlight keeps covering the code it already matched and only the new tail is plain.
+  const [spans, setSpans] = useState<HighlightSpan[] | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    void highlightToSpans(code, language).then((result) => {
+      if (!cancelled) setSpans(result);
+    });
+    return () => { cancelled = true; };
+  }, [code, language]);
+  const parts = useMemo(() => {
+    if (!spans) return null;
+    const covered = spans.map((span) => span.text).join("");
+    if (covered === code) return spans;
+    return code.startsWith(covered) ? [...spans, { text: code.slice(covered.length), className: "" }] : null;
+  }, [spans, code]);
+
   const label = languageLabel(language) ?? t("chat.codeLabel");
   const onCopy = async () => {
     const ok = await copyText(code);
@@ -69,8 +87,8 @@ function CodeBlockImpl({ code, language }: { code: string; language?: string }) 
 
   return (
     // Code is always left-to-right, even inside Arabic replies.
-    <div dir="ltr" className="my-3 overflow-hidden rounded-xl border border-slate-200 bg-slate-50 text-left dark:border-white/[0.08] dark:bg-[#08080A]">
-      <div className="flex items-center justify-between gap-2 border-b border-slate-200 bg-slate-100/80 py-1 ps-3 pe-1 dark:border-white/[0.08] dark:bg-white/[0.04]">
+    <div dir="ltr" className="my-4 overflow-hidden rounded-xl border border-slate-200 bg-slate-50 text-left dark:border-white/[0.08] dark:bg-[#0c0c10]">
+      <div className="flex items-center justify-between gap-2 border-b border-slate-200 bg-slate-100/80 py-0.5 ps-4 pe-1 dark:border-white/[0.06] dark:bg-white/[0.04]">
         <span className="font-mono text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-zinc-400">{label}</span>
         <button
           type="button"
@@ -82,7 +100,7 @@ function CodeBlockImpl({ code, language }: { code: string; language?: string }) 
         </button>
         <span role="status" aria-live="polite" className="sr-only">{copy === "copied" ? t("chat.copied") : copy === "failed" ? t("chat.copyFailed") : ""}</span>
       </div>
-      <pre className="overflow-x-auto p-3 text-[13px] leading-relaxed text-slate-800 dark:text-zinc-200"><code className="font-mono whitespace-pre">{code}</code></pre>
+      <pre className="mae-ai-code mae-code-font overflow-x-auto p-4 text-[13px] leading-relaxed text-slate-800 dark:text-zinc-200"><code className="font-mono whitespace-pre">{parts ? parts.map((part, index) => (part.className ? <span key={index} className={part.className}>{part.text}</span> : part.text)) : code}</code></pre>
     </div>
   );
 }

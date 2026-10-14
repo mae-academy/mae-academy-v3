@@ -92,6 +92,24 @@ describe("buildRequestMessages", () => {
     expect(out[0]).not.toHaveProperty("imageUrl");
     expect(out[2].imageUrl).toBe("data:image/jpeg;base64,BBBB");
   });
+
+  it("strips the simulator marker (complete or partial) from earlier answers, not from user text", () => {
+    const out = buildRequestMessages([
+      msg("1", "user", "kvl?"),
+      msg("2", "model", "Use KVL.\n[[SIM:circuits]]"),
+      msg("3", "user", "and [[SIM:power]] literally"),
+      msg("4", "model", "Half way [[SIM:con"),
+      msg("5", "user", "go on"),
+    ]);
+    expect(out.map((m) => m.content)).toEqual(["kvl?", "Use KVL.", "and [[SIM:power]] literally", "Half way", "go on"]);
+    expect(JSON.stringify(out)).not.toContain("[[SIM:circuits]]");
+  });
+
+  it("drops a model turn that was only a marker", () => {
+    const out = buildRequestMessages([msg("1", "user", "a"), msg("2", "model", "[[SIM:logic]]"), msg("3", "user", "b")]);
+    expect(out).toHaveLength(1);
+    expect(out[0].content).toBe("a\n\nb");
+  });
 });
 
 function sseResponse(chunks: string[], init: ResponseInit = { status: 200 }): Response {
@@ -116,6 +134,20 @@ describe("streamChat", () => {
     const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe("/api/ai/chat");
     expect(JSON.parse(init.body as string)).toMatchObject({ lab: "control", messages: [{ role: "user", content: "hi" }] });
+  });
+
+  it("sends the request body without the marker and reports the demo mode header", async () => {
+    const messages = [msg("1", "user", "hi"), msg("2", "model", "Answer\n[[SIM:control]]"), msg("3", "user", "more")];
+    const fetchImpl = vi.fn(async () => new Response(new ReadableStream<Uint8Array>({ start(c) { c.enqueue(new TextEncoder().encode(DONE)); c.close(); } }), { status: 200, headers: { "X-MAE-AI-Mode": "mock" } }));
+    const modes: string[] = [];
+    await streamChat({ messages, lab: "general", signal: new AbortController().signal, onDelta: () => {}, onMode: (m) => modes.push(m), fetchImpl: fetchImpl as unknown as typeof fetch });
+    expect(modes).toEqual(["mock"]);
+    const body = (fetchImpl.mock.calls[0] as unknown as [string, RequestInit])[1].body as string;
+    expect(body).not.toContain("[[SIM");
+    expect(JSON.parse(body).messages[1].content).toBe("Answer");
+    const live = vi.fn(async () => sseResponse([DONE]));
+    await streamChat({ messages, lab: "general", signal: new AbortController().signal, onDelta: () => {}, onMode: (m) => modes.push(m), fetchImpl: live as unknown as typeof fetch });
+    expect(modes).toEqual(["mock", "live"]);
   });
 
   it.each([

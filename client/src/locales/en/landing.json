@@ -6,6 +6,11 @@
     "ctaPrimary": "Launch a Simulation",
     "ctaSecondary": "Explore Library"
   },
+  "aiCallout": {
+    "title": "Chat with MAE AI",
+    "description": "Upload schematics, analyze coursework, or ask any engineering concept.",
+    "cta": "Start chatting"
+  },
   "founder": {
     "title": "Engineering education becomes powerful when it remains close to the real system.",
     "description": "Meet the founder and the MAE premise behind the platform: Model. Analyze. Engineering.",

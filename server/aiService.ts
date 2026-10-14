@@ -1,7 +1,7 @@
 import OpenAI from "openai";
 import "dotenv/config";
 import { GoogleGenAI } from "@google/genai";
-import { AI_HISTORY_WINDOW, AI_MAX_IMAGE_BYTES, AI_MAX_MESSAGE_CHARS, LAB_CONTEXTS, type ChatMessage, type LabContext } from "../shared/aiTypes";
+import { AI_HISTORY_WINDOW, AI_MAX_IMAGE_BYTES, AI_MAX_MESSAGE_CHARS, LAB_CONTEXTS, type ChatMessage, type LabContext, type SimLab } from "../shared/aiTypes";
 
 const nvidiaClient = new OpenAI({
   apiKey: process.env.NVIDIA_API_KEY ?? "",
@@ -151,6 +151,10 @@ const LAB_HINTS: Record<LabContext, string> = {
   plc: "The student is in the PLC studio: ladder logic, timers, counters, scan cycle, I/O wiring, and IEC 61131-3 languages.",
 };
 
+/** The one place the marker contract is worded; the client strips it with `splitSimMarker`. */
+const SIM_MARKER_RULE =
+  "Only when your answer analyzes or designs something that can be opened in one of our interactive simulators (a circuit, a logic gate network or Boolean problem, a control transfer function, root locus or PID, a power converter, a signals transform, Arduino or other code, a pneumatic or hydraulic circuit, or a PLC ladder), end your reply with exactly one final line, alone on its own line: [[SIM:<lab>]] where <lab> is one of circuits|power|logic|control|code|arduino|signals|fluid|plc. Never add the marker to general chat, refusals, or purely conceptual theory with nothing to simulate. Never write more than one marker, and never put it inside a code fence.";
+
 export function buildSystemInstruction(lab: LabContext): string {
   return [
     "You are MAE AI, a patient and rigorous engineering professor on MAE Academy. You help students with circuits, power electronics, control systems, digital logic, signals and systems, mechatronics, PLC and fluid power, and embedded or engineering code.",
@@ -162,22 +166,47 @@ export function buildSystemInstruction(lab: LabContext): string {
     "- Put code in fenced blocks with a language tag (cpp, arduino, python or matlab) and keep the surrounding explanation short.",
     "- If a question is not about engineering, science or mathematics (or is unrelated to learning on this platform), politely decline in one or two sentences and invite an engineering question instead.",
     "- Reply in the language the student writes in (English, Arabic or Spanish). Keep LaTeX itself unchanged and in standard notation.",
+    "- Infer the engineering sub-domain (circuits, power electronics, logic, control, signals, code, fluid power, PLC) automatically from the question or image; do not ask the student which one it is.",
+    "",
+    "Simulator marker:",
+    `- ${SIM_MARKER_RULE}`,
     "",
     `Context: ${LAB_HINTS[lab]}`,
   ].join("\n");
 }
 
-let client: GoogleGenAI | undefined;
-function getClient(): GoogleGenAI {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new AiNotConfiguredError();
-  client ??= new GoogleGenAI({ apiKey });
-  return client;
+// Mode selection: the single place that decides live vs demo vs not configured.
+
+export type AiMode = "live" | "mock" | "unconfigured";
+
+/** The trimmed key, read at call time; an empty or whitespace-only value (`GEMINI_API_KEY=`) counts as missing. */
+export function geminiApiKey(env: NodeJS.ProcessEnv = process.env): string | undefined {
+  return env.GEMINI_API_KEY?.trim() || undefined;
 }
 
-/** Fails fast (before any SSE headers go out) when the key is missing. */
-export function assertAiConfigured(): void {
-  getClient();
+/** Demo replies are a dev convenience only: production and Vercel without a key fail closed. */
+export function resolveAiMode(env: NodeJS.ProcessEnv = process.env): AiMode {
+  if (geminiApiKey(env)) return "live";
+  return env.NODE_ENV !== "production" && !env.VERCEL ? "mock" : "unconfigured";
+}
+
+/** Fails fast (before any SSE headers go out) with AiNotConfiguredError; otherwise says which stream to serve. */
+export function assertAiConfigured(): Exclude<AiMode, "unconfigured"> {
+  const mode = resolveAiMode();
+  if (mode === "unconfigured") throw new AiNotConfiguredError();
+  return mode;
+}
+
+let client: GoogleGenAI | undefined;
+let clientKey: string | undefined;
+function getClient(): GoogleGenAI {
+  const apiKey = geminiApiKey();
+  if (!apiKey) throw new AiNotConfiguredError();
+  if (!client || clientKey !== apiKey) {
+    client = new GoogleGenAI({ apiKey });
+    clientKey = apiKey;
+  }
+  return client;
 }
 
 /** Streams the model's reply as text deltas. Aborting `signal` stops reading from the upstream stream. */
@@ -196,5 +225,146 @@ export async function* streamChat(request: SanitizedChat, signal?: AbortSignal):
     if (signal?.aborted) return;
     const text = chunk.text;
     if (text) yield text;
+  }
+}
+
+// Dev-only demo stream (see resolveAiMode). Same shape as streamChat: an async generator of text deltas.
+
+const MOCK_NOTE = "*Demo mode — no `GEMINI_API_KEY` is set, so this is a canned reply.*";
+
+type MockTopic = Extract<SimLab, "circuits" | "power" | "logic" | "control" | "code" | "arduino">;
+
+const MOCK_REPLIES: Record<MockTopic, string> = {
+  circuits: [
+    "A series loop with $V_s = 12\\,\\text{V}$, $R_1 = 1\\,\\text{k}\\Omega$ and $R_2 = 2\\,\\text{k}\\Omega$.",
+    "",
+    "**Given:** one loop, one source. **Method:** Kirchhoff's voltage law around the loop.",
+    "",
+    "$$-V_s + I R_1 + I R_2 = 0 \\;\\Rightarrow\\; I = \\frac{V_s}{R_1 + R_2} = \\frac{12}{3000} = 4\\,\\text{mA}$$",
+    "",
+    "The voltage across $R_2$ is the divider output:",
+    "",
+    "$$V_{R_2} = V_s \\frac{R_2}{R_1 + R_2} = 12 \\cdot \\frac{2}{3} = 8\\,\\text{V}$$",
+  ].join("\n"),
+  control: [
+    "Take the unity-feedback plant $G(s) = \\dfrac{K}{s(s+2)}$.",
+    "",
+    "The closed-loop transfer function is",
+    "",
+    "$$T(s) = \\frac{K}{s^2 + 2s + K}, \\qquad s = -1 \\pm \\sqrt{1 - K}$$",
+    "",
+    "For $0 < K < 1$ both poles are real and negative; for $K > 1$ they become a complex pair at $\\text{Re}(s) = -1$, so the root locus bends vertically and the response turns oscillatory. A PID adds $u(t) = K_p e + K_i \\int e\\,dt + K_d \\dot{e}$ to shape that trade-off.",
+  ].join("\n"),
+  power: [
+    "For an ideal buck converter in continuous conduction, the duty cycle sets the output directly:",
+    "",
+    "$$D = \\frac{V_o}{V_{in}}$$",
+    "",
+    "Example: $V_{in} = 12\\,\\text{V}$ and $V_o = 5\\,\\text{V}$ give $D \\approx 0.42$. The inductor ripple is $\\Delta I_L = \\dfrac{(V_{in} - V_o)\\,D}{L f_s}$.",
+  ].join("\n"),
+  arduino: [
+    "A minimal blink sketch that toggles the on-board LED every 500 ms:",
+    "",
+    "```cpp",
+    "const int LED = 13;",
+    "",
+    "void setup() {",
+    "  pinMode(LED, OUTPUT);",
+    "}",
+    "",
+    "void loop() {",
+    "  digitalWrite(LED, !digitalRead(LED));",
+    "  delay(500);",
+    "}",
+    "```",
+  ].join("\n"),
+  code: [
+    "A small C++ function that sums an array:",
+    "",
+    "```cpp",
+    "int sum(const int* a, int n) {",
+    "  int total = 0;",
+    "  for (int i = 0; i < n; ++i) total += a[i];",
+    "  return total;",
+    "}",
+    "```",
+    "",
+    "It runs in $O(n)$ time and $O(1)$ extra space.",
+  ].join("\n"),
+  logic: [
+    "Simplify $F = AB + A\\bar{B}$ with the distributive law:",
+    "",
+    "$$F = A(B + \\bar{B}) = A \\cdot 1 = A$$",
+    "",
+    "The whole network collapses to a wire from $A$ to the output; $B$ has no effect.",
+  ].join("\n"),
+};
+
+const MOCK_DEFAULT =
+  "Hi, I'm MAE AI. Ask me about circuits, control systems, power electronics, digital logic, signals, Arduino or PLC and I'll walk through it step by step.";
+
+/** Keyword routing for the demo reply; the first match wins, so the specific topics come before `circuits`. */
+const MOCK_TOPICS: ReadonlyArray<readonly [MockTopic, RegExp]> = [
+  ["power", /\b(buck|boost|converter|inverter|rectifier)\b/],
+  ["control", /root locus|transfer function|\bpid\b|\bbode\b|nyquist|control system/],
+  ["arduino", /\barduino\b/],
+  ["code", /c\+\+|\bcpp\b|\bcode\b|\bsketch\b/],
+  ["logic", /\blogic\b|\bgates?\b|boolean|k-map|karnaugh/],
+  ["circuits", /circuit|\bkvl\b|\bkcl\b|resistor|voltage divider|\bohm/],
+];
+
+/** The complete demo reply (note, answer, trailing simulator marker where relevant) for one user message. */
+export function mockReply(content: string, hasImage = false): string {
+  const text = content.toLowerCase();
+  const topic = MOCK_TOPICS.find(([, pattern]) => pattern.test(text))?.[0];
+  if (!topic) {
+    const imageNote = hasImage ? "\n\nI can see you attached an image, but reading images needs the real Gemini key; set `GEMINI_API_KEY` to try that." : "";
+    return `${MOCK_NOTE}\n\n${MOCK_DEFAULT}${imageNote}`;
+  }
+  return `${MOCK_NOTE}\n\n${MOCK_REPLIES[topic]}\n\n[[SIM:${topic}]]`;
+}
+
+let warnedMock = false;
+
+/** Resolves after `ms`, or immediately when `signal` aborts. */
+function pause(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve) => {
+    if (signal?.aborted) return resolve();
+    const done = () => {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", done);
+      resolve();
+    };
+    const timer = setTimeout(done, ms);
+    signal?.addEventListener("abort", done, { once: true });
+  });
+}
+
+/** Streams a canned reply in small chunks with a short delay so streaming UI can be exercised; stops on abort. */
+export async function* mockChatStream(request: SanitizedChat, signal?: AbortSignal): AsyncGenerator<string> {
+  if (!warnedMock) {
+    warnedMock = true;
+    console.warn("GEMINI_API_KEY is not set; /api/ai/chat is serving demo responses (dev only)");
+  }
+  const last = request.messages[request.messages.length - 1];
+  const reply = mockReply(last?.content ?? "", Boolean(last?.imageUrl));
+  // The marker goes out in two pieces, as a real model streams it, so the UI's partial-marker stripping is exercised.
+  const cut = reply.lastIndexOf("[[SIM:");
+  const body = cut < 0 ? reply : reply.slice(0, cut);
+  const marker = cut < 0 ? "" : reply.slice(cut);
+  const chunks: string[] = [];
+  let pending = "";
+  for (const word of body.match(/\S+\s*/g) ?? []) {
+    pending += word;
+    if (pending.length < 16) continue;
+    chunks.push(pending);
+    pending = "";
+  }
+  if (pending) chunks.push(pending);
+  if (marker) chunks.push(marker.slice(0, 6), marker.slice(6));
+  for (const chunk of chunks) {
+    if (signal?.aborted) return;
+    yield chunk;
+    await pause(15 + Math.random() * 15, signal);
   }
 }

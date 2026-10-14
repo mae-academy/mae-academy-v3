@@ -3,7 +3,7 @@
  * Persistent global shell; background, header, and footer remain outside route transitions.
  */
 import { ReactNode, useEffect, useRef, useState } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { Award, BookOpen, Compass, Cpu, FileText, Heart, Info, Lock, Mail, MessageSquare } from "lucide-react";
 import Header, { Locale } from "./Header";
 import SocialLinks from "@/components/SocialLinks";
@@ -32,6 +32,9 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const transitionTimers = useRef<number[]>([]);
   const copy = localizedContent[locale];
   const { t } = useTranslation("common");
+  // The MAE AI chat fills the viewport under the header; a footer below it would push the composer off-screen.
+  const [location] = useLocation();
+  const fullViewportPage = location === "/ai" || location.startsWith("/ai/");
 
   useEffect(() => {
     const root = document.documentElement;
@@ -51,7 +54,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
     ];
   };
 
-  return <LocaleProvider locale={locale}><div className={`min-h-screen w-full max-w-full overflow-x-hidden bg-[#ffffff] text-slate-950 transition-colors dark:bg-[#000000] dark:text-zinc-100 ${locale === "ar" ? "font-arabic" : "font-sans"}`}>
+  return <LocaleProvider locale={locale}><div className={`${fullViewportPage ? "" : "min-h-screen"} w-full max-w-full overflow-x-hidden bg-[#ffffff] text-slate-950 transition-colors dark:bg-[#000000] dark:text-zinc-100 ${locale === "ar" ? "font-arabic" : "font-sans"}`}>
     <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden" aria-hidden="true">
       <div className="absolute -left-56 top-24 h-[32rem] w-[32rem] rounded-full bg-blue-600/10 blur-3xl dark:bg-blue-600/8" />
       <div className="absolute left-[30%] top-[40rem] h-[28rem] w-[28rem] rounded-full bg-violet-600/8 blur-3xl dark:bg-violet-600/6" />
@@ -60,7 +63,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
     </div>
     <Header locale={locale} onLocaleChange={handleLocaleChange} isLocaleTransitioning={Boolean(languageTarget)} isDark={isDark} onThemeToggle={() => setIsDark((value) => !value)} />
     <main className="min-h-[calc(100svh-var(--mae-header-height))] w-full max-w-full overflow-x-hidden">{children}</main>
-    <footer className="border-t border-slate-200/80 bg-white/40 backdrop-blur-xs dark:border-white/[0.08] dark:bg-[#08080A]/80">
+    {!fullViewportPage && <footer className="border-t border-slate-200/80 bg-white/40 backdrop-blur-xs dark:border-white/[0.08] dark:bg-[#08080A]/80">
       <div className="max-w-[1536px] mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14 lg:py-16 w-full">
         <div className="grid items-start gap-10 sm:grid-cols-2 lg:grid-cols-[1.3fr_0.8fr_0.9fr_1fr] lg:gap-12">
           {/* Column 1: Brand & Mission */}
@@ -232,7 +235,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
           </div>
         </div>
       </div>
-    </footer>
+    </footer>}
     <LanguageTransition target={languageTarget} />
   </div></LocaleProvider>;
 }

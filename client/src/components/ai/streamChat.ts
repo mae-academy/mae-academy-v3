@@ -1,4 +1,4 @@
-import { AI_HISTORY_WINDOW, type AiStreamEvent, type ChatMessage, type LabContext } from "@shared/aiTypes";
+import { AI_HISTORY_WINDOW, splitSimMarker, type AiStreamEvent, type ChatMessage, type LabContext } from "@shared/aiTypes";
 
 export type ChatErrorKind =
   | "rate_limit"
@@ -88,11 +88,13 @@ export function createSseParser(onEvent: (event: AiStreamEvent) => void): SsePar
 /**
  * The slice of history the server will actually read: the last AI_HISTORY_WINDOW messages, unanswered or
  * empty turns folded away (a failed reply leaves two user turns in a row, which Gemini rejects), and only
- * the newest image kept (the server drops older ones anyway, so don't upload them again).
+ * the newest image kept (the server drops older ones anyway, so don't upload them again). The trailing
+ * `[[SIM:<lab>]]` marker of earlier answers is UI plumbing, so it is stripped before it can reach the model.
  */
 export function buildRequestMessages(messages: readonly ChatMessage[]): ChatMessage[] {
   const merged: ChatMessage[] = [];
-  for (const message of messages.slice(-AI_HISTORY_WINDOW)) {
+  for (const original of messages.slice(-AI_HISTORY_WINDOW)) {
+    const message = original.role === "model" ? { ...original, content: splitSimMarker(original.content).text } : original;
     if (message.role === "model" && !message.content.trim()) continue;
     const previous = merged[merged.length - 1];
     if (previous && previous.role === message.role) {
@@ -130,6 +132,8 @@ export interface StreamChatOptions {
   lab: LabContext;
   signal: AbortSignal;
   onDelta: (text: string) => void;
+  /** Called once the stream is accepted; `mock` is the dev-only demo stream (no GEMINI_API_KEY on the server). */
+  onMode?: (mode: "live" | "mock") => void;
   fetchImpl?: typeof fetch;
 }
 
@@ -138,7 +142,7 @@ export interface StreamChatOptions {
  * completion; rejects with ChatStreamError on any failure and with the native AbortError when `signal` aborts.
  * Error bodies are never surfaced (they may be HTML or leak internals).
  */
-export async function streamChat({ messages, lab, signal, onDelta, fetchImpl = fetch }: StreamChatOptions): Promise<void> {
+export async function streamChat({ messages, lab, signal, onDelta, onMode, fetchImpl = fetch }: StreamChatOptions): Promise<void> {
   let response: Response;
   try {
     response = await fetchImpl("/api/ai/chat", {
@@ -158,6 +162,7 @@ export async function streamChat({ messages, lab, signal, onDelta, fetchImpl = f
     throw new ChatStreamError(kindForStatus(response.status));
   }
   if (!response.body) throw new ChatStreamError("upstream");
+  onMode?.(response.headers.get("X-MAE-AI-Mode") === "mock" ? "mock" : "live");
 
   let finished = false;
   let streamError = false;

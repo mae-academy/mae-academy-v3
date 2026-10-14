@@ -8,6 +8,7 @@ import { motion, Variants } from "framer-motion";
 import { ArrowRight, MoveRight } from "lucide-react";
 import { Link } from "wouter";
 import EngineeringPlatformsSection from "@/components/EngineeringPlatformsSection";
+import MaeAiCallout from "@/components/MaeAiCallout";
 import { useTranslation } from "react-i18next";
 import { usePageTitle } from "@/hooks/usePageTitle";
 
@@ -41,7 +42,7 @@ export default function Home() {
         {/* Subtle Tri-Tone Background Ambient Glow */}
         <div className="pointer-events-none absolute -top-24 left-1/2 -translate-x-1/2 w-[850px] h-[360px] opacity-35 blur-3xl mae-gradient-glow rounded-full -z-10 dark:opacity-20" />
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-16">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-4 lg:pt-16 lg:pb-8">
           {/* Left Column (Text & CTAs): Span 7 columns */}
           <div className="min-w-0 lg:col-span-7 flex flex-col items-start space-y-6 z-10 text-left rtl:text-right">
             <motion.span
@@ -82,6 +83,11 @@ export default function Home() {
                 {t("hero.ctaSecondary")}
               </Link>
             </motion.div>
+
+            {/* MAE AI banner (mobile/tablet): stacked directly under the launch actions */}
+            <motion.div variants={itemVariants} className="w-full pt-2 lg:hidden">
+              <MaeAiCallout />
+            </motion.div>
           </div>
 
           {/* Right Column (Oscilloscope Interactive Widget): Span 5 columns */}
@@ -97,6 +103,11 @@ export default function Home() {
             </div>
           </motion.div>
         </div>
+
+        {/* MAE AI entry banner (desktop): single row spanning the hero, beneath the launch actions */}
+        <motion.div variants={itemVariants} className="hidden lg:block w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <MaeAiCallout />
+        </motion.div>
       </section>
 
       {/* ============================================================ */}

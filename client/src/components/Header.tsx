@@ -1,6 +1,6 @@
 import { memo, useState } from "react";
 import { Link, useLocation } from "wouter";
-import { ChevronDown, Menu, Moon, Sun, X } from "lucide-react";
+import { ChevronDown, Menu, Moon, Sparkles, Sun, X } from "lucide-react";
 import HeaderNavigationSlider from "./HeaderNavigationSlider";
 import { isRouteActive, Locale, platformRoutes } from "@/data/platform";
 import { useLocale } from "@/contexts/LocaleContext";
@@ -121,9 +121,13 @@ function Header({ locale, onLocaleChange, isLocaleTransitioning, isDark, onTheme
                   }`}
                 >
                   <span>{t(`navbar.${route.index}`)}</span>
-                  <span className={`text-[11px] font-mono opacity-70 ${active ? "text-white" : "text-slate-400"}`}>
-                    {route.index}
-                  </span>
+                  {route.ai ? (
+                    <Sparkles className={`h-4 w-4 ${active ? "text-white" : "text-violet-500 dark:text-violet-400"}`} aria-hidden="true" />
+                  ) : (
+                    <span className={`text-[11px] font-mono opacity-70 ${active ? "text-white" : "text-slate-400"}`}>
+                      {route.index}
+                    </span>
+                  )}
                 </Link>
               );
             })}

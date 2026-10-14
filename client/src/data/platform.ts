@@ -7,11 +7,14 @@ export type CardType = "research" | "courses" | "simulations";
 
 export type PlatformRoute = {
   href: string;
+  /** Locale key under `navbar.*` (also the numeric badge in the mobile drawer). */
   index: string;
+  /** Marks the MAE AI entry so nav surfaces can render a Sparkles icon. */
+  ai?: boolean;
 };
 
 export const platformRoutes: PlatformRoute[] = [
-  { href: "/", index: "00" }, { href: "/research", index: "01" }, { href: "/library", index: "02" }, { href: "/simulations", index: "03" }, { href: "/about", index: "04" }, { href: "/contact", index: "05" },
+  { href: "/", index: "00" }, { href: "/research", index: "01" }, { href: "/library", index: "02" }, { href: "/simulations", index: "03" }, { href: "/ai", index: "ai", ai: true }, { href: "/about", index: "04" }, { href: "/contact", index: "05" },
 ];
 
 export type HomeGatewayMeta = {

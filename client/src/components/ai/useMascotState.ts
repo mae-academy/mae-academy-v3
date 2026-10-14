@@ -9,7 +9,7 @@ export const LISTENING_IDLE_MS = 2500;
 export const TALKING_SILENCE_MS = 900;
 
 export interface MascotStateApi {
-  /** The derived mascot state; feed it straight into <MascotVisualizer state={state} />. */
+  /** The derived mascot state; feed it straight into <MaiMascot state={state} />. */
   state: MascotState;
   /** User typed / pasted / attached an image. Debounced: idle again after LISTENING_IDLE_MS. Ignored while a response is in flight. */
   onInputActivity: () => void;

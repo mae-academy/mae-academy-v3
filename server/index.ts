@@ -3,7 +3,7 @@ import { createServer } from "http";
 import path from "path";
 import { fileURLToPath } from "url";
 import "dotenv/config";
-import { AiNotConfiguredError, AiRequestError, assertAiConfigured, generateCircuitAnalysis, sanitizeChatRequest, streamChat } from "./aiService";
+import { AiNotConfiguredError, AiRequestError, assertAiConfigured, generateCircuitAnalysis, mockChatStream, sanitizeChatRequest, streamChat } from "./aiService";
 import type { AiStreamEvent } from "../shared/aiTypes";
 import { libraryCoverHandler } from "./libraryCover";
 import { libraryDoabHandler, libraryDoabItemHandler } from "./libraryDoab";
@@ -132,9 +132,10 @@ async function startServer() {
   const openStreams = new Map<string, number>();
   app.post("/api/ai/chat", express.json({ limit: "4mb" }), async (req, res) => {
     let request;
+    let mode;
     try {
       request = sanitizeChatRequest(req.body);
-      assertAiConfigured();
+      mode = assertAiConfigured(); // "live", or "mock" (dev only, no key); throws when production has no key
     } catch (error) {
       if (error instanceof AiNotConfiguredError) {
         res.status(503).json({ error: error.message });
@@ -174,7 +175,7 @@ async function startServer() {
     };
     let started = false;
     try {
-      const stream = streamChat(request, abort.signal);
+      const stream = mode === "mock" ? mockChatStream(request, abort.signal) : streamChat(request, abort.signal);
       // Pull the first chunk before committing to SSE so an upstream failure can still be a JSON 502.
       let first = await stream.next();
       res.status(200);
@@ -182,6 +183,7 @@ async function startServer() {
       res.setHeader("Cache-Control", "no-cache, no-transform");
       res.setHeader("Connection", "keep-alive");
       res.setHeader("X-Accel-Buffering", "no");
+      res.setHeader("X-MAE-AI-Mode", mode);
       res.flushHeaders();
       started = true;
       while (!first.done) {

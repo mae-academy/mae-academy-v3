@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { LAB_CONTEXTS } from "@shared/aiTypes";
+import { simulationRouteMeta } from "@/data/platform";
 import { aiPathForLab, labForSimulationSlug, parseLabParam, simulatorPathForLab } from "./aiLab";
 
 describe("labForSimulationSlug", () => {
@@ -40,5 +41,15 @@ describe("lab routes", () => {
     expect(aiPathForLab("general")).toBe("/ai");
     expect(aiPathForLab("control")).toBe("/ai?lab=control");
     for (const lab of LAB_CONTEXTS) expect(simulatorPathForLab(lab)).toMatch(/^\/simulations/);
+  });
+
+  it("every simulator shortcut resolves to a catalogued simulator, and each simulator's lab points back to it", () => {
+    for (const lab of LAB_CONTEXTS.filter((l) => l !== "general")) {
+      const path = simulatorPathForLab(lab);
+      const slug = path.split("/").pop();
+      const entry = simulationRouteMeta.find((e) => e.slug === slug);
+      expect(entry, `${lab} -> ${path}`).toBeDefined();
+      expect(labForSimulationSlug(slug)).toBe(lab);
+    }
   });
 });
