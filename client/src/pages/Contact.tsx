@@ -73,9 +73,21 @@ export default function Contact() {
 
   return (
     <section dir={isRtl ? "rtl" : "ltr"} lang={locale} className="mx-auto w-full max-w-[1380px] px-4 py-12 sm:px-6 sm:py-16 lg:px-8">
-      <header className="mb-10 max-w-3xl">
-        <h1 className="break-words text-2xl font-black tracking-tight sm:text-4xl">{t("contact.title")}</h1>
-        <p className="mt-3 text-slate-600 dark:text-slate-400">{t("contact.subtitle")}</p>
+      <header className="mb-10 grid gap-6 lg:grid-cols-[1.2fr_.8fr] lg:items-end">
+        <div>
+          <div className="flex items-center gap-4 mb-4">
+            <p className="text-sm font-semibold tracking-wider text-indigo-600 dark:text-indigo-400">
+              {t("contact.eyebrow")}
+            </p>
+            <span className="h-px w-16 bg-brand-gradient" />
+          </div>
+          <h1 className="max-w-3xl break-words text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white">
+            {t("contact.title")}
+          </h1>
+        </div>
+        <p className="max-w-xl border-l-2 border-indigo-500/40 pl-5 text-sm md:text-base text-slate-500 leading-relaxed dark:text-zinc-400 rtl:border-l-0 rtl:border-r-2 rtl:pl-0 rtl:pr-5 font-normal">
+          {t("contact.subtitle")}
+        </p>
       </header>
 
       <div className="grid gap-8 lg:grid-cols-[1.5fr_1fr] lg:gap-10">

@@ -24,7 +24,7 @@ export default function AttributionPolicy() {
       animate="visible"
       dir={isRtl ? "rtl" : "ltr"}
       lang={locale}
-      className={`max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16 ${
+      className={`max-w-[1380px] mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16 ${
         isRtl ? "font-['Tajawal',sans-serif]" : "font-['Poppins',sans-serif]"
       }`}
     >
@@ -37,7 +37,7 @@ export default function AttributionPolicy() {
         </p>
       </header>
 
-      <div className="text-slate-600 dark:text-slate-300 leading-relaxed space-y-6">
+      <div className="max-w-4xl text-slate-600 dark:text-slate-300 leading-relaxed space-y-6">
         <p>{t("attribution.intro")}</p>
 
         <h2 className="text-xl sm:text-2xl font-semibold text-slate-900 dark:text-white mt-8 mb-3">

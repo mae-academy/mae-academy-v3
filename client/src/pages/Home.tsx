@@ -7,7 +7,6 @@ import { lazy, Suspense } from "react";
 import { motion, Variants } from "framer-motion";
 import { ArrowRight, MoveRight } from "lucide-react";
 import { Link } from "wouter";
-import FounderArchiveSeal from "@/components/FounderArchiveSeal";
 import EngineeringPlatformsSection from "@/components/EngineeringPlatformsSection";
 import { useTranslation } from "react-i18next";
 import { usePageTitle } from "@/hooks/usePageTitle";
@@ -137,11 +136,13 @@ export default function Home() {
               {/* Right Column (lg:col-span-5): Founder Profile Summary, Image Placeholder, Slogan Gradient & Action Link */}
               <div className="min-w-0 lg:col-span-5 flex flex-col justify-between p-4 sm:p-7 rounded-xl border border-slate-200/80 bg-white/90 dark:border-white/[0.08] dark:bg-[#08080A] space-y-5">
                 <div className="flex items-center gap-4">
-                  {/* Clean, borderless container slot ready for future headshot */}
-                  <div className="aspect-square w-20 h-20 sm:w-24 sm:h-24 max-w-[120px] rounded-2xl border border-slate-200/80 bg-slate-100/50 flex items-center justify-center overflow-hidden shrink-0 dark:border-white/[0.08] dark:bg-white/[0.02]">
-                    <div className="w-14 h-14 text-slate-700 dark:text-slate-300">
-                      <FounderArchiveSeal />
-                    </div>
+                  <div className="aspect-square w-20 h-20 sm:w-24 sm:h-24 max-w-[120px] rounded-2xl border border-slate-200/80 bg-slate-950 overflow-hidden shrink-0 dark:border-white/[0.08]">
+                    <img
+                      src="/founder-schematic.jpg"
+                      alt="Mohammad AbuElyan — Schematic CAD Portrait"
+                      className="h-full w-full object-cover object-center"
+                      loading="lazy"
+                    />
                   </div>
                   <div className="min-w-0">
                     <h3 className="text-base font-bold text-slate-900 dark:text-white break-words">

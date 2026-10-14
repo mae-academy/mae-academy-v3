@@ -37,8 +37,9 @@
     "aboutUs": "About Us"
   },
   "contact": {
+    "eyebrow": "05 / Contact MAE Academy",
     "title": "Contact Us",
-    "subtitle": "Questions, feedback, or partnership ideas? Send us a message and we'll get back to you.",
+    "subtitle": "Direct communication lines for academic inquiries, institutional partnerships, and platform support.",
     "name": "Name",
     "email": "Email",
     "topic": "Topic",

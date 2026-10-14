@@ -4,7 +4,7 @@
  */
 import { ReactNode, useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
-import { BookOpen, Compass, Cpu, FileText, Heart, Info, Mail, MessageSquare, ShieldCheck } from "lucide-react";
+import { Award, BookOpen, Compass, Cpu, FileText, Heart, Info, Lock, Mail, MessageSquare } from "lucide-react";
 import Header, { Locale } from "./Header";
 import SocialLinks from "@/components/SocialLinks";
 import { LocaleProvider } from "@/contexts/LocaleContext";
@@ -136,7 +136,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
                 href="/privacy"
                 className="group inline-flex min-h-11 items-center gap-2.5 text-slate-600 transition-colors hover:text-violet-600 dark:text-slate-400 dark:hover:text-violet-300"
               >
-                <ShieldCheck className="h-4 w-4 text-slate-400 transition-colors group-hover:text-violet-600 dark:text-slate-500 dark:group-hover:text-violet-300" />
+                <Lock className="h-4 w-4 text-slate-400 transition-colors group-hover:text-violet-600 dark:text-slate-500 dark:group-hover:text-violet-300" />
                 <span className="font-medium">
                   {t("footer.privacyPolicy")}
                 </span>
@@ -154,7 +154,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
                 href="/attribution-policy"
                 className="group inline-flex min-h-11 items-center gap-2.5 text-slate-600 transition-colors hover:text-violet-600 dark:text-slate-400 dark:hover:text-violet-300"
               >
-                <ShieldCheck className="h-4 w-4 text-slate-400 transition-colors group-hover:text-violet-600 dark:text-slate-500 dark:group-hover:text-violet-300" />
+                <Award className="h-4 w-4 text-slate-400 transition-colors group-hover:text-violet-600 dark:text-slate-500 dark:group-hover:text-violet-300" />
                 <span className="font-medium">
                   {t("footer.attributionPolicy")}
                 </span>
