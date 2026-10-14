@@ -4,6 +4,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import "dotenv/config";
 import { AiBlockedError, AiNotConfiguredError,AiRequestError, assertAiConfigured, generateCircuitAnalysis, mockChatStream, sanitizeChatRequest, streamChat } from "./aiService";
+import { schematicHandler } from "./aiImage";
 import type { AiStreamEvent } from "../shared/aiTypes";
 import { libraryCoverHandler } from "./libraryCover";
 import { libraryDoabHandler, libraryDoabItemHandler } from "./libraryDoab";
@@ -44,6 +45,8 @@ async function startServer() {
         ? "code"
         : path === "/ai/chat"
         ? "ai"
+        : path === "/ai/schematic"
+        ? "ai-image"
         : /^\/(pdf-thumb|pdf-proxy|pdf-download|library\/cover)/.test(path)
         ? "assets"
         : "general";
@@ -214,6 +217,9 @@ async function startServer() {
       }
     }
   });
+
+  // Text-to-image schematics: tiny JSON body (a prompt), strict tier and a per-IP concurrency cap of one.
+  app.post("/api/ai/schematic", express.json({ limit: "8kb" }), schematicHandler);
 
   app.use(express.json());
 

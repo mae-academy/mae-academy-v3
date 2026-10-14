@@ -12,12 +12,21 @@ const renderAssistant = (content: string, streaming: boolean, live = true) =>
 
 describe("assistantView", () => {
   it("hides complete and partial markers and only reports the lab for finished answers", () => {
-    expect(assistantView("Use KVL.\n[[SIM:circuits]]", false)).toEqual({ text: "Use KVL.", lab: "circuits" });
-    expect(assistantView("Use KVL.\n[[SIM:circuits]]", true)).toEqual({ text: "Use KVL.", lab: null });
+    expect(assistantView("Use KVL.\n[[SIM:circuits]]", false)).toEqual({ text: "Use KVL.", lab: "circuits", schematic: null });
+    expect(assistantView("Use KVL.\n[[SIM:circuits]]", true)).toEqual({ text: "Use KVL.", lab: null, schematic: null });
     for (const partial of ["Use KVL.\n[[", "Use KVL.\n[[SIM:", "Use KVL.\n[[SIM:circ"]) {
-      expect(assistantView(partial, true)).toEqual({ text: "Use KVL.", lab: null });
+      expect(assistantView(partial, true)).toEqual({ text: "Use KVL.", lab: null, schematic: null });
     }
-    expect(assistantView("No simulator here.", false)).toEqual({ text: "No simulator here.", lab: null });
+    expect(assistantView("No simulator here.", false)).toEqual({ text: "No simulator here.", lab: null, schematic: null });
+  });
+
+  it("hides the schematic tag (complete or partial) and exposes its prompt only for finished answers", () => {
+    const full = "Netlist below.\n\n[GENERATE_SCHEMATIC: A buck converter schematic, white background]\n[[SIM:power]]";
+    expect(assistantView(full, false)).toEqual({ text: "Netlist below.", lab: "power", schematic: "A buck converter schematic, white background" });
+    expect(assistantView(full, true)).toEqual({ text: "Netlist below.", lab: null, schematic: null });
+    for (const partial of ["Netlist below.\n\n[GENERATE_", "Netlist below.\n\n[GENERATE_SCHEMATIC: A buck conv", "Netlist below.\n\n[GENERATE_SCHEMATIC: A buck converter]\n[[SI"]) {
+      expect(assistantView(partial, true).text, partial).toBe("Netlist below.");
+    }
   });
 });
 
@@ -51,6 +60,20 @@ describe("AssistantMessage simulator action", () => {
       expect(container.textContent).not.toContain("[[SIM");
       unmount();
     }
+  });
+
+  it("never shows the tag text, mid-stream or finished, and the image card appears only when finished", () => {
+    const tag = "[GENERATE_SCHEMATIC: A buck converter schematic, white background]";
+    for (const partial of ["Netlist.\n\n[GENERATE_SCH", `Netlist.\n\n${tag}`]) {
+      const { container, unmount } = renderAssistant(partial, true);
+      expect(container.textContent).not.toContain("GENERATE");
+      expect(screen.queryByText("Generating schematic…")).toBeNull();
+      unmount();
+    }
+    const { container } = renderAssistant(`Netlist.\n\n${tag}`, false);
+    expect(container.textContent).not.toContain("GENERATE");
+    // not created in this session: a button, no request
+    expect(screen.getByRole("button", { name: "Generate schematic image" })).toBeTruthy();
   });
 
   it("shows no action for a completed answer without a marker", () => {

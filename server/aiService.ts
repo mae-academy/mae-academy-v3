@@ -8,6 +8,7 @@ import {
   AI_MAX_MESSAGE_CHARS,
   AI_MAX_MODEL_MESSAGE_CHARS,
   LAB_CONTEXTS,
+  splitSchematicTag,
   splitSimMarker,
   stripSvgDiagrams,
   type ChatMessage,
@@ -97,9 +98,9 @@ export function windowMessages(messages: readonly ChatMessage[]): ChatMessage[] 
   return tail;
 }
 
-/** A model turn as it is resent to the model: no SVG, no trailing simulator marker, bounded length, never empty. */
+/** A model turn as it is resent to the model: no SVG (old chats still hold some), no schematic tag, no trailing simulator marker, bounded length, never empty. */
 export function cleanModelTurn(content: string): string {
-  const text = splitSimMarker(stripSvgDiagrams(content)).text;
+  const text = splitSchematicTag(splitSimMarker(stripSvgDiagrams(content)).text).text;
   if (text.length > AI_MAX_MODEL_MESSAGE_CHARS) return `${text.slice(0, AI_MAX_MODEL_MESSAGE_CHARS - 1)}…`;
   return text.trim() ? text : "[empty reply]";
 }
@@ -212,11 +213,12 @@ const INTEGRATION_RULES = [
   "- Infer the engineering sub-domain automatically from the question or image; do not ask which lab it belongs to.",
   "- When an image of a schematic or diagram is attached, first state the components, values and labelled nodes you read (for example node A, node B, ground). If a value or connection is unreadable or ambiguous, say so and ask for a clearer image instead of guessing.",
   "",
-  "How diagrams are delivered (the platform renders them, so this format is mandatory):",
-  "- Give one short lead-in sentence, then ONE complete standalone SVG inside a fenced block whose info string is exactly `xml:svg` (never a bare fence), following Section 1.7. Keep tables, derivations and math outside the block as normal text.",
-  '- There is no stylesheet: every line, polyline, path and outline shape must carry explicit stroke="#000" and stroke-width, and fill="none" where it is not filled, otherwise it is invisible or fills black. Text needs explicit font-size and text-anchor.',
-  "- Inside the SVG, labels are PLAIN TEXT: never LaTeX and never $ signs (a diagram is a plain image and nothing typesets it). Write signals and values as R(s), E(s), G(s) = N(s)/D(s), K_p written as Kp with a <tspan baseline-shift=\"sub\" font-size=\"10\">, and use Unicode for symbols (ω, Ω, μ, τ, σ, ×, −). Use a real minus sign (−) at 16 px or larger for summing-junction signs, placed clear of the wires. The LaTeX rule applies to the text outside the SVG block.",
-  '- The root is <svg xmlns="http://www.w3.org/2000/svg" width="W" height="H" viewBox="0 0 W H"> (xmlns and viewBox are required; the header comment from Section 1.7 is fine). The platform sanitises with an allow-list and drops everything else, so use ONLY these elements: svg, g, defs, marker, line, polyline, polygon, path, rect, circle, ellipse, text, tspan, title, desc, and only presentation attributes (stroke, stroke-width, stroke-dasharray, fill, d, points, x, y, cx, cy, r, rx, ry, x1, y1, x2, y2, transform, font-size, font-family, text-anchor, dominant-baseline, id, class). NEVER use script, foreignObject, image, style elements, event handlers, or external URLs/hrefs. Escape & as &amp; and < as &lt; inside text. Close the SVG with </svg>.',
+  "Schematic images (the platform turns a tag into a picture, so this format is mandatory):",
+  "- Do not emit SVG or ```xml:svg blocks; diagrams are produced by the image tag below, so ignore the SVG construction rules above and give the netlist/block table instead.",
+  "- When the student asks you to draw, visualize or generate a circuit schematic or engineering diagram: give the academic explanation, the equations and a node netlist or block table in text and LaTeX first. Then, as the LAST content of the reply (just before the optional [[SIM:..]] line), append exactly one tag on its own line: [GENERATE_SCHEMATIC: <detailed text-to-image prompt>].",
+  "- The prompt describes a crisp black-and-white IEEE/IEC textbook schematic on a white background, high contrast, clean orthogonal wiring and generous component spacing, labeled nodes, and lists every component with its value and the topology in words. It is ONE line, written in English even for Arabic or Spanish students, with no square brackets and no line breaks inside, under 900 characters.",
+  "- Example: [GENERATE_SCHEMATIC: A crisp high-contrast black-and-white electrical schematic of a 5V Buck converter, textbook style, showing DC source 12V, controlled switch S1, diode D1, inductor 50uH, capacitor 47uF, and load 2.5 ohms, clean orthogonal wiring, white background, technical line art]",
+  "- Never emit the tag unless a drawing is clearly requested. At most one tag per reply, never inside a code fence, and never in a refusal.",
   "",
   "Simulator marker:",
   `- ${SIM_MARKER_RULE} A circuit or network you drew may also end with the marker when a simulator can open it.`,
@@ -256,7 +258,7 @@ export function assertAiConfigured(): Exclude<AiMode, "unconfigured"> {
 
 let client: GoogleGenAI | undefined;
 let clientKey: string | undefined;
-function getClient(): GoogleGenAI {
+export function getGeminiClient(): GoogleGenAI {
   const apiKey = geminiApiKey();
   if (!apiKey) throw new AiNotConfiguredError();
   if (!client || clientKey !== apiKey) {
@@ -337,7 +339,7 @@ export async function* streamChat(request: SanitizedChat, signal?: AbortSignal):
   const primary = process.env.GEMINI_MODEL?.trim() || DEFAULT_MODEL;
   // Try the chosen model twice (a spike usually passes), then a lighter one as a last resort.
   const models = primary === FALLBACK_MODEL ? [primary, primary] : [primary, primary, FALLBACK_MODEL];
-  const client = getClient();
+  const client = getGeminiClient();
   const stream = await withModelFallback(
     models,
     (model) =>
@@ -347,8 +349,8 @@ export async function* streamChat(request: SanitizedChat, signal?: AbortSignal):
         config: {
           systemInstruction: buildSystemInstruction(request.lab),
           temperature: 0.3,
-          // A full SVG diagram runs 10-30 KB (several thousand tokens) and thinking tokens count against this
-          // budget too; 8192 risked cutting a drawing off mid-tag. Flash models allow up to 65536.
+          // Long derivations plus thinking tokens count against this budget;
+          // 8192 risked cutting an answer off. Flash models allow up to 65536.
           maxOutputTokens: 16384,
           safetySettings: [...SAFETY_SETTINGS],
           abortSignal: signal,
@@ -445,44 +447,18 @@ const MOCK_REPLIES: Record<MockTopic, string> = {
   ].join("\n"),
 };
 
-/** Small valid sample drawing (allowed elements only) so the diagram UI can be exercised without a key. */
-const MOCK_SVG = [
-  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" width="100%" height="100%" style="background:#ffffff;">',
-  "  <title>Voltage divider</title>",
-  '  <g stroke="#000000" stroke-width="3" fill="none" stroke-linejoin="round">',
-  '    <polyline points="150,220 150,100 400,100 400,125"/>',
-  '    <polyline points="400,125 415,135 385,155 415,175 385,195 400,205 400,295"/>',
-  '    <polyline points="400,295 415,305 385,325 415,345 385,365 400,375 400,400"/>',
-  '    <polyline points="150,280 150,400 400,400 400,420"/>',
-  '    <line x1="400" y1="250" x2="556" y2="250"/>',
-  '    <circle cx="150" cy="250" r="30"/>',
-  '    <line x1="370" y1="420" x2="430" y2="420"/>',
-  '    <line x1="380" y1="432" x2="420" y2="432"/>',
-  '    <line x1="390" y1="444" x2="410" y2="444"/>',
-  '    <circle cx="560" cy="250" r="5" fill="#ffffff"/>',
-  "  </g>",
-  '  <circle cx="400" cy="250" r="6" fill="#000000"/>',
-  '  <circle cx="400" cy="400" r="6" fill="#000000"/>',
-  '  <g font-family="sans-serif" font-size="18" fill="#000000">',
-  '    <text x="150" y="246" text-anchor="middle">+</text>',
-  '    <text x="150" y="274" text-anchor="middle">-</text>',
-  '    <text x="112" y="256" text-anchor="end">Vin = 12 V</text>',
-  '    <text x="435" y="170">R1 = 1 kΩ</text>',
-  '    <text x="435" y="340">R2 = 2 kΩ</text>',
-  '    <text x="575" y="256">Vout</text>',
-  '    <text x="415" y="238">A</text>',
-  "  </g>",
-  "</svg>",
-].join("\n");
-
 const MOCK_DRAW_REPLY = [
   "Here is a voltage divider: a 12 V source feeding R1 and R2 in series, with the output taken across R2.",
   "",
-  "```xml:svg",
-  MOCK_SVG,
-  "```",
+  "| Node | Connection |",
+  "| --- | --- |",
+  "| A | Vin+ to R1 |",
+  "| B | R1 to R2 (Vout) |",
+  "| GND | R2 and Vin- |",
   "",
   "With these values $V_{out} = 12 \\cdot \\frac{2}{3} = 8\\,\\text{V}$.",
+  "",
+  "[GENERATE_SCHEMATIC: A crisp high-contrast black-and-white electrical schematic of a voltage divider, textbook style, showing DC source Vin 12V, resistor R1 1k ohm in series with resistor R2 2k ohm, output node Vout between R1 and R2, ground symbol at the bottom, clean orthogonal wiring, labeled nodes, white background, technical line art]",
 ].join("\n");
 
 /** Asks for a drawing (English or Arabic); checked before the topic keywords so "draw a voltage divider" draws. */
@@ -537,7 +513,7 @@ export async function* mockChatStream(request: SanitizedChat, signal?: AbortSign
   }
   const last = request.messages[request.messages.length - 1];
   const reply = mockReply(last?.content ?? "", Boolean(last?.imageUrl));
-  // The marker goes out in two pieces, as a real model streams it, so the UI's partial-marker stripping is exercised.
+  // The tag and the marker go out in two pieces each, as a real model streams them, so the UI's partial stripping is exercised.
   const cut = reply.lastIndexOf("[[SIM:");
   const body = cut < 0 ? reply : reply.slice(0, cut);
   const marker = cut < 0 ? "" : reply.slice(cut);

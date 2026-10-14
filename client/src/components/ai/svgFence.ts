@@ -1,16 +1,10 @@
 /**
- * Helpers for the fenced SVG diagrams the model can emit: a block whose info string is `xml:svg`
- * (also accepted: `svg`, or `xml` / `html` / no language when the body starts with `<svg`).
- * Pure string work, shared by the renderer, the streaming pre-pass and the request builder.
+ * Legacy SVG handling. Diagrams are now text-to-image (see SchematicImage), but chats stored before that still hold
+ * fenced `xml:svg` blocks. They render as ordinary code blocks; this module only keeps them out of requests sent back
+ * to the model, and strips HTML comments from prose. Pure string work.
  */
 
 export const OMITTED_DIAGRAM = "[diagram omitted]";
-
-/**
- * Info string of the closed stand-in fence that replaces a diagram whose closing fence has not streamed in yet.
- * The random suffix keeps model output from ever producing it, so a finished message cannot get stuck on a placeholder.
- */
-export const PENDING_DIAGRAM_LANG = `mae-diagram-pending-${Math.random().toString(36).slice(2, 10)}`;
 
 interface FenceBlock {
   /** Offset of the opening fence line. */
@@ -101,9 +95,6 @@ function firstToken(info: string): string {
  * template opens with a header comment (`<!-- Standard: IEC 60617 | Pitch P = 20 px ... -->`), and models do not
  * always tag the fence, so an untyped block has to be recognised by what it contains, not by its first characters.
  */
-/** `<!-- Standard: ...` (the header comment of the platform's SVG template), including while "Standard" is still being typed. */
-const STANDARD_HEADER = /^<!--\s*(?:Standard\b|(?:S(?:t(?:a(?:n(?:d(?:a(?:r(?:d)?)?)?)?)?)?)?)?$)/i;
-
 function skipPrelude(body: string): { rest: string; hadPrelude: boolean } {
   let rest = body.trimStart();
   let hadPrelude = false;
@@ -128,27 +119,6 @@ export function isSvgFence(language: string | undefined, body: string): boolean 
   return false;
 }
 
-/** Same decision for a fence that is still streaming: be generous so that no half-built code block flashes. */
-function looksLikeOpenDiagram(block: FenceBlock): boolean {
-  const lang = firstToken(block.info);
-  if (lang === "xml:svg" || lang === "svg") return true;
-  const body = block.body.trimStart();
-  const { rest, hadPrelude } = skipPrelude(body);
-  // The platform template opens with an XML prolog or a `<!-- Standard: ... -->` header. While that prelude is still
-  // arriving, or has finished with nothing after it yet, an `<svg` is about to follow: hold the placeholder rather
-  // than flash a code block. Ordinary XML/HTML fences that merely start with a comment are left alone.
-  const unclosedPrelude = /^<\?xml(?![\s\S]*?\?>)/i.test(rest) || (/^<!--(?![\s\S]*?-->)/.test(rest) && STANDARD_HEADER.test(rest));
-  const awaitingSvg = hadPrelude && rest === "" && (/^<\?xml/i.test(body) || STANDARD_HEADER.test(body));
-  const partialSvg = rest !== "" && "<svg".startsWith(rest.toLowerCase()); // `<`, `<s`, `<sv` still arriving
-  const svgStart = body !== "" && (partialSvg || /^<svg[\s>/]/i.test(rest) || unclosedPrelude || awaitingSvg);
-  if (lang === "" || lang === "xml" || lang === "html") {
-    if (lang !== "" && body === "") return true;
-    return svgStart;
-  }
-  // The info string itself may still be arriving: `x`, `xml:`, `xml:sv` ...
-  return !block.hasBody && "xml:svg".startsWith(lang);
-}
-
 /**
  * Replaces every SVG diagram fence with a short literal, for model turns sent back as history (a diagram is large
  * and the model does not need to re-read its own drawing). An unterminated fence is cut to the end of the text.
@@ -164,17 +134,4 @@ export function stripSvgFences(text: string, replacement: string = OMITTED_DIAGR
     cursor = block.end;
   }
   return out + text.slice(cursor);
-}
-
-/**
- * While an answer streams, markdown would show an unterminated diagram fence as a code block that grows by the
- * line. Swap that open fence for a closed, empty one in the pending language so the renderer can show a
- * "drawing" placeholder instead. Text with no open diagram fence is returned untouched.
- */
-export function markPendingDiagram(text: string): string {
-  if (!text.includes("```") && !text.includes("~~~")) return text;
-  const blocks = scanFences(text);
-  const last = blocks[blocks.length - 1];
-  if (!last || last.closed || !looksLikeOpenDiagram(last)) return text;
-  return `${text.slice(0, last.start)}\`\`\`${PENDING_DIAGRAM_LANG}\n\`\`\``;
 }

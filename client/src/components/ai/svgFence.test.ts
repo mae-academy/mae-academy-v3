@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { OMITTED_DIAGRAM, PENDING_DIAGRAM_LANG, isSvgFence, markPendingDiagram, stripHtmlComments, stripSvgFences } from "./svgFence";
+import { OMITTED_DIAGRAM, isSvgFence, stripHtmlComments, stripSvgFences } from "./svgFence";
 
 const SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500"><rect width="10" height="10"/></svg>';
 
@@ -50,40 +50,6 @@ describe("stripSvgFences", () => {
   });
 });
 
-describe("markPendingDiagram", () => {
-  const pending = (before = "") => `${before}\`\`\`${PENDING_DIAGRAM_LANG}\n\`\`\``;
-  it("replaces an open xml:svg fence, whatever has streamed so far", () => {
-    expect(markPendingDiagram("Lead-in\n\n```xml:svg\n")).toBe(pending("Lead-in\n\n"));
-    expect(markPendingDiagram('Lead-in\n\n```xml:svg\n<svg xmlns="http://www.w3.org/2000/svg" vie')).toBe(pending("Lead-in\n\n"));
-    expect(markPendingDiagram(`\`\`\`xml:svg\n${SVG}\n\``)).toBe(pending());
-    expect(markPendingDiagram(`\`\`\`xml:svg\n${SVG}\n\`\``)).toBe(pending());
-  });
-  it("also covers svg, a body that starts with <svg, and an info string still being typed", () => {
-    expect(markPendingDiagram("```svg\n<sv")).toBe(pending());
-    expect(markPendingDiagram("```xml\n<svg viewBox")).toBe(pending());
-    expect(markPendingDiagram("```\n<svg")).toBe(pending());
-    expect(markPendingDiagram("```\n<s")).toBe(pending());
-    expect(markPendingDiagram("```xml")).toBe(pending());
-    expect(markPendingDiagram("Intro\n```xml:s")).toBe(pending("Intro\n"));
-  });
-  it("leaves a closed diagram alone (it renders for real)", () => {
-    const text = `Text\n\n\`\`\`xml:svg\n${SVG}\n\`\`\`\n\nMore text`;
-    expect(markPendingDiagram(text)).toBe(text);
-  });
-  it("only touches the open fence at the end, never an earlier closed one", () => {
-    const closed = `\`\`\`xml:svg\n${SVG}\n\`\`\`\n\n`;
-    expect(markPendingDiagram(`${closed}\`\`\`xml:svg\n<svg`)).toBe(pending(closed));
-  });
-  it("does not disturb ordinary code blocks, even unfinished ones", () => {
-    for (const text of ["```python\nprint(1)", "```cpp\nint x", "```\nplain text", "```\n", "```xml\n<note>", "```xml\n<!-- hi -->", "no fences at all", "```json\n{"]) {
-      expect(markPendingDiagram(text), text).toBe(text);
-    }
-  });
-  it("is not fooled by a ``` inside inline code", () => {
-    expect(markPendingDiagram("use ```xml:svg``` to draw")).toBe("use ```xml:svg``` to draw");
-  });
-});
-
 describe("stripHtmlComments", () => {
   it("returns text without comments untouched", () => {
     const text = "Plain **markdown** with `code` and\n```cpp\nint x;\n```\n";
@@ -127,14 +93,5 @@ describe("diagrams that open with the platform's header comment", () => {
   it("strips such a fence from history like any other diagram", () => {
     const text = `Here:\n\`\`\`\n${HEADER}\n${SVG}\n\`\`\`\nDone.`;
     expect(stripSvgFences(text)).toBe(`Here:\n${OMITTED_DIAGRAM}\nDone.`);
-  });
-  it("shows the placeholder while the header comment is still streaming in, and after it closes", () => {
-    const pending = (text: string) => markPendingDiagram(text).includes(PENDING_DIAGRAM_LANG);
-    expect(pending("```\n<!-- Standard: IEC 60")).toBe(true);
-    expect(pending(`\`\`\`\n${HEADER}\n<sv`)).toBe(true);
-    expect(pending(`\`\`\`\n${HEADER}\n<svg xmlns="http://www.w3.org/2000/svg"`)).toBe(true);
-  });
-  it("does not turn an ordinary xml fence with a finished comment into a placeholder", () => {
-    expect(markPendingDiagram("```xml\n<!-- hi -->\n<note>")).toBe("```xml\n<!-- hi -->\n<note>");
   });
 });

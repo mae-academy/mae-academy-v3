@@ -64,26 +64,29 @@
   "actions": {
     "openSimulator": "Abrir en el simulador interactivo"
   },
-  "diagram": {
-    "label": "Diagrama del circuito",
-    "drawing": "Dibujando el diagrama…",
-    "failed": "No se pudo mostrar el diagrama",
-    "open": "Abrir el diagrama en grande: {{title}}",
-    "actions": "Acciones del diagrama",
-    "expand": "Ampliar el diagrama",
-    "downloadSvg": "Descargar SVG",
-    "downloadPng": "Descargar PNG",
-    "copySvg": "Copiar código SVG",
-    "copied": "Código SVG copiado",
+  "schematic": {
+    "label": "Esquema del circuito",
+    "generating": "Generando el esquema…",
+    "generate": "Generar imagen del esquema",
+    "alt": "Esquema generado por IA: {{prompt}}",
+    "disclaimer": "Imagen generada por IA. Verifícala con la lista de nodos (netlist) de arriba; el texto es la fuente de verdad.",
+    "fallbackNote": "Generada por un modelo de imágenes de uso general: los símbolos y las conexiones pueden ser incorrectos; revisa la lista de nodos de arriba.",
+    "failed": "No se pudo generar la imagen del esquema en este momento.",
+    "retry": "Intentar de nuevo",
+    "actions": "Acciones del esquema",
+    "expand": "Ampliar esquema",
+    "open": "Abrir el esquema más grande",
+    "download": "Descargar PNG",
+    "regenerate": "Regenerar",
     "downloadFailed": "No se pudo iniciar la descarga.",
-    "pngFailed": "No se pudo crear el PNG. Prueba a descargar el SVG.",
+    "openedInTab": "La imagen se abrió en una pestaña nueva. Guárdala desde allí.",
     "close": "Cerrar",
     "zoom": "Zoom",
     "zoomIn": "Acercar",
     "zoomOut": "Alejar",
     "fit": "Ajustar a la pantalla",
     "fitShort": "Ajustar",
-    "lightboxHint": "Usa los botones de zoom o las teclas + y - para inspeccionar el diagrama. Pulsa Escape para cerrar."
+    "lightboxHint": "Usa los botones de zoom o las teclas + y - para inspeccionar el esquema. Pulsa Escape para cerrar."
   },
   "demo": {
     "short": "Modo demo",

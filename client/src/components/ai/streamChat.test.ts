@@ -117,6 +117,17 @@ describe("buildRequestMessages", () => {
     expect(JSON.stringify(out).length).toBeLessThan(400);
   });
 
+  it("strips the schematic tag from earlier model answers but keeps a user's literal text", () => {
+    const out = buildRequestMessages([
+      msg("1", "user", "draw a buck"),
+      msg("2", "model", "Netlist: ...\n\n[GENERATE_SCHEMATIC: A buck converter, white background]\n[[SIM:power]]"),
+      msg("3", "user", "type [GENERATE_SCHEMATIC: x] literally"),
+    ]);
+    expect(out[1].content).toBe("Netlist: ...");
+    expect(out[2].content).toBe("type [GENERATE_SCHEMATIC: x] literally");
+    expect(JSON.stringify(out.slice(0, 2))).not.toContain("GENERATE_SCHEMATIC");
+  });
+
   it("drops a model turn that was only a marker", () => {
     const out = buildRequestMessages([msg("1", "user", "a"), msg("2", "model", "[[SIM:logic]]"), msg("3", "user", "b")]);
     expect(out).toHaveLength(1);

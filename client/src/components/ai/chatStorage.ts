@@ -184,7 +184,7 @@ export function saveThreads(source: readonly ChatThread[], storage: StorageLike 
     working = working.slice(0, -1);
     if (attempt(working)) return "trimmed";
   }
-  // A single chat can still be too big when its answers carry diagrams (20-30 KB each): keep ever shorter tails.
+  // A single chat can still be too big (long answers, legacy 20-30 KB SVG diagrams): keep ever shorter tails.
   for (const tail of EMERGENCY_TAILS) {
     if (attempt([{ ...working[0], messages: working[0].messages.slice(-tail) }])) return "trimmed";
   }

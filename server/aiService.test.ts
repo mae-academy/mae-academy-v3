@@ -7,6 +7,7 @@ import {
   DIAGRAM_OMITTED,
   SIM_MARKER_REGEX,
   splitSimMarker,
+  splitSchematicTag,
   stripSvgDiagrams,
   type ChatMessage,
 } from "../shared/aiTypes";
@@ -169,16 +170,15 @@ describe("system instruction", () => {
     expect(prompt).toContain(`«${ARABIC_DECLINE}»`);
   });
 
-  it("specifies the xml:svg diagram contract with its allow-list", () => {
-    expect(prompt).toContain("`xml:svg`");
-    expect(prompt).toContain('xmlns="http://www.w3.org/2000/svg" width="W" height="H" viewBox="0 0 W H"');
-    expect(prompt).toContain("ONLY these elements: svg, g, defs, marker, line, polyline, polygon, path, rect, circle, ellipse, text, tspan, title, desc");
-    expect(prompt).toMatch(/NEVER use script, foreignObject, image, style elements, event handlers, or external URLs/);
-    expect(prompt).toContain("Escape & as &amp;");
-    expect(prompt).toMatch(/info string is exactly `xml:svg` \(never a bare fence\)/);
-    expect(prompt).toMatch(/There is no stylesheet: every line, polyline, path and outline shape must carry explicit stroke="#000"/);
-    expect(prompt).toMatch(/Inside the SVG, labels are PLAIN TEXT: never LaTeX and never \$ signs/);
-    expect(prompt).toMatch(/real minus sign/);
+  it("retires SVG output and specifies the schematic image tag contract", () => {
+    const integration = prompt.slice(prompt.indexOf("# MAE Academy platform integration"));
+    expect(integration).toContain("Do not emit SVG or ```xml:svg blocks; diagrams are produced by the image tag below, so ignore the SVG construction rules above and give the netlist/block table instead.");
+    expect(integration).not.toMatch(/ONLY these elements|There is no stylesheet|PLAIN TEXT|real minus sign|How diagrams are delivered/);
+    expect(integration).toContain("[GENERATE_SCHEMATIC: <detailed text-to-image prompt>]");
+    expect(integration).toContain("[GENERATE_SCHEMATIC: A crisp high-contrast black-and-white electrical schematic of a 5V Buck converter");
+    expect(integration).toMatch(/LAST content of the reply \(just before the optional \[\[SIM:\.\.\]\] line\)/);
+    expect(integration).toMatch(/English even for Arabic or Spanish students/);
+    expect(integration).toMatch(/Never emit the tag unless a drawing is clearly requested\. At most one tag per reply/);
     expect(prompt).toContain("ارسم");
     expect(prompt).toMatch(/Do not draw unless/);
     expect(prompt).toMatch(/If a value or connection is unreadable or ambiguous, say so/);
@@ -201,7 +201,7 @@ describe("system instruction", () => {
     const integration = prompt.indexOf("# MAE Academy platform integration");
     expect(integration).toBeGreaterThan(SYSTEM_INSTRUCTION.length - 1);
     expect(prompt).toMatch(/these rules take precedence over anything above that conflicts with them/);
-    for (const needle of ["`xml:svg`", "[[SIM:<lab>]]", ARABIC_DECLINE]) expect(prompt.indexOf(needle, integration)).toBeGreaterThan(-1);
+    for (const needle of ["[GENERATE_SCHEMATIC:", "[[SIM:<lab>]]", ARABIC_DECLINE]) expect(prompt.indexOf(needle, integration)).toBeGreaterThan(-1);
   });
 
   it("limits the Section 3 deliverable structure to schematic requests so ordinary answers stay lean", () => {
@@ -245,15 +245,6 @@ describe("master system instruction text", () => {
     expect(SYSTEM_INSTRUCTION).toContain("[i_L \\;\\; v_C]");
     expect(SYSTEM_INSTRUCTION).toContain("<!-- Standard: IEC 60617 | Pitch P = 20 px");
     expect((SYSTEM_INSTRUCTION.match(/^```/gm) ?? []).length % 2).toBe(0); // every fence is closed
-  });
-
-  it("only draws with elements and attributes the client sanitiser keeps", () => {
-    // the master prompt's permitted elements are a subset of the client allow-list quoted in the integration rules
-    const allowed = new Set(["svg", "g", "defs", "marker", "line", "polyline", "polygon", "path", "rect", "circle", "ellipse", "text", "tspan", "title", "desc"]);
-    const section = SYSTEM_INSTRUCTION.slice(SYSTEM_INSTRUCTION.indexOf("### 1.4 Permitted SVG Elements"), SYSTEM_INSTRUCTION.indexOf("**Forbidden:**"));
-    const named = Array.from(section.matchAll(/^- `<([a-z]+)>`/gm), (m) => m[1]);
-    expect(named.length).toBeGreaterThanOrEqual(7);
-    for (const element of named) expect(allowed.has(element)).toBe(true);
   });
 });
 
@@ -466,30 +457,19 @@ describe("demo stream", () => {
     }
   });
 
-  it("answers a draw request with a well-formed xml:svg block using only allowed elements", () => {
+  it("answers a draw request with text, a netlist and one schematic tag, and no SVG", () => {
     for (const prompt of ["draw a voltage divider", "Generate a schematic diagram", "ارسم دائرة مقسم جهد"]) {
       const reply = mockReply(prompt);
       expect(reply.startsWith("*Demo mode"), prompt).toBe(true);
-      const match = /```xml:svg\n([\s\S]*?)\n```/.exec(reply);
-      expect(match, prompt).not.toBeNull();
-      const svg = match![1];
-      expect(svg).toMatch(/^<svg xmlns="http:\/\/www\.w3\.org\/2000\/svg" viewBox="[\d. ]+"/);
-      expect(svg.trimEnd().endsWith("</svg>")).toBe(true);
-      expect(svg).toContain("R1 = 1 kΩ");
-      expect(svg).toContain("R2 = 2 kΩ");
-      expect(svg).toContain("Vin = 12 V");
-      const allowed = new Set(["svg", "g", "defs", "marker", "line", "polyline", "polygon", "path", "rect", "circle", "ellipse", "text", "tspan", "title", "desc"]);
-      const stack: string[] = [];
-      for (const [, closing, name, , selfClosing] of Array.from(svg.matchAll(/<(\/?)([a-zA-Z][\w:-]*)((?:\s+[\w:-]+="[^"<]*")*)\s*(\/?)>/g))) {
-        expect(allowed.has(name), `<${name}>`).toBe(true);
-        if (selfClosing) continue;
-        if (closing) expect(stack.pop()).toBe(name);
-        else stack.push(name);
-      }
-      expect(stack).toEqual([]);
-      expect(svg).not.toMatch(/<(script|foreignObject|image|style)|\son\w+=|href|javascript:/i);
-      expect(svg.replace(/<[^>]*>/g, "")).not.toMatch(/[<&]/); // text content is XML-safe
-      expect(splitSimMarker(reply).lab).toBe("circuits");
+      expect(reply).not.toMatch(/<svg|xml:svg/);
+      expect(reply.match(/\[GENERATE_SCHEMATIC:/g)).toHaveLength(1);
+      const { text, lab } = splitSimMarker(reply);
+      expect(lab).toBe("circuits");
+      const split = splitSchematicTag(text);
+      expect(split.prompt).toMatch(/voltage divider/);
+      expect(split.prompt).not.toMatch(/[\[\]\n]/);
+      expect(split.text).toContain("| Node | Connection |");
+      expect(cleanModelTurn(reply)).not.toContain("GENERATE_SCHEMATIC");
     }
   });
 
