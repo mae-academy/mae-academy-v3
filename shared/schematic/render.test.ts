@@ -9,7 +9,7 @@ const ELEMENTS = new Set(['svg', 'g', 'defs', 'line', 'polyline', 'polygon', 'pa
 const ATTRS = new Set([
   'xmlns', 'viewBox', 'width', 'height', 'id', 'x', 'y', 'x1', 'y1', 'x2', 'y2', 'cx', 'cy', 'r', 'points', 'd',
   'fill', 'stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin', 'stroke-dasharray', 'shape-rendering',
-  'font-family', 'font-size', 'font-weight', 'text-anchor',
+  'font-family', 'font-size', 'font-weight', 'font-style', 'dy', 'text-anchor',
 ]);
 
 function audit(svg: string): void {

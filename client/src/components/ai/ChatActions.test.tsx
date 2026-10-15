@@ -2,6 +2,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ChatWorkspace } from "./ChatWorkspace";
+import { getComposerValue, typeInComposer } from "./composerTestUtils";
 import { VOICE_NOTICE_KEY, type RecognitionResultLike } from "./voiceInput";
 
 const encoder = new TextEncoder();
@@ -49,9 +50,8 @@ afterEach(() => {
   delete win.SpeechSynthesisUtterance;
 });
 
-const composer = () => screen.getByRole("textbox", { name: "Message MAE AI" }) as HTMLTextAreaElement;
 const sendMessage = async (text: string, replies: number) => {
-  fireEvent.change(composer(), { target: { value: text } });
+  typeInComposer(text);
   fireEvent.click(screen.getByRole("button", { name: "Send" }));
   await waitFor(() => expect(screen.getAllByRole("link", { name: /Open in Interactive Simulator/ })).toHaveLength(replies));
 };
@@ -150,6 +150,33 @@ describe("voice input in the composer", () => {
     });
   });
 
+  it("appends the transcript after a draft that holds a formula, and sends one clean string", async () => {
+    win.SpeechRecognition = FakeRecognition;
+    localStorage.setItem(VOICE_NOTICE_KEY, "1");
+    render(<ChatWorkspace lab="general" />);
+    typeInComposer("integrate $x^2$ and");
+    fireEvent.click(screen.getByRole("button", { name: "Dictate a message" }));
+    await waitFor(() => expect(FakeRecognition.last).not.toBeNull());
+    act(() => FakeRecognition.last?.say("explain each step", false));
+    fireEvent.click(screen.getByRole("button", { name: "Stop and send" }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(requestBodies(fetchMock)[0].messages).toEqual([expect.objectContaining({ role: "user", content: "integrate $x^2$ and explain each step" })]);
+    FakeRecognition.last = null;
+  });
+
+  it("brings the draft's formula back as a math node after the recording is cancelled", async () => {
+    win.SpeechRecognition = FakeRecognition;
+    localStorage.setItem(VOICE_NOTICE_KEY, "1");
+    render(<ChatWorkspace lab="general" />);
+    typeInComposer("keep $x^2$ here");
+    fireEvent.click(screen.getByRole("button", { name: "Dictate a message" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Cancel recording" })).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: "Cancel recording" }));
+    expect(document.querySelectorAll("[data-math-input] [data-mae-math]")).toHaveLength(1);
+    expect(getComposerValue()).toBe("keep $x^2$ here");
+    FakeRecognition.last = null;
+  });
+
   it("shows no microphone button where speech recognition is missing", () => {
     render(<ChatWorkspace lab="general" />);
     expect(screen.queryByRole("button", { name: "Dictate a message" })).toBeNull();
@@ -184,13 +211,13 @@ describe("voice input in the composer", () => {
     win.SpeechRecognition = FakeRecognition;
     localStorage.setItem(VOICE_NOTICE_KEY, "1");
     render(<ChatWorkspace lab="general" />);
-    fireEvent.change(composer(), { target: { value: "my draft" } });
+    typeInComposer("my draft");
     fireEvent.click(screen.getByRole("button", { name: "Dictate a message" }));
     expect(screen.queryByRole("button", { name: "Continue" })).toBeNull();
     await waitFor(() => expect(screen.getByRole("button", { name: "Cancel recording" })).toBeTruthy());
     act(() => FakeRecognition.last?.say("never sent"));
     fireEvent.keyDown(screen.getByRole("button", { name: "Cancel recording" }).parentElement!.parentElement!, { key: "Escape" });
-    expect(composer().value).toBe("my draft");
+    expect(getComposerValue()).toBe("my draft");
     expect(fetchMock).not.toHaveBeenCalled();
     await waitFor(() => expect(tracks.every((t) => t.readyState === "ended")).toBe(true));
   });

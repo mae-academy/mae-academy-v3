@@ -82,9 +82,12 @@ export function placePart(part: PartSpec, std: Standard, P: number): PlacedPart 
   const box: [number, number, number, number] = [
     ax + Math.min(c1[0], c2[0]), ay + Math.min(c1[1], c2[1]), ax + Math.max(c1[0], c2[0]), ay + Math.max(c1[1], c2[1]),
   ];
+  // A flipped op-amp (inverting input at the bottom) keeps V+ on top and V- at the bottom, as in every textbook figure.
+  const swapSupply = part.type === 'opamp' && part.flip;
   const terminals: PlacedTerminal[] = built.terminals.map((tm) => {
     const [x, y] = T(tm.x, tm.y);
-    return { part: part.id, name: tm.name, x: ax + Math.round(x), y: ay + Math.round(y), optional: tm.optional === true, key: `${part.id}.${tm.name}` };
+    const name = swapSupply && tm.name === 'V+' ? 'V-' : swapSupply && tm.name === 'V-' ? 'V+' : tm.name;
+    return { part: part.id, name, x: ax + Math.round(x), y: ay + Math.round(y), optional: tm.optional === true, key: `${part.id}.${name}` };
   });
   return { part, sym, terminals, prims, box, display };
 }

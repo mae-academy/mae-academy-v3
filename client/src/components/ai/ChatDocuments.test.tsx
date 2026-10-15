@@ -3,6 +3,7 @@ import { cleanup, configure, fireEvent, render, screen, waitFor, within } from "
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ChatDocument } from "@shared/aiTypes";
 import { ChatWorkspace } from "./ChatWorkspace";
+import { composer, composerPlaceholder, getComposerValue, typeInComposer } from "./composerTestUtils";
 import { DocumentBadge } from "./DocumentBadge";
 import { UserMessage } from "./ChatMessages";
 import { THREADS_STORAGE_KEY } from "./chatStorage";
@@ -62,14 +63,13 @@ afterEach(() => {
 
 const pdf = (name = "lecture-notes.pdf") => new File(["%PDF-1.4\n1 0 obj\n<<>>\nendobj\n%%EOF"], name, { type: "application/pdf" });
 const fileInput = () => document.querySelector('input[type="file"]') as HTMLInputElement;
-const composer = () => screen.getByRole("textbox", { name: "Message MAE AI" }) as HTMLTextAreaElement;
 const pick = (file: File) => fireEvent.change(fileInput(), { target: { files: [file] } });
 const attach = async (file = pdf()) => {
   pick(file);
   await screen.findByRole("button", { name: "Remove attachment" });
 };
 const ask = async (text: string, replies: number) => {
-  fireEvent.change(composer(), { target: { value: text } });
+  typeInComposer(text);
   fireEvent.click(screen.getByRole("button", { name: "Send" }));
   await waitFor(() => expect(screen.getAllByText("Here is the summary.")).toHaveLength(replies));
 };
@@ -121,11 +121,11 @@ describe("attaching documents in the composer", () => {
     render(<ChatWorkspace lab="general" />);
     await attach();
     expect(screen.getByTitle("lecture-notes.pdf")).toBeTruthy();
-    expect(composer().placeholder).toBe("Ask a question about this document…");
+    expect(composerPlaceholder()).toBe("Ask a question about this document…");
     const chips = within(screen.getByRole("list", { name: "Suggested questions about the document" })).getAllByRole("button");
     expect(chips.map((c) => c.textContent)).toEqual(["Summarise this document", "Explain the derivations step by step", "Check it for errors"]);
     fireEvent.click(chips[1]);
-    expect(composer().value).toBe("Explain the derivations step by step");
+    expect(getComposerValue()).toBe("Explain the derivations step by step");
   });
 
   it("requires a question: the send button stays disabled with an empty draft", async () => {
@@ -139,7 +139,7 @@ describe("attaching documents in the composer", () => {
     await attach();
     fireEvent.click(screen.getByRole("button", { name: "Remove attachment" }));
     expect(screen.queryByTitle("lecture-notes.pdf")).toBeNull();
-    expect(composer().placeholder).not.toContain("document");
+    expect(composerPlaceholder()).not.toContain("document");
   });
 
   it("explains that Word and PowerPoint files are not supported yet", async () => {

@@ -69,15 +69,10 @@
     "alt": "Schematic: {{title}}",
     "drawing": "Drawing schematic…",
     "verifying": "Verifying…",
-    "fixing": "Fixing {{n}} issue(s) (attempt {{attempt}}/{{max}})…",
-    "passed": "✓ 10/10 verification gates passed",
-    "unverified": "Unverified — {{n}} issue(s)",
-    "unreadable": "Unverified — the schematic spec could not be read",
-    "issues": "Issues ({{n}})",
-    "warnings": "Warnings ({{n}})",
-    "autoCorrected": "Auto-corrected by the verifier.",
-    "verifyFix": "Verify & fix",
-    "repairUnavailable": "Automatic fixing is unavailable right now.",
+    "passed": "Verified: all gates passed",
+    "unavailable": "I couldn't produce a verified drawing of this circuit. The connection table in the answer is the reference.",
+    "redraw": "Redraw with a standard layout",
+    "redrawPrompt": "Please redraw the schematic using one of the standard archetypes if one applies, otherwise a simpler layout.",
     "netlist": "Netlist",
     "col": {
       "designator": "Designator",
@@ -402,7 +397,7 @@
     "continueMessage": "Continue to the next step.",
     "hint": "The assistant reveals one step at a time and asks you a checkpoint question."
   },
-  "mathPreview": {
-    "label": "Formula preview"
+  "mathInput": {
+    "formula": "Formula"
   }
 }

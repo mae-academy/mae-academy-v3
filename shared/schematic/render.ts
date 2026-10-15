@@ -1,7 +1,8 @@
 // Deterministic SVG renderer. Every user string is XML-escaped; attributes only ever receive engine-computed numbers.
 
 import { rnd } from './geometry';
-import { layoutSchematic } from './layout';
+import { FONT, layoutSchematic, type TextBlock } from './layout';
+import { mathTspans } from './mathText';
 import { normalizeSchematicSpec } from './parse';
 import type { Fill, Seg, SymPrim } from './symbols';
 import type { SchematicSpec } from './types';
@@ -127,9 +128,9 @@ export function renderSpec(spec: SchematicSpec, opts: RenderOptions = {}): Rende
   for (const [x, y] of lay.analysis.dots) out.push(`<circle cx="${num(x * P + ox)}" cy="${num(y * P + oy)}" r="${num(r)}"/>`);
   out.push('</g>');
 
-  out.push('<g id="labels" fill="#000" stroke="none" font-family="Helvetica, Arial, sans-serif" font-size="14">');
-  const text = (l: { lines: string[]; anchor: string; x: number; baselines: number[] }): void => {
-    l.lines.forEach((line, i) => out.push(`<text x="${num(l.x + ox)}" y="${num(l.baselines[i] + oy)}" text-anchor="${l.anchor}">${escapeXml(line)}</text>`));
+  out.push(`<g id="labels" fill="#000" stroke="none" font-family="Times New Roman, Times, serif" font-size="${FONT}">`);
+  const text = (l: TextBlock): void => {
+    l.lines.forEach((line, i) => out.push(`<text x="${num(l.x + ox)}" y="${num(l.baselines[i] + oy)}" text-anchor="${l.anchor}">${line.math ? mathTspans(line.text, FONT, escapeXml) : escapeXml(line.text)}</text>`));
   };
   lay.partLabels.forEach(text);
   lay.freeLabels.forEach(text);

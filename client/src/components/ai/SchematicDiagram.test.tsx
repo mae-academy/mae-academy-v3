@@ -3,6 +3,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BUCK_CONVERTER, VOLTAGE_DIVIDER } from "@shared/schematic/fixtures";
 import { AiMarkdown } from "./AiMarkdown";
+import { PlotFixContext } from "./PlotCard";
 import { SchematicAutoRepairContext, SchematicDiagram } from "./SchematicDiagram";
 import { resetSchematicVerifyCache } from "./schematicVerify";
 
@@ -30,28 +31,39 @@ afterEach(() => {
 });
 
 describe("SchematicDiagram", () => {
-  it("draws a valid spec as an inert data-URI image in a white card, with the status row and netlist, and no network call", () => {
+  it("draws a valid spec as an inert data-URI image in a white card, with a quiet verified line and the netlist, and no network call", () => {
     const { container } = renderCard(good, true);
     const img = container.querySelector("img")!;
     expect(img.getAttribute("src")?.startsWith("data:image/svg+xml;charset=utf-8,")).toBe(true);
     expect(img.getAttribute("alt")).toBe("Schematic: 5 V buck converter");
     expect(container.querySelector("svg:not(.lucide), script, foreignObject")).toBeNull(); // markup is never injected
     expect(container.querySelector("button[dir=ltr]")?.className).toContain("bg-white");
-    expect(screen.getByText("✓ 10/10 verification gates passed")).toBeTruthy();
+    expect(screen.getByText("Verified: all gates passed")).toBeTruthy();
     expect(container.querySelector("[aria-live=polite]")).toBeTruthy();
+    expect(container.querySelector("[class*=amber], [role=note]")).toBeNull();
     expect(screen.getByText("Netlist")).toBeTruthy();
     expect(screen.getAllByRole("columnheader").map((h) => h.textContent)).toEqual(["Designator", "Type", "Value", "Nodes"]);
     expect(screen.getByRole("rowheader", { name: "D1" })).toBeTruthy();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("repairs an invalid spec once and shows the corrected diagram with a note", async () => {
+  it("draws an archetype request verified on first render, locally, with no network call and no repair", () => {
+    const text = JSON.stringify({ archetype: "three_phase_full_wave_rectifier", params: { load: "RL" } });
+    const { container } = renderCard(text, true);
+    expect(screen.queryByText("Verifying…")).toBeNull();
+    expect(container.querySelector("img")).toBeTruthy();
+    expect(screen.getByText("Verified: all gates passed")).toBeTruthy();
+    for (const id of ["D1", "D2", "D3", "D4", "D5", "D6", "VA", "VB", "VC"]) expect(screen.getByRole("rowheader", { name: id })).toBeTruthy();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("repairs an invalid free-form spec silently and shows the corrected diagram with no banner or note", async () => {
     fetchMock.mockResolvedValue(reply({ spec: BUCK_CONVERTER, ok: true, errors: [], warnings: [] }));
     const { container } = renderCard(noGround, true);
     expect(screen.getByText("Verifying…")).toBeTruthy();
     await waitFor(() => expect(container.querySelector("img")).toBeTruthy());
-    expect(screen.getByText("✓ 10/10 verification gates passed")).toBeTruthy();
-    expect(screen.getByText("Auto-corrected by the verifier.")).toBeTruthy();
+    expect(screen.getByText("Verified: all gates passed")).toBeTruthy();
+    expect(container.textContent).not.toMatch(/Auto-corrected|Unverified|Verify & fix/);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe("/api/ai/schematic-repair");
@@ -60,53 +72,73 @@ describe("SchematicDiagram", () => {
     expect(body.errors.length).toBeGreaterThan(0);
   });
 
-  it("shows the progress text while it fixes", async () => {
+  it("shows only the Verifying status while it repairs (no issue counts)", async () => {
     let release: (r: Response) => void = () => undefined;
     fetchMock.mockReturnValue(new Promise<Response>((resolve) => (release = resolve)));
-    renderCard(noGround, true);
-    await waitFor(() => expect(screen.getByText(/Fixing \d+ issue\(s\) \(attempt 1\/2\)…/)).toBeTruthy());
+    const { container } = renderCard(noGround, true);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(screen.getByText("Verifying…")).toBeTruthy();
+    expect(container.textContent).not.toMatch(/Fixing|issue/i);
     await act(async () => release(reply({ spec: BUCK_CONVERTER })));
-    await waitFor(() => expect(screen.getByText("✓ 10/10 verification gates passed")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Verified: all gates passed")).toBeTruthy());
   });
 
-  it("shows an amber Unverified banner with the issues, and never claims a pass, when the repair route is down", async () => {
+  const noBannerNoFixButton = (container: HTMLElement) => {
+    expect(container.querySelector("img")).toBeNull(); // a failed circuit is never drawn
+    expect(container.querySelector("details, pre, [class*=amber], [role=note]")).toBeNull();
+    expect(container.textContent).not.toMatch(/Unverified|issue\(s\)|Verify & fix|Auto-corrected/);
+    expect(screen.queryByRole("button", { name: "Verify & fix" })).toBeNull();
+    expect(screen.getByText(/couldn't produce a verified drawing of this circuit\. The connection table in the answer is the reference\./)).toBeTruthy();
+  };
+
+  it("shows the calm neutral card, not the drawing, when the repair route is down", async () => {
     fetchMock.mockResolvedValue(reply({ error: "not configured" }, 503));
     const { container } = renderCard(noGround, true);
-    await waitFor(() => expect(screen.getByText(/Unverified — \d+ issue/)).toBeTruthy());
-    expect(container.querySelector("img")).toBeTruthy(); // best-effort drawing
-    expect(screen.queryByText(/verification gates passed/)).toBeNull();
-    expect(screen.getByText("Automatic fixing is unavailable right now.")).toBeTruthy();
-    expect(container.querySelector("details")).toBeTruthy();
-    expect(container.textContent).toMatch(/ground/i);
-    expect(screen.getByRole("button", { name: "Verify & fix" })).toBeTruthy();
+    await waitFor(() => expect(screen.getByText(/couldn't produce a verified drawing/)).toBeTruthy());
+    noBannerNoFixButton(container);
+    expect(screen.queryByText(/verified: all gates passed/i)).toBeNull();
   });
 
-  it("stops after two failed repair attempts and stays unverified", async () => {
+  it("stops after two failed repair attempts and shows the card", async () => {
     fetchMock.mockImplementation(async () => reply({ spec: JSON.parse(noGround), ok: true }));
-    renderCard(noGround, true);
-    await waitFor(() => expect(screen.getByText(/Unverified — \d+ issue/)).toBeTruthy());
+    const { container } = renderCard(noGround, true);
+    await waitFor(() => expect(screen.getByText(/couldn't produce a verified drawing/)).toBeTruthy());
     expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(screen.queryByRole("button", { name: "Verify & fix" })).toBeNull();
+    noBannerNoFixButton(container);
   });
 
-  it("falls back to the raw JSON in a code block, plus the reason, when the spec is unreadable", () => {
-    const broken = '{"title": "x", "parts": [';
-    const { container } = renderCard(broken, false);
-    expect(container.querySelector("pre code")?.textContent).toContain('"parts": [');
-    expect(container.querySelector("img")).toBeNull();
-    expect(screen.getByText(/could not be read/)).toBeTruthy();
-    expect(container.textContent).toMatch(/JSON/);
+  it("offers one Redraw button that sends the localized follow-up through the normal send path", async () => {
+    fetchMock.mockResolvedValue(reply({ error: "x" }, 503));
+    const send = vi.fn();
+    const { container } = render(
+      <PlotFixContext.Provider value={send}>
+        <SchematicAutoRepairContext.Provider value={true}>
+          <SchematicDiagram text={noGround} />
+        </SchematicAutoRepairContext.Provider>
+      </PlotFixContext.Provider>,
+    );
+    await waitFor(() => expect(screen.getByRole("button", { name: "Redraw with a standard layout" })).toBeTruthy());
+    expect(container.querySelectorAll("button")).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button", { name: "Redraw with a standard layout" }));
+    expect(send).toHaveBeenCalledWith("Please redraw the schematic using one of the standard archetypes if one applies, otherwise a simpler layout.");
   });
 
-  it("restored messages validate locally with no request, and Verify & fix repairs on click", async () => {
-    fetchMock.mockResolvedValue(reply({ spec: BUCK_CONVERTER }));
+  it("shows the card (and no code dump) when the spec is unreadable", () => {
+    const { container } = renderCard('{"title": "x", "parts": [', false);
+    noBannerNoFixButton(container);
+    expect(container.querySelector("pre code")).toBeNull();
+  });
+
+  it("restored messages validate locally with no request and show the same card on failure", () => {
     const { container } = renderCard(noGround, false);
-    expect(container.querySelector("img")).toBeTruthy();
-    expect(screen.getByText(/Unverified — \d+ issue/)).toBeTruthy();
+    noBannerNoFixButton(container);
     expect(fetchMock).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: "Verify & fix" }));
-    await waitFor(() => expect(screen.getByText("✓ 10/10 verification gates passed")).toBeTruthy());
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows the card for a bad archetype request without asking the repairer", () => {
+    const { container } = renderCard(JSON.stringify({ archetype: "buck_converter", params: { Vin: "twelve" } }), true);
+    noBannerNoFixButton(container);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("renders hostile strings inert", () => {

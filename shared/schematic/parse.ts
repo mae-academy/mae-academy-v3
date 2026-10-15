@@ -1,7 +1,8 @@
 // Untrusted-input handling: JSON extraction from LLM text, strict shape normalisation, size caps, type whitelist.
 
+import { expandArchetypeRequest } from './archetypes/registry';
 import { getSymbol } from './symbols';
-import { LIMITS, PART_TYPES, type Compass, type DomainSpec, type Issue, type LabelPref, type LabelSpec, type PartAttrs, type PartSpec, type PartType, type Pt, type Rot, type SchematicSpec, type WireSpec } from './types';
+import { LIMITS, PART_TYPES, type Compass, type IcPin, type DomainSpec, type Issue, type LabelPref, type LabelSpec, type PartAttrs, type PartSpec, type PartType, type Pt, type Rot, type SchematicSpec, type WireSpec } from './types';
 
 export interface NormalizeResult { spec: SchematicSpec | null; errors: Issue[]; warnings: Issue[] }
 export interface ParseResult extends NormalizeResult { json: unknown }
@@ -78,6 +79,28 @@ function strOf(v: unknown, where: string, errors: Issue[], required = false): st
   return s;
 }
 
+const PIN_NAME_RE = /^[A-Za-z0-9+\-_]{1,8}$/;
+
+function icPinsOf(v: unknown, where: string, errors: Issue[]): IcPin[] | null {
+  if (!Array.isArray(v) || v.length > 24) { errors.push({ code: 'ATTR_VALUE', message: `${where} must be an array of at most 24 pins {name,side,pos}.`, where }); return null; }
+  const pins: IcPin[] = [];
+  const names = new Set<string>(), slots = new Set<string>();
+  for (let i = 0; i < v.length; i++) {
+    const raw: unknown = v[i];
+    const w = `${where}[${i}]`;
+    if (!isPlain(raw)) { errors.push({ code: 'ATTR_VALUE', message: `${w} must be an object {name,side,pos}.`, where }); continue; }
+    const name = own(raw, 'name'), side = own(raw, 'side'), pos = own(raw, 'pos'), optional = own(raw, 'optional');
+    if (typeof name !== 'string' || !PIN_NAME_RE.test(name)) { errors.push({ code: 'ATTR_VALUE', message: `${w}.name must be 1-8 chars of letters, digits, + - _.`, where }); continue; }
+    if (side !== 'L' && side !== 'R' && side !== 'T' && side !== 'B') { errors.push({ code: 'ATTR_VALUE', message: `${w}.side must be "L", "R", "T" or "B".`, where }); continue; }
+    if (typeof pos !== 'number' || !Number.isInteger(pos)) { errors.push({ code: 'ATTR_VALUE', message: `${w}.pos must be an integer.`, where }); continue; }
+    if (names.has(name)) { errors.push({ code: 'ATTR_VALUE', message: `${w}: pin name ${JSON.stringify(name)} is used twice.`, where }); continue; }
+    if (slots.has(`${side}${pos}`)) { errors.push({ code: 'ATTR_VALUE', message: `${w}: two pins share side ${side} position ${pos}.`, where }); continue; }
+    names.add(name); slots.add(`${side}${pos}`);
+    pins.push({ name, side, pos, ...(optional === true ? { optional: true } : {}) });
+  }
+  return pins;
+}
+
 function attrsOf(raw: unknown, type: PartType, where: string, errors: Issue[], warnings: Issue[]): PartAttrs {
   const out: PartAttrs = {};
   if (raw === undefined || raw === null) return out;
@@ -85,7 +108,7 @@ function attrsOf(raw: unknown, type: PartType, where: string, errors: Issue[], w
   const sym = getSymbol(type);
   const allowed = new Set(sym?.attrKeys ?? []);
   for (const key of Object.keys(raw)) {
-    if (!allowed.has(key)) { warnings.push({ code: 'ATTR_UNKNOWN', message: `${where}.attrs.${JSON.stringify(key).slice(0, 30)} is not used by type "${type}" and was ignored.`, where }); continue; }
+    if (!allowed.has(key) && key !== 'label') { warnings.push({ code: 'ATTR_UNKNOWN', message: `${where}.attrs.${JSON.stringify(key).slice(0, 30)} is not used by type "${type}" and was ignored.`, where }); continue; }
     const v = own(raw, key);
     if (key === 'state') {
       const ok = type === 'switch' ? ['open', 'closed'] : ['1', '2'];
@@ -98,6 +121,12 @@ function attrsOf(raw: unknown, type: PartType, where: string, errors: Issue[], w
     } else if (key === 'control') {
       const s = strOf(v, `${where}.attrs.control`, errors);
       if (s !== undefined) out.control = s;
+    } else if (key === 'label') {
+      const s = strOf(v, `${where}.attrs.label`, errors);
+      if (s !== undefined && s.trim() !== '') out.label = s.trim();
+    } else if (key === 'pins') {
+      const pins = icPinsOf(v, `${where}.attrs.pins`, errors);
+      if (pins) out.pins = pins;
     } else if (key === 'w' || key === 'h') {
       if (typeof v === 'number' && Number.isInteger(v) && v >= 2 && v <= LIMITS.maxBlockDim) out[key] = v;
       else errors.push({ code: 'ATTR_VALUE', message: `${where}.attrs.${key} must be an integer 2..${LIMITS.maxBlockDim} (grid units).`, where });
@@ -112,6 +141,14 @@ function attrsOf(raw: unknown, type: PartType, where: string, errors: Issue[], w
       out.signs = signs;
     }
   }
+  if (type === 'ic') {
+    const w = out.w ?? 8, h = out.h ?? 8;
+    if (w < 4 || h < 4) errors.push({ code: 'ATTR_VALUE', message: `${where}.attrs.w and h must be at least 4 for an ic.`, where });
+    for (const p of out.pins ?? []) {
+      const len = p.side === 'L' || p.side === 'R' ? h : w;
+      if (p.pos < 1 || p.pos > len - 1) errors.push({ code: 'ATTR_VALUE', message: `${where}.attrs.pins: pin ${JSON.stringify(p.name)} pos ${p.pos} must be 1..${len - 1} on side ${p.side}.`, where });
+    }
+  }
   if (type === 'block' && out.h !== undefined && out.h % 2 !== 0) errors.push({ code: 'ATTR_VALUE', message: `${where}.attrs.h must be even so the ports land on grid points.`, where });
   return out;
 }
@@ -121,6 +158,13 @@ export function normalizeSchematicSpec(raw: unknown): NormalizeResult {
   const warnings: Issue[] = [];
   const fail = (): NormalizeResult => ({ spec: null, errors, warnings });
   if (!isPlain(raw)) { errors.push({ code: 'SHAPE_ROOT', message: 'The spec must be a JSON object with parts, wires, labels.' }); return fail(); }
+
+  // Archetype request: expanded by the engine into a normal spec (never trust the model with coordinates).
+  if (Object.prototype.hasOwnProperty.call(raw, 'archetype')) {
+    const ex = expandArchetypeRequest(raw);
+    if (!ex.spec) { errors.push(...ex.errors); return fail(); }
+    return normalizeSchematicSpec(JSON.parse(JSON.stringify(ex.spec)));
+  }
 
   const title = strOf(own(raw, 'title'), 'title', errors) ?? '';
   const stdRaw = own(raw, 'standard');

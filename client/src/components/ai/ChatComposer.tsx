@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useImperativeHandle, useLayoutEffect, useRef, useState, type ClipboardEvent, type FormEvent, type KeyboardEvent, type Ref } from "react";
+import { useCallback, useEffect, useId, useImperativeHandle, useRef, useState, type ClipboardEvent, type FormEvent, type KeyboardEvent, type Ref } from "react";
 import { ArrowUp, Mic, Paperclip, Pencil, Square, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -7,9 +7,8 @@ import { cn } from "@/lib/utils";
 import { DocumentBadge } from "./DocumentBadge";
 import { DocumentError, classifyAttachment, prepareDocumentForChat, unsupportedKind } from "./documentUtils";
 import { ImageError, prepareImageForChat } from "./imageUtils";
-import { insertAtCursor } from "./insertAtCursor";
+import { MathInputArea, type MathInputHandle } from "./MathInputArea";
 import { MathKeyboard, MathKeyboardToggle } from "./MathKeyboard";
-import { MathText, hasMath } from "./mathText";
 import type { MathKey } from "./mathKeyboardData";
 import type { RunPhase } from "./useChatRunner";
 import { useVoiceInput } from "./useVoiceInput";
@@ -17,13 +16,9 @@ import { VoiceWaveform } from "./VoiceWaveform";
 import { acceptVoiceNotice, formatElapsed, hasAcceptedVoiceNotice, isVoiceInputSupported, joinText, recognitionLang, truncateTranscript } from "./voiceInput";
 
 const COUNTER_FROM = Math.floor(AI_MAX_MESSAGE_CHARS * 0.8);
-/** Eight lines of `leading-6`; the textarea scrolls beyond that. */
-const MAX_TEXTAREA_PX = 192;
 /** The picker accepts images, PDFs and Markdown / plain text; classification re-checks by MIME with an extension fallback. */
 const FILE_ACCEPT = "image/png,image/jpeg,image/webp,application/pdf,.pdf,text/plain,text/markdown,.md,.txt";
 const DOCUMENT_PROMPTS = ["summarise", "derivations", "errors"] as const;
-/** The live formula preview trails typing by this long. */
-const PREVIEW_DEBOUNCE_MS = 80;
 
 /** What the composer held before an edit began; Cancel (and a finished edit) puts it back. */
 interface EditState {
@@ -73,14 +68,14 @@ export interface ChatComposerProps {
   ref?: Ref<ComposerHandle>;
 }
 
-/** The message box: auto-growing textarea, image attach (picker / paste), send / stop with an in-flight spinner. */
+/** The message box: auto-growing rich-math editor (formulas typeset inline, `$…$` only on the wire), image attach (picker / paste), send / stop with an in-flight spinner. */
 export function ChatComposer({ phase, onSubmit, onStop, onActivity, onEditChange, large = false, className, ref }: ChatComposerProps) {
   const { t, i18n } = useTranslation("ai");
   const [draft, setDraft] = useState("");
   const [image, setImage] = useState<string | null>(null);
   const [doc, setDocument] = useState<ChatDocument | null>(null);
   const [preparing, setPreparing] = useState<"image" | "document" | null>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const areaRef = useRef<MathInputHandle>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [voiceSupported] = useState(() => isVoiceInputSupported());
@@ -92,7 +87,6 @@ export function ChatComposer({ phase, onSubmit, onStop, onActivity, onEditChange
   const [mathOpen, setMathOpen] = useState(false);
   const [tooLong, setTooLong] = useState(false);
   const tooLongTimer = useRef<number | undefined>(undefined);
-  const pendingSelection = useRef<{ value: string; start: number; end: number } | null>(null);
   const mathPanelId = `math-keyboard-${useId().replace(/:/g, "")}`;
 
   const cancelEdit = () => {
@@ -136,20 +130,8 @@ export function ChatComposer({ phase, onSubmit, onStop, onActivity, onEditChange
   const [editing, setEditing] = useState<EditState | null>(null);
   const editingRef = useRef<EditState | null>(null);
   editingRef.current = editing;
-  const [previewText, setPreviewText] = useState("");
-  const showPreview = draft.includes("$") && previewText !== "" && hasMath(previewText);
 
-  // Typing and key presses keep the preview a beat behind, so a burst of keys typesets once.
-  useEffect(() => {
-    if (!draft.includes("$")) {
-      setPreviewText("");
-      return;
-    }
-    const timer = window.setTimeout(() => setPreviewText(draft), PREVIEW_DEBOUNCE_MS);
-    return () => window.clearTimeout(timer);
-  }, [draft]);
-
-  // Esc leaves edit mode from anywhere on the page, not only from the textarea (an open dialog or menu handles its own Esc first).
+  // Esc leaves edit mode from anywhere on the page, not only from the editor (an open dialog or menu handles its own Esc first).
   useEffect(() => {
     if (!editing) return;
     const onKey = (event: globalThis.KeyboardEvent) => {
@@ -164,15 +146,11 @@ export function ChatComposer({ phase, onSubmit, onStop, onActivity, onEditChange
 
   // An edit replaces whatever reply is running, so a running stream never blocks submitting one.
   const busy = phase !== "idle" && !editing;
-  const canSend = !busy && preparing === null && draft.trim().length > 0;
+  // Empty = no non-whitespace text and no non-empty formula (the draft is the serialized string, which leaves empty formulas out).
+  const canSend = !busy && preparing === null && draft.trim().length > 0 && draft.length <= AI_MAX_MESSAGE_CHARS;
 
   const focus = useCallback(() => {
-    requestAnimationFrame(() => {
-      const el = textareaRef.current;
-      if (!el) return;
-      el.focus();
-      el.setSelectionRange(el.value.length, el.value.length);
-    });
+    requestAnimationFrame(() => areaRef.current?.focus());
   }, []);
 
   const attachFile = useCallback(
@@ -266,61 +244,25 @@ export function ChatComposer({ phase, onSubmit, onStop, onActivity, onEditChange
   });
   const recording = voice.status !== "idle";
 
-  useLayoutEffect(() => {
-    const el = textareaRef.current;
-    if (!el) return;
-    el.style.height = "auto";
-    el.style.height = `${Math.min(el.scrollHeight, MAX_TEXTAREA_PX)}px`;
-  }, [draft, recording]);
-
-  // A key press sets the draft and the wanted selection; apply it once React has put that value in the DOM, so the caret never jumps to the end.
-  useLayoutEffect(() => {
-    const el = textareaRef.current;
-    const pending = pendingSelection.current;
-    if (!el || !pending || el.value !== pending.value) return;
-    pendingSelection.current = null;
-    el.focus();
-    el.setSelectionRange(pending.start, pending.end);
-  }, [draft]);
   useEffect(() => () => window.clearTimeout(tooLongTimer.current), []);
+
+  const flashTooLong = useCallback(() => {
+    setTooLong(true);
+    window.clearTimeout(tooLongTimer.current);
+    tooLongTimer.current = window.setTimeout(() => setTooLong(false), 2500);
+  }, []);
 
   const closeMath = () => {
     setMathOpen(false);
-    textareaRef.current?.focus();
+    areaRef.current?.focus();
   };
 
+  /** A key puts a formula (with empty boxes) at the caret, or into the formula the caret is already in. */
   const insertKey = (key: MathKey) => {
-    const el = textareaRef.current;
-    if (!el) return;
-    const current = el.value;
-    const start = Math.min(el.selectionStart, el.selectionEnd);
-    const end = Math.max(el.selectionStart, el.selectionEnd);
-    const result = insertAtCursor(current, start, end, key, { maxChars: AI_MAX_MESSAGE_CHARS });
-    el.focus();
-    if (!result) {
-      setTooLong(true);
-      window.clearTimeout(tooLongTimer.current);
-      tooLongTimer.current = window.setTimeout(() => setTooLong(false), 2500);
-      return;
-    }
-    setTooLong(false);
-    onActivity();
-    // execCommand keeps the browser's undo stack; the state write is the fallback where it is missing or declined.
-    const inserted = result.value.slice(start, result.value.length - (current.length - end));
-    let native = false;
-    if (typeof document.execCommand === "function") {
-      el.setSelectionRange(start, end);
-      try {
-        native = document.execCommand("insertText", false, inserted) && el.value === result.value;
-      } catch {
-        native = false;
-      }
-    }
-    if (!native) {
-      pendingSelection.current = { value: result.value, start: result.caretStart, end: result.caretEnd };
-      setDraft(result.value);
-    }
-    el.setSelectionRange(result.caretStart, result.caretEnd);
+    void Promise.resolve(areaRef.current?.insertMath(key.template, key.latex)).then((inserted) => {
+      if (inserted === false) flashTooLong();
+      else setTooLong(false);
+    });
   };
 
   useEffect(() => {
@@ -361,7 +303,8 @@ export function ChatComposer({ phase, onSubmit, onStop, onActivity, onEditChange
 
   const submit = () => {
     if (!canSend) return;
-    commit(draft.trim());
+    // Read the editor itself: it drops empty formulas, and a keystroke may be newer than the last render.
+    commit((areaRef.current?.getValue() ?? draft).trim());
   };
 
   const onFormSubmit = (event: FormEvent) => {
@@ -369,22 +312,15 @@ export function ChatComposer({ phase, onSubmit, onStop, onActivity, onEditChange
     submit();
   };
 
-  const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (event.key === "Escape" && mathOpen) {
+  /** Enter (with the IME and Shift guards) is handled inside the editor; Escape closes the keypad, else leaves edit mode. */
+  const onEscape = (event: globalThis.KeyboardEvent) => {
+    if (mathOpen) {
       event.preventDefault();
       closeMath();
-      return;
-    }
-    if (event.key === "Escape" && editingRef.current) {
+    } else if (editingRef.current) {
       event.preventDefault();
       cancelEdit();
-      return;
     }
-    if (event.key !== "Enter" || event.shiftKey) return;
-    // Enter during IME composition confirms the candidate; it must not send.
-    if (event.nativeEvent.isComposing || event.keyCode === 229) return;
-    event.preventDefault();
-    submit();
   };
 
   const onPaste = (event: ClipboardEvent) => {
@@ -532,31 +468,19 @@ export function ChatComposer({ phase, onSubmit, onStop, onActivity, onEditChange
       ) : (
         <>
       <MathKeyboard open={mathOpen} id={mathPanelId} onInsert={insertKey} onClose={closeMath} tooLong={tooLong} />
-      {showPreview ? (
-        <div
-          role="group"
-          aria-label={t("mathPreview.label")}
-          aria-live="off"
-          dir="auto"
-          data-math-preview
-          className="mx-4 mt-3 max-h-28 overflow-y-auto whitespace-pre-wrap break-words rounded-xl bg-violet-50/70 px-3 py-2 text-base leading-7 text-slate-800 dark:bg-violet-500/10 dark:text-zinc-100"
-        >
-          <MathText text={previewText} />
-        </div>
-      ) : null}
-      <textarea
-        ref={textareaRef}
+      <MathInputArea
+        ref={areaRef}
         value={draft}
-        onChange={(event) => { setDraft(event.target.value); onActivity(); }}
-        onKeyDown={onKeyDown}
-        rows={1}
-        dir="auto"
-        maxLength={AI_MAX_MESSAGE_CHARS}
-        enterKeyHint="send"
-        aria-label={t("composer.label")}
+        onChange={setDraft}
+        onSubmit={submit}
+        onActivity={onActivity}
+        onLimit={flashTooLong}
+        onEscape={onEscape}
+        maxChars={AI_MAX_MESSAGE_CHARS}
+        ariaLabel={t("composer.label")}
         placeholder={t(editing ? "edit.placeholder" : doc ? "composer.documentPlaceholder" : "composer.placeholder")}
         className={cn(
-          "block w-full resize-none bg-transparent px-5 text-base leading-6 text-slate-900 outline-none placeholder:text-slate-400 dark:text-white dark:placeholder:text-zinc-500",
+          "block w-full bg-transparent px-5 text-base leading-6 text-slate-900 dark:text-white",
           large ? "min-h-[3.75rem] pt-5 pb-1.5" : "min-h-[3rem] pt-3.5 pb-1",
         )}
       />
@@ -581,7 +505,7 @@ export function ChatComposer({ phase, onSubmit, onStop, onActivity, onEditChange
           ) : null}
         </div>
 
-        <MathKeyboardToggle open={mathOpen} panelId={mathPanelId} onToggle={() => (mathOpen ? closeMath() : setMathOpen(true))} />
+        <MathKeyboardToggle open={mathOpen} panelId={mathPanelId} onToggle={() => { if (mathOpen) closeMath(); else { setMathOpen(true); areaRef.current?.preload(); } }} />
 
         {voiceSupported ? (
           <button

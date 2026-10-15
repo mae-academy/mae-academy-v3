@@ -1,0 +1,87 @@
+/* The composer's rich-math text box. Layout classes (padding, min-height) come from the composer; this file owns the editor mechanics. */
+
+.mae-math-input {
+  position: relative;
+  max-height: 12rem; /* eight lines of leading-6, then it scrolls */
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  cursor: text;
+  outline: none;
+}
+
+.mae-math-input[data-empty]::before {
+  content: attr(data-placeholder);
+  position: absolute;
+  pointer-events: none;
+  color: #94a3b8;
+}
+:is(.dark) .mae-math-input[data-empty]::before {
+  color: #71717a;
+}
+
+/* A formula: an inline-block island, vertically centred on the text line. */
+.mae-math {
+  display: inline-block;
+  vertical-align: middle;
+  max-width: 100%;
+  margin: 0 0.12em;
+  padding: 0.1em 0.3em;
+  border: 1px solid transparent;
+  border-radius: 0.5rem;
+  background: rgb(124 58 237 / 0.08);
+  color: inherit;
+  font-size: 1.1em;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  outline: none;
+}
+:is(.dark) .mae-math {
+  background: rgb(167 139 250 / 0.14);
+}
+
+math-field.mae-math {
+  min-width: 1.4em;
+  --hue: 262;
+  --caret-color: #7c3aed;
+  --selection-background-color: rgb(139 92 246 / 0.28);
+  --selection-color: inherit;
+  --contains-highlight-background-color: rgb(139 92 246 / 0.12);
+  --placeholder-color: #7c3aed;
+  --placeholder-opacity: 0.55;
+  --text-font-family: "KaTeX_Main", "KaTeX_Math", "Times New Roman", serif;
+  --smart-fence-opacity: 0.5;
+}
+:is(.dark) math-field.mae-math {
+  --caret-color: #c4b5fd;
+  --placeholder-color: #c4b5fd;
+  --selection-background-color: rgb(167 139 250 / 0.35);
+}
+
+math-field.mae-math:focus-within {
+  border-color: rgb(124 58 237 / 0.55);
+  background: rgb(124 58 237 / 0.12);
+}
+:is(.dark) math-field.mae-math:focus-within {
+  border-color: rgb(196 181 253 / 0.55);
+}
+
+/* No keyboard toggle, no menu button: the composer has its own keypad. */
+math-field.mae-math::part(menu-toggle),
+math-field.mae-math::part(virtual-keyboard-toggle) {
+  display: none;
+}
+
+.mae-math-chip {
+  cursor: default;
+  user-select: none;
+}
+
+@media (pointer: coarse) {
+  .mae-math {
+    min-height: 2rem;
+  }
+}

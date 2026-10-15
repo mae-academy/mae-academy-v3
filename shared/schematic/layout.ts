@@ -2,15 +2,18 @@
 
 import { analyze, type Analysis } from './netlist';
 import { rnd } from './geometry';
+import { autoMathSource, mathMetrics, texText } from './mathText';
 import type { SymPrim } from './symbols';
 import type { Issue, LabelPref, SchematicSpec } from './types';
 
-export const FONT = 14;
-export const LINE_H = 16;
+export const FONT = 16;
+export const LINE_H = 18;
 export type PxRect = [number, number, number, number];
 
+/** One rendered label line: `math` lines hold LaTeX-subset source (see mathText.ts), others plain text. */
+export interface LabelLine { text: string; math: boolean }
 export interface TextBlock {
-  lines: string[];
+  lines: LabelLine[];
   anchor: 'start' | 'middle' | 'end';
   x: number;
   /** baseline y of each line */
@@ -39,6 +42,10 @@ export function textWidth(s: string, size = FONT): number {
   return Math.ceil(w * size);
 }
 
+/** Pixel width of a label line at the label font size. */
+export function lineWidth(l: LabelLine, size = FONT): number {
+  return l.math ? mathMetrics(l.text, size).width : textWidth(l.text, size);
+}
 const hit = (a: PxRect, b: PxRect): boolean => Math.min(a[2], b[2]) - Math.max(a[0], b[0]) > 0 && Math.min(a[3], b[3]) - Math.max(a[1], b[1]) > 0;
 const inflate = (r: PxRect, d: number): PxRect => [r[0] - d, r[1] - d, r[2] + d, r[3] + d];
 
@@ -70,9 +77,11 @@ function primBounds(p: SymPrim): PxRect | null {
 type Side = 'above' | 'below' | 'left' | 'right';
 const OUTWARD: Record<number, Side> = { 0: 'above', 90: 'right', 180: 'below', 270: 'left' };
 
-function block(lines: string[], side: Side, align: 'c' | 'a' | 'b', gap: number, box: PxRect): TextBlock {
-  const w = Math.max(...lines.map((l) => textWidth(l)));
+function block(lines: LabelLine[], side: Side, align: 'c' | 'a' | 'b', gap: number, box: PxRect): TextBlock {
+  const w = Math.max(...lines.map((l) => lineWidth(l)));
   const h = LINE_H * lines.length;
+  const ext = lines.map((l) => (l.math ? mathMetrics(l.text, FONT) : { hasSub: false, hasSup: false }));
+  const extraTop = ext[0].hasSup ? 2 : 0, extraBottom = ext[ext.length - 1].hasSub ? 2 : 0;
   const cx = (box[0] + box[2]) / 2, cy = (box[1] + box[3]) / 2;
   let anchor: TextBlock['anchor'] = 'middle';
   let x: number, top: number, x0: number;
@@ -86,7 +95,7 @@ function block(lines: string[], side: Side, align: 'c' | 'a' | 'b', gap: number,
     if (side === 'right') { anchor = 'start'; x = box[2] + gap; x0 = x; } else { anchor = 'end'; x = box[0] - gap; x0 = x - w; }
   }
   top = rnd(top);
-  return { lines, anchor, x: rnd(x), baselines: lines.map((_, i) => top + LINE_H * i + 12), rect: [x0, top + 1, x0 + w, top + h - 1] };
+  return { lines, anchor, x: rnd(x), baselines: lines.map((_, i) => top + LINE_H * i + 13), rect: [x0, top + 1 - extraTop, x0 + w, top + h - 1 + extraBottom] };
 }
 
 export function layoutSchematic(spec: SchematicSpec): Layout {
@@ -100,16 +109,22 @@ export function layoutSchematic(spec: SchematicSpec): Layout {
 
   // free-standing labels first: they are fixed
   const freeLabels: TextBlock[] = spec.labels.map((l) => {
-    const w = textWidth(l.text);
+    const line: LabelLine = { text: autoMathSource(l.text), math: true };
+    const m = mathMetrics(line.text, FONT);
+    const w = m.width;
     const x = l.at[0] * P, base = l.at[1] * P - 6;
     const x0 = l.anchor === 'start' ? x : l.anchor === 'end' ? x - w : x - w / 2;
-    return { lines: [l.text], anchor: l.anchor, x, baselines: [base], rect: [x0, base - 11, x0 + w, base + 3] };
+    return { lines: [line], anchor: l.anchor, x, baselines: [base], rect: [x0, base - 13 - (m.hasSup ? 2 : 0), x0 + w, base + 3 + (m.hasSub ? 2 : 0)] };
   });
   const placedRects: PxRect[] = [];
   freeLabels.forEach((f, i) => {
     for (const p of a.placed) {
       const b = p.box.map((v) => v * P) as PxRect;
       if (hit(f.rect, b)) { warnings.push({ code: 'LABEL_OVERLAP', message: `Label "${spec.labels[i].text}" at (${spec.labels[i].at}) overlaps part ${p.part.id}; move the label.`, where: `labels[${i}]` }); break; }
+    }
+    for (const sg of a.segs) {
+      const sr: PxRect = [Math.min(sg.x1, sg.x2) * P - 1, Math.min(sg.y1, sg.y2) * P - 1, Math.max(sg.x1, sg.x2) * P + 1, Math.max(sg.y1, sg.y2) * P + 1];
+      if (hit(f.rect, sr)) { warnings.push({ code: 'LABEL_WIRE_OVERLAP', message: `Label "${spec.labels[i].text}" at (${spec.labels[i].at}) overlaps a wire; move the label into free space.`, where: `labels[${i}]` }); break; }
     }
     placedRects.push(f.rect);
   });
@@ -118,9 +133,13 @@ export function layoutSchematic(spec: SchematicSpec): Layout {
   for (const p of a.placed) {
     const mode = p.sym.labelMode;
     if (mode === 'none' || p.part.label === 'none') continue;
-    const lines: string[] = [];
-    if (mode === 'full') lines.push(p.part.attrs.control ? `${p.part.id} (${p.part.attrs.control})` : p.part.id);
-    if (p.display) lines.push(p.display);
+    const lines: LabelLine[] = [];
+    if (mode === 'full' || mode === 'id') {
+      const des = autoMathSource(p.part.attrs.label ?? p.part.id);
+      lines.push({ text: p.part.attrs.control ? `${des}\\ ${texText(`(${p.part.attrs.control})`)}` : des, math: true });
+    }
+    if (mode !== 'id' && p.display && p.part.type === 'rail' && p.part.attrs.label) lines.push({ text: `${autoMathSource(p.part.attrs.label)}\\,=\\,${texText(p.display)}`, math: true }); // rail: "V_{CC} = 12 V"
+    else if (mode !== 'id' && p.display) lines.push(p.part.type === 'port' ? { text: autoMathSource(p.display), math: true } : { text: p.display, math: false });
     if (lines.length === 0) continue;
     const box = p.box.map((v) => Math.round(v * P)) as PxRect;
     const pref = p.part.label !== 'auto' ? (p.part.label as Exclude<LabelPref, 'auto' | 'none'>) : null;

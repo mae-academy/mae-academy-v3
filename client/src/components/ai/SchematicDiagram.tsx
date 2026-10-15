@@ -1,12 +1,13 @@
 import { createContext, memo, useCallback, useContext, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
-import { Braces, FileCode2, ImageDown, ListTree, Maximize2, PenLine, ShieldCheck, TriangleAlert, Wrench, X, ZoomIn, ZoomOut } from "lucide-react";
+import { Braces, Check, CircuitBoard, FileCode2, ImageDown, ListTree, Maximize2, PenLine, ShieldCheck, X, ZoomIn, ZoomOut } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
-import { extractJsonText, netlistToMarkdown, type Issue } from "@shared/schematic";
+import { extractJsonText, netlistToMarkdown } from "@shared/schematic";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-import { CodeBlock, copyText } from "./CodeBlock";
-import { MAX_REPAIR_ATTEMPTS, analyzeSchematic, cachedVerification, startVerification, type SchematicOutcome, type VerifyProgress } from "./schematicVerify";
+import { copyText } from "./CodeBlock";
+import { PlotFixContext } from "./PlotCard";
+import { analyzeSchematic, isArchetypeSpecText, cachedVerification, startVerification, type SchematicOutcome } from "./schematicVerify";
 import { downloadBlob, rasterizeSvg, schematicFilename, svgBlob, svgDataUri } from "./schematicExport";
 
 /** True for messages created in this page session: their schematic may call the repair route on its own. Restored ones only validate locally. */
@@ -52,7 +53,7 @@ export function SchematicPending() {
   );
 }
 
-function VerifyingCard({ progress }: { progress: VerifyProgress }) {
+function VerifyingCard() {
   const { t } = useTranslation("ai");
   return (
     <div role="status" aria-live="polite" className="my-4 overflow-hidden rounded-2xl bg-slate-50 ring-1 ring-slate-200 dark:bg-white/[0.04] dark:ring-white/10">
@@ -62,8 +63,24 @@ function VerifyingCard({ progress }: { progress: VerifyProgress }) {
           <ShieldCheck className="h-4 w-4 motion-safe:animate-pulse" aria-hidden="true" />
           {t("schematic.verifying")}
         </p>
-        {progress.phase === "fixing" ? <p className="text-xs text-slate-500 dark:text-zinc-400">{t("schematic.fixing", { n: progress.issues, attempt: progress.attempt, max: MAX_REPAIR_ATTEMPTS })}</p> : null}
       </div>
+    </div>
+  );
+}
+
+/** Shown instead of a drawing that could not be verified: calm and neutral, never a broken diagram presented as correct. */
+function UnavailableCard({ issues }: { issues: number }) {
+  const { t } = useTranslation("ai");
+  const redraw = useContext(PlotFixContext);
+  return (
+    <div role="status" data-schematic-unavailable={issues} className="my-4 flex flex-col items-start gap-3 rounded-2xl bg-slate-50 px-4 py-4 text-sm text-slate-700 ring-1 ring-slate-200 dark:bg-white/[0.04] dark:text-zinc-200 dark:ring-white/10 sm:flex-row sm:items-center">
+      <CircuitBoard className="h-5 w-5 shrink-0 text-slate-400 dark:text-zinc-500" aria-hidden="true" />
+      <p dir="auto" className="min-w-0 flex-1">{t("schematic.unavailable")}</p>
+      {redraw ? (
+        <button type="button" className={pillButton} onClick={() => redraw(t("schematic.redrawPrompt"))}>
+          {t("schematic.redraw")}
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -171,18 +188,6 @@ function Lightbox({ src, alt, title, actions, onClose }: LightboxProps) {
   );
 }
 
-function IssueList({ issues }: { issues: readonly Issue[] }) {
-  return (
-    <ul dir="auto" className="mt-1 list-disc space-y-0.5 ps-5 text-xs text-slate-600 marker:text-slate-400 dark:text-zinc-300">
-      {issues.map((issue, index) => (
-        <li key={`${issue.code}-${index}`} className="break-words">
-          {issue.message}
-        </li>
-      ))}
-    </ul>
-  );
-}
-
 function NetlistTable({ outcome }: { outcome: SchematicOutcome }) {
   const { t } = useTranslation("ai");
   const parts = outcome.validation.netlist.parts;
@@ -230,8 +235,7 @@ export interface SchematicDiagramProps {
 function useSchematicOutcome(text: string, autoRepair: boolean) {
   const cached = cachedVerification(text);
   const [outcome, setOutcome] = useState<SchematicOutcome>(() => cached ?? analyzeSchematic(text));
-  const [running, setRunning] = useState<boolean>(() => !cached && autoRepair && analyzeSchematic(text).status !== "verified");
-  const [progress, setProgress] = useState<VerifyProgress>({ phase: "verifying", attempt: 0, issues: 0 });
+  const [running, setRunning] = useState<boolean>(() => !cached && autoRepair && analyzeSchematic(text).status !== "verified" && !isArchetypeSpecText(text));
   // Whether this message may repair on its own is decided once; flipping it later must not trigger a request.
   const auto = useRef(autoRepair);
   const runId = useRef(0);
@@ -239,13 +243,8 @@ function useSchematicOutcome(text: string, autoRepair: boolean) {
   const begin = useCallback((spec: string) => {
     const id = ++runId.current;
     const run = startVerification(spec);
-    setProgress(run.progress());
     setRunning(true);
-    const unsubscribe = run.subscribe((next) => {
-      if (runId.current === id) setProgress(next);
-    });
     void run.promise.then((result) => {
-      unsubscribe();
       if (runId.current !== id) return;
       setOutcome(result);
       setRunning(false);
@@ -260,7 +259,7 @@ function useSchematicOutcome(text: string, autoRepair: boolean) {
     } else {
       const local = analyzeSchematic(text);
       setOutcome(local);
-      if (local.status !== "verified" && auto.current) begin(text);
+      if (local.status !== "verified" && auto.current && !isArchetypeSpecText(text)) begin(text);
       else setRunning(false);
     }
     return () => {
@@ -268,13 +267,13 @@ function useSchematicOutcome(text: string, autoRepair: boolean) {
     };
   }, [text, begin]);
 
-  return { outcome, running, progress, verify: () => begin(text) };
+  return { outcome, running };
 }
 
 function SchematicDiagramImpl({ text }: SchematicDiagramProps) {
   const { t } = useTranslation("ai");
   const autoRepair = useContext(SchematicAutoRepairContext);
-  const { outcome, running, progress, verify } = useSchematicOutcome(text, autoRepair);
+  const { outcome, running } = useSchematicOutcome(text, autoRepair);
   const [open, setOpen] = useState(false);
   const opener = useRef<HTMLElement | null>(null);
 
@@ -311,57 +310,21 @@ function SchematicDiagramImpl({ text }: SchematicDiagramProps) {
     },
   };
 
-  if (running) return <VerifyingCard progress={progress} />;
+  if (running) return <VerifyingCard />;
 
-  const errors = validation.errors;
-  const canFix = status !== "verified" && (outcome.attempts < MAX_REPAIR_ATTEMPTS || outcome.repairError !== undefined) && text.trim().length > 0;
+  // Only a verified drawing is ever shown. Anything else (free-form spec that failed every repair, bad archetype request,
+  // unreadable JSON, repair route down) becomes the neutral card; the reasons go to the console for developers only.
+  if (status !== "verified" || !render) {
+    if (typeof console !== "undefined") console.debug("[schematic] not drawn:", validation.errors.map((issue) => issue.message));
+    return <UnavailableCard issues={validation.errors.length} />;
+  }
 
   const statusRow = (
-    <div aria-live="polite" className="mt-2 space-y-1 text-xs text-slate-600 dark:text-zinc-300">
-      {status === "verified" ? (
-        <p className="font-medium text-emerald-700 dark:text-emerald-400">{t("schematic.passed")}</p>
-      ) : (
-        <div role="note" className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-amber-950 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-100">
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <p className="flex min-w-0 flex-1 items-center gap-1.5 font-semibold">
-              <TriangleAlert className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-300" aria-hidden="true" />
-              {status === "unparseable" ? t("schematic.unreadable") : t("schematic.unverified", { n: errors.length })}
-            </p>
-            {canFix ? (
-              <button type="button" className={cn(pillButton, "min-h-11 border-amber-400 bg-white text-amber-950 hover:bg-amber-100 sm:min-h-9")} onClick={verify}>
-                <Wrench className="h-4 w-4" aria-hidden="true" />
-                {t("schematic.verifyFix")}
-              </button>
-            ) : null}
-          </div>
-          {outcome.repairError ? <p className="mt-1">{t("schematic.repairUnavailable")}</p> : null}
-          {errors.length > 0 ? (
-            <details>
-              <summary className={cn(summaryClass, "text-amber-900 hover:text-amber-950 dark:text-amber-100")}>{t("schematic.issues", { n: errors.length })}</summary>
-              <IssueList issues={errors} />
-            </details>
-          ) : null}
-        </div>
-      )}
-      {outcome.repaired ? <p className="text-slate-500 dark:text-zinc-400">{t("schematic.autoCorrected")}</p> : null}
-      {validation.warnings.length > 0 ? (
-        <details>
-          <summary className={summaryClass}>{t("schematic.warnings", { n: validation.warnings.length })}</summary>
-          <IssueList issues={validation.warnings} />
-        </details>
-      ) : null}
-    </div>
+    <p aria-live="polite" className="mt-2 flex items-center gap-1.5 text-xs text-slate-500 dark:text-zinc-400">
+      <Check className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" aria-hidden="true" />
+      {t("schematic.passed")}
+    </p>
   );
-
-  if (!render) {
-    // Nothing drawable: show the raw spec as code, with the reasons.
-    return (
-      <figure className="my-4">
-        <CodeBlock code={text} language="json" />
-        {statusRow}
-      </figure>
-    );
-  }
 
   return (
     <figure className="my-4">

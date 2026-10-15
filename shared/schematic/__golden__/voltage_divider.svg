@@ -1,49 +1,49 @@
 <!-- Standard: IEC 60617 | Pitch P = 20 px | Signal stroke 2 px | Power stroke 3 px -->
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 289 251" width="289" height="251">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 295 255" width="295" height="255">
 <title>Voltage divider</title>
 <desc>Schematic generated deterministically from a grid-snapped spec.</desc>
-<rect x="0" y="0" width="289" height="251" fill="#fff"/>
+<rect x="0" y="0" width="295" height="255" fill="#fff"/>
 <g id="wires" fill="none" stroke="#000" stroke-width="2" stroke-linecap="square" stroke-linejoin="miter" shape-rendering="crispEdges">
-<polyline points="46,73 86,73"/>
-<polyline points="166,73 206,73"/>
-<polyline points="46,153 46,193 126,193"/>
-<polyline points="206,153 206,193 126,193"/>
+<polyline points="46,77 86,77"/>
+<polyline points="166,77 206,77"/>
+<polyline points="46,157 46,197 126,197"/>
+<polyline points="206,157 206,197 126,197"/>
 </g>
 <g id="parts" fill="none" stroke="#000" stroke-width="2" stroke-linecap="square" stroke-linejoin="miter" font-family="Helvetica, Arial, sans-serif">
 <g>
-<line x1="46" y1="73" x2="46" y2="93"/>
-<circle cx="46" cy="113" r="20" fill="#fff"/>
-<line x1="46" y1="133" x2="46" y2="153"/>
-<text x="46" y="109" text-anchor="middle" font-size="18" fill="#000" stroke="none">+</text>
-<text x="46" y="129" text-anchor="middle" font-size="18" fill="#000" stroke="none">−</text>
+<line x1="46" y1="77" x2="46" y2="97"/>
+<circle cx="46" cy="117" r="20" fill="#fff"/>
+<line x1="46" y1="137" x2="46" y2="157"/>
+<text x="46" y="113" text-anchor="middle" font-size="18" fill="#000" stroke="none">+</text>
+<text x="46" y="133" text-anchor="middle" font-size="18" fill="#000" stroke="none">−</text>
 </g>
 <g>
-<line x1="86" y1="73" x2="106" y2="73"/>
-<rect x="106" y="63" width="40" height="20" fill="#fff"/>
-<line x1="146" y1="73" x2="166" y2="73"/>
+<line x1="86" y1="77" x2="106" y2="77"/>
+<rect x="106" y="67" width="40" height="20" fill="#fff"/>
+<line x1="146" y1="77" x2="166" y2="77"/>
 </g>
 <g>
-<line x1="206" y1="73" x2="206" y2="93"/>
-<rect x="196" y="93" width="20" height="40" fill="#fff"/>
-<line x1="206" y1="133" x2="206" y2="153"/>
+<line x1="206" y1="77" x2="206" y2="97"/>
+<rect x="196" y="97" width="20" height="40" fill="#fff"/>
+<line x1="206" y1="137" x2="206" y2="157"/>
 </g>
 <g>
-<line x1="126" y1="193" x2="126" y2="213"/>
-<line x1="111" y1="213" x2="141" y2="213"/>
-<line x1="116" y1="219" x2="136" y2="219"/>
-<line x1="121" y1="225" x2="131" y2="225"/>
+<line x1="126" y1="197" x2="126" y2="217"/>
+<line x1="111" y1="217" x2="141" y2="217"/>
+<line x1="116" y1="223" x2="136" y2="223"/>
+<line x1="121" y1="229" x2="131" y2="229"/>
 </g>
 </g>
 <g id="junctions" fill="#000" stroke="none">
-<circle cx="126" cy="193" r="3"/>
+<circle cx="126" cy="197" r="3"/>
 </g>
-<g id="labels" fill="#000" stroke="none" font-family="Helvetica, Arial, sans-serif" font-size="14">
-<text x="72" y="109" text-anchor="start">V1</text>
-<text x="72" y="125" text-anchor="start">10 V</text>
-<text x="126" y="37" text-anchor="middle">R1</text>
-<text x="126" y="53" text-anchor="middle">10 kΩ</text>
-<text x="222" y="109" text-anchor="start">R2</text>
-<text x="222" y="125" text-anchor="start">10 kΩ</text>
-<text x="206" y="67" text-anchor="start">Vout</text>
+<g id="labels" fill="#000" stroke="none" font-family="Times New Roman, Times, serif" font-size="16">
+<text x="72" y="112" text-anchor="start"><tspan font-style="italic">V</tspan><tspan dy="4" font-size="12">1</tspan></text>
+<text x="72" y="130" text-anchor="start">10 V</text>
+<text x="126" y="38" text-anchor="middle"><tspan font-style="italic">R</tspan><tspan dy="4" font-size="12">1</tspan></text>
+<text x="126" y="56" text-anchor="middle">10 kΩ</text>
+<text x="222" y="112" text-anchor="start"><tspan font-style="italic">R</tspan><tspan dy="4" font-size="12">2</tspan></text>
+<text x="222" y="130" text-anchor="start">10 kΩ</text>
+<text x="206" y="71" text-anchor="start"><tspan font-style="italic">V</tspan><tspan dy="4" font-size="12">out</tspan></text>
 </g>
 </svg>

@@ -1,8 +1,9 @@
-import { extractJsonText, renderSpec, validateSchematic, type Issue, type RenderResult, type ValidationResult } from "@shared/schematic";
+import { extractJsonText, isArchetypeRequest, renderSpec, validateSchematic, type Issue, type RenderResult, type ValidationResult } from "@shared/schematic";
 
 /**
- * Orchestration behind the schematic card: validate locally, and when the spec fails, ask the server to repair it
- * (at most MAX_REPAIR_ATTEMPTS rounds), re-validating every answer here. The server's own verdict is never trusted.
+ * Orchestration behind the schematic card: validate locally (archetype requests are built and verified here, with no network),
+ * and when a free-form spec fails, ask the server to repair it (at most MAX_REPAIR_ATTEMPTS rounds), re-validating every answer
+ * here. The server's own verdict is never trusted. Only a `verified` outcome is ever drawn.
  * Pure of React; results are cached per spec text for the page's lifetime and identical requests share one run.
  */
 
@@ -72,6 +73,17 @@ export function issueMessages(issues: readonly Issue[]): string[] {
   return (lines.length ? lines : ["The spec failed validation."]).slice(0, MAX_ERRORS_SENT);
 }
 
+/** True when the spec text is an archetype request ({"archetype": ...}). Those are never sent to the free-form repairer. */
+export function isArchetypeSpecText(specText: string): boolean {
+  const body = extractJsonText(specText);
+  if (body === null) return false;
+  try {
+    return isArchetypeRequest(JSON.parse(body));
+  } catch {
+    return false;
+  }
+}
+
 const analysisCache = new Map<string, SchematicOutcome>();
 
 /** Local, synchronous check: parse, run the 10 gates, draw whatever can be drawn. Never throws. Memoized per text. */
@@ -117,6 +129,7 @@ export async function verifyWithRepair(original: string, options: RepairLoopOpti
   const { repair, maxAttempts = MAX_REPAIR_ATTEMPTS, signal, onProgress } = options;
   const first = analyzeSchematic(original);
   if (first.status === "verified") return first;
+  if (isArchetypeSpecText(original)) return first; // a bad archetype request has nothing to "repair": it is replaced by a fresh request
 
   let best = first;
   let current = first;

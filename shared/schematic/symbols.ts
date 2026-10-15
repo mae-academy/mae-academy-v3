@@ -35,7 +35,8 @@ export interface SymbolDef {
   summary: string;
   analog: boolean;
   prefixes: string[];
-  labelMode: 'full' | 'value' | 'none';
+  /** full = designator + value, value = value only, id = designator only, none = nothing */
+  labelMode: 'full' | 'value' | 'id' | 'none';
   unit: Dim | null;
   valueRequired: boolean;
   isolator?: boolean;
@@ -206,6 +207,15 @@ diode('led', 'light-emitting diode', ln(2, -0.5, 2, 0.5), [
   ln(1.6, -0.55, 2.1, -1.05), ah(2.25, -1.2, 1, -1, 0.4, 0.15),
 ], -1.4);
 
+def({
+  type: 'scr', summary: 'thyristor (SCR): A anode, K cathode, G gate lead below the cathode side', prefixes: ['T', 'TH', 'SCR', 'VT', 'D', 'Q'],
+  build: () => ({
+    terminals: [t('A', 0, 0), t('K', 3, 0), t('G', 3, 2)],
+    prims: [ln(0, 0, 1, 0), pl([[1, -0.5], [1, 0.5], [2, 0]], true, 'white'), ln(2, -0.5, 2, 0.5), ln(2, 0, 3, 0), pl([[2, 0.5], [2.5, 1.25], [3, 2]])],
+    box: [0, -0.5, 3, 2],
+  }),
+});
+
 // ---- switches ----
 def({
   type: 'switch', summary: 'SPST switch; attrs.state open|closed, attrs.control e.g. "PWM"', prefixes: ['S', 'SW', 'K'], attrKeys: ['state', 'control'],
@@ -258,10 +268,10 @@ function mos(type: 'nmos' | 'pmos', bodyDiode: boolean): BuiltSymbol {
   }
   return { terminals: [t('G', 0, 0), t('D', 2, -2), t('S', 2, 2)], prims, box: [0, -2, right, 2] };
 }
-def({ type: 'nmos', summary: 'N-channel enhancement MOSFET; attrs.body_diode', prefixes: ['M', 'Q'], attrKeys: ['body_diode'], build: ({ attrs }) => mos('nmos', attrs.body_diode === true) });
-def({ type: 'pmos', summary: 'P-channel enhancement MOSFET; attrs.body_diode', prefixes: ['M', 'Q'], attrKeys: ['body_diode'], build: ({ attrs }) => mos('pmos', attrs.body_diode === true) });
+def({ type: 'nmos', summary: 'N-channel enhancement MOSFET; attrs.body_diode', prefixes: ['M', 'Q'], attrKeys: ['body_diode', 'control'], build: ({ attrs }) => mos('nmos', attrs.body_diode === true) });
+def({ type: 'pmos', summary: 'P-channel enhancement MOSFET; attrs.body_diode', prefixes: ['M', 'Q'], attrKeys: ['body_diode', 'control'], build: ({ attrs }) => mos('pmos', attrs.body_diode === true) });
 def({
-  type: 'igbt', summary: 'IGBT (insulated gate, collector/emitter)', prefixes: ['Q', 'M'],
+  type: 'igbt', summary: 'IGBT (insulated gate, collector/emitter)', prefixes: ['Q', 'M'], attrKeys: ['control'],
   build: () => ({
     terminals: [t('G', 0, 0), t('C', 2, -2), t('E', 2, 2)],
     prims: [ln(0, 0, 0.6, 0), ln(0.6, -0.9, 0.6, 0.9), ln(1, -1, 1, 1), ln(1, -0.5, 2, -1.5), ln(2, -1.5, 2, -2), ln(1, 0.5, 2, 1.5), ln(2, 1.5, 2, 2), ah(1.85, 1.35, 1, 1, 0.4, 0.17)],
@@ -342,6 +352,36 @@ def({
     prims: [ln(0, 0, 1, 0), pl([[1, -1.5], [1, 1.5], [4, 0]], true, 'white'), ln(4, 0, 5, 0), tx(1.85, 0, value, 14)],
     box: [0, -1.5, 5, 1.5],
   }),
+});
+
+def({
+  type: 'motor', summary: 'DC motor (circle with M); terminals 1 and 2', prefixes: ['M', 'MOT'], unit: null,
+  build: () => ({
+    terminals: [t('1', 0, 0), t('2', 4, 0)],
+    prims: [ln(0, 0, 0.5, 0), ci(2, 0, 1.5, 'white'), ln(3.5, 0, 4, 0), tx(2, 0, 'M', 20, 'middle', true)],
+    box: [0, -1.5, 4, 1.5],
+  }),
+});
+def({
+  type: 'ic', summary: 'generic IC block with NAMED pins: attrs.w,h (grid), attrs.pins [{name,side L|R|T|B,pos}], value = caption inside; terminals are the pin names',
+  analog: false, labelMode: 'id', attrKeys: ['w', 'h', 'pins'], prefixes: ['U', 'IC'],
+  build: ({ attrs, value }) => {
+    const w = attrs.w ?? 8, h = attrs.h ?? 8;
+    const terminals: SymTerminal[] = [];
+    const prims: SymPrim[] = [rc(1, 1, w - 2, h - 2, 'white')];
+    for (const pin of attrs.pins ?? []) {
+      const [x, y] = pin.side === 'L' ? [0, pin.pos] : pin.side === 'R' ? [w, pin.pos] : pin.side === 'T' ? [pin.pos, 0] : [pin.pos, h];
+      terminals.push(t(pin.name, x, y, pin.optional));
+      const [x2, y2] = pin.side === 'L' ? [1, y] : pin.side === 'R' ? [w - 1, y] : pin.side === 'T' ? [x, 1] : [x, h - 1];
+      prims.push(ln(x, y, x2, y2));
+      if (pin.side === 'L') prims.push(tx(1.25, y, pin.name, 11, 'start'));
+      else if (pin.side === 'R') prims.push(tx(w - 1.25, y, pin.name, 11, 'end'));
+      else if (pin.side === 'T') prims.push(tx(x, 1.6, pin.name, 11, 'middle'));
+      else prims.push(tx(x, h - 1.6, pin.name, 11, 'middle'));
+    }
+    if (value) prims.push(tx(w / 2, h / 2, value, 14, 'middle', true));
+    return { terminals, prims, box: [0, 0, w, h] };
+  },
 });
 
 // ---- logic gates (IEEE distinctive) ----

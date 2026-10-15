@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { BUCK_CONVERTER, VOLTAGE_DIVIDER } from "@shared/schematic/fixtures";
-import { MAX_REPAIR_ATTEMPTS, RepairUnavailableError, analyzeSchematic, cachedVerification, issueMessages, requestRepair, resetSchematicVerifyCache, startVerification, verifyWithRepair } from "./schematicVerify";
+import { MAX_REPAIR_ATTEMPTS, RepairUnavailableError, analyzeSchematic, cachedVerification, isArchetypeSpecText, issueMessages, requestRepair, resetSchematicVerifyCache, startVerification, verifyWithRepair } from "./schematicVerify";
 
 const good = JSON.stringify(BUCK_CONVERTER);
 const noGround = JSON.stringify({ ...BUCK_CONVERTER, parts: BUCK_CONVERTER.parts.filter((p) => p.type !== "ground") });
@@ -43,6 +43,31 @@ describe("analyzeSchematic", () => {
     expect(svg).not.toMatch(/<svg[^>]*\sonload/i);
     expect((svg.match(/<svg\b/g) ?? []).length).toBe(1);
     expect(svg).toContain("&lt;script&gt;");
+  });
+});
+
+describe("archetype requests", () => {
+  const request = JSON.stringify({ archetype: "three_phase_full_wave_rectifier", params: { load: "RL" } });
+
+  it("are built and verified locally and drawn", () => {
+    const outcome = analyzeSchematic(request);
+    expect(outcome.status).toBe("verified");
+    expect(outcome.validation.errors).toEqual([]);
+    expect(outcome.validation.warnings).toEqual([]);
+    expect(outcome.render?.svg).toContain("<tspan");
+    expect(isArchetypeSpecText("Here:\n```schematic\n" + request + "\n```")).toBe(true);
+    expect(isArchetypeSpecText(good)).toBe(false);
+    expect(isArchetypeSpecText("not json")).toBe(false);
+  });
+
+  it("never call the repairer, even when the request is bad", async () => {
+    const repair = vi.fn();
+    expect((await verifyWithRepair(request, { repair })).status).toBe("verified");
+    const bad = await verifyWithRepair(JSON.stringify({ archetype: "three_phase_full_wave_rectifier", params: { load: "XYZ" } }), { repair });
+    expect(bad.status).not.toBe("verified");
+    expect(bad.render).toBeNull();
+    expect(bad.validation.errors[0].message).toContain("load");
+    expect(repair).not.toHaveBeenCalled();
   });
 });
 
@@ -166,7 +191,7 @@ describe("startVerification", () => {
     expect(repair).toHaveBeenCalledTimes(1);
   });
 
-  it("does not cache an outcome that could not reach the route, so Verify & fix can retry", async () => {
+  it("does not cache an outcome that could not reach the route, so a later run can retry", async () => {
     const repair = vi.fn().mockRejectedValueOnce(new RepairUnavailableError(0)).mockResolvedValueOnce(JSON.parse(good));
     expect((await startVerification(noGround, repair).promise).repairError).toBe("unavailable");
     expect(cachedVerification(noGround)).toBeUndefined();

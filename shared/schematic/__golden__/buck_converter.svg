@@ -1,81 +1,80 @@
 <!-- Standard: IEC 60617 | Pitch P = 20 px | Signal stroke 2 px | Power stroke 3 px -->
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 645 249" width="645" height="249">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 650 253" width="650" height="253">
 <title>5 V buck converter</title>
 <desc>Schematic generated deterministically from a grid-snapped spec.</desc>
-<rect x="0" y="0" width="645" height="249" fill="#fff"/>
+<rect x="0" y="0" width="650" height="253" fill="#fff"/>
 <g id="wires" fill="none" stroke="#000" stroke-width="2" stroke-linecap="square" stroke-linejoin="miter" shape-rendering="crispEdges">
-<polyline points="46,71 126,71"/>
-<polyline points="206,71 286,71"/>
-<polyline points="246,91 246,71"/>
-<polyline points="366,71 446,71"/>
-<polyline points="446,71 566,71"/>
-<polyline points="46,151 46,191 246,191"/>
-<polyline points="246,151 246,191"/>
-<polyline points="246,191 566,191"/>
-<polyline points="446,131 446,191"/>
-<polyline points="566,151 566,191"/>
+<polyline points="46,75 126,75"/>
+<polyline points="206,75 286,75"/>
+<polyline points="246,95 246,75"/>
+<polyline points="366,75 446,75"/>
+<polyline points="446,75 566,75"/>
+<polyline points="46,155 46,195 246,195"/>
+<polyline points="246,155 246,195"/>
+<polyline points="246,195 566,195"/>
+<polyline points="446,135 446,195"/>
+<polyline points="566,155 566,195"/>
 </g>
 <g id="parts" fill="none" stroke="#000" stroke-width="2" stroke-linecap="square" stroke-linejoin="miter" font-family="Helvetica, Arial, sans-serif">
 <g>
-<line x1="46" y1="71" x2="46" y2="91"/>
-<circle cx="46" cy="111" r="20" fill="#fff"/>
-<line x1="46" y1="131" x2="46" y2="151"/>
-<text x="46" y="107" text-anchor="middle" font-size="18" fill="#000" stroke="none">+</text>
-<text x="46" y="127" text-anchor="middle" font-size="18" fill="#000" stroke="none">−</text>
+<line x1="46" y1="75" x2="46" y2="95"/>
+<circle cx="46" cy="115" r="20" fill="#fff"/>
+<line x1="46" y1="135" x2="46" y2="155"/>
+<text x="46" y="111" text-anchor="middle" font-size="18" fill="#000" stroke="none">+</text>
+<text x="46" y="131" text-anchor="middle" font-size="18" fill="#000" stroke="none">−</text>
 </g>
 <g>
-<line x1="126" y1="71" x2="146" y2="71"/>
-<line x1="186" y1="71" x2="206" y2="71"/>
-<circle cx="146" cy="71" r="3" fill="#000"/>
-<circle cx="186" cy="71" r="3" fill="#000"/>
-<line x1="146" y1="71" x2="182" y2="54"/>
+<line x1="126" y1="75" x2="146" y2="75"/>
+<line x1="186" y1="75" x2="206" y2="75"/>
+<circle cx="146" cy="75" r="3" fill="#000"/>
+<circle cx="186" cy="75" r="3" fill="#000"/>
+<line x1="146" y1="75" x2="182" y2="58"/>
 </g>
 <g>
-<line x1="246" y1="151" x2="246" y2="131"/>
-<polygon points="236,131 256,131 246,111" fill="#fff"/>
-<line x1="236" y1="111" x2="256" y2="111"/>
-<line x1="246" y1="111" x2="246" y2="91"/>
+<line x1="246" y1="155" x2="246" y2="135"/>
+<polygon points="236,135 256,135 246,115" fill="#fff"/>
+<line x1="236" y1="115" x2="256" y2="115"/>
+<line x1="246" y1="115" x2="246" y2="95"/>
 </g>
 <g>
-<path d="M286 71L294 71A8 8 0 0 1 310 71A8 8 0 0 1 326 71A8 8 0 0 1 342 71A8 8 0 0 1 358 71L366 71"/>
+<path d="M286 75L294 75A8 8 0 0 1 310 75A8 8 0 0 1 326 75A8 8 0 0 1 342 75A8 8 0 0 1 358 75L366 75"/>
 </g>
 <g>
-<line x1="446" y1="71" x2="446" y2="96"/>
-<line x1="461" y1="96" x2="431" y2="96"/>
-<line x1="461" y1="106" x2="431" y2="106"/>
-<line x1="446" y1="106" x2="446" y2="131"/>
+<line x1="446" y1="75" x2="446" y2="100"/>
+<line x1="461" y1="100" x2="431" y2="100"/>
+<line x1="461" y1="110" x2="431" y2="110"/>
+<line x1="446" y1="110" x2="446" y2="135"/>
 </g>
 <g>
-<line x1="566" y1="71" x2="566" y2="91"/>
-<rect x="556" y="91" width="20" height="40" fill="#fff"/>
-<line x1="566" y1="131" x2="566" y2="151"/>
+<line x1="566" y1="75" x2="566" y2="95"/>
+<rect x="556" y="95" width="20" height="40" fill="#fff"/>
+<line x1="566" y1="135" x2="566" y2="155"/>
 </g>
 <g>
-<line x1="246" y1="191" x2="246" y2="211"/>
-<line x1="231" y1="211" x2="261" y2="211"/>
-<line x1="236" y1="217" x2="256" y2="217"/>
-<line x1="241" y1="223" x2="251" y2="223"/>
+<line x1="246" y1="195" x2="246" y2="215"/>
+<line x1="231" y1="215" x2="261" y2="215"/>
+<line x1="236" y1="221" x2="256" y2="221"/>
+<line x1="241" y1="227" x2="251" y2="227"/>
 </g>
 </g>
 <g id="junctions" fill="#000" stroke="none">
-<circle cx="246" cy="71" r="3"/>
-<circle cx="446" cy="71" r="3"/>
-<circle cx="246" cy="191" r="3"/>
-<circle cx="446" cy="191" r="3"/>
+<circle cx="246" cy="75" r="3"/>
+<circle cx="446" cy="75" r="3"/>
+<circle cx="246" cy="195" r="3"/>
+<circle cx="446" cy="195" r="3"/>
 </g>
-<g id="labels" fill="#000" stroke="none" font-family="Helvetica, Arial, sans-serif" font-size="14">
-<text x="72" y="107" text-anchor="start">V1</text>
-<text x="72" y="123" text-anchor="start">12 V</text>
-<text x="166" y="41" text-anchor="middle">S1 (PWM)</text>
-<text x="262" y="117" text-anchor="start">D1</text>
-<text x="262" y="133" text-anchor="start">1N5819</text>
-<text x="326" y="37" text-anchor="middle">L1</text>
-<text x="326" y="53" text-anchor="middle">50 µH</text>
-<text x="467" y="97" text-anchor="start">C1</text>
-<text x="467" y="113" text-anchor="start">47 µF</text>
-<text x="582" y="107" text-anchor="start">R1</text>
-<text x="582" y="123" text-anchor="start">2.5 Ω</text>
-<text x="506" y="65" text-anchor="middle">Vout</text>
-<text x="226" y="65" text-anchor="middle">SW</text>
+<g id="labels" fill="#000" stroke="none" font-family="Times New Roman, Times, serif" font-size="16">
+<text x="72" y="110" text-anchor="start"><tspan font-style="italic">V</tspan><tspan dy="4" font-size="12">1</tspan></text>
+<text x="72" y="128" text-anchor="start">12 V</text>
+<text x="166" y="44" text-anchor="middle"><tspan font-style="italic">S</tspan><tspan dy="4" font-size="12">1</tspan><tspan dy="-4"> (PWM)</tspan></text>
+<text x="262" y="129" text-anchor="start"><tspan font-style="italic">D</tspan><tspan dy="4" font-size="12">1</tspan></text>
+<text x="326" y="38" text-anchor="middle"><tspan font-style="italic">L</tspan><tspan dy="4" font-size="12">1</tspan></text>
+<text x="326" y="56" text-anchor="middle">50 µH</text>
+<text x="467" y="100" text-anchor="start"><tspan font-style="italic">C</tspan><tspan dy="4" font-size="12">1</tspan></text>
+<text x="467" y="118" text-anchor="start">47 µF</text>
+<text x="582" y="110" text-anchor="start"><tspan font-style="italic">R</tspan><tspan dy="4" font-size="12">1</tspan></text>
+<text x="582" y="128" text-anchor="start">2.5 Ω</text>
+<text x="506" y="69" text-anchor="middle"><tspan font-style="italic">V</tspan><tspan dy="4" font-size="12">out</tspan></text>
+<text x="226" y="69" text-anchor="middle">SW</text>
 </g>
 </svg>

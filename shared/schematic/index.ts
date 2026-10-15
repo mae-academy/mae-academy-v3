@@ -8,3 +8,8 @@ export { validateSchematic, validateSpec, SCHEMATIC_GATES_SUMMARY, type Validati
 export { renderSchematicSvg, renderSpec, escapeXml, type RenderOptions, type RenderResult } from './render';
 export { layoutSchematic, type Layout } from './layout';
 export { SCHEMATIC_SPEC_DOC, SCHEMATIC_FENCE, SCHEMATIC_EXAMPLE } from './specDoc';
+export * from './archetypes/types';
+export { ARCHETYPES, DUPLICATE_ARCHETYPE_IDS, buildArchetype, findArchetype, isArchetypeRequest, expandArchetypeRequest, type BuildResult } from './archetypes/registry';
+export { resolveParams } from './archetypes/params';
+export { ARCHETYPE_DOC, buildArchetypeDoc, archetypeLine } from './archetypes/archetypeDoc';
+export { parseMath, autoMathSource, mathMetrics, mathTspans, texText } from './mathText';

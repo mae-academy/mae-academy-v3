@@ -1,25 +1,24 @@
 /**
  * Data model for the virtual LaTeX keyboard.
  *
- * Templates are authored with two markers that the builder strips:
- *   ⟦…⟧  the first parameter: selected after insertion (placeholder text) or replaced by the user's selection
- *   ‸    an empty first parameter: the caret sits here (the builder places it automatically between the
- *        first empty `{}` / `()` / `[]` when no marker is written)
- * A key with neither (Greek letters, \infty, \partial …) is a "symbol": the caret lands after it and it replaces any selection.
+ * Templates are authored with markers that the builder turns into MathLive `\placeholder{}` boxes:
+ *   ⟦…⟧  the first parameter: the caret goes here after insertion, and a plain-text selection is moved into it
+ *   ⟨…⟩  a further parameter: another empty box (its text is kept in `latex`, which the key face and the fallback chip show)
+ *   ‸    an empty first parameter
+ * A key with no marker (Greek letters, \infty, \partial …) is a "symbol": it is inserted as is, without boxes.
  */
 export type MathTabId = "calculus" | "functions" | "algebra" | "greek";
 
 export interface MathKey {
   id: string;
-  /** The LaTeX that is inserted. */
+  /** The plain LaTeX of the key (markers stripped, parameters shown with their default text). */
   latex: string;
+  /** The MathLive template: every parameter is an empty `\placeholder{}`; the first one receives the caret. */
+  template: string;
   /** What the key face shows (defaults to `latex`; used where the raw template renders as an empty box). */
   face: string;
   /** Plain-words English name; the localized name comes from `mathKeyboard.keys.<id>` when present. */
   name: string;
-  /** First-parameter range inside `latex` (selection or caret). Absent for symbol keys. */
-  selStart?: number;
-  selEnd?: number;
 }
 
 export interface MathTab {
@@ -27,29 +26,12 @@ export interface MathTab {
   keys: MathKey[];
 }
 
-const SELECT_OPEN = "⟦";
-const SELECT_CLOSE = "⟧";
-const CARET = "‸";
+const PLACEHOLDER = "\\placeholder{}";
 
 function key(id: string, name: string, source: string, face?: string): MathKey {
-  const open = source.indexOf(SELECT_OPEN);
-  const close = source.indexOf(SELECT_CLOSE);
-  const caret = source.indexOf(CARET);
-  let latex = source;
-  let selStart: number | undefined;
-  let selEnd: number | undefined;
-  if (open !== -1 && close > open) {
-    latex = source.replace(SELECT_OPEN, "").replace(SELECT_CLOSE, "");
-    selStart = open;
-    selEnd = close - 1;
-  } else if (caret !== -1) {
-    latex = source.replace(CARET, "");
-    selStart = selEnd = caret;
-  } else {
-    const empties = ["{}", "()", "[]"].map((pair) => latex.indexOf(pair)).filter((i) => i !== -1);
-    if (empties.length > 0) selStart = selEnd = Math.min(...empties) + 1;
-  }
-  return { id, latex, face: face ?? latex, name, selStart, selEnd };
+  const latex = source.replace(/[⟦⟧⟨⟩‸]/g, "");
+  const template = source.replace(/⟦[^⟧]*⟧|⟨[^⟩]*⟩|‸/g, PLACEHOLDER);
+  return { id, latex, template, face: face ?? latex, name };
 }
 
 const symbol = (id: string, name: string, latex: string) => key(id, name, latex);
@@ -61,12 +43,12 @@ export const MATH_TABS: MathTab[] = [
   {
     id: "calculus",
     keys: [
-      key("integral", "integral from a to b", "\\int_{⟦a⟧}^{b}"),
+      key("integral", "integral from a to b", "\\int_{⟦a⟧}^{⟨b⟩}"),
       key("derivative", "derivative with respect to x", "\\frac{⟦d⟧}{dx}"),
-      key("limit", "limit as x approaches a", "\\lim_{⟦x⟧ \\to a}"),
-      key("sum", "sum from n equals 1 to infinity", "\\sum_{⟦n=1⟧}^{\\infty}"),
+      key("limit", "limit as x approaches a", "\\lim_{⟦x⟧ \\to ⟨a⟩}"),
+      key("sum", "sum from n equals 1 to infinity", "\\sum_{⟦n=1⟧}^{⟨\\infty⟩}"),
       symbol("partial", "partial derivative symbol", "\\partial"),
-      key("product", "product from n equals 1 to N", "\\prod_{⟦n=1⟧}^{N}"),
+      key("product", "product from n equals 1 to N", "\\prod_{⟦n=1⟧}^{⟨N⟩}"),
       symbol("contour", "contour integral", "\\oint"),
       symbol("nabla", "nabla, gradient", "\\nabla"),
       symbol("double-integral", "double integral", "\\iint"),
@@ -97,14 +79,14 @@ export const MATH_TABS: MathTab[] = [
   {
     id: "algebra",
     keys: [
-      key("fraction", "fraction", "\\frac{⟦a⟧}{b}"),
+      key("fraction", "fraction", "\\frac{⟦a⟧}{⟨b⟩}"),
       key("sqrt", "square root", "\\sqrt{‸}", "\\sqrt{x}"),
-      key("nth-root", "nth root", "\\sqrt[⟦n⟧]{}", "\\sqrt[n]{x}"),
+      key("nth-root", "nth root", "\\sqrt[⟦n⟧]{⟨⟩}", "\\sqrt[n]{x}"),
       key("power", "power, superscript", "x^{⟦2⟧}"),
       key("subscript", "subscript", "x_{⟦n⟧}"),
-      key("matrix", "2 by 2 matrix", "\\begin{bmatrix} ⟦a⟧ & b \\\\ c & d \\end{bmatrix}"),
-      key("determinant", "2 by 2 determinant", "\\begin{vmatrix} ⟦a⟧ & b \\\\ c & d \\end{vmatrix}"),
-      key("binomial", "binomial coefficient", "\\binom{⟦n⟧}{k}"),
+      key("matrix", "2 by 2 matrix", "\\begin{bmatrix} ⟦a⟧ & ⟨b⟩ \\\\ ⟨c⟩ & ⟨d⟩\\end{bmatrix}"),
+      key("determinant", "2 by 2 determinant", "\\begin{vmatrix} ⟦a⟧ & ⟨b⟩ \\\\ ⟨c⟩ & ⟨d⟩\\end{vmatrix}"),
+      key("binomial", "binomial coefficient", "\\binom{⟦n⟧}{⟨k⟩}"),
       key("overline", "overline", "\\overline{‸}", "\\overline{AB}"),
       key("bar", "x bar, mean", "\\bar{⟦x⟧}"),
       key("vector", "vector", "\\vec{⟦v⟧}"),

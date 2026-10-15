@@ -33,7 +33,7 @@ import {
   windowMessages,
   withModelFallback,
 } from "./aiService";
-import { SCHEMATIC_GATES_SUMMARY, SCHEMATIC_SPEC_DOC, validateSchematic } from "../shared/schematic";
+import { ARCHETYPE_DOC, ARCHETYPES, SCHEMATIC_GATES_SUMMARY, SCHEMATIC_SPEC_DOC, validateSchematic } from "../shared/schematic";
 import { BUCK_CONVERTER } from "../shared/schematic/fixtures";
 
 const PNG = "data:image/png;base64,iVBORw0KGgo=";
@@ -205,6 +205,20 @@ describe("system instruction", () => {
     expect(prompt).toMatch(/If a value or connection is unreadable or ambiguous, say so/);
   });
 
+  it("is archetype-first: embeds the catalogue, forbids coordinates for archetypes, and bans part numbers", () => {
+    const integration = prompt.slice(prompt.indexOf("# MAE Academy platform integration"));
+    expect(integration).toContain(ARCHETYPE_DOC);
+    for (const id of Array.from(ARCHETYPES.keys())) expect(integration).toContain(`- ${id}:`);
+    expect(integration).toMatch(/ARCHETYPE FIRST/);
+    expect(integration).toContain('{"archetype":"<id>","params":{...}}');
+    expect(integration).toMatch(/never parts, wires, coordinates or labels/);
+    expect(integration).toMatch(/FREE-FORM only when no archetype fits/);
+    expect(integration).toMatch(/unavailable/);
+    expect(integration).toMatch(/NEVER commercial part numbers \(1N4007, LM741/);
+    expect(integration).toContain("$V_{\\text{out}}$");
+    expect(ARCHETYPE_DOC.length).toBeLessThan(7000); // the full 22-circuit roster, sent in every system prompt
+  });
+
   it("keeps the marker usable after a drawing", () => {
     expect(prompt).toMatch(/drew may also end with the marker/);
   });
@@ -232,7 +246,7 @@ describe("system instruction", () => {
 
   it("stays within a sane size for a prompt sent on every request", () => {
     expect(prompt.length).toBeGreaterThan(30_000);
-    expect(prompt.length).toBeLessThan(75_000);
+    expect(prompt.length).toBeLessThan(72_000);
   });
 });
 

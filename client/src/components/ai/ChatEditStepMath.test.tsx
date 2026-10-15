@@ -2,6 +2,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ChatWorkspace } from "./ChatWorkspace";
+import { composer, getComposerValue, typeInComposer } from "./composerTestUtils";
 import { ACTIVE_THREAD_KEY, THREADS_STORAGE_KEY } from "./chatStorage";
 
 const encoder = new TextEncoder();
@@ -45,8 +46,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-const composer = () => screen.getByRole("textbox", { name: /Message MAE AI|Edit your message/ }) as HTMLTextAreaElement;
-const type = (text: string) => fireEvent.change(composer(), { target: { value: text } });
+const type = (text: string) => typeInComposer(text);
 const send = (name = "Send") => fireEvent.click(screen.getByRole("button", { name }));
 const turn = async (text: string, answer: RegExp) => {
   type(text);
@@ -70,7 +70,7 @@ describe("editing a user message", () => {
     expect(edits).toHaveLength(3);
     fireEvent.click(edits[1]);
     expect(screen.getByText("Editing message")).toBeTruthy();
-    expect(composer().value).toBe("question two");
+    expect(getComposerValue()).toBe("question two");
     expect(document.querySelector('[data-editing="true"]')).toBeTruthy();
 
     type("question two EDITED");
@@ -85,7 +85,7 @@ describe("editing a user message", () => {
     expect(screen.getAllByText("question two EDITED")).toHaveLength(1);
     expect(screen.getByText(/Answer 1\./)).toBeTruthy();
     expect(screen.queryByText("Editing message")).toBeNull();
-    expect(composer().value).toBe("");
+    expect(getComposerValue()).toBe("");
     expect(screen.queryByRole("alert")).toBeNull();
 
     cleanup(); // unmount flushes storage
@@ -98,15 +98,15 @@ describe("editing a user message", () => {
     await turn("first question", /Answer 1\./);
     type("half-typed draft");
     fireEvent.click(screen.getByRole("button", { name: "Edit message" }));
-    expect(composer().value).toBe("first question");
+    expect(getComposerValue()).toBe("first question");
     fireEvent.click(screen.getByRole("button", { name: "Cancel editing" }));
-    expect(composer().value).toBe("half-typed draft");
+    expect(getComposerValue()).toBe("half-typed draft");
     expect(screen.queryByText("Editing message")).toBeNull();
     expect(fetchMock).toHaveBeenCalledTimes(1);
 
     fireEvent.click(screen.getByRole("button", { name: "Edit message" }));
     fireEvent.keyDown(composer(), { key: "Escape" });
-    expect(composer().value).toBe("half-typed draft");
+    expect(getComposerValue()).toBe("half-typed draft");
     expect(document.querySelector('[data-editing="true"]')).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Edit message" }));
@@ -115,7 +115,7 @@ describe("editing a user message", () => {
     await screen.findByText(/Answer 2\./);
     expect(within(screen.getByRole("navigation", { name: "Chat history" })).getByRole("button", { name: "brand new opener" })).toBeTruthy();
     expect(bodies(fetchMock)[1].messages).toHaveLength(1);
-    expect(composer().value).toBe("half-typed draft");
+    expect(getComposerValue()).toBe("half-typed draft");
   });
 
   it("refuses an empty edit and offers no Edit button while a reply streams", async () => {
@@ -158,25 +158,37 @@ describe("editing a user message", () => {
   });
 });
 
-describe("math preview and rendered user bubbles", () => {
-  it("shows a typeset preview while a draft contains math, hides it otherwise, and degrades on invalid LaTeX", async () => {
+describe("inline math in the composer and rendered user bubbles", () => {
+  it("editing a sent message that holds a formula loads it as a math node, and the edit sends the same clean string", async () => {
     render(<ChatWorkspace lab="general" />);
-    expect(document.querySelector("[data-math-preview]")).toBeNull();
+    await turn("evaluate $\\int_{a}^{b} x\\,dx$ now", /Answer 1\./);
+    fireEvent.click(screen.getByRole("button", { name: "Edit message" }));
+    expect(screen.getByText("Editing message")).toBeTruthy();
+    expect(document.querySelectorAll("[data-math-input] [data-mae-math]")).toHaveLength(1);
+    expect(visibleText(composer())).not.toContain("$");
+    expect(getComposerValue()).toBe("evaluate $\\int_{a}^{b} x\\,dx$ now");
+    send("Send edited message");
+    await screen.findByText(/Answer 2\./);
+    expect(bodies(fetchMock)[1].messages.at(-1)?.content).toBe("evaluate $\\int_{a}^{b} x\\,dx$ now");
+  });
+
+  it("shows a draft's formulas inline as math nodes (no preview strip, no raw dollars or commands), and survives invalid LaTeX", () => {
+    render(<ChatWorkspace lab="general" />);
+    expect(document.querySelector("[data-math-input] [data-mae-math]")).toBeNull();
     type("compute $\\int_{a}^{b} f(x)\\,dx$ please");
-    await waitFor(() => expect(document.querySelector("[data-math-preview] .katex")).toBeTruthy());
-    const preview = document.querySelector("[data-math-preview]")!;
-    expect(preview.getAttribute("aria-label")).toBe("Formula preview");
-    expect(preview.getAttribute("aria-live")).toBe("off");
-    expect(visibleText(preview)).not.toContain("$");
-    expect(visibleText(preview)).not.toContain("\\int");
-    expect(visibleText(preview)).toContain("please");
+    const nodes = document.querySelectorAll("[data-math-input] [data-mae-math]");
+    expect(nodes).toHaveLength(1);
+    expect(document.querySelector("[data-math-preview]")).toBeNull();
+    expect(visibleText(composer())).not.toContain("$");
+    expect(visibleText(composer())).not.toContain("\\int");
+    expect(visibleText(composer())).toContain("please");
+    expect(getComposerValue()).toBe("compute $\\int_{a}^{b} f(x)\\,dx$ please");
 
     type("plain text, price 5 dollars");
-    await waitFor(() => expect(document.querySelector("[data-math-preview]")).toBeNull());
+    expect(document.querySelector("[data-math-input] [data-mae-math]")).toBeNull();
 
     expect(() => type("bad $\\frac{1}{$ and $\\notacommand{x}$ end")).not.toThrow();
-    await waitFor(() => expect(document.querySelector("[data-math-preview]")).toBeTruthy());
-    expect(visibleText(document.querySelector("[data-math-preview]")!)).toContain("end");
+    expect(visibleText(composer())).toContain("end");
   });
 
   it("renders the sent message through KaTeX, copies and sends raw LaTeX", async () => {

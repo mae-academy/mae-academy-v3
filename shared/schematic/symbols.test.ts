@@ -4,6 +4,7 @@ import { SYMBOL_LIST, getSymbol, type SymPrim } from './symbols';
 import { PART_TYPES, type PartSpec, type Rot } from './types';
 import { formatValue, parseValue } from './values';
 
+const IC_ATTRS: PartSpec['attrs'] = { w: 10, h: 8, pins: [{ name: 'TRIG', side: 'L', pos: 2 }, { name: 'OUT', side: 'R', pos: 3 }, { name: 'VCC', side: 'T', pos: 5 }, { name: 'GND', side: 'B', pos: 4 }] };
 const part = (type: PartSpec['type'], at: [number, number], rot: Rot = 0, flip = false, attrs: PartSpec['attrs'] = {}): PartSpec => ({ id: 'X1', type, at, rot, flip, label: 'auto', attrs, value: 'v' });
 const terms = (p: PartSpec): Record<string, [number, number]> => Object.fromEntries(placePart(p, 'IEC', 20)!.terminals.map((t) => [t.name, [t.x, t.y]]));
 
@@ -26,6 +27,25 @@ describe('terminal offsets', () => {
       });
     });
   }
+  it('scr: A, K, G with the gate lead below the cathode side, in 4 rotations', () => {
+    const exp = [
+      { A: [0, 0], K: [3, 0], G: [3, 2] }, { A: [0, 0], K: [0, 3], G: [-2, 3] },
+      { A: [0, 0], K: [-3, 0], G: [-3, -2] }, { A: [0, 0], K: [0, -3], G: [2, -3] },
+    ];
+    [0, 90, 180, 270].forEach((rot, i) => expect(terms(part('scr', [0, 0], rot as Rot))).toEqual(exp[i]));
+  });
+  it('motor: two terminals 4 apart in all rotations', () => {
+    expect(terms(part('motor', [2, 2]))).toEqual({ 1: [2, 2], 2: [6, 2] });
+    expect(terms(part('motor', [2, 2], 90))).toEqual({ 1: [2, 2], 2: [2, 6] });
+    expect(terms(part('motor', [2, 2], 180))).toEqual({ 1: [2, 2], 2: [-2, 2] });
+    expect(terms(part('motor', [2, 2], 270))).toEqual({ 1: [2, 2], 2: [2, -2] });
+  });
+  it('ic: terminals are the named pins on the L/R/T/B edges, rotating with the part', () => {
+    expect(terms(part('ic', [0, 0], 0, false, IC_ATTRS))).toEqual({ TRIG: [0, 2], OUT: [10, 3], VCC: [5, 0], GND: [4, 8] });
+    expect(terms(part('ic', [0, 0], 90, false, IC_ATTRS))).toEqual({ TRIG: [-2, 0], OUT: [-3, 10], VCC: [0, 5], GND: [-8, 4] });
+    expect(terms(part('ic', [0, 0], 180, false, IC_ATTRS))).toEqual({ TRIG: [0, -2], OUT: [-10, -3], VCC: [-5, 0], GND: [-4, -8] });
+    expect(terms(part('ic', [0, 0], 270, false, IC_ATTRS))).toEqual({ TRIG: [2, 0], OUT: [3, -10], VCC: [0, -5], GND: [8, -4] });
+  });
   it('resistor at [10,5] rot 0 has terminals [10,5] and [14,5]', () => {
     expect(terms(part('resistor', [10, 5]))).toEqual({ 1: [10, 5], 2: [14, 5] });
   });
@@ -35,7 +55,7 @@ describe('symbol library invariants', () => {
   it('covers every whitelisted type exactly once', () => {
     expect(SYMBOL_LIST.map((s) => s.type).sort()).toEqual([...PART_TYPES].sort());
   });
-  const attrsFor = (t: string): PartSpec['attrs'] => (t === 'block' ? { w: 4, h: 2 } : t === 'sum' ? { signs: { W: '+', S: '−' } } : t === 'nmos' || t === 'pmos' ? { body_diode: true } : t === 'opamp' ? { supply: true } : {});
+  const attrsFor = (t: string): PartSpec['attrs'] => (t === 'block' ? { w: 4, h: 2 } : t === 'sum' ? { signs: { W: '+', S: '−' } } : t === 'nmos' || t === 'pmos' ? { body_diode: true } : t === 'opamp' ? { supply: true } : t === 'ic' ? IC_ATTRS : {});
   for (const s of SYMBOL_LIST) {
     it(`${s.type}: terminals on integer grid points inside the footprint, in all 8 orientations`, () => {
       for (const rot of [0, 90, 180, 270] as Rot[]) for (const flip of [false, true]) {

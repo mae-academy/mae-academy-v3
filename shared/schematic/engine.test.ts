@@ -299,7 +299,7 @@ describe('parsing untrusted text', () => {
 
 describe('LLM spec doc', () => {
   it('is compact, lists every type and its terminals', () => {
-    expect(SCHEMATIC_SPEC_DOC.length).toBeLessThanOrEqual(5200);
+    expect(SCHEMATIC_SPEC_DOC.length).toBeLessThanOrEqual(6400);
     for (const t of PART_TYPES) expect(SCHEMATIC_SPEC_DOC).toContain(`\n${t}:`);
     expect(SCHEMATIC_SPEC_DOC).toContain('resistor: 1:(0,0) 2:(4,0)');
     expect(SCHEMATIC_SPEC_DOC).toContain('npn: B:(0,0) C:(2,-2) E:(2,2)');

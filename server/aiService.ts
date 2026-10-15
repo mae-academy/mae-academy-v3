@@ -25,8 +25,8 @@ import { DOCUMENT_ANALYSIS_RULES } from "./aiDocumentPrompt";
 import { HANDWRITING_AUDIT_RULES, STEP_MODE_RULES } from "./aiGuidancePrompts";
 
 export { HANDWRITING_AUDIT_RULES, STEP_MODE_RULES };
-import { SCHEMATIC_FENCE, SCHEMATIC_GATES_SUMMARY, SCHEMATIC_SPEC_DOC } from "../shared/schematic";
-import { BJT_CE_STAGE, BUCK_CONVERTER, PID_LOOP, VOLTAGE_DIVIDER } from "../shared/schematic/fixtures";
+import { ARCHETYPE_DOC, SCHEMATIC_FENCE, SCHEMATIC_GATES_SUMMARY, SCHEMATIC_SPEC_DOC } from "../shared/schematic";
+import { BUCK_CONVERTER, PID_LOOP, VOLTAGE_DIVIDER } from "../shared/schematic/fixtures";
 
 const nvidiaClient = new OpenAI({
   apiKey: process.env.NVIDIA_API_KEY ?? "",
@@ -402,27 +402,23 @@ const INTEGRATION_RULES = [
   "",
   "Schematic drawings (the platform draws them from a JSON spec, so this format is mandatory):",
   "- The master prompt's SVG rules (Sections 1.4, 1.7 and the SVG form of 3.2) do NOT apply here. Never emit SVG, ```xml:svg blocks, ASCII art or image tags (Mermaid is allowed ONLY for the cases in the Visual engines section below, never for circuits or control block diagrams). A deterministic engine draws the symbols from a validated library and enforces the 10 verification gates below; your job is a correct, grid-snapped spec.",
-  "- Only when a drawing, schematic or block diagram is clearly requested (for example «ارسم» or «draw»): first give the academic explanation, the equations and the node netlist or block table as text and LaTeX. THEN append exactly ONE fenced block whose info string is exactly `schematic` and whose content is ONLY the JSON spec (no prose inside, strict JSON: double quotes, no comments, no trailing commas). It is the LAST content of the reply, just before the optional [[SIM:..]] line. Never emit it for ordinary questions, refusals or when only an explanation is wanted. At most one per reply; for a change request (\"make R1 5 kΩ\") re-emit the complete corrected spec, starting from your previous ```schematic block in the conversation.",
-  "- Before writing the spec, mentally run Phase A (topology and node extraction), Phase B (grid alignment and clearance) and Phase C (engineering sanity) of the master prompt and then ALL 10 gates below. Fix your own errors first; the spec you emit must already pass every gate. Gates:",
+  "- Only when a drawing, schematic or block diagram is clearly requested (for example «ارسم» or «draw»): first give the academic explanation, the equations and the node netlist or block table as text and LaTeX. THEN append exactly ONE fenced block whose info string is exactly `schematic` and whose content is ONLY a JSON object (no prose inside, strict JSON: double quotes, no comments, no trailing commas). It is the LAST content of the reply, just before the optional [[SIM:..]] line. Never emit it for ordinary questions, refusals or when only an explanation is wanted. At most one per reply.",
+  "- ARCHETYPE FIRST. The platform owns a catalogue of hand-verified, pre-routed circuits (below). If the requested circuit matches one, the block is ONLY {\"archetype\":\"<id>\",\"params\":{...}} (optionally \"title\"): never parts, wires, coordinates or labels. Take the parameter values from the student's request; for every value they did not give, omit it (the default is used) and state that assumption in the text. Parameters are strings with units (\"10 kΩ\", \"47 µF\") or one of the listed choices; unknown parameters are rejected. For a change request (\"make R_L 4.7 Ω\", \"add an LC filter\") re-emit the archetype request with the updated params.",
+  "Archetype catalogue (id: summary. Params: name [unit] (default) | choices):",
+  ARCHETYPE_DOC,
+  "- FREE-FORM only when no archetype fits (for example a control block diagram, a logic network or an unusual circuit). A free-form spec must pass the full contract below, and if it still fails verification the student sees only an \"unavailable\" card instead of a drawing, so prefer the CLOSEST archetype plus an explanation of the difference over a risky free-form drawing. Never use a free-form spec for a circuit that has an archetype.",
+  "- Label policy: use functional academic designators only (R1, C1, L1, D1, S1, V_A, V_{\\text{in}}); NEVER commercial part numbers (1N4007, LM741, 2N2222, TL072, NE555, IRF540...) in values, labels or text unless the student explicitly asked for that part. In the text write designators as math: $D_1$ to $D_6$, $V_A$, $V_{\\text{out}}$, $R_L$.",
+  "- Free-form only: before writing the spec, mentally run Phase A (topology and node extraction), Phase B (grid alignment and clearance) and Phase C (engineering sanity) of the master prompt and then ALL 10 gates below. Fix your own errors first; the spec you emit must already pass every gate. Gates:",
   ...SCHEMATIC_GATES_SUMMARY.map((gate) => `  ${gate}`),
-  "- Practical rules: all coordinates are integers in grid units. Compute every wire endpoint from the terminal offsets table (position + rotated offset), never by eye. Give every part a value with a unit (blocks carry their transfer function or name). Draw ground at node 0. Put a wire between parts instead of letting them touch, keep parts at least one grid unit apart, and run wires between perpendicular terminals with an explicit bend point. Keep the figure compact (about 40 x 24 grid units at most) and place labels in free space.",
-  "- Write the text in the student's language; keep identifiers, designators and units in the spec in standard notation. If the circuit is too complex to draw faithfully, say so and draw the essential core instead of guessing.",
+  "- Free-form practical rules: all coordinates are integers in grid units. Compute every wire endpoint from the terminal offsets table (position + rotated offset), never by eye. Give every part a value with a unit (blocks carry their transfer function or name). Draw ground at node 0. Put a wire between parts instead of letting them touch, keep parts at least one grid unit apart, and run wires between perpendicular terminals with an explicit bend point. Keep the figure compact (about 40 x 24 grid units at most) and place labels in free space.",
+  "- Write the text in the student's language; keep identifiers, designators and units in the spec in standard notation. If the circuit is too complex to draw faithfully, say so and use the closest archetype or draw the essential core instead of guessing.",
   "",
-  "Spec format (reference; the engine reads exactly this):",
+  "Free-form spec format (reference; the engine reads exactly this):",
   SCHEMATIC_SPEC_DOC,
   "",
-  "Verified reference specs (they pass all 10 gates; copy their conventions: switch/diode orientation, rails, ground at the bottom, labels, a feedback tap that starts ON the output wire):",
-  "Buck converter (series switch, freewheeling diode, LC filter, load):",
-  "```" + SCHEMATIC_FENCE,
-  JSON.stringify(BUCK_CONVERTER),
-  "```",
-  "Unity-feedback loop (a block diagram has NO ground, rails or values on the sum; the feedback wire ends on the sum's S terminal and begins at a vertex on the output wire):",
+  "Verified free-form reference (a block diagram has NO ground, rails or values on the sum; the feedback wire ends on the sum's S terminal and begins at a vertex on the output wire):",
   "```" + SCHEMATIC_FENCE,
   JSON.stringify(PID_LOOP),
-  "```",
-  "Common-emitter BJT stage with divider bias and bypass capacitor (rails repeated per branch, one ground per branch, ports for input/output):",
-  "```" + SCHEMATIC_FENCE,
-  JSON.stringify(BJT_CE_STAGE),
   "```",
   "- Extra explicit checks before ANY diagram, on top of the 10 gates: (a) in a three-phase circuit label the sources and lines A, B and C consistently, and count the parts (a three-phase full-wave bridge has 6 diodes or SCRs: 3 on the upper rail, 3 on the lower rail, each leg fed by one phase); (b) check the polarity of every diode and SCR: conduction runs anode to cathode, and the cathodes of the upper group join the positive DC rail while the anodes of the lower group join the negative rail; (c) every net ties to a real node, with nothing left floating.",
   "",

@@ -4,11 +4,11 @@ export const PART_TYPES = [
   'resistor', 'potentiometer', 'capacitor', 'polarized_capacitor', 'inductor', 'transformer',
   'vsource', 'vsource_ac', 'isource', 'battery',
   'ground', 'rail', 'port', 'junction',
-  'diode', 'zener', 'led', 'schottky',
+  'diode', 'zener', 'led', 'schottky', 'scr',
   'switch', 'switch_spdt',
   'npn', 'pnp', 'nmos', 'pmos', 'igbt',
   'opamp', 'optocoupler',
-  'block', 'sum', 'gain',
+  'block', 'sum', 'gain', 'motor', 'ic',
   'and', 'or', 'nand', 'nor', 'xor', 'xnor', 'not', 'buffer', 'dff',
 ] as const;
 export type PartType = (typeof PART_TYPES)[number];
@@ -19,6 +19,10 @@ export type Standard = 'IEC' | 'IEEE';
 export type LabelPref = 'auto' | 'none' | 'above' | 'below' | 'left' | 'right';
 export type Compass = 'N' | 'E' | 'S' | 'W';
 
+export type IcSide = 'L' | 'R' | 'T' | 'B';
+/** One named pin of a generic `ic` block: `pos` is the integer grid offset along its edge (1..len-1). */
+export interface IcPin { name: string; side: IcSide; pos: number; optional?: boolean }
+
 export interface PartAttrs {
   state?: string;
   body_diode?: boolean;
@@ -27,6 +31,10 @@ export interface PartAttrs {
   signs?: Partial<Record<Compass, '+' | '−'>>;
   supply?: boolean;
   control?: string;
+  /** Display override for the designator: a LaTeX-ish string such as `V_A` or `V_{\\text{out}}` (the id stays the netlist name). */
+  label?: string;
+  /** `ic` only: the named pins. */
+  pins?: IcPin[];
 }
 
 export interface PartSpec {

@@ -2,6 +2,7 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ChatWorkspace } from "./ChatWorkspace";
+import { getComposerValue, typeInComposer } from "./composerTestUtils";
 import { LEGACY_CHAT_KEY, THREADS_STORAGE_KEY } from "./chatStorage";
 
 const encoder = new TextEncoder();
@@ -48,7 +49,6 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-const composer = () => screen.getByRole("textbox", { name: "Message MAE AI" }) as HTMLTextAreaElement;
 const send = () => fireEvent.click(screen.getByRole("button", { name: "Send" }));
 const sidebar = () => screen.getByRole("navigation", { name: "Chat history" });
 
@@ -67,7 +67,7 @@ describe("ChatWorkspace", () => {
   it("fills the composer from a chip, sends, streams, and shows the simulator action only after completion, never the marker", async () => {
     render(<ChatWorkspace lab="control" />);
     fireEvent.click(screen.getByRole("button", { name: "Analyze this KVL circuit" }));
-    expect(composer().value).toBe("Analyze this KVL circuit");
+    expect(getComposerValue()).toBe("Analyze this KVL circuit");
     send();
 
     const action = await screen.findByRole("link", { name: /Open in Interactive Simulator/ });
@@ -90,10 +90,10 @@ describe("ChatWorkspace", () => {
 
   it("strips the marker from earlier answers in the next request", async () => {
     render(<ChatWorkspace lab="general" />);
-    fireEvent.change(composer(), { target: { value: "first" } });
+    typeInComposer("first");
     send();
     await screen.findByRole("link", { name: /Open in Interactive Simulator/ });
-    fireEvent.change(composer(), { target: { value: "second" } });
+    typeInComposer("second");
     send();
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
     const second = requestBodies(fetchMock)[1];
@@ -103,14 +103,14 @@ describe("ChatWorkspace", () => {
 
   it("new chat returns to the empty state, and thread switching restores each conversation", async () => {
     render(<ChatWorkspace lab="general" />);
-    fireEvent.change(composer(), { target: { value: "alpha question" } });
+    typeInComposer("alpha question");
     send();
     await screen.findByRole("link", { name: /Open in Interactive Simulator/ });
 
     fireEvent.click(screen.getByRole("button", { name: "New chat" }));
     expect(screen.getByRole("heading", { level: 1 }).textContent).toContain("What can I help you");
     fetchMock.mockImplementationOnce(async () => streamResponse("Beta answer."));
-    fireEvent.change(composer(), { target: { value: "beta question" } });
+    typeInComposer("beta question");
     send();
     await screen.findByText("Beta answer.");
     expect(screen.queryByText(/Use Kirchhoff/)).toBeNull();
@@ -136,7 +136,7 @@ describe("ChatWorkspace", () => {
       return new Response(body, { status: 200, headers: { "content-type": "text/event-stream" } });
     });
     render(<ChatWorkspace lab="general" />);
-    fireEvent.change(composer(), { target: { value: "slow one" } });
+    typeInComposer("slow one");
     send();
     await screen.findByText(/Partial answer/);
     expect(screen.getByRole("button", { name: "Stop" })).toBeTruthy();
@@ -153,7 +153,7 @@ describe("ChatWorkspace", () => {
 
   it("deletes a thread only after the AlertDialog confirm, falling back to a blank chat", async () => {
     render(<ChatWorkspace lab="general" />);
-    fireEvent.change(composer(), { target: { value: "to delete" } });
+    typeInComposer("to delete");
     send();
     await screen.findByRole("link", { name: /Open in Interactive Simulator/ });
 
@@ -188,7 +188,7 @@ describe("ChatWorkspace", () => {
   it("shows a friendly localized message with Retry on 503, never the server's text", async () => {
     fetchMock.mockImplementationOnce(async () => new Response(JSON.stringify({ error: "GEMINI_API_KEY is not set on the server" }), { status: 503 }));
     render(<ChatWorkspace lab="general" />);
-    fireEvent.change(composer(), { target: { value: "hello" } });
+    typeInComposer("hello");
     send();
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toContain("taking a short break");

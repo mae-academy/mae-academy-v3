@@ -73,7 +73,7 @@ describe("AssistantMessage simulator action", () => {
   });
 
   it("renders a schematic fence inline in the message once complete, and a placeholder while it streams", () => {
-    const spec = JSON.stringify({ title: "Divider", parts: [{ id: "R1", type: "resistor", value: "1 kΩ", at: [2, 2] }, { id: "R2", type: "resistor", value: "2 kΩ", at: [8, 2] }, { id: "GND1", type: "ground", at: [5, 6] }], wires: [] });
+    const spec = JSON.stringify({ archetype: "buck_converter", params: { Vin: "12 V" } });
     const body = `Netlist.\n\n\`\`\`schematic\n${spec}\n\`\`\`\n[[SIM:circuits]]`;
     const streaming = renderAssistant(body.slice(0, body.indexOf("\n[[SIM") - 30), true);
     expect(screen.getByText("Drawing schematic…")).toBeTruthy();

@@ -69,15 +69,10 @@
     "alt": "Esquema: {{title}}",
     "drawing": "Dibujando el esquema…",
     "verifying": "Verificando…",
-    "fixing": "Corrigiendo {{n}} problema(s) (intento {{attempt}}/{{max}})…",
-    "passed": "✓ Superó las 10 puertas de verificación (10/10)",
-    "unverified": "Sin verificar — {{n}} problema(s)",
-    "unreadable": "Sin verificar — no se pudo leer la especificación del esquema",
-    "issues": "Problemas ({{n}})",
-    "warnings": "Advertencias ({{n}})",
-    "autoCorrected": "Corregido automáticamente por el verificador.",
-    "verifyFix": "Verificar y corregir",
-    "repairUnavailable": "La corrección automática no está disponible ahora.",
+    "passed": "Verificado: superó todas las puertas",
+    "unavailable": "No pude generar un dibujo verificado de este circuito. La tabla de conexiones de la respuesta es la referencia.",
+    "redraw": "Redibujar con un diseño estándar",
+    "redrawPrompt": "Por favor, redibuja el esquema usando uno de los arquetipos estándar si alguno aplica; si no, con un diseño más simple.",
     "netlist": "Lista de nodos (netlist)",
     "col": {
       "designator": "Designador",
@@ -402,7 +397,7 @@
     "continueMessage": "Continúa con el siguiente paso.",
     "hint": "El asistente muestra un paso a la vez y te hace una pregunta de control."
   },
-  "mathPreview": {
-    "label": "Vista previa de fórmulas"
+  "mathInput": {
+    "formula": "Fórmula"
   }
 }
