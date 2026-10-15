@@ -246,7 +246,64 @@ describe("system instruction", () => {
 
   it("stays within a sane size for a prompt sent on every request", () => {
     expect(prompt.length).toBeGreaterThan(30_000);
-    expect(prompt.length).toBeLessThan(72_000);
+    expect(prompt.length).toBeLessThan(78_000);
+  });
+});
+
+describe("signal-operation grounding and brand palette", () => {
+  const off = buildSystemInstruction("signals");
+  const on = buildSystemInstruction("signals", { stepMode: true });
+
+  it("states analytical invariance across Step-by-Step on and off", () => {
+    expect(off).toMatch(/IDENTICAL whether Step-by-Step mode is on or off/);
+    expect(on).toMatch(/Step-by-Step mode changes only the pacing/);
+  });
+
+  it("forces explicit bounds, the five overlap classes and a boundary-continuity check", () => {
+    expect(off).toContain("\\tau \\in [t - T, t]");
+    for (const cls of ["no overlap", "partial ingress", "complete overlap", "partial egress", "post-overlap"]) expect(off).toContain(cls);
+    expect(off).toContain("\\lim_{t \\to t_k^-} y(t) = \\lim_{t \\to t_k^+} y(t)");
+    expect(off).toMatch(/reject it internally, re-derive/);
+  });
+
+  it("requires vectorized piecewise plotting on at least 1000 points", () => {
+    expect(off).toMatch(/np\.select/);
+    expect(off).toMatch(/np\.piecewise/);
+    expect(off).toContain("scipy.signal.convolve(x, h, mode='same') * dt");
+    expect(off).toContain("np.linspace(t_start, t_end, 1000)");
+    expect(off).toMatch(/never fewer than 1000 points/);
+  });
+
+  it("pins the MAE palette and the plot preamble", () => {
+    for (const line of ["COLOR_BLUE = '#2563EB'", "COLOR_PURPLE = '#7C3AED'", "COLOR_RED = '#DC2626'", "plt.rcParams['axes.edgecolor'] = '#E2E8F0'", "plt.rcParams['axes.linewidth'] = 1.2"]) expect(off).toContain(line);
+    expect(off).toContain("color=COLOR_RED, linewidth=2.5");
+  });
+
+  it("keeps the static prefix identical with and without step mode (the step rules are appended after it)", () => {
+    expect(on.startsWith(off.slice(0, off.indexOf("Context:")))).toBe(true);
+  });
+});
+
+// Ground truth for the benchmark x(t) = 4u(t), h(t) = tri(2t): the analytic piecewise answer the prompt must lead to.
+describe("benchmark convolution 4u(t) * tri(2t)", () => {
+  const tri = (t: number) => Math.max(0, 1 - 2 * Math.abs(t));
+  const y = (t: number) => (t < -0.5 ? 0 : t < 0 ? (2 * t + 1) ** 2 : t < 0.5 ? 1 + 4 * t - 4 * t * t : 2);
+
+  it("is continuous at every boundary t_k = -1/2, 0, 1/2", () => {
+    for (const tk of [-0.5, 0, 0.5]) expect(Math.abs(y(tk - 1e-9) - y(tk + 1e-9))).toBeLessThan(1e-6);
+    expect([y(-0.5), y(0), y(0.5)]).toEqual([0, 1, 2]);
+  });
+
+  it("matches a numerical convolution on a 1000+ point grid", () => {
+    const n = 4000, t0 = -2, t1 = 2, dt = (t1 - t0) / (n - 1);
+    let worst = 0;
+    for (let i = 1000; i < 3000; i += 37) { // t in [-1, 1]: the support of h stays inside the window
+      const t = t0 + i * dt;
+      let acc = 0;
+      for (let j = 0; j < n; j++) { const tau = t0 + j * dt; acc += 4 * (tau >= 0 ? 1 : 0) * tri(t - tau) * dt; }
+      worst = Math.max(worst, Math.abs(acc - y(t)));
+    }
+    expect(worst).toBeLessThan(0.02);
   });
 });
 

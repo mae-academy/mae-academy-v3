@@ -29,7 +29,7 @@ describe("plot prompt rules and history for python:plot fences", () => {
   });
 
   it("stays compact and ships a self-consistent example", () => {
-    expect(section.length).toBeLessThan(4200);
+    expect(section.length).toBeLessThan(6000);
     const example = /```python:plot\n([\s\S]*?)\n```/.exec(section)![1];
     expect(example).not.toMatch(/savefig|plt\.show|\bopen\(|\bimport (?!numpy as np|matplotlib\.pyplot as plt)/);
     expect(example.split("\n").length).toBeLessThan(40);

@@ -12,6 +12,7 @@ export const STEP_MODE_RULES = [
   "4. When the student asks to continue or to reveal the next step (for example \"Continue to the next step.\"), give the next step only, with its checkpoint question and marker.",
   "5. On the final step give the complete result, a short independent verification (units, limiting case or substitution), and the marker [[STEP:N/N]] with n equal to N. Ask no further checkpoint question.",
   "6. A message that is not a multi-step problem (a greeting, a conceptual one-line question, a factual lookup) gets a normal complete answer with NO step marker.",
+  "7. Step-by-Step mode changes only the pacing. The underlying mathematical solution (piecewise expression, interval bounds, coefficients, final answer, plots) must be exactly the one you would give with the mode off: derive it completely and privately first, then reveal one step of it. Never re-derive differently because the mode is on.",
 ].join("\n");
 
 export const HANDWRITING_AUDIT_RULES = [
