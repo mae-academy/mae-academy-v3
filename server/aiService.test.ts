@@ -284,6 +284,43 @@ describe("signal-operation grounding and brand palette", () => {
   });
 });
 
+describe("numerical discipline and verified reference formulas (benchmark Q06, Q08)", () => {
+  const p = buildSystemInstruction("general");
+
+  it("demands a second-route recheck of arithmetic and the actual performance of named methods", () => {
+    expect(p).toMatch(/re-compute it by a second route/);
+    expect(p).toMatch(/A named method is performed, not mentioned/);
+    expect(p).toContain("= 0.0625 m");
+    expect(p).toMatch(/words and abbreviations go in \\text\{\.\.\.\}/);
+  });
+
+  it("pins the patch-antenna design equations and their worked numbers", () => {
+    expect(p).toContain("W = \\frac{c}{2 f_r}\\sqrt{\\frac{2}{\\epsilon_r+1}}");
+    expect(p).toContain("L = L_{eff} - 2\\Delta L");
+    expect(p).toMatch(/W = 38\.0 mm, \\epsilon_\{reff\} = 4\.09, \\Delta L = 0\.74 mm, L = 29\.4 mm/);
+  });
+
+  it("pins the FWM phase mismatch with the i-k and j-k pairing and physical-length efficiency", () => {
+    expect(p).toContain("\\Delta\\beta = -\\beta_2(\\omega_i-\\omega_k)(\\omega_j-\\omega_k)");
+    expect(p).toContain("\\Delta f_{ik}\\,\\Delta f_{jk}");
+    expect(p).toMatch(/with L, not L_\{eff\}, inside the exponential and the sine/);
+  });
+
+  // The numbers quoted in the prompt must be true; these recompute them.
+  it("quotes correct worked numbers", () => {
+    const c = 299792458, f = 2.4e9, er = 4.4, h = 1.6e-3;
+    const W = (c / (2 * f)) * Math.sqrt(2 / (er + 1));
+    const ee = (er + 1) / 2 + ((er - 1) / 2) * (1 + (12 * h) / W) ** -0.5;
+    const dL = 0.412 * h * ((ee + 0.3) * (W / h + 0.264)) / ((ee - 0.258) * (W / h + 0.8));
+    const L = c / (2 * f * Math.sqrt(ee)) - 2 * dL;
+    expect([c / (2 * f) * 1e3, W * 1e3, ee, dL * 1e3, L * 1e3].map((x) => +x.toFixed(2))).toEqual([62.46, 38.01, 4.09, 0.74, 29.42]);
+    // FWM: -b2*dik*djk equals the direct beta combination for a quadratic beta(w).
+    const b2 = -21e-27, w0 = 1e15, beta = (w: number) => 0.5 * b2 * (w - w0) ** 2;
+    const [wi, wj, wk] = [w0 + 3e12, w0 + 5e12, w0];
+    expect(beta(wi) + beta(wj) - beta(wk) - beta(wi + wj - wk)).toBeCloseTo(-b2 * (wi - wk) * (wj - wk), 6);
+  });
+});
+
 // Ground truth for the benchmark x(t) = 4u(t), h(t) = tri(2t): the analytic piecewise answer the prompt must lead to.
 describe("benchmark convolution 4u(t) * tri(2t)", () => {
   const tri = (t: number) => Math.max(0, 1 - 2 * Math.abs(t));
