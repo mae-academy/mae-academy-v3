@@ -4,7 +4,7 @@ import { buildSystemInstruction, cleanModelTurn, limitModelTurn } from "./aiServ
 
 describe("plot prompt rules and history for python:plot fences", () => {
   const prompt = buildSystemInstruction("circuits");
-  const section = prompt.slice(prompt.indexOf("Plots (the student's browser runs the script"), prompt.indexOf("Attachments:"));
+  const section = prompt.slice(prompt.indexOf("Plots (the student's browser runs the script"), prompt.indexOf("Visual engines (deterministic"));
   const plotFence = (code: string) => "```python:plot\n" + code + "\n```";
 
   it("names the fence, the allowed libraries and the host-owned output rules", () => {
@@ -15,7 +15,7 @@ describe("plot prompt rules and history for python:plot fences", () => {
     expect(section).toContain("import matplotlib.pyplot as plt");
     expect(section).toContain("scipy.signal");
     expect(section).toMatch(/No plt\.show\(\), no savefig/);
-    expect(section).toMatch(/Never mix it with a ```schematic block/);
+    expect(section).toMatch(/Never use it to draw wiring or block diagrams/);
   });
 
   it("requires the house style and mathtext typography", () => {

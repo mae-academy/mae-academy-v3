@@ -1,4 +1,4 @@
-import type { ChatMessage } from "@shared/aiTypes";
+import type { ChatDocument, ChatMessage } from "@shared/aiTypes";
 
 /** One saved conversation. `title` is only set once the user renames it; otherwise the title is derived from the first message. */
 export interface ChatThread {
@@ -145,4 +145,31 @@ export function groupThreads(threads: readonly ChatThread[], now: number = Date.
       buckets[key].push(thread);
     });
   return (["today", "week", "older"] as const).filter((key) => buckets[key].length > 0).map((key) => ({ key, threads: buckets[key] }));
+}
+
+export interface MessageEditPatch {
+  /** The new text; whitespace-only is rejected. */
+  content: string;
+  /** `null` removes the image, `undefined` keeps the current one. */
+  imageUrl?: string | null;
+  /** `null` removes the document, `undefined` keeps the current one. */
+  document?: ChatDocument | null;
+}
+
+/**
+ * The history to resend after the student edits user message `messageId`: everything before it, then the edited
+ * message itself (same id and position, new text / attachment), and NOTHING after it, so no stale reply, duplicate
+ * user message or orphan error survives. Null when the edit is not possible: unknown id, not a user message, or
+ * empty text. The input array is never mutated.
+ */
+export function editAndResend(messages: readonly ChatMessage[], messageId: string, patch: MessageEditPatch): ChatMessage[] | null {
+  const index = messages.findIndex((message) => message.id === messageId);
+  if (index === -1 || messages[index].role !== "user") return null;
+  const content = patch.content.trim();
+  if (!content) return null;
+  const { imageUrl: oldImage, document: oldDocument, ...base } = messages[index];
+  const imageUrl = patch.imageUrl === undefined ? oldImage : patch.imageUrl;
+  const document = patch.document === undefined ? oldDocument : patch.document;
+  const edited: ChatMessage = { ...base, content, ...(imageUrl ? { imageUrl } : {}), ...(document ? { document } : {}) };
+  return [...messages.slice(0, index), edited];
 }

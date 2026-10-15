@@ -7,7 +7,10 @@ import { KatexMath } from "@/components/ui/KatexMath";
 import { CodeBlock } from "./CodeBlock";
 import { normalizeMathDelimiters } from "./mathDelimiters";
 import { SchematicDiagram, SchematicPending } from "./SchematicDiagram";
-import { PENDING_PLOT_LANG, PENDING_SCHEMATIC_LANG, PLOT_LANG, markPendingPlot, markPendingSchematic, stripHtmlComments } from "./svgFence";
+import { MERMAID_LANG, PARAMS_LANG, PENDING_MERMAID_LANG, PENDING_PARAMS_LANG, PENDING_PLOT_LANG, PENDING_SCHEMATIC_LANG, PENDING_WAVEDROM_LANG, PLOT_LANG, WAVEDROM_LANG, markPendingEngines, markPendingPlot, markPendingSchematic, stripHtmlComments } from "./svgFence";
+import { InteractiveParameterSlider, ParamsPending } from "@/components/engines/InteractiveParameterSlider";
+import { MermaidDiagram, MermaidPending } from "@/components/engines/MermaidDiagram";
+import { WaveDromDiagram, WaveDromPending } from "@/components/engines/WaveDromDiagram";
 import { PlotCard, PlotPending } from "./PlotCard";
 
 const REMARK_PLUGINS = [remarkGfm, remarkMath];
@@ -48,6 +51,12 @@ const components: Components = {
     if (language?.toLowerCase() === "schematic") return <SchematicDiagram text={text} />;
     if (language === PENDING_PLOT_LANG) return <PlotPending />;
     if (language?.toLowerCase() === PLOT_LANG) return <PlotCard code={text} />;
+    if (language === PENDING_PARAMS_LANG) return <ParamsPending />;
+    if (language?.toLowerCase() === PARAMS_LANG) return <InteractiveParameterSlider code={text} />;
+    if (language === PENDING_MERMAID_LANG) return <MermaidPending />;
+    if (language?.toLowerCase() === MERMAID_LANG) return <MermaidDiagram code={text} />;
+    if (language === PENDING_WAVEDROM_LANG) return <WaveDromPending />;
+    if (language?.toLowerCase() === WAVEDROM_LANG) return <WaveDromDiagram code={text} />;
     return <CodeBlock code={text} language={language} />;
   },
   a({ href, children }) {
@@ -102,7 +111,7 @@ class MarkdownBoundary extends Component<{ content: string; children: ReactNode 
 function AiMarkdownImpl({ content, streaming }: { content: string; streaming?: boolean }) {
   // Old stored chats may end with a dead generation tag; it never shows, not even half of it mid-stream.
   const text = useMemo(() => stripLegacySchematicTag(content), [content]);
-  const source = useMemo(() => normalizeMathDelimiters(stripHtmlComments(streaming ? markPendingPlot(markPendingSchematic(text)) : text)), [text, streaming]);
+  const source = useMemo(() => normalizeMathDelimiters(stripHtmlComments(streaming ? markPendingEngines(markPendingPlot(markPendingSchematic(text))) : text)), [text, streaming]);
   return (
     <div className="min-w-0 break-words">
       <MarkdownBoundary content={text}>

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Check, Copy, RotateCcw, Square, Volume2 } from "lucide-react";
+import { Check, Copy, Pencil, RotateCcw, Square, Volume2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -19,6 +19,8 @@ export interface MessageActionsProps {
   /** Regenerate is unavailable while a reply is being produced. */
   busy?: boolean;
   onRegenerate?: () => void;
+  /** User messages only: loads the message into the composer for editing. */
+  onEdit?: () => void;
 }
 
 /** Targets are 44px on touch and 32px with a mouse; the row is revealed on hover / focus and always shown without hover. */
@@ -42,7 +44,7 @@ function ActionButton({ label, onClick, disabled, small, pressed, children }: { 
 }
 
 /** Copy / regenerate / read aloud under a finished message. Rendered only for completed messages so streaming never reflows. */
-export function MessageActions({ messageId, content, role, canRegenerate = false, busy = false, onRegenerate }: MessageActionsProps) {
+export function MessageActions({ messageId, content, role, canRegenerate = false, busy = false, onRegenerate, onEdit }: MessageActionsProps) {
   const { t, i18n } = useTranslation("ai");
   const [copied, setCopied] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -93,6 +95,12 @@ export function MessageActions({ messageId, content, role, canRegenerate = false
         {copied ? <Check className={cn(icon, "text-emerald-600 dark:text-emerald-400")} aria-hidden="true" /> : <Copy className={icon} aria-hidden="true" />}
       </ActionButton>
       <span role="status" aria-live="polite" className="sr-only">{copied ? t("message.copied") : ""}</span>
+
+      {user && onEdit ? (
+        <ActionButton label={t("edit.button")} onClick={onEdit} disabled={busy} small>
+          <Pencil className={icon} aria-hidden="true" />
+        </ActionButton>
+      ) : null}
 
       {!user && speechSupported ? (
         <ActionButton label={speaking ? t("message.stopReading") : t("message.readAloud")} onClick={toggleSpeech} pressed={speaking}>

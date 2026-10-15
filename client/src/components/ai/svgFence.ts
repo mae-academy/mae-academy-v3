@@ -184,3 +184,33 @@ export function markPendingPlot(text: string): string {
   if (!last || last.closed || !looksLikeOpenPlot(last)) return text;
   return `${text.slice(0, last.start)}\`\`\`${PENDING_PLOT_LANG}\n\`\`\``;
 }
+
+/** Fences of the deterministic visual engines added after the plot: interactive sliders, Mermaid and WaveDrom. */
+export const PARAMS_LANG = "json:interactive-params";
+export const MERMAID_LANG = "mermaid";
+export const WAVEDROM_LANG = "wavedrom";
+
+export const PENDING_PARAMS_LANG = `mae-params-pending-${Math.random().toString(36).slice(2, 10)}`;
+export const PENDING_MERMAID_LANG = `mae-mermaid-pending-${Math.random().toString(36).slice(2, 10)}`;
+export const PENDING_WAVEDROM_LANG = `mae-wavedrom-pending-${Math.random().toString(36).slice(2, 10)}`;
+
+const ENGINE_FENCES: ReadonlyArray<{ lang: string; pending: string; minPrefix: number }> = [
+  { lang: PARAMS_LANG, pending: PENDING_PARAMS_LANG, minPrefix: "json:".length },
+  { lang: MERMAID_LANG, pending: PENDING_MERMAID_LANG, minPrefix: 3 },
+  { lang: WAVEDROM_LANG, pending: PENDING_WAVEDROM_LANG, minPrefix: 3 },
+];
+
+/** Streaming pre-pass for the three engine fences: an unterminated one becomes a closed empty fence in its pending language (no raw source flashes). */
+export function markPendingEngines(text: string): string {
+  if (!text.includes("```") && !text.includes("~~~")) return text;
+  const blocks = scanFences(text);
+  const last = blocks[blocks.length - 1];
+  if (!last || last.closed) return text;
+  const lang = firstToken(last.info);
+  for (const fence of ENGINE_FENCES) {
+    if (lang === fence.lang || (!last.hasBody && lang.length >= fence.minPrefix && fence.lang.startsWith(lang))) {
+      return `${text.slice(0, last.start)}\`\`\`${fence.pending}\n\`\`\``;
+    }
+  }
+  return text;
+}

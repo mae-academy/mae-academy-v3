@@ -23,10 +23,18 @@ export interface ChatTranscriptProps {
   onRegenerate: (assistantId: string) => void;
   /** A reply is being produced; regenerate is disabled meanwhile. */
   busy: boolean;
+  /** Loads a user message into the composer for editing; omitted (no Edit button) while a reply streams. */
+  onEdit?: (messageId: string) => void;
+  /** The user message currently being edited, if any. */
+  editingId?: string | null;
+  /** Step-by-step guidance is on. */
+  stepMode?: boolean;
+  /** Sends the fixed "continue to the next step" message. */
+  onReveal?: () => void;
 }
 
 /** The scrolling message column: follows the stream only while the reader is at the bottom, with a jump-to-latest pill otherwise. */
-export function ChatTranscript({ messages, streamingId, mascotState, stateLabels, sharedAvatar, error, onRetry, onRegenerate, busy }: ChatTranscriptProps) {
+export function ChatTranscript({ messages, streamingId, mascotState, stateLabels, sharedAvatar, error, onRetry, onRegenerate, busy, onEdit, editingId = null, stepMode = false, onReveal }: ChatTranscriptProps) {
   const { t } = useTranslation("ai");
   const reduceMotion = useReducedMotion();
   const scrollerRef = useRef<HTMLDivElement>(null);
@@ -92,7 +100,7 @@ export function ChatTranscript({ messages, streamingId, mascotState, stateLabels
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-7 px-4 pb-8 pt-6 sm:px-6">
           {visible.map((message) =>
             message.role === "user" ? (
-              <UserMessage key={message.id} message={message} onImageLoad={onImageLoad} />
+              <UserMessage key={message.id} message={message} onImageLoad={onImageLoad} onEdit={busy ? undefined : onEdit} editing={editingId === message.id} />
             ) : (
               <AssistantMessage
                 key={message.id}
@@ -105,6 +113,8 @@ export function ChatTranscript({ messages, streamingId, mascotState, stateLabels
                 canRegenerate={message.id === latestAssistantId && message.id === lastId}
                 busy={busy}
                 onRegenerate={regenerateLatest}
+                stepMode={stepMode && editingId === null}
+                onReveal={onReveal}
               />
             ),
           )}

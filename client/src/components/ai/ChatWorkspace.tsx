@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { motion, useReducedMotion } from "framer-motion";
-import { FileUp, FlaskConical, PanelLeft, Sparkles, SquarePen, X } from "lucide-react";
+import { FileUp, FlaskConical, ListOrdered, PanelLeft, Sparkles, SquarePen, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { LabContext, MascotState } from "@shared/aiTypes";
 import {
@@ -19,12 +19,12 @@ import { ChatComposer, type ComposerHandle, type ComposerSubmit } from "./ChatCo
 import { ChatSidebar } from "./ChatSidebar";
 import { ChatTranscript } from "./ChatTranscript";
 import { MAI_LAYOUT_ID, MAI_LAYOUT_TRANSITION } from "./ChatMessages";
-import { loadSidebarOpen, saveSidebarOpen } from "./chatStorage";
+import { loadSidebarOpen, loadStepMode, saveSidebarOpen, saveStepMode } from "./chatStorage";
 import { classifyAttachment } from "./documentUtils";
 import MaiMascot from "./MaiMascot";
 import { PlotFixContext } from "./PlotCard";
 import { SuggestionChips } from "./SuggestionChips";
-import { newId } from "./chatThreads";
+import { editAndResend, newId } from "./chatThreads";
 import { stopSpeaking } from "./speech";
 import { useChatRunner, type RunPhase } from "./useChatRunner";
 import { useChatThreads } from "./useChatThreads";
@@ -64,6 +64,34 @@ function DemoNotice({ onDismiss }: { onDismiss: () => void }) {
   );
 }
 
+/** Step-by-step guidance switch: full label from sm up, a compact icon + state on phones. */
+function StepModeSwitch({ on, onToggle }: { on: boolean; onToggle: () => void }) {
+  const { t } = useTranslation("ai");
+  const state = t(on ? "stepMode.on" : "stepMode.off");
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      aria-label={t("stepMode.label", { state })}
+      title={t("stepMode.hint")}
+      onClick={onToggle}
+      data-step-mode-switch
+      className={cn(
+        "inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition-colors sm:min-h-9",
+        on
+          ? "border-violet-400 bg-violet-100 text-violet-900 dark:border-violet-400/50 dark:bg-violet-500/20 dark:text-violet-100"
+          : "border-slate-200 bg-white text-slate-600 hover:bg-slate-100 dark:border-white/[0.12] dark:bg-transparent dark:text-zinc-300 dark:hover:bg-white/[0.08]",
+        FOCUS,
+      )}
+    >
+      <ListOrdered className="h-4 w-4 shrink-0" aria-hidden="true" />
+      <span aria-hidden="true" className="sm:hidden">{t("stepMode.short", { state })}</span>
+      <span aria-hidden="true" className="hidden sm:inline">{t("stepMode.label", { state })}</span>
+    </button>
+  );
+}
+
 /** The full-viewport conversation: collapsible history sidebar, centered canvas, docked composer. */
 export function ChatWorkspace({ lab, className }: ChatWorkspaceProps) {
   const { t } = useTranslation("ai");
@@ -75,7 +103,17 @@ export function ChatWorkspace({ lab, className }: ChatWorkspaceProps) {
   const labRef = useRef(lab);
   labRef.current = lab;
   const getLab = useCallback(() => labRef.current, []);
-  const runner = useChatRunner({ mascot, getLab, updateMessages: threads.updateMessages });
+  const [stepMode, setStepMode] = useState(() => loadStepMode());
+  const stepModeRef = useRef(stepMode);
+  stepModeRef.current = stepMode;
+  const getStepMode = useCallback(() => stepModeRef.current, []);
+  const toggleStepMode = () => {
+    const next = !stepMode;
+    saveStepMode(next);
+    setStepMode(next);
+  };
+  const runner = useChatRunner({ mascot, getLab, getStepMode, updateMessages: threads.updateMessages });
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const composerRef = useRef<ComposerHandle>(null);
   const dragDepth = useRef(0);
@@ -131,13 +169,22 @@ export function ChatWorkspace({ lab, className }: ChatWorkspaceProps) {
 
   /** Leaves the current chat: stop any stream (keeping its partial text), settle the mascot. */
   const leaveChat = useCallback(() => {
+    composerRef.current?.cancelEdit();
     stopSpeaking();
     runner.stop();
     mascot.reset();
   }, [mascot, runner]);
 
   /* ---- chat actions ---- */
-  const handleSubmit = ({ text, image, document }: ComposerSubmit) => {
+  const handleSubmit = ({ text, image, document, editId }: ComposerSubmit) => {
+    if (editId) {
+      // Editing replaces the message and drops everything after it; a running stream is aborted by the new run.
+      const edited = editAndResend(active.messages, editId, { content: text, imageUrl: image, document });
+      if (!edited) return;
+      stopSpeaking();
+      runner.send(active.id, edited);
+      return;
+    }
     if (runner.active) return;
     stopSpeaking();
     const message = { id: newId(), role: "user" as const, content: text, timestamp: Date.now(), ...(image ? { imageUrl: image } : {}), ...(document ? { document } : {}) };
@@ -149,6 +196,21 @@ export function ChatWorkspace({ lab, className }: ChatWorkspaceProps) {
   const submitRef = useRef(handleSubmit);
   submitRef.current = handleSubmit;
   const askFix = useCallback((text: string) => submitRef.current({ text, image: null, document: null }), []);
+  const reveal = useCallback(() => submitRef.current({ text: t("stepMode.continueMessage"), image: null, document: null }), [t]);
+
+  const handleEdit = useCallback(
+    (messageId: string) => {
+      const message = active.messages.find((m) => m.id === messageId);
+      if (!message || message.role !== "user" || runner.active) return;
+      stopSpeaking();
+      composerRef.current?.beginEdit({ id: message.id, text: message.content, image: message.imageUrl ?? null, document: message.document ?? null });
+    },
+    [active.messages, runner.active],
+  );
+  // An edit target that disappears (another chat, cleared history) ends edit mode.
+  useEffect(() => {
+    if (editingId && !active.messages.some((m) => m.id === editingId)) composerRef.current?.cancelEdit();
+  }, [active.messages, editingId]);
 
   const handleRetry = () => {
     if (runner.active) return;
@@ -313,6 +375,7 @@ export function ChatWorkspace({ lab, className }: ChatWorkspaceProps) {
             {t("page.title")}
           </span>
           <div className="min-w-0 flex-1" />
+          <StepModeSwitch on={stepMode} onToggle={toggleStepMode} />
           {runner.mode === "mock" && !demoDismissed ? <DemoNotice onDismiss={() => setDemoDismissed(true)} /> : null}
           {showTopNewChat ? (
             <button type="button" onClick={handleNewChat} aria-label={t("sidebar.newChat")} title={t("sidebar.newChat")} className={ICON_BUTTON}>
@@ -348,6 +411,10 @@ export function ChatWorkspace({ lab, className }: ChatWorkspaceProps) {
                   onRetry={handleRetry}
                   onRegenerate={handleRegenerate}
                   busy={runner.active !== null}
+                  onEdit={handleEdit}
+                  editingId={editingId}
+                  stepMode={stepMode}
+                  onReveal={reveal}
                 />
               </PlotFixContext.Provider>
             </>
@@ -365,6 +432,7 @@ export function ChatWorkspace({ lab, className }: ChatWorkspaceProps) {
               onSubmit={handleSubmit}
               onStop={runner.stop}
               onActivity={mascot.onInputActivity}
+              onEditChange={setEditingId}
             />
             {!isEmpty ? <p className="mt-2 text-center text-xs text-slate-500 dark:text-zinc-500">{t("composer.disclaimer")}</p> : null}
           </motion.div>

@@ -1,4 +1,4 @@
-import { AI_HISTORY_WINDOW, splitSimMarker, stripLegacySchematicTag, type AiStreamEvent, type ChatDocument, type ChatMessage, type LabContext } from "@shared/aiTypes";
+import { AI_HISTORY_WINDOW, splitTrailingMarkers, stripLegacySchematicTag, type AiStreamEvent, type ChatDocument, type ChatMessage, type LabContext } from "@shared/aiTypes";
 
 import { stripSvgFences } from "./svgFence";
 
@@ -100,7 +100,7 @@ export function buildRequestMessages(messages: readonly ChatMessage[]): ChatMess
   const merged: ChatMessage[] = [];
   for (const original of messages.slice(-AI_HISTORY_WINDOW)) {
     // The simulator marker and a legacy schematic tag are UI plumbing, and legacy SVG diagrams are large: none of it goes back to the model. ```schematic specs stay (the model edits its own previous spec).
-    const message = original.role === "model" ? { ...original, content: stripSvgFences(stripLegacySchematicTag(splitSimMarker(stripLegacySchematicTag(original.content)).text)) } : original;
+    const message = original.role === "model" ? { ...original, content: stripSvgFences(stripLegacySchematicTag(splitTrailingMarkers(stripLegacySchematicTag(original.content)).text)) } : original;
     if (message.role === "model" && !message.content.trim()) continue;
     const previous = merged[merged.length - 1];
     if (previous && previous.role === message.role) {
@@ -157,6 +157,8 @@ function kindForStatus(status: number): ChatErrorKind {
 export interface StreamChatOptions {
   messages: readonly ChatMessage[];
   lab: LabContext;
+  /** Step-by-step guidance; sent as `stepMode: true` only when on, so the body is unchanged otherwise. */
+  stepMode?: boolean;
   signal: AbortSignal;
   onDelta: (text: string) => void;
   /** Called once the stream is accepted; `mock` is the dev-only demo stream (no GEMINI_API_KEY on the server). */
@@ -169,13 +171,13 @@ export interface StreamChatOptions {
  * completion; rejects with ChatStreamError on any failure and with the native AbortError when `signal` aborts.
  * Error bodies are never surfaced (they may be HTML or leak internals).
  */
-export async function streamChat({ messages, lab, signal, onDelta, onMode, fetchImpl = fetch }: StreamChatOptions): Promise<void> {
+export async function streamChat({ messages, lab, stepMode, signal, onDelta, onMode, fetchImpl = fetch }: StreamChatOptions): Promise<void> {
   let response: Response;
   try {
     response = await fetchImpl("/api/ai/chat", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ messages: buildRequestMessages(messages), lab }),
+      body: JSON.stringify({ messages: buildRequestMessages(messages), lab, ...(stepMode ? { stepMode: true } : {}) }),
       signal,
     });
   } catch (error) {

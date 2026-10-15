@@ -12,18 +12,18 @@ const renderAssistant = (content: string, streaming: boolean, live = true) =>
 
 describe("assistantView", () => {
   it("hides complete and partial markers and only reports the lab for finished answers", () => {
-    expect(assistantView("Use KVL.\n[[SIM:circuits]]", false)).toEqual({ text: "Use KVL.", lab: "circuits" });
-    expect(assistantView("Use KVL.\n[[SIM:circuits]]", true)).toEqual({ text: "Use KVL.", lab: null });
+    expect(assistantView("Use KVL.\n[[SIM:circuits]]", false)).toEqual({ text: "Use KVL.", lab: "circuits", step: null });
+    expect(assistantView("Use KVL.\n[[SIM:circuits]]", true)).toEqual({ text: "Use KVL.", lab: null, step: null });
     for (const partial of ["Use KVL.\n[[", "Use KVL.\n[[SIM:", "Use KVL.\n[[SIM:circ"]) {
-      expect(assistantView(partial, true)).toEqual({ text: "Use KVL.", lab: null });
+      expect(assistantView(partial, true)).toEqual({ text: "Use KVL.", lab: null, step: null });
     }
-    expect(assistantView("No simulator here.", false)).toEqual({ text: "No simulator here.", lab: null });
+    expect(assistantView("No simulator here.", false)).toEqual({ text: "No simulator here.", lab: null, step: null });
   });
 
   it("strips a stray legacy GENERATE_SCHEMATIC tag from old stored messages, complete or partial", () => {
     const full = "Netlist below.\n\n[GENERATE_SCHEMATIC: A buck converter schematic, white background]\n[[SIM:power]]";
-    expect(assistantView(full, false)).toEqual({ text: "Netlist below.", lab: "power" });
-    expect(assistantView(full, true)).toEqual({ text: "Netlist below.", lab: null });
+    expect(assistantView(full, false)).toEqual({ text: "Netlist below.", lab: "power", step: null });
+    expect(assistantView(full, true)).toEqual({ text: "Netlist below.", lab: null, step: null });
     for (const partial of ["Netlist below.\n\n[GENERATE_", "Netlist below.\n\n[GENERATE_SCHEMATIC: A buck conv", "Netlist below.\n\n[GENERATE_SCHEMATIC: A buck converter]\n[[SI"]) {
       expect(assistantView(partial, true).text, partial).toBe("Netlist below.");
     }

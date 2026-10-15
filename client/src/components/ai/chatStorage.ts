@@ -229,3 +229,14 @@ export function loadSidebarOpen(storage: StorageLike | null = defaultStorage()):
 export function saveSidebarOpen(open: boolean, storage: StorageLike | null = defaultStorage()): void {
   try { storage?.setItem(SIDEBAR_STORAGE_KEY, open ? "open" : "closed"); } catch { /* ignore */ }
 }
+
+const STEP_MODE_KEY = "mae-ai:step-mode:v1";
+
+/** Step-by-step guidance is opt-in: only an explicit "on" is remembered. */
+export function loadStepMode(storage: StorageLike | null = defaultStorage()): boolean {
+  try { return storage?.getItem(STEP_MODE_KEY) === "on"; } catch { return false; }
+}
+
+export function saveStepMode(on: boolean, storage: StorageLike | null = defaultStorage()): void {
+  try { storage?.setItem(STEP_MODE_KEY, on ? "on" : "off"); } catch { /* ignore */ }
+}

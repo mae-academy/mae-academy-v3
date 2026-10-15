@@ -2,7 +2,8 @@ import { memo } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { Zap } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { splitSimMarker, stripLegacySchematicTag, type ChatMessage, type MascotState, type SimLab } from "@shared/aiTypes";
+import { splitTrailingMarkers, stripLegacySchematicTag, type ChatMessage, type MascotState, type SimLab, type StepInfo } from "@shared/aiTypes";
+import { cn } from "@/lib/utils";
 import PrefetchLink from "@/components/common/PrefetchLink";
 import { simulatorPathForLab } from "@/lib/aiLab";
 import AiMarkdown from "./AiMarkdown";
@@ -11,6 +12,7 @@ import MaiMascot from "./MaiMascot";
 import { MessageActions } from "./MessageActions";
 import { PlotAutoRunContext } from "./PlotCard";
 import { SchematicAutoRepairContext } from "./SchematicDiagram";
+import { MathText, hasMath } from "./mathText";
 import { isSessionMessage } from "./sessionMessages";
 
 /**
@@ -19,9 +21,9 @@ import { isSessionMessage } from "./sessionMessages";
  * once the answer is complete. Mid-stream the marker is hidden even when only half of it has arrived. The stored content
  * keeps both. A schematic is a fenced ```schematic block inside the text and renders where it sits.
  */
-export function assistantView(content: string, streaming: boolean): { text: string; lab: SimLab | null } {
-  const { text: withoutMarker, lab } = splitSimMarker(content);
-  return { text: stripLegacySchematicTag(withoutMarker), lab: streaming ? null : lab };
+export function assistantView(content: string, streaming: boolean): { text: string; lab: SimLab | null; step: StepInfo | null } {
+  const { text: withoutMarker, lab, step } = splitTrailingMarkers(content);
+  return { text: stripLegacySchematicTag(withoutMarker), lab: streaming ? null : lab, step: streaming ? null : step };
 }
 
 /** Shared-layout transition from the empty-state hero to the first assistant avatar. */
@@ -84,11 +86,20 @@ export interface MessageProps {
   onImageLoad: () => void;
 }
 
-export const UserMessage = memo(function UserMessage({ message, onImageLoad }: Omit<MessageProps, "streaming">) {
+export interface UserMessageProps extends Omit<MessageProps, "streaming"> {
+  /** Offered when the message can be edited (idle chat); the transcript passes a stable callback. */
+  onEdit?: (messageId: string) => void;
+  /** This message is currently loaded in the composer for editing. */
+  editing?: boolean;
+}
+
+export const UserMessage = memo(function UserMessage({ message, onImageLoad, onEdit, editing = false }: UserMessageProps) {
   const { t } = useTranslation("ai");
+  const edit = onEdit ? () => onEdit(message.id) : undefined;
   return (
-    <div className="group/msg flex flex-col items-end">
-      <div className="max-w-[88%] rounded-3xl bg-slate-100 px-4 py-2.5 text-slate-900 dark:bg-white/[0.08] dark:text-zinc-50 sm:max-w-[80%]">
+    <div className="group/msg flex flex-col items-end" data-editing={editing ? "true" : undefined}>
+      <div className={cn("max-w-[88%] rounded-3xl bg-slate-100 px-4 py-2.5 text-slate-900 dark:bg-white/[0.08] dark:text-zinc-50 sm:max-w-[80%]", editing && "ring-2 ring-violet-500 ring-offset-2 ring-offset-white dark:ring-violet-400 dark:ring-offset-[#09090b]")}>
+        {editing ? <span className="sr-only">{t("edit.editing")}: </span> : null}
         <span className="sr-only">{t("chat.you")}: </span>
         {message.imageUrl ? <img src={message.imageUrl} alt={t("chat.attachedImage")} onLoad={onImageLoad} className="mb-2 max-h-60 max-w-full rounded-2xl bg-white object-contain" /> : null}
         {message.document ? (
@@ -97,9 +108,13 @@ export const UserMessage = memo(function UserMessage({ message, onImageLoad }: O
             {message.document.dataUrl ? null : <p dir="auto" className="text-xs text-slate-500 dark:text-zinc-400">{t("document.reattach")}</p>}
           </div>
         ) : null}
-        {message.content ? <p dir="auto" className="whitespace-pre-wrap break-words text-start text-base leading-7">{message.content}</p> : null}
+        {message.content ? (
+          <p dir="auto" className="whitespace-pre-wrap break-words text-start text-base leading-7">
+            {hasMath(message.content) ? <MathText text={message.content} /> : message.content}
+          </p>
+        ) : null}
       </div>
-      {message.content ? <MessageActions messageId={message.id} content={message.content} role="user" /> : null}
+      {message.content ? <MessageActions messageId={message.id} content={message.content} role="user" onEdit={edit} /> : null}
     </div>
   );
 });
@@ -114,11 +129,33 @@ export interface AssistantMessageProps extends MessageProps {
   /** A reply is being produced somewhere: regenerate is disabled. */
   busy?: boolean;
   onRegenerate?: () => void;
+  /** Step-by-step guidance is on: a non-final step of the latest message offers "Reveal Step n+1". */
+  stepMode?: boolean;
+  /** Stable callback sending the fixed "continue" message. */
+  onReveal?: () => void;
 }
 
-export const AssistantMessage = memo(function AssistantMessage({ message, streaming, live, mascotState, stateLabels, sharedAvatar, canRegenerate, busy, onRegenerate }: Omit<AssistantMessageProps, "onImageLoad"> & { onImageLoad?: () => void }) {
+export function StepProgress({ step }: { step: StepInfo }) {
   const { t } = useTranslation("ai");
-  const { text, lab } = assistantView(message.content, streaming);
+  return (
+    <span
+      role="img"
+      aria-label={t("stepMode.progress", { n: step.n, total: step.total })}
+      data-step-chip
+      className="mt-3 inline-flex min-h-6 items-center gap-2 rounded-full border border-violet-200 bg-violet-50 px-2.5 text-xs font-medium text-violet-800 dark:border-violet-400/25 dark:bg-violet-500/10 dark:text-violet-200"
+    >
+      <span aria-hidden="true">{t("stepMode.progress", { n: step.n, total: step.total })}</span>
+      <span aria-hidden="true" className="h-1 w-12 overflow-hidden rounded-full bg-violet-200 dark:bg-violet-400/25">
+        <span className="block h-full rounded-full bg-violet-600 dark:bg-violet-300" style={{ width: `${Math.round((step.n / step.total) * 100)}%` }} />
+      </span>
+    </span>
+  );
+}
+
+export const AssistantMessage = memo(function AssistantMessage({ message, streaming, live, mascotState, stateLabels, sharedAvatar, canRegenerate, busy, onRegenerate, stepMode = false, onReveal }: Omit<AssistantMessageProps, "onImageLoad"> & { onImageLoad?: () => void }) {
+  const { t } = useTranslation("ai");
+  const { text, lab, step } = assistantView(message.content, streaming);
+  const canReveal = step !== null && step.n < step.total && stepMode && canRegenerate === true && !busy && onReveal !== undefined;
   return (
     <div className="group/msg flex items-start gap-3 sm:gap-4">
       <AssistantAvatar live={live} state={mascotState} stateLabels={stateLabels} shared={sharedAvatar} />
@@ -134,6 +171,22 @@ export const AssistantMessage = memo(function AssistantMessage({ message, stream
           <TypingDots />
         ) : null}
         {lab ? <SimulatorAction lab={lab} /> : null}
+        {step && text ? (
+          <div className="flex flex-wrap items-center gap-3">
+            <StepProgress step={step} />
+            {canReveal ? (
+              <button
+                type="button"
+                onClick={onReveal}
+                data-step-reveal
+                className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-full bg-gradient-to-br from-blue-600 to-violet-600 px-5 text-sm font-semibold text-white shadow-sm transition-[opacity,transform] hover:opacity-90 active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+              >
+                <span>{t("stepMode.reveal", { next: step.n + 1 })}</span>
+                <span aria-hidden="true" className="inline-block rtl:-scale-x-100">➔</span>
+              </button>
+            ) : null}
+          </div>
+        ) : null}
         {!streaming && text ? <MessageActions messageId={message.id} content={message.content} role="model" canRegenerate={canRegenerate} busy={busy} onRegenerate={onRegenerate} /> : null}
       </div>
     </div>

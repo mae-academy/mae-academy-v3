@@ -103,6 +103,110 @@
     "fitShort": "Fit",
     "lightboxHint": "Use the zoom buttons or the + and - keys to inspect the schematic. Press Escape to close."
   },
+  "engine": {
+    "actions": "Diagram actions",
+    "expand": "Expand",
+    "open": "Open larger",
+    "downloadSvg": "Download SVG",
+    "downloadPng": "Download PNG",
+    "copySource": "Copy source",
+    "copied": "Source copied",
+    "copyFailed": "Could not copy",
+    "viewSource": "View source",
+    "hideSource": "Hide source",
+    "close": "Close",
+    "zoom": "Zoom",
+    "zoomIn": "Zoom in",
+    "zoomOut": "Zoom out",
+    "fit": "Fit to screen",
+    "fitShort": "Fit",
+    "lightboxHint": "Use the zoom buttons or the + and - keys to inspect the diagram. Press Escape to close.",
+    "downloadFailed": "The download could not be started.",
+    "pngFallback": "PNG export is not available in this browser, so the SVG was downloaded instead."
+  },
+  "mermaid": {
+    "label": "Diagram",
+    "alt": "Diagram drawn from the diagram code",
+    "preparing": "Preparing diagram…",
+    "rendering": "Drawing the diagram…",
+    "error": {
+      "blocked": "This diagram was not drawn because its code is not allowed.",
+      "syntax": "This diagram has a syntax error, so it could not be drawn.",
+      "load": "The diagram engine could not be downloaded. Check your connection and reload.",
+      "internal": "The diagram could not be drawn here."
+    },
+    "blocked": {
+      "empty": "The diagram is empty.",
+      "size": "The diagram code is too large (limit 8 KB).",
+      "lineLength": "A line is too long or there are too many lines.",
+      "type": "Only flowchart, graph, stateDiagram, stateDiagram-v2 and sequenceDiagram are supported.",
+      "directive": "Configuration directives (%%{...}%%) are not allowed.",
+      "frontmatter": "Front matter configuration is not allowed.",
+      "click": "Links, click handlers and callbacks are not allowed.",
+      "html": "HTML in labels is not allowed.",
+      "url": "URLs and scripts are not allowed."
+    }
+  },
+  "wavedrom": {
+    "label": "Timing diagram",
+    "alt": "Digital timing diagram",
+    "preparing": "Preparing timing diagram…",
+    "rendering": "Drawing the timing diagram…",
+    "error": {
+      "invalid": "This timing diagram was not drawn because its specification is not valid.",
+      "load": "The timing engine could not be downloaded. Check your connection and reload.",
+      "internal": "The timing diagram could not be drawn here."
+    },
+    "reason": {
+      "tooLarge": "The specification is too large (limit 20 KB).",
+      "notJson": "The specification is not valid JSON.",
+      "notObject": "The specification must be a JSON object.",
+      "noSignal": "It needs a non-empty \"signal\" list.",
+      "tooManySignals": "Too many signals (limit 40).",
+      "badSignal": "A signal has an invalid field.",
+      "badWave": "A wave string contains characters that are not allowed.",
+      "waveTooLong": "A wave string is longer than 200 characters.",
+      "badData": "A data label is invalid or too long.",
+      "badKey": "An unknown or unsafe key was used.",
+      "tooDeep": "Groups are nested too deeply.",
+      "badConfig": "The config, head or foot section is invalid.",
+      "badName": "A signal name is invalid or too long.",
+      "badEdge": "An edge entry is invalid."
+    }
+  },
+  "params": {
+    "label": "Interactive parameters",
+    "preparing": "Preparing interactive tool…",
+    "reset": "Reset",
+    "results": "Results",
+    "exact": "Exact value of {{name}}",
+    "plotAlt": "Plot of {{y}} against {{x}}",
+    "viewJson": "View specification",
+    "hideJson": "Hide specification",
+    "errorTitle": "This interactive tool could not be built.",
+    "issue": {
+      "tooLarge": "The specification is too large (limit {{max}} KB).",
+      "notJson": "The specification is not valid JSON.",
+      "notObject": "The specification must be a JSON object.",
+      "noParameters": "It needs a non-empty \"parameters\" list.",
+      "tooManyParameters": "Too many parameters (limit {{max}}).",
+      "badParameter": "Parameter {{n}} is not a valid object.",
+      "badName": "\"{{name}}\" is not a valid parameter name.",
+      "duplicateName": "The parameter name \"{{name}}\" is used twice.",
+      "badNumber": "Parameter \"{{name}}\" needs numeric min, max, default and step.",
+      "minMax": "Parameter \"{{name}}\": min must be smaller than max.",
+      "defaultRange": "Parameter \"{{name}}\": the default is outside min..max.",
+      "stepPositive": "Parameter \"{{name}}\": step must be greater than zero.",
+      "noFormula": "It needs a \"formula\" or an \"outputs\" list.",
+      "tooManyOutputs": "Too many results (limit {{max}}).",
+      "badFormula": "The {{where}} cannot be evaluated: {{message}}.",
+      "unknownName": "The {{where}} uses \"{{name}}\", which is not a parameter.",
+      "badPlot": "The plot section is not valid.",
+      "plotRange": "The plot needs numeric xMin smaller than xMax.",
+      "plotLog": "A logarithmic plot needs xMin greater than zero.",
+      "badText": "A text field is invalid."
+    }
+  },
   "plot": {
     "label": "Plot",
     "alt": "Plot: {{title}}",
@@ -278,5 +382,27 @@
       "invalid_text": "That file isn't readable UTF-8 text.",
       "read": "That file could not be read."
     }
+  },
+  "edit": {
+    "button": "Edit message",
+    "banner": "Editing message",
+    "cancel": "Cancel",
+    "cancelLabel": "Cancel editing",
+    "editing": "Message being edited",
+    "send": "Send edited message",
+    "placeholder": "Edit your message…"
+  },
+  "stepMode": {
+    "label": "Step-by-step guidance: {{state}}",
+    "on": "ON",
+    "off": "OFF",
+    "short": "Steps: {{state}}",
+    "reveal": "Reveal Step {{next}}",
+    "progress": "Step {{n}} of {{total}}",
+    "continueMessage": "Continue to the next step.",
+    "hint": "The assistant reveals one step at a time and asks you a checkpoint question."
+  },
+  "mathPreview": {
+    "label": "Formula preview"
   }
 }

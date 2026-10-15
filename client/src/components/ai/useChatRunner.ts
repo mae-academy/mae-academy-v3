@@ -29,6 +29,8 @@ export interface ChatRunnerOptions {
   mascot: ChatMascot;
   /** Read at send time, so a changed `?lab=` applies to the next request without re-creating callbacks. */
   getLab: () => LabContext;
+  /** Read at send time: step-by-step guidance on/off. */
+  getStepMode?: () => boolean;
   updateMessages: UpdateMessages;
 }
 
@@ -53,7 +55,7 @@ export interface ChatRunner {
  * Owns one streaming request at a time. Message updates are addressed by thread id, so a stream that finishes
  * (or is aborted) after the user switched threads still lands in the thread it belongs to.
  */
-export function useChatRunner({ mascot, getLab, updateMessages }: ChatRunnerOptions): ChatRunner {
+export function useChatRunner({ mascot, getLab, getStepMode, updateMessages }: ChatRunnerOptions): ChatRunner {
   const { onSend, onToken, onStreamEnd, onError } = mascot;
   const [active, setActive] = useState<ActiveRun | null>(null);
   const [error, setError] = useState<ScopedError | null>(null);
@@ -67,6 +69,8 @@ export function useChatRunner({ mascot, getLab, updateMessages }: ChatRunnerOpti
   const flushRef = useRef<() => void>(() => {});
   const getLabRef = useRef(getLab);
   getLabRef.current = getLab;
+  const getStepModeRef = useRef(getStepMode);
+  getStepModeRef.current = getStepMode;
 
   const stop = useCallback(() => {
     flushRef.current();
@@ -114,6 +118,7 @@ export function useChatRunner({ mascot, getLab, updateMessages }: ChatRunnerOpti
         await streamChat({
           messages: history,
           lab: getLabRef.current(),
+          stepMode: getStepModeRef.current?.() ?? false,
           signal: controller.signal,
           onMode: (next) => { if (!stale()) setMode(next); },
           onDelta: (text) => {

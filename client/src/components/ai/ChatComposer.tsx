@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useImperativeHandle, useLayoutEffect, useRef, useState, type ClipboardEvent, type FormEvent, type KeyboardEvent, type Ref } from "react";
-import { ArrowUp, Mic, Paperclip, Square, X } from "lucide-react";
+import { ArrowUp, Mic, Paperclip, Pencil, Square, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { AI_MAX_MESSAGE_CHARS, type ChatDocument } from "@shared/aiTypes";
@@ -9,6 +9,7 @@ import { DocumentError, classifyAttachment, prepareDocumentForChat, unsupportedK
 import { ImageError, prepareImageForChat } from "./imageUtils";
 import { insertAtCursor } from "./insertAtCursor";
 import { MathKeyboard, MathKeyboardToggle } from "./MathKeyboard";
+import { MathText, hasMath } from "./mathText";
 import type { MathKey } from "./mathKeyboardData";
 import type { RunPhase } from "./useChatRunner";
 import { useVoiceInput } from "./useVoiceInput";
@@ -21,6 +22,21 @@ const MAX_TEXTAREA_PX = 192;
 /** The picker accepts images, PDFs and Markdown / plain text; classification re-checks by MIME with an extension fallback. */
 const FILE_ACCEPT = "image/png,image/jpeg,image/webp,application/pdf,.pdf,text/plain,text/markdown,.md,.txt";
 const DOCUMENT_PROMPTS = ["summarise", "derivations", "errors"] as const;
+/** The live formula preview trails typing by this long. */
+const PREVIEW_DEBOUNCE_MS = 80;
+
+/** What the composer held before an edit began; Cancel (and a finished edit) puts it back. */
+interface EditState {
+  id: string;
+  prev: { draft: string; image: string | null; doc: ChatDocument | null };
+}
+
+export interface EditSeed {
+  id: string;
+  text: string;
+  image: string | null;
+  document: ChatDocument | null;
+}
 
 export interface ComposerHandle {
   focus: () => void;
@@ -29,12 +45,18 @@ export interface ComposerHandle {
   openFilePicker: () => void;
   /** Validates and attaches an image (resized) or a PDF / text document: the same path as the picker, paste and drop. */
   attachFile: (file: Blob) => Promise<void>;
+  /** Loads a sent user message (text and attachment) into the box in edit mode. */
+  beginEdit: (seed: EditSeed) => void;
+  /** Leaves edit mode and restores the previous draft. No-op outside edit mode. */
+  cancelEdit: () => void;
 }
 
 export interface ComposerSubmit {
   text: string;
   image: string | null;
   document: ChatDocument | null;
+  /** Set when the submission is an edit of that user message (everything after it is dropped by the caller). */
+  editId?: string;
 }
 
 export interface ChatComposerProps {
@@ -43,6 +65,8 @@ export interface ChatComposerProps {
   onStop: () => void;
   /** Typing, pasting or attaching: lets the mascot lean in. */
   onActivity: () => void;
+  /** Reports entering (message id) and leaving (null) edit mode. */
+  onEditChange?: (id: string | null) => void;
   /** The larger, centered variant used on the empty state. */
   large?: boolean;
   className?: string;
@@ -50,7 +74,7 @@ export interface ChatComposerProps {
 }
 
 /** The message box: auto-growing textarea, image attach (picker / paste), send / stop with an in-flight spinner. */
-export function ChatComposer({ phase, onSubmit, onStop, onActivity, large = false, className, ref }: ChatComposerProps) {
+export function ChatComposer({ phase, onSubmit, onStop, onActivity, onEditChange, large = false, className, ref }: ChatComposerProps) {
   const { t, i18n } = useTranslation("ai");
   const [draft, setDraft] = useState("");
   const [image, setImage] = useState<string | null>(null);
@@ -71,12 +95,75 @@ export function ChatComposer({ phase, onSubmit, onStop, onActivity, large = fals
   const pendingSelection = useRef<{ value: string; start: number; end: number } | null>(null);
   const mathPanelId = `math-keyboard-${useId().replace(/:/g, "")}`;
 
+  const cancelEdit = () => {
+    const current = editingRef.current;
+    if (!current) return;
+    editingRef.current = null;
+    setEditing(null);
+    setDraft(current.prev.draft);
+    setImage(current.prev.image);
+    setDocument(current.prev.doc);
+    onEditChange?.(null);
+    focus();
+  };
+
+  /** Hands the message to the caller, then either clears the box or, after an edit, puts the earlier draft back. */
+  const commit = (text: string) => {
+    const current = editingRef.current;
+    onSubmit({ text, image: imageRef.current, document: documentRef.current, ...(current ? { editId: current.id } : {}) });
+    if (current) {
+      editingRef.current = null;
+      setEditing(null);
+      setDraft(current.prev.draft);
+      setImage(current.prev.image);
+      setDocument(current.prev.doc);
+      onEditChange?.(null);
+    } else {
+      setDraft("");
+      setImage(null);
+      setDocument(null);
+    }
+    focus();
+  };
+
   const imageRef = useRef<string | null>(null);
   const documentRef = useRef<ChatDocument | null>(null);
   imageRef.current = image;
   documentRef.current = doc;
 
-  const busy = phase !== "idle";
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
+  const [editing, setEditing] = useState<EditState | null>(null);
+  const editingRef = useRef<EditState | null>(null);
+  editingRef.current = editing;
+  const [previewText, setPreviewText] = useState("");
+  const showPreview = draft.includes("$") && previewText !== "" && hasMath(previewText);
+
+  // Typing and key presses keep the preview a beat behind, so a burst of keys typesets once.
+  useEffect(() => {
+    if (!draft.includes("$")) {
+      setPreviewText("");
+      return;
+    }
+    const timer = window.setTimeout(() => setPreviewText(draft), PREVIEW_DEBOUNCE_MS);
+    return () => window.clearTimeout(timer);
+  }, [draft]);
+
+  // Esc leaves edit mode from anywhere on the page, not only from the textarea (an open dialog or menu handles its own Esc first).
+  useEffect(() => {
+    if (!editing) return;
+    const onKey = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== "Escape" || event.defaultPrevented) return;
+      if (document.querySelector('[role="dialog"], [role="alertdialog"], [role="menu"]')) return;
+      cancelEdit();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editing]);
+
+  // An edit replaces whatever reply is running, so a running stream never blocks submitting one.
+  const busy = phase !== "idle" && !editing;
   const canSend = !busy && preparing === null && draft.trim().length > 0;
 
   const focus = useCallback(() => {
@@ -136,8 +223,25 @@ export function ChatComposer({ phase, onSubmit, onStop, onActivity, large = fals
       },
       openFilePicker: () => fileRef.current?.click(),
       attachFile,
+      beginEdit: (seed: EditSeed) => {
+        const prev = editingRef.current?.prev ?? { draft: draftRef.current, image: imageRef.current, doc: documentRef.current };
+        setEditing({ id: seed.id, prev });
+        setDraft(seed.text);
+        setImage(seed.image);
+        imageRef.current = seed.image;
+        setDocument(seed.document);
+        documentRef.current = seed.document;
+        setNoticeOpen(false);
+        setVoiceMessage(null);
+        setMathOpen(false);
+        onEditChange?.(seed.id);
+        onActivity();
+        focus();
+      },
+      cancelEdit: () => cancelEdit(),
     }),
-    [attachFile, focus, onActivity],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [attachFile, focus, onActivity, onEditChange],
   );
 
   const voice = useVoiceInput({
@@ -157,11 +261,7 @@ export function ChatComposer({ phase, onSubmit, onStop, onActivity, large = fals
         focus();
         return;
       }
-      setDraft("");
-      setImage(null);
-      setDocument(null);
-      onSubmit({ text, image, document: doc });
-      focus();
+      commit(text);
     },
   });
   const recording = voice.status !== "idle";
@@ -261,11 +361,7 @@ export function ChatComposer({ phase, onSubmit, onStop, onActivity, large = fals
 
   const submit = () => {
     if (!canSend) return;
-    onSubmit({ text: draft.trim(), image, document: doc });
-    setDraft("");
-    setImage(null);
-    setDocument(null);
-    focus();
+    commit(draft.trim());
   };
 
   const onFormSubmit = (event: FormEvent) => {
@@ -277,6 +373,11 @@ export function ChatComposer({ phase, onSubmit, onStop, onActivity, large = fals
     if (event.key === "Escape" && mathOpen) {
       event.preventDefault();
       closeMath();
+      return;
+    }
+    if (event.key === "Escape" && editingRef.current) {
+      event.preventDefault();
+      cancelEdit();
       return;
     }
     if (event.key !== "Enter" || event.shiftKey) return;
@@ -312,6 +413,21 @@ export function ChatComposer({ phase, onSubmit, onStop, onActivity, large = fals
         className,
       )}
     >
+      {editing ? (
+        <div data-edit-banner className="flex items-center gap-2 px-4 pt-3 text-sm text-violet-800 dark:text-violet-200">
+          <Pencil className="h-4 w-4 shrink-0" aria-hidden="true" />
+          <span role="status" className="min-w-0 flex-1 truncate font-medium">{t("edit.banner")}</span>
+          <button
+            type="button"
+            onClick={cancelEdit}
+            aria-label={t("edit.cancelLabel")}
+            className="inline-flex min-h-11 items-center rounded-full px-3 text-sm font-medium text-slate-700 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-blue-600 dark:text-zinc-200 dark:hover:bg-white/[0.08]"
+          >
+            {t("edit.cancel")}
+          </button>
+        </div>
+      ) : null}
+
       {image || doc || preparing ? (
         <div className="flex min-w-0 items-center gap-3 px-4 pt-4">
           {image ? (
@@ -416,6 +532,18 @@ export function ChatComposer({ phase, onSubmit, onStop, onActivity, large = fals
       ) : (
         <>
       <MathKeyboard open={mathOpen} id={mathPanelId} onInsert={insertKey} onClose={closeMath} tooLong={tooLong} />
+      {showPreview ? (
+        <div
+          role="group"
+          aria-label={t("mathPreview.label")}
+          aria-live="off"
+          dir="auto"
+          data-math-preview
+          className="mx-4 mt-3 max-h-28 overflow-y-auto whitespace-pre-wrap break-words rounded-xl bg-violet-50/70 px-3 py-2 text-base leading-7 text-slate-800 dark:bg-violet-500/10 dark:text-zinc-100"
+        >
+          <MathText text={previewText} />
+        </div>
+      ) : null}
       <textarea
         ref={textareaRef}
         value={draft}
@@ -426,7 +554,7 @@ export function ChatComposer({ phase, onSubmit, onStop, onActivity, large = fals
         maxLength={AI_MAX_MESSAGE_CHARS}
         enterKeyHint="send"
         aria-label={t("composer.label")}
-        placeholder={t(doc ? "composer.documentPlaceholder" : "composer.placeholder")}
+        placeholder={t(editing ? "edit.placeholder" : doc ? "composer.documentPlaceholder" : "composer.placeholder")}
         className={cn(
           "block w-full resize-none bg-transparent px-5 text-base leading-6 text-slate-900 outline-none placeholder:text-slate-400 dark:text-white dark:placeholder:text-zinc-500",
           large ? "min-h-[3.75rem] pt-5 pb-1.5" : "min-h-[3rem] pt-3.5 pb-1",
@@ -486,8 +614,8 @@ export function ChatComposer({ phase, onSubmit, onStop, onActivity, large = fals
           <button
             type="submit"
             disabled={!canSend}
-            aria-label={t("composer.send")}
-            title={t("composer.send")}
+            aria-label={t(editing ? "edit.send" : "composer.send")}
+            title={t(editing ? "edit.send" : "composer.send")}
             className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-600 to-violet-600 text-white shadow-sm transition-[opacity,transform] hover:opacity-90 active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-not-allowed disabled:from-slate-200 disabled:to-slate-200 disabled:text-slate-400 disabled:shadow-none dark:disabled:from-white/[0.08] dark:disabled:to-white/[0.08] dark:disabled:text-zinc-500"
           >
             <ArrowUp className="h-5 w-5" aria-hidden="true" />

@@ -41,6 +41,8 @@ export const AI_MAX_DOCUMENT_NAME_CHARS = 120;
 export interface AiChatRequest {
   messages: ChatMessage[];
   lab?: LabContext;
+  /** Step-by-step guidance mode: the model reveals one pedagogical step at a time. Boolean only; anything else is ignored. */
+  stepMode?: boolean;
 }
 
 /**
@@ -101,6 +103,41 @@ export function splitSimMarker(text: string): { text: string; lab: SimLab | null
     if (before === '' || /\s$/.test(before)) return { text: before.trimEnd(), lab: null };
   }
   return { text, lab: null };
+}
+
+/**
+ * In step-by-step guidance mode the model ends a step with `[[STEP:n/N]]` alone on its line (n = this step, N = the
+ * estimated total), BEFORE the optional `[[SIM:..]]` marker. The UI strips it with `splitStepMarker` (call it AFTER
+ * splitSimMarker, or use `splitTrailingMarkers`, which does both).
+ */
+export const STEP_MARKER_REGEX = /\n?\[\[STEP:(\d{1,2})\/(\d{1,2})\]\]\s*$/;
+const STEP_PARTIAL_REGEX = /\[\[?(?:S(?:T(?:E(?:P(?::\d{0,2}(?:\/\d{0,2}\]?)?)?)?)?)?)?$/;
+
+export interface StepInfo {
+  n: number;
+  total: number;
+}
+
+export function splitStepMarker(text: string): { text: string; step: StepInfo | null } {
+  const match = STEP_MARKER_REGEX.exec(text);
+  if (match) {
+    const n = Math.max(1, Number(match[1]));
+    return { text: text.slice(0, match.index).trimEnd(), step: { n, total: Math.max(n, Number(match[2])) } };
+  }
+  const partial = STEP_PARTIAL_REGEX.exec(text);
+  if (partial) {
+    const before = text.slice(0, partial.index);
+    // Only at the start of the text or after whitespace, so `a[` or `x[[` in prose is never touched.
+    if (before === '' || /\s$/.test(before)) return { text: before.trimEnd(), step: null };
+  }
+  return { text, step: null };
+}
+
+/** Strips the trailing `[[SIM:..]]` and then the `[[STEP:n/N]]` marker (complete or half-streamed). */
+export function splitTrailingMarkers(text: string): { text: string; lab: SimLab | null; step: StepInfo | null } {
+  const sim = splitSimMarker(text);
+  const step = splitStepMarker(sim.text);
+  return { text: step.text, lab: sim.lab, step: step.step };
 }
 
 const LEGACY_TAG_OPENS = ['[GENERATE_SCHEMATIC:', '[GENERATE_IMAGE:'] as const;

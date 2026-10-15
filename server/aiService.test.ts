@@ -190,7 +190,7 @@ describe("system instruction", () => {
   it("retires SVG output and specifies the schematic spec contract", () => {
     const integration = prompt.slice(prompt.indexOf("# MAE Academy platform integration"));
     expect(integration).toMatch(/Sections 1\.4, 1\.7 and the SVG form of 3\.2\) do NOT apply/);
-    expect(integration).toMatch(/Never emit SVG, ```xml:svg blocks, ASCII art, Mermaid or image tags/);
+    expect(integration).toMatch(/Never emit SVG, ```xml:svg blocks, ASCII art or image tags/);
     expect(integration).not.toMatch(/GENERATE_SCHEMATIC|text-to-image|ONLY these elements|There is no stylesheet|real minus sign/);
     expect(integration).toMatch(/info string is exactly `schematic`/);
     expect(integration).toMatch(/LAST content of the reply, just before the optional \[\[SIM:\.\.\]\] line/);

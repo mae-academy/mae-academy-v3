@@ -103,6 +103,110 @@
     "fitShort": "Ajustar",
     "lightboxHint": "Usa los botones de zoom o las teclas + y - para inspeccionar el esquema. Pulsa Escape para cerrar."
   },
+  "engine": {
+    "actions": "Acciones del diagrama",
+    "expand": "Ampliar",
+    "open": "Abrir más grande",
+    "downloadSvg": "Descargar SVG",
+    "downloadPng": "Descargar PNG",
+    "copySource": "Copiar código",
+    "copied": "Código copiado",
+    "copyFailed": "No se pudo copiar",
+    "viewSource": "Ver código",
+    "hideSource": "Ocultar código",
+    "close": "Cerrar",
+    "zoom": "Zoom",
+    "zoomIn": "Acercar",
+    "zoomOut": "Alejar",
+    "fit": "Ajustar a la pantalla",
+    "fitShort": "Ajustar",
+    "lightboxHint": "Usa los botones de zoom o las teclas + y - para inspeccionar el diagrama. Pulsa Escape para cerrar.",
+    "downloadFailed": "No se pudo iniciar la descarga.",
+    "pngFallback": "La exportación a PNG no está disponible en este navegador, así que se descargó el SVG."
+  },
+  "mermaid": {
+    "label": "Diagrama",
+    "alt": "Diagrama dibujado a partir del código del diagrama",
+    "preparing": "Preparando el diagrama…",
+    "rendering": "Dibujando el diagrama…",
+    "error": {
+      "blocked": "No se dibujó este diagrama porque su código no está permitido.",
+      "syntax": "Este diagrama tiene un error de sintaxis y no se pudo dibujar.",
+      "load": "No se pudo descargar el motor de diagramas. Revisa tu conexión y recarga.",
+      "internal": "No se pudo dibujar el diagrama aquí."
+    },
+    "blocked": {
+      "empty": "El diagrama está vacío.",
+      "size": "El código del diagrama es demasiado grande (límite 8 KB).",
+      "lineLength": "Una línea es demasiado larga o hay demasiadas líneas.",
+      "type": "Solo se admiten flowchart, graph, stateDiagram, stateDiagram-v2 y sequenceDiagram.",
+      "directive": "Las directivas de configuración (%%{...}%%) no están permitidas.",
+      "frontmatter": "La configuración en front matter no está permitida.",
+      "click": "No se permiten enlaces, manejadores de clic ni callbacks.",
+      "html": "No se permite HTML en las etiquetas.",
+      "url": "No se permiten URL ni scripts."
+    }
+  },
+  "wavedrom": {
+    "label": "Diagrama de tiempos",
+    "alt": "Diagrama de tiempos digital",
+    "preparing": "Preparando el diagrama de tiempos…",
+    "rendering": "Dibujando el diagrama de tiempos…",
+    "error": {
+      "invalid": "No se dibujó este diagrama de tiempos porque su especificación no es válida.",
+      "load": "No se pudo descargar el motor de tiempos. Revisa tu conexión y recarga.",
+      "internal": "No se pudo dibujar el diagrama de tiempos aquí."
+    },
+    "reason": {
+      "tooLarge": "La especificación es demasiado grande (límite 20 KB).",
+      "notJson": "La especificación no es JSON válido.",
+      "notObject": "La especificación debe ser un objeto JSON.",
+      "noSignal": "Necesita una lista \"signal\" no vacía.",
+      "tooManySignals": "Demasiadas señales (límite 40).",
+      "badSignal": "Una señal tiene un campo no válido.",
+      "badWave": "Una cadena de onda contiene caracteres no permitidos.",
+      "waveTooLong": "Una cadena de onda supera los 200 caracteres.",
+      "badData": "Una etiqueta de datos no es válida o es demasiado larga.",
+      "badKey": "Se usó una clave desconocida o insegura.",
+      "tooDeep": "Los grupos están anidados demasiado profundo.",
+      "badConfig": "La sección config, head o foot no es válida.",
+      "badName": "El nombre de una señal no es válido o es demasiado largo.",
+      "badEdge": "Una entrada edge no es válida."
+    }
+  },
+  "params": {
+    "label": "Parámetros interactivos",
+    "preparing": "Preparando la herramienta interactiva…",
+    "reset": "Restablecer",
+    "results": "Resultados",
+    "exact": "Valor exacto de {{name}}",
+    "plotAlt": "Gráfica de {{y}} frente a {{x}}",
+    "viewJson": "Ver especificación",
+    "hideJson": "Ocultar especificación",
+    "errorTitle": "No se pudo construir esta herramienta interactiva.",
+    "issue": {
+      "tooLarge": "La especificación es demasiado grande (límite {{max}} KB).",
+      "notJson": "La especificación no es JSON válido.",
+      "notObject": "La especificación debe ser un objeto JSON.",
+      "noParameters": "Necesita una lista \"parameters\" no vacía.",
+      "tooManyParameters": "Demasiados parámetros (límite {{max}}).",
+      "badParameter": "El parámetro {{n}} no es un objeto válido.",
+      "badName": "\"{{name}}\" no es un nombre de parámetro válido.",
+      "duplicateName": "El nombre de parámetro \"{{name}}\" se usa dos veces.",
+      "badNumber": "El parámetro \"{{name}}\" necesita min, max, default y step numéricos.",
+      "minMax": "Parámetro \"{{name}}\": min debe ser menor que max.",
+      "defaultRange": "Parámetro \"{{name}}\": el valor por defecto está fuera de min..max.",
+      "stepPositive": "Parámetro \"{{name}}\": step debe ser mayor que cero.",
+      "noFormula": "Necesita una \"formula\" o una lista \"outputs\".",
+      "tooManyOutputs": "Demasiados resultados (límite {{max}}).",
+      "badFormula": "No se puede evaluar {{where}}: {{message}}.",
+      "unknownName": "{{where}} usa \"{{name}}\", que no es un parámetro.",
+      "badPlot": "La sección de la gráfica no es válida.",
+      "plotRange": "La gráfica necesita xMin numérico menor que xMax.",
+      "plotLog": "Una gráfica logarítmica necesita xMin mayor que cero.",
+      "badText": "Un campo de texto no es válido."
+    }
+  },
   "plot": {
     "label": "Gráfica",
     "alt": "Gráfica: {{title}}",
@@ -278,5 +382,27 @@
       "invalid_text": "Ese archivo no es texto UTF-8 legible.",
       "read": "No se pudo leer ese archivo."
     }
+  },
+  "edit": {
+    "button": "Editar mensaje",
+    "banner": "Editando mensaje",
+    "cancel": "Cancelar",
+    "cancelLabel": "Cancelar la edición",
+    "editing": "Mensaje en edición",
+    "send": "Enviar mensaje editado",
+    "placeholder": "Edita tu mensaje…"
+  },
+  "stepMode": {
+    "label": "Guía paso a paso: {{state}}",
+    "on": "SÍ",
+    "off": "NO",
+    "short": "Pasos: {{state}}",
+    "reveal": "Mostrar el paso {{next}}",
+    "progress": "Paso {{n}} de {{total}}",
+    "continueMessage": "Continúa con el siguiente paso.",
+    "hint": "El asistente muestra un paso a la vez y te hace una pregunta de control."
+  },
+  "mathPreview": {
+    "label": "Vista previa de fórmulas"
   }
 }
