@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { stripLegacySchematicTag } from "@shared/aiTypes";
 import { recognitionLang } from "./voiceInput";
 
 /* ---------- text preparation (pure) ---------- */
@@ -80,7 +81,7 @@ export function toSpokenText(markdown: string, lang: SpokenLang = "en"): string 
   s = s.replace(/(^|\n)[ \t]*(```|~~~)([^\n]*)\n?([\s\S]*?)(?:\n[ \t]*\2[ \t]*(?=\n|$)|$)/g, (_m, lead: string, _fence: string, info: string) =>
     /^\s*schematic\b/i.test(info) ? `${lead}\n` : `${lead}\n${w.code}.\n`,
   );
-  s = s.replace(/\[\[SIM:[a-z]+\]\]/g, " ").replace(/\[GENERATE_[A-Z]+:[^\]]*\]?/g, " ");
+  s = stripLegacySchematicTag(s.replace(/\[\[SIM:[a-z]+\]\]/g, " "));
 
   // Math before any other markdown: its symbols (`_`, `*`, `|`) must not be read as markup.
   s = s.replace(/\$\$([\s\S]+?)\$\$/g, (_m, tex: string) => `, ${latexToSpoken(tex, lang)}, `);

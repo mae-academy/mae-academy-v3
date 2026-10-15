@@ -1,37 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { IMAGE_TAG_REGEX, MAX_IMAGE_PROMPT_CHARS, splitImageTag, splitSimMarker, stripLegacySchematicTag } from './aiTypes';
-
-const IMG_PROMPT = 'Publication-grade technical illustration of motor types, labeled components (stator, rotor).';
-const IMG_TAG = `[GENERATE_IMAGE: ${IMG_PROMPT}]`;
-
-describe('splitImageTag', () => {
-  it('extracts a trailing tag and its prompt', () => {
-    expect(splitImageTag(`Explanation.\n\n${IMG_TAG}`)).toEqual({ text: 'Explanation.', prompt: IMG_PROMPT });
-  });
-  it('cooperates with splitSimMarker called first', () => {
-    const { text } = splitSimMarker(`Explanation.\n\n${IMG_TAG}\n[[SIM:power]]`);
-    expect(splitImageTag(text)).toEqual({ text: 'Explanation.', prompt: IMG_PROMPT });
-  });
-  it('handles CRLF and brackets inside the prompt', () => {
-    expect(splitImageTag('A.\r\n[GENERATE_IMAGE: draw a [motor] cutaway view]\r\n')).toEqual({ text: 'A.', prompt: 'draw a motor cutaway view' });
-  });
-  it('hides partial tags mid-stream with no prompt', () => {
-    for (const tail of ['[', '[GENER', '[GENERATE_IMAGE', '[GENERATE_IMAGE:', '[GENERATE_IMAGE: Publication-grade tech']) {
-      expect(splitImageTag(`Text.\n\n${tail}`), tail).toEqual({ text: 'Text.', prompt: null });
-    }
-  });
-  it('leaves ordinary brackets alone and keeps the first of several tags', () => {
-    expect(splitImageTag('array a[1] and b[')).toEqual({ text: 'array a[1] and b[', prompt: null });
-    expect(splitImageTag('see a[GENERATE_IMAGE: x y z] here').prompt).toBeNull();
-    expect(splitImageTag('A\n[GENERATE_IMAGE: first prompt here]\n[GENERATE_IMAGE: second prompt here]')).toEqual({ text: 'A', prompt: 'first prompt here' });
-  });
-  it('clamps the prompt, matches the strict regex and is idempotent', () => {
-    expect(splitImageTag(`x\n[GENERATE_IMAGE: ${'a'.repeat(1500)}]`).prompt).toHaveLength(MAX_IMAGE_PROMPT_CHARS);
-    expect(IMAGE_TAG_REGEX.exec(IMG_TAG)?.[1]).toBeTruthy();
-    const once = splitImageTag(`X\n${IMG_TAG}\nY`).text;
-    expect(splitImageTag(once)).toEqual({ text: once, prompt: null });
-  });
-});
+import { stripLegacySchematicTag } from './aiTypes';
 
 const TAG = '[GENERATE_SCHEMATIC: A buck converter, [labelled] nodes]';
 
@@ -53,5 +21,14 @@ describe('stripLegacySchematicTag', () => {
   it('is idempotent', () => {
     const once = stripLegacySchematicTag(`X\n${TAG}\nY`);
     expect(stripLegacySchematicTag(once)).toBe(once);
+  });
+  it('also hides the retired illustration tag (complete, unclosed, partial)', () => {
+    const img = '[GENERATE_IMAGE: Publication-grade technical illustration of motor types, labeled]';
+    expect(stripLegacySchematicTag(`Types.\n\n${img}`)).toBe('Types.');
+    expect(stripLegacySchematicTag(`Types.\n\n${img}\n[[SIM:power]]`)).toBe('Types.\n\n[[SIM:power]]');
+    for (const tail of ['[GENERATE_IMAGE', '[GENERATE_IMAGE:', '[GENERATE_IMAGE: Publication-grade tech']) {
+      expect(stripLegacySchematicTag(`Text.\n\n${tail}`), tail).toBe('Text.');
+    }
+    expect(stripLegacySchematicTag('see a[GENERATE_IMAGE: x] here')).toBe('see a[GENERATE_IMAGE: x] here');
   });
 });

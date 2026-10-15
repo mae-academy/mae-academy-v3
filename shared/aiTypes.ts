@@ -9,8 +9,33 @@ export interface ChatMessage {
   content: string;
   /** `data:image/(jpeg|png|webp);base64,...`; the client downsizes to 1200px / JPEG 80% before sending. */
   imageUrl?: string;
+  /** A document the student attached to this message (PDF, or a small text/Markdown file). */
+  document?: ChatDocument;
   timestamp: number;
 }
+
+export type DocumentMimeType = 'application/pdf' | 'text/plain' | 'text/markdown';
+
+/**
+ * Attached course material. `dataUrl` (`data:<mime>;base64,...`) exists only on the wire and in memory: it is never
+ * written to localStorage (a PDF would blow the quota), so a restored message carries just `name`, `mimeType`, `size`
+ * and the student must re-attach the file to ask further questions about it. On the wire, the client puts the ACTIVE
+ * document on the last user message of every request (follow-up questions keep the document in context even after the
+ * message that first carried it has left the history window); the server uses the last document it finds.
+ */
+export interface ChatDocument {
+  name: string;
+  mimeType: DocumentMimeType;
+  /** Decoded size in bytes, for the badge. */
+  size: number;
+  dataUrl?: string;
+}
+
+export const AI_DOCUMENT_MIME_TYPES: readonly DocumentMimeType[] = ['application/pdf', 'text/plain', 'text/markdown'];
+/** Decoded PDF size cap. Gemini's inline request limit is 20 MB total; base64 adds a third, and the request also carries history. */
+export const AI_MAX_PDF_BYTES = 6 * 1024 * 1024;
+export const AI_MAX_TEXT_DOCUMENT_BYTES = 200 * 1024;
+export const AI_MAX_DOCUMENT_NAME_CHARS = 120;
 
 /** Body of `POST /api/ai/chat`. The server only reads the last `AI_HISTORY_WINDOW` messages, and the last one must be a user message. */
 export interface AiChatRequest {
@@ -78,19 +103,24 @@ export function splitSimMarker(text: string): { text: string; lab: SimLab | null
   return { text, lab: null };
 }
 
-const LEGACY_TAG_OPEN = '[GENERATE_SCHEMATIC:';
+const LEGACY_TAG_OPENS = ['[GENERATE_SCHEMATIC:', '[GENERATE_IMAGE:'] as const;
 
 /**
- * Chats stored before schematics became a validated JSON spec may end with a text-to-image tag
- * `[GENERATE_SCHEMATIC: ...]`. It is dead text now: this strips it (complete, or still unclosed to the end of the
- * text) so old messages never show it. Only at the start of the text or after whitespace. Pure and idempotent.
+ * Hide-only helper for chats stored by earlier versions, which may contain a dead text-to-image tag:
+ * `[GENERATE_SCHEMATIC: ...]` or `[GENERATE_IMAGE: ...]`. Neither is produced or acted on any more; this strips
+ * them (complete, or still unclosed to the end of the text, or a partial prefix mid-stream) so old messages never
+ * show raw tag text. Only at the start of the text or after whitespace. Pure and idempotent.
  */
 export function stripLegacySchematicTag(text: string): string {
   if (!text.includes('[')) return text;
   let out = text;
   let from = 0;
   for (;;) {
-    const start = out.indexOf(LEGACY_TAG_OPEN, from);
+    let start = -1;
+    for (const open of LEGACY_TAG_OPENS) {
+      const at = out.indexOf(open, from);
+      if (at !== -1 && (start === -1 || at < start)) start = at;
+    }
     if (start === -1) break;
     if (start > 0 && !/\s/.test(out[start - 1])) {
       from = start + 1;
@@ -107,65 +137,14 @@ export function stripLegacySchematicTag(text: string): string {
     out = (out.slice(0, start).trimEnd() + (out.slice(end).trim() ? '\n\n' + out.slice(end).trimStart() : '')).trimEnd();
     from = 0;
   }
-  for (let length = Math.min(out.length, LEGACY_TAG_OPEN.length - 1); length >= 1; length--) {
+  const longest = Math.max(...LEGACY_TAG_OPENS.map((open) => open.length));
+  for (let length = Math.min(out.length, longest - 1); length >= 1; length--) {
     const tail = out.slice(-length);
-    if (!tail.startsWith('[') || !LEGACY_TAG_OPEN.startsWith(tail)) continue;
+    if (!tail.startsWith('[') || !LEGACY_TAG_OPENS.some((open) => open.startsWith(tail))) continue;
     const before = out.slice(0, out.length - length);
     if (before === '' || /\s$/.test(before)) return before.trimEnd();
   }
   return out;
-}
-
-/** Longest illustration prompt the tag may carry and the image route accepts. */
-export const MAX_IMAGE_PROMPT_CHARS = 1000;
-
-const IMAGE_TAG_OPEN = '[GENERATE_IMAGE:';
-
-/** A complete, well-formed tag: single line, no brackets inside. Looser tags are still hidden by `splitImageTag`. */
-export const IMAGE_TAG_REGEX = /\[GENERATE_IMAGE:\s*([^[\]\r\n]{1,1000}?)\s*\]/;
-
-/**
- * When an answer is best served by an illustration (machine taxonomies, cutaways, concept maps) the model ends it
- * with one `[GENERATE_IMAGE: <english prompt>]` line (before the optional `[[SIM:..]]` line). The UI hides it with
- * `splitImageTag` and renders an illustration card. Call `splitSimMarker` first. A complete tag yields its prompt
- * (tolerating CRLF and stray brackets inside, clamped to MAX_IMAGE_PROMPT_CHARS); an unclosed trailing tag or a
- * trailing partial prefix (`[GENER`) is dropped with no prompt, so a streaming UI never flashes half a tag. Only at
- * the start of the text or after whitespace. Further tags are removed too; the first one wins.
- */
-export function splitImageTag(text: string): { text: string; prompt: string | null } {
-  if (!text.includes('[')) return { text, prompt: null };
-  let out = text;
-  let prompt: string | null = null;
-  let from = 0;
-  for (;;) {
-    const start = out.indexOf(IMAGE_TAG_OPEN, from);
-    if (start === -1) break;
-    if (start > 0 && !/\s/.test(out[start - 1])) {
-      from = start + 1;
-      continue;
-    }
-    const lineEnd = out.indexOf('\n', start);
-    const line = out.slice(start, lineEnd === -1 ? out.length : lineEnd).replace(/\r$/, '');
-    const close = line.lastIndexOf(']');
-    if (close === -1) {
-      out = out.slice(0, start).trimEnd();
-      break;
-    }
-    if (prompt === null) {
-      const inner = line.slice(IMAGE_TAG_OPEN.length, close).replace(/[[\]]/g, ' ').replace(/\s+/g, ' ').trim();
-      if (inner) prompt = inner.slice(0, MAX_IMAGE_PROMPT_CHARS);
-    }
-    const end = start + close + 1;
-    out = (out.slice(0, start).trimEnd() + (out.slice(end).trim() ? '\n\n' + out.slice(end).trimStart() : '')).trimEnd();
-    from = 0;
-  }
-  for (let length = Math.min(out.length, IMAGE_TAG_OPEN.length - 1); length >= 1; length--) {
-    const tail = out.slice(-length);
-    if (!tail.startsWith('[') || !IMAGE_TAG_OPEN.startsWith(tail)) continue;
-    const before = out.slice(0, out.length - length);
-    if (before === '' || /\s$/.test(before)) return { text: before.trimEnd(), prompt };
-  }
-  return { text: out, prompt };
 }
 
 /** What a vector diagram is replaced with when a model turn is resent as history. */

@@ -1,6 +1,6 @@
 /**
  * MAE Academy visual system: Luminous Technical Atelier.
- * Native SVG technical illustrations with discipline-specific station schematics.
+ * Native SVG technical drawings with discipline-specific station schematics.
  */
 import { memo } from "react";
 import { useLocale } from "@/contexts/LocaleContext";

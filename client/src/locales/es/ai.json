@@ -58,8 +58,8 @@
     "copied": "Copiado",
     "copyFailed": "No se pudo copiar",
     "codeLabel": "Código",
-    "dropTitle": "Suelta una imagen para adjuntarla",
-    "dropHint": "PNG, JPEG o WebP"
+    "dropTitle": "Suelta un archivo para adjuntarlo",
+    "dropHint": "Imagen, PDF, Markdown o texto"
   },
   "actions": {
     "openSimulator": "Abrir en el simulador interactivo"
@@ -103,29 +103,6 @@
     "fitShort": "Ajustar",
     "lightboxHint": "Usa los botones de zoom o las teclas + y - para inspeccionar el esquema. Pulsa Escape para cerrar."
   },
-  "illustration": {
-    "label": "Ilustración",
-    "alt": "Ilustración generada por IA: {{prompt}}",
-    "generate": "Generar ilustración",
-    "generating": "Generando ilustración…",
-    "actions": "Acciones de la ilustración",
-    "expand": "Ampliar ilustración",
-    "open": "Abrir la ilustración en grande",
-    "download": "Descargar PNG",
-    "regenerate": "Regenerar",
-    "close": "Cerrar",
-    "zoom": "Zoom",
-    "zoomIn": "Acercar",
-    "zoomOut": "Alejar",
-    "fit": "Ajustar a la pantalla",
-    "fitShort": "Ajustar",
-    "lightboxHint": "Usa los botones de zoom o las teclas + y - para inspeccionar la ilustración. Pulsa Escape para cerrar.",
-    "disclaimer": "Ilustración generada por IA — contrástala con la explicación",
-    "downloadFailed": "No se pudo iniciar la descarga.",
-    "unavailable": "La generación de ilustraciones no está disponible ahora mismo",
-    "serviceHint": "Hay que activar el servicio de imágenes para poder generar ilustraciones.",
-    "retry": "Reintentar"
-  },
   "demo": {
     "short": "Modo demo",
     "full": "Modo demo — añade GEMINI_API_KEY para respuestas reales",
@@ -145,11 +122,14 @@
     "placeholder": "Pregunta o adjunta un esquema…",
     "send": "Enviar",
     "stop": "Detener",
-    "attach": "Adjuntar imagen",
+    "attach": "Adjuntar imagen o documento",
     "removeImage": "Quitar la imagen adjunta",
     "preparing": "Preparando la imagen…",
     "counter": "{{count}} / {{max}} caracteres",
-    "disclaimer": "La IA puede cometer errores. Verifica los resultados antes de confiar en ellos."
+    "disclaimer": "La IA puede cometer errores. Verifica los resultados antes de confiar en ellos.",
+    "removeAttachment": "Quitar adjunto",
+    "preparingDocument": "Leyendo archivo…",
+    "documentPlaceholder": "Haz una pregunta sobre este documento…"
   },
   "errors": {
     "rate_limit": "Demasiadas solicitudes. Espera un minuto e inténtalo de nuevo.",
@@ -197,5 +177,26 @@
     "source_too_large": "La imagen es demasiado grande (más de 15 MB).",
     "decode": "No se pudo leer la imagen.",
     "too_large": "La imagen sigue siendo demasiado grande tras reducirla. Prueba con una más pequeña."
+  },
+  "document": {
+    "replacedImage": "El documento ha reemplazado a la imagen adjunta. Un adjunto por mensaje.",
+    "replacedByImage": "La imagen ha reemplazado al documento adjunto. Un adjunto por mensaje.",
+    "reattach": "Vuelve a adjuntar este archivo para preguntar más sobre él",
+    "suggestionsLabel": "Preguntas sugeridas sobre el documento",
+    "prompts": {
+      "summarise": "Resume este documento",
+      "derivations": "Explica las deducciones paso a paso",
+      "errors": "Revisa si tiene errores"
+    },
+    "errors": {
+      "type": "Solo se pueden adjuntar imágenes, PDF, Markdown y archivos de texto plano.",
+      "office": "Los archivos de Word y PowerPoint aún no son compatibles: expórtalos a PDF y adjunta ese archivo.",
+      "empty": "Ese archivo está vacío.",
+      "pdf_too_large": "Ese PDF es demasiado grande (más de 6 MB).",
+      "text_too_large": "Ese archivo de texto es demasiado grande (más de 200 KB).",
+      "invalid_pdf": "Ese archivo no es un PDF válido.",
+      "invalid_text": "Ese archivo no es texto UTF-8 legible.",
+      "read": "No se pudo leer ese archivo."
+    }
   }
 }

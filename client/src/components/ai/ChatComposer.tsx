@@ -2,9 +2,11 @@ import { useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, u
 import { ArrowUp, Mic, Paperclip, Square, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
-import { AI_MAX_MESSAGE_CHARS } from "@shared/aiTypes";
+import { AI_MAX_MESSAGE_CHARS, type ChatDocument } from "@shared/aiTypes";
 import { cn } from "@/lib/utils";
-import { ACCEPTED_IMAGE_TYPES, ImageError, prepareImageForChat } from "./imageUtils";
+import { DocumentBadge } from "./DocumentBadge";
+import { DocumentError, classifyAttachment, prepareDocumentForChat, unsupportedKind } from "./documentUtils";
+import { ImageError, prepareImageForChat } from "./imageUtils";
 import type { RunPhase } from "./useChatRunner";
 import { useVoiceInput } from "./useVoiceInput";
 import { VoiceWaveform } from "./VoiceWaveform";
@@ -13,19 +15,23 @@ import { acceptVoiceNotice, formatElapsed, hasAcceptedVoiceNotice, isVoiceInputS
 const COUNTER_FROM = Math.floor(AI_MAX_MESSAGE_CHARS * 0.8);
 /** Eight lines of `leading-6`; the textarea scrolls beyond that. */
 const MAX_TEXTAREA_PX = 192;
+/** The picker accepts images, PDFs and Markdown / plain text; classification re-checks by MIME with an extension fallback. */
+const FILE_ACCEPT = "image/png,image/jpeg,image/webp,application/pdf,.pdf,text/plain,text/markdown,.md,.txt";
+const DOCUMENT_PROMPTS = ["summarise", "derivations", "errors"] as const;
 
 export interface ComposerHandle {
   focus: () => void;
   /** Replaces the draft and moves the caret to its end. */
   setDraft: (text: string) => void;
   openFilePicker: () => void;
-  /** Resizes and attaches an image file (the same path as the picker, paste and drop). */
+  /** Validates and attaches an image (resized) or a PDF / text document: the same path as the picker, paste and drop. */
   attachFile: (file: Blob) => Promise<void>;
 }
 
 export interface ComposerSubmit {
   text: string;
   image: string | null;
+  document: ChatDocument | null;
 }
 
 export interface ChatComposerProps {
@@ -45,7 +51,8 @@ export function ChatComposer({ phase, onSubmit, onStop, onActivity, large = fals
   const { t, i18n } = useTranslation("ai");
   const [draft, setDraft] = useState("");
   const [image, setImage] = useState<string | null>(null);
-  const [preparing, setPreparing] = useState(false);
+  const [doc, setDocument] = useState<ChatDocument | null>(null);
+  const [preparing, setPreparing] = useState<"image" | "document" | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -55,8 +62,13 @@ export function ChatComposer({ phase, onSubmit, onStop, onActivity, large = fals
   const recordingRef = useRef<HTMLDivElement>(null);
   const continueRef = useRef<HTMLButtonElement>(null);
 
+  const imageRef = useRef<string | null>(null);
+  const documentRef = useRef<ChatDocument | null>(null);
+  imageRef.current = image;
+  documentRef.current = doc;
+
   const busy = phase !== "idle";
-  const canSend = !busy && !preparing && (draft.trim().length > 0 || image !== null);
+  const canSend = !busy && preparing === null && draft.trim().length > 0;
 
   const focus = useCallback(() => {
     requestAnimationFrame(() => {
@@ -70,13 +82,34 @@ export function ChatComposer({ phase, onSubmit, onStop, onActivity, large = fals
   const attachFile = useCallback(
     async (file: Blob) => {
       onActivity();
-      setPreparing(true);
+      const named = file as File;
+      const kind = classifyAttachment({ type: file.type, name: named.name });
+      if (!kind) {
+        toast.error(t(`document.errors.${unsupportedKind({ name: named.name })}`));
+        focus();
+        return;
+      }
+      setPreparing(kind);
       try {
-        setImage(await prepareImageForChat(file));
+        if (kind === "image") {
+          const prepared = await prepareImageForChat(file);
+          setImage(prepared);
+          if (documentRef.current) toast.info(t("document.replacedByImage"));
+          documentRef.current = null;
+          setDocument(null);
+        } else {
+          const prepared = await prepareDocumentForChat(named);
+          setDocument(prepared);
+          documentRef.current = prepared;
+          if (imageRef.current) toast.info(t("document.replacedImage"));
+          imageRef.current = null;
+          setImage(null);
+        }
       } catch (caught) {
-        toast.error(t(`image.${caught instanceof ImageError ? caught.kind : "decode"}`));
+        if (kind === "image") toast.error(t(`image.${caught instanceof ImageError ? caught.kind : "decode"}`));
+        else toast.error(t(`document.errors.${caught instanceof DocumentError ? caught.kind : "read"}`));
       } finally {
-        setPreparing(false);
+        setPreparing(null);
         focus();
       }
     },
@@ -117,7 +150,8 @@ export function ChatComposer({ phase, onSubmit, onStop, onActivity, large = fals
       }
       setDraft("");
       setImage(null);
-      onSubmit({ text, image });
+      setDocument(null);
+      onSubmit({ text, image, document: doc });
       focus();
     },
   });
@@ -168,9 +202,10 @@ export function ChatComposer({ phase, onSubmit, onStop, onActivity, large = fals
 
   const submit = () => {
     if (!canSend) return;
-    onSubmit({ text: draft.trim(), image });
+    onSubmit({ text: draft.trim(), image, document: doc });
     setDraft("");
     setImage(null);
+    setDocument(null);
     focus();
   };
 
@@ -188,7 +223,7 @@ export function ChatComposer({ phase, onSubmit, onStop, onActivity, large = fals
   };
 
   const onPaste = (event: ClipboardEvent) => {
-    const file = Array.from(event.clipboardData.files).find((f) => f.type.startsWith("image/"));
+    const file = Array.from(event.clipboardData.files).find((f) => f.type.startsWith("image/") || classifyAttachment(f) !== null);
     // A screenshot has no text flavour; a copy from a document may carry both, and then the text is what's wanted.
     if (file && !event.clipboardData.getData("text/plain")) {
       event.preventDefault();
@@ -213,8 +248,8 @@ export function ChatComposer({ phase, onSubmit, onStop, onActivity, large = fals
         className,
       )}
     >
-      {image || preparing ? (
-        <div className="flex items-center gap-3 px-4 pt-4">
+      {image || doc || preparing ? (
+        <div className="flex min-w-0 items-center gap-3 px-4 pt-4">
           {image ? (
             <div className="relative">
               <img src={image} alt={t("chat.attachedImage")} className="h-16 w-16 rounded-xl border border-slate-200 bg-white object-cover dark:border-white/[0.12]" />
@@ -228,8 +263,28 @@ export function ChatComposer({ phase, onSubmit, onStop, onActivity, large = fals
               </button>
             </div>
           ) : null}
-          {preparing ? <span className="text-sm text-slate-500 motion-safe:animate-pulse dark:text-zinc-400">{t("composer.preparing")}</span> : null}
+          {doc ? <DocumentBadge document={doc} onRemove={() => { setDocument(null); focus(); }} /> : null}
+          {preparing ? <span role="status" className="text-sm text-slate-500 motion-safe:animate-pulse dark:text-zinc-400">{t(preparing === "document" ? "composer.preparingDocument" : "composer.preparing")}</span> : null}
         </div>
+      ) : null}
+
+      {doc && draft.trim() === "" && !recording ? (
+        <ul aria-label={t("document.suggestionsLabel")} className="flex flex-wrap gap-2 px-4 pt-3">
+          {DOCUMENT_PROMPTS.map((id) => {
+            const label = t(`document.prompts.${id}`);
+            return (
+              <li key={id}>
+                <button
+                  type="button"
+                  onClick={() => { setDraft(label); onActivity(); focus(); }}
+                  className="inline-flex min-h-11 items-center rounded-full border border-slate-200 bg-white/70 px-4 text-sm text-slate-600 transition-colors hover:border-violet-300 hover:bg-violet-50 hover:text-violet-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:border-white/[0.1] dark:bg-white/[0.03] dark:text-zinc-300 dark:hover:border-violet-400/40 dark:hover:bg-violet-500/10 dark:hover:text-violet-100"
+                >
+                  <span dir="auto">{label}</span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
       ) : null}
 
       {voiceMessage ? (
@@ -306,7 +361,7 @@ export function ChatComposer({ phase, onSubmit, onStop, onActivity, large = fals
         maxLength={AI_MAX_MESSAGE_CHARS}
         enterKeyHint="send"
         aria-label={t("composer.label")}
-        placeholder={t("composer.placeholder")}
+        placeholder={t(doc ? "composer.documentPlaceholder" : "composer.placeholder")}
         className={cn(
           "block w-full resize-none bg-transparent px-5 text-base leading-6 text-slate-900 outline-none placeholder:text-slate-400 dark:text-white dark:placeholder:text-zinc-500",
           large ? "min-h-[3.75rem] pt-5 pb-1.5" : "min-h-[3rem] pt-3.5 pb-1",
@@ -314,7 +369,7 @@ export function ChatComposer({ phase, onSubmit, onStop, onActivity, large = fals
       />
 
       <div className="flex items-center gap-2 px-2.5 pb-2.5">
-        <input ref={fileRef} type="file" accept={ACCEPTED_IMAGE_TYPES.join(",")} className="hidden" tabIndex={-1} onChange={(event) => onFilePicked(event.target.files)} />
+        <input ref={fileRef} type="file" accept={FILE_ACCEPT} className="hidden" tabIndex={-1} onChange={(event) => onFilePicked(event.target.files)} />
         <button
           type="button"
           onClick={() => fileRef.current?.click()}
@@ -337,7 +392,7 @@ export function ChatComposer({ phase, onSubmit, onStop, onActivity, large = fals
           <button
             type="button"
             onClick={startVoice}
-            disabled={busy || preparing}
+            disabled={busy || preparing !== null}
             aria-label={t("voice.start")}
             title={t("voice.start")}
             data-voice-start

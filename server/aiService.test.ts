@@ -363,15 +363,14 @@ describe("model turn hygiene", () => {
     expect(JSON.stringify(buildContents(messages))).not.toContain("<svg");
   });
 
-  it("strips the illustration tag (and the marker after it) from resent model turns", () => {
+  it("strips legacy tags (schematic and illustration) and the marker from resent model turns", () => {
     const { messages } = sanitizeChatRequest({ messages: history("Types of machines: ...\n\n[GENERATE_IMAGE: Publication-grade technical illustration of machines, labeled]\n[[SIM:power]]") });
     expect(messages[1].content).toBe("Types of machines: ...");
   });
 
-  it("documents the illustration tag and keeps circuits on the schematic engine", () => {
+  it("keeps circuits on the schematic engine and no longer offers image generation", () => {
     const prompt = buildSystemInstruction("general");
-    expect(prompt).toMatch(/\[GENERATE_IMAGE: <prompt>\]/);
-    expect(prompt).toMatch(/NEVER the image tag/);
+    expect(prompt).not.toMatch(/GENERATE_|Illustrations \(/);
     expect(prompt).toMatch(/three-phase full-wave bridge has 6 diodes/);
     expect(prompt).toMatch(/polarity of every diode and SCR/);
   });

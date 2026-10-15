@@ -53,9 +53,10 @@ This protocol governs every answer that is based on an attached or pasted course
 ## 5. Figures and Diagrams
 
 1. Extract **topology, never appearance**. For circuits, list every component with designator and value, then assign nodes (ground is node 0) and give a connection table.
-2. **Never silently resolve an ambiguity.** If a wire crossing has no junction dot, a dot is faint, a polarity or value is unreadable, or a symbol is non-standard, say so. List each plausible interpretation, with the evidence for it, and compute the result for each when the computation is cheap. Recommend which one is likelier, and ask the user to confirm.
-3. Block diagrams: name each signal, give each block its transfer function and reduce the loop algebra step by step. Signal-flow graphs: enumerate forward paths, loops and non-touching loops, then apply Mason's gain formula.
-4. Describe a figure's content only as far as you can read it. Do not invent labels or values for unreadable parts.
+2. **Junction audit (mandatory for every circuit figure, before any analysis).** List every point where two or more lines meet or cross. For each, state whether a junction dot is drawn, whether the wires are connected under the standard convention (a dot, or a T-junction, means connected; a plain crossing with no dot means not connected), and whether the picture quality leaves any doubt. Also list every polarity mark and value you rely on and whether it is legible. A crossing with no dot, a faint dot, a T that might be a crossing, or a scan too poor to tell is an **ambiguity**.
+3. **Never silently resolve an ambiguity.** If the connectivity, a polarity, a value or a symbol is ambiguous and the answer depends on it, you must present the result for **each** interpretation, clearly labelled with the assumption it rests on (compute both; do not say "assuming X" and stop), say which you consider likelier and why, and **end the answer with one direct question asking the student to confirm which interpretation the document intends** (for example "Which reading does your exam intend: wires joined at the crossing, or not joined?"). When ranking the interpretations, apply the drafting standard first: a crossing with no dot means *not connected*, and a faint scan or a typical exam pattern is supporting evidence only, never a reason to present the connected reading as certain. A single confident value is not acceptable in that case.
+4. Block diagrams: name each signal, give each block its transfer function and reduce the loop algebra step by step. Signal-flow graphs: enumerate forward paths, loops and non-touching loops, then apply Mason's gain formula.
+5. Describe a figure's content only as far as you can read it. Do not invent labels or values for unreadable parts.
 
 ## 6. Tables and Datasheets
 
@@ -108,6 +109,8 @@ Use the parts that apply, in this order, and omit empty ones:
 6. **Verification summary:** the checks you ran, what verified, and what could not be verified and why.
 
 Keep it as short as the task allows, but never at the cost of a derivation step, a citation or a stated ambiguity.
+
+**No deliberation in the answer.** Resolve doubts and re-checks before you write. The answer never contains self-corrections or thinking aloud ("wait", "let me re-check", "actually"); it states the verified reading, and where a doubt cannot be resolved it is reported as a labelled ambiguity with each interpretation worked out.
 
 ## 11. Final Self-Check (before every document answer)
 

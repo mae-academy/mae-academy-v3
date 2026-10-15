@@ -1,4 +1,4 @@
-import { AI_HISTORY_WINDOW, splitImageTag, splitSimMarker, stripLegacySchematicTag, type AiStreamEvent, type ChatMessage, type LabContext } from "@shared/aiTypes";
+import { AI_HISTORY_WINDOW, splitSimMarker, stripLegacySchematicTag, type AiStreamEvent, type ChatDocument, type ChatMessage, type LabContext } from "@shared/aiTypes";
 
 import { stripSvgFences } from "./svgFence";
 
@@ -92,12 +92,15 @@ export function createSseParser(onEvent: (event: AiStreamEvent) => void): SsePar
  * empty turns folded away (a failed reply leaves two user turns in a row, which Gemini rejects), and only
  * the newest image kept (the server drops older ones anyway, so don't upload them again). The trailing
  * `[[SIM:<lab>]]` marker of earlier answers is UI plumbing, so it is stripped before it can reach the model.
+ * The ACTIVE document (the newest message in the whole thread whose bytes are in memory) rides on the last user message,
+ * so follow-ups keep it in context after the message that first carried it has left the window; every other message
+ * carries document metadata only. When the bytes are gone (after a reload) nothing is attached.
  */
 export function buildRequestMessages(messages: readonly ChatMessage[]): ChatMessage[] {
   const merged: ChatMessage[] = [];
   for (const original of messages.slice(-AI_HISTORY_WINDOW)) {
     // The simulator marker and a legacy schematic tag are UI plumbing, and legacy SVG diagrams are large: none of it goes back to the model. ```schematic specs stay (the model edits its own previous spec).
-    const message = original.role === "model" ? { ...original, content: stripSvgFences(stripLegacySchematicTag(splitImageTag(splitSimMarker(original.content).text).text)) } : original;
+    const message = original.role === "model" ? { ...original, content: stripSvgFences(stripLegacySchematicTag(splitSimMarker(stripLegacySchematicTag(original.content)).text)) } : original;
     if (message.role === "model" && !message.content.trim()) continue;
     const previous = merged[merged.length - 1];
     if (previous && previous.role === message.role) {
@@ -105,6 +108,7 @@ export function buildRequestMessages(messages: readonly ChatMessage[]): ChatMess
         ...message,
         content: [previous.content, message.content].filter(Boolean).join("\n\n"),
         imageUrl: message.imageUrl ?? previous.imageUrl,
+        ...(message.document ?? previous.document ? { document: message.document ?? previous.document } : {}),
       };
     } else {
       merged.push({ ...message });
@@ -115,10 +119,30 @@ export function buildRequestMessages(messages: readonly ChatMessage[]): ChatMess
   merged.forEach((message, index) => {
     if (message.imageUrl) newestImage = index;
   });
+  let activeDocument: ChatDocument | undefined;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const candidate = messages[i].document;
+    if (candidate?.dataUrl) {
+      activeDocument = candidate;
+      break;
+    }
+  }
+  let lastUser = -1;
+  merged.forEach((message, index) => {
+    if (message.role === "user") lastUser = index;
+  });
   return merged.map((message, index) => {
-    if (index === newestImage || !message.imageUrl) return message;
-    const { imageUrl: _dropped, ...rest } = message;
-    return rest;
+    let out: ChatMessage = message;
+    if (index !== newestImage && message.imageUrl) {
+      const { imageUrl: _dropped, ...rest } = message;
+      out = rest;
+    }
+    if (index === lastUser && activeDocument) return { ...out, document: activeDocument };
+    if (out.document?.dataUrl) {
+      const { dataUrl: _bytes, ...meta } = out.document;
+      return { ...out, document: meta };
+    }
+    return out;
   });
 }
 

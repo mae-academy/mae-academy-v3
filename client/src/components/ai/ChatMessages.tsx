@@ -6,6 +6,7 @@ import { splitSimMarker, stripLegacySchematicTag, type ChatMessage, type MascotS
 import PrefetchLink from "@/components/common/PrefetchLink";
 import { simulatorPathForLab } from "@/lib/aiLab";
 import AiMarkdown from "./AiMarkdown";
+import { DocumentBadge } from "./DocumentBadge";
 import MaiMascot from "./MaiMascot";
 import { MessageActions } from "./MessageActions";
 import { SchematicAutoRepairContext } from "./SchematicDiagram";
@@ -89,6 +90,12 @@ export const UserMessage = memo(function UserMessage({ message, onImageLoad }: O
       <div className="max-w-[88%] rounded-3xl bg-slate-100 px-4 py-2.5 text-slate-900 dark:bg-white/[0.08] dark:text-zinc-50 sm:max-w-[80%]">
         <span className="sr-only">{t("chat.you")}: </span>
         {message.imageUrl ? <img src={message.imageUrl} alt={t("chat.attachedImage")} onLoad={onImageLoad} className="mb-2 max-h-60 max-w-full rounded-2xl bg-white object-contain" /> : null}
+        {message.document ? (
+          <div className="mb-2 flex flex-col items-start gap-1">
+            <DocumentBadge document={message.document} className="bg-white dark:bg-white/[0.06]" />
+            {message.document.dataUrl ? null : <p dir="auto" className="text-xs text-slate-500 dark:text-zinc-400">{t("document.reattach")}</p>}
+          </div>
+        ) : null}
         {message.content ? <p dir="auto" className="whitespace-pre-wrap break-words text-start text-base leading-7">{message.content}</p> : null}
       </div>
       {message.content ? <MessageActions messageId={message.id} content={message.content} role="user" /> : null}

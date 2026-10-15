@@ -41,8 +41,8 @@ describe("document analysis protocol", () => {
     expect(DOCUMENT_ANALYSIS_RULES).not.toMatch(/zero[- ]error|99%|100% accura|guarantee/i);
   });
 
-  it("is not part of the live prompt yet (the chat has no document attachments)", () => {
-    expect(read("./aiService.ts")).not.toContain("DOCUMENT_ANALYSIS_RULES");
+  it("is wired into the live prompt only behind the hasDocument option", () => {
+    expect(read("./aiService.ts")).toMatch(/options\.hasDocument \? \[DOCUMENT_ANALYSIS_RULES/);
   });
 
   it("is small enough to append per request (about 3k tokens)", () => {

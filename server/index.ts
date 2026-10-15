@@ -5,7 +5,8 @@ import { fileURLToPath } from "url";
 import "dotenv/config";
 import { AiBlockedError, AiNotConfiguredError,AiRequestError, assertAiConfigured, generateCircuitAnalysis, mockChatStream, sanitizeChatRequest, streamChat } from "./aiService";
 import { schematicRepairHandler } from "./aiSchematic";
-import { generateImageHandler } from "./aiImage";
+import { chatBodyErrorHandler } from "./aiBodyErrors";
+import { createDocumentLimiter } from "./aiDocumentLimit";
 import type { AiStreamEvent } from "../shared/aiTypes";
 import { libraryCoverHandler } from "./libraryCover";
 import { libraryDoabHandler, libraryDoabItemHandler } from "./libraryDoab";
@@ -48,8 +49,6 @@ async function startServer() {
         ? "ai"
         : path === "/ai/schematic-repair"
         ? "ai-repair"
-        : path === "/ai/generate-image"
-        ? "ai-image"
         : /^\/(pdf-thumb|pdf-proxy|pdf-download|library\/cover)/.test(path)
         ? "assets"
         : "general";
@@ -133,10 +132,12 @@ async function startServer() {
     );
     res.status(response.status).type("application/json").send(await response.text());
   });
-  // MAE AI chat (SSE). Own JSON parser: the global 100kb default would reject schematic images.
+  // MAE AI chat (SSE). Own JSON parser: the global 100kb default would reject schematic images and PDFs.
+  // 12mb: a 6 MB PDF is ~8 MB of base64, plus history and a downsized image.
   const MAX_STREAMS_PER_IP = 2;
   const openStreams = new Map<string, number>();
-  app.post("/api/ai/chat", express.json({ limit: "4mb" }), async (req, res) => {
+  const documentLimiter = createDocumentLimiter(); // 3 requests carrying document bytes per minute per IP
+  app.post("/api/ai/chat", express.json({ limit: "12mb" }), async (req, res) => {
     let request;
     let mode;
     try {
@@ -159,6 +160,14 @@ async function startServer() {
     if (active >= MAX_STREAMS_PER_IP) {
       res.status(429).json({ error: "Too many open requests. Wait for the current answers to finish." });
       return;
+    }
+    if (request.document) {
+      const slot = documentLimiter.tryAcquire(ip);
+      if (!slot.ok) {
+        res.setHeader("Retry-After", String(Math.ceil(slot.retryAfterMs / 1000)));
+        res.status(429).json({ error: "You're sending documents too quickly. Wait a moment, then ask again." });
+        return;
+      }
     }
     openStreams.set(ip, active + 1);
     const abort = new AbortController();
@@ -221,11 +230,11 @@ async function startServer() {
     }
   });
 
+  // Oversized or malformed chat bodies: JSON `{ error }` instead of body-parser's HTML page.
+  app.use("/api/ai/chat", chatBodyErrorHandler);
+
   // Schematic auto-repair: small JSON body (a spec of at most 20k chars plus error messages), own tier and a per-IP concurrency cap of one.
   app.post("/api/ai/schematic-repair", express.json({ limit: "64kb" }), schematicRepairHandler);
-
-  // Illustration generation: tiny JSON body (a prompt), strict tier and a per-IP concurrency cap of one.
-  app.post("/api/ai/generate-image", express.json({ limit: "8kb" }), generateImageHandler);
 
   app.use(express.json());
 

@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { motion, useReducedMotion } from "framer-motion";
-import { FlaskConical, ImagePlus, PanelLeft, Sparkles, SquarePen, X } from "lucide-react";
+import { FileUp, FlaskConical, PanelLeft, Sparkles, SquarePen, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { toast } from "sonner";
 import type { LabContext, MascotState } from "@shared/aiTypes";
 import {
   AlertDialog,
@@ -21,7 +20,7 @@ import { ChatSidebar } from "./ChatSidebar";
 import { ChatTranscript } from "./ChatTranscript";
 import { MAI_LAYOUT_ID, MAI_LAYOUT_TRANSITION } from "./ChatMessages";
 import { loadSidebarOpen, saveSidebarOpen } from "./chatStorage";
-import { isAcceptedImageType } from "./imageUtils";
+import { classifyAttachment } from "./documentUtils";
 import MaiMascot from "./MaiMascot";
 import { SuggestionChips } from "./SuggestionChips";
 import { newId } from "./chatThreads";
@@ -137,10 +136,10 @@ export function ChatWorkspace({ lab, className }: ChatWorkspaceProps) {
   }, [mascot, runner]);
 
   /* ---- chat actions ---- */
-  const handleSubmit = ({ text, image }: ComposerSubmit) => {
+  const handleSubmit = ({ text, image, document }: ComposerSubmit) => {
     if (runner.active) return;
     stopSpeaking();
-    const message = { id: newId(), role: "user" as const, content: text, timestamp: Date.now(), ...(image ? { imageUrl: image } : {}) };
+    const message = { id: newId(), role: "user" as const, content: text, timestamp: Date.now(), ...(image ? { imageUrl: image } : {}), ...(document ? { document } : {}) };
     if (active.messages.length === 0) setHandoff(true);
     runner.send(active.id, [...active.messages, message]);
   };
@@ -202,12 +201,12 @@ export function ChatWorkspace({ lab, className }: ChatWorkspaceProps) {
     });
   };
 
-  /* ---- image drag and drop over the whole canvas ---- */
+  /* ---- file drag and drop over the whole canvas ---- */
   const carriesImage = (event: DragEvent) => {
     if (!Array.from(event.dataTransfer.types).includes("Files")) return false;
     const items = Array.from(event.dataTransfer.items ?? []);
     // Types are only exposed during the drag; an empty type is let through and validated on drop.
-    return items.length === 0 || items.some((item) => item.kind === "file" && (item.type === "" || item.type.startsWith("image/")));
+    return items.length === 0 || items.some((item) => item.kind === "file" && (item.type === "" || item.type.startsWith("image/") || item.type === "application/pdf" || item.type.startsWith("text/")));
   };
   const onDragEnter = (event: DragEvent) => {
     if (!carriesImage(event)) return;
@@ -231,9 +230,9 @@ export function ChatWorkspace({ lab, className }: ChatWorkspaceProps) {
     dragDepth.current = 0;
     setDragging(false);
     const files = Array.from(event.dataTransfer.files);
-    const file = files.find((f) => isAcceptedImageType(f.type));
+    // The first attachable file wins; with none, the composer explains why the first one was refused.
+    const file = files.find((f) => classifyAttachment(f) !== null) ?? files[0];
     if (file) void composerRef.current?.attachFile(file);
-    else if (files.length > 0) toast.error(t("image.type"));
   };
 
   const sidebar = (onClose?: () => void) => (
@@ -381,7 +380,7 @@ export function ChatWorkspace({ lab, className }: ChatWorkspaceProps) {
 
       {dragging ? (
         <div className="pointer-events-none absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 border-2 border-dashed border-violet-500 bg-violet-50/90 text-violet-800 backdrop-blur-sm dark:bg-violet-950/80 dark:text-violet-100" aria-hidden="true">
-          <ImagePlus className="h-10 w-10" />
+          <FileUp className="h-10 w-10" />
           <p className="text-base font-semibold">{t("chat.dropTitle")}</p>
           <p className="text-sm opacity-80">{t("chat.dropHint")}</p>
         </div>

@@ -58,8 +58,8 @@
     "copied": "Copied",
     "copyFailed": "Copy failed",
     "codeLabel": "Code",
-    "dropTitle": "Drop an image to attach it",
-    "dropHint": "PNG, JPEG or WebP"
+    "dropTitle": "Drop a file to attach it",
+    "dropHint": "Image, PDF, Markdown or text"
   },
   "actions": {
     "openSimulator": "Open in Interactive Simulator"
@@ -103,29 +103,6 @@
     "fitShort": "Fit",
     "lightboxHint": "Use the zoom buttons or the + and - keys to inspect the schematic. Press Escape to close."
   },
-  "illustration": {
-    "label": "Illustration",
-    "alt": "AI-generated illustration: {{prompt}}",
-    "generate": "Generate illustration",
-    "generating": "Generating illustration…",
-    "actions": "Illustration actions",
-    "expand": "Expand illustration",
-    "open": "Open illustration larger",
-    "download": "Download PNG",
-    "regenerate": "Regenerate",
-    "close": "Close",
-    "zoom": "Zoom",
-    "zoomIn": "Zoom in",
-    "zoomOut": "Zoom out",
-    "fit": "Fit to screen",
-    "fitShort": "Fit",
-    "lightboxHint": "Use the zoom buttons or the + and - keys to inspect the illustration. Press Escape to close.",
-    "disclaimer": "AI-generated illustration — verify against the explanation",
-    "downloadFailed": "The download could not be started.",
-    "unavailable": "Illustration generation isn't available right now",
-    "serviceHint": "The image service needs to be enabled before illustrations can be generated.",
-    "retry": "Retry"
-  },
   "demo": {
     "short": "Demo mode",
     "full": "Demo mode — add GEMINI_API_KEY for real answers",
@@ -145,11 +122,14 @@
     "placeholder": "Ask anything, or attach a schematic…",
     "send": "Send",
     "stop": "Stop",
-    "attach": "Attach image",
+    "attach": "Attach image or document",
     "removeImage": "Remove attached image",
     "preparing": "Preparing image…",
     "counter": "{{count}} / {{max}} characters",
-    "disclaimer": "AI can make mistakes. Verify results before relying on them."
+    "disclaimer": "AI can make mistakes. Verify results before relying on them.",
+    "removeAttachment": "Remove attachment",
+    "preparingDocument": "Reading file…",
+    "documentPlaceholder": "Ask a question about this document…"
   },
   "errors": {
     "rate_limit": "Too many requests. Please wait a minute and try again.",
@@ -197,5 +177,26 @@
     "source_too_large": "That image is too large (over 15 MB).",
     "decode": "That image could not be read.",
     "too_large": "That image is still too large after resizing. Try a smaller one."
+  },
+  "document": {
+    "replacedImage": "The document replaced the attached image. One attachment per message.",
+    "replacedByImage": "The image replaced the attached document. One attachment per message.",
+    "reattach": "Re-attach this file to ask more about it",
+    "suggestionsLabel": "Suggested questions about the document",
+    "prompts": {
+      "summarise": "Summarise this document",
+      "derivations": "Explain the derivations step by step",
+      "errors": "Check it for errors"
+    },
+    "errors": {
+      "type": "Only images, PDF, Markdown and plain text files can be attached.",
+      "office": "Word and PowerPoint files aren't supported yet — export to PDF and attach that.",
+      "empty": "That file is empty.",
+      "pdf_too_large": "That PDF is too large (over 6 MB).",
+      "text_too_large": "That text file is too large (over 200 KB).",
+      "invalid_pdf": "That file isn't a valid PDF.",
+      "invalid_text": "That file isn't readable UTF-8 text.",
+      "read": "That file could not be read."
+    }
   }
 }

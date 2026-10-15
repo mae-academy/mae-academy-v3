@@ -1,4 +1,4 @@
-import type { ChatMessage } from "@shared/aiTypes";
+import { AI_DOCUMENT_MIME_TYPES, type ChatDocument, type ChatMessage } from "@shared/aiTypes";
 import { MAX_THREADS, MAX_THREAD_MESSAGES, newId, type ChatThread } from "./chatThreads";
 
 /** Versioned so a future shape can migrate or discard old data instead of crashing on it. */
@@ -33,6 +33,22 @@ function isMessage(value: unknown): value is ChatMessage {
   return true;
 }
 
+/** Stored documents keep only their metadata: the bytes (`dataUrl`) are never persisted. Invalid metadata is dropped, not the message. */
+function cleanDocument(value: unknown): ChatDocument | undefined {
+  if (typeof value !== "object" || value === null) return undefined;
+  const d = value as Record<string, unknown>;
+  if (typeof d.name !== "string" || !d.name) return undefined;
+  if (!(AI_DOCUMENT_MIME_TYPES as readonly unknown[]).includes(d.mimeType)) return undefined;
+  if (typeof d.size !== "number" || !Number.isFinite(d.size) || d.size < 0) return undefined;
+  return { name: d.name, mimeType: d.mimeType as ChatDocument["mimeType"], size: d.size };
+}
+
+function withoutBytes(message: ChatMessage): ChatMessage {
+  if (!message.document?.dataUrl) return message;
+  const { dataUrl: _bytes, ...document } = message.document;
+  return { ...message, document };
+}
+
 /** Valid messages only, without interrupted (empty) model turns, capped to the newest MAX_THREAD_MESSAGES. */
 function cleanMessages(list: unknown): ChatMessage[] {
   if (!Array.isArray(list)) return [];
@@ -40,7 +56,10 @@ function cleanMessages(list: unknown): ChatMessage[] {
     .filter(isMessage)
     .filter((m) => m.role === "user" || m.content.trim() !== "")
     .slice(-MAX_THREAD_MESSAGES)
-    .map(({ id, role, content, imageUrl, timestamp }) => (imageUrl ? { id, role, content, imageUrl, timestamp } : { id, role, content, timestamp }));
+    .map(({ id, role, content, imageUrl, document, timestamp }) => {
+      const doc = cleanDocument(document);
+      return { id, role, content, ...(imageUrl ? { imageUrl } : {}), ...(doc ? { document: doc } : {}), timestamp };
+    });
 }
 
 function readJson(storage: StorageLike, key: string): unknown {
@@ -145,7 +164,7 @@ export type SaveResult = "saved" | "trimmed" | "failed";
 export function saveThreads(source: readonly ChatThread[], storage: StorageLike | null = defaultStorage()): SaveResult {
   if (!storage) return "failed";
   const prepared = source
-    .map((thread) => ({ ...thread, messages: thread.messages.filter((m) => m.role === "user" || m.content.trim() !== "").slice(-MAX_THREAD_MESSAGES) }))
+    .map((thread) => ({ ...thread, messages: thread.messages.filter((m) => m.role === "user" || m.content.trim() !== "").slice(-MAX_THREAD_MESSAGES).map(withoutBytes) }))
     .filter((thread) => thread.messages.length > 0)
     .sort((a, b) => b.updatedAt - a.updatedAt)
     .slice(0, MAX_THREADS);
