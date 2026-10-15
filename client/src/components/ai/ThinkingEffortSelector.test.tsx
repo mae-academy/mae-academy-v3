@@ -7,37 +7,38 @@ import { ThinkingEffortSelector } from "./ThinkingEffortSelector";
 
 afterEach(cleanup);
 
+const openMenu = () => fireEvent.keyDown(screen.getByRole("button", { name: /^Thinking:/ }), { key: "Enter" });
+
 describe("ThinkingEffortSelector", () => {
-  it("is a labelled radio group with Low / Med / High and exactly one selected", () => {
+  it("is a compact dropdown trigger that names the current level and explains it in a tooltip", () => {
     render(<ThinkingEffortSelector value="medium" onChange={() => {}} />);
-    expect(screen.getByRole("radiogroup", { name: "Thinking" })).toBeTruthy();
-    const radios = screen.getAllByRole("radio");
-    expect(radios.map((r) => r.textContent)).toEqual(["Low", "Med", "High"]);
-    expect(radios.map((r) => r.getAttribute("aria-checked"))).toEqual(["false", "true", "false"]);
+    const trigger = screen.getByRole("button", { name: "Thinking: Med" });
+    expect(trigger.getAttribute("title")).toBe("Recommended for engineering coursework");
+    expect(trigger.getAttribute("data-thinking-effort")).toBe("medium");
+    cleanup();
+    render(<ThinkingEffortSelector value="low" onChange={() => {}} />);
+    expect(screen.getByRole("button", { name: "Thinking: Low" }).getAttribute("title")).toBe("Fast answers, minimal reasoning tokens");
+    cleanup();
+    render(<ThinkingEffortSelector value="high" onChange={() => {}} />);
+    expect(screen.getByRole("button", { name: "Thinking: High" }).getAttribute("title")).toBe("Exhaustive step-by-step proofs & complex matrices");
   });
 
-  it("explains each level in its tooltip", () => {
+  it("opens a menu of Low / Med / High with exactly the current level checked, each with its hint", () => {
     render(<ThinkingEffortSelector value="medium" onChange={() => {}} />);
-    const title = (effort: string) => document.querySelector(`[data-thinking-effort="${effort}"]`)?.getAttribute("title");
-    expect(title("low")).toBe("Fast answers, minimal reasoning tokens");
-    expect(title("medium")).toBe("Recommended for engineering coursework");
-    expect(title("high")).toBe("Exhaustive step-by-step proofs & complex matrices");
+    openMenu();
+    const items = screen.getAllByRole("menuitemradio");
+    expect(items.map((i) => i.getAttribute("data-thinking-effort-option"))).toEqual(["low", "medium", "high"]);
+    expect(items.map((i) => i.getAttribute("aria-checked"))).toEqual(["false", "true", "false"]);
+    expect(items[0].textContent).toContain("Fast answers, minimal reasoning tokens");
+    expect(items[2].textContent).toContain("Exhaustive step-by-step proofs & complex matrices");
   });
 
-  it("reports the clicked level and supports arrow-key movement", () => {
+  it("reports the chosen level", () => {
     const onChange = vi.fn();
     render(<ThinkingEffortSelector value="medium" onChange={onChange} />);
-    fireEvent.click(screen.getByRole("radio", { name: "Thinking: High" }));
-    expect(onChange).toHaveBeenLastCalledWith("high");
-    fireEvent.keyDown(screen.getByRole("radio", { name: "Thinking: Med" }), { key: "ArrowRight" });
-    expect(onChange).toHaveBeenLastCalledWith("high");
-    fireEvent.keyDown(screen.getByRole("radio", { name: "Thinking: Med" }), { key: "ArrowLeft" });
-    expect(onChange).toHaveBeenLastCalledWith("low");
-  });
-
-  it("only the selected radio is in the tab order", () => {
-    render(<ThinkingEffortSelector value="high" onChange={() => {}} />);
-    expect(screen.getAllByRole("radio").map((r) => r.tabIndex)).toEqual([-1, -1, 0]);
+    openMenu();
+    fireEvent.click(screen.getByRole("menuitemradio", { name: /High/ }));
+    expect(onChange).toHaveBeenCalledWith("high");
   });
 });
 

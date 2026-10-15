@@ -4,6 +4,8 @@ import { stripSvgFences } from "./svgFence";
 
 export type ChatErrorKind =
   | "rate_limit"
+  | "cooling_down"
+  | "daily_limit"
   | "not_configured"
   | "forbidden"
   | "bad_request"
@@ -146,8 +148,8 @@ export function buildRequestMessages(messages: readonly ChatMessage[]): ChatMess
   });
 }
 
-function kindForStatus(status: number): ChatErrorKind {
-  if (status === 429) return "rate_limit";
+function kindForStatus(status: number, reason: string | null): ChatErrorKind {
+  if (status === 429) return reason === "model_cooldown" ? "cooling_down" : reason === "model_daily" ? "daily_limit" : "rate_limit";
   if (status === 503) return "not_configured";
   if (status === 403) return "forbidden";
   if (status === 400 || status === 413) return "bad_request";
@@ -190,7 +192,7 @@ export async function streamChat({ messages, lab, stepMode, thinkingEffort, sign
   if (!response.ok) {
     // Release the connection without reading the (untrusted) body.
     void response.body?.cancel().catch(() => undefined);
-    throw new ChatStreamError(kindForStatus(response.status));
+    throw new ChatStreamError(kindForStatus(response.status, response.headers.get("x-mae-ai-reason")));
   }
   if (!response.body) throw new ChatStreamError("upstream");
   onMode?.(response.headers.get("X-MAE-AI-Mode") === "mock" ? "mock" : "live");

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { motion, useReducedMotion } from "framer-motion";
-import { FileUp, FlaskConical, ListOrdered, PanelLeft, Sparkles, SquarePen, X } from "lucide-react";
+import { FileUp, FlaskConical, PanelLeft, Sparkles, SquarePen, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { LabContext, MascotState, ThinkingEffort } from "@shared/aiTypes";
 import {
@@ -20,7 +20,6 @@ import { ChatSidebar } from "./ChatSidebar";
 import { ChatTranscript } from "./ChatTranscript";
 import { MAI_LAYOUT_ID, MAI_LAYOUT_TRANSITION } from "./ChatMessages";
 import { loadSidebarOpen, loadStepMode, loadThinkingEffort, saveSidebarOpen, saveStepMode, saveThinkingEffort } from "./chatStorage";
-import { ThinkingEffortSelector } from "./ThinkingEffortSelector";
 import { classifyAttachment } from "./documentUtils";
 import MaiMascot from "./MaiMascot";
 import { PlotFixContext } from "./PlotCard";
@@ -49,7 +48,7 @@ export interface ChatWorkspaceProps {
 function DemoNotice({ onDismiss }: { onDismiss: () => void }) {
   const { t } = useTranslation("ai");
   return (
-    <div role="status" className="inline-flex min-h-8 max-w-full items-center gap-1.5 rounded-full border border-amber-300/70 bg-amber-50 ps-3 pe-1 text-xs font-medium text-amber-900 dark:border-amber-400/25 dark:bg-amber-400/10 dark:text-amber-100">
+    <div role="status" className="inline-flex min-h-8 max-w-full items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 ps-3 pe-1 text-xs font-medium text-blue-900 dark:border-blue-400/25 dark:bg-blue-950/40 dark:text-blue-100">
       <FlaskConical className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
       <span className="truncate sm:hidden">{t("demo.short")}</span>
       <span className="hidden truncate sm:inline">{t("demo.full")}</span>
@@ -57,39 +56,11 @@ function DemoNotice({ onDismiss }: { onDismiss: () => void }) {
         type="button"
         onClick={onDismiss}
         aria-label={t("demo.dismiss")}
-        className={cn("relative flex h-6 w-6 shrink-0 items-center justify-center rounded-full hover:bg-amber-200/60 before:absolute before:-inset-2.5 before:content-[''] dark:hover:bg-amber-300/15", FOCUS)}
+        className={cn("relative flex h-6 w-6 shrink-0 items-center justify-center rounded-full hover:bg-blue-200/60 before:absolute before:-inset-2.5 before:content-[''] dark:hover:bg-blue-300/15", FOCUS)}
       >
         <X className="h-3.5 w-3.5" aria-hidden="true" />
       </button>
     </div>
-  );
-}
-
-/** Step-by-step guidance switch: full label from sm up, a compact icon + state on phones. */
-function StepModeSwitch({ on, onToggle }: { on: boolean; onToggle: () => void }) {
-  const { t } = useTranslation("ai");
-  const state = t(on ? "stepMode.on" : "stepMode.off");
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={on}
-      aria-label={t("stepMode.label", { state })}
-      title={t("stepMode.hint")}
-      onClick={onToggle}
-      data-step-mode-switch
-      className={cn(
-        "inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition-colors sm:min-h-9",
-        on
-          ? "border-violet-400 bg-violet-100 text-violet-900 dark:border-violet-400/50 dark:bg-violet-500/20 dark:text-violet-100"
-          : "border-slate-200 bg-white text-slate-600 hover:bg-slate-100 dark:border-white/[0.12] dark:bg-transparent dark:text-zinc-300 dark:hover:bg-white/[0.08]",
-        FOCUS,
-      )}
-    >
-      <ListOrdered className="h-4 w-4 shrink-0" aria-hidden="true" />
-      <span aria-hidden="true" className="sm:hidden">{t("stepMode.short", { state })}</span>
-      <span aria-hidden="true" className="hidden sm:inline">{t("stepMode.label", { state })}</span>
-    </button>
   );
 }
 
@@ -384,8 +355,6 @@ export function ChatWorkspace({ lab, className }: ChatWorkspaceProps) {
             {t("page.title")}
           </span>
           <div className="min-w-0 flex-1" />
-          <ThinkingEffortSelector value={thinkingEffort} onChange={changeThinkingEffort} />
-          <StepModeSwitch on={stepMode} onToggle={toggleStepMode} />
           {runner.mode === "mock" && !demoDismissed ? <DemoNotice onDismiss={() => setDemoDismissed(true)} /> : null}
           {showTopNewChat ? (
             <button type="button" onClick={handleNewChat} aria-label={t("sidebar.newChat")} title={t("sidebar.newChat")} className={ICON_BUTTON}>
@@ -443,6 +412,10 @@ export function ChatWorkspace({ lab, className }: ChatWorkspaceProps) {
               onStop={runner.stop}
               onActivity={mascot.onInputActivity}
               onEditChange={setEditingId}
+              thinkingEffort={thinkingEffort}
+              onThinkingEffortChange={changeThinkingEffort}
+              stepMode={stepMode}
+              onToggleStepMode={toggleStepMode}
             />
             {!isEmpty ? <p className="mt-2 text-center text-xs text-slate-500 dark:text-zinc-500">{t("composer.disclaimer")}</p> : null}
           </motion.div>

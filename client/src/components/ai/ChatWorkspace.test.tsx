@@ -57,13 +57,14 @@ describe("ChatWorkspace thinking effort", () => {
 
   it("sends medium by default, then the chosen level, and remembers it in mae_thinking_effort", async () => {
     render(<ChatWorkspace lab="general" />);
-    expect(screen.getByRole("radio", { name: "Thinking: Med" }).getAttribute("aria-checked")).toBe("true");
+    expect(screen.getByRole("button", { name: "Thinking: Med" })).toBeTruthy();
     typeInComposer("first");
     send();
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
     expect(bodyEffort()).toBe("medium");
 
-    fireEvent.click(screen.getByRole("radio", { name: "Thinking: High" }));
+    fireEvent.keyDown(screen.getByRole("button", { name: "Thinking: Med" }), { key: "Enter" });
+    fireEvent.click(screen.getByRole("menuitemradio", { name: /High/ }));
     expect(localStorage.getItem("mae_thinking_effort")).toBe("high");
     await screen.findByText(/Kirchhoff/);
     typeInComposer("second");
@@ -75,7 +76,7 @@ describe("ChatWorkspace thinking effort", () => {
   it("restores the saved level on the next visit", () => {
     localStorage.setItem("mae_thinking_effort", "low");
     render(<ChatWorkspace lab="general" />);
-    expect(screen.getByRole("radio", { name: "Thinking: Low" }).getAttribute("aria-checked")).toBe("true");
+    expect(screen.getByRole("button", { name: "Thinking: Low" })).toBeTruthy();
   });
 });
 

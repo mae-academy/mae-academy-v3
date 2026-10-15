@@ -50,7 +50,7 @@ export function MathKeyboardToggle({ open, panelId, onToggle }: MathKeyboardTogg
       data-math-keyboard-toggle
       className={cn(
         "flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-blue-600 dark:text-zinc-400 dark:hover:bg-white/[0.08] dark:hover:text-white",
-        open && "bg-violet-100 text-violet-900 dark:bg-violet-500/20 dark:text-violet-100",
+        open && "bg-gradient-to-r from-blue-600/15 via-indigo-600/15 to-violet-600/15 text-blue-800 ring-1 ring-blue-500/30 dark:from-blue-500/25 dark:via-indigo-500/25 dark:to-violet-500/25 dark:text-blue-100 dark:ring-blue-400/30",
       )}
     >
       <span aria-hidden="true" dir="ltr">
@@ -145,7 +145,7 @@ export function MathKeyboard({ open, id, onInsert, onClose, tooLong }: MathKeybo
                     className={cn(
                       "min-h-10 shrink-0 whitespace-nowrap rounded-full px-3.5 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-blue-600",
                       selected
-                        ? "bg-violet-600 text-white shadow-sm dark:bg-violet-500"
+                        ? "bg-gradient-to-r from-blue-600/20 via-indigo-600/20 to-violet-600/20 text-blue-800 shadow-sm ring-1 ring-blue-500/30 backdrop-blur-sm dark:from-blue-500/30 dark:via-indigo-500/30 dark:to-violet-500/30 dark:text-blue-50 dark:ring-blue-400/35"
                         : "text-slate-600 hover:bg-slate-200/70 dark:text-zinc-300 dark:hover:bg-white/[0.08]",
                     )}
                   >
@@ -173,7 +173,7 @@ export function MathKeyboard({ open, id, onInsert, onClose, tooLong }: MathKeybo
                       aria-label={name}
                       title={name}
                       data-key-id={item.id}
-                      className="flex min-h-11 min-w-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white px-1.5 py-1 text-[0.95rem] text-slate-900 shadow-sm transition-[transform,background-color,border-color] hover:border-violet-300 hover:bg-violet-50 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-blue-600 active:scale-95 active:bg-violet-100 dark:border-white/[0.1] dark:bg-[#1c1c22] dark:text-white dark:hover:border-violet-400/50 dark:hover:bg-violet-500/15 dark:active:bg-violet-500/25"
+                      className="flex min-h-11 min-w-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white px-1.5 py-1 text-[0.95rem] text-slate-900 shadow-sm transition-[transform,background-color,border-color] hover:border-blue-300 hover:bg-gradient-to-br hover:from-blue-50 hover:to-violet-50 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-blue-600 active:scale-95 active:from-blue-100 active:to-violet-100 dark:border-white/[0.1] dark:bg-[#1c1c22] dark:text-white dark:hover:border-blue-400/50 dark:hover:from-blue-500/20 dark:hover:to-violet-500/20 dark:active:from-blue-500/30 dark:active:to-violet-500/30"
                     >
                       <span aria-hidden="true" className="pointer-events-none max-w-full">
                         <KatexMath math={item.face} />

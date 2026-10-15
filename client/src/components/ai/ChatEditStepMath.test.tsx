@@ -224,18 +224,18 @@ describe("inline math in the composer and rendered user bubbles", () => {
 });
 
 describe("step-by-step guidance", () => {
-  const toggle = () => screen.getByRole("switch", { name: /Step-by-step guidance/ });
+  const toggle = () => screen.getByRole("switch", { name: /Step Guidance/ });
 
   it("is an accessible switch, off by default, persisted, and sends the flag only while on", async () => {
     render(<ChatWorkspace lab="general" />);
     expect(toggle().getAttribute("aria-checked")).toBe("false");
-    expect(toggle().getAttribute("aria-label")).toBe("Step-by-step guidance: OFF");
+    expect(toggle().getAttribute("aria-label")).toBe("Step Guidance: OFF");
     await turn("first", /Answer 1\./);
     expect(bodies(fetchMock)[0]).not.toHaveProperty("stepMode");
 
     fireEvent.click(toggle());
     expect(toggle().getAttribute("aria-checked")).toBe("true");
-    expect(toggle().getAttribute("aria-label")).toBe("Step-by-step guidance: ON");
+    expect(toggle().getAttribute("aria-label")).toBe("Step Guidance: ON");
     expect(localStorage.getItem("mae-ai:step-mode:v1")).toBe("on");
     await turn("second", /Answer 2\./);
     expect(bodies(fetchMock)[1].stepMode).toBe(true);

@@ -127,9 +127,9 @@ function InteractiveParameterSliderImpl({ code }: InteractiveParameterSliderProp
   if (!parsed.ok) {
     return (
       <figure className="my-4">
-        <div role="alert" className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-100">
+        <div role="alert" className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900 dark:border-blue-400/25 dark:bg-blue-950/40 dark:text-blue-100">
           <p className="flex items-center gap-1.5 font-semibold">
-            <TriangleAlert className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-300" aria-hidden="true" />
+            <TriangleAlert className="h-4 w-4 shrink-0 text-blue-600 dark:text-blue-200" aria-hidden="true" />
             {t("params.errorTitle")}
           </p>
           <ul dir="auto" className="mt-1 list-disc space-y-0.5 ps-5 text-xs">

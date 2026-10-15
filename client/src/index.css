@@ -1384,3 +1384,28 @@ html[dir="rtl"] .math-expression-display {
 .mae-ai-code .tok-macroName { color: var(--tok-meta); }
 .mae-ai-code .tok-punctuation,
 .mae-ai-code .tok-operator { color: var(--tok-punct); }
+
+/* MAE AI plot loading skeleton: engineering grid + a soft sweeping shimmer. Motion only when the user has not asked for less. */
+.mae-plot-grid {
+  background-image:
+    linear-gradient(to right, rgb(37 99 235 / 0.10) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(37 99 235 / 0.10) 1px, transparent 1px),
+    linear-gradient(to right, rgb(124 58 237 / 0.06) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(124 58 237 / 0.06) 1px, transparent 1px);
+  background-size: 48px 48px, 48px 48px, 12px 12px, 12px 12px;
+  mask-image: radial-gradient(ellipse at center, black 35%, transparent 85%);
+}
+.dark .mae-plot-grid {
+  background-image:
+    linear-gradient(to right, rgb(96 165 250 / 0.12) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(96 165 250 / 0.12) 1px, transparent 1px),
+    linear-gradient(to right, rgb(167 139 250 / 0.07) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(167 139 250 / 0.07) 1px, transparent 1px);
+}
+@keyframes mae-plot-shimmer {
+  0% { transform: translateX(-130%) skewX(-18deg); }
+  100% { transform: translateX(330%) skewX(-18deg); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .mae-plot-shimmer { animation: mae-plot-shimmer 2.2s ease-in-out infinite; }
+}

@@ -63,6 +63,10 @@ describe("PlotCard", () => {
     expect(run).toHaveBeenCalledTimes(1);
     expect(screen.getByRole("status").textContent).toMatch(/Starting the plot engine/);
     expect(screen.getByRole("status").textContent).toMatch(/20.30 MB/);
+    // Premium loading skeleton: engineering grid + shimmer, with the headline label.
+    expect(screen.getByRole("status").textContent).toMatch(/Synthesizing high-resolution analytical plot\.\.\./);
+    expect(container.querySelector("[data-plot-skeleton] .mae-plot-grid")).toBeTruthy();
+    expect(container.querySelector("[data-plot-skeleton] .mae-plot-shimmer")).toBeTruthy();
 
     act(() => pending[0].options.onProgress?.("numpy" as PlotStage));
     expect(screen.getByRole("status").textContent).toMatch(/Loading NumPy/);

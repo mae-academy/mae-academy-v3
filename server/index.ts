@@ -3,7 +3,7 @@ import { createServer } from "http";
 import path from "path";
 import { fileURLToPath } from "url";
 import "dotenv/config";
-import { AiBlockedError, AiNotConfiguredError,AiRequestError, assertAiConfigured, generateCircuitAnalysis, mockChatStream, sanitizeChatRequest, streamChat } from "./aiService";
+import { AiBlockedError, AiNotConfiguredError, AiRateLimitError, AiRequestError, assertAiConfigured, generateCircuitAnalysis, mockChatStream, sanitizeChatRequest, streamChat } from "./aiService";
 import { schematicRepairHandler } from "./aiSchematic";
 import { chatBodyErrorHandler } from "./aiBodyErrors";
 import { createDocumentLimiter } from "./aiDocumentLimit";
@@ -217,6 +217,19 @@ async function startServer() {
           res.end();
         } else {
           res.status(422).json({ error: error.message });
+        }
+        return;
+      }
+      if (error instanceof AiRateLimitError) {
+        // Upstream quota: a calm, fixed message and a machine-readable reason (the body is never shown, the header picks the client copy).
+        console.warn(`MAE AI upstream rate limit (${error.kind}${error.retryAfterSeconds ? `, retry in ${error.retryAfterSeconds}s` : ""})`);
+        if (started) {
+          send({ type: "error", message: error.message });
+          res.end();
+        } else {
+          res.setHeader("X-MAE-AI-Reason", error.kind === "daily" ? "model_daily" : "model_cooldown");
+          if (error.kind === "cooldown") res.setHeader("Retry-After", String(error.retryAfterSeconds ?? 10));
+          res.status(429).json({ error: error.message });
         }
         return;
       }

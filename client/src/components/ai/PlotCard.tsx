@@ -1,4 +1,4 @@
-import { createContext, memo, useCallback, useContext, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { createContext, memo, useCallback, useContext, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { ChartLine, Code2, ImageDown, Loader2, Maximize2, Play, TriangleAlert, Wrench, X, ZoomIn, ZoomOut } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -30,10 +30,23 @@ const cardShell = "my-4 overflow-hidden rounded-2xl bg-slate-50 ring-1 ring-slat
 
 function SkeletonPlot() {
   return (
-    <svg aria-hidden="true" viewBox="0 0 160 60" className="h-16 w-40 text-slate-300 motion-safe:animate-pulse dark:text-zinc-600" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M8 6v48h144" />
+    <svg aria-hidden="true" viewBox="0 0 160 60" className="h-16 w-40 text-blue-500/70 motion-safe:animate-pulse dark:text-blue-300/60" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M8 6v48h144" className="text-slate-400 dark:text-zinc-500" />
       <path d="M14 44c14-34 22-34 34-6s22 22 34-4 24-18 36-12 14 4 24 0" />
     </svg>
+  );
+}
+
+/** Loading skeleton for a plot: engineering grid, soft blue/violet glow, a sweeping shimmer, and the content centered on top. */
+function ShimmerShell({ children }: { children: ReactNode }) {
+  return (
+    <div role="status" aria-live="polite" data-plot-skeleton className="relative isolate my-4 overflow-hidden rounded-2xl bg-slate-50 ring-1 ring-blue-200/70 dark:bg-white/[0.04] dark:ring-blue-400/20">
+      <div aria-hidden="true" className="mae-plot-grid absolute inset-0 -z-10" />
+      <div aria-hidden="true" className="absolute -top-12 start-[18%] -z-10 size-44 rounded-full bg-blue-500/25 blur-3xl motion-safe:animate-pulse dark:bg-blue-500/20" />
+      <div aria-hidden="true" className="absolute -bottom-14 end-[18%] -z-10 size-44 rounded-full bg-violet-500/25 blur-3xl motion-safe:animate-pulse [animation-delay:700ms] dark:bg-violet-500/20" />
+      <div aria-hidden="true" className="mae-plot-shimmer absolute inset-y-0 start-0 -z-10 w-1/3 bg-gradient-to-r from-transparent via-white/60 to-transparent dark:via-white/10" />
+      {children}
+    </div>
   );
 }
 
@@ -41,34 +54,36 @@ function SkeletonPlot() {
 export function PlotPending() {
   const { t } = useTranslation("ai");
   return (
-    <div role="status" aria-live="polite" className={cardShell}>
+    <ShimmerShell>
       <div className="flex h-44 flex-col items-center justify-center gap-4 sm:h-52">
         <SkeletonPlot />
-        <p className="flex items-center gap-2 text-sm font-medium text-slate-500 dark:text-zinc-400">
-          <ChartLine className="h-4 w-4 motion-safe:animate-pulse" aria-hidden="true" />
+        <p className="flex items-center gap-2 text-sm font-medium text-slate-600 dark:text-zinc-300">
+          <ChartLine className="h-4 w-4 text-blue-600 motion-safe:animate-pulse dark:text-blue-300" aria-hidden="true" />
           {t("plot.preparing")}
         </p>
       </div>
-    </div>
+    </ShimmerShell>
   );
 }
 
+/** Shown while the Python runtime loads and the script runs. */
 function LoadingCard({ stage }: { stage: PlotStage | null }) {
   const { t } = useTranslation("ai");
   const visible = PLOT_STAGES.filter((s) => s !== "scipy" || stage === "scipy");
   const index = stage ? visible.indexOf(stage) : -1;
   return (
-    <div role="status" aria-live="polite" className={cardShell}>
+    <ShimmerShell>
       <div className="flex min-h-44 flex-col items-center justify-center gap-3 px-4 py-6 text-center sm:min-h-52">
         <SkeletonPlot />
-        <p className="flex items-center gap-2 text-sm font-medium text-slate-600 dark:text-zinc-300">
-          <Loader2 className="h-4 w-4 motion-safe:animate-spin" aria-hidden="true" />
+        <p className="text-sm font-semibold text-slate-800 dark:text-zinc-100">{t("plot.synthesizing")}</p>
+        <p className="flex items-center gap-2 text-xs font-medium text-slate-600 dark:text-zinc-300">
+          <Loader2 className="h-3.5 w-3.5 text-blue-600 motion-safe:animate-spin dark:text-blue-300" aria-hidden="true" />
           {stage ? t(`plot.stage.${stage}`) : t("plot.waiting")}
-          {index >= 0 ? <span className="text-xs font-normal text-slate-500 dark:text-zinc-400">{t("plot.step", { n: index + 1, total: visible.length })}</span> : null}
+          {index >= 0 ? <span className="font-normal text-slate-500 dark:text-zinc-400">{t("plot.step", { n: index + 1, total: visible.length })}</span> : null}
         </p>
         <p className="max-w-md text-xs text-slate-500 dark:text-zinc-400">{t("plot.loadingHint")}</p>
       </div>
-    </div>
+    </ShimmerShell>
   );
 }
 
@@ -282,20 +297,20 @@ function PlotCardImpl({ code }: PlotCardProps) {
     const fixText = t("plot.fixPrompt", { error: detail });
     return (
       <figure className="my-4">
-        <div role="alert" className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-100">
+        <div role="alert" className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900 dark:border-blue-400/25 dark:bg-blue-950/40 dark:text-blue-100">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
             <p className="flex min-w-0 flex-1 items-center gap-1.5 font-semibold">
-              <TriangleAlert className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-300" aria-hidden="true" />
+              <TriangleAlert className="h-4 w-4 shrink-0 text-blue-600 dark:text-blue-200" aria-hidden="true" />
               {t(`plot.error.${error.kind}`)}
             </p>
             {error.kind === "load" || error.kind === "timeout" || error.kind === "internal" ? (
-              <button type="button" className={cn(pillButton, "border-amber-400 bg-white text-amber-950 hover:bg-amber-100 sm:min-h-9")} onClick={() => begin(code)}>
+              <button type="button" className={cn(pillButton, "border-blue-300 bg-white text-blue-900 hover:bg-blue-100 sm:min-h-9")} onClick={() => begin(code)}>
                 <Play className="h-4 w-4" aria-hidden="true" />
                 {t("plot.retry")}
               </button>
             ) : null}
             {askFix ? (
-              <button type="button" className={cn(pillButton, "border-amber-400 bg-white text-amber-950 hover:bg-amber-100 sm:min-h-9")} onClick={() => askFix(fixText)}>
+              <button type="button" className={cn(pillButton, "border-blue-300 bg-white text-blue-900 hover:bg-blue-100 sm:min-h-9")} onClick={() => askFix(fixText)}>
                 <Wrench className="h-4 w-4" aria-hidden="true" />
                 {t("plot.askFix")}
               </button>
@@ -328,7 +343,7 @@ function PlotCardImpl({ code }: PlotCardProps) {
       {warnings.length > 0 ? (
         <details className="mt-2 text-xs text-slate-600 dark:text-zinc-300">
           <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 px-1 font-medium marker:hidden sm:min-h-8 [&::-webkit-details-marker]:hidden">
-            <TriangleAlert className="h-3.5 w-3.5 text-amber-600" aria-hidden="true" />
+            <TriangleAlert className="h-3.5 w-3.5 text-blue-600" aria-hidden="true" />
             {t("plot.warnings", { count: warnings.length })}
           </summary>
           <ul dir="ltr" className="list-disc space-y-0.5 ps-5 font-mono">

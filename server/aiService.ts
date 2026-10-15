@@ -92,6 +92,40 @@ export class AiBlockedError extends Error {
   }
 }
 
+/**
+ * Gemini answered 429. `cooldown` is a per-minute limit that clears in seconds; `daily` is a per-day quota that will not
+ * clear soon. The route maps it to HTTP 429 plus an `X-MAE-AI-Reason` header, and the client shows localized copy for each.
+ */
+export const AI_COOLDOWN_MESSAGE = "The reasoning engine is cooling down. Please try again in a few seconds.";
+export const AI_DAILY_LIMIT_MESSAGE = "MAE AI has reached its usage limit for now. Please try again later.";
+export class AiRateLimitError extends Error {
+  constructor(readonly kind: "cooldown" | "daily", readonly retryAfterSeconds?: number) {
+    super(kind === "daily" ? AI_DAILY_LIMIT_MESSAGE : AI_COOLDOWN_MESSAGE);
+    this.name = "AiRateLimitError";
+  }
+}
+
+/** "14h51m12.4s", "49.69s" or "37s" (as Gemini words its retry hints) to seconds; undefined when there is no hint. */
+export function parseRetryDelaySeconds(text: string): number | undefined {
+  const match = /(?:retry(?:Delay)?\D{0,12}?)(\d+(?:\.\d+)?h)?(\d+(?:\.\d+)?m)?(\d+(?:\.\d+)?s)/i.exec(text);
+  if (!match || (!match[1] && !match[2] && !match[3])) return undefined;
+  const part = (value?: string) => (value ? Number.parseFloat(value) : 0);
+  return Math.ceil(part(match[1]) * 3600 + part(match[2]) * 60 + part(match[3]));
+}
+
+/** The rate-limit view of an upstream failure, or null when it is something else. */
+export function classifyRateLimit(error: unknown): AiRateLimitError | null {
+  const status = (error as { status?: unknown; code?: unknown } | null)?.status ?? (error as { code?: unknown } | null)?.code;
+  const text = String((error as { message?: unknown } | null)?.message ?? "");
+  if (status !== 429 && !/RESOURCE_EXHAUSTED|"code":\s*429/.test(text)) return null;
+  const seconds = parseRetryDelaySeconds(text);
+  if (/PerDay/i.test(text) || (seconds !== undefined && seconds > 600)) return new AiRateLimitError("daily", seconds);
+  return new AiRateLimitError("cooldown", seconds);
+}
+
+/** A per-minute cooldown that clears within this many seconds is waited out once, silently, before the student sees anything. */
+const MAX_COOLDOWN_WAIT_SECONDS = 20;
+
 const IMAGE_URL = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/]*={0,2})$/;
 
 /** An attachment whose bytes passed validation. PDFs keep their base64 (it goes to Gemini as `inlineData`); text becomes a string. */
@@ -558,7 +592,7 @@ export const MODEL_NAME = process.env.GEMINI_MODEL?.trim() || DEFAULT_MODEL;
  * Thinking budget in tokens per effort level (Gemini `thinkingConfig.thinkingBudget`). Thinking tokens count against
  * `maxOutputTokens`, so the output cap is the answer allowance plus the budget; otherwise a deep think could starve the answer.
  */
-export const THINKING_BUDGETS: Readonly<Record<ThinkingEffort, number>> = { low: 1024, medium: 4096, high: 16384 };
+export const THINKING_BUDGETS: Readonly<Record<ThinkingEffort, number>> = { low: 0, medium: 2048, high: 8192 };
 const ANSWER_TOKEN_ALLOWANCE = 16384;
 
 export function thinkingSettings(effort: ThinkingEffort): { thinkingConfig: { thinkingBudget: number }; maxOutputTokens: number } {
@@ -650,24 +684,41 @@ export function chunkText(chunk: { candidates?: { content?: { parts?: { text?: s
 export async function* streamChat(request: SanitizedChat, signal?: AbortSignal): AsyncGenerator<string> {
   const models = modelChain();
   const client = getGeminiClient();
-  const stream = await withModelFallback(
-    models,
-    (model) =>
-      client.models.generateContentStream({
-        model,
-        contents: buildContents(request.messages),
-        config: {
-          systemInstruction: buildSystemInstruction(request.lab, { hasDocument: request.hasDocument, stepMode: request.stepMode, hasImage: request.hasImage }),
-          temperature: 0.3,
-          // Thinking budget by effort; the output cap includes it (see THINKING_BUDGETS).
-          ...thinkingSettings(request.thinkingEffort),
-          safetySettings: [...SAFETY_SETTINGS],
-          ...(codeExecutionEnabled() ? { tools: [{ codeExecution: {} }] } : {}),
-          abortSignal: signal,
-        },
-      }),
-    { signal },
-  );
+  const open = () =>
+    withModelFallback(
+      models,
+      (model) =>
+        client.models.generateContentStream({
+          model,
+          contents: buildContents(request.messages),
+          config: {
+            systemInstruction: buildSystemInstruction(request.lab, { hasDocument: request.hasDocument, stepMode: request.stepMode, hasImage: request.hasImage }),
+            temperature: 0.3,
+            // Thinking budget by effort; the output cap includes it (see THINKING_BUDGETS).
+            ...thinkingSettings(request.thinkingEffort),
+            safetySettings: [...SAFETY_SETTINGS],
+            ...(codeExecutionEnabled() ? { tools: [{ codeExecution: {} }] } : {}),
+            abortSignal: signal,
+          },
+        }),
+      { signal },
+    );
+  let stream: Awaited<ReturnType<typeof open>>;
+  try {
+    stream = await open();
+  } catch (error) {
+    const limit = classifyRateLimit(error);
+    if (!limit) throw error;
+    // A short per-minute cooldown is waited out once, invisibly; a daily quota or a longer wait goes straight to the student.
+    if (limit.kind !== "cooldown" || (limit.retryAfterSeconds ?? 5) > MAX_COOLDOWN_WAIT_SECONDS || signal?.aborted) throw limit;
+    await new Promise<void>((resolve) => setTimeout(resolve, (limit.retryAfterSeconds ?? 5) * 1000 + 250));
+    if (signal?.aborted) throw limit;
+    try {
+      stream = await open();
+    } catch (again) {
+      throw classifyRateLimit(again) ?? again;
+    }
+  }
   let produced = false;
   let blocked: string | undefined;
   for await (const chunk of stream) {

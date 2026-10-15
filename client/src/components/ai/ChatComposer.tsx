@@ -2,7 +2,7 @@ import { useCallback, useEffect, useId, useImperativeHandle, useRef, useState, t
 import { ArrowUp, Mic, Paperclip, Pencil, Square, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
-import { AI_MAX_MESSAGE_CHARS, type ChatDocument } from "@shared/aiTypes";
+import { AI_MAX_MESSAGE_CHARS, type ChatDocument, type ThinkingEffort } from "@shared/aiTypes";
 import { cn } from "@/lib/utils";
 import { DocumentBadge } from "./DocumentBadge";
 import { DocumentError, classifyAttachment, prepareDocumentForChat, unsupportedKind } from "./documentUtils";
@@ -12,6 +12,8 @@ import { MathKeyboard, MathKeyboardToggle } from "./MathKeyboard";
 import type { MathKey } from "./mathKeyboardData";
 import type { RunPhase } from "./useChatRunner";
 import { useVoiceInput } from "./useVoiceInput";
+import { StepModeSwitch } from "./StepModeSwitch";
+import { ThinkingEffortSelector } from "./ThinkingEffortSelector";
 import { VoiceWaveform } from "./VoiceWaveform";
 import { acceptVoiceNotice, formatElapsed, hasAcceptedVoiceNotice, isVoiceInputSupported, joinText, recognitionLang, truncateTranscript } from "./voiceInput";
 
@@ -64,12 +66,18 @@ export interface ChatComposerProps {
   onEditChange?: (id: string | null) => void;
   /** The larger, centered variant used on the empty state. */
   large?: boolean;
+  /** Reasoning depth dropdown; shown only when both the value and its change handler are given. */
+  thinkingEffort?: ThinkingEffort;
+  onThinkingEffortChange?: (next: ThinkingEffort) => void;
+  /** Step-by-step guidance pill; shown only when the toggle handler is given. */
+  stepMode?: boolean;
+  onToggleStepMode?: () => void;
   className?: string;
   ref?: Ref<ComposerHandle>;
 }
 
 /** The message box: auto-growing rich-math editor (formulas typeset inline, `$…$` only on the wire), image attach (picker / paste), send / stop with an in-flight spinner. */
-export function ChatComposer({ phase, onSubmit, onStop, onActivity, onEditChange, large = false, className, ref }: ChatComposerProps) {
+export function ChatComposer({ phase, onSubmit, onStop, onActivity, onEditChange, large = false, thinkingEffort, onThinkingEffortChange, stepMode = false, onToggleStepMode, className, ref }: ChatComposerProps) {
   const { t, i18n } = useTranslation("ai");
   const [draft, setDraft] = useState("");
   const [image, setImage] = useState<string | null>(null);
@@ -485,7 +493,8 @@ export function ChatComposer({ phase, onSubmit, onStop, onActivity, onEditChange
         )}
       />
 
-      <div className="flex items-center gap-2 px-2.5 pb-2.5">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 px-2.5 pb-2.5">
+        <div className="flex min-w-0 items-center gap-1.5">
         <input ref={fileRef} type="file" accept={FILE_ACCEPT} className="hidden" tabIndex={-1} onChange={(event) => onFilePicked(event.target.files)} />
         <button
           type="button"
@@ -496,6 +505,8 @@ export function ChatComposer({ phase, onSubmit, onStop, onActivity, onEditChange
         >
           <Paperclip className="h-5 w-5" aria-hidden="true" />
         </button>
+        {thinkingEffort && onThinkingEffortChange ? <ThinkingEffortSelector value={thinkingEffort} onChange={onThinkingEffortChange} /> : null}
+        </div>
 
         <div className="min-w-0 flex-1 text-end text-xs text-slate-500 dark:text-zinc-400">
           {draft.length >= COUNTER_FROM || tooLong ? (
@@ -505,7 +516,10 @@ export function ChatComposer({ phase, onSubmit, onStop, onActivity, onEditChange
           ) : null}
         </div>
 
+        <div className="ms-auto flex items-center gap-1.5">
         <MathKeyboardToggle open={mathOpen} panelId={mathPanelId} onToggle={() => { if (mathOpen) closeMath(); else { setMathOpen(true); areaRef.current?.preload(); } }} />
+
+        {onToggleStepMode ? <StepModeSwitch on={stepMode} onToggle={onToggleStepMode} /> : null}
 
         {voiceSupported ? (
           <button
@@ -545,6 +559,7 @@ export function ChatComposer({ phase, onSubmit, onStop, onActivity, onEditChange
             <ArrowUp className="h-5 w-5" aria-hidden="true" />
           </button>
         )}
+        </div>
       </div>
         </>
       )}

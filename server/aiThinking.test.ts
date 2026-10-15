@@ -11,11 +11,11 @@ describe("single model and thinking effort", () => {
   });
 
   it("maps effort to a Gemini thinking budget and keeps room for the answer on top of it", () => {
-    expect(THINKING_BUDGETS).toEqual({ low: 1024, medium: 4096, high: 16384 });
-    expect(thinkingSettings("low")).toEqual({ thinkingConfig: { thinkingBudget: 1024 }, maxOutputTokens: 17408 });
-    expect(thinkingSettings("medium").thinkingConfig).toEqual({ thinkingBudget: 4096 });
+    expect(THINKING_BUDGETS).toEqual({ low: 0, medium: 2048, high: 8192 });
+    expect(thinkingSettings("low")).toEqual({ thinkingConfig: { thinkingBudget: 0 }, maxOutputTokens: 16384 });
+    expect(thinkingSettings("medium").thinkingConfig).toEqual({ thinkingBudget: 2048 });
     const high = thinkingSettings("high");
-    expect(high.thinkingConfig.thinkingBudget).toBe(16384);
+    expect(high.thinkingConfig.thinkingBudget).toBe(8192);
     expect(high.maxOutputTokens - high.thinkingConfig.thinkingBudget).toBeGreaterThanOrEqual(16384);
   });
 

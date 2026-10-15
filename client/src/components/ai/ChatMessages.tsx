@@ -74,7 +74,7 @@ export function SimulatorAction({ lab }: { lab: SimLab }) {
       data-sim-lab={lab}
       className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-full border border-violet-300/70 bg-gradient-to-r from-blue-50 to-violet-50 px-4 text-sm font-medium text-violet-900 shadow-sm transition-[box-shadow,border-color] hover:border-violet-400 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:border-violet-400/30 dark:from-blue-500/10 dark:to-violet-500/10 dark:text-violet-100 dark:hover:border-violet-300/60"
     >
-      <Zap className="h-4 w-4 text-amber-500" aria-hidden="true" />
+      <Zap className="h-4 w-4 text-blue-500" aria-hidden="true" />
       <span>{t("actions.openSimulator")}</span>
     </PrefetchLink>
   );

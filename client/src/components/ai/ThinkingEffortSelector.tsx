@@ -1,69 +1,61 @@
-import { Brain, Microscope, Scale, Zap, type LucideIcon } from "lucide-react";
+import { Brain, ChevronDown, Microscope, Scale, Zap, type LucideIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { THINKING_EFFORTS, type ThinkingEffort } from "@shared/aiTypes";
+import { THINKING_EFFORTS, parseThinkingEffort, type ThinkingEffort } from "@shared/aiTypes";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 
 const FOCUS = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600";
 
 const ICONS: Record<ThinkingEffort, LucideIcon> = { low: Zap, medium: Scale, high: Microscope };
 
-/** Selected look per level: low is a light badge, medium the standard brand tint, high a high-contrast accent. */
-const ACTIVE: Record<ThinkingEffort, string> = {
-  low: "bg-slate-200 text-slate-900 dark:bg-white/15 dark:text-zinc-50",
-  medium: "bg-violet-100 text-violet-900 dark:bg-violet-500/25 dark:text-violet-100",
-  high: "bg-violet-700 text-white dark:bg-violet-500 dark:text-white",
+/** Trigger look per level: low is a light badge, medium the soft brand tint, high the solid brand gradient. */
+const TRIGGER: Record<ThinkingEffort, string> = {
+  low: "border-slate-200 bg-white text-slate-600 hover:bg-slate-100 dark:border-white/[0.12] dark:bg-transparent dark:text-zinc-300 dark:hover:bg-white/[0.08]",
+  medium: "border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 dark:border-blue-400/25 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-950/60",
+  high: "border-transparent bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-sm hover:opacity-90",
 };
 
 /**
- * Reasoning-depth selector: a segmented radio group (Low / Med / High). Heavy derivations get a bigger thinking budget,
- * quick questions stay fast and cheap. Full labels from sm up, icons only on phones.
+ * Reasoning-depth dropdown (Low / Med / High), small enough for the composer's accessory bar. Heavy derivations get a bigger
+ * thinking budget, quick questions stay fast and cheap. The word "Thinking" shows from sm up; phones show the icon and level.
  */
 export function ThinkingEffortSelector({ value, onChange }: { value: ThinkingEffort; onChange: (next: ThinkingEffort) => void }) {
   const { t } = useTranslation("ai");
-  const move = (from: ThinkingEffort, step: number) => {
-    const next = THINKING_EFFORTS[(THINKING_EFFORTS.indexOf(from) + step + THINKING_EFFORTS.length) % THINKING_EFFORTS.length];
-    onChange(next);
-    requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-thinking-effort="${next}"]`)?.focus());
-  };
+  const Icon = ICONS[value];
+  const name = t(`thinking.${value}`);
   return (
-    <div
-      role="radiogroup"
-      aria-label={t("thinking.label")}
-      data-thinking-effort-selector
-      className="inline-flex min-h-11 shrink-0 items-center gap-0.5 rounded-full border border-slate-200 bg-white p-0.5 dark:border-white/[0.12] dark:bg-transparent sm:min-h-9"
-    >
-      <Brain className="mx-1.5 hidden h-4 w-4 shrink-0 text-slate-500 dark:text-zinc-400 md:block" aria-hidden="true" />
-      <span className="hidden pe-1 text-xs font-medium text-slate-600 dark:text-zinc-300 md:inline">{t("thinking.label")}</span>
-      {THINKING_EFFORTS.map((effort) => {
-        const Icon = ICONS[effort];
-        const selected = value === effort;
-        const name = t(`thinking.${effort}`);
-        return (
-          <button
-            key={effort}
-            type="button"
-            role="radio"
-            aria-checked={selected}
-            aria-label={`${t("thinking.label")}: ${name}`}
-            title={t(`thinking.${effort}Hint`)}
-            tabIndex={selected ? 0 : -1}
-            data-thinking-effort={effort}
-            onClick={() => onChange(effort)}
-            onKeyDown={(event) => {
-              if (event.key === "ArrowRight" || event.key === "ArrowDown") { event.preventDefault(); move(effort, 1); }
-              else if (event.key === "ArrowLeft" || event.key === "ArrowUp") { event.preventDefault(); move(effort, -1); }
-            }}
-            className={cn(
-              "inline-flex min-h-10 items-center gap-1 rounded-full px-2.5 text-xs font-medium transition-colors sm:min-h-8",
-              selected ? ACTIVE[effort] : "text-slate-600 hover:bg-slate-100 dark:text-zinc-300 dark:hover:bg-white/[0.08]",
-              FOCUS,
-            )}
-          >
-            <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-            <span>{name}</span>
-          </button>
-        );
-      })}
-    </div>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          aria-label={`${t("thinking.label")}: ${name}`}
+          title={t(`thinking.${value}Hint`)}
+          data-thinking-effort-trigger
+          data-thinking-effort={value}
+          className={cn("inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition-colors sm:min-h-9", TRIGGER[value], FOCUS)}
+        >
+          <Brain className="h-4 w-4 shrink-0" aria-hidden="true" />
+          <span aria-hidden="true" className="hidden sm:inline">{t("thinking.label")}:</span>
+          <span aria-hidden="true" className="inline-flex items-center gap-1"><Icon className="h-3.5 w-3.5" />{name}</span>
+          <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-70" aria-hidden="true" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent side="top" align="start" sideOffset={8} className="w-64 rounded-2xl p-1.5" aria-label={t("thinking.label")}>
+        <DropdownMenuRadioGroup value={value} onValueChange={(next) => onChange(parseThinkingEffort(next))}>
+          {THINKING_EFFORTS.map((effort) => {
+            const ItemIcon = ICONS[effort];
+            return (
+              <DropdownMenuRadioItem key={effort} value={effort} data-thinking-effort-option={effort} className="min-h-11 items-start gap-2 rounded-xl py-2">
+                <ItemIcon className="mt-0.5 h-4 w-4 shrink-0 text-blue-600 dark:text-blue-300" aria-hidden="true" />
+                <span className="flex min-w-0 flex-col">
+                  <span className="text-sm font-medium">{t(`thinking.${effort}`)}</span>
+                  <span className="text-xs font-normal text-slate-500 dark:text-zinc-400">{t(`thinking.${effort}Hint`)}</span>
+                </span>
+              </DropdownMenuRadioItem>
+            );
+          })}
+        </DropdownMenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

@@ -49,6 +49,7 @@
     "scrollLatest": "Jump to latest",
     "you": "You",
     "assistant": "MAE AI",
+    "analyzing": "Analyzing equations & physical constraints...",
     "attachedImage": "Attached image",
     "retry": "Retry",
     "stopped": "Response stopped.",
@@ -206,6 +207,7 @@
     "label": "Plot",
     "alt": "Plot: {{title}}",
     "preparing": "Preparing plot…",
+    "synthesizing": "Synthesizing high-resolution analytical plot...",
     "waiting": "Starting the plot engine…",
     "step": "({{n}}/{{total}})",
     "loadingHint": "Loading scientific Python. The first plot downloads about 20–30 MB; it is cached afterwards.",
@@ -312,6 +314,8 @@
   },
   "errors": {
     "rate_limit": "Too many requests. Please wait a minute and try again.",
+    "cooling_down": "The reasoning engine is cooling down. Please try again in a few seconds.",
+    "daily_limit": "MAE AI has reached its usage limit for now. Please try again later.",
     "not_configured": "MAE AI is taking a short break and can't answer right now. Please try again in a little while.",
     "forbidden": "This request was blocked. Please reload the page and try again.",
     "bad_request": "That message could not be processed. Try shortening it or using a smaller image.",
@@ -397,7 +401,7 @@
     "highHint": "Exhaustive step-by-step proofs & complex matrices"
   },
   "stepMode": {
-    "label": "Step-by-step guidance: {{state}}",
+    "label": "Step Guidance: {{state}}",
     "on": "ON",
     "off": "OFF",
     "short": "Steps: {{state}}",
