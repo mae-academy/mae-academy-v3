@@ -604,7 +604,8 @@ export function blockedReason(chunk: ChunkVerdictInput): string | undefined {
 /** Models tried in order for any Gemini text call: the chosen one twice (a spike usually passes), then a lighter one as a last resort. */
 export function modelChain(env: NodeJS.ProcessEnv = process.env): string[] {
   const primary = env.GEMINI_MODEL?.trim() || DEFAULT_MODEL;
-  return primary === FALLBACK_MODEL ? [primary, primary] : [primary, primary, FALLBACK_MODEL];
+  // GEMINI_NO_FALLBACK=1 keeps every answer on the primary model (the 50-question benchmark must not silently grade the lighter one).
+  return primary === FALLBACK_MODEL || env.GEMINI_NO_FALLBACK === "1" ? [primary, primary] : [primary, primary, FALLBACK_MODEL];
 }
 
 /** Streams the model's reply as text deltas. Aborting `signal` stops reading from the upstream stream. Throws AiBlockedError when the answer is blocked or empty. */
