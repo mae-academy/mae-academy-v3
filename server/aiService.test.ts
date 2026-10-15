@@ -22,6 +22,8 @@ import {
   blockedReason,
   buildContents,
   buildSystemInstruction,
+  chunkText,
+  codeExecutionEnabled,
   cleanModelTurn,
   limitModelTurn,
   geminiApiKey,
@@ -246,7 +248,7 @@ describe("system instruction", () => {
 
   it("stays within a sane size for a prompt sent on every request", () => {
     expect(prompt.length).toBeGreaterThan(30_000);
-    expect(prompt.length).toBeLessThan(78_000);
+    expect(prompt.length).toBeLessThan(84_000);
   });
 });
 
@@ -288,7 +290,7 @@ describe("numerical discipline and verified reference formulas (benchmark Q06, Q
   const p = buildSystemInstruction("general");
 
   it("demands a second-route recheck of arithmetic and the actual performance of named methods", () => {
-    expect(p).toMatch(/re-compute it by a second route/);
+    expect(p).toMatch(/re-compute the result by a second route/);
     expect(p).toMatch(/A named method is performed, not mentioned/);
     expect(p).toContain("= 0.0625 m");
     expect(p).toMatch(/words and abbreviations go in \\text\{\.\.\.\}/);
@@ -301,9 +303,45 @@ describe("numerical discipline and verified reference formulas (benchmark Q06, Q
   });
 
   it("pins the FWM phase mismatch with the i-k and j-k pairing and physical-length efficiency", () => {
-    expect(p).toContain("\\Delta\\beta = -\\beta_2(\\omega_i-\\omega_k)(\\omega_j-\\omega_k)");
+    expect(p).toContain("-\\beta_2 x_i x_j = -\\beta_2(\\omega_i-\\omega_k)(\\omega_j-\\omega_k)");
+    expect(p).toMatch(/Write out the expansion in full/);
     expect(p).toContain("\\Delta f_{ik}\\,\\Delta f_{jk}");
     expect(p).toMatch(/with L, not L_\{eff\}, inside the exponential and the sine/);
+  });
+
+  it("forbids skipped steps, demands the two-line closing audit and routes arithmetic to code execution", () => {
+    expect(p).toMatch(/Zero mental arithmetic/);
+    expect(p).toMatch(/never write "after simplification we obtain"/);
+    expect(p).toMatch(/each Taylor-expansion term/);
+    expect(p).toMatch(/Mandatory closing audit[\s\S]*Check 1, dimensional consistency[\s\S]*Check 2, physical viability/);
+    expect(p).toMatch(/code-execution tool is available, use it/);
+    expect(p).toMatch(/never paste its code or raw output/);
+  });
+
+  it("pins the branch-line hybrid even/odd derivation (Q09)", () => {
+    expect(p).toMatch(/even mode = open stubs and odd mode = shorted stubs/);
+    expect(p).toContain("S_{31} = \\frac{T_e-T_o}{2} = -\\frac{1}{\\sqrt{2}}");
+    expect(p).toMatch(/Present all of these steps, not only the matrix/);
+    // recompute: ABCD of each half, then the S-parameters the prompt quotes
+    const j = (re: number, im: number) => ({ re, im });
+    const mul = (a: { re: number; im: number }, b: { re: number; im: number }) => j(a.re * b.re - a.im * b.im, a.re * b.im + a.im * b.re);
+    const add = (a: { re: number; im: number }, b: { re: number; im: number }) => j(a.re + b.re, a.im + b.im);
+    const mm = (X: ReturnType<typeof j>[][], Y: ReturnType<typeof j>[][]) => [[add(mul(X[0][0], Y[0][0]), mul(X[0][1], Y[1][0])), add(mul(X[0][0], Y[0][1]), mul(X[0][1], Y[1][1]))], [add(mul(X[1][0], Y[0][0]), mul(X[1][1], Y[1][0])), add(mul(X[1][0], Y[0][1]), mul(X[1][1], Y[1][1]))]];
+    const r2 = Math.SQRT2;
+    const line = [[j(0, 0), j(0, 1 / r2)], [j(0, r2), j(0, 0)]];
+    const half = (y: number) => { const st = [[j(1, 0), j(0, 0)], [j(0, y), j(1, 0)]]; return mm(mm(st, line), st); };
+    const te = (M: ReturnType<typeof half>) => { const d = add(add(M[0][0], M[0][1]), add(M[1][0], M[1][1])); const n = d.re * d.re + d.im * d.im; return j((2 * d.re) / n, (-2 * d.im) / n); };
+    const [Te, To] = [te(half(1)), te(half(-1))];
+    expect([(Te.re + To.re) / 2, (Te.im + To.im) / 2].map((x) => +(x * r2).toFixed(6))).toEqual([0, -1]); // S21 = -j/sqrt2
+    expect([(Te.re - To.re) / 2, (Te.im - To.im) / 2].map((x) => +(x * r2).toFixed(6))).toEqual([-1, 0]); // S31 = -1/sqrt2
+  });
+
+  it("extracts only visible text from a chunk and switches code execution on by default", () => {
+    const parts = [{ text: "A " }, { executableCode: {} } as never, { text: "hidden", thought: true }, { text: "B" }];
+    expect(chunkText({ candidates: [{ content: { parts } }] })).toBe("A B");
+    expect(chunkText({})).toBe("");
+    expect(codeExecutionEnabled({} as NodeJS.ProcessEnv)).toBe(true);
+    expect(codeExecutionEnabled({ GEMINI_CODE_EXECUTION: "0" } as unknown as NodeJS.ProcessEnv)).toBe(false);
   });
 
   // The numbers quoted in the prompt must be true; these recompute them.
