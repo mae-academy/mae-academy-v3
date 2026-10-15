@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { markSessionMessage } from "./sessionMessages";
-import type { ChatMessage, LabContext } from "@shared/aiTypes";
+import type { ChatMessage, LabContext, ThinkingEffort } from "@shared/aiTypes";
 import { newId, regenerateHistory } from "./chatThreads";
 import { ChatStreamError, streamChat, type ChatErrorKind } from "./streamChat";
 import type { MascotStateApi } from "./useMascotState";
@@ -31,6 +31,8 @@ export interface ChatRunnerOptions {
   getLab: () => LabContext;
   /** Read at send time: step-by-step guidance on/off. */
   getStepMode?: () => boolean;
+  /** Read at send time: reasoning depth (low / medium / high). */
+  getThinkingEffort?: () => ThinkingEffort;
   updateMessages: UpdateMessages;
 }
 
@@ -55,7 +57,7 @@ export interface ChatRunner {
  * Owns one streaming request at a time. Message updates are addressed by thread id, so a stream that finishes
  * (or is aborted) after the user switched threads still lands in the thread it belongs to.
  */
-export function useChatRunner({ mascot, getLab, getStepMode, updateMessages }: ChatRunnerOptions): ChatRunner {
+export function useChatRunner({ mascot, getLab, getStepMode, getThinkingEffort, updateMessages }: ChatRunnerOptions): ChatRunner {
   const { onSend, onToken, onStreamEnd, onError } = mascot;
   const [active, setActive] = useState<ActiveRun | null>(null);
   const [error, setError] = useState<ScopedError | null>(null);
@@ -71,6 +73,8 @@ export function useChatRunner({ mascot, getLab, getStepMode, updateMessages }: C
   getLabRef.current = getLab;
   const getStepModeRef = useRef(getStepMode);
   getStepModeRef.current = getStepMode;
+  const getThinkingEffortRef = useRef(getThinkingEffort);
+  getThinkingEffortRef.current = getThinkingEffort;
 
   const stop = useCallback(() => {
     flushRef.current();
@@ -119,6 +123,7 @@ export function useChatRunner({ mascot, getLab, getStepMode, updateMessages }: C
           messages: history,
           lab: getLabRef.current(),
           stepMode: getStepModeRef.current?.() ?? false,
+          thinkingEffort: getThinkingEffortRef.current?.(),
           signal: controller.signal,
           onMode: (next) => { if (!stale()) setMode(next); },
           onDelta: (text) => {

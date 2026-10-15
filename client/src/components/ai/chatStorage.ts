@@ -1,4 +1,4 @@
-import { AI_DOCUMENT_MIME_TYPES, type ChatDocument, type ChatMessage } from "@shared/aiTypes";
+import { AI_DOCUMENT_MIME_TYPES, DEFAULT_THINKING_EFFORT, parseThinkingEffort, type ChatDocument, type ChatMessage, type ThinkingEffort } from "@shared/aiTypes";
 import { MAX_THREADS, MAX_THREAD_MESSAGES, newId, type ChatThread } from "./chatThreads";
 
 /** Versioned so a future shape can migrate or discard old data instead of crashing on it. */
@@ -231,6 +231,17 @@ export function saveSidebarOpen(open: boolean, storage: StorageLike | null = def
 }
 
 const STEP_MODE_KEY = "mae-ai:step-mode:v1";
+
+/** Reasoning depth (low | medium | high). Any stored value that is not one of those three reads back as the default. */
+export const THINKING_EFFORT_KEY = "mae_thinking_effort";
+
+export function loadThinkingEffort(storage: StorageLike | null = defaultStorage()): ThinkingEffort {
+  try { return parseThinkingEffort(storage?.getItem(THINKING_EFFORT_KEY)); } catch { return DEFAULT_THINKING_EFFORT; }
+}
+
+export function saveThinkingEffort(effort: ThinkingEffort, storage: StorageLike | null = defaultStorage()): void {
+  try { storage?.setItem(THINKING_EFFORT_KEY, effort); } catch { /* ignore */ }
+}
 
 /** Step-by-step guidance is opt-in: only an explicit "on" is remembered. */
 export function loadStepMode(storage: StorageLike | null = defaultStorage()): boolean {

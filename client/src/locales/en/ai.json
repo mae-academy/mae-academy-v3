@@ -387,6 +387,15 @@
     "send": "Send edited message",
     "placeholder": "Edit your message…"
   },
+  "thinking": {
+    "label": "Thinking",
+    "low": "Low",
+    "lowHint": "Fast answers, minimal reasoning tokens",
+    "medium": "Med",
+    "mediumHint": "Recommended for engineering coursework",
+    "high": "High",
+    "highHint": "Exhaustive step-by-step proofs & complex matrices"
+  },
   "stepMode": {
     "label": "Step-by-step guidance: {{state}}",
     "on": "ON",

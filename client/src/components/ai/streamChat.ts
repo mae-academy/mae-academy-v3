@@ -1,4 +1,4 @@
-import { AI_HISTORY_WINDOW, splitTrailingMarkers, stripLegacySchematicTag, type AiStreamEvent, type ChatDocument, type ChatMessage, type LabContext } from "@shared/aiTypes";
+import { AI_HISTORY_WINDOW, splitTrailingMarkers, stripLegacySchematicTag, type AiStreamEvent, type ChatDocument, type ChatMessage, type LabContext, type ThinkingEffort } from "@shared/aiTypes";
 
 import { stripSvgFences } from "./svgFence";
 
@@ -159,6 +159,8 @@ export interface StreamChatOptions {
   lab: LabContext;
   /** Step-by-step guidance; sent as `stepMode: true` only when on, so the body is unchanged otherwise. */
   stepMode?: boolean;
+  /** Reasoning depth; always sent when given so the server never has to guess. */
+  thinkingEffort?: ThinkingEffort;
   signal: AbortSignal;
   onDelta: (text: string) => void;
   /** Called once the stream is accepted; `mock` is the dev-only demo stream (no GEMINI_API_KEY on the server). */
@@ -171,13 +173,13 @@ export interface StreamChatOptions {
  * completion; rejects with ChatStreamError on any failure and with the native AbortError when `signal` aborts.
  * Error bodies are never surfaced (they may be HTML or leak internals).
  */
-export async function streamChat({ messages, lab, stepMode, signal, onDelta, onMode, fetchImpl = fetch }: StreamChatOptions): Promise<void> {
+export async function streamChat({ messages, lab, stepMode, thinkingEffort, signal, onDelta, onMode, fetchImpl = fetch }: StreamChatOptions): Promise<void> {
   let response: Response;
   try {
     response = await fetchImpl("/api/ai/chat", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ messages: buildRequestMessages(messages), lab, ...(stepMode ? { stepMode: true } : {}) }),
+      body: JSON.stringify({ messages: buildRequestMessages(messages), lab, ...(stepMode ? { stepMode: true } : {}), ...(thinkingEffort ? { thinkingEffort } : {}) }),
       signal,
     });
   } catch (error) {

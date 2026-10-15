@@ -387,6 +387,15 @@
     "send": "Enviar mensaje editado",
     "placeholder": "Edita tu mensaje…"
   },
+  "thinking": {
+    "label": "Razonamiento",
+    "low": "Bajo",
+    "lowHint": "Respuestas rápidas con mínimo razonamiento",
+    "medium": "Medio",
+    "mediumHint": "Recomendado para cursos de ingeniería",
+    "high": "Alto",
+    "highHint": "Demostraciones exhaustivas paso a paso y matrices complejas"
+  },
   "stepMode": {
     "label": "Guía paso a paso: {{state}}",
     "on": "SÍ",

@@ -12,6 +12,7 @@ import {
   AI_MAX_MESSAGE_CHARS,
   AI_MAX_MODEL_MESSAGE_CHARS,
   LAB_CONTEXTS,
+  parseThinkingEffort,
   splitTrailingMarkers,
   stripLegacySchematicTag,
   stripSvgDiagrams,
@@ -20,6 +21,7 @@ import {
   type DocumentMimeType,
   type LabContext,
   type SimLab,
+  type ThinkingEffort,
 } from "../shared/aiTypes";
 import { DOCUMENT_ANALYSIS_RULES } from "./aiDocumentPrompt";
 import { HANDWRITING_AUDIT_RULES, STEP_MODE_RULES } from "./aiGuidancePrompts";
@@ -111,6 +113,8 @@ export interface SanitizedChat {
   readonly hasDocument: boolean;
   /** Step-by-step guidance requested (a real boolean true only). */
   readonly stepMode: boolean;
+  /** Reasoning depth requested by the client; selects the Gemini thinking budget. */
+  readonly thinkingEffort: ThinkingEffort;
   /** The last user turn carries an image: selects the handwritten-work audit rules. */
   readonly hasImage: boolean;
 }
@@ -249,7 +253,7 @@ function sanitizeDocument(raw: unknown, index: number): { meta: ChatDocument; at
 /** Validates an untrusted request body; throws AiRequestError with a client-safe message. */
 export function sanitizeChatRequest(body: unknown): SanitizedChat {
   if (typeof body !== "object" || body === null) throw new AiRequestError("Request body must be a JSON object.");
-  const { messages, lab, stepMode } = body as { messages?: unknown; lab?: unknown; stepMode?: unknown };
+  const { messages, lab, stepMode, thinkingEffort } = body as { messages?: unknown; lab?: unknown; stepMode?: unknown; thinkingEffort?: unknown };
   if (!Array.isArray(messages) || messages.length === 0) throw new AiRequestError("messages must be a non-empty array.");
 
   // Only the tail is ever used, so validate (and pay for) just that.
@@ -291,7 +295,7 @@ export function sanitizeChatRequest(body: unknown): SanitizedChat {
   const document = [...windowed].reverse().find((m) => m.attachment)?.attachment ?? null;
   if (!last.content.trim() && !last.imageUrl && !document) throw new AiRequestError("The last message is empty.");
   const safeLab = LAB_CONTEXTS.includes(lab as LabContext) ? (lab as LabContext) : "general";
-  return { messages: windowed, lab: safeLab, document, hasDocument: document !== null, stepMode: stepMode === true, hasImage: Boolean(last.imageUrl) };
+  return { messages: windowed, lab: safeLab, document, hasDocument: document !== null, stepMode: stepMode === true, thinkingEffort: parseThinkingEffort(thinkingEffort), hasImage: Boolean(last.imageUrl) };
 }
 
 export interface GeminiPart {
@@ -546,10 +550,21 @@ export function getGeminiClient(): GoogleGenAI {
   return client;
 }
 
-// Aliases, not versioned names. gemini-2.0-flash / 1.5-flash are retired and absent from this key's model
-// list, and 2.5-flash already 404s, so the `-latest` alias is the only reliable choice; override with GEMINI_MODEL.
-const DEFAULT_MODEL = "gemini-flash-latest";
-const FALLBACK_MODEL = "gemini-flash-lite-latest";
+/** MAE AI runs on exactly one model. There is no fallback to a lighter model: a quota or demand error is reported, never papered over. */
+const DEFAULT_MODEL = "gemini-3.7-flash";
+export const MODEL_NAME = process.env.GEMINI_MODEL?.trim() || DEFAULT_MODEL;
+
+/**
+ * Thinking budget in tokens per effort level (Gemini `thinkingConfig.thinkingBudget`). Thinking tokens count against
+ * `maxOutputTokens`, so the output cap is the answer allowance plus the budget; otherwise a deep think could starve the answer.
+ */
+export const THINKING_BUDGETS: Readonly<Record<ThinkingEffort, number>> = { low: 1024, medium: 4096, high: 16384 };
+const ANSWER_TOKEN_ALLOWANCE = 16384;
+
+export function thinkingSettings(effort: ThinkingEffort): { thinkingConfig: { thinkingBudget: number }; maxOutputTokens: number } {
+  const thinkingBudget = THINKING_BUDGETS[effort];
+  return { thinkingConfig: { thinkingBudget }, maxOutputTokens: ANSWER_TOKEN_ALLOWANCE + thinkingBudget };
+}
 /** Transient upstream failures worth another attempt ("model is experiencing high demand" is a 503). */
 const RETRYABLE_STATUS = new Set([500, 503, 504]);
 
@@ -612,11 +627,10 @@ export function blockedReason(chunk: ChunkVerdictInput): string | undefined {
   return finish && BLOCKING_FINISH_REASONS.has(finish) ? `finish:${finish}` : undefined;
 }
 
-/** Models tried in order for any Gemini text call: the chosen one twice (a spike usually passes), then a lighter one as a last resort. */
+/** The model for every Gemini text call, twice (one retry after a transient 5xx). Never a different model. */
 export function modelChain(env: NodeJS.ProcessEnv = process.env): string[] {
-  const primary = env.GEMINI_MODEL?.trim() || DEFAULT_MODEL;
-  // GEMINI_NO_FALLBACK=1 keeps every answer on the primary model (the 50-question benchmark must not silently grade the lighter one).
-  return primary === FALLBACK_MODEL || env.GEMINI_NO_FALLBACK === "1" ? [primary, primary] : [primary, primary, FALLBACK_MODEL];
+  const model = env.GEMINI_MODEL?.trim() || DEFAULT_MODEL;
+  return [model, model];
 }
 
 /** Gemini's built-in Python sandbox does the arithmetic instead of the model predicting digits. GEMINI_CODE_EXECUTION=0 turns it off. */
@@ -645,9 +659,8 @@ export async function* streamChat(request: SanitizedChat, signal?: AbortSignal):
         config: {
           systemInstruction: buildSystemInstruction(request.lab, { hasDocument: request.hasDocument, stepMode: request.stepMode, hasImage: request.hasImage }),
           temperature: 0.3,
-          // Long derivations plus thinking tokens count against this budget;
-          // 8192 risked cutting an answer off. Flash models allow up to 65536.
-          maxOutputTokens: 16384,
+          // Thinking budget by effort; the output cap includes it (see THINKING_BUDGETS).
+          ...thinkingSettings(request.thinkingEffort),
           safetySettings: [...SAFETY_SETTINGS],
           ...(codeExecutionEnabled() ? { tools: [{ codeExecution: {} }] } : {}),
           abortSignal: signal,

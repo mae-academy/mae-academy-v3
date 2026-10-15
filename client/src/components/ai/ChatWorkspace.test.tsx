@@ -52,6 +52,33 @@ afterEach(() => {
 const send = () => fireEvent.click(screen.getByRole("button", { name: "Send" }));
 const sidebar = () => screen.getByRole("navigation", { name: "Chat history" });
 
+describe("ChatWorkspace thinking effort", () => {
+  const bodyEffort = () => (requestBodies(fetchMock).at(-1) as unknown as { thinkingEffort?: string }).thinkingEffort;
+
+  it("sends medium by default, then the chosen level, and remembers it in mae_thinking_effort", async () => {
+    render(<ChatWorkspace lab="general" />);
+    expect(screen.getByRole("radio", { name: "Thinking: Med" }).getAttribute("aria-checked")).toBe("true");
+    typeInComposer("first");
+    send();
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(bodyEffort()).toBe("medium");
+
+    fireEvent.click(screen.getByRole("radio", { name: "Thinking: High" }));
+    expect(localStorage.getItem("mae_thinking_effort")).toBe("high");
+    await screen.findByText(/Kirchhoff/);
+    typeInComposer("second");
+    send();
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    expect(bodyEffort()).toBe("high");
+  });
+
+  it("restores the saved level on the next visit", () => {
+    localStorage.setItem("mae_thinking_effort", "low");
+    render(<ChatWorkspace lab="general" />);
+    expect(screen.getByRole("radio", { name: "Thinking: Low" }).getAttribute("aria-checked")).toBe("true");
+  });
+});
+
 describe("ChatWorkspace", () => {
   it("starts on the empty state: one h1, the hero mascot, the composer and four suggestion chips; no lab tabs or info cards", () => {
     render(<ChatWorkspace lab="general" />);

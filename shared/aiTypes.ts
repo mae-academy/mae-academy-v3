@@ -37,12 +37,23 @@ export const AI_MAX_PDF_BYTES = 6 * 1024 * 1024;
 export const AI_MAX_TEXT_DOCUMENT_BYTES = 200 * 1024;
 export const AI_MAX_DOCUMENT_NAME_CHARS = 120;
 
+/** How much reasoning the model may spend before answering (Gemini `thinkingBudget`, see server/aiService.ts). */
+export type ThinkingEffort = "low" | "medium" | "high";
+export const THINKING_EFFORTS: readonly ThinkingEffort[] = ["low", "medium", "high"];
+export const DEFAULT_THINKING_EFFORT: ThinkingEffort = "medium";
+/** Anything that is not exactly "low" | "medium" | "high" (missing, wrong type, wrong case) becomes the default. */
+export function parseThinkingEffort(value: unknown): ThinkingEffort {
+  return THINKING_EFFORTS.includes(value as ThinkingEffort) ? (value as ThinkingEffort) : DEFAULT_THINKING_EFFORT;
+}
+
 /** Body of `POST /api/ai/chat`. The server only reads the last `AI_HISTORY_WINDOW` messages, and the last one must be a user message. */
 export interface AiChatRequest {
   messages: ChatMessage[];
   lab?: LabContext;
   /** Step-by-step guidance mode: the model reveals one pedagogical step at a time. Boolean only; anything else is ignored. */
   stepMode?: boolean;
+  /** Reasoning depth: "low" | "medium" (default) | "high". Anything else is treated as "medium". */
+  thinkingEffort?: ThinkingEffort;
 }
 
 /**

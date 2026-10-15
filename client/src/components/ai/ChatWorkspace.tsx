@@ -3,7 +3,7 @@ import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { motion, useReducedMotion } from "framer-motion";
 import { FileUp, FlaskConical, ListOrdered, PanelLeft, Sparkles, SquarePen, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import type { LabContext, MascotState } from "@shared/aiTypes";
+import type { LabContext, MascotState, ThinkingEffort } from "@shared/aiTypes";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,7 +19,8 @@ import { ChatComposer, type ComposerHandle, type ComposerSubmit } from "./ChatCo
 import { ChatSidebar } from "./ChatSidebar";
 import { ChatTranscript } from "./ChatTranscript";
 import { MAI_LAYOUT_ID, MAI_LAYOUT_TRANSITION } from "./ChatMessages";
-import { loadSidebarOpen, loadStepMode, saveSidebarOpen, saveStepMode } from "./chatStorage";
+import { loadSidebarOpen, loadStepMode, loadThinkingEffort, saveSidebarOpen, saveStepMode, saveThinkingEffort } from "./chatStorage";
+import { ThinkingEffortSelector } from "./ThinkingEffortSelector";
 import { classifyAttachment } from "./documentUtils";
 import MaiMascot from "./MaiMascot";
 import { PlotFixContext } from "./PlotCard";
@@ -112,7 +113,15 @@ export function ChatWorkspace({ lab, className }: ChatWorkspaceProps) {
     saveStepMode(next);
     setStepMode(next);
   };
-  const runner = useChatRunner({ mascot, getLab, getStepMode, updateMessages: threads.updateMessages });
+  const [thinkingEffort, setThinkingEffort] = useState<ThinkingEffort>(() => loadThinkingEffort());
+  const thinkingEffortRef = useRef(thinkingEffort);
+  thinkingEffortRef.current = thinkingEffort;
+  const getThinkingEffort = useCallback(() => thinkingEffortRef.current, []);
+  const changeThinkingEffort = (next: ThinkingEffort) => {
+    saveThinkingEffort(next);
+    setThinkingEffort(next);
+  };
+  const runner = useChatRunner({ mascot, getLab, getStepMode, getThinkingEffort, updateMessages: threads.updateMessages });
   const [editingId, setEditingId] = useState<string | null>(null);
 
   const composerRef = useRef<ComposerHandle>(null);
@@ -375,6 +384,7 @@ export function ChatWorkspace({ lab, className }: ChatWorkspaceProps) {
             {t("page.title")}
           </span>
           <div className="min-w-0 flex-1" />
+          <ThinkingEffortSelector value={thinkingEffort} onChange={changeThinkingEffort} />
           <StepModeSwitch on={stepMode} onToggle={toggleStepMode} />
           {runner.mode === "mock" && !demoDismissed ? <DemoNotice onDismiss={() => setDemoDismissed(true)} /> : null}
           {showTopNewChat ? (
