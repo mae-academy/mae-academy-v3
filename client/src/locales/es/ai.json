@@ -103,6 +103,51 @@
     "fitShort": "Ajustar",
     "lightboxHint": "Usa los botones de zoom o las teclas + y - para inspeccionar el esquema. Pulsa Escape para cerrar."
   },
+  "plot": {
+    "label": "Gráfica",
+    "alt": "Gráfica: {{title}}",
+    "preparing": "Preparando la gráfica…",
+    "waiting": "Iniciando el motor de gráficas…",
+    "step": "({{n}}/{{total}})",
+    "loadingHint": "Cargando Python científico. La primera gráfica descarga unos 20–30 MB; después queda en caché.",
+    "stage": {
+      "runtime": "Cargando el entorno de Python",
+      "numpy": "Cargando NumPy",
+      "matplotlib": "Cargando Matplotlib",
+      "scipy": "Cargando SciPy",
+      "rendering": "Dibujando la gráfica"
+    },
+    "restoredHint": "Esta gráfica no se ha dibujado en esta sesión. Dibujarla descarga el entorno de Python científico (unos 20–30 MB, luego en caché).",
+    "run": "Dibujar gráfica",
+    "retry": "Reintentar",
+    "askFix": "Pedir a MAE AI que corrija la gráfica",
+    "fixPrompt": "El script de la gráfica falló con este error: {{error}}\nPor favor corrígelo y envía la gráfica corregida.",
+    "errorAtLine": "Línea {{line}}: {{message}}",
+    "error": {
+      "rejected": "No se ejecutó este script porque usa algo que no está permitido en las gráficas.",
+      "python": "El script de la gráfica se detuvo con un error, así que no se dibujó ninguna figura.",
+      "limit": "La figura supera los límites permitidos.",
+      "timeout": "La gráfica tardó demasiado y se detuvo.",
+      "load": "No se pudo descargar el motor de gráficas. Revisa tu conexión e inténtalo de nuevo.",
+      "internal": "No se pudo dibujar la gráfica aquí."
+    },
+    "actions": "Acciones de la gráfica",
+    "expand": "Ampliar gráfica",
+    "open": "Abrir la gráfica más grande",
+    "download": "Descargar PNG (300 DPI)",
+    "downloadFailed": "No se pudo iniciar la descarga.",
+    "viewCode": "Ver código Python",
+    "hideCode": "Ocultar código Python",
+    "close": "Cerrar",
+    "zoom": "Zoom",
+    "zoomIn": "Acercar",
+    "zoomOut": "Alejar",
+    "fit": "Ajustar a la pantalla",
+    "fitShort": "Ajustar",
+    "lightboxHint": "Usa los botones de zoom o las teclas + y - para inspeccionar la gráfica. Pulsa Escape para cerrar.",
+    "ready": "Gráfica lista",
+    "warnings": "{{count}} aviso(s)"
+  },
   "demo": {
     "short": "Modo demo",
     "full": "Modo demo — añade GEMINI_API_KEY para respuestas reales",
@@ -116,6 +161,41 @@
     "cancel": "Cancelar",
     "delete": "Eliminar chat",
     "clearAll": "Borrar todo"
+  },
+  "mathKeyboard": {
+    "open": "Abrir teclado matemático",
+    "close": "Cerrar teclado matemático",
+    "panel": "Teclado matemático",
+    "tabsLabel": "Grupos de símbolos matemáticos",
+    "keysLabel": "Teclas: {{tab}}",
+    "tabs": {
+      "calculus": "Cálculo",
+      "functions": "Funciones",
+      "algebra": "Álgebra y matrices",
+      "greek": "Griego y constantes"
+    },
+    "tooLong": "Límite del mensaje alcanzado: esa fórmula no cabe.",
+    "hint": "Selecciona texto antes para ponerlo dentro de la fórmula.",
+    "keys": {
+      "integral": "Integral de a a b",
+      "derivative": "Derivada respecto a x",
+      "limit": "Límite cuando x tiende a a",
+      "sum": "Suma desde n igual a 1 hasta infinito",
+      "partial": "Símbolo de derivada parcial",
+      "fraction": "Fracción",
+      "sqrt": "Raíz cuadrada",
+      "nth-root": "Raíz n-ésima",
+      "power": "Potencia",
+      "subscript": "Subíndice",
+      "matrix": "Matriz 2 por 2",
+      "determinant": "Determinante 2 por 2",
+      "ln": "Logaritmo natural",
+      "sin": "Seno",
+      "cos": "Coseno",
+      "tan": "Tangente",
+      "abs": "Valor absoluto",
+      "infinity": "Infinito"
+    }
   },
   "composer": {
     "label": "Mensaje para MAE AI",

@@ -9,6 +9,7 @@ import AiMarkdown from "./AiMarkdown";
 import { DocumentBadge } from "./DocumentBadge";
 import MaiMascot from "./MaiMascot";
 import { MessageActions } from "./MessageActions";
+import { PlotAutoRunContext } from "./PlotCard";
 import { SchematicAutoRepairContext } from "./SchematicDiagram";
 import { isSessionMessage } from "./sessionMessages";
 
@@ -125,7 +126,9 @@ export const AssistantMessage = memo(function AssistantMessage({ message, stream
         <span className="sr-only">{t("chat.assistant")}: </span>
         {text ? (
           <SchematicAutoRepairContext.Provider value={isSessionMessage(message.id)}>
-            <AiMarkdown content={text} streaming={streaming} />
+            <PlotAutoRunContext.Provider value={isSessionMessage(message.id)}>
+              <AiMarkdown content={text} streaming={streaming} />
+            </PlotAutoRunContext.Provider>
           </SchematicAutoRepairContext.Provider>
         ) : streaming ? (
           <TypingDots />

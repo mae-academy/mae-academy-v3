@@ -7,7 +7,8 @@ import { KatexMath } from "@/components/ui/KatexMath";
 import { CodeBlock } from "./CodeBlock";
 import { normalizeMathDelimiters } from "./mathDelimiters";
 import { SchematicDiagram, SchematicPending } from "./SchematicDiagram";
-import { PENDING_SCHEMATIC_LANG, markPendingSchematic, stripHtmlComments } from "./svgFence";
+import { PENDING_PLOT_LANG, PENDING_SCHEMATIC_LANG, PLOT_LANG, markPendingPlot, markPendingSchematic, stripHtmlComments } from "./svgFence";
+import { PlotCard, PlotPending } from "./PlotCard";
 
 const REMARK_PLUGINS = [remarkGfm, remarkMath];
 /** Only these schemes may be linked; everything else (javascript:, data:, ...) renders as plain text. */
@@ -45,6 +46,8 @@ const components: Components = {
     const language = /language-([\w+#.:-]+)/.exec(className)?.[1];
     if (language === PENDING_SCHEMATIC_LANG) return <SchematicPending />;
     if (language?.toLowerCase() === "schematic") return <SchematicDiagram text={text} />;
+    if (language === PENDING_PLOT_LANG) return <PlotPending />;
+    if (language?.toLowerCase() === PLOT_LANG) return <PlotCard code={text} />;
     return <CodeBlock code={text} language={language} />;
   },
   a({ href, children }) {
@@ -99,7 +102,7 @@ class MarkdownBoundary extends Component<{ content: string; children: ReactNode 
 function AiMarkdownImpl({ content, streaming }: { content: string; streaming?: boolean }) {
   // Old stored chats may end with a dead generation tag; it never shows, not even half of it mid-stream.
   const text = useMemo(() => stripLegacySchematicTag(content), [content]);
-  const source = useMemo(() => normalizeMathDelimiters(stripHtmlComments(streaming ? markPendingSchematic(text) : text)), [text, streaming]);
+  const source = useMemo(() => normalizeMathDelimiters(stripHtmlComments(streaming ? markPendingPlot(markPendingSchematic(text)) : text)), [text, streaming]);
   return (
     <div className="min-w-0 break-words">
       <MarkdownBoundary content={text}>

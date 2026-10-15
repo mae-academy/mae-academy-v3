@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type ClipboardEvent, type FormEvent, type KeyboardEvent, type Ref } from "react";
+import { useCallback, useEffect, useId, useImperativeHandle, useLayoutEffect, useRef, useState, type ClipboardEvent, type FormEvent, type KeyboardEvent, type Ref } from "react";
 import { ArrowUp, Mic, Paperclip, Square, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -7,6 +7,9 @@ import { cn } from "@/lib/utils";
 import { DocumentBadge } from "./DocumentBadge";
 import { DocumentError, classifyAttachment, prepareDocumentForChat, unsupportedKind } from "./documentUtils";
 import { ImageError, prepareImageForChat } from "./imageUtils";
+import { insertAtCursor } from "./insertAtCursor";
+import { MathKeyboard, MathKeyboardToggle } from "./MathKeyboard";
+import type { MathKey } from "./mathKeyboardData";
 import type { RunPhase } from "./useChatRunner";
 import { useVoiceInput } from "./useVoiceInput";
 import { VoiceWaveform } from "./VoiceWaveform";
@@ -61,6 +64,12 @@ export function ChatComposer({ phase, onSubmit, onStop, onActivity, large = fals
   const [voiceMessage, setVoiceMessage] = useState<{ tone: "error" | "info"; text: string } | null>(null);
   const recordingRef = useRef<HTMLDivElement>(null);
   const continueRef = useRef<HTMLButtonElement>(null);
+
+  const [mathOpen, setMathOpen] = useState(false);
+  const [tooLong, setTooLong] = useState(false);
+  const tooLongTimer = useRef<number | undefined>(undefined);
+  const pendingSelection = useRef<{ value: string; start: number; end: number } | null>(null);
+  const mathPanelId = `math-keyboard-${useId().replace(/:/g, "")}`;
 
   const imageRef = useRef<string | null>(null);
   const documentRef = useRef<ChatDocument | null>(null);
@@ -164,6 +173,56 @@ export function ChatComposer({ phase, onSubmit, onStop, onActivity, large = fals
     el.style.height = `${Math.min(el.scrollHeight, MAX_TEXTAREA_PX)}px`;
   }, [draft, recording]);
 
+  // A key press sets the draft and the wanted selection; apply it once React has put that value in the DOM, so the caret never jumps to the end.
+  useLayoutEffect(() => {
+    const el = textareaRef.current;
+    const pending = pendingSelection.current;
+    if (!el || !pending || el.value !== pending.value) return;
+    pendingSelection.current = null;
+    el.focus();
+    el.setSelectionRange(pending.start, pending.end);
+  }, [draft]);
+  useEffect(() => () => window.clearTimeout(tooLongTimer.current), []);
+
+  const closeMath = () => {
+    setMathOpen(false);
+    textareaRef.current?.focus();
+  };
+
+  const insertKey = (key: MathKey) => {
+    const el = textareaRef.current;
+    if (!el) return;
+    const current = el.value;
+    const start = Math.min(el.selectionStart, el.selectionEnd);
+    const end = Math.max(el.selectionStart, el.selectionEnd);
+    const result = insertAtCursor(current, start, end, key, { maxChars: AI_MAX_MESSAGE_CHARS });
+    el.focus();
+    if (!result) {
+      setTooLong(true);
+      window.clearTimeout(tooLongTimer.current);
+      tooLongTimer.current = window.setTimeout(() => setTooLong(false), 2500);
+      return;
+    }
+    setTooLong(false);
+    onActivity();
+    // execCommand keeps the browser's undo stack; the state write is the fallback where it is missing or declined.
+    const inserted = result.value.slice(start, result.value.length - (current.length - end));
+    let native = false;
+    if (typeof document.execCommand === "function") {
+      el.setSelectionRange(start, end);
+      try {
+        native = document.execCommand("insertText", false, inserted) && el.value === result.value;
+      } catch {
+        native = false;
+      }
+    }
+    if (!native) {
+      pendingSelection.current = { value: result.value, start: result.caretStart, end: result.caretEnd };
+      setDraft(result.value);
+    }
+    el.setSelectionRange(result.caretStart, result.caretEnd);
+  };
+
   useEffect(() => {
     if (voice.error) setVoiceMessage({ tone: "error", text: t(`voice.errors.${voice.error}`) });
   }, [voice.error, t]);
@@ -215,6 +274,11 @@ export function ChatComposer({ phase, onSubmit, onStop, onActivity, large = fals
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === "Escape" && mathOpen) {
+      event.preventDefault();
+      closeMath();
+      return;
+    }
     if (event.key !== "Enter" || event.shiftKey) return;
     // Enter during IME composition confirms the candidate; it must not send.
     if (event.nativeEvent.isComposing || event.keyCode === 229) return;
@@ -351,6 +415,7 @@ export function ChatComposer({ phase, onSubmit, onStop, onActivity, large = fals
         </div>
       ) : (
         <>
+      <MathKeyboard open={mathOpen} id={mathPanelId} onInsert={insertKey} onClose={closeMath} tooLong={tooLong} />
       <textarea
         ref={textareaRef}
         value={draft}
@@ -381,12 +446,14 @@ export function ChatComposer({ phase, onSubmit, onStop, onActivity, large = fals
         </button>
 
         <div className="min-w-0 flex-1 text-end text-xs text-slate-500 dark:text-zinc-400">
-          {draft.length >= COUNTER_FROM ? (
-            <span className={cn("tabular-nums", draft.length >= AI_MAX_MESSAGE_CHARS && "font-semibold text-rose-600 dark:text-rose-400")}>
+          {draft.length >= COUNTER_FROM || tooLong ? (
+            <span className={cn("tabular-nums", (draft.length >= AI_MAX_MESSAGE_CHARS || tooLong) && "font-semibold text-rose-600 dark:text-rose-400")}>
               {t("composer.counter", { count: draft.length, max: AI_MAX_MESSAGE_CHARS })}
             </span>
           ) : null}
         </div>
+
+        <MathKeyboardToggle open={mathOpen} panelId={mathPanelId} onToggle={() => (mathOpen ? closeMath() : setMathOpen(true))} />
 
         {voiceSupported ? (
           <button

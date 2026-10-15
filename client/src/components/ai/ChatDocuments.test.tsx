@@ -1,11 +1,15 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, configure, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ChatDocument } from "@shared/aiTypes";
 import { ChatWorkspace } from "./ChatWorkspace";
 import { DocumentBadge } from "./DocumentBadge";
 import { UserMessage } from "./ChatMessages";
 import { THREADS_STORAGE_KEY } from "./chatStorage";
+
+// These tests mount the whole workspace and read files; testing-library's default 1 s waitFor is too tight when the
+// full suite (Pyodide, simulators) is hogging the CPU.
+configure({ asyncUtilTimeout: 5000 });
 
 const toastMock = vi.hoisted(() => ({ error: vi.fn(), info: vi.fn(), success: vi.fn() }));
 vi.mock("sonner", () => ({ toast: toastMock }));

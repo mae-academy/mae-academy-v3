@@ -22,6 +22,7 @@ import { MAI_LAYOUT_ID, MAI_LAYOUT_TRANSITION } from "./ChatMessages";
 import { loadSidebarOpen, saveSidebarOpen } from "./chatStorage";
 import { classifyAttachment } from "./documentUtils";
 import MaiMascot from "./MaiMascot";
+import { PlotFixContext } from "./PlotCard";
 import { SuggestionChips } from "./SuggestionChips";
 import { newId } from "./chatThreads";
 import { stopSpeaking } from "./speech";
@@ -143,6 +144,11 @@ export function ChatWorkspace({ lab, className }: ChatWorkspaceProps) {
     if (active.messages.length === 0) setHandoff(true);
     runner.send(active.id, [...active.messages, message]);
   };
+
+  // "Ask MAE AI to fix this plot": a plain follow-up message. The ref keeps the callback stable for the context consumers.
+  const submitRef = useRef(handleSubmit);
+  submitRef.current = handleSubmit;
+  const askFix = useCallback((text: string) => submitRef.current({ text, image: null, document: null }), []);
 
   const handleRetry = () => {
     if (runner.active) return;
@@ -330,18 +336,20 @@ export function ChatWorkspace({ lab, className }: ChatWorkspaceProps) {
           ) : (
             <>
               <h1 className="sr-only">{t("page.title")}</h1>
-              <ChatTranscript
-                key={active.id}
-                messages={active.messages}
-                streamingId={streamingId}
-                mascotState={mascot.state}
-                stateLabels={stateLabels}
-                sharedAvatar={handoff}
-                error={error}
-                onRetry={handleRetry}
-                onRegenerate={handleRegenerate}
-                busy={runner.active !== null}
-              />
+              <PlotFixContext.Provider value={askFix}>
+                <ChatTranscript
+                  key={active.id}
+                  messages={active.messages}
+                  streamingId={streamingId}
+                  mascotState={mascot.state}
+                  stateLabels={stateLabels}
+                  sharedAvatar={handoff}
+                  error={error}
+                  onRetry={handleRetry}
+                  onRegenerate={handleRegenerate}
+                  busy={runner.active !== null}
+                />
+              </PlotFixContext.Provider>
             </>
           )}
 

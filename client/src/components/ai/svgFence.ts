@@ -162,3 +162,25 @@ export function markPendingSchematic(text: string): string {
   if (!last || last.closed || !looksLikeOpenSchematic(last)) return text;
   return `${text.slice(0, last.start)}\`\`\`${PENDING_SCHEMATIC_LANG}\n\`\`\``;
 }
+
+/** Info string of the executable plot fence. */
+export const PLOT_LANG = "python:plot";
+
+/** Language the streaming pre-pass gives an unfinished ```python:plot fence; the renderer shows a "Preparing plot" placeholder for it. */
+export const PENDING_PLOT_LANG = `mae-plot-pending-${Math.random().toString(36).slice(2, 10)}`;
+
+/** An unterminated fence whose language is `python:plot`, or the start of it (after `python:`) while the info line is still arriving. */
+function looksLikeOpenPlot(block: FenceBlock): boolean {
+  const lang = firstToken(block.info);
+  if (lang === PLOT_LANG) return true;
+  return !block.hasBody && lang.length >= "python:".length && PLOT_LANG.startsWith(lang);
+}
+
+/** Streaming counterpart of markPendingSchematic for ```python:plot: an unterminated fence becomes a closed empty one in the pending language. */
+export function markPendingPlot(text: string): string {
+  if (!text.includes("```") && !text.includes("~~~")) return text;
+  const blocks = scanFences(text);
+  const last = blocks[blocks.length - 1];
+  if (!last || last.closed || !looksLikeOpenPlot(last)) return text;
+  return `${text.slice(0, last.start)}\`\`\`${PENDING_PLOT_LANG}\n\`\`\``;
+}

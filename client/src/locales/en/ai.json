@@ -103,6 +103,51 @@
     "fitShort": "Fit",
     "lightboxHint": "Use the zoom buttons or the + and - keys to inspect the schematic. Press Escape to close."
   },
+  "plot": {
+    "label": "Plot",
+    "alt": "Plot: {{title}}",
+    "preparing": "Preparing plot…",
+    "waiting": "Starting the plot engine…",
+    "step": "({{n}}/{{total}})",
+    "loadingHint": "Loading scientific Python. The first plot downloads about 20–30 MB; it is cached afterwards.",
+    "stage": {
+      "runtime": "Loading the Python runtime",
+      "numpy": "Loading NumPy",
+      "matplotlib": "Loading Matplotlib",
+      "scipy": "Loading SciPy",
+      "rendering": "Drawing the plot"
+    },
+    "restoredHint": "This plot has not been drawn in this session. Drawing it downloads the scientific Python runtime (about 20–30 MB, cached afterwards).",
+    "run": "Run plot",
+    "retry": "Try again",
+    "askFix": "Ask MAE AI to fix this plot",
+    "fixPrompt": "The plot script failed with this error: {{error}}\nPlease fix it and send the corrected plot.",
+    "errorAtLine": "Line {{line}}: {{message}}",
+    "error": {
+      "rejected": "This plot script was not run because it uses something plots are not allowed to use.",
+      "python": "The plot script stopped with an error, so no figure was drawn.",
+      "limit": "The figure is larger than the limits allow.",
+      "timeout": "The plot took too long and was stopped.",
+      "load": "The plot engine could not be downloaded. Check your connection and try again.",
+      "internal": "The plot could not be drawn here."
+    },
+    "actions": "Plot actions",
+    "expand": "Expand plot",
+    "open": "Open plot larger",
+    "download": "Download PNG (300 DPI)",
+    "downloadFailed": "The download could not be started.",
+    "viewCode": "View Python code",
+    "hideCode": "Hide Python code",
+    "close": "Close",
+    "zoom": "Zoom",
+    "zoomIn": "Zoom in",
+    "zoomOut": "Zoom out",
+    "fit": "Fit to screen",
+    "fitShort": "Fit",
+    "lightboxHint": "Use the zoom buttons or the + and - keys to inspect the plot. Press Escape to close.",
+    "ready": "Plot ready",
+    "warnings": "{{count}} warning(s)"
+  },
   "demo": {
     "short": "Demo mode",
     "full": "Demo mode — add GEMINI_API_KEY for real answers",
@@ -116,6 +161,41 @@
     "cancel": "Cancel",
     "delete": "Delete chat",
     "clearAll": "Clear all"
+  },
+  "mathKeyboard": {
+    "open": "Open math keyboard",
+    "close": "Close math keyboard",
+    "panel": "Math keyboard",
+    "tabsLabel": "Math symbol groups",
+    "keysLabel": "{{tab}} keys",
+    "tabs": {
+      "calculus": "Calculus",
+      "functions": "Functions",
+      "algebra": "Algebra & Matrix",
+      "greek": "Greek & Constants"
+    },
+    "tooLong": "Message limit reached — that formula doesn't fit.",
+    "hint": "Select text first to put it inside the formula.",
+    "keys": {
+      "integral": "Integral from a to b",
+      "derivative": "Derivative with respect to x",
+      "limit": "Limit as x approaches a",
+      "sum": "Sum from n equals 1 to infinity",
+      "partial": "Partial derivative symbol",
+      "fraction": "Fraction",
+      "sqrt": "Square root",
+      "nth-root": "Nth root",
+      "power": "Power",
+      "subscript": "Subscript",
+      "matrix": "2 by 2 matrix",
+      "determinant": "2 by 2 determinant",
+      "ln": "Natural logarithm",
+      "sin": "Sine",
+      "cos": "Cosine",
+      "tan": "Tangent",
+      "abs": "Absolute value",
+      "infinity": "Infinity"
+    }
   },
   "composer": {
     "label": "Message MAE AI",
