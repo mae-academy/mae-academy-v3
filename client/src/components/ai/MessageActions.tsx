@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { copyText } from "./CodeBlock";
 import { cleanMessageSource } from "./messageText";
+import { copyRichMessage } from "./richCopy";
 import { detectSpeechLang, isSpeechSynthesisSupported, spokenLangOf, toSpokenText, useSpeech } from "./speech";
 
 const COPIED_MS = 1800;
@@ -54,7 +55,9 @@ export function MessageActions({ messageId, content, role, canRegenerate = false
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
 
   const copy = async () => {
-    const ok = await copyText(user ? content : cleanMessageSource(content));
+    // Assistant replies go to the clipboard as HTML with MathML equations plus plain text, so a paste into Word
+    // gives equations instead of $...$; the user's own messages stay plain text.
+    const ok = await (user ? copyText(content) : copyRichMessage(cleanMessageSource(content)));
     if (!ok) {
       toast.error(t("chat.copyFailed"));
       return;

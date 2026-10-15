@@ -127,6 +127,20 @@ describe("validation", () => {
 describe("system instruction", () => {
   const prompt = buildSystemInstruction("general");
 
+  it("covers the full scientific scope and the five derivation gates, kept distinct from the diagram gates", () => {
+    for (const area of ["ODE/PDE", "Maxwell's equations", "quantum mechanics", "heat transfer", "machine design", "LQR", "Intel 8086 assembly", "RTOS"]) expect(prompt).toContain(area);
+    expect(prompt).toMatch(/Derivation gates \(these are about calculations and are separate from the 10 diagram gates\)/);
+    for (const gate of ["(1) Dimensional homogeneity", "(2) Step-by-step derivation", "(3) Boundary and edge cases", "(4) Notation", "(5) Precision"]) expect(prompt).toContain(gate);
+    expect(prompt).toContain("written as \\mu."); // a single backslash, not an over-escaped one
+    expect(prompt).not.toContain("\\\\mu");
+  });
+
+  it("promises no certainty: it asks the model to flag doubt instead of guessing", () => {
+    expect(prompt).toMatch(/you cannot be certain of every result/);
+    expect(prompt).toMatch(/never invent datasheet numbers, citations or standards clauses/);
+    expect(prompt).not.toMatch(/zero[- ]error|99%/i);
+  });
+
   it("demands dollar-delimited LaTeX and forbids the bracket forms", () => {
     expect(prompt).toContain("$...$");
     expect(prompt).toContain("$$...$$");
