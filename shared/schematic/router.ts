@@ -276,7 +276,7 @@ function routeAll(inp: RouteInput): RouteOutcome {
       const inOwn = x >= own.x0 && x <= own.x1 && y >= own.y0 && y <= own.y1;
       if (!inOwn) {
         // the lead is as long as the part's own keep-out; the cell just beyond must be free, or the parts are too close together
-        if (grid.blocked[grid.idx(x, y)]) { if (process.env.ROUTER_DEBUG) console.log('lane blocked', t.id, x, y, t.dir, JSON.stringify(own)); return { ok: false, failed: t.net, wires: [], portParts: [] }; }
+        if (grid.blocked[grid.idx(x, y)]) return { ok: false, failed: t.net, wires: [], portParts: [] };
         break;
       }
       cells.push([x, y]);
@@ -377,7 +377,6 @@ function routeAll(inp: RouteInput): RouteOutcome {
       const hp = new Heap();
       hp.push(0, s0);
       let goalState = -1;
-      let popped = 0, maxY = -1e9;
       const crossOk = (i: number, d: Dir): boolean => {
         const o = grid.owner[i];
         if (o === -1 || o === ni) return true;
@@ -390,7 +389,6 @@ function routeAll(inp: RouteInput): RouteOutcome {
         if (cst > dist[st]) continue;
         const ci = st >> 2, d = DIRS[st & 3];
         const [cx, cy] = grid.xy(ci);
-        popped++; maxY = Math.max(maxY, cy);
         const isStart = st === s0;
         if (!isStart && (inTree(ci) || isGoalBus(cx, cy, d))) { goalState = st; break; }
         const here = grid.owner[ci];
@@ -417,7 +415,7 @@ function routeAll(inp: RouteInput): RouteOutcome {
           if (cost < dist[ns]) { dist[ns] = cost; prev[ns] = st; hp.push(cost, ns); }
         }
       }
-      if (goalState < 0) { if (process.env.ROUTER_DEBUG) console.log('route fail', lane.t.id, lane.t.x, lane.t.y, lane.t.dir, 'end', lane.end, 'popped', popped, 'maxY', maxY, 'bus', bus, 'grid', grid.ox, grid.oy, W, H, DIRS.map((d2) => { const nx = lane.end[0] + DX[d2], ny = lane.end[1] + DY[d2]; const i2 = grid.idx(nx, ny); return d2 + ':' + grid.blocked[i2] + '/' + grid.owner[i2] + '/' + grid.flags[i2]; }).join(' '), 'net', ni, 'owner here', grid.owner[startIdx]); return { ok: false, failed: lane.t.net, wires: [], portParts: [] }; }
+      if (goalState < 0) return { ok: false, failed: lane.t.net, wires: [], portParts: [] };
 
       // rebuild the path, terminal -> lane -> routed cells
       const cells: [number, number][] = [];
@@ -737,8 +735,18 @@ function expand(raw: Record<string, unknown>, normalize: Normalizer): NetlistExp
   assignDepths(rparts, nets);
 
   // top bus: the highest net that many parts hang from
+  // Supply-like nets (a source's + pin, or a name like VCC / V3V3 / VBUS) become the top bus when enough parts hang from them.
+  const positive = new Set<string>();
+  for (const p of rparts) {
+    if (!SOURCE_TYPES.has(p.part.type)) continue;
+    for (const [pin, net] of Array.from(p.pins)) if (pin === '+' || pin === '1') positive.add(net);
+  }
+  const powerName = /^(vcc|vdd|vbat|vbus|vsup|vpp|v\d[\dv.]*|\+\d.*)$/i;
+  const rank = (n: Net): number => (positive.has(n.name) ? 10 : 0) + (powerName.test(n.name) ? 5 : 0) + n.pins.length;
   let topNet: string | null = null;
-  const topCandidates = Array.from(nets.values()).filter((n) => !n.ground && n.pins.length >= 4).sort((a, b) => b.pins.length - a.pins.length);
+  const topCandidates = Array.from(nets.values())
+    .filter((n) => !n.ground && (n.pins.length >= 4 || (n.pins.length >= 3 && (positive.has(n.name) || powerName.test(n.name)))))
+    .sort((a, b) => rank(b) - rank(a));
   if (topCandidates.length) topNet = topCandidates[0].name;
 
   // ---- place + route, widening the channels until everything routes ----
@@ -750,7 +758,6 @@ function expand(raw: Record<string, unknown>, normalize: Normalizer): NetlistExp
     layoutParts(rparts, gap);
     for (let it = 0; it < 3; it++) { chooseOrientations(rparts, nets, topNet); classify(rparts, nets, topNet); layoutParts(rparts, gap); }
     placement = buildTerminals(rparts, nets);
-    if (process.env.ROUTER_DEBUG) console.log('gap', gap, rparts.map((q) => `${q.id}@${q.px},${q.py} ${q.cur.rot}/${q.cur.flip} box ${q.cur.box}`).join(' | '), 'ports', JSON.stringify(placement.ports), 'bounds', JSON.stringify(placement.bounds));
     outcome = routeAll({ parts: rparts, nets, terminals: placement.terminals, ports: placement.ports, groundBus: !!groundNet, topBus: topNet, bounds: placement.bounds });
     if (outcome.ok) break;
   }
