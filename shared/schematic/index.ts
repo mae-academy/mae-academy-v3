@@ -13,3 +13,4 @@ export { ARCHETYPES, DUPLICATE_ARCHETYPE_IDS, buildArchetype, findArchetype, isA
 export { resolveParams } from './archetypes/params';
 export { ARCHETYPE_DOC, buildArchetypeDoc, archetypeLine } from './archetypes/archetypeDoc';
 export { parseMath, autoMathSource, mathMetrics, mathTspans, texText } from './mathText';
+export { expandNetlistRequest, isNetlistRequest, NETLIST_DOC } from './router';

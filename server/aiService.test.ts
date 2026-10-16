@@ -29,6 +29,8 @@ import {
   geminiApiKey,
   parseGeminiKeys,
   nextKeyStart,
+  withKeyRotation,
+  RATE_LIMIT_BACKOFF_MS,
   mockChatStream,
   mockReply,
   resolveAiMode,
@@ -37,7 +39,7 @@ import {
   windowMessages,
   withModelFallback,
 } from "./aiService";
-import { ARCHETYPE_DOC, ARCHETYPES, SCHEMATIC_GATES_SUMMARY, SCHEMATIC_SPEC_DOC, validateSchematic } from "../shared/schematic";
+import { ARCHETYPE_DOC, NETLIST_DOC, SCHEMATIC_GATES_SUMMARY, validateSchematic } from "../shared/schematic";
 import { BUCK_CONVERTER } from "../shared/schematic/fixtures";
 
 const PNG = "data:image/png;base64,iVBORw0KGgo=";
@@ -198,29 +200,30 @@ describe("system instruction", () => {
     expect(integration).not.toMatch(/GENERATE_SCHEMATIC|text-to-image|ONLY these elements|There is no stylesheet|real minus sign/);
     expect(integration).toMatch(/info string is exactly `schematic`/);
     expect(integration).toMatch(/LAST content of the reply, just before the optional \[\[SIM:\.\.\]\] line/);
-    expect(integration).toMatch(/Phase A .* Phase B .* Phase C .* ALL 10 gates/);
+    expect(integration).toMatch(/Phase A .* Phase C .* electrical gates/);
     expect(integration).toMatch(/no comments, no trailing commas/);
-    expect(integration).toMatch(/Compute every wire endpoint from the terminal offsets table/);
-    expect(integration).toMatch(/Draw ground at node 0/);
+    expect(integration).toMatch(/Ground is the net named 0/);
     for (const gate of SCHEMATIC_GATES_SUMMARY) expect(integration).toContain(gate);
-    expect(integration).toContain(SCHEMATIC_SPEC_DOC);
+    expect(integration).toContain(NETLIST_DOC);
     expect(prompt).toContain("ارسم");
     expect(prompt).toMatch(/Do not draw unless/);
     expect(prompt).toMatch(/If a value or connection is unreadable or ambiguous, say so/);
   });
 
-  it("is archetype-first: embeds the catalogue, forbids coordinates for archetypes, and bans part numbers", () => {
+  it("is netlist-first: any circuit is drawn from a topology, archetypes are only a shortcut, and part numbers are banned", () => {
     const integration = prompt.slice(prompt.indexOf("# MAE Academy platform integration"));
+    expect(integration).toMatch(/NETLIST FIRST/);
+    expect(integration).toMatch(/Never refuse a drawing/);
+    expect(integration).toMatch(/never coordinates, rotations, wires or label positions/);
+    expect(integration).not.toMatch(/unavailable/);
+    expect(integration).not.toMatch(/FREE-FORM only when no archetype fits/);
     expect(integration).toContain(ARCHETYPE_DOC);
-    for (const id of Array.from(ARCHETYPES.keys())) expect(integration).toContain(`- ${id}:`);
-    expect(integration).toMatch(/ARCHETYPE FIRST/);
-    expect(integration).toContain('{"archetype":"<id>","params":{...}}');
-    expect(integration).toMatch(/never parts, wires, coordinates or labels/);
-    expect(integration).toMatch(/FREE-FORM only when no archetype fits/);
-    expect(integration).toMatch(/unavailable/);
+    expect(integration).toMatch(/Shortcut for classic circuits/);
+    expect(integration).toMatch(/Series: pin 2 of A and pin 1 of B share one net name/);
+    expect(integration).toMatch(/Every active loop returns to net 0/);
     expect(integration).toMatch(/NEVER commercial part numbers \(1N4007, LM741/);
     expect(integration).toContain("$V_{\\text{out}}$");
-    expect(ARCHETYPE_DOC.length).toBeLessThan(7000); // the full 22-circuit roster, sent in every system prompt
+    expect(ARCHETYPE_DOC.length).toBeLessThan(7000);
   });
 
   it("keeps the marker usable after a drawing", () => {
@@ -925,5 +928,60 @@ describe("model turns that carry a schematic spec", () => {
   it("leaves a short turn unchanged", () => {
     const turn = `Short.\n\n${fenceOf(spec)}`;
     expect(limitModelTurn(turn)).toBe(turn);
+  });
+});
+
+describe("withKeyRotation (429 failover with 2 s / 4 s backoff)", () => {
+  const limit = (message = "RESOURCE_EXHAUSTED retry in 5s") => Object.assign(new Error(message), { status: 429 });
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("rotates to the next key at once on a 429 and never pauses while a key still works", async () => {
+    vi.stubEnv("GEMINI_KEYS", " k0 , k1 ,k2 ");
+    const sleeps: number[] = [];
+    const seen: number[] = [];
+    const out = await withKeyRotation(async (_client, index) => { seen.push(index); if (index !== 2) throw limit(); return "ok"; }, { start: 0, sleep: async (ms) => { sleeps.push(ms); } });
+    expect(out).toBe("ok");
+    expect(seen).toEqual([0, 1, 2]);
+    expect(sleeps).toEqual([]);
+  });
+
+  it("starts from the given key and wraps around the pool", async () => {
+    vi.stubEnv("GEMINI_KEYS", "a,b,c");
+    const seen: number[] = [];
+    await withKeyRotation(async (_c, index) => { seen.push(index); if (seen.length < 3) throw limit(); return 1; }, { start: 1, sleep: async () => {} });
+    expect(seen).toEqual([1, 2, 0]);
+  });
+
+  it("when every key is on cooldown it waits 2 s, then 4 s, retrying all keys each time, before giving up", async () => {
+    vi.stubEnv("GEMINI_KEYS", "a,b");
+    const sleeps: number[] = [];
+    let calls = 0;
+    await expect(withKeyRotation(async () => { calls++; throw limit(); }, { start: 0, sleep: async (ms) => { sleeps.push(ms); } })).rejects.toMatchObject({ status: 429 });
+    expect(RATE_LIMIT_BACKOFF_MS).toEqual([2000, 4000]);
+    expect(sleeps).toEqual([2000, 4000]);
+    expect(calls).toBe(6); // 2 keys x 3 passes
+  });
+
+  it("succeeds on a later pass once the cooldown clears", async () => {
+    vi.stubEnv("GEMINI_KEYS", "a,b");
+    let calls = 0;
+    const sleeps: number[] = [];
+    const out = await withKeyRotation(async () => { calls++; if (calls <= 3) throw limit(); return "recovered"; }, { start: 0, sleep: async (ms) => { sleeps.push(ms); } });
+    expect(out).toBe("recovered");
+    expect(sleeps).toEqual([2000]);
+  });
+
+  it("does not wait on a daily quota, and a single key behaves like the old single-key setup", async () => {
+    vi.stubEnv("GEMINI_KEYS", "only");
+    const sleeps: number[] = [];
+    await expect(withKeyRotation(async () => { throw limit("RESOURCE_EXHAUSTED GenerateRequestsPerDay quota"); }, { sleep: async (ms) => { sleeps.push(ms); } })).rejects.toMatchObject({ status: 429 });
+    expect(sleeps).toEqual([]);
+  });
+
+  it("throws any other error immediately, without trying the other keys", async () => {
+    vi.stubEnv("GEMINI_KEYS", "a,b,c");
+    let calls = 0;
+    await expect(withKeyRotation(async () => { calls++; throw Object.assign(new Error("bad request"), { status: 400 }); }, { start: 0 })).rejects.toThrow("bad request");
+    expect(calls).toBe(1);
   });
 });

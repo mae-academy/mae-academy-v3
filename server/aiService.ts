@@ -27,7 +27,7 @@ import { DOCUMENT_ANALYSIS_RULES } from "./aiDocumentPrompt";
 import { HANDWRITING_AUDIT_RULES, STEP_MODE_RULES } from "./aiGuidancePrompts";
 
 export { HANDWRITING_AUDIT_RULES, STEP_MODE_RULES };
-import { ARCHETYPE_DOC, SCHEMATIC_FENCE, SCHEMATIC_GATES_SUMMARY, SCHEMATIC_SPEC_DOC } from "../shared/schematic";
+import { ARCHETYPE_DOC, NETLIST_DOC, SCHEMATIC_FENCE, SCHEMATIC_GATES_SUMMARY } from "../shared/schematic";
 import { BUCK_CONVERTER, PID_LOOP, VOLTAGE_DIVIDER } from "../shared/schematic/fixtures";
 
 const nvidiaClient = new OpenAI({
@@ -122,9 +122,6 @@ export function classifyRateLimit(error: unknown): AiRateLimitError | null {
   if (/PerDay/i.test(text) || (seconds !== undefined && seconds > 600)) return new AiRateLimitError("daily", seconds);
   return new AiRateLimitError("cooldown", seconds);
 }
-
-/** A per-minute cooldown that clears within this many seconds is waited out once, silently, before the student sees anything. */
-const MAX_COOLDOWN_WAIT_SECONDS = 20;
 
 const IMAGE_URL = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/]*={0,2})$/;
 
@@ -439,20 +436,20 @@ const INTEGRATION_RULES = [
   "- When an image of a schematic or diagram is attached, first state the components, values and labelled nodes you read (for example node A, node B, ground). If a value or connection is unreadable or ambiguous, say so and ask for a clearer image instead of guessing.",
   "",
   "Schematic drawings (the platform draws them from a JSON spec, so this format is mandatory):",
-  "- The master prompt's SVG rules (Sections 1.4, 1.7 and the SVG form of 3.2) do NOT apply here. Never emit SVG, ```xml:svg blocks, ASCII art or image tags (Mermaid is allowed ONLY for the cases in the Visual engines section below, never for circuits or control block diagrams). A deterministic engine draws the symbols from a validated library and enforces the 10 verification gates below; your job is a correct, grid-snapped spec.",
+  "- The master prompt's SVG rules (Sections 1.4, 1.7 and the SVG form of 3.2) do NOT apply here. Never emit SVG, ```xml:svg blocks, ASCII art or image tags (Mermaid is allowed ONLY for the cases in the Visual engines section below, never for circuits or control block diagrams). A deterministic engine draws the symbols from a validated library and enforces the 10 verification gates below; your job is a correct netlist.",
   "- Only when a drawing, schematic or block diagram is clearly requested (for example «ارسم» or «draw»): first give the academic explanation, the equations and the node netlist or block table as text and LaTeX. THEN append exactly ONE fenced block whose info string is exactly `schematic` and whose content is ONLY a JSON object (no prose inside, strict JSON: double quotes, no comments, no trailing commas). It is the LAST content of the reply, just before the optional [[SIM:..]] line. Never emit it for ordinary questions, refusals or when only an explanation is wanted. At most one per reply.",
-  "- ARCHETYPE FIRST. The platform owns a catalogue of hand-verified, pre-routed circuits (below). If the requested circuit matches one, the block is ONLY {\"archetype\":\"<id>\",\"params\":{...}} (optionally \"title\"): never parts, wires, coordinates or labels. Take the parameter values from the student's request; for every value they did not give, omit it (the default is used) and state that assumption in the text. Parameters are strings with units (\"10 kΩ\", \"47 µF\") or one of the listed choices; unknown parameters are rejected. For a change request (\"make R_L 4.7 Ω\", \"add an LC filter\") re-emit the archetype request with the updated params.",
+  "- NETLIST FIRST. You can draw ANY circuit, block diagram or logic network, however unusual (protection circuits, clamps, multi-stage transistor stages, microcontroller interfaces). Never refuse a drawing, never say a circuit cannot be drawn, and never substitute a different \"closest\" circuit: describe the REAL circuit as a netlist and the platform places every part and routes every wire with an orthogonal router. The block is ONLY the netlist JSON described below: never coordinates, rotations, wires or label positions.",
+  NETLIST_DOC,
+  "- Topology rules (the router enforces the geometry, you supply the connectivity). Series: pin 2 of A and pin 1 of B share one net name. Parallel: both parts sit on the same two net names. A junction is any net with 3 or more pins (the platform draws the dot; never add a junction part). Nets with different names never connect where wires merely cross. No floating pins: every pin has a net, every net has at least two pins or is listed in \"labels\". Every active loop returns to net 0 (ground). Part bodies are impassable and no wire runs through one; the engine guarantees that, so do not try to describe routes.",
+  "- Shortcut for classic circuits: when the request is exactly one of the verified circuits below you MAY emit ONLY {\"archetype\":\"<id>\",\"params\":{...}} (optionally \"title\"; values as strings with units; unknown params are rejected). For a change request that alters the topology, emit a netlist instead.",
   "Archetype catalogue (id: summary. Params: name [unit] (default) | choices):",
   ARCHETYPE_DOC,
-  "- FREE-FORM only when no archetype fits (for example a control block diagram, a logic network or an unusual circuit). A free-form spec must pass the full contract below, and if it still fails verification the student sees only an \"unavailable\" card instead of a drawing, so prefer the CLOSEST archetype plus an explanation of the difference over a risky free-form drawing. Never use a free-form spec for a circuit that has an archetype.",
-  "- Label policy: use functional academic designators only (R1, C1, L1, D1, S1, V_A, V_{\\text{in}}); NEVER commercial part numbers (1N4007, LM741, 2N2222, TL072, NE555, IRF540...) in values, labels or text unless the student explicitly asked for that part. In the text write designators as math: $D_1$ to $D_6$, $V_A$, $V_{\\text{out}}$, $R_L$.",
-  "- Free-form only: before writing the spec, mentally run Phase A (topology and node extraction), Phase B (grid alignment and clearance) and Phase C (engineering sanity) of the master prompt and then ALL 10 gates below. Fix your own errors first; the spec you emit must already pass every gate. Gates:",
+  "- Label policy: use functional academic designators only (R1, C1, L1, D1, S1, V_A, V_{\\text{in}}); NEVER commercial part numbers (1N4007, LM741, 2N2222, TL072, NE555, IRF540...) in values, labels or text unless the student explicitly asked for that part. In the text write designators as math: $D_1$ to $D_6$, $V_A$, $V_{\\text{out}}$, $R_L$. A generic chip such as an ESP32 is an `ic` part whose caption is its name.",
+  "- Before writing the netlist, mentally run Phase A (topology and node extraction) and Phase C (engineering sanity) of the master prompt and then the electrical gates below. Fix your own errors first; the netlist you emit must already satisfy them. Gates:",
   ...SCHEMATIC_GATES_SUMMARY.map((gate) => `  ${gate}`),
-  "- Free-form practical rules: all coordinates are integers in grid units. Compute every wire endpoint from the terminal offsets table (position + rotated offset), never by eye. Give every part a value with a unit (blocks carry their transfer function or name). Draw ground at node 0. Put a wire between parts instead of letting them touch, keep parts at least one grid unit apart, and run wires between perpendicular terminals with an explicit bend point. Keep the figure compact (about 40 x 24 grid units at most) and place labels in free space.",
-  "- Write the text in the student's language; keep identifiers, designators and units in the spec in standard notation. If the circuit is too complex to draw faithfully, say so and use the closest archetype or draw the essential core instead of guessing.",
+  "- Give every part a value with a unit (blocks and chips carry their transfer function or name). Name the input, output and supply nets in \"labels\". Keep the figure sensible: split a very large system into stages and draw one stage per block.",
+  "- Write the text in the student's language; keep identifiers, designators and units in the spec in standard notation. If the circuit is too complex to draw faithfully in one sheet, say so and draw the essential core as a netlist instead of guessing.",
   "",
-  "Free-form spec format (reference; the engine reads exactly this):",
-  SCHEMATIC_SPEC_DOC,
   "",
   "Verified free-form reference (a block diagram has NO ground, rails or values on the sum; the feedback wire ends on the sum's S terminal and begins at a vertex on the output wire):",
   "```" + SCHEMATIC_FENCE,
@@ -702,6 +699,44 @@ export function chunkText(chunk: { candidates?: { content?: { parts?: { text?: s
   return (chunk.candidates?.[0]?.content?.parts ?? []).filter((part) => typeof part.text === "string" && !part.thought).map((part) => part.text).join("");
 }
 
+/** Pauses between full passes over the key pool when every key answered a per-minute 429: 2 s, then 4 s. */
+export const RATE_LIMIT_BACKOFF_MS: readonly number[] = [2000, 4000];
+
+/**
+ * Runs `attempt` on the keys of the pool in round-robin order. A 429 moves on to the next key at once (no pause); when every
+ * key has answered 429 in a pass, a per-minute cooldown is retried after each `backoffMs` pause (exponential: 2 s, 4 s) and a
+ * daily quota is reported straight away. Anything that is not a 429 is thrown immediately. Throws the last 429 when nothing worked.
+ */
+export async function withKeyRotation<T>(
+  attempt: (client: GoogleGenAI, keyIndex: number) => Promise<T>,
+  options: { signal?: AbortSignal; start?: number; backoffMs?: readonly number[]; sleep?: (ms: number) => Promise<void> } = {},
+): Promise<T> {
+  const { signal, backoffMs = RATE_LIMIT_BACKOFF_MS, sleep = (ms) => new Promise<void>((resolve) => setTimeout(resolve, ms)) } = options;
+  const poolSize = parseGeminiKeys().length;
+  if (poolSize === 0) throw new AiNotConfiguredError();
+  const start = options.start ?? nextKeyStart(poolSize);
+  for (let pass = 0; ; pass++) {
+    let lastError: unknown;
+    let cooldown = false;
+    for (let i = 0; i < poolSize; i++) {
+      const index = (start + i) % poolSize;
+      try {
+        return await attempt(getGeminiClient(index), index);
+      } catch (error) {
+        const limit = classifyRateLimit(error);
+        if (!limit || signal?.aborted) throw error;
+        lastError = error;
+        if (limit.kind === "cooldown") cooldown = true;
+        if (i < poolSize - 1) console.warn(`[Key Rotator] Key index ${index} hit quota limit (429). Rotating to next key...`);
+        else console.warn(`[Key Rotator] Key index ${index} hit quota limit (429). All ${poolSize} keys are limited${pass < backoffMs.length && cooldown ? `; retrying in ${backoffMs[pass] / 1000}s` : ""}.`);
+      }
+    }
+    if (!cooldown || pass >= backoffMs.length) throw lastError;
+    await sleep(backoffMs[pass]);
+    if (signal?.aborted) throw lastError;
+  }
+}
+
 /** Streams the model's reply as text deltas. Aborting `signal` stops reading from the upstream stream. Throws AiBlockedError when the answer is blocked or empty. */
 export async function* streamChat(request: SanitizedChat, signal?: AbortSignal): AsyncGenerator<string> {
   const models = modelChain();
@@ -727,36 +762,13 @@ export async function* streamChat(request: SanitizedChat, signal?: AbortSignal):
         }),
       { signal },
     );
-  // Zero-downtime failover: a 429 on one key moves straight to the next; only when every key has answered 429 does the student see a limit.
-  const open = async () => {
-    let lastError: unknown;
-    for (let attempt = 0; attempt < poolSize; attempt++) {
-      const index = (start + attempt) % poolSize;
-      try {
-        return await openWith(getGeminiClient(index));
-      } catch (error) {
-        if (signal?.aborted || !classifyRateLimit(error)) throw error;
-        lastError = error;
-        if (attempt < poolSize - 1) console.warn(`[Key Rotator] Key index ${index} hit quota limit (429). Rotating to next key...`);
-      }
-    }
-    throw lastError;
-  };
-  let stream: Awaited<ReturnType<typeof open>>;
+  // Zero-downtime failover: a 429 moves straight to the next key; when every key is limited, a per-minute cooldown is retried
+  // after 2 s and then 4 s (across all keys again) before the student sees anything.
+  let stream: Awaited<ReturnType<typeof openWith>>;
   try {
-    stream = await open();
+    stream = await withKeyRotation((client) => openWith(client), { signal, start });
   } catch (error) {
-    const limit = classifyRateLimit(error);
-    if (!limit) throw error;
-    // A short per-minute cooldown is waited out once, invisibly; a daily quota or a longer wait goes straight to the student.
-    if (limit.kind !== "cooldown" || (limit.retryAfterSeconds ?? 5) > MAX_COOLDOWN_WAIT_SECONDS || signal?.aborted) throw limit;
-    await new Promise<void>((resolve) => setTimeout(resolve, (limit.retryAfterSeconds ?? 5) * 1000 + 250));
-    if (signal?.aborted) throw limit;
-    try {
-      stream = await open();
-    } catch (again) {
-      throw classifyRateLimit(again) ?? again;
-    }
+    throw classifyRateLimit(error) ?? error;
   }
   let produced = false;
   let blocked: string | undefined;

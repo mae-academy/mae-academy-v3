@@ -1,6 +1,7 @@
 // Untrusted-input handling: JSON extraction from LLM text, strict shape normalisation, size caps, type whitelist.
 
 import { expandArchetypeRequest } from './archetypes/registry';
+import { expandNetlistRequest } from './router';
 import { getSymbol } from './symbols';
 import { LIMITS, PART_TYPES, type Compass, type IcPin, type DomainSpec, type Issue, type LabelPref, type LabelSpec, type PartAttrs, type PartSpec, type PartType, type Pt, type Rot, type SchematicSpec, type WireSpec } from './types';
 
@@ -164,6 +165,15 @@ export function normalizeSchematicSpec(raw: unknown): NormalizeResult {
     const ex = expandArchetypeRequest(raw);
     if (!ex.spec) { errors.push(...ex.errors); return fail(); }
     return normalizeSchematicSpec(JSON.parse(JSON.stringify(ex.spec)));
+  }
+
+  // Netlist request: placed and routed by the engine (any topology; the model never supplies coordinates).
+  if (Object.prototype.hasOwnProperty.call(raw, 'netlist')) {
+    const ex = expandNetlistRequest(raw, normalizeSchematicSpec);
+    warnings.push(...ex.warnings);
+    if (!ex.spec) { errors.push(...ex.errors); return fail(); }
+    const done = normalizeSchematicSpec(JSON.parse(JSON.stringify(ex.spec)));
+    return { spec: done.spec, errors: [...errors, ...done.errors], warnings: [...warnings, ...done.warnings] };
   }
 
   const title = strOf(own(raw, 'title'), 'title', errors) ?? '';
