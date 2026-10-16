@@ -375,7 +375,7 @@
       "type": "Solo se pueden adjuntar imágenes, PDF, Markdown y archivos de texto plano.",
       "office": "Los archivos de Word y PowerPoint aún no son compatibles: expórtalos a PDF y adjunta ese archivo.",
       "empty": "Ese archivo está vacío.",
-      "pdf_too_large": "Ese PDF es demasiado grande (más de 6 MB).",
+      "pdf_too_large": "Archivo demasiado grande. El tamaño máximo de PDF es 50 MB.",
       "text_too_large": "Ese archivo de texto es demasiado grande (más de 200 KB).",
       "invalid_pdf": "Ese archivo no es un PDF válido.",
       "invalid_text": "Ese archivo no es texto UTF-8 legible.",
@@ -393,11 +393,11 @@
   },
   "thinking": {
     "label": "Razonamiento",
-    "low": "Bajo",
+    "low": "Bajo (Rápido)",
     "lowHint": "Respuestas rápidas con mínimo razonamiento",
-    "medium": "Medio",
+    "medium": "Medio (Equilibrado)",
     "mediumHint": "Recomendado para cursos de ingeniería",
-    "high": "Alto",
+    "high": "Alto (Profundo)",
     "highHint": "Demostraciones exhaustivas paso a paso y matrices complejas"
   },
   "stepMode": {

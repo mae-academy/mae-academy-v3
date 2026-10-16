@@ -149,9 +149,9 @@ describe("brand palette: no amber or yellow in the chat UI", () => {
     expect(read(file)).not.toMatch(/\b(?:bg|text|border|ring|fill|from|to|via|hover:bg|dark:bg|dark:text|dark:border)-(?:amber|yellow)-/);
   });
 
-  it("the math keyboard uses translucent blue/indigo/violet gradients, not a flat solid violet", () => {
+  it("the math keyboard tabs use the MAE AI blue/indigo/purple gradient, not a flat solid violet", () => {
     const source = read("MathKeyboard.tsx");
-    expect(source).toMatch(/from-blue-600\/20 via-indigo-600\/20 to-violet-600\/20/);
+    expect(source).toMatch(/bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white shadow-md shadow-indigo-500\/20/);
     expect(source).not.toMatch(/bg-violet-600 text-white/);
   });
 });

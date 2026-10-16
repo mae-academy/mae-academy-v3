@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { motion, useReducedMotion } from "framer-motion";
-import { FileUp, FlaskConical, PanelLeft, Sparkles, SquarePen, X } from "lucide-react";
+import { FileUp, FlaskConical, PanelLeft, SquarePen, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { LabContext, MascotState, ThinkingEffort } from "@shared/aiTypes";
 import {
@@ -351,7 +351,6 @@ export function ChatWorkspace({ lab, className }: ChatWorkspaceProps) {
             <PanelLeft className="h-5 w-5 rtl:-scale-x-100" aria-hidden="true" />
           </button>
           <span className="flex items-center gap-1.5 text-sm font-semibold text-slate-800 dark:text-zinc-100">
-            <Sparkles className="h-4 w-4 text-violet-600 dark:text-violet-300" aria-hidden="true" />
             {t("page.title")}
           </span>
           <div className="min-w-0 flex-1" />

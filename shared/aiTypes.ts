@@ -33,7 +33,7 @@ export interface ChatDocument {
 
 export const AI_DOCUMENT_MIME_TYPES: readonly DocumentMimeType[] = ['application/pdf', 'text/plain', 'text/markdown'];
 /** Decoded PDF size cap. Gemini's inline request limit is 20 MB total; base64 adds a third, and the request also carries history. */
-export const AI_MAX_PDF_BYTES = 6 * 1024 * 1024;
+export const AI_MAX_PDF_BYTES = 50 * 1024 * 1024;
 export const AI_MAX_TEXT_DOCUMENT_BYTES = 200 * 1024;
 export const AI_MAX_DOCUMENT_NAME_CHARS = 120;
 

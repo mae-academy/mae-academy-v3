@@ -12,25 +12,27 @@ const openMenu = () => fireEvent.keyDown(screen.getByRole("button", { name: /^Th
 describe("ThinkingEffortSelector", () => {
   it("is a compact dropdown trigger that names the current level and explains it in a tooltip", () => {
     render(<ThinkingEffortSelector value="medium" onChange={() => {}} />);
-    const trigger = screen.getByRole("button", { name: "Thinking: Med" });
+    const trigger = screen.getByRole("button", { name: "Thinking: Medium (Balanced)" });
     expect(trigger.getAttribute("title")).toBe("Recommended for engineering coursework");
     expect(trigger.getAttribute("data-thinking-effort")).toBe("medium");
     cleanup();
     render(<ThinkingEffortSelector value="low" onChange={() => {}} />);
-    expect(screen.getByRole("button", { name: "Thinking: Low" }).getAttribute("title")).toBe("Fast answers, minimal reasoning tokens");
+    expect(screen.getByRole("button", { name: "Thinking: Low (Fast)" }).getAttribute("title")).toBe("Fast answers, minimal reasoning tokens");
     cleanup();
     render(<ThinkingEffortSelector value="high" onChange={() => {}} />);
-    expect(screen.getByRole("button", { name: "Thinking: High" }).getAttribute("title")).toBe("Exhaustive step-by-step proofs & complex matrices");
+    expect(screen.getByRole("button", { name: "Thinking: High (Deep)" }).getAttribute("title")).toBe("Exhaustive step-by-step proofs & complex matrices");
   });
 
-  it("opens a menu of Low / Med / High with exactly the current level checked, each with its hint", () => {
+  it("opens a plain-text menu of Low / Medium / High with exactly the current level checked, hints as tooltips", () => {
     render(<ThinkingEffortSelector value="medium" onChange={() => {}} />);
     openMenu();
     const items = screen.getAllByRole("menuitemradio");
     expect(items.map((i) => i.getAttribute("data-thinking-effort-option"))).toEqual(["low", "medium", "high"]);
     expect(items.map((i) => i.getAttribute("aria-checked"))).toEqual(["false", "true", "false"]);
-    expect(items[0].textContent).toContain("Fast answers, minimal reasoning tokens");
-    expect(items[2].textContent).toContain("Exhaustive step-by-step proofs & complex matrices");
+    expect(items.map((i) => i.textContent)).toEqual(["Low (Fast)", "Medium (Balanced)", "High (Deep)"]);
+    expect(items.map((i) => i.querySelectorAll(":scope > svg").length)).toEqual([0, 1, 0]); // only the checkmark on the selected level
+    expect(items[0].getAttribute("title")).toBe("Fast answers, minimal reasoning tokens");
+    expect(items[2].getAttribute("title")).toBe("Exhaustive step-by-step proofs & complex matrices");
   });
 
   it("reports the chosen level", () => {

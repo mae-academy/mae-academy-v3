@@ -115,7 +115,7 @@ export function MathKeyboard({ open, id, onInsert, onClose, tooLong }: MathKeybo
           animate={reduceMotion ? undefined : { height: "auto", opacity: 1 }}
           exit={reduceMotion ? { opacity: 1 } : { height: 0, opacity: 0 }}
           transition={{ duration: reduceMotion ? 0 : 0.18, ease: "easeOut" }}
-          className="overflow-hidden"
+          className="overflow-hidden pb-2.5"
         >
           <div
             id={id}
@@ -126,7 +126,7 @@ export function MathKeyboard({ open, id, onInsert, onClose, tooLong }: MathKeybo
             className="mx-2.5 mt-2.5 rounded-2xl border border-slate-200 bg-slate-50/80 dark:border-white/[0.1] dark:bg-white/[0.03]"
           >
             <p id={`${id}-hint`} className="sr-only">{t("mathKeyboard.hint")}</p>
-            <div role="tablist" aria-label={t("mathKeyboard.tabsLabel")} className="flex gap-1 overflow-x-auto px-2 pt-2 [scrollbar-width:none]">
+            <div role="tablist" aria-label={t("mathKeyboard.tabsLabel")} className="flex gap-1 overflow-x-auto px-2.5 py-2 [scrollbar-width:none]">
               {MATH_TABS.map((item) => {
                 const selected = item.id === tab;
                 return (
@@ -145,8 +145,8 @@ export function MathKeyboard({ open, id, onInsert, onClose, tooLong }: MathKeybo
                     className={cn(
                       "min-h-10 shrink-0 whitespace-nowrap rounded-full px-3.5 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-blue-600",
                       selected
-                        ? "bg-gradient-to-r from-blue-600/20 via-indigo-600/20 to-violet-600/20 text-blue-800 shadow-sm ring-1 ring-blue-500/30 backdrop-blur-sm dark:from-blue-500/30 dark:via-indigo-500/30 dark:to-violet-500/30 dark:text-blue-50 dark:ring-blue-400/35"
-                        : "text-slate-600 hover:bg-slate-200/70 dark:text-zinc-300 dark:hover:bg-white/[0.08]",
+                        ? "bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white shadow-md shadow-indigo-500/20"
+                        : "text-slate-600 hover:bg-slate-200/60 dark:text-zinc-300 dark:hover:bg-white/[0.08]",
                     )}
                   >
                     {tabLabel(item.id)}

@@ -133,11 +133,11 @@ async function startServer() {
     res.status(response.status).type("application/json").send(await response.text());
   });
   // MAE AI chat (SSE). Own JSON parser: the global 100kb default would reject schematic images and PDFs.
-  // 12mb: a 6 MB PDF is ~8 MB of base64, plus history and a downsized image.
+  // 72mb: a 50 MB PDF is ~67 MB of base64 (x4/3), plus history and a downsized image. Only this route gets the large limit.
   const MAX_STREAMS_PER_IP = 2;
   const openStreams = new Map<string, number>();
   const documentLimiter = createDocumentLimiter(); // 3 requests carrying document bytes per minute per IP
-  app.post("/api/ai/chat", express.json({ limit: "12mb" }), async (req, res) => {
+  app.post("/api/ai/chat", express.json({ limit: "72mb" }), async (req, res) => {
     let request;
     let mode;
     try {

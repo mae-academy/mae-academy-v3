@@ -375,7 +375,7 @@
       "type": "Only images, PDF, Markdown and plain text files can be attached.",
       "office": "Word and PowerPoint files aren't supported yet — export to PDF and attach that.",
       "empty": "That file is empty.",
-      "pdf_too_large": "That PDF is too large (over 6 MB).",
+      "pdf_too_large": "File too large. Maximum PDF size is 50 MB.",
       "text_too_large": "That text file is too large (over 200 KB).",
       "invalid_pdf": "That file isn't a valid PDF.",
       "invalid_text": "That file isn't readable UTF-8 text.",
@@ -393,11 +393,11 @@
   },
   "thinking": {
     "label": "Thinking",
-    "low": "Low",
+    "low": "Low (Fast)",
     "lowHint": "Fast answers, minimal reasoning tokens",
-    "medium": "Med",
+    "medium": "Medium (Balanced)",
     "mediumHint": "Recommended for engineering coursework",
-    "high": "High",
+    "high": "High (Deep)",
     "highHint": "Exhaustive step-by-step proofs & complex matrices"
   },
   "stepMode": {

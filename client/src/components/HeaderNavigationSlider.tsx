@@ -3,7 +3,6 @@
  * Persistent route rail: navigation bar using canonical SegmentedControl.
  */
 import { useLocation } from "wouter";
-import { Sparkles } from "lucide-react";
 import { SegmentedControl, type SegmentedOption } from "@/components/common/templates/SegmentedControl";
 import { isRouteActive, Locale, platformRoutes } from "@/data/platform";
 import { useLocale } from "@/contexts/LocaleContext";
@@ -35,7 +34,6 @@ export default function HeaderNavigationSlider({ locale: _locale }: HeaderNaviga
     value: item.href,
     label: t(`navbar.${item.index}`),
     href: item.href,
-    icon: item.ai ? <Sparkles className="h-full w-full" aria-hidden="true" /> : undefined,
   }));
 
   return (

@@ -8,7 +8,7 @@ export function chatBodyErrorHandler(error: unknown, _req: Request, res: Respons
   if (res.headersSent) return next(error);
   const type = (error as { type?: unknown } | null)?.type;
   if (type === "entity.too.large") {
-    res.status(413).json({ error: "That request is too large. PDFs are limited to 6 MB and text files to 200 KB." });
+    res.status(413).json({ error: "That request is too large. PDFs are limited to 50 MB and text files to 200 KB." });
     return;
   }
   if (typeof type === "string" && /^(entity\.parse\.failed|entity\.verify\.failed|encoding\.unsupported|charset\.unsupported|request\.aborted|request\.size\.invalid|stream\.encoding\.set)$/.test(type)) {

@@ -154,9 +154,9 @@ describe("attaching documents in the composer", () => {
     pick(new File(["x"], "a.zip", { type: "application/zip" }));
     await waitFor(() => expect(toastMock.error).toHaveBeenLastCalledWith("Only images, PDF, Markdown and plain text files can be attached."));
     const big = pdf("big.pdf");
-    Object.defineProperty(big, "size", { value: 7 * 1024 * 1024 });
+    Object.defineProperty(big, "size", { value: 51 * 1024 * 1024 });
     pick(big);
-    await waitFor(() => expect(toastMock.error).toHaveBeenLastCalledWith("That PDF is too large (over 6 MB)."));
+    await waitFor(() => expect(toastMock.error).toHaveBeenLastCalledWith("File too large. Maximum PDF size is 50 MB."));
     pick(new File(["hello"], "fake.pdf", { type: "application/pdf" }));
     await waitFor(() => expect(toastMock.error).toHaveBeenLastCalledWith("That file isn't a valid PDF."));
     pick(new File([], "empty.md", { type: "" }));

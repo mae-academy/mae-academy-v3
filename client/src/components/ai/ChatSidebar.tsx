@@ -9,6 +9,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { MathText } from "./mathText";
 import { RENAME_MAX_CHARS, groupThreads, threadTitle, type ChatThread } from "./chatThreads";
 
 export interface ChatSidebarProps {
@@ -96,9 +97,10 @@ function ThreadRow({ thread, active, onSelect, onRename, onRequestDelete }: Thre
           type="button"
           onClick={() => onSelect(thread.id)}
           aria-current={active ? "true" : undefined}
+          aria-label={title.replace(/\$/g, "")}
           className={cn("min-h-11 min-w-0 flex-1 rounded-lg px-3 text-start text-sm text-slate-700 dark:text-zinc-200", active && "font-medium text-slate-950 dark:text-white", FOCUS)}
         >
-          <span dir="auto" className="block truncate">{title}</span>
+          <span dir="auto" className="block truncate"><MathText text={title} /></span>
         </button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
