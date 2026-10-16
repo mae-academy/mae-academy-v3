@@ -27,6 +27,8 @@ import {
   cleanModelTurn,
   limitModelTurn,
   geminiApiKey,
+  parseGeminiKeys,
+  nextKeyStart,
   mockChatStream,
   mockReply,
   resolveAiMode,
@@ -588,12 +590,30 @@ describe("key and mode resolution", () => {
     expect(resolveAiMode({ NODE_ENV: "development", VERCEL: "1" } as NodeJS.ProcessEnv)).toBe("unconfigured");
   });
 
+  describe("key pool", () => {
+    it("splits on commas, trims whitespace and drops empties", () => {
+      expect(parseGeminiKeys({ GEMINI_KEYS: " a , b,, c ,\n" } as NodeJS.ProcessEnv)).toEqual(["a", "b", "c"]);
+    });
+    it("falls back to GEMINI_API_KEY and behaves as a single key", () => {
+      expect(parseGeminiKeys({ GEMINI_API_KEY: " k " } as NodeJS.ProcessEnv)).toEqual(["k"]);
+      expect(parseGeminiKeys({} as NodeJS.ProcessEnv)).toEqual([]);
+      expect(nextKeyStart(1)).toBe(0);
+      expect(nextKeyStart(1)).toBe(0);
+    });
+    it("round-robins the starting key", () => {
+      const first = nextKeyStart(3);
+      expect(nextKeyStart(3)).toBe((first + 1) % 3);
+      expect(nextKeyStart(3)).toBe((first + 2) % 3);
+    });
+  });
+
   describe("assertAiConfigured", () => {
     afterEach(() => vi.unstubAllEnvs());
 
     it("reads process.env at call time", () => {
       vi.stubEnv("VERCEL", "");
       vi.stubEnv("NODE_ENV", "development");
+      vi.stubEnv("GEMINI_KEYS", "");
       vi.stubEnv("GEMINI_API_KEY", "");
       expect(assertAiConfigured()).toBe("mock");
       vi.stubEnv("GEMINI_API_KEY", "k");
@@ -602,6 +622,7 @@ describe("key and mode resolution", () => {
 
     it("throws AiNotConfiguredError in production without a key", () => {
       vi.stubEnv("NODE_ENV", "production");
+      vi.stubEnv("GEMINI_KEYS", "");
       vi.stubEnv("GEMINI_API_KEY", "  ");
       expect(() => assertAiConfigured()).toThrow(AiNotConfiguredError);
     });

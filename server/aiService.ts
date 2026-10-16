@@ -554,9 +554,29 @@ export { SYSTEM_INSTRUCTION };
 
 export type AiMode = "live" | "mock" | "unconfigured";
 
-/** The trimmed key, read at call time; an empty or whitespace-only value (`GEMINI_API_KEY=`) counts as missing. */
+/** Every configured key: `GEMINI_KEYS` (comma-separated) or, failing that, `GEMINI_API_KEY`. Trimmed, empties dropped, read at call time. */
+export function parseGeminiKeys(env: NodeJS.ProcessEnv = process.env): string[] {
+  const rawKeys = env.GEMINI_KEYS || env.GEMINI_API_KEY || "";
+  return rawKeys
+    .split(",")
+    .map((k) => k.trim())
+    .filter((k) => k.length > 0);
+}
+
+/** The first configured key; an empty or whitespace-only value (`GEMINI_API_KEY=`) counts as missing. */
 export function geminiApiKey(env: NodeJS.ProcessEnv = process.env): string | undefined {
-  return env.GEMINI_API_KEY?.trim() || undefined;
+  return parseGeminiKeys(env)[0];
+}
+
+const KEY_POOL: string[] = parseGeminiKeys();
+console.log(`[MAE AI Engine] Initialized with ${KEY_POOL.length} active Gemini API keys.`);
+
+/** Round-robin cursor: each chat request starts on the next key so the load spreads across all projects. */
+let currentKeyIndex = 0;
+export function nextKeyStart(poolSize: number): number {
+  const start = currentKeyIndex % poolSize;
+  currentKeyIndex = (start + 1) % poolSize;
+  return start;
 }
 
 /** Demo replies are a dev convenience only: production and Vercel without a key fail closed. */
@@ -572,14 +592,16 @@ export function assertAiConfigured(): Exclude<AiMode, "unconfigured"> {
   return mode;
 }
 
-let client: GoogleGenAI | undefined;
-let clientKey: string | undefined;
-export function getGeminiClient(): GoogleGenAI {
-  const apiKey = geminiApiKey();
-  if (!apiKey) throw new AiNotConfiguredError();
-  if (!client || clientKey !== apiKey) {
+const clients = new Map<string, GoogleGenAI>();
+/** The client for the key at `index` in the pool (default: the first); instances are cached per key. */
+export function getGeminiClient(index = 0): GoogleGenAI {
+  const pool = parseGeminiKeys();
+  if (pool.length === 0) throw new AiNotConfiguredError();
+  const apiKey = pool[((index % pool.length) + pool.length) % pool.length];
+  let client = clients.get(apiKey);
+  if (!client) {
     client = new GoogleGenAI({ apiKey });
-    clientKey = apiKey;
+    clients.set(apiKey, client);
   }
   return client;
 }
@@ -683,8 +705,10 @@ export function chunkText(chunk: { candidates?: { content?: { parts?: { text?: s
 /** Streams the model's reply as text deltas. Aborting `signal` stops reading from the upstream stream. Throws AiBlockedError when the answer is blocked or empty. */
 export async function* streamChat(request: SanitizedChat, signal?: AbortSignal): AsyncGenerator<string> {
   const models = modelChain();
-  const client = getGeminiClient();
-  const open = () =>
+  const poolSize = parseGeminiKeys().length;
+  if (poolSize === 0) throw new AiNotConfiguredError();
+  const start = nextKeyStart(poolSize);
+  const openWith = (client: GoogleGenAI) =>
     withModelFallback(
       models,
       (model) =>
@@ -703,6 +727,21 @@ export async function* streamChat(request: SanitizedChat, signal?: AbortSignal):
         }),
       { signal },
     );
+  // Zero-downtime failover: a 429 on one key moves straight to the next; only when every key has answered 429 does the student see a limit.
+  const open = async () => {
+    let lastError: unknown;
+    for (let attempt = 0; attempt < poolSize; attempt++) {
+      const index = (start + attempt) % poolSize;
+      try {
+        return await openWith(getGeminiClient(index));
+      } catch (error) {
+        if (signal?.aborted || !classifyRateLimit(error)) throw error;
+        lastError = error;
+        if (attempt < poolSize - 1) console.warn(`[Key Rotator] Key index ${index} hit quota limit (429). Rotating to next key...`);
+      }
+    }
+    throw lastError;
+  };
   let stream: Awaited<ReturnType<typeof open>>;
   try {
     stream = await open();
