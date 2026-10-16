@@ -603,7 +603,7 @@ export function getGeminiClient(index = 0): GoogleGenAI {
   return client;
 }
 
-/** MAE AI runs on exactly one model. There is no fallback to a lighter model: a quota or demand error is reported, never papered over. */
+/** The preferred model for every new request. A lighter fallback (see `fallbackModel`) is used only when Google reports the preferred one overloaded or out of quota. */
 const DEFAULT_MODEL = "gemini-3.7-flash";
 export const MODEL_NAME = process.env.GEMINI_MODEL?.trim() || DEFAULT_MODEL;
 
@@ -680,10 +680,54 @@ export function blockedReason(chunk: ChunkVerdictInput): string | undefined {
   return finish && BLOCKING_FINISH_REASONS.has(finish) ? `finish:${finish}` : undefined;
 }
 
-/** The model for every Gemini text call, twice (one retry after a transient 5xx). Never a different model. */
+/** The model for every Gemini text call, twice (one retry after a transient 5xx). The fallback model is layered on top by `withOverloadFallback`. */
 export function modelChain(env: NodeJS.ProcessEnv = process.env): string[] {
   const model = env.GEMINI_MODEL?.trim() || DEFAULT_MODEL;
   return [model, model];
+}
+
+const DEFAULT_FALLBACK_MODEL = "gemini-2.5-flash";
+
+/**
+ * The lighter model tried once the preferred one is overloaded (5xx) or out of quota on every key. `GEMINI_FALLBACK_MODEL` overrides it;
+ * an empty value, `off` or `0` turns the fallback off. Undefined when disabled or when it would equal the preferred model.
+ */
+export function fallbackModel(env: NodeJS.ProcessEnv = process.env): string | undefined {
+  const raw = env.GEMINI_FALLBACK_MODEL?.trim() ?? DEFAULT_FALLBACK_MODEL;
+  if (!raw || raw === "0" || raw.toLowerCase() === "off") return undefined;
+  return raw === modelChain(env)[0] ? undefined : raw;
+}
+
+/** True for an upstream failure that is about Google's capacity (429 quota or a transient 5xx), not about the request itself. */
+export function isUpstreamOverload(error: unknown): boolean {
+  if (classifyRateLimit(error)) return true;
+  const status = (error as { status?: unknown } | null)?.status;
+  return typeof status === "number" && RETRYABLE_STATUS.has(status);
+}
+
+/**
+ * Runs `attempt` on the preferred model first (every new request starts there). Only when that fails with an overload (see
+ * `isUpstreamOverload`) before any output exists does it run `attempt` once more on `fallback`. If the fallback fails too, the
+ * preferred model's error is thrown, since that is the real cause the student should hear about.
+ */
+export async function withOverloadFallback<T>(
+  preferred: string,
+  fallback: string | undefined,
+  attempt: (model: string) => Promise<T>,
+  options: { signal?: AbortSignal } = {},
+): Promise<T> {
+  try {
+    return await attempt(preferred);
+  } catch (error) {
+    if (!fallback || options.signal?.aborted || !isUpstreamOverload(error)) throw error;
+    console.warn(`[Model Fallback] ${preferred} is overloaded or out of quota on every key; retrying on ${fallback}.`);
+    try {
+      return await attempt(fallback);
+    } catch (fallbackError) {
+      console.warn(`[Model Fallback] ${fallback} failed too (${(fallbackError as { status?: unknown } | null)?.status ?? "error"}).`);
+      throw error;
+    }
+  }
 }
 
 /** Gemini's built-in Python sandbox does the arithmetic instead of the model predicting digits. GEMINI_CODE_EXECUTION=0 turns it off. */
@@ -743,12 +787,12 @@ export async function* streamChat(request: SanitizedChat, signal?: AbortSignal):
   const poolSize = parseGeminiKeys().length;
   if (poolSize === 0) throw new AiNotConfiguredError();
   const start = nextKeyStart(poolSize);
-  const openWith = (client: GoogleGenAI) =>
+  const openWith = (client: GoogleGenAI, model: string) =>
     withModelFallback(
-      models,
-      (model) =>
+      [model, model],
+      (m) =>
         client.models.generateContentStream({
-          model,
+          model: m,
           contents: buildContents(request.messages),
           config: {
             systemInstruction: buildSystemInstruction(request.lab, { hasDocument: request.hasDocument, stepMode: request.stepMode, hasImage: request.hasImage }),
@@ -763,10 +807,11 @@ export async function* streamChat(request: SanitizedChat, signal?: AbortSignal):
       { signal },
     );
   // Zero-downtime failover: a 429 moves straight to the next key; when every key is limited, a per-minute cooldown is retried
-  // after 2 s and then 4 s (across all keys again) before the student sees anything.
+  // after 2 s and then 4 s (across all keys again). Only if the preferred model is still overloaded or out of quota does the
+  // request fall back to the lighter model, again across the whole key pool, before the student sees anything.
   let stream: Awaited<ReturnType<typeof openWith>>;
   try {
-    stream = await withKeyRotation((client) => openWith(client), { signal, start });
+    stream = await withOverloadFallback(models[0], fallbackModel(), (model) => withKeyRotation((client) => openWith(client, model), { signal, start }), { signal });
   } catch (error) {
     throw classifyRateLimit(error) ?? error;
   }
