@@ -686,7 +686,7 @@ export function modelChain(env: NodeJS.ProcessEnv = process.env): string[] {
   return [model, model];
 }
 
-const DEFAULT_FALLBACK_MODEL = "gemini-2.5-flash";
+const DEFAULT_FALLBACK_MODEL = "gemini-3.6-flash";
 
 /**
  * The lighter model tried once the preferred one is overloaded (5xx) or out of quota on every key. `GEMINI_FALLBACK_MODEL` overrides it;

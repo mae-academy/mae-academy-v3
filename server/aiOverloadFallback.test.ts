@@ -43,10 +43,10 @@ describe("withOverloadFallback (preferred model first, lighter model only when G
     ).rejects.toMatchObject({ status: 503 });
   });
 
-  it("fallbackModel defaults to gemini-2.5-flash, is overridable, and can be switched off", () => {
-    expect(fallbackModel({} as NodeJS.ProcessEnv)).toBe("gemini-2.5-flash");
-    expect(fallbackModel({ GEMINI_FALLBACK_MODEL: " gemini-3.6-flash " } as NodeJS.ProcessEnv)).toBe("gemini-3.6-flash");
+  it("fallbackModel defaults to gemini-3.6-flash, is overridable, and can be switched off", () => {
+    expect(fallbackModel({} as NodeJS.ProcessEnv)).toBe("gemini-3.6-flash");
+    expect(fallbackModel({ GEMINI_FALLBACK_MODEL: " gemini-3.5-flash " } as NodeJS.ProcessEnv)).toBe("gemini-3.5-flash");
     for (const off of ["", "off", "OFF", "0"]) expect(fallbackModel({ GEMINI_FALLBACK_MODEL: off } as NodeJS.ProcessEnv)).toBeUndefined();
-    expect(fallbackModel({ GEMINI_MODEL: "gemini-2.5-flash" } as NodeJS.ProcessEnv)).toBeUndefined();
+    expect(fallbackModel({ GEMINI_MODEL: "gemini-3.6-flash" } as NodeJS.ProcessEnv)).toBeUndefined();
   });
 });
