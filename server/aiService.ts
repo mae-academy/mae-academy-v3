@@ -603,7 +603,7 @@ export function getGeminiClient(index = 0): GoogleGenAI {
   return client;
 }
 
-/** The preferred model for every new request. A lighter fallback (see `fallbackModel`) is used only when Google reports the preferred one overloaded or out of quota. */
+/** The preferred model for every new request. Lighter fallbacks (see `fallbackModels`) are used only when Google reports it overloaded, out of quota or unavailable. */
 const DEFAULT_MODEL = "gemini-3.7-flash";
 export const MODEL_NAME = process.env.GEMINI_MODEL?.trim() || DEFAULT_MODEL;
 
@@ -686,16 +686,21 @@ export function modelChain(env: NodeJS.ProcessEnv = process.env): string[] {
   return [model, model];
 }
 
-const DEFAULT_FALLBACK_MODEL = "gemini-3.6-flash";
+/** Tried in order after the preferred model. Tiers a key can no longer use (404) are skipped, so a retired model costs one failed call. */
+const DEFAULT_FALLBACK_MODELS = ["gemini-3.6-flash", "gemini-3.5-flash", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
 
 /**
- * The lighter model tried once the preferred one is overloaded (5xx) or out of quota on every key. `GEMINI_FALLBACK_MODEL` overrides it;
- * an empty value, `off` or `0` turns the fallback off. Undefined when disabled or when it would equal the preferred model.
+ * The lighter models tried, in order, once the preferred one is overloaded (5xx), out of quota or unavailable on every key.
+ * `GEMINI_FALLBACK_MODELS` (comma-separated; the older single `GEMINI_FALLBACK_MODEL` works too) overrides the default list;
+ * an empty value, `off` or `0` turns the cascade off. Duplicates and the preferred model itself are dropped.
  */
-export function fallbackModel(env: NodeJS.ProcessEnv = process.env): string | undefined {
-  const raw = env.GEMINI_FALLBACK_MODEL?.trim() ?? DEFAULT_FALLBACK_MODEL;
-  if (!raw || raw === "0" || raw.toLowerCase() === "off") return undefined;
-  return raw === modelChain(env)[0] ? undefined : raw;
+export function fallbackModels(env: NodeJS.ProcessEnv = process.env): string[] {
+  const raw = (env.GEMINI_FALLBACK_MODELS ?? env.GEMINI_FALLBACK_MODEL)?.trim();
+  if (raw !== undefined && (!raw || raw === "0" || raw.toLowerCase() === "off")) return [];
+  const list = raw ? raw.split(",") : DEFAULT_FALLBACK_MODELS;
+  const preferred = modelChain(env)[0];
+  const cleaned = list.map((m) => m.trim()).filter((m) => m && m !== preferred);
+  return cleaned.filter((m, i) => cleaned.indexOf(m) === i);
 }
 
 /** True for an upstream failure that is about Google's capacity (429 quota or a transient 5xx), not about the request itself. */
@@ -705,34 +710,48 @@ export function isUpstreamOverload(error: unknown): boolean {
   return typeof status === "number" && RETRYABLE_STATUS.has(status);
 }
 
+/** A 404 from generateContent: the model is retired or not offered to this key, so the next tier may still work. */
+export function isModelUnavailable(error: unknown): boolean {
+  return (error as { status?: unknown } | null)?.status === 404;
+}
+
 /**
- * Runs `attempt` on the preferred model first (every new request starts there). Only when that fails with an overload (see
- * `isUpstreamOverload`) before any output exists does it run `attempt` once more on `fallback`. If the fallback fails too, the
- * preferred model's error is thrown, since that is the real cause the student should hear about.
+ * Runs `attempt` on `models[0]` first (every new request starts on the preferred model), then steps down the list while the
+ * failure is an overload or an unavailable model and nothing has been produced yet. Each `attempt` already rotates the whole key
+ * pool. If every tier fails, the FIRST error is thrown: the preferred model's failure is the real cause the student should hear about.
  */
 export async function withOverloadFallback<T>(
-  preferred: string,
-  fallback: string | undefined,
+  models: readonly string[],
   attempt: (model: string) => Promise<T>,
   options: { signal?: AbortSignal } = {},
 ): Promise<T> {
-  try {
-    return await attempt(preferred);
-  } catch (error) {
-    if (!fallback || options.signal?.aborted || !isUpstreamOverload(error)) throw error;
-    console.warn(`[Model Fallback] ${preferred} is overloaded or out of quota on every key; retrying on ${fallback}.`);
+  let firstError: unknown;
+  for (let i = 0; i < models.length; i++) {
     try {
-      return await attempt(fallback);
-    } catch (fallbackError) {
-      console.warn(`[Model Fallback] ${fallback} failed too (${(fallbackError as { status?: unknown } | null)?.status ?? "error"}).`);
-      throw error;
+      const out = await attempt(models[i]);
+      if (i > 0) console.warn(`[Model Fallback] answered by ${models[i]} after ${models.slice(0, i).join(", ")} failed.`);
+      return out;
+    } catch (error) {
+      if (i === 0) firstError = error;
+      if (options.signal?.aborted) throw error;
+      const stepDown = isUpstreamOverload(error) || isModelUnavailable(error);
+      if (!stepDown && i === 0) throw error; // not about capacity: a fallback model would fail the same way
+      if (!stepDown || i === models.length - 1) throw firstError;
+      console.warn(`[Model Fallback] ${models[i]} failed on every key (${(error as { status?: unknown } | null)?.status ?? "error"}); trying ${models[i + 1]}.`);
     }
   }
+  throw firstError;
 }
 
-/** Gemini's built-in Python sandbox does the arithmetic instead of the model predicting digits. GEMINI_CODE_EXECUTION=0 turns it off. */
-export function codeExecutionEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return env.GEMINI_CODE_EXECUTION?.trim() !== "0";
+/**
+ * Gemini's built-in Python sandbox does the arithmetic instead of the model predicting digits. GEMINI_CODE_EXECUTION=0 turns it off.
+ * It is also off whenever a PDF is attached: Gemini rejects `codeExecution` combined with a PDF `inlineData` part (HTTP 400),
+ * so document turns are answered by the model alone and only plain-text turns get the sandbox.
+ */
+export function codeExecutionEnabled(env: NodeJS.ProcessEnv = process.env, request?: Pick<SanitizedChat, "document" | "messages">): boolean {
+  if (env.GEMINI_CODE_EXECUTION?.trim() === "0") return false;
+  if (request?.document?.kind === "pdf" || request?.messages.some((m) => m.attachment?.kind === "pdf")) return false;
+  return true;
 }
 
 /**
@@ -781,50 +800,103 @@ export async function withKeyRotation<T>(
   }
 }
 
+/** Most times one reply is resumed after the upstream connection drops mid-answer. */
+const MAX_STREAM_RESUMES = 2;
+const RESUME_PROMPT = "Your previous reply was cut off by a connection error. Continue it exactly where it stopped: do not repeat, summarise or restart anything already written, and do not add an introduction. If you were inside a code block or a formula, keep going inside it.";
+
+/** A transport failure (no HTTP status) rather than an API error: the SDK's truncated-frame error, a reset or a dropped socket. */
+export function isStreamBreak(error: unknown): boolean {
+  if (typeof (error as { status?: unknown } | null)?.status === "number") return false;
+  return /Incomplete JSON segment|terminated|fetch failed|ECONNRESET|socket hang up|other side closed|network/i.test((error as Error | null)?.message ?? "");
+}
+
 /** Streams the model's reply as text deltas. Aborting `signal` stops reading from the upstream stream. Throws AiBlockedError when the answer is blocked or empty. */
 export async function* streamChat(request: SanitizedChat, signal?: AbortSignal): AsyncGenerator<string> {
   const models = modelChain();
   const poolSize = parseGeminiKeys().length;
   if (poolSize === 0) throw new AiNotConfiguredError();
   const start = nextKeyStart(poolSize);
-  const openWith = (client: GoogleGenAI, model: string) =>
+  const baseContents = buildContents(request.messages);
+  const openWith = (client: GoogleGenAI, model: string, contents: GeminiContent[]) =>
     withModelFallback(
       [model, model],
       (m) =>
         client.models.generateContentStream({
           model: m,
-          contents: buildContents(request.messages),
+          contents,
           config: {
             systemInstruction: buildSystemInstruction(request.lab, { hasDocument: request.hasDocument, stepMode: request.stepMode, hasImage: request.hasImage }),
             temperature: 0.3,
             // Thinking budget by effort; the output cap includes it (see THINKING_BUDGETS).
             ...thinkingSettings(request.thinkingEffort),
             safetySettings: [...SAFETY_SETTINGS],
-            ...(codeExecutionEnabled() ? { tools: [{ codeExecution: {} }] } : {}),
+            // Never together with a PDF: Gemini answers that combination with HTTP 400 (see codeExecutionEnabled).
+            ...(codeExecutionEnabled(process.env, request) ? { tools: [{ codeExecution: {} }] } : {}),
             abortSignal: signal,
           },
         }),
       { signal },
     );
   // Zero-downtime failover: a 429 moves straight to the next key; when every key is limited, a per-minute cooldown is retried
-  // after 2 s and then 4 s (across all keys again). Only if the preferred model is still overloaded or out of quota does the
-  // request fall back to the lighter model, again across the whole key pool, before the student sees anything.
-  let stream: Awaited<ReturnType<typeof openWith>>;
-  try {
-    stream = await withOverloadFallback(models[0], fallbackModel(), (model) => withKeyRotation((client) => openWith(client, model), { signal, start }), { signal });
-  } catch (error) {
-    throw classifyRateLimit(error) ?? error;
-  }
+  // after 2 s and then 4 s (across all keys again). Only if the preferred model is still overloaded, out of quota or unavailable
+  // does the request step down the fallback cascade, again across the whole key pool, before the student sees anything.
+  // Opening the stream and reading its first chunk is one step: a connection that opens and then breaks before any output
+  // (e.g. the SDK's "Incomplete JSON segment") is treated like an overloaded model, so the cascade steps down instead of showing an error.
+  const openFirst = async (model: string, contents: GeminiContent[]) => {
+    const stream = await withKeyRotation((client) => openWith(client, model, contents), { signal, start });
+    const iterator = stream[Symbol.asyncIterator]();
+    try {
+      return { iterator, first: await iterator.next() };
+    } catch (error) {
+      if (signal?.aborted || typeof (error as { status?: unknown } | null)?.status === "number") throw error;
+      throw Object.assign(new Error(`stream broke before the first chunk: ${(error as Error | null)?.message ?? "unknown"}`), { status: 503, cause: error });
+    }
+  };
+  const openCascade = async (contents: GeminiContent[]) => {
+    try {
+      return await withOverloadFallback([models[0], ...fallbackModels()], (model) => openFirst(model, contents), { signal });
+    } catch (error) {
+      throw classifyRateLimit(error) ?? error;
+    }
+  };
+  let opened = await openCascade(baseContents);
+  let iterator = opened.iterator;
+  let step = opened.first;
   let produced = false;
   let blocked: string | undefined;
-  for await (const chunk of stream) {
-    if (signal?.aborted) return;
-    blocked ??= blockedReason(chunk);
-    const text = chunkText(chunk);
-    if (text) {
-      produced = true;
-      yield text;
+  let answer = "";
+  let resumes = 0;
+  try {
+    while (!step.done) {
+      if (signal?.aborted) return;
+      const chunk = step.value;
+      blocked ??= blockedReason(chunk);
+      const text = chunkText(chunk);
+      if (text) {
+        produced = true;
+        answer += text;
+        yield text;
+      }
+      try {
+        step = await iterator.next();
+      } catch (error) {
+        // The connection dropped after part of the answer was already shown (the SDK reports "Incomplete JSON segment"). Rather
+        // than failing the turn, ask the model to carry on from the text streamed so far, up to twice.
+        if (signal?.aborted || !produced || resumes >= MAX_STREAM_RESUMES || !isStreamBreak(error)) throw error;
+        resumes++;
+        console.warn(`[Stream] upstream dropped after ${answer.length} chars; resuming the answer (${resumes}/${MAX_STREAM_RESUMES}).`);
+        await iterator.return?.(undefined).catch(() => undefined);
+        opened = await openCascade([
+          ...baseContents,
+          { role: "model", parts: [{ text: answer }] },
+          { role: "user", parts: [{ text: RESUME_PROMPT }] },
+        ]);
+        iterator = opened.iterator;
+        step = opened.first;
+      }
     }
+  } finally {
+    await iterator.return?.(undefined).catch(() => undefined);
   }
   if (signal?.aborted) return;
   // Never end silently: a blocked prompt, a policy stop, or no text at all becomes a controlled error.
