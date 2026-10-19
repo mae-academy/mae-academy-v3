@@ -63,7 +63,7 @@ export const EngineStateSchema = z.object({
   acc: finite.min(0).max(1),
   integ: record(z.array(bucket).max(128)),
   disp: record(z.object({
-    value: z.number(), unit: z.string().max(8), status: z.enum(['ready', 'open', 'overflow', 'unsupported']),
+    value: z.number().nullable(), unit: z.string().max(8), status: z.enum(['ready', 'open', 'overflow', 'unsupported']),
     continuity: z.boolean().optional(), frequency: finite.optional(),
   }).loose()),
   dispAt: finite,

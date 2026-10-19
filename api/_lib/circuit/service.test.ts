@@ -154,6 +154,14 @@ describe('POST /api/circuit/solve — stateless transient', () => {
     expect(Object.keys(body.wirePhases).length).toBeGreaterThan(0);
   });
 
+  it('accepts carried state whose open-circuit ohmmeter reading came back from JSON as null (was +Infinity)', async () => {
+    const cache = new CircuitCache();
+    const first = await ok({ analysisType: 'transient', timeStep: 0.002, steps: 1, circuit: divider().circuit }, cache);
+    const state = JSON.parse(JSON.stringify(first.state));
+    state.disp = { M1: { value: null, unit: 'Ω', status: 'open' } };
+    await ok({ analysisType: 'transient', timeStep: 0.002, steps: 1, h: first.h, state }, cache);
+  });
+
   it('keeps a Schmitt trigger latched across stateless calls (hysteresis lives in the carried state)', async () => {
     const build = (vin: number) => {
       const components = [part('Vin', 'dc-voltage', { voltage: vin }), part('R1', 'resistor', { resistance: 9000 }), part('R2', 'resistor', { resistance: 1000 }), part('U1', 'opamp', { gain: 1e6 }), part('G', 'ground')];
