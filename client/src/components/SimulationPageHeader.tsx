@@ -10,7 +10,10 @@ import { prefetchRoute } from "@/lib/routePrefetch";
  * A single reusable tool-tab item for the MAE Academy simulator toolbar.
  * `id` is the stable key / active-tool value; `label` is the localized text.
  */
-export type SimulationPageTool = { id: string; label: string };
+/** MAE AI is temporarily hidden from production. */
+const SHOW_MAE_AI = false as boolean;
+
+export type SimulationPageTool ={ id: string; label: string };
 
 export interface SimulationPageHeaderProps {
   /** Localized simulation title, rendered centered between the back button and the toolbar. */
@@ -112,7 +115,8 @@ export function SimulationPageHeader({
         </nav>
       ) : null}
 
-      {aiLab ? (
+      {/* MAE AI temporarily hidden from production */}
+      {SHOW_MAE_AI && aiLab ? (
         <div className="mb-6 sm:mb-8 flex w-full justify-center px-1">
           <button
             type="button"

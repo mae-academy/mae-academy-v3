@@ -70,6 +70,10 @@
       ]
     }
   ],
+  "redirects": [
+    { "source": "/ai", "destination": "/", "permanent": false },
+    { "source": "/ai/:path*", "destination": "/", "permanent": false }
+  ],
   "rewrites": [
     {
       "source": "/api/(.*)",

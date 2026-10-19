@@ -6,8 +6,12 @@ import { Sparkles } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import PrefetchLink from "@/components/common/PrefetchLink";
 
+const SHOW_MAE_AI = false;
+
 export default function MaeAiCallout() {
   const { t } = useTranslation("landing");
+  // MAE AI is temporarily hidden from production.
+  if (!(SHOW_MAE_AI as boolean)) return null;
 
   return (
     <div className="relative overflow-hidden rounded-2xl border border-slate-200/90 bg-white/90 shadow-sm dark:border-white/[0.08] dark:bg-[#08080A]">
