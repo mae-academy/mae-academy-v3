@@ -98,14 +98,19 @@ async function loadGlue(): Promise<NgspiceGlue> {
   }
   const sourceText = await response.text();
 
-  const blobUrl = URL.createObjectURL(
-    new Blob([sourceText], { type: "text/javascript" })
-  );
   let mod: { default?: NgspiceFactory; createNgspiceModule?: NgspiceFactory };
-  try {
-    mod = await import(/* @vite-ignore */ blobUrl);
-  } finally {
-    URL.revokeObjectURL(blobUrl);
+  if (import.meta.env.PROD) {
+    // The production CSP has no `blob:` in script-src, so a blob import is refused there; the same-origin file is allowed.
+    mod = await import(/* @vite-ignore */ new URL(url, self.location.href).href);
+  } else {
+    const blobUrl = URL.createObjectURL(
+      new Blob([sourceText], { type: "text/javascript" })
+    );
+    try {
+      mod = await import(/* @vite-ignore */ blobUrl);
+    } finally {
+      URL.revokeObjectURL(blobUrl);
+    }
   }
 
   const factory = mod.default ?? mod.createNgspiceModule;
