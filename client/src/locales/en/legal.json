@@ -6,7 +6,7 @@
     "collection": {
       "title": "Information Collection & User Accounts",
       "p1": "MAE Academy does not require any user registration or account creation to access its tools, simulations, open-source literature, or academic resources.",
-      "p2": "We do not collect or store any personally identifiable information (PII) unless you voluntarily reach out to us via our designated contact email (<a href=\"mailto:maeacademy2026@gmail.com\" class=\"font-medium text-violet-600 dark:text-violet-400 underline underline-offset-4 hover:text-violet-700\">maeacademy2026@gmail.com</a>). In such instances, your email address and message are utilized solely to respond to your inquiry."
+      "p2": "We do not collect or store any personally identifiable information (PII) unless you voluntarily reach out to us via our designated contact email (<a href=\"mailto:contact@maeacademy.org\" class=\"font-medium text-violet-600 dark:text-violet-400 underline underline-offset-4 hover:text-violet-700\">contact@maeacademy.org</a>). In such instances, your email address and message are utilized solely to respond to your inquiry."
     },
     "logs": {
       "title": "Server Log Files",
@@ -30,7 +30,7 @@
     "contact": {
       "title": "Updates & Contact",
       "p1": "We reserve the right to revise this policy to reflect operational, legal, or regulatory modifications. We encourage visitors to review this page periodically.",
-      "p2": "For any legal or privacy inquiries, please contact us at: <a href=\"mailto:maeacademy2026@gmail.com\" class=\"font-medium text-violet-600 dark:text-violet-400 underline underline-offset-4 hover:text-violet-700\">maeacademy2026@gmail.com</a>"
+      "p2": "For any legal or privacy inquiries, please contact us at: <a href=\"mailto:contact@maeacademy.org\" class=\"font-medium text-violet-600 dark:text-violet-400 underline underline-offset-4 hover:text-violet-700\">contact@maeacademy.org</a>"
     },
     "instagram": {
       "title": "Instagram Automation & Educational Resource Integration",
@@ -44,7 +44,7 @@
       "p1": "In accordance with Meta Platform Terms and global data protection standards, users have the right to request the deletion of any data, interaction records, or identifiers associated with their Instagram account.",
       "p2": "Because MAE Academy does not operate persistent user accounts or maintain databases of Instagram user data (processing data transiently in memory only), your personal data is by default not stored beyond the immediate processing of your request. However, if you wish to formally submit a data deletion request or verify that no residual server records remain, please follow the instructions below:",
       "step1Title": "1. Submit an Email Deletion Request",
-      "step1Desc": "Send an email to our designated compliance address: <a href=\"mailto:maeacademy2026@gmail.com\" class=\"font-medium text-violet-600 dark:text-violet-400 underline underline-offset-4 hover:text-violet-700\">maeacademy2026@gmail.com</a> with the subject line <strong>\"Data Deletion Request - Instagram Automation\"</strong>.",
+      "step1Desc": "Send an email to our designated compliance address: <a href=\"mailto:contact@maeacademy.org\" class=\"font-medium text-violet-600 dark:text-violet-400 underline underline-offset-4 hover:text-violet-700\">contact@maeacademy.org</a> with the subject line <strong>\"Data Deletion Request - Instagram Automation\"</strong>.",
       "step2Title": "2. Provide Required Identifier",
       "step2Desc": "Include your public Instagram handle/username (@username) and the approximate date/time or post of your interaction so we can verify our temporary server logs.",
       "step3Title": "3. Revoke Permissions via Instagram Settings",
@@ -81,7 +81,7 @@
     },
     "contact": {
       "title": "Contact Information",
-      "p1": "For any legal inquiries, copyright concerns, or questions regarding these terms, please contact: <a href=\"mailto:maeacademy2026@gmail.com\" class=\"font-medium text-violet-600 dark:text-violet-400 underline underline-offset-4 hover:text-violet-700\">maeacademy2026@gmail.com</a>"
+      "p1": "For any legal inquiries, copyright concerns, or questions regarding these terms, please contact: <a href=\"mailto:contact@maeacademy.org\" class=\"font-medium text-violet-600 dark:text-violet-400 underline underline-offset-4 hover:text-violet-700\">contact@maeacademy.org</a>"
     },
     "instagram": {
       "title": "Automated Instagram Services & Resource Delivery",
@@ -109,7 +109,7 @@
     "dmca": {
       "title": "DMCA Notice & Takedown Procedure",
       "p1": "MAE Academy respects the intellectual property rights of creators and copyright owners. If you believe in good faith that any indexed record or reference on our platform infringes your copyright, please submit a formal written notice to our compliance address:",
-      "p2": "<a href=\"mailto:maeacademy2026@gmail.com\" class=\"font-medium text-violet-600 dark:text-violet-400 underline underline-offset-4 hover:text-violet-700\">maeacademy2026@gmail.com</a>",
+      "p2": "<a href=\"mailto:contact@maeacademy.org\" class=\"font-medium text-violet-600 dark:text-violet-400 underline underline-offset-4 hover:text-violet-700\">contact@maeacademy.org</a>",
       "p3": "Our Commitment: We pledge to review and verify any formal notice, and promptly delist or remove any contested third-party reference within 48 business hours of receipt."
     }
   }

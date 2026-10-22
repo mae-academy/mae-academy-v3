@@ -77,11 +77,11 @@ export default function MainLayout({ children }: MainLayoutProps) {
               {t("footer.description")}
             </p>
             <a
-              href="mailto:maeacademy2026@gmail.com"
+              href="mailto:contact@maeacademy.org"
               className="mt-2 inline-flex min-h-11 items-center gap-2 break-all text-xs font-medium text-slate-500 transition-colors hover:text-violet-600 dark:text-slate-400 dark:hover:text-violet-300"
             >
               <Mail className="h-4 w-4 text-violet-600 dark:text-violet-400" />
-              <span>maeacademy2026@gmail.com</span>
+              <span>contact@maeacademy.org</span>
             </a>
           </div>
 

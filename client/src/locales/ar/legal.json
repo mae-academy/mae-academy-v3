@@ -6,7 +6,7 @@
     "collection": {
       "title": "جمع البيانات الشخصية وتسجيل الدخول",
       "p1": "لا تتطلب منصة MAE Academy إنشاء حساب أو تسجيل دخول لاستخدام الأدوات أو الوصول إلى المراجع والأبحاث والكتب المتاحة.",
-      "p2": "لا نقوم بجمع أو تخزين أي بيانات تعريف شخصية (مثل الأسماء، أرقام الهواتف، أو العناوين) إلا في حال قيامك بمراسلتنا طوعاً عبر البريد الإلكتروني المخصص للتواصل (<a href=\"mailto:maeacademy2026@gmail.com\" class=\"font-medium text-violet-600 dark:text-violet-400 underline underline-offset-4 hover:text-violet-700\">maeacademy2026@gmail.com</a>)، وفي هذه الحالة تُستخدم بياناتك فقط للرد على استفسارك."
+      "p2": "لا نقوم بجمع أو تخزين أي بيانات تعريف شخصية (مثل الأسماء، أرقام الهواتف، أو العناوين) إلا في حال قيامك بمراسلتنا طوعاً عبر البريد الإلكتروني المخصص للتواصل (<a href=\"mailto:contact@maeacademy.org\" class=\"font-medium text-violet-600 dark:text-violet-400 underline underline-offset-4 hover:text-violet-700\">contact@maeacademy.org</a>)، وفي هذه الحالة تُستخدم بياناتك فقط للرد على استفسارك."
     },
     "logs": {
       "title": "ملفات السجلات",
@@ -30,7 +30,7 @@
     "contact": {
       "title": "التعديلات والتواصل",
       "p1": "نحتفظ بالحق في تحديث سياسة الخصوصية هذه لمواكبة التحديثات التقنية والقانونية. يُنصح بمراجعة هذه الصفحة بشكل دوري.",
-      "p2": "لأي استفسارات قانونية أو ملاحظات متعلقة بالخصوصية، يرجى التواصل معنا عبر: <a href=\"mailto:maeacademy2026@gmail.com\" class=\"font-medium text-violet-600 dark:text-violet-400 underline underline-offset-4 hover:text-violet-700\">maeacademy2026@gmail.com</a>"
+      "p2": "لأي استفسارات قانونية أو ملاحظات متعلقة بالخصوصية، يرجى التواصل معنا عبر: <a href=\"mailto:contact@maeacademy.org\" class=\"font-medium text-violet-600 dark:text-violet-400 underline underline-offset-4 hover:text-violet-700\">contact@maeacademy.org</a>"
     },
     "instagram": {
       "title": "التكامل الآلي مع إنستغرام وتوزيع المصادر التعليمية",
@@ -44,7 +44,7 @@
       "p1": "وفقاً لشروط منصة Meta ومعايير حماية البيانات المعمول بها، يحق لجميع المستخدمين طلب حذف أي بيانات، أو سجلات تفاعل، أو معرفات مرتبطة بحساباتهم على إنستغرام.",
       "p2": "نظراً لأن منصة MAE Academy لا تدير حسابات مستخدمين دائمة ولا تحتفظ بقواعد بيانات لبيانات مستخدمي إنستغرام (حيث تتم المعالجة بشكل عابر ولحظي في الذاكرة فقط)، فإن بياناتك لا يتم حفظها بشكل دائم افتراضياً. ومع ذلك، إذا كنت ترغب في تقديم طلب رسمي لحذف البيانات أو التحقق من خلو الخوادم من أي سجلات فنية متبقية، يرجى اتباع التعليمات الآتية:",
       "step1Title": "1. إرسال طلب الحذف عبر البريد الإلكتروني",
-      "step1Desc": "أرسل رسالة إلكترونية إلى بريد الخصوصية والامتثال: <a href=\"mailto:maeacademy2026@gmail.com\" class=\"font-medium text-violet-600 dark:text-violet-400 underline underline-offset-4 hover:text-violet-700\">maeacademy2026@gmail.com</a> مع كتابة عنوان الرسالة: <strong>«Data Deletion Request - Instagram Automation»</strong>.",
+      "step1Desc": "أرسل رسالة إلكترونية إلى بريد الخصوصية والامتثال: <a href=\"mailto:contact@maeacademy.org\" class=\"font-medium text-violet-600 dark:text-violet-400 underline underline-offset-4 hover:text-violet-700\">contact@maeacademy.org</a> مع كتابة عنوان الرسالة: <strong>«Data Deletion Request - Instagram Automation»</strong>.",
       "step2Title": "2. تزويدنا بمعرف الحساب",
       "step2Desc": "يرجى ذكر اسم المستخدم العام لحسابك على إنستغرام (@username) وتاريخ أو منشور التفاعل التقريبي لنتمكن من مراجعة سجلات الخادم المؤقتة ومطابقتها بدقة.",
       "step3Title": "3. إلغاء الأذونات عبر إعدادات إنستغرام",
@@ -81,7 +81,7 @@
     },
     "contact": {
       "title": "التواصل والاستفسارات",
-      "p1": "لأي استفسارات قانونية أو أسئلة تتعلق بشروط الاستخدام، يسعدنا تواصلكم عبر البريد الإلكتروني: <a href=\"mailto:maeacademy2026@gmail.com\" class=\"font-medium text-violet-600 dark:text-violet-400 underline underline-offset-4 hover:text-violet-700\">maeacademy2026@gmail.com</a>"
+      "p1": "لأي استفسارات قانونية أو أسئلة تتعلق بشروط الاستخدام، يسعدنا تواصلكم عبر البريد الإلكتروني: <a href=\"mailto:contact@maeacademy.org\" class=\"font-medium text-violet-600 dark:text-violet-400 underline underline-offset-4 hover:text-violet-700\">contact@maeacademy.org</a>"
     },
     "instagram": {
       "title": "خدمات التكامل التفاعلي مع إنستغرام وتوزيع الموارد",
@@ -109,7 +109,7 @@
     "dmca": {
       "title": "إجراء الإشعار والإزالة (DMCA Notice & Takedown)",
       "p1": "تحترم MAE Academy حقوق الملكية الفكرية وتلتزم بحمايتها. إذا كنت تعتقد بحسن نية أن أي محتوى أو سجل مفهرس على المنصة ينتهك حقوق النشر الخاصة بك، يرجى تقديم إشعار كتابي رسمي إلى بريد الامتثال:",
-      "p2": "<a href=\"mailto:maeacademy2026@gmail.com\" class=\"font-medium text-violet-600 dark:text-violet-400 underline underline-offset-4 hover:text-violet-700\">maeacademy2026@gmail.com</a>",
+      "p2": "<a href=\"mailto:contact@maeacademy.org\" class=\"font-medium text-violet-600 dark:text-violet-400 underline underline-offset-4 hover:text-violet-700\">contact@maeacademy.org</a>",
       "p3": "التزامنا: نتعهد بمراجعة أي إشعار رسمي والتحقق منه وإزالة أو فك فهرسة أي سجل متنازع عليه خلال 48 ساعة عمل من تاريخ استلام الإشعار."
     }
   }

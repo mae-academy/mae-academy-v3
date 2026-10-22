@@ -458,8 +458,8 @@ export const officialChannels: OfficialContactChannel[] = [
       ar: "البريد الإداري والتنفيذي للمنصة",
       es: "Correo Comercial de la Plataforma",
     },
-    address: "maeacademy2026@gmail.com",
-    href: "mailto:maeacademy2026@gmail.com",
+    address: "contact@maeacademy.org",
+    href: "mailto:contact@maeacademy.org",
     type: "platform",
     description: {
       en: "Direct editorial and administrative inbox for MAE Academy curriculum partnerships, simulator feedback, and lectures.",

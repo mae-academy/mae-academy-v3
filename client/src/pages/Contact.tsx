@@ -7,7 +7,7 @@ import { useLocale } from "@/contexts/LocaleContext";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import SocialLinks from "@/components/SocialLinks";
 
-const SUPPORT_EMAIL = "maeacademy2026@gmail.com";
+const SUPPORT_EMAIL = "contact@maeacademy.org";
 const TOPICS = ["general", "support", "feedback", "partnership", "legal"] as const;
 const WEB3FORMS_URL = "https://api.web3forms.com/submit";
 const ACCESS_KEY = import.meta.env.VITE_WEB3FORMS_ACCESS_KEY || "c4f70c88-da58-4e49-8970-214d260daee6";

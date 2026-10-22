@@ -6,7 +6,7 @@
     "collection": {
       "title": "Recopilación de Información y Cuentas de Usuario",
       "p1": "MAE Academy no requiere ningún registro de usuario o creación de cuenta para acceder a sus herramientas, simulaciones, literatura de código abierto o recursos académicos.",
-      "p2": "No recopilamos ni almacenamos ninguna información de identificación personal (PII) a menos que nos contactes voluntariamente a través de nuestro correo electrónico de contacto designado (<a href=\"mailto:maeacademy2026@gmail.com\" class=\"font-medium text-violet-600 dark:text-violet-400 underline underline-offset-4 hover:text-violet-700\">maeacademy2026@gmail.com</a>). En tales casos, tu dirección de correo electrónico y mensaje se utilizan únicamente para responder a tu consulta."
+      "p2": "No recopilamos ni almacenamos ninguna información de identificación personal (PII) a menos que nos contactes voluntariamente a través de nuestro correo electrónico de contacto designado (<a href=\"mailto:contact@maeacademy.org\" class=\"font-medium text-violet-600 dark:text-violet-400 underline underline-offset-4 hover:text-violet-700\">contact@maeacademy.org</a>). En tales casos, tu dirección de correo electrónico y mensaje se utilizan únicamente para responder a tu consulta."
     },
     "logs": {
       "title": "Archivos de Registro del Servidor",
@@ -30,7 +30,7 @@
     "contact": {
       "title": "Actualizaciones y Contacto",
       "p1": "Nos reservamos el derecho de revisar esta política para reflejar modificaciones operativas, legales o reglamentarias. Alentamos a los visitantes a revisar esta página periódicamente.",
-      "p2": "Para cualquier consulta legal o de privacidad, contáctanos en: <a href=\"mailto:maeacademy2026@gmail.com\" class=\"font-medium text-violet-600 dark:text-violet-400 underline underline-offset-4 hover:text-violet-700\">maeacademy2026@gmail.com</a>"
+      "p2": "Para cualquier consulta legal o de privacidad, contáctanos en: <a href=\"mailto:contact@maeacademy.org\" class=\"font-medium text-violet-600 dark:text-violet-400 underline underline-offset-4 hover:text-violet-700\">contact@maeacademy.org</a>"
     },
     "instagram": {
       "title": "Automatización de Instagram e Integración de Recursos Educativos",
@@ -44,7 +44,7 @@
       "p1": "De conformidad con los Términos de la Plataforma Meta y los estándares de protección de datos, los usuarios tienen derecho a solicitar la eliminación de cualquier dato o registro de interacción asociado con su cuenta de Instagram.",
       "p2": "Dado que MAE Academy no mantiene cuentas de usuario persistentes ni bases de datos de perfiles de Instagram (procesando los datos de forma transitoria en memoria), sus datos personales no se conservan de forma predeterminada. Sin embargo, para solicitar formalmente la verificación y eliminación de cualquier registro residual del servidor, siga estas instrucciones:",
       "step1Title": "1. Enviar Solicitud por Correo Electrónico",
-      "step1Desc": "Envíe un correo electrónico a nuestra dirección de cumplimiento: <a href=\"mailto:maeacademy2026@gmail.com\" class=\"font-medium text-violet-600 dark:text-violet-400 underline underline-offset-4 hover:text-violet-700\">maeacademy2026@gmail.com</a> con el asunto <strong>\"Data Deletion Request - Instagram Automation\"</strong>.",
+      "step1Desc": "Envíe un correo electrónico a nuestra dirección de cumplimiento: <a href=\"mailto:contact@maeacademy.org\" class=\"font-medium text-violet-600 dark:text-violet-400 underline underline-offset-4 hover:text-violet-700\">contact@maeacademy.org</a> con el asunto <strong>\"Data Deletion Request - Instagram Automation\"</strong>.",
       "step2Title": "2. Proporcionar Identificador Requerido",
       "step2Desc": "Incluya su nombre de usuario público de Instagram (@usuario) y la fecha aproximada de su interacción para que podamos cotejarla con nuestros registros del servidor.",
       "step3Title": "3. Revocar Permisos a través de Configuración de Instagram",
@@ -81,7 +81,7 @@
     },
     "contact": {
       "title": "Información de Contacto",
-      "p1": "Para cualquier consulta legal, inquietud sobre derechos de autor o preguntas con respecto a estos términos, comunícate con: <a href=\"mailto:maeacademy2026@gmail.com\" class=\"font-medium text-violet-600 dark:text-violet-400 underline underline-offset-4 hover:text-violet-700\">maeacademy2026@gmail.com</a>"
+      "p1": "Para cualquier consulta legal, inquietud sobre derechos de autor o preguntas con respecto a estos términos, comunícate con: <a href=\"mailto:contact@maeacademy.org\" class=\"font-medium text-violet-600 dark:text-violet-400 underline underline-offset-4 hover:text-violet-700\">contact@maeacademy.org</a>"
     },
     "instagram": {
       "title": "Servicios Automatizados de Instagram y Entrega de Recursos",
@@ -109,7 +109,7 @@
     "dmca": {
       "title": "Aviso de DMCA y Procedimiento de Eliminación",
       "p1": "MAE Academy respeta los derechos de propiedad intelectual de los creadores y propietarios de derechos de autor. Si crees de buena fe que cualquier registro indexado o referencia en nuestra plataforma infringe tus derechos de autor, envía un aviso formal por escrito a nuestra dirección de cumplimiento:",
-      "p2": "<a href=\"mailto:maeacademy2026@gmail.com\" class=\"font-medium text-violet-600 dark:text-violet-400 underline underline-offset-4 hover:text-violet-700\">maeacademy2026@gmail.com</a>",
+      "p2": "<a href=\"mailto:contact@maeacademy.org\" class=\"font-medium text-violet-600 dark:text-violet-400 underline underline-offset-4 hover:text-violet-700\">contact@maeacademy.org</a>",
       "p3": "Nuestro Compromiso: Nos comprometemos a revisar y verificar cualquier aviso formal, y a retirar de la lista o eliminar de inmediato cualquier referencia de terceros impugnada dentro de las 48 horas hábiles posteriores a la recepción."
     }
   }
