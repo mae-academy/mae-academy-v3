@@ -75,59 +75,36 @@ export function prefetchRoute(href: string): void {
   });
 }
 
-/**
- * Eagerly prefetch core navigation routes during browser idle time.
- * Called once from App.tsx on mount.
- */
-export function prefetchCoreRoutes(): void {
-  const coreRoutes = ["/", "/research", "/library", "/simulations", "/about"];
-
-  const prefetchBatch = () => {
-    for (const route of coreRoutes) {
-      prefetchRoute(route);
-    }
-  };
-
-  // Use requestIdleCallback where available, else defer via setTimeout
-  if ("requestIdleCallback" in window) {
-    (window as Window & { requestIdleCallback: (cb: () => void) => void }).requestIdleCallback(prefetchBatch);
-  } else {
-    setTimeout(prefetchBatch, 2000);
-  }
+/** False on Save-Data and slow cellular links, where speculative downloads would compete with the page the user is on. */
+function canPrefetch(): boolean {
+  const c = (navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string } }).connection;
+  return !(c?.saveData || (c?.effectiveType && /(^|-)2g$|3g/.test(c.effectiveType)));
 }
 
 /**
- * Warm the SimulationDetail chunk (shared by all /simulations/* slugs) plus
- * ArduinoStudio and PlcSimulator during a second idle callback, after core
- * routes are already cached. This eliminates the "Loading Module..." flash
- * for first-time simulator navigation.
- *
- * Called from App.tsx after prefetchCoreRoutes().
+ * Warm the light core routes once the page has loaded and the browser is idle.
+ * The heavy simulator chunks (SimulationDetail, Arduino, PLC: several MB of JS that must also be
+ * evaluated on import) are deliberately NOT warmed here: doing so froze pages like /contact on
+ * mid-range phones. They are prefetched on hover/focus intent instead (see prefetchOnHover).
  */
-export function prefetchSimulatorHub(): void {
-  const simulatorRoutes = [
-    "/simulations/control-systems",   // warms SimulationDetail chunk
-    "/simulations/arduino-studio",
-    "/simulations/plc",
-  ];
+export function prefetchCoreRoutes(): void {
+  if (!canPrefetch()) return;
+  // Only the two main calls to action. /about is excluded on purpose: its chunk graph pulls in KaTeX (~520 kB).
+  const coreRoutes = ["/simulations", "/library"];
 
   const prefetchBatch = () => {
-    for (const route of simulatorRoutes) {
-      prefetchRoute(route);
-    }
+    for (const route of coreRoutes) prefetchRoute(route);
   };
 
-  const schedule = (cb: () => void) => {
+  const schedule = () => {
     if ("requestIdleCallback" in window) {
-      (window as Window & { requestIdleCallback: (cb: () => void, opts?: { timeout: number }) => void })
-        .requestIdleCallback(cb, { timeout: 5000 });
+      (window as Window & { requestIdleCallback: (cb: () => void, opts?: { timeout: number }) => void }).requestIdleCallback(prefetchBatch, { timeout: 8000 });
     } else {
-      setTimeout(cb, 4000);
+      setTimeout(prefetchBatch, 4000);
     }
   };
-
-  // Delay by one extra idle cycle so we don't compete with core prefetches
-  schedule(() => schedule(prefetchBatch));
+  if (document.readyState === "complete") schedule();
+  else window.addEventListener("load", schedule, { once: true });
 }
 
 /**

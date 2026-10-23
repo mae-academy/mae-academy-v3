@@ -18,7 +18,7 @@ import ErrorBoundary from "@/components/ui/ErrorBoundary";
 import { useCanonical } from "@/hooks/useCanonical";
 import MainLayout from "./components/MainLayout";
 import { lazyRetry } from "@/lib/lazyRetry";
-import { prefetchCoreRoutes, prefetchSimulatorHub } from "@/lib/routePrefetch";
+import { prefetchCoreRoutes } from "@/lib/routePrefetch";
 import ScrollToTop from "@/components/common/ScrollToTop";
 import PageLoader from "@/components/ui/PageLoader";
 
@@ -128,12 +128,9 @@ function AnimatedRoutes() {
 }
 
 export default function App() {
-  // Prefetch core routes + simulator chunks during browser idle time.
-  // Two separate idle callbacks: core routes first, then simulator hub
-  // (so they don't compete for bandwidth on slow connections).
+  // Warm the light core routes when the browser is idle (never the heavy simulator chunks; see routePrefetch.ts).
   useEffect(() => {
     prefetchCoreRoutes();
-    prefetchSimulatorHub();
   }, []);
 
   return (
