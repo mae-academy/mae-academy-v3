@@ -37,7 +37,6 @@ const TermsOfService = lazyRetry(() => import("./pages/TermsOfService"));
 const Privacy = lazyRetry(() => import("./pages/Privacy"));
 const Terms = lazyRetry(() => import("./pages/Terms"));
 const AttributionPolicy = lazyRetry(() => import("./pages/AttributionPolicy"));
-const AiPage = lazyRetry(() => import("./pages/AiPage"));
 const NotFound = lazyRetry(() => import("./pages/NotFound"));
 const ArduinoStudioPage = lazyRetry(() => import("./pages/ArduinoStudioPage"));
 const PlcSimulatorPage = lazyRetry(() => import("./pages/PlcSimulatorPage"));
@@ -109,7 +108,8 @@ function AnimatedRoutes() {
             <Route path="/simulations/:slug" component={SimulationDetail} />
             <Route path="/simulations" component={Simulations} />
             <Route path="/simulators/arduino-studio" component={ArduinoStudioPage} />
-            <Route path="/ai" component={AiPage} />
+            <Route path="/ai/:rest*"><Redirect to="/" /></Route>
+            <Route path="/ai"><Redirect to="/" /></Route>
             <Route path="/about" component={About} />
             <Route path="/contact" component={Contact} />
             <Route path="/privacy" component={Privacy} />

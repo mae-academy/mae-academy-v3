@@ -7,6 +7,7 @@
     content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="description"
     content="MAE Academy: a global platform for academic research, engineering courses, and practical simulations." />
+  <meta name="google-adsense-account" content="ca-pub-1937330840014217" />
   <title>MAE Academy — Free Online Engineering Simulators &amp; Courses</title>
   <script type="application/ld+json" id="mae-landing-jsonld">
   {
@@ -45,7 +46,30 @@
 </head>
 
 <body>
-  <div id="root"></div>
+  <div id="root">
+    <!-- Crawler-readable fallback; React replaces it on mount. -->
+    <header>
+      <a href="/">MAE Academy</a>
+    </header>
+    <main>
+      <h1>MAE Academy: Free Online Engineering Simulators &amp; Courses</h1>
+      <p>MAE Academy is a global platform for academic research, engineering courses and practical simulations: PLC ladder logic, Arduino, Python/C++/8086 code studio, digital logic, signals and systems, control systems, power electronics and circuits.</p>
+      <nav aria-label="Primary">
+        <a href="/simulations">Simulations</a>
+        <a href="/research">Research</a>
+        <a href="/library">Library</a>
+        <a href="/about">About</a>
+        <a href="/contact">Contact</a>
+      </nav>
+    </main>
+    <footer>
+      <a href="/privacy-policy">Privacy Policy</a>
+      <a href="/terms">Terms of Service</a>
+      <a href="/about">About</a>
+      <a href="/contact">Contact</a>
+    </footer>
+  </div>
+  <noscript>This site needs JavaScript enabled to run its interactive engineering simulators.</noscript>
   <script type="module" src="/src/main.tsx"></script>
 </body>
 

@@ -71,6 +71,12 @@
     }
   ],
   "redirects": [
+    {
+      "source": "/(.*)",
+      "has": [{ "type": "host", "value": "www.maeacademy.org" }],
+      "destination": "https://maeacademy.org/$1",
+      "permanent": true
+    },
     { "source": "/ai", "destination": "/", "permanent": false },
     { "source": "/ai/:path*", "destination": "/", "permanent": false }
   ],
@@ -80,7 +86,11 @@
       "destination": "/api/$1"
     },
     {
-      "source": "/(.*)",
+      "source": "/",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/(research|library|courses|code|assembler|simulations|simulators|fluid-drive|about|contact|privacy|privacy-policy|terms|terms-of-service|attribution-policy)(/.*)?",
       "destination": "/index.html"
     }
   ]
