@@ -4,7 +4,14 @@
  * with KaTeX telemetry notation, stable 60 FPS animation loop, and clean header.
  */
 import { useEffect, useRef, useState } from "react";
-import { KatexMath } from "@/components/ui/KatexMath";
+import { lazy, Suspense } from "react";
+
+// KaTeX is ~520 kB of JS plus CSS. The hero only needs it for the hover tooltip, so it is fetched on the first hover
+// (plain text shows for that instant); the always-visible readouts use light serif markup instead.
+const KatexMath = lazy(() => import("@/components/ui/KatexMath").then((m) => ({ default: m.KatexMath })));
+
+const Sym = ({ children }: { children: React.ReactNode }) => <i className="font-serif">{children}</i>;
+const Readout = ({ children }: { children: React.ReactNode }) => <span className="font-serif">{children}</span>;
 
 const FREQ_HZ = 120;
 const A1 = 1.65; // Peak amplitude for V_p-p = 3.3 V
@@ -383,7 +390,7 @@ export default function EngineeringScope({ className = "" }: EngineeringScopePro
         </div>
 
         <div className="px-2 py-0.5 sm:py-1 bg-slate-100 rounded-md text-[10px] sm:text-xs font-mono font-medium text-slate-700 dark:bg-white/[0.06] dark:border dark:border-white/[0.08] dark:text-zinc-200 flex items-center">
-          <KatexMath math="10\text{ ms/div}" />
+          <Readout>10 ms/div</Readout>
         </div>
       </div>
 
@@ -407,19 +414,21 @@ export default function EngineeringScope({ className = "" }: EngineeringScopePro
               top: Math.max(35, hoverInfo.y - 12),
             }}
           >
+            <Suspense fallback={<span className="font-serif">Δt = {hoverInfo.time} ms, V₁ = {hoverInfo.v1} V, V₂ = {hoverInfo.v2} V</span>}>
             <KatexMath
               math={`\\Delta t = ${hoverInfo.time}\\text{ ms}, \\quad \\textcolor{#2563EB}{V_1(t) = ${hoverInfo.v1}\\text{ V}}, \\quad \\textcolor{#7C3AED}{V_2(t) = ${hoverInfo.v2}\\text{ V}}`}
             />
+            </Suspense>
           </div>
         )}
       </div>
 
       {/* Readout Footer snug directly below grid without gaps */}
       <div className="flex justify-between items-center mt-2.5 sm:mt-3 pt-1 text-[10px] sm:text-xs text-slate-600 dark:text-zinc-300 font-mono whitespace-nowrap gap-1 overflow-x-auto no-scrollbar">
-        <KatexMath math="f = 120\text{ Hz}" />
-        <KatexMath math="\zeta = 0.35" />
-        <KatexMath math="V_{\text{p-p}} = 3.3\text{ V}" />
-        <KatexMath math="\phi = -42.0^\circ" />
+        <Readout><Sym>f</Sym> = 120 Hz</Readout>
+        <Readout><Sym>ζ</Sym> = 0.35</Readout>
+        <Readout><Sym>V</Sym><sub>p-p</sub> = 3.3 V</Readout>
+        <Readout><Sym>φ</Sym> = −42.0°</Readout>
       </div>
     </div>
   );

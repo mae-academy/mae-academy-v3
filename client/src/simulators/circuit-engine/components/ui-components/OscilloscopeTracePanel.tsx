@@ -13,6 +13,7 @@ import { calculateVdc, calculateVpp } from '@/simulators/circuit-engine/componen
 import type { OscilloscopeDisplaySettings } from '@/simulators/circuit-engine/components/ui-components/oscilloscopeDisplaySettings';
 import { V3Math } from '@/components/ui/V3Math';
 import { InlineMath } from 'react-katex';
+import "katex/dist/katex.min.css";
 
 type ScopePanelColors = { line: string; subtle: string; muted: string };
 

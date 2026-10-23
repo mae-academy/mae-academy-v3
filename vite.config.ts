@@ -69,28 +69,6 @@ function writeToLogFile(source: LogSource, entries: unknown[]) {
   trimLogFile(logPath, MAX_LOG_SIZE_BYTES);
 }
 
-/** Preloads the KaTeX webfonts (hashed asset names) so math glyphs never font-swap. */
-function katexFontPreloadPlugin(): Plugin {
-  const wanted = ["KaTeX_Math-Italic", "KaTeX_Main-Regular"];
-  return {
-    name: "katex-font-preload",
-    apply: "build",
-    transformIndexHtml: {
-      order: "post",
-      handler(_html, ctx) {
-        const bundle = ctx.bundle ?? {};
-        return Object.keys(bundle)
-          .filter(file => file.endsWith(".woff2") && wanted.some(name => path.basename(file).startsWith(name)))
-          .map(file => ({
-            tag: "link",
-            attrs: { rel: "preload", as: "font", type: "font/woff2", href: `/${file}`, crossorigin: "" },
-            injectTo: "head" as const,
-          }));
-      },
-    },
-  };
-}
-
 /**
  * Vite plugin to collect browser debug logs
  * - POST /__manus__/logs: Browser sends logs, written directly to files
@@ -488,7 +466,8 @@ const plugins = [
   react(),
   tailwindcss(),
   jsxLocPlugin(),
-  vitePluginManusRuntime(),
+  // The Manus runtime inlines a ~370 kB React bundle into index.html. It is a host-editing aid, so it only runs in dev.
+  { ...vitePluginManusRuntime(), apply: "serve" as const },
   vitePluginManusDebugCollector(),
   vitePluginStorageProxy(),
   vitePluginPlcApi(),
@@ -497,7 +476,6 @@ const plugins = [
   vitePluginSignalsApi(),
   vitePluginControlApi(),
   vitePluginCodeApi(),
-  katexFontPreloadPlugin(),
 ];
 
 export default defineConfig({

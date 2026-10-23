@@ -6,6 +6,7 @@ import { evaluateSignal } from "@shared/signals/signalEngine";
  * only holds setup inputs and user commands; it never receives animation t.
  */
 import katex from "katex";
+import "katex/dist/katex.min.css";
 import { FastForward, Pause, Play, Rewind, Sigma, StepForward } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
