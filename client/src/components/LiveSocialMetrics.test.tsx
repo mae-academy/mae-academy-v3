@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { act, cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   Odometer,
   organicIncrement,
@@ -16,7 +16,7 @@ afterEach(async () => {
 });
 
 describe("SocialMetricsBar & SocialPlatformBreakdown Suite", () => {
-  it("renders compact SocialMetricsBar with total views, community, reactions, and handle", () => {
+  it("renders the compact SocialMetricsBar with only total views and the handle", () => {
     render(<SocialMetricsBar initialData={INITIAL_SOCIAL_METRICS} />);
 
     // Check presence of official handle
@@ -25,9 +25,9 @@ describe("SocialMetricsBar & SocialPlatformBreakdown Suite", () => {
     // Check label for total views
     expect(screen.getByText(/Total Views/i)).toBeDefined();
 
-    // Check community and reaction stats
-    expect(screen.getByText(/Community/i)).toBeDefined();
-    expect(screen.getByText(/Reactions/i)).toBeDefined();
+    // The secondary Community / Reactions pills were removed from the hero
+    expect(screen.queryByText(/Community/i)).toBeNull();
+    expect(screen.queryByText(/Reactions/i)).toBeNull();
   });
 
   it("renders SocialPlatformBreakdown with verified platform links", () => {
@@ -48,8 +48,8 @@ describe("SocialMetricsBar & SocialPlatformBreakdown Suite", () => {
 
 describe("Baseline data", () => {
   it("matches the official follower counts", () => {
-    expect(INITIAL_SOCIAL_METRICS.instagram.followers).toBe(58240);
-    expect(INITIAL_SOCIAL_METRICS.facebook.followers).toBe(59000);
+    expect(INITIAL_SOCIAL_METRICS.instagram.followers).toBe(58171);
+    expect(INITIAL_SOCIAL_METRICS.facebook.followers).toBe(59920);
   });
 });
 
@@ -85,7 +85,7 @@ describe("Localization", () => {
     await act(async () => { await i18n.changeLanguage("es"); });
     render(<SocialMetricsBar />);
     expect(screen.getByText("Vistas Totales")).toBeDefined();
-    expect(screen.getByText("Comunidad")).toBeDefined();
+    expect(screen.queryByText("Comunidad")).toBeNull();
   });
 
   it("renders Arabic labels", async () => {
@@ -93,5 +93,32 @@ describe("Localization", () => {
     render(<SocialPlatformBreakdown />);
     expect(screen.getByText("حضور المنصات الرسمية")).toBeDefined();
     expect(screen.getByText("زيارة الحساب")).toBeDefined();
+  });
+});
+
+describe("Live follower refresh", () => {
+  const stubFetch = (impl: () => Promise<unknown>) => vi.stubGlobal("fetch", vi.fn(impl));
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("shows the baseline first, then the counts returned by /api/telemetry/social", async () => {
+    stubFetch(async () => ({ ok: true, json: async () => ({ instagram: 58300, facebook: 60100, updatedAt: "x", source: "live" }) }));
+    render(<SocialPlatformBreakdown />);
+    expect(screen.getByText("58,171")).toBeDefined();
+    expect(screen.getByText("59,920")).toBeDefined();
+    expect(await screen.findByText("58,300")).toBeDefined();
+    expect(screen.getByText("60,100")).toBeDefined();
+  });
+
+  it("keeps the baseline when the API fails or returns junk", async () => {
+    stubFetch(async () => ({ ok: true, json: async () => ({ instagram: "many", facebook: -4 }) }));
+    render(<SocialPlatformBreakdown />);
+    await act(async () => { await Promise.resolve(); });
+    expect(screen.getByText("58,171")).toBeDefined();
+    expect(screen.getByText("59,920")).toBeDefined();
+    cleanup();
+    stubFetch(async () => { throw new Error("offline"); });
+    render(<SocialPlatformBreakdown />);
+    await act(async () => { await Promise.resolve(); });
+    expect(screen.getByText("59,920")).toBeDefined();
   });
 });

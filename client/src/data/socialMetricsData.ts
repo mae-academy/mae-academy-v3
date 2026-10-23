@@ -5,9 +5,11 @@
  * Platforms: Instagram & Facebook
  * Realistic baseline estimates:
  * - Aggregate Views: 40M+ (Primary Hero Focus)
- * - Aggregate Community / Followers: 117k+
+ * - Followers: loaded from /api/telemetry/social (baseline in shared/socialMetrics.ts)
  * - High-engagement technical & engineering education reach
  */
+
+import { SOCIAL_FOLLOWER_BASELINE } from '@shared/socialMetrics';
 
 export interface PlatformSocialData {
   platform: 'instagram' | 'facebook';
@@ -36,7 +38,7 @@ export const INITIAL_SOCIAL_METRICS: SocialMetricsSnapshot = {
     handle: '@mae.academy',
     displayName: 'MAE Academy',
     profileUrl: 'https://www.instagram.com/mae.academy/',
-    followers: 58240,
+    followers: SOCIAL_FOLLOWER_BASELINE.instagram, // first-paint fallback; /api/telemetry/social replaces it
     videoViews: 18549000,
     engagement: 976000,
     verified: true,
@@ -48,7 +50,7 @@ export const INITIAL_SOCIAL_METRICS: SocialMetricsSnapshot = {
     handle: '@mae.academy',
     displayName: 'MAE Academy',
     profileUrl: 'https://web.facebook.com/search/top?q=mae%20academy',
-    followers: 59000,
+    followers: SOCIAL_FOLLOWER_BASELINE.facebook, // first-paint fallback; /api/telemetry/social replaces it
     videoViews: 21979000,
     engagement: 1089000,
     verified: true,

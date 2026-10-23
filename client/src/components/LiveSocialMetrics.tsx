@@ -4,7 +4,7 @@
  * 1. SocialMetricsBar (Hero):
  *    Compact, horizontally-aligned inline row placed directly below the CTA buttons
  *    ("Launch a Simulation" & "Explore Library") and directly above the "Chat with MAE AI" banner.
- *    Displays Total Views, Community, Reactions, and @mae.academy badge.
+ *    Displays the Total Views odometer and the @mae.academy badge.
  *    Total Views rolls like a mechanical odometer: each changing digit slides up from below.
  * 
  * 2. SocialPlatformBreakdown (Bottom):
@@ -12,8 +12,9 @@
  */
 
 import React, { useEffect, useRef, useState } from "react";
-import { Eye, Users, Heart, ArrowUpRight, CheckCircle2 } from "lucide-react";
+import { Eye, ArrowUpRight, CheckCircle2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { useSocialFollowers } from "@/hooks/useSocialFollowers";
 import {
   INITIAL_SOCIAL_METRICS,
   SocialMetricsSnapshot,
@@ -227,10 +228,6 @@ export function SocialMetricsBar({
 
   const totalViews =
     initialData.instagram.videoViews + initialData.facebook.videoViews;
-  const totalFollowers =
-    initialData.instagram.followers + initialData.facebook.followers;
-  const totalEngagement =
-    initialData.instagram.engagement + initialData.facebook.engagement;
 
   return (
     <div
@@ -256,43 +253,7 @@ export function SocialMetricsBar({
       {/* Subtle Vertical Divider */}
       <div className="hidden sm:block h-6 w-px bg-slate-200 dark:bg-white/10" aria-hidden="true" />
 
-      {/* 2. Community / Followers */}
-      <div className="flex items-center gap-2.5 min-w-0">
-        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-violet-500/10 text-violet-600 dark:text-violet-400 border border-violet-500/15">
-          <Users className="h-3.5 w-3.5" />
-        </span>
-        <div className="flex flex-col">
-          <span className="text-[10px] uppercase font-semibold tracking-wider text-slate-400 dark:text-zinc-500">
-            {t("socialMetrics.community")}
-          </span>
-          <div className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white leading-none font-sans">
-            <bdi dir="ltr">{formatCompact(totalFollowers)}</bdi>
-          </div>
-        </div>
-      </div>
-
-      {/* Subtle Vertical Divider */}
-      <div className="hidden sm:block h-6 w-px bg-slate-200 dark:bg-white/10" aria-hidden="true" />
-
-      {/* 3. Total Reactions / Engagement */}
-      <div className="flex items-center gap-2.5 min-w-0">
-        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/15">
-          <Heart className="h-3.5 w-3.5" />
-        </span>
-        <div className="flex flex-col">
-          <span className="text-[10px] uppercase font-semibold tracking-wider text-slate-400 dark:text-zinc-500">
-            {t("socialMetrics.reactions")}
-          </span>
-          <div className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white leading-none font-sans">
-            <bdi dir="ltr">{formatCompact(totalEngagement)}</bdi>
-          </div>
-        </div>
-      </div>
-
-      {/* Subtle Vertical Divider */}
-      <div className="hidden lg:block h-6 w-px bg-slate-200 dark:bg-white/10" aria-hidden="true" />
-
-      {/* 4. Official Handle Badge: @mae.academy */}
+      {/* 2. Official Handle Badge: @mae.academy */}
       <div className="flex items-center gap-1.5 ms-auto sm:ms-0">
         <a
           href="https://www.instagram.com/mae.academy/"
@@ -330,6 +291,10 @@ export function SocialPlatformBreakdown({
   className = "",
 }: SocialPlatformBreakdownProps) {
   const { t } = useTranslation("landing");
+  const followers = useSocialFollowers({
+    instagram: initialData.instagram.followers,
+    facebook: initialData.facebook.followers,
+  });
 
   return (
     <section
@@ -397,7 +362,7 @@ export function SocialPlatformBreakdown({
                   {t("socialMetrics.followers")}
                 </div>
                 <div className="text-base sm:text-lg font-bold text-slate-900 dark:text-white font-sans">
-                  {formatWithCommas(initialData.instagram.followers)}
+                  <Odometer value={followers.instagram} />
                 </div>
               </div>
 
@@ -467,7 +432,7 @@ export function SocialPlatformBreakdown({
                   {t("socialMetrics.followers")}
                 </div>
                 <div className="text-base sm:text-lg font-bold text-slate-900 dark:text-white font-sans">
-                  {formatWithCommas(initialData.facebook.followers)}
+                  <Odometer value={followers.facebook} />
                 </div>
               </div>
 
