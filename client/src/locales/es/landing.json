@@ -53,5 +53,38 @@
       },
       "cta": "Explorar Notas de Investigación"
     }
+  },
+  "socialMetrics": {
+    "liveBadge": "Alcance Estimado en Vivo",
+    "viewsPerMin": "vistas/min",
+    "titlePrefix": "Alcance en Ingeniería y",
+    "titleGradient": "Métricas Sociales en Vivo",
+    "subtitle": "Telemetría en tiempo real en los canales oficiales de @mae.academy en Instagram y Facebook, midiendo el impacto de la educación abierta en ingeniería.",
+    "detailedBtn": "Detallado (1,234,567)",
+    "compactBtn": "Compacto (40M+)",
+    "aggregateViewsLabel": "Vistas Totales Agregadas (IG + FB)",
+    "liveStreamActive": "Transmisión en Vivo Activa",
+    "videoViewsSuffix": "Vistas de Video",
+    "viewsDescription": "A través de series de clases especializadas, animaciones de dinámica de sistemas y demostraciones de laboratorio de circuitos producidas bajo la marca MAE Academy.",
+    "totalFollowers": "Comunidad Total",
+    "totalFollowersSub": "Estudiantes e Ingenieros",
+    "totalReactions": "Reacciones Totales",
+    "totalReactionsSub": "Me gusta, compartidos y respuestas",
+    "officialHandle": "Cuenta Oficial",
+    "verifiedEntity": "Entidad de Marca Verificada",
+    "velocity": "Velocidad / Ritmo",
+    "velocitySub": "Tráfico orgánico en vivo",
+    "visitProfile": "Visitar Perfil",
+    "visitPage": "Visitar Página",
+    "followers": "Seguidores",
+    "views": "Vistas",
+    "reactions": "Reacciones",
+    "engagement": "Interacción",
+    "igDescriptor": "Reels, clips de laboratorio y tutoriales",
+    "fbDescriptor": "Clases completas, debates y actualizaciones",
+    "synced": "Sincronizado",
+    "totalViews": "Vistas Totales",
+    "community": "Comunidad",
+    "officialTelemetry": "Telemetría de Plataformas Oficiales"
   }
 }

@@ -53,5 +53,38 @@
       },
       "cta": "Explore Research Notes"
     }
+  },
+  "socialMetrics": {
+    "liveBadge": "Live Estimated Reach",
+    "viewsPerMin": "views/min",
+    "titlePrefix": "Engineering Reach &",
+    "titleGradient": "Live Social Metrics",
+    "subtitle": "Real-time engagement telemetry across @mae.academy official Instagram and Facebook channels, measuring open-access engineering viewership worldwide.",
+    "detailedBtn": "Detailed (1,234,567)",
+    "compactBtn": "Compact (40M+)",
+    "aggregateViewsLabel": "Aggregate Total Views (IG + FB)",
+    "liveStreamActive": "Live Stream Active",
+    "videoViewsSuffix": "Video Views",
+    "viewsDescription": "Across specialized lecture series, system dynamics animations, and circuit laboratory demonstrations authored and produced under the MAE Academy brand.",
+    "totalFollowers": "Total Followers",
+    "totalFollowersSub": "Students & Engineers",
+    "totalReactions": "Total Reactions",
+    "totalReactionsSub": "Likes, shares & replies",
+    "officialHandle": "Official Handle",
+    "verifiedEntity": "Verified Brand Entity",
+    "velocity": "Pace / Velocity",
+    "velocitySub": "Stochastic live traffic",
+    "visitProfile": "Visit Profile",
+    "visitPage": "Visit Page",
+    "followers": "Followers",
+    "views": "Views",
+    "reactions": "Reactions",
+    "engagement": "Engagement",
+    "igDescriptor": "Reels, Dynamic Lab Clips & Tutorials",
+    "fbDescriptor": "Full Lectures, Community Discussions & Updates",
+    "synced": "Synced",
+    "totalViews": "Total Views",
+    "community": "Community",
+    "officialTelemetry": "Official Platform Telemetry"
   }
 }

@@ -9,6 +9,7 @@ import { ArrowRight, MoveRight } from "lucide-react";
 import { Link } from "wouter";
 import EngineeringPlatformsSection from "@/components/EngineeringPlatformsSection";
 import MaeAiCallout from "@/components/MaeAiCallout";
+import { SocialMetricsBar, SocialPlatformBreakdown } from "@/components/LiveSocialMetrics";
 import { useTranslation } from "react-i18next";
 import { usePageTitle } from "@/hooks/usePageTitle";
 
@@ -84,7 +85,12 @@ export default function Home() {
               </Link>
             </motion.div>
 
-            {/* MAE AI banner (mobile/tablet): stacked directly under the launch actions */}
+            {/* Social Metrics Bar: Inline row directly below CTA buttons & directly above MAE AI card */}
+            <motion.div variants={itemVariants} className="w-full pt-1">
+              <SocialMetricsBar />
+            </motion.div>
+
+            {/* MAE AI banner (mobile/tablet): stacked directly under the metrics bar */}
             <motion.div variants={itemVariants} className="w-full pt-2 lg:hidden">
               <MaeAiCallout />
             </motion.div>
@@ -104,7 +110,7 @@ export default function Home() {
           </motion.div>
         </div>
 
-        {/* MAE AI entry banner (desktop): single row spanning the hero, beneath the launch actions */}
+        {/* MAE AI entry banner (desktop): single row spanning the hero, beneath the launch actions & metrics */}
         <motion.div variants={itemVariants} className="hidden lg:block w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <MaeAiCallout />
         </motion.div>
@@ -114,6 +120,12 @@ export default function Home() {
       {/* CORE ENGINEERING PLATFORMS: Vertical Alternating Showcase    */}
       {/* ============================================================ */}
       <EngineeringPlatformsSection />
+
+      {/* ============================================================ */}
+      {/* SOCIAL PLATFORM TELEMETRY BREAKDOWN: Instagram & Facebook     */}
+      {/* Positioned right above the Founder section at the bottom     */}
+      {/* ============================================================ */}
+      <SocialPlatformBreakdown />
 
       {/* ============================================================ */}
       {/* FOUNDER & ABOUT SECTION: Expanded 2-Column Banner            */}
