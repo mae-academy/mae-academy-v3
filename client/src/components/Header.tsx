@@ -5,6 +5,7 @@ import HeaderNavigationSlider from "./HeaderNavigationSlider";
 import { isRouteActive, Locale, platformRoutes } from "@/data/platform";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useTranslation } from "react-i18next";
+import { prepareLocale } from "@/i18n/config";
 
 export type { Locale } from "@/data/platform";
 
@@ -77,7 +78,7 @@ function Header({ locale, onLocaleChange, isLocaleTransitioning, isDark, onTheme
                     key={option}
                     disabled={isLocaleTransitioning}
                     onClick={() => {
-                      i18n.changeLanguage(option);
+                      void prepareLocale(option).then(() => i18n.changeLanguage(option));
                       onLocaleChange(option);
                       setLanguageOpen(false);
                     }}

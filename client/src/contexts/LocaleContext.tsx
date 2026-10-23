@@ -2,7 +2,7 @@
 import { createContext, ReactNode, useContext, useEffect } from "react";
 import type { Locale } from "@/data/platform";
 import { localizedContent, LocaleContent } from "@/data/content";
-import i18n from "@/i18n/config";
+import i18n, { prepareLocale } from "@/i18n/config";
 
 type LocaleContextValue = { locale: Locale; copy: LocaleContent; isRtl: boolean };
 const LocaleContext = createContext<LocaleContextValue | null>(null);
@@ -10,7 +10,7 @@ const LocaleContext = createContext<LocaleContextValue | null>(null);
 export function LocaleProvider({ locale, children }: { locale: Locale; children: ReactNode }) {
   useEffect(() => {
     if (i18n.language !== locale) {
-      i18n.changeLanguage(locale);
+      void prepareLocale(locale).then(() => i18n.changeLanguage(locale));
     }
   }, [locale]);
 
