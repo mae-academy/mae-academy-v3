@@ -5,10 +5,13 @@ import { SIMULATOR_SEO } from "./simulatorSeoData";
 
 const publicDir = resolve(__dirname, "../../public");
 
+/** Digital Logic tool tabs that render the same page as ?tool=schematic; only the schematic URL is listed to avoid duplicate-content entries. */
+const SAME_PAGE_TOOLS = new Set(["analyzer", "kmap", "synthesis", "timing", "state-machine"].map((t) => `/simulations/digital-logic-design?tool=${t}`));
+
 describe("sitemap and robots", () => {
   it("lists every simulator tool canonical URL", () => {
     const xml = readFileSync(resolve(publicDir, "sitemap.xml"), "utf8");
-    const missing = SIMULATOR_SEO.filter((e) => !xml.includes(`<loc>https://maeacademy.org${e.path}</loc>`)).map((e) => e.path);
+    const missing = SIMULATOR_SEO.filter((e) => !SAME_PAGE_TOOLS.has(e.path) && !xml.includes(`<loc>https://maeacademy.org${e.path}</loc>`)).map((e) => e.path);
     expect(missing).toEqual([]);
   });
   it("points robots.txt at the sitemap without blocking simulators", () => {
