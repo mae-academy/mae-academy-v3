@@ -1,7 +1,7 @@
 {
   "limit_basis": "percent_of_weekly_usage_shown_in_account_settings",
   "usable_percent": 75,
-  "weekly_percent_used": null,
+  "weekly_percent_used": 16,
   "estimate_percent_per_prompt": null,
   "tier_weights": {
     "opus_high": 4,
