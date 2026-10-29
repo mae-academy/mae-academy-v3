@@ -2,6 +2,8 @@
 
 Status: **approved**. Lint (ESLint 9.39.5 and plugins) and the chunk-size audit are installed on `automation/setup`. `e2e` and the `test: vitest run` change are not installed yet. ESLint 9 is end-of-life upstream (10.x is current); 9.39.5 was pinned by the owner.
 
+> **ESLint upgrade required before Phase 1.** `eslint@9.39.5` is end-of-life: npm marks it deprecated ("This version is no longer supported", see https://eslint.org/version-support). ESLint 10.0.0 was released on 2026-02-06; the newest releases are `eslint` 10.13.0 and `@eslint/js` 10.0.1. Before any Phase 1 prompt (`a-1` onward) runs, the owner approves the upgrade and both packages move to 10.x. `typescript-eslint` 8.72.1 (peer `eslint ^8.57.0 || ^9.0.0 || ^10.0.0`) and `eslint-plugin-react-hooks` 7.1.1 (peer includes `^10.0.0`) already support ESLint 10, so they stay as they are.
+
 ## Packages
 
 | Package | Version (exact pin) | Why |
