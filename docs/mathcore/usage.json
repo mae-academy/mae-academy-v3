@@ -1,1 +1,10 @@
-[]
+[
+  {
+    "id": "a-1",
+    "timestamp": "2026-10-29T12:53:53.960Z",
+    "status": "passed",
+    "calibration": true,
+    "weekly_percent_before": 16,
+    "weekly_percent_after": null
+  }
+]
