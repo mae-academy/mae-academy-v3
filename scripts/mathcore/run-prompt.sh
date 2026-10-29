@@ -174,7 +174,7 @@ else
   for _ in $(seq 1 40); do
     # MATHCORE_PIN_DNS=1: for machines whose system resolver blocks *.vercel.app; pins the IP from dig.
     pin=(); [ "${MATHCORE_PIN_DNS:-}" = 1 ] && ip="$(dig +short "$PREVIEW_HOST" | grep -E '^[0-9.]+$' | head -1)" && [ -n "$ip" ] && pin=(--resolve "$PREVIEW_HOST:443:$ip")
-    code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "${pin[@]}" -H "x-vercel-protection-bypass: $VERCEL_AUTOMATION_BYPASS_SECRET" "$PREVIEW_URL/")"
+    code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 ${pin[@]+"${pin[@]}"} -H "x-vercel-protection-bypass: $VERCEL_AUTOMATION_BYPASS_SECRET" "$PREVIEW_URL/")"
     [ "$code" = 200 ] && PREVIEW_STATUS="reachable (HTTP 200)" && break
     sleep 15
   done
