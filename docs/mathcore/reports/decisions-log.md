@@ -17,3 +17,4 @@ Append-only. Every pipeline decision: timestamp (UTC), prompt id, decision, reas
 | 2026-10-29 | setup | PR creation disabled; compare URLs reported instead | Spec 5.3: `gh` not installed or authenticated |
 | 2026-10-29 | setup | Golden files: executor writes the generator only (a-1) | Golden files are human-owned; the owner runs the oracle and commits them |
 | 2026-10-29 | setup | No dependency or skill installed | Tooling proposal and AgentPhone await owner approval |
+| 2026-10-29T12:51:52Z | a-1 | executor exited non-zero | continuing to the gate, which decides |
