@@ -5,7 +5,7 @@
 # Exit codes: 0 branch pushed and report written, 1 safety or setup error, 2 deferred (budget or prompt status),
 #             3 blocked after two gate failures, 4 preview unreachable.
 #
-# Safety: works in its own temporary worktree cut from origin/main, pushes only mathcore/<id> to mae-academy-v3,
+# Safety: works in its own temporary worktree cut from origin/main (or MATHCORE_BASE), pushes only mathcore/<id> to mae-academy-v3,
 # never touches main, never merges, never deletes branches, never calls Vercel. Secrets come only from the
 # environment (VERCEL_AUTOMATION_BYPASS_SECRET, GH_TOKEN, AGENTPHONE_API_KEY) and are never written or echoed.
 #
@@ -14,6 +14,7 @@
 #   MATHCORE_REVIEWER      command that reads the reviewer input on stdin (default: claude -p, no edit tools)
 #   MATHCORE_NODE_MODULES  path to an existing node_modules to symlink instead of running pnpm install
 #   MATHCORE_PIN_DNS=1     resolve the preview host with dig and pin it in curl (local machines with DNS filtering)
+#   MATHCORE_BASE          origin/<branch> to cut the worktree from and gate against (default origin/main)
 set -uo pipefail
 
 ID="${1:?usage: run-prompt.sh <id>}"
@@ -32,6 +33,9 @@ remote="$(git -C "$SRC_ROOT" remote get-url --push origin)"
 # One trailing .git is optional (cloud checkouts omit it); anything else must match exactly.
 [ "${remote%.git}" = "${EXPECTED_REMOTE%.git}" ] || die "origin push URL is '$remote', expected $EXPECTED_REMOTE (.git optional)"
 case "$BRANCH" in mathcore/*) ;; *) die "refusing to work on branch $BRANCH" ;; esac
+BASE_REF="${MATHCORE_BASE:-origin/main}"
+[[ "$BASE_REF" =~ ^origin/[A-Za-z0-9._/-]+$ ]] || die "MATHCORE_BASE must be origin/<branch>, got '$BASE_REF'"
+[ "$BASE_REF" = "origin/$BRANCH" ] && die "MATHCORE_BASE cannot be the branch being created"
 
 # Pipeline files are copied out first so the run uses this checkout's scripts and prompts, whatever main contains.
 PIPE="$(mktemp -d)"
@@ -43,14 +47,14 @@ if ! $DRY_RUN; then
   grep -q '^- Status: deferred' "$PIPE/prompt.md" && die "prompt $ID is marked deferred (DECISIONS.md D2/D3)" 2
 fi
 
-git -C "$SRC_ROOT" fetch --quiet origin main || die "cannot fetch origin/main"
+git -C "$SRC_ROOT" fetch --quiet origin "${BASE_REF#origin/}" || die "cannot fetch $BASE_REF"
 git -C "$SRC_ROOT" show-ref --quiet "refs/heads/$BRANCH" && die "local branch $BRANCH already exists; a human must resolve it"
 git -C "$SRC_ROOT" ls-remote --exit-code --heads origin "$BRANCH" >/dev/null && die "remote branch $BRANCH already exists (PR may be open: waiting for human review)"
 
 WT="$(mktemp -d)/mathcore-$ID"
-git -C "$SRC_ROOT" worktree add --quiet -b "$BRANCH" "$WT" origin/main || die "cannot create worktree"
+git -C "$SRC_ROOT" worktree add --quiet -b "$BRANCH" "$WT" "$BASE_REF" || die "cannot create worktree"
 cd "$WT" || die "cannot enter worktree"
-BASE_SHA="$(git rev-parse origin/main)"
+BASE_SHA="$(git rev-parse "$BASE_REF")"
 mkdir -p docs/mathcore/reports
 LOG=docs/mathcore/reports/decisions-log.md
 REPORT=docs/mathcore/reports/$ID.md
@@ -117,7 +121,7 @@ fi
 # --- 4. gate, one repair round ------------------------------------------------------------------------------------
 GATE_RESULT=""
 for attempt in 1 2; do
-  bash "$PIPE/gate.sh" origin/main > "$PIPE/gate-$attempt.log" 2>&1
+  bash "$PIPE/gate.sh" "$BASE_REF" > "$PIPE/gate-$attempt.log" 2>&1
   GATE_RC=$?
   GATE_RESULT="$(grep 'GATE RESULT' "$PIPE/gate-$attempt.log" | tail -1)"
   echo "gate attempt $attempt: $GATE_RESULT"
@@ -195,7 +199,7 @@ fi
 {
   echo "# Mathcore run: $ID"; echo
   echo "- Started: $STAMP"
-  echo "- Base: \`$BASE_SHA\` (origin/main)"
+  echo "- Base: \`$BASE_SHA\` ($BASE_REF)"
   echo "- Status: **$STATUS**"
   echo "- Preview URL: $PREVIEW_URL ($PREVIEW_STATUS)"
   echo "- Budget guard: \`$BUDGET_JSON\`"
