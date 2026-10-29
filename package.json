@@ -11,6 +11,7 @@
     "preview": "vite preview --host",
     "check": "tsc --noEmit",
     "audit:dist": "node scripts/audit-dist.mjs",
+    "audit:chunks": "node scripts/mathcore/audit-chunks.mjs",
     "format": "prettier --write .",
     "test": "vitest"
   },
