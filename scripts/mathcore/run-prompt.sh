@@ -29,7 +29,8 @@ die() { echo "run-prompt: STOP: $*" >&2; exit "${2:-1}"; }
 [[ "$ID" =~ ^([a-l]-[1-4]|zz-test)$ ]] || die "invalid id '$ID'"
 DRY_RUN=false; [ "$ID" = zz-test ] && DRY_RUN=true
 remote="$(git -C "$SRC_ROOT" remote get-url --push origin)"
-[ "$remote" = "$EXPECTED_REMOTE" ] || die "origin push URL is '$remote', expected $EXPECTED_REMOTE"
+# One trailing .git is optional (cloud checkouts omit it); anything else must match exactly.
+[ "${remote%.git}" = "${EXPECTED_REMOTE%.git}" ] || die "origin push URL is '$remote', expected $EXPECTED_REMOTE (.git optional)"
 case "$BRANCH" in mathcore/*) ;; *) die "refusing to work on branch $BRANCH" ;; esac
 
 # Pipeline files are copied out first so the run uses this checkout's scripts and prompts, whatever main contains.
