@@ -363,3 +363,12 @@ Exit: acceptable response time; CAS service vs Pyodide decided by measurement.
 ## 15. Next step
 
 Phase 0 on a branch: install and pin Compute Engine, measure chunk sizes and 20 expression shapes on D1, then set the budgets. Blocked until D1 specs are provided by the owner.
+
+## Owner note — D1 reference devices (2026-10-29)
+
+Amends D1 (Section 1). The owner has no physical Android phone, so the "mid-range Android phone" in D1 is replaced by a simulated phone. Status of D1: **specs recorded (iPad pending)**.
+
+- **Laptop (primary reference):** MacBook Pro Retina 15-inch (Mid 2014); CPU 2.5 GHz Quad-Core Intel Core i7; GPU Intel Iris Pro 1536 MB (not used: rendering is CPU-only, ADR-4); RAM 16 GB 1600 MHz DDR3; macOS Sequoia 15.7.7.
+- **Mobile (simulated):** Chrome DevTools CPU throttling at 4× on the laptop above. Every mobile number is labeled "simulated".
+- **iPad (secondary real-device reference):** model, chip, RAM and iPadOS version: pending owner input.
+- The device serial number is not recorded anywhere.
