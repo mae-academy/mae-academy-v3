@@ -1,15 +1,15 @@
 # Tooling proposal: lint, e2e, chunk-size audit
 
-Status: **approved**. Lint (ESLint 9.39.5 and plugins) and the chunk-size audit are installed on `automation/setup`. `e2e` and the `test: vitest run` change are not installed yet. ESLint 9 is end-of-life upstream (10.x is current); 9.39.5 was pinned by the owner.
+Status: **approved**. Lint (ESLint 10.13.0 and plugins) and the chunk-size audit are installed on `automation/setup`. `e2e` and the `test: vitest run` change are not installed yet.
 
-> **ESLint upgrade required before Phase 1.** `eslint@9.39.5` is end-of-life: npm marks it deprecated ("This version is no longer supported", see https://eslint.org/version-support). ESLint 10.0.0 was released on 2026-02-06; the newest releases are `eslint` 10.13.0 and `@eslint/js` 10.0.1. Before any Phase 1 prompt (`a-1` onward) runs, the owner approves the upgrade and both packages move to 10.x. `typescript-eslint` 8.72.1 (peer `eslint ^8.57.0 || ^9.0.0 || ^10.0.0`) and `eslint-plugin-react-hooks` 7.1.1 (peer includes `^10.0.0`) already support ESLint 10, so they stay as they are.
+> **ESLint upgraded to 10 (owner-approved, before Phase 1).** ESLint 9.39.5 was installed first and is end-of-life upstream; `eslint` moved to 10.13.0 and `@eslint/js` to 10.0.1. `typescript-eslint` 8.72.1 (peer `eslint ^8.57.0 || ^9.0.0 || ^10.0.0`) and `eslint-plugin-react-hooks` 7.1.1 (peer includes `^10.0.0`) are unchanged and verified against ESLint 10.
 
 ## Packages
 
 | Package | Version (exact pin) | Why |
 |---|---|---|
-| `eslint` | 9.39.5 (installed) | Gate step 2: lint restricted to mathcore paths. No linter exists in the repo today. |
-| `@eslint/js` | 9.39.5 (installed) | Recommended JS rules for the flat config. |
+| `eslint` | 10.13.0 (installed) | Gate step 2: lint restricted to mathcore paths. No linter exists in the repo today. |
+| `@eslint/js` | 10.0.1 (installed) | Recommended JS rules for the flat config. |
 | `typescript-eslint` | 8.72.1 (installed) | Type-aware rules for `.ts`/`.tsx`. |
 | `eslint-plugin-react-hooks` | 7.1.1 (installed) | Hook rules for `client/src/features/mathcore/ui/`. |
 | `@playwright/test` | 1.62.1 (already installed) | Section 7 browser tests against the preview URL. Installed but unused: no config or script. Needs only `pnpm exec playwright install chromium` in the cloud environment. |
