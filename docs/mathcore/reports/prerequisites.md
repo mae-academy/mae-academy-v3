@@ -1,28 +1,26 @@
 # MAE Math Core pipeline: prerequisites check
 
-- Run 2, 2026-10-29. This follows the revised setup spec.
-- Target repository: `mae-academy/mae-academy-v3`
-- Base commit: `8594cba848712b2b0578e1974f1e1765b4959e6e`. Local `main`, `origin/main`, and `mae-academy-v3` `main` all point to it.
-- Result: **STOPPED at P5**. Nothing has been pushed.
+- Run 3, 2026-10-29. This follows the revised setup spec.
+- Target repository: `mae-academy/mae-academy-v3`. Local `origin` now points to it, and the remote was checked before any push.
+- Base commit: `8594cba848712b2b0578e1974f1e1765b4959e6e`. It is unchanged on remote `main` after the pushes.
+- Result: **STOPPED at P6**. Preview deployments need a Vercel login.
 
 | Check | Result | Evidence |
 |---|---|---|
-| P1: plan committed to main | Prepared locally, not pushed | The plan was not on `main`, so branch `docs/plan-3.1` (commit `8cd2f86`) adds `MAEngine-Plan.md`. It is byte-identical to the owner's working copy (`cmp`). SHA-256: `bbe5a34c…dcc6`. No PR yet: the branch is not pushed and `gh` is unavailable. |
-| P2: `DECISIONS.md` | Prepared locally, not pushed | Branch `docs/decisions` (commit `95bd366`) records D0 to D4 as owner-approved on 2026-10-29. D1 specs are pending owner input. |
-| P3: `BUDGET.json` | Prepared locally, not pushed | It is on the same branch. `weekly_percent_used` and `estimate_percent_per_prompt` are null, so only calibration runs are allowed. |
-| P4: default branch of v3 is `main` | PASS | `git ls-remote --symref https://github.com/mae-academy/mae-academy-v3.git HEAD` returns `ref: refs/heads/main`. |
-| P5: Vercel production branch is `main` | **CANNOT VERIFY: STOP** | The Vercel CLI is not installed, there is no `.vercel/project.json`, and `vercel.json` has no `git` block. The Vercel dashboard needs a login. The GitHub API cannot be reached from this sandbox. Under Section 4, the pipeline stops and asks the owner. |
-| P6: test branch gives a reachable `*.vercel.app` preview | NOT RUN | This needs a push. Pushing is held until P5 is confirmed, because if the production branch were not `main`, any pushed branch could deploy to production. |
-| P7: `package.json` scripts | PASS with one fix pending | `check` = `tsc --noEmit`, `build`, and `audit:dist` are present. `test` = `vitest`, which runs in watch mode, so the gate will call `vitest run`. Whether to change the `test` script is part of the tooling proposal. `dev` and `preview` are recorded for reference only. Missing: lint, e2e (see Section 5.1). |
+| P1: plan committed to main | Branch pushed; PR awaits owner | `docs/plan-3.1` (commit `8cd2f86`) adds `MAEngine-Plan.md`, byte-identical to the owner's copy (`cmp`). PR not opened (`gh` unavailable). Compare URL: https://github.com/mae-academy/mae-academy-v3/compare/main...docs/plan-3.1?expand=1 |
+| P2: `DECISIONS.md` | Branch pushed; PR awaits owner | `docs/decisions` (commit `95bd366`). D1 specs are pending owner input. Compare URL: https://github.com/mae-academy/mae-academy-v3/compare/main...docs/decisions?expand=1 |
+| P3: `BUDGET.json` | Branch pushed | It is on `docs/decisions`. Both percentages are null, so only the two calibration runs are allowed. |
+| P4: default branch is `main` | PASS | `git ls-remote --symref origin HEAD` returns `ref: refs/heads/main`. |
+| P5: Vercel production branch is `main` | PASS | Vercel → mae-academy-v3 → Settings → Environments → Production → Branch Tracking says "Every commit pushed to the main branch will create a Production Deployment". Settings → Git shows the connected repository `mae-academy/mae-academy-v3`. Read only; nothing was changed. |
+| P6: reachable `*.vercel.app` preview | **FAIL: not publicly reachable** | Pushing `docs/decisions` produced a deployment with Environment = Preview, Status = Ready, and "Assigning Custom Domains: Skipped". URLs: `mae-academy-v3-git-docs-decisions-mae-academy.vercel.app` and `mae-academy-v3-u6bio3999-mae-academy.vercel.app`. But Settings → Deployment Protection has **Vercel Authentication on ("Require Log In", Standard Protection)**, so anonymous requests (Playwright, `curl`) get a login wall. `docs/plan-3.1` was still building at check time. |
+| P7: `package.json` scripts | PASS with caveats | `check` = `tsc --noEmit`, `test` = `vitest` (watch mode, so the gate passes `--run` and the tooling proposal changes it to `vitest run`), `build`, `audit:dist`. Information only: `dev`, `preview`. **Caveat:** `audit:dist` (`scripts/audit-dist.mjs`) is a leak scan for source maps, engine signatures, and secrets. It does not audit chunk sizes, so the plan's 80 KB engine-chunk budget (§6.2) has no check yet. |
 
-## Notes
+## Owner decisions needed
 
-- **Remote:** the local `origin` is `github.com/mae-academy/mae-academy`. Its branches and `main` match `mae-academy-v3` exactly, so the repository was most likely renamed. Before any push, the remote is re-pointed to `mae-academy-v3` and verified.
-- **GitHub CLI:** `gh` is not installed and was not installed. PR creation stays disabled. Each PR is reported as a GitHub compare URL that the owner opens by hand.
-
-## Owner action needed to continue
-
-Confirm the Vercel production branch is `main`. Do one of these:
-
-- sign in to Vercel in the Claude browser pane, so the pipeline can read Project → Settings → Git (read only), or
-- confirm it in writing.
+1. **Preview access (P6).** Choose one; the pipeline must not change Vercel settings:
+   - a. Recommended: in Deployment Protection → *Protection Bypass for Automation*, add a secret and provide it to the pipeline as the environment variable `VERCEL_AUTOMATION_BYPASS_SECRET`. Previews stay private, and browser tests send the `x-vercel-protection-bypass` header.
+   - b. Turn off Vercel Authentication for previews. Previews become public.
+2. **Prompt ids.** The spec asks for ids `a-1` to `s-3`, one per weekly step of PLAN.md §10. §10 has 12 phases (0 to 11) totalling 36 weeks. One letter per phase with one number per week ends at `l-3`, not `s-3`, and no grouping found in the plan yields 19 letters (`a` to `s`). The owner needs to give the mapping.
+3. **Deferred phases.** D2 defers Phase 8 and D3 defers Phase 5 and the 3D parts of Phase 9. Should prompt files exist for them, either marked deferred or skipped by the scheduler, or be left out?
+4. **Design tokens file** for the theme lint. There is no dedicated tokens file. Candidate: `client/src/index.css` (`@theme inline`, `:root`, `.dark` variables). Needs confirmation.
+5. **Chunk-size audit.** Approve adding a chunk-size check to the tooling proposal, since `audit:dist` does not cover it.
