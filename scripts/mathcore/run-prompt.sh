@@ -13,6 +13,7 @@
 #   MATHCORE_EXECUTOR      command that reads the executor prompt on stdin (default: claude -p, edits only)
 #   MATHCORE_REVIEWER      command that reads the reviewer input on stdin (default: claude -p, no edit tools)
 #   MATHCORE_NODE_MODULES  path to an existing node_modules to symlink instead of running pnpm install
+#   MATHCORE_PIN_DNS=1     resolve the preview host with dig and pin it in curl (local machines with DNS filtering)
 set -uo pipefail
 
 ID="${1:?usage: run-prompt.sh <id>}"
@@ -169,8 +170,11 @@ PREVIEW_STATUS="unreachable"
 if [ -z "${VERCEL_AUTOMATION_BYPASS_SECRET:-}" ]; then
   PREVIEW_STATUS="unreachable: VERCEL_AUTOMATION_BYPASS_SECRET not set"
 else
+  PREVIEW_HOST="${PREVIEW_URL#https://}"
   for _ in $(seq 1 40); do
-    code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 -H "x-vercel-protection-bypass: $VERCEL_AUTOMATION_BYPASS_SECRET" "$PREVIEW_URL/")"
+    # MATHCORE_PIN_DNS=1: for machines whose system resolver blocks *.vercel.app; pins the IP from dig.
+    pin=(); [ "${MATHCORE_PIN_DNS:-}" = 1 ] && ip="$(dig +short "$PREVIEW_HOST" | grep -E '^[0-9.]+$' | head -1)" && [ -n "$ip" ] && pin=(--resolve "$PREVIEW_HOST:443:$ip")
+    code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "${pin[@]}" -H "x-vercel-protection-bypass: $VERCEL_AUTOMATION_BYPASS_SECRET" "$PREVIEW_URL/")"
     [ "$code" = 200 ] && PREVIEW_STATUS="reachable (HTTP 200)" && break
     sleep 15
   done
