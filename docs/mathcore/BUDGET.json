@@ -1,0 +1,18 @@
+{
+  "limit_basis": "percent_of_weekly_usage_shown_in_account_settings",
+  "usable_percent": 75,
+  "weekly_percent_used": null,
+  "estimate_percent_per_prompt": null,
+  "tier_weights": {
+    "opus_high": 4,
+    "sonnet_high": 2,
+    "sonnet_medium": 1,
+    "haiku_low": 0.3
+  },
+  "max_repair_rounds": 2,
+  "escalate_after_failures": 2,
+  "exploration_cap": 20,
+  "notifications_enabled": false,
+  "voice_enabled": false,
+  "allowed_recipients": ["+962793079775"]
+}
