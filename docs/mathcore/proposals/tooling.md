@@ -1,15 +1,15 @@
 # Tooling proposal: lint, e2e, chunk-size audit
 
-Status: **awaiting owner approval**. Nothing below is installed. When this PR is approved, the pipeline installs exactly these pinned versions on `automation/tooling`, records them in `docs/mathcore/reports/decisions-log.md`, and opens a separate PR.
+Status: **approved**. Lint (ESLint 9.39.5 and plugins) and the chunk-size audit are installed on `automation/setup`. `e2e` and the `test: vitest run` change are not installed yet. ESLint 9 is end-of-life upstream (10.x is current); 9.39.5 was pinned by the owner.
 
 ## Packages
 
 | Package | Version (exact pin) | Why |
 |---|---|---|
-| `eslint` | 9.39.1 (to confirm) | Gate step 2: lint restricted to mathcore paths. No linter exists in the repo today. |
-| `@eslint/js` | 9.39.1 (to confirm) | Recommended JS rules for the flat config. |
-| `typescript-eslint` | 8.46.4 (to confirm) | Type-aware rules for `.ts`/`.tsx`. |
-| `eslint-plugin-react-hooks` | 7.0.1 (to confirm) | Hook rules for `client/src/features/mathcore/ui/`. |
+| `eslint` | 9.39.5 (installed) | Gate step 2: lint restricted to mathcore paths. No linter exists in the repo today. |
+| `@eslint/js` | 9.39.5 (installed) | Recommended JS rules for the flat config. |
+| `typescript-eslint` | 8.72.1 (installed) | Type-aware rules for `.ts`/`.tsx`. |
+| `eslint-plugin-react-hooks` | 7.1.1 (installed) | Hook rules for `client/src/features/mathcore/ui/`. |
 | `@playwright/test` | 1.62.1 (already installed) | Section 7 browser tests against the preview URL. Installed but unused: no config or script. Needs only `pnpm exec playwright install chromium` in the cloud environment. |
 
 "To confirm": the npm registry could not be reached from the setup sandbox, so these versions could not be checked against the registry. At install time the pipeline pins the newest patch of the major version shown (ESLint 9, typescript-eslint 8, react-hooks 7) and writes the resolved version here before committing. If the newest version is a new major, it stops and asks.
@@ -19,13 +19,13 @@ The chunk-size audit needs no new package. It uses Node's built-in `zlib`.
 ## Scripts added to `package.json`
 
 ```json
-"lint": "eslint",
+"lint": "eslint --no-error-on-unmatched-pattern",
 "e2e": "playwright test --config e2e/mathcore/playwright.config.ts",
 "audit:chunks": "node scripts/mathcore/audit-chunks.mjs",
 "test": "vitest run"
 ```
 
-- `lint` takes paths, and the gate calls `pnpm run lint shared/mathcore client/src/features/mathcore`. A repo-wide lint is out of scope.
+- `lint` takes paths, and the gate calls `pnpm run lint shared/mathcore client/src/features/mathcore`. A repo-wide lint is out of scope. `--no-error-on-unmatched-pattern` lets the step pass before Phase 1 creates those directories.
 - `test` changes from `vitest` (watch mode) to `vitest run` (spec 5.2). Developers keep watch mode with `pnpm exec vitest`.
 
 ## Config files created
