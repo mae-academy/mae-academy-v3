@@ -34,6 +34,9 @@ importers:
       '@codemirror/view':
         specifier: ^6.43.13
         version: 6.43.13
+      '@cortex-js/compute-engine':
+        specifier: 0.58.0
+        version: 0.58.0
       '@google/genai':
         specifier: ^2.29.1
         version: 2.29.1
