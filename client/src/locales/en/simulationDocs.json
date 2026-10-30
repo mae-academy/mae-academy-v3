@@ -797,6 +797,10 @@
         {
           "heading": "Dependencies between lines",
           "body": "Each line may define a name, such as a = 2 or f(x) = x^2, and may use names defined by other lines. These links form a directed graph. The engine evaluates definitions before their uses, and when a slider changes it re-evaluates only the lines that depend on it. Circular definitions, where a depends on b and b depends on a, are rejected and the message names the lines involved."
+        },
+        {
+          "heading": "Implicit curves and inequalities",
+          "body": "An equation such as x² + y² = 9 cannot always be solved for y, so the engine draws it as the set where F(x, y) = left side − right side is zero. It evaluates F on a coarse grid, refines only the cells where F changes sign or comes close to zero, and places each crossing by bisection along the cell edge. A sign change that grows instead of shrinking under bisection is a pole, not a curve, and is not drawn. An inequality such as y > x² is shaded where its side of F holds; a strict inequality draws its boundary dashed because the boundary itself is not included."
         }
       ],
       "equations": [

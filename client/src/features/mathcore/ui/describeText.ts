@@ -3,6 +3,14 @@ import type { TFunction } from "i18next";
 import type { CurveDescription } from "@shared/mathcore/describe/describe";
 
 export function describeItem(t: TFunction<"mathcore">, label: string, d: CurveDescription): string {
+  if (d.shaded !== undefined) {
+    // Inequality: say how much is shaded first (the region may fill the view while its boundary is off-screen).
+    // "All" and "none" only when exact; otherwise 1–99 %, so a nearly full view is not called full.
+    const percent = Math.min(99, Math.max(1, Math.round(d.shaded * 100)));
+    const region =
+      d.shaded === 1 ? t("describe.regionAll", { label }) : d.shaded === 0 ? t("describe.regionNone", { label }) : t("describe.region", { label, percent });
+    return d.extent ? `${region}; ${t("describe.boundary", { ...d.extent })}.` : `${region}.`;
+  }
   if (d.pieces === 0) return t("describe.hidden", { label });
   if (d.extent) {
     return t("describe.extent", { label, count: d.pieces, ...d.extent }) + ".";

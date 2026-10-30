@@ -43,7 +43,11 @@
     "maxima": "máximos locales cerca de {{list}}",
     "minima": "mínimos locales cerca de {{list}}",
     "extent_one": "{{label}}: una pieza que abarca x de {{xmin}} a {{xmax}} y y de {{ymin}} a {{ymax}}",
-    "extent_other": "{{label}}: {{count}} piezas que abarcan x de {{xmin}} a {{xmax}} y y de {{ymin}} a {{ymax}}"
+    "extent_other": "{{label}}: {{count}} piezas que abarcan x de {{xmin}} a {{xmax}} y y de {{ymin}} a {{ymax}}",
+    "region": "{{label}}: la región sombreada cubre cerca del {{percent}}% de la vista",
+    "regionAll": "{{label}}: la región sombreada llena toda la vista",
+    "regionNone": "{{label}}: no hay región sombreada en esta vista",
+    "boundary": "su borde abarca x de {{xmin}} a {{xmax}} y y de {{ymin}} a {{ymax}}"
   },
   "value_is": "= {{value}}",
   "benchmarks": "Ejecutar mediciones",

@@ -29,7 +29,8 @@ export function parseLatex(latex: string, parser: RawParser, ctx: NormalizeConte
   try {
     raw = parser(latex);
   } catch (err) {
-    return { ok: false, errors: [{ message: `Parser failed: ${err instanceof Error ? err.message : String(err)}` }] };
+    // The parser's own message (a crash, a timeout in the parse Worker, or the parser being unavailable).
+    return { ok: false, errors: [{ message: err instanceof Error ? err.message : String(err) }] };
   }
   const { expr, errors } = normalizeStatement(raw, ctx);
   if (errors.length > 0 || hasInvalid(expr)) {

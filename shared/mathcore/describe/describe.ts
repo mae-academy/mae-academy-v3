@@ -13,6 +13,8 @@ export interface CurveDescription {
   extrema: Array<{ x: number; y: number; type: "max" | "min" }>;
   /** Number of disconnected pieces (asymptotes and undefined regions split the curve). */
   pieces: number;
+  /** For an inequality: the fraction of the view that is shaded (0–1). */
+  shaded?: number;
   /** For curves that are not a function graph (implicit, polar, parametric): the box they span. */
   extent?: { xmin: number; xmax: number; ymin: number; ymax: number };
 }

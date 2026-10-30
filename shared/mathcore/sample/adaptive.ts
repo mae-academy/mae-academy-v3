@@ -7,7 +7,7 @@
  *   curve is cut; otherwise it is a steep but continuous part and the points are kept.
  * - Refinement stops at a tolerance in world units, so a caller passes the size of one pixel.
  */
-import { PRECISION_WARNING_MAGNITUDE } from "../constants";
+import { JUMP_BISECTIONS, JUMP_PIXELS, PRECISION_WARNING_MAGNITUDE } from "../constants";
 
 /** One connected piece of a curve: interleaved x0, y0, x1, y1, … */
 export type Polyline = Float64Array;
@@ -36,10 +36,6 @@ export interface ExplicitOptions {
 const DEFAULT_INITIAL = 200;
 const DEFAULT_MAX_POINTS = 4000;
 const DEFAULT_MAX_DEPTH = 8;
-/** Bisection steps used to decide whether a jump is a discontinuity. */
-const JUMP_BISECTIONS = 40;
-/** Neighbouring samples further apart than this many pixels (after refinement) are checked as a possible jump. */
-const JUMP_PIXELS = 8;
 
 const finite = Number.isFinite;
 

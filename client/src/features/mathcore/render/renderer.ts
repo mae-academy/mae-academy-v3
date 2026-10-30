@@ -3,6 +3,7 @@
  * Colors and the label font come from the design tokens in client/src/index.css, read at draw time, so the theme
  * (light/dark) is always current and no color is written in this file.
  */
+import { DASH_PATTERNS, FIELD_OPACITY } from "@shared/mathcore/constants";
 import type { Viewport } from "@shared/mathcore/ir/types";
 
 export interface DrawCurve {
@@ -70,8 +71,6 @@ export function gridStep(span: number, target: number): number {
   return (n < 1.5 ? 1 : n < 3.5 ? 2 : n < 7.5 ? 5 : 10) * mag;
 }
 
-/** Opacity of shaded regions (0–1): light enough that curves and the grid stay readable under them. */
-const FIELD_ALPHA = 0.2;
 
 /** `rgb` bytes of any CSS color, read back from a 1×1 canvas (so tokens, hex and oklch all work). */
 const rgbCache = new Map<string, [number, number, number]>();
@@ -184,7 +183,7 @@ export class Canvas2DRenderer implements Renderer {
     for (const c of scene.curves) {
       ctx.strokeStyle = c.color;
       ctx.lineWidth = c.highlighted ? c.width + 1.5 : c.width;
-      ctx.setLineDash(c.dash === "dashed" ? [8, 6] : c.dash === "dotted" ? [2, 4] : []);
+      ctx.setLineDash(c.dash === "dashed" ? [...DASH_PATTERNS.dashed] : c.dash === "dotted" ? [...DASH_PATTERNS.dotted] : []);
       ctx.beginPath();
       for (const s of c.segments) {
         if (s.length === 2) continue;
@@ -229,8 +228,17 @@ export class Canvas2DRenderer implements Renderer {
     }
   }
 
+  /** Tinted layers by mask, so a redraw (hover, trace) does not rebuild the image (Phase 3 review). */
+  private readonly layers = new WeakMap<Uint8Array, { color: string; layer: HTMLCanvasElement }>();
+
   private drawField(f: DrawField): void {
     const { ctx } = this;
+    const cached = this.layers.get(f.data);
+    if (cached && cached.color === f.color) {
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(cached.layer, 0, 0, this.width, this.height);
+      return;
+    }
     const layer = document.createElement("canvas");
     layer.width = f.width;
     layer.height = f.height;
@@ -238,7 +246,7 @@ export class Canvas2DRenderer implements Renderer {
     if (!lg) return;
     const img = lg.createImageData(f.width, f.height);
     const [r, g, b] = rgbOf(f.color);
-    const alpha = Math.round(FIELD_ALPHA * 255);
+    const alpha = Math.round(FIELD_OPACITY * 255);
     for (let i = 0; i < f.data.length; i++) {
       if (f.data[i] === 1) {
         img.data[4 * i] = r;
@@ -248,6 +256,7 @@ export class Canvas2DRenderer implements Renderer {
       }
     }
     lg.putImageData(img, 0, 0);
+    this.layers.set(f.data, { color: f.color, layer });
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(layer, 0, 0, this.width, this.height);
   }

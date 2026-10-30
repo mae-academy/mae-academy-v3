@@ -9,7 +9,7 @@ import type { EngineRequest, EngineResponse } from "./protocol";
 /** Distributive Omit, so each request variant keeps its own fields. */
 type WithoutSeq<T> = T extends unknown ? Omit<T, "seq"> : never;
 
-/** Only the first `load` of a Worker also downloads Compute Engine; it gets longer than the 5-second task limit. */
+/** Until a Worker has answered once it may still be starting (module download), so every request gets this limit. */
 const LOAD_TIMEOUT_MS = 30_000;
 
 export interface WorkerLike {
@@ -73,7 +73,8 @@ export function createEngineClient(config: EngineClientConfig): EngineClient {
       }
       if (res.seq !== latest) return; // stale: a newer request is pending
       clear();
-      warm = true;
+      // Only a real answer proves the Worker is running; an error reply may come from a failed start.
+      if (res.type !== "error") warm = true;
       config.onResult(res);
     };
     w.onerror = () => {
@@ -94,7 +95,7 @@ export function createEngineClient(config: EngineClientConfig): EngineClient {
         // A runaway evaluation cannot be interrupted inside the Worker: replace the Worker.
         drop();
         config.onRestart("timeout");
-      }, req.type === "load" && !warm ? Math.max(timeoutMs, LOAD_TIMEOUT_MS) : timeoutMs);
+      }, warm ? timeoutMs : Math.max(timeoutMs, LOAD_TIMEOUT_MS));
       w.postMessage({ ...req, seq });
       return seq;
     },

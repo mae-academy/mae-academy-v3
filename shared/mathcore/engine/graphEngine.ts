@@ -51,6 +51,8 @@ export class GraphEngine {
   private readonly parseCache = new Map<string, ParseResult>();
   /** Literal each scalar item had at the last rebuild: a changed literal moves its slider, an unchanged one does not. */
   private readonly lastLiteral = new Map<string, number>();
+  /** Names used by some line at the last rebuild without parse errors (pruning removes only names dropped since). */
+  private lastUsed = new Set<string>();
   private items: ItemState[] = [];
   private dag: DagResult = buildDag([]);
   private readonly values = new Map<string, number>();
@@ -261,13 +263,19 @@ export class GraphEngine {
         changed = true;
       }
     }
-    // A slider whose last use was deleted goes away with it (and stops counting toward the limit).
+    // A slider whose last use was deleted goes away with it (and stops counting toward the limit). While any line has
+    // a parse error (mid-typing: y = a\sin( ), nothing is pruned, so the slider keeps its range and value; a parameter
+    // that came with the document and was never used is kept too.
     const used = new Set(this.items.flatMap((i) => i.uses));
-    for (const name of Object.keys(params)) {
-      if (!used.has(name) && !defined.has(name)) {
-        delete params[name];
-        changed = true;
+    const typing = this.items.some((i) => !i.parse.ok);
+    if (!typing) {
+      for (const name of Object.keys(params)) {
+        if (this.lastUsed.has(name) && !used.has(name) && !defined.has(name)) {
+          delete params[name];
+          changed = true;
+        }
       }
+      this.lastUsed = used;
     }
     if (changed) this.graphDoc = { ...this.graphDoc, params };
   }

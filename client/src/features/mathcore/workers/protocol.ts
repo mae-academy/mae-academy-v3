@@ -4,6 +4,7 @@
  */
 import type { CurveDescription } from "@shared/mathcore/describe/describe";
 import type { GraphIR, Viewport } from "@shared/mathcore/ir/types";
+import type { ParsedEntry } from "./parseProtocol";
 
 export interface ViewRequest {
   viewport: Viewport;
@@ -15,7 +16,8 @@ export interface ViewRequest {
 }
 
 export type EngineRequest =
-  | { type: "load"; seq: number; graph: GraphIR; view: ViewRequest }
+  /** `parsed` holds the parse Worker's result for every item's LaTeX. */
+  | { type: "load"; seq: number; graph: GraphIR; parsed: Record<string, ParsedEntry>; view: ViewRequest }
   | { type: "param"; seq: number; name: string; value: number; view: ViewRequest }
   | { type: "view"; seq: number; view: ViewRequest }
   | { type: "bench"; seq: number }

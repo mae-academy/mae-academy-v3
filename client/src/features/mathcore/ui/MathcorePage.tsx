@@ -20,7 +20,11 @@ import { GraphCanvas, triangleRun } from "./GraphCanvas";
 import { SliderRow } from "./SliderRow";
 import type { EngineClient, WorkerLike } from "../workers/engineClient";
 import { createEngineClient } from "../workers/engineClient";
+import type { ParseClient, ParseWorkerLike } from "../workers/parseClient";
+import { createParseClient } from "../workers/parseClient";
+import type { ParsedEntry } from "../workers/parseProtocol";
 import type { EngineResponse, ItemResult } from "../workers/protocol";
+import { mergeParams } from "./mergeParams";
 import "../mathcore.css";
 
 /** The link in the address bar is refreshed this long after the last change. */
@@ -49,18 +53,9 @@ function initialGraph(): { graph: GraphIR; invalid: boolean } {
   return { graph: { ...emptyGraph(), items: [{ id: newId(), latex: "y=a\\sin(x)" }] }, invalid };
 }
 
-/**
- * Takes the Worker's document into the page's. The Worker decides which sliders exist (it creates and removes them);
- * the page keeps its own ranges, steps and animation, which the user may have edited since the request was sent.
- * Values come from the Worker only for a `load`: retyping `a = 2` as `a = 5` moves the slider, a drag does not.
- */
-function mergeParams(g: GraphIR, res: Result): GraphIR {
-  const next: Record<string, Param> = {};
-  for (const [name, theirs] of Object.entries(res.graph.params)) {
-    const mine = g.params[name];
-    next[name] = mine ? { ...mine, value: res.cause === "load" ? theirs.value : mine.value } : theirs;
-  }
-  return JSON.stringify(next) === JSON.stringify(g.params) ? g : { ...g, params: next };
+/** What the engine must be reloaded for: the lines and the slider ranges (values travel as `param` requests). */
+function documentKey(g: GraphIR): string {
+  return JSON.stringify([g.items, Object.entries(g.params).sort(([a], [b]) => a.localeCompare(b)).map(([k, p]) => [k, p.min, p.max, p.step])]);
 }
 
 function download(name: string, blob: Blob) {
@@ -86,6 +81,11 @@ export default function MathcorePage() {
   const [linkTooLarge, setLinkTooLarge] = useState(false);
   const [canvasEl, setCanvasEl] = useState<HTMLCanvasElement | null>(null);
   const client = useRef<EngineClient | null>(null);
+  const parser = useRef<ParseClient | null>(null);
+  const lastParsed = useRef<Record<string, ParsedEntry>>({});
+  const loadRound = useRef(0);
+  /** Key of the document the engine Worker last reported (items and slider ranges). */
+  const engineKey = useRef("");
   const graphRef = useRef(graph);
   useEffect(() => {
     graphRef.current = graph;
@@ -114,7 +114,8 @@ export default function MathcorePage() {
         if (res.type === "result") {
           setResult(res);
           setNotice(null);
-          setGraph((g) => mergeParams(g, res));
+          setGraph((g) => mergeParams(g, res.graph, res.cause));
+          engineKey.current = documentKey(res.graph);
           // A tangent follows its curve when a slider moves it.
           if (traceAt.current) c.trace(traceAt.current.id, traceAt.current.x);
         } else if (res.type === "bench") setBench(res.results);
@@ -123,22 +124,39 @@ export default function MathcorePage() {
       onTrace: setTrace,
       onRestart: () => {
         setNotice(t("engineRestarted"));
-        c.send({ type: "load", graph: graphRef.current, view: view("full") });
+        c.send({ type: "load", graph: graphRef.current, parsed: lastParsed.current, view: view("full") });
       },
     });
     client.current = c;
-    return () => c.dispose();
+    const p = createParseClient({
+      createWorker: () =>
+        new Worker(new URL("../workers/mathcore-parse-worker.ts", import.meta.url), { type: "module" }) as unknown as ParseWorkerLike,
+    });
+    parser.current = p;
+    return () => {
+      c.dispose();
+      p.dispose();
+    };
     // One Worker per page visit; `view` reads refs.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Items or parameter ranges changed: send the document, debounced (STEPS.md §7.1 technique 5).
-  const docKey = useMemo(
-    () => JSON.stringify([graph.items, Object.entries(graph.params).map(([k, p]) => [k, p.min, p.max, p.step])]),
-    [graph.items, graph.params],
-  );
+  const docKey = useMemo(() => documentKey(graph), [graph]);
   useEffect(() => {
-    const id = setTimeout(() => client.current?.send({ type: "load", graph: graphRef.current, view: view("full") }), PARSE_DEBOUNCE_MS);
+    // The engine already holds this document (for example a slider it just created itself): nothing to send.
+    if (docKey === engineKey.current) return;
+    const id = setTimeout(() => {
+      // Parse (parse Worker, 200 ms limit per line), then hand the document and its parsed lines to the engine.
+      // A newer edit makes this round stale; only the latest round reaches the engine.
+      const round = ++loadRound.current;
+      const doc = graphRef.current;
+      void parser.current?.parseAll(doc.items.map((i) => i.latex)).then((parsed) => {
+        if (round !== loadRound.current) return;
+        lastParsed.current = parsed;
+        client.current?.send({ type: "load", graph: graphRef.current, parsed, view: view("full") });
+      });
+    }, PARSE_DEBOUNCE_MS);
     return () => clearTimeout(id);
   }, [docKey, view]);
 
@@ -413,7 +431,7 @@ export default function MathcorePage() {
           />
           {trace && trace.slope !== null && (
             <p className="mc-trace" dir="ltr" aria-live="polite">
-              {t("tangentAt", { x: trace.x.toPrecision(6), slope: trace.slope.toPrecision(8) })}
+              {t("tangentAt", { x: trace.x.toPrecision(6), slope: trace.slope.toPrecision(6) })}
             </p>
           )}
         </section>

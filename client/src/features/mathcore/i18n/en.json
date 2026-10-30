@@ -43,7 +43,11 @@
     "maxima": "local maxima near {{list}}",
     "minima": "local minima near {{list}}",
     "extent_one": "{{label}}: one piece spanning x from {{xmin}} to {{xmax}} and y from {{ymin}} to {{ymax}}",
-    "extent_other": "{{label}}: {{count}} pieces spanning x from {{xmin}} to {{xmax}} and y from {{ymin}} to {{ymax}}"
+    "extent_other": "{{label}}: {{count}} pieces spanning x from {{xmin}} to {{xmax}} and y from {{ymin}} to {{ymax}}",
+    "region": "{{label}}: the shaded region covers about {{percent}}% of the view",
+    "regionAll": "{{label}}: the shaded region fills the whole view",
+    "regionNone": "{{label}}: no shaded region in this view",
+    "boundary": "its boundary spans x from {{xmin}} to {{xmax}} and y from {{ymin}} to {{ymax}}"
   },
   "value_is": "= {{value}}",
   "benchmarks": "Run benchmarks",

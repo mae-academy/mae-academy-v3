@@ -5,7 +5,10 @@
  */
 import { compile } from "../compile/compile";
 import { GraphEngine } from "../engine/graphEngine";
-import { IMPLICIT_CELL_PX_DRAG, IMPLICIT_CELL_PX_FULL, IMPLICIT_REFINE_DRAG, IMPLICIT_REFINE_FULL } from "../constants";
+import {
+  SAMPLE_DRAG_FACTOR, SAMPLE_INITIAL_FULL, SAMPLE_INITIAL_MIN,
+  FIELD_STRIDE_DRAG, FIELD_STRIDE_FULL, IMPLICIT_CELL_PX_DRAG, IMPLICIT_CELL_PX_FULL, IMPLICIT_REFINE_DRAG, IMPLICIT_REFINE_FULL,
+} from "../constants";
 import { contour, insideTest, regionMask } from "../implicit/marching";
 import { emptyGraph } from "../ir/types";
 import { sampleExplicit } from "../sample/adaptive";
@@ -17,9 +20,6 @@ const RAW: Record<string, unknown> = {
   "y=e^{-ax^2}": ["Equal", "y", ["Power", "e", ["Negate", ["InvisibleOperator", "a", ["Power", "x", 2]]]]],
 };
 
-/** Quarter resolution while dragging (STEPS.md §7.1 technique 2); the initial interval count is a quarter too. */
-const DRAG_FACTOR = 4;
-const DRAG_INITIAL = 50;
 
 export interface BenchResult {
   id: string;
@@ -98,21 +98,35 @@ export function runBenchmarks(): BenchResult[] {
     v = v > 9 ? -9 : v + 0.13;
     for (const id of engine.setParam("a", v)) {
       const rt = engine.runtime(id);
-      if (rt?.kind === "Explicit") sampleExplicit(rt.f, -10, 10, { tolerance: (12 / 600) * DRAG_FACTOR, yRange: 12, initial: DRAG_INITIAL });
+      if (rt?.kind === "Explicit") sampleExplicit(rt.f, -10, 10, {
+          tolerance: (12 / 600) * SAMPLE_DRAG_FACTOR,
+          yRange: 12,
+          initial: Math.max(SAMPLE_INITIAL_MIN, SAMPLE_INITIAL_FULL / SAMPLE_DRAG_FACTOR),
+        });
     }
   }));
 
   // Implicit field, STEPS.md §7.2: 400×250 during a drag (curve + quarter-resolution shading) and 1600×1000 on release.
-  const F = (x: number, y: number) => x * x + y * y - 9 + Math.sin(3 * x) * Math.cos(2 * y);
+  // F is the engine's compiled closure for x² + y² + sin(3x)·cos(2y) < 9, exactly what the Worker evaluates.
+  const Fc = compile(
+    ["Subtract", ["Add", ["Power", "x", 2], ["Power", "y", 2], ["Multiply", ["Sin", ["Multiply", 3, "x"]], ["Cos", ["Multiply", 2, "y"]]]], 9],
+    { variables: ["x", "y"] },
+  );
+  const xy = new Float64Array(2);
+  const F = (x: number, y: number) => {
+    xy[0] = x;
+    xy[1] = y;
+    return Fc.evaluate(xy);
+  };
   const inside = insideTest("<");
   const view = { xmin: -5, xmax: 5, ymin: -3.125, ymax: 3.125, aspect: "equal" as const };
   add("implicit-400x250-drag", "Implicit field 400×250 during drag", 16, "ms", time(() => {
     contour(F, view, { width: 400, height: 250, cellPx: IMPLICIT_CELL_PX_DRAG, refine: IMPLICIT_REFINE_DRAG });
-    regionMask(F, view, 400, 250, 4, inside);
+    regionMask(F, view, 400, 250, FIELD_STRIDE_DRAG, inside, IMPLICIT_CELL_PX_DRAG);
   }));
   add("implicit-1600x1000-full", "Implicit field 1600×1000 on release (curve + full shading)", 150, "ms", time(() => {
     contour(F, view, { width: 1600, height: 1000, cellPx: IMPLICIT_CELL_PX_FULL, refine: IMPLICIT_REFINE_FULL });
-    regionMask(F, view, 1600, 1000, 1, inside);
+    regionMask(F, view, 1600, 1000, FIELD_STRIDE_FULL, inside, IMPLICIT_CELL_PX_FULL);
   }, 9));
 
   // Raw evaluation throughput, as a reference figure for the other budgets.

@@ -3,6 +3,7 @@
  * from the design tokens, so no color is written here. Fields (implicit shading) are exported by the PNG path only
  * (ADR-7: no SVG for fields).
  */
+import { DASH_PATTERNS } from "../constants";
 import type { Polyline } from "../sample/adaptive";
 import type { Viewport } from "../ir/types";
 
@@ -36,7 +37,11 @@ export function buildSvg(o: SvgOptions): string {
   const sy = o.height / (ymax - ymin);
   const px = (x: number) => ((x - xmin) * sx).toFixed(COORD_DIGITS);
   const py = (y: number) => ((ymax - y) * sy).toFixed(COORD_DIGITS);
-  const dashes = { solid: "", dashed: ' stroke-dasharray="8 6"', dotted: ' stroke-dasharray="2 4"' };
+  const dashes = {
+    solid: "",
+    dashed: ` stroke-dasharray="${DASH_PATTERNS.dashed.join(" ")}"`,
+    dotted: ` stroke-dasharray="${DASH_PATTERNS.dotted.join(" ")}"`,
+  };
   const out: string[] = [];
   out.push(
     `<svg xmlns="http://www.w3.org/2000/svg" width="${o.width}" height="${o.height}" viewBox="0 0 ${o.width} ${o.height}" role="img" aria-labelledby="t d">`,

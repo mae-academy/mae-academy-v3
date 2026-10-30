@@ -13,6 +13,7 @@
     "lint": "eslint --no-error-on-unmatched-pattern",
     "audit:dist": "node scripts/audit-dist.mjs",
     "audit:chunks": "node scripts/mathcore/audit-chunks.mjs",
+    "e2e": "playwright test -c tests/mathcore/playwright.config.ts",
     "format": "prettier --write .",
     "test": "vitest"
   },

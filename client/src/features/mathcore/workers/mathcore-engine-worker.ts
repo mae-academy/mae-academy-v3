@@ -1,42 +1,42 @@
 /// <reference lib="webworker" />
 /**
- * Mathcore engine Worker (ADR-11): parses (Compute Engine is imported here, lazily, ADR-1), evaluates and samples.
+ * Mathcore engine Worker (ADR-11): normalizes, evaluates and samples. Parsing happens in the parse Worker.
  * The page only draws. File name: emitted as `mathcore-engine-worker-<hash>.js` so the chunk audit measures it.
  */
 import { bench } from "./benchEntry";
 import { centralDifference } from "@shared/mathcore/calculus/derivative";
 import { describeExplicit, describeExtent } from "@shared/mathcore/describe/describe";
 import {
-  FIELD_STRIDE_DRAG, FIELD_STRIDE_FULL, IMPLICIT_CELL_PX_DRAG, IMPLICIT_CELL_PX_FULL, IMPLICIT_REFINE_DRAG, IMPLICIT_REFINE_FULL,
+  FIELD_STRIDE_DRAG, FIELD_STRIDE_FULL, IMPLICIT_CELL_PX_DRAG, SAMPLE_DRAG_FACTOR, SAMPLE_INITIAL_FULL, SAMPLE_INITIAL_MIN, IMPLICIT_CELL_PX_FULL, IMPLICIT_REFINE_DRAG, IMPLICIT_REFINE_FULL,
 } from "@shared/mathcore/constants";
 import { GraphEngine } from "@shared/mathcore/engine/graphEngine";
 import { contour, insideTest, regionMask } from "@shared/mathcore/implicit/marching";
 import type { RawParser } from "@shared/mathcore/parse/parse";
 import { sampleExplicit, sampleParametric, samplePolar } from "@shared/mathcore/sample/adaptive";
 import type { SampleResult } from "@shared/mathcore/sample/adaptive";
+import type { ParsedEntry } from "./parseProtocol";
 import type { EngineRequest, EngineResponse, ItemResult, ViewRequest } from "./protocol";
+import { superseded } from "./requestQueue";
 
 declare const self: DedicatedWorkerGlobalScope;
 
-/** Quarter resolution while dragging (STEPS.md §7.1 technique 2). */
-const DRAG_FACTOR = 4;
-/** Initial uniform intervals for explicit curves at full quality; drag uses a quarter. */
-const FULL_INITIAL = 200;
 /** Polar and parametric parameter ranges (one full turn; Desmos-like default). */
 const TURN = 2 * Math.PI;
 
-let parser: Promise<RawParser> | null = null;
 let engine: GraphEngine | null = null;
 const last = new Map<string, ItemResult>();
 
-/** One Compute Engine per Worker, even when two requests ask for it before the download finishes. */
-function getParser(): Promise<RawParser> {
-  parser ??= import("@cortex-js/compute-engine").then(({ ComputeEngine }) => {
-    const ce = new ComputeEngine();
-    return (latex: string) => ce.parse(latex, { form: "raw" }).json;
-  });
-  return parser;
-}
+/**
+ * LaTeX → raw MathJSON comes from the parse Worker (via the page) with each `load`; parsing never runs here.
+ * A string without an entry, or whose parse failed or timed out, becomes an error on its line.
+ */
+let parsed: Record<string, ParsedEntry> = {};
+const parser: RawParser = (latex) => {
+  const entry = parsed[latex];
+  if (!entry) throw new Error("This line has not been parsed yet");
+  if (!entry.ok) throw new Error(entry.message);
+  return entry.raw;
+};
 
 function sampleItem(e: GraphEngine, id: string, view: ViewRequest): ItemResult {
   const state = e.item(id);
@@ -50,10 +50,10 @@ function sampleItem(e: GraphEngine, id: string, view: ViewRequest): ItemResult {
   const rt = e.runtime(id);
   if (!rt || !state || state.errors.length > 0) return base;
   const { xmin, xmax, ymin, ymax } = view.viewport;
-  const factor = view.quality === "drag" ? DRAG_FACTOR : 1;
+  const factor = view.quality === "drag" ? SAMPLE_DRAG_FACTOR : 1;
   const pxY = ((ymax - ymin) / view.height) * factor;
   const pxX = ((xmax - xmin) / view.width) * factor;
-  const initial = Math.max(25, Math.round(FULL_INITIAL / factor));
+  const initial = Math.max(SAMPLE_INITIAL_MIN, Math.round(SAMPLE_INITIAL_FULL / factor));
   let r: SampleResult;
   switch (rt.kind) {
     case "Explicit":
@@ -98,10 +98,16 @@ function sampleItem(e: GraphEngine, id: string, view: ViewRequest): ItemResult {
       });
       const out: ItemResult = { ...base, segments: c.polylines, relation: rt.relation };
       if (rt.relation !== "=") {
-        const m = regionMask(rt.F, view.viewport, view.width, view.height, drag ? FIELD_STRIDE_DRAG : FIELD_STRIDE_FULL, insideTest(rt.relation));
+        const m = regionMask(
+          rt.F, view.viewport, view.width, view.height, drag ? FIELD_STRIDE_DRAG : FIELD_STRIDE_FULL, insideTest(rt.relation),
+          drag ? IMPLICIT_CELL_PX_DRAG : IMPLICIT_CELL_PX_FULL,
+        );
         out.field = { width: m.width, height: m.height, data: m.data };
       }
-      if (!drag) out.description = describeExtent(c.polylines);
+      if (!drag) {
+        out.description = describeExtent(c.polylines);
+        if (out.field) out.description.shaded = out.field.data.reduce((n, v) => n + v, 0) / out.field.data.length;
+      }
       return out;
     }
     default:
@@ -131,17 +137,30 @@ function respond(seq: number, cause: "load" | "param" | "view", e: GraphEngine, 
   self.postMessage(msg);
 }
 
-async function handle(req: EngineRequest): Promise<void> {
+/**
+ * Progressive display (STEPS.md §7.2: 1600×1000 field "on release, progressive"): when the document has implicit
+ * items, a quarter-resolution frame is posted first, then the full one, under the same sequence number.
+ */
+function progressive(
+  seq: number, cause: "load" | "view", e: GraphEngine, view: ViewRequest, ids: readonly string[], reevaluated: string[], t0: number,
+) {
+  const heavy = e.graph.items.some((it) => e.runtime(it.id)?.kind === "Implicit");
+  if (view.quality === "full" && heavy) respond(seq, cause, e, { ...view, quality: "drag" }, ids, reevaluated, t0);
+  respond(seq, cause, e, view, ids, reevaluated, t0);
+}
+
+function handle(req: EngineRequest): void {
   const t0 = performance.now();
   try {
     switch (req.type) {
       case "load": {
-        const p = await getParser();
+        parsed = req.parsed;
         // The engine is kept between loads so parsed lines and slider literals survive an edit.
         if (engine) engine.load(req.graph);
-        else engine = new GraphEngine(p, req.graph);
+        else engine = new GraphEngine(parser, req.graph);
         last.clear();
-        respond(req.seq, "load", engine, req.view, engine.graph.items.map((i) => i.id), engine.graph.items.map((i) => i.id), t0);
+        const all = engine.graph.items.map((i) => i.id);
+        progressive(req.seq, "load", engine, req.view, all, all, t0);
         break;
       }
       case "param": {
@@ -152,7 +171,7 @@ async function handle(req: EngineRequest): Promise<void> {
       }
       case "view": {
         if (!engine) return;
-        respond(req.seq, "view", engine, req.view, engine.graph.items.map((i) => i.id), [], t0);
+        progressive(req.seq, "view", engine, req.view, engine.graph.items.map((i) => i.id), [], t0);
         break;
       }
       case "trace": {
@@ -180,30 +199,29 @@ async function handle(req: EngineRequest): Promise<void> {
  * `load` replaces everything, a newer `view` or a newer `param` for the same slider replaces the older one.
  */
 const pending: EngineRequest[] = [];
-let running = false;
+let scheduled = false;
 
-function superseded(req: EngineRequest): boolean {
-  return pending.some((later) => {
-    if (later.type === "load") return req.type === "load" || req.type === "view" || req.type === "param";
-    if (later.type === "view") return req.type === "view";
-    if (later.type === "param") return req.type === "param" && req.name === later.name;
-    return false;
-  });
+/**
+ * Handles one request per task, then yields, so messages that arrived during a long sampling job are queued first
+ * and the superseded ones are skipped instead of each being computed in turn.
+ */
+function pump(): void {
+  scheduled = false;
+  for (let req = pending.shift(); req; req = pending.shift()) {
+    if (superseded(req, pending)) continue;
+    handle(req);
+    break;
+  }
+  if (pending.length > 0) schedule();
 }
 
-async function pump(): Promise<void> {
-  if (running) return;
-  running = true;
-  try {
-    for (let req = pending.shift(); req; req = pending.shift()) {
-      if (!superseded(req)) await handle(req);
-    }
-  } finally {
-    running = false;
-  }
+function schedule(): void {
+  if (scheduled) return;
+  scheduled = true;
+  setTimeout(pump, 0);
 }
 
 self.onmessage = (ev: MessageEvent<EngineRequest>) => {
   pending.push(ev.data);
-  void pump();
+  schedule();
 };

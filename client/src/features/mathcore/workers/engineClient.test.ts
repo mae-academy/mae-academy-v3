@@ -20,7 +20,7 @@ class FakeWorker implements WorkerLike {
 }
 
 const view = { viewport: { xmin: -1, xmax: 1, ymin: -1, ymax: 1, aspect: "equal" as const }, width: 100, height: 100, quality: "full" as const };
-const result = (seq: number): EngineResponse => ({ type: "result", seq, graph: { version: "1.0", viewport: view.viewport, params: {}, items: [], view: { mode: "2d", grid: true, showSteps: false, locale: "en" } }, items: [], evaluations: 0, reevaluated: [], ms: 0 });
+const result = (seq: number): EngineResponse => ({ type: "result", seq, graph: { version: "1.0", viewport: view.viewport, params: {}, items: [], view: { mode: "2d", grid: true, showSteps: false, locale: "en" } }, items: [], evaluations: 0, reevaluated: [], cause: "view", ms: 0 });
 
 describe("engine client (STEPS.md §7.1, §7.3, §9)", () => {
   beforeEach(() => vi.useFakeTimers());
@@ -38,10 +38,12 @@ describe("engine client (STEPS.md §7.1, §7.3, §9)", () => {
     expect(workers[0].sent.map((m) => m.seq)).toEqual([1, 2]);
   });
 
-  it("replaces the Worker after 5 seconds without an answer", () => {
+  it("replaces a running Worker after 5 seconds without an answer", () => {
     const workers: FakeWorker[] = [];
     const restarts: string[] = [];
     const c = createEngineClient({ createWorker: () => (workers.push(new FakeWorker()), workers[workers.length - 1]), onResult: () => {}, onRestart: (r) => restarts.push(r) });
+    c.send({ type: "view", view });
+    workers[0].reply(result(1)); // the Worker has started
     c.send({ type: "view", view });
     vi.advanceTimersByTime(4999);
     expect(restarts).toEqual([]);
@@ -52,10 +54,31 @@ describe("engine client (STEPS.md §7.1, §7.3, §9)", () => {
     expect(workers).toHaveLength(2);
   });
 
+  it("a request sent while the Worker is still starting keeps the long limit (Phase 3 review)", () => {
+    const restarts: string[] = [];
+    const c = createEngineClient({ createWorker: () => new FakeWorker(), onResult: () => {}, onRestart: (r) => restarts.push(r) });
+    c.send({ type: "load", graph: (result(0) as Extract<EngineResponse, { type: "result" }>).graph, parsed: {}, view });
+    vi.advanceTimersByTime(20);
+    c.send({ type: "view", view });
+    vi.advanceTimersByTime(10_000);
+    expect(restarts).toEqual([]);
+  });
+
+  it("an error reply does not count as a started Worker", () => {
+    const w = new FakeWorker();
+    const restarts: string[] = [];
+    const c = createEngineClient({ createWorker: () => w, onResult: () => {}, onRestart: (r) => restarts.push(r) });
+    c.send({ type: "view", view });
+    w.reply({ type: "error", seq: 1, message: "boom" });
+    c.send({ type: "view", view });
+    vi.advanceTimersByTime(10_000);
+    expect(restarts).toEqual([]);
+  });
+
   it("gives the first load (Compute Engine download) a longer limit", () => {
     const restarts: string[] = [];
     const c = createEngineClient({ createWorker: () => new FakeWorker(), onResult: () => {}, onRestart: (r) => restarts.push(r) });
-    c.send({ type: "load", graph: result(0).type === "result" ? (result(0) as Extract<EngineResponse, { type: "result" }>).graph : (undefined as never), view });
+    c.send({ type: "load", graph: (result(0) as Extract<EngineResponse, { type: "result" }>).graph, parsed: {}, view });
     vi.advanceTimersByTime(10_000);
     expect(restarts).toEqual([]);
   });

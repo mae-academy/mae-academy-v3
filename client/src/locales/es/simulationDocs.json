@@ -797,6 +797,10 @@
         {
           "heading": "Dependencias entre líneas",
           "body": "Cada línea puede definir un nombre, como a = 2 o f(x) = x^2, y puede usar nombres definidos por otras líneas. Estos vínculos forman un grafo dirigido. El motor evalúa las definiciones antes de sus usos y, cuando cambia un deslizador, reevalúa solo las líneas que dependen de él. Las definiciones circulares, donde a depende de b y b depende de a, se rechazan y el mensaje nombra las líneas implicadas."
+        },
+        {
+          "heading": "Curvas implícitas y desigualdades",
+          "body": "Una ecuación como x² + y² = 9 no siempre se puede despejar para y, así que el motor la dibuja como el conjunto donde F(x, y) = lado izquierdo − lado derecho vale cero. Evalúa F en una malla gruesa, refina solo las celdas donde F cambia de signo o se acerca a cero, y sitúa cada cruce por bisección sobre el borde de la celda. Un cambio de signo que crece en lugar de reducirse al bisecar es un polo, no una curva, y no se dibuja. Una desigualdad como y > x² se sombrea donde se cumple su lado de F; una desigualdad estricta dibuja su borde discontinuo porque el borde no está incluido."
         }
       ],
       "equations": [

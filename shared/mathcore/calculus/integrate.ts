@@ -1,7 +1,9 @@
 /**
  * Definite integrals (STEPS.md §7.3): adaptive Simpson for general values; Riemann sums for teaching (`riemann.ts`).
  */
-import { INTEGRAL_MAX_DEPTH, INTEGRAL_TOLERANCE, TANH_SINH_MAX_LEVEL } from "../constants";
+import {
+  DIVERGENCE_BOUND, INTEGRAL_MAX_DEPTH, INTEGRAL_TOLERANCE, TANH_SINH_MAX_LEVEL, TANH_SINH_NOISE_FLOOR, TANH_SINH_RELATIVE,
+} from "../constants";
 
 export interface SimpsonOptions {
   /** Absolute tolerance on the whole interval. */
@@ -69,6 +71,7 @@ export function tanhSinh(f: (x: number) => number, a: number, b: number, toleran
   const mid = (a + b) / 2;
   let evaluations = 0;
   let prev = NaN;
+  let lastChange = Infinity;
   for (let level = 0; level <= TANH_SINH_MAX_LEVEL; level++) {
     const h = 1 / 2 ** level;
     let sum = (Math.PI / 2) * f(mid);
@@ -94,14 +97,17 @@ export function tanhSinh(f: (x: number) => number, a: number, b: number, toleran
       sum += w * (fl + fr);
     }
     const value = half * h * sum;
-    if (level > 2 && Math.abs(value - prev) <= Math.max(tolerance, Math.abs(value) * 1e-14)) return { value, converged: true, evaluations };
+    lastChange = Math.abs(value - prev);
+    if (level > 2 && lastChange <= Math.max(tolerance, Math.abs(value) * TANH_SINH_RELATIVE)) return { value, converged: true, evaluations };
     prev = value;
   }
+  // Near an endpoint singularity the abscissae lose relative precision (1 − x² cancels), so the levels can stop
+  // agreeing at ~1e-12 while the value is right to ~1e-10. Accept that noise floor; a divergent integral keeps
+  // changing by much more than this and is still rejected.
+  if (Math.abs(lastChange) <= TANH_SINH_NOISE_FLOOR * Math.abs(prev)) return { value: prev, converged: true, evaluations };
   return { value: prev, converged: false, evaluations };
 }
 
-/** A sampled |f| above this means the integrand blows up inside the interval, not that it has a bounded jump. */
-const DIVERGENCE_BOUND = 1e9;
 
 /**
  * Definite integral used by the compiler.

@@ -50,9 +50,33 @@ export const IMPLICIT_CELL_PX_FULL = 6;
 export const IMPLICIT_CELL_PX_DRAG = 12;
 export const IMPLICIT_REFINE_FULL = 4;
 export const IMPLICIT_REFINE_DRAG = 2;
+/** Bisections per sign change on a lattice edge (accuracy 2⁻¹² of a fine cell, and the pole test). */
+export const CROSSING_BISECTIONS = 12;
+/** A coarse cell whose corner is within this many cell-widths of zero at the local slope is refined. */
+export const NEAR_ZERO_CELLS = 1.5;
+/** Curve ends closer than this many fine-cell diagonals are joined. */
+export const STITCH_CELLS = 2;
 /** Inequality shading: one sample every this many pixels (full quality, while dragging). */
 export const FIELD_STRIDE_FULL = 1;
 export const FIELD_STRIDE_DRAG = 4;
+/** Tanh-sinh: successive levels agreeing to this relative change count as converged. */
+export const TANH_SINH_RELATIVE = 1e-12;
+/** Tanh-sinh: after the last level, a change below this relative size is the rounding noise floor, not divergence. */
+export const TANH_SINH_NOISE_FLOOR = 1e-9;
+/** A sampled |f| above this means the integrand blows up inside the interval, not that it has a bounded jump. */
+export const DIVERGENCE_BOUND = 1e9;
+/** STEPS.md §7.1 technique 2: while dragging, curves are sampled at a quarter of the resolution. */
+export const SAMPLE_DRAG_FACTOR = 4;
+/** Initial uniform intervals of a curve at full quality (divided by SAMPLE_DRAG_FACTOR while dragging, never below the minimum). */
+export const SAMPLE_INITIAL_FULL = 200;
+export const SAMPLE_INITIAL_MIN = 25;
+/** Jump detection on sampled curves: neighbours further apart than this many pixels are bisected this many times. */
+export const JUMP_PIXELS = 8;
+export const JUMP_BISECTIONS = 40;
+/** Dash patterns (on, off) in canvas units, shared by the canvas renderer and SVG export. */
+export const DASH_PATTERNS = { dashed: [8, 6], dotted: [2, 4] } as const;
+/** Opacity of inequality shading (0–1): light enough that curves and the grid stay readable under it. */
+export const FIELD_OPACITY = 0.2;
 /** Compiled closures kept in the compile cache. */
 export const COMPILE_CACHE_LIMIT = 512;
 /** Owner decision Q7: style width in (0, 10]. */

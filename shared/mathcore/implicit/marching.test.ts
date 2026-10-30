@@ -19,7 +19,7 @@ describe("Marching Squares contour (STEPS.md §7.3)", () => {
   it("refines only where the curve is: far fewer evaluations than a fine full grid", () => {
     const r = contour((x, y) => x * x + y * y - 9, vp(5, 3.125), opts);
     const fullFine = (Math.ceil(400 / 6) * 4 + 1) * (Math.ceil(250 / 6) * 4 + 1);
-    expect(r.evaluations).toBeLessThan(fullFine / 4);
+    expect(r.evaluations).toBeLessThan(fullFine / 2);
   });
 
   it("a hyperbola xy = 1 gives two pieces, not joined through the origin", () => {
@@ -91,5 +91,136 @@ describe("inequality region", () => {
     const m = regionMask((x) => x, vp(5, 3), 400, 250, 4, insideTest(">"));
     expect(m.width).toBe(100);
     expect(m.height).toBe(63);
+  });
+});
+
+function rng(seed: number) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+describe("Phase 3 review regressions (closed curves, pole filter false rejects)", () => {
+  const view = vp(5, 3.125);
+  const isClosed = (p: Float64Array) => p[0] === p[p.length - 2] && p[1] === p[p.length - 1];
+
+  it("circles of every size are drawn as one closed loop (300 random circles per size band)", () => {
+    const r = rng(314);
+    const bands: Array<[number, number]> = [[0.1, 0.3], [0.3, 1], [1, 2.5]];
+    for (const [rmin, rmax] of bands) {
+      let broken = 0;
+      for (let k = 0; k < 300; k++) {
+        const rad = rmin + (rmax - rmin) * r();
+        const cx = (r() * 2 - 1) * (5 - rad);
+        const cy = (r() * 2 - 1) * (3.125 - rad);
+        const c = contour((x, y) => (x - cx) ** 2 + (y - cy) ** 2 - rad * rad, view, opts);
+        if (!(c.polylines.length === 1 && isClosed(c.polylines[0]))) broken++;
+      }
+      expect(broken, `radius ${rmin}–${rmax}: ${broken} of 300 not one closed loop`).toBe(0);
+    }
+  });
+
+  it("a thin ellipse (a = 3, b = 0.05) is one closed loop", () => {
+    const c = contour((x, y) => (x / 3) ** 2 + (y / 0.05) ** 2 - 1, view, opts);
+    expect(c.polylines).toHaveLength(1);
+    expect(isClosed(c.polylines[0])).toBe(true);
+  });
+
+  it("oscillating curves stay in one piece: y = sin(10x), y = sin(20x), y = sin(2x²)", () => {
+    for (const f of [(x: number) => Math.sin(10 * x), (x: number) => Math.sin(20 * x), (x: number) => Math.sin(2 * x * x)]) {
+      const c = contour((x, y) => y - f(x), view, opts);
+      expect(c.polylines).toHaveLength(1);
+      for (const [x, y] of points(c.polylines)) expect(Math.abs(y - f(x))).toBeLessThan(5e-3);
+    }
+  });
+
+  it("the heart (x² + y² − 1)³ = x²y³ is one closed curve", () => {
+    const c = contour((x, y) => (x * x + y * y - 1) ** 3 - x * x * y ** 3, vp(2, 1.5), opts);
+    expect(c.polylines).toHaveLength(1);
+  });
+
+  // Lines 0.8 px apart, (y − c)² = 1e-4, lie inside one fine lattice row (1.5 px) and are not resolvable by sign;
+  // the documented limit. Two fine cells apart (3 px) they must both be found.
+  it("two lines 3 px apart, (y − c)² = 0.0375², are both found", () => {
+    const r = rng(8);
+    let missing = 0;
+    for (let k = 0; k < 100; k++) {
+      const c0 = (r() * 2 - 1) * 2.5;
+      const c = contour((x, y) => (y - c0) ** 2 - 0.0375 ** 2, view, opts);
+      if (c.polylines.length < 2) missing++;
+    }
+    expect(missing).toBe(0);
+  });
+
+  it("crossings are accurate to a fraction of a fine cell (bisection)", () => {
+    const c = contour((x, y) => x * x + y * y - 9, view, opts);
+    for (const [x, y] of points(c.polylines)) expect(Math.abs(Math.hypot(x, y) - 3)).toBeLessThan(1e-4);
+  });
+
+  it("y = tan(3x) still has no pole lines", () => {
+    const c = contour((x, y) => y - Math.tan(3 * x), view, opts);
+    for (const p of c.polylines) {
+      const xs = Array.from({ length: p.length / 2 }, (_, i) => p[2 * i]);
+      for (let k = -5; k <= 5; k++) {
+        const pole = (Math.PI / 2 + k * Math.PI) / 3;
+        expect(Math.min(...xs) < pole && Math.max(...xs) > pole).toBe(false);
+      }
+    }
+  });
+});
+
+describe("randomized properties (implicit engine soundness)", () => {
+  /** Random smooth F: a conic plus a trigonometric ripple, with random coefficients. */
+  const randomF = (r: () => number) => {
+    const [a, b, c, d, e, k, m, s] = Array.from({ length: 8 }, () => r() * 2 - 1);
+    return (x: number, y: number) => a * x * x + b * y * y + c * x * y + d * x + e * y - 0.5 + 0.3 * s * Math.sin(2 * k * x + 3 * m * y);
+  };
+  const view = vp(5, 3.125);
+  const fine = 10 / (Math.ceil(400 / 6) * 4);
+
+  it("every contour point lies on its curve: |F(p)| / |∇F(p)| below a tenth of a fine cell (200 random F)", () => {
+    const r = rng(1234);
+    for (let k = 0; k < 200; k++) {
+      const F = randomF(r);
+      const c = contour(F, view, opts);
+      for (const [x, y] of points(c.polylines)) {
+        const h = 1e-6;
+        const g = Math.hypot((F(x + h, y) - F(x - h, y)) / (2 * h), (F(x, y + h) - F(x, y - h)) / (2 * h));
+        if (g < 1e-6) continue; // tangency: distance is not defined by the gradient
+        expect(Math.abs(F(x, y)) / g).toBeLessThan(0.1 * fine);
+      }
+    }
+  });
+
+  it("the adaptive mask agrees with per-pixel evaluation except within a pixel of the boundary (200 random F)", () => {
+    const r = rng(77);
+    for (let k = 0; k < 200; k++) {
+      const F = randomF(r);
+      const exact = regionMask(F, view, 200, 125, 1, insideTest("<"));
+      const fast = regionMask(F, view, 200, 125, 1, insideTest("<"), 8);
+      let mismatches = 0;
+      for (let i = 0; i < exact.data.length; i++) if (exact.data[i] !== fast.data[i]) mismatches++;
+      expect(mismatches).toBe(0);
+      expect(fast.evaluations).toBeLessThanOrEqual(exact.evaluations + (Math.ceil(200 / 8) + 1) * (Math.ceil(125 / 8) + 1));
+    }
+  });
+
+  it("the adaptive mask evaluates far fewer pixels for a simple region", () => {
+    const exact = regionMask((x, y) => x * x + y * y - 4, view, 1600, 1000, 1, insideTest("<"));
+    const fast = regionMask((x, y) => x * x + y * y - 4, view, 1600, 1000, 1, insideTest("<"), 8);
+    expect(fast.data).toEqual(exact.data);
+    expect(fast.evaluations).toBeLessThan(exact.evaluations / 5);
+  });
+
+  it("partly undefined regions match per-pixel evaluation (√ domain edge)", () => {
+    const F = (x: number, y: number) => y - Math.sqrt(x);
+    const exact = regionMask(F, view, 200, 125, 1, insideTest(">="));
+    const fast = regionMask(F, view, 200, 125, 1, insideTest(">="), 8);
+    expect(fast.data).toEqual(exact.data);
   });
 });

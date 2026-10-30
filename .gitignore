@@ -141,3 +141,7 @@ client/src/simulators/circuit-engine/engine/spice/mnaValidationSuite.ac.report.m
 # Local tooling caches / logs
 .manus-logs/
 .vite/
+
+# Playwright output (mathcore e2e)
+test-results/
+playwright-report/

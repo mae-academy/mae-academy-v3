@@ -112,3 +112,25 @@ describe("GraphEngine reviewer findings (Phases 1-2 review)", () => {
     expect(Object.keys(e.graph.params)).toEqual([]);
   });
 });
+
+describe("GraphEngine Phase 3 review fixes", () => {
+  it("a transient parse error keeps the slider's range and value", () => {
+    const g = doc(["y=a\\sin(x)"], { a: { value: 3, min: -50, max: 50, step: 0.5 } });
+    const e = new GraphEngine(parser, g);
+    e.setLatex("i1", "y=a\\sin(");
+    expect(e.graph.params.a).toEqual({ value: 3, min: -50, max: 50, step: 0.5 });
+    e.setLatex("i1", "y=a\\sin(x)");
+    expect(e.graph.params.a).toEqual({ value: 3, min: -50, max: 50, step: 0.5 });
+  });
+
+  it("an unused parameter that came with the document is kept", () => {
+    const e = new GraphEngine(parser, doc(["y=x"], { k: { value: 2, min: 0, max: 5, step: 1 } }));
+    expect(e.graph.params.k).toBeDefined();
+  });
+
+  it("retyping a literal outside the slider range widens the range", () => {
+    const e = new GraphEngine(parser, doc(["a=2", "y=ax"]));
+    e.setLatex("i1", "a=50");
+    expect(e.graph.params.a).toMatchObject({ value: 50, max: 50 });
+  });
+});

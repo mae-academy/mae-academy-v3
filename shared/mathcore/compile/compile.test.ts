@@ -138,3 +138,11 @@ describe("integral edge cases (Phases 1-2 review)", () => {
     expect(ev(["Integrate", ["Floor", "t"], "t", 0, 3])).toBeCloseTo(3, 10);
   });
 });
+
+describe("integral noise floor (Phase 3 review)", () => {
+  // The tail inside the last double next to ±1 is ∫ ≈ √(2·1.1e-16) ≈ 1.5e-8 per end: the floating-point limit for an
+  // integrand that only sees x, so 7 digits is the attainable accuracy here.
+  it("∫₋₁¹ 1/√(1 − x²) dx = π (singular at both ends) to 7 digits", () => {
+    expect(ev(["Integrate", ["Divide", 1, ["Sqrt", ["Subtract", 1, ["Power", "t", 2]]]], "t", -1, 1])).toBeCloseTo(Math.PI, 7);
+  });
+});
