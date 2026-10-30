@@ -16,7 +16,7 @@ Each one is verified by running Compute Engine 0.58.0 (see `phase-0-measurements
 | Q7 style | Keys: `color`, `width`, `fill`, `hidden`, `dash`. `color` is `#RRGGBB` or a design-token name (resolved against `client/src/index.css` at render time). `width` in (0, 10]. Unknown keys rejected | Strict schema; tokens keep the theme rule |
 | Q8 unknown keys | Reject, with the path of the first unknown key | MAE AI output and links must be exact |
 | Q9 required | `version`, `viewport`, `items` required; `params` and `view` optional with defaults; item `style` optional | Smallest valid document is still useful |
-| Q10 params | `min < max`, `min ≤ value ≤ max`, `step > 0`, `animate.from/to` within `[min, max]`, `period_s` in [0.5, 60]. Name: a single letter or a letter followed by subscript `_[A-Za-z0-9]+`, not reserved. Auto-created default: `value 1, min -10, max 10, step 0.1` | Desmos-like defaults |
+| Q10 params | `min < max`, `min ≤ value ≤ max`, `step > 0`, `animate.from/to` within `[min, max]`, `period_s` in [0.5, 60]. Name: a single letter or a Greek letter name (`alpha` … `chi`, as Compute Engine emits `\alpha`), optionally followed by a subscript `_[A-Za-z0-9]+`, not reserved. Auto-created default: `value 1, min -10, max 10, step 0.1` | Desmos-like defaults |
 | Q11 id | `[A-Za-z0-9_-]{1,32}` | Link-safe |
 | Q12 scope | The schema enforces structure; node count, cycles and link size are checked by `parse`, `dag` and `codec` and tested there | Each rule lives where its data exists |
 | Q13 corpus | 300 expressions generated from fixed templates over the Phase 1 function set, real-valued only (no D2/D3), 8 points each, chosen inside the domain | Reproducible |

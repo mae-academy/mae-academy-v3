@@ -124,8 +124,11 @@ fi
 # Required tests named in the prompt (backticked paths under "## Required tests") must exist after the executor.
 missing_tests() {
   $DRY_RUN && return 0
-  awk '/^## Required tests/{f=1;next} /^## /{f=0} f' "$PIPE/prompt.md" | grep -o '`[^`]*`' | tr -d '`' |
-    while read -r t; do [ -f "$t" ] || echo "$t"; done
+  local listed
+  listed="$(awk '/^## Required tests/{f=1;next} /^## /{f=0} f' "$PIPE/prompt.md" | grep -o '`[^`]*`' | tr -d '`')"
+  # A prompt without a parsable test list cannot be judged complete.
+  [ -z "$listed" ] && { echo "(no backticked paths under '## Required tests')"; return 0; }
+  while read -r t; do [ -f "$t" ] || echo "$t"; done <<< "$listed"
 }
 
 # --- 4. gate, one repair round ------------------------------------------------------------------------------------
@@ -139,7 +142,9 @@ for attempt in 1 2; do
   decide "gate failed (attempt $attempt of 2)" "$GATE_RESULT"
   notify prompt_failed
   if [ "$attempt" -eq 1 ] && ! $DRY_RUN; then
-    run_executor "$(tail -60 "$PIPE/gate-$attempt.log")"
+    # The repair round's exit status replaces the first one: the run is judged on the work it ends with.
+    if run_executor "$(tail -60 "$PIPE/gate-$attempt.log")"; then EXEC_FAILED=false; else
+      EXEC_FAILED=true; decide "repair executor exited non-zero" "the run cannot pass"; fi
   else
     break
   fi

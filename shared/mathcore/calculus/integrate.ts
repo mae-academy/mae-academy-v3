@@ -1,6 +1,7 @@
 /**
  * Definite integrals (STEPS.md §7.3): adaptive Simpson for general values; Riemann sums for teaching (`riemann.ts`).
  */
+import { INTEGRAL_MAX_DEPTH, INTEGRAL_TOLERANCE, TANH_SINH_MAX_LEVEL } from "../constants";
 
 export interface SimpsonOptions {
   /** Absolute tolerance on the whole interval. */
@@ -16,9 +17,8 @@ export interface IntegralResult {
   evaluations: number;
 }
 
-/** Default absolute tolerance relative to the integral's scale. */
-const DEFAULT_TOLERANCE = 1e-12;
-const DEFAULT_MAX_DEPTH = 50;
+const DEFAULT_TOLERANCE = INTEGRAL_TOLERANCE;
+const DEFAULT_MAX_DEPTH = INTEGRAL_MAX_DEPTH;
 
 export function adaptiveSimpson(f: (x: number) => number, a: number, b: number, opts: SimpsonOptions = {}): IntegralResult {
   const tol = opts.tolerance ?? DEFAULT_TOLERANCE;
@@ -58,4 +58,58 @@ export function adaptiveSimpson(f: (x: number) => number, a: number, b: number, 
 
   const value = step(a, b, fa, fm, fb, whole, tol, 0);
   return { value, converged: converged && Number.isFinite(value), evaluations };
+}
+
+/**
+ * Tanh-sinh (double-exponential) quadrature. It never evaluates the endpoints, so integrable endpoint
+ * singularities such as ∫₀¹ ln t dt or ∫₀¹ t^(−1/2) dt converge.
+ */
+export function tanhSinh(f: (x: number) => number, a: number, b: number, tolerance = INTEGRAL_TOLERANCE): IntegralResult {
+  const half = (b - a) / 2;
+  const mid = (a + b) / 2;
+  let evaluations = 0;
+  let prev = NaN;
+  for (let level = 0; level <= TANH_SINH_MAX_LEVEL; level++) {
+    const h = 1 / 2 ** level;
+    let sum = (Math.PI / 2) * f(mid);
+    evaluations++;
+    for (let k = 1; ; k++) {
+      const t = k * h;
+      const s = (Math.PI / 2) * Math.sinh(t);
+      const e = Math.exp(-2 * s);
+      // Distance from each endpoint, 1 − tanh(s), computed without cancellation.
+      const dist = (2 * e) / (1 + e);
+      const w = ((Math.PI / 2) * Math.cosh(t) * 4 * e) / ((1 + e) * (1 + e));
+      const xl = a + half * dist;
+      const xr = b - half * dist;
+      // Each side stops on its own once its abscissa rounds onto the endpoint: near 0 that happens far later than
+      // near 1, and stopping both sides together loses the tail of a singularity at 0.
+      const leftOk = xl !== a;
+      const rightOk = xr !== b;
+      if (w < Number.MIN_VALUE || (!leftOk && !rightOk)) break;
+      const fl = leftOk ? f(xl) : 0;
+      const fr = rightOk ? f(xr) : 0;
+      evaluations += 2;
+      if (!Number.isFinite(fl) || !Number.isFinite(fr)) return { value: NaN, converged: false, evaluations };
+      sum += w * (fl + fr);
+    }
+    const value = half * h * sum;
+    if (level > 2 && Math.abs(value - prev) <= Math.max(tolerance, Math.abs(value) * 1e-14)) return { value, converged: true, evaluations };
+    prev = value;
+  }
+  return { value: prev, converged: false, evaluations };
+}
+
+/**
+ * Definite integral used by the compiler: adaptive Simpson first; tanh-sinh when an endpoint is singular; a
+ * depth-limited Simpson value is kept for interior jumps (its error is confined to an interval of width 2⁻⁵⁰).
+ */
+export function integrate(f: (x: number) => number, a: number, b: number): IntegralResult {
+  const simpson = adaptiveSimpson(f, a, b);
+  if (simpson.converged) return simpson;
+  if (!Number.isFinite(f(a)) || !Number.isFinite(f(b)) || !Number.isFinite(simpson.value)) {
+    const ts = tanhSinh(f, a, b);
+    if (ts.converged) return ts;
+  }
+  return Number.isFinite(simpson.value) ? { ...simpson, converged: true } : simpson;
 }

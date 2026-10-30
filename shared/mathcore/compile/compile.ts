@@ -11,8 +11,8 @@
  */
 import type { Expr } from "../ast/expr";
 import { CONSTANTS, args, hashExpr, head, isFn, isNum, isSym } from "../ast/expr";
-import { adaptiveSimpson } from "../calculus/integrate";
-import { DERIVATIVE_STEP_SCALE, MAX_CALL_DEPTH, MAX_SUM_TERMS } from "../constants";
+import { integrate } from "../calculus/integrate";
+import { COMPILE_CACHE_LIMIT, DERIVATIVE_STEP_SCALE, MAX_CALL_DEPTH, MAX_SUM_TERMS } from "../constants";
 import { erf, erfc, gamma } from "../stats/special";
 
 export class CompileError extends Error {}
@@ -114,6 +114,13 @@ const COMPARE: Readonly<Record<string, (a: number, b: number) => boolean>> = {
   GreaterEqual: (a, b) => a >= b,
 };
 
+/** An integer literal, or Negate of one. */
+function literalInteger(e: Expr): number | null {
+  if (isNum(e)) return Number.isInteger(e) ? e : null;
+  if (isFn(e) && e[0] === "Negate" && e.length === 2 && isNum(e[1]) && Number.isInteger(e[1])) return -e[1];
+  return null;
+}
+
 /** Literal p/q (or -p/q) exponent: returns [p, q] for integer p, q. */
 function literalFraction(e: Expr): [number, number] | null {
   let sign = 1;
@@ -122,10 +129,11 @@ function literalFraction(e: Expr): [number, number] | null {
     sign = -1;
     x = x[1];
   }
-  if (isFn(x) && x[0] === "Divide" && isNum(x[1]) && isNum(x[2])) {
-    const p = x[1];
-    const q = x[2];
-    if (Number.isInteger(p) && Number.isInteger(q) && q !== 0) return [sign * p, q];
+  // Compute Engine writes x^{-1/3} as Divide(Negate(1), 3): accept a negated integer numerator too.
+  if (isFn(x) && x[0] === "Divide" && x.length === 3) {
+    const p = literalInteger(x[1]);
+    const q = literalInteger(x[2]);
+    if (p !== null && q !== null && q !== 0) return [sign * p, q];
   }
   return null;
 }
@@ -136,11 +144,13 @@ class Compiler {
   constructor(
     variables: readonly string[],
     private readonly functions: ReadonlyMap<string, FunctionDef>,
+    /** Top-level variables (parameters) visible inside user functions. */
+    private readonly globals: readonly string[] = variables,
   ) {
     for (const v of variables) this.slot(v);
   }
 
-  private slot(name: string): number {
+  slot(name: string): number {
     let i = this.slotOf.get(name);
     if (i === undefined) {
       i = this.slotCount++;
@@ -384,7 +394,7 @@ class Compiler {
           s[slot] = x;
           return body(s);
         };
-        const r = adaptiveSimpson(f, lo(s), hi(s));
+        const r = integrate(f, lo(s), hi(s));
         s[slot] = saved;
         return r.converged ? r.value : NaN;
       };
@@ -401,8 +411,14 @@ class Compiler {
     depth++;
     let inner: Compiler;
     let body: Node;
+    const globalsMap: Array<[number, number]> = [];
     try {
-      inner = new Compiler(def.params, this.functions);
+      inner = new Compiler(def.params, this.functions, this.globals);
+      // Parameters used inside the body are copied from the caller's slots (a function parameter shadows them).
+      for (const g of this.globals) {
+        const outer = this.slotOf.get(g);
+        if (outer !== undefined && !def.params.includes(g)) globalsMap.push([inner.slot(g), outer]);
+      }
       body = inner.compile(def.body);
     } finally {
       depth--;
@@ -413,14 +429,15 @@ class Compiler {
       // A fresh frame per call keeps nested calls of the same function correct.
       const f = frame.slice();
       for (let i = 0; i < argNodes.length; i++) f[i] = argNodes[i](s);
+      for (const [inner0, outer] of globalsMap) f[inner0] = s[outer];
       return body(f);
     };
   }
 }
 
 const cache = new Map<string, CompiledExpr>();
-/** Cache entries kept; old entries are dropped first (Map keeps insertion order). */
-const CACHE_LIMIT = 512;
+/** Old entries are dropped first (Map keeps insertion order). */
+const CACHE_LIMIT = COMPILE_CACHE_LIMIT;
 
 function functionsKey(functions: ReadonlyMap<string, FunctionDef> | undefined): string {
   if (!functions || functions.size === 0) return "";

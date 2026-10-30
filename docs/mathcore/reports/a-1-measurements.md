@@ -1,4 +1,4 @@
-# Phase 0 measurements (2026-10-30)
+# a-1 measurements: Phase 0 (2026-10-30)
 
 Everything below was obtained by running code in the cloud session (Node 22.22.0, Linux), not by reading source.
 Device measurements on the D1 laptop (Phase 0 item 5) are **not measured**: they need the owner's hardware.
@@ -30,15 +30,39 @@ Spec: `docs/mathcore/specs/graph-ir.md`. Validator: `shared/mathcore/ir/schema.t
 
 - Generator: `scripts/mathcore/oracle/` (`corpus.ts` → `build-inputs.ts` → `generate.py`; Python environment in
   `requirements.txt`, steps in `README.md`).
-- Output: `shared/mathcore/__golden__/eval.json`: 300 expressions, 2400 sample points (2394 finite, 6 domain errors),
-  mpmath at 50 digits, stored to 25 significant digits.
+- Output: `shared/mathcore/__golden__/eval.json`: 300 expressions, 2400 sample points (all finite), mpmath at 50 digits,
+  stored to 25 significant digits. Test: `golden.test.ts` (tolerance 10⁻¹², relative).
 - Points with condition number |x·f′/f| > 10⁴ or value 0 are excluded by the generator (none were excluded in this corpus).
-- Engine vs mpmath: **max relative error 4.8 × 10⁻¹⁴** (`\cos(e^{-x})` at x = −0.45); tolerance 10⁻¹². Test: `golden.test.ts`.
+- Semantics shared by engine and oracle: IEEE-754 extended reals (±∞ propagate, NaN outside the real domain), real odd
+  roots for literal fractional exponents (`x^{-1/3}` at x = −8 is −0.5).
+- Reviewer fix (2026-10-30): the first corpus stored `x^{-1/3}` and `x^{-5/3}` at negative x as domain errors because
+  both evaluators missed Compute Engine's `Divide(Negate(1), 3)` form. Fixed in both; the corpus was regenerated.
+
+## Differential fuzzing (STEPS.md §10)
+
+- `scripts/mathcore/oracle/fuzz.ts` (seed 20261030) → `generate_fuzz.py` (mpmath 50 digits; a point is kept only where an
+  ideal float64 evaluator, mpmath at 53 bits, agrees within 10⁻¹⁴ and the value does not hinge on the sign of a zero).
+- Offline run, 10,000 expressions: 28,172 judged points (4,353 domain errors), **0 failures**
+  (`pnpm exec tsx scripts/mathcore/oracle/check-fuzz.ts …`).
+- Fixed-seed subset in Vitest: `__golden__/fuzz.json`, 500 expressions, 1,406 points, `fuzz.test.ts`, 0 failures.
+
+## Special functions
+
+`__golden__/algorithms.json` (mpmath): Γ, ln Γ, erf, erfc, Iₓ(a, b), P(a, x), Q(a, x); `stats/special.test.ts`, all within 10⁻¹².
 
 ## Item 5. D1 device benchmarks — not measured
 
-The benchmark harness (`shared/mathcore/bench/`) runs in Vitest and in the browser. Budgets in STEPS.md §7.2 stay
-hypotheses until the owner runs it on the MacBook Pro (Mid 2014) and the simulated phone (4× CPU throttle).
+Harness: `shared/mathcore/bench/benchmarks.ts`, run in Node with `pnpm exec tsx scripts/mathcore/bench.ts` and in the
+browser from the mathcore page. Budgets in STEPS.md §7.2 stay hypotheses until the owner runs it on the MacBook Pro
+(Mid 2014) and the simulated phone (4× CPU throttle).
+
+Reference figures from the cloud machine (Node 22, not D1):
+
+| Case | Median | §7.2 target |
+|---|---|---|
+| Slider drag, 3 curves × 2000 samples | 0.42 ms | ≤ 2 ms |
+| Update one curve (adaptive sampling) | 0.17 ms | ≤ 4 ms |
+| Closure evaluations per second | 24 million | reference |
 
 ## Item 6. D0
 

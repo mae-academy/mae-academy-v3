@@ -8,6 +8,16 @@ const LN_SQRT_2PI = 0.5 * Math.log(2 * Math.PI);
 const EPS = Number.EPSILON;
 /** Iteration cap for series and continued fractions; reaching it returns NaN instead of a silent wrong value. */
 const MAX_ITER = 10_000;
+/** Lentz guard against division by zero in continued fractions. */
+const TINY = 1e-300;
+/** erf: positive-term series up to here, continued fraction beyond (the series has no cancellation for |x| ≤ 3). */
+const ERF_SERIES_LIMIT = 3;
+/** erf(x) = ±1 to double precision beyond |x| = 6. */
+const ERF_SATURATION = 6;
+/** erfc: 1 − erf below this (erfc ≥ 0.48 there, so no cancellation); continued fraction above. */
+const ERFC_FRACTION_START = 0.5;
+/** erfc(x) underflows to 0 beyond x ≈ 26.6. */
+const ERFC_UNDERFLOW = 27;
 
 // Lanczos approximation, g = 7, n = 9 (relative error about 1e-15 for real arguments).
 const LANCZOS_G = 7;
@@ -66,7 +76,6 @@ function erfSeries(x: number): number {
 
 /** erfc(x) for x ≥ 0.5 by the Laplace continued fraction (modified Lentz). */
 function erfcFraction(x: number): number {
-  const tiny = 1e-300;
   // erfc(x) = e^{-x²}/√π · 1/(x + (1/2)/(x + 1/(x + (3/2)/(x + 2/(x + …)))))
   let f = x;
   let C = x;
@@ -74,9 +83,9 @@ function erfcFraction(x: number): number {
   for (let n = 1; n < MAX_ITER; n++) {
     const an = n / 2;
     D = x + an * D;
-    D = Math.abs(D) < tiny ? tiny : D;
+    D = Math.abs(D) < TINY ? TINY : D;
     C = x + an / C;
-    C = Math.abs(C) < tiny ? tiny : C;
+    C = Math.abs(C) < TINY ? TINY : C;
     D = 1 / D;
     const delta = C * D;
     f *= delta;
@@ -88,43 +97,42 @@ function erfcFraction(x: number): number {
 export function erf(x: number): number {
   if (Number.isNaN(x)) return NaN;
   const ax = Math.abs(x);
-  if (ax <= 3) return erfSeries(x);
-  if (ax > 6) return Math.sign(x);
+  if (ax <= ERF_SERIES_LIMIT) return erfSeries(x);
+  if (ax > ERF_SATURATION) return Math.sign(x);
   return Math.sign(x) * (1 - erfcFraction(ax));
 }
 
 export function erfc(x: number): number {
   if (Number.isNaN(x)) return NaN;
-  if (x < 0.5) return 1 - erf(x);
-  if (x > 27) return 0;
+  if (x < ERFC_FRACTION_START) return 1 - erf(x);
+  if (x > ERFC_UNDERFLOW) return 0;
   return erfcFraction(x);
 }
 
 /** Continued fraction for the incomplete beta (modified Lentz). */
 function betaFraction(a: number, b: number, x: number): number {
-  const tiny = 1e-300;
   const qab = a + b;
   const qap = a + 1;
   const qam = a - 1;
   let c = 1;
   let d = 1 - (qab * x) / qap;
-  d = Math.abs(d) < tiny ? tiny : d;
+  d = Math.abs(d) < TINY ? TINY : d;
   d = 1 / d;
   let h = d;
   for (let m = 1; m < MAX_ITER; m++) {
     const m2 = 2 * m;
     let aa = (m * (b - m) * x) / ((qam + m2) * (a + m2));
     d = 1 + aa * d;
-    d = Math.abs(d) < tiny ? tiny : d;
+    d = Math.abs(d) < TINY ? TINY : d;
     c = 1 + aa / c;
-    c = Math.abs(c) < tiny ? tiny : c;
+    c = Math.abs(c) < TINY ? TINY : c;
     d = 1 / d;
     h *= d * c;
     aa = (-(a + m) * (qab + m) * x) / ((a + m2) * (qap + m2));
     d = 1 + aa * d;
-    d = Math.abs(d) < tiny ? tiny : d;
+    d = Math.abs(d) < TINY ? TINY : d;
     c = 1 + aa / c;
-    c = Math.abs(c) < tiny ? tiny : c;
+    c = Math.abs(c) < TINY ? TINY : c;
     d = 1 / d;
     const del = d * c;
     h *= del;
@@ -171,18 +179,17 @@ export function incompleteGammaQ(a: number, x: number): number {
 }
 
 function incompleteGammaQFraction(a: number, x: number, lnFront: number): number {
-  const tiny = 1e-300;
   let b = x + 1 - a;
-  let c = 1 / tiny;
+  let c = 1 / TINY;
   let d = 1 / b;
   let h = d;
   for (let i = 1; i < MAX_ITER; i++) {
     const an = -i * (i - a);
     b += 2;
     d = an * d + b;
-    d = Math.abs(d) < tiny ? tiny : d;
+    d = Math.abs(d) < TINY ? TINY : d;
     c = b + an / c;
-    c = Math.abs(c) < tiny ? tiny : c;
+    c = Math.abs(c) < TINY ? TINY : c;
     d = 1 / d;
     const del = d * c;
     h *= del;

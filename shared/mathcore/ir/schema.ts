@@ -4,7 +4,7 @@
  * Unknown keys are rejected (Q8). `validateGraph` returns a fully defaulted document on success.
  */
 import {
-  MAX_ID_LENGTH, MAX_ITEMS, MAX_LATEX_LENGTH, MAX_PARAMS, MAX_PERIOD_S, MIN_PERIOD_S, RESERVED_SYMBOLS,
+  MAX_ID_LENGTH, MAX_ITEMS, MAX_LATEX_LENGTH, MAX_PARAMS, MAX_PERIOD_S, MAX_STYLE_WIDTH, MIN_PERIOD_S, RESERVED_SYMBOLS,
 } from "../constants";
 import type { Animation, GraphIR, Item, ItemStyle, Param, View, Viewport } from "./types";
 import { DEFAULT_VIEW, ITEM_KINDS, SUPPORTED_IR_VERSIONS } from "./types";
@@ -22,7 +22,6 @@ const ID_PATTERN = /^[A-Za-z0-9_-]+$/;
 const PARAM_NAME = /^(?:[A-Za-z]|alpha|beta|gamma|delta|epsilon|lambda|mu|nu|sigma|tau|phi|psi|omega|rho|kappa|eta|zeta|xi|chi)(?:_[A-Za-z0-9]+)?$/;
 /** Q7: `#RRGGBB` or a design-token name. */
 const COLOR_PATTERN = /^(?:#[0-9A-Fa-f]{6}|[a-z][a-z0-9-]*)$/;
-const MAX_STYLE_WIDTH = 10;
 
 type Obj = Record<string, unknown>;
 const isObj = (v: unknown): v is Obj => typeof v === "object" && v !== null && !Array.isArray(v);

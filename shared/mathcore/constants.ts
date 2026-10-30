@@ -39,3 +39,13 @@ export const DERIVATIVE_STEP_SCALE = Math.sqrt(Number.EPSILON);
 export const MAX_CALL_DEPTH = 64;
 /** Upper bound on terms in a Σ or Π so a typo cannot freeze a Worker. */
 export const MAX_SUM_TERMS = 100_000;
+
+/** STEPS.md §7.3 integrals: absolute tolerance of adaptive Simpson and its recursion limit. */
+export const INTEGRAL_TOLERANCE = 1e-12;
+export const INTEGRAL_MAX_DEPTH = 50;
+/** Tanh-sinh fallback for endpoint singularities: maximum refinement level (step 2⁻ᵏ). */
+export const TANH_SINH_MAX_LEVEL = 10;
+/** Compiled closures kept in the compile cache. */
+export const COMPILE_CACHE_LIMIT = 512;
+/** Owner decision Q7: style width in (0, 10]. */
+export const MAX_STYLE_WIDTH = 10;

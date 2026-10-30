@@ -3,7 +3,7 @@
  * Order matters: the ODE form is checked before the generic `Equal` cases.
  */
 import type { Expr } from "../ast/expr";
-import { args, containsSymbol, freeSymbols, head, isFn, isNum, isSym } from "../ast/expr";
+import { CONSTANTS, args, containsSymbol, freeSymbols, head, isFn, isNum, isSym } from "../ast/expr";
 import { RESERVED_SYMBOLS } from "../constants";
 import { DISTRIBUTION_HEADS } from "../normalize/normalize";
 
@@ -68,7 +68,11 @@ export function inferType(expr: Expr): InferredType {
 
 function infer(e: Expr): InferredType {
   if (isNum(e)) return { kind: "Value", expr: e };
-  if (isSym(e)) return freeOf(e, ["x"]) ? { kind: "Value", expr: e } : explicitFromBare(e);
+  if (isSym(e)) {
+    if (e === "x") return explicitFromBare(e);
+    if (RESERVED_SYMBOLS.has(e)) return unknown(`${e} alone needs an equation`);
+    return { kind: "Value", expr: e };
+  }
   const h = head(e) as string;
   const a = args(e);
 
@@ -85,6 +89,7 @@ function infer(e: Expr): InferredType {
     // ODE first (§6.2): D(y, x) = F(x, y).
     if (head(lhs) === "D") {
       const [dep, ind] = args(lhs);
+      if (isSym(dep) && isSym(ind) && dep === ind) return unknown("a variable cannot be differentiated with respect to itself");
       if (isSym(dep) && isSym(ind)) return { kind: "ODE1", dependent: dep, independent: ind, F: rhs };
       return unknown("only first-order ODEs dy/dx = F(x, y) are supported");
     }
@@ -94,7 +99,7 @@ function infer(e: Expr): InferredType {
     if (isSym(lhs) && head(rhs) === "Matrix") return matrix(rhs, lhs);
 
     // Scalar definition: name = expression without reserved symbols.
-    if (isSym(lhs) && !RESERVED_SYMBOLS.has(lhs) && !(lhs in { Pi: 1, ExponentialE: 1 })) {
+    if (isSym(lhs) && !RESERVED_SYMBOLS.has(lhs) && !(lhs in CONSTANTS)) {
       const reserved = Array.from(freeSymbols(rhs)).filter((s) => RESERVED_SYMBOLS.has(s));
       if (reserved.length === 0 && !containsSymbol(rhs, lhs)) return { kind: "Scalar", name: lhs, expr: rhs, literal: numericValue(rhs) };
     }
@@ -117,7 +122,10 @@ function infer(e: Expr): InferredType {
   }
 
   if (h === "Matrix") return matrix(e, null);
-  if (h === "Integrate" && a.length === 4 && isSym(a[1])) return { kind: "RiemannSum", body: a[0], variable: a[1], a: a[2], b: a[3] };
+  // A definite integral is a teaching RiemannSum when it is a number; with x free it is a function of x (Explicit).
+  if (h === "Integrate" && a.length === 4 && isSym(a[1]) && !freeSymbols(e).has("x")) {
+    return { kind: "RiemannSum", body: a[0], variable: a[1], a: a[2], b: a[3] };
+  }
   if (DISTRIBUTION_HEADS.has(h)) return { kind: "Distribution", family: h, args: a };
 
   const free = freeSymbols(e);

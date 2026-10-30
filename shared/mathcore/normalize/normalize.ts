@@ -320,8 +320,10 @@ class Normalizer {
     const target = this.norm(rest[0]);
     const order = typeof rest[1] === "number" ? rest[1] : 1;
     if (!isSym(target)) return this.fail("Prime notation needs a variable name");
+    // y' is d/dx; x' is d/dt (a prime on x means time, as in x' = y for a 2D system).
+    const independent = target === "x" ? "t" : "x";
     let e: Expr = target;
-    for (let k = 0; k < order; k++) e = ["D", e, "x"];
+    for (let k = 0; k < order; k++) e = ["D", e, independent];
     return e;
   }
 
