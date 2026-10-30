@@ -5,6 +5,8 @@
  */
 import { compile } from "../compile/compile";
 import { GraphEngine } from "../engine/graphEngine";
+import { IMPLICIT_CELL_PX_DRAG, IMPLICIT_CELL_PX_FULL, IMPLICIT_REFINE_DRAG, IMPLICIT_REFINE_FULL } from "../constants";
+import { contour, insideTest, regionMask } from "../implicit/marching";
 import { emptyGraph } from "../ir/types";
 import { sampleExplicit } from "../sample/adaptive";
 
@@ -99,6 +101,19 @@ export function runBenchmarks(): BenchResult[] {
       if (rt?.kind === "Explicit") sampleExplicit(rt.f, -10, 10, { tolerance: (12 / 600) * DRAG_FACTOR, yRange: 12, initial: DRAG_INITIAL });
     }
   }));
+
+  // Implicit field, STEPS.md §7.2: 400×250 during a drag (curve + quarter-resolution shading) and 1600×1000 on release.
+  const F = (x: number, y: number) => x * x + y * y - 9 + Math.sin(3 * x) * Math.cos(2 * y);
+  const inside = insideTest("<");
+  const view = { xmin: -5, xmax: 5, ymin: -3.125, ymax: 3.125, aspect: "equal" as const };
+  add("implicit-400x250-drag", "Implicit field 400×250 during drag", 16, "ms", time(() => {
+    contour(F, view, { width: 400, height: 250, cellPx: IMPLICIT_CELL_PX_DRAG, refine: IMPLICIT_REFINE_DRAG });
+    regionMask(F, view, 400, 250, 4, inside);
+  }));
+  add("implicit-1600x1000-full", "Implicit field 1600×1000 on release (curve + full shading)", 150, "ms", time(() => {
+    contour(F, view, { width: 1600, height: 1000, cellPx: IMPLICIT_CELL_PX_FULL, refine: IMPLICIT_REFINE_FULL });
+    regionMask(F, view, 1600, 1000, 1, inside);
+  }, 9));
 
   // Raw evaluation throughput, as a reference figure for the other budgets.
   const n = 200_000;

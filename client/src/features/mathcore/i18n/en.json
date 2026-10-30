@@ -41,7 +41,9 @@
     "zeros": "crosses zero at x = {{list}}",
     "noZeros": "no zeros in view",
     "maxima": "local maxima near {{list}}",
-    "minima": "local minima near {{list}}"
+    "minima": "local minima near {{list}}",
+    "extent_one": "{{label}}: one piece spanning x from {{xmin}} to {{xmax}} and y from {{ymin}} to {{ymax}}",
+    "extent_other": "{{label}}: {{count}} pieces spanning x from {{xmin}} to {{xmax}} and y from {{ymin}} to {{ymax}}"
   },
   "value_is": "= {{value}}",
   "benchmarks": "Run benchmarks",

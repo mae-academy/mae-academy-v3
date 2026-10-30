@@ -41,7 +41,9 @@
     "zeros": "cruza el cero en x = {{list}}",
     "noZeros": "sin ceros en la vista",
     "maxima": "máximos locales cerca de {{list}}",
-    "minima": "mínimos locales cerca de {{list}}"
+    "minima": "mínimos locales cerca de {{list}}",
+    "extent_one": "{{label}}: una pieza que abarca x de {{xmin}} a {{xmax}} y y de {{ymin}} a {{ymax}}",
+    "extent_other": "{{label}}: {{count}} piezas que abarcan x de {{xmin}} a {{xmax}} y y de {{ymin}} a {{ymax}}"
   },
   "value_is": "= {{value}}",
   "benchmarks": "Ejecutar mediciones",

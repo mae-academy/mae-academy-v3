@@ -33,6 +33,10 @@ export interface ItemResult {
   value?: number;
   description?: CurveDescription;
   precisionWarning?: boolean;
+  /** Inequality shading: one byte per sample, row 0 at the top (ImageData order). */
+  field?: { width: number; height: number; data: Uint8Array };
+  /** For implicit items: `=`, `<`, `<=`, `>` or `>=` (strict inequalities draw a dashed boundary). */
+  relation?: string;
   /** For a point whose coordinates are single parameters, the parameters a drag changes. */
   dragParams?: { x?: string; y?: string };
 }

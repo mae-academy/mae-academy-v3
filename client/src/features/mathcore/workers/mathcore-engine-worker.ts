@@ -5,8 +5,12 @@
  */
 import { bench } from "./benchEntry";
 import { centralDifference } from "@shared/mathcore/calculus/derivative";
-import { describeExplicit } from "@shared/mathcore/describe/describe";
+import { describeExplicit, describeExtent } from "@shared/mathcore/describe/describe";
+import {
+  FIELD_STRIDE_DRAG, FIELD_STRIDE_FULL, IMPLICIT_CELL_PX_DRAG, IMPLICIT_CELL_PX_FULL, IMPLICIT_REFINE_DRAG, IMPLICIT_REFINE_FULL,
+} from "@shared/mathcore/constants";
 import { GraphEngine } from "@shared/mathcore/engine/graphEngine";
+import { contour, insideTest, regionMask } from "@shared/mathcore/implicit/marching";
 import type { RawParser } from "@shared/mathcore/parse/parse";
 import { sampleExplicit, sampleParametric, samplePolar } from "@shared/mathcore/sample/adaptive";
 import type { SampleResult } from "@shared/mathcore/sample/adaptive";
@@ -84,11 +88,29 @@ function sampleItem(e: GraphEngine, id: string, view: ViewRequest): ItemResult {
     }
     case "Value":
       return { ...base, value: rt.value };
+    case "Implicit": {
+      const drag = view.quality === "drag";
+      const c = contour(rt.F, view.viewport, {
+        width: view.width,
+        height: view.height,
+        cellPx: drag ? IMPLICIT_CELL_PX_DRAG : IMPLICIT_CELL_PX_FULL,
+        refine: drag ? IMPLICIT_REFINE_DRAG : IMPLICIT_REFINE_FULL,
+      });
+      const out: ItemResult = { ...base, segments: c.polylines, relation: rt.relation };
+      if (rt.relation !== "=") {
+        const m = regionMask(rt.F, view.viewport, view.width, view.height, drag ? FIELD_STRIDE_DRAG : FIELD_STRIDE_FULL, insideTest(rt.relation));
+        out.field = { width: m.width, height: m.height, data: m.data };
+      }
+      if (!drag) out.description = describeExtent(c.polylines);
+      return out;
+    }
     default:
       return base;
   }
   const out: ItemResult = { ...base, segments: r.segments, precisionWarning: r.precisionWarning };
-  if (view.quality === "full" && rt.kind === "Explicit" && rt.dependent === "y") out.description = describeExplicit(r.segments);
+  if (view.quality === "full") {
+    out.description = rt.kind === "Explicit" && rt.dependent === "y" ? describeExplicit(r.segments) : describeExtent(r.segments);
+  }
   return out;
 }
 

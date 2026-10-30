@@ -24,7 +24,7 @@ export interface ExpressionRowProps {
 }
 
 /** Item kinds drawn by a later phase, with that phase (STEPS.md §11). */
-const LATER_PHASE: Readonly<Record<string, number>> = { Implicit: 3, Matrix2: 4, Matrix3: 5, ODE1: 6, RiemannSum: 9, Distribution: 10 };
+const LATER_PHASE: Readonly<Record<string, number>> = { Matrix2: 4, Matrix3: 5, ODE1: 6, RiemannSum: 9, Distribution: 10 };
 
 export function ExpressionRow({ index, latex, color, result, onChange, onRemove, onEnter }: ExpressionRowProps) {
   const { t } = useTranslation(NS);

@@ -45,6 +45,14 @@ export const INTEGRAL_TOLERANCE = 1e-12;
 export const INTEGRAL_MAX_DEPTH = 50;
 /** Tanh-sinh fallback for endpoint singularities: maximum refinement level (step 2⁻ᵏ). */
 export const TANH_SINH_MAX_LEVEL = 10;
+/** Implicit curves (STEPS.md §7.1 techniques 2–3): coarse cell size and refinement of cells the curve crosses. */
+export const IMPLICIT_CELL_PX_FULL = 6;
+export const IMPLICIT_CELL_PX_DRAG = 12;
+export const IMPLICIT_REFINE_FULL = 4;
+export const IMPLICIT_REFINE_DRAG = 2;
+/** Inequality shading: one sample every this many pixels (full quality, while dragging). */
+export const FIELD_STRIDE_FULL = 1;
+export const FIELD_STRIDE_DRAG = 4;
 /** Compiled closures kept in the compile cache. */
 export const COMPILE_CACHE_LIMIT = 512;
 /** Owner decision Q7: style width in (0, 10]. */

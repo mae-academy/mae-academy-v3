@@ -13,6 +13,14 @@ export interface DrawCurve {
   highlighted?: boolean;
 }
 
+/** Inequality shading: a mask (1 = inside) stretched over the view, tinted with the item color. */
+export interface DrawField {
+  width: number;
+  height: number;
+  data: Uint8Array;
+  color: string;
+}
+
 export interface DrawPoint {
   x: number;
   y: number;
@@ -33,6 +41,7 @@ export interface Scene {
   viewport: Viewport;
   grid: boolean;
   curves: DrawCurve[];
+  fields?: DrawField[];
   points: DrawPoint[];
   tangent?: DrawTangent | null;
 }
@@ -59,6 +68,28 @@ export function gridStep(span: number, target: number): number {
   const mag = 10 ** Math.floor(Math.log10(raw));
   const n = raw / mag;
   return (n < 1.5 ? 1 : n < 3.5 ? 2 : n < 7.5 ? 5 : 10) * mag;
+}
+
+/** Opacity of shaded regions (0–1): light enough that curves and the grid stay readable under them. */
+const FIELD_ALPHA = 0.2;
+
+/** `rgb` bytes of any CSS color, read back from a 1×1 canvas (so tokens, hex and oklch all work). */
+const rgbCache = new Map<string, [number, number, number]>();
+function rgbOf(color: string): [number, number, number] {
+  const hit = rgbCache.get(color);
+  if (hit) return hit;
+  const c = document.createElement("canvas");
+  c.width = c.height = 1;
+  const g = c.getContext("2d", { willReadFrequently: true });
+  let rgb: [number, number, number] = [0, 0, 0];
+  if (g) {
+    g.fillStyle = color;
+    g.fillRect(0, 0, 1, 1);
+    const d = g.getImageData(0, 0, 1, 1).data;
+    rgb = [d[0], d[1], d[2]];
+  }
+  rgbCache.set(color, rgb);
+  return rgb;
 }
 
 /** Target grid lines across the larger dimension. */
@@ -146,6 +177,8 @@ export class Canvas2DRenderer implements Renderer {
       }
     }
 
+    for (const f of scene.fields ?? []) this.drawField(f);
+
     ctx.lineJoin = "round";
     ctx.lineCap = "round";
     for (const c of scene.curves) {
@@ -194,6 +227,29 @@ export class Canvas2DRenderer implements Renderer {
         ctx.fillText(p.label, X(p.x) + POINT_RADIUS * 2, Y(p.y) - POINT_RADIUS);
       }
     }
+  }
+
+  private drawField(f: DrawField): void {
+    const { ctx } = this;
+    const layer = document.createElement("canvas");
+    layer.width = f.width;
+    layer.height = f.height;
+    const lg = layer.getContext("2d");
+    if (!lg) return;
+    const img = lg.createImageData(f.width, f.height);
+    const [r, g, b] = rgbOf(f.color);
+    const alpha = Math.round(FIELD_ALPHA * 255);
+    for (let i = 0; i < f.data.length; i++) {
+      if (f.data[i] === 1) {
+        img.data[4 * i] = r;
+        img.data[4 * i + 1] = g;
+        img.data[4 * i + 2] = b;
+        img.data[4 * i + 3] = alpha;
+      }
+    }
+    lg.putImageData(img, 0, 0);
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(layer, 0, 0, this.width, this.height);
   }
 
   private gridLines(step: number, color: string, width: number, scene: Scene, X: (x: number) => number, Y: (y: number) => number) {

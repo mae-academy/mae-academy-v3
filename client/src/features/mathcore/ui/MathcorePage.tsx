@@ -11,7 +11,7 @@ import type { GraphIR, Item, Param, Viewport } from "@shared/mathcore/ir/types";
 import { DEFAULT_VIEWPORT, emptyGraph } from "@shared/mathcore/ir/types";
 import { PARSE_DEBOUNCE_MS } from "@shared/mathcore/constants";
 import { NS } from "../i18n/register";
-import type { DrawCurve, DrawPoint, Scene } from "../render/renderer";
+import type { DrawCurve, DrawField, DrawPoint, Scene } from "../render/renderer";
 import { PALETTE_TOKENS, resolveColor } from "../render/renderer";
 import { describeItem } from "./describeText";
 import { ExpressionRow } from "./ExpressionRow";
@@ -195,12 +195,16 @@ export default function MathcorePage() {
 
   const scene: Scene = useMemo(() => {
     const curves: DrawCurve[] = [];
+    const fields: DrawField[] = [];
     const points: DrawPoint[] = [];
     graph.items.forEach((it, i) => {
       const r = results.get(it.id);
       if (!r || it.style?.hidden) return;
+      if (r.field) fields.push({ ...r.field, color: colors[i] });
+      // A strict inequality (< or >) does not include its boundary, so the boundary is dashed.
+      const strict = r.relation === "<" || r.relation === ">";
       if (r.segments.length) {
-        curves.push({ segments: r.segments, color: colors[i], width: it.style?.width ?? DEFAULT_WIDTH, dash: it.style?.dash, highlighted: trace?.id === it.id });
+        curves.push({ segments: r.segments, color: colors[i], width: it.style?.width ?? DEFAULT_WIDTH, dash: it.style?.dash ?? (strict ? "dashed" : undefined), highlighted: trace?.id === it.id });
       }
       if (r.point) points.push({ x: r.point.x, y: r.point.y, color: colors[i] });
     });
@@ -210,6 +214,7 @@ export default function MathcorePage() {
       viewport: graph.viewport,
       grid: graph.view.grid,
       curves,
+      fields,
       points,
       tangent:
         traced && traced.slope !== null

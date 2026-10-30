@@ -35,3 +35,14 @@ describe("SVG export", () => {
     expect(svg).toContain('stroke-dasharray="8 6"');
   });
 });
+
+describe("curves that are not a function graph", () => {
+  it("describes an implicit curve by its pieces and the box it spans", async () => {
+    const { describeExtent } = await import("./describe");
+    const circle = Float64Array.from(Array.from({ length: 41 }, (_, i) => [3 * Math.cos((i / 40) * 2 * Math.PI), 3 * Math.sin((i / 40) * 2 * Math.PI)]).flat());
+    const d = describeExtent([circle]);
+    expect(d.pieces).toBe(1);
+    expect(d.extent).toEqual({ xmin: -3, xmax: 3, ymin: -3, ymax: 3 });
+    expect(describeExtent([]).pieces).toBe(0);
+  });
+});

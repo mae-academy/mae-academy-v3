@@ -45,7 +45,13 @@
     "zeros": "يقطع الصفر عند x = {{list}}",
     "noZeros": "لا أصفار في العرض",
     "maxima": "قيم عظمى محلية قرب {{list}}",
-    "minima": "قيم صغرى محلية قرب {{list}}"
+    "minima": "قيم صغرى محلية قرب {{list}}",
+    "extent_zero": "{{label}}: لا قطع",
+    "extent_one": "{{label}}: قطعة واحدة تمتد من x = {{xmin}} إلى {{xmax}} ومن y = {{ymin}} إلى {{ymax}}",
+    "extent_two": "{{label}}: قطعتان تمتدان من x = {{xmin}} إلى {{xmax}} ومن y = {{ymin}} إلى {{ymax}}",
+    "extent_few": "{{label}}: {{count}} قطع تمتد من x = {{xmin}} إلى {{xmax}} ومن y = {{ymin}} إلى {{ymax}}",
+    "extent_many": "{{label}}: {{count}} قطعة تمتد من x = {{xmin}} إلى {{xmax}} ومن y = {{ymin}} إلى {{ymax}}",
+    "extent_other": "{{label}}: {{count}} قطعة تمتد من x = {{xmin}} إلى {{xmax}} ومن y = {{ymin}} إلى {{ymax}}"
   },
   "value_is": "= {{value}}",
   "benchmarks": "شغّل قياسات الأداء",

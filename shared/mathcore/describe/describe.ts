@@ -13,6 +13,8 @@ export interface CurveDescription {
   extrema: Array<{ x: number; y: number; type: "max" | "min" }>;
   /** Number of disconnected pieces (asymptotes and undefined regions split the curve). */
   pieces: number;
+  /** For curves that are not a function graph (implicit, polar, parametric): the box they span. */
+  extent?: { xmin: number; xmax: number; ymin: number; ymax: number };
 }
 
 /** Description values are rounded to this many significant digits for speech. */
@@ -67,6 +69,25 @@ function parabolaVertex(x0: number, y0: number, x1: number, y1: number, x2: numb
   const xv = -B / (2 * A);
   if (!(xv >= Math.min(x0, x2) && xv <= Math.max(x0, x2))) return { x: x1, y: y1 };
   return { x: xv, y: A * xv * xv + B * xv + C };
+}
+
+/** Description of a curve that is not y = f(x): how many pieces and the box they span. */
+export function describeExtent(segments: readonly Polyline[]): CurveDescription {
+  let xmin = Infinity;
+  let xmax = -Infinity;
+  let ymin = Infinity;
+  let ymax = -Infinity;
+  for (const s of segments) {
+    for (let i = 0; i + 1 < s.length; i += 2) {
+      xmin = Math.min(xmin, s[i]);
+      xmax = Math.max(xmax, s[i]);
+      ymin = Math.min(ymin, s[i + 1]);
+      ymax = Math.max(ymax, s[i + 1]);
+    }
+  }
+  if (xmin > xmax) return { domain: [], zeros: [], extrema: [], pieces: 0 };
+  const r = roundForSpeech;
+  return { domain: [], zeros: [], extrema: [], pieces: segments.length, extent: { xmin: r(xmin), xmax: r(xmax), ymin: r(ymin), ymax: r(ymax) } };
 }
 
 function dedupe(xs: number[]): number[] {
