@@ -74,7 +74,8 @@ function main() {
     id,
     timestamp: new Date().toISOString(),
     status,
-    calibration: budget.estimate_percent_per_prompt === null,
+    // Only a passed run measures the cost of a real step; a failed or deferred run is not a calibration sample.
+    calibration: budget.estimate_percent_per_prompt === null && status === "passed",
     weekly_percent_before: budget.weekly_percent_used,
     weekly_percent_after: null,
   });

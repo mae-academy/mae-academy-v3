@@ -2,7 +2,7 @@
 # Mathcore orchestrator: runs one prompt end to end and stops before any merge.
 #   usage: scripts/mathcore/run-prompt.sh <id>      (ids a-1 .. l-3, or zz-test for the V1 dry run)
 #
-# Exit codes: 0 branch pushed and report written, 1 safety or setup error, 2 deferred (budget or prompt status),
+# Exit codes: 0 branch pushed and report written, 1 safety or setup error, 2 deferred (budget, prompt status, or no deliverable),
 #             3 blocked after two gate failures, 4 preview unreachable.
 #
 # Safety: works in its own temporary worktree cut from origin/main (or MATHCORE_BASE), pushes only mathcore/<id> to mae-academy-v3,
@@ -29,6 +29,7 @@ die() { echo "run-prompt: STOP: $*" >&2; exit "${2:-1}"; }
 # --- guards -------------------------------------------------------------------------------------------------------
 [[ "$ID" =~ ^([a-l]-[1-4]|zz-test)$ ]] || die "invalid id '$ID'"
 DRY_RUN=false; [ "$ID" = zz-test ] && DRY_RUN=true
+EXEC_FAILED=false
 remote="$(git -C "$SRC_ROOT" remote get-url --push origin)"
 # One trailing .git is optional (cloud checkouts omit it); anything else must match exactly.
 [ "${remote%.git}" = "${EXPECTED_REMOTE%.git}" ] || die "origin push URL is '$remote', expected $EXPECTED_REMOTE (.git optional)"
@@ -63,6 +64,8 @@ REPORT=docs/mathcore/reports/$ID.md
 decide() { printf '| %s | %s | %s | %s |\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$ID" "$1" "$2" >> "$LOG"; echo "decision: $1 ($2)"; }
 
 budget_file() { [ -f docs/mathcore/BUDGET.json ] && echo docs/mathcore/BUDGET.json || echo "$SRC_ROOT/docs/mathcore/BUDGET.json"; }
+# Usage state lives in the source checkout (automation/setup), not on the run branch, so it survives between runs.
+USAGE_FILE="$SRC_ROOT/docs/mathcore/usage.json"
 
 notify() {
   # Template names only (docs/mathcore/templates/notify.md). Sending is not wired until AgentPhone is approved
@@ -83,7 +86,7 @@ else
 fi
 
 # --- 1. budget guard ----------------------------------------------------------------------------------------------
-BUDGET_JSON="$(MATHCORE_BUDGET="$(budget_file)" pnpm exec tsx "$PIPE/budget-guard.ts" check "$ID")"
+BUDGET_JSON="$(MATHCORE_BUDGET="$(budget_file)" MATHCORE_USAGE="$USAGE_FILE" pnpm exec tsx "$PIPE/budget-guard.ts" check "$ID")"
 BUDGET_EXIT=$?
 echo "budget: $BUDGET_JSON"
 if [ $BUDGET_EXIT -ne 0 ]; then
@@ -115,8 +118,15 @@ if $DRY_RUN; then
   printf 'zz-test dry run created at %s from %s\n' "$STAMP" "$BASE_SHA" > docs/mathcore/reports/zz-test.txt
   decide "executor replaced by dry run" "V1 creates exactly one file"
 else
-  run_executor || decide "executor exited non-zero" "continuing to the gate, which decides"
+  run_executor || { EXEC_FAILED=true; decide "executor exited non-zero" "the run cannot pass; the gate still runs for the report"; }
 fi
+
+# Required tests named in the prompt (backticked paths under "## Required tests") must exist after the executor.
+missing_tests() {
+  $DRY_RUN && return 0
+  awk '/^## Required tests/{f=1;next} /^## /{f=0} f' "$PIPE/prompt.md" | grep -o '`[^`]*`' | tr -d '`' |
+    while read -r t; do [ -f "$t" ] || echo "$t"; done
+}
 
 # --- 4. gate, one repair round ------------------------------------------------------------------------------------
 GATE_RESULT=""
@@ -136,7 +146,12 @@ for attempt in 1 2; do
 done
 
 STATUS=passed
-if [ $GATE_RC -ne 0 ]; then
+MISSING="$(missing_tests)"
+if [ $GATE_RC -eq 0 ] && { $EXEC_FAILED || [ -n "$MISSING" ]; }; then
+  # A passing gate on a run that produced nothing is not a pass.
+  STATUS=deferred
+  decide "deferred" "executor failed=$EXEC_FAILED; missing required tests: ${MISSING:-none}"
+elif [ $GATE_RC -ne 0 ]; then
   STATUS=blocked
   # Report-only branch: keep the failed work as a patch, drop it from the tree.
   git add -A && git diff --cached "$BASE_SHA" -- . ':!docs/mathcore/reports' > "docs/mathcore/reports/$ID-failed.patch"
@@ -213,7 +228,11 @@ fi
   if [ -f "docs/mathcore/reports/$ID-questions.md" ]; then cat "docs/mathcore/reports/$ID-questions.md"; else echo "None."; fi
 } > "$REPORT"
 
-$DRY_RUN || MATHCORE_BUDGET="$(budget_file)" pnpm exec tsx "$PIPE/budget-guard.ts" record "$ID" "$STATUS" >/dev/null
+if ! $DRY_RUN; then
+  MATHCORE_BUDGET="$(budget_file)" MATHCORE_USAGE="$USAGE_FILE" pnpm exec tsx "$PIPE/budget-guard.ts" record "$ID" "$STATUS" >/dev/null
+  cp "$USAGE_FILE" docs/mathcore/usage.json
+  decide "usage recorded in $USAGE_FILE" "commit it on automation/setup so the next run sees it"
+fi
 
 # --- 9 (decision). Pull requests stay disabled until gh is authorized (Section 5.3) -------------------------------
 COMPARE="https://github.com/mae-academy/mae-academy-v3/compare/main...$BRANCH?expand=1"
@@ -242,4 +261,5 @@ cd "$SRC_ROOT" && git worktree remove --force "$WT"
 echo "branch: $BRANCH  status: $STATUS  preview: $PREVIEW_URL ($PREVIEW_STATUS)  compare: $COMPARE"
 [[ "$PREVIEW_STATUS" != reachable* ]] && exit 4
 [ "$STATUS" = blocked ] && exit 3
+[ "$STATUS" = deferred ] && exit 2
 exit 0
