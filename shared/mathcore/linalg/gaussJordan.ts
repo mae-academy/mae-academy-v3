@@ -1,0 +1,195 @@
+/**
+ * Annotated Gauss-Jordan elimination (STEPS.md §8.2): a written step tree where each row operation is shown in LaTeX
+ * (Rᵢ ← Rᵢ − kRⱼ, Rᵢ ↔ Rⱼ, Rᵢ ← kRᵢ) with the pivot highlighted. Exact for rational input; otherwise floating
+ * point with a zero test relative to the matrix scale.
+ */
+import { Fraction } from "./fraction";
+import type { Mat } from "./matrix";
+import { toFractions } from "./matrix";
+
+/** Entries below this times the largest |entry| count as zero in floating-point elimination. */
+export const ELIMINATION_RELATIVE_TOLERANCE = 1e-12;
+/** Significant digits shown for floating-point entries in LaTeX. */
+const FLOAT_DIGITS = 6;
+
+interface Field<T> {
+  zero: T;
+  one: T;
+  add: (a: T, b: T) => T;
+  sub: (a: T, b: T) => T;
+  mul: (a: T, b: T) => T;
+  div: (a: T, b: T) => T;
+  isZero: (a: T) => boolean;
+  isOne: (a: T) => boolean;
+  /** Compares |a| and |b|. */
+  cmpAbs: (a: T, b: T) => number;
+  neg: (a: T) => T;
+  latex: (a: T) => string;
+  num: (a: T) => number;
+}
+
+const exactField: Field<Fraction> = {
+  zero: Fraction.ZERO,
+  one: Fraction.ONE,
+  add: (a, b) => a.add(b),
+  sub: (a, b) => a.sub(b),
+  mul: (a, b) => a.mul(b),
+  div: (a, b) => a.div(b),
+  isZero: (a) => a.isZero(),
+  isOne: (a) => a.isOne(),
+  cmpAbs: (a, b) => a.compareAbs(b),
+  neg: (a) => a.neg(),
+  latex: (a) => a.toLatex(),
+  num: (a) => a.toNumber(),
+};
+
+function floatField(scale: number): Field<number> {
+  const tol = ELIMINATION_RELATIVE_TOLERANCE * Math.max(scale, Number.MIN_VALUE);
+  const latex = (a: number) => {
+    const r = Number(a.toPrecision(FLOAT_DIGITS));
+    return Math.abs(r) < tol ? "0" : String(r);
+  };
+  return {
+    zero: 0,
+    one: 1,
+    add: (a, b) => a + b,
+    sub: (a, b) => a - b,
+    mul: (a, b) => a * b,
+    div: (a, b) => a / b,
+    isZero: (a) => Math.abs(a) <= tol,
+    isOne: (a) => Math.abs(a - 1) <= ELIMINATION_RELATIVE_TOLERANCE,
+    cmpAbs: (a, b) => Math.sign(Math.abs(a) - Math.abs(b)),
+    neg: (a) => -a,
+    latex,
+    num: (a) => a,
+  };
+}
+
+export type RowOp =
+  | { op: "swap"; i: number; j: number }
+  | { op: "scale"; i: number; k: number }
+  | { op: "add"; i: number; j: number; k: number };
+
+export interface GaussStep {
+  op: RowOp;
+  /** LaTeX of the operation, rows numbered from 1: `R_2 \leftarrow R_2 - \frac{3}{2}R_1`. */
+  latex: string;
+  /** Matrix after the step, as numbers and as LaTeX entries. */
+  matrix: number[][];
+  matrixLatex: string[][];
+  /** Pivot used by this step [row, column] (0-based), highlighted in the UI. */
+  pivot: [number, number];
+}
+
+export interface GaussResult {
+  steps: GaussStep[];
+  /** Reduced row echelon form. */
+  rref: number[][];
+  rrefLatex: string[][];
+  rank: number;
+  pivots: Array<[number, number]>;
+  exact: boolean;
+  /** For an augmented system [A | b]: the solution type and, when unique, the solution. */
+  system?: { kind: "unique"; x: number[]; xLatex: string[] } | { kind: "none" } | { kind: "infinite"; free: number[] };
+}
+
+function rowLabel(i: number): string {
+  return `R_{${i + 1}}`;
+}
+
+function run<T>(F: Field<T>, M: T[][], augmented: boolean): GaussResult & { exact: boolean } {
+  const rows = M.length;
+  const cols = M[0].length;
+  const varCols = augmented ? cols - 1 : cols;
+  const steps: GaussStep[] = [];
+  const pivots: Array<[number, number]> = [];
+  const snapshot = (op: RowOp, latex: string, pivot: [number, number]) =>
+    steps.push({ op, latex, matrix: M.map((r) => r.map(F.num)), matrixLatex: M.map((r) => r.map(F.latex)), pivot });
+
+  let r = 0;
+  for (let c = 0; c < varCols && r < rows; c++) {
+    // Partial pivoting: the largest |entry| in the column (for exact input, the first non-zero keeps numbers small
+    // only when it is also the largest, so both cases use the largest).
+    let p = -1;
+    for (let i = r; i < rows; i++) if (!F.isZero(M[i][c]) && (p < 0 || F.cmpAbs(M[i][c], M[p][c]) > 0)) p = i;
+    if (p < 0) continue;
+    if (p !== r) {
+      [M[p], M[r]] = [M[r], M[p]];
+      snapshot({ op: "swap", i: r, j: p }, `${rowLabel(r)} \\leftrightarrow ${rowLabel(p)}`, [r, c]);
+    }
+    const pv = M[r][c];
+    if (!F.isOne(pv)) {
+      const k = F.div(F.one, pv);
+      M[r] = M[r].map((v) => F.mul(v, k));
+      M[r][c] = F.one; // exactly 1 after scaling, also in floating point
+      snapshot({ op: "scale", i: r, k: F.num(k) }, `${rowLabel(r)} \\leftarrow ${coef(F, k)}${rowLabel(r)}`, [r, c]);
+    }
+    for (let i = 0; i < rows; i++) {
+      if (i === r || F.isZero(M[i][c])) continue;
+      const k = M[i][c];
+      M[i] = M[i].map((v, j) => F.sub(v, F.mul(k, M[r][j])));
+      M[i][c] = F.zero;
+      const neg = F.cmpAbs(k, F.zero) > 0 && F.num(k) < 0;
+      const mag = neg ? F.neg(k) : k;
+      snapshot(
+        { op: "add", i, j: r, k: -F.num(k) },
+        `${rowLabel(i)} \\leftarrow ${rowLabel(i)} ${neg ? "+" : "-"} ${coef(F, mag)}${rowLabel(r)}`,
+        [r, c],
+      );
+    }
+    pivots.push([r, c]);
+    r++;
+  }
+
+  const result: GaussResult = {
+    steps,
+    rref: M.map((row) => row.map(F.num)),
+    rrefLatex: M.map((row) => row.map(F.latex)),
+    rank: pivots.length,
+    pivots,
+    exact: F === (exactField as unknown as Field<T>),
+  };
+  if (augmented) {
+    const inconsistent = M.some((row) => row.slice(0, varCols).every((v) => F.isZero(v)) && !F.isZero(row[varCols]));
+    if (inconsistent) result.system = { kind: "none" };
+    else if (pivots.length < varCols) {
+      const pivotCols = new Set(pivots.map(([, c]) => c));
+      result.system = { kind: "infinite", free: Array.from({ length: varCols }, (_, j) => j).filter((j) => !pivotCols.has(j)) };
+    } else {
+      const x = pivots.map(([pr]) => M[pr][varCols]);
+      result.system = { kind: "unique", x: x.map(F.num), xLatex: x.map(F.latex) };
+    }
+  }
+  return result;
+}
+
+/** `k` as a coefficient in front of a row label: 1 is omitted, fractions are wrapped. */
+function coef<T>(F: Field<T>, k: T): string {
+  if (F.isOne(k)) return "";
+  const s = F.latex(k);
+  return s.startsWith("-") ? `\\left(${s}\\right)` : s;
+}
+
+/** Gauss-Jordan on A (augmented = false) or on [A | b] (augmented = true, last column is b). */
+export function gaussJordan(A: Mat, augmented = false): GaussResult {
+  if (A.length === 0 || A.some((r) => r.length !== A[0].length)) throw new RangeError("gaussJordan needs a rectangular matrix");
+  const exact = toFractions(A);
+  if (exact) return run(exactField, exact, augmented);
+  const scale = Math.max(...A.flat().map(Math.abs));
+  return run(floatField(scale), A.map((r) => r.slice()), augmented);
+}
+
+/** LaTeX of a matrix (bmatrix), optionally with a vertical bar before the last column and a highlighted pivot. */
+export function matrixToLatex(entries: string[][], options: { augmented?: boolean; pivot?: [number, number] } = {}): string {
+  const cols = entries[0]?.length ?? 0;
+  const body = entries
+    .map((row, i) =>
+      row.map((v, j) => (options.pivot && options.pivot[0] === i && options.pivot[1] === j ? `\\boxed{${v}}` : v)).join(" & "),
+    )
+    .join(" \\\\ ");
+  if (options.augmented) {
+    const spec = `${"c".repeat(cols - 1)}|c`;
+    return `\\left[\\begin{array}{${spec}} ${body} \\end{array}\\right]`;
+  }
+  return `\\begin{bmatrix} ${body} \\end{bmatrix}`;
+}
