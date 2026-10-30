@@ -208,7 +208,7 @@ fi
 BROWSER="Not run."
 if [[ "$PREVIEW_STATUS" == reachable* ]]; then
   if node -e "process.exit(require('./package.json').scripts?.e2e ? 0 : 1)"; then
-    PLAYWRIGHT_BASE_URL="$PREVIEW_URL" pnpm run e2e > "$PIPE/e2e.log" 2>&1 && BROWSER="Passed." || BROWSER="Failed. See e2e output below."
+    PLAYWRIGHT_BASE_URL="$PREVIEW_URL" pnpm run e2e:mathcore > "$PIPE/e2e.log" 2>&1 && BROWSER="Passed." || BROWSER="Failed. See e2e output below."
   else
     BROWSER="Not run: no e2e script (Playwright awaiting tooling approval)."
   fi

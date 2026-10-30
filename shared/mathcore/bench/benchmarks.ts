@@ -120,14 +120,34 @@ export function runBenchmarks(): BenchResult[] {
   };
   const inside = insideTest("<");
   const view = { xmin: -5, xmax: 5, ymin: -3.125, ymax: 3.125, aspect: "equal" as const };
-  add("implicit-400x250-drag", "Implicit field 400×250 during drag", 16, "ms", time(() => {
-    contour(F, view, { width: 400, height: 250, cellPx: IMPLICIT_CELL_PX_DRAG, refine: IMPLICIT_REFINE_DRAG });
-    regionMask(F, view, 400, 250, FIELD_STRIDE_DRAG, inside, IMPLICIT_CELL_PX_DRAG);
-  }));
-  add("implicit-1600x1000-full", "Implicit field 1600×1000 on release (curve + full shading)", 150, "ms", time(() => {
-    contour(F, view, { width: 1600, height: 1000, cellPx: IMPLICIT_CELL_PX_FULL, refine: IMPLICIT_REFINE_FULL });
-    regionMask(F, view, 1600, 1000, FIELD_STRIDE_FULL, inside, IMPLICIT_CELL_PX_FULL);
+  // Exactly the Worker's paths on a 1600×1000 canvas: during a drag the curve uses the drag lattice and the shading is
+  // the 400×250 mask (stride 4); on release the Worker posts that drag frame first, then the full frame.
+  const dragFrame = (G: (x: number, y: number) => number) => {
+    contour(G, view, { width: 1600, height: 1000, cellPx: IMPLICIT_CELL_PX_DRAG, refine: IMPLICIT_REFINE_DRAG });
+    regionMask(G, view, 1600, 1000, FIELD_STRIDE_DRAG, inside, IMPLICIT_CELL_PX_DRAG);
+  };
+  const fullFrame = (G: (x: number, y: number) => number) => {
+    contour(G, view, { width: 1600, height: 1000, cellPx: IMPLICIT_CELL_PX_FULL, refine: IMPLICIT_REFINE_FULL });
+    regionMask(G, view, 1600, 1000, FIELD_STRIDE_FULL, inside, IMPLICIT_CELL_PX_FULL);
+  };
+  add("implicit-400x250-drag", "Implicit field 400×250 during drag (1600×1000 canvas, drag lattice + quarter mask)", 16, "ms", time(() => dragFrame(F)));
+  add("implicit-1600x1000-full", "Implicit field 1600×1000 on release (drag frame, then curve + full shading)", 150, "ms", time(() => {
+    dragFrame(F);
+    fullFrame(F);
   }, 9));
+  // A dense field (concentric rings everywhere): refinement and per-pixel shading cover most of the view. Reported
+  // against the same budgets; parallel strips (§7.1 technique 4) are what would bring it down.
+  const Dc = compile(["Sin", ["Add", ["Power", "x", 2], ["Power", "y", 2]]], { variables: ["x", "y"] });
+  const D = (x: number, y: number) => {
+    xy[0] = x;
+    xy[1] = y;
+    return Dc.evaluate(xy);
+  };
+  add("implicit-dense-drag", "Dense field sin(x²+y²) < 0, 400×250 during drag", 16, "ms", time(() => dragFrame(D), 5));
+  add("implicit-dense-full", "Dense field sin(x²+y²) < 0, 1600×1000 on release", 150, "ms", time(() => {
+    dragFrame(D);
+    fullFrame(D);
+  }, 3));
 
   // Raw evaluation throughput, as a reference figure for the other budgets.
   const n = 200_000;

@@ -9,7 +9,7 @@ import { buildSvg } from "@shared/mathcore/export/svg";
 import { LINK_PARAM, decodeGraph, encodeGraph, exportJson, importJson } from "@shared/mathcore/ir/codec";
 import type { GraphIR, Item, Param, Viewport } from "@shared/mathcore/ir/types";
 import { DEFAULT_VIEWPORT, emptyGraph } from "@shared/mathcore/ir/types";
-import { PARSE_DEBOUNCE_MS } from "@shared/mathcore/constants";
+import { DEFAULT_CURVE_WIDTH, LINK_DEBOUNCE_MS, PARSE_DEBOUNCE_MS } from "@shared/mathcore/constants";
 import { NS } from "../i18n/register";
 import type { DrawCurve, DrawField, DrawPoint, DrawTransform, Scene } from "../render/renderer";
 import { LINALG_TOKENS, PALETTE_TOKENS, resolveColor } from "../render/renderer";
@@ -22,15 +22,10 @@ import type { EngineClient, WorkerLike } from "../workers/engineClient";
 import { createEngineClient } from "../workers/engineClient";
 import type { ParseClient, ParseWorkerLike } from "../workers/parseClient";
 import { createParseClient } from "../workers/parseClient";
-import type { ParsedEntry } from "../workers/parseProtocol";
 import type { EngineResponse, ItemResult } from "../workers/protocol";
 import { mergeParams } from "./mergeParams";
 import "../mathcore.css";
 
-/** The link in the address bar is refreshed this long after the last change. */
-const LINK_DEBOUNCE_MS = 500;
-/** Default curve width when an item has no style (canvas drawing units). */
-const DEFAULT_WIDTH = 2.5;
 
 /** Theory section (STEPS.md §4, repo rule: every studio has one); loaded after the graph is usable. */
 const SimulationDocumentation = lazy(() => import("@/components/simulations/SimulationDocumentation"));
@@ -82,10 +77,16 @@ export default function MathcorePage() {
   const [canvasEl, setCanvasEl] = useState<HTMLCanvasElement | null>(null);
   const client = useRef<EngineClient | null>(null);
   const parser = useRef<ParseClient | null>(null);
-  const lastParsed = useRef<Record<string, ParsedEntry>>({});
   const loadRound = useRef(0);
-  /** Key of the document the engine Worker last reported (items and slider ranges). */
+  /**
+   * Key (items and slider ranges) of the document the engine holds or is about to hold: set when a document is sent,
+   * then from each answer (only answers to the latest request arrive). Comparing against what was sent, not only
+   * what was answered, means an edit undone before its answer arrives is still sent (Phase 3 re-review defect 1).
+   */
   const engineKey = useRef("");
+  /** The next load is an unrelated document (first load, import, Worker restart): the engine forgets slider memory. */
+  const freshDoc = useRef(true);
+  const sendDocument = useRef<() => void>(() => undefined);
   const graphRef = useRef(graph);
   useEffect(() => {
     graphRef.current = graph;
@@ -124,7 +125,9 @@ export default function MathcorePage() {
       onTrace: setTrace,
       onRestart: () => {
         setNotice(t("engineRestarted"));
-        c.send({ type: "load", graph: graphRef.current, parsed: lastParsed.current, view: view("full") });
+        // The new Worker starts empty: parse the current document again and send it as a fresh one.
+        freshDoc.current = true;
+        sendDocument.current();
       },
     });
     client.current = c;
@@ -141,22 +144,32 @@ export default function MathcorePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /**
+   * Parse (parse Worker, 200 ms limit per line), then hand the document and its parsed lines to the engine. The
+   * items sent are exactly the ones parsed (a keystroke during the parse starts its own round); slider values are the
+   * latest. A newer round makes this one stale; only the latest round reaches the engine.
+   */
+  useEffect(() => {
+    sendDocument.current = () => {
+      const round = ++loadRound.current;
+      const items = graphRef.current.items;
+      void parser.current?.parseAll(items.map((i) => i.latex)).then((parsed) => {
+        if (round !== loadRound.current) return;
+        const doc = { ...graphRef.current, items };
+        engineKey.current = documentKey(doc);
+        const fresh = freshDoc.current;
+        freshDoc.current = false;
+        client.current?.send({ type: "load", graph: doc, parsed, view: view("full"), fresh });
+      });
+    };
+  }, [view]);
+
   // Items or parameter ranges changed: send the document, debounced (STEPS.md §7.1 technique 5).
   const docKey = useMemo(() => documentKey(graph), [graph]);
   useEffect(() => {
-    // The engine already holds this document (for example a slider it just created itself): nothing to send.
+    // The engine holds or is about to hold this document (for example a slider it just created itself).
     if (docKey === engineKey.current) return;
-    const id = setTimeout(() => {
-      // Parse (parse Worker, 200 ms limit per line), then hand the document and its parsed lines to the engine.
-      // A newer edit makes this round stale; only the latest round reaches the engine.
-      const round = ++loadRound.current;
-      const doc = graphRef.current;
-      void parser.current?.parseAll(doc.items.map((i) => i.latex)).then((parsed) => {
-        if (round !== loadRound.current) return;
-        lastParsed.current = parsed;
-        client.current?.send({ type: "load", graph: graphRef.current, parsed, view: view("full") });
-      });
-    }, PARSE_DEBOUNCE_MS);
+    const id = setTimeout(() => sendDocument.current(), PARSE_DEBOUNCE_MS);
     return () => clearTimeout(id);
   }, [docKey, view]);
 
@@ -231,7 +244,7 @@ export default function MathcorePage() {
       // A strict inequality (< or >) does not include its boundary, so the boundary is dashed.
       const strict = r.relation === "<" || r.relation === ">";
       if (r.segments.length) {
-        curves.push({ segments: r.segments, color: colors[i], width: it.style?.width ?? DEFAULT_WIDTH, dash: it.style?.dash ?? (strict ? "dashed" : undefined), highlighted: trace?.id === it.id });
+        curves.push({ segments: r.segments, color: colors[i], width: it.style?.width ?? DEFAULT_CURVE_WIDTH, dash: it.style?.dash ?? (strict ? "dashed" : undefined), highlighted: trace?.id === it.id, smooth: r.kind === "Implicit" });
       }
       if (r.point) points.push({ x: r.point.x, y: r.point.y, color: colors[i], label: r.label });
     });
@@ -304,7 +317,10 @@ export default function MathcorePage() {
   const onImport = async (file: File | undefined) => {
     if (!file) return;
     const r = importJson(await file.text());
-    if (r.ok) setGraph(r.graph);
+    if (r.ok) {
+      freshDoc.current = true;
+      setGraph(r.graph);
+    }
     else setNotice(t("importFailed"));
   };
 

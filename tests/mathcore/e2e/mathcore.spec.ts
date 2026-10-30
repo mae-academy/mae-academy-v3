@@ -179,3 +179,19 @@ test.describe("Phase 4: 2×2 linear algebra", () => {
     await expect(page.getByTestId("mc-linalg").nth(1)).toContainText("Solution");
   });
 });
+
+test("implicit fields run on parallel strip Workers and shade correctly across strip borders", async ({ page }) => {
+  const strips: string[] = [];
+  page.on("request", (r) => {
+    if (r.url().includes("mathcore-strip-worker")) strips.push(r.url());
+  });
+  await page.goto(link(doc([["c", "x^2+y^2<4"]])));
+  await ready(page);
+  const cores = await page.evaluate(() => navigator.hardwareConcurrency);
+  await expect(page.locator(".mc-details").first()).toContainText("shaded region", { timeout: 15_000, useInnerText: false });
+  if (cores >= 3) expect(strips.length).toBeGreaterThan(0);
+  // Inside near the top and bottom of the disc (different strips) and outside; all points off the grid lines.
+  const bg = await pixelAt(page, -4.7, -2.7);
+  for (const [x, y] of [[0.1, 1.7], [0.1, -1.7], [1.1, 0.3]]) expect(await pixelAt(page, x, y)).not.toEqual(bg);
+  expect(await pixelAt(page, 3.1, 2.3)).toEqual(bg);
+});

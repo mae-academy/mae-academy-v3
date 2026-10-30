@@ -1,6 +1,6 @@
 /**
- * Mathcore browser tests (STEPS.md §10). Locally: `pnpm run build && pnpm run e2e` (serves dist with vite preview).
- * Against a deployment: PLAYWRIGHT_BASE_URL=<preview URL> pnpm run e2e (the pipeline does this, step 6).
+ * Mathcore browser tests (STEPS.md §10). Locally: `pnpm run build && pnpm run e2e:mathcore` (serves dist with vite preview).
+ * Against a deployment: PLAYWRIGHT_BASE_URL=<preview URL> pnpm run e2e:mathcore (the pipeline does this, step 6).
  * MATHCORE_CHROMIUM points at a pre-installed Chromium when the bundled browsers are not downloaded.
  */
 import { defineConfig } from "@playwright/test";

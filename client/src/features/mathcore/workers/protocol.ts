@@ -18,7 +18,8 @@ export interface ViewRequest {
 
 export type EngineRequest =
   /** `parsed` holds the parse Worker's result for every item's LaTeX. */
-  | { type: "load"; seq: number; graph: GraphIR; parsed: Record<string, ParsedEntry>; view: ViewRequest }
+  /** `fresh`: an unrelated document (import, link); sliders forget what the previous document remembered. */
+  | { type: "load"; seq: number; graph: GraphIR; parsed: Record<string, ParsedEntry>; view: ViewRequest; fresh?: boolean }
   | { type: "param"; seq: number; name: string; value: number; view: ViewRequest }
   | { type: "view"; seq: number; view: ViewRequest }
   | { type: "bench"; seq: number }
@@ -36,8 +37,8 @@ export interface ItemResult {
   value?: number;
   description?: CurveDescription;
   precisionWarning?: boolean;
-  /** Inequality shading: one byte per sample, row 0 at the top (ImageData order). */
-  field?: { width: number; height: number; data: Uint8Array };
+  /** Inequality shading: one byte per sample, row 0 at the top (ImageData order), over `viewport`. */
+  field?: { width: number; height: number; data: Uint8Array; viewport: Viewport };
   /** For implicit items: `=`, `<`, `<=`, `>` or `>=` (strict inequalities draw a dashed boundary). */
   relation?: string;
   /** For a point whose coordinates are single parameters, the parameters a drag changes. */
@@ -73,8 +74,12 @@ export type EngineResponse =
       reevaluated: string[];
       /** The request this answers; a `load` answer may carry slider values that the document text changed. */
       cause: "load" | "param" | "view";
+      /** The quarter-resolution frame of a progressive answer; the full frame follows under the same sequence. */
+      partial?: boolean;
       ms: number;
     }
+  /** The request had nothing to act on (no document loaded yet); it only stops the watchdog. */
+  | { type: "skipped"; seq: number }
   | { type: "bench"; seq: number; results: unknown }
   | { type: "trace"; seq: number; id: string; x: number; y: number; slope: number | null }
   | { type: "error"; seq: number; message: string };

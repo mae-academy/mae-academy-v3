@@ -50,8 +50,8 @@ export const IMPLICIT_CELL_PX_FULL = 6;
 export const IMPLICIT_CELL_PX_DRAG = 12;
 export const IMPLICIT_REFINE_FULL = 4;
 export const IMPLICIT_REFINE_DRAG = 2;
-/** Bisections per sign change on a lattice edge (accuracy 2⁻¹² of a fine cell, and the pole test). */
-export const CROSSING_BISECTIONS = 12;
+/** Bisections per sign change on a lattice edge (accuracy 2⁻⁸ of a fine cell, then linear interpolation; and the pole test). */
+export const CROSSING_BISECTIONS = 8;
 /** A coarse cell whose corner is within this many cell-widths of zero at the local slope is refined. */
 export const NEAR_ZERO_CELLS = 1.5;
 /** Curve ends closer than this many fine-cell diagonals are joined. */
@@ -93,3 +93,37 @@ export const LINEARITY_PROBES: readonly (readonly number[])[] = [
 export const LINEARITY_RELATIVE_TOLERANCE = 1e-9;
 /** Opacity of the grid transformed by a 2×2 matrix (STEPS.md §8.2), over the plain grid. */
 export const TRANSFORM_GRID_OPACITY = 0.45;
+/** Bisection step at which the pole test records the bracket spread (compared with the spread at the end). */
+export const POLE_TEST_STEP = 4;
+/** A crossing is a zero when the final bracket spread is at most this fraction of the early one (a zero gives ~2⁻⁸). */
+export const ROOT_SPREAD_RATIO = 0.5;
+/** Distance from the view border, relative to the view span, at which a curve end counts as leaving the view. */
+export const VIEW_BORDER_RELATIVE = 1e-9;
+/** Smallest shading block, in mask pixels (a block of 1 would be per-pixel evaluation with extra cost). */
+export const MASK_MIN_BLOCK = 2;
+/** Blocks at least this many mask pixels wide are also probed at their edge midpoints, not only at the centre. */
+export const MASK_EDGE_PROBE_BLOCK = 4;
+/** A Worker that has not answered yet may still be downloading its code (Compute Engine): first-request limit. */
+export const PARSE_LOAD_TIMEOUT_MS = 30_000;
+export const ENGINE_LOAD_TIMEOUT_MS = 30_000;
+/** Parsed LaTeX strings kept by the page (the oldest are dropped first). */
+export const PARSE_CACHE_LIMIT = 2000;
+/** A string that timed out this many times on a running parser is cached as too slow (once may be a busy machine). */
+export const PARSE_TIMEOUTS_BEFORE_CACHE = 2;
+/** Endpoint tail exponents within this of 1 count as not integrable (∫ u^(−α) diverges at α = 1). */
+export const TAIL_ALPHA_MARGIN = 1e-3;
+/** A tanh-sinh node is used while its rounded abscissa is within this relative error of its intended endpoint distance. */
+export const ABSCISSA_RELATIVE = 0.25;
+/** Relative model error assumed for an endpoint tail f·d/(1 − α) when bounding the error (measured: ~1%). */
+export const TAIL_MODEL_UNCERTAINTY = 0.05;
+/** Address-bar link refresh delay after the last change. */
+export const LINK_DEBOUNCE_MS = 500;
+/** Curve width when an item has no style (canvas drawing units). */
+export const DEFAULT_CURVE_WIDTH = 2.5;
+/** Polar θ and parametric t run over [0, PARAMETER_TURN] (one full turn, as in Desmos). */
+export const PARAMETER_TURN = 2 * Math.PI;
+/** Adaptive sampling: points per curve (the 2000-sample budget with refinement headroom) and bisection depth. */
+export const SAMPLE_MAX_POINTS = 4000;
+export const SAMPLE_MAX_DEPTH = 8;
+/** Strip Workers for implicit fields (§7.1 technique 4; §7.2 plans four Workers for the heaviest fields). */
+export const STRIP_WORKERS_MAX = 4;

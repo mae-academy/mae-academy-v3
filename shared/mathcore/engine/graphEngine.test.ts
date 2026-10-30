@@ -204,3 +204,60 @@ describe("GraphEngine: matrices and systems (Phase 4)", () => {
     expect(e.item("i1")?.errors[0]?.message).toMatch(/finite/);
   });
 });
+
+describe("GraphEngine: Phase 3 re-review regressions", () => {
+  it("a line that failed to parse (parser unavailable) parses on the next load that brings it", () => {
+    let online = false;
+    const flaky = (latex: string): unknown => {
+      if (!online) throw new Error("The math parser could not load");
+      return parser(latex);
+    };
+    const e = new GraphEngine(flaky, doc(["y=x^2"]));
+    expect(e.item("i1")?.errors[0]?.message).toMatch(/could not load/);
+    online = true;
+    e.load(doc(["y=x^2"]));
+    expect(e.item("i1")?.errors).toEqual([]);
+    expect(e.runtime("i1")?.kind).toBe("Explicit");
+  });
+
+  it("retyping a slider's number through an empty or invalid line moves the slider (a=5 → a= → a=7)", () => {
+    const e = new GraphEngine(parser, doc(["a=5", "y=ax"]));
+    expect(e.graph.params.a.value).toBe(5);
+    e.load({ ...e.graph, items: [{ id: "i1", latex: "a=" }, { id: "i2", latex: "y=ax" }] });
+    e.load({ ...e.graph, items: [{ id: "i1", latex: "a=7" }, { id: "i2", latex: "y=ax" }] });
+    expect(e.graph.params.a.value).toBe(7);
+    const rt = e.runtime("i2");
+    if (rt?.kind !== "Explicit") throw new Error("expected a curve");
+    expect(rt.f(1)).toBe(7);
+    // Through an empty line too.
+    e.load({ ...e.graph, items: [{ id: "i1", latex: "" }, { id: "i2", latex: "y=ax" }] });
+    e.load({ ...e.graph, items: [{ id: "i1", latex: "a=2" }, { id: "i2", latex: "y=ax" }] });
+    expect(e.graph.params.a.value).toBe(2);
+  });
+
+  it("an empty row does not stop pruning; a slider seen only while typing is still pruned later", () => {
+    const e = new GraphEngine(parser, doc(["y=ax", ""]));
+    expect(e.graph.params.a).toBeDefined();
+    e.load({ ...e.graph, items: [{ id: "i1", latex: "y=x" }, { id: "i2", latex: "" }] });
+    expect(e.graph.params.a).toBeUndefined();
+    // b appears while another line is mid-typing, then disappears; once typing ends it is pruned.
+    e.load({ ...e.graph, items: [{ id: "i1", latex: "y=bx" }, { id: "i2", latex: "y=\\sin(" }] });
+    expect(e.graph.params.b).toBeDefined();
+    e.load({ ...e.graph, items: [{ id: "i1", latex: "y=x" }, { id: "i2", latex: "y=\\sin(" }] });
+    e.load({ ...e.graph, items: [{ id: "i1", latex: "y=x" }, { id: "i2", latex: "y=\\sin(x)" }] });
+    expect(e.graph.params.b).toBeUndefined();
+  });
+
+  it("a fresh document keeps its own unused slider even if the previous document used that name", () => {
+    const e = new GraphEngine(parser, doc(["y=ax"]));
+    e.load(doc(["y=x"], { a: { value: 3, min: -10, max: 10, step: 0.1 } }), { fresh: true });
+    expect(e.graph.params.a).toEqual({ value: 3, min: -10, max: 10, step: 0.1 });
+  });
+
+  it("the parse cache holds only the current document's lines", () => {
+    const e = new GraphEngine(parser, doc(["y=x"]));
+    for (let k = 0; k < 50; k++) e.load(doc([`y=x+${k}`]));
+    const size = (e as unknown as { parseCache: Map<string, unknown> }).parseCache.size;
+    expect(size).toBeLessThanOrEqual(2);
+  });
+});

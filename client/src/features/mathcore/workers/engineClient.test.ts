@@ -64,15 +64,45 @@ describe("engine client (STEPS.md §7.1, §7.3, §9)", () => {
     expect(restarts).toEqual([]);
   });
 
-  it("an error reply does not count as a started Worker", () => {
+  it("an error reply counts as a started Worker: later requests get the 5 s limit (Phase 3 re-review)", () => {
     const w = new FakeWorker();
     const restarts: string[] = [];
     const c = createEngineClient({ createWorker: () => w, onResult: () => {}, onRestart: (r) => restarts.push(r) });
     c.send({ type: "view", view });
     w.reply({ type: "error", seq: 1, message: "boom" });
     c.send({ type: "view", view });
-    vi.advanceTimersByTime(10_000);
+    vi.advanceTimersByTime(5000);
+    expect(restarts).toEqual(["timeout"]);
+  });
+
+  it("a partial (progressive) frame is delivered but keeps the watchdog for the full frame", () => {
+    const workers: FakeWorker[] = [];
+    const restarts: string[] = [];
+    const seen: boolean[] = [];
+    const c = createEngineClient({
+      createWorker: () => (workers.push(new FakeWorker()), workers[workers.length - 1]),
+      onResult: (r) => r.type === "result" && seen.push(!!r.partial),
+      onRestart: (r) => restarts.push(r),
+    });
+    c.send({ type: "view", view });
+    workers[0].reply(result(1));
+    c.send({ type: "view", view });
+    workers[0].reply({ ...(result(2) as Extract<EngineResponse, { type: "result" }>), partial: true });
+    vi.advanceTimersByTime(5000);
+    expect(seen).toEqual([false, true]);
+    expect(restarts).toEqual(["timeout"]);
+  });
+
+  it("a skipped reply (no document yet) stops the watchdog and is not delivered", () => {
+    const w = new FakeWorker();
+    const restarts: string[] = [];
+    const results: unknown[] = [];
+    const c = createEngineClient({ createWorker: () => w, onResult: (r) => results.push(r), onRestart: (r) => restarts.push(r) });
+    c.send({ type: "view", view });
+    w.reply({ type: "skipped", seq: 1 });
+    vi.advanceTimersByTime(60_000);
     expect(restarts).toEqual([]);
+    expect(results).toEqual([]);
   });
 
   it("gives the first load (Compute Engine download) a longer limit", () => {

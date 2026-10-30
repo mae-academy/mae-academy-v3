@@ -19,6 +19,7 @@ import { inferType } from "../infer/inferType";
 import type { ParseError, ParseResult, RawParser } from "../parse/parse";
 import { parseLatex } from "../parse/parse";
 import type { GraphIR, Item, Param } from "../ir/types";
+import type { ImplicitSource } from "../implicit/source";
 
 export interface ItemState {
   id: string;
@@ -50,6 +51,8 @@ const NUMERIC_KINDS = new Set(["Scalar", "Value"]);
 export class GraphEngine {
   private graphDoc: GraphIR;
   private readonly parseCache = new Map<string, ParseResult>();
+  /** Cache keys used by the current rebuild; the rest are dropped after it (one entry per keystroke otherwise). */
+  private parseKeys = new Set<string>();
   /** Literal each scalar item had at the last rebuild: a changed literal moves its slider, an unchanged one does not. */
   private readonly lastLiteral = new Map<string, number>();
   /** Names used by some line at the last rebuild without parse errors (pruning removes only names dropped since). */
@@ -90,6 +93,21 @@ export class GraphEngine {
     return this.runtimes.get(id) ?? null;
   }
 
+  /**
+   * What a strip Worker needs to rebuild an implicit item's F (STEPS.md §7.1 technique 4): the expression, the
+   * variable order (x, y, then the environment), the current environment values and the user functions.
+   */
+  implicitSource(id: string): ImplicitSource | null {
+    const it = this.item(id);
+    if (!it || it.errors.length > 0 || it.type.kind !== "Implicit" || !this.runtimes.get(id)) return null;
+    return {
+      F: it.type.F,
+      variables: ["x", "y", ...this.envNames],
+      env: Array.from(this.envValues),
+      functions: Array.from(this.functions.entries()),
+    };
+  }
+
   value(name: string): number | undefined {
     return this.values.get(name);
   }
@@ -98,8 +116,17 @@ export class GraphEngine {
     return this.dag.cycles;
   }
 
-  /** Replaces the document (new link, undo, MAE AI output). */
-  load(graph: GraphIR): void {
+  /**
+   * Replaces the document. Parse failures are dropped from the cache first: they may come from the parser being
+   * unavailable or slow, and the caller brings fresh parses with each load. `fresh` marks an unrelated document (an
+   * import or a link), so what the previous document's sliders remembered does not carry over.
+   */
+  load(graph: GraphIR, options: { fresh?: boolean } = {}): void {
+    for (const [key, r] of Array.from(this.parseCache.entries())) if (!r.ok) this.parseCache.delete(key);
+    if (options.fresh) {
+      this.lastLiteral.clear();
+      this.lastUsed = new Set();
+    }
     this.graphDoc = graph;
     this.rebuild();
   }
@@ -137,6 +164,7 @@ export class GraphEngine {
 
   private parse(latex: string, functions: ReadonlySet<string>): ParseResult {
     const key = `${Array.from(functions).sort().join(",")}|${latex}`;
+    this.parseKeys.add(key);
     let r = this.parseCache.get(key);
     if (!r) {
       r = parseLatex(latex, this.parser, { functions });
@@ -148,6 +176,7 @@ export class GraphEngine {
   private rebuild(): void {
     // Pass 1 finds function definitions; pass 2 parses with them so `f(x)` is a call.
     let fnNames = new Set<string>();
+    this.parseKeys = new Set();
     for (let pass = 0; pass < 3; pass++) {
       const states = this.graphDoc.items.map((it) => this.analyze(it, fnNames));
       const next = new Set(states.filter((s) => s.type.kind === "FunctionDef").flatMap((s) => s.defines));
@@ -155,6 +184,8 @@ export class GraphEngine {
       if (next.size === fnNames.size && Array.from(next).every((n) => fnNames.has(n))) break;
       fnNames = next;
     }
+
+    for (const key of Array.from(this.parseCache.keys())) if (!this.parseKeys.has(key)) this.parseCache.delete(key);
 
     this.dag = buildDag(this.items);
     for (const cycle of this.dag.cycles) {
@@ -243,12 +274,10 @@ export class GraphEngine {
     // Literal scalar items are sliders: they get a parameter entry holding the literal as its value, and retyping
     // the literal (a = 2 → a = 5) moves the slider; leaving it alone keeps wherever the slider was dragged to.
     const conflicted = new Set(this.dag.conflicts.map((c) => c.name));
-    const literals = new Set<string>();
     for (const it of this.items) {
       if (it.type.kind !== "Scalar" || it.type.literal === null || conflicted.has(it.type.name) || it.errors.length > 0) continue;
       const name = it.type.name;
       const v = it.type.literal;
-      literals.add(name);
       const existing = params[name];
       if (!existing) {
         if (count >= MAX_PARAMS) continue;
@@ -261,7 +290,8 @@ export class GraphEngine {
       }
       this.lastLiteral.set(name, v);
     }
-    for (const name of Array.from(this.lastLiteral.keys())) if (!literals.has(name)) this.lastLiteral.delete(name);
+    // The literal is remembered as long as its slider exists, so retyping through an empty or invalid line
+    // (a = 5 → a = → a = 7) still moves the slider; it is forgotten with the slider (below).
     for (const it of this.items) {
       for (const name of it.uses) {
         if (defined.has(name) || params[name] || RESERVED_SYMBOLS.has(name)) continue;
@@ -278,8 +308,10 @@ export class GraphEngine {
     // A slider whose last use was deleted goes away with it (and stops counting toward the limit). While any line has
     // a parse error (mid-typing: y = a\sin( ), nothing is pruned, so the slider keeps its range and value; a parameter
     // that came with the document and was never used is kept too.
+    // An empty line is not a line being typed: it does not stop pruning. While typing, names used now are added to
+    // what is remembered, so a slider that appears and disappears mid-typing is still pruned later.
     const used = new Set(this.items.flatMap((i) => i.uses));
-    const typing = this.items.some((i) => !i.parse.ok);
+    const typing = this.items.some((i) => !i.parse.ok && i.latex.trim() !== "");
     if (!typing) {
       for (const name of Object.keys(params)) {
         if (this.lastUsed.has(name) && !used.has(name) && !defined.has(name)) {
@@ -288,7 +320,10 @@ export class GraphEngine {
         }
       }
       this.lastUsed = used;
+    } else {
+      used.forEach((n) => this.lastUsed.add(n));
     }
+    for (const name of Array.from(this.lastLiteral.keys())) if (!params[name]) this.lastLiteral.delete(name);
     if (changed) this.graphDoc = { ...this.graphDoc, params };
   }
 

@@ -39,27 +39,60 @@ Added in this round:
   LaTeX string, and the engine Worker receives the parsed lines with each document. `parseClient.test.ts`.
 - **Progressive display**: with implicit items, a quarter-resolution frame is posted before the full one.
 - **Request queue**: one request per task, then yield, so superseded requests are skipped (`requestQueue.test.ts`).
-- **Browser tests** committed: `tests/mathcore/e2e/mathcore.spec.ts` (`pnpm run e2e`, 9 tests): card → route, zero
+- **Browser tests** committed: `tests/mathcore/e2e/mathcore.spec.ts` (`pnpm run e2e:mathcore`): card → route, zero
   mathcore bytes on `/`, sliders and dependent-only updates, errors and cycles, retyped literal, shading inside vs
-  outside, tangent slope, corrupt link, Arabic RTL.
+  outside, tangent slope, corrupt link, Arabic RTL, strip Workers.
+
+## Re-review round (Phase 3 re-review of 4ebf055)
+
+| # | Finding | Fix | Evidence |
+|---|---|---|---|
+| 1 | Undoing an edit before its answer arrived left the old curve | the page records the document it *sent* as the engine's document, then each answer's | `MathcorePage.tsx` (`sendDocument`, `engineKey`) |
+| 2 | A failed parse stayed cached (offline, slow start, crash) | parse client caches only parses, syntax errors and a timeout seen twice on a running parser; an "unavailable" reply does not mark the parser started; the engine drops cached failures on each load; the page sends exactly the items it parsed; a restarted Worker gets a fresh parse | `parseClient.test.ts` (offline, crash, start-up and repeated timeouts), `graphEngine.test.ts` |
+| 3 | `a=5 → a= → a=7` left the slider at 5 | a literal is remembered while its slider exists | `graphEngine.test.ts` |
+| 4 | A lattice point next to a pole let the asymptote through | the pole test compares the bracket spread early and late in the bisection (shrinks at a zero, grows at a pole, stays at a jump), never the corner values | `y = 1/(x − 0.5)` on the reviewer's views and three more, `1/(x−1)³`, `tan x`, `floor` |
+| 5 | Stitching was ~cubic (6.3 s for `tan x tan y = 1` at ±60) | ends bucketed in a grid, pairs matched closest first, chains walked once | 4000 shuffled fragments in < 300 ms; the ±60 case contours in < 1 s, every vertex on cos(x + y) = 0 |
+| 6 | The full frame after a progressive frame had no watchdog | the quarter frame is marked `partial`; the client keeps the timer for the full frame | `engineClient.test.ts` |
+| 7 | Shading aliased with patterns at the block spacing (47% wrong) | each block not refined by its corners is probed at its centre (and edge midpoints for blocks ≥ 4 mask pixels) | `sin 40x · sin 40y` at ±20, ±21, ±22 and stripes of 1 and 2 blocks: < 2% vs per-pixel |
+| 8 | Blocks with all corners undefined were skipped | the same probes (mask) and a centre probe (contour) find defined slivers | `y < √(0.0004 − x²)`: same shaded count as per-pixel, curve drawn |
+| 9 | Unused sliders kept or removed wrongly | empty lines are not "typing"; names seen while typing are remembered; an import or a restarted Worker is a fresh document | `graphEngine.test.ts` |
+| 10 | `param`/`view` before any document got no answer | the Worker answers `skipped`, which stops the watchdog | `engineClient.test.ts` |
+| 11 | tanh-sinh reported convergence on a 7-digit answer | the stretch next to an endpoint that no double reaches is added analytically (f ≈ C·d^(−α), α < 1); a side ends at the first node whose abscissa no longer represents its distance; `estimatedError` bounds the error when the noise floor is used | ∫₋₁¹ 1/√(1−x²): error 1.8e-10 (was 2.2e-8); nine integrable and seven divergent cases in `integrate.test.ts` |
+| 12 | Shading stretched over the current view while panning | the mask carries its viewport and is drawn there | `renderer.ts` |
+| 13 | Unbounded engine parse cache | only the current document's lines are kept | `graphEngine.test.ts` |
+| §7.1-4 | Parallel strips not built | the engine Worker splits each field into cell- and block-aligned strips over up to four strip Workers (one per spare core), stitches curves across strip borders and concatenates mask rows; a failed strip Worker falls back to this Worker | `strips.test.ts`, `stripPool.test.ts`, e2e "strip Workers" |
+| §7.3 | Contours not smoothed | implicit curves are drawn with quadratic curves through segment midpoints | `renderer.ts` |
+| — | Benchmark did not time what the Worker runs | the drag case is the Worker's drag path on a 1600×1000 canvas; release is the drag frame plus the full frame; a dense field was added | `benchmarks.ts` |
+| — | Loose constants | timeouts, cache sizes, link debounce, default width, parameter turn, sampling limits and the new tolerances are in `constants.ts`; the e2e script is `e2e:mathcore` | — |
+
+Other changes: 8 bisections per crossing instead of 12 (crossings still placed to 2⁻⁸ of a fine cell, then interpolated);
+saddles decided by F at the cell centre; lattice slopes computed once per lattice point.
 
 ## Exit criterion: implicit field budget at quarter resolution
 
-| Case (STEPS.md §7.2) | Target | Measured here |
-|---|---|---|
-| Implicit field 400×250 during drag | ≤ 16 ms | 2.6–3.0 ms |
-| Implicit field 1600×1000 on release | ≤ 150 ms | 70 ms (curve + full-resolution shading) |
+Reference F = x² + y² + sin 3x · cos 2y < 9 (the engine's compiled closure), view ±5, canvas 1600×1000.
 
-Both use the engine's compiled closure for x² + y² + sin 3x · cos 2y < 9 and include the curve and the shading.
-They are reference figures from the cloud machine; D1 laptop numbers are still open (Phase 0 item 5). Parallel
-strips (§7.1 technique 4) are not needed for the budget and are not built.
+| Case (STEPS.md §7.2) | Target | Node, one thread | Chromium, engine Worker + 3 strip Workers (4 cores) |
+|---|---|---|---|
+| Field 400×250 during drag (drag lattice + quarter mask) | ≤ 16 ms | 10–12 ms | 7.7 ms |
+| Field 1600×1000 on release (quarter frame, then full frame) | ≤ 150 ms | 94 ms | 75.7 ms |
+| Dense sin(x² + y²) < 0, drag | ≤ 16 ms | 20–30 ms (fails) | 10.1 ms |
+| Dense sin(x² + y²) < 0, release | ≤ 150 ms | 122–154 ms | 84.6 ms |
+
+Chromium figures are round trips measured from the page (message passing and copies included). They are reference
+figures from the cloud machine; D1 laptop numbers are still open (Phase 0 item 5). On a machine with fewer than three
+cores no strip Workers are started and the single-thread column applies.
 
 ## Known limits
 
 - F that touches zero without changing sign (x² + y² = 0, (x − y)² = 0) is not drawn by any sign-based method.
-- Features narrower than one fine lattice cell (1.5 px at full quality; two lines 0.8 px apart) are not resolved.
-- A step discontinuity of a bounded F (floor) is drawn as a vertical segment, as a sign change that does not grow.
+- Features narrower than about one fine lattice cell (1.5 px at full quality) may be missed; patterns finer than half
+  a shading block can still alias (the probes catch periods of one and two blocks).
+- An endpoint singularity at the right end of an interval stronger than (1 − x)^(−0.5) (for example (1 − x)^(−0.75)) is
+  reported as not converged: doubles near 1 are too sparse for the tail fit. At a left end at 0 it converges.
 - SVG export contains curves only; shading is in PNG export (ADR-7: no SVG for fields).
 - Full-quality responses copy the shading mask of every inequality (about 1.6 MB per item at 1600×1000).
 - Chained inequalities (`0 < x < 1`) are rejected with an explanation; restrictions `{0<x<1}` work on explicit curves.
 - Inequality fill color is the item color at 20% opacity; `style.fill` is not used yet.
+- Visual snapshot tests (§10, ≤ 0.5% pixels) are not added: their baseline images would be new human-owned
+  baselines (`docs/mathcore/baselines/`), which need the owner's approval. The e2e tests check pixels at chosen points.

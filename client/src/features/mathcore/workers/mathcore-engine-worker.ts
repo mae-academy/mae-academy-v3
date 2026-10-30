@@ -7,10 +7,11 @@ import { bench } from "./benchEntry";
 import { centralDifference } from "@shared/mathcore/calculus/derivative";
 import { describeExplicit, describeExtent } from "@shared/mathcore/describe/describe";
 import {
-  FIELD_STRIDE_DRAG, FIELD_STRIDE_FULL, IMPLICIT_CELL_PX_DRAG, SAMPLE_DRAG_FACTOR, SAMPLE_INITIAL_FULL, SAMPLE_INITIAL_MIN, IMPLICIT_CELL_PX_FULL, IMPLICIT_REFINE_DRAG, IMPLICIT_REFINE_FULL,
+  FIELD_STRIDE_DRAG, FIELD_STRIDE_FULL, IMPLICIT_CELL_PX_DRAG, PARAMETER_TURN, SAMPLE_DRAG_FACTOR, SAMPLE_INITIAL_FULL, SAMPLE_INITIAL_MIN, IMPLICIT_CELL_PX_FULL, IMPLICIT_REFINE_DRAG, IMPLICIT_REFINE_FULL, STRIP_WORKERS_MAX,
 } from "@shared/mathcore/constants";
 import { GraphEngine } from "@shared/mathcore/engine/graphEngine";
-import { contour, insideTest, regionMask } from "@shared/mathcore/implicit/marching";
+import { implicitField } from "@shared/mathcore/implicit/strips";
+import type { FieldOptions, FieldResult } from "@shared/mathcore/implicit/strips";
 import { DISPLAY_DIGITS, analyzeMatrix, analyzeSystem, symbolLatex } from "@shared/mathcore/linalg/analyze";
 import type { MatrixAnalysis, SystemAnalysis } from "@shared/mathcore/linalg/analyze";
 import { systemLines2, transform2 } from "@shared/mathcore/linalg/transform2";
@@ -20,13 +21,47 @@ import type { SampleResult } from "@shared/mathcore/sample/adaptive";
 import type { ParsedEntry } from "./parseProtocol";
 import type { EngineRequest, EngineResponse, ItemResult, ViewRequest } from "./protocol";
 import { superseded } from "./requestQueue";
+import { createStripPool } from "./stripPool";
+import type { StripPool, StripWorkerLike } from "./stripPool";
 
 declare const self: DedicatedWorkerGlobalScope;
 
-/** Polar and parametric parameter ranges (one full turn; Desmos-like default). */
-const TURN = 2 * Math.PI;
 
 let engine: GraphEngine | null = null;
+
+/**
+ * Strip Workers for implicit fields (STEPS.md §7.1 technique 4): one per spare core, up to STRIP_WORKERS_MAX, and
+ * none on a machine with fewer than three cores (two strips on one spare core gain nothing). If a strip Worker fails
+ * the pool is closed and this Worker computes fields itself from then on.
+ */
+const STRIP_WORKERS = Math.min(STRIP_WORKERS_MAX, Math.max(0, (self.navigator?.hardwareConcurrency ?? 1) - 1));
+let pool: StripPool | null = null;
+function stripPool(): StripPool | null {
+  if (pool || STRIP_WORKERS < 2 || typeof Worker === "undefined") return pool;
+  try {
+    pool = createStripPool(
+      STRIP_WORKERS,
+      () => new Worker(new URL("./mathcore-strip-worker.ts", import.meta.url), { type: "module" }) as unknown as StripWorkerLike,
+    );
+  } catch {
+    pool = null;
+  }
+  return pool;
+}
+
+async function field(e: GraphEngine, id: string, F: (x: number, y: number) => number, view: ViewRequest, o: FieldOptions): Promise<FieldResult> {
+  const p = stripPool();
+  const source = p ? e.implicitSource(id) : null;
+  if (p && source) {
+    try {
+      return await p.run(source, view.viewport, o);
+    } catch {
+      p.dispose();
+      pool = null;
+    }
+  }
+  return implicitField(F, view.viewport, o);
+}
 const last = new Map<string, ItemResult>();
 
 /** Canvas label text (no LaTeX): 6 significant digits, no float noise. */
@@ -55,7 +90,7 @@ const parser: RawParser = (latex) => {
   return entry.raw;
 };
 
-function sampleItem(e: GraphEngine, id: string, view: ViewRequest): ItemResult {
+async function sampleItem(e: GraphEngine, id: string, view: ViewRequest): Promise<ItemResult> {
   const state = e.item(id);
   const base: ItemResult = {
     id,
@@ -90,10 +125,10 @@ function sampleItem(e: GraphEngine, id: string, view: ViewRequest): ItemResult {
       }
       break;
     case "Polar":
-      r = samplePolar(rt.r, 0, TURN, { tolerance: Math.min(pxX, pxY), initial });
+      r = samplePolar(rt.r, 0, PARAMETER_TURN, { tolerance: Math.min(pxX, pxY), initial });
       break;
     case "Parametric":
-      r = sampleParametric(rt.x, rt.y, 0, TURN, { tolerance: Math.min(pxX, pxY), initial });
+      r = sampleParametric(rt.x, rt.y, 0, PARAMETER_TURN, { tolerance: Math.min(pxX, pxY), initial });
       break;
     case "Point": {
       const t = state.type.kind === "Point" ? state.type : null;
@@ -131,22 +166,18 @@ function sampleItem(e: GraphEngine, id: string, view: ViewRequest): ItemResult {
     }
     case "Implicit": {
       const drag = view.quality === "drag";
-      const c = contour(rt.F, view.viewport, {
+      const f = await field(e, id, rt.F, view, {
         width: view.width,
         height: view.height,
         cellPx: drag ? IMPLICIT_CELL_PX_DRAG : IMPLICIT_CELL_PX_FULL,
         refine: drag ? IMPLICIT_REFINE_DRAG : IMPLICIT_REFINE_FULL,
+        stride: drag ? FIELD_STRIDE_DRAG : FIELD_STRIDE_FULL,
+        relation: rt.relation,
       });
-      const out: ItemResult = { ...base, segments: c.polylines, relation: rt.relation };
-      if (rt.relation !== "=") {
-        const m = regionMask(
-          rt.F, view.viewport, view.width, view.height, drag ? FIELD_STRIDE_DRAG : FIELD_STRIDE_FULL, insideTest(rt.relation),
-          drag ? IMPLICIT_CELL_PX_DRAG : IMPLICIT_CELL_PX_FULL,
-        );
-        out.field = { width: m.width, height: m.height, data: m.data };
-      }
+      const out: ItemResult = { ...base, segments: f.polylines, relation: rt.relation };
+      if (f.mask) out.field = { ...f.mask, viewport: view.viewport };
       if (!drag) {
-        out.description = describeExtent(c.polylines);
+        out.description = describeExtent(f.polylines);
         if (out.field) out.description.shaded = out.field.data.reduce((n, v) => n + v, 0) / out.field.data.length;
       }
       return out;
@@ -161,9 +192,13 @@ function sampleItem(e: GraphEngine, id: string, view: ViewRequest): ItemResult {
   return out;
 }
 
-function respond(seq: number, cause: "load" | "param" | "view", e: GraphEngine, view: ViewRequest, ids: readonly string[], reevaluated: string[], t0: number) {
-  for (const id of ids) last.set(id, sampleItem(e, id, view));
-  const items = e.graph.items.map((it) => last.get(it.id) ?? sampleItem(e, it.id, view));
+async function respond(
+  seq: number, cause: "load" | "param" | "view", e: GraphEngine, view: ViewRequest, ids: readonly string[], reevaluated: string[], t0: number,
+  partial = false,
+): Promise<void> {
+  for (const id of ids) last.set(id, await sampleItem(e, id, view));
+  const items: ItemResult[] = [];
+  for (const it of e.graph.items) items.push(last.get(it.id) ?? (await sampleItem(e, it.id, view)));
   const msg: EngineResponse = {
     type: "result",
     seq,
@@ -172,6 +207,7 @@ function respond(seq: number, cause: "load" | "param" | "view", e: GraphEngine, 
     evaluations: e.evaluations,
     reevaluated,
     cause,
+    partial,
     ms: performance.now() - t0,
   };
   // Copies are posted (not transferred) because `last` keeps the arrays for items that did not change.
@@ -182,38 +218,44 @@ function respond(seq: number, cause: "load" | "param" | "view", e: GraphEngine, 
  * Progressive display (STEPS.md §7.2: 1600×1000 field "on release, progressive"): when the document has implicit
  * items, a quarter-resolution frame is posted first, then the full one, under the same sequence number.
  */
-function progressive(
+async function progressive(
   seq: number, cause: "load" | "view", e: GraphEngine, view: ViewRequest, ids: readonly string[], reevaluated: string[], t0: number,
-) {
+): Promise<void> {
   const heavy = e.graph.items.some((it) => e.runtime(it.id)?.kind === "Implicit");
-  if (view.quality === "full" && heavy) respond(seq, cause, e, { ...view, quality: "drag" }, ids, reevaluated, t0);
-  respond(seq, cause, e, view, ids, reevaluated, t0);
+  if (view.quality === "full" && heavy) await respond(seq, cause, e, { ...view, quality: "drag" }, ids, reevaluated, t0, true);
+  await respond(seq, cause, e, view, ids, reevaluated, t0);
 }
 
-function handle(req: EngineRequest): void {
+async function handle(req: EngineRequest): Promise<void> {
   const t0 = performance.now();
   try {
     switch (req.type) {
       case "load": {
         parsed = req.parsed;
         // The engine is kept between loads so parsed lines and slider literals survive an edit.
-        if (engine) engine.load(req.graph);
+        if (engine) engine.load(req.graph, { fresh: req.fresh });
         else engine = new GraphEngine(parser, req.graph);
         last.clear();
         analyses.clear();
         const all = engine.graph.items.map((i) => i.id);
-        progressive(req.seq, "load", engine, req.view, all, all, t0);
+        await progressive(req.seq, "load", engine, req.view, all, all, t0);
         break;
       }
       case "param": {
-        if (!engine) return;
+        if (!engine) {
+          self.postMessage({ type: "skipped", seq: req.seq } satisfies EngineResponse);
+          return;
+        }
         const ids = engine.setParam(req.name, req.value);
-        respond(req.seq, "param", engine, req.view, ids, ids, t0);
+        await respond(req.seq, "param", engine, req.view, ids, ids, t0);
         break;
       }
       case "view": {
-        if (!engine) return;
-        progressive(req.seq, "view", engine, req.view, engine.graph.items.map((i) => i.id), [], t0);
+        if (!engine) {
+          self.postMessage({ type: "skipped", seq: req.seq } satisfies EngineResponse);
+          return;
+        }
+        await progressive(req.seq, "view", engine, req.view, engine.graph.items.map((i) => i.id), [], t0);
         break;
       }
       case "trace": {
@@ -242,25 +284,32 @@ function handle(req: EngineRequest): void {
  */
 const pending: EngineRequest[] = [];
 let scheduled = false;
+/** A request is being handled (it may be waiting for strip Workers); the next one starts when it finishes. */
+let busy = false;
 
 /**
  * Handles one request per task, then yields, so messages that arrived during a long sampling job are queued first
  * and the superseded ones are skipped instead of each being computed in turn.
  */
-function pump(): void {
+async function pump(): Promise<void> {
   scheduled = false;
   for (let req = pending.shift(); req; req = pending.shift()) {
     if (superseded(req, pending)) continue;
-    handle(req);
+    busy = true;
+    try {
+      await handle(req);
+    } finally {
+      busy = false;
+    }
     break;
   }
   if (pending.length > 0) schedule();
 }
 
 function schedule(): void {
-  if (scheduled) return;
+  if (scheduled || busy) return;
   scheduled = true;
-  setTimeout(pump, 0);
+  setTimeout(() => void pump(), 0);
 }
 
 self.onmessage = (ev: MessageEvent<EngineRequest>) => {

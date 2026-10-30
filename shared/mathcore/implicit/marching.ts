@@ -21,7 +21,7 @@
  * Limits: a curve where F touches zero without changing sign (x² + y² = 0, (x − y)² = 0) is not found by any
  * sign-based method; a closed curve smaller than a fine cell may be missed.
  */
-import { CROSSING_BISECTIONS, NEAR_ZERO_CELLS, STITCH_CELLS } from "../constants";
+import { CROSSING_BISECTIONS, MASK_EDGE_PROBE_BLOCK, MASK_MIN_BLOCK, NEAR_ZERO_CELLS, POLE_TEST_STEP, ROOT_SPREAD_RATIO, STITCH_CELLS, VIEW_BORDER_RELATIVE } from "../constants";
 import type { Viewport } from "../ir/types";
 import type { Polyline } from "../sample/adaptive";
 
@@ -83,7 +83,11 @@ export function contour(F: (x: number, y: number) => number, vp: Viewport, o: Co
       let flo = a;
       let fhi = b;
       let exact: number | null = a === 0 ? 0 : b === 0 ? 1 : null;
+      // |F(hi) − F(lo)| early in the bisection, compared with the end: it shrinks with the bracket at a real zero
+      // and grows at a pole, whatever the corner values are (a corner next to a pole can be huge).
+      let earlySpread = NaN;
       for (let k = 0; k < CROSSING_BISECTIONS && exact === null; k++) {
+        if (k === POLE_TEST_STEP) earlySpread = Math.abs(fhi - flo);
         const m = (lo + hi) / 2;
         const fm = F(vertical ? ax : ax + m * dx, vertical ? ay + m * dy : ay);
         evaluations++;
@@ -100,8 +104,11 @@ export function contour(F: (x: number, y: number) => number, vp: Viewport, o: Co
           fhi = fm;
         }
       }
-      // A real zero leaves a bracket whose values shrank; a pole leaves values that grew.
-      const isRoot = exact !== null || (Number.isFinite(lo) && Math.max(Math.abs(flo), Math.abs(fhi)) <= Math.max(Math.abs(a), Math.abs(b)));
+      // A real zero leaves a bracket whose spread shrank (by ~2^-(bisections − step)); a pole one whose spread grew,
+      // and a jump of a bounded F (floor) one whose spread stayed: only the first is a crossing.
+      const isRoot =
+        exact !== null ||
+        (Number.isFinite(lo) && (Number.isNaN(earlySpread) ? true : Math.abs(fhi - flo) <= ROOT_SPREAD_RATIO * earlySpread));
       if (isRoot) {
         const s = exact ?? lo + ((hi - lo) * flo) / (flo - fhi);
         p = vertical ? [ax, ay + s * dy] : [ax + s * dx, ay];
@@ -140,8 +147,11 @@ export function contour(F: (x: number, y: number) => number, vp: Viewport, o: Co
       const [a, b] = ids.filter((_, k) => has[k]);
       link(a, b);
     } else if (n === 4) {
-      // Saddle: the centre value decides which corners are joined through the middle of the cell.
-      const centrePositive = (v00 + v10 + v11 + v01) / 4 > 0;
+      // Saddle: F at the centre of the cell decides which corners are joined through the middle (the corner average
+      // when the centre is undefined).
+      const fc = F(vp.xmin + (i + 0.5) * dx, vp.ymin + (j + 0.5) * dy);
+      evaluations++;
+      const centrePositive = (Number.isFinite(fc) ? fc : (v00 + v10 + v11 + v01) / 4) > 0;
       if (centrePositive === (c[0] === 1)) {
         link(ids[0], ids[1]);
         link(ids[2], ids[3]);
@@ -158,23 +168,24 @@ export function contour(F: (x: number, y: number) => number, vp: Viewport, o: Co
    * the local slope over one coarse cell. Looking one cell outward sees a valley that lies inside the cell, where the
    * cell's own corners are almost equal.
    */
-  const coarseSlope = (i0: number, j0: number): number => {
-    // Hot path (every coarse cell): plain loops, no allocation. NaN comparisons are false, so undefined
-    // neighbours are ignored.
-    let s = 0;
-    for (let c = 0; c < 4; c++) {
-      const ci = c === 1 || c === 2 ? i0 + R : i0;
-      const cj = c >= 2 ? j0 + R : j0;
-      const v = value(ci, cj);
-      for (let n = 0; n < 4; n++) {
-        const ni = n === 0 ? ci + R : n === 1 ? ci - R : ci;
-        const nj = n === 2 ? cj + R : n === 3 ? cj - R : cj;
-        if (ni < 0 || nj < 0 || ni > NX || nj > NY) continue;
-        const d = Math.abs(value(ni, nj) - v);
-        if (d > s) s = d;
-      }
+  // Slope seen from each coarse lattice point: the largest |ΔF| to its four coarse neighbours, computed once per point
+  // (a coarse cell then takes the largest of its four corners). NaN comparisons are false, so undefined neighbours
+  // are ignored.
+  const pointSlope = new Float64Array((cols + 1) * (rows + 1));
+  for (let J = 0; J <= rows; J++) {
+    for (let I = 0; I <= cols; I++) {
+      const v = value(I * R, J * R);
+      let sl = 0;
+      if (I < cols) sl = Math.max(sl, Math.abs(value((I + 1) * R, J * R) - v) || 0);
+      if (I > 0) sl = Math.max(sl, Math.abs(value((I - 1) * R, J * R) - v) || 0);
+      if (J < rows) sl = Math.max(sl, Math.abs(value(I * R, (J + 1) * R) - v) || 0);
+      if (J > 0) sl = Math.max(sl, Math.abs(value(I * R, (J - 1) * R) - v) || 0);
+      pointSlope[J * (cols + 1) + I] = sl;
     }
-    return s;
+  }
+  const coarseSlope = (ci: number, cj: number): number => {
+    const k = cj * (cols + 1) + ci;
+    return Math.max(pointSlope[k], pointSlope[k + 1], pointSlope[k + cols + 1], pointSlope[k + cols + 2]);
   };
   const refined = new Uint8Array(cols * rows);
   let refinedCount = 0;
@@ -189,8 +200,15 @@ export function contour(F: (x: number, y: number) => number, vp: Viewport, o: Co
     for (let ci = 0; ci < cols; ci++) {
       const i0 = ci * R;
       const j0 = cj * R;
-      if (needsRefinement4(value(i0, j0), value(i0 + R, j0), value(i0 + R, j0 + R), value(i0, j0 + R), coarseSlope(i0, j0))) {
-        refine(ci, cj);
+      const a = value(i0, j0);
+      const b = value(i0 + R, j0);
+      const c = value(i0 + R, j0 + R);
+      const d = value(i0, j0 + R);
+      if (needsRefinement4(a, b, c, d, coarseSlope(ci, cj))) refine(ci, cj);
+      else if (!Number.isFinite(a) && !Number.isFinite(b) && !Number.isFinite(c) && !Number.isFinite(d)) {
+        // All corners undefined: a defined sliver may still run through the cell (y = √(ε − x²)).
+        evaluations++;
+        if (Number.isFinite(F(vp.xmin + (i0 + R / 2) * dx, vp.ymin + (j0 + R / 2) * dy))) refine(ci, cj);
       }
     }
   }
@@ -285,52 +303,95 @@ export function needsRefinement4(a: number, b: number, c: number, d: number, loc
 /**
  * Joins polyline ends closer than `gap` (gaps left by cells that could not be resolved), closing loops. An end on the
  * border of the view is where the curve leaves it, never a gap, so it is not joined.
+ *
+ * Near-linear: ends are bucketed in a grid of `gap`-sized cells, candidate pairs are matched closest first (each end
+ * at most once), and the matched lines are walked into chains and loops.
  */
 export function stitch(polylines: Float64Array[], gap: number, vp?: Viewport): Float64Array[] {
-  const lines = polylines.map((p) => Array.from(p));
-  const end = (l: number[], atStart: boolean): [number, number] => (atStart ? [l[0], l[1]] : [l[l.length - 2], l[l.length - 1]]);
-  const edgeTol = vp ? 1e-9 * Math.max(vp.xmax - vp.xmin, vp.ymax - vp.ymin) : 0;
-  const onBorder = (p: [number, number]) =>
-    !!vp &&
-    (Math.abs(p[0] - vp.xmin) <= edgeTol || Math.abs(p[0] - vp.xmax) <= edgeTol || Math.abs(p[1] - vp.ymin) <= edgeTol || Math.abs(p[1] - vp.ymax) <= edgeTol);
-  const dist = (a: [number, number], b: [number, number]) =>
-    onBorder(a) || onBorder(b) ? Infinity : Math.hypot(a[0] - b[0], a[1] - b[1]);
-  const closed = (l: number[]) => l.length >= 6 && l[0] === l[l.length - 2] && l[1] === l[l.length - 1];
-  let merged = true;
-  while (merged) {
-    merged = false;
-    for (let i = 0; i < lines.length && !merged; i++) {
-      const a = lines[i];
-      if (closed(a)) continue;
-      // Close a loop whose own ends nearly meet.
-      if (a.length >= 8 && dist(end(a, true), end(a, false)) <= gap) {
-        a.push(a[0], a[1]);
-        merged = true;
-        break;
-      }
-      for (let j = i + 1; j < lines.length && !merged; j++) {
-        const b = lines[j];
-        if (closed(b)) continue;
-        // Try the four end pairings; reverse as needed so a's end meets b's start.
-        const options: Array<[boolean, boolean]> = [[false, true], [false, false], [true, true], [true, false]];
-        for (const [aStart, bStart] of options) {
-          if (dist(end(a, aStart), end(b, bStart)) > gap) continue;
-          const aa = aStart ? reversePoints(a) : a;
-          const bb = bStart ? b : reversePoints(b);
-          lines[i] = aa.concat(bb);
-          lines.splice(j, 1);
-          merged = true;
-          break;
+  const n = polylines.length;
+  const closed = (l: Float64Array) => l.length >= 6 && l[0] === l[l.length - 2] && l[1] === l[l.length - 1];
+  const edgeTol = vp ? VIEW_BORDER_RELATIVE * Math.max(vp.xmax - vp.xmin, vp.ymax - vp.ymin) : 0;
+  const onBorder = (x: number, y: number) =>
+    !!vp && (Math.abs(x - vp.xmin) <= edgeTol || Math.abs(x - vp.xmax) <= edgeTol || Math.abs(y - vp.ymin) <= edgeTol || Math.abs(y - vp.ymax) <= edgeTol);
+  // End e = 2k + side: side 0 is the start of line k, side 1 its end.
+  const ex = new Float64Array(2 * n);
+  const ey = new Float64Array(2 * n);
+  const open = new Uint8Array(2 * n);
+  const buckets = new Map<string, number[]>();
+  const size = gap > 0 ? gap : 1;
+  const key = (x: number, y: number) => `${Math.floor(x / size)},${Math.floor(y / size)}`;
+  for (let k = 0; k < n; k++) {
+    const l = polylines[k];
+    if (l.length < 4 || closed(l)) continue;
+    for (let side = 0; side < 2; side++) {
+      const e = 2 * k + side;
+      ex[e] = side === 0 ? l[0] : l[l.length - 2];
+      ey[e] = side === 0 ? l[1] : l[l.length - 1];
+      if (onBorder(ex[e], ey[e])) continue;
+      open[e] = 1;
+      const kk = key(ex[e], ey[e]);
+      (buckets.get(kk) ?? buckets.set(kk, []).get(kk))?.push(e);
+    }
+  }
+  const pairs: Array<[number, number, number]> = [];
+  for (let e = 0; e < 2 * n; e++) {
+    if (!open[e]) continue;
+    const bx = Math.floor(ex[e] / size);
+    const by = Math.floor(ey[e] / size);
+    for (let u = -1; u <= 1; u++) {
+      for (let v = -1; v <= 1; v++) {
+        for (const f of buckets.get(`${bx + u},${by + v}`) ?? []) {
+          if (f <= e) continue;
+          // A line's own two ends join only when it is long enough to be a loop.
+          if (f >> 1 === e >> 1 && polylines[e >> 1].length < 8) continue;
+          const d = Math.hypot(ex[e] - ex[f], ey[e] - ey[f]);
+          if (d <= gap) pairs.push([d, e, f]);
         }
       }
     }
   }
-  return lines.map((l) => Float64Array.from(l));
-}
-
-function reversePoints(l: number[]): number[] {
-  const out: number[] = [];
-  for (let k = l.length - 2; k >= 0; k -= 2) out.push(l[k], l[k + 1]);
+  pairs.sort((p, q) => p[0] - q[0]);
+  const match = new Int32Array(2 * n).fill(-1);
+  for (const [, e, f] of pairs) {
+    if (match[e] < 0 && match[f] < 0) {
+      match[e] = f;
+      match[f] = e;
+    }
+  }
+  const out: Float64Array[] = [];
+  const visited = new Uint8Array(n);
+  const append = (acc: number[], l: Float64Array, reversed: boolean) => {
+    if (!reversed) for (let i = 0; i < l.length; i++) acc.push(l[i]);
+    else for (let i = l.length - 2; i >= 0; i -= 2) acc.push(l[i], l[i + 1]);
+  };
+  /** Walks from end `start` (entering its line there) along matched ends until a free end or back to the start. */
+  const walk = (start: number) => {
+    const acc: number[] = [];
+    let e = start;
+    for (;;) {
+      const k = e >> 1;
+      visited[k] = 1;
+      append(acc, polylines[k], (e & 1) === 1);
+      const m = match[e ^ 1];
+      if (m < 0) break;
+      if (visited[m >> 1]) {
+        acc.push(acc[0], acc[1]);
+        break;
+      }
+      e = m;
+    }
+    out.push(Float64Array.from(acc));
+  };
+  for (let k = 0; k < n; k++) {
+    const l = polylines[k];
+    if (l.length < 4 || closed(l)) {
+      visited[k] = 1;
+      out.push(l);
+    }
+  }
+  for (let e = 0; e < 2 * n; e++) if (!visited[e >> 1] && match[e] < 0) walk(e);
+  // What is left is made of loops (every end matched).
+  for (let k = 0; k < n; k++) if (!visited[k]) walk(2 * k);
   return out;
 }
 
@@ -387,7 +448,7 @@ export function regionMask(
     evaluations++;
     data[j * w + i] = Number.isFinite(v) && inside(v) ? 1 : 0;
   };
-  const B = cellPx ? Math.max(2, Math.round(cellPx / stride)) : 0;
+  const B = cellPx ? Math.max(MASK_MIN_BLOCK, Math.round(cellPx / stride)) : 0;
   if (!B) {
     for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) pixel(i, j);
     return { width: w, height: h, data, evaluations };
@@ -403,31 +464,53 @@ export function regionMask(
     }
   }
   const at = (I: number, J: number) => lat[J * (cw + 1) + I];
-  let slope = 0;
-  const diff = (ci: number, cj: number, ni: number, nj: number) => {
-    if (ni < 0 || nj < 0 || ni > cw || nj > ch) return;
-    const d = Math.abs(at(ni, nj) - at(ci, cj));
-    if (d > slope) slope = d;
-  };
+  // Slope seen from each lattice point (largest |ΔF| to its four neighbours), once per point as in `contour`.
+  const pointSlope = new Float64Array(lat.length);
+  for (let J = 0; J <= ch; J++) {
+    for (let I = 0; I <= cw; I++) {
+      const v = at(I, J);
+      let sl = 0;
+      if (I < cw) sl = Math.max(sl, Math.abs(at(I + 1, J) - v) || 0);
+      if (I > 0) sl = Math.max(sl, Math.abs(at(I - 1, J) - v) || 0);
+      if (J < ch) sl = Math.max(sl, Math.abs(at(I, J + 1) - v) || 0);
+      if (J > 0) sl = Math.max(sl, Math.abs(at(I, J - 1) - v) || 0);
+      pointSlope[J * (cw + 1) + I] = sl;
+    }
+  }
   for (let J = 0; J < ch; J++) {
     for (let I = 0; I < cw; I++) {
-      slope = 0;
-      for (let c = 0; c < 4; c++) {
-        const ci = c === 1 || c === 2 ? I + 1 : I;
-        const cj = c >= 2 ? J + 1 : J;
-        diff(ci, cj, ci + 1, cj);
-        diff(ci, cj, ci - 1, cj);
-        diff(ci, cj, ci, cj + 1);
-        diff(ci, cj, ci, cj - 1);
-      }
+      const k = J * (cw + 1) + I;
+      const slope = Math.max(pointSlope[k], pointSlope[k + 1], pointSlope[k + cw + 1], pointSlope[k + cw + 2]);
       const i1 = Math.min(w, (I + 1) * B);
       const j1 = Math.min(h, (J + 1) * B);
       const c0 = at(I, J);
-      if (needsRefinement4(c0, at(I + 1, J), at(I + 1, J + 1), at(I, J + 1), slope)) {
+      const c1 = at(I + 1, J);
+      const c2 = at(I + 1, J + 1);
+      const c3 = at(I, J + 1);
+      let refineBlock = needsRefinement4(c0, c1, c2, c3, slope);
+      if (!refineBlock) {
+        // Probes inside the block (centre, and edge midpoints when the block is large enough): a pattern repeating at
+        // the block spacing, or a defined sliver between undefined corners, does not show at the corners alone.
+        const allUndefined = !Number.isFinite(c0) && !Number.isFinite(c1) && !Number.isFinite(c2) && !Number.isFinite(c3);
+        const want = allUndefined ? -1 : inside(c0) ? 1 : 0;
+        const x0 = vp.xmin + I * B * sx;
+        const y0 = vp.ymax - J * B * sy;
+        const hx = ((i1 - I * B) * sx) / 2;
+        const hy = ((j1 - J * B) * sy) / 2;
+        const probes = B >= MASK_EDGE_PROBE_BLOCK ? 5 : 1;
+        for (let q = 0; q < probes && !refineBlock; q++) {
+          const px = q === 0 ? x0 + hx : q === 1 ? x0 : q === 2 ? x0 + 2 * hx : x0 + hx;
+          const py = q === 0 ? y0 - hy : q === 1 || q === 2 ? y0 - hy : q === 3 ? y0 : y0 - 2 * hy;
+          const v = F(px, py);
+          evaluations++;
+          if (allUndefined) refineBlock = Number.isFinite(v);
+          else refineBlock = !Number.isFinite(v) || (inside(v) ? 1 : 0) !== want || Math.abs(v) <= NEAR_ZERO_CELLS * slope;
+        }
+      }
+      if (refineBlock) {
         for (let j = J * B; j < j1; j++) for (let i = I * B; i < i1; i++) pixel(i, j);
-      } else {
-        const fill = inside(c0) ? 1 : 0;
-        if (fill) for (let j = J * B; j < j1; j++) data.fill(1, j * w + I * B, j * w + i1);
+      } else if (Number.isFinite(c0) && inside(c0)) {
+        for (let j = J * B; j < j1; j++) data.fill(1, j * w + I * B, j * w + i1);
       }
     }
   }

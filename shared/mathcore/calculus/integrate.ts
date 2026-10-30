@@ -2,7 +2,7 @@
  * Definite integrals (STEPS.md §7.3): adaptive Simpson for general values; Riemann sums for teaching (`riemann.ts`).
  */
 import {
-  DIVERGENCE_BOUND, INTEGRAL_MAX_DEPTH, INTEGRAL_TOLERANCE, TANH_SINH_MAX_LEVEL, TANH_SINH_NOISE_FLOOR, TANH_SINH_RELATIVE,
+  DIVERGENCE_BOUND, INTEGRAL_MAX_DEPTH, INTEGRAL_TOLERANCE, ABSCISSA_RELATIVE, TAIL_ALPHA_MARGIN, TAIL_MODEL_UNCERTAINTY, TANH_SINH_MAX_LEVEL, TANH_SINH_NOISE_FLOOR, TANH_SINH_RELATIVE,
 } from "../constants";
 
 export interface SimpsonOptions {
@@ -17,6 +17,11 @@ export interface IntegralResult {
   /** False when a branch hit the depth limit or produced a non-finite value. */
   converged: boolean;
   evaluations: number;
+  /**
+   * Set when the answer was accepted at the tanh-sinh noise floor: the last change between levels plus the model
+   * uncertainty of the endpoint tails (a bound on the error, not the error itself).
+   */
+  estimatedError?: number;
 }
 
 const DEFAULT_TOLERANCE = INTEGRAL_TOLERANCE;
@@ -72,10 +77,17 @@ export function tanhSinh(f: (x: number) => number, a: number, b: number, toleran
   let evaluations = 0;
   let prev = NaN;
   let lastChange = Infinity;
+  /** Size of the analytic endpoint tails at the last level (their model error is a fraction of this). */
+  let tail = 0;
   for (let level = 0; level <= TANH_SINH_MAX_LEVEL; level++) {
     const h = 1 / 2 ** level;
     let sum = (Math.PI / 2) * f(mid);
     evaluations++;
+    // The two innermost samples on each side (distance from the endpoint, value), for the tail correction.
+    const left = { d1: NaN, f1: NaN, d2: NaN, f2: NaN };
+    const right = { d1: NaN, f1: NaN, d2: NaN, f2: NaN };
+    let leftDone = false;
+    let rightDone = false;
     for (let k = 1; ; k++) {
       const t = k * h;
       const s = (Math.PI / 2) * Math.sinh(t);
@@ -85,27 +97,51 @@ export function tanhSinh(f: (x: number) => number, a: number, b: number, toleran
       const w = ((Math.PI / 2) * Math.cosh(t) * 4 * e) / ((1 + e) * (1 + e));
       const xl = a + half * dist;
       const xr = b - half * dist;
-      // Each side stops on its own once its abscissa rounds onto the endpoint: near 0 that happens far later than
-      // near 1, and stopping both sides together loses the tail of a singularity at 0.
-      const leftOk = xl !== a;
-      const rightOk = xr !== b;
+      // Each side stops on its own once its abscissa no longer represents the intended distance from the endpoint
+      // (near 1 that happens at ~1e-16, near 0 far later); the stretch inside is added by `endpointTail`.
+      // A distance that repeats the previous one (two nodes rounded onto the same double) also ends the side.
+      const leftOk = !leftDone && Math.abs(xl - a - half * dist) <= ABSCISSA_RELATIVE * half * dist && !(xl - a >= left.d2);
+      const rightOk = !rightDone && Math.abs(b - xr - half * dist) <= ABSCISSA_RELATIVE * half * dist && !(b - xr >= right.d2);
+      if (!leftOk) leftDone = true;
+      if (!rightOk) rightDone = true;
       if (w < Number.MIN_VALUE || (!leftOk && !rightOk)) break;
       const fl = leftOk ? f(xl) : 0;
       const fr = rightOk ? f(xr) : 0;
       evaluations += 2;
       if (!Number.isFinite(fl) || !Number.isFinite(fr)) return { value: NaN, converged: false, evaluations };
       sum += w * (fl + fr);
+      if (leftOk) Object.assign(left, { d1: left.d2, f1: left.f2, d2: xl - a, f2: fl });
+      if (rightOk) Object.assign(right, { d1: right.d2, f1: right.f2, d2: b - xr, f2: fr });
     }
-    const value = half * h * sum;
+    const tl = endpointTail(left);
+    const tr = endpointTail(right);
+    if (Number.isNaN(tl) || Number.isNaN(tr)) return { value: NaN, converged: false, evaluations };
+    const value = half * h * sum + tl + tr;
+    tail = Math.abs(tl) + Math.abs(tr);
     lastChange = Math.abs(value - prev);
     if (level > 2 && lastChange <= Math.max(tolerance, Math.abs(value) * TANH_SINH_RELATIVE)) return { value, converged: true, evaluations };
     prev = value;
   }
-  // Near an endpoint singularity the abscissae lose relative precision (1 − x² cancels), so the levels can stop
-  // agreeing at ~1e-12 while the value is right to ~1e-10. Accept that noise floor; a divergent integral keeps
-  // changing by much more than this and is still rejected.
-  if (Math.abs(lastChange) <= TANH_SINH_NOISE_FLOOR * Math.abs(prev)) return { value: prev, converged: true, evaluations };
+  // Rounding in the abscissae next to a singular endpoint can keep the levels from agreeing to 1e-12 even after the
+  // tail correction. Accept agreement to TANH_SINH_NOISE_FLOOR, and say so through `estimatedError`; a divergent
+  // integral keeps changing by much more than this and is still rejected.
+  if (Math.abs(lastChange) <= TANH_SINH_NOISE_FLOOR * Math.abs(prev)) {
+    return { value: prev, converged: true, evaluations, estimatedError: lastChange + TAIL_MODEL_UNCERTAINTY * tail };
+  }
   return { value: prev, converged: false, evaluations };
+}
+
+/**
+ * ∫ over the stretch next to an endpoint that no double abscissa can reach (closer than one ulp of the endpoint).
+ * From the two innermost samples, f ≈ C·d^(−α); the tail is ∫₀^d C u^(−α) du = f·d / (1 − α). α ≥ 1 is not
+ * integrable: NaN. A bounded integrand (α ≤ 0) contributes at most f·d, below rounding: 0.
+ */
+function endpointTail(s: { d1: number; f1: number; d2: number; f2: number }): number {
+  if (!(s.d2 > 0 && s.d1 > s.d2) || s.f1 === 0 || s.f2 === 0 || s.f1 > 0 !== s.f2 > 0) return 0;
+  const alpha = Math.log(Math.abs(s.f2 / s.f1)) / Math.log(s.d1 / s.d2);
+  if (!(alpha > 0)) return 0;
+  if (alpha >= 1 - TAIL_ALPHA_MARGIN) return NaN;
+  return (s.f2 * s.d2) / (1 - alpha);
 }
 
 

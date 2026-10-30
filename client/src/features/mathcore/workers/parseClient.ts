@@ -2,14 +2,13 @@
  * Parse client (STEPS.md §9): parses LaTeX strings one at a time in the parse Worker, caches results by string, and
  * replaces the Worker when one expression takes longer than 200 ms (the parse is synchronous inside the Worker and
  * cannot be interrupted). The first request of a fresh Worker also downloads Compute Engine, so it gets a longer limit.
+ *
+ * Only answers that depend on the LaTeX alone are cached: a parse, a syntax error, and a timeout that happened twice
+ * on a running parser. A crash, an unavailable parser (offline) or a timeout while the parser was starting is
+ * returned for this round only, so the line is parsed again next time.
  */
-import { PARSE_TIMEOUT_MS } from "@shared/mathcore/constants";
+import { PARSE_CACHE_LIMIT, PARSE_LOAD_TIMEOUT_MS, PARSE_TIMEOUT_MS, PARSE_TIMEOUTS_BEFORE_CACHE } from "@shared/mathcore/constants";
 import type { ParsedEntry, ParseRequest, ParseResponse } from "./parseProtocol";
-
-/** First request of a fresh Worker: Compute Engine download and start-up. */
-export const PARSE_LOAD_TIMEOUT_MS = 30_000;
-/** Cached strings kept (the oldest are dropped first). */
-const CACHE_LIMIT = 2000;
 
 export interface ParseWorkerLike {
   postMessage(message: ParseRequest): void;
@@ -34,6 +33,10 @@ export function createParseClient(config: ParseClientConfig): ParseClient {
   const timeoutMs = config.timeoutMs ?? PARSE_TIMEOUT_MS;
   const loadTimeoutMs = config.loadTimeoutMs ?? PARSE_LOAD_TIMEOUT_MS;
   const cache = new Map<string, ParsedEntry>();
+  /** Answers for this round that are not cached (transient failures). */
+  const transient = new Map<string, ParsedEntry>();
+  /** Timeouts seen per string on a running parser. */
+  const timeouts = new Map<string, number>();
   let worker: ParseWorkerLike | null = null;
   let warm = false;
   let seq = 0;
@@ -51,9 +54,11 @@ export function createParseClient(config: ParseClientConfig): ParseClient {
   };
 
   const remember = (latex: string, entry: ParsedEntry) => {
-    if (cache.size >= CACHE_LIMIT) cache.delete(cache.keys().next().value as string);
+    if (cache.size >= PARSE_CACHE_LIMIT) cache.delete(cache.keys().next().value as string);
     cache.set(latex, entry);
+    transient.delete(latex);
   };
+  const once = (latex: string, entry: ParsedEntry) => transient.set(latex, entry);
 
   const parseOne = (latex: string): Promise<void> =>
     new Promise<void>((resolve) => {
@@ -62,25 +67,36 @@ export function createParseClient(config: ParseClientConfig): ParseClient {
       const w = worker;
       const id = ++seq;
       const limit = warm ? timeoutMs : loadTimeoutMs;
+      const wasWarm = warm;
       const timer = setTimeout(() => {
         drop();
-        remember(latex, {
-          ok: false,
-          message: limit === timeoutMs ? `Parsing took longer than ${timeoutMs} ms` : "The math parser did not start in time",
-        });
+        if (!wasWarm) once(latex, { ok: false, message: "The math parser did not start in time" });
+        else {
+          const n = (timeouts.get(latex) ?? 0) + 1;
+          timeouts.set(latex, n);
+          const entry: ParsedEntry = { ok: false, message: `Parsing took longer than ${timeoutMs} ms` };
+          if (n >= PARSE_TIMEOUTS_BEFORE_CACHE) remember(latex, entry);
+          else once(latex, entry);
+        }
         resolve();
       }, limit);
       w.onmessage = (ev) => {
         if (ev.data.seq !== id) return;
         clearTimeout(timer);
-        warm = true;
-        remember(latex, ev.data.ok ? { ok: true, raw: ev.data.raw } : { ok: false, message: ev.data.message });
+        const d = ev.data;
+        if (!d.ok && d.unavailable) {
+          // Compute Engine did not load: the Worker is not ready, and the answer says nothing about this LaTeX.
+          once(latex, { ok: false, message: d.message });
+        } else {
+          warm = true;
+          remember(latex, d.ok ? { ok: true, raw: d.raw } : { ok: false, message: d.message });
+        }
         resolve();
       };
       w.onerror = () => {
         clearTimeout(timer);
         drop();
-        remember(latex, { ok: false, message: "The math parser stopped unexpectedly" });
+        once(latex, { ok: false, message: "The math parser stopped unexpectedly" });
         resolve();
       };
       w.postMessage({ seq: id, latex });
@@ -93,8 +109,9 @@ export function createParseClient(config: ParseClientConfig): ParseClient {
       return chain.then(() => {
         const out: Record<string, ParsedEntry> = {};
         for (const l of unique) {
-          const e = cache.get(l);
+          const e = cache.get(l) ?? transient.get(l);
           if (e) out[l] = e;
+          transient.delete(l);
         }
         return out;
       });

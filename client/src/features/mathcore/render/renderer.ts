@@ -12,14 +12,18 @@ export interface DrawCurve {
   width: number;
   dash?: "solid" | "dashed" | "dotted";
   highlighted?: boolean;
+  /** Implicit contours (STEPS.md §7.3): drawn through the midpoints of the polyline with quadratic curves. */
+  smooth?: boolean;
 }
 
-/** Inequality shading: a mask (1 = inside) stretched over the view, tinted with the item color. */
+/** Inequality shading: a mask (1 = inside) over the viewport it was computed for, tinted with the item color. */
 export interface DrawField {
   width: number;
   height: number;
   data: Uint8Array;
   color: string;
+  /** Where the mask lies; while the view pans or zooms it is drawn there until the new mask arrives. */
+  viewport?: Viewport;
 }
 
 export interface DrawPoint {
@@ -208,7 +212,10 @@ export class Canvas2DRenderer implements Renderer {
       }
     }
 
-    for (const f of scene.fields ?? []) this.drawField(f);
+    for (const f of scene.fields ?? []) {
+      const fv = f.viewport ?? scene.viewport;
+      this.drawField(f, X(fv.xmin), Y(fv.ymax), (fv.xmax - fv.xmin) * sx, (fv.ymax - fv.ymin) * sy);
+    }
     for (const t of scene.transforms ?? []) this.drawTransform(t, X, Y, css.font);
 
     ctx.lineJoin = "round";
@@ -221,7 +228,16 @@ export class Canvas2DRenderer implements Renderer {
       for (const s of c.segments) {
         if (s.length === 2) continue;
         ctx.moveTo(X(s[0]), Y(s[1]));
-        for (let i = 2; i < s.length; i += 2) ctx.lineTo(X(s[i]), Y(s[i + 1]));
+        if (c.smooth && s.length >= 6) {
+          // Each vertex becomes the control point of a quadratic from the previous midpoint to the next one; the ends
+          // stay where the contour put them.
+          for (let i = 2; i < s.length - 2; i += 2) {
+            ctx.quadraticCurveTo(X(s[i]), Y(s[i + 1]), X((s[i] + s[i + 2]) / 2), Y((s[i + 1] + s[i + 3]) / 2));
+          }
+          ctx.lineTo(X(s[s.length - 2]), Y(s[s.length - 1]));
+        } else {
+          for (let i = 2; i < s.length; i += 2) ctx.lineTo(X(s[i]), Y(s[i + 1]));
+        }
       }
       ctx.stroke();
     }
@@ -336,12 +352,12 @@ export class Canvas2DRenderer implements Renderer {
   /** Tinted layers by mask, so a redraw (hover, trace) does not rebuild the image (Phase 3 review). */
   private readonly layers = new WeakMap<Uint8Array, { color: string; layer: HTMLCanvasElement }>();
 
-  private drawField(f: DrawField): void {
+  private drawField(f: DrawField, left: number, top: number, w: number, h: number): void {
     const { ctx } = this;
     const cached = this.layers.get(f.data);
     if (cached && cached.color === f.color) {
       ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(cached.layer, 0, 0, this.width, this.height);
+      ctx.drawImage(cached.layer, left, top, w, h);
       return;
     }
     const layer = document.createElement("canvas");
@@ -363,7 +379,7 @@ export class Canvas2DRenderer implements Renderer {
     lg.putImageData(img, 0, 0);
     this.layers.set(f.data, { color: f.color, layer });
     ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(layer, 0, 0, this.width, this.height);
+    ctx.drawImage(layer, left, top, w, h);
   }
 
   private gridLines(step: number, color: string, width: number, scene: Scene, X: (x: number) => number, Y: (y: number) => number) {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Viewport } from "../ir/types";
-import { contour, extentOf, insideTest, regionMask } from "./marching";
+import { contour, extentOf, insideTest, regionMask, stitch } from "./marching";
 
 const vp = (h: number, v: number): Viewport => ({ xmin: -h, xmax: h, ymin: -v, ymax: v, aspect: "equal" });
 const opts = { width: 400, height: 250, cellPx: 6, refine: 4 };
@@ -222,5 +222,155 @@ describe("randomized properties (implicit engine soundness)", () => {
     const exact = regionMask(F, view, 200, 125, 1, insideTest(">="));
     const fast = regionMask(F, view, 200, 125, 1, insideTest(">="), 8);
     expect(fast.data).toEqual(exact.data);
+  });
+});
+
+describe("Phase 3 re-review regressions", () => {
+  const FULL = { width: 1600, height: 1000, cellPx: 6, refine: 4 };
+  const DRAG = { width: 1600, height: 1000, cellPx: 12, refine: 2 };
+  /** Longest segment lying within `tol` of the vertical line x = x0 (an asymptote drawn as a curve). */
+  const verticalAt = (polys: readonly Float64Array[], x0: number, tol: number) => {
+    let worst = 0;
+    for (const p of polys) {
+      for (let i = 0; i + 3 < p.length; i += 2) {
+        if (Math.abs(p[i] - x0) < tol && Math.abs(p[i + 2] - x0) < tol) worst = Math.max(worst, Math.abs(p[i + 3] - p[i + 1]));
+      }
+    }
+    return worst;
+  };
+
+  it("a pole next to a lattice point is not drawn: y = 1/(x − 0.5) on views where a corner lands at the pole", () => {
+    const F = (x: number, y: number) => y - 1 / (x - 0.5);
+    const views: Array<[Viewport, number, number]> = [
+      [{ xmin: -7, xmax: 3, ymin: -3.125, ymax: 3.125, aspect: "free" }, 800, 500],
+      [{ xmin: -5, xmax: 5, ymin: -3, ymax: 3, aspect: "free" }, 1000, 600],
+      [{ xmin: -4.5, xmax: 5.5, ymin: -3, ymax: 3, aspect: "free" }, 400, 250],
+      [{ xmin: -10, xmax: 10, ymin: -6, ymax: 6, aspect: "free" }, 1600, 1000],
+    ];
+    for (const [view, width, height] of views) {
+      for (const o of [{ cellPx: 6, refine: 4 }, { cellPx: 12, refine: 2 }]) {
+        const c = contour(F, view, { width, height, ...o });
+        expect(verticalAt(c.polylines, 0.5, 1e-3), JSON.stringify([view, width, o])).toBeLessThan(0.05);
+        expect(c.polylines.length).toBeGreaterThanOrEqual(2);
+      }
+    }
+    // Other rational and trigonometric poles.
+    for (const [G, x0] of [[(x: number, y: number) => y - 1 / (x - 1) ** 3, 1], [(x: number, y: number) => y * (x + 2) - 1, -2], [(x: number, y: number) => y - Math.tan(x), Math.PI / 2]] as const) {
+      const c = contour(G, { xmin: -5, xmax: 5, ymin: -3, ymax: 3, aspect: "free" }, FULL);
+      expect(verticalAt(c.polylines, x0, 1e-3)).toBeLessThan(0.05);
+    }
+  });
+
+  it("a bounded jump is not a crossing: y = floor(x) draws no vertical risers", () => {
+    const c = contour((x, y) => y - Math.floor(x), { xmin: -3.3, xmax: 3.3, ymin: -3.1, ymax: 3.1, aspect: "free" }, FULL);
+    for (const k of [-2, -1, 0, 1, 2, 3]) expect(verticalAt(c.polylines, k, 1e-3)).toBeLessThan(0.05);
+    expect(c.polylines.length).toBeGreaterThanOrEqual(6);
+  });
+
+  it("stitching many pieces stays fast: tan x · tan y = 1 at ±60, 1600×1000 full quality", () => {
+    const t0 = performance.now();
+    const c = contour((x, y) => Math.tan(x) * Math.tan(y) - 1, { xmin: -60, xmax: 60, ymin: -37.5, ymax: 37.5, aspect: "equal" }, FULL);
+    const ms = performance.now() - t0;
+    // tan x tan y = 1 ⟺ cos(x + y) = 0 where defined: about 76 diagonal lines across this view, cut at the points
+    // where tan x or tan y is infinite. Every vertex lies on one of them.
+    expect(c.polylines.length).toBeGreaterThan(40);
+    expect(c.polylines.length).toBeLessThan(400);
+    for (const [x, y] of points(c.polylines)) expect(Math.abs(Math.cos(x + y))).toBeLessThan(1e-3);
+    expect(ms).toBeLessThan(2000);
+  });
+
+  it("shading agrees with per-pixel evaluation for patterns at the block spacing", () => {
+    const mismatch = (F: (x: number, y: number) => number, view: Viewport, width: number, height: number, stride: number, cellPx: number) => {
+      const inside = insideTest(">");
+      const exact = regionMask(F, view, width, height, stride, inside);
+      const fast = regionMask(F, view, width, height, stride, inside, cellPx);
+      let bad = 0;
+      for (let i = 0; i < exact.data.length; i++) if (exact.data[i] !== fast.data[i]) bad++;
+      return bad / exact.data.length;
+    };
+    for (const h of [20, 21, 22]) {
+      const view: Viewport = { xmin: -h, xmax: h, ymin: -h * 0.625, ymax: h * 0.625, aspect: "equal" };
+      expect(mismatch((x, y) => Math.sin(40 * x) * Math.sin(40 * y), view, 1600, 1000, 1, 6), `±${h}`).toBeLessThan(0.02);
+    }
+    // Stripes whose period is exactly one block (6 px) and two blocks.
+    const view: Viewport = { xmin: 0, xmax: 1600, ymin: 0, ymax: 1000, aspect: "equal" };
+    for (const period of [6, 12]) {
+      expect(mismatch((x) => Math.sin((2 * Math.PI * (x - 1)) / period), view, 1600, 1000, 1, 6), `period ${period}`).toBeLessThan(0.02);
+    }
+    // Drag quality (stride 4, 12 px cells).
+    expect(mismatch((x, y) => Math.sin(40 * x) * Math.sin(40 * y), vp(5, 3), 1600, 1000, 4, 12)).toBeLessThan(0.05);
+  });
+
+  it("a defined sliver between undefined corners is shaded and drawn: y < √(0.0004 − x²)", () => {
+    const F = (x: number, y: number) => y - Math.sqrt(0.0004 - x * x);
+    const view = { xmin: -10, xmax: 10, ymin: -6.25, ymax: 6.25, aspect: "equal" as const };
+    const inside = insideTest("<");
+    const exact = regionMask(F, view, 1600, 1000, 1, inside);
+    const fast = regionMask(F, view, 1600, 1000, 1, inside, 6);
+    const count = (d: Uint8Array) => d.reduce((n, v) => n + v, 0);
+    expect(count(exact.data)).toBeGreaterThan(0);
+    expect(count(fast.data)).toBe(count(exact.data));
+    expect(contour(F, view, FULL).polylines.length).toBeGreaterThan(0);
+  });
+
+  it("the engine's drag setting on a full-size canvas still closes circles", () => {
+    const r = rng(7);
+    for (let k = 0; k < 200; k++) {
+      const cx = (r() - 0.5) * 6;
+      const cy = (r() - 0.5) * 3;
+      const R = 0.2 + r() * 2;
+      const c = contour((x, y) => (x - cx) ** 2 + (y - cy) ** 2 - R * R, vp(8, 5), DRAG);
+      const inView = cx - R > -8 && cx + R < 8 && cy - R > -5 && cy + R < 5;
+      if (inView) expect(c.polylines.length, `circle ${k}`).toBe(1);
+    }
+  });
+});
+
+describe("stitch", () => {
+  it("joins 4000 shuffled, reversed fragments of one circle into one closed loop, quickly", () => {
+    const N = 4000;
+    const gapAt = (k: number) => (2 * Math.PI * k) / N;
+    const frags: Float64Array[] = [];
+    for (let k = 0; k < N; k++) {
+      // Each fragment leaves a small gap before the next.
+      const a = gapAt(k) + 1e-5;
+      const b = gapAt(k + 1) - 1e-5;
+      const f = Float64Array.of(Math.cos(a), Math.sin(a), Math.cos(b), Math.sin(b));
+      frags.push(k % 3 === 0 ? Float64Array.of(f[2], f[3], f[0], f[1]) : f);
+    }
+    const r = rng(3);
+    for (let i = frags.length - 1; i > 0; i--) {
+      const j = Math.floor(r() * (i + 1));
+      [frags[i], frags[j]] = [frags[j], frags[i]];
+    }
+    const t0 = performance.now();
+    const out = stitch(frags, 1e-4);
+    expect(performance.now() - t0).toBeLessThan(300);
+    expect(out.length).toBe(1);
+    const l = out[0];
+    expect(l.length).toBe(4 * N + 2);
+    expect(l[0]).toBe(l[l.length - 2]);
+    expect(l[1]).toBe(l[l.length - 1]);
+  });
+
+  it("never joins ends on the view border, and keeps closed and too-short loops as they are", () => {
+    const view: Viewport = { xmin: -1, xmax: 1, ymin: -1, ymax: 1, aspect: "free" };
+    const a = Float64Array.of(-1, 0, -0.5, 0.2);
+    const b = Float64Array.of(-1, 0.00001, -0.5, -0.2);
+    expect(stitch([a, b], 0.01, view).length).toBe(2);
+    const closedLoop = Float64Array.of(0, 0, 0.1, 0, 0.1, 0.1, 0, 0);
+    const short = Float64Array.of(0.3, 0.3, 0.30001, 0.30001);
+    const out = stitch([closedLoop, short], 0.01, view);
+    expect(out).toContain(closedLoop);
+    expect(out.length).toBe(2);
+  });
+
+  it("a matched pair is the closest one: three ends near a point join the nearest two", () => {
+    const a = Float64Array.of(0, 0, 1, 0);
+    const b = Float64Array.of(1.001, 0, 2, 0);
+    const c = Float64Array.of(1.009, 0.001, 1.5, 1);
+    const out = stitch([a, b, c], 0.02);
+    expect(out.length).toBe(2);
+    expect(Array.from(out.find((l) => l.length === 8) ?? [])).toEqual([0, 0, 1, 0, 1.001, 0, 2, 0]);
   });
 });

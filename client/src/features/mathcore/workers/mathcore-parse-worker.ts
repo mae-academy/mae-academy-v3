@@ -38,7 +38,13 @@ self.onmessage = (ev: MessageEvent<ParseRequest>) => {
       self.postMessage(msg);
     },
     (err: unknown) => {
-      self.postMessage({ seq, latex, ok: false, message: `The math parser could not load: ${err instanceof Error ? err.message : String(err)}` } satisfies ParseResponse);
+      self.postMessage({
+        seq,
+        latex,
+        ok: false,
+        message: `The math parser could not load: ${err instanceof Error ? err.message : String(err)}`,
+        unavailable: true,
+      } satisfies ParseResponse);
     },
   );
 };

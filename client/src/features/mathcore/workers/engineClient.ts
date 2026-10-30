@@ -3,14 +3,12 @@
  * restarts the Worker when a task runs longer than 5 seconds (§9: cancellation with timeout). Same pattern as
  * features/plot/plotRunner.ts.
  */
-import { WORKER_TIMEOUT_MS } from "@shared/mathcore/constants";
+import { ENGINE_LOAD_TIMEOUT_MS, WORKER_TIMEOUT_MS } from "@shared/mathcore/constants";
 import type { EngineRequest, EngineResponse } from "./protocol";
 
 /** Distributive Omit, so each request variant keeps its own fields. */
 type WithoutSeq<T> = T extends unknown ? Omit<T, "seq"> : never;
 
-/** Until a Worker has answered once it may still be starting (module download), so every request gets this limit. */
-const LOAD_TIMEOUT_MS = 30_000;
 
 export interface WorkerLike {
   postMessage(message: EngineRequest): void;
@@ -29,7 +27,7 @@ export interface EngineClient {
 
 export interface EngineClientConfig {
   createWorker: () => WorkerLike;
-  onResult: (res: Exclude<EngineResponse, { type: "trace" }>) => void;
+  onResult: (res: Exclude<EngineResponse, { type: "trace" } | { type: "skipped" }>) => void;
   onTrace?: (res: Extract<EngineResponse, { type: "trace" }>) => void;
   /** Called when the Worker was restarted after a timeout or crash; the page reloads the document. */
   onRestart: (reason: string) => void;
@@ -42,7 +40,7 @@ export function createEngineClient(config: EngineClientConfig): EngineClient {
   let seq = 0;
   let latest = 0;
   let latestTrace = 0;
-  /** True once this Worker has answered a request, i.e. Compute Engine is loaded. */
+  /** True once this Worker has answered a request, i.e. its code is loaded and running. */
   let warm = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
 
@@ -72,9 +70,15 @@ export function createEngineClient(config: EngineClientConfig): EngineClient {
         return;
       }
       if (res.seq !== latest) return; // stale: a newer request is pending
+      // Any answer proves the Worker's code is running (parsing, and Compute Engine, live in the parse Worker).
+      warm = true;
+      // A partial (progressive) frame keeps the watchdog running for the full frame that follows.
+      if (res.type === "result" && res.partial) {
+        config.onResult(res);
+        return;
+      }
       clear();
-      // Only a real answer proves the Worker is running; an error reply may come from a failed start.
-      if (res.type !== "error") warm = true;
+      if (res.type === "skipped") return;
       config.onResult(res);
     };
     w.onerror = () => {
@@ -95,7 +99,7 @@ export function createEngineClient(config: EngineClientConfig): EngineClient {
         // A runaway evaluation cannot be interrupted inside the Worker: replace the Worker.
         drop();
         config.onRestart("timeout");
-      }, warm ? timeoutMs : Math.max(timeoutMs, LOAD_TIMEOUT_MS));
+      }, warm ? timeoutMs : Math.max(timeoutMs, ENGINE_LOAD_TIMEOUT_MS));
       w.postMessage({ ...req, seq });
       return seq;
     },
