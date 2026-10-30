@@ -2,7 +2,7 @@
  * Normalization: raw MathJSON from Compute Engine 0.58.0 (`ce.parse(latex, { form: "raw" })`, owner decision Q1)
  * → the engine's core form (`ast/expr.ts`).
  *
- * Shapes this module relies on were recorded by running 0.58.0 (docs/mathcore/reports/phase-0-measurements.md
+ * Shapes this module relies on were recorded by running 0.58.0 (docs/mathcore/reports/a-1-measurements.md
  * and `mathjsonShapes.test.ts`). The rewrites:
  *  - `InvisibleOperator` → `Multiply`, or a function call when the symbol is a known or user-defined function.
  *  - `Delimiter` → its content, or `Tuple` for a comma list.

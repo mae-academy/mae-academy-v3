@@ -21,15 +21,16 @@ const FULL_INITIAL = 200;
 /** Polar and parametric parameter ranges (one full turn; Desmos-like default). */
 const TURN = 2 * Math.PI;
 
-let parser: RawParser | null = null;
+let parser: Promise<RawParser> | null = null;
 let engine: GraphEngine | null = null;
 const last = new Map<string, ItemResult>();
 
-async function getParser(): Promise<RawParser> {
-  if (parser) return parser;
-  const { ComputeEngine } = await import("@cortex-js/compute-engine");
-  const ce = new ComputeEngine();
-  parser = (latex: string) => ce.parse(latex, { form: "raw" }).json;
+/** One Compute Engine per Worker, even when two requests ask for it before the download finishes. */
+function getParser(): Promise<RawParser> {
+  parser ??= import("@cortex-js/compute-engine").then(({ ComputeEngine }) => {
+    const ce = new ComputeEngine();
+    return (latex: string) => ce.parse(latex, { form: "raw" }).json;
+  });
   return parser;
 }
 
@@ -68,10 +69,10 @@ function sampleItem(e: GraphEngine, id: string, view: ViewRequest): ItemResult {
       }
       break;
     case "Polar":
-      r = samplePolar(rt.r, 0, TURN, { tolerance: Math.min(pxX, pxY), jump: Math.max(xmax - xmin, ymax - ymin), initial });
+      r = samplePolar(rt.r, 0, TURN, { tolerance: Math.min(pxX, pxY), initial });
       break;
     case "Parametric":
-      r = sampleParametric(rt.x, rt.y, 0, TURN, { tolerance: Math.min(pxX, pxY), jump: Math.max(xmax - xmin, ymax - ymin), initial });
+      r = sampleParametric(rt.x, rt.y, 0, TURN, { tolerance: Math.min(pxX, pxY), initial });
       break;
     case "Point": {
       const t = state.type.kind === "Point" ? state.type : null;
@@ -91,7 +92,7 @@ function sampleItem(e: GraphEngine, id: string, view: ViewRequest): ItemResult {
   return out;
 }
 
-function respond(seq: number, e: GraphEngine, view: ViewRequest, ids: readonly string[], reevaluated: string[], t0: number) {
+function respond(seq: number, cause: "load" | "param" | "view", e: GraphEngine, view: ViewRequest, ids: readonly string[], reevaluated: string[], t0: number) {
   for (const id of ids) last.set(id, sampleItem(e, id, view));
   const items = e.graph.items.map((it) => last.get(it.id) ?? sampleItem(e, it.id, view));
   const msg: EngineResponse = {
@@ -101,6 +102,7 @@ function respond(seq: number, e: GraphEngine, view: ViewRequest, ids: readonly s
     items,
     evaluations: e.evaluations,
     reevaluated,
+    cause,
     ms: performance.now() - t0,
   };
   // Copies are posted (not transferred) because `last` keeps the arrays for items that did not change.
@@ -113,20 +115,22 @@ async function handle(req: EngineRequest): Promise<void> {
     switch (req.type) {
       case "load": {
         const p = await getParser();
-        engine = new GraphEngine(p, req.graph);
+        // The engine is kept between loads so parsed lines and slider literals survive an edit.
+        if (engine) engine.load(req.graph);
+        else engine = new GraphEngine(p, req.graph);
         last.clear();
-        respond(req.seq, engine, req.view, engine.graph.items.map((i) => i.id), engine.graph.items.map((i) => i.id), t0);
+        respond(req.seq, "load", engine, req.view, engine.graph.items.map((i) => i.id), engine.graph.items.map((i) => i.id), t0);
         break;
       }
       case "param": {
         if (!engine) return;
         const ids = engine.setParam(req.name, req.value);
-        respond(req.seq, engine, req.view, ids, ids, t0);
+        respond(req.seq, "param", engine, req.view, ids, ids, t0);
         break;
       }
       case "view": {
         if (!engine) return;
-        respond(req.seq, engine, req.view, engine.graph.items.map((i) => i.id), [], t0);
+        respond(req.seq, "view", engine, req.view, engine.graph.items.map((i) => i.id), [], t0);
         break;
       }
       case "trace": {
@@ -148,6 +152,36 @@ async function handle(req: EngineRequest): Promise<void> {
   }
 }
 
+/**
+ * Requests run one at a time, in order, so a pan or slider move that arrives while Compute Engine is still loading
+ * waits for the document instead of being dropped. A request that a later one makes pointless is skipped: a newer
+ * `load` replaces everything, a newer `view` or a newer `param` for the same slider replaces the older one.
+ */
+const pending: EngineRequest[] = [];
+let running = false;
+
+function superseded(req: EngineRequest): boolean {
+  return pending.some((later) => {
+    if (later.type === "load") return req.type === "load" || req.type === "view" || req.type === "param";
+    if (later.type === "view") return req.type === "view";
+    if (later.type === "param") return req.type === "param" && req.name === later.name;
+    return false;
+  });
+}
+
+async function pump(): Promise<void> {
+  if (running) return;
+  running = true;
+  try {
+    for (let req = pending.shift(); req; req = pending.shift()) {
+      if (!superseded(req)) await handle(req);
+    }
+  } finally {
+    running = false;
+  }
+}
+
 self.onmessage = (ev: MessageEvent<EngineRequest>) => {
-  void handle(ev.data);
+  pending.push(ev.data);
+  void pump();
 };

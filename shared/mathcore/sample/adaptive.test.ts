@@ -26,6 +26,11 @@ describe("explicit sampling", () => {
     expect(steep.segments.length).toBe(1);
   });
 
+  it("cuts a step function whose jumps are small compared with the view (floor on [-10, 10])", () => {
+    const r = sampleExplicit(Math.floor, -9.5, 9.5, { tolerance: 20 / 600, yRange: 20 });
+    expect(r.segments.length).toBe(20);
+  });
+
   it("cuts at every jump of floor (5 jumps on [-2.5, 2.5])", () => {
     const r = sampleExplicit((x) => 10 * Math.floor(x), -2.5, 2.5, { tolerance: 0.01, yRange: 6 });
     expect(r.segments.length).toBe(6);
@@ -50,7 +55,7 @@ describe("explicit sampling", () => {
 
 describe("parametric and polar sampling", () => {
   it("samples a unit circle closed and on the curve", () => {
-    const r = sampleParametric(Math.cos, Math.sin, 0, 2 * Math.PI, { tolerance: 0.001, jump: 12 });
+    const r = sampleParametric(Math.cos, Math.sin, 0, 2 * Math.PI, { tolerance: 0.001 });
     expect(r.segments).toHaveLength(1);
     const s = r.segments[0];
     for (let i = 0; i < s.length; i += 2) expect(Math.hypot(s[i], s[i + 1])).toBeCloseTo(1, 12);
@@ -58,7 +63,7 @@ describe("parametric and polar sampling", () => {
   });
 
   it("polar cardioid r = 1 + cos θ", () => {
-    const r = samplePolar((t) => 1 + Math.cos(t), 0, 2 * Math.PI, { tolerance: 0.001, jump: 12 });
+    const r = samplePolar((t) => 1 + Math.cos(t), 0, 2 * Math.PI, { tolerance: 0.001 });
     expect(r.segments).toHaveLength(1);
     const s = r.segments[0];
     for (let i = 0; i < s.length; i += 2) {

@@ -49,6 +49,8 @@ const NUMERIC_KINDS = new Set(["Scalar", "Value"]);
 export class GraphEngine {
   private graphDoc: GraphIR;
   private readonly parseCache = new Map<string, ParseResult>();
+  /** Literal each scalar item had at the last rebuild: a changed literal moves its slider, an unchanged one does not. */
+  private readonly lastLiteral = new Map<string, number>();
   private items: ItemState[] = [];
   private dag: DagResult = buildDag([]);
   private readonly values = new Map<string, number>();
@@ -156,6 +158,16 @@ export class GraphEngine {
     for (const c of this.dag.conflicts) {
       for (const id of c.ids) this.item(id)?.errors.push({ message: `"${c.name}" is defined more than once` });
     }
+    // Lines that use a name defined twice, or that sit downstream of a circular definition, say so instead of vanishing.
+    const conflicted = new Set(this.dag.conflicts.map((c) => c.name));
+    for (const it of this.items) {
+      const bad = it.uses.find((n) => conflicted.has(n) && !it.defines.includes(n));
+      if (bad !== undefined) it.errors.push({ message: `"${bad}" is defined more than once` });
+    }
+    const ordered = new Set(this.dag.order);
+    for (const it of this.items) {
+      if (it.errors.length === 0 && !ordered.has(it.id)) it.errors.push({ message: "Depends on a circular definition" });
+    }
 
     this.addAutoParams();
     this.functions = new Map();
@@ -214,15 +226,28 @@ export class GraphEngine {
     const params: Record<string, Param> = { ...this.graphDoc.params };
     let count = Object.keys(params).length;
     let changed = false;
-    // Literal scalar items are sliders: they get a parameter entry holding the literal as its value.
+    // Literal scalar items are sliders: they get a parameter entry holding the literal as its value, and retyping
+    // the literal (a = 2 → a = 5) moves the slider; leaving it alone keeps wherever the slider was dragged to.
+    const conflicted = new Set(this.dag.conflicts.map((c) => c.name));
+    const literals = new Set<string>();
     for (const it of this.items) {
-      if (it.type.kind === "Scalar" && it.type.literal !== null && !params[it.type.name] && count < MAX_PARAMS) {
-        const v = it.type.literal;
-        params[it.type.name] = { ...DEFAULT_PARAM, value: v, min: Math.min(DEFAULT_PARAM.min, v), max: Math.max(DEFAULT_PARAM.max, v) };
+      if (it.type.kind !== "Scalar" || it.type.literal === null || conflicted.has(it.type.name) || it.errors.length > 0) continue;
+      const name = it.type.name;
+      const v = it.type.literal;
+      literals.add(name);
+      const existing = params[name];
+      if (!existing) {
+        if (count >= MAX_PARAMS) continue;
+        params[name] = { ...DEFAULT_PARAM, value: v, min: Math.min(DEFAULT_PARAM.min, v), max: Math.max(DEFAULT_PARAM.max, v) };
         count++;
         changed = true;
+      } else if (this.lastLiteral.has(name) && this.lastLiteral.get(name) !== v) {
+        params[name] = { ...existing, value: v, min: Math.min(existing.min, v), max: Math.max(existing.max, v) };
+        changed = true;
       }
+      this.lastLiteral.set(name, v);
     }
+    for (const name of Array.from(this.lastLiteral.keys())) if (!literals.has(name)) this.lastLiteral.delete(name);
     for (const it of this.items) {
       for (const name of it.uses) {
         if (defined.has(name) || params[name] || RESERVED_SYMBOLS.has(name)) continue;
@@ -233,6 +258,14 @@ export class GraphEngine {
         }
         params[name] = { ...DEFAULT_PARAM };
         count++;
+        changed = true;
+      }
+    }
+    // A slider whose last use was deleted goes away with it (and stops counting toward the limit).
+    const used = new Set(this.items.flatMap((i) => i.uses));
+    for (const name of Object.keys(params)) {
+      if (!used.has(name) && !defined.has(name)) {
+        delete params[name];
         changed = true;
       }
     }

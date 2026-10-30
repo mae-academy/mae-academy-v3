@@ -9,7 +9,7 @@ import type { EngineRequest, EngineResponse } from "./protocol";
 /** Distributive Omit, so each request variant keeps its own fields. */
 type WithoutSeq<T> = T extends unknown ? Omit<T, "seq"> : never;
 
-/** The first `load` also downloads Compute Engine; it gets longer than the 5-second task limit. */
+/** Only the first `load` of a Worker also downloads Compute Engine; it gets longer than the 5-second task limit. */
 const LOAD_TIMEOUT_MS = 30_000;
 
 export interface WorkerLike {
@@ -42,6 +42,8 @@ export function createEngineClient(config: EngineClientConfig): EngineClient {
   let seq = 0;
   let latest = 0;
   let latestTrace = 0;
+  /** True once this Worker has answered a request, i.e. Compute Engine is loaded. */
+  let warm = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
 
   const clear = () => {
@@ -57,6 +59,7 @@ export function createEngineClient(config: EngineClientConfig): EngineClient {
       worker.terminate();
     }
     worker = null;
+    warm = false;
   };
 
   const ensure = (): WorkerLike => {
@@ -70,6 +73,7 @@ export function createEngineClient(config: EngineClientConfig): EngineClient {
       }
       if (res.seq !== latest) return; // stale: a newer request is pending
       clear();
+      warm = true;
       config.onResult(res);
     };
     w.onerror = () => {
@@ -90,7 +94,7 @@ export function createEngineClient(config: EngineClientConfig): EngineClient {
         // A runaway evaluation cannot be interrupted inside the Worker: replace the Worker.
         drop();
         config.onRestart("timeout");
-      }, req.type === "load" ? Math.max(timeoutMs, LOAD_TIMEOUT_MS) : timeoutMs);
+      }, req.type === "load" && !warm ? Math.max(timeoutMs, LOAD_TIMEOUT_MS) : timeoutMs);
       w.postMessage({ ...req, seq });
       return seq;
     },

@@ -122,3 +122,19 @@ describe("reviewer findings (Phase 0 review)", () => {
     expect(ev(["Or", ["Less", "x", 0], ["Greater", "x", 2]], 1)).toBe(0);
   });
 });
+
+describe("integral edge cases (Phases 1-2 review)", () => {
+  it("a divergent integral is undefined, not a number", () => {
+    expect(ev(["Integrate", ["Divide", 1, "t"], "t", -1, 2])).toBeNaN();
+    expect(ev(["Integrate", ["Divide", 1, "t"], "t", 0, 1])).toBeNaN();
+  });
+
+  it("an interior integrable singularity is integrated (∫₋₁¹ |t|^(-1/2) dt = 4)", () => {
+    const body: Expr = ["Power", ["Abs", "t"], ["Divide", ["Negate", 1], 2]];
+    expect(ev(["Integrate", body, "t", -1, 1])).toBeCloseTo(4, 6);
+  });
+
+  it("bounded jumps still integrate (floor, sign)", () => {
+    expect(ev(["Integrate", ["Floor", "t"], "t", 0, 3])).toBeCloseTo(3, 10);
+  });
+});

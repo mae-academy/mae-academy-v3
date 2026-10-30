@@ -4,7 +4,20 @@
  * Results are measurements, never assumptions: each case reports the median of its runs.
  */
 import { compile } from "../compile/compile";
+import { GraphEngine } from "../engine/graphEngine";
+import { emptyGraph } from "../ir/types";
 import { sampleExplicit } from "../sample/adaptive";
+
+/** MathJSON as Compute Engine emits it (form: raw) for the three benchmark lines, so the benchmark needs no parser. */
+const RAW: Record<string, unknown> = {
+  "y=a\\sin(x)": ["Equal", "y", ["InvisibleOperator", "a", ["Sin", "x"]]],
+  "y=x^2+ax": ["Equal", "y", ["Add", ["Power", "x", 2], ["InvisibleOperator", "a", "x"]]],
+  "y=e^{-ax^2}": ["Equal", "y", ["Power", "e", ["Negate", ["InvisibleOperator", "a", ["Power", "x", 2]]]]],
+};
+
+/** Quarter resolution while dragging (STEPS.md §7.1 technique 2); the initial interval count is a quarter too. */
+const DRAG_FACTOR = 4;
+const DRAG_INITIAL = 50;
 
 export interface BenchResult {
   id: string;
@@ -73,6 +86,18 @@ export function runBenchmarks(): BenchResult[] {
       vals[0] = x;
       return curves[0].evaluate(vals);
     }, -10, 10, { tolerance: 12 / 600, yRange: 12 });
+  }));
+
+  // A whole drag frame as the page runs it: setParam through the dependency graph, then every curve sampled at
+  // quarter resolution. Excludes the postMessage copy and the canvas draw (measured on the device in the browser).
+  const engine = new GraphEngine((latex) => RAW[latex], { ...emptyGraph(), items: Object.keys(RAW).map((latex, i) => ({ id: `b${i}`, latex })) });
+  let v = 0.5;
+  add("drag-frame-engine", "Dragging slider, 3 curves: setParam + drag-quality sampling", 2, "ms", time(() => {
+    v = v > 9 ? -9 : v + 0.13;
+    for (const id of engine.setParam("a", v)) {
+      const rt = engine.runtime(id);
+      if (rt?.kind === "Explicit") sampleExplicit(rt.f, -10, 10, { tolerance: (12 / 600) * DRAG_FACTOR, yRange: 12, initial: DRAG_INITIAL });
+    }
   }));
 
   // Raw evaluation throughput, as a reference figure for the other budgets.

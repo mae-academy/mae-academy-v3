@@ -15,6 +15,14 @@ import type { SimulationDocsTopic } from "./toolDocs/types";
 export type { SimulationDocsTopic };
 
 export const EQUATIONS: Record<SimulationDocsTopic, string[]> = {
+  mathcore: [
+    "x = r(\\theta)\\cos\\theta, \\quad y = r(\\theta)\\sin\\theta",
+    "y = f(x_0) + f'(x_0)\\,(x - x_0)",
+    "f'(x_0) \\approx \\frac{f(x_0 + h) - f(x_0 - h)}{2h}, \\quad h \\approx \\sqrt{\\varepsilon}\\,\\max(1, |x_0|)",
+    "\\left|\\frac{\\hat y - y}{y}\\right| \\le 10^{-12}",
+    "i \\to j \\iff \\text{line } j \\text{ uses a name defined by line } i",
+    "p_k = p_{\\min} + k\\,\\Delta p, \\quad k \\in \\mathbb{Z}, \\; p_k \\le p_{\\max}",
+  ],
   circuits: [
     "V = I \\cdot R",
     "\\sum_{k} I_k = 0 \\quad \\text{at every node}",
@@ -93,6 +101,7 @@ const TOPIC_BY_SLUG: Record<string, SimulationDocsTopic> = {
   plc: "plc",
   "arduino-studio": "arduino",
   "pneumatics-and-hydraulics": "fluid",
+  mathcore: "mathcore",
 };
 
 export function docsTopicForSlug(slug: string | undefined): SimulationDocsTopic | null {

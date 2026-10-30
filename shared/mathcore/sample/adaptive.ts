@@ -2,9 +2,9 @@
  * Adaptive curve sampling (STEPS.md §6.1 Explicit/Polar/Parametric, §9 edge cases).
  *
  * - Undefined domain: the curve is cut at NaN and ±Infinity.
- * - A large jump between neighbours is bisected before it is treated as an asymptote: if the jump survives
- *   narrowing to a tiny interval it is a discontinuity and the curve is cut; otherwise it is a steep but
- *   continuous part and the extra points are kept.
+ * - A jump between neighbouring samples (more than a few pixels after refinement) is bisected before it is treated
+ *   as an asymptote: if at least half of it survives narrowing to a tiny interval it is a discontinuity and the
+ *   curve is cut; otherwise it is a steep but continuous part and the points are kept.
  * - Refinement stops at a tolerance in world units, so a caller passes the size of one pixel.
  */
 import { PRECISION_WARNING_MAGNITUDE } from "../constants";
@@ -23,7 +23,7 @@ export interface SampleResult {
 export interface ExplicitOptions {
   /** World-space tolerance for the midpoint test, normally one pixel in y. */
   tolerance: number;
-  /** Visible y-range height; jumps larger than this are checked as possible asymptotes. */
+  /** Visible y-range height (context for callers; jump detection itself works in pixels, see JUMP_PIXELS). */
   yRange: number;
   /** Initial uniform intervals (default 200). */
   initial?: number;
@@ -38,6 +38,8 @@ const DEFAULT_MAX_POINTS = 4000;
 const DEFAULT_MAX_DEPTH = 8;
 /** Bisection steps used to decide whether a jump is a discontinuity. */
 const JUMP_BISECTIONS = 40;
+/** Neighbouring samples further apart than this many pixels (after refinement) are checked as a possible jump. */
+const JUMP_PIXELS = 8;
 
 const finite = Number.isFinite;
 
@@ -110,7 +112,7 @@ export function sampleExplicit(f: (x: number) => number, xmin: number, xmax: num
     if (cur.length >= 2) {
       const px = cur[cur.length - 2];
       const py = cur[cur.length - 1];
-      if (Math.abs(y - py) > opts.yRange && isDiscontinuity(ev, px, py, x, y, opts.yRange)) flush();
+      if (Math.abs(y - py) > JUMP_PIXELS * opts.tolerance && isDiscontinuity(ev, px, py, x, y)) flush();
     }
     cur.push(x, y);
   }
@@ -120,9 +122,12 @@ export function sampleExplicit(f: (x: number) => number, xmin: number, xmax: num
 
 /**
  * Bisects [a, b] toward the jump. A continuous steep function's jump shrinks with the interval; a pole or a step
- * keeps a jump of at least half the visible range down to an interval of about 1e-12 of the original width.
+ * keeps at least half of its size down to an interval of about 1e-12 of the original width.
  */
-export function isDiscontinuity(f: (x: number) => number, a: number, fa: number, b: number, fb: number, yRange: number): boolean {
+export function isDiscontinuity(f: (x: number) => number, a: number, fa: number, b: number, fb: number): boolean {
+  // A real jump keeps at least half of its size however closely it is bracketed; a steep continuous part loses
+  // half of it with every bisection.
+  const keep = Math.abs(fb - fa) / 2;
   let lo = a;
   let hi = b;
   let flo = fa;
@@ -140,16 +145,14 @@ export function isDiscontinuity(f: (x: number) => number, a: number, fa: number,
       lo = m;
       flo = fm;
     }
-    if (Math.abs(fhi - flo) < yRange / 2) return false;
+    if (Math.abs(fhi - flo) < keep) return false;
   }
-  return Math.abs(fhi - flo) >= yRange / 2;
+  return Math.abs(fhi - flo) >= keep;
 }
 
 export interface ParametricOptions {
   /** World-space tolerance (one pixel). */
   tolerance: number;
-  /** Jump threshold in world units (normally the larger visible range). */
-  jump: number;
   initial?: number;
   maxPoints?: number;
   maxDepth?: number;
@@ -223,14 +226,14 @@ export function sampleParametric(
     if (cur.length >= 2 && i >= 3) {
       const px = cur[cur.length - 2];
       const py = cur[cur.length - 1];
-      if (Math.hypot(x - px, y - py) > opts.jump) {
+      if (Math.hypot(x - px, y - py) > JUMP_PIXELS * opts.tolerance) {
         const tPrev = pts[i - 3];
         const dist = (tt: number) => {
           const p = ev(tt);
           return Math.hypot(p[0] - px, p[1] - py);
         };
         // Same rule as explicit curves, applied to the distance from the previous point.
-        if (isDiscontinuity(dist, tPrev, 0, t, Math.hypot(x - px, y - py), opts.jump)) flush();
+        if (isDiscontinuity(dist, tPrev, 0, t, Math.hypot(x - px, y - py))) flush();
       }
     }
     cur.push(x, y);

@@ -100,16 +100,44 @@ export function tanhSinh(f: (x: number) => number, a: number, b: number, toleran
   return { value: prev, converged: false, evaluations };
 }
 
+/** A sampled |f| above this means the integrand blows up inside the interval, not that it has a bounded jump. */
+const DIVERGENCE_BOUND = 1e9;
+
 /**
- * Definite integral used by the compiler: adaptive Simpson first; tanh-sinh when an endpoint is singular; a
- * depth-limited Simpson value is kept for interior jumps (its error is confined to an interval of width 2⁻⁵⁰).
+ * Definite integral used by the compiler.
+ *  - Adaptive Simpson first. A bounded integrand with jumps (floor, sign) never meets the tolerance at the jump, but its
+ *    value is right up to an interval of width 2⁻⁵⁰, so the depth-limited result is kept.
+ *  - If the integrand blows up (endpoint or interior singularity), Simpson's answer is meaningless: tanh-sinh is tried
+ *    on the whole interval, then split at the largest sample so an interior singularity becomes two endpoint ones.
+ *  - A divergent integral (1/x across 0) converges in neither, and is reported as not converged (the page shows NaN).
  */
 export function integrate(f: (x: number) => number, a: number, b: number): IntegralResult {
-  const simpson = adaptiveSimpson(f, a, b);
-  if (simpson.converged) return simpson;
-  if (!Number.isFinite(f(a)) || !Number.isFinite(f(b)) || !Number.isFinite(simpson.value)) {
-    const ts = tanhSinh(f, a, b);
-    if (ts.converged) return ts;
+  let peak = 0;
+  let peakAt = (a + b) / 2;
+  // A sample that is exactly infinite (1/0, ln 0) is a singular point; it beats any finite peak as the split point.
+  let singularAt: number | null = null;
+  const watched = (x: number) => {
+    const v = f(x);
+    if (Math.abs(v) === Infinity && singularAt === null) singularAt = x;
+    if (Number.isFinite(v) && Math.abs(v) > peak) {
+      peak = Math.abs(v);
+      peakAt = x;
+    }
+    return v;
+  };
+  const simpson = adaptiveSimpson(watched, a, b);
+  const blewUp = !Number.isFinite(simpson.value) || peak > DIVERGENCE_BOUND || !Number.isFinite(f(a)) || !Number.isFinite(f(b));
+  if (simpson.converged && !blewUp) return simpson;
+  if (!blewUp) return { ...simpson, converged: true };
+  const whole = tanhSinh(f, a, b);
+  if (whole.converged) return whole;
+  const split = singularAt ?? peakAt;
+  if (split > a && split < b) {
+    const left = tanhSinh(f, a, split);
+    const right = tanhSinh(f, split, b);
+    if (left.converged && right.converged) {
+      return { value: left.value + right.value, converged: true, evaluations: left.evaluations + right.evaluations };
+    }
   }
-  return Number.isFinite(simpson.value) ? { ...simpson, converged: true } : simpson;
+  return { value: NaN, converged: false, evaluations: simpson.evaluations + whole.evaluations };
 }

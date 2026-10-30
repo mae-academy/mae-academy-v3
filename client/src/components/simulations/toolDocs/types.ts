@@ -1,5 +1,5 @@
 /** Docs topics map 1:1 to studios; a topic may hold several tool docs (one per segmented control option). */
-export type SimulationDocsTopic = "circuits" | "signals" | "control" | "fluid" | "logic" | "plc" | "arduino" | "powerElectronics" | "codeStudio";
+export type SimulationDocsTopic = "circuits" | "signals" | "control" | "fluid" | "logic" | "plc" | "arduino" | "powerElectronics" | "codeStudio" | "mathcore";
 
 /** One worked-example step. `text` is prose with inline `$...$` math; `tex` is an optional display equation. */
 export interface ToolDocStep {

@@ -79,3 +79,36 @@ describe("GraphEngine", () => {
     if (imp?.kind === "Implicit") expect(imp.F(1, 1)).toBe(-2);
   });
 });
+
+describe("GraphEngine reviewer findings (Phases 1-2 review)", () => {
+  it("retyping a literal scalar item moves its slider (a = 2 → a = 5)", () => {
+    const e = new GraphEngine(parser, doc(["a=2", "y=ax"]));
+    e.setLatex("i1", "a=5");
+    expect(e.value("a")).toBe(5);
+    expect(e.graph.params.a.value).toBe(5);
+    const rt = e.runtime("i2");
+    if (rt?.kind === "Explicit") expect(rt.f(1)).toBe(5);
+  });
+
+  it("an unchanged literal keeps the slider where it was dragged", () => {
+    const e = new GraphEngine(parser, doc(["a=2", "y=ax"]));
+    e.setParam("a", 4);
+    e.load(e.graph); // a reload with the same text
+    expect(e.graph.params.a.value).toBe(4);
+  });
+
+  it("lines downstream of a cycle, or of a name defined twice, report why they are missing", () => {
+    const cyc = new GraphEngine(parser, doc(["a=b", "b=a", "y=ax"]));
+    expect(cyc.item("i3")?.errors[0].message).toMatch(/circular/);
+    const dup = new GraphEngine(parser, doc(["a=1", "a=2", "y=ax"]));
+    expect(dup.item("i3")?.errors[0].message).toMatch(/"a" is defined more than once/);
+    expect(dup.runtime("i3")).toBeNull();
+  });
+
+  it("removes a slider when its last use is deleted", () => {
+    const e = new GraphEngine(parser, doc(["y=qx"]));
+    expect(Object.keys(e.graph.params)).toEqual(["q"]);
+    e.setLatex("i1", "y=x");
+    expect(Object.keys(e.graph.params)).toEqual([]);
+  });
+});

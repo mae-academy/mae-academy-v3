@@ -50,5 +50,8 @@
   "value_is": "= {{value}}",
   "benchmarks": "شغّل قياسات الأداء",
   "benchHeader": "قياسات الأداء على هذا الجهاز (STEPS.md §7.2)",
-  "evaluations": "{{count}} عملية تقييم؛ آخر تحديث أعاد تقييم {{changed}}"
+  "evaluations": "{{count}} عملية تقييم؛ آخر تحديث أعاد تقييم {{changed}}",
+  "linkInvalid": "هذا الرابط ليس رسمًا صالحًا، لذلك يُعرض رسم جديد. يبقى العنوان كما هو حتى تعدّل.",
+  "benchPass": "نجح",
+  "benchFail": "فشل"
 }

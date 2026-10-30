@@ -777,6 +777,90 @@
           "body": "Los relés de protección y los dispositivos de medida ejecutan firmware embebido en el que temporizadores e interrupciones muestrean las formas de onda de la línea. El tiempo determinista, fijado por la configuración de temporizadores e interrupciones, hace que las respuestas de protección sean predecibles y repetibles."
         }
       ]
+    },
+    "mathcore": {
+      "title": "Math Core: teoría y guía de laboratorio",
+      "intro": "Math Core es un banco de trabajo gráfico para funciones, curvas y ecuaciones. Escribe una expresión y cada letra sin definir se convierte en un deslizador. El motor analiza tu LaTeX, construye una función compilada por expresión y la dibuja con muestreo adaptativo. La teoría siguiente explica lo que hace el motor, para que puedas predecir una gráfica a mano y comprobarla después en el lienzo.",
+      "principles": [
+        {
+          "heading": "De LaTeX a una función compilada",
+          "body": "Tu entrada se analiza una sola vez y se convierte en un árbol. El árbol se compila en una clausura, una pequeña función que calcula el valor para cualquier x sin volver a analizar. Al arrastrar un deslizador solo se llama a las clausuras con un nuevo valor del parámetro, por eso la gráfica sigue al puntero con suavidad. El motor nunca ejecuta el texto como código."
+        },
+        {
+          "heading": "Muestreo adaptativo y discontinuidades",
+          "body": "Primero se toman puntos a intervalos regulares. Donde el punto medio de un intervalo se aleja de la recta entre sus extremos, el intervalo se divide de nuevo, hasta una profundidad fija. Donde la función no está definida, como la raíz cuadrada de un número negativo, la curva se corta. Un salto muy grande se biseca antes de aceptarlo como asíntota, de modo que una curva empinada pero continua queda unida y un polo como 1/x se dibuja en dos partes."
+        },
+        {
+          "heading": "Derivadas y tangentes",
+          "body": "La tangente en un punto usa una diferencia central, que promedia un paso hacia delante y otro hacia atrás y cancela el primer término del error. El paso es la raíz cuadrada del épsilon de máquina por el mayor entre 1 y el tamaño de x, y equilibra el error de truncamiento con el de redondeo. Mueve el puntero sobre una curva para ver la pendiente y el triángulo de pendiente con su avance y su elevación."
+        },
+        {
+          "heading": "Dependencias entre líneas",
+          "body": "Cada línea puede definir un nombre, como a = 2 o f(x) = x^2, y puede usar nombres definidos por otras líneas. Estos vínculos forman un grafo dirigido. El motor evalúa las definiciones antes de sus usos y, cuando cambia un deslizador, reevalúa solo las líneas que dependen de él. Las definiciones circulares, donde a depende de b y b depende de a, se rechazan y el mensaje nombra las líneas implicadas."
+        }
+      ],
+      "equations": [
+        "Forma paramétrica de una curva polar r = f(θ)",
+        "Recta tangente en el punto x0",
+        "Diferencia central con el paso que usa el motor",
+        "Objetivo de precisión del corpus de referencia frente a valores de 50 dígitos",
+        "Dependencia de la línea j respecto de la línea i",
+        "Los valores del deslizador son múltiplos del paso"
+      ],
+      "parameters": [
+        {
+          "term": "Rango y paso del deslizador",
+          "body": "Cada deslizador tiene un mínimo, un máximo y un paso. El valor siempre queda dentro del rango y avanza en múltiplos del paso. Un paso pequeño da una animación suave y uno grande da saltos claros."
+        },
+        {
+          "term": "Periodo de animación",
+          "body": "Un deslizador animado va de un extremo de su rango al otro y vuelve. El periodo está entre 0.5 y 60 segundos. Como el movimiento es una onda triangular, una animación en bucle no tiene saltos bruscos."
+        },
+        {
+          "term": "Ventana y proporción",
+          "body": "La ventana es la zona visible en x e y. Con proporción igual, una unidad mide lo mismo en ambos ejes y una circunferencia se ve como tal. El zoom con la rueda o con las teclas más y menos mantiene fijo el punto bajo el puntero."
+        },
+        {
+          "term": "Enlace y exportación",
+          "body": "Toda la gráfica se guarda en la dirección, de modo que un enlace copiado reabre la misma gráfica. Una gráfica muy grande no cabe en un enlace y la página ofrece entonces un archivo JSON. También puedes exportar la imagen como PNG o SVG."
+        }
+      ],
+      "experiments": [
+        {
+          "title": "Amplitud y periodo",
+          "body": "Escribe y = a sin(b x) y aparecen dos deslizadores. Predice que a fija la altura de las ondas y que el periodo es 2π/b. Pon b en 2 y comprueba que la curva se repite cada 3.14 unidades."
+        },
+        {
+          "title": "De la secante a la tangente",
+          "body": "Escribe y = x^2 y pasa el puntero por la curva en x = 1. Predice una pendiente de 2. Compárala con la pendiente de la secante (f(1 + h) − f(1))/h para h = 1, 0.1 y 0.01 y observa que se acerca a 2."
+        },
+        {
+          "title": "Un polo y una curva empinada",
+          "body": "Dibuja y = 1/x y y = 50 arctan(100 x) en la misma gráfica. La primera se corta en x = 0 en dos partes y la segunda queda en una sola aunque sea muy empinada. Acerca el zoom en ambas para ver la diferencia."
+        },
+        {
+          "title": "Deslizadores dependientes",
+          "body": "Escribe a = 2, luego k = 3a y luego y = k x. Mueve a y observa cómo cambian k y la recta a la vez. Cambia la línea independiente y = sin x y fíjate en que su lista de deslizadores no cambia. El contador bajo la lista muestra cuántas líneas se reevaluaron."
+        }
+      ],
+      "applications": [
+        {
+          "field": "Sistemas de control",
+          "body": "Dibuja respuestas al escalón, magnitudes de Bode y lugares de las raíces como curvas paramétricas mientras un deslizador de ganancia mueve los polos. La misma herramienta de tangente lee la pendiente en el origen de una respuesta."
+        },
+        {
+          "field": "Procesamiento de señales",
+          "body": "Compara una sinusoide con sus sumas parciales de Fourier definiendo la suma con un deslizador para el número de términos, y observa el sobreimpulso de Gibbs cerca de un salto."
+        },
+        {
+          "field": "Métodos numéricos",
+          "body": "Dibuja una función y una raíz candidata, y lee la tangente en la estimación para seguir a mano un paso de Newton antes de usar una rutina numérica."
+        },
+        {
+          "field": "Docencia y exámenes",
+          "body": "Comparte una gráfica como enlace para que el estudiante abra exactamente los mismos deslizadores y curvas, y expórtala como SVG para ejercicios impresos."
+        }
+      ]
     }
   }
 }

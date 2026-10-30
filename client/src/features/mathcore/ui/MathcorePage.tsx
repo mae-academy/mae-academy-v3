@@ -3,7 +3,7 @@
  * route-level lazy loading, Graph IR as the single state (ADR-9) in the link (?g=), PNG/SVG/JSON export and text
  * descriptions. Compute Engine, parsing and sampling live in the engine Worker (ADR-1, ADR-11, ADR-12).
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { buildSvg } from "@shared/mathcore/export/svg";
 import { LINK_PARAM, decodeGraph, encodeGraph, exportJson, importJson } from "@shared/mathcore/ir/codec";
@@ -28,19 +28,39 @@ const LINK_DEBOUNCE_MS = 500;
 /** Default curve width when an item has no style (canvas drawing units). */
 const DEFAULT_WIDTH = 2.5;
 
+/** Theory section (STEPS.md §4, repo rule: every studio has one); loaded after the graph is usable. */
+const SimulationDocumentation = lazy(() => import("@/components/simulations/SimulationDocumentation"));
+
 type Result = Extract<EngineResponse, { type: "result" }>;
 type Trace = Extract<EngineResponse, { type: "trace" }>;
 
 let idCounter = 0;
 const newId = () => `e${Date.now().toString(36)}${(idCounter++).toString(36)}`;
 
-function initialGraph(): GraphIR {
+/** The graph in the address, or a starter graph; `invalid` when a `?g=` was present but could not be read. */
+function initialGraph(): { graph: GraphIR; invalid: boolean } {
   const encoded = new URLSearchParams(window.location.search).get(LINK_PARAM);
+  let invalid = false;
   if (encoded) {
     const r = decodeGraph(encoded);
-    if (r.ok) return r.graph;
+    if (r.ok) return { graph: r.graph, invalid: false };
+    invalid = true;
   }
-  return { ...emptyGraph(), items: [{ id: newId(), latex: "y=a\\sin(x)" }] };
+  return { graph: { ...emptyGraph(), items: [{ id: newId(), latex: "y=a\\sin(x)" }] }, invalid };
+}
+
+/**
+ * Takes the Worker's document into the page's. The Worker decides which sliders exist (it creates and removes them);
+ * the page keeps its own ranges, steps and animation, which the user may have edited since the request was sent.
+ * Values come from the Worker only for a `load`: retyping `a = 2` as `a = 5` moves the slider, a drag does not.
+ */
+function mergeParams(g: GraphIR, res: Result): GraphIR {
+  const next: Record<string, Param> = {};
+  for (const [name, theirs] of Object.entries(res.graph.params)) {
+    const mine = g.params[name];
+    next[name] = mine ? { ...mine, value: res.cause === "load" ? theirs.value : mine.value } : theirs;
+  }
+  return JSON.stringify(next) === JSON.stringify(g.params) ? g : { ...g, params: next };
 }
 
 function download(name: string, blob: Blob) {
@@ -54,7 +74,11 @@ function download(name: string, blob: Blob) {
 
 export default function MathcorePage() {
   const { t, i18n } = useTranslation(NS);
-  const [graph, setGraph] = useState<GraphIR>(initialGraph);
+  const [initial] = useState(initialGraph);
+  const [graph, setGraph] = useState<GraphIR>(initial.graph);
+  const [linkNotice] = useState<string | null>(initial.invalid ? t("linkInvalid") : null);
+  const [themeTick, setThemeTick] = useState(0);
+  const traceAt = useRef<{ id: string; x: number } | null>(null);
   const [result, setResult] = useState<Result | null>(null);
   const [trace, setTrace] = useState<Trace | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -90,8 +114,9 @@ export default function MathcorePage() {
         if (res.type === "result") {
           setResult(res);
           setNotice(null);
-          // Keep automatically created parameters (STEPS.md §5.2) without re-sending the document.
-          setGraph((g) => (JSON.stringify(g.params) === JSON.stringify(res.graph.params) ? g : { ...g, params: res.graph.params }));
+          setGraph((g) => mergeParams(g, res));
+          // A tangent follows its curve when a slider moves it.
+          if (traceAt.current) c.trace(traceAt.current.id, traceAt.current.x);
         } else if (res.type === "bench") setBench(res.results);
         else if (res.type === "error") setNotice(t("engineError", { message: res.message }));
       },
@@ -117,8 +142,17 @@ export default function MathcorePage() {
     return () => clearTimeout(id);
   }, [docKey, view]);
 
-  // The link always carries the full Graph IR (?g=); too large → keep the address bar as it was and say so.
+  // The theme class on <html> decides every token color: repaint when it changes.
   useEffect(() => {
+    const observer = new MutationObserver(() => setThemeTick((n) => n + 1));
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class", "data-theme"] });
+    return () => observer.disconnect();
+  }, []);
+
+  // The link always carries the full Graph IR (?g=); too large → keep the address bar as it was and say so.
+  // A shared link that could not be read stays in the address bar until the user edits something.
+  useEffect(() => {
+    if (initial.invalid && graph.items === initial.graph.items) return;
     const id = setTimeout(() => {
       const enc = encodeGraph(graph);
       setLinkTooLarge(!enc.ok);
@@ -129,7 +163,7 @@ export default function MathcorePage() {
       }
     }, LINK_DEBOUNCE_MS);
     return () => clearTimeout(id);
-  }, [graph]);
+  }, [graph, initial]);
 
   const setItems = (items: Item[]) => setGraph((g) => ({ ...g, items }));
 
@@ -155,9 +189,9 @@ export default function MathcorePage() {
   const colors = useMemo(() => {
     const root = document.documentElement;
     return graph.items.map((it, i) => resolveColor(root, it.style?.color, PALETTE_TOKENS[i % PALETTE_TOKENS.length]));
-    // The theme class on <html> can change; recompute with the results.
+    // `result` and `themeTick` only trigger a re-read of the tokens.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [graph.items, result]);
+  }, [graph.items, result, themeTick]);
 
   const scene: Scene = useMemo(() => {
     const curves: DrawCurve[] = [];
@@ -286,6 +320,11 @@ export default function MathcorePage() {
         </p>
       )}
       {linkTooLarge && <p className="mc-notice">{t("linkTooLarge")}</p>}
+      {linkNotice && (
+        <p className="mc-notice" role="status">
+          {linkNotice}
+        </p>
+      )}
       <div className="mc-layout">
         <aside className="mc-panel" aria-label={t("expressions")}>
           {!result && <p className="mc-note">{t("loadingEngine")}</p>}
@@ -341,7 +380,7 @@ export default function MathcorePage() {
                     <tr key={b.id}>
                       <td>{b.id}</td>
                       <td>{b.unit === "ms" ? `${b.median.toFixed(3)} ms` : `${Math.round(b.median).toLocaleString()} /s`}</td>
-                      <td>{b.pass ? "PASS" : "FAIL"}</td>
+                      <td>{b.pass ? t("benchPass") : t("benchFail")}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -354,7 +393,11 @@ export default function MathcorePage() {
             scene={scene}
             onViewport={setViewport}
             traceTargets={traceTargets}
-            onTrace={(target) => (target ? client.current?.trace(target.id, target.x) : setTrace(null))}
+            onTrace={(target) => {
+              traceAt.current = target;
+              if (target) client.current?.trace(target.id, target.x);
+              else setTrace(null);
+            }}
             draggable={draggable}
             onDragPoint={onDragPoint}
             equalAspect={graph.viewport.aspect === "equal"}
@@ -370,6 +413,9 @@ export default function MathcorePage() {
           )}
         </section>
       </div>
+      <Suspense fallback={null}>
+        <SimulationDocumentation topic="mathcore" />
+      </Suspense>
     </div>
   );
 }

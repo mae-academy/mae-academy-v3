@@ -3,7 +3,7 @@
 The owner gave blanket approval (2026-10-30, in session) to build the whole Math Core engine in the cloud session,
 on `automation/setup`, touching nothing outside the mathcore paths, with every step checked by the reviewers.
 Where `a-1-questions.md` asked for a decision, the executor applied the recommendation below under that approval.
-Each one is verified by running Compute Engine 0.58.0 (see `phase-0-measurements.md`), not by reading its source.
+Each one is verified by running Compute Engine 0.58.0 (see `a-1-measurements.md`), not by reading its source.
 
 | Q | Decision | Reason |
 |---|---|---|

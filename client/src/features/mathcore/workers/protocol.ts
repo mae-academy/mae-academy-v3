@@ -48,6 +48,8 @@ export type EngineResponse =
       evaluations: number;
       /** Ids re-evaluated by this request (empty for a pure view change). */
       reevaluated: string[];
+      /** The request this answers; a `load` answer may carry slider values that the document text changed. */
+      cause: "load" | "param" | "view";
       ms: number;
     }
   | { type: "bench"; seq: number; results: unknown }

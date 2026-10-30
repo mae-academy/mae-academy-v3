@@ -46,5 +46,8 @@
   "value_is": "= {{value}}",
   "benchmarks": "Ejecutar mediciones",
   "benchHeader": "Mediciones en este dispositivo (STEPS.md §7.2)",
-  "evaluations": "{{count}} evaluaciones; la última actualización reevaluó {{changed}}"
+  "evaluations": "{{count}} evaluaciones; la última actualización reevaluó {{changed}}",
+  "linkInvalid": "Este enlace no es una gráfica válida, así que se muestra una nueva. La dirección se conserva hasta que edites.",
+  "benchPass": "Cumple",
+  "benchFail": "No cumple"
 }
