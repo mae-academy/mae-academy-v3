@@ -69,6 +69,10 @@ export interface TransformResult {
   /** +1 orientation kept, −1 reversed, 0 singular. */
   orientation: -1 | 0 | 1;
   eigenLines: Float64Array[];
+  /** Repeated (double line), scalar (radial lines) or complex (rotation arc of θ) eigenvalues, or two lines. */
+  eigenMarker: { kind: "lines" | "double" | "radial" | "rotation"; theta?: number };
+  /** Matrix name for the canvas labels (A·î is written M·î for a matrix named M). */
+  name: string;
 }
 
 export type EngineResponse =

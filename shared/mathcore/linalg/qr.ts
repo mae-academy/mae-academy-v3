@@ -8,7 +8,10 @@
  *    without deflation an exceptional shift breaks cycles. (Algorithm of EISPACK `hqr`.)
  * Repeated and complex eigenvalues are therefore handled explicitly, as the plan requires.
  */
+import { EIGEN_IMAG_RELATIVE } from "../constants";
 import type { Mat } from "./matrix";
+
+export { EIGEN_IMAG_RELATIVE };
 
 export interface EigenValue {
   re: number;
@@ -206,7 +209,7 @@ export interface Eigen3 {
 }
 
 /** Relative tolerance for treating two eigenvalues as equal, or an imaginary part as zero. */
-const EIGEN_EQUAL_TOLERANCE = 1e-9;
+const EIGEN_EQUAL_TOLERANCE = EIGEN_IMAG_RELATIVE;
 
 const cross = (u: number[], v: number[]): [number, number, number] => [
   u[1] * v[2] - u[2] * v[1],

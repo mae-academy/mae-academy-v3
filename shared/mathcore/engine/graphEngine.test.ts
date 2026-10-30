@@ -261,3 +261,63 @@ describe("GraphEngine: Phase 3 re-review regressions", () => {
     expect(size).toBeLessThanOrEqual(2);
   });
 });
+
+describe("GraphEngine: Phase 4 review regressions", () => {
+  const vec2 = "\\begin{bmatrix}x\\\\y\\end{bmatrix}";
+  it("a slider that moves an item into an error and out again clears the error", () => {
+    const e = new GraphEngine(parser, doc(["M = \\begin{bmatrix} \\frac{1}{a} & 0 \\\\ 0 & 1 \\end{bmatrix}"], { a: { value: 1, min: -5, max: 5, step: 1 } }));
+    e.setParam("a", 0);
+    expect(e.item("i1")?.errors[0]?.message).toMatch(/finite/);
+    e.setParam("a", 2);
+    expect(e.item("i1")?.errors).toEqual([]);
+    expect(e.runtime("i1")).toMatchObject({ values: [[0.5, 0], [0, 1]] });
+  });
+
+  it("a system on a named matrix follows the matrix into and out of an error (no stale matrix)", () => {
+    const e = new GraphEngine(parser, doc(["M = \\begin{bmatrix} \\frac{1}{a} & 0 \\\\ 0 & 1 \\end{bmatrix}", `M${vec2}=\\begin{bmatrix}1\\\\2\\end{bmatrix}`], { a: { value: 1, min: -5, max: 5, step: 1 } }));
+    expect(e.runtime("i2")).toMatchObject({ A: [[1, 0], [0, 1]] });
+    e.setParam("a", 0);
+    expect(e.item("i2")?.errors[0]?.message).toMatch(/"M" has an error/);
+    e.setParam("a", 4);
+    expect(e.item("i2")?.errors).toEqual([]);
+    expect(e.runtime("i2")).toMatchObject({ A: [[0.25, 0], [0, 1]] });
+  });
+
+  it("linearity is structural: |y − 1|, |z|, a·x² with a = 0, 1/x are all rejected", () => {
+    for (const bad of [
+      "\\begin{cases}x+|y-1|=3\\\\x-y=0\\end{cases}",
+      "\\begin{cases}x+y+|z|=3\\\\x-y=0\\\\x+z=1\\end{cases}",
+      "\\begin{cases}a x^2+y=1\\\\x-y=0\\end{cases}",
+      "\\begin{cases}\\frac{1}{x}+y=1\\\\x-y=0\\end{cases}",
+      "\\begin{cases}xy=1\\\\x-y=0\\end{cases}",
+      "\\begin{cases}2^x+y=1\\\\x-y=0\\end{cases}",
+    ]) {
+      const e = new GraphEngine(parser, doc([bad], { a: { value: 0, min: -5, max: 5, step: 1 } }));
+      expect(e.item("i1")?.errors[0]?.message, bad).toMatch(/not linear/);
+    }
+    // Linear with parameters and constants in odd places is accepted.
+    const ok = new GraphEngine(parser, doc(["\\begin{cases}\\frac{x}{2}+a y=\\sin(1)\\\\x-\\frac{y}{a}=0\\end{cases}"], { a: { value: 2, min: -5, max: 5, step: 1 } }));
+    expect(ok.item("i1")?.errors).toEqual([]);
+    expect(ok.runtime("i1")).toMatchObject({ A: [[0.5, 2], [1, -0.5]] });
+  });
+
+  it("a large constant does not swallow the coefficients (x + y + 10¹⁷ = 0)", () => {
+    const e = new GraphEngine(parser, doc(["\\begin{cases}x+y+10^{17}=0\\\\x-y=0\\end{cases}"]));
+    expect(e.runtime("i1")).toMatchObject({ A: [[1, 1], [1, -1]], b: [-1e17, 0] });
+  });
+
+  it("b = A x (sides reversed) is a system too", () => {
+    const e = new GraphEngine(parser, doc([`\\begin{bmatrix}5\\\\6\\end{bmatrix}=\\begin{bmatrix}1&2\\\\3&4\\end{bmatrix}${vec2}`]));
+    expect(e.runtime("i1")).toMatchObject({ kind: "GaussSystem", A: [[1, 2], [3, 4]], b: [5, 6] });
+  });
+
+  it("a rejected line creates no sliders; messages show π, not Pi; unknowns that shadow a slider are flagged", () => {
+    const rejected = new GraphEngine(parser, doc(["\\begin{bmatrix}1&a\\\\0&2\\end{bmatrix}\\begin{bmatrix}a\\\\b\\end{bmatrix}=\\begin{bmatrix}1\\\\2\\end{bmatrix}"]));
+    expect(rejected.item("i1")?.errors.length).toBeGreaterThan(0);
+    expect(rejected.graph.params).toEqual({});
+    const pi = new GraphEngine(parser, doc([`\\pi${vec2}=\\begin{bmatrix}1\\\\2\\end{bmatrix}`]));
+    expect(pi.item("i1")?.errors[0]?.message).toContain('"π"');
+    const shadow = new GraphEngine(parser, doc(["a = 5", "\\begin{bmatrix}1&0\\\\0&2\\end{bmatrix}\\begin{bmatrix}a\\\\b\\end{bmatrix}=\\begin{bmatrix}1\\\\2\\end{bmatrix}"]));
+    expect(shadow.item("i2")?.warnings[0]).toMatch(/a is an unknown here/);
+  });
+});

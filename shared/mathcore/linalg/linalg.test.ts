@@ -204,22 +204,73 @@ describe("2×2 transform geometry (STEPS.md §8.2)", () => {
     expect(g.orientation).toBe(-1);
     expect(transform2([[1, 2], [2, 4]], view).singular).toBe(true);
   });
-  it("transformed grid lines stay parallel and evenly spaced", () => {
+  const dirOf = (l: Float64Array) => Math.atan2(l[3] - l[1], l[2] - l[0]);
+  const families = (grid: Float64Array[]) => {
+    const out: Float64Array[][] = [];
+    for (const l of grid) {
+      const f = out.find((g) => Math.abs(Math.sin(dirOf(g[0]) - dirOf(l))) < 1e-9);
+      if (f) f.push(l);
+      else out.push([l]);
+    }
+    return out;
+  };
+  /** A family of parallel lines covers the box when no strip wider than one line spacing is left empty at its sides. */
+  const covers = (fam: Float64Array[], v: { xmin: number; xmax: number; ymin: number; ymax: number }) => {
+    const t = dirOf(fam[0]);
+    const n = [-Math.sin(t), Math.cos(t)];
+    const offs = fam.map((l) => l[0] * n[0] + l[1] * n[1]).sort((p, q) => p - q);
+    const cs = [[v.xmin, v.ymin], [v.xmax, v.ymin], [v.xmin, v.ymax], [v.xmax, v.ymax]].map(([x, y]) => x * n[0] + y * n[1]);
+    const spacing = offs.length > 1 ? offs[1] - offs[0] : Infinity;
+    const slack = 1e-9 * Math.max(...cs.map(Math.abs), 1);
+    return offs[0] <= Math.min(...cs) + spacing + slack && offs[offs.length - 1] >= Math.max(...cs) - spacing - slack;
+  };
+  it("transformed grid lines stay parallel and evenly spaced, two families", () => {
     const g = transform2([[1, 0.5], [0.2, 1]], view);
-    const dir = (l: Float64Array) => Math.atan2(l[3] - l[1], l[2] - l[0]);
-    const verticals = g.grid.filter((_, i) => i % 2 === 0);
-    for (const l of verticals) expect(Math.abs(Math.sin(dir(l) - dir(verticals[0])))).toBeLessThan(1e-12);
-    // Spacing: consecutive lines x = k map to offsets A·(1, 0) apart.
-    const mid = (l: Float64Array) => [(l[0] + l[2]) / 2, (l[1] + l[3]) / 2];
-    const d1 = mid(verticals[21]).map((v, i) => v - mid(verticals[20])[i]);
-    const d2 = mid(verticals[22]).map((v, i) => v - mid(verticals[21])[i]);
-    expect(d1[0]).toBeCloseTo(d2[0], 12);
-    expect(d1[1]).toBeCloseTo(d2[1], 12);
+    const fam = families(g.grid);
+    expect(fam.length).toBe(2);
+    for (const f of fam) {
+      const t = dirOf(f[0]);
+      const n = [-Math.sin(t), Math.cos(t)];
+      const offs = f.map((l) => l[0] * n[0] + l[1] * n[1]).sort((p, q) => p - q);
+      const gaps = offs.slice(1).map((o, i) => o - offs[i]);
+      for (const gap of gaps) expect(gap).toBeCloseTo(gaps[0], 10);
+    }
   });
-  it("draws eigen-lines for real eigenvalues and none for a rotation", () => {
+  it("the grid reaches across any view: contraction, zoomed out, far from the origin", () => {
+    const cases: Array<[number[][], { xmin: number; xmax: number; ymin: number; ymax: number; aspect: "equal" }]> = [
+      [[[0.01, 0], [0, 0.01]], { xmin: -10, xmax: 10, ymin: -10, ymax: 10, aspect: "equal" }],
+      [[[1, 0], [0, 1]], { xmin: -100, xmax: 100, ymin: -100, ymax: 100, aspect: "equal" }],
+      [[[2, 1], [1, 3]], { xmin: 1000, xmax: 1010, ymin: 1000, ymax: 1010, aspect: "equal" }],
+      [[[1e5, 0], [0, 1e-5]], { xmin: -10, xmax: 10, ymin: -10, ymax: 10, aspect: "equal" }],
+    ];
+    for (const [A, v] of cases) {
+      const g = transform2(A, v);
+      const fam = families(g.grid);
+      expect(fam.length, JSON.stringify(A)).toBe(2);
+      for (const f of fam) {
+        expect(f.length).toBeLessThanOrEqual(2 * 120 + 2);
+        expect(covers(f, v), `${JSON.stringify(A)} ${JSON.stringify(v)}`).toBe(true);
+      }
+    }
+    // Eigen-lines through the origin are clipped to the view and still visible far from it.
+    const far = transform2([[2, 1], [1, 2]], { xmin: 1000, xmax: 1010, ymin: 1000, ymax: 1010, aspect: "equal" });
+    expect(far.eigenLines.length).toBe(1);
+    expect(Math.min(far.eigenLines[0][0], far.eigenLines[0][2])).toBeGreaterThan(990);
+  });
+  it("eigen markers: two lines, a double line, radial lines, a rotation arc", () => {
+    expect(transform2([[2, 1], [1, 2]], view)).toMatchObject({ eigenMarker: { kind: "lines" } });
     expect(transform2([[2, 1], [1, 2]], view).eigenLines).toHaveLength(2);
-    expect(transform2([[1, 1], [0, 1]], view).eigenLines).toHaveLength(1);
-    expect(transform2([[0, -1], [1, 0]], view).eigenLines).toHaveLength(0);
+    const shear = transform2([[1, 1], [0, 1]], view);
+    expect(shear.eigenMarker.kind).toBe("double");
+    expect(shear.eigenLines).toHaveLength(1);
+    const scalar = transform2([[3, 0], [0, 3]], view);
+    expect(scalar.eigenMarker.kind).toBe("radial");
+    expect(scalar.eigenLines.length).toBe(8);
+    const rot = transform2([[0, -1], [1, 0]], view);
+    expect(rot.eigenMarker).toEqual({ kind: "rotation", theta: Math.PI / 2 });
+    expect(rot.eigenLines).toHaveLength(0);
+    // The singular image is one line (the column space).
+    expect(families(transform2([[1, 2], [2, 4]], view).grid).length).toBe(1);
   });
 });
 

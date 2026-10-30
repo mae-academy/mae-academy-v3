@@ -3,7 +3,7 @@
  * Colors and the label font come from the design tokens in client/src/index.css, read at draw time, so the theme
  * (light/dark) is always current and no color is written in this file.
  */
-import { DASH_PATTERNS, FIELD_OPACITY, TRANSFORM_GRID_OPACITY } from "@shared/mathcore/constants";
+import { ANGLE_DIGITS, DASH_PATTERNS, FIELD_OPACITY, TRANSFORM_GRID_OPACITY } from "@shared/mathcore/constants";
 import type { Viewport } from "@shared/mathcore/ir/types";
 
 export interface DrawCurve {
@@ -50,6 +50,10 @@ export interface DrawTransform {
   iHat: [number, number];
   jHat: [number, number];
   eigenLines: readonly Float64Array[];
+  /** How the eigen-directions are marked (STEPS.md §8.2): two lines, a double line, radial lines, a rotation arc. */
+  eigenMarker?: { kind: "lines" | "double" | "radial" | "rotation"; theta?: number };
+  /** Matrix name on the arrow labels. */
+  name?: string;
   /** Item color: the transformed grid. */
   color: string;
   /** Unit-square image fill for orientation +1 and −1. */
@@ -149,6 +153,9 @@ const ARROW_WIDTH = 2.5;
 const ARROW_HEAD = 10;
 /** Eigen-direction line width in CSS pixels. */
 const EIGEN_WIDTH = 1.5;
+/** Gap of a double eigen-line (repeated eigenvalue) and radius of the rotation arc, in CSS pixels. */
+const DOUBLE_LINE_GAP = 2;
+const ROTATION_ARC_RADIUS = 36;
 /** Arrow-head half width and label offset, as fractions of the head length. */
 const ARROW_HEAD_SPREAD = 0.5;
 const ARROW_LABEL_OFFSET = 0.6;
@@ -243,15 +250,25 @@ export class Canvas2DRenderer implements Renderer {
       ctx.beginPath();
       for (const s of c.segments) {
         if (s.length === 2) continue;
-        ctx.moveTo(X(s[0]), Y(s[1]));
-        if (c.smooth && s.length >= 6) {
-          // Each vertex becomes the control point of a quadratic from the previous midpoint to the next one; the ends
-          // stay where the contour put them.
-          for (let i = 2; i < s.length - 2; i += 2) {
+        const n = s.length;
+        const closed = n >= 8 && s[0] === s[n - 2] && s[1] === s[n - 1];
+        if (c.smooth && closed) {
+          // A loop starts and ends at the midpoint of its first edge, so the seam is smooth too.
+          ctx.moveTo(X((s[0] + s[2]) / 2), Y((s[1] + s[3]) / 2));
+          for (let i = 2; i < n - 2; i += 2) {
             ctx.quadraticCurveTo(X(s[i]), Y(s[i + 1]), X((s[i] + s[i + 2]) / 2), Y((s[i + 1] + s[i + 3]) / 2));
           }
-          ctx.lineTo(X(s[s.length - 2]), Y(s[s.length - 1]));
+          ctx.quadraticCurveTo(X(s[0]), Y(s[1]), X((s[0] + s[2]) / 2), Y((s[1] + s[3]) / 2));
+        } else if (c.smooth && n >= 6) {
+          // At least three points: each vertex becomes the control point of a quadratic from the previous midpoint to
+          // the next one; the ends stay where the contour put them.
+          ctx.moveTo(X(s[0]), Y(s[1]));
+          for (let i = 2; i < n - 2; i += 2) {
+            ctx.quadraticCurveTo(X(s[i]), Y(s[i + 1]), X((s[i] + s[i + 2]) / 2), Y((s[i + 1] + s[i + 3]) / 2));
+          }
+          ctx.lineTo(X(s[n - 2]), Y(s[n - 1]));
         } else {
+          ctx.moveTo(X(s[0]), Y(s[1]));
           for (let i = 2; i < s.length; i += 2) ctx.lineTo(X(s[i]), Y(s[i + 1]));
         }
       }
@@ -321,21 +338,59 @@ export class Canvas2DRenderer implements Renderer {
     ctx.strokeStyle = t.orientation < 0 ? t.negative : t.positive;
     ctx.lineWidth = 1;
     ctx.stroke();
-    // Eigen-directions.
+    // Eigen-directions: dashed lines; a repeated eigenvalue with one direction is a double line, a scalar matrix
+    // radial lines through the origin, complex eigenvalues an arc of the rotation angle θ.
+    const marker = t.eigenMarker?.kind ?? "lines";
     ctx.strokeStyle = t.eigen;
     ctx.lineWidth = EIGEN_WIDTH;
-    ctx.setLineDash([...DASH_PATTERNS.dashed]);
+    ctx.setLineDash(marker === "radial" ? [...DASH_PATTERNS.dotted] : [...DASH_PATTERNS.dashed]);
     ctx.beginPath();
     for (const l of t.eigenLines) {
-      ctx.moveTo(X(l[0]), Y(l[1]));
-      ctx.lineTo(X(l[2]), Y(l[3]));
+      const offsets = marker === "double" ? [-DOUBLE_LINE_GAP, DOUBLE_LINE_GAP] : [0];
+      const len = Math.hypot(X(l[2]) - X(l[0]), Y(l[3]) - Y(l[1])) || 1;
+      const nx = -(Y(l[3]) - Y(l[1])) / len;
+      const ny = (X(l[2]) - X(l[0])) / len;
+      for (const o of offsets) {
+        ctx.moveTo(X(l[0]) + o * nx, Y(l[1]) + o * ny);
+        ctx.lineTo(X(l[2]) + o * nx, Y(l[3]) + o * ny);
+      }
     }
     ctx.stroke();
     ctx.setLineDash([]);
-    // Aî and Aĵ.
     ctx.font = font;
-    for (const [v, label] of [[t.iHat, "Aî"], [t.jHat, "Aĵ"]] as const) this.arrow(X(0), Y(0), X(v[0]), Y(v[1]), t.arrow, label);
+    if (marker === "rotation" && t.eigenMarker?.theta !== undefined) this.rotationArc(X(0), Y(0), t.eigenMarker.theta, t.eigen);
+    // A·î and A·ĵ, with the matrix's own name.
+    const name = t.name ?? "A";
+    for (const [v, label] of [[t.iHat, `${name}î`], [t.jHat, `${name}ĵ`]] as const) this.arrow(X(0), Y(0), X(v[0]), Y(v[1]), t.arrow, label);
     ctx.restore();
+  }
+
+  /** Arc from the x-axis through θ (counter-clockwise on screen), with an arrow head and the angle in degrees. */
+  private rotationArc(cx: number, cy: number, theta: number, color: string): void {
+    const { ctx } = this;
+    ctx.strokeStyle = color;
+    ctx.fillStyle = color;
+    ctx.lineWidth = EIGEN_WIDTH;
+    ctx.beginPath();
+    // Screen y points down, so a counter-clockwise world angle is negative on the canvas.
+    ctx.arc(cx, cy, ROTATION_ARC_RADIUS, 0, -theta, true);
+    ctx.stroke();
+    const ex = cx + ROTATION_ARC_RADIUS * Math.cos(theta);
+    const ey = cy - ROTATION_ARC_RADIUS * Math.sin(theta);
+    // Head tangent to the arc at its end.
+    const tx = -Math.sin(theta);
+    const ty = -Math.cos(theta);
+    const h = ARROW_HEAD * ARROW_HEAD_SPREAD * 2;
+    ctx.beginPath();
+    ctx.moveTo(ex, ey);
+    ctx.lineTo(ex - tx * h - ty * h * ARROW_HEAD_SPREAD, ey - ty * h + tx * h * ARROW_HEAD_SPREAD);
+    ctx.lineTo(ex - tx * h + ty * h * ARROW_HEAD_SPREAD, ey - ty * h - tx * h * ARROW_HEAD_SPREAD);
+    ctx.closePath();
+    ctx.fill();
+    const mid = theta / 2;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.fillText(`θ = ${Number(((theta * 180) / Math.PI).toPrecision(ANGLE_DIGITS))}°`, cx + (ROTATION_ARC_RADIUS + ARROW_HEAD) * Math.cos(mid), cy - (ROTATION_ARC_RADIUS + ARROW_HEAD) * Math.sin(mid));
   }
 
   private arrow(x0: number, y0: number, x1: number, y1: number, color: string, label: string): void {

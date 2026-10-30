@@ -374,3 +374,68 @@ describe("stitch", () => {
     expect(Array.from(out.find((l) => l.length === 8) ?? [])).toEqual([0, 0, 1, 0, 1.001, 0, 2, 0]);
   });
 });
+
+describe("Phase 3 third round: steep zeros, weak zeros, aliasing at any canvas size", () => {
+  const O = { width: 800, height: 500, cellPx: 6, refine: 4 };
+  const ymaxOf = (polys: readonly Float64Array[]) => Math.max(...polys.flatMap((p) => Array.from(p).filter((_, i) => i % 2 === 1)));
+  it("steep but finite F keeps its zero set (not mistaken for a pole or a jump)", () => {
+    const circle = (x: number, y: number) => x * x + y * y - 1;
+    const v = { xmin: -2, xmax: 2, ymin: -1.25, ymax: 1.25, aspect: "equal" as const };
+    for (const F of [(x: number, y: number) => Math.tanh(1e5 * circle(x, y)), (x: number, y: number) => 1 / (1 + Math.exp(-1e5 * circle(x, y))) - 0.5]) {
+      const c = contour(F, v, O);
+      expect(c.polylines.length).toBe(1);
+      for (const [x, y] of points(c.polylines)) expect(Math.abs(Math.hypot(x, y) - 1)).toBeLessThan(1e-3);
+    }
+    const parabola = contour((x, y) => Math.atan(1e6 * (y - x * x)), { xmin: -2, xmax: 2, ymin: -1, ymax: 3, aspect: "free" }, O);
+    expect(parabola.polylines.length).toBe(1);
+    const wave = contour((x, y) => Math.tanh(1e4 * (y - Math.sin(x))), { xmin: -10, xmax: 10, ymin: -6.25, ymax: 6.25, aspect: "equal" }, O);
+    expect(wave.polylines.length).toBe(1);
+  });
+
+  it("weak zeros |d|^p with p < 1/4 are kept: |x|^0.2 + |y|^0.2 = 1 reaches its tips; y = x^(1/9)", () => {
+    const c = contour((x, y) => Math.abs(x) ** 0.2 + Math.abs(y) ** 0.2 - 1, { xmin: -1.2, xmax: 1.2, ymin: -1.2, ymax: 1.2, aspect: "free" }, O);
+    expect(ymaxOf(c.polylines)).toBeGreaterThan(0.99);
+    const root9 = contour((x, y) => y - Math.sign(x) * Math.abs(x) ** (1 / 9), { xmin: -2, xmax: 2, ymin: -1.25, ymax: 1.25, aspect: "equal" }, O);
+    const xs = points(root9.polylines).map(([x]) => x);
+    expect(Math.min(...xs)).toBeLessThan(-1.9);
+    expect(Math.max(...xs)).toBeGreaterThan(1.9);
+  });
+
+  it("shading does not alias at any canvas size (full quality, < 2% vs per-pixel)", () => {
+    const S = (x: number, y: number) => Math.sin(40 * x) * Math.sin(40 * y);
+    for (const [w, h, X] of [[800, 500, 20], [800, 500, 21], [1600, 1000, 21], [1600, 1000, 42], [1200, 700, 30]]) {
+      const view = { xmin: -X, xmax: X, ymin: (-X * h) / w, ymax: (X * h) / w, aspect: "equal" as const };
+      const exact = regionMask(S, view, w, h, 1, insideTest(">"));
+      const fast = regionMask(S, view, w, h, 1, insideTest(">"), 6);
+      let bad = 0;
+      for (let i = 0; i < exact.data.length; i++) if (exact.data[i] !== fast.data[i]) bad++;
+      expect(bad / exact.data.length, `${w}×${h} ±${X}`).toBeLessThan(0.02);
+    }
+  });
+
+  it("the last lattice row and column lie exactly on the view border", () => {
+    const seen: number[] = [];
+    contour((x, y) => {
+      if (Math.abs(y - 0.7) < 1e-9 || Math.abs(x - 0.9) < 1e-9) seen.push(y === 0.7 || x === 0.9 ? 1 : 0);
+      return x - y;
+    }, { xmin: -0.3, xmax: 0.9, ymin: -0.1, ymax: 0.7, aspect: "free" }, { width: 97, height: 61, cellPx: 6, refine: 4 });
+    expect(seen.length).toBeGreaterThan(0);
+    expect(seen.every((v) => v === 1)).toBe(true);
+  });
+});
+
+describe("stitch: crowded ends and exact joins", () => {
+  it("3000 fragments whose ends crowd one cell stay fast", () => {
+    const r = rng(11);
+    const frags: Float64Array[] = [];
+    for (let k = 0; k < 3000; k++) frags.push(Float64Array.of(r() * 1e-3, r() * 1e-3, 1 + r(), 1 + r()));
+    const t0 = performance.now();
+    stitch(frags, 0.01);
+    expect(performance.now() - t0).toBeLessThan(1500);
+  });
+  it("pieces that meet exactly are joined without a duplicate vertex", () => {
+    const out = stitch([Float64Array.of(0, 0, 1, 0), Float64Array.of(1, 0, 1, 1), Float64Array.of(1, 1, 0, 0)], 0.01);
+    expect(out.length).toBe(1);
+    expect(Array.from(out[0])).toEqual([0, 0, 1, 0, 1, 1, 0, 0]);
+  });
+});

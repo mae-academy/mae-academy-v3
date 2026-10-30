@@ -58,7 +58,7 @@ export function createParseClient(config: ParseClientConfig): ParseClient {
     cache.set(latex, entry);
     transient.delete(latex);
   };
-  const once = (latex: string, entry: ParsedEntry) => transient.set(latex, entry);
+  const once = (latex: string, entry: ParsedEntry) => transient.set(latex, entry.ok ? entry : { ...entry, transient: true });
 
   const parseOne = (latex: string): Promise<void> =>
     new Promise<void>((resolve) => {
@@ -75,8 +75,13 @@ export function createParseClient(config: ParseClientConfig): ParseClient {
           const n = (timeouts.get(latex) ?? 0) + 1;
           timeouts.set(latex, n);
           const entry: ParsedEntry = { ok: false, message: `Parsing took longer than ${timeoutMs} ms` };
-          if (n >= PARSE_TIMEOUTS_BEFORE_CACHE) remember(latex, entry);
-          else once(latex, entry);
+          if (n >= PARSE_TIMEOUTS_BEFORE_CACHE) {
+            timeouts.delete(latex);
+            remember(latex, entry);
+          } else {
+            if (timeouts.size > PARSE_CACHE_LIMIT) timeouts.delete(timeouts.keys().next().value as string);
+            once(latex, entry);
+          }
         }
         resolve();
       }, limit);

@@ -7,6 +7,7 @@ import type { Viewport } from "@shared/mathcore/ir/types";
 import type { ImplicitSource } from "@shared/mathcore/implicit/source";
 import type { FieldOptions, FieldResult } from "@shared/mathcore/implicit/strips";
 import { mergeStrips, planStrips } from "@shared/mathcore/implicit/strips";
+import { STRIP_LOAD_TIMEOUT_MS, STRIP_TIMEOUT_MS } from "@shared/mathcore/constants";
 import type { StripRequest, StripResponse } from "./stripProtocol";
 
 export interface StripWorkerLike {
@@ -22,8 +23,18 @@ export interface StripPool {
   dispose(): void;
 }
 
-export function createStripPool(size: number, createWorker: () => StripWorkerLike): StripPool {
+export interface StripPoolOptions {
+  /** Limit for a run once every Worker has answered once. */
+  timeoutMs?: number;
+  /** Limit for runs before that (the strip Worker chunk may still be downloading). */
+  loadTimeoutMs?: number;
+}
+
+export function createStripPool(size: number, createWorker: () => StripWorkerLike, opts: StripPoolOptions = {}): StripPool {
+  const timeoutMs = opts.timeoutMs ?? STRIP_TIMEOUT_MS;
+  const loadTimeoutMs = opts.loadTimeoutMs ?? STRIP_LOAD_TIMEOUT_MS;
   const workers = Array.from({ length: size }, createWorker);
+  let warm = false;
   const waiting = new Map<number, { resolve: (r: FieldResult) => void; reject: (e: Error) => void }>();
   let nextId = 0;
   const failAll = (message: string) => {
@@ -35,6 +46,7 @@ export function createStripPool(size: number, createWorker: () => StripWorkerLik
       const pending = waiting.get(ev.data.id);
       if (!pending) return;
       waiting.delete(ev.data.id);
+      warm = true;
       if (ev.data.ok) pending.resolve(ev.data.result);
       else pending.reject(new Error(ev.data.message));
     };
@@ -52,7 +64,14 @@ export function createStripPool(size: number, createWorker: () => StripWorkerLik
             workers[k % size].postMessage({ id, source, viewport: s.viewport, options: { ...options, height: s.bottom - s.top } });
           }),
       );
-      return Promise.all(parts).then((r) => mergeStrips(r, viewport, options));
+      // A strip Worker that stalls fails the run (the engine Worker then computes the field itself).
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const limit = new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error("A strip Worker did not answer in time")), warm ? timeoutMs : loadTimeoutMs);
+      });
+      return Promise.race([Promise.all(parts), limit])
+        .then((r) => mergeStrips(r, viewport, options))
+        .finally(() => clearTimeout(timer));
     },
     dispose() {
       failAll("The strip pool was closed");

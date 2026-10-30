@@ -1,17 +1,17 @@
 /**
  * Linear algebra for 2×2 and 3×3 matrices (STEPS.md §8.2, Phase 4; 3×3 eigenvalues in qr.ts).
  *
- * - Determinant by Gaussian elimination with partial pivoting (the plan's method), exact for rational input.
+ * - Determinant by Gaussian elimination (the plan's method) in exact rational arithmetic: on the decimals the user
+ *   typed when they are short, otherwise on the exact values of the doubles (every double is m / 2ᵏ). The result is
+ *   the correctly rounded determinant of the matrix actually stored, also when it is nearly singular.
  * - "Singular" is decided relative to the matrix scale (Hadamard bound), never by an absolute tolerance (§9).
  * - 2×2 eigenvalues in closed form, computed without cancellation; repeated and complex cases are reported
  *   explicitly (scalar matrix = every direction, defective = one direction, complex = rotation-scaling).
  */
+import { DISCRIMINANT_ULPS, SINGULAR_RELATIVE_TOLERANCE } from "../constants";
 import { Fraction } from "./fraction";
 
 export type Mat = number[][];
-
-/** |det| below this times the Hadamard bound (product of row norms) counts as singular. */
-export const SINGULAR_RELATIVE_TOLERANCE = 1e-12;
 
 export function size(A: Mat): number {
   return A.length;
@@ -48,6 +48,28 @@ export function toFractions(A: Mat): Fraction[][] | null {
     out.push(r);
   }
   return out;
+}
+
+/** Exact values of the doubles in A (dyadic rationals), or null if an entry is not finite. */
+export function toDyadic(A: Mat): Fraction[][] | null {
+  const out: Fraction[][] = [];
+  for (const row of A) {
+    const r: Fraction[] = [];
+    for (const v of row) {
+      const f = Fraction.fromDouble(v);
+      if (!f) return null;
+      r.push(f);
+    }
+    out.push(r);
+  }
+  return out;
+}
+
+/** Power of two near the largest |entry| (1 for a zero matrix): dividing by it is exact and avoids overflow. */
+export function powerOfTwoScale(A: Mat): number {
+  const m = Math.max(...A.flat().map(Math.abs));
+  if (!(m > 0) || !Number.isFinite(m)) return 1;
+  return 2 ** Math.round(Math.log2(m));
 }
 
 /** Floating-point determinant by Gaussian elimination with partial pivoting. */
@@ -101,9 +123,20 @@ export function determinant(A: Mat): Determinant {
   if (!isSquare(A)) throw new RangeError("determinant needs a square matrix");
   const F = toFractions(A);
   const exact = F ? detExact(F) : null;
-  const value = exact ? exact.toNumber() : detFloat(A);
-  const singular = exact ? exact.isZero() : Math.abs(value) <= SINGULAR_RELATIVE_TOLERANCE * hadamardBound(A) || !Number.isFinite(value);
-  return { value, exact, singular, sign: singular ? 0 : value > 0 ? 1 : -1 };
+  const D = exact ? null : toDyadic(A);
+  const full = exact ?? (D ? detExact(D) : null);
+  if (!full) return { value: NaN, exact: null, singular: true, sign: 0 };
+  const value = full.toNumber();
+  // Singular: exactly zero for typed decimals; otherwise |det| tiny next to the Hadamard bound, compared on the
+  // matrix scaled by a power of two (both sides scale by sⁿ, so neither overflows nor underflows).
+  let singular = full.isZero();
+  if (!singular && !exact) {
+    const s = powerOfTwoScale(A);
+    const scaled = A.map((r) => r.map((v) => v / s));
+    const ds = detExact(toDyadic(scaled) as Fraction[][]).toNumber();
+    singular = Math.abs(ds) <= SINGULAR_RELATIVE_TOLERANCE * hadamardBound(scaled);
+  }
+  return { value, exact, singular, sign: singular ? 0 : full.n > BigInt(0) ? 1 : -1 };
 }
 
 export type Eigen2 =
@@ -121,39 +154,44 @@ function unit(v: [number, number]): [number, number] {
 }
 
 /** Eigen-direction of [[a, b], [c, d]] for eigenvalue λ, from the better-conditioned row of A − λI. */
-function eigenvector(a: number, b: number, c: number, d: number, lambda: number): [number, number] {
+export function eigenvector(a: number, b: number, c: number, d: number, lambda: number): [number, number] {
   const r1: [number, number] = [b, lambda - a];
   const r2: [number, number] = [lambda - d, c];
   return unit(Math.hypot(...r1) >= Math.hypot(...r2) ? r1 : r2);
 }
 
-/** Relative tolerance under which the discriminant counts as zero (repeated eigenvalue). */
-const REPEATED_RELATIVE_TOLERANCE = 1e-12;
-
+/**
+ * 2×2 eigenvalues in closed form. The matrix is first divided by a power of two near its largest entry (exact; no
+ * overflow for entries near 1e300); results are scaled back. The eigenvalues are repeated only when the
+ * discriminant ((a − d)/2)² + bc is within a few ulps of the terms it is summed from (a relative test on this
+ * computation, not on the matrix scale), and the smaller root is det / λ₁ with the exactly computed determinant.
+ */
 export function eigen2(A: Mat): Eigen2 {
   if (!isSquare(A, 2)) throw new RangeError("eigen2 needs a 2×2 matrix");
-  const [[a, b], [c, d]] = A;
+  const k = powerOfTwoScale(A);
+  const [[a, b], [c, d]] = A.map((r) => r.map((v) => v / k));
   const half = (a + d) / 2;
-  // Discriminant (λ − half)² = ((a − d)/2)² + bc, written without the cancellation of half² − det.
-  const disc = ((a - d) / 2) ** 2 + b * c;
-  const scale = Math.max(Math.abs(a), Math.abs(b), Math.abs(c), Math.abs(d), Number.MIN_VALUE) ** 2;
-  if (Math.abs(disc) <= REPEATED_RELATIVE_TOLERANCE * scale) {
-    if (b === 0 && c === 0 && a === d) return { kind: "scalar", value: a };
-    const offDiagonal = Math.max(Math.abs(b), Math.abs(c), Math.abs(a - d));
-    if (offDiagonal <= REPEATED_RELATIVE_TOLERANCE * Math.sqrt(scale)) return { kind: "scalar", value: half };
-    return { kind: "defective", value: half, vector: eigenvector(a, b, c, d, half) };
+  const p = ((a - d) / 2) ** 2;
+  const q = b * c;
+  const disc = p + q;
+  if (Math.abs(disc) <= DISCRIMINANT_ULPS * Number.EPSILON * (p + Math.abs(q))) {
+    if (b === 0 && c === 0 && a === d) return { kind: "scalar", value: a * k };
+    if (Math.max(Math.abs(b), Math.abs(c), Math.abs(a - d)) <= DISCRIMINANT_ULPS * Number.EPSILON * Math.max(Math.abs(a), Math.abs(d))) {
+      return { kind: "scalar", value: half * k };
+    }
+    return { kind: "defective", value: half * k, vector: eigenvector(a, b, c, d, half) };
   }
   if (disc < 0) {
     const im = Math.sqrt(-disc);
-    return { kind: "complex", re: half, im, r: Math.hypot(half, im), theta: Math.atan2(im, half) };
+    return { kind: "complex", re: half * k, im: im * k, r: Math.hypot(half, im) * k, theta: Math.atan2(im, half) };
   }
   // Larger-magnitude root first, the other from det / λ₁ (no cancellation when half and √disc nearly cancel).
   const s = Math.sqrt(disc);
   const l1 = half >= 0 ? half + s : half - s;
-  const det = a * d - b * c;
+  const det = determinant([[a, b], [c, d]]).value;
   const l2 = l1 !== 0 ? det / l1 : half - (l1 - half);
   const values: [number, number] = l1 >= l2 ? [l1, l2] : [l2, l1];
-  return { kind: "distinct", values, vectors: [eigenvector(a, b, c, d, values[0]), eigenvector(a, b, c, d, values[1])] };
+  return { kind: "distinct", values: [values[0] * k, values[1] * k], vectors: [eigenvector(a, b, c, d, values[0]), eigenvector(a, b, c, d, values[1])] };
 }
 
 export function multiply(A: Mat, B: Mat): Mat {

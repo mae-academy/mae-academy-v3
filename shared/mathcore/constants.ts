@@ -87,22 +87,32 @@ export const MAX_STYLE_WIDTH = 10;
  */
 export const LINEARITY_PROBES: readonly (readonly number[])[] = [
   [0.7310, -1.3127, 0.4519],
-  [-2.1033, 0.5871, 1.9207],
+  [-2.1033, 0.5871, -1.9207],
+  [3.4129, 2.7713, -3.0581],
+  [-4.6687, -3.9251, 2.6633],
 ];
 /** Relative tolerance of the linearity check (rounding in F, not a modelling tolerance). */
 export const LINEARITY_RELATIVE_TOLERANCE = 1e-9;
 /** Opacity of the grid transformed by a 2×2 matrix (STEPS.md §8.2), over the plain grid. */
 export const TRANSFORM_GRID_OPACITY = 0.45;
-/** Bisection step at which the pole test records the bracket spread (compared with the spread at the end). */
+/** Bisection step at which the pole test records the bracket spread (compared with the spread after the halvings). */
 export const POLE_TEST_STEP = 4;
-/** A crossing is a zero when the final bracket spread is at most this fraction of the early one (a zero gives ~2⁻⁸). */
+/** A crossing is a zero when the bracket spread fell to at most this fraction of the reference spread. */
 export const ROOT_SPREAD_RATIO = 0.5;
+/** Bisections allowed on an edge whose spread has not shrunk after CROSSING_BISECTIONS (steep F, weak zeros). */
+export const CROSSING_BISECTIONS_MAX = 40;
 /** Distance from the view border, relative to the view span, at which a curve end counts as leaving the view. */
 export const VIEW_BORDER_RELATIVE = 1e-9;
 /** Smallest shading block, in mask pixels (a block of 1 would be per-pixel evaluation with extra cost). */
 export const MASK_MIN_BLOCK = 2;
-/** Blocks at least this many mask pixels wide are also probed at their edge midpoints, not only at the centre. */
+/** Shading blocks at least this many mask pixels wide get MASK_PROBES_LARGE jittered probes, smaller ones fewer. */
 export const MASK_EDGE_PROBE_BLOCK = 4;
+export const MASK_PROBES_LARGE = 5;
+export const MASK_PROBES_SMALL = 1;
+/** Jittered probes per coarse contour cell that its corners did not mark for refinement. */
+export const CONTOUR_PROBES = 1;
+/** Jittered probes stay this fraction of a cell away from its edges (the corners are already known). */
+export const JITTER_MARGIN = 0.05;
 /** A Worker that has not answered yet may still be downloading its code (Compute Engine): first-request limit. */
 export const PARSE_LOAD_TIMEOUT_MS = 30_000;
 export const ENGINE_LOAD_TIMEOUT_MS = 30_000;
@@ -113,9 +123,9 @@ export const PARSE_TIMEOUTS_BEFORE_CACHE = 2;
 /** Endpoint tail exponents within this of 1 count as not integrable (∫ u^(−α) diverges at α = 1). */
 export const TAIL_ALPHA_MARGIN = 1e-3;
 /** A tanh-sinh node is used while its rounded abscissa is within this relative error of its intended endpoint distance. */
-export const ABSCISSA_RELATIVE = 0.25;
-/** Relative model error assumed for an endpoint tail f·d/(1 − α) when bounding the error (measured: ~1%). */
-export const TAIL_MODEL_UNCERTAINTY = 0.05;
+export const ABSCISSA_RELATIVE = 1e-2;
+/** Relative model error assumed for an endpoint tail when bounding the error (measured: below 1e-5 of the tail). */
+export const TAIL_MODEL_UNCERTAINTY = 1e-3;
 /** Address-bar link refresh delay after the last change. */
 export const LINK_DEBOUNCE_MS = 500;
 /** Curve width when an item has no style (canvas drawing units). */
@@ -127,6 +137,12 @@ export const SAMPLE_MAX_POINTS = 4000;
 export const SAMPLE_MAX_DEPTH = 8;
 /** Strip Workers for implicit fields (§7.1 technique 4; §7.2 plans four Workers for the heaviest fields). */
 export const STRIP_WORKERS_MAX = 4;
+/** Fewer strip Workers than this are not worth starting; this many cores are left for the page and this Worker. */
+export const STRIP_WORKERS_MIN = 2;
+export const STRIP_RESERVED_CORES = 1;
+/** A strip run that takes longer fails over to this Worker (longer before the strip chunk has loaded). */
+export const STRIP_TIMEOUT_MS = 3000;
+export const STRIP_LOAD_TIMEOUT_MS = 20_000;
 /**
  * 3D view: camera distance fitted to a box of half-size L. The box's bounding sphere has radius √3·L; with the 45°
  * field of view it fits at √3·L / sin(22.5°) ≈ 4.5·L.
@@ -134,3 +150,40 @@ export const STRIP_WORKERS_MAX = 4;
 export const CAMERA_FIT_DISTANCE = 4.5;
 /** 3D frames while the camera moves are rendered at this fraction of the canvas size (§7.1 technique 2). */
 export const FRAME3_DRAG_SCALE = 0.5;
+/** Significant digits of floating-point numbers in reports, step LaTeX, labels and spoken descriptions. */
+export const DISPLAY_DIGITS = 6;
+/** |det| below this times the Hadamard bound (product of row norms) counts as singular (relative, §9). */
+export const SINGULAR_RELATIVE_TOLERANCE = 1e-12;
+/**
+ * Floating-point elimination: a difference a − b smaller than this times |a| + |b| is cancellation noise and is set
+ * to 0 (a relative test on the operands of that subtraction, so the matrix's overall scale does not matter).
+ */
+export const CANCELLATION_RELATIVE = 64 * Number.EPSILON;
+/** 2×2 eigenvalues are repeated when the discriminant is within this many ulps of the terms it is summed from. */
+export const DISCRIMINANT_ULPS = 8;
+/** Decimal places accepted for an exact decimal conversion (0.125 → 1/8) in step-by-step reports. */
+export const MAX_EXACT_DECIMALS = 9;
+/** Square factors are pulled out of √n by trial division up to this bound. */
+export const SQUARE_FACTOR_LIMIT = 10_000;
+/** Transformed grid: lines per family at most (k steps by 1, 2 or 5 × 10ⁿ beyond this). */
+export const TRANSFORM_GRID_MAX_LINES = 120;
+/** 3×3 eigenvalues: equal, or real, within this relative tolerance of the largest |λ| (QR rounding). */
+export const EIGEN_IMAG_RELATIVE = 1e-9;
+/** Stitching: nearest partner ends each curve end proposes (ends crowded in one cell stay linear to handle). */
+export const STITCH_CANDIDATES = 2;
+/** Tanh-sinh: levels compared before convergence is accepted, and the distance from an endpoint (as a fraction of
+ * the half interval) within which an overflowing integrand ends that side instead of failing. */
+export const TANH_SINH_MIN_LEVEL = 3;
+export const TANH_SINH_EDGE_FRACTION = 1e-12;
+/** Interior singularity search: bracket around the largest sample (fraction of the interval) and iterations. */
+export const PEAK_BRACKET = 1e-2;
+export const PEAK_ITERATIONS = 200;
+/** Simpson that did not converge and saw a sample this many times the mean |f| is treated as singular there. */
+export const SINGULAR_PEAK_RATIO = 1e4;
+/** A line whose parse failed for a passing reason is parsed again after this delay, doubling up to the maximum. */
+export const PARSE_RETRY_MS = 2000;
+export const PARSE_RETRY_MAX_MS = 30_000;
+/** Canvas size assumed until the canvas has been laid out (CSS pixels). */
+export const CANVAS_FALLBACK = { width: 800, height: 500 } as const;
+/** Significant digits of a rotation angle (degrees) and scale shown to the reader. */
+export const ANGLE_DIGITS = 4;

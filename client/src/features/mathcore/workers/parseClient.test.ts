@@ -63,7 +63,7 @@ describe("parse client (STEPS.md §9: 200 ms parse timeout in the parse Worker)"
     const p = c.parseAll(["slow", "y"]);
     await vi.advanceTimersByTimeAsync(200);
     const r = await p;
-    expect(r.slow).toEqual({ ok: false, message: "Parsing took longer than 200 ms" });
+    expect(r.slow).toEqual({ ok: false, message: "Parsing took longer than 200 ms", transient: true });
     expect(r.y).toEqual({ ok: true, raw: ["Raw", "y"] });
     expect(FakeParseWorker.created).toBe(2);
   });
@@ -77,13 +77,13 @@ describe("parse client (STEPS.md §9: 200 ms parse timeout in the parse Worker)"
     await vi.advanceTimersByTimeAsync(0);
     expect(settled).toBe(false);
     await vi.advanceTimersByTimeAsync(30_000);
-    expect((await p).slow).toEqual({ ok: false, message: "The math parser did not start in time" });
+    expect((await p).slow).toEqual({ ok: false, message: "The math parser did not start in time", transient: true });
   });
 
   it("an unavailable parser (offline) is not cached and does not count as started", async () => {
     const c = createParseClient({ createWorker: () => new FakeParseWorker() });
     FakeParseWorker.offline = true;
-    expect((await c.parseAll(["x"])).x).toEqual({ ok: false, message: "could not load" });
+    expect((await c.parseAll(["x"])).x).toEqual({ ok: false, message: "could not load", transient: true });
     FakeParseWorker.offline = false;
     // Back online: the same line parses, and a slow line still gets the long start-up limit.
     expect((await c.parseAll(["x"])).x).toEqual({ ok: true, raw: ["Raw", "x"] });
@@ -106,7 +106,7 @@ describe("parse client (STEPS.md §9: 200 ms parse timeout in the parse Worker)"
 
   it("a crash is not cached; the line is parsed again by a new Worker", async () => {
     const c = createParseClient({ createWorker: () => new FakeParseWorker() });
-    expect((await c.parseAll(["crash"])).crash).toEqual({ ok: false, message: "The math parser stopped unexpectedly" });
+    expect((await c.parseAll(["crash"])).crash).toEqual({ ok: false, message: "The math parser stopped unexpectedly", transient: true });
     const before = FakeParseWorker.created;
     expect((await c.parseAll(["crash"])).crash.ok).toBe(false);
     expect(FakeParseWorker.created).toBe(before + 1);
@@ -119,16 +119,16 @@ describe("parse client (STEPS.md §9: 200 ms parse timeout in the parse Worker)"
     const warmUp = () => c.parseAll([`w${++n}`]);
     const cold = c.parseAll(["slow"]);
     await vi.advanceTimersByTimeAsync(30_000);
-    expect((await cold).slow).toEqual({ ok: false, message: "The math parser did not start in time" });
+    expect((await cold).slow).toEqual({ ok: false, message: "The math parser did not start in time", transient: true });
     await warmUp();
     const first = c.parseAll(["slow"]);
     await vi.advanceTimersByTimeAsync(200);
-    expect((await first).slow).toEqual({ ok: false, message: "Parsing took longer than 200 ms" });
+    expect((await first).slow).toEqual({ ok: false, message: "Parsing took longer than 200 ms", transient: true });
     await warmUp();
     const second = c.parseAll(["slow"]);
     await vi.advanceTimersByTimeAsync(200);
     expect((await second).slow.ok).toBe(false);
-    // Now cached: no Worker is asked again.
+    // Now cached (no longer transient): no Worker is asked again.
     const created = FakeParseWorker.created;
     expect((await c.parseAll(["slow"])).slow).toEqual({ ok: false, message: "Parsing took longer than 200 ms" });
     expect(FakeParseWorker.created).toBe(created);

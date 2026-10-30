@@ -1,16 +1,14 @@
 /**
  * Annotated Gauss-Jordan elimination (STEPS.md §8.2): a written step tree where each row operation is shown in LaTeX
  * (Rᵢ ← Rᵢ − kRⱼ, Rᵢ ↔ Rⱼ, Rᵢ ← kRᵢ) with the pivot highlighted. Exact for rational input; otherwise floating
- * point with a zero test relative to the matrix scale.
+ * point where a difference is zero only when it is cancellation noise of its own operands.
  */
+import { CANCELLATION_RELATIVE } from "../constants";
 import { Fraction } from "./fraction";
+import { numberLatex } from "./format";
 import type { Mat } from "./matrix";
 import { toFractions } from "./matrix";
 
-/** Entries below this times the largest |entry| count as zero in floating-point elimination. */
-export const ELIMINATION_RELATIVE_TOLERANCE = 1e-12;
-/** Significant digits shown for floating-point entries in LaTeX. */
-const FLOAT_DIGITS = 6;
 
 interface Field<T> {
   zero: T;
@@ -43,26 +41,28 @@ const exactField: Field<Fraction> = {
   num: (a) => a.toNumber(),
 };
 
-function floatField(scale: number): Field<number> {
-  const tol = ELIMINATION_RELATIVE_TOLERANCE * Math.max(scale, Number.MIN_VALUE);
-  const latex = (a: number) => {
-    const r = Number(a.toPrecision(FLOAT_DIGITS));
-    return Math.abs(r) < tol ? "0" : String(r);
-  };
-  return {
-    zero: 0,
-    one: 1,
-    add: (a, b) => a + b,
-    sub: (a, b) => a - b,
-    mul: (a, b) => a * b,
-    div: (a, b) => a / b,
-    isZero: (a) => Math.abs(a) <= tol,
-    isOne: (a) => Math.abs(a - 1) <= ELIMINATION_RELATIVE_TOLERANCE,
-    cmpAbs: (a, b) => Math.sign(Math.abs(a) - Math.abs(b)),
-    neg: (a) => -a,
-    latex,
-    num: (a) => a,
-  };
+/**
+ * Floating-point field for irrational input. A difference counts as zero only when it is cancellation noise of its
+ * own operands (|a − b| ≤ CANCELLATION_RELATIVE·(|a| + |b|)), so tiny but genuine entries (1e-13, or 1e-8 next to
+ * 1e8) are kept, and the matrix's overall scale plays no part (§9: relative comparisons only).
+ */
+const floatField: Field<number> = {
+  zero: 0,
+  one: 1,
+  add: (a, b) => snap(a + b, a, b),
+  sub: (a, b) => snap(a - b, a, b),
+  mul: (a, b) => a * b,
+  div: (a, b) => a / b,
+  isZero: (a) => a === 0,
+  isOne: (a) => Math.abs(a - 1) <= CANCELLATION_RELATIVE,
+  cmpAbs: (a, b) => Math.sign(Math.abs(a) - Math.abs(b)),
+  neg: (a) => -a,
+  latex: numberLatex,
+  num: (a) => a,
+};
+
+function snap(r: number, a: number, b: number): number {
+  return Math.abs(r) <= CANCELLATION_RELATIVE * (Math.abs(a) + Math.abs(b)) ? 0 : r;
 }
 
 export type RowOp =
@@ -180,8 +180,7 @@ export function gaussJordan(A: Mat, augmented: boolean | number = false): GaussR
   if (!Number.isInteger(extra) || extra < 0 || extra >= A[0].length) throw new RangeError("gaussJordan: bad number of augmented columns");
   const exact = toFractions(A);
   if (exact) return run(exactField, exact, extra);
-  const scale = Math.max(...A.flat().map(Math.abs));
-  return run(floatField(scale), A.map((r) => r.slice()), extra);
+  return run(floatField, A.map((r) => r.slice()), extra);
 }
 
 /**

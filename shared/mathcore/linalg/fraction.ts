@@ -3,8 +3,7 @@
  * short-decimal matrices are reduced exactly, so a student sees R₂ ← R₂ − ⅔R₁, not R₂ ← R₂ − 0.6666666666666666R₁.
  */
 
-/** Decimal places accepted for an exact conversion (0.125 → 1/8); longer decimals stay floating point. */
-const MAX_EXACT_DECIMALS = 9;
+import { MAX_EXACT_DECIMALS } from "../constants";
 
 // BigInt literals (0n) need an ES2020 target; this project targets lower, so the constants are built with BigInt().
 const B0 = BigInt(0);
@@ -15,6 +14,10 @@ const bigPow10 = (k: number): bigint => {
   for (let i = 0; i < k; i++) r *= B10;
   return r;
 };
+
+const B2 = BigInt(2);
+const MAX_SAFE = BigInt(Number.MAX_SAFE_INTEGER);
+const bitLength = (x: bigint): number => x.toString(2).length;
 
 const gcd = (a: bigint, b: bigint): bigint => {
   let x = a < B0 ? -a : a;
@@ -51,6 +54,21 @@ export class Fraction {
     return null;
   }
 
+  /** The exact value of a finite double (a dyadic rational m / 2ᵏ), or null for ±∞ and NaN. */
+  static fromDouble(x: number): Fraction | null {
+    if (!Number.isFinite(x)) return null;
+    let m = x;
+    let k = 0;
+    // At most 1074 doublings make any finite double an integer, and each doubling is exact.
+    while (!Number.isInteger(m)) {
+      m *= 2;
+      k++;
+    }
+    let d = B1;
+    for (let i = 0; i < k; i++) d *= B2;
+    return new Fraction(BigInt(m), d);
+  }
+
   add(o: Fraction): Fraction {
     return new Fraction(this.n * o.d + o.n * this.d, this.d * o.d);
   }
@@ -80,8 +98,16 @@ export class Fraction {
     const b = (o.n < B0 ? -o.n : o.n) * this.d;
     return a === b ? 0 : a > b ? 1 : -1;
   }
+  /** Nearest double (also when numerator or denominator are far beyond the double range). */
   toNumber(): number {
-    return Number(this.n) / Number(this.d);
+    const n = this.n < B0 ? -this.n : this.n;
+    if (n <= MAX_SAFE && this.d <= MAX_SAFE) return Number(this.n) / Number(this.d);
+    if (n === B0) return 0;
+    // Shift so the integer quotient has about 64 significant bits, then scale back by the shift.
+    const shift = 64 - (bitLength(n) - bitLength(this.d));
+    const q = shift >= 0 ? (n << BigInt(shift)) / this.d : n / (this.d << BigInt(-shift));
+    const v = Number(q) * 2 ** -Math.max(-1000, Math.min(1000, shift)) * 2 ** -(shift - Math.max(-1000, Math.min(1000, shift)));
+    return this.n < B0 ? -v : v;
   }
   /** LaTeX: `3`, `-\frac{2}{3}`. */
   toLatex(): string {

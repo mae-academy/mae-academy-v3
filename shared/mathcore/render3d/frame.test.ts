@@ -37,7 +37,7 @@ describe("3D frame of a document (Phase 5)", () => {
     const f = renderFrame3(e, { width: 400, height: 300, quality: "drag", camera }, colors);
     expect([f.width, f.height]).toEqual([200, 150]);
     expect(f.camera).toEqual(camera);
-    expect(f.labels.map((l) => l.text)).toEqual(["x", "y", "z", "Aî", "Aĵ", "Ak̂"]);
+    expect(f.labels.map((l) => l.text)).toEqual(["x", "y", "z", "Mî", "Mĵ", "Mk̂"]);
   });
 
   it("2D items, 2×2 matrices, errors and hidden items add nothing but the axes", () => {

@@ -6,6 +6,7 @@ import type { Expr } from "../ast/expr";
 import { CONSTANTS, args, containsSymbol, freeSymbols, head, isFn, isNum, isSym } from "../ast/expr";
 import { RESERVED_SYMBOLS } from "../constants";
 import { DISTRIBUTION_HEADS } from "../normalize/normalize";
+import { isLinearIn } from "./linear";
 
 export type InferredType =
   | { kind: "Scalar"; name: string; expr: Expr; literal: number | null }
@@ -105,8 +106,11 @@ function infer(e: Expr): InferredType {
     }
     if (head(rhs) === "D") return unknown("write the derivative on the left: dy/dx = F(x, y)");
 
-    // A x = b with a literal or named matrix.
+    // A x = b (or b = A x) with a literal or named matrix.
     if (head(lhs) === "Multiply" && args(lhs).length === 2 && head(args(lhs)[1]) === "Matrix") return matrixSystem(args(lhs)[0], args(lhs)[1], rhs);
+    if (head(rhs) === "Multiply" && args(rhs).length === 2 && head(args(rhs)[1]) === "Matrix" && head(lhs) === "Matrix") {
+      return matrixSystem(args(rhs)[0], args(rhs)[1], lhs);
+    }
 
     // Named matrix: M = [[…]].
     if (isSym(lhs) && head(rhs) === "Matrix") return matrix(rhs, lhs);
@@ -220,5 +224,7 @@ function equationSystem(eqs: Expr[]): InferredType {
   const F = eqs.map((eq): Expr => ["Subtract", args(eq)[0], args(eq)[1]]);
   const stray = F.flatMap((f) => Array.from(freeSymbols(f))).find((s) => RESERVED_SYMBOLS.has(s) && !unknowns.includes(s));
   if (stray) return unknown(`a system of ${eqs.length} equations uses only ${unknowns.join(", ")}; ${stray} is not allowed`);
+  const bad = F.findIndex((f) => !isLinearIn(f, unknowns));
+  if (bad >= 0) return unknown(`equation ${bad + 1} is not linear in ${unknowns.join(", ")}`);
   return { kind: "GaussSystem", unknowns, source: { form: "equations", F } };
 }

@@ -18,6 +18,7 @@ describe("parallel strips (STEPS.md §7.1 technique 4)", () => {
       const s = planStrips(vp, 1600, h, 6, 1, 4);
       expect(s[0].top).toBe(0);
       expect(s[s.length - 1].bottom).toBe(h);
+      expect(s.reduce((n, x) => n + (x.bottom - x.top), 0)).toBe(h);
       s.forEach((x, i) => {
         if (i > 0) {
           expect(x.top).toBe(s[i - 1].bottom);
@@ -63,5 +64,22 @@ describe("parallel strips (STEPS.md §7.1 technique 4)", () => {
       expect(l[0]).toBeCloseTo(l[l.length - 2], 12);
       expect(r.mask).toBeNull();
     }
+  });
+});
+
+describe("strips when the height is not a multiple of the stride", () => {
+  it("the merged mask equals the single-run mask (1600×997, stride 4)", () => {
+    const o: FieldOptions = { ...DRAG, height: 997 };
+    const F = (x: number, y: number) => x * x + y * y + Math.sin(3 * x) * Math.cos(2 * y) - 9;
+    const strips = planStrips(vp, 1600, 997, o.cellPx, o.stride, 4);
+    const total = strips.reduce((n, x) => n + (x.bottom - x.top), 0);
+    expect(total).toBeGreaterThanOrEqual(997);
+    expect(total).toBeLessThan(997 + o.stride);
+    const merged = mergeStrips(strips.map((s) => implicitField(F, s.viewport, { ...o, height: s.bottom - s.top })), vp, o);
+    const single = implicitField(F, vp, o);
+    expect(merged.mask?.height).toBe(single.mask?.height);
+    let diff = 0;
+    single.mask?.data.forEach((v, i) => (diff += v === merged.mask?.data[i] ? 0 : 1));
+    expect(diff).toBeLessThanOrEqual(single.mask ? single.mask.width * 2 : 0);
   });
 });

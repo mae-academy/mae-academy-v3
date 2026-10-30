@@ -32,6 +32,8 @@ export interface ItemState {
   errors: ParseError[];
   /** Non-blocking notes (a stored `kind` that disagrees with inference). */
   warnings: string[];
+  /** The error of the last evaluation (also in `errors`); cleared before the next one, e.g. when a slider moves. */
+  runtimeError?: ParseError;
 }
 
 /** A compiled plottable item, ready to sample with the current parameter values. */
@@ -206,6 +208,12 @@ export class GraphEngine {
     }
 
     this.addAutoParams();
+    // Unknowns of a system that are also sliders: the system solves for them and ignores the slider.
+    for (const it of this.items) {
+      if (it.type.kind !== "GaussSystem") continue;
+      const shadowed = it.type.unknowns.filter((u) => !RESERVED_SYMBOLS.has(u) && this.graphDoc.params[u]);
+      if (shadowed.length) it.warnings.push(`${shadowed.join(", ")} ${shadowed.length === 1 ? "is an unknown" : "are unknowns"} here; the slider does not apply in this system`);
+    }
     this.functions = new Map();
     for (const it of this.items) {
       if (it.type.kind === "FunctionDef" && it.errors.length === 0) {
@@ -235,7 +243,11 @@ export class GraphEngine {
     if (!parse.ok) return state;
     const t = inferType(parse.expr);
     state.type = t;
-    if (t.kind === "Unknown") state.errors.push({ message: t.reason });
+    if (t.kind === "Unknown") {
+      // A line that cannot be drawn creates no sliders.
+      state.errors.push({ message: t.reason });
+      return state;
+    }
     let bodyForUses: Expr = parse.expr;
     const bound = new Set<string>();
     if (t.kind === "Scalar") {
@@ -377,9 +389,14 @@ export class GraphEngine {
       let A: number[][];
       if (Array.isArray(src.A)) A = src.A.map((row) => row.map((cell) => this.constant(cell)));
       else {
-        const m = this.matrices.get(src.A.name);
-        if (!m) throw new Error(`"${src.A.name}" is not a matrix defined in this graph`);
-        if (m.length !== unknowns.length) throw new Error(`"${src.A.name}" is ${m.length}×${m.length} but there are ${unknowns.length} unknowns`);
+        const name = src.A.name;
+        const m = this.matrices.get(name);
+        const shown = displayName(name);
+        if (!m) {
+          const isMatrix = this.items.some((x) => (x.type.kind === "Matrix2" || x.type.kind === "Matrix3") && x.type.name === name);
+          throw new Error(isMatrix ? `The matrix "${shown}" has an error` : `"${shown}" is not a matrix defined in this graph`);
+        }
+        if (m.length !== unknowns.length) throw new Error(`"${shown}" is ${m.length}×${m.length} but there are ${unknowns.length} unknowns`);
         A = m.map((r) => r.slice());
       }
       return { A, b: src.b.map((v) => this.constant(v)) };
@@ -396,7 +413,9 @@ export class GraphEngine {
         return c.evaluate(buf);
       };
       const c0 = at(new Array<number>(n).fill(0));
-      const row = unknowns.map((_, j) => at(unknowns.map((__, k) => (k === j ? 1 : 0))) - c0);
+      // Coefficients from a step of size t ≥ |c₀|, so a large constant (x + y + 10¹⁷) does not swallow them.
+      const t = Math.max(1, Math.abs(c0));
+      const row = unknowns.map((_, j) => (at(unknowns.map((__, k) => (k === j ? t : 0))) - c0) / t);
       if (!Number.isFinite(c0) || row.some((v) => !Number.isFinite(v))) throw new Error(`Equation ${i + 1} is not defined at 0`);
       for (const probe of LINEARITY_PROBES) {
         const p = probe.slice(0, n);
@@ -416,6 +435,14 @@ export class GraphEngine {
 
   private evaluateItem(it: ItemState): void {
     this.evaluations++;
+    // An error from the last evaluation (1/a at a = 0) is not structural: the item is evaluated again.
+    if (it.runtimeError) {
+      const old = it.runtimeError;
+      it.errors = it.errors.filter((e) => e !== old);
+      it.runtimeError = undefined;
+    }
+    const t0 = it.type;
+    if ((t0.kind === "Matrix2" || t0.kind === "Matrix3") && t0.name) this.matrices.delete(t0.name);
     if (it.errors.length > 0 || !it.parse.ok) {
       this.runtimes.set(it.id, null);
       return;
@@ -479,11 +506,16 @@ export class GraphEngine {
           this.runtimes.set(it.id, null);
       }
     } catch (err) {
-      it.errors.push({ message: err instanceof Error ? err.message : String(err) });
+      it.runtimeError = { message: err instanceof Error ? err.message : String(err) };
+      it.errors.push(it.runtimeError);
       this.runtimes.set(it.id, null);
     }
   }
 }
+
+/** A symbol as the user wrote it (Compute Engine names \\pi "Pi"). */
+const DISPLAY_NAMES: Readonly<Record<string, string>> = { Pi: "π", ExponentialE: "e", ImaginaryUnit: "i" };
+const displayName = (name: string) => DISPLAY_NAMES[name] ?? name;
 
 /** True for item types whose value is a number (sliders and computed values). */
 export function isNumericKind(kind: string): boolean {

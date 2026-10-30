@@ -39,6 +39,9 @@ export function createEngineClient(config: EngineClientConfig): EngineClient {
   let worker: WorkerLike | null = null;
   let seq = 0;
   let latest = 0;
+  /** Sequence of the latest `load`: its answer carries slider values the document text changed, so it is delivered
+   * even when a view or slider request was sent after it (Phase 3 re-review). */
+  let latestLoad = 0;
   let latestTrace = 0;
   /** True once this Worker has answered a request, i.e. its code is loaded and running. */
   let warm = false;
@@ -69,7 +72,12 @@ export function createEngineClient(config: EngineClientConfig): EngineClient {
         if (res.seq === latestTrace) config.onTrace?.(res);
         return;
       }
-      if (res.seq !== latest) return; // stale: a newer request is pending
+      if (res.seq !== latest) {
+        // Stale: a newer request is pending. The full answer to the latest load still goes through (the watchdog
+        // stays with the newer request).
+        if (res.type === "result" && res.cause === "load" && res.seq === latestLoad && !res.partial) config.onResult(res);
+        return;
+      }
       // Any answer proves the Worker's code is running (parsing, and Compute Engine, live in the parse Worker).
       warm = true;
       // A partial (progressive) frame keeps the watchdog running for the full frame that follows.
@@ -93,6 +101,7 @@ export function createEngineClient(config: EngineClientConfig): EngineClient {
     send(req) {
       seq += 1;
       latest = seq;
+      if (req.type === "load") latestLoad = seq;
       const w = ensure();
       clear();
       timer = setTimeout(() => {

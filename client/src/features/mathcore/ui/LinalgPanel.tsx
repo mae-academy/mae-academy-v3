@@ -6,6 +6,7 @@
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { KatexMath } from "@/components/ui/KatexMath";
+import { ANGLE_DIGITS } from "@shared/mathcore/constants";
 import type { MatrixAnalysis, StepReport, SystemAnalysis } from "@shared/mathcore/linalg/analyze";
 import { NS } from "../i18n/register";
 import type { ItemResult } from "../workers/protocol";
@@ -18,8 +19,6 @@ export interface LinalgPanelProps {
   mode?: "2d" | "3d";
 }
 
-/** Significant digits of the rotation angle (degrees) and scale. */
-const ANGLE_DIGITS = 4;
 
 function Steps({ title, start, steps, open, result }: { title: string; start: string; steps: StepReport[]; open: boolean; result?: ReactNode }) {
   return (
@@ -44,7 +43,7 @@ function Steps({ title, start, steps, open, result }: { title: string; start: st
 function MatrixReport({ a, showSteps, mode }: { a: MatrixAnalysis; showSteps: boolean; mode: "2d" | "3d" }) {
   const { t } = useTranslation(NS);
   const orientation = a.det.singular ? "singular" : a.det.sign > 0 ? "kept" : "reversed";
-  const complex = a.eigen.values.find((v) => v.im > 0);
+  const rotation = a.eigen.rotation;
   return (
     <div className="mc-linalg" data-testid="mc-linalg">
       <div className="mc-linalg-row">
@@ -82,17 +81,17 @@ function MatrixReport({ a, showSteps, mode }: { a: MatrixAnalysis; showSteps: bo
           ))}
         </div>
       )}
-      {complex && (
+      {rotation && (
         <p className="mc-note">
           {t("linalg.rotation", {
-            angle: Number(((Math.atan2(complex.im, complex.re) * 180) / Math.PI).toPrecision(ANGLE_DIGITS)),
-            scale: Number(Math.hypot(complex.re, complex.im).toPrecision(ANGLE_DIGITS)),
+            angle: Number(((rotation.theta * 180) / Math.PI).toPrecision(ANGLE_DIGITS)),
+            scale: Number(rotation.scale.toPrecision(ANGLE_DIGITS)),
           })}
         </p>
       )}
       {a.size === 3 && mode === "2d" && <p className="mc-note">{t("linalg.matrix3d")}</p>}
       <Steps
-        title={t("linalg.stepsInverse")}
+        title={t("linalg.stepsInverse", { name: a.name.replace(/\\mathrm\{(\w+)\}/g, "$1").replace(/[\\{}]/g, "") })}
         start={a.inverse.start}
         steps={a.inverse.steps}
         open={showSteps}

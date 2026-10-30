@@ -27,7 +27,7 @@ export const SOLID_OPACITY = 0.35;
 const MARKER = 0.06;
 
 export type Scene3Item =
-  | { kind: "matrix"; values: Mat; color: RGB }
+  | { kind: "matrix"; values: Mat; color: RGB; name?: string }
   | { kind: "system"; A: Mat; b: number[]; solution: Vec3 | null; colors: [RGB, RGB, RGB] };
 
 export interface Scene3Colors {
@@ -170,7 +170,8 @@ export function buildScene3(items: readonly Scene3Item[], colors: Scene3Colors):
       for (let i = 0; i < 8; i++) {
         for (const bit of [1, 2, 4]) if (!(i & bit)) lines.push({ from: img(i), to: img(i | bit), color: it.color });
       }
-      const names = ["Aî", "Aĵ", "Ak̂"];
+      const n = it.name ?? "A";
+      const names = [`${n}î`, `${n}ĵ`, `${n}k̂`];
       for (let k = 0; k < 3; k++) {
         const col: Vec3 = [A[0][k], A[1][k], A[2][k]];
         lines.push({ from: [0, 0, 0], to: col, color: colors.arrow });

@@ -7,12 +7,13 @@ import { bench } from "./benchEntry";
 import { centralDifference } from "@shared/mathcore/calculus/derivative";
 import { describeExplicit, describeExtent } from "@shared/mathcore/describe/describe";
 import {
-  FIELD_STRIDE_DRAG, FIELD_STRIDE_FULL, IMPLICIT_CELL_PX_DRAG, PARAMETER_TURN, SAMPLE_DRAG_FACTOR, SAMPLE_INITIAL_FULL, SAMPLE_INITIAL_MIN, IMPLICIT_CELL_PX_FULL, IMPLICIT_REFINE_DRAG, IMPLICIT_REFINE_FULL, STRIP_WORKERS_MAX,
+  FIELD_STRIDE_DRAG, FIELD_STRIDE_FULL, PRECISION_WARNING_MAGNITUDE, IMPLICIT_CELL_PX_DRAG, PARAMETER_TURN, SAMPLE_DRAG_FACTOR, SAMPLE_INITIAL_FULL, SAMPLE_INITIAL_MIN, IMPLICIT_CELL_PX_FULL, IMPLICIT_REFINE_DRAG, IMPLICIT_REFINE_FULL, STRIP_RESERVED_CORES, STRIP_WORKERS_MAX, STRIP_WORKERS_MIN,
 } from "@shared/mathcore/constants";
 import { GraphEngine } from "@shared/mathcore/engine/graphEngine";
 import { implicitField } from "@shared/mathcore/implicit/strips";
 import type { FieldOptions, FieldResult } from "@shared/mathcore/implicit/strips";
-import { DISPLAY_DIGITS, analyzeMatrix, analyzeSystem, symbolLatex } from "@shared/mathcore/linalg/analyze";
+import { analyzeMatrix, analyzeSystem, symbolLatex } from "@shared/mathcore/linalg/analyze";
+import { numberText } from "@shared/mathcore/linalg/format";
 import type { MatrixAnalysis, SystemAnalysis } from "@shared/mathcore/linalg/analyze";
 import { systemLines2, transform2 } from "@shared/mathcore/linalg/transform2";
 import { renderFrame3 } from "@shared/mathcore/render3d/frame";
@@ -31,14 +32,15 @@ declare const self: DedicatedWorkerGlobalScope;
 let engine: GraphEngine | null = null;
 
 /**
- * Strip Workers for implicit fields (STEPS.md §7.1 technique 4): one per spare core, up to STRIP_WORKERS_MAX, and
- * none on a machine with fewer than three cores (two strips on one spare core gain nothing). If a strip Worker fails
- * the pool is closed and this Worker computes fields itself from then on.
+ * Strip Workers for implicit fields (STEPS.md §7.1 technique 4): one per core left after STRIP_RESERVED_CORES, up to
+ * STRIP_WORKERS_MAX, and none below STRIP_WORKERS_MIN (two strips on one spare core gain nothing). If a strip Worker
+ * fails or stalls, the pool is closed for good and this Worker computes fields itself from then on.
  */
-const STRIP_WORKERS = Math.min(STRIP_WORKERS_MAX, Math.max(0, (self.navigator?.hardwareConcurrency ?? 1) - 1));
+const STRIP_WORKERS = Math.min(STRIP_WORKERS_MAX, Math.max(0, (self.navigator?.hardwareConcurrency ?? 1) - STRIP_RESERVED_CORES));
 let pool: StripPool | null = null;
+let stripsFailed = false;
 function stripPool(): StripPool | null {
-  if (pool || STRIP_WORKERS < 2 || typeof Worker === "undefined") return pool;
+  if (pool || stripsFailed || STRIP_WORKERS < STRIP_WORKERS_MIN || typeof Worker === "undefined") return pool;
   try {
     pool = createStripPool(
       STRIP_WORKERS,
@@ -46,6 +48,7 @@ function stripPool(): StripPool | null {
     );
   } catch {
     pool = null;
+    stripsFailed = true;
   }
   return pool;
 }
@@ -59,14 +62,19 @@ async function field(e: GraphEngine, id: string, F: (x: number, y: number) => nu
     } catch {
       p.dispose();
       pool = null;
+      stripsFailed = true;
     }
   }
   return implicitField(F, view.viewport, o);
 }
 const last = new Map<string, ItemResult>();
 
-/** Canvas label text (no LaTeX): 6 significant digits, no float noise. */
-const plain = (v: number) => String(Number(v.toPrecision(DISPLAY_DIGITS)));
+/** Canvas label text (no LaTeX): DISPLAY_DIGITS significant digits, no float noise. */
+const plain = numberText;
+/** §9: values beyond 10⁸ lose precision in double arithmetic; the row says so. */
+const beyondPrecision = (values: readonly number[]) => values.some((v) => Math.abs(v) > PRECISION_WARNING_MAGNITUDE);
+/** Symbol as the user wrote it, for canvas labels. */
+const displayText = (name: string) => ({ Pi: "π", ExponentialE: "e" } as Record<string, string>)[name] ?? name;
 
 /** Reports by item id and input values: a pan or zoom redraws the geometry but does not redo the elimination. */
 const analyses = new Map<string, { key: string; value: MatrixAnalysis | SystemAnalysis }>();
@@ -145,22 +153,30 @@ async function sampleItem(e: GraphEngine, id: string, view: ViewRequest): Promis
       const t = state.type;
       const name = (t.kind === "Matrix2" || t.kind === "Matrix3") && t.name ? symbolLatex(t.name) : "A";
       const analysis = cachedAnalysis(id, [rt.values, name], () => analyzeMatrix(rt.values, name));
-      const out: ItemResult = { ...base, linalg: { type: "matrix", analysis } };
+      const out: ItemResult = { ...base, linalg: { type: "matrix", analysis }, precisionWarning: beyondPrecision(rt.values.flat()) };
       if (rt.size === 2) {
-        const g = transform2(rt.values, view.viewport);
-        out.transform = { grid: g.grid, iHat: g.iHat, jHat: g.jHat, parallelogram: g.parallelogram, orientation: g.orientation, eigenLines: g.eigenLines };
+        const g = transform2(rt.values, view.viewport, analysis.eigen);
+        out.transform = {
+          grid: g.grid, iHat: g.iHat, jHat: g.jHat, parallelogram: g.parallelogram, orientation: g.orientation,
+          eigenLines: g.eigenLines, eigenMarker: g.eigenMarker,
+          name: t.kind === "Matrix2" && t.name ? displayText(t.name) : "A",
+        };
       }
       return out;
     }
     case "GaussSystem": {
       const analysis = cachedAnalysis(id, [rt.A, rt.b, rt.unknowns], () => analyzeSystem(rt.A, rt.b, rt.unknowns));
-      const out: ItemResult = { ...base, linalg: { type: "system", analysis } };
-      if (rt.unknowns.length === 2) {
-        out.segments = systemLines2(rt.A, rt.b, view.viewport);
+      const solved = analysis.solution.kind === "unique" ? analysis.solution.values : [];
+      const out: ItemResult = { ...base, linalg: { type: "system", analysis }, precisionWarning: beyondPrecision([...rt.A.flat(), ...rt.b, ...solved]) };
+      // Drawn on the axes only when the unknowns are x and y (in either order); columns follow the axes.
+      const ix = rt.unknowns.indexOf("x");
+      const iy = rt.unknowns.indexOf("y");
+      if (rt.unknowns.length === 2 && ix >= 0 && iy >= 0) {
+        out.segments = systemLines2(rt.A.map((r) => [r[ix], r[iy]]), rt.b, view.viewport);
         const s = analysis.solution;
         if (s.kind === "unique") {
-          out.point = { x: s.values[0], y: s.values[1] };
-          out.label = `(${plain(s.values[0])}, ${plain(s.values[1])})`;
+          out.point = { x: s.values[ix], y: s.values[iy] };
+          out.label = `(${plain(s.values[ix])}, ${plain(s.values[iy])})`;
         }
       }
       return out;

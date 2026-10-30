@@ -7,7 +7,10 @@ import { integrate, tanhSinh } from "./integrate";
 
 describe("tanh-sinh endpoint singularities", () => {
   const integrable: Array<[string, (x: number) => number, number, number, number, number]> = [
-    ["1/√(1−x²) on [−1, 1]", (x) => 1 / Math.sqrt(1 - x * x), -1, 1, Math.PI, 1e-9],
+    ["1/√(1−x²) on [−1, 1]", (x) => 1 / Math.sqrt(1 - x * x), -1, 1, Math.PI, 1e-10],
+    ["1/√|x − 0.3| on [0, 1] (interior)", (x) => 1 / Math.sqrt(Math.abs(x - 0.3)), 0, 1, 2 * Math.sqrt(0.3) + 2 * Math.sqrt(0.7), 1e-9],
+    ["1/√|x − 1/3| on [0, 1] (interior)", (x) => 1 / Math.sqrt(Math.abs(x - 1 / 3)), 0, 1, 2 * Math.sqrt(1 / 3) + 2 * Math.sqrt(2 / 3), 1e-9],
+    ["ln|x − 0.4| on [0, 1] (interior)", (x) => Math.log(Math.abs(x - 0.4)), 0, 1, 0.4 * Math.log(0.4) - 0.4 + 0.6 * Math.log(0.6) - 0.6, 1e-12],
     ["1/√(4−x²) on [−2, 2]", (x) => 1 / Math.sqrt(4 - x * x), -2, 2, Math.PI, 1e-9],
     ["1/√(1−x) on [0, 1]", (x) => 1 / Math.sqrt(1 - x), 0, 1, 2, 1e-9],
     ["1/√(x(1−x)) on [0, 1]", (x) => 1 / Math.sqrt(x * (1 - x)), 0, 1, Math.PI, 1e-9],
@@ -42,6 +45,12 @@ describe("tanh-sinh endpoint singularities", () => {
       expect(r.converged, f.toString()).toBe(false);
       expect(r.value).toBeNaN();
     }
+  });
+
+  it("known limits: exponents within 1e-3 of 1 and singular ends far from 0 relative to the interval are not converged", () => {
+    // ∫₀¹ x^(−0.999) dx = 1000 converges mathematically; the tail exponent is too close to 1 to model.
     expect(tanhSinh((x) => x ** -0.999, 0, 1).converged).toBe(false);
+    // Doubles next to 10⁶ are 1.2e-10 apart, too coarse for the tail fit on an interval of length 1.
+    expect(integrate((x) => 1 / Math.sqrt(x - 1e6), 1e6, 1e6 + 1).converged).toBe(false);
   });
 });

@@ -47,11 +47,16 @@ export function renderFrame3(
     if (it.style?.hidden) continue;
     const rt = e.runtime(it.id);
     if (rt?.kind === "Matrix" && rt.size === 3) {
-      items.push({ kind: "matrix", values: rt.values, color: colors.items[it.id] ?? colors.arrow });
+      const t = e.item(it.id)?.type;
+      const name = t && (t.kind === "Matrix2" || t.kind === "Matrix3") && t.name ? t.name : undefined;
+      items.push({ kind: "matrix", values: rt.values, color: colors.items[it.id] ?? colors.arrow, name });
     } else if (rt?.kind === "GaussSystem" && rt.unknowns.length === 3) {
+      // On the axes only when the unknowns are x, y and z (in any order); columns follow the axes.
+      const order = ["x", "y", "z"].map((u) => rt.unknowns.indexOf(u));
+      if (order.some((k) => k < 0)) continue;
       const a = analyze(it.id, rt.A, rt.b, rt.unknowns);
-      const solution = a.solution.kind === "unique" ? (a.solution.values as Vec3) : null;
-      items.push({ kind: "system", A: rt.A, b: rt.b, solution, colors: colors.planes });
+      const solution = a.solution.kind === "unique" ? (order.map((k) => a.solution.kind === "unique" ? a.solution.values[k] : 0) as Vec3) : null;
+      items.push({ kind: "system", A: rt.A.map((r) => order.map((k) => r[k])), b: rt.b, solution, colors: colors.planes });
     }
   }
   const scene = buildScene3(items, colors);

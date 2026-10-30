@@ -9,7 +9,7 @@ import { buildSvg } from "@shared/mathcore/export/svg";
 import { LINK_PARAM, decodeGraph, encodeGraph, exportJson, importJson } from "@shared/mathcore/ir/codec";
 import type { Camera3, GraphIR, Item, Param, Viewport } from "@shared/mathcore/ir/types";
 import { DEFAULT_VIEWPORT, emptyGraph } from "@shared/mathcore/ir/types";
-import { DEFAULT_CURVE_WIDTH, LINK_DEBOUNCE_MS, PARSE_DEBOUNCE_MS } from "@shared/mathcore/constants";
+import { CANVAS_FALLBACK, DEFAULT_CURVE_WIDTH, LINK_DEBOUNCE_MS, PARSE_DEBOUNCE_MS, PARSE_RETRY_MAX_MS, PARSE_RETRY_MS } from "@shared/mathcore/constants";
 import { NS } from "../i18n/register";
 import type { DrawCurve, DrawField, DrawPoint, DrawTransform, Scene } from "../render/renderer";
 import { LINALG_TOKENS, PALETTE_TOKENS, SCENE3_TOKENS, cssRgb, resolveColor } from "../render/renderer";
@@ -84,14 +84,17 @@ export default function MathcorePage() {
    * what was answered, means an edit undone before its answer arrives is still sent (Phase 3 re-review defect 1).
    */
   const engineKey = useRef("");
-  /** The next load is an unrelated document (first load, import, Worker restart): the engine forgets slider memory. */
-  const freshDoc = useRef(true);
+  /** Items of an unrelated document (first load, import, Worker restart): its load tells the engine to forget slider
+   * memory. Compared by identity, so an older round finishing first does not take the flag. */
+  const freshItems = useRef<Item[] | null>(initial.graph.items);
+  const retry = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const retryDelay = useRef(0);
   const sendDocument = useRef<() => void>(() => undefined);
   const graphRef = useRef(graph);
   useEffect(() => {
     graphRef.current = graph;
   }, [graph]);
-  const size = useRef({ w: 800, h: 500 });
+  const size = useRef<{ w: number; h: number }>({ w: CANVAS_FALLBACK.width, h: CANVAS_FALLBACK.height });
 
   /** Token colors for the 3D frame, as RGB (the Worker has no CSS); refreshed with the theme and the items. */
   const colors3d = useRef<ViewRequest["colors3d"]>(undefined);
@@ -137,7 +140,7 @@ export default function MathcorePage() {
       onRestart: () => {
         setNotice(t("engineRestarted"));
         // The new Worker starts empty: parse the current document again and send it as a fresh one.
-        freshDoc.current = true;
+        freshItems.current = graphRef.current.items;
         sendDocument.current();
       },
     });
@@ -164,13 +167,22 @@ export default function MathcorePage() {
     sendDocument.current = () => {
       const round = ++loadRound.current;
       const items = graphRef.current.items;
+      // The engine is about to hold these items: set now, so undoing an edit while it is still being parsed is a
+      // change again and starts its own round (Phase 3 re-review).
+      engineKey.current = documentKey({ ...graphRef.current, items });
+      clearTimeout(retry.current);
       void parser.current?.parseAll(items.map((i) => i.latex)).then((parsed) => {
         if (round !== loadRound.current) return;
         const doc = { ...graphRef.current, items };
-        engineKey.current = documentKey(doc);
-        const fresh = freshDoc.current;
-        freshDoc.current = false;
+        // Only the document that was imported or restarted is fresh, not an older round that happens to finish first.
+        const fresh = freshItems.current === items;
+        if (fresh) freshItems.current = null;
         client.current?.send({ type: "load", graph: doc, parsed, view: view("full"), fresh });
+        // A line that failed for a passing reason (parser offline, crashed, still starting) is parsed again later.
+        if (Object.values(parsed).some((e) => !e.ok && e.transient)) {
+          retryDelay.current = Math.min(PARSE_RETRY_MAX_MS, retryDelay.current * 2 || PARSE_RETRY_MS);
+          retry.current = setTimeout(() => sendDocument.current(), retryDelay.current);
+        } else retryDelay.current = 0;
       });
     };
   }, [view]);
@@ -357,7 +369,7 @@ export default function MathcorePage() {
     if (!file) return;
     const r = importJson(await file.text());
     if (r.ok) {
-      freshDoc.current = true;
+      freshItems.current = r.graph.items;
       setGraph(r.graph);
     }
     else setNotice(t("importFailed"));

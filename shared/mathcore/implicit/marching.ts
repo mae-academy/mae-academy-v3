@@ -21,7 +21,7 @@
  * Limits: a curve where F touches zero without changing sign (x² + y² = 0, (x − y)² = 0) is not found by any
  * sign-based method; a closed curve smaller than a fine cell may be missed.
  */
-import { CROSSING_BISECTIONS, MASK_EDGE_PROBE_BLOCK, MASK_MIN_BLOCK, NEAR_ZERO_CELLS, POLE_TEST_STEP, ROOT_SPREAD_RATIO, STITCH_CELLS, VIEW_BORDER_RELATIVE } from "../constants";
+import { CONTOUR_PROBES, CROSSING_BISECTIONS, STITCH_CANDIDATES, JITTER_MARGIN, MASK_EDGE_PROBE_BLOCK, MASK_MIN_BLOCK, MASK_PROBES_LARGE, MASK_PROBES_SMALL, NEAR_ZERO_CELLS, CROSSING_BISECTIONS_MAX, POLE_TEST_STEP, ROOT_SPREAD_RATIO, STITCH_CELLS, VIEW_BORDER_RELATIVE } from "../constants";
 import type { Viewport } from "../ir/types";
 import type { Polyline } from "../sample/adaptive";
 
@@ -43,6 +43,18 @@ export interface ContourResult {
 
 type Corners = [number, number, number, number];
 
+/**
+ * Deterministic pseudo-random offset in (JITTER_MARGIN, 1 − JITTER_MARGIN) for probe q of cell (i, j). Probes at
+ * irregular positions turn a pattern that repeats at a fraction of the cell spacing into disagreement with the
+ * corners, where probes on a regular sub-grid would land on the same phase as the corners (aliasing).
+ */
+export function jitter(i: number, j: number, q: number): number {
+  let h = Math.imul(i, 73856093) ^ Math.imul(j, 19349663) ^ Math.imul(q + 1, 83492791);
+  h = Math.imul(h ^ (h >>> 13), 0x5bd1e995);
+  h ^= h >>> 15;
+  return JITTER_MARGIN + (1 - 2 * JITTER_MARGIN) * ((h >>> 0) / 4294967296);
+}
+
 export function contour(F: (x: number, y: number) => number, vp: Viewport, o: ContourOptions): ContourResult {
   const cols = Math.max(1, Math.ceil(o.width / o.cellPx));
   const rows = Math.max(1, Math.ceil(o.height / o.cellPx));
@@ -56,10 +68,14 @@ export function contour(F: (x: number, y: number) => number, vp: Viewport, o: Co
   const known = new Uint8Array(vals.length);
   let evaluations = 0;
 
+  // The last lattice row and column sit exactly on the view border, so two strips sharing a border evaluate F at
+  // the same points there.
+  const latX = (i: number) => (i === NX ? vp.xmax : vp.xmin + i * dx);
+  const latY = (j: number) => (j === NY ? vp.ymax : vp.ymin + j * dy);
   const value = (i: number, j: number): number => {
     const k = j * stride + i;
     if (known[k] === 0) {
-      vals[k] = F(vp.xmin + i * dx, vp.ymin + j * dy);
+      vals[k] = F(latX(i), latY(j));
       known[k] = 1;
       evaluations++;
     }
@@ -75,19 +91,30 @@ export function contour(F: (x: number, y: number) => number, vp: Viewport, o: Co
     const b = vertical ? value(i, j + 1) : value(i + 1, j);
     let p: [number, number] | null = null;
     if (Number.isFinite(a) && Number.isFinite(b) && a > 0 !== b > 0) {
-      const ax = vp.xmin + i * dx;
-      const ay = vp.ymin + j * dy;
+      const ax = latX(i);
+      const ay = latY(j);
       // Bisect along the edge (parameter s in [0, 1]) keeping the sign change inside the bracket.
       let lo = 0;
       let hi = 1;
       let flo = a;
       let fhi = b;
       let exact: number | null = a === 0 ? 0 : b === 0 ? 1 : null;
-      // |F(hi) − F(lo)| early in the bisection, compared with the end: it shrinks with the bracket at a real zero
-      // and grows at a pole, whatever the corner values are (a corner next to a pole can be huge).
-      let earlySpread = NaN;
-      for (let k = 0; k < CROSSING_BISECTIONS && exact === null; k++) {
-        if (k === POLE_TEST_STEP) earlySpread = Math.abs(fhi - flo);
+      // Spread |F(hi) − F(lo)| of the bracket: it shrinks with the bracket at a zero, grows at a pole, and stays at a
+      // jump of a bounded F (floor), whatever the corner values are (a corner next to a pole can be huge). A steep but
+      // finite F (tanh(10⁵·g)) or a weak zero (|d|^0.2) looks like a jump until the bracket is inside its transition,
+      // so when the spread has not shrunk after CROSSING_BISECTIONS halvings, bisection goes on (up to
+      // CROSSING_BISECTIONS_MAX) and the test is repeated against the spread at that point.
+      let reference = NaN;
+      let isRoot = false;
+      for (let k = 0; k < CROSSING_BISECTIONS_MAX && exact === null; k++) {
+        if (k === POLE_TEST_STEP) reference = Math.abs(fhi - flo);
+        if (k === CROSSING_BISECTIONS) {
+          if (Math.abs(fhi - flo) <= ROOT_SPREAD_RATIO * reference) {
+            isRoot = true;
+            break;
+          }
+          reference = Math.abs(fhi - flo);
+        }
         const m = (lo + hi) / 2;
         const fm = F(vertical ? ax : ax + m * dx, vertical ? ay + m * dy : ay);
         evaluations++;
@@ -104,11 +131,7 @@ export function contour(F: (x: number, y: number) => number, vp: Viewport, o: Co
           fhi = fm;
         }
       }
-      // A real zero leaves a bracket whose spread shrank (by ~2^-(bisections − step)); a pole one whose spread grew,
-      // and a jump of a bounded F (floor) one whose spread stayed: only the first is a crossing.
-      const isRoot =
-        exact !== null ||
-        (Number.isFinite(lo) && (Number.isNaN(earlySpread) ? true : Math.abs(fhi - flo) <= ROOT_SPREAD_RATIO * earlySpread));
+      if (!isRoot) isRoot = exact !== null || (Number.isFinite(lo) && Math.abs(fhi - flo) <= ROOT_SPREAD_RATIO * reference);
       if (isRoot) {
         const s = exact ?? lo + ((hi - lo) * flo) / (flo - fhi);
         p = vertical ? [ax, ay + s * dy] : [ax + s * dx, ay];
@@ -204,11 +227,20 @@ export function contour(F: (x: number, y: number) => number, vp: Viewport, o: Co
       const b = value(i0 + R, j0);
       const c = value(i0 + R, j0 + R);
       const d = value(i0, j0 + R);
-      if (needsRefinement4(a, b, c, d, coarseSlope(ci, cj))) refine(ci, cj);
-      else if (!Number.isFinite(a) && !Number.isFinite(b) && !Number.isFinite(c) && !Number.isFinite(d)) {
-        // All corners undefined: a defined sliver may still run through the cell (y = √(ε − x²)).
+      if (needsRefinement4(a, b, c, d, coarseSlope(ci, cj))) {
+        refine(ci, cj);
+        continue;
+      }
+      // Probes inside the cell: a defined sliver between undefined corners (y = √(ε − x²)), or a sign change that
+      // repeats at a fraction of the cell spacing and so does not show at the corners.
+      const allUndefined = !Number.isFinite(a) && !Number.isFinite(b) && !Number.isFinite(c) && !Number.isFinite(d);
+      for (let q = 0; q < CONTOUR_PROBES; q++) {
+        const v = F(vp.xmin + (i0 + R * jitter(ci, cj, 2 * q)) * dx, vp.ymin + (j0 + R * jitter(ci, cj, 2 * q + 1)) * dy);
         evaluations++;
-        if (Number.isFinite(F(vp.xmin + (i0 + R / 2) * dx, vp.ymin + (j0 + R / 2) * dy))) refine(ci, cj);
+        if (allUndefined ? Number.isFinite(v) : !Number.isFinite(v) || v > 0 !== a > 0) {
+          refine(ci, cj);
+          break;
+        }
       }
     }
   }
@@ -333,22 +365,31 @@ export function stitch(polylines: Float64Array[], gap: number, vp?: Viewport): F
       (buckets.get(kk) ?? buckets.set(kk, []).get(kk))?.push(e);
     }
   }
+  // Each end proposes only its STITCH_CANDIDATES nearest partners, so ends clustered in one cell (a tangle) cost a
+  // distance scan, not a sort of every pair.
   const pairs: Array<[number, number, number]> = [];
+  const best: Array<[number, number]> = [];
   for (let e = 0; e < 2 * n; e++) {
     if (!open[e]) continue;
     const bx = Math.floor(ex[e] / size);
     const by = Math.floor(ey[e] / size);
+    best.length = 0;
     for (let u = -1; u <= 1; u++) {
       for (let v = -1; v <= 1; v++) {
         for (const f of buckets.get(`${bx + u},${by + v}`) ?? []) {
-          if (f <= e) continue;
+          if (f === e) continue;
           // A line's own two ends join only when it is long enough to be a loop.
           if (f >> 1 === e >> 1 && polylines[e >> 1].length < 8) continue;
           const d = Math.hypot(ex[e] - ex[f], ey[e] - ey[f]);
-          if (d <= gap) pairs.push([d, e, f]);
+          if (d > gap) continue;
+          if (best.length < STITCH_CANDIDATES) best.push([d, f]);
+          else if (d < best[best.length - 1][0]) best[best.length - 1] = [d, f];
+          else continue;
+          best.sort((p, q) => p[0] - q[0]);
         }
       }
     }
+    for (const [d, f] of best) pairs.push([d, Math.min(e, f), Math.max(e, f)]);
   }
   pairs.sort((p, q) => p[0] - q[0]);
   const match = new Int32Array(2 * n).fill(-1);
@@ -360,9 +401,14 @@ export function stitch(polylines: Float64Array[], gap: number, vp?: Viewport): F
   }
   const out: Float64Array[] = [];
   const visited = new Uint8Array(n);
+  // A joined piece whose first point repeats the last point so far is appended without it (no duplicate vertex).
+  const push = (acc: number[], x: number, y: number) => {
+    if (acc.length >= 2 && acc[acc.length - 2] === x && acc[acc.length - 1] === y) return;
+    acc.push(x, y);
+  };
   const append = (acc: number[], l: Float64Array, reversed: boolean) => {
-    if (!reversed) for (let i = 0; i < l.length; i++) acc.push(l[i]);
-    else for (let i = l.length - 2; i >= 0; i -= 2) acc.push(l[i], l[i + 1]);
+    if (!reversed) for (let i = 0; i < l.length; i += 2) push(acc, l[i], l[i + 1]);
+    else for (let i = l.length - 2; i >= 0; i -= 2) push(acc, l[i], l[i + 1]);
   };
   /** Walks from end `start` (entering its line there) along matched ends until a free end or back to the start. */
   const walk = (start: number) => {
@@ -375,7 +421,8 @@ export function stitch(polylines: Float64Array[], gap: number, vp?: Viewport): F
       const m = match[e ^ 1];
       if (m < 0) break;
       if (visited[m >> 1]) {
-        acc.push(acc[0], acc[1]);
+        // Close the loop (already closed when the last piece ended exactly on the first point).
+        push(acc, acc[0], acc[1]);
         break;
       }
       e = m;
@@ -489,19 +536,17 @@ export function regionMask(
       const c3 = at(I, J + 1);
       let refineBlock = needsRefinement4(c0, c1, c2, c3, slope);
       if (!refineBlock) {
-        // Probes inside the block (centre, and edge midpoints when the block is large enough): a pattern repeating at
-        // the block spacing, or a defined sliver between undefined corners, does not show at the corners alone.
+        // Probes at jittered positions inside the block (more when the block is large): a pattern repeating at a
+        // fraction of the block spacing, or a defined sliver between undefined corners, does not show at the corners.
         const allUndefined = !Number.isFinite(c0) && !Number.isFinite(c1) && !Number.isFinite(c2) && !Number.isFinite(c3);
         const want = allUndefined ? -1 : inside(c0) ? 1 : 0;
         const x0 = vp.xmin + I * B * sx;
         const y0 = vp.ymax - J * B * sy;
-        const hx = ((i1 - I * B) * sx) / 2;
-        const hy = ((j1 - J * B) * sy) / 2;
-        const probes = B >= MASK_EDGE_PROBE_BLOCK ? 5 : 1;
+        const wx = (i1 - I * B) * sx;
+        const wy = (j1 - J * B) * sy;
+        const probes = B >= MASK_EDGE_PROBE_BLOCK ? MASK_PROBES_LARGE : MASK_PROBES_SMALL;
         for (let q = 0; q < probes && !refineBlock; q++) {
-          const px = q === 0 ? x0 + hx : q === 1 ? x0 : q === 2 ? x0 + 2 * hx : x0 + hx;
-          const py = q === 0 ? y0 - hy : q === 1 || q === 2 ? y0 - hy : q === 3 ? y0 : y0 - 2 * hy;
-          const v = F(px, py);
+          const v = F(x0 + wx * jitter(I, J, 2 * q), y0 - wy * jitter(I, J, 2 * q + 1));
           evaluations++;
           if (allUndefined) refineBlock = Number.isFinite(v);
           else refineBlock = !Number.isFinite(v) || (inside(v) ? 1 : 0) !== want || Math.abs(v) <= NEAR_ZERO_CELLS * slope;

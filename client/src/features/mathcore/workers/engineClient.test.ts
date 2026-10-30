@@ -127,4 +127,26 @@ describe("engine client (STEPS.md §7.1, §7.3, §9)", () => {
     expect(traces).toEqual([2]);
     expect(results).toEqual([1]);
   });
+
+  it("the full answer to the latest load is delivered even after a newer view request (slider values)", () => {
+    const w = new FakeWorker();
+    const seen: Array<[number, string]> = [];
+    const c = createEngineClient({
+      createWorker: () => w,
+      onResult: (r) => r.type === "result" && seen.push([r.seq, r.cause]),
+      onRestart: () => {},
+    });
+    const load = result(1) as Extract<EngineResponse, { type: "result" }>;
+    c.send({ type: "load", graph: load.graph, parsed: {}, view });
+    c.send({ type: "view", view });
+    w.reply({ ...load, seq: 1, cause: "load", partial: true });
+    w.reply({ ...load, seq: 1, cause: "load" });
+    w.reply({ ...load, seq: 2, cause: "view" });
+    expect(seen).toEqual([[1, "load"], [2, "view"]]);
+    // An older load (a newer load exists) is still dropped.
+    c.send({ type: "load", graph: load.graph, parsed: {}, view });
+    c.send({ type: "load", graph: load.graph, parsed: {}, view });
+    w.reply({ ...load, seq: 3, cause: "load" });
+    expect(seen.length).toBe(2);
+  });
 });

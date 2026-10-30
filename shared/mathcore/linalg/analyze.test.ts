@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 import algorithms from "../__golden__/algorithms.json";
-import { analyzeMatrix, analyzeSystem, numberLatex, squareFactor } from "./analyze";
+import { analyzeMatrix, analyzeSystem, numberLatex, squareFactor, symbolLatex } from "./analyze";
 import { apply, multiply } from "./matrix";
 import type { Mat } from "./matrix";
 
@@ -348,5 +348,94 @@ describe("matrix name in the report", () => {
     expect(a.det.working.startsWith("\\det M = ad - bc")).toBe(true);
     expect(a.characteristic.startsWith("\\det(\\lambda I - M)")).toBe(true);
     expect(analyzeMatrix([[1, 0, 0], [0, 1, 0], [0, 0, 1]], "B_{1}").det.working.startsWith("\\det B_{1} = ")).toBe(true);
+  });
+});
+
+describe("Phase 4 review: scale-free numerics", () => {
+  const I2 = (M: Mat) => M.length === 2;
+  const checkInverse = (A: Mat, tol = 1e-12) => {
+    const a = analyzeMatrix(A);
+    expect(a.inverse.values, JSON.stringify(A)).not.toBeNull();
+    multiply(A, a.inverse.values as Mat).forEach((row, i) => row.forEach((v, j) => expect(Math.abs(v - (i === j ? 1 : 0))).toBeLessThan(tol)));
+    return a;
+  };
+  it("tiny matrices are not singular and have the right inverse", () => {
+    const a = checkInverse([[1e-13, 2e-13], [3e-13, 4e-13]]);
+    expect(a.det.singular).toBe(false);
+    expect(a.rank).toBe(2);
+    expect(a.det.value).toBeCloseTo(-2e-26, 40);
+    checkInverse([[2e-15, 0], [0, 3e-15]]);
+    expect(analyzeMatrix([[1e-300, 0], [0, 1e-300]]).rank).toBe(2);
+  });
+
+  it("badly scaled matrices keep their small entries", () => {
+    checkInverse([[Math.PI, 1e8], [1e-8, Math.E]], 1e-9);
+    checkInverse([[1e8, 1, 0], [1, 1e-8, 1], [0, 1, 1]], 1e-8);
+  });
+
+  it("badly scaled systems solve correctly", () => {
+    const A = [[Math.PI * 1e8, 1], [1, Math.E]];
+    const b = [1, 2];
+    const s = analyzeSystem(A, b, ["x", "y"]);
+    if (s.solution.kind !== "unique") throw new Error("expected unique");
+    apply(A, s.solution.values).forEach((v, i) => expect(Math.abs(v - b[i])).toBeLessThan(1e-12));
+    expect(s.solution.latex[0]).not.toBe("x = 0");
+    const big = analyzeSystem([[1e200, 1], [1, -1]], [1, 0], ["x", "y"]);
+    expect(big.solution.kind).toBe("unique");
+  });
+
+  it("overflowing entries: det is honest (±∞ or exact), eigenvalues ±√2·10²⁰⁰, not singular", () => {
+    const a = analyzeMatrix([[1e200, 1e200], [1e200, -1e200]]);
+    expect(a.det.singular).toBe(false);
+    expect(a.det.value).toBe(-Infinity);
+    const l = a.eigen.values.map((v) => v.re).sort((p, q) => p - q);
+    expect(l[0] / -(Math.SQRT2 * 1e200)).toBeCloseTo(1, 12);
+    expect(l[1] / (Math.SQRT2 * 1e200)).toBeCloseTo(1, 12);
+  });
+
+  it("eigenvalues always agree with their kind (exact path with a tiny discriminant)", () => {
+    for (const A of [[[1, 1e-9], [2e-9, 1]], [[1, 1e-9], [-2e-9, 1]]] as Mat[]) {
+      const a = analyzeMatrix(A);
+      expect(a.eigen.values.length).toBe(2);
+      const disc = A[0][1] * A[1][0];
+      if (disc > 0) {
+        expect(a.eigen.kind).toBe("distinct");
+        // λ ≈ 1 ± 1.4e-9: the gap is resolved to the ulp of 1 (relative 1e-6 of the gap).
+        expect(Math.abs(a.eigen.values[0].re - a.eigen.values[1].re - 2 * Math.sqrt(disc))).toBeLessThan(1e-6 * 2 * Math.sqrt(disc));
+        expect(a.eigen.directions?.length).toBe(2);
+      } else {
+        expect(a.eigen.kind).toBe("complex");
+        expect(Math.abs(Math.abs(a.eigen.values[0].im) - Math.sqrt(-disc))).toBeLessThan(1e-6 * Math.sqrt(-disc));
+        expect(a.eigen.rotation).toBeDefined();
+      }
+    }
+  });
+
+  it("the determinant of a nearly singular matrix is exact to the last digit", () => {
+    const A = [[Math.PI, 2.7182818284590424], [Math.PI, Math.E]];
+    const d = analyzeMatrix(A).det.value;
+    // Exact: π·(e − 2.7182818284590424) with the stored doubles.
+    expect(d).not.toBe(0);
+    const small = analyzeMatrix(A).eigen.values.map((v) => Math.abs(v.re)).sort((p, q) => p - q)[0];
+    const big = analyzeMatrix(A).eigen.values.map((v) => Math.abs(v.re)).sort((p, q) => q - p)[0];
+    expect(Math.abs(small * big - Math.abs(d)) / Math.abs(d)).toBeLessThan(1e-12);
+    expect(I2(A)).toBe(true);
+  });
+
+  it("floating-point step LaTeX never uses JS exponent syntax", () => {
+    const a = analyzeMatrix([[Math.PI * 1e-7, 1], [1, Math.E]]);
+    for (const s of a.inverse.steps) {
+      expect(s.op).not.toMatch(/\de[-+]?\d/);
+      expect(s.matrix).not.toMatch(/\de[-+]?\d/);
+    }
+    expect(a.inverse.steps.some((s) => s.op.includes("\\times 10^{") || s.matrix.includes("\\times 10^{"))).toBe(true);
+  });
+
+  it("multi-letter and Greek names are KaTeX-safe", () => {
+    expect(symbolLatex("Rot")).toBe("\\mathrm{Rot}");
+    expect(symbolLatex("alpha")).toBe("\\alpha");
+    expect(symbolLatex("x_1")).toBe("x_{1}");
+    expect(symbolLatex("ab_c2")).toBe("\\mathrm{ab}_{c2}");
+    expect(analyzeSystem([[1, 0], [0, 1]], [1, 2], ["ab", "theta"]).equations).toEqual(["\\mathrm{ab} = 1", "\\theta = 2"]);
   });
 });

@@ -57,7 +57,9 @@ describe("linear algebra vs mpmath (Phase 4 exit)", () => {
     for (const c of cases) {
       const got = determinant(c.matrix).value;
       const want = Number(c.det);
-      const err = Math.abs(got - want) / Math.max(Math.abs(want), hadamardBound(c.matrix) * 1e-6);
+      // Plain relative error: the determinant is computed exactly on the stored doubles, so even nearly singular
+      // matrices meet 1e-9 (STEPS.md §8.2 criterion as written).
+      const err = want === 0 ? Math.abs(got) / hadamardBound(c.matrix) : Math.abs(got - want) / Math.abs(want);
       if (!(err <= TOLERANCE)) bad.push(`${JSON.stringify(c.matrix)}: ${got} vs ${c.det}`);
     }
     expect(bad).toEqual([]);
@@ -70,6 +72,14 @@ describe("linear algebra vs mpmath (Phase 4 exit)", () => {
       const viaQr = worstEigenError(eigenvalues(c.matrix), want);
       if (!(viaQr <= TOLERANCE)) bad.push(`QR ${JSON.stringify(c.matrix)}: ${viaQr.toExponential(2)}`);
       if (c.matrix.length === 2) {
+        // 2×2: every eigenvalue relative to itself (the small root comes from the exact determinant).
+        const own = closedForm2(c.matrix);
+        for (const g of own) {
+          const w = want.reduce((p, q) => (Math.hypot(q.re - g.re, q.im - g.im) < Math.hypot(p.re - g.re, p.im - g.im) ? q : p));
+          const rel = Math.hypot(g.re - w.re, g.im - w.im) / Math.max(Math.hypot(w.re, w.im), Number.MIN_VALUE);
+          const tiny = Math.hypot(w.re, w.im) <= 1e-300;
+          if (!(rel <= TOLERANCE) && !tiny) bad.push(`closed (own scale) ${JSON.stringify(c.matrix)}: ${rel.toExponential(2)}`);
+        }
         const viaClosed = worstEigenError(closedForm2(c.matrix), want);
         if (!(viaClosed <= TOLERANCE)) bad.push(`closed ${JSON.stringify(c.matrix)}: ${viaClosed.toExponential(2)}`);
       }

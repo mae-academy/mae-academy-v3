@@ -11,14 +11,13 @@ import { Fraction } from "./fraction";
 import type { GaussResult } from "./gaussJordan";
 import { gaussJordan, matrixToLatex } from "./gaussJordan";
 import type { Mat } from "./matrix";
-import { determinant, eigen2, toFractions } from "./matrix";
+import { DISPLAY_DIGITS, SQUARE_FACTOR_LIMIT } from "../constants";
+import { numberLatex } from "./format";
+import { determinant, eigen2, eigenvector, toFractions } from "./matrix";
 import type { EigenValue } from "./qr";
-import { eigen3 } from "./qr";
+import { EIGEN_IMAG_RELATIVE, eigen3 } from "./qr";
 
-/** Significant digits of floating-point numbers in the LaTeX reports. */
-export const DISPLAY_DIGITS = 6;
-/** Square factors are pulled out of √n by trial division up to this prime bound (larger n stay as they are). */
-const SQUARE_FACTOR_LIMIT = 10_000;
+export { DISPLAY_DIGITS, numberLatex };
 
 export interface StepReport {
   /** Row operation, e.g. `R_2 \leftarrow R_2 - 3R_1`. */
@@ -36,6 +35,10 @@ export interface EigenReport {
   vectors: Array<{ value: string; vector: string }>;
   /** Closed-form working for 2×2: λ = (T ± √(T² − 4D)) / 2 with the numbers substituted. */
   working?: string;
+  /** 2×2: unit eigen-directions for the canvas (none for a scalar matrix: every direction; none when complex). */
+  directions?: Array<[number, number]>;
+  /** 2×2 with complex eigenvalues α ± iβ: rotation angle θ and scale r in the real eigenvector basis. */
+  rotation?: { theta: number; scale: number };
 }
 
 export interface MatrixAnalysis {
@@ -75,19 +78,6 @@ export interface SystemAnalysis {
 }
 
 // ---------------------------------------------------------------- number formatting
-
-/** LaTeX of a double with DISPLAY_DIGITS significant digits: `2.5`, `-1.41421`, `3.2 \times 10^{-7}`. */
-export function numberLatex(x: number): string {
-  if (Number.isNaN(x)) return "\\text{undefined}";
-  if (!Number.isFinite(x)) return x > 0 ? "\\infty" : "-\\infty";
-  const r = Number(x.toPrecision(DISPLAY_DIGITS));
-  if (r === 0) return "0";
-  if (Math.abs(r) >= 1e6 || Math.abs(r) < 1e-4) {
-    const [m, e] = r.toExponential(DISPLAY_DIGITS - 1).split("e");
-    return `${String(Number(m))} \\times 10^{${Number(e)}}`;
-  }
-  return String(r);
-}
 
 type Num = { exact: Fraction | null; value: number };
 
@@ -203,8 +193,11 @@ function polynomialLatex(coefficients: Num[]): string {
 }
 
 function eigenReport2(A: Mat, F: Fraction[][] | null, T: Num, D: Num): EigenReport {
-  const e = eigen2(A);
+  const [[a, b], [c, d]] = A;
+  const unitOf = (lambda: number): [number, number] => eigenvector(a, b, c, d, lambda);
   if (F && T.exact && D.exact) {
+    // Exact classification from the rational discriminant T² − 4D; the numbers come from the same closed form, so
+    // the kind, the LaTeX and the values always agree.
     const disc = T.exact.mul(T.exact).sub(D.exact.mul(new Fraction(BigInt(4))));
     const working = `\\lambda = \\frac{T \\pm \\sqrt{T^2 - 4D}}{2} = \\frac{${latexOf(T)} \\pm \\sqrt{${latexOf(fromFraction(disc))}}}{2}`;
     const half = T.exact.div(new Fraction(BigInt(2)));
@@ -217,7 +210,8 @@ function eigenReport2(A: Mat, F: Fraction[][] | null, T: Num, D: Num): EigenRepo
         kind: scalar ? "scalar" : "defective",
         values,
         latex: [`${value.toLatex()} \\text{ (double)}`],
-        vectors: vec ? [{ value: value.toLatex(), vector: vec }] : [{ value: value.toLatex(), vector: "\\text{every } v" }],
+        vectors: vec ? [{ value: value.toLatex(), vector: vec.latex }] : [{ value: value.toLatex(), vector: "\\text{every } v" }],
+        directions: vec ? [vec.unit] : [],
         working,
       };
     }
@@ -229,28 +223,44 @@ function eigenReport2(A: Mat, F: Fraction[][] | null, T: Num, D: Num): EigenRepo
       // Rational eigenvalues: exact eigenvectors too.
       const l1 = half.add(q);
       const l2 = half.sub(q);
+      const v1 = directionExact(F, l1) as { latex: string; unit: [number, number] };
+      const v2 = directionExact(F, l2) as { latex: string; unit: [number, number] };
       return {
         kind: "distinct",
         values: [{ re: l1.toNumber(), im: 0 }, { re: l2.toNumber(), im: 0 }],
         latex: [l1.toLatex(), l2.toLatex()],
-        vectors: [l1, l2].map((l) => ({ value: l.toLatex(), vector: directionExact(F, l) as string })),
+        vectors: [{ value: l1.toLatex(), vector: v1.latex }, { value: l2.toLatex(), vector: v2.latex }],
+        directions: [v1.unit, v2.unit],
         working,
       };
     }
-    const values: EigenValue[] =
-      e.kind === "complex"
-        ? [{ re: e.re, im: e.im }, { re: e.re, im: -e.im }]
-        : e.kind === "distinct"
-          ? e.values.map((v) => ({ re: v, im: 0 }))
-          : [];
+    const h = half.toNumber();
+    const off = q.toNumber() * Math.sqrt(Number(r));
+    if (negative) {
+      return {
+        kind: "complex",
+        values: [{ re: h, im: off }, { re: h, im: -off }],
+        latex: [plusMinusLatex(half, q, r, true)],
+        vectors: [],
+        directions: [],
+        rotation: rotationOf(h, off),
+        working,
+      };
+    }
+    // The root of larger magnitude directly, the other as det / λ₁ (no cancellation).
+    const big = h >= 0 ? h + off : h - off;
+    const small = D.value / big;
+    const [l1, l2] = big >= small ? [big, small] : [small, big];
     return {
-      kind: negative ? "complex" : "distinct",
-      values,
-      latex: [plusMinusLatex(half, q, r, negative)],
-      vectors: e.kind === "distinct" ? e.values.map((v, i) => ({ value: numberLatex(v), vector: vectorLatex(unitDirection(e.vectors[i])) })) : [],
+      kind: "distinct",
+      values: [{ re: l1, im: 0 }, { re: l2, im: 0 }],
+      latex: [plusMinusLatex(half, q, r, false)],
+      vectors: [l1, l2].map((l) => ({ value: numberLatex(l), vector: vectorLatex(unitDirection(unitOf(l))) })),
+      directions: [unitOf(l1), unitOf(l2)],
       working,
     };
   }
+  const e = eigen2(A);
   switch (e.kind) {
     case "distinct":
       return {
@@ -258,15 +268,23 @@ function eigenReport2(A: Mat, F: Fraction[][] | null, T: Num, D: Num): EigenRepo
         values: e.values.map((v) => ({ re: v, im: 0 })),
         latex: e.values.map(numberLatex),
         vectors: e.values.map((v, i) => ({ value: numberLatex(v), vector: vectorLatex(unitDirection(e.vectors[i])) })),
+        directions: e.vectors,
       };
     case "scalar":
-      return { kind: "scalar", values: [{ re: e.value, im: 0 }, { re: e.value, im: 0 }], latex: [`${numberLatex(e.value)} \\text{ (double)}`], vectors: [{ value: numberLatex(e.value), vector: "\\text{every } v" }] };
+      return {
+        kind: "scalar",
+        values: [{ re: e.value, im: 0 }, { re: e.value, im: 0 }],
+        latex: [`${numberLatex(e.value)} \\text{ (double)}`],
+        vectors: [{ value: numberLatex(e.value), vector: "\\text{every } v" }],
+        directions: [],
+      };
     case "defective":
       return {
         kind: "defective",
         values: [{ re: e.value, im: 0 }, { re: e.value, im: 0 }],
         latex: [`${numberLatex(e.value)} \\text{ (double)}`],
         vectors: [{ value: numberLatex(e.value), vector: vectorLatex(unitDirection(e.vector)) }],
+        directions: [e.vector],
       };
     case "complex":
       return {
@@ -274,26 +292,38 @@ function eigenReport2(A: Mat, F: Fraction[][] | null, T: Num, D: Num): EigenRepo
         values: [{ re: e.re, im: e.im }, { re: e.re, im: -e.im }],
         latex: [`${numberLatex(e.re)} \\pm ${numberLatex(e.im)}i`],
         vectors: [],
+        directions: [],
+        rotation: rotationOf(e.re, e.im),
       };
   }
 }
 
-/** Eigen-direction of a rational 2×2 for rational λ, as integers. */
-function directionExact(F: Fraction[][], lambda: Fraction): string | null {
+/** α ± iβ: in the real basis of an eigenvector, A is a rotation by θ = atan2(β, α) scaled by r = |λ|. */
+function rotationOf(re: number, im: number): { theta: number; scale: number } {
+  return { theta: Math.atan2(Math.abs(im), re), scale: Math.hypot(re, im) };
+}
+
+/** Eigen-direction of a rational 2×2 for rational λ: integers for the LaTeX, and a unit vector for the canvas. */
+function directionExact(F: Fraction[][], lambda: Fraction): { latex: string; unit: [number, number] } | null {
   const [[a, b], [c, d]] = F;
   const r1 = [b, lambda.sub(a)];
   const r2 = [lambda.sub(d), c];
   const v = r1.every((x) => x.isZero()) ? r2 : r1;
   if (v.every((x) => x.isZero())) return null;
-  return vectorLatex(integerDirection(v));
+  const ints = integerDirection(v);
+  const nums = ints.map(Number);
+  const n = Math.hypot(nums[0], nums[1]);
+  return { latex: vectorLatex(ints), unit: [nums[0] / n, nums[1] / n] };
 }
 
 function eigenReport3(A: Mat): EigenReport {
   const e = eigen3(A);
   const latex: string[] = [];
+  const scale = Math.max(...e.values.map((v) => Math.hypot(v.re, v.im)), Number.MIN_VALUE);
   for (const v of e.values) {
-    if (v.im > 0) latex.push(`${numberLatex(v.re)} \\pm ${numberLatex(v.im)}i`);
-    else if (v.im === 0 || Math.abs(v.im) <= 1e-9 * Math.max(1, Math.abs(v.re))) latex.push(numberLatex(v.re));
+    const real = Math.abs(v.im) <= EIGEN_IMAG_RELATIVE * scale;
+    if (real) latex.push(numberLatex(v.re));
+    else if (v.im > 0) latex.push(`${numberLatex(v.re)} \\pm ${numberLatex(Math.abs(v.im))}i`);
   }
   return {
     kind: e.kind,
@@ -328,7 +358,9 @@ export function analyzeMatrix(A: Mat, name = "A"): MatrixAnalysis {
 
   const identity = A.map((row, i) => [...row, ...A.map((_, j) => (i === j ? 1 : 0))]);
   const g = gaussJordan(identity, n);
-  const inverse = d.singular ? null : matrixToLatex(g.rrefLatex.map((row) => row.slice(n)));
+  // No inverse when the determinant says singular or the elimination found fewer than n pivots.
+  const invertible = !d.singular && g.rank === n;
+  const inverse = invertible ? matrixToLatex(g.rrefLatex.map((row) => row.slice(n))) : null;
   return {
     size: n,
     name,
@@ -339,7 +371,7 @@ export function analyzeMatrix(A: Mat, name = "A"): MatrixAnalysis {
     trace: { value: T.value, latex: latexOf(T) },
     characteristic,
     eigen: n === 2 ? eigenReport2(A, F, T, det) : eigenReport3(A),
-    inverse: { start: matrixToLatex(identity.map((r, i) => r.map((v, j) => (j < n ? entries[i][j] : String(v)))), { augmented: n }), steps: steps(g, n), result: inverse, values: d.singular ? null : g.rref.map((row) => row.slice(n)) },
+    inverse: { start: matrixToLatex(identity.map((r, i) => r.map((v, j) => (j < n ? entries[i][j] : String(v)))), { augmented: n }), steps: steps(g, n), result: inverse, values: invertible ? g.rref.map((row) => row.slice(n)) : null },
     // Pivots are taken only in A's columns, so this is the rank of A.
     rank: g.rank,
   };
@@ -368,8 +400,23 @@ function equationLatex(row: string[], numeric: number[], unknowns: string[], rhs
   return `${out === "" ? "0" : out} = ${rhs}`;
 }
 
-/** LaTeX of a symbol name: `x_1` → `x_{1}`, Greek names (`alpha`) get a backslash. */
-export const symbolLatex = (s: string): string => (/^[a-zA-Z](_\w+)?$/.test(s) ? s.replace(/_(\w+)$/, "_{$1}") : `\\${s}`);
+const GREEK = new Set([
+  "alpha", "beta", "gamma", "delta", "epsilon", "varepsilon", "zeta", "eta", "theta", "vartheta", "iota", "kappa", "lambda",
+  "mu", "nu", "xi", "pi", "rho", "sigma", "tau", "upsilon", "phi", "varphi", "chi", "psi", "omega",
+  "Gamma", "Delta", "Theta", "Lambda", "Xi", "Pi", "Sigma", "Upsilon", "Phi", "Psi", "Omega",
+]);
+
+/**
+ * LaTeX of a symbol name: `x_1` → `x_{1}`, Greek names (`alpha`) get a backslash, other multi-letter names are
+ * upright (`\mathrm{Rot}`), so no undefined macro reaches KaTeX.
+ */
+export function symbolLatex(name: string): string {
+  const m = /^([A-Za-z]+)(?:_(\w+))?$/.exec(name);
+  if (!m) return `\\mathrm{${name.replace(/[^A-Za-z0-9]/g, "")}}`;
+  const [, base, sub] = m;
+  const head = base.length === 1 ? base : GREEK.has(base) ? `\\${base}` : `\\mathrm{${base}}`;
+  return sub ? `${head}_{${sub}}` : head;
+}
 
 /** x_c = rhs − Σ M[r][j] x_j over the free columns j, for each pivot (r, c) of the RREF of [A | b]. */
 function parametric(g: GaussResult, free: number[], names: string[]): string[] {

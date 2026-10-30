@@ -10,5 +10,8 @@ export type ParseResponse =
   | { seq: number; latex: string; ok: true; raw: unknown }
   | { seq: number; latex: string; ok: false; message: string; unavailable?: true };
 
-/** Raw MathJSON of one LaTeX string, or why it has none (syntax crash, 200 ms timeout, parser unavailable). */
-export type ParsedEntry = { ok: true; raw: unknown } | { ok: false; message: string };
+/**
+ * Raw MathJSON of one LaTeX string, or why it has none (syntax error, 200 ms timeout, parser unavailable).
+ * `transient`: the reason may pass (parser offline, crashed or still starting); the page parses the line again later.
+ */
+export type ParsedEntry = { ok: true; raw: unknown } | { ok: false; message: string; transient?: true };

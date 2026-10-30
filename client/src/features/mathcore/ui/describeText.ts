@@ -2,10 +2,9 @@
 import type { TFunction } from "i18next";
 import type { CurveDescription } from "@shared/mathcore/describe/describe";
 import type { MatrixAnalysis, SystemAnalysis } from "@shared/mathcore/linalg/analyze";
+import { numberText } from "@shared/mathcore/linalg/format";
 
-/** Significant digits read out for matrix values. */
-const SPOKEN_DIGITS = 6;
-const spoken = (v: number) => String(Number(v.toPrecision(SPOKEN_DIGITS)));
+const spoken = numberText;
 
 /** Sentence for a matrix or a linear system (the canvas picture says the same: orientation, eigenvalues, solution). */
 export function describeLinalg(

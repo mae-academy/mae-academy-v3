@@ -68,28 +68,53 @@ Added in this round:
 Other changes: 8 bisections per crossing instead of 12 (crossings still placed to 2⁻⁸ of a fine cell, then interpolated);
 saddles decided by F at the cell centre; lattice slopes computed once per lattice point.
 
+## Third round (verification of 7ec1db3)
+
+| Finding | Fix | Evidence |
+|---|---|---|
+| The spread-based pole test dropped real zeros of steep finite F (tanh(10⁵g), atan(10⁶g), logistic) and weak zeros (\|d\|^0.2) | when the spread has not shrunk after 8 halvings, bisection continues up to 40 and the test is repeated against the spread at step 8: steep and weak zeros then shrink, poles and jumps do not | tanh/atan/logistic circles and parabola: one curve; tanh(10⁴(y − sin x)): one curve; \|x\|^0.2 + \|y\|^0.2 = 1 reaches y = 0.996; y = x^(1/9) spans the view |
+| Aliasing at half-block periods on other canvas sizes (43%) | probes at deterministic jittered positions in every shading block and every coarse contour cell, so no period lines up with them | sin 40x · sin 40y on 800×500, 1200×700 and 1600×1000 at several zooms: < 2% vs per-pixel at full quality |
+| Strip mask rows misaligned when height is not a multiple of the stride | strips are planned in mask rows | 1600×997, stride 4: same rows as one run |
+| Strip border not bit-identical | the last lattice row and column are the view border itself | test on the lattice points |
+| Stitch quadratic when ends crowd one cell (30.9 s) | each end proposes its 2 nearest partners | 3000 crowded fragments < 1.5 s; exact joins leave no duplicate vertex |
+| Failed strip pool rebuilt every frame; no strip timeout | a failed or stalled pool (3 s, 20 s for the first run) is closed for good and this Worker computes fields | `stripPool.test.ts` |
+| Edit undone while still parsing was lost | the engine key is set when a round starts | `MathcorePage.tsx` |
+| New slider value lost when a view request followed the load | the full answer to the latest load is always delivered | `engineClient.test.ts` |
+| Import could lose its fresh flag to an older round | fresh documents are recognised by their items | `MathcorePage.tsx` |
+| No retry after a transient parse failure; unbounded timeout map | transient entries are marked and the page parses again after 2 s, doubling to 30 s; the map is bounded | `parseClient.test.ts` |
+| Interior singularity integrated to 8 digits (1/√\|x − 0.3\|) | a Simpson result with a sample far above the mean is treated as singular; the singular point is located by ternary search and split first; the endpoint tail starts where the last node's share ends (half a step past it) | 1/√\|x − 0.3\|, 1/√\|x − 1/3\|: < 1e-9; 1/√(1 − x²): 1.6e-11; ln\|x − 0.4\|: 2e-16 |
+| Seam corner on smoothed loops | closed loops start at the midpoint of their first edge | `renderer.ts` |
+| Pipeline e2e step never ran | it checks `e2e:mathcore` | `run-prompt.sh` |
+| Hardcoded values | probe counts, jitter margin, strip limits, retry delays, fallback canvas size and tanh-sinh levels are in `constants.ts` | — |
+
 ## Exit criterion: implicit field budget at quarter resolution
 
-Reference F = x² + y² + sin 3x · cos 2y < 9 (the engine's compiled closure), view ±5, canvas 1600×1000.
+Reference F = x² + y² + sin 3x · cos 2y < 9 (the engine's compiled closure), view ±5, canvas 1600×1000. Measured after
+the third round on the cloud machine (4 cores, load ≈ 1.2–1.5); ranges are over repeated runs.
 
-| Case (STEPS.md §7.2) | Target | Node, one thread | Chromium, engine Worker + 3 strip Workers (4 cores) |
+| Case (STEPS.md §7.2) | Target | Node, one thread | Chromium, engine Worker + 3 strip Workers |
 |---|---|---|---|
-| Field 400×250 during drag (drag lattice + quarter mask) | ≤ 16 ms | 10–12 ms | 7.7 ms |
-| Field 1600×1000 on release (quarter frame, then full frame) | ≤ 150 ms | 94 ms | 75.7 ms |
-| Dense sin(x² + y²) < 0, drag | ≤ 16 ms | 20–30 ms (fails) | 10.1 ms |
-| Dense sin(x² + y²) < 0, release | ≤ 150 ms | 122–154 ms | 84.6 ms |
+| Field 400×250 during drag (drag lattice + quarter mask) | ≤ 16 ms | 12.8–15.9 ms | 9.7–10.9 ms |
+| Field 1600×1000 on release (quarter frame, then full frame) | ≤ 150 ms | 106–110 ms | 88–108 ms |
+| Dense sin(x² + y²) < 0, drag | ≤ 16 ms | 23–30 ms (fails) | 14.5–14.8 ms |
+| Dense sin(x² + y²) < 0, release | ≤ 150 ms | 132–133 ms | 89 ms |
 
-Chromium figures are round trips measured from the page (message passing and copies included). They are reference
-figures from the cloud machine; D1 laptop numbers are still open (Phase 0 item 5). On a machine with fewer than three
-cores no strip Workers are started and the single-thread column applies.
+Chromium figures are round trips measured from a page (message passing and copies included). On a machine with fewer
+than three cores no strip Workers start and the single-thread column applies, where the dense drag case misses the
+budget. D1 laptop numbers are still open (Phase 0 item 5).
 
 ## Known limits
 
 - F that touches zero without changing sign (x² + y² = 0, (x − y)² = 0) is not drawn by any sign-based method.
-- Features narrower than about one fine lattice cell (1.5 px at full quality) may be missed; patterns finer than half
-  a shading block can still alias (the probes catch periods of one and two blocks).
-- An endpoint singularity at the right end of an interval stronger than (1 − x)^(−0.5) (for example (1 − x)^(−0.75)) is
-  reported as not converged: doubles near 1 are too sparse for the tail fit. At a left end at 0 it converges.
+- Features narrower than about one fine lattice cell (1.5 px at full quality) may be missed, for example the 1.6 px
+  sliver y < √(0.0004 − x²) on an 800×500 canvas at ±10. Cells with an undefined corner draw no boundary.
+- Curve following does not cross strip borders: a feature narrower than a coarse cell that crosses a border can be
+  cut there.
+- At drag quality (shading stride 4) patterns finer than two mask pixels alias, as any sampling at that resolution
+  does; the full frame that follows is per-pixel accurate where it matters.
+- Integrals: tail exponents within 10⁻³ of 1 (x^(−0.999)), slowly divergent-looking tails (1/(x ln²x)), endpoint
+  singularities far from 0 relative to the interval length ([10⁶, 10⁶ + 1]) and right-end singularities stronger than
+  (1 − x)^(−0.5) are reported as not converged (NaN). `estimatedError` is computed but not shown on the page yet.
 - SVG export contains curves only; shading is in PNG export (ADR-7: no SVG for fields).
 - Full-quality responses copy the shading mask of every inequality (about 1.6 MB per item at 1600×1000).
 - Chained inequalities (`0 < x < 1`) are rejected with an explanation; restrictions `{0<x<1}` work on explicit curves.

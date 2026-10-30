@@ -69,4 +69,13 @@ describe("strip pool (STEPS.md §7.1 technique 4)", () => {
     await expect(p).rejects.toThrow(/closed/);
     expect(workers.every((w) => w.terminated)).toBe(true);
   });
+
+  it("a stalled strip Worker fails the run after the limit", async () => {
+    class Silent extends FakeStripWorker {
+      postMessage() {}
+    }
+    const pool = createStripPool(2, () => new Silent(), { timeoutMs: 20, loadTimeoutMs: 40 });
+    await expect(pool.run(source, vp, o)).rejects.toThrow(/in time/);
+    pool.dispose();
+  });
 });

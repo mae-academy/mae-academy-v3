@@ -38,7 +38,7 @@ export function implicitField(F: (x: number, y: number) => number, vp: Viewport,
 }
 
 export interface Strip {
-  /** Pixel rows [top, bottom) of the canvas, row 0 at the top. */
+  /** Pixel rows [top, bottom) of the canvas, row 0 at the top (whole shading rows: see `planStrips`). */
   top: number;
   bottom: number;
   viewport: Viewport;
@@ -54,20 +54,23 @@ export function stripUnit(cellPx: number, stride: number): number {
 }
 
 /**
- * Up to `count` strips of whole units, top to bottom. Border y values come from one formula, so two strips sharing a
- * border agree on it to the bit.
+ * Up to `count` strips of whole units, top to bottom, planned in shading rows: the canvas has ⌈height / stride⌉
+ * mask rows of equal height, every strip takes whole rows (the last one may reach up to stride − 1 pixels past the
+ * canvas bottom, exactly as the single-run mask does), so the merged mask has the single run's rows. Border y values
+ * come from one formula, so two strips sharing a border agree on it to the bit.
  */
 export function planStrips(vp: Viewport, width: number, height: number, cellPx: number, stride: number, count: number): Strip[] {
-  const unit = stripUnit(cellPx, stride);
-  const units = Math.max(1, Math.ceil(height / unit));
+  const unitRows = stripUnit(cellPx, stride) / stride;
+  const rows = Math.max(1, Math.ceil(height / stride));
+  const units = Math.max(1, Math.ceil(rows / unitRows));
   const n = Math.max(1, Math.min(Math.floor(count), units));
-  const borderY = (row: number) => (row >= height ? vp.ymin : vp.ymax - (row / height) * (vp.ymax - vp.ymin));
+  const borderY = (row: number) => (row >= rows ? vp.ymin : vp.ymax - (row / rows) * (vp.ymax - vp.ymin));
   const strips: Strip[] = [];
   for (let k = 0; k < n; k++) {
-    const top = Math.min(height, Math.round((k * units) / n) * unit);
-    const bottom = k === n - 1 ? height : Math.min(height, Math.round(((k + 1) * units) / n) * unit);
-    if (bottom <= top) continue;
-    strips.push({ top, bottom, viewport: { ...vp, ymax: borderY(top), ymin: borderY(bottom) } });
+    const r0 = Math.min(rows, Math.round((k * units) / n) * unitRows);
+    const r1 = k === n - 1 ? rows : Math.min(rows, Math.round(((k + 1) * units) / n) * unitRows);
+    if (r1 <= r0) continue;
+    strips.push({ top: r0 * stride, bottom: r1 * stride, viewport: { ...vp, ymax: borderY(r0), ymin: borderY(r1) } });
   }
   return strips;
 }

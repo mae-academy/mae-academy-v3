@@ -2,7 +2,8 @@
  * One line of the expression list: a MathLive field (the app's MathLive loader, STEPS.md §3 reuse) with the item's
  * color, error and value. Falls back to a plain LaTeX text field if MathLive cannot load.
  */
-import { Suspense, lazy, useEffect, useRef, useState } from "react";
+import { Component, Suspense, lazy, useEffect, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { MATH_FIELD_TAG, loadMathLive } from "@/components/ai/mathliveLoader";
 import { MAX_LATEX_LENGTH } from "@shared/mathcore/constants";
@@ -11,6 +12,17 @@ import type { ItemResult } from "../workers/protocol";
 
 /** KaTeX and the report load only when a matrix or system is on the page. */
 const LinalgPanel = lazy(() => import("./LinalgPanel"));
+
+/** A report chunk that fails to load (offline) shows a note in its row instead of taking the page down. */
+class PanelBoundary extends Component<{ fallback: ReactNode; children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  render() {
+    return this.state.failed ? this.props.fallback : this.props.children;
+  }
+}
 
 interface MathFieldElement extends HTMLElement {
   value: string;
@@ -121,9 +133,11 @@ export function ExpressionRow({ index, latex, color, result, onChange, onRemove,
         ))}
         {result?.precisionWarning && <div className="mc-note">{t("precision")}</div>}
         {errors.length === 0 && result?.linalg && (
-          <Suspense fallback={<div className="mc-note">{t("linalg.loading")}</div>}>
-            <LinalgPanel report={result.linalg} showSteps={showSteps} mode={mode} />
-          </Suspense>
+          <PanelBoundary fallback={<div className="mc-note">{t("linalg.panelFailed")}</div>}>
+            <Suspense fallback={<div className="mc-note">{t("linalg.loading")}</div>}>
+              <LinalgPanel report={result.linalg} showSteps={showSteps} mode={mode} />
+            </Suspense>
+          </PanelBoundary>
         )}
       </div>
       <button type="button" className="mc-icon-button" onClick={onRemove} aria-label={t("removeExpression", { n: index + 1 })}>
