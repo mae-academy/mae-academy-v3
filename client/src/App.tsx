@@ -41,6 +41,7 @@ const NotFound = lazyRetry(() => import("./pages/NotFound"));
 const ArduinoStudioPage = lazyRetry(() => import("./pages/ArduinoStudioPage"));
 const PlcSimulatorPage = lazyRetry(() => import("./pages/PlcSimulatorPage"));
 const FluidSimulatorPage = lazyRetry(() => import("./pages/FluidSimulatorPage"));
+const MathcorePage = lazyRetry(() => import("./features/mathcore/ui/MathcorePage"));
 const HiddenSymbolDesigner = lazyRetry(() => import("./simulators/circuit-engine/components/pages/HiddenSymbolDesigner"));
 
 const pageVariants = {
@@ -107,6 +108,7 @@ function AnimatedRoutes() {
             <Route path="/simulations/:slug/:tool" component={SimulationDetail} />
             <Route path="/simulations/:slug" component={SimulationDetail} />
             <Route path="/simulations" component={Simulations} />
+            <Route path="/mathcore" component={MathcorePage} />
             <Route path="/simulators/arduino-studio" component={ArduinoStudioPage} />
             <Route path="/ai/:rest*"><Redirect to="/" /></Route>
             <Route path="/ai"><Redirect to="/" /></Route>
