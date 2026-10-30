@@ -2,12 +2,15 @@
  * One line of the expression list: a MathLive field (the app's MathLive loader, STEPS.md §3 reuse) with the item's
  * color, error and value. Falls back to a plain LaTeX text field if MathLive cannot load.
  */
-import { useEffect, useRef, useState } from "react";
+import { Suspense, lazy, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { MATH_FIELD_TAG, loadMathLive } from "@/components/ai/mathliveLoader";
 import { MAX_LATEX_LENGTH } from "@shared/mathcore/constants";
 import { NS } from "../i18n/register";
 import type { ItemResult } from "../workers/protocol";
+
+/** KaTeX and the report load only when a matrix or system is on the page. */
+const LinalgPanel = lazy(() => import("./LinalgPanel"));
 
 interface MathFieldElement extends HTMLElement {
   value: string;
@@ -21,12 +24,14 @@ export interface ExpressionRowProps {
   onChange: (latex: string) => void;
   onRemove: () => void;
   onEnter: () => void;
+  /** Gauss-Jordan steps start open (`view.showSteps`). */
+  showSteps?: boolean;
 }
 
 /** Item kinds drawn by a later phase, with that phase (STEPS.md §11). */
-const LATER_PHASE: Readonly<Record<string, number>> = { Matrix2: 4, Matrix3: 5, ODE1: 6, RiemannSum: 9, Distribution: 10 };
+const LATER_PHASE: Readonly<Record<string, number>> = { Matrix3: 5, ODE1: 6, RiemannSum: 9, Distribution: 10 };
 
-export function ExpressionRow({ index, latex, color, result, onChange, onRemove, onEnter }: ExpressionRowProps) {
+export function ExpressionRow({ index, latex, color, result, onChange, onRemove, onEnter, showSteps = false }: ExpressionRowProps) {
   const { t } = useTranslation(NS);
   const host = useRef<HTMLDivElement>(null);
   const field = useRef<MathFieldElement | null>(null);
@@ -113,6 +118,11 @@ export function ExpressionRow({ index, latex, color, result, onChange, onRemove,
           </div>
         ))}
         {result?.precisionWarning && <div className="mc-note">{t("precision")}</div>}
+        {errors.length === 0 && result?.linalg && (
+          <Suspense fallback={<div className="mc-note">{t("linalg.loading")}</div>}>
+            <LinalgPanel report={result.linalg} showSteps={showSteps} />
+          </Suspense>
+        )}
       </div>
       <button type="button" className="mc-icon-button" onClick={onRemove} aria-label={t("removeExpression", { n: index + 1 })}>
         ×

@@ -11,9 +11,9 @@ import type { GraphIR, Item, Param, Viewport } from "@shared/mathcore/ir/types";
 import { DEFAULT_VIEWPORT, emptyGraph } from "@shared/mathcore/ir/types";
 import { PARSE_DEBOUNCE_MS } from "@shared/mathcore/constants";
 import { NS } from "../i18n/register";
-import type { DrawCurve, DrawField, DrawPoint, Scene } from "../render/renderer";
-import { PALETTE_TOKENS, resolveColor } from "../render/renderer";
-import { describeItem } from "./describeText";
+import type { DrawCurve, DrawField, DrawPoint, DrawTransform, Scene } from "../render/renderer";
+import { LINALG_TOKENS, PALETTE_TOKENS, resolveColor } from "../render/renderer";
+import { describeItem, describeLinalg } from "./describeText";
 import { ExpressionRow } from "./ExpressionRow";
 import type { DraggablePoint, TraceTarget } from "./GraphCanvas";
 import { GraphCanvas, triangleRun } from "./GraphCanvas";
@@ -215,16 +215,25 @@ export default function MathcorePage() {
     const curves: DrawCurve[] = [];
     const fields: DrawField[] = [];
     const points: DrawPoint[] = [];
+    const transforms: DrawTransform[] = [];
+    const root = document.documentElement;
+    const linalgColors = {
+      positive: resolveColor(root, undefined, LINALG_TOKENS.positive),
+      negative: resolveColor(root, undefined, LINALG_TOKENS.negative),
+      arrow: resolveColor(root, undefined, LINALG_TOKENS.arrow),
+      eigen: resolveColor(root, undefined, LINALG_TOKENS.eigen),
+    };
     graph.items.forEach((it, i) => {
       const r = results.get(it.id);
       if (!r || it.style?.hidden) return;
       if (r.field) fields.push({ ...r.field, color: colors[i] });
+      if (r.transform) transforms.push({ ...r.transform, color: colors[i], ...linalgColors });
       // A strict inequality (< or >) does not include its boundary, so the boundary is dashed.
       const strict = r.relation === "<" || r.relation === ">";
       if (r.segments.length) {
         curves.push({ segments: r.segments, color: colors[i], width: it.style?.width ?? DEFAULT_WIDTH, dash: it.style?.dash ?? (strict ? "dashed" : undefined), highlighted: trace?.id === it.id });
       }
-      if (r.point) points.push({ x: r.point.x, y: r.point.y, color: colors[i] });
+      if (r.point) points.push({ x: r.point.x, y: r.point.y, color: colors[i], label: r.label });
     });
     const traced = trace && Number.isFinite(trace.y) ? trace : null;
     if (traced) points.push({ x: traced.x, y: traced.y, color: colors[graph.items.findIndex((it) => it.id === traced.id)] ?? colors[0], label: `(${traced.x.toPrecision(4)}, ${traced.y.toPrecision(4)})` });
@@ -233,6 +242,7 @@ export default function MathcorePage() {
       grid: graph.view.grid,
       curves,
       fields,
+      transforms,
       points,
       tangent:
         traced && traced.slope !== null
@@ -301,7 +311,9 @@ export default function MathcorePage() {
   const descriptions = graph.items
     .map((it, i) => {
       const r = results.get(it.id);
-      return r?.description ? describeItem(t, `${t("expressionLabel", { n: i + 1 })}`, r.description) : null;
+      const label = t("expressionLabel", { n: i + 1 });
+      if (r?.linalg && r.errors.length === 0) return describeLinalg(t, label, r.linalg);
+      return r?.description ? describeItem(t, label, r.description) : null;
     })
     .filter((d): d is string => d !== null);
 
@@ -335,6 +347,17 @@ export default function MathcorePage() {
           <button type="button" className="mc-button" onClick={() => setViewport({ ...DEFAULT_VIEWPORT }, "full")}>
             {t("resetView")}
           </button>
+          <label className="mc-button">
+            <input
+              type="checkbox"
+              checked={graph.view.showSteps}
+              onChange={(e) => {
+                const showSteps = e.target.checked;
+                setGraph((g) => ({ ...g, view: { ...g.view, showSteps } }));
+              }}
+            />
+            {t("showSteps")}
+          </label>
         </div>
       </header>
       {notice && (
@@ -359,6 +382,7 @@ export default function MathcorePage() {
                 latex={it.latex}
                 color={colors[i]}
                 result={results.get(it.id)}
+                showSteps={graph.view.showSteps}
                 onChange={(latex) => setItems(graph.items.map((x) => (x.id === it.id ? { ...x, latex } : x)))}
                 onRemove={() => setItems(graph.items.filter((x) => x.id !== it.id))}
                 onEnter={() => setItems([...graph.items.slice(0, i + 1), { id: newId(), latex: "" }, ...graph.items.slice(i + 1)])}

@@ -97,10 +97,10 @@ function rowLabel(i: number): string {
   return `R_{${i + 1}}`;
 }
 
-function run<T>(F: Field<T>, M: T[][], augmented: boolean): GaussResult & { exact: boolean } {
+function run<T>(F: Field<T>, M: T[][], extra: number): GaussResult & { exact: boolean } {
   const rows = M.length;
   const cols = M[0].length;
-  const varCols = augmented ? cols - 1 : cols;
+  const varCols = cols - extra;
   const steps: GaussStep[] = [];
   const pivots: Array<[number, number]> = [];
   const snapshot = (op: RowOp, latex: string, pivot: [number, number]) =>
@@ -149,7 +149,7 @@ function run<T>(F: Field<T>, M: T[][], augmented: boolean): GaussResult & { exac
     pivots,
     exact: F === (exactField as unknown as Field<T>),
   };
-  if (augmented) {
+  if (extra === 1) {
     const inconsistent = M.some((row) => row.slice(0, varCols).every((v) => F.isZero(v)) && !F.isZero(row[varCols]));
     if (inconsistent) result.system = { kind: "none" };
     else if (pivots.length < varCols) {
@@ -170,25 +170,34 @@ function coef<T>(F: Field<T>, k: T): string {
   return s.startsWith("-") ? `\\left(${s}\\right)` : s;
 }
 
-/** Gauss-Jordan on A (augmented = false) or on [A | b] (augmented = true, last column is b). */
-export function gaussJordan(A: Mat, augmented = false): GaussResult {
+/**
+ * Gauss-Jordan on A (augmented = false), on [A | b] (augmented = true, last column is b), or on [A | B] with the
+ * last `augmented` columns to the right of the bar (no pivots are taken there; [A | I] gives the inverse).
+ */
+export function gaussJordan(A: Mat, augmented: boolean | number = false): GaussResult {
   if (A.length === 0 || A.some((r) => r.length !== A[0].length)) throw new RangeError("gaussJordan needs a rectangular matrix");
+  const extra = augmented === true ? 1 : augmented === false ? 0 : augmented;
+  if (!Number.isInteger(extra) || extra < 0 || extra >= A[0].length) throw new RangeError("gaussJordan: bad number of augmented columns");
   const exact = toFractions(A);
-  if (exact) return run(exactField, exact, augmented);
+  if (exact) return run(exactField, exact, extra);
   const scale = Math.max(...A.flat().map(Math.abs));
-  return run(floatField(scale), A.map((r) => r.slice()), augmented);
+  return run(floatField(scale), A.map((r) => r.slice()), extra);
 }
 
-/** LaTeX of a matrix (bmatrix), optionally with a vertical bar before the last column and a highlighted pivot. */
-export function matrixToLatex(entries: string[][], options: { augmented?: boolean; pivot?: [number, number] } = {}): string {
+/**
+ * LaTeX of a matrix (bmatrix), optionally with a vertical bar before the last column (`augmented: true`) or before
+ * the last `augmented` columns, and a highlighted pivot.
+ */
+export function matrixToLatex(entries: string[][], options: { augmented?: boolean | number; pivot?: [number, number] } = {}): string {
   const cols = entries[0]?.length ?? 0;
   const body = entries
     .map((row, i) =>
       row.map((v, j) => (options.pivot && options.pivot[0] === i && options.pivot[1] === j ? `\\boxed{${v}}` : v)).join(" & "),
     )
     .join(" \\\\ ");
-  if (options.augmented) {
-    const spec = `${"c".repeat(cols - 1)}|c`;
+  const extra = options.augmented === true ? 1 : options.augmented || 0;
+  if (extra > 0 && extra < cols) {
+    const spec = `${"c".repeat(cols - extra)}|${"c".repeat(extra)}`;
     return `\\left[\\begin{array}{${spec}} ${body} \\end{array}\\right]`;
   }
   return `\\begin{bmatrix} ${body} \\end{bmatrix}`;

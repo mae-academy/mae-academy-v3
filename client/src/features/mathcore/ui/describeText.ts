@@ -1,6 +1,32 @@
 /** Localized sentence for a curve description (STEPS.md §4 Accessibility, ADR-13). */
 import type { TFunction } from "i18next";
 import type { CurveDescription } from "@shared/mathcore/describe/describe";
+import type { MatrixAnalysis, SystemAnalysis } from "@shared/mathcore/linalg/analyze";
+
+/** Significant digits read out for matrix values. */
+const SPOKEN_DIGITS = 6;
+const spoken = (v: number) => String(Number(v.toPrecision(SPOKEN_DIGITS)));
+
+/** Sentence for a matrix or a linear system (the canvas picture says the same: orientation, eigenvalues, solution). */
+export function describeLinalg(
+  t: TFunction<"mathcore">,
+  label: string,
+  r: { type: "matrix"; analysis: MatrixAnalysis } | { type: "system"; analysis: SystemAnalysis },
+): string {
+  if (r.type === "system") {
+    const s = r.analysis.solution;
+    if (s.kind === "none") return t("describe.systemNone", { label });
+    if (s.kind === "infinite") return t("describe.systemInfinite", { label });
+    const solution = s.values.map((v, i) => `${r.analysis.unknowns[i]} = ${spoken(v)}`).join(", ");
+    return t("describe.systemUnique", { label, solution });
+  }
+  const a = r.analysis;
+  const orientation = t(`linalg.orientation_${a.det.singular ? "singular" : a.det.sign > 0 ? "kept" : "reversed"}`);
+  const eigen = a.eigen.values
+    .map((v) => (v.im === 0 ? spoken(v.re) : `${spoken(v.re)} ${v.im > 0 ? "+" : "−"} ${spoken(Math.abs(v.im))}i`))
+    .join(", ");
+  return t("describe.matrix", { label, det: spoken(a.det.value), orientation, eigen });
+}
 
 export function describeItem(t: TFunction<"mathcore">, label: string, d: CurveDescription): string {
   if (d.shaded !== undefined) {

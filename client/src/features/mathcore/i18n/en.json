@@ -47,7 +47,11 @@
     "region": "{{label}}: the shaded region covers about {{percent}}% of the view",
     "regionAll": "{{label}}: the shaded region fills the whole view",
     "regionNone": "{{label}}: no shaded region in this view",
-    "boundary": "its boundary spans x from {{xmin}} to {{xmax}} and y from {{ymin}} to {{ymax}}"
+    "boundary": "its boundary spans x from {{xmin}} to {{xmax}} and y from {{ymin}} to {{ymax}}",
+    "matrix": "{{label}}: matrix with determinant {{det}}, {{orientation}}; eigenvalues {{eigen}}.",
+    "systemUnique": "{{label}}: linear system with the unique solution {{solution}}.",
+    "systemNone": "{{label}}: linear system with no solution.",
+    "systemInfinite": "{{label}}: linear system with infinitely many solutions."
   },
   "value_is": "= {{value}}",
   "benchmarks": "Run benchmarks",
@@ -55,5 +59,22 @@
   "evaluations": "{{count}} item evaluations; last update re-evaluated {{changed}}",
   "linkInvalid": "This link is not a valid graph, so a new graph is shown. The address stays until you edit.",
   "benchPass": "Pass",
-  "benchFail": "Fail"
+  "benchFail": "Fail",
+  "showSteps": "Show steps",
+  "linalg": {
+    "loading": "Loading the matrix report…",
+    "orientation_kept": "orientation kept",
+    "orientation_reversed": "orientation reversed",
+    "orientation_singular": "singular matrix",
+    "eigenvalues": "Eigenvalues",
+    "eigenvectors": "Eigen-directions",
+    "rotation": "Complex eigenvalues: the matrix rotates by {{angle}}° and scales by {{scale}}; no real eigen-direction.",
+    "stepsInverse": "Gauss-Jordan on [A | I] (inverse)",
+    "stepsSystem": "Gauss-Jordan on [A | b]",
+    "noInverse": "No inverse: the matrix is singular (rank {{rank}}).",
+    "solution": "Solution",
+    "noSolution": "No solution (inconsistent, rank of A = {{rank}})",
+    "infinite": "Infinitely many solutions (rank {{rank}})",
+    "planesLater": "The three planes are drawn from Phase 5 on."
+  }
 }

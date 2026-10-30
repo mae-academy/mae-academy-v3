@@ -121,3 +121,61 @@ test("Arabic: RTL shell, LTR math", async ({ page }) => {
   await expect(page.locator(".mc-canvas-wrap")).toHaveAttribute("dir", "ltr");
   await expect(page.locator(".mc-title")).toContainText("رسم");
 });
+
+test.describe("Phase 4: 2×2 linear algebra", () => {
+  test("a matrix shows det, orientation, closed-form eigenvalues and Gauss-Jordan steps; the canvas shades by orientation", async ({ page }) => {
+    await page.goto(link(doc([["m", "M=\\begin{bmatrix}1&2\\\\3&4\\end{bmatrix}"]], { view: { mode: "2d", grid: true, showSteps: true, locale: "en" } })));
+    await ready(page);
+    const panel = page.getByTestId("mc-linalg");
+    await expect(panel).toBeVisible({ timeout: 15_000 });
+    await expect(panel.locator(".mc-badge")).toHaveText("orientation reversed");
+    // KaTeX output: det, the surd and the boxed pivots.
+    await expect(panel.locator(".katex").first()).toBeVisible();
+    await expect(panel).toContainText("33");
+    await expect(panel.locator(".mc-steps[open] .mc-step")).toHaveCount(5);
+    await expect(panel.locator(".mc-steps .fbox, .mc-steps .boxpad").first()).toBeAttached();
+    // Unit square image: (0,0), (1,3), (3,7), (2,4); its centre (1.5, 3.5) is outside the view, so test (1, 2.2).
+    const reversed = await pixelAt(page, 1, 2.2);
+    await page.goto(link(doc([["m", "M=\\begin{bmatrix}2&1\\\\1&2\\end{bmatrix}"]])));
+    await ready(page);
+    await expect(page.getByTestId("mc-linalg").locator(".mc-badge")).toHaveText("orientation kept");
+    const kept = await pixelAt(page, 1.5, 1.5);
+    const background = await pixelAt(page, -4.6, -2.6);
+    // Red-dominant vs blue-dominant tint over the background.
+    expect(reversed[0] - reversed[2]).toBeGreaterThan(background[0] - background[2]);
+    expect(kept[2] - kept[0]).toBeGreaterThan(background[2] - background[0]);
+  });
+
+  test("a singular matrix says so and has no inverse; a slider updates the report", async ({ page }) => {
+    await page.goto(link(doc([["m", "M=\\begin{bmatrix}1&2\\\\2&a\\end{bmatrix}"]], { params: { a: { value: 4, min: -10, max: 10, step: 1 } } })));
+    await ready(page);
+    const panel = page.getByTestId("mc-linalg");
+    await expect(panel.locator(".mc-badge")).toHaveText("singular matrix", { timeout: 15_000 });
+    await expect(panel).toContainText("No inverse");
+    await page.getByRole("slider", { name: /a/ }).first().focus();
+    await page.keyboard.press("ArrowRight");
+    await expect(panel.locator(".mc-badge")).toHaveText("orientation kept");
+    await expect(panel).not.toContainText("No inverse");
+  });
+
+  test("A x = b draws both lines and labels the solution; cases and inconsistent systems", async ({ page }) => {
+    await page.goto(link(doc([["s", "\\begin{bmatrix}1&1\\\\1&-1\\end{bmatrix}\\begin{bmatrix}x\\\\y\\end{bmatrix}=\\begin{bmatrix}2\\\\0\\end{bmatrix}"]])));
+    await ready(page);
+    const panel = page.getByTestId("mc-linalg");
+    await expect(panel).toContainText("Solution", { timeout: 15_000 });
+    await expect(page.locator(".mc-details").first()).toContainText("unique solution x = 1, y = 1", { useInnerText: false });
+    await page.goto(link(doc([["s", "\\begin{cases}x+y=1\\\\2x+2y=5\\end{cases}"]])));
+    await ready(page);
+    await expect(page.getByTestId("mc-linalg")).toContainText("No solution", { timeout: 15_000 });
+    await page.goto(link(doc([["s", "\\begin{cases}x^2+y=1\\\\x-y=0\\end{cases}"]])));
+    await ready(page);
+    await expect(page.locator(".mc-error")).toContainText("not linear");
+  });
+
+  test("a named matrix in A x = b follows the matrix line", async ({ page }) => {
+    await page.goto(link(doc([["a", "A=\\begin{bmatrix}2&0\\\\0&4\\end{bmatrix}"], ["s", "A\\begin{bmatrix}x\\\\y\\end{bmatrix}=\\begin{bmatrix}2\\\\2\\end{bmatrix}"]])));
+    await ready(page);
+    await expect(page.getByTestId("mc-linalg")).toHaveCount(2, { timeout: 15_000 });
+    await expect(page.getByTestId("mc-linalg").nth(1)).toContainText("Solution");
+  });
+});

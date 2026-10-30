@@ -3,6 +3,7 @@
  * Every request carries a sequence number; a response for an older sequence is stale and dropped (STEPS.md §7.1).
  */
 import type { CurveDescription } from "@shared/mathcore/describe/describe";
+import type { MatrixAnalysis, SystemAnalysis } from "@shared/mathcore/linalg/analyze";
 import type { GraphIR, Viewport } from "@shared/mathcore/ir/types";
 import type { ParsedEntry } from "./parseProtocol";
 
@@ -41,6 +42,22 @@ export interface ItemResult {
   relation?: string;
   /** For a point whose coordinates are single parameters, the parameters a drag changes. */
   dragParams?: { x?: string; y?: string };
+  /** Label drawn next to `point` (the solution of a 2×2 system). */
+  label?: string;
+  /** Matrix or system report with LaTeX (STEPS.md §8.2). */
+  linalg?: { type: "matrix"; analysis: MatrixAnalysis } | { type: "system"; analysis: SystemAnalysis };
+  /** Canvas geometry of a 2×2 matrix: transformed grid, Aî and Aĵ, the image of the unit square, eigen-directions. */
+  transform?: TransformResult;
+}
+
+export interface TransformResult {
+  grid: Float64Array[];
+  iHat: [number, number];
+  jHat: [number, number];
+  parallelogram: Float64Array;
+  /** +1 orientation kept, −1 reversed, 0 singular. */
+  orientation: -1 | 0 | 1;
+  eigenLines: Float64Array[];
 }
 
 export type EngineResponse =

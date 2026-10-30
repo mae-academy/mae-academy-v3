@@ -3,7 +3,7 @@ import { Fraction } from "./fraction";
 import { gaussJordan, matrixToLatex } from "./gaussJordan";
 import type { Mat } from "./matrix";
 import { apply, detFloat, determinant, eigen2, multiply } from "./matrix";
-import { transform2 } from "./transform2";
+import { systemLines2, transform2 } from "./transform2";
 
 /** Deterministic pseudo-random numbers for property tests. */
 function rng(seed: number) {
@@ -229,5 +229,28 @@ describe("Fraction.fromNumber edge cases (found while testing)", () => {
     expect(Fraction.fromNumber(0)?.isZero()).toBe(true);
     expect(Fraction.fromNumber(0.1)?.toLatex()).toBe("\\frac{1}{10}");
     expect(Fraction.fromNumber(1e15)?.toLatex()).toBe("1000000000000000");
+  });
+});
+
+describe("systemLines2 (2×2 system lines)", () => {
+  const view = { xmin: -10, xmax: 10, ymin: -6, ymax: 6, aspect: "free" as const };
+  it("each line satisfies its equation at both ends and reaches past the view", () => {
+    const A = [[1, 2], [3, -4], [0.001, 5]];
+    const b = [5, 6, 1];
+    const lines = systemLines2(A, b, view);
+    expect(lines.length).toBe(3);
+    lines.forEach((l, i) => {
+      for (const k of [0, 2]) expect(A[i][0] * l[k] + A[i][1] * l[k + 1]).toBeCloseTo(b[i], 9);
+      const xs = [l[0], l[2]].sort((p, q) => p - q);
+      const ys = [l[1], l[3]].sort((p, q) => p - q);
+      expect(xs[0] <= view.xmin || ys[0] <= view.ymin).toBe(true);
+      expect(xs[1] >= view.xmax || ys[1] >= view.ymax).toBe(true);
+    });
+  });
+  it("vertical lines (b = 0) and the empty row 0x + 0y = c", () => {
+    const lines = systemLines2([[2, 0], [0, 0]], [4, 1], view);
+    expect(lines.length).toBe(1);
+    expect(lines[0][0]).toBe(2);
+    expect(lines[0][2]).toBe(2);
   });
 });

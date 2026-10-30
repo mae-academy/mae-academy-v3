@@ -64,3 +64,27 @@ export function transform2(A: Mat, view: Viewport): Transform2Geometry {
     eigenLines,
   };
 }
+
+/**
+ * Lines a·x + b·y = c of a 2×2 system, each as a 2-point polyline reaching past the view (STEPS.md §6.1 GaussSystem:
+ * the solution is where the lines meet). A row 0·x + 0·y = c has no line and is left out.
+ */
+export function systemLines2(A: Mat, rhs: number[], view: Viewport): Float64Array[] {
+  const w = view.xmax - view.xmin;
+  const h = view.ymax - view.ymin;
+  const out: Float64Array[] = [];
+  A.forEach(([a, b], i) => {
+    const c = rhs[i];
+    if (Math.abs(b) >= Math.abs(a)) {
+      if (b === 0) return;
+      const x0 = view.xmin - w;
+      const x1 = view.xmax + w;
+      out.push(Float64Array.of(x0, (c - a * x0) / b, x1, (c - a * x1) / b));
+    } else {
+      const y0 = view.ymin - h;
+      const y1 = view.ymax + h;
+      out.push(Float64Array.of((c - b * y0) / a, y0, (c - b * y1) / a, y1));
+    }
+  });
+  return out;
+}

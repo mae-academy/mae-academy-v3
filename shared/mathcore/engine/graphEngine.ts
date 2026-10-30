@@ -11,10 +11,10 @@ import type { Expr } from "../ast/expr";
 import { calledFunctions, freeSymbols } from "../ast/expr";
 import type { CompiledExpr, FunctionDef } from "../compile/compile";
 import { compile } from "../compile/compile";
-import { DEFAULT_PARAM, MAX_PARAMS, RESERVED_SYMBOLS } from "../constants";
+import { DEFAULT_PARAM, LINEARITY_PROBES, LINEARITY_RELATIVE_TOLERANCE, MAX_PARAMS, RESERVED_SYMBOLS } from "../constants";
 import type { DagResult } from "../graph/dag";
 import { buildDag, transitiveDependents } from "../graph/dag";
-import type { InferredType } from "../infer/inferType";
+import type { InferredType, SystemSource } from "../infer/inferType";
 import { inferType } from "../infer/inferType";
 import type { ParseError, ParseResult, RawParser } from "../parse/parse";
 import { parseLatex } from "../parse/parse";
@@ -42,7 +42,8 @@ export type ItemRuntime =
   | { kind: "Implicit"; F: (x: number, y: number) => number; relation: "=" | "<" | "<=" | ">" | ">=" }
   | { kind: "ODE1"; F: (indep: number, dep: number) => number; dependent: string; independent: string }
   | { kind: "Value"; value: number }
-  | { kind: "Matrix"; size: 2 | 3; values: number[][] };
+  | { kind: "Matrix"; size: 2 | 3; values: number[][] }
+  | { kind: "GaussSystem"; A: number[][]; b: number[]; unknowns: string[] };
 
 const NUMERIC_KINDS = new Set(["Scalar", "Value"]);
 
@@ -56,6 +57,8 @@ export class GraphEngine {
   private items: ItemState[] = [];
   private dag: DagResult = buildDag([]);
   private readonly values = new Map<string, number>();
+  /** Values of named matrices (`M = [[…]]`), for systems written `M x = b`. */
+  private readonly matrices = new Map<string, number[][]>();
   private functions = new Map<string, FunctionDef>();
   private readonly runtimes = new Map<string, ItemRuntime | null>();
   private envNames: string[] = [];
@@ -179,6 +182,7 @@ export class GraphEngine {
       }
     }
     this.values.clear();
+    this.matrices.clear();
     for (const [name, p] of Object.entries(this.graphDoc.params)) this.values.set(name, p.value);
     this.runtimes.clear();
     this.refreshEnv();
@@ -213,6 +217,14 @@ export class GraphEngine {
     } else if ((t.kind === "Matrix2" || t.kind === "Matrix3") && t.name) {
       state.defines = [t.name];
       bodyForUses = ["List", ...t.rows.flat()];
+    } else if (t.kind === "GaussSystem") {
+      // The unknowns are bound by the system; a named matrix is a use (so the system follows the matrix in the DAG).
+      t.unknowns.forEach((u) => bound.add(u));
+      const src = t.source;
+      bodyForUses =
+        src.form === "equations"
+          ? ["List", ...src.F]
+          : ["List", ...(Array.isArray(src.A) ? src.A.flat() : [src.A.name]), ...src.b];
     }
     const free = Array.from(freeSymbols(bodyForUses)).filter((s) => !bound.has(s) && !RESERVED_SYMBOLS.has(s));
     state.uses = free.concat(Array.from(calledFunctions(bodyForUses)));
@@ -314,6 +326,59 @@ export class GraphEngine {
     };
   }
 
+  /** A constant entry (matrix cell, right side); a non-finite value is an error at the item. */
+  private constant(e: Expr): number {
+    const v = this.compileWith(e, []).evaluate(this.envValues);
+    if (!Number.isFinite(v)) throw new Error("A matrix or right-side entry is not a finite number");
+    return v;
+  }
+
+  /**
+   * A and b of a system. Equations are reduced to coefficients numerically: c₀ = F(0), cⱼ = F(eⱼ) − c₀, then the
+   * affine model is checked at LINEARITY_PROBES so x² or xy is reported instead of being linearized.
+   */
+  private system(unknowns: string[], src: SystemSource): { A: number[][]; b: number[] } {
+    if (src.form === "matrix") {
+      let A: number[][];
+      if (Array.isArray(src.A)) A = src.A.map((row) => row.map((cell) => this.constant(cell)));
+      else {
+        const m = this.matrices.get(src.A.name);
+        if (!m) throw new Error(`"${src.A.name}" is not a matrix defined in this graph`);
+        if (m.length !== unknowns.length) throw new Error(`"${src.A.name}" is ${m.length}×${m.length} but there are ${unknowns.length} unknowns`);
+        A = m.map((r) => r.slice());
+      }
+      return { A, b: src.b.map((v) => this.constant(v)) };
+    }
+    const n = unknowns.length;
+    const A: number[][] = [];
+    const b: number[] = [];
+    src.F.forEach((f, i) => {
+      const c = this.compileWith(f, unknowns);
+      const buf = new Float64Array(n + this.envValues.length);
+      buf.set(this.envValues, n);
+      const at = (p: readonly number[]) => {
+        for (let j = 0; j < n; j++) buf[j] = p[j];
+        return c.evaluate(buf);
+      };
+      const c0 = at(new Array<number>(n).fill(0));
+      const row = unknowns.map((_, j) => at(unknowns.map((__, k) => (k === j ? 1 : 0))) - c0);
+      if (!Number.isFinite(c0) || row.some((v) => !Number.isFinite(v))) throw new Error(`Equation ${i + 1} is not defined at 0`);
+      for (const probe of LINEARITY_PROBES) {
+        const p = probe.slice(0, n);
+        const model = c0 + row.reduce((s, v, j) => s + v * p[j], 0);
+        const actual = at(p);
+        const scale = Math.abs(c0) + row.reduce((s, v, j) => s + Math.abs(v * p[j]), 0) + Math.abs(actual);
+        if (!(Math.abs(actual - model) <= LINEARITY_RELATIVE_TOLERANCE * Math.max(scale, Number.MIN_VALUE))) {
+          throw new Error(`Equation ${i + 1} is not linear in ${unknowns.join(", ")}`);
+        }
+      }
+      A.push(row);
+      // 0 − c₀ rather than −c₀, so an empty right side is +0 (no "-0" in the report).
+      b.push(0 - c0);
+    });
+    return { A, b };
+  }
+
   private evaluateItem(it: ItemState): void {
     this.evaluations++;
     if (it.errors.length > 0 || !it.parse.ok) {
@@ -367,10 +432,14 @@ export class GraphEngine {
           break;
         case "Matrix2":
         case "Matrix3": {
-          const values = t.rows.map((row) => row.map((cell) => this.compileWith(cell, []).evaluate(this.envValues)));
+          const values = t.rows.map((row) => row.map((cell) => this.constant(cell)));
+          if (t.name) this.matrices.set(t.name, values);
           this.runtimes.set(it.id, { kind: "Matrix", size: t.kind === "Matrix2" ? 2 : 3, values });
           break;
         }
+        case "GaussSystem":
+          this.runtimes.set(it.id, { kind: "GaussSystem", unknowns: t.unknowns, ...this.system(t.unknowns, t.source) });
+          break;
         default:
           this.runtimes.set(it.id, null);
       }

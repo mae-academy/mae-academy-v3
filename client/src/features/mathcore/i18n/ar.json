@@ -55,7 +55,11 @@
     "region": "{{label}}: المنطقة المظللة تغطي نحو {{percent}}% من العرض",
     "regionAll": "{{label}}: المنطقة المظللة تملأ العرض كله",
     "regionNone": "{{label}}: لا منطقة مظللة في هذا العرض",
-    "boundary": "وحدّها يمتد من x = {{xmin}} إلى {{xmax}} ومن y = {{ymin}} إلى {{ymax}}"
+    "boundary": "وحدّها يمتد من x = {{xmin}} إلى {{xmax}} ومن y = {{ymin}} إلى {{ymax}}",
+    "matrix": "{{label}}: مصفوفة محددها {{det}}، {{orientation}}؛ القيم الذاتية {{eigen}}.",
+    "systemUnique": "{{label}}: نظام خطي له حل وحيد {{solution}}.",
+    "systemNone": "{{label}}: نظام خطي ليس له حل.",
+    "systemInfinite": "{{label}}: نظام خطي له عدد لا نهائي من الحلول."
   },
   "value_is": "= {{value}}",
   "benchmarks": "شغّل قياسات الأداء",
@@ -63,5 +67,22 @@
   "evaluations": "{{count}} عملية تقييم؛ آخر تحديث أعاد تقييم {{changed}}",
   "linkInvalid": "هذا الرابط ليس رسمًا صالحًا، لذلك يُعرض رسم جديد. يبقى العنوان كما هو حتى تعدّل.",
   "benchPass": "نجح",
-  "benchFail": "فشل"
+  "benchFail": "فشل",
+  "showSteps": "إظهار الخطوات",
+  "linalg": {
+    "loading": "جارٍ تحميل تقرير المصفوفة…",
+    "orientation_kept": "الاتجاه محفوظ",
+    "orientation_reversed": "الاتجاه معكوس",
+    "orientation_singular": "مصفوفة منفردة",
+    "eigenvalues": "القيم الذاتية",
+    "eigenvectors": "الاتجاهات الذاتية",
+    "rotation": "قيم ذاتية مركّبة: المصفوفة تدوّر بزاوية {{angle}}° وتكبّر بمعامل {{scale}}؛ لا يوجد اتجاه ذاتي حقيقي.",
+    "stepsInverse": "غاوس-جوردان على [A | I] (المعكوس)",
+    "stepsSystem": "غاوس-جوردان على [A | b]",
+    "noInverse": "لا يوجد معكوس: المصفوفة منفردة (الرتبة {{rank}}).",
+    "solution": "الحل",
+    "noSolution": "لا يوجد حل (نظام غير متّسق، رتبة A = {{rank}})",
+    "infinite": "عدد لا نهائي من الحلول (الرتبة {{rank}})",
+    "planesLater": "تُرسم المستويات الثلاثة ابتداءً من المرحلة 5."
+  }
 }

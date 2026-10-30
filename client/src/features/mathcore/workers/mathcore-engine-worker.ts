@@ -11,6 +11,9 @@ import {
 } from "@shared/mathcore/constants";
 import { GraphEngine } from "@shared/mathcore/engine/graphEngine";
 import { contour, insideTest, regionMask } from "@shared/mathcore/implicit/marching";
+import { DISPLAY_DIGITS, analyzeMatrix, analyzeSystem, symbolLatex } from "@shared/mathcore/linalg/analyze";
+import type { MatrixAnalysis, SystemAnalysis } from "@shared/mathcore/linalg/analyze";
+import { systemLines2, transform2 } from "@shared/mathcore/linalg/transform2";
 import type { RawParser } from "@shared/mathcore/parse/parse";
 import { sampleExplicit, sampleParametric, samplePolar } from "@shared/mathcore/sample/adaptive";
 import type { SampleResult } from "@shared/mathcore/sample/adaptive";
@@ -25,6 +28,20 @@ const TURN = 2 * Math.PI;
 
 let engine: GraphEngine | null = null;
 const last = new Map<string, ItemResult>();
+
+/** Canvas label text (no LaTeX): 6 significant digits, no float noise. */
+const plain = (v: number) => String(Number(v.toPrecision(DISPLAY_DIGITS)));
+
+/** Reports by item id and input values: a pan or zoom redraws the geometry but does not redo the elimination. */
+const analyses = new Map<string, { key: string; value: MatrixAnalysis | SystemAnalysis }>();
+function cachedAnalysis<T extends MatrixAnalysis | SystemAnalysis>(id: string, input: unknown, build: () => T): T {
+  const key = JSON.stringify(input);
+  const hit = analyses.get(id);
+  if (hit && hit.key === key) return hit.value as T;
+  const value = build();
+  analyses.set(id, { key, value });
+  return value;
+}
 
 /**
  * LaTeX → raw MathJSON comes from the parse Worker (via the page) with each `load`; parsing never runs here.
@@ -88,6 +105,30 @@ function sampleItem(e: GraphEngine, id: string, view: ViewRequest): ItemResult {
     }
     case "Value":
       return { ...base, value: rt.value };
+    case "Matrix": {
+      const t = state.type;
+      const name = (t.kind === "Matrix2" || t.kind === "Matrix3") && t.name ? symbolLatex(t.name) : "A";
+      const analysis = cachedAnalysis(id, [rt.values, name], () => analyzeMatrix(rt.values, name));
+      const out: ItemResult = { ...base, linalg: { type: "matrix", analysis } };
+      if (rt.size === 2) {
+        const g = transform2(rt.values, view.viewport);
+        out.transform = { grid: g.grid, iHat: g.iHat, jHat: g.jHat, parallelogram: g.parallelogram, orientation: g.orientation, eigenLines: g.eigenLines };
+      }
+      return out;
+    }
+    case "GaussSystem": {
+      const analysis = cachedAnalysis(id, [rt.A, rt.b, rt.unknowns], () => analyzeSystem(rt.A, rt.b, rt.unknowns));
+      const out: ItemResult = { ...base, linalg: { type: "system", analysis } };
+      if (rt.unknowns.length === 2) {
+        out.segments = systemLines2(rt.A, rt.b, view.viewport);
+        const s = analysis.solution;
+        if (s.kind === "unique") {
+          out.point = { x: s.values[0], y: s.values[1] };
+          out.label = `(${plain(s.values[0])}, ${plain(s.values[1])})`;
+        }
+      }
+      return out;
+    }
     case "Implicit": {
       const drag = view.quality === "drag";
       const c = contour(rt.F, view.viewport, {
@@ -159,6 +200,7 @@ function handle(req: EngineRequest): void {
         if (engine) engine.load(req.graph);
         else engine = new GraphEngine(parser, req.graph);
         last.clear();
+        analyses.clear();
         const all = engine.graph.items.map((i) => i.id);
         progressive(req.seq, "load", engine, req.view, all, all, t0);
         break;

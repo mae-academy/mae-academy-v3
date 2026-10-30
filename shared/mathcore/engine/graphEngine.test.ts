@@ -134,3 +134,73 @@ describe("GraphEngine Phase 3 review fixes", () => {
     expect(e.graph.params.a).toMatchObject({ value: 50, max: 50 });
   });
 });
+
+describe("GraphEngine: matrices and systems (Phase 4)", () => {
+  const vec2 = "\\begin{bmatrix}x\\\\y\\end{bmatrix}";
+  it("a matrix with a parameter is a Matrix runtime and follows its slider", () => {
+    const e = new GraphEngine(parser, doc(["M = \\begin{bmatrix} a & 1 \\\\ 0 & 1 \\end{bmatrix}"]));
+    expect(e.runtime("i1")).toEqual({ kind: "Matrix", size: 2, values: [[1, 1], [0, 1]] });
+    expect(e.setParam("a", -2)).toEqual(["i1"]);
+    expect(e.runtime("i1")).toMatchObject({ values: [[-2, 1], [0, 1]] });
+  });
+
+  it("literal system: A and b are numbers, x and y do not become sliders", () => {
+    const e = new GraphEngine(parser, doc([`\\begin{bmatrix}1&2\\\\3&k\\end{bmatrix}${vec2}=\\begin{bmatrix}5\\\\6\\end{bmatrix}`]));
+    expect(Object.keys(e.graph.params)).toEqual(["k"]);
+    expect(e.runtime("i1")).toEqual({ kind: "GaussSystem", unknowns: ["x", "y"], A: [[1, 2], [3, 1]], b: [5, 6] });
+  });
+
+  it("named matrix: the system follows the matrix and its slider (dependents only)", () => {
+    const e = new GraphEngine(parser, doc([`A${vec2}=\\begin{bmatrix}1\\\\c\\end{bmatrix}`, "A = \\begin{bmatrix} a & 0 \\\\ 0 & 2 \\end{bmatrix}", "y = x"]));
+    expect(e.item("i1")?.errors).toEqual([]);
+    expect(e.runtime("i1")).toMatchObject({ A: [[1, 0], [0, 2]], b: [1, 1] });
+    expect(e.setParam("a", 4).sort()).toEqual(["i1", "i2"]);
+    expect(e.runtime("i1")).toMatchObject({ A: [[4, 0], [0, 2]] });
+    expect(e.setParam("c", 3)).toEqual(["i1"]);
+    expect(e.runtime("i1")).toMatchObject({ b: [1, 3] });
+  });
+
+  it("named system errors: not a matrix, wrong size, missing", () => {
+    const notMatrix = new GraphEngine(parser, doc([`A${vec2}=\\begin{bmatrix}1\\\\2\\end{bmatrix}`, "A = 3"]));
+    expect(notMatrix.item("i1")?.errors[0].message).toMatch(/not a matrix/);
+    const size = new GraphEngine(parser, doc([`A${vec2}=\\begin{bmatrix}1\\\\2\\end{bmatrix}`, "A = \\begin{bmatrix}1&0&0\\\\0&1&0\\\\0&0&1\\end{bmatrix}"]));
+    expect(size.item("i1")?.errors[0].message).toMatch(/3×3 but there are 2 unknowns/);
+  });
+
+  it("cases: coefficients extracted numerically, parameters allowed", () => {
+    const e = new GraphEngine(parser, doc(["\\begin{cases}2x - y = 3 + a\\\\x + 4y = -1\\end{cases}"]));
+    expect(e.item("i1")?.errors).toEqual([]);
+    const rt = e.runtime("i1");
+    expect(rt).toMatchObject({ kind: "GaussSystem", unknowns: ["x", "y"] });
+    if (rt?.kind !== "GaussSystem") throw new Error("expected a system");
+    expect(rt.A).toEqual([[2, -1], [1, 4]]);
+    expect(rt.b).toEqual([4, -1]);
+    e.setParam("a", 0);
+    expect((e.runtime("i1") as { b: number[] }).b).toEqual([3, -1]);
+  });
+
+  it("cases: rearranged and scaled terms (y = 2x + 1 → −2x + y = 1, and 3(x − y) = x)", () => {
+    const e = new GraphEngine(parser, doc(["\\begin{cases}y = 2x + 1\\\\3(x - y) = x\\end{cases}"]));
+    const rt = e.runtime("i1") as { A: number[][]; b: number[] };
+    expect(rt.A).toEqual([[-2, 1], [2, -3]]);
+    expect(rt.b).toEqual([1, 0]);
+  });
+
+  it("cases: non-linear equations are rejected, not linearized", () => {
+    for (const bad of ["\\begin{cases}x^2 + y = 1\\\\x - y = 0\\end{cases}", "\\begin{cases}xy = 1\\\\x - y = 0\\end{cases}", "\\begin{cases}\\sin(x) = y\\\\x = 1\\end{cases}", "\\begin{cases}x+y=1\\\\x-y=0\\\\z^3=1\\end{cases}"]) {
+      const e = new GraphEngine(parser, doc([bad]));
+      expect(e.item("i1")?.errors[0]?.message, bad).toMatch(/not linear/);
+      expect(e.runtime("i1")).toBeNull();
+    }
+  });
+
+  it("cases: equations undefined at the origin are reported", () => {
+    const e = new GraphEngine(parser, doc(["\\begin{cases}\\frac{1}{x} + y = 1\\\\x - y = 0\\end{cases}"]));
+    expect(e.item("i1")?.errors[0]?.message).toMatch(/not defined at 0|not linear/);
+  });
+
+  it("a matrix entry that is not finite is an error at the item", () => {
+    const e = new GraphEngine(parser, doc(["M = \\begin{bmatrix} \\frac{1}{a} & 0 \\\\ 0 & 1 \\end{bmatrix}", "a = 0"]));
+    expect(e.item("i1")?.errors[0]?.message).toMatch(/finite/);
+  });
+});

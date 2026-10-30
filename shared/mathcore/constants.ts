@@ -81,3 +81,15 @@ export const FIELD_OPACITY = 0.2;
 export const COMPILE_CACHE_LIMIT = 512;
 /** Owner decision Q7: style width in (0, 10]. */
 export const MAX_STYLE_WIDTH = 10;
+/**
+ * Points where a system's equations are checked for linearity (F(p) = F(0) + Σ cⱼpⱼ): fixed, irregular values so a
+ * non-linear term cannot vanish at all of them by accident, and the result is reproducible.
+ */
+export const LINEARITY_PROBES: readonly (readonly number[])[] = [
+  [0.7310, -1.3127, 0.4519],
+  [-2.1033, 0.5871, 1.9207],
+];
+/** Relative tolerance of the linearity check (rounding in F, not a modelling tolerance). */
+export const LINEARITY_RELATIVE_TOLERANCE = 1e-9;
+/** Opacity of the grid transformed by a 2×2 matrix (STEPS.md §8.2), over the plain grid. */
+export const TRANSFORM_GRID_OPACITY = 0.45;

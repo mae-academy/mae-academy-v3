@@ -3,7 +3,7 @@
  * Colors and the label font come from the design tokens in client/src/index.css, read at draw time, so the theme
  * (light/dark) is always current and no color is written in this file.
  */
-import { DASH_PATTERNS, FIELD_OPACITY } from "@shared/mathcore/constants";
+import { DASH_PATTERNS, FIELD_OPACITY, TRANSFORM_GRID_OPACITY } from "@shared/mathcore/constants";
 import type { Viewport } from "@shared/mathcore/ir/types";
 
 export interface DrawCurve {
@@ -38,11 +38,29 @@ export interface DrawTangent {
   color: string;
 }
 
+/** A 2×2 matrix on the canvas (STEPS.md §8.2). Colors are resolved from LINALG_TOKENS by the page. */
+export interface DrawTransform {
+  grid: readonly Float64Array[];
+  parallelogram: Float64Array;
+  orientation: -1 | 0 | 1;
+  iHat: [number, number];
+  jHat: [number, number];
+  eigenLines: readonly Float64Array[];
+  /** Item color: the transformed grid. */
+  color: string;
+  /** Unit-square image fill for orientation +1 and −1. */
+  positive: string;
+  negative: string;
+  arrow: string;
+  eigen: string;
+}
+
 export interface Scene {
   viewport: Viewport;
   grid: boolean;
   curves: DrawCurve[];
   fields?: DrawField[];
+  transforms?: DrawTransform[];
   points: DrawPoint[];
   tangent?: DrawTangent | null;
 }
@@ -54,6 +72,12 @@ export interface Renderer {
 
 /** Curve palette: design-token names (index.css); item styles may also name a token. */
 export const PALETTE_TOKENS = ["--slider-blue", "--slider-red", "--slider-violet", "--foreground", "--muted-foreground"] as const;
+
+/**
+ * Design tokens for matrices: orientation kept (blue) or reversed (red) shades the unit square's image differently
+ * (§8.2 "negative orientation changes color"); Aî, Aĵ use the text color; eigen-directions the violet accent.
+ */
+export const LINALG_TOKENS = { positive: "--slider-blue", negative: "--slider-red", arrow: "--foreground", eigen: "--slider-violet" } as const;
 
 /** Resolves a style color: `#RRGGBB` as is, a token name (`primary` or `--primary`) through the element's style. */
 export function resolveColor(el: Element, color: string | undefined, fallbackToken: string): string {
@@ -100,6 +124,14 @@ const LABEL_GAP_EM = 0.4;
 /** Point radius and tangent line width in CSS pixels (drawing units, not layout spacing). */
 const POINT_RADIUS = 4.5;
 const AXIS_WIDTH = 1.25;
+/** Basis-vector arrows: shaft width and head length in CSS pixels. */
+const ARROW_WIDTH = 2.5;
+const ARROW_HEAD = 10;
+/** Eigen-direction line width in CSS pixels. */
+const EIGEN_WIDTH = 1.5;
+/** Arrow-head half width and label offset, as fractions of the head length. */
+const ARROW_HEAD_SPREAD = 0.5;
+const ARROW_LABEL_OFFSET = 0.6;
 
 export class Canvas2DRenderer implements Renderer {
   private readonly ctx: CanvasRenderingContext2D;
@@ -177,6 +209,7 @@ export class Canvas2DRenderer implements Renderer {
     }
 
     for (const f of scene.fields ?? []) this.drawField(f);
+    for (const t of scene.transforms ?? []) this.drawTransform(t, X, Y, css.font);
 
     ctx.lineJoin = "round";
     ctx.lineCap = "round";
@@ -226,6 +259,78 @@ export class Canvas2DRenderer implements Renderer {
         ctx.fillText(p.label, X(p.x) + POINT_RADIUS * 2, Y(p.y) - POINT_RADIUS);
       }
     }
+  }
+
+  private drawTransform(t: DrawTransform, X: (x: number) => number, Y: (y: number) => number, font: string): void {
+    const { ctx } = this;
+    ctx.save();
+    // Transformed grid: images of x = k and y = k, still parallel and evenly spaced.
+    ctx.globalAlpha = TRANSFORM_GRID_OPACITY;
+    ctx.strokeStyle = t.color;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (const g of t.grid) {
+      ctx.moveTo(X(g[0]), Y(g[1]));
+      ctx.lineTo(X(g[2]), Y(g[3]));
+    }
+    ctx.stroke();
+    // Image of the unit square, shaded by orientation (a singular matrix squashes it to a segment: outline only).
+    const p = t.parallelogram;
+    ctx.beginPath();
+    ctx.moveTo(X(p[0]), Y(p[1]));
+    for (let i = 2; i < p.length; i += 2) ctx.lineTo(X(p[i]), Y(p[i + 1]));
+    ctx.closePath();
+    if (t.orientation !== 0) {
+      ctx.globalAlpha = FIELD_OPACITY;
+      ctx.fillStyle = t.orientation > 0 ? t.positive : t.negative;
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = t.orientation < 0 ? t.negative : t.positive;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    // Eigen-directions.
+    ctx.strokeStyle = t.eigen;
+    ctx.lineWidth = EIGEN_WIDTH;
+    ctx.setLineDash([...DASH_PATTERNS.dashed]);
+    ctx.beginPath();
+    for (const l of t.eigenLines) {
+      ctx.moveTo(X(l[0]), Y(l[1]));
+      ctx.lineTo(X(l[2]), Y(l[3]));
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+    // Aî and Aĵ.
+    ctx.font = font;
+    for (const [v, label] of [[t.iHat, "Aî"], [t.jHat, "Aĵ"]] as const) this.arrow(X(0), Y(0), X(v[0]), Y(v[1]), t.arrow, label);
+    ctx.restore();
+  }
+
+  private arrow(x0: number, y0: number, x1: number, y1: number, color: string, label: string): void {
+    const { ctx } = this;
+    const len = Math.hypot(x1 - x0, y1 - y0);
+    ctx.strokeStyle = color;
+    ctx.fillStyle = color;
+    ctx.lineWidth = ARROW_WIDTH;
+    ctx.lineCap = "round";
+    if (len < 1) return;
+    const ux = (x1 - x0) / len;
+    const uy = (y1 - y0) / len;
+    const head = Math.min(ARROW_HEAD, len / 2);
+    ctx.beginPath();
+    ctx.moveTo(x0, y0);
+    ctx.lineTo(x1 - ux * head, y1 - uy * head);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    const spread = head * ARROW_HEAD_SPREAD;
+    ctx.lineTo(x1 - ux * head - uy * spread, y1 - uy * head + ux * spread);
+    ctx.lineTo(x1 - ux * head + uy * spread, y1 - uy * head - ux * spread);
+    ctx.closePath();
+    ctx.fill();
+    ctx.textAlign = ux >= 0 ? "left" : "right";
+    ctx.textBaseline = uy >= 0 ? "top" : "bottom";
+    ctx.fillText(label, x1 + ux * head * ARROW_LABEL_OFFSET, y1 + uy * head * ARROW_LABEL_OFFSET);
   }
 
   /** Tinted layers by mask, so a redraw (hover, trace) does not rebuild the image (Phase 3 review). */
