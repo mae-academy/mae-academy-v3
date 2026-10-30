@@ -247,16 +247,16 @@ export default function MathcorePage() {
 
   useEffect(() => {
     const root = document.documentElement;
-    const rgb = (token: string) => cssRgb(resolveColor(root, undefined, token));
+    const tokenRgb = (token: string) => cssRgb(resolveColor(root, undefined, token));
     colors3d.current = {
-      background: rgb(SCENE3_TOKENS.background),
-      axis: rgb(SCENE3_TOKENS.axis),
-      box: rgb(SCENE3_TOKENS.box),
-      positive: rgb(LINALG_TOKENS.positive),
-      negative: rgb(LINALG_TOKENS.negative),
-      arrow: rgb(LINALG_TOKENS.arrow),
-      eigen: rgb(LINALG_TOKENS.eigen),
-      planes: [rgb(SCENE3_TOKENS.planes[0]), rgb(SCENE3_TOKENS.planes[1]), rgb(SCENE3_TOKENS.planes[2])],
+      background: tokenRgb(SCENE3_TOKENS.background),
+      axis: tokenRgb(SCENE3_TOKENS.axis),
+      box: tokenRgb(SCENE3_TOKENS.box),
+      positive: tokenRgb(LINALG_TOKENS.positive),
+      negative: tokenRgb(LINALG_TOKENS.negative),
+      arrow: tokenRgb(LINALG_TOKENS.arrow),
+      eigen: tokenRgb(LINALG_TOKENS.eigen),
+      planes: [tokenRgb(SCENE3_TOKENS.planes[0]), tokenRgb(SCENE3_TOKENS.planes[1]), tokenRgb(SCENE3_TOKENS.planes[2])],
       items: Object.fromEntries(graph.items.map((it, i) => [it.id, cssRgb(colors[i])])),
     };
     // A theme change repaints the 3D frame with the new colors.
