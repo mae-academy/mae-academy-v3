@@ -12,7 +12,7 @@ owner decisions Q5–Q12 (`docs/mathcore/reports/owner-decisions-2026-10-30.md`)
 | `viewport` | yes | object | `xmin < xmax`, `ymin < ymax`, all finite; `aspect` is `equal` (default) or `free` |
 | `params` | no (default `{}`) | object | ≤ 50 entries; see Parameters |
 | `items` | yes | array | ≤ 100 entries; see Items |
-| `view` | no | object | `mode` `2d` (`3d` rejected while D3 is deferred), `grid` and `showSteps` booleans, `locale` `ar` \| `en` \| `es` |
+| `view` | no | object | `mode` `2d` or `3d` (D3 lifted for Phase 5, 2026-10-30), optional `camera` `{ azimuth, elevation, distance }` (radians; \|elevation\| ≤ 1.5; distance in [2, 200]) for the 3D view, `grid` and `showSteps` booleans, `locale` `ar` \| `en` \| `es` |
 
 Unknown keys are rejected at every level, with the path of the key (Q8).
 

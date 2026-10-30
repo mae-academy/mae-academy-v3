@@ -26,12 +26,14 @@ export interface ExpressionRowProps {
   onEnter: () => void;
   /** Gauss-Jordan steps start open (`view.showSteps`). */
   showSteps?: boolean;
+  /** 2D or 3D view (Phase 5): 3×3 items point to the 3D view while the 2D view is shown. */
+  mode?: "2d" | "3d";
 }
 
 /** Item kinds drawn by a later phase, with that phase (STEPS.md §11). */
-const LATER_PHASE: Readonly<Record<string, number>> = { Matrix3: 5, ODE1: 6, RiemannSum: 9, Distribution: 10 };
+const LATER_PHASE: Readonly<Record<string, number>> = { ODE1: 6, RiemannSum: 9, Distribution: 10 };
 
-export function ExpressionRow({ index, latex, color, result, onChange, onRemove, onEnter, showSteps = false }: ExpressionRowProps) {
+export function ExpressionRow({ index, latex, color, result, onChange, onRemove, onEnter, showSteps = false, mode = "2d" }: ExpressionRowProps) {
   const { t } = useTranslation(NS);
   const host = useRef<HTMLDivElement>(null);
   const field = useRef<MathFieldElement | null>(null);
@@ -120,7 +122,7 @@ export function ExpressionRow({ index, latex, color, result, onChange, onRemove,
         {result?.precisionWarning && <div className="mc-note">{t("precision")}</div>}
         {errors.length === 0 && result?.linalg && (
           <Suspense fallback={<div className="mc-note">{t("linalg.loading")}</div>}>
-            <LinalgPanel report={result.linalg} showSteps={showSteps} />
+            <LinalgPanel report={result.linalg} showSteps={showSteps} mode={mode} />
           </Suspense>
         )}
       </div>

@@ -14,6 +14,8 @@ export interface LinalgPanelProps {
   report: NonNullable<ItemResult["linalg"]>;
   /** `view.showSteps`: the steps start open. */
   showSteps: boolean;
+  /** 3×3 items are drawn in the 3D view; in the 2D view they say so. */
+  mode?: "2d" | "3d";
 }
 
 /** Significant digits of the rotation angle (degrees) and scale. */
@@ -39,7 +41,7 @@ function Steps({ title, start, steps, open, result }: { title: string; start: st
   );
 }
 
-function MatrixReport({ a, showSteps }: { a: MatrixAnalysis; showSteps: boolean }) {
+function MatrixReport({ a, showSteps, mode }: { a: MatrixAnalysis; showSteps: boolean; mode: "2d" | "3d" }) {
   const { t } = useTranslation(NS);
   const orientation = a.det.singular ? "singular" : a.det.sign > 0 ? "kept" : "reversed";
   const complex = a.eigen.values.find((v) => v.im > 0);
@@ -88,6 +90,7 @@ function MatrixReport({ a, showSteps }: { a: MatrixAnalysis; showSteps: boolean 
           })}
         </p>
       )}
+      {a.size === 3 && mode === "2d" && <p className="mc-note">{t("linalg.matrix3d")}</p>}
       <Steps
         title={t("linalg.stepsInverse")}
         start={a.inverse.start}
@@ -103,7 +106,7 @@ function MatrixReport({ a, showSteps }: { a: MatrixAnalysis; showSteps: boolean 
   );
 }
 
-function SystemReport({ s, showSteps }: { s: SystemAnalysis; showSteps: boolean }) {
+function SystemReport({ s, showSteps, mode }: { s: SystemAnalysis; showSteps: boolean; mode: "2d" | "3d" }) {
   const { t } = useTranslation(NS);
   const sol = s.solution;
   return (
@@ -130,12 +133,16 @@ function SystemReport({ s, showSteps }: { s: SystemAnalysis; showSteps: boolean 
           </>
         )}
       </div>
-      {s.size === 3 && <p className="mc-note">{t("linalg.planesLater")}</p>}
+      {s.size === 3 && mode === "2d" && <p className="mc-note">{t("linalg.planes3d")}</p>}
       <Steps title={t("linalg.stepsSystem")} start={s.start} steps={s.steps} open={showSteps} />
     </div>
   );
 }
 
-export default function LinalgPanel({ report, showSteps }: LinalgPanelProps) {
-  return report.type === "matrix" ? <MatrixReport a={report.analysis} showSteps={showSteps} /> : <SystemReport s={report.analysis} showSteps={showSteps} />;
+export default function LinalgPanel({ report, showSteps, mode = "2d" }: LinalgPanelProps) {
+  return report.type === "matrix" ? (
+    <MatrixReport a={report.analysis} showSteps={showSteps} mode={mode} />
+  ) : (
+    <SystemReport s={report.analysis} showSteps={showSteps} mode={mode} />
+  );
 }

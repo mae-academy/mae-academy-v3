@@ -75,6 +75,10 @@
     "solution": "Solución",
     "noSolution": "Sin solución (sistema incompatible, rango de A = {{rank}})",
     "infinite": "Infinitas soluciones (rango {{rank}})",
-    "planesLater": "Los tres planos se dibujan a partir de la Fase 5."
-  }
+    "planes3d": "Activa la vista 3D para ver los tres planos y dónde se cortan.",
+    "matrix3d": "Activa la vista 3D para ver la imagen del cubo unidad."
+  },
+  "view3d": "Vista 3D",
+  "view3dNote": "Vista 3D: matrices y sistemas 3×3. Arrastra para girar y desplaza para acercar. Las curvas y regiones se dibujan en la vista 2D.",
+  "graphLabel3d": "Gráfico 3D. Usa las flechas para girar y más o menos para acercar."
 }

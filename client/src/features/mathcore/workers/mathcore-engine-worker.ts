@@ -15,6 +15,7 @@ import type { FieldOptions, FieldResult } from "@shared/mathcore/implicit/strips
 import { DISPLAY_DIGITS, analyzeMatrix, analyzeSystem, symbolLatex } from "@shared/mathcore/linalg/analyze";
 import type { MatrixAnalysis, SystemAnalysis } from "@shared/mathcore/linalg/analyze";
 import { systemLines2, transform2 } from "@shared/mathcore/linalg/transform2";
+import { renderFrame3 } from "@shared/mathcore/render3d/frame";
 import type { RawParser } from "@shared/mathcore/parse/parse";
 import { sampleExplicit, sampleParametric, samplePolar } from "@shared/mathcore/sample/adaptive";
 import type { SampleResult } from "@shared/mathcore/sample/adaptive";
@@ -207,6 +208,7 @@ async function respond(
     evaluations: e.evaluations,
     reevaluated,
     cause,
+    frame3d: view.mode === "3d" && view.colors3d ? renderFrame3(e, view, view.colors3d, (id, a, b, u) => cachedAnalysis(id, [a, b, u], () => analyzeSystem(a, b, u))) : undefined,
     partial,
     ms: performance.now() - t0,
   };

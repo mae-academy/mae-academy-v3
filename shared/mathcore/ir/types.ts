@@ -55,8 +55,17 @@ export interface Item {
   style?: ItemStyle;
 }
 
+/** Orbit camera of the 3D view (Phase 5): angles in radians, distance in world units from the origin. */
+export interface Camera3 {
+  azimuth: number;
+  elevation: number;
+  distance: number;
+}
+
 export interface View {
-  mode: "2d";
+  mode: "2d" | "3d";
+  /** 3D view only; the default camera when absent. */
+  camera?: Camera3;
   grid: boolean;
   showSteps: boolean;
   locale: "ar" | "en" | "es";
@@ -72,6 +81,13 @@ export interface GraphIR {
 
 export const DEFAULT_VIEWPORT: Viewport = { xmin: -10, xmax: 10, ymin: -6, ymax: 6, aspect: "equal" };
 export const DEFAULT_VIEW: View = { mode: "2d", grid: true, showSteps: false, locale: "en" };
+/** Camera limits: elevation stays short of the poles (the up vector would flip), distance within a sane zoom range. */
+export const CAMERA_LIMITS = { elevation: 1.5, distanceMin: 2, distanceMax: 200 } as const;
+/**
+ * Default orbit: oblique (not 45°, where the common planes x = y and x = −y are seen edge-on), slightly above the
+ * xy-plane. The distance is replaced by the fitted one when the page has no camera.
+ */
+export const DEFAULT_CAMERA3: Camera3 = { azimuth: 1.1, elevation: 0.45, distance: 22 };
 
 export function emptyGraph(): GraphIR {
   return { version: IR_VERSION, viewport: { ...DEFAULT_VIEWPORT }, params: {}, items: [], view: { ...DEFAULT_VIEW } };

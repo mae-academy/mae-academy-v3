@@ -75,6 +75,10 @@
     "solution": "Solution",
     "noSolution": "No solution (inconsistent, rank of A = {{rank}})",
     "infinite": "Infinitely many solutions (rank {{rank}})",
-    "planesLater": "The three planes are drawn from Phase 5 on."
-  }
+    "planes3d": "Turn on the 3D view to see the three planes and where they meet.",
+    "matrix3d": "Turn on the 3D view to see the image of the unit cube."
+  },
+  "view3d": "3D view",
+  "view3dNote": "3D view: 3×3 matrices and systems. Drag to orbit, scroll to zoom. Curves and regions are drawn in the 2D view.",
+  "graphLabel3d": "3D graph. Use the arrow keys to orbit and plus or minus to zoom."
 }

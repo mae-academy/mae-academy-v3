@@ -10,6 +10,8 @@ import {
   FIELD_STRIDE_DRAG, FIELD_STRIDE_FULL, IMPLICIT_CELL_PX_DRAG, IMPLICIT_CELL_PX_FULL, IMPLICIT_REFINE_DRAG, IMPLICIT_REFINE_FULL,
 } from "../constants";
 import { contour, insideTest, regionMask } from "../implicit/marching";
+import { DEFAULT_CAMERA, render, surfaceMesh } from "../render3d/raster";
+import { buildScene3 } from "../render3d/scene";
 import { emptyGraph } from "../ir/types";
 import { sampleExplicit } from "../sample/adaptive";
 
@@ -148,6 +150,28 @@ export function runBenchmarks(): BenchResult[] {
     dragFrame(D);
     fullFrame(D);
   }, 3));
+
+  // 3D (STEPS.md §7.2, D3 lifted for Phase 5): an 80×80 grid surface (12,800 triangles) per frame, at the drag
+  // resolution (half of a 1600×1000 canvas) and at full canvas size; and the Phase 5 linear-algebra scene.
+  const surface = surfaceMesh((x, y) => Math.sin(x) * Math.cos(y), -5, 5, -5, 5, 80, [37, 99, 235]);
+  const cam = { ...DEFAULT_CAMERA, distance: 22 };
+  const bg: [number, number, number] = [255, 255, 255];
+  add("3d-80x80-drag", "3D model 80×80 grid (12,800 triangles), 800×500 frame", 25, "ms", time(() => {
+    render([surface], [], cam, 800, 500, bg);
+  }, 9));
+  add("3d-80x80-full", "3D model 80×80 grid (12,800 triangles), 1600×1000 frame", 25, "ms", time(() => {
+    render([surface], [], cam, 1600, 1000, bg);
+  }, 5));
+  const scene3 = buildScene3(
+    [
+      { kind: "system", A: [[1, 1, 1], [1, -1, 0], [0, 1, -1]], b: [3, 0, 0], solution: [1, 1, 1], colors: [[37, 99, 235], [225, 29, 72], [124, 58, 237]] },
+      { kind: "matrix", values: [[1, 0.5, 0], [0, 1, 0.3], [0.2, 0, 1]], color: [0, 0, 0] },
+    ],
+    { background: bg, axis: [100, 116, 139], box: [226, 232, 240], positive: [37, 99, 235], negative: [225, 29, 72], arrow: [15, 23, 42], eigen: [124, 58, 237] },
+  );
+  add("3d-linalg-full", "Phase 5 scene (3 planes, unit-cube image), 1600×1000 frame", 25, "ms", time(() => {
+    render(scene3.meshes, scene3.lines, { ...DEFAULT_CAMERA, distance: scene3.half * 4.5 }, 1600, 1000, bg);
+  }, 5));
 
   // Raw evaluation throughput, as a reference figure for the other budgets.
   const n = 200_000;

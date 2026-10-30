@@ -7,7 +7,7 @@ import {
   MAX_ID_LENGTH, MAX_ITEMS, MAX_LATEX_LENGTH, MAX_PARAMS, MAX_PERIOD_S, MAX_STYLE_WIDTH, MIN_PERIOD_S, RESERVED_SYMBOLS,
 } from "../constants";
 import type { Animation, GraphIR, Item, ItemStyle, Param, View, Viewport } from "./types";
-import { DEFAULT_VIEW, ITEM_KINDS, SUPPORTED_IR_VERSIONS } from "./types";
+import { CAMERA_LIMITS, DEFAULT_VIEW, ITEM_KINDS, SUPPORTED_IR_VERSIONS } from "./types";
 
 export interface IssueDetail {
   path: string;
@@ -157,17 +157,30 @@ class Checker {
   view(v: unknown): View {
     if (v === undefined) return { ...DEFAULT_VIEW };
     if (!isObj(v)) return this.issue("view", "must be an object"), { ...DEFAULT_VIEW };
-    this.keys(v, "view", ["mode", "grid", "showSteps", "locale"], []);
+    this.keys(v, "view", ["mode", "camera", "grid", "showSteps", "locale"], []);
     const mode = v.mode ?? DEFAULT_VIEW.mode;
-    if (mode === "3d") this.issue("view.mode", "3D is deferred by decision D3");
-    else if (mode !== "2d") this.issue("view.mode", 'must be "2d"');
+    if (mode !== "2d" && mode !== "3d") this.issue("view.mode", 'must be "2d" or "3d"');
     const grid = v.grid ?? DEFAULT_VIEW.grid;
     const showSteps = v.showSteps ?? DEFAULT_VIEW.showSteps;
     if (typeof grid !== "boolean") this.issue("view.grid", "must be a boolean");
     if (typeof showSteps !== "boolean") this.issue("view.showSteps", "must be a boolean");
     const locale = v.locale ?? DEFAULT_VIEW.locale;
     if (locale !== "ar" && locale !== "en" && locale !== "es") this.issue("view.locale", "must be ar, en or es");
-    return { mode: "2d", grid: grid as boolean, showSteps: showSteps as boolean, locale: locale as View["locale"] };
+    const out: View = { mode: mode === "3d" ? "3d" : "2d", grid: grid as boolean, showSteps: showSteps as boolean, locale: locale as View["locale"] };
+    if (v.camera !== undefined) {
+      const cam = v.camera;
+      if (!isObj(cam)) this.issue("view.camera", "must be an object");
+      else {
+        this.keys(cam, "view.camera", ["azimuth", "elevation", "distance"], ["azimuth", "elevation", "distance"]);
+        const [azimuth, elevation, distance] = (["azimuth", "elevation", "distance"] as const).map((k) => this.num(cam, k, "view.camera"));
+        if (Math.abs(elevation) > CAMERA_LIMITS.elevation) this.issue("view.camera.elevation", `must be within ±${CAMERA_LIMITS.elevation}`);
+        if (!(distance >= CAMERA_LIMITS.distanceMin && distance <= CAMERA_LIMITS.distanceMax)) {
+          this.issue("view.camera.distance", `must be in [${CAMERA_LIMITS.distanceMin}, ${CAMERA_LIMITS.distanceMax}]`);
+        }
+        out.camera = { azimuth, elevation, distance };
+      }
+    }
+    return out;
   }
 }
 

@@ -69,9 +69,18 @@ export interface Scene {
   tangent?: DrawTangent | null;
 }
 
+/** A 3D frame rendered by the engine Worker (Phase 5), with labels in CSS pixels. */
+export interface DrawFrame3 {
+  width: number;
+  height: number;
+  rgba: Uint8ClampedArray;
+  labels: ReadonlyArray<{ x: number; y: number; text: string }>;
+}
+
 export interface Renderer {
   resize(width: number, height: number, pixelRatio: number): void;
   draw(scene: Scene): void;
+  drawFrame3(frame: DrawFrame3): void;
 }
 
 /** Curve palette: design-token names (index.css); item styles may also name a token. */
@@ -82,6 +91,13 @@ export const PALETTE_TOKENS = ["--slider-blue", "--slider-red", "--slider-violet
  * (§8.2 "negative orientation changes color"); Aî, Aĵ use the text color; eigen-directions the violet accent.
  */
 export const LINALG_TOKENS = { positive: "--slider-blue", negative: "--slider-red", arrow: "--foreground", eigen: "--slider-violet" } as const;
+/** 3D view (Phase 5): the three planes of a 3×3 system, and the scene's background, axes and box. */
+export const SCENE3_TOKENS = {
+  planes: ["--slider-blue", "--slider-red", "--slider-violet"],
+  background: "--background",
+  axis: "--muted-foreground",
+  box: "--border",
+} as const;
 
 /** Resolves a style color: `#RRGGBB` as is, a token name (`primary` or `--primary`) through the element's style. */
 export function resolveColor(el: Element, color: string | undefined, fallbackToken: string): string {
@@ -102,7 +118,7 @@ export function gridStep(span: number, target: number): number {
 
 /** `rgb` bytes of any CSS color, read back from a 1×1 canvas (so tokens, hex and oklch all work). */
 const rgbCache = new Map<string, [number, number, number]>();
-function rgbOf(color: string): [number, number, number] {
+export function cssRgb(color: string): [number, number, number] {
   const hit = rgbCache.get(color);
   if (hit) return hit;
   const c = document.createElement("canvas");
@@ -349,6 +365,34 @@ export class Canvas2DRenderer implements Renderer {
     ctx.fillText(label, x1 + ux * head * ARROW_LABEL_OFFSET, y1 + uy * head * ARROW_LABEL_OFFSET);
   }
 
+  /** Frame layer reused while its size stays the same (one per camera move otherwise). */
+  private frameLayer: HTMLCanvasElement | null = null;
+
+  drawFrame3(frame: DrawFrame3): void {
+    const { ctx } = this;
+    const css = getComputedStyle(this.canvas);
+    ctx.setTransform(this.ratio, 0, 0, this.ratio, 0, 0);
+    let layer = this.frameLayer;
+    if (!layer || layer.width !== frame.width || layer.height !== frame.height) {
+      layer = document.createElement("canvas");
+      layer.width = frame.width;
+      layer.height = frame.height;
+      this.frameLayer = layer;
+    }
+    const lg = layer.getContext("2d");
+    if (!lg) return;
+    const img = lg.createImageData(frame.width, frame.height);
+    img.data.set(frame.rgba);
+    lg.putImageData(img, 0, 0);
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(layer, 0, 0, this.width, this.height);
+    ctx.fillStyle = css.getPropertyValue("--foreground").trim();
+    ctx.font = css.font;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "bottom";
+    for (const l of frame.labels) ctx.fillText(l.text, l.x + POINT_RADIUS, l.y - POINT_RADIUS);
+  }
+
   /** Tinted layers by mask, so a redraw (hover, trace) does not rebuild the image (Phase 3 review). */
   private readonly layers = new WeakMap<Uint8Array, { color: string; layer: HTMLCanvasElement }>();
 
@@ -366,7 +410,7 @@ export class Canvas2DRenderer implements Renderer {
     const lg = layer.getContext("2d");
     if (!lg) return;
     const img = lg.createImageData(f.width, f.height);
-    const [r, g, b] = rgbOf(f.color);
+    const [r, g, b] = cssRgb(f.color);
     const alpha = Math.round(FIELD_OPACITY * 255);
     for (let i = 0; i < f.data.length; i++) {
       if (f.data[i] === 1) {

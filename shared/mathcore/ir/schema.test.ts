@@ -121,13 +121,25 @@ describe("Graph IR schema (STEPS.md §5)", () => {
     expect(issuesOf(d)).toEqual([]);
   });
 
-  it("rejects 3D mode while D3 is deferred, and unknown locales", () => {
+  it("accepts 3D mode with an optional camera (D3 lifted for Phase 5); rejects unknown modes and locales", () => {
     const d = clone(EXAMPLE);
     (d.view as Record<string, unknown>).mode = "3d";
-    (d.view as Record<string, unknown>).locale = "fr";
+    expect(issuesOf(d)).toEqual([]);
+    (d.view as Record<string, unknown>).camera = { azimuth: 1, elevation: 0.5, distance: 20 };
+    expect(issuesOf(d)).toEqual([]);
+    (d.view as Record<string, unknown>).camera = { azimuth: 1, elevation: 2, distance: 1, fov: 1 };
     const issues = issuesOf(d);
-    expect(issues).toContain("view.mode: 3D is deferred by decision D3");
-    expect(issues).toContain("view.locale: must be ar, en or es");
+    expect(issues).toContain("view.camera.elevation: must be within ±1.5");
+    expect(issues).toContain("view.camera.distance: must be in [2, 200]");
+    expect(issues.some((i) => i.startsWith("view.camera"))).toBe(true);
+    (d.view as Record<string, unknown>).camera = { azimuth: 1, elevation: 0.5 };
+    expect(issuesOf(d).some((i) => i.includes("distance"))).toBe(true);
+    (d.view as Record<string, unknown>).camera = undefined;
+    (d.view as Record<string, unknown>).mode = "4d";
+    (d.view as Record<string, unknown>).locale = "fr";
+    const bad = issuesOf(d);
+    expect(bad).toContain('view.mode: must be "2d" or "3d"');
+    expect(bad).toContain("view.locale: must be ar, en or es");
   });
 
   it("rejects an inverted viewport and non-finite numbers", () => {

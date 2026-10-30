@@ -1,14 +1,16 @@
 /**
  * The graph surface (STEPS.md §4 Interaction): pan (drag, arrow keys), zoom (wheel, + / −), tracing with the tangent
- * and slope triangle (§8.1), and dragging points whose coordinates are parameters. Drawing only; all evaluation
- * happens in the engine Worker.
+ * and slope triangle (§8.1), and dragging points whose coordinates are parameters. In the 3D view (Phase 5) a drag or
+ * the arrow keys orbit the camera and the wheel or + / − move it closer or farther. Drawing only; all evaluation and
+ * 3D rendering happen in the engine Worker.
  */
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { Viewport } from "@shared/mathcore/ir/types";
+import type { Camera3, Viewport } from "@shared/mathcore/ir/types";
 import { closestPoint } from "@shared/mathcore/sample/closest";
 import { NS } from "../i18n/register";
-import type { Scene } from "../render/renderer";
+import { moveCamera } from "./camera";
+import type { DrawFrame3, Scene } from "../render/renderer";
 import { Canvas2DRenderer, gridStep } from "../render/renderer";
 
 export interface TraceTarget {
@@ -32,6 +34,9 @@ export interface GraphCanvasProps {
   /** Keeps one unit equal on both axes (viewport.aspect = "equal"). */
   equalAspect: boolean;
   onCanvas?: (canvas: HTMLCanvasElement | null) => void;
+  /** 3D view: the Worker's frame (with the camera it used) and the camera handler. */
+  frame3?: (DrawFrame3 & { camera: Camera3 }) | null;
+  onCamera?: (camera: Camera3, quality: "drag" | "full") => void;
 }
 
 /** Pointer distance, in CSS pixels, within which a curve is traced or a point grabbed. */
@@ -42,6 +47,10 @@ const ZOOM_STEP = 1.2;
 const KEY_PAN = 0.1;
 /** Delay after the last interaction before full-resolution sampling (STEPS.md §7.1 technique 2). */
 const SETTLE_MS = 150;
+/** Orbit: radians per CSS pixel of drag, and per arrow-key press. */
+const ORBIT_PER_PX = 0.01;
+const ORBIT_KEY = 0.1;
+
 
 export function GraphCanvas(props: GraphCanvasProps) {
   const { t } = useTranslation(NS);
@@ -49,7 +58,8 @@ export function GraphCanvas(props: GraphCanvasProps) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const renderer = useRef<Canvas2DRenderer | null>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
-  const drag = useRef<{ mode: "pan" | "point"; id?: string; x: number; y: number; vp: Viewport } | null>(null);
+  const drag = useRef<{ mode: "pan" | "point" | "orbit"; id?: string; x: number; y: number; vp: Viewport; camera?: Camera3 } | null>(null);
+  const in3d = !!props.frame3 && !!props.onCamera;
   const settle = useRef<ReturnType<typeof setTimeout>>(undefined);
   const propsRef = useRef(props);
   useEffect(() => {
@@ -94,8 +104,15 @@ export function GraphCanvas(props: GraphCanvasProps) {
 
   useEffect(() => {
     if (!renderer.current || !size.w) return;
-    renderer.current.draw(props.scene);
-  }, [props.scene, size]);
+    if (props.frame3) renderer.current.drawFrame3(props.frame3);
+    else renderer.current.draw(props.scene);
+  }, [props.scene, props.frame3, size]);
+
+  const emitCamera = (c: Camera3) => {
+    propsRef.current.onCamera?.(c, "drag");
+    clearTimeout(settle.current);
+    settle.current = setTimeout(() => propsRef.current.onCamera?.(c, "full"), SETTLE_MS);
+  };
 
   const toWorld = (clientX: number, clientY: number, vp = props.scene.viewport) => {
     const r = canvas.current?.getBoundingClientRect();
@@ -130,6 +147,10 @@ export function GraphCanvas(props: GraphCanvasProps) {
 
   const onPointerDown = (e: React.PointerEvent) => {
     (e.target as Element).setPointerCapture(e.pointerId);
+    if (in3d && props.frame3) {
+      drag.current = { mode: "orbit", x: e.clientX, y: e.clientY, vp: props.scene.viewport, camera: props.frame3.camera };
+      return;
+    }
     const w = toWorld(e.clientX, e.clientY);
     const { sx, sy } = pxScale();
     const hit = props.draggable.find((p) => Math.hypot((p.x - w.x) * sx, (p.y - w.y) * sy) <= HIT_RADIUS);
@@ -140,6 +161,12 @@ export function GraphCanvas(props: GraphCanvasProps) {
 
   const onPointerMove = (e: React.PointerEvent) => {
     const d = drag.current;
+    if (d?.mode === "orbit" && d.camera) {
+      // Dragging right turns the scene right (camera moves left); dragging down tilts it toward the viewer.
+      emitCamera(moveCamera(d.camera, -(e.clientX - d.x) * ORBIT_PER_PX, (e.clientY - d.y) * ORBIT_PER_PX));
+      return;
+    }
+    if (in3d) return;
     if (d?.mode === "pan") {
       const r = canvas.current?.getBoundingClientRect();
       if (!r) return;
@@ -174,6 +201,10 @@ export function GraphCanvas(props: GraphCanvasProps) {
   };
 
   const onWheel = (e: React.WheelEvent) => {
+    if (in3d && props.frame3) {
+      emitCamera(moveCamera(props.frame3.camera, 0, 0, e.deltaY > 0 ? ZOOM_STEP : 1 / ZOOM_STEP));
+      return;
+    }
     const w = toWorld(e.clientX, e.clientY);
     zoomAt(w.x, w.y, e.deltaY > 0 ? ZOOM_STEP : 1 / ZOOM_STEP);
   };
@@ -188,6 +219,24 @@ export function GraphCanvas(props: GraphCanvasProps) {
   }, []);
 
   const onKeyDown = (e: React.KeyboardEvent) => {
+    if (in3d && props.frame3) {
+      const c = props.frame3.camera;
+      const turns: Record<string, () => Camera3> = {
+        ArrowLeft: () => moveCamera(c, ORBIT_KEY, 0),
+        ArrowRight: () => moveCamera(c, -ORBIT_KEY, 0),
+        ArrowUp: () => moveCamera(c, 0, ORBIT_KEY),
+        ArrowDown: () => moveCamera(c, 0, -ORBIT_KEY),
+        "+": () => moveCamera(c, 0, 0, 1 / ZOOM_STEP),
+        "=": () => moveCamera(c, 0, 0, 1 / ZOOM_STEP),
+        "-": () => moveCamera(c, 0, 0, ZOOM_STEP),
+      };
+      const turn = turns[e.key];
+      if (turn) {
+        e.preventDefault();
+        emitCamera(turn());
+      }
+      return;
+    }
     const v = props.scene.viewport;
     const dx = (v.xmax - v.xmin) * KEY_PAN;
     const dy = (v.ymax - v.ymin) * KEY_PAN;
@@ -216,7 +265,7 @@ export function GraphCanvas(props: GraphCanvasProps) {
         className="mc-canvas"
         tabIndex={0}
         role="img"
-        aria-label={t("graphLabel")}
+        aria-label={t(in3d ? "graphLabel3d" : "graphLabel")}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}

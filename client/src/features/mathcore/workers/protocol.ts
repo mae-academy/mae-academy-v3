@@ -4,7 +4,8 @@
  */
 import type { CurveDescription } from "@shared/mathcore/describe/describe";
 import type { MatrixAnalysis, SystemAnalysis } from "@shared/mathcore/linalg/analyze";
-import type { GraphIR, Viewport } from "@shared/mathcore/ir/types";
+import type { Camera3, GraphIR, Viewport } from "@shared/mathcore/ir/types";
+import type { Frame3, Frame3Colors } from "@shared/mathcore/render3d/frame";
 import type { ParsedEntry } from "./parseProtocol";
 
 export interface ViewRequest {
@@ -14,7 +15,16 @@ export interface ViewRequest {
   height: number;
   /** `drag`: quarter resolution while a slider or the view moves; `full` on release (STEPS.md §7.1 technique 2). */
   quality: "drag" | "full";
+  /** 3D view (Phase 5): the Worker also renders the 3D items into `frame3d`. */
+  mode?: "2d" | "3d";
+  /** Orbit camera; when absent the Worker fits the camera to the scene and reports it. */
+  camera?: Camera3;
+  /** Token colors resolved by the page (the Worker has no CSS): scene colors, the three plane colors, item colors. */
+  colors3d?: Frame3Colors;
 }
+
+/** A rendered 3D frame (RGBA at `width` × `height`, stretched over the canvas) and its labels in CSS pixels. */
+export type Frame3Result = Frame3;
 
 export type EngineRequest =
   /** `parsed` holds the parse Worker's result for every item's LaTeX. */
@@ -74,6 +84,8 @@ export type EngineResponse =
       reevaluated: string[];
       /** The request this answers; a `load` answer may carry slider values that the document text changed. */
       cause: "load" | "param" | "view";
+      /** 3D view only. */
+      frame3d?: Frame3Result;
       /** The quarter-resolution frame of a progressive answer; the full frame follows under the same sequence. */
       partial?: boolean;
       ms: number;

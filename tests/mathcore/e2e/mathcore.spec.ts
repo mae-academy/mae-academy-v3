@@ -195,3 +195,64 @@ test("implicit fields run on parallel strip Workers and shade correctly across s
   for (const [x, y] of [[0.1, 1.7], [0.1, -1.7], [1.1, 0.3]]) expect(await pixelAt(page, x, y)).not.toEqual(bg);
   expect(await pixelAt(page, 3.1, 2.3)).toEqual(bg);
 });
+
+test.describe("Phase 5: 3D linear algebra", () => {
+  /** Cheap signature of the whole canvas: sums of the RGB channels on a coarse grid. */
+  const signature = (page: Page) =>
+    page.evaluate(() => {
+      const c = document.querySelector<HTMLCanvasElement>(".mc-canvas");
+      const ctx = c?.getContext("2d");
+      if (!c || !ctx) return "";
+      const d = ctx.getImageData(0, 0, c.width, c.height).data;
+      let s = 0;
+      for (let i = 0; i < d.length; i += 4 * 97) s += d[i] * 3 + d[i + 1] * 5 + d[i + 2] * 7;
+      return String(s);
+    });
+  const system3 = "\\begin{cases}x+y+z=3\\\\x-y=0\\\\y-z=0\\end{cases}";
+
+  test("a 3×3 system points to the 3D view; the 3D view draws the planes and the solution", async ({ page }) => {
+    await page.goto(link(doc([["s", system3]])));
+    await ready(page);
+    const panel = page.getByTestId("mc-linalg");
+    await expect(panel).toContainText("Turn on the 3D view", { timeout: 15_000 });
+    await expect(panel).toContainText("Solution");
+    const flat = await signature(page);
+    const toggle = page.getByRole("button", { name: "3D view" });
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator(".mc-note").filter({ hasText: "Drag to orbit" })).toBeVisible();
+    await expect(panel).not.toContainText("Turn on the 3D view");
+    await expect.poll(() => signature(page)).not.toBe(flat);
+    // The mode is saved in the link.
+    await expect.poll(() => {
+      const g = new URL(page.url()).searchParams.get("g") ?? "";
+      return (JSON.parse(LZString.decompressFromEncodedURIComponent(g) ?? "{}") as { view?: { mode?: string } }).view?.mode;
+    }).toBe("3d");
+  });
+
+  test("dragging and the arrow keys orbit the camera; Reset view fits it again; the camera is shared in the link", async ({ page }) => {
+    await page.goto(link(doc([["m", "M=\\begin{bmatrix}2&0&0\\\\0&1&0.5\\\\0&0.5&1\\end{bmatrix}"]], { view: { mode: "3d", grid: true, showSteps: false, locale: "en" } })));
+    await ready(page);
+    await expect(page.getByTestId("mc-linalg")).toContainText("orientation kept", { timeout: 15_000 });
+    await expect.poll(() => signature(page)).not.toBe("0");
+    const before = await signature(page);
+    const box = await page.locator(".mc-canvas").boundingBox();
+    if (!box) throw new Error("no canvas");
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 2 + 120, box.y + box.height / 2 + 40, { steps: 6 });
+    await page.mouse.up();
+    await expect.poll(() => signature(page)).not.toBe(before);
+    const camera = () => {
+      const g = new URL(page.url()).searchParams.get("g") ?? "";
+      return (JSON.parse(LZString.decompressFromEncodedURIComponent(g) ?? "{}") as { view?: { camera?: { azimuth: number } } }).view?.camera;
+    };
+    await expect.poll(camera).toBeDefined();
+    const orbited = await signature(page);
+    await page.locator(".mc-canvas").focus();
+    await page.keyboard.press("ArrowLeft");
+    await expect.poll(() => signature(page)).not.toBe(orbited);
+    await page.getByRole("button", { name: "Reset view" }).click();
+    await expect.poll(camera).toBeUndefined();
+  });
+});

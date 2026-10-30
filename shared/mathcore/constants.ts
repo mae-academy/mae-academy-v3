@@ -127,3 +127,10 @@ export const SAMPLE_MAX_POINTS = 4000;
 export const SAMPLE_MAX_DEPTH = 8;
 /** Strip Workers for implicit fields (§7.1 technique 4; §7.2 plans four Workers for the heaviest fields). */
 export const STRIP_WORKERS_MAX = 4;
+/**
+ * 3D view: camera distance fitted to a box of half-size L. The box's bounding sphere has radius √3·L; with the 45°
+ * field of view it fits at √3·L / sin(22.5°) ≈ 4.5·L.
+ */
+export const CAMERA_FIT_DISTANCE = 4.5;
+/** 3D frames while the camera moves are rendered at this fraction of the canvas size (§7.1 technique 2). */
+export const FRAME3_DRAG_SCALE = 0.5;

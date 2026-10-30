@@ -17,3 +17,6 @@ Append-only. Every pipeline decision: timestamp (UTC), prompt id, decision, reas
 | 2026-10-29 | setup | PR creation disabled; compare URLs reported instead | Spec 5.3: `gh` not installed or authenticated |
 | 2026-10-29 | setup | Golden files: executor writes the generator only (a-1) | Golden files are human-owned; the owner runs the oracle and commits them |
 | 2026-10-29 | setup | No dependency or skill installed | Tooling proposal and AgentPhone await owner approval |
+| 2026-10-30 | phase-5 | D3 (3D in v1) lifted for Phase 5 only: Matrix3, QR eigenvalues, projected planes, software 3D | Owner instruction (2026-10-30): finish Phases 3, 4 and 5 fully, heavily tested; the 3D parts of Phase 9 stay deferred |
+| 2026-10-30 | phase-5 | Work stops after Phase 5; Phase 6 (ODEs) and later belong to a separate scope | Owner instruction (2026-10-30); headless ODE code already on the branch stays, without UI |
+| 2026-10-30 | phase-3 | Visual snapshot tests (§10) not added | Their baseline images would be new human-owned baselines (`docs/mathcore/baselines/`); pixel checks at chosen points are used instead |

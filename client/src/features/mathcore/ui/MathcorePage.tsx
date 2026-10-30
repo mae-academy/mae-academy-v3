@@ -7,12 +7,12 @@ import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } fro
 import { useTranslation } from "react-i18next";
 import { buildSvg } from "@shared/mathcore/export/svg";
 import { LINK_PARAM, decodeGraph, encodeGraph, exportJson, importJson } from "@shared/mathcore/ir/codec";
-import type { GraphIR, Item, Param, Viewport } from "@shared/mathcore/ir/types";
+import type { Camera3, GraphIR, Item, Param, Viewport } from "@shared/mathcore/ir/types";
 import { DEFAULT_VIEWPORT, emptyGraph } from "@shared/mathcore/ir/types";
 import { DEFAULT_CURVE_WIDTH, LINK_DEBOUNCE_MS, PARSE_DEBOUNCE_MS } from "@shared/mathcore/constants";
 import { NS } from "../i18n/register";
 import type { DrawCurve, DrawField, DrawPoint, DrawTransform, Scene } from "../render/renderer";
-import { LINALG_TOKENS, PALETTE_TOKENS, resolveColor } from "../render/renderer";
+import { LINALG_TOKENS, PALETTE_TOKENS, SCENE3_TOKENS, cssRgb, resolveColor } from "../render/renderer";
 import { describeItem, describeLinalg } from "./describeText";
 import { ExpressionRow } from "./ExpressionRow";
 import type { DraggablePoint, TraceTarget } from "./GraphCanvas";
@@ -22,7 +22,7 @@ import type { EngineClient, WorkerLike } from "../workers/engineClient";
 import { createEngineClient } from "../workers/engineClient";
 import type { ParseClient, ParseWorkerLike } from "../workers/parseClient";
 import { createParseClient } from "../workers/parseClient";
-import type { EngineResponse, ItemResult } from "../workers/protocol";
+import type { EngineResponse, ItemResult, ViewRequest } from "../workers/protocol";
 import { mergeParams } from "./mergeParams";
 import "../mathcore.css";
 
@@ -93,13 +93,24 @@ export default function MathcorePage() {
   }, [graph]);
   const size = useRef({ w: 800, h: 500 });
 
+  /** Token colors for the 3D frame, as RGB (the Worker has no CSS); refreshed with the theme and the items. */
+  const colors3d = useRef<ViewRequest["colors3d"]>(undefined);
+
+  /** View request from the current document; `patch` carries a change that is not in `graphRef` yet. */
   const view = useCallback(
-    (quality: "drag" | "full", viewport: Viewport = graphRef.current.viewport) => ({
-      viewport,
-      width: canvasEl?.clientWidth || size.current.w,
-      height: canvasEl?.clientHeight || size.current.h,
-      quality,
-    }),
+    (quality: "drag" | "full", viewport: Viewport = graphRef.current.viewport, patch: Partial<ViewRequest> = {}): ViewRequest => {
+      const v = graphRef.current.view;
+      return {
+        viewport,
+        width: canvasEl?.clientWidth || size.current.w,
+        height: canvasEl?.clientHeight || size.current.h,
+        quality,
+        mode: v.mode,
+        camera: v.camera,
+        colors3d: colors3d.current,
+        ...patch,
+      };
+    },
     [canvasEl],
   );
 
@@ -215,6 +226,16 @@ export default function MathcorePage() {
     client.current?.send({ type: "view", view: view(quality, v) });
   };
 
+  // 3D view (Phase 5): the camera lives in the document (shared by links); undefined means "fit the scene".
+  const setCamera = (camera: Camera3 | undefined, quality: "drag" | "full") => {
+    setGraph((g) => ({ ...g, view: { ...g.view, camera } }));
+    client.current?.send({ type: "view", view: view(quality, undefined, { camera }) });
+  };
+  const setMode = (mode: "2d" | "3d") => {
+    setGraph((g) => ({ ...g, view: { ...g.view, mode } }));
+    client.current?.send({ type: "view", view: view("full", undefined, { mode }) });
+  };
+
   const results = useMemo(() => new Map((result?.items ?? []).map((r) => [r.id, r])), [result]);
 
   const colors = useMemo(() => {
@@ -223,6 +244,24 @@ export default function MathcorePage() {
     // `result` and `themeTick` only trigger a re-read of the tokens.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [graph.items, result, themeTick]);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    const rgb = (token: string) => cssRgb(resolveColor(root, undefined, token));
+    colors3d.current = {
+      background: rgb(SCENE3_TOKENS.background),
+      axis: rgb(SCENE3_TOKENS.axis),
+      box: rgb(SCENE3_TOKENS.box),
+      positive: rgb(LINALG_TOKENS.positive),
+      negative: rgb(LINALG_TOKENS.negative),
+      arrow: rgb(LINALG_TOKENS.arrow),
+      eigen: rgb(LINALG_TOKENS.eigen),
+      planes: [rgb(SCENE3_TOKENS.planes[0]), rgb(SCENE3_TOKENS.planes[1]), rgb(SCENE3_TOKENS.planes[2])],
+      items: Object.fromEntries(graph.items.map((it, i) => [it.id, cssRgb(colors[i])])),
+    };
+    // A theme change repaints the 3D frame with the new colors.
+    if (graphRef.current.view.mode === "3d" && themeTick > 0) client.current?.send({ type: "view", view: view("full") });
+  }, [colors, graph.items, themeTick, view]);
 
   const scene: Scene = useMemo(() => {
     const curves: DrawCurve[] = [];
@@ -360,8 +399,20 @@ export default function MathcorePage() {
             {t("importJson")}
             <input type="file" accept="application/json,.json" className="mc-sr" onChange={(e) => void onImport(e.target.files?.[0])} />
           </label>
-          <button type="button" className="mc-button" onClick={() => setViewport({ ...DEFAULT_VIEWPORT }, "full")}>
+          <button
+            type="button"
+            className="mc-button"
+            onClick={() => (graph.view.mode === "3d" ? setCamera(undefined, "full") : setViewport({ ...DEFAULT_VIEWPORT }, "full"))}
+          >
             {t("resetView")}
+          </button>
+          <button
+            type="button"
+            className="mc-button"
+            aria-pressed={graph.view.mode === "3d"}
+            onClick={() => setMode(graph.view.mode === "3d" ? "2d" : "3d")}
+          >
+            {t("view3d")}
           </button>
           <label className="mc-button">
             <input
@@ -399,6 +450,7 @@ export default function MathcorePage() {
                 color={colors[i]}
                 result={results.get(it.id)}
                 showSteps={graph.view.showSteps}
+                mode={graph.view.mode}
                 onChange={(latex) => setItems(graph.items.map((x) => (x.id === it.id ? { ...x, latex } : x)))}
                 onRemove={() => setItems(graph.items.filter((x) => x.id !== it.id))}
                 onEnter={() => setItems([...graph.items.slice(0, i + 1), { id: newId(), latex: "" }, ...graph.items.slice(i + 1)])}
@@ -468,7 +520,10 @@ export default function MathcorePage() {
               setCanvasEl(el);
               if (el) size.current = { w: el.clientWidth, h: el.clientHeight };
             }}
+            frame3={graph.view.mode === "3d" ? result?.frame3d ?? null : null}
+            onCamera={graph.view.mode === "3d" ? setCamera : undefined}
           />
+          {graph.view.mode === "3d" && <p className="mc-note">{t("view3dNote")}</p>}
           {trace && trace.slope !== null && (
             <p className="mc-trace" dir="ltr" aria-live="polite">
               {t("tangentAt", { x: trace.x.toPrecision(6), slope: trace.slope.toPrecision(6) })}
