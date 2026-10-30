@@ -47,6 +47,17 @@ First review of the Phase 4 code (snapshot 7ec1db3) and fixes:
 | No precision warning beyond 10⁸ | matrix and system rows show it |
 | A failed panel chunk could take the page down | error boundary in the row |
 
+Second review (verification of 7aeaa25) and fixes:
+
+| Finding | Fix |
+|---|---|
+| The per-subtraction snap missed true singularity (27 of 1500 dependent 3×3 gave a "unique" solution) | entries are zero below 10⁻¹² of their row's own scale, tracked through the row operations (coefficients and augmented columns separately); 0 of 3000 dependent systems misclassified, tiny and badly scaled matrices still exact |
+| Grid loop hung far from the origin (k + 1 = k) | integer-indexed lines, at most 2 × 120 per family |
+| Grids of 1e±200 matrices empty or one line | A⁻¹ through a power-of-two scaled matrix |
+| Coefficient step overflow (10¹⁶⁰x + y = 10¹⁶⁰) | unit step first, refined only when the constant swallowed the coefficient |
+| Rotation arc always counter-clockwise | θ signed by the sense in which A turns î (the sign of a₂₁) |
+| x⁰ rejected as nonlinear; θ and M′ as empty or merged names | degree 0; `\text{…}` names |
+
 ## Known limits
 
 - Two-column `cases` (value & condition) parses as a piecewise expression and is not a system.

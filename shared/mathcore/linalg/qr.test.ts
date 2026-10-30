@@ -111,3 +111,46 @@ describe("QR eigenvalues (Francis double shift, STEPS.md §8.2)", () => {
     expect(eigenspace3([[3, 0, 0], [0, 3, 0], [0, 0, 3]], 3)).toHaveLength(3);
   });
 });
+
+describe("3×3 eigenvalues: repeated, defective and extreme scales (Phase 5 review)", () => {
+  it("defective and repeated cases are classified exactly, with exact values and eigenspace sizes", () => {
+    const cases: Array<[number[][], number[], number]> = [
+      // λ = 1 triple with one Jordan block: one eigen-direction.
+      [[[-2, 4, -3], [-5, 7, -4], [-3, 4, -2]], [1, 1, 1], 1],
+      // 3, 2, 2 with 2 defective.
+      [[[0, 4, -4], [-4, 8, -5], [-3, 4, -1]], [3, 2, 2], 2],
+      // λ = 2 triple with a two-dimensional eigenspace.
+      [[[0, 4, -4], [-3, 8, -6], [-2, 4, -2]], [2, 2, 2], 2],
+      // Scalar matrix: three directions.
+      [[[5, 0, 0], [0, 5, 0], [0, 0, 5]], [5, 5, 5], 3],
+    ];
+    for (const [A, values, nvec] of cases) {
+      const e = eigen3(A);
+      expect(e.kind, JSON.stringify(A)).toBe("repeated-real");
+      expect(e.values.map((v) => v.re)).toEqual(values);
+      expect(e.values.every((v) => v.im === 0)).toBe(true);
+      expect(e.vectors.length, JSON.stringify(A)).toBe(nvec);
+      for (const { value, vector } of e.vectors) {
+        const Av = A.map((r) => r[0] * vector[0] + r[1] * vector[1] + r[2] * vector[2]);
+        Av.forEach((x, i) => expect(x).toBeCloseTo(value * vector[i], 10));
+      }
+    }
+  });
+
+  it("entries near 1e154 and 1e-170 neither throw nor lose accuracy", () => {
+    const base = [[1, 2, 0], [0, 1, 1], [1, 0, 3]];
+    const ref = eigenvalues(base);
+    for (const k of [1e154, 1e-170, 1e300]) {
+      const got = eigenvalues(base.map((r) => r.map((v) => v * k)));
+      for (const g of got) {
+        const w = ref.reduce((p, q) => (Math.hypot(q.re * k - g.re, q.im * k - g.im) < Math.hypot(p.re * k - g.re, p.im * k - g.im) ? q : p));
+        expect(Math.hypot(g.re - w.re * k, g.im - w.im * k) / (Math.hypot(w.re, w.im) * k)).toBeLessThan(1e-12);
+      }
+    }
+  });
+
+  it("the kind follows the exact discriminant: one real root and a complex pair, or three real roots", () => {
+    expect(eigen3([[0, -1, 0], [1, 0, 0], [0, 0, 2]]).kind).toBe("complex-pair");
+    expect(eigen3([[2, 1, 0], [1, 2, 0], [0, 0, 5]]).kind).toBe("distinct-real");
+  });
+});

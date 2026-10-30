@@ -5,8 +5,8 @@
  */
 import type { Viewport } from "../ir/types";
 import type { Eigen2, Mat } from "./matrix";
-import { determinant, eigen2 } from "./matrix";
-import { TRANSFORM_GRID_MAX_LINES } from "../constants";
+import { determinant, eigen2, powerOfTwoScale } from "./matrix";
+import { TRANSFORM_BOX_MARGIN, TRANSFORM_GRID_MAX_LINES, TRANSFORM_RADIAL_LINES } from "../constants";
 
 export interface Transform2Geometry {
   /** Images of the grid lines x = k and y = k that cross the view, each a 2-point polyline [x0, y0, x1, y1]. */
@@ -38,7 +38,7 @@ export interface EigenHint {
 }
 
 /** Radial lines drawn for a scalar matrix. */
-const RADIAL_LINES = 8;
+const RADIAL_LINES = TRANSFORM_RADIAL_LINES;
 
 /** Segment of the line {p + t·d} inside the box (slab clipping), or null if it misses the box. */
 export function clipLine2(p: [number, number], d: [number, number], box: { xmin: number; xmax: number; ymin: number; ymax: number }): Float64Array | null {
@@ -74,16 +74,20 @@ export function transform2(A: Mat, view: Viewport, hint?: EigenHint): Transform2
   const det = determinant(A);
   const eigen = eigen2(A);
   // A slightly larger box, so lines run past the canvas edge.
-  const mx = (view.xmax - view.xmin) * 0.05;
-  const my = (view.ymax - view.ymin) * 0.05;
+  const mx = (view.xmax - view.xmin) * TRANSFORM_BOX_MARGIN;
+  const my = (view.ymax - view.ymin) * TRANSFORM_BOX_MARGIN;
   const box = { xmin: view.xmin - mx, xmax: view.xmax + mx, ymin: view.ymin - my, ymax: view.ymax + my };
   const grid: Float64Array[] = [];
   const col1: [number, number] = [a, c];
   const col2: [number, number] = [b, d];
-  if (!det.singular && Number.isFinite(det.value)) {
+  if (!det.singular) {
     // Source coordinates of the box corners (A⁻¹ p): the lines x = k (and y = k) that cross the view are those
-    // with k between the smallest and largest first (second) coordinate.
-    const inv = (x: number, y: number): [number, number] => [(d * x - b * y) / det.value, (-c * x + a * y) / det.value];
+    // with k between the smallest and largest first (second) coordinate. A⁻¹ = (A/s)⁻¹/s with s a power of two, so
+    // entries near 1e±200 neither overflow nor underflow.
+    const s0 = powerOfTwoScale(A);
+    const [a1, b1, c1, d1] = [a / s0, b / s0, c / s0, d / s0];
+    const det1 = a1 * d1 - b1 * c1;
+    const inv = (x: number, y: number): [number, number] => [(d1 * (x / s0) - b1 * (y / s0)) / det1, (-c1 * (x / s0) + a1 * (y / s0)) / det1];
     const corners = [inv(box.xmin, box.ymin), inv(box.xmax, box.ymin), inv(box.xmin, box.ymax), inv(box.xmax, box.ymax)];
     for (const axis of [0, 1]) {
       const ks = corners.map((q) => q[axis]);
@@ -93,7 +97,11 @@ export function transform2(A: Mat, view: Viewport, hint?: EigenHint): Transform2
       // Lines x = k run along A·ĵ through k·A·î (and y = k along A·î through k·A·ĵ).
       const through = axis === 0 ? col1 : col2;
       const along = axis === 0 ? col2 : col1;
-      for (let k = Math.ceil(k0 / step) * step; k <= k1; k += step) {
+      // Integer index, not k += step: far from the origin a small step would not change k.
+      const first = Math.ceil(k0 / step);
+      const count = Math.min(Math.floor(k1 / step) - first, 2 * TRANSFORM_GRID_MAX_LINES);
+      for (let i = 0; i <= count; i++) {
+        const k = (first + i) * step;
         const seg = clipLine2([k * through[0], k * through[1]], along, box);
         if (seg) grid.push(seg);
       }
@@ -117,7 +125,7 @@ export function transform2(A: Mat, view: Viewport, hint?: EigenHint): Transform2
     lines = Array.from({ length: RADIAL_LINES }, (_, i): [number, number] => [Math.cos((Math.PI * i) / RADIAL_LINES), Math.sin((Math.PI * i) / RADIAL_LINES)]);
   } else if (kind === "defective") eigenMarker = { kind: "double" };
   else if (kind === "complex") {
-    eigenMarker = { kind: "rotation", theta: hint?.rotation?.theta ?? (eigen.kind === "complex" ? eigen.theta : undefined) };
+    eigenMarker = { kind: "rotation", theta: hint?.rotation?.theta ?? (eigen.kind === "complex" ? Math.sign(c || 1) * eigen.theta : undefined) };
     lines = [];
   }
   const eigenLines = lines.map((v) => clipLine2([0, 0], v, box)).filter((l): l is Float64Array => l !== null);

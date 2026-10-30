@@ -39,6 +39,8 @@ export function createParseClient(config: ParseClientConfig): ParseClient {
   const timeouts = new Map<string, number>();
   let worker: ParseWorkerLike | null = null;
   let warm = false;
+  /** The parser has answered at least once in this visit. */
+  let everWarm = false;
   let seq = 0;
   /** Requests run strictly one after another (one string in flight). */
   let chain: Promise<void> = Promise.resolve();
@@ -70,7 +72,9 @@ export function createParseClient(config: ParseClientConfig): ParseClient {
       const wasWarm = warm;
       const timer = setTimeout(() => {
         drop();
-        if (!wasWarm) once(latex, { ok: false, message: "The math parser did not start in time" });
+        // A start-up timeout counts against the line only when the parser has started before in this visit (the
+        // download works): a line that hangs the parser would otherwise be retried on fresh Workers forever.
+        if (!wasWarm && !everWarm) once(latex, { ok: false, message: "The math parser did not start in time" });
         else {
           const n = (timeouts.get(latex) ?? 0) + 1;
           timeouts.set(latex, n);
@@ -94,6 +98,7 @@ export function createParseClient(config: ParseClientConfig): ParseClient {
           once(latex, { ok: false, message: d.message });
         } else {
           warm = true;
+          everWarm = true;
           remember(latex, d.ok ? { ok: true, raw: d.raw } : { ok: false, message: d.message });
         }
         resolve();

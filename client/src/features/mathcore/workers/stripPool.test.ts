@@ -75,7 +75,7 @@ describe("strip pool (STEPS.md §7.1 technique 4)", () => {
       postMessage() {}
     }
     const pool = createStripPool(2, () => new Silent(), { timeoutMs: 20, loadTimeoutMs: 40 });
-    await expect(pool.run(source, vp, o)).rejects.toThrow(/in time/);
+    await expect(pool.run(source, vp, o)).rejects.toThrow(/too long/);
     pool.dispose();
   });
 });

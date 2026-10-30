@@ -3,7 +3,7 @@
  * (Rᵢ ← Rᵢ − kRⱼ, Rᵢ ↔ Rⱼ, Rᵢ ← kRᵢ) with the pivot highlighted. Exact for rational input; otherwise floating
  * point where a difference is zero only when it is cancellation noise of its own operands.
  */
-import { CANCELLATION_RELATIVE } from "../constants";
+import { ELIMINATION_RELATIVE } from "../constants";
 import { Fraction } from "./fraction";
 import { numberLatex } from "./format";
 import type { Mat } from "./matrix";
@@ -42,28 +42,24 @@ const exactField: Field<Fraction> = {
 };
 
 /**
- * Floating-point field for irrational input. A difference counts as zero only when it is cancellation noise of its
- * own operands (|a − b| ≤ CANCELLATION_RELATIVE·(|a| + |b|)), so tiny but genuine entries (1e-13, or 1e-8 next to
- * 1e8) are kept, and the matrix's overall scale plays no part (§9: relative comparisons only).
+ * Floating-point field for irrational input. Zero tests are done by `run` relative to each row's own scale (see
+ * there), so tiny but genuine entries (1e-13, or 1e-8 next to 1e8 in another row) are kept, the residue of a
+ * dependent row is recognised as zero, and the matrix's overall scale plays no part (§9).
  */
 const floatField: Field<number> = {
   zero: 0,
   one: 1,
-  add: (a, b) => snap(a + b, a, b),
-  sub: (a, b) => snap(a - b, a, b),
+  add: (a, b) => a + b,
+  sub: (a, b) => a - b,
   mul: (a, b) => a * b,
   div: (a, b) => a / b,
   isZero: (a) => a === 0,
-  isOne: (a) => Math.abs(a - 1) <= CANCELLATION_RELATIVE,
+  isOne: (a) => a === 1,
   cmpAbs: (a, b) => Math.sign(Math.abs(a) - Math.abs(b)),
   neg: (a) => -a,
   latex: numberLatex,
   num: (a) => a,
 };
-
-function snap(r: number, a: number, b: number): number {
-  return Math.abs(r) <= CANCELLATION_RELATIVE * (Math.abs(a) + Math.abs(b)) ? 0 : r;
-}
 
 export type RowOp =
   | { op: "swap"; i: number; j: number }
@@ -106,6 +102,16 @@ function run<T>(F: Field<T>, M: T[][], extra: number): GaussResult & { exact: bo
   const snapshot = (op: RowOp, latex: string, pivot: [number, number]) =>
     steps.push({ op, latex, matrix: M.map((r) => r.map(F.num)), matrixLatex: M.map((r) => r.map(F.latex)), pivot });
 
+  // Floating point only: the scale of each row, separately for the coefficients and the augmented part, carried
+  // through the row operations; an entry below ELIMINATION_RELATIVE of its row's scale is rounding residue (0).
+  const float = F === (floatField as unknown as Field<T>);
+  const rowMax = (row: T[], from: number, to: number) => row.slice(from, to).reduce((m, v) => Math.max(m, Math.abs(F.num(v))), 0);
+  const sA = M.map((row) => rowMax(row, 0, varCols));
+  const sB = M.map((row) => rowMax(row, varCols, cols));
+  const snap = (i: number) => {
+    if (!float) return;
+    M[i] = M[i].map((v, j) => (Math.abs(F.num(v)) <= ELIMINATION_RELATIVE * (j < varCols ? sA[i] : sB[i]) ? F.zero : v));
+  };
   let r = 0;
   for (let c = 0; c < varCols && r < rows; c++) {
     // Partial pivoting: the largest |entry| in the column (for exact input, the first non-zero keeps numbers small
@@ -122,6 +128,9 @@ function run<T>(F: Field<T>, M: T[][], extra: number): GaussResult & { exact: bo
       const k = F.div(F.one, pv);
       M[r] = M[r].map((v) => F.mul(v, k));
       M[r][c] = F.one; // exactly 1 after scaling, also in floating point
+      const f = Math.abs(F.num(k));
+      sA[r] *= f;
+      sB[r] *= f;
       snapshot({ op: "scale", i: r, k: F.num(k) }, `${rowLabel(r)} \\leftarrow ${coef(F, k)}${rowLabel(r)}`, [r, c]);
     }
     for (let i = 0; i < rows; i++) {
@@ -129,6 +138,10 @@ function run<T>(F: Field<T>, M: T[][], extra: number): GaussResult & { exact: bo
       const k = M[i][c];
       M[i] = M[i].map((v, j) => F.sub(v, F.mul(k, M[r][j])));
       M[i][c] = F.zero;
+      const f = Math.abs(F.num(k));
+      sA[i] = Math.max(sA[i], f * sA[r]);
+      sB[i] = Math.max(sB[i], f * sB[r]);
+      snap(i);
       const neg = F.cmpAbs(k, F.zero) > 0 && F.num(k) < 0;
       const mag = neg ? F.neg(k) : k;
       snapshot(

@@ -436,6 +436,8 @@ describe("Phase 4 review: scale-free numerics", () => {
     expect(symbolLatex("alpha")).toBe("\\alpha");
     expect(symbolLatex("x_1")).toBe("x_{1}");
     expect(symbolLatex("ab_c2")).toBe("\\mathrm{ab}_{c2}");
+    expect(symbolLatex("θ")).toBe("\\text{θ}");
+    expect(symbolLatex("M'")).toBe("\\text{M'}");
     expect(analyzeSystem([[1, 0], [0, 1]], [1, 2], ["ab", "theta"]).equations).toEqual(["\\mathrm{ab} = 1", "\\theta = 2"]);
   });
 });

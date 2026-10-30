@@ -3,7 +3,7 @@
  * (ADR-4) at canvas size, or at FRAME3_DRAG_SCALE of it while the camera moves. Labels are projected to CSS pixels
  * here and drawn by the page. Runs in the engine Worker.
  */
-import { CAMERA_FIT_DISTANCE, FRAME3_DRAG_SCALE } from "../constants";
+import { CAMERA_FIT_MARGIN, CAMERA_FOV, FRAME3_DRAG_SCALE, FRAME3_MAX_SIDE } from "../constants";
 import type { GraphEngine } from "../engine/graphEngine";
 import type { Camera3, Viewport } from "../ir/types";
 import { DEFAULT_CAMERA3 } from "../ir/types";
@@ -32,6 +32,19 @@ export interface Frame3 {
   labels: Array<{ x: number; y: number; text: string }>;
   /** The camera used: the request's, or the one fitted to the scene. */
   camera: Camera3;
+  /** Half-size of the viewing box (the page limits zoom relative to it). */
+  half: number;
+}
+
+/**
+ * Camera distance at which the box's bounding sphere (radius √3·L) fits the narrower of the vertical and horizontal
+ * fields of view, with CAMERA_FIT_MARGIN.
+ */
+export function fitDistance(half: number, width: number, height: number): number {
+  const aspect = width > 0 && height > 0 ? width / height : 1;
+  const hfov = 2 * Math.atan(Math.tan(CAMERA_FOV / 2) * aspect);
+  const fov = Math.min(CAMERA_FOV, hfov);
+  return (CAMERA_FIT_MARGIN * Math.sqrt(3) * half) / Math.sin(fov / 2);
 }
 
 type Analyze = (id: string, A: Mat, b: number[], unknowns: string[]) => SystemAnalysis;
@@ -60,10 +73,10 @@ export function renderFrame3(
     }
   }
   const scene = buildScene3(items, colors);
-  const camera = req.camera ?? { ...DEFAULT_CAMERA3, distance: scene.half * CAMERA_FIT_DISTANCE };
+  const camera = req.camera ?? { ...DEFAULT_CAMERA3, distance: fitDistance(scene.half, req.width, req.height) };
   const k = req.quality === "drag" ? FRAME3_DRAG_SCALE : 1;
-  const width = Math.max(1, Math.round(req.width * k));
-  const height = Math.max(1, Math.round(req.height * k));
+  const width = Math.min(FRAME3_MAX_SIDE, Math.max(1, Math.round(req.width * k) || 1));
+  const height = Math.min(FRAME3_MAX_SIDE, Math.max(1, Math.round(req.height * k) || 1));
   const cam = { ...DEFAULT_CAMERA, ...camera, target: [0, 0, 0] as Vec3 };
   const f = render(scene.meshes, scene.lines, cam, width, height, colors.background);
   const project = projector(cam, req.width, req.height);
@@ -72,5 +85,5 @@ export function renderFrame3(
     const p = project(l.at);
     if (p) labels.push({ x: p[0], y: p[1], text: l.text });
   }
-  return { width, height, rgba: f.rgba, labels, camera };
+  return { width, height, rgba: f.rgba, labels, camera, half: scene.half };
 }

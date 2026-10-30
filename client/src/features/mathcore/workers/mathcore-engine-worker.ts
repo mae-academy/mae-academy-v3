@@ -23,7 +23,7 @@ import type { SampleResult } from "@shared/mathcore/sample/adaptive";
 import type { ParsedEntry } from "./parseProtocol";
 import type { EngineRequest, EngineResponse, ItemResult, ViewRequest } from "./protocol";
 import { superseded } from "./requestQueue";
-import { createStripPool } from "./stripPool";
+import { StripTimeout, createStripPool } from "./stripPool";
 import type { StripPool, StripWorkerLike } from "./stripPool";
 
 declare const self: DedicatedWorkerGlobalScope;
@@ -59,9 +59,13 @@ async function field(e: GraphEngine, id: string, F: (x: number, y: number) => nu
   if (p && source) {
     try {
       return await p.run(source, view.viewport, o);
-    } catch {
+    } catch (err) {
+      // A stalled run: the Workers are busy with it, so the pool is replaced next time, and the field is reported as
+      // too heavy rather than recomputed here (that would outlast the page's watchdog). A failed Worker: strips are
+      // off for this visit and fields are computed here.
       p.dispose();
       pool = null;
+      if (err instanceof StripTimeout) throw err;
       stripsFailed = true;
     }
   }
@@ -209,13 +213,38 @@ async function sampleItem(e: GraphEngine, id: string, view: ViewRequest): Promis
   return out;
 }
 
+/** The 3D frame; a failure leaves the frame out (the rows still show their reports and errors). */
+function safeFrame3(e: GraphEngine, view: ViewRequest, colors: NonNullable<ViewRequest["colors3d"]>) {
+  try {
+    return renderFrame3(e, view, colors, (id, a, b, u) => cachedAnalysis(id, [a, b, u], () => analyzeSystem(a, b, u)));
+  } catch {
+    return undefined;
+  }
+}
+
+/** One item's failure (a numerical exception while sampling or analysing) is an error on that line only. */
+async function safeSample(e: GraphEngine, id: string, view: ViewRequest): Promise<ItemResult> {
+  try {
+    return await sampleItem(e, id, view);
+  } catch (err) {
+    const state = e.item(id);
+    return {
+      id,
+      kind: state?.type.kind ?? "Unknown",
+      errors: [...(state?.errors ?? []), { message: err instanceof Error ? err.message : String(err) }],
+      warnings: state?.warnings ?? [],
+      segments: [],
+    };
+  }
+}
+
 async function respond(
   seq: number, cause: "load" | "param" | "view", e: GraphEngine, view: ViewRequest, ids: readonly string[], reevaluated: string[], t0: number,
   partial = false,
 ): Promise<void> {
-  for (const id of ids) last.set(id, await sampleItem(e, id, view));
+  for (const id of ids) last.set(id, await safeSample(e, id, view));
   const items: ItemResult[] = [];
-  for (const it of e.graph.items) items.push(last.get(it.id) ?? (await sampleItem(e, it.id, view)));
+  for (const it of e.graph.items) items.push(last.get(it.id) ?? (await safeSample(e, it.id, view)));
   const msg: EngineResponse = {
     type: "result",
     seq,
@@ -224,7 +253,7 @@ async function respond(
     evaluations: e.evaluations,
     reevaluated,
     cause,
-    frame3d: view.mode === "3d" && view.colors3d ? renderFrame3(e, view, view.colors3d, (id, a, b, u) => cachedAnalysis(id, [a, b, u], () => analyzeSystem(a, b, u))) : undefined,
+    frame3d: view.mode === "3d" && view.colors3d ? safeFrame3(e, view, view.colors3d) : undefined,
     partial,
     ms: performance.now() - t0,
   };

@@ -87,17 +87,36 @@ saddles decided by F at the cell centre; lattice slopes computed once per lattic
 | Pipeline e2e step never ran | it checks `e2e:mathcore` | `run-prompt.sh` |
 | Hardcoded values | probe counts, jitter margin, strip limits, retry delays, fallback canvas size and tanh-sinh levels are in `constants.ts` | — |
 
+## Fourth round (verification of 7aeaa25)
+
+| Finding | Fix | Evidence |
+|---|---|---|
+| Zero-mean jump integrands sent to tanh-sinh (wrong or NaN) | the singularity test compares the peak with the median \|f\| on a uniform grid, not with ∫f | seven jump integrands to < 1e-9 (`integrate.test.ts`) |
+| ∫₀¹⁰ (x − ⌊x⌋ − ½) dx = −½ and a narrow Gaussian = 0, both "converged" (older) | Simpson starts on 7 panels with irregular borders and a minimum depth of 3 | 6.6e-15 and 8e-15 |
+| Parse retry never stopped for a line that hangs the parser | at most 5 retries; a start-up timeout counts against the line once the parser has started in this visit | `parseClient.test.ts` |
+| A late load answer reverted a slider dragged after it | sliders moved after the answered request keep their page values | `mergeParams.test.ts` |
+| An intermediate answer could still make an undone edit look sent | the engine key is taken only from answers that hold the latest load | `MathcorePage.tsx` |
+| Fresh flag lost when editing right after an import | fresh = the first round started after the import | `MathcorePage.tsx` |
+| Unknown lines (a system mid-edit) pruned sliders | such lines count as being typed | `graphEngine.test.ts` |
+| Stitch candidate cap left ends unjoined | unmatched ends propose again among unmatched ones (up to 4 rounds) | `marching.test.ts` |
+| A heavy field on strips was failed, then recomputed serially past the watchdog | a stalled run reports "the field took too long" on its line; only a crashed strip Worker disables strips; the pool is warm only when every Worker has answered | `stripPool.test.ts` |
+| Chromium numbers had no script | `scripts/mathcore/bench-browser.cjs` | below |
+
+Cost of the third round's robustness (measured by the reviewer against 523b7a8, single thread): about +16% on the
+drag path and +25% on release (jittered probes add 36–56% evaluations on plain curves; edges that look like poles
+or jumps bisect up to 40 times instead of 8).
+
 ## Exit criterion: implicit field budget at quarter resolution
 
 Reference F = x² + y² + sin 3x · cos 2y < 9 (the engine's compiled closure), view ±5, canvas 1600×1000. Measured after
 the third round on the cloud machine (4 cores, load ≈ 1.2–1.5); ranges are over repeated runs.
 
-| Case (STEPS.md §7.2) | Target | Node, one thread | Chromium, engine Worker + 3 strip Workers |
+| Case (STEPS.md §7.2) | Target | Node, one thread | Chromium, engine Worker + 3 strip Workers (`bench-browser.cjs`) |
 |---|---|---|---|
-| Field 400×250 during drag (drag lattice + quarter mask) | ≤ 16 ms | 12.8–15.9 ms | 9.7–10.9 ms |
-| Field 1600×1000 on release (quarter frame, then full frame) | ≤ 150 ms | 106–110 ms | 88–108 ms |
-| Dense sin(x² + y²) < 0, drag | ≤ 16 ms | 23–30 ms (fails) | 14.5–14.8 ms |
-| Dense sin(x² + y²) < 0, release | ≤ 150 ms | 132–133 ms | 89 ms |
+| Field 400×250 during drag (drag lattice + quarter mask) | ≤ 16 ms | 13.2–13.5 ms | 9.9–12.5 ms |
+| Field 1600×1000 on release (quarter frame, then full frame) | ≤ 150 ms | 102–105 ms | 96–102 ms |
+| Dense sin(x² + y²) < 0, drag | ≤ 16 ms | 21–23 ms (fails) | 10.2–14.0 ms |
+| Dense sin(x² + y²) < 0, release | ≤ 150 ms | 128–165 ms (fails at times) | 83–87 ms |
 
 Chromium figures are round trips measured from a page (message passing and copies included). On a machine with fewer
 than three cores no strip Workers start and the single-thread column applies, where the dense drag case misses the
@@ -112,6 +131,10 @@ budget. D1 laptop numbers are still open (Phase 0 item 5).
   cut there.
 - At drag quality (shading stride 4) patterns finer than two mask pixels alias, as any sampling at that resolution
   does; the full frame that follows is per-pixel accurate where it matters.
+- Very steep zeros beyond about tanh(10¹³·g) and weak zeros sign(x)\|x\|^p with p below about 0.03 are not drawn (the
+  extended bisection stops at 40 halvings).
+- Full-quality shading differs from per-pixel evaluation by up to about 1.5% for patterns repeating at the block size.
+- Integrals with two interior singularities are not split twice (NaN).
 - Integrals: tail exponents within 10⁻³ of 1 (x^(−0.999)), slowly divergent-looking tails (1/(x ln²x)), endpoint
   singularities far from 0 relative to the interval length ([10⁶, 10⁶ + 1]) and right-end singularities stronger than
   (1 − x)^(−0.5) are reported as not converged (NaN). `estimatedError` is computed but not shown on the page yet.

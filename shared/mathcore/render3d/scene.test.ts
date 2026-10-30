@@ -89,3 +89,39 @@ describe("3D scene (Phase 5)", () => {
     expect(painted / (800 * 500)).toBeGreaterThan(0.05);
   });
 });
+
+describe("scene robustness (Phase 5 review)", () => {
+  it("plane intersections do not depend on the coefficients' scale; a zero direction misses the box", () => {
+    const m = planeIntersection([1e-90, 2e-90, 0], 1e-90, [0, 1e-90, 1e-90], 0);
+    expect(m).not.toBeNull();
+    expect(clipLineToBox([0, 0, 0], [0, 0, 0], 5)).toBeNull();
+  });
+  it("sceneHalf ignores overflowed content and stays finite", () => {
+    expect(sceneHalf([{ kind: "matrix", values: [[1e308, 1e308, 0], [0, 1, 0], [0, 0, 1]], color: [0, 0, 0] }])).toBeLessThanOrEqual(1e150);
+    expect(Number.isFinite(sceneHalf([{ kind: "matrix", values: [[1e308, 1e308, 0], [0, 1, 0], [0, 0, 1]], color: [0, 0, 0] }]))).toBe(true);
+  });
+  it("lines behind a translucent plane are tinted by it, lines in front are not", () => {
+    const quad = { positions: Float32Array.of(-1, -1, 0, 1, -1, 0, 1, 1, 0, -1, 1, 0), indices: Uint32Array.of(0, 1, 2, 0, 2, 3), color: [255, 0, 0] as RGB, opacity: 0.45 };
+    const cam = { ...DEFAULT_CAMERA, azimuth: 0, elevation: 1.5, distance: 6 };
+    const behind = render([quad], [{ from: [0, -0.5, -0.5], to: [0, 0.5, -0.5], color: [0, 255, 0] }], cam, 101, 101, [255, 255, 255]);
+    const front = render([quad], [{ from: [0, -0.5, 0.5], to: [0, 0.5, 0.5], color: [0, 255, 0] }], cam, 101, 101, [255, 255, 255]);
+    const count = (f: { rgba: Uint8ClampedArray }, pred: (r: number, g: number, b: number) => boolean) => {
+      let n = 0;
+      for (let i = 0; i < f.rgba.length; i += 4) if (pred(f.rgba[i], f.rgba[i + 1], f.rgba[i + 2])) n++;
+      return n;
+    };
+    const pure = (r: number, g: number, b: number) => r === 0 && g === 255 && b === 0;
+    const tinted = (r: number, g: number) => g > 150 && r > 50 && !(r === 255 && g === 255);
+    expect(count(front, pure)).toBeGreaterThan(10);
+    expect(count(behind, pure)).toBe(0);
+    expect(count(behind, tinted)).toBeGreaterThan(10);
+  });
+  it("two triangles sharing an edge blend it once (half-open spans)", () => {
+    const quad = { positions: Float32Array.of(-1, -1, 0, 1, -1, 0, 1, 1, 0, -1, 1, 0), indices: Uint32Array.of(0, 1, 2, 0, 2, 3), color: [0, 0, 0] as RGB, opacity: 0.5 };
+    const f = render([quad], [], { ...DEFAULT_CAMERA, azimuth: 0, elevation: 1.5, distance: 6 }, 65, 65, [200, 200, 200]);
+    const values = new Set<string>();
+    for (let i = 0; i < f.rgba.length; i += 4) values.add(`${f.rgba[i]},${f.rgba[i + 1]},${f.rgba[i + 2]}`);
+    // Background and one blend: no pixel blended twice along the shared diagonal.
+    expect(values.size).toBe(2);
+  });
+});

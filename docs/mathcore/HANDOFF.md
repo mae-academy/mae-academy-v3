@@ -1,4 +1,4 @@
-# Math Core — handoff for a new session
+# Math Core — handoff for a new session (state at the end of 2026-10-30)
 
 Read this first. It replaces re-reading the earlier conversation. Paste the prompt at the end into a new session.
 
@@ -10,8 +10,12 @@ Read this first. It replaces re-reading the earlier conversation. Paste the prom
   `docs/mathcore/reports/decisions-log.md` (append-only).
 - Phase reports (what was built, review rounds, measured budgets, known limits):
   `docs/mathcore/reports/phase-1-2.md`, `phase-3.md`, `phase-4.md`, `phase-5.md`.
-- **Scope:** Phases 0–5 are done. The owner lifted D3 (3D) for Phase 5 only. **Stop after Phase 5**: Phase 6 (ODEs) and
-  later are a separate scope. Headless ODE code (`shared/mathcore/ode/`) exists without UI; do not build on it unasked.
+- **Scope:** Phases 0–5 are done and went through independent review rounds (Phase 3: four, Phase 4: two, Phase 5:
+  one); every finding is fixed or listed as a known limit in its report. The owner lifted D3 (3D) for Phase 5 only.
+  **Stop after Phase 5**: Phase 6 (ODEs) and later are a separate scope. Headless ODE code (`shared/mathcore/ode/`)
+  exists without UI; do not build on it unasked.
+- State at handoff: gate green, 380+ mathcore unit tests and 17 browser tests pass; budgets in each report
+  (implicit fields in Chromium: 10–13 ms drag, 83–102 ms release; 3D: ≤ 10 ms per frame while the camera moves).
 
 ## Code map
 
@@ -29,6 +33,7 @@ timeout 580 bash scripts/mathcore/gate.sh origin/automation/setup   # typecheck,
 npx vitest run shared/mathcore client/src/features/mathcore         # mathcore unit tests only
 pnpm run build && MATHCORE_CHROMIUM=/opt/pw-browsers/chromium pnpm run e2e:mathcore
 pnpm exec tsx scripts/mathcore/bench.ts                            # §7.2 budgets (Node, one thread)
+node scripts/mathcore/bench-browser.cjs                            # implicit fields in Chromium (needs vite preview on 4173)
 ```
 
 Rules learned the hard way:
@@ -45,7 +50,9 @@ Rules learned the hard way:
 
 - Visual snapshot tests (§10) need new human-owned baselines in `docs/mathcore/baselines/`: owner approval needed.
 - D1 reference-device measurements (Phase 0 item 5) are still open; all budgets were measured on the cloud machine.
-- Known limits are listed at the end of each phase report.
+- Known limits are listed at the end of each phase report (for example: features thinner than about 1.5 px, the dense
+  implicit field misses the drag budget on machines with fewer than 3 cores, some extreme integrals return NaN,
+  2D curves are not drawn in the 3D view).
 
 ## Prompt for a new session
 

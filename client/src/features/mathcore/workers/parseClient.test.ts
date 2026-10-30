@@ -133,4 +133,19 @@ describe("parse client (STEPS.md §9: 200 ms parse timeout in the parse Worker)"
     expect((await c.parseAll(["slow"])).slow).toEqual({ ok: false, message: "Parsing took longer than 200 ms" });
     expect(FakeParseWorker.created).toBe(created);
   });
+
+  it("a line that hangs the parser is cached after two timeouts, even when the second hits a restarted Worker", async () => {
+    const c = createParseClient({ createWorker: () => new FakeParseWorker() });
+    await c.parseAll(["x"]); // the parser has started once in this visit
+    const first = c.parseAll(["slow"]);
+    await vi.advanceTimersByTimeAsync(200);
+    expect((await first).slow.ok).toBe(false);
+    // The replacement Worker is cold, so this round gets the long limit, and its timeout still counts.
+    const second = c.parseAll(["slow"]);
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect((await second).slow).toEqual({ ok: false, message: "Parsing took longer than 200 ms" });
+    const created = FakeParseWorker.created;
+    expect((await c.parseAll(["slow"])).slow.ok).toBe(false);
+    expect(FakeParseWorker.created).toBe(created);
+  });
 });

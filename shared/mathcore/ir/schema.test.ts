@@ -127,10 +127,10 @@ describe("Graph IR schema (STEPS.md §5)", () => {
     expect(issuesOf(d)).toEqual([]);
     (d.view as Record<string, unknown>).camera = { azimuth: 1, elevation: 0.5, distance: 20 };
     expect(issuesOf(d)).toEqual([]);
-    (d.view as Record<string, unknown>).camera = { azimuth: 1, elevation: 2, distance: 1, fov: 1 };
+    (d.view as Record<string, unknown>).camera = { azimuth: 1, elevation: 2, distance: 0, fov: 1 };
     const issues = issuesOf(d);
     expect(issues).toContain("view.camera.elevation: must be within ±1.5");
-    expect(issues).toContain("view.camera.distance: must be in [2, 200]");
+    expect(issues).toContain("view.camera.distance: must be a positive number");
     expect(issues.some((i) => i.startsWith("view.camera"))).toBe(true);
     (d.view as Record<string, unknown>).camera = { azimuth: 1, elevation: 0.5 };
     expect(issuesOf(d).some((i) => i.includes("distance"))).toBe(true);

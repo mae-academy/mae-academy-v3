@@ -320,4 +320,15 @@ describe("GraphEngine: Phase 4 review regressions", () => {
     const shadow = new GraphEngine(parser, doc(["a = 5", "\\begin{bmatrix}1&0\\\\0&2\\end{bmatrix}\\begin{bmatrix}a\\\\b\\end{bmatrix}=\\begin{bmatrix}1\\\\2\\end{bmatrix}"]));
     expect(shadow.item("i2")?.warnings[0]).toMatch(/a is an unknown here/);
   });
+
+  it("second review: sliders survive a system line mid-edit; huge coefficients; x^0", () => {
+    const e = new GraphEngine(parser, doc(["\\begin{cases}x+ay=1\\\\x-y=0\\end{cases}"], { a: { value: 3.7, min: -20, max: 20, step: 0.1 } }));
+    e.load({ ...e.graph, items: [{ id: "i1", latex: "\\begin{cases}x+ay^2=1\\\\x-y=0\\end{cases}" }] });
+    expect(e.graph.params.a).toEqual({ value: 3.7, min: -20, max: 20, step: 0.1 });
+    const big = new GraphEngine(parser, doc(["\\begin{cases}10^{160}x+y=10^{160}\\\\x-y=0\\end{cases}"]));
+    expect(big.item("i1")?.errors).toEqual([]);
+    expect((big.runtime("i1") as { A: number[][] }).A[0][0]).toBeCloseTo(1e160, -150);
+    const zero = new GraphEngine(parser, doc(["\\begin{cases}x^{0}+y=1\\\\x-y=0\\end{cases}"]));
+    expect(zero.item("i1")?.errors).toEqual([]);
+  });
 });

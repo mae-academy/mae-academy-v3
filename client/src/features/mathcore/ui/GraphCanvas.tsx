@@ -10,6 +10,7 @@ import type { Camera3, Viewport } from "@shared/mathcore/ir/types";
 import { closestPoint } from "@shared/mathcore/sample/closest";
 import { NS } from "../i18n/register";
 import { moveCamera } from "./camera";
+import { ORBIT_RADIANS_PER_KEY, ORBIT_RADIANS_PER_PX, ZOOM_FACTOR } from "@shared/mathcore/constants";
 import type { DrawFrame3, Scene } from "../render/renderer";
 import { Canvas2DRenderer, gridStep } from "../render/renderer";
 
@@ -34,22 +35,24 @@ export interface GraphCanvasProps {
   /** Keeps one unit equal on both axes (viewport.aspect = "equal"). */
   equalAspect: boolean;
   onCanvas?: (canvas: HTMLCanvasElement | null) => void;
-  /** 3D view: the Worker's frame (with the camera it used) and the camera handler. */
-  frame3?: (DrawFrame3 & { camera: Camera3 }) | null;
+  /** 3D view: the Worker's frame (with the camera it used and the box half-size) and the camera handler. */
+  frame3?: (DrawFrame3 & { camera: Camera3; half: number }) | null;
+  /** The document's camera (undefined: fitted by the Worker). */
+  camera?: Camera3;
   onCamera?: (camera: Camera3, quality: "drag" | "full") => void;
 }
 
 /** Pointer distance, in CSS pixels, within which a curve is traced or a point grabbed. */
 const HIT_RADIUS = 12;
 /** Zoom factor per wheel notch and per + / − key. */
-const ZOOM_STEP = 1.2;
+const ZOOM_STEP = ZOOM_FACTOR;
 /** Fraction of the view moved by one arrow-key press. */
 const KEY_PAN = 0.1;
 /** Delay after the last interaction before full-resolution sampling (STEPS.md §7.1 technique 2). */
 const SETTLE_MS = 150;
 /** Orbit: radians per CSS pixel of drag, and per arrow-key press. */
-const ORBIT_PER_PX = 0.01;
-const ORBIT_KEY = 0.1;
+const ORBIT_PER_PX = ORBIT_RADIANS_PER_PX;
+const ORBIT_KEY = ORBIT_RADIANS_PER_KEY;
 
 
 export function GraphCanvas(props: GraphCanvasProps) {
@@ -60,6 +63,15 @@ export function GraphCanvas(props: GraphCanvasProps) {
   const [size, setSize] = useState({ w: 0, h: 0 });
   const drag = useRef<{ mode: "pan" | "point" | "orbit"; id?: string; x: number; y: number; vp: Viewport; camera?: Camera3 } | null>(null);
   const in3d = !!props.frame3 && !!props.onCamera;
+  // Each orbit or zoom step starts from the camera last asked for, not from the last frame the Worker answered with,
+  // so quick key presses and wheel ticks add up (Phase 5 review).
+  const cameraRef = useRef<Camera3 | null>(null);
+  const frameCamera = props.frame3?.camera;
+  useEffect(() => {
+    cameraRef.current = props.camera ?? frameCamera ?? null;
+  }, [props.camera, frameCamera]);
+  const currentCamera = () => cameraRef.current ?? props.frame3?.camera ?? null;
+  const half = props.frame3?.half ?? 1;
   const settle = useRef<ReturnType<typeof setTimeout>>(undefined);
   const propsRef = useRef(props);
   useEffect(() => {
@@ -109,6 +121,7 @@ export function GraphCanvas(props: GraphCanvasProps) {
   }, [props.scene, props.frame3, size]);
 
   const emitCamera = (c: Camera3) => {
+    cameraRef.current = c;
     propsRef.current.onCamera?.(c, "drag");
     clearTimeout(settle.current);
     settle.current = setTimeout(() => propsRef.current.onCamera?.(c, "full"), SETTLE_MS);
@@ -148,7 +161,7 @@ export function GraphCanvas(props: GraphCanvasProps) {
   const onPointerDown = (e: React.PointerEvent) => {
     (e.target as Element).setPointerCapture(e.pointerId);
     if (in3d && props.frame3) {
-      drag.current = { mode: "orbit", x: e.clientX, y: e.clientY, vp: props.scene.viewport, camera: props.frame3.camera };
+      drag.current = { mode: "orbit", x: e.clientX, y: e.clientY, vp: props.scene.viewport, camera: currentCamera() ?? props.frame3.camera };
       return;
     }
     const w = toWorld(e.clientX, e.clientY);
@@ -163,7 +176,7 @@ export function GraphCanvas(props: GraphCanvasProps) {
     const d = drag.current;
     if (d?.mode === "orbit" && d.camera) {
       // Dragging right turns the scene right (camera moves left); dragging down tilts it toward the viewer.
-      emitCamera(moveCamera(d.camera, -(e.clientX - d.x) * ORBIT_PER_PX, (e.clientY - d.y) * ORBIT_PER_PX));
+      emitCamera(moveCamera(d.camera, -(e.clientX - d.x) * ORBIT_PER_PX, (e.clientY - d.y) * ORBIT_PER_PX, 1, half));
       return;
     }
     if (in3d) return;
@@ -201,8 +214,9 @@ export function GraphCanvas(props: GraphCanvasProps) {
   };
 
   const onWheel = (e: React.WheelEvent) => {
-    if (in3d && props.frame3) {
-      emitCamera(moveCamera(props.frame3.camera, 0, 0, e.deltaY > 0 ? ZOOM_STEP : 1 / ZOOM_STEP));
+    const cam = currentCamera();
+    if (in3d && cam) {
+      emitCamera(moveCamera(cam, 0, 0, e.deltaY > 0 ? ZOOM_STEP : 1 / ZOOM_STEP, half));
       return;
     }
     const w = toWorld(e.clientX, e.clientY);
@@ -219,16 +233,16 @@ export function GraphCanvas(props: GraphCanvasProps) {
   }, []);
 
   const onKeyDown = (e: React.KeyboardEvent) => {
-    if (in3d && props.frame3) {
-      const c = props.frame3.camera;
+    const c = currentCamera();
+    if (in3d && c) {
       const turns: Record<string, () => Camera3> = {
-        ArrowLeft: () => moveCamera(c, ORBIT_KEY, 0),
-        ArrowRight: () => moveCamera(c, -ORBIT_KEY, 0),
-        ArrowUp: () => moveCamera(c, 0, ORBIT_KEY),
-        ArrowDown: () => moveCamera(c, 0, -ORBIT_KEY),
-        "+": () => moveCamera(c, 0, 0, 1 / ZOOM_STEP),
-        "=": () => moveCamera(c, 0, 0, 1 / ZOOM_STEP),
-        "-": () => moveCamera(c, 0, 0, ZOOM_STEP),
+        ArrowLeft: () => moveCamera(c, ORBIT_KEY, 0, 1, half),
+        ArrowRight: () => moveCamera(c, -ORBIT_KEY, 0, 1, half),
+        ArrowUp: () => moveCamera(c, 0, ORBIT_KEY, 1, half),
+        ArrowDown: () => moveCamera(c, 0, -ORBIT_KEY, 1, half),
+        "+": () => moveCamera(c, 0, 0, 1 / ZOOM_STEP, half),
+        "=": () => moveCamera(c, 0, 0, 1 / ZOOM_STEP, half),
+        "-": () => moveCamera(c, 0, 0, ZOOM_STEP, half),
       };
       const turn = turns[e.key];
       if (turn) {

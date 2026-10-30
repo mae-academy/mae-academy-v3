@@ -174,9 +174,7 @@ class Checker {
         this.keys(cam, "view.camera", ["azimuth", "elevation", "distance"], ["azimuth", "elevation", "distance"]);
         const [azimuth, elevation, distance] = (["azimuth", "elevation", "distance"] as const).map((k) => this.num(cam, k, "view.camera"));
         if (Math.abs(elevation) > CAMERA_LIMITS.elevation) this.issue("view.camera.elevation", `must be within ±${CAMERA_LIMITS.elevation}`);
-        if (!(distance >= CAMERA_LIMITS.distanceMin && distance <= CAMERA_LIMITS.distanceMax)) {
-          this.issue("view.camera.distance", `must be in [${CAMERA_LIMITS.distanceMin}, ${CAMERA_LIMITS.distanceMax}]`);
-        }
+        if (!(distance > 0)) this.issue("view.camera.distance", "must be a positive number");
         out.camera = { azimuth, elevation, distance };
       }
     }

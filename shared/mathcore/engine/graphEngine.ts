@@ -323,7 +323,9 @@ export class GraphEngine {
     // An empty line is not a line being typed: it does not stop pruning. While typing, names used now are added to
     // what is remembered, so a slider that appears and disappears mid-typing is still pruned later.
     const used = new Set(this.items.flatMap((i) => i.uses));
-    const typing = this.items.some((i) => !i.parse.ok && i.latex.trim() !== "");
+    // A line that does not parse, or parses into something that cannot be drawn yet (x + ay^2 in a system, mid-edit),
+    // counts as being typed.
+    const typing = this.items.some((i) => (!i.parse.ok || i.type.kind === "Unknown") && i.latex.trim() !== "");
     if (!typing) {
       for (const name of Object.keys(params)) {
         if (this.lastUsed.has(name) && !used.has(name) && !defined.has(name)) {
@@ -413,9 +415,16 @@ export class GraphEngine {
         return c.evaluate(buf);
       };
       const c0 = at(new Array<number>(n).fill(0));
-      // Coefficients from a step of size t ≥ |c₀|, so a large constant (x + y + 10¹⁷) does not swallow them.
-      const t = Math.max(1, Math.abs(c0));
-      const row = unknowns.map((_, j) => (at(unknowns.map((__, k) => (k === j ? t : 0))) - c0) / t);
+      // Coefficients from a unit step, then refined with a step t ≈ |c₀| / |coefficient| when the constant is much
+      // larger than the coefficient (x + y + 10¹⁷ would swallow it), without overflowing (10¹⁶⁰ x + y = 10¹⁶⁰).
+      const row = unknowns.map((_, j) => {
+        const unit = at(unknowns.map((__, k) => (k === j ? 1 : 0))) - c0;
+        // A coefficient swallowed to 0 (or below 1) is probed with t = |c₀|.
+        const t = Math.abs(c0) / Math.max(Math.abs(unit), 1);
+        if (!(t > 1) || !Number.isFinite(t)) return unit;
+        const refined = (at(unknowns.map((__, k) => (k === j ? t : 0))) - c0) / t;
+        return Number.isFinite(refined) ? refined : unit;
+      });
       if (!Number.isFinite(c0) || row.some((v) => !Number.isFinite(v))) throw new Error(`Equation ${i + 1} is not defined at 0`);
       for (const probe of LINEARITY_PROBES) {
         const p = probe.slice(0, n);

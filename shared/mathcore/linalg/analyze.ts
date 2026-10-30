@@ -11,7 +11,7 @@ import { Fraction } from "./fraction";
 import type { GaussResult } from "./gaussJordan";
 import { gaussJordan, matrixToLatex } from "./gaussJordan";
 import type { Mat } from "./matrix";
-import { DISPLAY_DIGITS, SQUARE_FACTOR_LIMIT } from "../constants";
+import { DIRECTION_SIGN_RELATIVE, DISPLAY_DIGITS, SQUARE_FACTOR_LIMIT } from "../constants";
 import { numberLatex } from "./format";
 import { determinant, eigen2, eigenvector, toFractions } from "./matrix";
 import type { EigenValue } from "./qr";
@@ -149,7 +149,7 @@ function integerDirection(v: Fraction[]): string[] {
 /** Unit direction with DISPLAY_DIGITS digits, first non-zero entry positive. */
 function unitDirection(v: number[]): string[] {
   const n = Math.hypot(...v);
-  const first = v.find((x) => Math.abs(x) > 1e-12 * n) ?? 1;
+  const first = v.find((x) => Math.abs(x) > DIRECTION_SIGN_RELATIVE * n) ?? 1;
   const s = first < 0 ? -1 : 1;
   return v.map((x) => numberLatex((s * x) / n));
 }
@@ -243,7 +243,7 @@ function eigenReport2(A: Mat, F: Fraction[][] | null, T: Num, D: Num): EigenRepo
         latex: [plusMinusLatex(half, q, r, true)],
         vectors: [],
         directions: [],
-        rotation: rotationOf(h, off),
+        rotation: rotationOf(h, off, A[1][0]),
         working,
       };
     }
@@ -293,14 +293,18 @@ function eigenReport2(A: Mat, F: Fraction[][] | null, T: Num, D: Num): EigenRepo
         latex: [`${numberLatex(e.re)} \\pm ${numberLatex(e.im)}i`],
         vectors: [],
         directions: [],
-        rotation: rotationOf(e.re, e.im),
+        rotation: rotationOf(e.re, e.im, A[1][0]),
       };
   }
 }
 
-/** α ± iβ: in the real basis of an eigenvector, A is a rotation by θ = atan2(β, α) scaled by r = |λ|. */
-function rotationOf(re: number, im: number): { theta: number; scale: number } {
-  return { theta: Math.atan2(Math.abs(im), re), scale: Math.hypot(re, im) };
+/**
+ * α ± iβ: in the real basis of an eigenvector, A is a rotation by θ = atan2(β, α) scaled by r = |λ|. The sense is
+ * that in which A turns every vector (no real eigen-direction, so it never changes): the sign of î × Aî, which is
+ * the matrix entry c = a₂₁ (counter-clockwise positive). `c` is omitted for 3×3 (the plane's orientation is drawn).
+ */
+function rotationOf(re: number, im: number, c = 1): { theta: number; scale: number } {
+  return { theta: Math.sign(c || 1) * Math.atan2(Math.abs(im), re), scale: Math.hypot(re, im) };
 }
 
 /** Eigen-direction of a rational 2×2 for rational λ: integers for the LaTeX, and a unit vector for the canvas. */
@@ -320,16 +324,24 @@ function eigenReport3(A: Mat): EigenReport {
   const e = eigen3(A);
   const latex: string[] = [];
   const scale = Math.max(...e.values.map((v) => Math.hypot(v.re, v.im)), Number.MIN_VALUE);
+  // Equal values are listed once with their multiplicity (exact for repeated roots, see eigen3).
+  const seen: number[] = [];
   for (const v of e.values) {
     const real = Math.abs(v.im) <= EIGEN_IMAG_RELATIVE * scale;
-    if (real) latex.push(numberLatex(v.re));
-    else if (v.im > 0) latex.push(`${numberLatex(v.re)} \\pm ${numberLatex(Math.abs(v.im))}i`);
+    if (real) {
+      if (seen.includes(v.re)) continue;
+      seen.push(v.re);
+      const m = e.values.filter((w) => w.re === v.re && Math.abs(w.im) <= EIGEN_IMAG_RELATIVE * scale).length;
+      latex.push(m === 1 ? numberLatex(v.re) : `${numberLatex(v.re)} \\text{ (${m === 2 ? "double" : "triple"})}`);
+    } else if (v.im > 0) latex.push(`${numberLatex(v.re)} \\pm ${numberLatex(Math.abs(v.im))}i`);
   }
+  const complex = e.values.find((v) => v.im > 0);
   return {
     kind: e.kind,
     values: e.values,
     latex,
     vectors: e.vectors.map((v) => ({ value: numberLatex(v.value), vector: vectorLatex(unitDirection(v.vector)) })),
+    ...(complex ? { rotation: rotationOf(complex.re, complex.im) } : {}),
   };
 }
 
@@ -412,7 +424,8 @@ const GREEK = new Set([
  */
 export function symbolLatex(name: string): string {
   const m = /^([A-Za-z]+)(?:_(\w+))?$/.exec(name);
-  if (!m) return `\\mathrm{${name.replace(/[^A-Za-z0-9]/g, "")}}`;
+  // Anything else (θ, M′, …) as escaped text, never empty and never merged with another name.
+  if (!m) return `\\text{${name.replace(/[\\{}$&#^_%~]/g, (ch) => `\\${ch}`)}}`;
   const [, base, sub] = m;
   const head = base.length === 1 ? base : GREEK.has(base) ? `\\${base}` : `\\mathrm{${base}}`;
   return sub ? `${head}_{${sub}}` : head;

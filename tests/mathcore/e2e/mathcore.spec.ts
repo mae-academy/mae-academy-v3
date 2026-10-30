@@ -255,4 +255,21 @@ test.describe("Phase 5: 3D linear algebra", () => {
     await page.getByRole("button", { name: "Reset view" }).click();
     await expect.poll(camera).toBeUndefined();
   });
+
+  test("ten quick arrow presses all count; a camera in a link is restored", async ({ page }) => {
+    const camera = { azimuth: 0.3, elevation: 0.4, distance: 30 };
+    await page.goto(link(doc([["m", "M=\\begin{bmatrix}2&0&0\\\\0&1&0\\\\0&0&1\\end{bmatrix}"]], { view: { mode: "3d", grid: true, showSteps: false, locale: "en", camera } })));
+    await ready(page);
+    await expect(page.getByTestId("mc-linalg")).toBeVisible({ timeout: 15_000 });
+    const linkCamera = () => {
+      const g = new URL(page.url()).searchParams.get("g") ?? "";
+      return (JSON.parse(LZString.decompressFromEncodedURIComponent(g) ?? "{}") as { view?: { camera?: { azimuth: number; distance: number } } }).view?.camera;
+    };
+    expect(linkCamera()).toEqual(camera);
+    await page.locator(".mc-canvas").focus();
+    for (let k = 0; k < 10; k++) await page.keyboard.press("ArrowLeft");
+    await expect.poll(() => linkCamera()?.azimuth).toBeCloseTo(1.3, 6);
+    for (let k = 0; k < 3; k++) await page.keyboard.press("-");
+    await expect.poll(() => linkCamera()?.distance).toBeCloseTo(30 * 1.2 ** 3, 6);
+  });
 });

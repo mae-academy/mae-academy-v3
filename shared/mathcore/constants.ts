@@ -143,11 +143,8 @@ export const STRIP_RESERVED_CORES = 1;
 /** A strip run that takes longer fails over to this Worker (longer before the strip chunk has loaded). */
 export const STRIP_TIMEOUT_MS = 3000;
 export const STRIP_LOAD_TIMEOUT_MS = 20_000;
-/**
- * 3D view: camera distance fitted to a box of half-size L. The box's bounding sphere has radius √3·L; with the 45°
- * field of view it fits at √3·L / sin(22.5°) ≈ 4.5·L.
- */
-export const CAMERA_FIT_DISTANCE = 4.5;
+/** 3D frames are at most this many pixels on a side (a huge canvas does not allocate a huge frame). */
+export const FRAME3_MAX_SIDE = 4096;
 /** 3D frames while the camera moves are rendered at this fraction of the canvas size (§7.1 technique 2). */
 export const FRAME3_DRAG_SCALE = 0.5;
 /** Significant digits of floating-point numbers in reports, step LaTeX, labels and spoken descriptions. */
@@ -155,10 +152,10 @@ export const DISPLAY_DIGITS = 6;
 /** |det| below this times the Hadamard bound (product of row norms) counts as singular (relative, §9). */
 export const SINGULAR_RELATIVE_TOLERANCE = 1e-12;
 /**
- * Floating-point elimination: a difference a − b smaller than this times |a| + |b| is cancellation noise and is set
- * to 0 (a relative test on the operands of that subtraction, so the matrix's overall scale does not matter).
+ * Floating-point elimination: an entry below this times its row's scale (tracked through the row operations,
+ * separately for coefficients and augmented columns) is rounding residue and is set to 0.
  */
-export const CANCELLATION_RELATIVE = 64 * Number.EPSILON;
+export const ELIMINATION_RELATIVE = 1e-12;
 /** 2×2 eigenvalues are repeated when the discriminant is within this many ulps of the terms it is summed from. */
 export const DISCRIMINANT_ULPS = 8;
 /** Decimal places accepted for an exact decimal conversion (0.125 → 1/8) in step-by-step reports. */
@@ -183,7 +180,55 @@ export const SINGULAR_PEAK_RATIO = 1e4;
 /** A line whose parse failed for a passing reason is parsed again after this delay, doubling up to the maximum. */
 export const PARSE_RETRY_MS = 2000;
 export const PARSE_RETRY_MAX_MS = 30_000;
+export const PARSE_RETRY_LIMIT = 5;
 /** Canvas size assumed until the canvas has been laid out (CSS pixels). */
 export const CANVAS_FALLBACK = { width: 800, height: 500 } as const;
 /** Significant digits of a rotation angle (degrees) and scale shown to the reader. */
 export const ANGLE_DIGITS = 4;
+/** 3D: near clipping plane as a fraction of the camera distance; vertical field of view; ambient light share. */
+export const NEAR_RELATIVE = 1e-3;
+export const CAMERA_FOV = Math.PI / 4;
+export const AMBIENT_LIGHT = 0.3;
+/** Lines are drawn as if this fraction nearer, so they win depth ties against the faces they lie on. */
+export const LINE_DEPTH_BIAS = 0.999;
+/** Upper bound on the pixels walked along one line (a line whose ends project far off-screen). */
+export const MAX_LINE_STEPS = 20_000;
+/** A line behind a translucent surface keeps this share of the surface color over it (≈ the planes' opacity). */
+export const LINE_BEHIND_MIX = 0.45;
+/** 3D scene: smallest and largest box half-size, margin around the content, solution marker and arc sizes (fractions
+ * of the half-size), and axis-label offset. */
+export const SCENE_MIN_HALF = 5;
+export const SCENE_MAX_HALF = 1e150;
+export const SCENE_MARGIN = 1.25;
+export const MARKER_FRACTION = 0.06;
+export const ARC_FRACTION = 0.35;
+export const LABEL_OFFSET = 1.06;
+/** Camera fit: the box's bounding sphere (radius √3·L) fits the narrower field of view with this margin. */
+export const CAMERA_FIT_MARGIN = 1.05;
+/** Camera zoom range relative to the box half-size L (a camera inside the box is allowed: near-plane clipping). */
+export const CAMERA_MIN_RELATIVE = 0.05;
+export const CAMERA_MAX_RELATIVE = 200;
+/** Canvas interaction: zoom factor per wheel notch or + / − key; 3D orbit radians per pixel of drag and per key. */
+export const ZOOM_FACTOR = 1.2;
+export const ORBIT_RADIANS_PER_PX = 0.01;
+export const ORBIT_RADIANS_PER_KEY = 0.1;
+/** Transform geometry: margin around the view (fraction of its size) and radial lines for a scalar matrix. */
+export const TRANSFORM_BOX_MARGIN = 0.05;
+export const TRANSFORM_RADIAL_LINES = 8;
+/** Uniform samples whose median |f| is the integrand's typical size (singularity test). */
+export const TYPICAL_SAMPLES = 33;
+/** Stitching rounds: ends left unmatched propose again among the unmatched ones. */
+export const STITCH_ROUNDS = 4;
+/** A unit direction's sign is fixed by its first entry larger than this share of its length. */
+export const DIRECTION_SIGN_RELATIVE = 1e-12;
+/** Canvas eigen markers (drawing units): gap of the double line, radius of the rotation arc. */
+export const EIGEN_DOUBLE_LINE_GAP = 2;
+export const EIGEN_ARC_RADIUS = 36;
+/** Adaptive Simpson: panels with irregular borders (nudged by up to PANEL_NUDGE/2 of a panel, positions spread by
+ * the golden-ratio fraction), minimum depth per panel, Richardson factor 15 and rounding allowance in ulps. */
+export const SIMPSON_PANELS = 7;
+export const PANEL_NUDGE = 0.5;
+export const PANEL_SPREAD = 0.6180339887498949;
+export const SIMPSON_MIN_DEPTH = 3;
+export const RICHARDSON = 15;
+export const SIMPSON_ROUNDING_ULPS = 4;

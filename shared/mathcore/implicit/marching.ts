@@ -21,7 +21,7 @@
  * Limits: a curve where F touches zero without changing sign (x² + y² = 0, (x − y)² = 0) is not found by any
  * sign-based method; a closed curve smaller than a fine cell may be missed.
  */
-import { CONTOUR_PROBES, CROSSING_BISECTIONS, STITCH_CANDIDATES, JITTER_MARGIN, MASK_EDGE_PROBE_BLOCK, MASK_MIN_BLOCK, MASK_PROBES_LARGE, MASK_PROBES_SMALL, NEAR_ZERO_CELLS, CROSSING_BISECTIONS_MAX, POLE_TEST_STEP, ROOT_SPREAD_RATIO, STITCH_CELLS, VIEW_BORDER_RELATIVE } from "../constants";
+import { CONTOUR_PROBES, CROSSING_BISECTIONS, STITCH_CANDIDATES, STITCH_ROUNDS, JITTER_MARGIN, MASK_EDGE_PROBE_BLOCK, MASK_MIN_BLOCK, MASK_PROBES_LARGE, MASK_PROBES_SMALL, NEAR_ZERO_CELLS, CROSSING_BISECTIONS_MAX, POLE_TEST_STEP, ROOT_SPREAD_RATIO, STITCH_CELLS, VIEW_BORDER_RELATIVE } from "../constants";
 import type { Viewport } from "../ir/types";
 import type { Polyline } from "../sample/adaptive";
 
@@ -365,39 +365,46 @@ export function stitch(polylines: Float64Array[], gap: number, vp?: Viewport): F
       (buckets.get(kk) ?? buckets.set(kk, []).get(kk))?.push(e);
     }
   }
-  // Each end proposes only its STITCH_CANDIDATES nearest partners, so ends clustered in one cell (a tangle) cost a
-  // distance scan, not a sort of every pair.
-  const pairs: Array<[number, number, number]> = [];
+  // Each end proposes only its STITCH_CANDIDATES nearest still-unmatched partners, so ends clustered in one cell (a
+  // tangle) cost a distance scan, not a sort of every pair. Pairs are matched closest first; ends left unmatched
+  // propose again among the unmatched ones, until a round adds nothing.
+  const match = new Int32Array(2 * n).fill(-1);
   const best: Array<[number, number]> = [];
-  for (let e = 0; e < 2 * n; e++) {
-    if (!open[e]) continue;
-    const bx = Math.floor(ex[e] / size);
-    const by = Math.floor(ey[e] / size);
-    best.length = 0;
-    for (let u = -1; u <= 1; u++) {
-      for (let v = -1; v <= 1; v++) {
-        for (const f of buckets.get(`${bx + u},${by + v}`) ?? []) {
-          if (f === e) continue;
-          // A line's own two ends join only when it is long enough to be a loop.
-          if (f >> 1 === e >> 1 && polylines[e >> 1].length < 8) continue;
-          const d = Math.hypot(ex[e] - ex[f], ey[e] - ey[f]);
-          if (d > gap) continue;
-          if (best.length < STITCH_CANDIDATES) best.push([d, f]);
-          else if (d < best[best.length - 1][0]) best[best.length - 1] = [d, f];
-          else continue;
-          best.sort((p, q) => p[0] - q[0]);
+  for (let round = 0; round < STITCH_ROUNDS; round++) {
+    const pairs: Array<[number, number, number]> = [];
+    for (let e = 0; e < 2 * n; e++) {
+      if (!open[e] || match[e] >= 0) continue;
+      const bx = Math.floor(ex[e] / size);
+      const by = Math.floor(ey[e] / size);
+      best.length = 0;
+      for (let u = -1; u <= 1; u++) {
+        for (let v = -1; v <= 1; v++) {
+          for (const f of buckets.get(`${bx + u},${by + v}`) ?? []) {
+            if (f === e || match[f] >= 0) continue;
+            // A line's own two ends join only when it is long enough to be a loop.
+            if (f >> 1 === e >> 1 && polylines[e >> 1].length < 8) continue;
+            const d = Math.hypot(ex[e] - ex[f], ey[e] - ey[f]);
+            if (d > gap) continue;
+            if (best.length < STITCH_CANDIDATES) best.push([d, f]);
+            else if (d < best[best.length - 1][0]) best[best.length - 1] = [d, f];
+            else continue;
+            best.sort((p, q) => p[0] - q[0]);
+          }
         }
       }
+      for (const [d, f] of best) pairs.push([d, Math.min(e, f), Math.max(e, f)]);
     }
-    for (const [d, f] of best) pairs.push([d, Math.min(e, f), Math.max(e, f)]);
-  }
-  pairs.sort((p, q) => p[0] - q[0]);
-  const match = new Int32Array(2 * n).fill(-1);
-  for (const [, e, f] of pairs) {
-    if (match[e] < 0 && match[f] < 0) {
-      match[e] = f;
-      match[f] = e;
+    if (pairs.length === 0) break;
+    pairs.sort((p, q) => p[0] - q[0]);
+    let added = 0;
+    for (const [, e, f] of pairs) {
+      if (match[e] < 0 && match[f] < 0) {
+        match[e] = f;
+        match[f] = e;
+        added++;
+      }
     }
+    if (added === 0) break;
   }
   const out: Float64Array[] = [];
   const visited = new Uint8Array(n);

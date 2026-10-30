@@ -438,4 +438,18 @@ describe("stitch: crowded ends and exact joins", () => {
     expect(out.length).toBe(1);
     expect(Array.from(out[0])).toEqual([0, 0, 1, 0, 1, 1, 0, 0]);
   });
+
+  it("ends whose nearest partners were taken still find each other (second round)", () => {
+    // e = (0,0) and g = (0.9,0) are within the gap; their nearest partners pair among themselves first.
+    const lines = [
+      Float64Array.of(-5, 0, 0, 0),
+      Float64Array.of(0.1, 0, 0.1, 5),
+      Float64Array.of(0.12, 0.05, 0.12, 6),
+      Float64Array.of(0.9, 0, 5, 0),
+      Float64Array.of(0.8, 0, 0.8, -5),
+      Float64Array.of(0.78, 0.05, 0.78, -6),
+    ];
+    const out = stitch(lines, 1);
+    expect(out.length).toBe(3);
+  });
 });

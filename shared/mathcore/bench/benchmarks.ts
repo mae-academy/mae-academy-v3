@@ -12,6 +12,8 @@ import {
 import { contour, insideTest, regionMask } from "../implicit/marching";
 import { DEFAULT_CAMERA, render, surfaceMesh } from "../render3d/raster";
 import { buildScene3 } from "../render3d/scene";
+import { fitDistance } from "../render3d/frame";
+import { DEFAULT_CAMERA3 } from "../ir/types";
 import { emptyGraph } from "../ir/types";
 import { sampleExplicit } from "../sample/adaptive";
 
@@ -154,7 +156,7 @@ export function runBenchmarks(): BenchResult[] {
   // 3D (STEPS.md §7.2, D3 lifted for Phase 5): an 80×80 grid surface (12,800 triangles) per frame, at the drag
   // resolution (half of a 1600×1000 canvas) and at full canvas size; and the Phase 5 linear-algebra scene.
   const surface = surfaceMesh((x, y) => Math.sin(x) * Math.cos(y), -5, 5, -5, 5, 80, [37, 99, 235]);
-  const cam = { ...DEFAULT_CAMERA, distance: 22 };
+  const cam = { ...DEFAULT_CAMERA, distance: fitDistance(5, 1600, 1000) };
   const bg: [number, number, number] = [255, 255, 255];
   add("3d-80x80-drag", "3D model 80×80 grid (12,800 triangles), 800×500 frame", 25, "ms", time(() => {
     render([surface], [], cam, 800, 500, bg);
@@ -169,9 +171,18 @@ export function runBenchmarks(): BenchResult[] {
     ],
     { background: bg, axis: [100, 116, 139], box: [226, 232, 240], positive: [37, 99, 235], negative: [225, 29, 72], arrow: [15, 23, 42], eigen: [124, 58, 237] },
   );
-  add("3d-linalg-full", "Phase 5 scene (3 planes, unit-cube image), 1600×1000 frame", 25, "ms", time(() => {
-    render(scene3.meshes, scene3.lines, { ...DEFAULT_CAMERA, distance: scene3.half * 4.5 }, 1600, 1000, bg);
+  // The app's camera: fitted to the scene, then zoomed in (half-resolution frames while the camera moves).
+  const fitted = fitDistance(scene3.half, 1600, 1000);
+  const appCam = (distance: number) => ({ ...DEFAULT_CAMERA, ...DEFAULT_CAMERA3, distance, target: [0, 0, 0] as [number, number, number] });
+  add("3d-linalg-full", "Phase 5 scene (3 planes, unit-cube image), fitted camera, 1600×1000 frame", 25, "ms", time(() => {
+    render(scene3.meshes, scene3.lines, appCam(fitted), 1600, 1000, bg);
   }, 5));
+  add("3d-linalg-zoom-drag", "Phase 5 scene zoomed in (camera inside the box), 800×500 frame while moving", 25, "ms", time(() => {
+    render(scene3.meshes, scene3.lines, appCam(scene3.half * 0.8), 800, 500, bg);
+  }, 5));
+  add("3d-linalg-zoom-full", "Phase 5 scene zoomed in, 1600×1000 frame on release (reference)", 150, "ms", time(() => {
+    render(scene3.meshes, scene3.lines, appCam(scene3.half * 0.8), 1600, 1000, bg);
+  }, 3));
 
   // Raw evaluation throughput, as a reference figure for the other budgets.
   const n = 200_000;

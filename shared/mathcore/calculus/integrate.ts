@@ -2,7 +2,7 @@
  * Definite integrals (STEPS.md §7.3): adaptive Simpson for general values; Riemann sums for teaching (`riemann.ts`).
  */
 import {
-  DIVERGENCE_BOUND, INTEGRAL_MAX_DEPTH, INTEGRAL_TOLERANCE, ABSCISSA_RELATIVE, PEAK_BRACKET, SINGULAR_PEAK_RATIO, PEAK_ITERATIONS, TAIL_ALPHA_MARGIN, TANH_SINH_EDGE_FRACTION, TANH_SINH_MIN_LEVEL, TAIL_MODEL_UNCERTAINTY, TANH_SINH_MAX_LEVEL, TANH_SINH_NOISE_FLOOR, TANH_SINH_RELATIVE,
+  DIVERGENCE_BOUND, INTEGRAL_MAX_DEPTH, PANEL_NUDGE, PANEL_SPREAD, RICHARDSON, SIMPSON_MIN_DEPTH, SIMPSON_PANELS, SIMPSON_ROUNDING_ULPS, INTEGRAL_TOLERANCE, ABSCISSA_RELATIVE, PEAK_BRACKET, SINGULAR_PEAK_RATIO, TYPICAL_SAMPLES, PEAK_ITERATIONS, TAIL_ALPHA_MARGIN, TANH_SINH_EDGE_FRACTION, TANH_SINH_MIN_LEVEL, TAIL_MODEL_UNCERTAINTY, TANH_SINH_MAX_LEVEL, TANH_SINH_NOISE_FLOOR, TANH_SINH_RELATIVE,
 } from "../constants";
 
 export interface SimpsonOptions {
@@ -32,13 +32,8 @@ export function adaptiveSimpson(f: (x: number) => number, a: number, b: number, 
   const maxDepth = opts.maxDepth ?? DEFAULT_MAX_DEPTH;
   if (!Number.isFinite(a) || !Number.isFinite(b)) return { value: NaN, converged: false, evaluations: 0 };
   if (a === b) return { value: 0, converged: true, evaluations: 0 };
-  let evaluations = 3;
+  let evaluations = 0;
   let converged = true;
-  const fa = f(a);
-  const fb = f(b);
-  const m = (a + b) / 2;
-  const fm = f(m);
-  const whole = ((b - a) / 6) * (fa + 4 * fm + fb);
 
   const step = (a0: number, b0: number, fa0: number, fm0: number, fb0: number, s: number, eps: number, depth: number): number => {
     const m0 = (a0 + b0) / 2;
@@ -56,14 +51,31 @@ export function adaptiveSimpson(f: (x: number) => number, a: number, b: number, 
     }
     if (depth >= maxDepth) {
       converged = false;
-      return left + right + diff / 15;
+      return left + right + diff / RICHARDSON;
     }
-    // Absolute test, scaled by the current estimate so large integrals are not over-refined.
-    if (Math.abs(diff) <= 15 * Math.max(eps, Math.abs(left + right) * Number.EPSILON * 4)) return left + right + diff / 15;
+    // Absolute test, scaled by the current estimate so large integrals are not over-refined; never before
+    // SIMPSON_MIN_DEPTH (a few agreeing samples prove nothing about a narrow peak between them).
+    const settled = Math.abs(diff) <= RICHARDSON * Math.max(eps, Math.abs(left + right) * Number.EPSILON * SIMPSON_ROUNDING_ULPS);
+    if (depth >= SIMPSON_MIN_DEPTH && settled) return left + right + diff / RICHARDSON;
     return step(a0, m0, fa0, flm, fm0, left, eps / 2, depth + 1) + step(m0, b0, fm0, frm, fb0, right, eps / 2, depth + 1);
   };
 
-  const value = step(a, b, fa, fm, fb, whole, tol, 0);
+  // Panels with irregular borders (SIMPSON_PANELS of them, each border nudged by a fixed irrational fraction), so
+  // regularly placed samples cannot line up with a periodic pattern in f (∫₀¹⁰ (x − ⌊x⌋ − ½) dx with every sample on
+  // an integer or a half would "converge" to −½).
+  let value = 0;
+  const w = (b - a) / SIMPSON_PANELS;
+  const border = (i: number) => (i === 0 ? a : i === SIMPSON_PANELS ? b : a + w * (i + PANEL_NUDGE * ((i * PANEL_SPREAD) % 1 - 0.5)));
+  for (let i = 0; i < SIMPSON_PANELS; i++) {
+    const a0 = border(i);
+    const b0 = border(i + 1);
+    const fa0 = f(a0);
+    const fb0 = f(b0);
+    const m0 = (a0 + b0) / 2;
+    const fm0 = f(m0);
+    evaluations += 3;
+    value += step(a0, b0, fa0, fm0, fb0, ((b0 - a0) / 6) * (fa0 + 4 * fm0 + fb0), (tol * (b0 - a0)) / (b - a), 0);
+  }
   return { value, converged: converged && Number.isFinite(value), evaluations };
 }
 
@@ -164,6 +176,18 @@ function endpointTail(s: { d1: number; f1: number; d2: number; f2: number }, cut
 }
 
 
+/** Median |f| at TYPICAL_SAMPLES interior points of a uniform grid (non-finite values left out). */
+function typicalSize(f: (x: number) => number, a: number, b: number): number {
+  const vals: number[] = [];
+  for (let i = 1; i <= TYPICAL_SAMPLES; i++) {
+    const v = Math.abs(f(a + ((b - a) * i) / (TYPICAL_SAMPLES + 1)));
+    if (Number.isFinite(v)) vals.push(v);
+  }
+  if (vals.length === 0) return 0;
+  vals.sort((p, q) => p - q);
+  return vals[Math.floor(vals.length / 2)];
+}
+
 /** Point of largest |f| near `x0` (ternary search on a shrinking bracket; a non-finite value is the point itself). */
 function locatePeak(f: (x: number) => number, a: number, b: number, x0: number): number {
   const w = (b - a) * PEAK_BRACKET;
@@ -211,12 +235,14 @@ export function integrate(f: (x: number) => number, a: number, b: number): Integ
   };
   const simpson = adaptiveSimpson(watched, a, b);
   // Blown up: a non-finite sample or end value, a sample beyond DIVERGENCE_BOUND, or (Simpson not converged) a sample
-  // far above the integrand's mean size, as at 1/√|x − 0.3| whose samples never land on 0.3.
-  const mean = Math.abs(simpson.value) / Math.abs(b - a);
+  // far above the typical |f|, as at 1/√|x − 0.3| whose samples never land on 0.3.
+  // Typical size of f: the median |f| on a uniform grid (Simpson's own samples crowd around a singularity), so a
+  // jump with zero mean is not mistaken for a singularity.
+  const typical = simpson.converged ? 0 : typicalSize(f, a, b);
   const blewUp =
     !Number.isFinite(simpson.value) ||
     peak > DIVERGENCE_BOUND ||
-    (!simpson.converged && peak > SINGULAR_PEAK_RATIO * Math.max(mean, Number.MIN_VALUE)) ||
+    (!simpson.converged && peak > SINGULAR_PEAK_RATIO * Math.max(typical, Number.MIN_VALUE)) ||
     !Number.isFinite(f(a)) ||
     !Number.isFinite(f(b));
   if (simpson.converged && !blewUp) return simpson;

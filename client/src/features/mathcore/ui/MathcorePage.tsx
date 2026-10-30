@@ -9,7 +9,7 @@ import { buildSvg } from "@shared/mathcore/export/svg";
 import { LINK_PARAM, decodeGraph, encodeGraph, exportJson, importJson } from "@shared/mathcore/ir/codec";
 import type { Camera3, GraphIR, Item, Param, Viewport } from "@shared/mathcore/ir/types";
 import { DEFAULT_VIEWPORT, emptyGraph } from "@shared/mathcore/ir/types";
-import { CANVAS_FALLBACK, DEFAULT_CURVE_WIDTH, LINK_DEBOUNCE_MS, PARSE_DEBOUNCE_MS, PARSE_RETRY_MAX_MS, PARSE_RETRY_MS } from "@shared/mathcore/constants";
+import { CANVAS_FALLBACK, DEFAULT_CURVE_WIDTH, LINK_DEBOUNCE_MS, PARSE_DEBOUNCE_MS, PARSE_RETRY_LIMIT, PARSE_RETRY_MAX_MS, PARSE_RETRY_MS } from "@shared/mathcore/constants";
 import { NS } from "../i18n/register";
 import type { DrawCurve, DrawField, DrawPoint, DrawTransform, Scene } from "../render/renderer";
 import { LINALG_TOKENS, PALETTE_TOKENS, SCENE3_TOKENS, cssRgb, resolveColor } from "../render/renderer";
@@ -86,9 +86,14 @@ export default function MathcorePage() {
   const engineKey = useRef("");
   /** Items of an unrelated document (first load, import, Worker restart): its load tells the engine to forget slider
    * memory. Compared by identity, so an older round finishing first does not take the flag. */
-  const freshItems = useRef<Item[] | null>(initial.graph.items);
+  /** Rounds started after this number load a fresh document (first load, import, Worker restart). */
+  const freshAfter = useRef<number | null>(0);
+  /** Sequence of the latest load sent, and of the latest request per slider. */
+  const latestLoadSeq = useRef(0);
+  const paramSeq = useRef(new Map<string, number>());
   const retry = useRef<ReturnType<typeof setTimeout>>(undefined);
   const retryDelay = useRef(0);
+  const retries = useRef(0);
   const sendDocument = useRef<() => void>(() => undefined);
   const graphRef = useRef(graph);
   useEffect(() => {
@@ -129,8 +134,12 @@ export default function MathcorePage() {
         if (res.type === "result") {
           setResult(res);
           setNotice(null);
-          setGraph((g) => mergeParams(g, res.graph, res.cause));
-          engineKey.current = documentKey(res.graph);
+          // Sliders moved after this answer's request keep their values (a late load answer must not undo a drag).
+          const moved = new Set(Array.from(paramSeq.current).filter(([, seq]) => seq > res.seq).map(([name]) => name));
+          setGraph((g) => mergeParams(g, res.graph, res.cause, moved));
+          // Only an answer that already holds the latest document may set the engine's key (sliders it created): an
+          // answer to an older request would make an edit undone meanwhile look already sent.
+          if (res.seq >= latestLoadSeq.current) engineKey.current = documentKey(res.graph);
           // A tangent follows its curve when a slider moves it.
           if (traceAt.current) c.trace(traceAt.current.id, traceAt.current.x);
         } else if (res.type === "bench") setBench(res.results);
@@ -140,7 +149,7 @@ export default function MathcorePage() {
       onRestart: () => {
         setNotice(t("engineRestarted"));
         // The new Worker starts empty: parse the current document again and send it as a fresh one.
-        freshItems.current = graphRef.current.items;
+        freshAfter.current = loadRound.current;
         sendDocument.current();
       },
     });
@@ -175,14 +184,20 @@ export default function MathcorePage() {
         if (round !== loadRound.current) return;
         const doc = { ...graphRef.current, items };
         // Only the document that was imported or restarted is fresh, not an older round that happens to finish first.
-        const fresh = freshItems.current === items;
-        if (fresh) freshItems.current = null;
-        client.current?.send({ type: "load", graph: doc, parsed, view: view("full"), fresh });
+        // Only a round started after the import (or restart) is the fresh document, not an older one finishing first.
+        const fresh = freshAfter.current !== null && round > freshAfter.current;
+        if (fresh) freshAfter.current = null;
+        latestLoadSeq.current = client.current?.send({ type: "load", graph: doc, parsed, view: view("full"), fresh }) ?? latestLoadSeq.current;
         // A line that failed for a passing reason (parser offline, crashed, still starting) is parsed again later.
-        if (Object.values(parsed).some((e) => !e.ok && e.transient)) {
+        // A bounded number of retries (PARSE_RETRY_LIMIT), then the line keeps its error until it is edited.
+        if (Object.values(parsed).some((e) => !e.ok && e.transient) && retries.current < PARSE_RETRY_LIMIT) {
+          retries.current++;
           retryDelay.current = Math.min(PARSE_RETRY_MAX_MS, retryDelay.current * 2 || PARSE_RETRY_MS);
           retry.current = setTimeout(() => sendDocument.current(), retryDelay.current);
-        } else retryDelay.current = 0;
+        } else if (!Object.values(parsed).some((e) => !e.ok && e.transient)) {
+          retryDelay.current = 0;
+          retries.current = 0;
+        }
       });
     };
   }, [view]);
@@ -223,7 +238,8 @@ export default function MathcorePage() {
 
   const setParam = (name: string, value: number, quality: "drag" | "full") => {
     setGraph((g) => (g.params[name] ? { ...g, params: { ...g.params, [name]: { ...g.params[name], value } } } : g));
-    client.current?.send({ type: "param", name, value, view: view(quality) });
+    const seq = client.current?.send({ type: "param", name, value, view: view(quality) });
+    if (seq !== undefined) paramSeq.current.set(name, seq);
   };
 
   const setRange = (name: string, patch: Partial<Param>) =>
@@ -369,7 +385,7 @@ export default function MathcorePage() {
     if (!file) return;
     const r = importJson(await file.text());
     if (r.ok) {
-      freshItems.current = r.graph.items;
+      freshAfter.current = loadRound.current;
       setGraph(r.graph);
     }
     else setNotice(t("importFailed"));
@@ -533,6 +549,7 @@ export default function MathcorePage() {
               if (el) size.current = { w: el.clientWidth, h: el.clientHeight };
             }}
             frame3={graph.view.mode === "3d" ? result?.frame3d ?? null : null}
+            camera={graph.view.camera}
             onCamera={graph.view.mode === "3d" ? setCamera : undefined}
           />
           {graph.view.mode === "3d" && <p className="mc-note">{t("view3dNote")}</p>}

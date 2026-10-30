@@ -7,7 +7,8 @@
  */
 import type { GraphIR, Param } from "@shared/mathcore/ir/types";
 
-export function mergeParams(page: GraphIR, worker: GraphIR, cause: "load" | "param" | "view"): GraphIR {
+/** `keep`: sliders the user moved after the request was sent; their page values win even on a `load`. */
+export function mergeParams(page: GraphIR, worker: GraphIR, cause: "load" | "param" | "view", keep: ReadonlySet<string> = new Set()): GraphIR {
   const next: Record<string, Param> = {};
   for (const [name, theirs] of Object.entries(worker.params)) {
     const mine = page.params[name];
@@ -15,7 +16,7 @@ export function mergeParams(page: GraphIR, worker: GraphIR, cause: "load" | "par
       next[name] = theirs;
       continue;
     }
-    const value = cause === "load" ? theirs.value : mine.value;
+    const value = cause === "load" && !keep.has(name) ? theirs.value : mine.value;
     next[name] = { ...mine, value, min: Math.min(mine.min, value), max: Math.max(mine.max, value) };
   }
   return JSON.stringify(next) === JSON.stringify(page.params) ? page : { ...page, params: next };

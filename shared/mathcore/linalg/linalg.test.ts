@@ -269,6 +269,15 @@ describe("2×2 transform geometry (STEPS.md §8.2)", () => {
     const rot = transform2([[0, -1], [1, 0]], view);
     expect(rot.eigenMarker).toEqual({ kind: "rotation", theta: Math.PI / 2 });
     expect(rot.eigenLines).toHaveLength(0);
+    // Clockwise rotation (A·î points down): negative θ.
+    expect(transform2([[0, 1], [-1, 0]], view).eigenMarker).toEqual({ kind: "rotation", theta: -Math.PI / 2 });
+    // Far from the origin (k + 1 = k in doubles), and entries near 1e±200: no hang, two families of lines.
+    const far = { xmin: 1e17 - 48, xmax: 1e17 + 48, ymin: -48, ymax: 48, aspect: "free" as const };
+    const t0 = performance.now();
+    transform2([[1, 0], [0, 1]], far);
+    expect(performance.now() - t0).toBeLessThan(500);
+    expect(families(transform2([[1e200, 0], [0, 1e200]], view).grid).length).toBe(2);
+    expect(families(transform2([[1e-200, 0], [0, 1e-200]], { xmin: -1e-199, xmax: 1e-199, ymin: -1e-199, ymax: 1e-199, aspect: "equal" }).grid).length).toBe(2);
     // The singular image is one line (the column space).
     expect(families(transform2([[1, 2], [2, 4]], view).grid).length).toBe(1);
   });

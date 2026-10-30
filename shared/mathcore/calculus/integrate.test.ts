@@ -53,4 +53,28 @@ describe("tanh-sinh endpoint singularities", () => {
     // Doubles next to 10⁶ are 1.2e-10 apart, too coarse for the tail fit on an interval of length 1.
     expect(integrate((x) => 1 / Math.sqrt(x - 1e6), 1e6, 1e6 + 1).converged).toBe(false);
   });
+
+  it("bounded jumps with zero or tiny mean stay on Simpson (Phase 3 verification)", () => {
+    const cases: Array<[(x: number) => number, number, number, number]> = [
+      [(x) => Math.floor(3 * x) - 1, 0, 1, 0],
+      [(x) => (x < 0.3 ? -7 : 3), 0, 1, 0],
+      [(x) => Math.sign(Math.sin(7 * x)), 0, 2 * Math.PI, 0],
+      [(x) => Math.sign(Math.cos(x)), 0, 2 * Math.PI, 0],
+      [(x) => Math.sign(x - 0.4), 0, 0.80001, 1e-5],
+      [(x) => (Math.abs(x) < 0.2 ? 1 : 0) - 0.2, -1, 1, 0],
+      [(x) => (x < 0.5 ? -1 : 1.0001), 0, 1, 5e-5],
+    ];
+    for (const [f, a, b, exact] of cases) {
+      const r = integrate(f, a, b);
+      expect(r.converged, f.toString()).toBe(true);
+      expect(Math.abs(r.value - exact), f.toString()).toBeLessThan(1e-9);
+    }
+  });
+
+  it("Simpson's samples do not line up with a periodic integrand or skip a narrow peak", () => {
+    const saw = integrate((x) => x - Math.floor(x) - 0.5, 0, 10);
+    expect(Math.abs(saw.value)).toBeLessThan(1e-9);
+    const peak = integrate((x) => Math.exp(-1e6 * (x - 0.3) ** 2), 0, 1);
+    expect(Math.abs(peak.value - Math.sqrt(Math.PI / 1e6))).toBeLessThan(1e-12);
+  });
 });

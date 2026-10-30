@@ -25,4 +25,11 @@ describe("mergeParams (page ← engine Worker)", () => {
     const page = g({ a: p(1) });
     expect(mergeParams(page, g({ a: p(1) }), "view")).toBe(page);
   });
+
+  it("a slider moved after the load keeps its page value when the load answer arrives late", () => {
+    const page = { ...emptyGraph(), params: { a: { value: 3, min: -10, max: 10, step: 0.1 } } };
+    const worker = { ...page, params: { a: { value: 2, min: -10, max: 10, step: 0.1 } } };
+    expect(mergeParams(page, worker, "load", new Set(["a"])).params.a.value).toBe(3);
+    expect(mergeParams(page, worker, "load").params.a.value).toBe(2);
+  });
 });

@@ -81,8 +81,11 @@ export interface GraphIR {
 
 export const DEFAULT_VIEWPORT: Viewport = { xmin: -10, xmax: 10, ymin: -6, ymax: 6, aspect: "equal" };
 export const DEFAULT_VIEW: View = { mode: "2d", grid: true, showSteps: false, locale: "en" };
-/** Camera limits: elevation stays short of the poles (the up vector would flip), distance within a sane zoom range. */
-export const CAMERA_LIMITS = { elevation: 1.5, distanceMin: 2, distanceMax: 200 } as const;
+/**
+ * Camera limits: elevation stays short of the poles (the up vector would flip); distance is any positive finite value
+ * (the page limits zoom relative to the scene size, which the document does not know).
+ */
+export const CAMERA_LIMITS = { elevation: 1.5 } as const;
 /**
  * Default orbit: oblique (not 45°, where the common planes x = y and x = −y are seen edge-on), slightly above the
  * xy-plane. The distance is replaced by the fitted one when the page has no camera.

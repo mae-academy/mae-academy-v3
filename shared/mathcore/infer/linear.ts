@@ -25,7 +25,8 @@ export function degreeIn(e: Expr, unknowns: readonly string[]): number {
     case "Divide":
       return depends(a[1]) ? NONLINEAR : degreeIn(a[0], unknowns);
     case "Power":
-      // x¹ only; a constant base with an unknown exponent (2^x) is not polynomial.
+      // x¹ and x⁰ only; a constant base with an unknown exponent (2^x) is not polynomial.
+      if (!depends(a[1]) && a[1] === 0) return 0;
       return !depends(a[1]) && a[1] === 1 ? degreeIn(a[0], unknowns) : NONLINEAR;
     default:
       // Any other function of an unknown (Abs, Sin, Sqrt, a user function, …).

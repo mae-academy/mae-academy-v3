@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest";
 import { GraphEngine } from "../engine/graphEngine";
 import { emptyGraph } from "../ir/types";
 import type { Frame3Colors } from "./frame";
-import { renderFrame3 } from "./frame";
+import { fitDistance, renderFrame3 } from "./frame";
+import { projector, DEFAULT_CAMERA } from "./raster";
+import type { Vec3 } from "./raster";
 
 const ce = new ComputeEngine();
 const parser = (latex: string): unknown => ce.parse(latex, { form: "raw" }).json;
@@ -28,7 +30,8 @@ describe("3D frame of a document (Phase 5)", () => {
     const sol = f.labels.find((l) => l.text === "(1, 1, 1)");
     expect(sol).toBeDefined();
     expect(sol && sol.x > 0 && sol.x < 400 && sol.y > 0 && sol.y < 300).toBe(true);
-    expect(f.camera.distance).toBeCloseTo(5 * 4.5, 12);
+    expect(f.camera.distance).toBeCloseTo(fitDistance(5, 400, 300), 12);
+    expect(f.half).toBe(5);
   });
 
   it("drag frames are half size; a given camera is used as is", () => {
@@ -51,5 +54,42 @@ describe("3D frame of a document (Phase 5)", () => {
     const f = renderFrame3(e, { width: 300, height: 200, quality: "full" }, colors);
     expect(f.labels.length).toBe(3);
     expect(painted(f.rgba)).toBeGreaterThan(0.2);
+  });
+});
+
+describe("Phase 5 review regressions", () => {
+  it("the fitted camera shows the whole box on wide, square and narrow canvases", () => {
+    for (const [w, h] of [[1600, 1000], [600, 600], [360, 500], [300, 600]]) {
+      const d = fitDistance(5, w, h);
+      const project = projector({ ...DEFAULT_CAMERA, azimuth: 1.1, elevation: 0.45, distance: d, target: [0, 0, 0] }, w, h);
+      for (let i = 0; i < 8; i++) {
+        const c: Vec3 = [i & 1 ? 5 : -5, i & 2 ? 5 : -5, i & 4 ? 5 : -5];
+        const p = project(c);
+        expect(p && p[0] >= 0 && p[0] <= w && p[1] >= 0 && p[1] <= h, `${w}×${h} corner ${i}`).toBe(true);
+      }
+    }
+  });
+
+  it("a camera inside the box still draws the planes in front of it (near-plane clipping)", () => {
+    const e = engine(["\\begin{cases}x+y+z=3\\\\x-y=0\\\\y-z=0\\end{cases}"]);
+    for (const distance of [22, 5, 2, 0.5]) {
+      const f = renderFrame3(e, { width: 300, height: 200, quality: "full", camera: { azimuth: 1.1, elevation: 0.45, distance } }, colors);
+      expect(painted(f.rgba), `distance ${distance}`).toBeGreaterThan(0.2);
+    }
+  });
+
+  it("a large scene keeps a finite fitted camera; frame sizes 0 or NaN give a 1×1 frame", () => {
+    const big = engine(["M=\\begin{bmatrix}100&0&0\\\\0&1&0\\\\0&0&1\\end{bmatrix}"]);
+    const f = renderFrame3(big, { width: 300, height: 200, quality: "full" }, colors);
+    expect(f.half).toBe(125);
+    expect(Number.isFinite(f.camera.distance)).toBe(true);
+    const tiny = renderFrame3(big, { width: 0, height: Number.NaN, quality: "full" }, colors);
+    expect([tiny.width, tiny.height]).toEqual([1, 1]);
+  });
+
+  it("a 3×3 complex pair shows its rotation: an arc label with θ", () => {
+    const e = engine(["R=\\begin{bmatrix}0&-1&0\\\\1&0&0\\\\0&0&2\\end{bmatrix}"]);
+    const f = renderFrame3(e, { width: 300, height: 200, quality: "full" }, colors);
+    expect(f.labels.some((l) => l.text === "θ = 90°")).toBe(true);
   });
 });

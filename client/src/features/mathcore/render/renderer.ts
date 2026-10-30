@@ -3,7 +3,7 @@
  * Colors and the label font come from the design tokens in client/src/index.css, read at draw time, so the theme
  * (light/dark) is always current and no color is written in this file.
  */
-import { ANGLE_DIGITS, DASH_PATTERNS, FIELD_OPACITY, TRANSFORM_GRID_OPACITY } from "@shared/mathcore/constants";
+import { ANGLE_DIGITS, DASH_PATTERNS, EIGEN_ARC_RADIUS, EIGEN_DOUBLE_LINE_GAP, FIELD_OPACITY, TRANSFORM_GRID_OPACITY } from "@shared/mathcore/constants";
 import type { Viewport } from "@shared/mathcore/ir/types";
 
 export interface DrawCurve {
@@ -154,8 +154,8 @@ const ARROW_HEAD = 10;
 /** Eigen-direction line width in CSS pixels. */
 const EIGEN_WIDTH = 1.5;
 /** Gap of a double eigen-line (repeated eigenvalue) and radius of the rotation arc, in CSS pixels. */
-const DOUBLE_LINE_GAP = 2;
-const ROTATION_ARC_RADIUS = 36;
+const DOUBLE_LINE_GAP = EIGEN_DOUBLE_LINE_GAP;
+const ROTATION_ARC_RADIUS = EIGEN_ARC_RADIUS;
 /** Arrow-head half width and label offset, as fractions of the head length. */
 const ARROW_HEAD_SPREAD = 0.5;
 const ARROW_LABEL_OFFSET = 0.6;
@@ -372,14 +372,15 @@ export class Canvas2DRenderer implements Renderer {
     ctx.fillStyle = color;
     ctx.lineWidth = EIGEN_WIDTH;
     ctx.beginPath();
-    // Screen y points down, so a counter-clockwise world angle is negative on the canvas.
-    ctx.arc(cx, cy, ROTATION_ARC_RADIUS, 0, -theta, true);
+    // Screen y points down, so a counter-clockwise world angle (θ > 0) is negative on the canvas; θ < 0 is clockwise.
+    ctx.arc(cx, cy, ROTATION_ARC_RADIUS, 0, -theta, theta > 0);
     ctx.stroke();
     const ex = cx + ROTATION_ARC_RADIUS * Math.cos(theta);
     const ey = cy - ROTATION_ARC_RADIUS * Math.sin(theta);
-    // Head tangent to the arc at its end.
-    const tx = -Math.sin(theta);
-    const ty = -Math.cos(theta);
+    // Head tangent to the arc at its end, pointing in the direction of travel.
+    const dir = theta >= 0 ? 1 : -1;
+    const tx = -Math.sin(theta) * dir;
+    const ty = -Math.cos(theta) * dir;
     const h = ARROW_HEAD * ARROW_HEAD_SPREAD * 2;
     ctx.beginPath();
     ctx.moveTo(ex, ey);

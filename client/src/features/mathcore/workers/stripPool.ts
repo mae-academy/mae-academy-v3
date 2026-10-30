@@ -10,6 +10,13 @@ import { mergeStrips, planStrips } from "@shared/mathcore/implicit/strips";
 import { STRIP_LOAD_TIMEOUT_MS, STRIP_TIMEOUT_MS } from "@shared/mathcore/constants";
 import type { StripRequest, StripResponse } from "./stripProtocol";
 
+/** A strip run that took too long (the field is too heavy), as opposed to a Worker that failed. */
+export class StripTimeout extends Error {
+  constructor() {
+    super("The field took too long to compute");
+  }
+}
+
 export interface StripWorkerLike {
   postMessage(message: StripRequest): void;
   terminate(): void;
@@ -34,24 +41,25 @@ export function createStripPool(size: number, createWorker: () => StripWorkerLik
   const timeoutMs = opts.timeoutMs ?? STRIP_TIMEOUT_MS;
   const loadTimeoutMs = opts.loadTimeoutMs ?? STRIP_LOAD_TIMEOUT_MS;
   const workers = Array.from({ length: size }, createWorker);
-  let warm = false;
+  /** Workers that have answered once (the pool is warm when all have: their code is loaded). */
+  const answered = new Set<number>();
   const waiting = new Map<number, { resolve: (r: FieldResult) => void; reject: (e: Error) => void }>();
   let nextId = 0;
   const failAll = (message: string) => {
     waiting.forEach((w) => w.reject(new Error(message)));
     waiting.clear();
   };
-  for (const w of workers) {
+  workers.forEach((w, index) => {
     w.onmessage = (ev) => {
+      answered.add(index);
       const pending = waiting.get(ev.data.id);
       if (!pending) return;
       waiting.delete(ev.data.id);
-      warm = true;
       if (ev.data.ok) pending.resolve(ev.data.result);
       else pending.reject(new Error(ev.data.message));
     };
     w.onerror = () => failAll("A strip Worker stopped");
-  }
+  });
   return {
     size,
     run(source, viewport, options) {
@@ -67,7 +75,7 @@ export function createStripPool(size: number, createWorker: () => StripWorkerLik
       // A strip Worker that stalls fails the run (the engine Worker then computes the field itself).
       let timer: ReturnType<typeof setTimeout> | undefined;
       const limit = new Promise<never>((_, reject) => {
-        timer = setTimeout(() => reject(new Error("A strip Worker did not answer in time")), warm ? timeoutMs : loadTimeoutMs);
+        timer = setTimeout(() => reject(new StripTimeout()), answered.size === size ? timeoutMs : loadTimeoutMs);
       });
       return Promise.race([Promise.all(parts), limit])
         .then((r) => mergeStrips(r, viewport, options))
