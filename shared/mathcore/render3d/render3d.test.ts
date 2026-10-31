@@ -93,3 +93,43 @@ describe("meshes", () => {
     expect(planeInCube([0, 0, 1], 5, 2)).toEqual([]);
   });
 });
+
+describe("A1: the near plane does not cut surfaces apart when the camera is close to (or inside) them", () => {
+  const floor = (z: number, R: number, opacity: number): Mesh => ({
+    positions: Float32Array.of(-R, -R, z, R, -R, z, R, R, z, -R, R, z),
+    indices: Uint32Array.of(0, 1, 2, 0, 2, 3),
+    color: [255, 255, 255],
+    opacity,
+  });
+  /** Pixels whose ray points down (so it meets the floor) but that stayed background. */
+  function holes(distance: number, offset: number, opacity: number): { holes: number; expected: number } {
+    const el = 0.45;
+    const W = 120;
+    const H = 90;
+    const cam: Camera = { azimuth: 1.1, elevation: el, distance, target: [0, 0, 0], fov: DEFAULT_CAMERA.fov };
+    const eyeZ = distance * Math.sin(el);
+    const f = render([floor(eyeZ - offset, 1e4, opacity)], [], cam, W, H, BG);
+    // Ray of pixel (x, y): forward + px·right + py·up; its z component is cos(el)·py − sin(el) (fwd_z = −sin el, up_z = cos el).
+    const focal = H / 2 / Math.tan(cam.fov / 2);
+    let missing = 0;
+    let expected = 0;
+    for (let y = 0; y < H; y++) {
+      const dirZ = Math.cos(el) * (-(y + 0.5 - H / 2) / focal) - Math.sin(el);
+      if (dirZ > -1e-3) continue; // at or above the horizon: the floor is not seen
+      for (let x = 0; x < W; x++) {
+        expected++;
+        if (pixel(f, x, y)[0] === 0) missing++;
+      }
+    }
+    return { holes: missing, expected };
+  }
+  for (const opacity of [1, 0.5]) {
+    it(`a floor 2e-4 of the camera distance below the eye is drawn on every downward pixel (opacity ${opacity})`, () => {
+      for (const distance of [20, 1, 0.25]) {
+        const r = holes(distance, 2e-4 * distance, opacity);
+        expect(r.expected).toBeGreaterThan(1000);
+        expect(r.holes, `distance ${distance}`).toBe(0);
+      }
+    });
+  }
+});

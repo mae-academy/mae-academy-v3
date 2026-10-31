@@ -192,8 +192,12 @@ export const PARSE_RETRY_LIMIT = 5;
 export const CANVAS_FALLBACK = { width: 800, height: 500 } as const;
 /** Significant digits of a rotation angle (degrees) and scale shown to the reader. */
 export const ANGLE_DIGITS = 4;
-/** 3D: near clipping plane as a fraction of the camera distance; vertical field of view; ambient light share. */
-export const NEAR_RELATIVE = 1e-3;
+/**
+ * 3D: near clipping plane as a fraction of the camera distance (far below any distance at which a plane near the eye is
+ * still meaningful, so zooming in or sitting inside the box does not cut surfaces apart; 1/z depth stays exact in
+ * Float32); vertical field of view; ambient light share.
+ */
+export const NEAR_RELATIVE = 1e-6;
 export const CAMERA_FOV = Math.PI / 4;
 export const AMBIENT_LIGHT = 0.3;
 /** Lines are drawn as if this fraction nearer, so they win depth ties against the faces they lie on. */
