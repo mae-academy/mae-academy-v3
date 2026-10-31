@@ -158,5 +158,183 @@
     "systemShape": "a system needs 2 equations in x, y or 3 equations in x, y, z",
     "strayUnknown": "a system of {{count}} equations uses only {{unknowns}}; {{stray}} is not allowed",
     "qrNoConvergence": "QR iteration did not converge"
-  }
+  },
+  "categories": {
+    "navLabel": "Math categories",
+    "heading": "Categories",
+    "home": "Expressions",
+    "graphing": {
+      "title": "Graphing",
+      "blurb": "Explicit, implicit, inequalities, parametric and polar curves."
+    },
+    "calculus": {
+      "title": "Calculus",
+      "blurb": "Derivative with its tangent, definite integral with its area."
+    },
+    "algebra": {
+      "title": "Algebra",
+      "blurb": "Only what exists: the zeros of a curve."
+    },
+    "linearSystems": {
+      "title": "Linear systems",
+      "blurb": "Equation systems and Gauss-Jordan elimination."
+    },
+    "linearAlgebra": {
+      "title": "Linear algebra",
+      "blurb": "$2\\times2$ and $3\\times3$ matrices: determinant, inverse, eigenvalues."
+    },
+    "unsupported": {
+      "surface3d": "Surfaces $z=f(x,y)$: not yet supported.",
+      "indefiniteIntegral": "Indefinite integrals $\\int f(x)\\,dx$ as a formula: not yet supported (without bounds, $a$ and $b$ become sliders).",
+      "symbolicDerivative": "Symbolic derivatives (the formula of $f'$): not yet supported; $f'$ is computed numerically.",
+      "solve": "solve: not yet supported.",
+      "simplify": "simplify: not yet supported.",
+      "factor": "factor: not yet supported.",
+      "systemBeyond3": "Systems with more than 3 unknowns: not yet supported.",
+      "matrixBeyond3": "General $n\\times n$ matrices ($n>3$): not yet supported.",
+      "transpose": "Transpose $A^T$: not yet supported."
+    }
+  },
+  "template": {
+    "title": "Template",
+    "sample": "Sample",
+    "add": "Add to graph",
+    "added": "Sample added.",
+    "close": "Close template",
+    "worksNow": "Works now",
+    "notYet": "Not yet supported",
+    "runs": "This sample runs as shipped."
+  },
+  "samples": {
+    "explicit": {
+      "title": "Explicit curve",
+      "explain": "$y=f(x)$. A letter that is not defined, like $a$, becomes a slider: drag it to change the curve."
+    },
+    "implicit": {
+      "title": "Implicit curve",
+      "explain": "$F(x,y)=0$: the circle of radius 2, drawn by marching squares."
+    },
+    "inequality": {
+      "title": "Inequality",
+      "explain": "The region $y>x^2-2$ is shaded; the boundary is dashed because the inequality is strict."
+    },
+    "parametric": {
+      "title": "Parametric curve",
+      "explain": "$(x(t),y(t))$. Only $t$ is the parameter; it runs over a range chosen from the view."
+    },
+    "polar": {
+      "title": "Polar curve",
+      "explain": "$r=f(\\theta)$: a cardioid."
+    },
+    "derivative": {
+      "title": "Derivative and tangent",
+      "explain": "Draws $f'$ and the tangent of $f$ at $x_0$. Without a defined $x_0$, one slider $x_0$ is created. Drag the point or the slider."
+    },
+    "integral": {
+      "title": "Definite integral",
+      "explain": "Shades the area between $f$ and the $x$-axis from $a$ to $b$ and shows the value: $\\int_0^1 x^2\\,dx=\\tfrac13$. A missing bound becomes a slider $a$ or $b$."
+    },
+    "zeros": {
+      "title": "Zeros of a curve",
+      "explain": "The text description of the graph lists where the curve crosses zero: here $x=-2$ and $x=2$."
+    },
+    "system2": {
+      "title": "Two equations",
+      "explain": "Two lines; the solution is where they meet, with the Gauss-Jordan steps."
+    },
+    "systemMatrix": {
+      "title": "A x = b",
+      "explain": "A named matrix times the unknowns $[x;y]$ equals a column of constants."
+    },
+    "matrix2": {
+      "title": "2×2 matrix",
+      "explain": "$\\det A$, orientation, eigenvalues, inverse with steps, and the transformed grid. The second line reads $\\det(A)$ from the report."
+    },
+    "matrix3": {
+      "title": "3×3 matrix",
+      "explain": "A diagonal matrix: $\\det=24$, eigenvalues $2,3,4$. Turn on the 3D view to see the image of the unit cube."
+    }
+  },
+  "classify": {
+    "label": "Kind of statement",
+    "interpretAs": "Interpret as:",
+    "slider": "slider",
+    "input": "input variable",
+    "function": "function definition",
+    "matrix": "constant matrix",
+    "output": "output",
+    "unknown": "unknown",
+    "choice": {
+      "slider": "slider",
+      "constant": "constant",
+      "input": "input",
+      "line": "line"
+    },
+    "why": {
+      "slider": "A name equal to a number is a slider.",
+      "capitalScalar": "A capital letter equal to a number can be a slider or a constant.",
+      "xAssigned": "$x$ is an input variable. The engine reads $x=3$ as the vertical line; choose input to hide it.",
+      "tAssigned": "$t$ is the input variable of parametric curves and cannot be assigned. Use another name for a slider.",
+      "function": "A later use of the name calls this function.",
+      "matrix": "A named matrix is a constant. Edit its entries below.",
+      "matrixLiteral": "A matrix without a name.",
+      "definedValue": "A value computed from other names.",
+      "output": "Drawn or computed.",
+      "unknown": "Not understood: see the message.",
+      "pending": "Waiting for the engine."
+    },
+    "inputHidden": "Hidden: $x$ and $t$ are input variables.",
+    "constantNote": "Constant: no slider."
+  },
+  "calc": {
+    "tangentAt": "Tangent at the point $x_0$. Drag the point or the slider $x_0$.",
+    "integralBounds": "A missing bound is a slider: $a$ and $b$.",
+    "area": "Area",
+    "notFraction": "≈"
+  },
+  "matrixOps": {
+    "transpose": "Transpose is not supported yet.",
+    "singular": "No inverse: the matrix is singular.",
+    "notMatrix": "\"{{name}}\" is not a matrix defined in this graph."
+  },
+  "matrixEditor": {
+    "label": "Entries of {{name}}",
+    "entry": "{{name}}, row {{r}}, column {{c}}",
+    "symbolic": "Entries with letters can be edited in the expression above."
+  },
+  "color": {
+    "change": "Color of expression {{n}}",
+    "current": "Current color: {{name}}",
+    "pick": "Choose color {{name}}",
+    "palette": "Curve colors"
+  },
+  "palette": {
+    "blue": "blue",
+    "red": "red",
+    "violet": "violet",
+    "pink": "pink",
+    "sky": "sky blue",
+    "indigo": "indigo",
+    "ink": "ink",
+    "gray": "gray",
+    "custom": "custom"
+  },
+  "shortcuts": {
+    "open": "Keyboard shortcuts (?)",
+    "title": "Keyboard shortcuts",
+    "close": "Close",
+    "key": "Key",
+    "action": "Action",
+    "rows": {
+      "tab": "Move between controls",
+      "arrows": "Up / Down in an expression: go to the previous / next expression",
+      "enter": "Add a new expression below",
+      "escape": "Leave the input (focus returns to the row); close this panel",
+      "help": "Open this panel (when no input has focus)",
+      "canvasPan": "On the graph: pan (2D) or orbit (3D)",
+      "canvasZoom": "On the graph: zoom in / out",
+      "slider": "On a slider: change the value; Home / End: ends of the range"
+    }
+  },
+  "skipToGraph": "Skip to the graph"
 }

@@ -7,6 +7,8 @@ import { useTranslation } from "react-i18next";
 import type { Param } from "@shared/mathcore/ir/types";
 import { NS } from "../i18n/register";
 import { formatValue } from "./ExpressionRow";
+import { MathLabel } from "./MathLabel";
+import { nameLatex } from "./nameLatex";
 
 export interface SliderRowProps {
   name: string;
@@ -61,7 +63,9 @@ export function SliderRow({ name, param, onValue, onRange }: SliderRowProps) {
   return (
     <li className="mc-slider">
       <div className="mc-slider-head" dir="ltr">
-        <span className="mc-slider-name">{name}</span>
+        <span className="mc-slider-name" data-name={name}>
+          <MathLabel math={nameLatex(name)} />
+        </span>
         <span className="mc-slider-value">= {formatValue(param.value)}</span>
         <button
           type="button"

@@ -9,7 +9,9 @@ import LZString from "lz-string";
 const link = (graph: unknown) => `/mathcore?g=${LZString.compressToEncodedURIComponent(JSON.stringify(graph))}`;
 const doc = (items: Array<[string, string]>, extra: Record<string, unknown> = {}) => ({
   version: "1.0",
-  viewport: { xmin: -5, xmax: 5, ymin: -3, ymax: 3 },
+  // Free aspect: the pixel tests below map world points to pixels assuming exactly this view; with "equal" the y range
+  // would follow the canvas shape, which changes with the page layout (the categories sidebar narrowed the canvas).
+  viewport: { xmin: -5, xmax: 5, ymin: -3, ymax: 3, aspect: "free" },
   items: items.map(([id, latex]) => ({ id, latex })),
   ...extra,
 });
@@ -59,7 +61,7 @@ test("other routes load no mathcore code", async ({ page }) => {
 test("an undefined letter becomes a slider; the keyboard moves it; only dependents are re-evaluated", async ({ page }) => {
   await page.goto(link(doc([["f", "y=a\\sin(x)"], ["g", "y=x^2-3"]])));
   await ready(page);
-  await expect(page.locator(".mc-slider-name")).toHaveText(["a"]);
+  await expect(page.locator(".mc-slider-name")).toHaveAttribute("data-name", "a");
   await page.locator(".mc-range").focus();
   for (let i = 0; i < 10; i++) await page.keyboard.press("ArrowRight");
   await expect(page.locator(".mc-slider-value")).toHaveText("= 2");

@@ -12,9 +12,19 @@ import { DEFAULT_VIEWPORT, emptyGraph } from "@shared/mathcore/ir/types";
 import { CANVAS_FALLBACK, DEFAULT_CURVE_WIDTH, LINK_DEBOUNCE_MS, PARSE_DEBOUNCE_MS, PARSE_RETRY_LIMIT, PARSE_RETRY_MAX_MS, PARSE_RETRY_MS } from "@shared/mathcore/constants";
 import { NS } from "../i18n/register";
 import type { DrawCurve, DrawField, DrawPoint, DrawTransform, Scene } from "../render/renderer";
-import { LINALG_TOKENS, PALETTE_TOKENS, SCENE3_TOKENS, cssRgb, resolveColor } from "../render/renderer";
+import { LINALG_TOKENS, SCENE3_TOKENS, cssRgb, resolveColor } from "../render/renderer";
+import { classifyStatement, effectiveInterpretation } from "@shared/mathcore/classify/classify";
+import type { Classification, Interpretation } from "@shared/mathcore/classify/classify";
+import { deriveHelpers, parseCalculus } from "@shared/mathcore/classify/derive";
+import type { CategoryId, Sample } from "./categories";
+import { CATEGORIES, STARTER_ID, STARTER_LATEX } from "./categories";
+import { CategorySidebar, TemplatePanel } from "./CategorySidebar";
+import { CURVE_PALETTE, defaultColorId } from "./curvePalette";
 import { describeItem, describeLinalg } from "./describeText";
+import type { CalcReadout } from "./ExpressionRow";
 import { ExpressionRow } from "./ExpressionRow";
+import { matrixOpResult, parseMatrixOp } from "./matrixOps";
+import { ShortcutsPanel } from "./ShortcutsPanel";
 import type { DraggablePoint, TraceTarget } from "./GraphCanvas";
 import { GraphCanvas } from "./GraphCanvas";
 import { SliderRow } from "./SliderRow";
@@ -33,6 +43,9 @@ const SimulationDocumentation = lazy(() => import("@/components/simulations/Simu
 type Result = Extract<EngineResponse, { type: "result" }>;
 type Trace = Extract<EngineResponse, { type: "trace" }>;
 
+/** Id infix of helper items (`<id>~tangent`); reader ids never contain it. */
+const HELPER_MARK = "~";
+
 let idCounter = 0;
 const newId = () => `e${Date.now().toString(36)}${(idCounter++).toString(36)}`;
 
@@ -45,7 +58,12 @@ function initialGraph(): { graph: GraphIR; invalid: boolean } {
     if (r.ok) return { graph: r.graph, invalid: false };
     invalid = true;
   }
-  return { graph: { ...emptyGraph(), items: [{ id: newId(), latex: "y=a\\sin(x)" }] }, invalid };
+  return { graph: { ...emptyGraph(), items: [{ id: STARTER_ID, latex: STARTER_LATEX }] }, invalid };
+}
+
+/** The reader's lines plus the helper items the engine needs for tangents and integrals (Part D); never stored. */
+function withHelpers(items: Item[]): Item[] {
+  return [...items, ...deriveHelpers(items, defaultColorId).map((h) => h.item)];
 }
 
 /** What the engine must be reloaded for: the lines and the slider ranges (values travel as `param` requests). */
@@ -75,6 +93,13 @@ export default function MathcorePage() {
   const [bench, setBench] = useState<unknown>(null);
   const [linkTooLarge, setLinkTooLarge] = useState(false);
   const [canvasEl, setCanvasEl] = useState<HTMLCanvasElement | null>(null);
+  /** Part B/D UI state: open template, the reader's choices for unclear statements, new row to focus, shortcuts panel. */
+  const [category, setCategory] = useState<CategoryId | null>(null);
+  const [addedSample, setAddedSample] = useState<string | null>(null);
+  const [interp, setInterp] = useState<Record<string, Interpretation>>({});
+  const [focusId, setFocusId] = useState<string | null>(null);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const shortcutsReturn = useRef<HTMLElement | null>(null);
   const client = useRef<EngineClient | null>(null);
   const parser = useRef<ParseClient | null>(null);
   const loadRound = useRef(0);
@@ -175,7 +200,7 @@ export default function MathcorePage() {
   useEffect(() => {
     sendDocument.current = () => {
       const round = ++loadRound.current;
-      const items = graphRef.current.items;
+      const items = withHelpers(graphRef.current.items);
       // The engine is about to hold these items: set now, so undoing an edit while it is still being parsed is a
       // change again and starts its own round (Phase 3 re-review).
       engineKey.current = documentKey({ ...graphRef.current, items });
@@ -203,7 +228,8 @@ export default function MathcorePage() {
   }, [view]);
 
   // Items or parameter ranges changed: send the document, debounced (STEPS.md §7.1 technique 5).
-  const docKey = useMemo(() => documentKey(graph), [graph]);
+  const allItems = useMemo(() => withHelpers(graph.items), [graph.items]);
+  const docKey = useMemo(() => documentKey({ ...graph, items: allItems }), [graph, allItems]);
   useEffect(() => {
     // The engine holds or is about to hold this document (for example a slider it just created itself).
     if (docKey === engineKey.current) return;
@@ -235,6 +261,25 @@ export default function MathcorePage() {
   }, [graph, initial]);
 
   const setItems = (items: Item[]) => setGraph((g) => ({ ...g, items }));
+  const addRow = (after: number) => {
+    const id = newId();
+    setFocusId(id);
+    setItems([...graphRef.current.items.slice(0, after + 1), { id, latex: "" }, ...graphRef.current.items.slice(after + 1)]);
+  };
+
+  /** Adds a template's lines (Part B). A line already in the graph is not added twice; the untouched starter line goes. */
+  const addSample = (sample: Sample) => {
+    setGraph((g) => {
+      const kept = g.items.length === 1 && g.items[0].id === STARTER_ID && g.items[0].latex === STARTER_LATEX ? [] : g.items.filter((it) => it.latex.trim() !== "");
+      const have = new Set(kept.map((it) => it.latex.trim()));
+      const added = sample.items.filter((l) => !have.has(l)).map((latex) => ({ id: newId(), latex }));
+      return { ...g, items: [...kept, ...added] };
+    });
+    setAddedSample(sample.id);
+  };
+
+  const setColor = (id: string, color: string) =>
+    setGraph((g) => ({ ...g, items: g.items.map((it) => (it.id === id ? { ...it, style: { ...it.style, color } } : it)) }));
 
   const setParam = (name: string, value: number, quality: "drag" | "full") => {
     setGraph((g) => (g.params[name] ? { ...g, params: { ...g.params, [name]: { ...g.params[name], value } } } : g));
@@ -266,12 +311,51 @@ export default function MathcorePage() {
 
   const results = useMemo(() => new Map((result?.items ?? []).map((r) => [r.id, r])), [result]);
 
+  /** Part D: what each of the reader's lines is, what the reader chose where it was unclear, and what follows from it. */
+  const rowInfo = useMemo(() => {
+    const matrixItems = graph.items.map((it) => ({ it, name: /^\s*([A-Z](?:_\{?\w+\}?)?)\s*=/.exec(it.latex)?.[1] }));
+    return graph.items.map((it) => {
+      const r = results.get(it.id);
+      const op = parseMatrixOp(it.latex);
+      const calc = parseCalculus(it.latex);
+      let classification: Classification = classifyStatement(it.latex, r?.kind);
+      if (op || calc) classification = { class: "output", reason: "output" };
+      const eff = effectiveInterpretation(classification, interp[it.id]);
+      let matrixOp: { latex?: string; message?: string } | undefined;
+      if (op) {
+        const m = matrixItems.find((x) => x.name === op.name);
+        const report = m ? results.get(m.it.id)?.linalg : undefined;
+        const res = matrixOpResult(op, report?.type === "matrix" ? report.analysis : null);
+        matrixOp = res.ok ? { latex: res.latex } : { message: t(`matrixOps.${res.reason}`, { name: op.name }) };
+      }
+      let readout: CalcReadout | undefined;
+      let shown = r;
+      if (calc?.kind === "derivative" && calc.fn) {
+        const v = (role: string) => results.get(`${it.id}${HELPER_MARK}${role}`)?.value;
+        readout = { kind: "derivative", fn: calc.fn, x0: graph.params["x_0"]?.value, value: v("value"), slope: v("slope") };
+      } else if (calc?.kind === "integral") {
+        const h = results.get(`${it.id}${HELPER_MARK}integral`);
+        readout = { kind: "integral", latex: it.latex.trim(), value: h?.value, lower: calc.lower ?? "a", upper: calc.upper ?? "b", missingBounds: !!calc.missingBounds };
+        // The engine reads a bare ∫ as a later-phase item; the page's own helper answers, so its errors are the row's.
+        if (r) shown = { ...r, kind: "Integral", errors: h?.errors ?? [] };
+      }
+      return { id: it.id, classification, eff, matrixOp, readout, shown };
+    });
+  }, [graph.items, graph.params, results, interp, t]);
+
+  /** Lines the reader read as "input variable" are not drawn; "constant" names have no slider. */
+  const hiddenIds = useMemo(() => new Set(graph.items.filter((it, i) => rowInfo[i]?.eff === "input").map((it) => it.id)), [graph.items, rowInfo]);
+  const constantNames = useMemo(
+    () => new Set(graph.items.flatMap((it, i) => (rowInfo[i]?.eff === "constant" ? [it.latex.split("=")[0].trim()] : []))),
+    [graph.items, rowInfo],
+  );
+
   const colors = useMemo(() => {
     const root = document.documentElement;
-    return graph.items.map((it, i) => resolveColor(root, it.style?.color, PALETTE_TOKENS[i % PALETTE_TOKENS.length]));
+    return allItems.map((it, i) => resolveColor(root, it.style?.color, CURVE_PALETTE[i % CURVE_PALETTE.length].token));
     // `result` and `themeTick` only trigger a re-read of the tokens.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [graph.items, result, themeTick]);
+  }, [allItems, result, themeTick]);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -303,9 +387,9 @@ export default function MathcorePage() {
       arrow: resolveColor(root, undefined, LINALG_TOKENS.arrow),
       eigen: resolveColor(root, undefined, LINALG_TOKENS.eigen),
     };
-    graph.items.forEach((it, i) => {
+    allItems.forEach((it, i) => {
       const r = results.get(it.id);
-      if (!r || it.style?.hidden) return;
+      if (!r || it.style?.hidden || hiddenIds.has(it.id)) return;
       if (r.field) fields.push({ ...r.field, color: colors[i] });
       if (r.transform) transforms.push({ ...r.transform, color: colors[i], ...linalgColors });
       // A strict inequality (< or >) does not include its boundary, so the boundary is dashed.
@@ -329,10 +413,11 @@ export default function MathcorePage() {
           ? { x0: traced.x, y0: traced.y, slope: traced.slope, color: resolveColor(document.documentElement, undefined, "--muted-foreground") }
           : null,
     };
-  }, [graph, results, colors, trace]);
+  }, [graph, allItems, hiddenIds, results, colors, trace]);
 
   const traceTargets: TraceTarget[] = (result?.items ?? [])
-    .filter((r) => r.kind === "Explicit" && r.segments.length > 0)
+    // Helper items (tangents, areas) are not traced: only the reader's own curves.
+    .filter((r) => r.kind === "Explicit" && r.segments.length > 0 && !r.id.includes(HELPER_MARK))
     .map((r) => ({ id: r.id, segments: r.segments }));
 
   const draggable: DraggablePoint[] = (result?.items ?? [])
@@ -400,14 +485,39 @@ export default function MathcorePage() {
     })
     .filter((d): d is string => d !== null);
 
-  const params = Object.entries(graph.params).sort(([a], [b]) => a.localeCompare(b));
+  const params = Object.entries(graph.params)
+    .filter(([name]) => !constantNames.has(name))
+    .sort(([a], [b]) => a.localeCompare(b));
   const isRtl = i18n.language === "ar";
+
+  // `?` opens the shortcuts panel unless the reader is typing (a field would receive the character).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "?" || e.ctrlKey || e.metaKey || e.altKey) return;
+      const el = e.target as HTMLElement | null;
+      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.tagName === "MATH-FIELD" || el.isContentEditable)) return;
+      e.preventDefault();
+      shortcutsReturn.current = document.activeElement as HTMLElement | null;
+      setShortcutsOpen(true);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+  const closeShortcuts = () => {
+    setShortcutsOpen(false);
+    setTimeout(() => shortcutsReturn.current?.focus(), 0);
+  };
+  const openCategory = CATEGORIES.find((c) => c.id === category) ?? null;
 
   return (
     <div className="mc-page" dir={isRtl ? "rtl" : "ltr"}>
+      <a className="mc-skip" href="#mc-graph">
+        {t("skipToGraph")}
+      </a>
       <header className="mc-header">
-        <div>
-          <h1 className="mc-title">{t("title")}</h1>
+        <div className="mc-heading">
+          <p className="mc-kicker font-mono" dir="ltr">MAE · MATH CORE</p>
+          <h1 className="mc-title mae-display">{t("title")}</h1>
           <p className="mc-subtitle">{t("subtitle")}</p>
         </div>
         <div className="mc-toolbar" role="toolbar">
@@ -442,6 +552,9 @@ export default function MathcorePage() {
           >
             {t("view3d")}
           </button>
+          <button type="button" className="mc-button" data-testid="mc-shortcuts-button" aria-haspopup="dialog" aria-label={t("shortcuts.open")} title={t("shortcuts.open")} onClick={(e) => { shortcutsReturn.current = e.currentTarget; setShortcutsOpen(true); }}>
+            ?
+          </button>
           <label className="mc-button">
             <input
               type="checkbox"
@@ -467,7 +580,15 @@ export default function MathcorePage() {
         </p>
       )}
       <div className="mc-layout">
+        <CategorySidebar
+          active={category}
+          onSelect={(id) => {
+            setCategory(id);
+            setAddedSample(null);
+          }}
+        />
         <aside className="mc-panel" aria-label={t("expressions")}>
+          {openCategory && <TemplatePanel category={openCategory} added={addedSample} onAdd={addSample} onClose={() => setCategory(null)} />}
           {!result && <p className="mc-note">{t("loadingEngine")}</p>}
           <ol className="mc-list">
             {graph.items.map((it, i) => (
@@ -475,17 +596,26 @@ export default function MathcorePage() {
                 key={it.id}
                 index={i}
                 latex={it.latex}
+                colorId={it.style?.color}
                 color={colors[i]}
-                result={results.get(it.id)}
+                result={rowInfo[i]?.shown}
                 showSteps={graph.view.showSteps}
                 mode={graph.view.mode}
+                classification={rowInfo[i]?.classification ?? { class: "unknown", reason: "pending" }}
+                interpretation={rowInfo[i]?.eff}
+                onInterpret={(choice) => setInterp((m) => ({ ...m, [it.id]: choice }))}
+                calc={rowInfo[i]?.readout}
+                matrixOp={rowInfo[i]?.matrixOp}
+                autoFocus={focusId === it.id}
+                onFocused={() => setFocusId(null)}
+                onColor={(color) => setColor(it.id, color)}
                 onChange={(latex) => setItems(graph.items.map((x) => (x.id === it.id ? { ...x, latex } : x)))}
                 onRemove={() => setItems(graph.items.filter((x) => x.id !== it.id))}
-                onEnter={() => setItems([...graph.items.slice(0, i + 1), { id: newId(), latex: "" }, ...graph.items.slice(i + 1)])}
+                onEnter={() => addRow(i)}
               />
             ))}
           </ol>
-          <button type="button" className="mc-button mc-add" onClick={() => setItems([...graph.items, { id: newId(), latex: "" }])}>
+          <button type="button" className="mc-button mc-add" onClick={() => addRow(graph.items.length - 1)}>
             + {t("addExpression")}
           </button>
           {params.length > 0 && (
@@ -531,7 +661,7 @@ export default function MathcorePage() {
             )}
           </details>
         </aside>
-        <section className="mc-graph">
+        <section className="mc-graph" id="mc-graph">
           <GraphCanvas
             scene={scene}
             onViewport={setViewport}
@@ -560,6 +690,7 @@ export default function MathcorePage() {
           )}
         </section>
       </div>
+      {shortcutsOpen && <ShortcutsPanel onClose={closeShortcuts} />}
       <Suspense fallback={null}>
         <SimulationDocumentation topic="mathcore" />
       </Suspense>

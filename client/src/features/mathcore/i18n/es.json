@@ -158,5 +158,183 @@
     "systemShape": "un sistema necesita 2 ecuaciones en x, y o 3 ecuaciones en x, y, z",
     "strayUnknown": "un sistema de {{count}} ecuaciones usa solo {{unknowns}}; {{stray}} no está permitido",
     "qrNoConvergence": "la iteración QR no convergió"
-  }
+  },
+  "categories": {
+    "navLabel": "Categorías de matemáticas",
+    "heading": "Categorías",
+    "home": "Expresiones",
+    "graphing": {
+      "title": "Gráficas",
+      "blurb": "Curvas explícitas, implícitas, desigualdades, paramétricas y polares."
+    },
+    "calculus": {
+      "title": "Cálculo",
+      "blurb": "Derivada con su tangente, integral definida con su área."
+    },
+    "algebra": {
+      "title": "Álgebra",
+      "blurb": "Solo lo que existe: los ceros de una curva."
+    },
+    "linearSystems": {
+      "title": "Sistemas lineales",
+      "blurb": "Sistemas de ecuaciones y eliminación de Gauss-Jordan."
+    },
+    "linearAlgebra": {
+      "title": "Álgebra lineal",
+      "blurb": "Matrices $2\\times2$ y $3\\times3$: determinante, inversa, valores propios."
+    },
+    "unsupported": {
+      "surface3d": "Superficies $z=f(x,y)$: aún no disponible.",
+      "indefiniteIntegral": "Integrales indefinidas $\\int f(x)\\,dx$ como fórmula: aún no disponible (sin límites, $a$ y $b$ son deslizadores).",
+      "symbolicDerivative": "Derivadas simbólicas (la fórmula de $f'$): aún no disponible; $f'$ se calcula numéricamente.",
+      "solve": "solve: aún no disponible.",
+      "simplify": "simplify: aún no disponible.",
+      "factor": "factor: aún no disponible.",
+      "systemBeyond3": "Sistemas con más de 3 incógnitas: aún no disponible.",
+      "matrixBeyond3": "Matrices $n\\times n$ generales ($n>3$): aún no disponible.",
+      "transpose": "Transpuesta $A^T$: aún no disponible."
+    }
+  },
+  "template": {
+    "title": "Plantilla",
+    "sample": "Ejemplo",
+    "add": "Añadir a la gráfica",
+    "added": "Ejemplo añadido.",
+    "close": "Cerrar plantilla",
+    "worksNow": "Funciona ahora",
+    "notYet": "Aún no disponible",
+    "runs": "Este ejemplo funciona tal cual."
+  },
+  "samples": {
+    "explicit": {
+      "title": "Curva explícita",
+      "explain": "$y=f(x)$. Una letra sin definir, como $a$, se convierte en un deslizador: muévelo para cambiar la curva."
+    },
+    "implicit": {
+      "title": "Curva implícita",
+      "explain": "$F(x,y)=0$: la circunferencia de radio 2."
+    },
+    "inequality": {
+      "title": "Desigualdad",
+      "explain": "Se sombrea la región $y>x^2-2$; el borde es discontinuo porque la desigualdad es estricta."
+    },
+    "parametric": {
+      "title": "Curva paramétrica",
+      "explain": "$(x(t),y(t))$. Solo $t$ es el parámetro."
+    },
+    "polar": {
+      "title": "Curva polar",
+      "explain": "$r=f(\\theta)$: una cardioide."
+    },
+    "derivative": {
+      "title": "Derivada y tangente",
+      "explain": "Dibuja $f'$ y la tangente de $f$ en $x_0$. Si $x_0$ no está definido, se crea un deslizador $x_0$. Arrastra el punto o el deslizador."
+    },
+    "integral": {
+      "title": "Integral definida",
+      "explain": "Sombrea el área entre $f$ y el eje $x$ de $a$ a $b$ y muestra el valor: $\\int_0^1 x^2\\,dx=\\tfrac13$. Un límite ausente se convierte en un deslizador $a$ o $b$."
+    },
+    "zeros": {
+      "title": "Ceros de una curva",
+      "explain": "La descripción en texto de la gráfica indica dónde la curva cruza cero: aquí $x=-2$ y $x=2$."
+    },
+    "system2": {
+      "title": "Dos ecuaciones",
+      "explain": "Dos rectas; la solución es donde se cortan, con los pasos de Gauss-Jordan."
+    },
+    "systemMatrix": {
+      "title": "A x = b",
+      "explain": "Una matriz con nombre por las incógnitas $[x;y]$ es igual a una columna de constantes."
+    },
+    "matrix2": {
+      "title": "Matriz 2×2",
+      "explain": "$\\det A$, orientación, valores propios, inversa con pasos y la cuadrícula transformada. La segunda línea lee $\\det(A)$ del informe."
+    },
+    "matrix3": {
+      "title": "Matriz 3×3",
+      "explain": "Una matriz diagonal: $\\det=24$, valores propios $2,3,4$. Activa la vista 3D para ver la imagen del cubo unidad."
+    }
+  },
+  "classify": {
+    "label": "Tipo de enunciado",
+    "interpretAs": "Interpretar como:",
+    "slider": "deslizador",
+    "input": "variable de entrada",
+    "function": "definición de función",
+    "matrix": "matriz constante",
+    "output": "resultado",
+    "unknown": "desconocido",
+    "choice": {
+      "slider": "deslizador",
+      "constant": "constante",
+      "input": "entrada",
+      "line": "recta"
+    },
+    "why": {
+      "slider": "Un nombre igual a un número es un deslizador.",
+      "capitalScalar": "Una mayúscula igual a un número puede ser un deslizador o una constante.",
+      "xAssigned": "$x$ es una variable de entrada. El motor lee $x=3$ como la recta vertical; elige entrada para ocultarla.",
+      "tAssigned": "$t$ es la variable de entrada de las curvas paramétricas y no se puede asignar. Usa otro nombre para un deslizador.",
+      "function": "Un uso posterior del nombre llama a esta función.",
+      "matrix": "Una matriz con nombre es constante. Edita sus entradas abajo.",
+      "matrixLiteral": "Una matriz sin nombre.",
+      "definedValue": "Un valor calculado a partir de otros nombres.",
+      "output": "Dibujado o calculado.",
+      "unknown": "No entendido: mira el mensaje.",
+      "pending": "Esperando al motor."
+    },
+    "inputHidden": "Oculto: $x$ y $t$ son variables de entrada.",
+    "constantNote": "Constante: sin deslizador."
+  },
+  "calc": {
+    "tangentAt": "Tangente en el punto $x_0$. Arrastra el punto o el deslizador $x_0$.",
+    "integralBounds": "Un límite ausente es un deslizador: $a$ y $b$.",
+    "area": "Área",
+    "notFraction": "≈"
+  },
+  "matrixOps": {
+    "transpose": "La transpuesta aún no está disponible.",
+    "singular": "Sin inversa: la matriz es singular.",
+    "notMatrix": "\"{{name}}\" no es una matriz definida en esta gráfica."
+  },
+  "matrixEditor": {
+    "label": "Entradas de {{name}}",
+    "entry": "{{name}}, fila {{r}}, columna {{c}}",
+    "symbolic": "Las entradas con letras se editan en la expresión de arriba."
+  },
+  "color": {
+    "change": "Color de la expresión {{n}}",
+    "current": "Color actual: {{name}}",
+    "pick": "Elegir el color {{name}}",
+    "palette": "Colores de curvas"
+  },
+  "palette": {
+    "blue": "azul",
+    "red": "rojo",
+    "violet": "violeta",
+    "pink": "rosa",
+    "sky": "celeste",
+    "indigo": "índigo",
+    "ink": "tinta",
+    "gray": "gris",
+    "custom": "personalizado"
+  },
+  "shortcuts": {
+    "open": "Atajos de teclado (?)",
+    "title": "Atajos de teclado",
+    "close": "Cerrar",
+    "key": "Tecla",
+    "action": "Acción",
+    "rows": {
+      "tab": "Moverse entre controles",
+      "arrows": "Arriba / Abajo en una expresión: ir a la expresión anterior / siguiente",
+      "enter": "Añadir una expresión debajo",
+      "escape": "Salir del campo (el foco vuelve a la fila); cerrar este panel",
+      "help": "Abrir este panel (cuando ningún campo tiene el foco)",
+      "canvasPan": "En la gráfica: desplazar (2D) u orbitar (3D)",
+      "canvasZoom": "En la gráfica: acercar / alejar",
+      "slider": "En un deslizador: cambiar el valor; Home / End: extremos del rango"
+    }
+  },
+  "skipToGraph": "Ir a la gráfica"
 }
