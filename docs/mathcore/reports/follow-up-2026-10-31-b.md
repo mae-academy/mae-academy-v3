@@ -49,7 +49,7 @@ V8 compiles the hot loops on first use.
 
 **The B8 coarsening is still needed.** Without it (the same build with `MASK_REFINE_STEP_DRAG = 1` and the dense
 tracing off) the dense drag is 20.3 ms; with the coarse curve alone it is 16.3 ms; with both 13.8 ms (earlier build).
-Visual cost of the coarse setting for sin(x²+y²) < 0 (measured, `/tmp` script not committed): the drag mask is wrong
+Visual cost of the coarse setting for sin(x²+y²) < 0 (measured; pinned by `marching.test.ts`, "visual cost of the drag-frame coarsening"): the drag mask is wrong
 at 1.69 % of its 400×250 pixels against the exact value at their centres (0.00 % without the sampling step; the full
 frame that follows is 0.00 %); the coarse curve has the same 28 pieces and the same length (124.4 units) as the fine
 one, and every point of the fine curve lies within 0.3 CSS px of it.
@@ -68,7 +68,24 @@ max, budget, pass). `device-results-template.md` has the commands and fields. **
 
 ## Item 4: intermittent browser failure
 
-See the end of this file once the runs are complete.
+Method: the suite run in a loop, one log per run, the failing test taken from the `✘` marker.
+
+- Runs 1–20 (25 tests, after items 2, 3 and 5): all passed.
+- Rule: no failure in 20, so 40 more, on the item 1 build (26 tests). Runs 21–25 passed, **run 26 failed**, run 27 passed;
+  the loop was stopped there to fix the cause (27 runs, one failure).
+- The failing test: `rapid keys and wheel ticks all count (per frame)` (the A4 test added in the first follow-up round).
+  Its azimuth was right (all 24 key presses counted) and its distance was 222.9 instead of 267.5, that is 30·1.2¹¹ instead
+  of 30·1.2¹²: **one wheel tick lost**.
+- Root cause: `GraphCanvas` mirrored `props.camera` into a ref in a passive effect. A wheel tick is not a discrete React
+  event, so it can arrive after the commit of the previous tick but before that commit's effect has run; the effect then
+  overwrote the newer step with the stale prop and the next tick started one step behind. Key presses are discrete events
+  (React flushes pending effects before them), which is why the key tests never failed.
+- Fix: `CameraSync` (`ui/camera.ts`) remembers the last 64 steps asked for; a prop that is one of them leaves the current
+  camera alone, and only a camera that is none of ours (a loaded link, Reset view) replaces it.
+- Deterministic reproduction: the e2e tests "101 alternating wheel ticks, one per frame / per task, lose no step" end the
+  distance at 30·1.2 only if no tick is lost. Before the fix 6 of 6 runs failed (final distances 1000, 0.62, 321 …); after
+  it 5 of 5 sessions passed. Unit tests in `moveCamera.test.ts` replay the interleaving (and a 200-trial random one).
+- Clean runs after the fix: see the end of this file.
 
 ## Item 5: owner decisions Q1–Q17
 

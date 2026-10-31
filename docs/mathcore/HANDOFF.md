@@ -1,4 +1,4 @@
-# Math Core — handoff for a new session (state after the follow-up round of 2026-10-31)
+# Math Core — handoff for a new session (state after the second follow-up round of 2026-10-31)
 
 Read this first. It replaces re-reading the earlier conversation. Paste the prompt at the end into a new session.
 
@@ -11,24 +11,27 @@ Read this first. It replaces re-reading the earlier conversation. Paste the prom
 - Phase reports (what was built, review rounds, measured budgets, known limits):
   `docs/mathcore/reports/phase-1-2.md`, `phase-3.md`, `phase-4.md`, `phase-5.md`.
 - **Scope:** Phases 0–5 are done and went through independent review rounds (Phase 3: four, Phase 4: two, Phase 5:
-  one), then a follow-up round on 2026-10-31 (`docs/mathcore/reports/follow-up-2026-10-31.md`, plus B10–B12 in
-  `phase-3.md`). Every finding is fixed or listed as a known limit in its report. The owner lifted D3 (3D) for Phase 5 only.
+  one), then two follow-up rounds on 2026-10-31 (`docs/mathcore/reports/follow-up-2026-10-31.md`, B10–B12 in
+  `phase-3.md`, and `follow-up-2026-10-31-b.md`: 2-core performance, per-value eigenvalues, device scripts, the flake hunt). Every finding is fixed or listed as a known limit in its report. The owner lifted D3 (3D) for Phase 5 only.
   **Stop after Phase 5**: Phase 6 (ODEs) and later are a separate scope. Headless ODE code (`shared/mathcore/ode/`)
   exists without UI; do not build on it unasked.
-- State at handoff (commit of the B10–B12 round, see the last section): gate green with no skipped steps, 459 mathcore
-  unit tests and 25 browser tests pass. Measured budgets are in each report and in the "Follow-up" sections. Key facts:
-  - Implicit fields, Chromium with 4 cores: drag 12.5–15.8 ms (dense and reference), release 81–116 ms.
-  - Implicit fields, Chromium on a real 2-core CPU (`taskset`): drag 26–41 ms and release 171–190 ms. **This misses the
-    16 ms and 150 ms budgets.** The earlier "12.6 ms on 2 cores" in the follow-up report came from a 4-core machine.
-  - 3D: the Phase 5 zoomed release frame 21 ms (budget 25 ms); 5 items at full size 27 ms, 10 items 48 ms.
+- State at handoff: gate green with no skipped steps; mathcore unit tests and browser tests pass (counts in the final
+  report of the round). Measured budgets are in each report. Key facts, all on the shared cloud machine:
+  - Implicit fields, Chromium on a **real two-core CPU** (`taskset -c 0,1`; `MATHCORE_CORES=2` alone is misleading), 1 s
+    after load: dense sin(x²+y²) < 0 drag 12.5–13.0 ms, release 122–128 ms (met). Right after load (cold JIT) dense drag is
+    23 ms and release 154 ms (**not met**). The reference field x²+y²+sin3x·cos2y < 9: drag 18.6–20.3 ms (**not met**),
+    release 137–169 ms (**not reliably met**). Baseline before this round: 32 / 208 / 34 / 195 ms.
+  - 3D under two cores (Node, `taskset`): every case within 25 ms (zoomed release frame 20.0 ms); not measured in a browser.
+  - 3×3 eigenvalues are per-value exact (error 0 on 23 exact adversarial matrices; `linalg/exactRoots.ts`).
+  - Not measured anywhere: the owner's MacBook and the D1 reference device (item 3: scripts ready, pending owner hardware).
 
 ## Code map
 
 | Area | Path |
 |---|---|
-| Headless engine (no DOM/React) | `shared/mathcore/` — `parse/`, `normalize/`, `infer/` (types, `linear.ts`), `compile/` (closure compiler, no eval), `engine/graphEngine.ts` (DAG, sliders, runtimes), `sample/`, `implicit/` (`marching.ts` contour + shading, `strips.ts`, `source.ts`), `calculus/integrate.ts` (Simpson + tanh-sinh with endpoint tails), `linalg/` (exact det, eigen2, QR eigen3, Gauss-Jordan, `analyze.ts` LaTeX reports, `transform2.ts`), `render3d/` (CPU rasterizer, `scene.ts`, `frame.ts`), `ir/` (types, schema, codec), `constants.ts` (every tolerance and limit) |
+| Headless engine (no DOM/React) | `shared/mathcore/` — `parse/`, `normalize/`, `infer/` (types, `linear.ts`), `compile/` (closure compiler, no eval), `engine/graphEngine.ts` (DAG, sliders, runtimes), `errors.ts` (error catalog keys), `sample/`, `implicit/` (`marching.ts` contour + shading, `strips.ts`, `source.ts`), `calculus/integrate.ts` (Simpson + tanh-sinh with endpoint tails), `linalg/` (exact det, eigen2, `exactRoots.ts` 512-bit root refinement for 3×3, QR, Gauss-Jordan, `analyze.ts` LaTeX reports, `transform2.ts`), `render3d/` (CPU rasterizer, `scene.ts`, `frame.ts`), `ir/` (types, schema, codec), `constants.ts` (every tolerance and limit) |
 | Page | `client/src/features/mathcore/ui/` (`MathcorePage.tsx`, `GraphCanvas.tsx`, `LinalgPanel.tsx` lazy KaTeX, `camera.ts`), `render/renderer.ts` (Canvas 2D, token colors only), `i18n/{en,ar,es}.json` |
-| Workers | `workers/mathcore-parse-worker.ts` (Compute Engine, 200 ms per line), `mathcore-engine-worker.ts` (evaluation, sampling, 3D frame), `mathcore-strip-worker.ts` + `stripPool.ts` (parallel implicit strips), `engineClient.ts` (5 s watchdog), `parseClient.ts` |
+| Workers | `workers/mathcore-parse-worker.ts` (Compute Engine, 200 ms per line), `mathcore-engine-worker.ts` (evaluation, sampling, 3D frame), `mathcore-strip-worker.ts` + `stripPool.ts` (parallel implicit strips; `stripWorkerCount`), `warmup.ts` (idle warm-up plan), `engineClient.ts` (5 s watchdog), `parseClient.ts` |
 | Tests | unit tests beside the code; golden `shared/mathcore/__golden__/` (human-owned, read-only); browser `tests/mathcore/e2e/mathcore.spec.ts` |
 
 ## How to check
@@ -37,8 +40,9 @@ Read this first. It replaces re-reading the earlier conversation. Paste the prom
 timeout 580 bash scripts/mathcore/gate.sh origin/automation/setup   # typecheck, lint, theme lint, tests, golden, build, audits
 npx vitest run shared/mathcore client/src/features/mathcore         # mathcore unit tests only
 pnpm run build && MATHCORE_CHROMIUM=/opt/pw-browsers/chromium pnpm run e2e:mathcore
-pnpm exec tsx scripts/mathcore/bench.ts                            # §7.2 budgets (Node, one thread)
-node scripts/mathcore/bench-browser.cjs                            # implicit fields in Chromium (needs vite preview on 4173)
+pnpm exec tsx scripts/mathcore/bench.ts > bench-node.json           # §7.2 budgets (Node, one thread): JSON on stdout, table on stderr
+node scripts/mathcore/bench-browser.cjs > bench-browser.json       # implicit fields in Chromium (needs vite preview on 4173)
+taskset -c 0,1 node scripts/mathcore/bench-browser.cjs             # a real two-core limit on Linux (MATHCORE_IDLE_MS=0 for a cold Worker)
 ```
 
 Rules learned the hard way:
@@ -62,21 +66,35 @@ Rules learned the hard way:
 
 ## Open items and owner decisions (not decided here)
 
-Each item below is a question for the owner. None was changed in the follow-up round.
+Status after the second follow-up round. "Owner" items are questions; none was decided by the executor.
 
-1. **3×3 eigenvalue accuracy.** STEPS.md §8.2 asks for 10⁻⁹ per eigenvalue. The code and its test check 10⁻⁹ relative to
-   the largest |λ|. Question: is the per-value criterion required, or is the largest-|λ| norm accepted?
-2. **Phase 9 3D parts.** Deferred by D3 (lifted only for Phase 5). Question: stay deferred, or lift for Phase 9 too?
-3. **Visual snapshot baselines (§10).** Question: approve new human-owned baselines in `docs/mathcore/baselines/`, or keep
-   the pixel checks at chosen points?
-4. **Reference device (D1) and the MacBook benchmark.** All budgets were measured on the cloud machine (4 shared cores).
-   Question: run `pnpm exec tsx scripts/mathcore/bench.ts` and `node scripts/mathcore/bench-browser.cjs` on the reference
-   device (and on a 2-core machine, since the browser misses the drag budget there)?
-5. **Q1–Q17 confirmation.** Question: confirm the answers in `docs/mathcore/reports/owner-decisions-2026-10-30.md`.
-6. **Vercel preview check for PR #3.** Question: check the preview deployment of PR #3 (no PR was created or changed here).
-7. **Dense-field drag quality (B8, decisions-log 2026-10-31).** Drag frames of dense fields trace coarse cells and sample
-   refined blocks every second pixel. Question: keep this trade-off, or revert it (set `MASK_REFINE_STEP_DRAG` to 1 and
-   drop `coarseWhenDense`)?
+**Closed in the round (with evidence):**
+- 3×3 eigenvalue accuracy: the per-value criterion of STEPS.md §8.2 is applied and tested (`linalgGolden.test.ts`,
+  `eigenCases.ts`; 23 exact cases, error 0; before: 14 over 1e-9, worst 0.65). See `phase-4.md`.
+
+**Open, performance (budgets unchanged):**
+- Reference field on two real cores: drag 18.6–20.3 ms (budget 16) and release 137–169 ms (budget 150).
+- Dense field right after load (cold JIT): drag 23 ms, release 154 ms. The warm numbers (1 s idle after load) pass.
+- No measurement exists on the owner's MacBook or on the D1 reference device (below).
+
+**Pending owner hardware:** item 3. `bench.ts` and `bench-browser.cjs` print one JSON document each;
+`docs/mathcore/reports/device-results-template.md` has the commands and the fields. The item is closed only when the
+owner has run them and committed the JSON.
+
+**Owner questions:**
+1. **Phase 9 3D parts.** Deferred by D3 (lifted only for Phase 5). Stay deferred, or lift for Phase 9 too?
+2. **Visual snapshot baselines (§10).** Approve new human-owned baselines in `docs/mathcore/baselines/`, or keep the pixel
+   checks at chosen points?
+3. **Reference device (D1) and the MacBook benchmark.** Run the two scripts on the reference device, and on a 2-core
+   machine, and commit the JSON (item 3 above).
+4. **Q1–Q17.** `docs/mathcore/reports/owner-decisions-review.md` lists, per question, the answer applied, file and line,
+   covering test and any conflict with the plan; the "owner confirmed" column is empty. Findings to look at: Q6's text is out
+   of date (`3d` is accepted since D3 was lifted for Phase 5); Q4 stores `theta` where the plan writes `θ`; Q3 has no test
+   for delimiters other than `bmatrix`.
+5. **Vercel preview check for PR #3.** Check the preview deployment of PR #3 (no PR was created or changed here).
+6. **Dense-field drag quality (B8).** Drag frames of dense fields trace coarse cells and sample refined blocks every
+   second pixel; without it the dense drag is 20.3 ms on two real cores. Measured visual cost: 1.69 % of drag-mask
+   pixels wrong, curve within 0.3 px. Keep, or revert (`MASK_REFINE_STEP_DRAG` = 1 and drop `coarseWhenDense`)?
 
 ## Prompt for a new session
 

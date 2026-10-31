@@ -285,6 +285,32 @@ test.describe("Phase 5: 3D linear algebra", () => {
     await expect.poll(() => linkCamera()?.distance).toBeCloseTo(30 * 1.2 ** 3, 6);
   });
 
+  // A4 root cause (found by the 60-run hunt): the page mirrored its camera prop into a ref in a passive effect, which could
+  // overwrite a newer step when a wheel tick (not a discrete event) arrived between a commit and that effect. A long run
+  // of ticks makes any lost step show: 101 ticks alternate out and in, so the distance must end one factor above the start.
+  for (const gap of ["per frame", "per task"] as const) {
+    test(`101 alternating wheel ticks, one ${gap}, lose no step`, async ({ page }) => {
+      const camera = { azimuth: 0.3, elevation: 0.4, distance: 30 };
+      await page.goto(link(doc([["m", "M=\\begin{bmatrix}2&0&0\\\\0&1&0\\\\0&0&1\\end{bmatrix}"]], { view: { mode: "3d", grid: true, showSteps: false, locale: "en", camera } })));
+      await ready(page);
+      await expect(page.getByTestId("mc-linalg")).toBeVisible({ timeout: 15_000 });
+      await page.locator(".mc-canvas").focus();
+      await page.evaluate(async (mode) => {
+        const el = document.querySelector<HTMLCanvasElement>(".mc-canvas");
+        if (!el) throw new Error("no canvas");
+        for (let k = 0; k < 101; k++) {
+          el.dispatchEvent(new WheelEvent("wheel", { deltaY: k % 2 === 0 ? 100 : -100, bubbles: true, cancelable: true }));
+          await (mode === "per frame" ? new Promise<void>((r) => requestAnimationFrame(() => r())) : new Promise<void>((r) => setTimeout(r, 0)));
+        }
+      }, gap);
+      const distance = () => {
+        const g = new URL(page.url()).searchParams.get("g") ?? "";
+        return (JSON.parse(LZString.decompressFromEncodedURIComponent(g) ?? "{}") as { view?: { camera?: { distance: number } } }).view?.camera?.distance;
+      };
+      await expect.poll(distance, { timeout: 10_000 }).toBeCloseTo(30 * 1.2, 6);
+    });
+  }
+
   test("rapid keys count from the fitted camera when the link has none", async ({ page }) => {
     await page.goto(link(doc([["m", "M=\\begin{bmatrix}2&0&0\\\\0&1&0\\\\0&0&1\\end{bmatrix}"]], { view: { mode: "3d", grid: true, showSteps: false, locale: "en" } })));
     await ready(page);

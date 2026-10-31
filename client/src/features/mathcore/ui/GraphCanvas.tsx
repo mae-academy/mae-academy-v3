@@ -9,7 +9,7 @@ import { useTranslation } from "react-i18next";
 import type { Camera3, Viewport } from "@shared/mathcore/ir/types";
 import { closestPoint } from "@shared/mathcore/sample/closest";
 import { NS } from "../i18n/register";
-import { moveCamera } from "./camera";
+import { CameraSync, moveCamera } from "./camera";
 import { ORBIT_RADIANS_PER_KEY, ORBIT_RADIANS_PER_PX, ZOOM_FACTOR } from "@shared/mathcore/constants";
 import type { DrawFrame3, Scene } from "../render/renderer";
 import { Canvas2DRenderer, gridStep } from "../render/renderer";
@@ -64,13 +64,13 @@ export function GraphCanvas(props: GraphCanvasProps) {
   const drag = useRef<{ mode: "pan" | "point" | "orbit"; id?: string; x: number; y: number; vp: Viewport; camera?: Camera3 } | null>(null);
   const in3d = !!props.frame3 && !!props.onCamera;
   // Each orbit or zoom step starts from the camera last asked for, not from the last frame the Worker answered with,
-  // so quick key presses and wheel ticks add up (Phase 5 review).
-  const cameraRef = useRef<Camera3 | null>(null);
+  // so quick key presses and wheel ticks add up (see CameraSync).
+  const cameraSync = useRef(new CameraSync());
   const frameCamera = props.frame3?.camera;
   useEffect(() => {
-    cameraRef.current = props.camera ?? frameCamera ?? null;
+    cameraSync.current.sync(props.camera, frameCamera);
   }, [props.camera, frameCamera]);
-  const currentCamera = () => cameraRef.current ?? props.frame3?.camera ?? null;
+  const currentCamera = () => cameraSync.current.current() ?? props.frame3?.camera ?? null;
   const half = props.frame3?.half ?? 1;
   const settle = useRef<ReturnType<typeof setTimeout>>(undefined);
   const propsRef = useRef(props);
@@ -121,7 +121,7 @@ export function GraphCanvas(props: GraphCanvasProps) {
   }, [props.scene, props.frame3, size]);
 
   const emitCamera = (c: Camera3) => {
-    cameraRef.current = c;
+    cameraSync.current.emit(c);
     propsRef.current.onCamera?.(c, "drag");
     clearTimeout(settle.current);
     settle.current = setTimeout(() => propsRef.current.onCamera?.(c, "full"), SETTLE_MS);
