@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { apply, detFloat } from "./matrix";
 import type { Mat } from "./matrix";
 import type { Eigen3Kind } from "./qr";
+import { EIGEN_CASES, typedMatrix } from "./eigenCases";
 import { complexPlane3, eigen3, eigenspace3, eigenvalues, hessenberg } from "./qr";
 
 function rng(seed: number) {
@@ -190,10 +191,13 @@ describe("A3: entries near 1e±200 (eigenvectors, eigenspaces, complex planes)",
   }
 });
 
-describe("A2: defective and repeated 3×3 matrices whose entries were rounded", () => {
+describe("A2: defective and repeated 3×3 matrices typed as decimals", () => {
+  // Changed in the per-value accuracy round: the matrices are P · J · P⁻¹ formed with exact decimals and rounded once,
+  // as typing them would. The earlier version multiplied in floating point, which rounds every entry differently; the
+  // eigenvalues of those stored doubles are, exactly, a split pair or triple (1e-8 apart), and eigen3 now reports
+  // them as they are (per-value accuracy, STEPS.md §8.2) instead of merging them by a tolerance.
   const P = [[1, 1, 0], [0, 1, 1], [1, 0, 1]];
   const Pinv = [[1, -1, 1], [1, 1, -1], [-1, 1, 1]].map((r) => r.map((v) => v / 2));
-  const mm = (X: number[][], Y: number[][]) => X.map((r) => Y[0].map((_, j) => r.reduce((s, v, k) => s + v * Y[k][j], 0)));
   const jordan = (l: number, m: number, form: "J3" | "J21" | "D21") =>
     form === "J3" ? [[l, 1, 0], [0, l, 1], [0, 0, l]] : form === "J21" ? [[l, 1, 0], [0, l, 0], [0, 0, m]] : [[l, 0, 0], [0, l, 0], [0, 0, m]];
   // [form, eigenvalue multiset (descending), eigen-directions]
@@ -204,9 +208,9 @@ describe("A2: defective and repeated 3×3 matrices whose entries were rounded", 
   });
   for (const l of [0.1, -3.7, 0.001, 2]) {
     for (const form of ["J3", "J21", "D21"] as const) {
-      it(`P·${form}(${l})·P⁻¹ (rounded entries) is repeated with the right eigenspaces`, () => {
+      it(`P·${form}(${l})·P⁻¹ typed as decimals is repeated with the right eigenspaces`, () => {
         const m = 5;
-        const A = mm(mm(P, jordan(l, m, form)), Pinv);
+        const A = typedMatrix(P, Pinv, jordan(l, m, form));
         const e = eigen3(A);
         const [values, nvec] = expected(l, m)[form];
         expect(e.kind).toBe("repeated-real");
@@ -220,13 +224,35 @@ describe("A2: defective and repeated 3×3 matrices whose entries were rounded", 
       });
     }
   }
+  it("the same matrices with floating-point rounded entries report the eigenvalues of the stored doubles", () => {
+    // Not merged: their exact eigenvalues differ by about 1e-8 relative, and the values are exact for what is stored.
+    const mm = (X: number[][], Y: number[][]) => X.map((r) => Y[0].map((_, j) => r.reduce((t, v, k) => t + v * Y[k][j], 0)));
+    const A = mm(mm(P, jordan(0.1, 5, "J3")), Pinv);
+    const e = eigen3(A);
+    const trace = A[0][0] + A[1][1] + A[2][2];
+    expect(e.values.reduce((t, v) => t + v.re, 0)).toBeCloseTo(trace, 12);
+    expect(e.values.every((v) => Math.abs(v.re - 0.1) < 1e-4)).toBe(true);
+  });
   it("typed decimals: a Jordan block with λ = 1.1 keeps one direction and the triple value 1.1", () => {
     const e = eigen3([[1.1, 1, 0], [0, 1.1, 1], [0, 0, 1.1]]);
     expect(e.values.map((v) => v.re)).toEqual([1.1, 1.1, 1.1]);
     expect(e.vectors).toHaveLength(1);
   });
-  it("eigenvalues that really differ stay distinct", () => {
+  it("eigenvalues that really differ stay distinct and exact", () => {
     expect(eigen3([[1, 0, 0], [0, 1.001, 0], [0, 0, 5]]).kind).toBe("distinct-real");
     expect(eigen3([[1, 0.5, 0], [0, 1.01, 0], [0, 0, 5]]).values.map((v) => v.re)).toEqual([5, 1.01, 1]);
+    // Eigenvalues 1 and 1 + 2⁻³⁰ of a diagonal matrix are not merged (they were within the old 1e-6 tolerance).
+    const near = eigen3([[1, 0, 0], [0, 1 + 2 ** -30, 0], [0, 0, 5]]);
+    expect(near.kind).toBe("distinct-real");
+    expect(near.values.map((v) => v.re)).toEqual([5, 1 + 2 ** -30, 1]);
+  });
+  it("widely spread eigenvalues are not mistaken for repeated ones (the earlier unit-norm test merged them)", () => {
+    // Matrix with eigenvalues 1, 1.5 and 1000 (‖A‖ about 6e4): the earlier unit-norm discriminant test took 1 and 1.5
+    // for a double root and returned 0.25 relative error.
+    const spread = EIGEN_CASES.find((c) => c.name === "spread 1 … 1000");
+    if (!spread) throw new Error("case missing");
+    const r = eigen3(spread.matrix);
+    expect(r.kind).toBe("distinct-real");
+    expect(r.values.map((v) => v.re)).toEqual([1000, 1.5, 1]);
   });
 });

@@ -63,14 +63,18 @@ Second review (verification of 7aeaa25) and fixes:
 - Two-column `cases` (value & condition) parses as a piecewise expression and is not a system.
 - Compute Engine parser messages and developer-invariant throws in `linalg/` stay English; engine, inference, compile and
   normalizer messages are translated (ar, es) since B10 (`i18n/errors.test.ts`).
-- The 3×3 exit criterion is met as an error relative to the largest \|λ\| (see Open items); a small eigenvalue of an
-  ill-conditioned 3×3 is not held to 10⁻⁹ relative to itself (owner question, not changed).
+- 3×3 eigenvalues are held to 10⁻⁹ per value (relative to each own magnitude) since the per-value round of 2026-10-31
+  (`linalgGolden.test.ts`, `eigenCases.ts`). Before it the 3×3 check was relative to the largest \|λ\| and QR lost small
+  eigenvalues of badly scaled matrices.
 - Exact eigenvectors are shown for rational eigenvalues; irrational ones as unit vectors with 6 digits.
 
 ## Open items (2026-10-31)
 
-- **Owner question:** the plan (STEPS.md §8.2) asks for 10⁻⁹ per eigenvalue; the 3×3 code and its test (`linalgGolden.test.ts`,
-  "eigenvalues within 1e-9 of the largest |λ|") check 10⁻⁹ relative to the largest |λ|. Which one is the criterion? Not changed.
+- **Closed 2026-10-31:** 3×3 per-value accuracy (`linalgGolden.test.ts`). The 66 golden 3×3 matrices were already within 3e-15
+  per value (unchanged). The 23 exact adversarial matrices of `linalg/eigenCases.ts` (eigenvalues spread over 12 orders of
+  magnitude, tiny and negative eigenvalues, roots 2⁻²⁰ … 2⁻⁴⁰ apart, eigenvector matrices with entries up to 1000,
+  complex pairs) are now exact on both `eigenvalues` and `eigen3` (error 0). At commit `856420e` both missed 1e-9 on 14 of
+  the 23 (worst 0.65, an ill-conditioned matrix); the same list is the regression test.
 - The 2×2 and determinant numbers above are asserted by `linalgGolden.test.ts` and `analyze.test.ts` (both pass at the
   current commit, gate included). No new measurement was taken in this round.
 

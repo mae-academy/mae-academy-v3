@@ -170,13 +170,6 @@ export const SQUARE_FACTOR_LIMIT = 10_000;
 export const TRANSFORM_GRID_MAX_LINES = 120;
 /** 3×3 eigenvalues: equal, or real, within this relative tolerance of the largest |λ| (QR rounding). */
 export const EIGEN_IMAG_RELATIVE = 1e-9;
-/**
- * A 3×3 matrix scaled to unit size whose characteristic-polynomial discriminant is at most this is treated as having a
- * repeated eigenvalue (rounded entries of a defective matrix give Δ ≈ 1e-17 for a double root, far less for a triple).
- */
-export const EIGEN_DISC_RELATIVE = 1e-12;
-/** In that case, all three roots coincide when even the most isolated one is within this of the others (unit-size matrix). */
-export const EIGEN_CLUSTER_RELATIVE = 1e-3;
 /** Stitching: nearest partner ends each curve end proposes (ends crowded in one cell stay linear to handle). */
 export const STITCH_CANDIDATES = 2;
 /** Tanh-sinh: levels compared before convergence is accepted, and the distance from an endpoint (as a fraction of

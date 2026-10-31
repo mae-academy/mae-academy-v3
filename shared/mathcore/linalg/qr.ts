@@ -8,10 +8,11 @@
  *    without deflation an exceptional shift breaks cycles. (Algorithm of EISPACK `hqr`.)
  * Repeated and complex eigenvalues are therefore handled explicitly, as the plan requires.
  */
-import { EIGEN_CLUSTER_RELATIVE, EIGEN_DISC_RELATIVE, EIGEN_IMAG_RELATIVE } from "../constants";
+import { EIGEN_IMAG_RELATIVE } from "../constants";
 import type { Mat } from "./matrix";
-import { detExact, powerOfTwoScale, toDyadic } from "./matrix";
+import { powerOfTwoScale } from "./matrix";
 import { Fraction } from "./fraction";
+import { cubic3, cubic3Exact, decimalRational, refinedEigenvalues3 } from "./exactRoots";
 import { KeyedError } from "../errors";
 
 export { EIGEN_IMAG_RELATIVE };
@@ -76,6 +77,12 @@ export function eigenvalues(A: Mat): EigenValue[] {
 
 function eigenvaluesScaled(A: Mat): EigenValue[] {
   const n = A.length;
+  // 3×3: roots of the exact characteristic polynomial, each to full relative accuracy (STEPS.md §8.2); QR below is
+  // the fallback for roots the refinement cannot separate and the method for every other size.
+  if (n === 3) {
+    const refined = refinedEigenvalues3(A);
+    if (refined) return refined;
+  }
   const a = hessenberg(A);
   const wr = new Array<number>(n).fill(0);
   const wi = new Array<number>(n).fill(0);
@@ -221,9 +228,6 @@ export interface Eigen3 {
   vectors: Array<{ value: number; vector: [number, number, number] }>;
 }
 
-/** Relative tolerance for treating two eigenvalues as equal, or an imaginary part as zero. */
-const EIGEN_EQUAL_TOLERANCE = EIGEN_IMAG_RELATIVE;
-
 const cross = (u: number[], v: number[]): [number, number, number] => [
   u[1] * v[2] - u[2] * v[1],
   u[2] * v[0] - u[0] * v[2],
@@ -260,106 +264,76 @@ export function eigenspace3(A: Mat, lambda: number): Array<[number, number, numb
 }
 
 /**
- * Characteristic polynomial λ³ + aλ² + bλ + c of a 3×3 matrix, exactly (on the stored doubles), and its discriminant
- * Δ = 18abc − 4a³c + a²b² − 4b³ − 27c²: Δ > 0 three distinct real roots, Δ < 0 one real root and a complex pair,
- * Δ = 0 a repeated root (all three equal when also a² = 3b).
- */
-function cubic3(A: Mat): { a: Fraction; b: Fraction; c: Fraction; disc: Fraction } | null {
-  const F = toDyadic(A);
-  if (!F) return null;
-  const T = F[0][0].add(F[1][1]).add(F[2][2]);
-  const minor = (i: number, j: number) => F[i][i].mul(F[j][j]).sub(F[i][j].mul(F[j][i]));
-  const M = minor(0, 1).add(minor(0, 2)).add(minor(1, 2));
-  const D = detExact(F);
-  const a = T.neg();
-  const b = M;
-  const c = D.neg();
-  const n = (k: number) => new Fraction(BigInt(k));
-  const disc = n(18).mul(a).mul(b).mul(c)
-    .sub(n(4).mul(a).mul(a).mul(a).mul(c))
-    .add(a.mul(a).mul(b).mul(b))
-    .sub(n(4).mul(b).mul(b).mul(b))
-    .sub(n(27).mul(c).mul(c));
-  return { a, b, c, disc };
-}
-
-/**
  * 3×3 eigen-decomposition. The matrix is divided by a power of two near its largest entry first (exact), so entries
  * near 1e±200 neither overflow nor underflow; values are scaled back, unit vectors are unaffected.
  *
- * The kind comes from the exact discriminant of the characteristic polynomial, so repeated and defective cases are
- * recognised exactly (QR alone splits a triple root by ~1e-5); a repeated root and the simple one are then exact too:
- * for λ³ + aλ² + bλ + c with Δ = 0, the double root is (9c − ab) / (2(a² − 3b)) and the simple one
- * (4ab − 9c − a³) / (a² − 3b); a triple root is −a/3. Eigen-directions number 3 − rank(A − λI).
- *
- * A matrix whose entries were rounded (typed decimals, a similarity transform of a Jordan form) has Δ ≠ 0 although it
- * is a repeated-root matrix to working precision. When |Δ| ≤ EIGEN_DISC_RELATIVE for the matrix scaled to unit size
- * (eigenvalues closer than about 1e-6 of the matrix norm), the roots are treated as repeated: a triple root is
- * trace/3, a double root (trace − simple)/2 with the simple root from QR (symmetric functions of the roots are
- * insensitive to the splitting), and the eigenspaces come from the numerical rank of A − λI. Distinct and complex
- * values otherwise come from QR.
+ * Values: the roots of the exact characteristic polynomial of the matrix as stored, each to full relative accuracy
+ * (exactRoots.ts; STEPS.md §8.2 asks 1e-9 for every eigenvalue, however small or close to another). No tolerance merges
+ * two distinct roots: whatever the data, the values are the eigenvalues of the stored doubles.
+ * A repeated root is recognised exactly from the discriminant: double root (9c − ab) / (2(a² − 3b)), simple root
+ * (4ab − 9c − a³) / (a² − 3b), triple root −a/3. One more case counts as repeated: a matrix typed as decimals
+ * (`1.1`, `0.001`) means the exact decimals, not the nearest doubles; when that exact matrix has a repeated root the
+ * values are the exact repeated roots, as typed (a Jordan block with λ = 1.1 shows 1.1 three times, not a complex pair
+ * 1.1 ± 5·10⁻⁶ i from rounding). Eigen-directions number 3 − rank(A − λI) for a repeated value.
  */
 export function eigen3(A: Mat): Eigen3 {
   if (A.length !== 3 || A.some((r) => r.length !== 3)) throw new RangeError("eigen3 needs a 3×3 matrix");
   if (A.flat().some((v) => !Number.isFinite(v))) throw new RangeError("eigen3 needs finite entries");
   const k = powerOfTwoScale(A);
-  const r = eigen3Scaled(A.map((row) => row.map((v) => v / k)));
+  const typed = decimalRational(A);
+  const typedCubic = typed ? cubic3Exact(typed) : null;
+  const repeatedAsTyped = typedCubic && typedCubic.disc.isZero() ? rootsOfRepeated(typedCubic) : null;
+  const r = eigen3Scaled(A.map((row) => row.map((v) => v / k)), repeatedAsTyped ? repeatedAsTyped.map((v) => v / k) : null);
   return { kind: r.kind, values: r.values.map((e) => ({ re: e.re * k, im: e.im * k })), vectors: r.vectors.map((v) => ({ value: v.value * k, vector: v.vector })) };
 }
 
-const dist = (u: EigenValue, v: EigenValue) => Math.hypot(u.re - v.re, u.im - v.im);
-
-function eigen3Scaled(A: Mat): Eigen3 {
-  const cub = cubic3(A);
+/** The three roots (with multiplicity) of a cubic whose discriminant is zero, from the exact formulas. */
+function rootsOfRepeated(cub: { a: Fraction; b: Fraction; c: Fraction }): number[] {
   const three = new Fraction(BigInt(3));
-  let roots: Array<{ value: number; multiplicity: number }> | null = null;
-  if (cub && cub.disc.isZero()) {
-    const { a, b, c } = cub;
-    const p = a.mul(a).sub(b.mul(three));
-    if (p.isZero()) roots = [{ value: a.neg().div(three).toNumber(), multiplicity: 3 }];
-    // p = (sum of squared root gaps) / 2 = 2d² for a double root and a simple one d apart: a tiny p means the three
-    // roots coincide to working precision (rounded entries), which the tolerance path below handles.
-    else if (Math.sqrt(Math.abs(p.toNumber()) / 2) > EIGEN_CLUSTER_RELATIVE) {
-      const double = c.mul(new Fraction(BigInt(9))).sub(a.mul(b)).div(p.mul(new Fraction(BigInt(2))));
-      const simple = a.mul(b).mul(new Fraction(BigInt(4))).sub(c.mul(new Fraction(BigInt(9)))).sub(a.mul(a).mul(a)).div(p);
-      roots = [{ value: double.toNumber(), multiplicity: 2 }, { value: simple.toNumber(), multiplicity: 1 }];
-    }
+  const { a, b, c } = cub;
+  const p = a.mul(a).sub(b.mul(three));
+  if (p.isZero()) {
+    const t = a.neg().div(three).toNumber();
+    return [t, t, t];
   }
-  const values = roots ? [] : eigenvalues(A);
-  if (!roots) {
-    // Product of squared root gaps (the discriminant), for a matrix of unit size.
-    const disc = cub ? Math.abs(cub.disc.toNumber()) : dist(values[0], values[1]) ** 2 * dist(values[0], values[2]) ** 2 * dist(values[1], values[2]) ** 2;
-    if (disc <= EIGEN_DISC_RELATIVE) {
-      const trace = A[0][0] + A[1][1] + A[2][2];
-      // The isolated root is the one farthest from the other two; if even that one is close, all three coincide.
-      const gap = values.map((v, i) => Math.min(...values.filter((_, j) => j !== i).map((w) => dist(v, w))));
-      const s = gap.indexOf(Math.max(...gap));
-      if (gap[s] <= EIGEN_CLUSTER_RELATIVE) roots = [{ value: trace / 3, multiplicity: 3 }];
-      else {
-        const simple = values[s].re;
-        roots = [{ value: (trace - simple) / 2, multiplicity: 2 }, { value: simple, multiplicity: 1 }];
-      }
-    }
-  }
+  const double = c.mul(new Fraction(BigInt(9))).sub(a.mul(b)).div(p.mul(new Fraction(BigInt(2)))).toNumber();
+  const simple = a.mul(b).mul(new Fraction(BigInt(4))).sub(c.mul(new Fraction(BigInt(9)))).sub(a.mul(a).mul(a)).div(p).toNumber();
+  return [double, double, simple];
+}
+
+function eigen3Scaled(A: Mat, repeated: number[] | null): Eigen3 {
+  const cub = cubic3(A);
+  let roots = repeated;
+  if (!roots && cub && cub.disc.isZero()) roots = rootsOfRepeated(cub);
   if (roots) {
-    const flat: EigenValue[] = roots
-      .flatMap((r) => Array.from({ length: r.multiplicity }, () => ({ re: r.value, im: 0 })))
-      .sort((u, v) => v.re - u.re);
-    const vectors = roots.flatMap((r) => eigenspace3(A, r.value).slice(0, r.multiplicity).map((vector) => ({ value: r.value, vector })));
-    return { kind: "repeated-real", values: flat, vectors };
+    // Repeated roots: each distinct value with its eigen-directions (3 − rank(A − λI), at most its multiplicity).
+    const distinct: Array<{ value: number; multiplicity: number }> = [];
+    for (const v of roots) {
+      const same = distinct.find((d) => d.value === v);
+      if (same) same.multiplicity++;
+      else distinct.push({ value: v, multiplicity: 1 });
+    }
+    const values: EigenValue[] = roots.map((re) => ({ re, im: 0 })).sort((u, v) => v.re - u.re);
+    const vectors = distinct.flatMap((d) => eigenspace3(A, d.value).slice(0, d.multiplicity).map((vector) => ({ value: d.value, vector })));
+    return { kind: "repeated-real", values, vectors };
   }
-  const scale = Math.max(...values.map((v) => Math.hypot(v.re, v.im)), Number.MIN_VALUE);
-  // Δ < 0: one real root and a complex pair, whatever the rounding in QR says.
-  const complex = cub ? cub.disc.n < BigInt(0) : values.some((v) => Math.abs(v.im) > EIGEN_EQUAL_TOLERANCE * scale);
+  let values = eigenvaluesScaled(A);
+  // Δ < 0: one real root and a complex pair; Δ > 0: three real roots, whatever the rounding says.
+  let complex: boolean;
   if (cub) {
+    complex = cub.disc.n < BigInt(0);
     if (complex) {
-      // The real root is the value with the smallest |im|; the pair keeps its conjugate imaginary parts.
       const sorted = values.slice().sort((u, v) => Math.abs(u.im) - Math.abs(v.im));
       sorted[0] = { re: sorted[0].re, im: 0 };
-      values.splice(0, values.length, ...sorted);
-    } else for (const v of values) v.im = 0;
+      values = sorted;
+    } else values = values.map((v) => ({ re: v.re, im: 0 }));
+  } else {
+    const scale = Math.max(...values.map((w) => Math.hypot(w.re, w.im)), Number.MIN_VALUE);
+    complex = values.some((v) => Math.abs(v.im) > EIGEN_IMAG_RELATIVE * scale);
   }
-  const reals = values.filter((v) => v.im === 0 || Math.abs(v.im) <= EIGEN_EQUAL_TOLERANCE * scale).map((v) => v.re);
+  values.sort((u, v) => v.re - u.re || v.im - u.im);
+  const scale = Math.max(...values.map((v) => Math.hypot(v.re, v.im)), Number.MIN_VALUE);
+  const reals = values.filter((v) => v.im === 0 || Math.abs(v.im) <= EIGEN_IMAG_RELATIVE * scale).map((v) => v.re);
   const vectors = reals.flatMap((value) => eigenspace3(A, value).slice(0, 1).map((vector) => ({ value, vector })));
   return { kind: complex ? "complex-pair" : "distinct-real", values, vectors };
 }

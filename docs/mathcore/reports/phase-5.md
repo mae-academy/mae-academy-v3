@@ -65,9 +65,13 @@ random decimal systems.
   with the translucent fragments on their pixel (fixed in A6, `render3d.test.ts`).
 - Text labels are drawn on top of the frame and are not hidden by surfaces in front of them.
 - Frames are rendered at CSS-pixel resolution and scaled up on high-density screens (slightly soft at DPR 2).
-- For floating-point 3×3 input, a double root is recognised when the discriminant of the unit-size matrix is at most
-  10⁻¹² (roots closer than about 10⁻⁶ of the matrix norm are reported as equal). Roots further apart come from QR, and
-  their eigenvectors are computed from the numerical rank of A − λI (`EIGEN_DISC_RELATIVE`, `EIGEN_CLUSTER_RELATIVE`).
+- 3×3 eigenvalues are the roots of the exact characteristic polynomial of the stored doubles, refined in 512-bit
+  fixed point (`linalg/exactRoots.ts`): every value is within 1e-9 of its own magnitude (STEPS.md §8.2), including
+  eigenvalues 1e-12 of ‖A‖ and roots 2⁻⁴⁰ apart. No tolerance merges two distinct roots. A matrix typed as decimals whose
+  exact decimal matrix has a repeated root is reported as repeated (a Jordan block with λ = 1.1 shows 1.1 three
+  times). A matrix whose entries were rounded by a floating-point computation (P·J·P⁻¹ in doubles) is reported with the
+  exact eigenvalues of what is stored: a split pair or triple about 1e-8 apart, or a complex pair. Eigenvectors come from
+  the numerical rank of A − λI. Cost: about 1 ms per matrix.
 - Full 1600×1000 frames grow with the number of items (Node, one thread, measured 2026-10-31): 1 item 12.8 ms, 5 items
   26.7 ms, 10 items 48.0 ms, 20 items 144.3 ms. The 25 ms budget is held for the Phase 5 scene (one 3×3 system and one
   3×3 matrix) and for the drag frames; more items than about 5 at full quality are not within it.
