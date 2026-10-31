@@ -33,6 +33,8 @@ export interface BenchResult {
   target: number;
   unit: "ms" | "samples/s";
   median: number;
+  /** Slowest run (equals `median` for a throughput figure). */
+  max: number;
   runs: number;
   pass: boolean;
 }
@@ -45,6 +47,9 @@ function median(xs: number[]): number {
   return s[Math.floor(s.length / 2)];
 }
 
+/** Slowest run of the last `time()` call, read by `add`. */
+let lastMax = 0;
+
 function time(fn: () => void, runs = RUNS): number {
   fn(); // warm-up (JIT)
   const t: number[] = [];
@@ -53,6 +58,7 @@ function time(fn: () => void, runs = RUNS): number {
     fn();
     t.push(performance.now() - t0);
   }
+  lastMax = Math.max(...t);
   return median(t);
 }
 
@@ -62,7 +68,7 @@ const now = (): number => performance.now();
 export function runBenchmarks(): BenchResult[] {
   const out: BenchResult[] = [];
   const add = (id: string, budgetCase: string, target: number, unit: BenchResult["unit"], m: number, runs = RUNS) =>
-    out.push({ id, budgetCase, target, unit, median: m, runs, pass: unit === "ms" ? m <= target : m >= target });
+    out.push({ id, budgetCase, target, unit, median: m, max: unit === "ms" ? lastMax : m, runs, pass: unit === "ms" ? m <= target : m >= target });
 
   // Slider drag: 3 curves × 2000 samples re-evaluated with a new parameter value (closures only, no recompile).
   const curves = [
