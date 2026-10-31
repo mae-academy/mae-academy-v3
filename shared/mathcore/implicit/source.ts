@@ -18,11 +18,5 @@ export interface ImplicitSource {
 /** F(x, y) from its source: compiled once (compile cache by expression), environment bound. */
 export function bindImplicit(src: ImplicitSource): (x: number, y: number) => number {
   const c = compile(src.F, { variables: src.variables, functions: new Map(src.functions) });
-  const buf = new Float64Array(src.variables.length);
-  buf.set(src.env, 2);
-  return (x, y) => {
-    buf[0] = x;
-    buf[1] = y;
-    return c.evaluate(buf);
-  };
+  return c.bindXY(src.env);
 }

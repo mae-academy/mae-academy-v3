@@ -3,6 +3,7 @@
  * Worker, sliders, links, errors, implicit curves and shading, tracing, RTL, and zero bytes on other routes.
  */
 import { expect, test, type Page } from "@playwright/test";
+import { readdirSync } from "node:fs";
 import LZString from "lz-string";
 
 const link = (graph: unknown) => `/mathcore?g=${LZString.compressToEncodedURIComponent(JSON.stringify(graph))}`;
@@ -333,4 +334,39 @@ test.describe("Phase 5: 3D linear algebra", () => {
       await expect.poll(() => linkCamera()?.distance, { timeout: 10_000 }).toBeCloseTo(30 * 1.2 ** 12, 6);
     });
   }
+});
+
+test("a release after a drag reuses the drag frame of the same view; a moved view computes its own", async ({ page }) => {
+  const worker = readdirSync("dist/public/assets").find((f) => f.startsWith("mathcore-engine-worker-"));
+  if (!worker) throw new Error("build first: no engine Worker chunk in dist/public/assets");
+  await page.goto("/");
+  const flags = await page.evaluate(async (url) => {
+    const w = new Worker(url, { type: "module" });
+    let seq = 0;
+    const ask = (msg: Record<string, unknown>) =>
+      new Promise<Array<{ partial: boolean; reused: boolean }>>((resolve) => {
+        const s = ++seq;
+        const seen: Array<{ partial: boolean; reused: boolean }> = [];
+        w.onmessage = (ev: MessageEvent) => {
+          if (ev.data.seq !== s) return;
+          seen.push({ partial: !!ev.data.partial, reused: !!ev.data.items?.[0]?.reused });
+          if (!ev.data.partial) resolve(seen);
+        };
+        w.postMessage({ ...msg, seq: s });
+      });
+    const raw = ["Less", ["Sin", ["Add", ["Power", "x", 2], ["Power", "y", 2]]], 0];
+    const viewport = { xmin: -5, xmax: 5, ymin: -3.125, ymax: 3.125, aspect: "equal" };
+    const graph = { version: "1.0", viewport, items: [{ id: "a", latex: "L" }], params: {}, view: { mode: "2d", grid: true, showSteps: false, locale: "en" } };
+    const view = (quality: string, dx: number) => ({ viewport: { ...viewport, xmin: -5 + dx, xmax: 5 + dx }, width: 800, height: 500, quality });
+    await ask({ type: "load", graph, parsed: { L: { ok: true, raw } }, view: view("full", 0) });
+    const drag = await ask({ type: "view", view: view("drag", 0.01) });
+    const release = await ask({ type: "view", view: view("full", 0.01) });
+    const moved = await ask({ type: "view", view: view("full", 0.02) });
+    w.terminate();
+    return { drag, release, moved };
+  }, `/assets/${worker}`);
+  // The drag frame itself is computed; the release's preview frame is that same frame; a different view recomputes.
+  expect(flags.drag.every((f) => !f.reused)).toBe(true);
+  expect(flags.release.find((f) => f.partial)?.reused).toBe(true);
+  expect(flags.moved.find((f) => f.partial)?.reused).toBe(false);
 });

@@ -585,3 +585,148 @@ describe("B11/B12: thin features at full quality (documented limits, rendering u
     expect(blank(1)).toBe(0);
   });
 });
+
+/**
+ * Output of the contour and the mask is pinned (taken from the implementation at 856420e, before the hot loops were
+ * restructured for the two-core budget in the follow-up of 2026-10-31): the same pieces, the same coordinates and the
+ * same number of evaluations. A change that alters any of them is deliberate and must update this table.
+ */
+describe("contour and mask output is unchanged by the hot-loop restructuring", () => {
+  const view = { xmin: -5, xmax: 5, ymin: -3.125, ymax: 3.125, aspect: "equal" as const };
+  const fields: Record<string, (x: number, y: number) => number> = {
+    circle: (x, y) => x * x + y * y - 9,
+    ref: (x, y) => x * x + y * y + Math.sin(3 * x) * Math.cos(2 * y) - 9,
+    dense: (x, y) => Math.sin(x * x + y * y),
+    lemniscate: (x, y) => (x * x + y * y) ** 2 - 8 * (x * x - y * y),
+  };
+  const sum = (ps: Float64Array[]) => {
+    let s = 0;
+    let n = 0;
+    for (const p of ps) {
+      n += p.length;
+      for (let i = 0; i < p.length; i++) s += p[i] * (1 + (i % 7));
+    }
+    return { pieces: ps.length, numbers: n, checksum: Number(s.toPrecision(12)) };
+  };
+  const on = (m: { data: Uint8Array }) => m.data.reduce((n, v) => n + v, 0);
+  const PINNED = {
+    "contour": {
+      "circle": {
+        "full": {
+          "pieces": 1,
+          "numbers": 5130,
+          "checksum": -11.7673987911,
+          "evaluations": 140337
+        },
+        "drag": {
+          "pieces": 1,
+          "numbers": 1290,
+          "checksum": -6.32654369368,
+          "evaluations": 30235,
+          "coarse": false
+        }
+      },
+      "ref": {
+        "full": {
+          "pieces": 2,
+          "numbers": 5196,
+          "checksum": -225.779412636,
+          "evaluations": 140891
+        },
+        "drag": {
+          "pieces": 2,
+          "numbers": 1304,
+          "checksum": -67.5419695361,
+          "evaluations": 30308,
+          "coarse": false
+        }
+      },
+      "dense": {
+        "full": {
+          "pieces": 27,
+          "numbers": 34222,
+          "checksum": 23.4176306513,
+          "evaluations": 424205
+        },
+        "drag": {
+          "pieces": 28,
+          "numbers": 4360,
+          "checksum": 32.1733902483,
+          "evaluations": 33627,
+          "coarse": true
+        }
+      },
+      "lemniscate": {
+        "full": {
+          "pieces": 2,
+          "numbers": 4124,
+          "checksum": -4.09414627504,
+          "evaluations": 130779
+        },
+        "drag": {
+          "pieces": 1,
+          "numbers": 1026,
+          "checksum": -1.73390216318,
+          "evaluations": 28835,
+          "coarse": false
+        }
+      }
+    },
+    "mask": {
+      "circle": {
+        "full": {
+          "shaded": 723804,
+          "evaluations": 330434
+        },
+        "drag": {
+          "shaded": 45253,
+          "evaluations": 25755
+        }
+      },
+      "ref": {
+        "full": {
+          "shaded": 724966,
+          "evaluations": 330993
+        },
+        "drag": {
+          "shaded": 45272,
+          "evaluations": 25780
+        }
+      },
+      "dense": {
+        "full": {
+          "shaded": 737944,
+          "evaluations": 674365
+        },
+        "drag": {
+          "shaded": 46119,
+          "evaluations": 42038
+        }
+      },
+      "lemniscate": {
+        "full": {
+          "shaded": 204756,
+          "evaluations": 319305
+        },
+        "drag": {
+          "shaded": 12759,
+          "evaluations": 25347
+        }
+      }
+    }
+  };
+  for (const [name, F] of Object.entries(fields)) {
+    it(`${name}: full and drag contour, full and drag mask`, () => {
+      const full = contour(F, view, { width: 1600, height: 1000, cellPx: 6, refine: 4 });
+      const drag = contour(F, view, { width: 1600, height: 1000, cellPx: 12, refine: 2, coarseWhenDense: 0.5 });
+      const mf = regionMask(F, view, 1600, 1000, 1, insideTest("<"), 6, 1);
+      const md = regionMask(F, view, 1600, 1000, 4, insideTest("<"), 12, 2);
+      const got = {
+        contour: { full: { ...sum(full.polylines), evaluations: full.evaluations }, drag: { ...sum(drag.polylines), evaluations: drag.evaluations, coarse: drag.coarse } },
+        mask: { full: { shaded: on(mf), evaluations: mf.evaluations }, drag: { shaded: on(md), evaluations: md.evaluations } },
+      };
+      expect(got.contour).toEqual(PINNED.contour[name as keyof typeof PINNED.contour]);
+      expect(got.mask).toEqual(PINNED.mask[name as keyof typeof PINNED.mask]);
+    });
+  }
+});

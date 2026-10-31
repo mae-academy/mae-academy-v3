@@ -9,6 +9,8 @@
  * Output: one JSON document on stdout (device, browser, cores, each case with median, max, budget and pass; fields in
  * docs/mathcore/reports/device-results-template.md), a table on stderr. MATHCORE_RUNS sets the runs per case (default 9).
  *
+ * MATHCORE_IDLE_MS (default 1000) is the idle time after loading before the first frame; 0 measures a cold Worker.
+ *
  * MATHCORE_CORES=2 makes the page report 2 logical cores (navigator.hardwareConcurrency), which is what sizes the strip
  * Worker pool; the machine still has all its cores, so this shows the pool a 2-core device would get, not its speed.
  */
@@ -20,6 +22,8 @@ const { chromium } = require("playwright");
 
 const base = process.argv[2] ?? "http://localhost:4173";
 const RUNS = Number(process.env.MATHCORE_RUNS ?? 9);
+/** Idle time between loading the document and the first frame, as a user has before the first drag (the Worker warms up in it). */
+const IDLE_MS = Number(process.env.MATHCORE_IDLE_MS ?? 1000);
 /** STEPS.md §7.2: drag frame and release frame budgets, in milliseconds. */
 const BUDGET = { drag: 16, release: 150 };
 const worker = readdirSync(join(process.env.MATHCORE_DIST ?? join(__dirname, "../../dist/public"), "assets")).find((f) => f.startsWith("mathcore-engine-worker-"));
@@ -32,7 +36,7 @@ if (!worker) throw new Error("Build first: no mathcore-engine-worker chunk in di
     await page.addInitScript((n) => Object.defineProperty(navigator, "hardwareConcurrency", { value: n }), Number(process.env.MATHCORE_CORES));
   }
   await page.goto(base);
-  const out = await page.evaluate(async ([url, runs]) => {
+  const out = await page.evaluate(async ([url, runs, idle]) => {
     const cases = {
       reference: ["Less", ["Add", ["Power", "x", 2], ["Power", "y", 2], ["Multiply", ["Sin", ["Multiply", 3, "x"]], ["Cos", ["Multiply", 2, "y"]]]], 9],
       dense: ["Less", ["Sin", ["Add", ["Power", "x", 2], ["Power", "y", 2]]], 0],
@@ -41,29 +45,37 @@ if (!worker) throw new Error("Build first: no mathcore-engine-worker chunk in di
     for (const [name, raw] of Object.entries(cases)) {
       const w = new Worker(url, { type: "module" });
       let seq = 0;
+      let lastWorkerMs = 0;
       const ask = (msg) =>
         new Promise((resolve) => {
           const s = ++seq;
           const t0 = performance.now();
           w.onmessage = (ev) => {
-            if (ev.data.seq === s && !ev.data.partial) resolve(performance.now() - t0);
+            if (ev.data.seq === s && !ev.data.partial) {
+              lastWorkerMs = ev.data.ms;
+              resolve(performance.now() - t0);
+            }
           };
           w.postMessage({ ...msg, seq: s });
         });
       const viewport = { xmin: -5, xmax: 5, ymin: -3.125, ymax: 3.125, aspect: "equal" };
       const graph = { version: "1.0", viewport, items: [{ id: "a", latex: "L" }], params: {}, view: { mode: "2d", grid: true, showSteps: false, locale: "en" } };
-      const view = (quality) => ({ viewport, width: 1600, height: 1000, quality });
+      // Each iteration pans the view a little, as a drag does (so no frame can be reused), then releases on that view.
+      const view = (quality, k = 0) => ({ viewport: { ...viewport, xmin: viewport.xmin + k * 0.0013, xmax: viewport.xmax + k * 0.0013 }, width: 1600, height: 1000, quality });
       await ask({ type: "load", graph, parsed: { L: { ok: true, raw } }, view: view("full") });
-      const t = { drag: [], full: [] };
-      for (let k = 0; k < runs; k++) {
-        t.drag.push(await ask({ type: "view", view: view("drag") }));
-        t.full.push(await ask({ type: "view", view: view("full") }));
+      await new Promise((r) => setTimeout(r, idle));
+      const t = { drag: [], full: [], workerDrag: [], workerFull: [] };
+      for (let k = 1; k <= runs; k++) {
+        t.drag.push(await ask({ type: "view", view: view("drag", k) }));
+        t.workerDrag.push(lastWorkerMs);
+        t.full.push(await ask({ type: "view", view: view("full", k) }));
+        t.workerFull.push(lastWorkerMs);
       }
-      res[name] = { drag: t.drag, release: t.full };
+      res[name] = { drag: t.drag, release: t.full, workerDrag: t.workerDrag, workerRelease: t.workerFull };
       w.terminate();
     }
     return res;
-  }, [`/assets/${worker}`, RUNS]);
+  }, [`/assets/${worker}`, RUNS, IDLE_MS]);
   const info = await page.evaluate(() => ({
     userAgent: navigator.userAgent,
     platform: navigator.platform,
@@ -84,6 +96,8 @@ if (!worker) throw new Error("Build first: no mathcore-engine-worker chunk in di
         comparator: "<=",
         budget,
         median: m,
+        /** Compute time inside the Worker (its own `ms`), without the message round trip. */
+        workerMedian: median(out[name][kind === "drag" ? "workerDrag" : "workerRelease"]),
         max: Math.max(...runs),
         runs: runs.length,
         pass: m <= budget,
@@ -114,7 +128,7 @@ if (!worker) throw new Error("Build first: no mathcore-engine-worker chunk in di
           logicalCores: cpus.length,
           memoryGB: Math.round((os.totalmem() / 2 ** 30) * 10) / 10,
         },
-        browser: { name: "chromium", version: browser.version(), ...info, logicalCoresReported: out.cores, coresOverride: process.env.MATHCORE_CORES ?? null },
+        browser: { name: "chromium", version: browser.version(), ...info, logicalCoresReported: out.cores, coresOverride: process.env.MATHCORE_CORES ?? null, idleAfterLoadMs: IDLE_MS, runsPerCase: RUNS },
         cases,
         passed: cases.filter((c) => c.pass).length,
         failed: cases.filter((c) => !c.pass).length,

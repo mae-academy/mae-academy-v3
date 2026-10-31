@@ -230,10 +230,12 @@ function contourWith(sc: ContourScratch, F: (x: number, y: number) => number, vp
 
   /** Marching-squares cell with lower-left lattice corner (i, j) and sides of `len` lattice steps. */
   const cell = (i: number, j: number, len = 1) => {
-    const v00 = value(i, j);
-    const v10 = value(i + len, j);
-    const v11 = value(i + len, j + len);
-    const v01 = value(i, j + len);
+    // The caller has evaluated the four corners (`refine` does so for the whole block): plain array reads.
+    const k = j * stride + i;
+    const v00 = vals[k];
+    const v10 = vals[k + len];
+    const v11 = vals[k + len * stride + len];
+    const v01 = vals[k + len * stride];
     if (!(Number.isFinite(v00) && Number.isFinite(v10) && Number.isFinite(v11) && Number.isFinite(v01))) return;
     const c0 = v00 > 0 ? 1 : 0;
     const c1 = v10 > 0 ? 1 : 0;
@@ -293,16 +295,20 @@ function contourWith(sc: ContourScratch, F: (x: number, y: number) => number, vp
   // Slope seen from each coarse lattice point: the largest |ΔF| to its four coarse neighbours, computed once per point
   // (a coarse cell then takes the largest of its four corners). NaN comparisons are false, so undefined neighbours
   // are ignored.
-  const pointSlope = new Float64Array((cols + 1) * (rows + 1));
+  const cw1 = cols + 1;
+  const coarse0 = new Float64Array(cw1 * (rows + 1));
+  for (let J = 0; J <= rows; J++) for (let I = 0; I <= cols; I++) coarse0[J * cw1 + I] = value(I * R, J * R);
+  const pointSlope = new Float64Array(coarse0.length);
   for (let J = 0; J <= rows; J++) {
     for (let I = 0; I <= cols; I++) {
-      const v = value(I * R, J * R);
+      const k = J * cw1 + I;
+      const v = coarse0[k];
       let sl = 0;
-      if (I < cols) sl = Math.max(sl, Math.abs(value((I + 1) * R, J * R) - v) || 0);
-      if (I > 0) sl = Math.max(sl, Math.abs(value((I - 1) * R, J * R) - v) || 0);
-      if (J < rows) sl = Math.max(sl, Math.abs(value(I * R, (J + 1) * R) - v) || 0);
-      if (J > 0) sl = Math.max(sl, Math.abs(value(I * R, (J - 1) * R) - v) || 0);
-      pointSlope[J * (cols + 1) + I] = sl;
+      if (I < cols) sl = Math.max(sl, Math.abs(coarse0[k + 1] - v) || 0);
+      if (I > 0) sl = Math.max(sl, Math.abs(coarse0[k - 1] - v) || 0);
+      if (J < rows) sl = Math.max(sl, Math.abs(coarse0[k + cw1] - v) || 0);
+      if (J > 0) sl = Math.max(sl, Math.abs(coarse0[k - cw1] - v) || 0);
+      pointSlope[k] = sl;
     }
   }
   const coarseSlope = (ci: number, cj: number): number => {
@@ -318,7 +324,11 @@ function contourWith(sc: ContourScratch, F: (x: number, y: number) => number, vp
     refined[cj * cols + ci] = 1;
     refinedCount++;
     if (coarse) cell(ci * R, cj * R, R);
-    else for (let b = 0; b < R; b++) for (let a = 0; a < R; a++) cell(ci * R + a, cj * R + b);
+    else {
+      // All (R + 1)² corners of the block first (neighbouring fine cells share them), then the cells.
+      for (let b = 0; b <= R; b++) for (let a = 0; a <= R; a++) value(ci * R + a, cj * R + b);
+      for (let b = 0; b < R; b++) for (let a = 0; a < R; a++) cell(ci * R + a, cj * R + b);
+    }
   };
   const flagged: number[] = [];
   // Coarse pass: refine cells that change sign, mix defined and undefined corners, or come close to zero.
@@ -326,10 +336,11 @@ function contourWith(sc: ContourScratch, F: (x: number, y: number) => number, vp
     for (let ci = 0; ci < cols; ci++) {
       const i0 = ci * R;
       const j0 = cj * R;
-      const a = value(i0, j0);
-      const b = value(i0 + R, j0);
-      const c = value(i0 + R, j0 + R);
-      const d = value(i0, j0 + R);
+      const k0 = cj * cw1 + ci;
+      const a = coarse0[k0];
+      const b = coarse0[k0 + 1];
+      const c = coarse0[k0 + cw1 + 1];
+      const d = coarse0[k0 + cw1];
       if (needsRefinement4(a, b, c, d, coarseSlope(ci, cj))) {
         flagged.push(cj * cols + ci);
         continue;
@@ -626,30 +637,31 @@ export function regionMask(
       evaluations++;
     }
   }
-  const at = (I: number, J: number) => lat[J * (cw + 1) + I];
+  const lw = cw + 1;
   // Slope seen from each lattice point (largest |ΔF| to its four neighbours), once per point as in `contour`.
   const pointSlope = new Float64Array(lat.length);
   for (let J = 0; J <= ch; J++) {
     for (let I = 0; I <= cw; I++) {
-      const v = at(I, J);
+      const k = J * lw + I;
+      const v = lat[k];
       let sl = 0;
-      if (I < cw) sl = Math.max(sl, Math.abs(at(I + 1, J) - v) || 0);
-      if (I > 0) sl = Math.max(sl, Math.abs(at(I - 1, J) - v) || 0);
-      if (J < ch) sl = Math.max(sl, Math.abs(at(I, J + 1) - v) || 0);
-      if (J > 0) sl = Math.max(sl, Math.abs(at(I, J - 1) - v) || 0);
-      pointSlope[J * (cw + 1) + I] = sl;
+      if (I < cw) sl = Math.max(sl, Math.abs(lat[k + 1] - v) || 0);
+      if (I > 0) sl = Math.max(sl, Math.abs(lat[k - 1] - v) || 0);
+      if (J < ch) sl = Math.max(sl, Math.abs(lat[k + lw] - v) || 0);
+      if (J > 0) sl = Math.max(sl, Math.abs(lat[k - lw] - v) || 0);
+      pointSlope[k] = sl;
     }
   }
   for (let J = 0; J < ch; J++) {
     for (let I = 0; I < cw; I++) {
-      const k = J * (cw + 1) + I;
-      const slope = Math.max(pointSlope[k], pointSlope[k + 1], pointSlope[k + cw + 1], pointSlope[k + cw + 2]);
+      const k = J * lw + I;
+      const slope = Math.max(pointSlope[k], pointSlope[k + 1], pointSlope[k + lw], pointSlope[k + lw + 1]);
       const i1 = Math.min(w, (I + 1) * B);
       const j1 = Math.min(h, (J + 1) * B);
-      const c0 = at(I, J);
-      const c1 = at(I + 1, J);
-      const c2 = at(I + 1, J + 1);
-      const c3 = at(I, J + 1);
+      const c0 = lat[k];
+      const c1 = lat[k + 1];
+      const c2 = lat[k + lw + 1];
+      const c3 = lat[k + lw];
       let refineBlock = needsRefinement4(c0, c1, c2, c3, slope);
       if (!refineBlock) {
         // Probes at jittered positions inside the block (more when the block is large): a pattern repeating at a
@@ -670,7 +682,16 @@ export function regionMask(
       }
       if (refineBlock) {
         if (refineStep <= 1) {
-          for (let j = J * B; j < j1; j++) for (let i = I * B; i < i1; i++) pixel(i, j);
+          // Every pixel of the block, inlined (this loop runs for most pixels of a dense field).
+          for (let j = J * B; j < j1; j++) {
+            const y = vp.ymax - (j + 0.5) * sy;
+            const row = j * w;
+            for (let i = I * B; i < i1; i++) {
+              const v = F(vp.xmin + (i + 0.5) * sx, y);
+              data[row + i] = Number.isFinite(v) && inside(v) ? 1 : 0;
+            }
+          }
+          evaluations += (j1 - J * B) * (i1 - I * B);
         } else {
           for (let j = J * B; j < j1; j += refineStep) {
             const gh = Math.min(refineStep, j1 - j);

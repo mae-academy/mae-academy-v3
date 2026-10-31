@@ -145,6 +145,14 @@ export const STRIP_WORKERS_MAX = 4;
 export const STRIP_WORKERS_MIN = 2;
 export const STRIP_RESERVED_CORES = 1;
 /** A strip run that takes longer fails over to this Worker (longer before the strip chunk has loaded). */
+/**
+ * Idle warm-up of the engine and strip Workers after a document with implicit items loads: up to this many silent
+ * drag-quality passes, stopped once they have used this much time, each started this long after the Worker went idle.
+ * A fresh Worker runs its first drag frames 3–5 times slower than a warm one (JIT), which a user feels on the first drag.
+ */
+export const WARMUP_PASSES = 8;
+export const WARMUP_BUDGET_MS = 400;
+export const WARMUP_DELAY_MS = 30;
 export const STRIP_TIMEOUT_MS = 3000;
 export const STRIP_LOAD_TIMEOUT_MS = 20_000;
 /** 3D frames are at most this many pixels on a side (a huge canvas does not allocate a huge frame). */

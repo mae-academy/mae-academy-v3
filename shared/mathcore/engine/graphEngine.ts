@@ -367,13 +367,7 @@ export class GraphEngine {
   }
 
   private bind2(c: CompiledExpr): (a: number, b: number) => number {
-    const buf = new Float64Array(2 + this.envValues.length);
-    buf.set(this.envValues, 2);
-    return (a, b) => {
-      buf[0] = a;
-      buf[1] = b;
-      return c.evaluate(buf);
-    };
+    return c.bindXY(this.envValues);
   }
 
   /** A constant entry (matrix cell, right side); a non-finite value is an error at the item. */

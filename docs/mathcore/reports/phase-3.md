@@ -149,20 +149,29 @@ languages with the same placeholders, and no unused keys), `errors.test.ts` (key
 e2e "engine errors are shown in the reader's language" for ar and es. Still English: Compute Engine's own parser messages
 (for example "Limit" in `\lim`) and developer-invariant throws in `linalg/` (except QR's non-convergence).
 
-**Implicit-field timings with the Phase 3 budgets (Node one thread, and Chromium).** Current numbers, 3 runs unless
-stated:
+**Implicit-field timings with the Phase 3 budgets.** Chromium, engine Worker round trips, 1600×1000 (`bench-browser.cjs`).
+Real two cores means `taskset -c 0,1` (see `follow-up-2026-10-31-b.md` for the method and what changed). Before the
+second follow-up round (commit 856420e):
 
-| Case | Target | Node (1 run) | Chromium, 4 cores (3 runs) | Chromium, real 2 cores (`taskset`, 2 runs) |
+| Case | Target | Chromium, 4 cores (3 runs) | Chromium, real 2 cores (median of 5) |
+|---|---|---|---|
+| Reference field, drag 400×250 | ≤ 16 ms | 12.7–15.8 ms | 34.2 ms (fails) |
+| Reference field, release 1600×1000 | ≤ 150 ms | 83.7–116.4 ms | 195.0 ms (fails) |
+| Dense sin(x²+y²) < 0, drag | ≤ 16 ms | 12.5–13.5 ms | 32.3 ms (fails) |
+| Dense sin(x²+y²) < 0, release | ≤ 150 ms | 80.7–87.0 ms | 207.6 ms (fails) |
+
+After it (two real cores, 1 s idle after load, two sessions; the first frame right after load is cold and slower):
+
+| Case | Target | Session A | Session B | Cold (no idle) |
 |---|---|---|---|---|
-| Reference field, drag 400×250 | ≤ 16 ms | 15.1 ms | 12.7–15.8 ms | 27.2–30.9 ms (fails) |
-| Reference field, release 1600×1000 | ≤ 150 ms | 128.9 ms | 83.7–116.4 ms | 175.8–180.6 ms (fails) |
-| Dense sin(x²+y²) < 0, drag | ≤ 16 ms | 13.3 ms | 12.5–13.5 ms | 26.1–41.0 ms (fails) |
-| Dense sin(x²+y²) < 0, release | ≤ 150 ms | 129.8 ms | 80.7–87.0 ms | 170.8–190.4 ms (fails) |
+| Reference field, drag | ≤ 16 ms | 18.6 ms | 20.3 ms | 24.4 ms |
+| Reference field, release | ≤ 150 ms | 136.6 ms | 169.3 ms | 159.4 ms |
+| Dense, drag | ≤ 16 ms | 12.5 ms | 13.0 ms | 23.4 ms |
+| Dense, release | ≤ 150 ms | 121.8 ms | 128.4 ms | 154.4 ms |
 
-The 2-core browser rows fail. The follow-up report (`follow-up-2026-10-31.md`) gave 12.6–15.3 ms for the dense drag
-on "2 cores"; that run set `MATHCORE_CORES=2` on a 4-core machine, which only changes the strip-worker count, so it did
-not measure a 2-core CPU. Before the B8 change the same `taskset` method gave 56–62 ms (dense drag) and 207–209 ms
-(dense release). The B8 change therefore helps on 2 cores, but the drag budget is still missed there.
+Dense field: met in the warm protocol; not met cold. Reference field: not met (drag), not reliably met (release).
+Node, one thread restricted to two CPUs (`bench.ts`): reference drag 13.2 ms, release 123.4 ms; dense drag 15.4 ms, release
+109.2 ms (all within budget; Node has no message round trip and no cold Worker).
 
 ## Known limits
 

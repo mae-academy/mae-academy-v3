@@ -4,7 +4,7 @@ import type { ImplicitSource } from "@shared/mathcore/implicit/source";
 import { implicitField } from "@shared/mathcore/implicit/strips";
 import type { FieldOptions } from "@shared/mathcore/implicit/strips";
 import type { StripRequest, StripResponse } from "./stripProtocol";
-import { createStripPool } from "./stripPool";
+import { createStripPool, stripWorkerCount } from "./stripPool";
 import type { StripWorkerLike } from "./stripPool";
 
 /** Runs the strip Worker's code in-process, answering asynchronously; `fail` makes it crash. */
@@ -77,5 +77,14 @@ describe("strip pool (STEPS.md §7.1 technique 4)", () => {
     const pool = createStripPool(2, () => new Silent(), { timeoutMs: 20, loadTimeoutMs: 40 });
     await expect(pool.run(source, vp, o)).rejects.toThrow(/too long/);
     pool.dispose();
+  });
+});
+
+describe("stripWorkerCount", () => {
+  it("none below two cores, both cores on two, one fewer than the cores above, at most STRIP_WORKERS_MAX", () => {
+    expect([0, 1].map(stripWorkerCount)).toEqual([0, 0]);
+    expect(stripWorkerCount(2)).toBe(2);
+    expect([3, 4, 5, 8, 64].map(stripWorkerCount)).toEqual([2, 3, 4, 4, 4]);
+    expect(stripWorkerCount(Number.NaN)).toBe(0);
   });
 });

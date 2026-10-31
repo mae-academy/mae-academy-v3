@@ -7,7 +7,7 @@ import type { Viewport } from "@shared/mathcore/ir/types";
 import type { ImplicitSource } from "@shared/mathcore/implicit/source";
 import type { FieldOptions, FieldResult } from "@shared/mathcore/implicit/strips";
 import { mergeStrips, planStrips } from "@shared/mathcore/implicit/strips";
-import { STRIP_LOAD_TIMEOUT_MS, STRIP_TIMEOUT_MS } from "@shared/mathcore/constants";
+import { STRIP_LOAD_TIMEOUT_MS, STRIP_RESERVED_CORES, STRIP_TIMEOUT_MS, STRIP_WORKERS_MAX } from "@shared/mathcore/constants";
 import type { StripRequest, StripResponse } from "./stripProtocol";
 
 /** A strip run that took too long (the field is too heavy), as opposed to a Worker that failed. */
@@ -90,4 +90,17 @@ export function createStripPool(size: number, createWorker: () => StripWorkerLik
       }
     },
   };
+}
+
+/**
+ * Number of strip Workers for a machine with `cores` logical cores: one fewer than the cores (one stays for the page and
+ * the engine Worker), up to STRIP_WORKERS_MAX; on two cores both are used, because while a field is computed the page
+ * and the engine Worker only wait for it (measured on two real cores, see the follow-up report of 2026-10-31, second round);
+ * none below two strips' worth of parallelism.
+ */
+export function stripWorkerCount(cores: number): number {
+  const c = Math.floor(cores);
+  if (!(c >= 2)) return 0;
+  const n = c === 2 ? 2 : c - STRIP_RESERVED_CORES;
+  return Math.min(STRIP_WORKERS_MAX, n);
 }

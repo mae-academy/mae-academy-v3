@@ -7,7 +7,7 @@ import { bench } from "./benchEntry";
 import { centralDifference } from "@shared/mathcore/calculus/derivative";
 import { describeExplicit, describeExtent } from "@shared/mathcore/describe/describe";
 import {
-  FIELD_STRIDE_DRAG, FIELD_STRIDE_FULL, MASK_REFINE_STEP_DRAG, IMPLICIT_DENSE_FRACTION_DRAG, PRECISION_WARNING_MAGNITUDE, IMPLICIT_CELL_PX_DRAG, PARAMETER_TURN, SAMPLE_DRAG_FACTOR, SAMPLE_INITIAL_FULL, SAMPLE_INITIAL_MIN, IMPLICIT_CELL_PX_FULL, IMPLICIT_REFINE_DRAG, IMPLICIT_REFINE_FULL, STRIP_RESERVED_CORES, STRIP_WORKERS_MAX, STRIP_WORKERS_MIN,
+  FIELD_STRIDE_DRAG, FIELD_STRIDE_FULL, MASK_REFINE_STEP_DRAG, IMPLICIT_DENSE_FRACTION_DRAG, PRECISION_WARNING_MAGNITUDE, IMPLICIT_CELL_PX_DRAG, PARAMETER_TURN, SAMPLE_DRAG_FACTOR, SAMPLE_INITIAL_FULL, SAMPLE_INITIAL_MIN, IMPLICIT_CELL_PX_FULL, IMPLICIT_REFINE_DRAG, IMPLICIT_REFINE_FULL, STRIP_WORKERS_MIN, WARMUP_BUDGET_MS, WARMUP_DELAY_MS, WARMUP_PASSES,
 } from "@shared/mathcore/constants";
 import { GraphEngine } from "@shared/mathcore/engine/graphEngine";
 import { implicitField } from "@shared/mathcore/implicit/strips";
@@ -23,7 +23,8 @@ import type { SampleResult } from "@shared/mathcore/sample/adaptive";
 import type { ParsedEntry } from "./parseProtocol";
 import type { EngineRequest, EngineResponse, ItemResult, ViewRequest } from "./protocol";
 import { superseded } from "./requestQueue";
-import { StripTimeout, createStripPool } from "./stripPool";
+import { WarmupPlan } from "./warmup";
+import { StripTimeout, createStripPool, stripWorkerCount } from "./stripPool";
 import type { StripPool, StripWorkerLike } from "./stripPool";
 
 declare const self: DedicatedWorkerGlobalScope;
@@ -32,11 +33,11 @@ declare const self: DedicatedWorkerGlobalScope;
 let engine: GraphEngine | null = null;
 
 /**
- * Strip Workers for implicit fields (STEPS.md §7.1 technique 4): one per core left after STRIP_RESERVED_CORES, up to
- * STRIP_WORKERS_MAX, and none below STRIP_WORKERS_MIN (two strips on one spare core gain nothing). If a strip Worker
+ * Strip Workers for implicit fields (STEPS.md §7.1 technique 4): see `stripWorkerCount` (cores − STRIP_RESERVED_CORES, both
+ * cores on a two-core machine, up to STRIP_WORKERS_MAX), and none below STRIP_WORKERS_MIN. If a strip Worker
  * fails or stalls, the pool is closed for good and this Worker computes fields itself from then on.
  */
-const STRIP_WORKERS = Math.min(STRIP_WORKERS_MAX, Math.max(0, (self.navigator?.hardwareConcurrency ?? 1) - STRIP_RESERVED_CORES));
+const STRIP_WORKERS = stripWorkerCount(self.navigator?.hardwareConcurrency ?? 1);
 let pool: StripPool | null = null;
 let stripsFailed = false;
 function stripPool(): StripPool | null {
@@ -53,8 +54,25 @@ function stripPool(): StripPool | null {
   return pool;
 }
 
+/** Field options for a view: drag quality (coarse lattice, quarter mask, coarse tracing of dense fields) or full. */
+function fieldOptions(view: ViewRequest, relation: FieldOptions["relation"]): FieldOptions {
+  const drag = view.quality === "drag";
+  return {
+    width: view.width,
+    height: view.height,
+    cellPx: drag ? IMPLICIT_CELL_PX_DRAG : IMPLICIT_CELL_PX_FULL,
+    refine: drag ? IMPLICIT_REFINE_DRAG : IMPLICIT_REFINE_FULL,
+    stride: drag ? FIELD_STRIDE_DRAG : FIELD_STRIDE_FULL,
+    relation,
+    refineStep: drag ? MASK_REFINE_STEP_DRAG : 1,
+    coarseWhenDense: drag ? IMPLICIT_DENSE_FRACTION_DRAG : undefined,
+  };
+}
+
 async function field(e: GraphEngine, id: string, F: (x: number, y: number) => number, view: ViewRequest, o: FieldOptions): Promise<FieldResult> {
-  const p = stripPool();
+  // A drag frame is about 10 ms of work: with only two strips the messages and the merge cost as much as they save, so
+  // it stays in this Worker; release frames (100+ ms) always use the strips.
+  const p = view.quality === "drag" && STRIP_WORKERS <= 2 ? null : stripPool();
   const source = p ? e.implicitSource(id) : null;
   if (p && source) {
     try {
@@ -72,6 +90,14 @@ async function field(e: GraphEngine, id: string, F: (x: number, y: number) => nu
   return implicitField(F, view.viewport, o);
 }
 const last = new Map<string, ItemResult>();
+
+/**
+ * Drag-quality frames of implicit items by item id. The release that follows a drag shows a drag-quality frame first
+ * (progressive display); when the view and the document are the same as in the last drag frame, that frame is reused
+ * instead of being computed again. `version` changes with every load and parameter change.
+ */
+let version = 0;
+const dragFrames = new Map<string, { key: string; result: ItemResult }>();
 
 /** Canvas label text (no LaTeX): DISPLAY_DIGITS significant digits, no float noise. */
 const plain = numberText;
@@ -187,22 +213,23 @@ async function sampleItem(e: GraphEngine, id: string, view: ViewRequest): Promis
     }
     case "Implicit": {
       const drag = view.quality === "drag";
-      const f = await field(e, id, rt.F, view, {
-        width: view.width,
-        height: view.height,
-        cellPx: drag ? IMPLICIT_CELL_PX_DRAG : IMPLICIT_CELL_PX_FULL,
-        refine: drag ? IMPLICIT_REFINE_DRAG : IMPLICIT_REFINE_FULL,
-        stride: drag ? FIELD_STRIDE_DRAG : FIELD_STRIDE_FULL,
-        relation: rt.relation,
-        refineStep: drag ? MASK_REFINE_STEP_DRAG : 1,
-        coarseWhenDense: drag ? IMPLICIT_DENSE_FRACTION_DRAG : undefined,
-      });
+      const cacheKey = `${version}|${view.width}x${view.height}|${JSON.stringify(view.viewport)}`;
+      if (drag) {
+        const hit = dragFrames.get(id);
+        if (hit && hit.key === cacheKey) return { ...hit.result, reused: true };
+      }
+      const f = await field(e, id, rt.F, view, fieldOptions(view, rt.relation));
       const out: ItemResult = { ...base, segments: f.polylines, relation: rt.relation };
       if (f.mask) out.field = { ...f.mask, viewport: view.viewport };
       if (!drag) {
         out.description = describeExtent(f.polylines);
-        if (out.field) out.description.shaded = out.field.data.reduce((n, v) => n + v, 0) / out.field.data.length;
-      }
+        if (out.field) {
+          let on = 0;
+          const data = out.field.data;
+          for (let k = 0; k < data.length; k++) on += data[k];
+          out.description.shaded = on / data.length;
+        }
+      } else dragFrames.set(id, { key: cacheKey, result: out });
       return out;
     }
     default:
@@ -277,6 +304,7 @@ async function progressive(
 
 async function handle(req: EngineRequest): Promise<void> {
   const t0 = performance.now();
+  if (req.type === "load" || req.type === "view") lastView = req.view;
   try {
     switch (req.type) {
       case "load": {
@@ -286,6 +314,8 @@ async function handle(req: EngineRequest): Promise<void> {
         else engine = new GraphEngine(parser, req.graph);
         last.clear();
         analyses.clear();
+        version++;
+        dragFrames.clear();
         const all = engine.graph.items.map((i) => i.id);
         await progressive(req.seq, "load", engine, req.view, all, all, t0);
         break;
@@ -296,6 +326,7 @@ async function handle(req: EngineRequest): Promise<void> {
           return;
         }
         const ids = engine.setParam(req.name, req.value);
+        version++;
         await respond(req.seq, "param", engine, req.view, ids, ids, t0);
         break;
       }
@@ -353,12 +384,54 @@ async function pump(): Promise<void> {
     break;
   }
   if (pending.length > 0) schedule();
+  else scheduleWarmup();
 }
 
 function schedule(): void {
   if (scheduled || busy) return;
   scheduled = true;
   setTimeout(() => void pump(), 0);
+}
+
+/**
+ * Idle warm-up (see WarmupPlan): after a request is served and nothing is queued, silent drag-quality passes of the
+ * implicit items at slightly shifted views, so the JIT (here and in the strip Workers) is warm before the first drag.
+ * They run only while idle, one pass per task, and queued requests always go first.
+ */
+const warmup = new WarmupPlan(WARMUP_PASSES, WARMUP_BUDGET_MS);
+let lastView: ViewRequest | null = null;
+let warmShifts = 0;
+function scheduleWarmup(): void {
+  if (warmup.done || !lastView || !engine) return;
+  setTimeout(() => void warmPass(), WARMUP_DELAY_MS);
+}
+async function warmPass(): Promise<void> {
+  const e = engine;
+  const v = lastView;
+  if (!e || !v || busy || scheduled || !warmup.mayRun(pending.length)) {
+    if (pending.length > 0) schedule();
+    return;
+  }
+  const items = e.graph.items.filter((it) => e.runtime(it.id)?.kind === "Implicit");
+  if (items.length === 0) return;
+  busy = true;
+  const t = performance.now();
+  let ok = true;
+  try {
+    const shift = (v.viewport.xmax - v.viewport.xmin) * 0.0007 * ++warmShifts;
+    const view: ViewRequest = { ...v, quality: "drag", viewport: { ...v.viewport, xmin: v.viewport.xmin + shift, xmax: v.viewport.xmax + shift } };
+    for (const it of items) {
+      const rt = e.runtime(it.id);
+      if (rt?.kind === "Implicit") await field(e, it.id, rt.F, view, fieldOptions(view, rt.relation));
+    }
+  } catch {
+    ok = false;
+  } finally {
+    busy = false;
+  }
+  warmup.record(performance.now() - t, ok);
+  if (pending.length > 0) schedule();
+  else scheduleWarmup();
 }
 
 self.onmessage = (ev: MessageEvent<EngineRequest>) => {

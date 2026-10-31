@@ -36,6 +36,12 @@ export interface CompileOptions {
 export interface CompiledExpr {
   /** Evaluates with values in `variables` order. Not reentrant across calls from inside itself. */
   evaluate(values: ArrayLike<number>): number;
+  /**
+   * A function of the first two variables (x, y) with the remaining variables fixed to `env` (in slot order after the
+   * first two). It owns its scratch slots, so it is independent of `evaluate` and of other bindings, and each call
+   * writes only x and y: the form the field code evaluates millions of times.
+   */
+  bindXY(env: ArrayLike<number>): (x: number, y: number) => number;
   readonly variables: readonly string[];
   readonly hash: string;
 }
@@ -462,6 +468,15 @@ export function compile(expr: Expr, opts: CompileOptions): CompiledExpr {
     evaluate(values) {
       for (let i = 0; i < n; i++) scratch[i] = values[i];
       return root(scratch);
+    },
+    bindXY(env) {
+      const own = new Float64Array(c.slotCount);
+      for (let i = 2; i < n; i++) own[i] = env[i - 2];
+      return (x, y) => {
+        own[0] = x;
+        own[1] = y;
+        return root(own);
+      };
     },
     variables: opts.variables,
     hash,

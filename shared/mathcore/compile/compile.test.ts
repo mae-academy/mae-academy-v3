@@ -146,3 +146,24 @@ describe("integral endpoint tails (Phase 3 re-review)", () => {
     expect(ev(["Integrate", ["Divide", 1, ["Sqrt", ["Subtract", 1, ["Power", "t", 2]]]], "t", -1, 1])).toBeCloseTo(Math.PI, 9);
   });
 });
+
+describe("bindXY (two-variable evaluator with a fixed environment)", () => {
+  const expr: Expr = ["Add", ["Multiply", "a", ["Sin", "x"]], ["Power", "y", 2], "b"];
+  const c = compile(expr, { variables: ["x", "y", "a", "b"] });
+
+  it("equals evaluate with the same values", () => {
+    const f = c.bindXY([2, 0.5]);
+    for (const [x, y] of [[0, 0], [1.3, -2], [-0.7, 4.1]]) expect(f(x, y)).toBe(c.evaluate([x, y, 2, 0.5]));
+  });
+
+  it("two bindings with different environments, and evaluate, do not disturb each other", () => {
+    const f = c.bindXY([2, 0.5]);
+    const g = c.bindXY([-1, 10]);
+    const want = (x: number, y: number, a: number, b: number) => a * Math.sin(x) + y * y + b;
+    for (let k = 0; k < 5; k++) {
+      expect(f(k, 1)).toBeCloseTo(want(k, 1, 2, 0.5), 12);
+      expect(c.evaluate([k, 2, 7, 7])).toBeCloseTo(want(k, 2, 7, 7), 12);
+      expect(g(k, 1)).toBeCloseTo(want(k, 1, -1, 10), 12);
+    }
+  });
+});

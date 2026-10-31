@@ -42,6 +42,8 @@ export interface ItemResult {
   kind: string;
   errors: Array<{ message: string; key?: ErrorKey; params?: ErrorParams; start?: number; end?: number }>;
   warnings: string[];
+  /** True when this drag-quality frame was the one computed for the same view and document a moment ago (not recomputed). */
+  reused?: boolean;
   /** Interleaved x, y polylines in world coordinates. */
   segments: Float64Array[];
   point?: { x: number; y: number };
