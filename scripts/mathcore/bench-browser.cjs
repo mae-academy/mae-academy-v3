@@ -5,18 +5,24 @@
  *
  *   pnpm run build && npx vite preview --port 4173 &
  *   MATHCORE_CHROMIUM=/opt/pw-browsers/chromium node scripts/mathcore/bench-browser.cjs [http://localhost:4173]
+ *
+ * MATHCORE_CORES=2 makes the page report 2 logical cores (navigator.hardwareConcurrency), which is what sizes the strip
+ * Worker pool; the machine still has all its cores, so this shows the pool a 2-core device would get, not its speed.
  */
 const { readdirSync } = require("node:fs");
 const { join } = require("node:path");
 const { chromium } = require("playwright");
 
 const base = process.argv[2] ?? "http://localhost:4173";
-const worker = readdirSync(join(__dirname, "../../dist/public/assets")).find((f) => f.startsWith("mathcore-engine-worker-"));
+const worker = readdirSync(join(process.env.MATHCORE_DIST ?? join(__dirname, "../../dist/public"), "assets")).find((f) => f.startsWith("mathcore-engine-worker-"));
 if (!worker) throw new Error("Build first: no mathcore-engine-worker chunk in dist/public/assets");
 
 (async () => {
   const browser = await chromium.launch(process.env.MATHCORE_CHROMIUM ? { executablePath: process.env.MATHCORE_CHROMIUM } : {});
   const page = await browser.newPage();
+  if (process.env.MATHCORE_CORES) {
+    await page.addInitScript((n) => Object.defineProperty(navigator, "hardwareConcurrency", { value: n }), Number(process.env.MATHCORE_CORES));
+  }
   await page.goto(base);
   const out = await page.evaluate(async (url) => {
     const cases = {

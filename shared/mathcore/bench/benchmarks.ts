@@ -7,7 +7,7 @@ import { compile } from "../compile/compile";
 import { GraphEngine } from "../engine/graphEngine";
 import {
   SAMPLE_DRAG_FACTOR, SAMPLE_INITIAL_FULL, SAMPLE_INITIAL_MIN,
-  FIELD_STRIDE_DRAG, FIELD_STRIDE_FULL, IMPLICIT_CELL_PX_DRAG, IMPLICIT_CELL_PX_FULL, IMPLICIT_REFINE_DRAG, IMPLICIT_REFINE_FULL,
+  FIELD_STRIDE_DRAG, FIELD_STRIDE_FULL, MASK_REFINE_STEP_DRAG, IMPLICIT_DENSE_FRACTION_DRAG, IMPLICIT_CELL_PX_DRAG, IMPLICIT_CELL_PX_FULL, IMPLICIT_REFINE_DRAG, IMPLICIT_REFINE_FULL,
 } from "../constants";
 import { contour, insideTest, regionMask } from "../implicit/marching";
 import { DEFAULT_CAMERA, render, surfaceMesh } from "../render3d/raster";
@@ -127,8 +127,8 @@ export function runBenchmarks(): BenchResult[] {
   // Exactly the Worker's paths on a 1600×1000 canvas: during a drag the curve uses the drag lattice and the shading is
   // the 400×250 mask (stride 4); on release the Worker posts that drag frame first, then the full frame.
   const dragFrame = (G: (x: number, y: number) => number) => {
-    contour(G, view, { width: 1600, height: 1000, cellPx: IMPLICIT_CELL_PX_DRAG, refine: IMPLICIT_REFINE_DRAG });
-    regionMask(G, view, 1600, 1000, FIELD_STRIDE_DRAG, inside, IMPLICIT_CELL_PX_DRAG);
+    contour(G, view, { width: 1600, height: 1000, cellPx: IMPLICIT_CELL_PX_DRAG, refine: IMPLICIT_REFINE_DRAG, coarseWhenDense: IMPLICIT_DENSE_FRACTION_DRAG });
+    regionMask(G, view, 1600, 1000, FIELD_STRIDE_DRAG, inside, IMPLICIT_CELL_PX_DRAG, MASK_REFINE_STEP_DRAG);
   };
   const fullFrame = (G: (x: number, y: number) => number) => {
     contour(G, view, { width: 1600, height: 1000, cellPx: IMPLICIT_CELL_PX_FULL, refine: IMPLICIT_REFINE_FULL });

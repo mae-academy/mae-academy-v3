@@ -453,3 +453,82 @@ describe("stitch: crowded ends and exact joins", () => {
     expect(out.length).toBe(3);
   });
 });
+
+describe("B8: dense-field drag frame (STEPS.md §7.2 budget 16 ms)", () => {
+  const dense = (x: number, y: number) => Math.sin(x * x + y * y);
+  const view = { xmin: -5, xmax: 5, ymin: -3.125, ymax: 3.125, aspect: "equal" as const };
+  const lt0 = insideTest("<");
+
+  it("the drag mask samples refined blocks every second pixel: at most 60 % of the evaluations of the exact mask on sin(x²+y²) < 0", () => {
+    const exact = regionMask(dense, view, 1600, 1000, 4, lt0, 12);
+    const drag = regionMask(dense, view, 1600, 1000, 4, lt0, 12, 2);
+    expect(exact.evaluations).toBeGreaterThan(70_000);
+    expect(drag.evaluations).toBeLessThan(exact.evaluations * 0.6);
+    expect([drag.width, drag.height]).toEqual([exact.width, exact.height]);
+  });
+
+  it("the drag mask only coarsens the boundary: a disc is filled the same inside, differing in a thin band at its edge", () => {
+    const F = (x: number, y: number) => x * x + y * y - 9;
+    const exact = regionMask(F, view, 1600, 1000, 4, lt0, 12);
+    const drag = regionMask(F, view, 1600, 1000, 4, lt0, 12, 2);
+    let differ = 0;
+    let far = 0;
+    for (let j = 0; j < exact.height; j++) {
+      for (let i = 0; i < exact.width; i++) {
+        const x = view.xmin + ((i + 0.5) * 10) / exact.width;
+        const y = view.ymax - ((j + 0.5) * 6.25) / exact.height;
+        const k = j * exact.width + i;
+        if (exact.data[k] !== drag.data[k]) {
+          differ++;
+          // Only within two mask pixels (0.05 units each) of the circle r = 3.
+          if (Math.abs(Math.hypot(x, y) - 3) > 0.15) far++;
+        }
+      }
+    }
+    expect(far).toBe(0);
+    expect(differ).toBeLessThan(0.01 * exact.data.length);
+  });
+
+  it("contour and mask together on the dense field stay under 85 000 evaluations in drag quality (146 000 before)", () => {
+    const c = contour(dense, view, { width: 1600, height: 1000, cellPx: 12, refine: 2, coarseWhenDense: 0.5 });
+    const m = regionMask(dense, view, 1600, 1000, 4, lt0, 12, 2);
+    expect(c.evaluations + m.evaluations).toBeLessThan(85_000);
+  });
+
+  it("the reused edge scratch leaves no trace: a contour after other contours (or after a failed one) equals a fresh one", () => {
+    const circle = (x: number, y: number) => x * x + y * y - 9;
+    const o = { width: 800, height: 500, cellPx: 6, refine: 2 };
+    const alone = contour(circle, view, o);
+    contour(dense, view, o);
+    contour((x, y) => x * y - 1, view, { ...o, width: 1600, height: 1000 });
+    expect(() =>
+      contour((x, y) => (x > 1 ? Number.NaN : x > 0 ? (() => { throw new Error("boom"); })() : circle(x, y)), view, o),
+    ).toThrow("boom");
+    const again = contour(circle, view, o);
+    expect(again.evaluations).toBe(alone.evaluations);
+    expect(again.polylines.map((p) => Array.from(p))).toEqual(alone.polylines.map((p) => Array.from(p)));
+  });
+
+  it("a dense field is traced on coarse cells in drag frames: half the evaluations, the same pieces, points still on the zero set", () => {
+    const o = { width: 1600, height: 1000, cellPx: 12, refine: 2 };
+    const fine = contour(dense, view, o);
+    const coarse = contour(dense, view, { ...o, coarseWhenDense: 0.5 });
+    expect(fine.coarse).toBe(false);
+    expect(coarse.coarse).toBe(true);
+    expect(fine.evaluations).toBeGreaterThan(70_000);
+    expect(coarse.evaluations).toBeLessThan(fine.evaluations * 0.55);
+    expect(coarse.polylines.length).toBe(fine.polylines.length);
+    for (const [x, y] of points(coarse.polylines)) expect(Math.abs(dense(x, y))).toBeLessThan(1e-6);
+  });
+
+  it("a sparse field is not affected by coarseWhenDense: same curves and evaluations", () => {
+    const circle = (x: number, y: number) => x * x + y * y - 9;
+    const o = { width: 1600, height: 1000, cellPx: 12, refine: 2 };
+    const a = contour(circle, view, o);
+    const b = contour(circle, view, { ...o, coarseWhenDense: 0.5 });
+    expect(b.coarse).toBe(false);
+    expect(b.evaluations).toBe(a.evaluations);
+    expect(b.polylines.map((p) => Array.from(p))).toEqual(a.polylines.map((p) => Array.from(p)));
+  });
+});
+

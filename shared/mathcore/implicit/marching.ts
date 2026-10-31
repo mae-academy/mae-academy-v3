@@ -33,15 +33,21 @@ export interface ContourOptions {
   cellPx: number;
   /** Subdivisions per coarse cell that contains the curve (1 = no refinement). */
   refine: number;
+  /**
+   * Drag frames of dense fields: when at least this fraction of the coarse cells needs refinement, the curve is
+   * traced on the coarse cells themselves (refine = 1) instead of on R × R fine cells each. The exact frame follows on
+   * release. Absent: always refine.
+   */
+  coarseWhenDense?: number;
 }
 
 export interface ContourResult {
   polylines: Polyline[];
   /** Evaluations of F, including the pole check (STEPS.md §7.1: cost is the number of evaluations). */
   evaluations: number;
+  /** True when `coarseWhenDense` took effect: the curve was traced on coarse cells. */
+  coarse?: boolean;
 }
-
-type Corners = [number, number, number, number];
 
 /**
  * Deterministic pseudo-random offset in (JITTER_MARGIN, 1 − JITTER_MARGIN) for probe q of cell (i, j). Probes at
@@ -55,7 +61,53 @@ export function jitter(i: number, j: number, q: number): number {
   return JITTER_MARGIN + (1 - 2 * JITTER_MARGIN) * ((h >>> 0) / 4294967296);
 }
 
+/**
+ * Per-edge scratch of `contour`, reused between calls (a Worker runs one contour at a time): zero means "nothing
+ * recorded", and only the entries a call touched are cleared afterwards, so a call costs time in proportion to its
+ * curve, not to the size of the lattice. Frames with more entries than SCRATCH_MAX_EDGES use fresh arrays.
+ */
+interface ContourScratch {
+  /** 0 unknown, 1 no crossing, slot + 2 otherwise. */
+  slotOf: Int32Array;
+  /** First and second neighbour of a crossing in the chain, plus one (0 = none). */
+  nb0: Int32Array;
+  nb1: Int32Array;
+  used: Uint8Array;
+  /** Edge ids whose `slotOf` was set, and crossings linked into the chain (in first-link order). */
+  touched: number[];
+  nodes: number[];
+}
+const SCRATCH_MAX_EDGES = 4_000_000;
+let sharedScratch: ContourScratch | null = null;
+const newScratch = (edges: number): ContourScratch => ({
+  slotOf: new Int32Array(edges),
+  nb0: new Int32Array(edges),
+  nb1: new Int32Array(edges),
+  used: new Uint8Array(edges),
+  touched: [],
+  nodes: [],
+});
+
 export function contour(F: (x: number, y: number) => number, vp: Viewport, o: ContourOptions): ContourResult {
+  const edges = 2 * (Math.max(1, Math.ceil(o.width / o.cellPx)) * Math.max(1, Math.floor(o.refine)) + 1) * (Math.max(1, Math.ceil(o.height / o.cellPx)) * Math.max(1, Math.floor(o.refine)) + 1);
+  if (edges > SCRATCH_MAX_EDGES) return contourWith(newScratch(edges), F, vp, o);
+  if (!sharedScratch || sharedScratch.slotOf.length < edges) sharedScratch = newScratch(edges);
+  const sc = sharedScratch;
+  try {
+    return contourWith(sc, F, vp, o);
+  } finally {
+    for (const id of sc.touched) sc.slotOf[id] = 0;
+    for (const id of sc.nodes) {
+      sc.nb0[id] = 0;
+      sc.nb1[id] = 0;
+      sc.used[id] = 0;
+    }
+    sc.touched.length = 0;
+    sc.nodes.length = 0;
+  }
+}
+
+function contourWith(sc: ContourScratch, F: (x: number, y: number) => number, vp: Viewport, o: ContourOptions): ContourResult {
   const cols = Math.max(1, Math.ceil(o.width / o.cellPx));
   const rows = Math.max(1, Math.ceil(o.height / o.cellPx));
   const R = Math.max(1, Math.floor(o.refine));
@@ -82,14 +134,24 @@ export function contour(F: (x: number, y: number) => number, vp: Viewport, o: Co
     return vals[k];
   };
 
-  /** Crossing point on a lattice edge, or null when the sign change is a pole or the edge has no crossing. */
-  const crossings = new Map<number, [number, number] | null>();
-  const crossing = (i: number, j: number, vertical: boolean): [number, number] | null => {
+  // Crossing points are stored by lattice-edge id (2 · vertex index + 1 for a vertical edge): `slotOf[id]` is
+  // 0 before the edge is looked at, 1 when it has no crossing (no sign change, or a pole), else 2 + the index of its
+  // point in `crossX`/`crossY`. Typed arrays instead of Maps: this is the hot path of every drag frame.
+  const NONE = -1;
+  const { slotOf, nb0, nb1, used, touched, nodes } = sc;
+  touched.length = 0;
+  nodes.length = 0;
+  let crossX = new Float64Array(256);
+  let crossY = new Float64Array(256);
+  let crossCount = 0;
+  /** Slot of the crossing on a lattice edge, or NONE when the sign change is a pole or the edge has no crossing. */
+  const crossing = (i: number, j: number, vertical: boolean, len = 1): number => {
     const id = 2 * (j * stride + i) + (vertical ? 1 : 0);
-    if (crossings.has(id)) return crossings.get(id) as [number, number] | null;
+    const known = slotOf[id];
+    if (known !== 0) return known - 2;
     const a = value(i, j);
-    const b = vertical ? value(i, j + 1) : value(i + 1, j);
-    let p: [number, number] | null = null;
+    const b = vertical ? value(i, j + len) : value(i + len, j);
+    let slot = NONE;
     if (Number.isFinite(a) && Number.isFinite(b) && a > 0 !== b > 0) {
       const ax = latX(i);
       const ay = latY(j);
@@ -116,7 +178,7 @@ export function contour(F: (x: number, y: number) => number, vp: Viewport, o: Co
           reference = Math.abs(fhi - flo);
         }
         const m = (lo + hi) / 2;
-        const fm = F(vertical ? ax : ax + m * dx, vertical ? ay + m * dy : ay);
+        const fm = F(vertical ? ax : ax + m * dx * len, vertical ? ay + m * dy * len : ay);
         evaluations++;
         if (!Number.isFinite(fm)) {
           lo = hi = NaN;
@@ -133,54 +195,91 @@ export function contour(F: (x: number, y: number) => number, vp: Viewport, o: Co
       }
       if (!isRoot) isRoot = exact !== null || (Number.isFinite(lo) && Math.abs(fhi - flo) <= ROOT_SPREAD_RATIO * reference);
       if (isRoot) {
-        const s = exact ?? lo + ((hi - lo) * flo) / (flo - fhi);
-        p = vertical ? [ax, ay + s * dy] : [ax + s * dx, ay];
+        const t = exact ?? lo + ((hi - lo) * flo) / (flo - fhi);
+        if (crossCount === crossX.length) {
+          const gx = new Float64Array(2 * crossCount);
+          const gy = new Float64Array(2 * crossCount);
+          gx.set(crossX);
+          gy.set(crossY);
+          crossX = gx;
+          crossY = gy;
+        }
+        crossX[crossCount] = vertical ? ax : ax + t * dx * len;
+        crossY[crossCount] = vertical ? ay + t * dy * len : ay;
+        slot = crossCount++;
       }
     }
-    crossings.set(id, p);
-    return p;
+    slotOf[id] = slot + 2;
+    touched.push(id);
+    return slot;
   };
 
   const edgeId = (i: number, j: number, vertical: boolean) => 2 * (j * stride + i) + (vertical ? 1 : 0);
-  const adjacency = new Map<number, number[]>();
+  // Each crossing is shared by two cells and a cell joins it to one other crossing, so a node has at most two
+  // neighbours: first and second are kept in insertion order; `nodes` lists the nodes in the order they were first linked.
+  const addNeighbour = (a: number, b: number) => {
+    if (nb0[a] === 0) {
+      nb0[a] = b + 1;
+      nodes.push(a);
+    } else nb1[a] = b + 1;
+  };
   const link = (a: number, b: number) => {
-    (adjacency.get(a) ?? adjacency.set(a, []).get(a))?.push(b);
-    (adjacency.get(b) ?? adjacency.set(b, []).get(b))?.push(a);
+    addNeighbour(a, b);
+    addNeighbour(b, a);
   };
 
-  const cell = (i: number, j: number) => {
+  /** Marching-squares cell with lower-left lattice corner (i, j) and sides of `len` lattice steps. */
+  const cell = (i: number, j: number, len = 1) => {
     const v00 = value(i, j);
-    const v10 = value(i + 1, j);
-    const v11 = value(i + 1, j + 1);
-    const v01 = value(i, j + 1);
+    const v10 = value(i + len, j);
+    const v11 = value(i + len, j + len);
+    const v01 = value(i, j + len);
     if (!(Number.isFinite(v00) && Number.isFinite(v10) && Number.isFinite(v11) && Number.isFinite(v01))) return;
-    const c: Corners = [v00 > 0 ? 1 : 0, v10 > 0 ? 1 : 0, v11 > 0 ? 1 : 0, v01 > 0 ? 1 : 0];
-    if (c[0] === c[1] && c[1] === c[2] && c[2] === c[3]) return;
+    const c0 = v00 > 0 ? 1 : 0;
+    const c1 = v10 > 0 ? 1 : 0;
+    const c2 = v11 > 0 ? 1 : 0;
+    const c3 = v01 > 0 ? 1 : 0;
+    if (c0 === c1 && c1 === c2 && c2 === c3) return;
     // Edges in order: bottom, right, top, left.
-    const e = [
-      [i, j, false],
-      [i + 1, j, true],
-      [i, j + 1, false],
-      [i, j, true],
-    ] as const;
-    const has = e.map(([ei, ej, v]) => crossing(ei, ej, v) !== null);
-    const ids = e.map(([ei, ej, v]) => edgeId(ei, ej, v));
-    const n = has.filter(Boolean).length;
+    const h0 = crossing(i, j, false, len) !== NONE;
+    const h1 = crossing(i + len, j, true, len) !== NONE;
+    const h2 = crossing(i, j + len, false, len) !== NONE;
+    const h3 = crossing(i, j, true, len) !== NONE;
+    const id0 = edgeId(i, j, false);
+    const id1 = edgeId(i + len, j, true);
+    const id2 = edgeId(i, j + len, false);
+    const id3 = edgeId(i, j, true);
+    const n = (h0 ? 1 : 0) + (h1 ? 1 : 0) + (h2 ? 1 : 0) + (h3 ? 1 : 0);
     if (n === 2) {
-      const [a, b] = ids.filter((_, k) => has[k]);
-      link(a, b);
+      // The two edges that have a crossing, in edge order.
+      let first = -1;
+      let second = -1;
+      if (h0) first = id0;
+      if (h1) {
+        if (first < 0) first = id1;
+        else second = id1;
+      }
+      if (h2) {
+        if (first < 0) first = id2;
+        else second = id2;
+      }
+      if (h3) {
+        if (first < 0) first = id3;
+        else second = id3;
+      }
+      link(first, second);
     } else if (n === 4) {
       // Saddle: F at the centre of the cell decides which corners are joined through the middle (the corner average
       // when the centre is undefined).
-      const fc = F(vp.xmin + (i + 0.5) * dx, vp.ymin + (j + 0.5) * dy);
+      const fc = F(vp.xmin + (i + len / 2) * dx, vp.ymin + (j + len / 2) * dy);
       evaluations++;
       const centrePositive = (Number.isFinite(fc) ? fc : (v00 + v10 + v11 + v01) / 4) > 0;
-      if (centrePositive === (c[0] === 1)) {
-        link(ids[0], ids[1]);
-        link(ids[2], ids[3]);
+      if (centrePositive === (c0 === 1)) {
+        link(id0, id1);
+        link(id2, id3);
       } else {
-        link(ids[0], ids[3]);
-        link(ids[2], ids[1]);
+        link(id0, id3);
+        link(id2, id1);
       }
     }
     // One or three valid crossings mean a pole removed an edge: the cell draws nothing.
@@ -212,12 +311,16 @@ export function contour(F: (x: number, y: number) => number, vp: Viewport, o: Co
   };
   const refined = new Uint8Array(cols * rows);
   let refinedCount = 0;
+  // Dense drag frames (see ContourOptions.coarseWhenDense): decided after the coarse pass, which only flags cells.
+  let coarse = false;
   const refine = (ci: number, cj: number) => {
     if (ci < 0 || cj < 0 || ci >= cols || cj >= rows || refined[cj * cols + ci]) return;
     refined[cj * cols + ci] = 1;
     refinedCount++;
-    for (let b = 0; b < R; b++) for (let a = 0; a < R; a++) cell(ci * R + a, cj * R + b);
+    if (coarse) cell(ci * R, cj * R, R);
+    else for (let b = 0; b < R; b++) for (let a = 0; a < R; a++) cell(ci * R + a, cj * R + b);
   };
+  const flagged: number[] = [];
   // Coarse pass: refine cells that change sign, mix defined and undefined corners, or come close to zero.
   for (let cj = 0; cj < rows; cj++) {
     for (let ci = 0; ci < cols; ci++) {
@@ -228,7 +331,7 @@ export function contour(F: (x: number, y: number) => number, vp: Viewport, o: Co
       const c = value(i0 + R, j0 + R);
       const d = value(i0, j0 + R);
       if (needsRefinement4(a, b, c, d, coarseSlope(ci, cj))) {
-        refine(ci, cj);
+        flagged.push(cj * cols + ci);
         continue;
       }
       // Probes inside the cell: a defined sliver between undefined corners (y = √(ε − x²)), or a sign change that
@@ -238,20 +341,20 @@ export function contour(F: (x: number, y: number) => number, vp: Viewport, o: Co
         const v = F(vp.xmin + (i0 + R * jitter(ci, cj, 2 * q)) * dx, vp.ymin + (j0 + R * jitter(ci, cj, 2 * q + 1)) * dy);
         evaluations++;
         if (allUndefined ? Number.isFinite(v) : !Number.isFinite(v) || v > 0 !== a > 0) {
-          refine(ci, cj);
+          flagged.push(cj * cols + ci);
           break;
         }
       }
     }
   }
+  coarse = o.coarseWhenDense !== undefined && R > 1 && flagged.length >= o.coarseWhenDense * cols * rows;
+  for (const idx of flagged) refine(idx % cols, Math.floor(idx / cols));
   // Curve following: a curve cannot stop inside the view, so an end lying on the border of a refined coarse cell
   // continues into the neighbour across that border (a spike narrower than a coarse cell is found this way).
   for (let pass = 0; pass < cols * rows; pass++) {
     const before = refinedCount;
     const dangling: number[] = [];
-    adjacency.forEach((nb, id) => {
-      if (nb.length === 1) dangling.push(id);
-    });
+    for (const id of nodes) if (nb1[id] === 0) dangling.push(id);
     for (const id of dangling) {
       const vertical = id % 2 === 1;
       const k = (id - (vertical ? 1 : 0)) / 2;
@@ -269,25 +372,24 @@ export function contour(F: (x: number, y: number) => number, vp: Viewport, o: Co
   }
 
   // Chain the segments: open curves start at nodes with one neighbour; what remains are closed loops.
-  const point = (id: number): [number, number] => {
-    const vertical = id % 2 === 1;
-    const k = (id - (vertical ? 1 : 0)) / 2;
-    return crossing(k % stride, Math.floor(k / stride), vertical) as [number, number];
-  };
-  const used = new Set<number>();
   const polylines: Polyline[] = [];
   const walk = (start: number) => {
     const pts: number[] = [];
     let prev = -1;
     let cur = start;
+    const push = (id: number) => {
+      const slot = slotOf[id] - 2;
+      pts.push(crossX[slot], crossY[slot]);
+    };
     for (;;) {
-      used.add(cur);
-      const [x, y] = point(cur);
-      pts.push(x, y);
-      const next = (adjacency.get(cur) ?? []).find((n) => n !== prev && !used.has(n));
-      if (next === undefined) {
+      used[cur] = 1;
+      push(cur);
+      const a = nb0[cur] - 1;
+      const b = nb1[cur] - 1;
+      const next = a !== -1 && a !== prev && !used[a] ? a : b !== -1 && b !== prev && !used[b] ? b : -1;
+      if (next === -1) {
         // A closed loop returns to its start.
-        if ((adjacency.get(cur) ?? []).includes(start) && prev !== start && pts.length > 4) pts.push(...point(start));
+        if ((a === start || b === start) && prev !== start && pts.length > 4) push(start);
         break;
       }
       prev = cur;
@@ -295,10 +397,11 @@ export function contour(F: (x: number, y: number) => number, vp: Viewport, o: Co
     }
     if (pts.length >= 4) polylines.push(Float64Array.from(pts));
   };
-  const nodes = Array.from(adjacency.entries());
-  for (const [id, nb] of nodes) if (nb.length === 1 && !used.has(id)) walk(id);
-  for (const [id] of nodes) if (!used.has(id)) walk(id);
-  return { polylines: stitch(polylines, STITCH_CELLS * Math.hypot(dx, dy), vp), evaluations };
+  const order = nodes.slice();
+  for (const id of order) if (nb1[id] === 0 && !used[id]) walk(id);
+  for (const id of order) if (!used[id]) walk(id);
+  const cellScale = coarse ? R : 1;
+  return { polylines: stitch(polylines, STITCH_CELLS * Math.hypot(dx * cellScale, dy * cellScale), vp), evaluations, coarse };
 }
 
 /**
@@ -490,6 +593,12 @@ export function regionMask(
   stride: number,
   inside: (v: number) => boolean,
   cellPx?: number,
+  /**
+   * Blocks that need refinement are sampled every `refineStep` mask pixels in each direction and the value is repeated
+   * over the step × step group (1 = every mask pixel). Drag frames use 2 (MASK_REFINE_STEP_DRAG): a dense field
+   * refines nearly every block, and the exact frame follows on release.
+   */
+  refineStep = 1,
 ): RegionMask {
   const w = Math.max(1, Math.ceil(width / stride));
   const h = Math.max(1, Math.ceil(height / stride));
@@ -560,7 +669,21 @@ export function regionMask(
         }
       }
       if (refineBlock) {
-        for (let j = J * B; j < j1; j++) for (let i = I * B; i < i1; i++) pixel(i, j);
+        if (refineStep <= 1) {
+          for (let j = J * B; j < j1; j++) for (let i = I * B; i < i1; i++) pixel(i, j);
+        } else {
+          for (let j = J * B; j < j1; j += refineStep) {
+            const gh = Math.min(refineStep, j1 - j);
+            for (let i = I * B; i < i1; i += refineStep) {
+              const gw = Math.min(refineStep, i1 - i);
+              const v = F(vp.xmin + (i + gw / 2) * sx, vp.ymax - (j + gh / 2) * sy);
+              evaluations++;
+              if (Number.isFinite(v) && inside(v)) {
+                for (let jj = 0; jj < gh; jj++) for (let ii = 0; ii < gw; ii++) data[(j + jj) * w + i + ii] = 1;
+              }
+            }
+          }
+        }
       } else if (Number.isFinite(c0) && inside(c0)) {
         for (let j = J * B; j < j1; j++) data.fill(1, j * w + I * B, j * w + i1);
       }

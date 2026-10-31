@@ -59,6 +59,10 @@ export const STITCH_CELLS = 2;
 /** Inequality shading: one sample every this many pixels (full quality, while dragging). */
 export const FIELD_STRIDE_FULL = 1;
 export const FIELD_STRIDE_DRAG = 4;
+/** While dragging, shading blocks that need refinement are sampled every second mask pixel (see `regionMask`). */
+export const MASK_REFINE_STEP_DRAG = 2;
+/** While dragging, a field whose coarse cells need refinement from this fraction on is traced on the coarse cells. */
+export const IMPLICIT_DENSE_FRACTION_DRAG = 0.5;
 /** Tanh-sinh: successive levels agreeing to this relative change count as converged. */
 export const TANH_SINH_RELATIVE = 1e-12;
 /** Tanh-sinh: after the last level, a change below this relative size is the rounding noise floor, not divergence. */

@@ -20,6 +20,10 @@ export interface FieldOptions {
   /** Shading stride (mask pixel = stride × stride CSS pixels); ignored without a relation other than "=". */
   stride: number;
   relation: Relation;
+  /** Sampling step inside refined shading blocks (see `regionMask`); 1 when absent. */
+  refineStep?: number;
+  /** Fraction of refined coarse cells from which the curve is traced coarsely (see `contour`); absent: never. */
+  coarseWhenDense?: number;
 }
 
 export interface FieldResult {
@@ -27,14 +31,16 @@ export interface FieldResult {
   /** Shading for inequalities, row 0 at the top. */
   mask: { width: number; height: number; data: Uint8Array } | null;
   evaluations: number;
+  /** True when the curve was traced on coarse cells (dense drag frame). */
+  coarse?: boolean;
 }
 
 /** Curve and shading of F over one view (one strip, or the whole canvas). */
 export function implicitField(F: (x: number, y: number) => number, vp: Viewport, o: FieldOptions): FieldResult {
-  const c = contour(F, vp, { width: o.width, height: o.height, cellPx: o.cellPx, refine: o.refine });
-  if (o.relation === "=") return { polylines: c.polylines, mask: null, evaluations: c.evaluations };
-  const m = regionMask(F, vp, o.width, o.height, o.stride, insideTest(o.relation), o.cellPx);
-  return { polylines: c.polylines, mask: { width: m.width, height: m.height, data: m.data }, evaluations: c.evaluations + m.evaluations };
+  const c = contour(F, vp, { width: o.width, height: o.height, cellPx: o.cellPx, refine: o.refine, coarseWhenDense: o.coarseWhenDense });
+  if (o.relation === "=") return { polylines: c.polylines, mask: null, evaluations: c.evaluations, coarse: c.coarse };
+  const m = regionMask(F, vp, o.width, o.height, o.stride, insideTest(o.relation), o.cellPx, o.refineStep ?? 1);
+  return { polylines: c.polylines, mask: { width: m.width, height: m.height, data: m.data }, evaluations: c.evaluations + m.evaluations, coarse: c.coarse };
 }
 
 export interface Strip {
@@ -78,13 +84,15 @@ export function planStrips(vp: Viewport, width: number, height: number, cellPx: 
 /** Joins strip results (top to bottom): curves stitched across the borders, mask rows concatenated. */
 export function mergeStrips(parts: readonly FieldResult[], vp: Viewport, o: FieldOptions): FieldResult {
   const all = parts.flatMap((p) => p.polylines);
-  const R = Math.max(1, Math.floor(o.refine));
+  // Strips that traced coarsely end their curves on coarse-cell edges: join with a gap in coarse cells then.
+  const R = parts.some((p) => p.coarse) ? 1 : Math.max(1, Math.floor(o.refine));
   const NX = Math.max(1, Math.ceil(o.width / o.cellPx)) * R;
   const NY = Math.max(1, Math.ceil(o.height / o.cellPx)) * R;
   const gap = STITCH_CELLS * Math.hypot((vp.xmax - vp.xmin) / NX, (vp.ymax - vp.ymin) / NY);
   const polylines = parts.length > 1 ? stitch(all, gap, vp) : all;
   const evaluations = parts.reduce((n, p) => n + p.evaluations, 0);
-  if (parts.every((p) => p.mask === null)) return { polylines, mask: null, evaluations };
+  const coarse = parts.some((p) => p.coarse);
+  if (parts.every((p) => p.mask === null)) return { polylines, mask: null, evaluations, coarse };
   const masks = parts.map((p) => p.mask).filter((m): m is NonNullable<FieldResult["mask"]> => m !== null);
   const width = masks[0].width;
   const height = masks.reduce((n, m) => n + m.height, 0);
@@ -94,5 +102,5 @@ export function mergeStrips(parts: readonly FieldResult[], vp: Viewport, o: Fiel
     data.set(m.data, offset);
     offset += m.data.length;
   }
-  return { polylines, mask: { width, height, data }, evaluations };
+  return { polylines, mask: { width, height, data }, evaluations, coarse };
 }

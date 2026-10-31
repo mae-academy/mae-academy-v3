@@ -82,4 +82,16 @@ describe("strips when the height is not a multiple of the stride", () => {
     single.mask?.data.forEach((v, i) => (diff += v === merged.mask?.data[i] ? 0 : 1));
     expect(diff).toBeLessThanOrEqual(single.mask ? single.mask.width * 2 : 0);
   });
+
+  it("coarse strips (dense drag frames) still join across strip borders: a circle forced coarse is one closed curve in 4 strips", () => {
+    const F = (x: number, y: number) => x * x + y * y - 9;
+    const o: FieldOptions = { ...DRAG, coarseWhenDense: 0 };
+    const four = run(F, o, 4);
+    expect(four.coarse).toBe(true);
+    expect(four.polylines).toHaveLength(1);
+    const p = four.polylines[0];
+    expect(Math.hypot(p[0] - p[p.length - 2], p[1] - p[p.length - 1])).toBeLessThan(1e-9);
+    for (let i = 0; i < p.length; i += 2) expect(Math.abs(Math.hypot(p[i], p[i + 1]) - 3)).toBeLessThan(0.01);
+  });
 });
+

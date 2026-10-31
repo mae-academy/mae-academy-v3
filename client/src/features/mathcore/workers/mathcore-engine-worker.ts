@@ -7,7 +7,7 @@ import { bench } from "./benchEntry";
 import { centralDifference } from "@shared/mathcore/calculus/derivative";
 import { describeExplicit, describeExtent } from "@shared/mathcore/describe/describe";
 import {
-  FIELD_STRIDE_DRAG, FIELD_STRIDE_FULL, PRECISION_WARNING_MAGNITUDE, IMPLICIT_CELL_PX_DRAG, PARAMETER_TURN, SAMPLE_DRAG_FACTOR, SAMPLE_INITIAL_FULL, SAMPLE_INITIAL_MIN, IMPLICIT_CELL_PX_FULL, IMPLICIT_REFINE_DRAG, IMPLICIT_REFINE_FULL, STRIP_RESERVED_CORES, STRIP_WORKERS_MAX, STRIP_WORKERS_MIN,
+  FIELD_STRIDE_DRAG, FIELD_STRIDE_FULL, MASK_REFINE_STEP_DRAG, IMPLICIT_DENSE_FRACTION_DRAG, PRECISION_WARNING_MAGNITUDE, IMPLICIT_CELL_PX_DRAG, PARAMETER_TURN, SAMPLE_DRAG_FACTOR, SAMPLE_INITIAL_FULL, SAMPLE_INITIAL_MIN, IMPLICIT_CELL_PX_FULL, IMPLICIT_REFINE_DRAG, IMPLICIT_REFINE_FULL, STRIP_RESERVED_CORES, STRIP_WORKERS_MAX, STRIP_WORKERS_MIN,
 } from "@shared/mathcore/constants";
 import { GraphEngine } from "@shared/mathcore/engine/graphEngine";
 import { implicitField } from "@shared/mathcore/implicit/strips";
@@ -194,6 +194,8 @@ async function sampleItem(e: GraphEngine, id: string, view: ViewRequest): Promis
         refine: drag ? IMPLICIT_REFINE_DRAG : IMPLICIT_REFINE_FULL,
         stride: drag ? FIELD_STRIDE_DRAG : FIELD_STRIDE_FULL,
         relation: rt.relation,
+        refineStep: drag ? MASK_REFINE_STEP_DRAG : 1,
+        coarseWhenDense: drag ? IMPLICIT_DENSE_FRACTION_DRAG : undefined,
       });
       const out: ItemResult = { ...base, segments: f.polylines, relation: rt.relation };
       if (f.mask) out.field = { ...f.mask, viewport: view.viewport };
