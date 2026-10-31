@@ -4,6 +4,7 @@
  * (light/dark) is always current and no color is written in this file.
  */
 import { ANGLE_DIGITS, DASH_PATTERNS, EIGEN_ARC_RADIUS, EIGEN_DOUBLE_LINE_GAP, FIELD_OPACITY, TRANSFORM_GRID_OPACITY } from "@shared/mathcore/constants";
+import { tangentGeometry } from "@shared/mathcore/calculus/tangentGeometry";
 import type { Viewport } from "@shared/mathcore/ir/types";
 
 export interface DrawCurve {
@@ -37,8 +38,6 @@ export interface DrawTangent {
   x0: number;
   y0: number;
   slope: number;
-  /** Slope-triangle run in world units. */
-  dx: number;
   color: string;
 }
 
@@ -281,15 +280,17 @@ export class Canvas2DRenderer implements Renderer {
       ctx.strokeStyle = t.color;
       ctx.lineWidth = AXIS_WIDTH;
       ctx.beginPath();
-      ctx.moveTo(X(xmin), Y(t.y0 + t.slope * (xmin - t.x0)));
-      ctx.lineTo(X(xmax), Y(t.y0 + t.slope * (xmax - t.x0)));
+      // Endpoints and triangle are DATA coordinates (tangentGeometry); X and Y only scale them to the canvas.
+      const g = tangentGeometry(t);
+      ctx.moveTo(X(g.from.x), Y(g.from.y));
+      ctx.lineTo(X(g.to.x), Y(g.to.y));
       ctx.stroke();
       // Slope triangle Δx, Δy.
       ctx.setLineDash([4, 4]);
       ctx.beginPath();
-      ctx.moveTo(X(t.x0), Y(t.y0));
-      ctx.lineTo(X(t.x0 + t.dx), Y(t.y0));
-      ctx.lineTo(X(t.x0 + t.dx), Y(t.y0 + t.slope * t.dx));
+      ctx.moveTo(X(g.triangle[0].x), Y(g.triangle[0].y));
+      ctx.lineTo(X(g.triangle[1].x), Y(g.triangle[1].y));
+      ctx.lineTo(X(g.triangle[2].x), Y(g.triangle[2].y));
       ctx.stroke();
       ctx.setLineDash([]);
     }

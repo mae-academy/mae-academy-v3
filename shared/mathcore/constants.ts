@@ -35,6 +35,14 @@ export const DEFAULT_PARAM = { value: 1, min: -10, max: 10, step: 0.1 } as const
 /** STEPS.md §7.3: central-difference step h ≈ √ε · max(1, |x|). */
 export const DERIVATIVE_STEP_SCALE = Math.sqrt(Number.EPSILON);
 
+/**
+ * Tangent drawing (Part E1, 2026-10-31): the tangent segment runs from x₀ − TANGENT_HALF_SPAN to x₀ + TANGENT_HALF_SPAN
+ * and its slope triangle has the run TANGENT_TRIANGLE_RUN, both in DATA units. Neither depends on the viewport: zooming
+ * or resizing changes only the drawing scale.
+ */
+export const TANGENT_HALF_SPAN = 2;
+export const TANGENT_TRIANGLE_RUN = 1;
+
 /** Guard for user-function recursion and nested evaluation (sums, integrals). */
 export const MAX_CALL_DEPTH = 64;
 /** Upper bound on terms in a Σ or Π so a typo cannot freeze a Worker. */

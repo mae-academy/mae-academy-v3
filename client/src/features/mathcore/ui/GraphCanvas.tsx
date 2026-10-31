@@ -12,7 +12,7 @@ import { NS } from "../i18n/register";
 import { CameraSync, moveCamera } from "./camera";
 import { ORBIT_RADIANS_PER_KEY, ORBIT_RADIANS_PER_PX, ZOOM_FACTOR } from "@shared/mathcore/constants";
 import type { DrawFrame3, Scene } from "../render/renderer";
-import { Canvas2DRenderer, gridStep } from "../render/renderer";
+import { Canvas2DRenderer } from "../render/renderer";
 
 export interface TraceTarget {
   id: string;
@@ -289,9 +289,4 @@ export function GraphCanvas(props: GraphCanvasProps) {
       />
     </div>
   );
-}
-
-/** Slope-triangle run: one grid step, so the triangle stays a readable size at any zoom. */
-export function triangleRun(v: Viewport): number {
-  return gridStep(Math.max(v.xmax - v.xmin, v.ymax - v.ymin), 10);
 }

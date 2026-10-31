@@ -16,7 +16,7 @@ import { LINALG_TOKENS, PALETTE_TOKENS, SCENE3_TOKENS, cssRgb, resolveColor } fr
 import { describeItem, describeLinalg } from "./describeText";
 import { ExpressionRow } from "./ExpressionRow";
 import type { DraggablePoint, TraceTarget } from "./GraphCanvas";
-import { GraphCanvas, triangleRun } from "./GraphCanvas";
+import { GraphCanvas } from "./GraphCanvas";
 import { SliderRow } from "./SliderRow";
 import type { EngineClient, WorkerLike } from "../workers/engineClient";
 import { createEngineClient } from "../workers/engineClient";
@@ -326,7 +326,7 @@ export default function MathcorePage() {
       points,
       tangent:
         traced && traced.slope !== null
-          ? { x0: traced.x, y0: traced.y, slope: traced.slope, dx: triangleRun(graph.viewport), color: resolveColor(document.documentElement, undefined, "--muted-foreground") }
+          ? { x0: traced.x, y0: traced.y, slope: traced.slope, color: resolveColor(document.documentElement, undefined, "--muted-foreground") }
           : null,
     };
   }, [graph, results, colors, trace]);
