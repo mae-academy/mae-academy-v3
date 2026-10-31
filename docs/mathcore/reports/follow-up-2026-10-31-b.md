@@ -85,7 +85,8 @@ Method: the suite run in a loop, one log per run, the failing test taken from th
 - Deterministic reproduction: the e2e tests "101 alternating wheel ticks, one per frame / per task, lose no step" end the
   distance at 30·1.2 only if no tick is lost. Before the fix 6 of 6 runs failed (final distances 1000, 0.62, 321 …); after
   it 5 of 5 sessions passed. Unit tests in `moveCamera.test.ts` replay the interleaving (and a 200-trial random one).
-- Clean runs after the fix: see the end of this file.
+- Clean runs after the fix: **20 consecutive runs of the full suite (28 tests each), all passed** (`run 1 … run 20`, exit 0).
+  Totals on this flake: 20 + 7 runs before the fix with 1 failure (run 26), 20 after with none.
 
 ## Item 5: owner decisions Q1–Q17
 

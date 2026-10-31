@@ -15,8 +15,8 @@ Read this first. It replaces re-reading the earlier conversation. Paste the prom
   `phase-3.md`, and `follow-up-2026-10-31-b.md`: 2-core performance, per-value eigenvalues, device scripts, the flake hunt). Every finding is fixed or listed as a known limit in its report. The owner lifted D3 (3D) for Phase 5 only.
   **Stop after Phase 5**: Phase 6 (ODEs) and later are a separate scope. Headless ODE code (`shared/mathcore/ode/`)
   exists without UI; do not build on it unasked.
-- State at handoff: gate green with no skipped steps; mathcore unit tests and browser tests pass (counts in the final
-  report of the round). Measured budgets are in each report. Key facts, all on the shared cloud machine:
+- State at handoff: gate green with no skipped steps; 481 mathcore unit tests (35 files) and 28 browser tests pass; the browser
+  suite passed 20 consecutive runs after the last fix (see `follow-up-2026-10-31-b.md`, item 4). Measured budgets are in each report. Key facts, all on the shared cloud machine:
   - Implicit fields, Chromium on a **real two-core CPU** (`taskset -c 0,1`; `MATHCORE_CORES=2` alone is misleading), 1 s
     after load: dense sin(x²+y²) < 0 drag 12.5–13.0 ms, release 122–128 ms (met). Right after load (cold JIT) dense drag is
     23 ms and release 154 ms (**not met**). The reference field x²+y²+sin3x·cos2y < 9: drag 18.6–20.3 ms (**not met**),
@@ -76,6 +76,9 @@ Status after the second follow-up round. "Owner" items are questions; none was d
 - Reference field on two real cores: drag 18.6–20.3 ms (budget 16) and release 137–169 ms (budget 150).
 - Dense field right after load (cold JIT): drag 23 ms, release 154 ms. The warm numbers (1 s idle after load) pass.
 - No measurement exists on the owner's MacBook or on the D1 reference device (below).
+
+**Closed (item 4):** the intermittent browser failure was a lost wheel tick in `GraphCanvas` (a stale prop overwrote the camera ref
+between a commit and its passive effect); fixed by `CameraSync`, with a deterministic stress test and 20 clean runs.
 
 **Pending owner hardware:** item 3. `bench.ts` and `bench-browser.cjs` print one JSON document each;
 `docs/mathcore/reports/device-results-template.md` has the commands and the fields. The item is closed only when the
