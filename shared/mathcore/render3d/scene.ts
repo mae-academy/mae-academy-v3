@@ -14,7 +14,7 @@
 import type { Mat } from "../linalg/matrix";
 import { determinant } from "../linalg/matrix";
 import { complexPlane3, eigen3 } from "../linalg/qr";
-import { ARC_FRACTION, LABEL_OFFSET, MARKER_FRACTION, SCENE_MARGIN, SCENE_MAX_HALF, SCENE_MIN_HALF as MIN_HALF } from "../constants";
+import { ARC_FRACTION, LABEL_OFFSET, MARKER_FRACTION, SCENE_MARGIN, SCENE_MAX_HALF, SCENE_MIN_HALF as MIN_HALF, SCENE_NORMALIZE_ABOVE } from "../constants";
 import { parallelepipedMesh, planeInCube, polygonMesh } from "./geometry";
 import type { Line3, Mesh, RGB, Vec3 } from "./raster";
 
@@ -47,8 +47,14 @@ export interface Scene3 {
   meshes: Mesh[];
   lines: Line3[];
   labels: Label3[];
-  /** Half-size of the viewing box. */
+  /** Half-size of the viewing box, in world units. */
   half: number;
+  /**
+   * Meshes, lines and label anchors are in world units divided by `scale` (1 unless the box is larger than
+   * SCENE_NORMALIZE_ABOVE, where Float32 vertex coordinates would overflow): render with a camera whose distance is
+   * also divided by `scale`.
+   */
+  scale: number;
 }
 
 const add = (a: Vec3, b: Vec3): Vec3 => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
@@ -127,7 +133,20 @@ export function planeIntersection(n1in: Vec3, b1in: number, n2in: Vec3, b2in: nu
 }
 
 export function buildScene3(items: readonly Scene3Item[], colors: Scene3Colors): Scene3 {
-  const L = sceneHalf(items);
+  const half = sceneHalf(items);
+  if (!(half > SCENE_NORMALIZE_ABOVE)) return buildNormalized(items, half, 1, colors);
+  // A huge scene is built in units of a power of two near its size, so vertices stay far inside the Float32 range.
+  const k = 2 ** Math.round(Math.log2(half));
+  const scaled = items.map((it): Scene3Item =>
+    it.kind === "system"
+      ? { ...it, b: it.b.map((v) => v / k), solution: it.solution && (it.solution.map((v) => v / k) as Vec3) }
+      : { ...it, values: it.values.map((r) => r.map((v) => v / k)) },
+  );
+  return buildNormalized(scaled, half / k, k, colors);
+}
+
+/** The scene for items already divided by `unit`, in a box of half-size L (in the same units). */
+function buildNormalized(items: readonly Scene3Item[], L: number, unit: number, colors: Scene3Colors): Scene3 {
   const meshes: Mesh[] = [];
   const lines: Line3[] = [];
   const labels: Label3[] = [];
@@ -168,7 +187,7 @@ export function buildScene3(items: readonly Scene3Item[], colors: Scene3Colors):
       if (s && finite3(s)) {
         const a = MARKER_FRACTION * L;
         for (const e of axes) lines.push({ from: add(s, scale(e[0], -a)), to: add(s, scale(e[0], a)), color: colors.arrow });
-        labels.push({ at: add(s, [a, a, a]), text: `(${fmt(s[0])}, ${fmt(s[1])}, ${fmt(s[2])})` });
+        labels.push({ at: add(s, [a, a, a]), text: `(${fmt(s[0] * unit)}, ${fmt(s[1] * unit)}, ${fmt(s[2] * unit)})` });
       }
     } else {
       const A = it.values;
@@ -207,5 +226,5 @@ export function buildScene3(items: readonly Scene3Item[], colors: Scene3Colors):
       }
     }
   }
-  return { meshes, lines, labels, half: L };
+  return { meshes, lines, labels, half: L * unit, scale: unit };
 }

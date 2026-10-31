@@ -211,6 +211,8 @@ export const LINE_BEHIND_MIX = 0.45;
 export const SCENE_MIN_HALF = 5;
 export const SCENE_MAX_HALF = 1e150;
 export const SCENE_MARGIN = 1.25;
+/** A 3D box larger than this is built in units of its own size (Float32 vertices overflow near 3e38). */
+export const SCENE_NORMALIZE_ABOVE = 1e15;
 export const MARKER_FRACTION = 0.06;
 export const ARC_FRACTION = 0.35;
 export const LABEL_OFFSET = 1.06;

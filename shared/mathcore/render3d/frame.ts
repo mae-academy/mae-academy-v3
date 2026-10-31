@@ -77,7 +77,8 @@ export function renderFrame3(
   const k = req.quality === "drag" ? FRAME3_DRAG_SCALE : 1;
   const width = Math.min(FRAME3_MAX_SIDE, Math.max(1, Math.round(req.width * k) || 1));
   const height = Math.min(FRAME3_MAX_SIDE, Math.max(1, Math.round(req.height * k) || 1));
-  const cam = { ...DEFAULT_CAMERA, ...camera, target: [0, 0, 0] as Vec3 };
+  // The scene is in world units divided by scene.scale (1 except for huge scenes); the camera follows.
+  const cam = { ...DEFAULT_CAMERA, ...camera, distance: camera.distance / scene.scale, target: [0, 0, 0] as Vec3 };
   const f = render(scene.meshes, scene.lines, cam, width, height, colors.background);
   const project = projector(cam, req.width, req.height);
   const labels: Frame3["labels"] = [];

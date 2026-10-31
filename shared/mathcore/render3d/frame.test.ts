@@ -93,3 +93,30 @@ describe("Phase 5 review regressions", () => {
     expect(f.labels.some((l) => l.text === "θ = 90°")).toBe(true);
   });
 });
+
+describe("A5 and A7: camera limits and fit follow the scene, not absolute numbers", () => {
+  const big = (digits: number) => "1" + "0".repeat(digits);
+  for (const digits of [20, 39, 45, 100]) {
+    it(`a scene of size 1e${digits} (past the Float32 range when 39 or more) is drawn, labelled in world units and fitted`, () => {
+      const e = engine([`\\begin{cases}x=${big(digits)}\\\\y=${big(digits)}\\\\z=${big(digits)}\\end{cases}`, `M=\\begin{bmatrix}${big(digits)}&0&0\\\\0&${big(digits)}&0\\\\0&0&${big(digits)}\\end{bmatrix}`]);
+      const f = renderFrame3(e, { width: 400, height: 300, quality: "full" }, colors);
+      expect(f.half).toBeGreaterThan(10 ** digits);
+      expect(Number.isFinite(f.camera.distance)).toBe(true);
+      expect(painted(f.rgba), "painted share").toBeGreaterThan(0.05);
+      const sol = f.labels.find((l) => l.text.startsWith("("));
+      const v = String(Number((10 ** digits).toPrecision(4)));
+      expect(sol?.text).toBe(`(${v}, ${v}, ${v})`);
+      expect(sol && sol.x > 0 && sol.x < 400 && sol.y > 0 && sol.y < 300).toBe(true);
+    });
+  }
+  it("the axis labels of the fitted view are inside a wide and a tall canvas", () => {
+    const e = engine(["M=\\begin{bmatrix}2&0&0\\\\0&1&0.5\\\\0&0.5&1\\end{bmatrix}"]);
+    for (const [w, h] of [[1600, 500], [500, 1600]]) {
+      const f = renderFrame3(e, { width: w, height: h, quality: "full" }, colors);
+      for (const name of ["x", "y", "z"]) {
+        const l = f.labels.find((q) => q.text === name);
+        expect(l && l.x > 0 && l.x < w && l.y > 0 && l.y < h, `${w}×${h} label ${name}`).toBe(true);
+      }
+    }
+  });
+});
