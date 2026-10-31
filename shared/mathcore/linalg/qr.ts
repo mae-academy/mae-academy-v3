@@ -230,10 +230,15 @@ const cross = (u: number[], v: number[]): [number, number, number] => [
 ];
 const norm3 = (v: number[]) => Math.hypot(v[0], v[1], v[2]);
 
-/** Null space of A − λI for a 3×3 A: 1, 2 or 3 unit vectors depending on the rank. */
+/**
+ * Null space of A − λI for a 3×3 A: 1, 2 or 3 unit vectors depending on the rank. Works on A and λ divided by a power
+ * of two near the largest entry (exact), so cross products of rows neither overflow nor underflow for entries near
+ * 1e±200.
+ */
 export function eigenspace3(A: Mat, lambda: number): Array<[number, number, number]> {
-  const M = A.map((row, i) => row.map((v, j) => v - (i === j ? lambda : 0)));
-  const scale = Math.max(...A.flat().map(Math.abs), Math.abs(lambda), Number.MIN_VALUE);
+  const k = powerOfTwoScale([...A, [lambda, 0, 0]]);
+  const M = A.map((row, i) => row.map((v, j) => v / k - (i === j ? lambda / k : 0)));
+  const scale = Math.max(...A.flat().map((v) => Math.abs(v / k)), Math.abs(lambda / k), Number.MIN_VALUE);
   const tol = 1e-8 * scale;
   const crosses = [cross(M[0], M[1]), cross(M[0], M[2]), cross(M[1], M[2])].sort((u, v) => norm3(v) - norm3(u));
   if (norm3(crosses[0]) > tol * scale) {
@@ -277,56 +282,52 @@ function cubic3(A: Mat): { a: Fraction; b: Fraction; c: Fraction; disc: Fraction
   return { a, b, c, disc };
 }
 
-/** Number of independent eigenvectors for λ: 3 − rank(A − λI), with the rank found by exact elimination. */
-function nullity3(A: Mat, lambda: Fraction): number {
-  const F = toDyadic(A) as Fraction[][];
-  const M = F.map((r, i) => r.map((v, j) => (i === j ? v.sub(lambda) : v)));
-  let rank = 0;
-  const rows = M.map((r) => r.slice());
-  for (let col = 0; col < 3 && rank < 3; col++) {
-    const p = rows.findIndex((r, i) => i >= rank && !r[col].isZero());
-    if (p < 0) continue;
-    [rows[rank], rows[p]] = [rows[p], rows[rank]];
-    for (let i = rank + 1; i < 3; i++) {
-      const f = rows[i][col].div(rows[rank][col]);
-      rows[i] = rows[i].map((v, j) => v.sub(f.mul(rows[rank][j])));
-    }
-    rank++;
-  }
-  return 3 - rank;
-}
-
 /**
- * 3×3 eigen-decomposition. The kind comes from the exact discriminant of the characteristic polynomial, so repeated
- * and defective cases are recognised exactly (QR alone splits a triple root by ~1e-5); a repeated root and the simple
- * one are then exact too: for λ³ + aλ² + bλ + c with Δ = 0, the double root is (9c − ab) / (2(a² − 3b)) and the simple
- * one (4ab − 9c − a³) / (a² − 3b); a triple root is −a/3. Distinct and complex values come from QR. Eigen-directions
- * number 3 − rank(A − λI).
+ * 3×3 eigen-decomposition. The matrix is divided by a power of two near its largest entry first (exact), so entries
+ * near 1e±200 neither overflow nor underflow; values are scaled back, unit vectors are unaffected.
+ *
+ * The kind comes from the exact discriminant of the characteristic polynomial, so repeated and defective cases are
+ * recognised exactly (QR alone splits a triple root by ~1e-5); a repeated root and the simple one are then exact too:
+ * for λ³ + aλ² + bλ + c with Δ = 0, the double root is (9c − ab) / (2(a² − 3b)) and the simple one
+ * (4ab − 9c − a³) / (a² − 3b); a triple root is −a/3. Eigen-directions number 3 − rank(A − λI).
+ *
+ * A matrix whose entries were rounded (typed decimals, a similarity transform of a Jordan form) has Δ ≠ 0 although it
+ * is a repeated-root matrix to working precision. When |Δ| ≤ EIGEN_DISC_RELATIVE for the matrix scaled to unit size
+ * (eigenvalues closer than about 1e-6 of the matrix norm), the roots are treated as repeated: a triple root is
+ * trace/3, a double root (trace − simple)/2 with the simple root from QR (symmetric functions of the roots are
+ * insensitive to the splitting), and the eigenspaces come from the numerical rank of A − λI. Distinct and complex
+ * values otherwise come from QR.
  */
 export function eigen3(A: Mat): Eigen3 {
   if (A.length !== 3 || A.some((r) => r.length !== 3)) throw new RangeError("eigen3 needs a 3×3 matrix");
+  if (A.flat().some((v) => !Number.isFinite(v))) throw new RangeError("eigen3 needs finite entries");
+  const k = powerOfTwoScale(A);
+  const r = eigen3Scaled(A.map((row) => row.map((v) => v / k)));
+  return { kind: r.kind, values: r.values.map((e) => ({ re: e.re * k, im: e.im * k })), vectors: r.vectors.map((v) => ({ value: v.value * k, vector: v.vector })) };
+}
+
+function eigen3Scaled(A: Mat): Eigen3 {
   const cub = cubic3(A);
+  const three = new Fraction(BigInt(3));
+  let roots: Array<{ value: number; multiplicity: number }> | null = null;
   if (cub && cub.disc.isZero()) {
     const { a, b, c } = cub;
-    const p = a.mul(a).sub(b.mul(new Fraction(BigInt(3))));
-    let roots: Array<{ value: Fraction; multiplicity: number }>;
-    if (p.isZero()) roots = [{ value: a.neg().div(new Fraction(BigInt(3))), multiplicity: 3 }];
+    const p = a.mul(a).sub(b.mul(three));
+    if (p.isZero()) roots = [{ value: a.neg().div(three).toNumber(), multiplicity: 3 }];
     else {
       const double = c.mul(new Fraction(BigInt(9))).sub(a.mul(b)).div(p.mul(new Fraction(BigInt(2))));
       const simple = a.mul(b).mul(new Fraction(BigInt(4))).sub(c.mul(new Fraction(BigInt(9)))).sub(a.mul(a).mul(a)).div(p);
-      roots = [{ value: double, multiplicity: 2 }, { value: simple, multiplicity: 1 }];
+      roots = [{ value: double.toNumber(), multiplicity: 2 }, { value: simple.toNumber(), multiplicity: 1 }];
     }
-    const values: EigenValue[] = roots
-      .flatMap((r) => Array.from({ length: r.multiplicity }, () => ({ re: r.value.toNumber(), im: 0 })))
-      .sort((u, v) => v.re - u.re);
-    const vectors = roots.flatMap((r) => {
-      const lambda = r.value.toNumber();
-      const k = nullity3(A, r.value);
-      return eigenspace3(A, lambda).slice(0, Math.max(1, k)).map((vector) => ({ value: lambda, vector }));
-    });
-    return { kind: "repeated-real", values, vectors };
   }
-  const values = eigenvalues(A);
+  const values = roots ? [] : eigenvalues(A);
+  if (roots) {
+    const flat: EigenValue[] = roots
+      .flatMap((r) => Array.from({ length: r.multiplicity }, () => ({ re: r.value, im: 0 })))
+      .sort((u, v) => v.re - u.re);
+    const vectors = roots.flatMap((r) => eigenspace3(A, r.value).slice(0, r.multiplicity).map((vector) => ({ value: r.value, vector })));
+    return { kind: "repeated-real", values: flat, vectors };
+  }
   const scale = Math.max(...values.map((v) => Math.hypot(v.re, v.im)), Number.MIN_VALUE);
   // Δ < 0: one real root and a complex pair, whatever the rounding in QR says.
   const complex = cub ? cub.disc.n < BigInt(0) : values.some((v) => Math.abs(v.im) > EIGEN_EQUAL_TOLERANCE * scale);
@@ -352,7 +353,9 @@ export function complexPlane3(A: Mat, lambda: EigenValue): { u: [number, number,
   type C = [number, number];
   const mul = (a: C, b: C): C => [a[0] * b[0] - a[1] * b[1], a[0] * b[1] + a[1] * b[0]];
   const sub = (a: C, b: C): C => [a[0] - b[0], a[1] - b[1]];
-  const M: C[][] = A.map((r, i) => r.map((v, j): C => (i === j ? [v - lambda.re, -lambda.im] : [v, 0])));
+  // Divided by a power of two near the largest entry (exact) so products of entries near 1e±200 stay finite.
+  const k = powerOfTwoScale([...A, [lambda.re, lambda.im, 0]]);
+  const M: C[][] = A.map((r, i) => r.map((v, j): C => (i === j ? [v / k - lambda.re / k, -lambda.im / k] : [v / k, 0])));
   const cross = (p: C[], q: C[]): C[] => [
     sub(mul(p[1], q[2]), mul(p[2], q[1])),
     sub(mul(p[2], q[0]), mul(p[0], q[2])),

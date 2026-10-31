@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { apply, detFloat } from "./matrix";
 import type { Mat } from "./matrix";
-import { eigen3, eigenspace3, eigenvalues, hessenberg } from "./qr";
+import type { Eigen3Kind } from "./qr";
+import { complexPlane3, eigen3, eigenspace3, eigenvalues, hessenberg } from "./qr";
 
 function rng(seed: number) {
   let a = seed >>> 0;
@@ -154,3 +155,38 @@ describe("3×3 eigenvalues: repeated, defective and extreme scales (Phase 5 revi
     expect(eigen3([[2, 1, 0], [1, 2, 0], [0, 0, 5]]).kind).toBe("distinct-real");
   });
 });
+
+describe("A3: entries near 1e±200 (eigenvectors, eigenspaces, complex planes)", () => {
+  const cases: Array<[string, number[][], Eigen3Kind, number]> = [
+    ["distinct real", [[2, 1, 0], [1, 2, 0], [0, 0, 5]], "distinct-real", 3],
+    ["complex pair", [[0, -1, 0], [1, 0, 0], [0, 0, 2]], "complex-pair", 1],
+    ["Jordan block", [[2, 1, 0], [0, 2, 1], [0, 0, 2]], "repeated-real", 1],
+    ["double with a plane", [[1, 0, 0], [0, 1, 0], [0, 0, 3]], "repeated-real", 3],
+  ];
+  for (const k of [1e200, 1e-200, 1e154, 1e300, 1e-300]) {
+    for (const [name, base, kind, nvec] of cases) {
+      it(`${name} × ${k}: same kind, finite unit vectors with A v = λ v`, () => {
+        const A = base.map((r) => r.map((v) => v * k));
+        const e = eigen3(A);
+        expect(e.kind).toBe(kind);
+        expect(e.vectors).toHaveLength(nvec);
+        for (const { value, vector } of e.vectors) {
+          expect(vector.every(Number.isFinite)).toBe(true);
+          expect(Math.hypot(...vector)).toBeCloseTo(1, 12);
+          // Residual relative to the matrix scale (entries are tens of orders from 1, so compare after dividing by k).
+          const res = A.map((row, i) => (row[0] * vector[0] + row[1] * vector[1] + row[2] * vector[2] - value * vector[i]) / k);
+          expect(Math.hypot(...res)).toBeLessThan(1e-9);
+        }
+      });
+    }
+    it(`complex plane × ${k} is finite and spans the invariant plane`, () => {
+      const A = [[0, -1, 0], [1, 0, 0], [0, 0, 2]].map((r) => r.map((v) => v * k));
+      const pair = eigen3(A).values.find((v) => v.im > 0);
+      const plane = pair && complexPlane3(A, pair);
+      expect(plane).not.toBeNull();
+      if (plane) for (const v of [...plane.u, ...plane.w]) expect(Number.isFinite(v)).toBe(true);
+      if (plane) expect(Math.hypot(...plane.u, ...plane.w)).toBeCloseTo(1, 12);
+    });
+  }
+});
+
