@@ -60,10 +60,38 @@ random decimal systems.
 
 ## Known limits
 
-- Translucent planes are blended in a fixed order without per-pixel sorting, so where two translucent planes overlap
-  the colors can look slightly different from the other side; a line behind several translucent layers is mixed once.
+- Translucent triangles are sorted by their mean depth, not split where they intersect: two translucent planes that cross
+  each other can blend in the wrong order along the crossing line. Lines are composited in exact per-pixel depth order
+  with the translucent fragments on their pixel (fixed in A6, `render3d.test.ts`).
 - Text labels are drawn on top of the frame and are not hidden by surfaces in front of them.
 - Frames are rendered at CSS-pixel resolution and scaled up on high-density screens (slightly soft at DPR 2).
-- For floating-point (non-rational) 3×3 input, eigenvalues that are distinct but closer than about 10⁻⁵ relative are
-  reported as computed by QR (only exactly repeated roots are recognised).
-- Ten or more 3×3 items in one view exceed the 25 ms budget for full frames.
+- For floating-point 3×3 input, a double root is recognised when the discriminant of the unit-size matrix is at most
+  10⁻¹² (roots closer than about 10⁻⁶ of the matrix norm are reported as equal). Roots further apart come from QR, and
+  their eigenvectors are computed from the numerical rank of A − λI (`EIGEN_DISC_RELATIVE`, `EIGEN_CLUSTER_RELATIVE`).
+- Full 1600×1000 frames grow with the number of items (Node, one thread, measured 2026-10-31): 1 item 12.8 ms, 5 items
+  26.7 ms, 10 items 48.0 ms, 20 items 144.3 ms. The 25 ms budget is held for the Phase 5 scene (one 3×3 system and one
+  3×3 matrix) and for the drag frames; more items than about 5 at full quality are not within it.
+- Thin 3D lines are never lost: a line shorter than a pixel still lights two pixels (`render3d.test.ts`, B11). The
+  thin-feature limit of Phase 3 applies to 2D curves and shading only.
+- On a real 2-core CPU the browser misses the 16 ms drag budget for the Phase 3 fields (see phase-3.md, the 2-core
+  rows); the 3D frames were not measured in a browser on 2 cores.
+
+## Follow-up (2026-10-31): A1–A7, B9 (commits 6bb2582 … 084aedf)
+
+Each item has a test that failed before its fix. Numbers are measured on the cloud machine (Node, `scripts/mathcore/bench.ts`, one thread):
+
+| Item | Fix | Test (file) | Measured before → after |
+|---|---|---|---|
+| A1 near plane | `NEAR_RELATIVE` 1e-3 → 1e-6 | "A1: the near plane…" (`render3d.test.ts`) | 8760 floor pixels missing at distance 20 → 0 |
+| A2 defective 3×3 | discriminant test with rounded entries | "A2: defective and repeated 3×3…" (`qr.test.ts`) | Jordan forms with decimal λ: distinct or complex, 3 directions → repeated, correct eigenspace |
+| A3 entries near 10^±200 | power-of-two scaling before cross products | "A3: entries near 1e±200" (`qr.test.ts`) | NaN or wrong vectors → finite unit vectors |
+| A4 rapid keys and wheel | none needed (camera ref already in place); browser coverage added | "rapid keys and wheel ticks all count" (×5, e2e) | with the ref reverted the steps are lost (0.6 vs 1.3 rad) |
+| A5 large scenes | boxes > 10¹⁵ built in scene units | "A5 and A7…" (`frame.test.ts`) | 10³⁹ and above: planes and matrix missing, only the axes drawn (3 % of pixels) → drawn |
+| A6 lines and translucent planes | depth-ordered compositing | "A6: lines are composited…" (`render3d.test.ts`) | line behind two planes (214, 203, 224) → (114, 64, 164) |
+| A7 aspect ratio | none needed (`fitDistance` already uses the aspect); labels checked | "A5 and A7…" (`frame.test.ts`) | passes before and after |
+| B9 release frame | row blend of translucent layers, packed 32-bit blend, cached buffers | "B9: the row blend…" (`render3d.test.ts`) | Phase 5 zoomed scene, 1600×1000: 48.4 ms → 21.2 ms (Node today) |
+
+**3D frame budgets (Node, one thread, 2026-10-31):** 80×80 grid drag 7.7 ms, full 14.2 ms; Phase 5 scene fitted 10.3 ms,
+zoomed drag 7.6 ms, zoomed full 21.2 ms (budget 25 ms for each, `bench.ts`). The release frame of the zoomed scene is
+within 25 ms on this machine; a D1 reference device is still to be measured.
+

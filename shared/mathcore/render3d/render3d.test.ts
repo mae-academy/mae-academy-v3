@@ -185,3 +185,18 @@ describe("B9: the row blend equals the per-triangle blend", () => {
     }
   });
 });
+
+describe("B11: 3D lines are never lost to thinness (measured; rendering unchanged)", () => {
+  it("a line that projects to a fraction of a pixel still lights at least two pixels; a 0.2-unit line lights more", () => {
+    const cam: Camera = { ...DEFAULT_CAMERA, distance: 20, target: [0, 0, 0] };
+    const lit = (len: number) => {
+      const f = render([], [{ from: [0, 0, 0], to: [len, 0, 0], color: [255, 0, 0] }], cam, 400, 300, BG);
+      let n = 0;
+      for (let i = 0; i < f.rgba.length; i += 4) if (f.rgba[i] > 0) n++;
+      return n;
+    };
+    expect(lit(1e-3)).toBeGreaterThanOrEqual(2);
+    expect(lit(0.01)).toBeGreaterThanOrEqual(2);
+    expect(lit(0.2)).toBeGreaterThan(lit(0.01));
+  });
+});

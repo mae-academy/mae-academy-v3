@@ -122,11 +122,55 @@ Chromium figures are round trips measured from a page (message passing and copie
 than three cores no strip Workers start and the single-thread column applies, where the dense drag case misses the
 budget. D1 laptop numbers are still open (Phase 0 item 5).
 
+## Follow-up (2026-10-31): thin features, error text (B10–B12)
+
+Measured on the cloud machine with the code at `787871c`; tests named below pin the numbers (`marching.test.ts`,
+"B11/B12"). Rendering is unchanged by this round.
+
+| Feature at full quality (1600×1000, view ±5, cell 6 px, refine 4) | Measured | Test |
+|---|---|---|
+| Circle of diameter 1 px, 400 fixed centres | found at 138 (34.5 %); missed at 262 | "of 400 centres…" |
+| Circle of diameter 2 px, same centres | found at 396 (99 %); missed at 4 | same |
+| Circle of diameter 1.25 / 1.5 / 1.75 px (random probe, 400 centres each) | found at 55 % / 77 % / 94 % | probe only, not a test |
+| Shaded band of width 0.25 px or 0.5 px, 10 placements inside a cell | blank in 6 of 10 | "a shaded band 0.25 px wide…" |
+| Shaded band of width 0.75 px | blank in 2 of 10 | probe only |
+| Shaded band of width 1 px | blank in 0 of 10 | same test |
+| Circle of diameter 1 px missed at one centre, drawn after a 4× zoom | found after zoom | "a loop 1 px across that is missed…" |
+
+**Correction to the earlier premise.** The known limit "a loop smaller than one grid cell (6 px) can be missed until zoom"
+is not what the code does. Loops of 2 px and above were found at 99 % of centres or better in the measurement, and
+nothing at 6 px is missed in the tests. The real miss zone is loops below about 2 px (one fine lattice cell is 1.5 px),
+and shaded bands below about 1 px. No rendering change was made.
+
+**B10 (error text).** Errors from parse, normalize, inference, compile, the graph engine and QR now carry a catalog
+key and params (`shared/mathcore/errors.ts`, 75 keys). The page translates them into ar and es through the existing
+mathcore dictionaries (`errors.<key>` in `i18n/{en,ar,es}.json`). Tests: `i18n/errors.test.ts` (every key in all three
+languages with the same placeholders, and no unused keys), `errors.test.ts` (keys and params on engine errors), and the
+e2e "engine errors are shown in the reader's language" for ar and es. Still English: Compute Engine's own parser messages
+(for example "Limit" in `\lim`) and developer-invariant throws in `linalg/` (except QR's non-convergence).
+
+**Implicit-field timings with the Phase 3 budgets (Node one thread, and Chromium).** Current numbers, 3 runs unless
+stated:
+
+| Case | Target | Node (1 run) | Chromium, 4 cores (3 runs) | Chromium, real 2 cores (`taskset`, 2 runs) |
+|---|---|---|---|---|
+| Reference field, drag 400×250 | ≤ 16 ms | 15.1 ms | 12.7–15.8 ms | 27.2–30.9 ms (fails) |
+| Reference field, release 1600×1000 | ≤ 150 ms | 128.9 ms | 83.7–116.4 ms | 175.8–180.6 ms (fails) |
+| Dense sin(x²+y²) < 0, drag | ≤ 16 ms | 13.3 ms | 12.5–13.5 ms | 26.1–41.0 ms (fails) |
+| Dense sin(x²+y²) < 0, release | ≤ 150 ms | 129.8 ms | 80.7–87.0 ms | 170.8–190.4 ms (fails) |
+
+The 2-core browser rows fail. The follow-up report (`follow-up-2026-10-31.md`) gave 12.6–15.3 ms for the dense drag
+on "2 cores"; that run set `MATHCORE_CORES=2` on a 4-core machine, which only changes the strip-worker count, so it did
+not measure a 2-core CPU. Before the B8 change the same `taskset` method gave 56–62 ms (dense drag) and 207–209 ms
+(dense release). The B8 change therefore helps on 2 cores, but the drag budget is still missed there.
+
 ## Known limits
 
 - F that touches zero without changing sign (x² + y² = 0, (x − y)² = 0) is not drawn by any sign-based method.
-- Features narrower than about one fine lattice cell (1.5 px at full quality) may be missed, for example the 1.6 px
-  sliver y < √(0.0004 − x²) on an 800×500 canvas at ±10. Cells with an undefined corner draw no boundary.
+- Thin features can be missed at full quality (measured in the section above): circles below about 2 px across
+  (138 of 400 found at 1 px, 396 of 400 at 2 px) and shaded bands below about 1 px (blank in 6 of 10 placements at
+  0.25 px). Both are gone after zooming in. Example: the 1.6 px sliver y < √(0.0004 − x²) on an 800×500 canvas at ±10.
+  Cells with an undefined corner draw no boundary.
 - Curve following does not cross strip borders: a feature narrower than a coarse cell that crosses a border can be
   cut there.
 - At drag quality (shading stride 4) patterns finer than two mask pixels alias, as any sampling at that resolution
@@ -140,7 +184,7 @@ budget. D1 laptop numbers are still open (Phase 0 item 5).
   (1 − x)^(−0.5) are reported as not converged (NaN). `estimatedError` is computed but not shown on the page yet.
 - SVG export contains curves only; shading is in PNG export (ADR-7: no SVG for fields).
 - Full-quality responses copy the shading mask of every inequality (about 1.6 MB per item at 1600×1000).
-- Chained inequalities (`0 < x < 1`) are rejected with an explanation; restrictions `{0<x<1}` work on explicit curves.
+- Chained inequalities (`0 < x < 1`) are rejected with an explanation (English and translated, see B10); restrictions `{0<x<1}` work on explicit curves.
 - Inequality fill color is the item color at 20% opacity; `style.fill` is not used yet.
 - Visual snapshot tests (§10, ≤ 0.5% pixels) are not added: their baseline images would be new human-owned
   baselines (`docs/mathcore/baselines/`), which need the owner's approval. The e2e tests check pixels at chosen points.

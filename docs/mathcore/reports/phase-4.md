@@ -61,5 +61,16 @@ Second review (verification of 7aeaa25) and fixes:
 ## Known limits
 
 - Two-column `cases` (value & condition) parses as a piecewise expression and is not a system.
-- Engine and inference error messages are English only (as in earlier phases).
+- Compute Engine parser messages and developer-invariant throws in `linalg/` stay English; engine, inference, compile and
+  normalizer messages are translated (ar, es) since B10 (`i18n/errors.test.ts`).
+- The 3×3 exit criterion is met as an error relative to the largest \|λ\| (see Open items); a small eigenvalue of an
+  ill-conditioned 3×3 is not held to 10⁻⁹ relative to itself (owner question, not changed).
 - Exact eigenvectors are shown for rational eigenvalues; irrational ones as unit vectors with 6 digits.
+
+## Open items (2026-10-31)
+
+- **Owner question:** the plan (STEPS.md §8.2) asks for 10⁻⁹ per eigenvalue; the 3×3 code and its test (`linalgGolden.test.ts`,
+  "eigenvalues within 1e-9 of the largest |λ|") check 10⁻⁹ relative to the largest |λ|. Which one is the criterion? Not changed.
+- The 2×2 and determinant numbers above are asserted by `linalgGolden.test.ts` and `analyze.test.ts` (both pass at the
+  current commit, gate included). No new measurement was taken in this round.
+

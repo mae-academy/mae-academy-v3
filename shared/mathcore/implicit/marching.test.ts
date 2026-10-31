@@ -532,3 +532,56 @@ describe("B8: dense-field drag frame (STEPS.md §7.2 budget 16 ms)", () => {
   });
 });
 
+
+/**
+ * Thin features at full quality (B11, B12). These tests document the measured behaviour; they are not a target. A
+ * curve or a shaded band thinner than about two pixels can be missed at some positions, and the miss goes away on
+ * zoom (see docs/mathcore/reports/phase-3.md, "Known limits").
+ */
+describe("B11/B12: thin features at full quality (documented limits, rendering unchanged)", () => {
+  const W = 1600;
+  const H = 1000;
+  const view = { xmin: -5, xmax: 5, ymin: -3.125, ymax: 3.125, aspect: "equal" as const };
+  const pxU = (view.xmax - view.xmin) / W;
+  /** 400 circle centres from a fixed linear congruential sequence (reproducible, not random at test time). */
+  const centres = (() => {
+    let s = 12345;
+    const rnd = () => {
+      s = (s * 1103515245 + 12345) & 0x7fffffff;
+      return s / 0x7fffffff;
+    };
+    return Array.from({ length: 400 }, () => [(rnd() - 0.5) * 8, (rnd() - 0.5) * 5] as const);
+  })();
+  const found = (dpx: number, v: typeof view, cx: number, cy: number, unit: number) => {
+    const r = (dpx / 2) * unit;
+    return contour((x, y) => (x - cx) ** 2 + (y - cy) ** 2 - r * r, v, { width: W, height: H, cellPx: 6, refine: 4 }).polylines.length > 0;
+  };
+
+  it("of 400 centres, a loop 2 px across is found at 396 and a loop 1 px across at 138 (missed at 262)", () => {
+    expect(centres.filter(([cx, cy]) => found(2, view, cx, cy, pxU)).length).toBe(396);
+    expect(centres.filter(([cx, cy]) => found(1, view, cx, cy, pxU)).length).toBe(138);
+  });
+
+  it("a loop 1 px across that is missed at full quality is found after a 4× zoom (same centre)", () => {
+    const missed = centres.find(([cx, cy]) => !found(1, view, cx, cy, pxU));
+    if (!missed) throw new Error("no missed centre in the fixed sequence");
+    // A 4× zoom centred on the loop: the same world circle is now 4 px across.
+    const [cx, cy] = missed;
+    const zoomed = { xmin: cx - (view.xmax - view.xmin) / 8, xmax: cx + (view.xmax - view.xmin) / 8, ymin: cy - (view.ymax - view.ymin) / 8, ymax: cy + (view.ymax - view.ymin) / 8, aspect: view.aspect };
+    expect(found(1, zoomed, cx, cy, pxU)).toBe(true);
+  });
+
+  it("a shaded band 0.25 px wide is blank at 6 of 10 sub-block placements; a 1 px band is never blank", () => {
+    const blank = (wpx: number) => {
+      let n = 0;
+      for (const off of [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]) {
+        const F = (x: number, y: number) => Math.abs(y - 0.3 - off * pxU * 6) - (wpx / 2) * pxU;
+        const m = regionMask(F, view, W, H, 1, insideTest("<"), 6);
+        if (!m.data.some((v) => v === 1)) n++;
+      }
+      return n;
+    };
+    expect(blank(0.25)).toBe(6);
+    expect(blank(1)).toBe(0);
+  });
+});
