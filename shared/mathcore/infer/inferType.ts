@@ -5,6 +5,7 @@
 import type { Expr } from "../ast/expr";
 import { CONSTANTS, args, containsSymbol, freeSymbols, head, isFn, isNum, isSym } from "../ast/expr";
 import { RESERVED_SYMBOLS } from "../constants";
+import type { ErrorKey, ErrorParams } from "../errors";
 import { DISTRIBUTION_HEADS } from "../normalize/normalize";
 import { isLinearIn } from "./linear";
 
@@ -22,7 +23,7 @@ export type InferredType =
   | { kind: "ODE1"; dependent: string; independent: string; F: Expr }
   | { kind: "Distribution"; family: string; args: Expr[] }
   | { kind: "FunctionDef"; name: string; params: string[]; body: Expr }
-  | { kind: "Unknown"; reason: string };
+  | { kind: "Unknown"; reason: string; key: ErrorKey; params?: ErrorParams };
 
 /**
  * A x = b (STEPS.md §6.1 GaussSystem): a literal or named n×n matrix times a column of unknowns equal to a column,
@@ -33,7 +34,7 @@ export type SystemSource =
   | { form: "matrix"; A: Expr[][] | { name: string }; b: Expr[] }
   | { form: "equations"; F: Expr[] };
 
-const unknown = (reason: string): InferredType => ({ kind: "Unknown", reason });
+const unknown = (reason: string, key: ErrorKey, params?: ErrorParams): InferredType => ({ kind: "Unknown", reason, key, params });
 
 /** Free symbols that are not reserved (the parameters an item depends on). */
 export function parameterSymbols(e: Expr): string[] {
@@ -73,7 +74,7 @@ export function inferType(expr: Expr): InferredType {
   try {
     return infer(expr);
   } catch (err) {
-    return unknown(`inference failed: ${err instanceof Error ? err.message : String(err)}`);
+    return unknown(`inference failed: ${err instanceof Error ? err.message : String(err)}`, "inferenceFailed", { detail: err instanceof Error ? err.message : String(err) });
   }
 }
 
@@ -81,7 +82,7 @@ function infer(e: Expr): InferredType {
   if (isNum(e)) return { kind: "Value", expr: e };
   if (isSym(e)) {
     if (e === "x") return explicitFromBare(e);
-    if (RESERVED_SYMBOLS.has(e)) return unknown(`${e} alone needs an equation`);
+    if (RESERVED_SYMBOLS.has(e)) return unknown(`${e} alone needs an equation`, "needsEquation", { name: e });
     return { kind: "Value", expr: e };
   }
   const h = head(e) as string;
@@ -89,9 +90,9 @@ function infer(e: Expr): InferredType {
 
   if (h === "Define") {
     const [name, params, body] = a;
-    if (!isSym(name) || !isFn(params) || params[0] !== "List" || body === undefined) return unknown("malformed function definition");
+    if (!isSym(name) || !isFn(params) || params[0] !== "List" || body === undefined) return unknown("malformed function definition", "malformedFunction");
     const names = params.slice(1);
-    if (!names.every(isSym)) return unknown("function parameters must be names");
+    if (!names.every(isSym)) return unknown("function parameters must be names", "functionParamNames");
     return { kind: "FunctionDef", name, params: names, body };
   }
 
@@ -100,11 +101,11 @@ function infer(e: Expr): InferredType {
     // ODE first (§6.2): D(y, x) = F(x, y).
     if (head(lhs) === "D") {
       const [dep, ind] = args(lhs);
-      if (isSym(dep) && isSym(ind) && dep === ind) return unknown("a variable cannot be differentiated with respect to itself");
+      if (isSym(dep) && isSym(ind) && dep === ind) return unknown("a variable cannot be differentiated with respect to itself", "selfDerivative");
       if (isSym(dep) && isSym(ind)) return { kind: "ODE1", dependent: dep, independent: ind, F: rhs };
-      return unknown("only first-order ODEs dy/dx = F(x, y) are supported");
+      return unknown("only first-order ODEs dy/dx = F(x, y) are supported", "firstOrderOnly");
     }
-    if (head(rhs) === "D") return unknown("write the derivative on the left: dy/dx = F(x, y)");
+    if (head(rhs) === "D") return unknown("write the derivative on the left: dy/dx = F(x, y)", "derivativeOnLeft");
 
     // A x = b (or b = A x) with a literal or named matrix.
     if (head(lhs) === "Multiply" && args(lhs).length === 2 && head(args(lhs)[1]) === "Matrix") return matrixSystem(args(lhs)[0], args(lhs)[1], rhs);
@@ -123,18 +124,18 @@ function infer(e: Expr): InferredType {
 
     const explicit = explicitForm(lhs, rhs) ?? explicitForm(rhs, lhs);
     if (explicit) return explicit;
-    if (lhs === "z" || rhs === "z") return unknown("z = f(x, y) surfaces need 3D (deferred by decision D3)");
+    if (lhs === "z" || rhs === "z") return unknown("z = f(x, y) surfaces need 3D (deferred by decision D3)", "surfaceNeeds3D");
     return implicit(lhs, rhs, "=");
   }
 
   if (RELATIONS[h] && a.length === 2) return implicit(a[0], a[1], RELATIONS[h]);
-  if (RELATIONS[h]) return unknown("chained comparisons are only supported as restrictions {a < x < b}");
+  if (RELATIONS[h]) return unknown("chained comparisons are only supported as restrictions {a < x < b}", "chainedComparison");
 
   if (h === "Tuple") {
-    if (a.length !== 2) return a.length === 3 ? unknown("3D points need decision D3") : unknown("only (x, y) pairs are supported");
+    if (a.length !== 2) return a.length === 3 ? unknown("3D points need decision D3", "points3D") : unknown("only (x, y) pairs are supported", "pairsOnly");
     const [x, y] = a;
     const usesT = containsSymbol(x, "t") || containsSymbol(y, "t");
-    if (!freeOf(x, ["x", "y"]) || !freeOf(y, ["x", "y"])) return unknown("a pair cannot use x or y; use t for parametric curves");
+    if (!freeOf(x, ["x", "y"]) || !freeOf(y, ["x", "y"])) return unknown("a pair cannot use x or y; use t for parametric curves", "pairVariables");
     return usesT ? { kind: "Parametric", x, y, parameter: "t" } : { kind: "Point", x, y };
   }
 
@@ -148,8 +149,8 @@ function infer(e: Expr): InferredType {
   if (DISTRIBUTION_HEADS.has(h)) return { kind: "Distribution", family: h, args: a };
 
   const free = freeSymbols(e);
-  if (free.has("z") && !free.has("x") && !free.has("y")) return unknown("w = f(z) complex maps are deferred by decision D2");
-  if (free.has("y")) return unknown("an expression in y needs an equation, for example x = g(y) or F(x, y) = 0");
+  if (free.has("z") && !free.has("x") && !free.has("y")) return unknown("w = f(z) complex maps are deferred by decision D2", "complexMapDeferred");
+  if (free.has("y")) return unknown("an expression in y needs an equation, for example x = g(y) or F(x, y) = 0", "yNeedsEquation");
   return explicitFromBare(e);
 }
 
@@ -171,18 +172,18 @@ function explicitForm(side: Expr, other: Expr): InferredType | null {
 function implicit(lhs: Expr, rhs: Expr, relation: "=" | "<" | "<=" | ">" | ">="): InferredType {
   const F: Expr = ["Subtract", lhs, rhs];
   const free = freeSymbols(F);
-  if (free.has("z")) return unknown("equations in z need 3D or complex mode (decisions D2, D3)");
-  if (!free.has("x") && !free.has("y")) return unknown("an equation needs x or y to plot");
+  if (free.has("z")) return unknown("equations in z need 3D or complex mode (decisions D2, D3)", "zEquation");
+  if (!free.has("x") && !free.has("y")) return unknown("an equation needs x or y to plot", "equationNeedsXY");
   return { kind: "Implicit", F, relation, strict: relation === "<" || relation === ">" };
 }
 
 function matrix(m: Expr, name: string | null): InferredType {
   const rowsList = args(m)[0];
-  if (!isFn(rowsList) || rowsList[0] !== "List") return unknown("malformed matrix");
+  if (!isFn(rowsList) || rowsList[0] !== "List") return unknown("malformed matrix", "malformedMatrix");
   const rows = args(rowsList).map((r) => (isFn(r) && r[0] === "List" ? args(r) : null));
-  if (rows.some((r) => r === null)) return unknown("malformed matrix row");
+  if (rows.some((r) => r === null)) return unknown("malformed matrix row", "malformedRow");
   const n = rows.length;
-  if ((n !== 2 && n !== 3) || rows.some((r) => (r as Expr[]).length !== n)) return unknown("only 2×2 and 3×3 matrices are supported in v1");
+  if ((n !== 2 && n !== 3) || rows.some((r) => (r as Expr[]).length !== n)) return unknown("only 2×2 and 3×3 matrices are supported in v1", "matrixSizeV1");
   return { kind: n === 2 ? "Matrix2" : "Matrix3", name, rows: rows as Expr[][] };
 }
 
@@ -198,21 +199,21 @@ function matrixRows(m: Expr): Expr[][] | null {
 function matrixSystem(A: Expr, x: Expr, b: Expr): InferredType {
   const xs = matrixRows(x);
   const bs = head(b) === "Matrix" ? matrixRows(b) : null;
-  if (!xs || xs.some((r) => r.length !== 1)) return unknown("write the unknowns as a column, for example [x; y]");
-  if (!bs || bs.some((r) => r.length !== 1)) return unknown("the right side of A x = b must be a column");
+  if (!xs || xs.some((r) => r.length !== 1)) return unknown("write the unknowns as a column, for example [x; y]", "unknownsColumn");
+  if (!bs || bs.some((r) => r.length !== 1)) return unknown("the right side of A x = b must be a column", "rightSideColumn");
   const n = xs.length;
-  if (n !== 2 && n !== 3) return unknown("only 2×2 and 3×3 systems are supported in v1");
-  if (bs.length !== n) return unknown(`the right side needs ${n} entries, one per unknown`);
+  if (n !== 2 && n !== 3) return unknown("only 2×2 and 3×3 systems are supported in v1", "systemSizeV1");
+  if (bs.length !== n) return unknown(`the right side needs ${n} entries, one per unknown`, "rightSideEntries", { n });
   const unknowns = xs.map((r) => r[0]);
-  if (!unknowns.every((u): u is string => isSym(u) && !(u in CONSTANTS))) return unknown("the unknowns must be names, for example x, y");
-  if (new Set(unknowns).size !== n) return unknown("each unknown may appear only once");
+  if (!unknowns.every((u): u is string => isSym(u) && !(u in CONSTANTS))) return unknown("the unknowns must be names, for example x, y", "unknownNames");
+  if (new Set(unknowns).size !== n) return unknown("each unknown may appear only once", "unknownOnce");
   const rhs = bs.map((r) => r[0]);
-  if (rhs.some((v) => unknowns.some((u) => containsSymbol(v, u)))) return unknown("the right side cannot contain the unknowns");
+  if (rhs.some((v) => unknowns.some((u) => containsSymbol(v, u)))) return unknown("the right side cannot contain the unknowns", "rightSideUnknowns");
   if (isSym(A)) return { kind: "GaussSystem", unknowns, source: { form: "matrix", A: { name: A }, b: rhs } };
-  if (head(A) !== "Matrix") return unknown("A x = b needs a matrix A");
+  if (head(A) !== "Matrix") return unknown("A x = b needs a matrix A", "needsMatrixA");
   const rows = matrixRows(A);
-  if (!rows || rows.length !== n || rows.some((r) => r.length !== n)) return unknown(`A must be ${n}×${n} for ${n} unknowns`);
-  if (rows.flat().some((v) => unknowns.some((u) => containsSymbol(v, u)))) return unknown("the matrix cannot contain the unknowns");
+  if (!rows || rows.length !== n || rows.some((r) => r.length !== n)) return unknown(`A must be ${n}×${n} for ${n} unknowns`, "matrixAsize", { n });
+  if (rows.flat().some((v) => unknowns.some((u) => containsSymbol(v, u)))) return unknown("the matrix cannot contain the unknowns", "matrixUnknowns");
   return { kind: "GaussSystem", unknowns, source: { form: "matrix", A: rows, b: rhs } };
 }
 
@@ -220,11 +221,11 @@ const SYSTEM_UNKNOWNS: Readonly<Record<number, string[]>> = { 2: ["x", "y"], 3: 
 
 function equationSystem(eqs: Expr[]): InferredType {
   const unknowns = SYSTEM_UNKNOWNS[eqs.length];
-  if (!unknowns) return unknown("a system needs 2 equations in x, y or 3 equations in x, y, z");
+  if (!unknowns) return unknown("a system needs 2 equations in x, y or 3 equations in x, y, z", "systemShape");
   const F = eqs.map((eq): Expr => ["Subtract", args(eq)[0], args(eq)[1]]);
   const stray = F.flatMap((f) => Array.from(freeSymbols(f))).find((s) => RESERVED_SYMBOLS.has(s) && !unknowns.includes(s));
-  if (stray) return unknown(`a system of ${eqs.length} equations uses only ${unknowns.join(", ")}; ${stray} is not allowed`);
+  if (stray) return unknown(`a system of ${eqs.length} equations uses only ${unknowns.join(", ")}; ${stray} is not allowed`, "strayUnknown", { count: eqs.length, unknowns: unknowns.join(", "), stray });
   const bad = F.findIndex((f) => !isLinearIn(f, unknowns));
-  if (bad >= 0) return unknown(`equation ${bad + 1} is not linear in ${unknowns.join(", ")}`);
+  if (bad >= 0) return unknown(`equation ${bad + 1} is not linear in ${unknowns.join(", ")}`, "equationNotLinear", { n: bad + 1, unknowns: unknowns.join(", ") });
   return { kind: "GaussSystem", unknowns, source: { form: "equations", F } };
 }

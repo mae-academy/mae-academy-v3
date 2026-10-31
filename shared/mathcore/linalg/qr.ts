@@ -12,6 +12,7 @@ import { EIGEN_CLUSTER_RELATIVE, EIGEN_DISC_RELATIVE, EIGEN_IMAG_RELATIVE } from
 import type { Mat } from "./matrix";
 import { detExact, powerOfTwoScale, toDyadic } from "./matrix";
 import { Fraction } from "./fraction";
+import { KeyedError } from "../errors";
 
 export { EIGEN_IMAG_RELATIVE };
 
@@ -129,7 +130,7 @@ function eigenvaluesScaled(A: Mat): EigenValue[] {
           }
           nn -= 2;
         } else {
-          if (its === MAX_ITERATIONS) throw new Error("QR iteration did not converge");
+          if (its === MAX_ITERATIONS) throw new KeyedError("QR iteration did not converge", "qrNoConvergence");
           if (EXCEPTIONAL_SHIFT_AT.has(its)) {
             t += x;
             for (let i = 0; i <= nn; i++) a[i][i] -= x;

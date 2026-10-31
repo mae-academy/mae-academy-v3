@@ -9,6 +9,7 @@ import { MATH_FIELD_TAG, loadMathLive } from "@/components/ai/mathliveLoader";
 import { MAX_LATEX_LENGTH } from "@shared/mathcore/constants";
 import { NS } from "../i18n/register";
 import type { ItemResult } from "../workers/protocol";
+import { errorText } from "./errorText";
 
 /** KaTeX and the report load only when a matrix or system is on the page. */
 const LinalgPanel = lazy(() => import("./LinalgPanel"));
@@ -117,7 +118,7 @@ export function ExpressionRow({ index, latex, color, result, onChange, onRemove,
         )}
         {errors.map((e, i) => (
           <div key={i} className="mc-error" role="alert">
-            {e.message}
+            {errorText(t, e)}
             {e.start !== undefined && (
               <code dir="ltr" className="mc-error-at">
                 {latex.slice(e.start, e.end)}

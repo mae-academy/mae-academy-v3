@@ -17,6 +17,7 @@ import { buildDag, transitiveDependents } from "../graph/dag";
 import type { InferredType, SystemSource } from "../infer/inferType";
 import { inferType } from "../infer/inferType";
 import type { ParseError, ParseResult, RawParser } from "../parse/parse";
+import { KeyedError } from "../errors";
 import { parseLatex } from "../parse/parse";
 import type { GraphIR, Item, Param } from "../ir/types";
 import type { ImplicitSource } from "../implicit/source";
@@ -191,20 +192,20 @@ export class GraphEngine {
 
     this.dag = buildDag(this.items);
     for (const cycle of this.dag.cycles) {
-      for (const id of cycle) this.item(id)?.errors.push({ message: `Circular definition: ${cycle.join(" → ")} → ${cycle[0]}` });
+      for (const id of cycle) this.item(id)?.errors.push({ message: `Circular definition: ${cycle.join(" → ")} → ${cycle[0]}`, key: "circularDefinition", params: { cycle: `${cycle.join(" → ")} → ${cycle[0]}` } });
     }
     for (const c of this.dag.conflicts) {
-      for (const id of c.ids) this.item(id)?.errors.push({ message: `"${c.name}" is defined more than once` });
+      for (const id of c.ids) this.item(id)?.errors.push({ message: `"${c.name}" is defined more than once`, key: "definedTwice", params: { name: c.name } });
     }
     // Lines that use a name defined twice, or that sit downstream of a circular definition, say so instead of vanishing.
     const conflicted = new Set(this.dag.conflicts.map((c) => c.name));
     for (const it of this.items) {
       const bad = it.uses.find((n) => conflicted.has(n) && !it.defines.includes(n));
-      if (bad !== undefined) it.errors.push({ message: `"${bad}" is defined more than once` });
+      if (bad !== undefined) it.errors.push({ message: `"${bad}" is defined more than once`, key: "definedTwice", params: { name: bad } });
     }
     const ordered = new Set(this.dag.order);
     for (const it of this.items) {
-      if (it.errors.length === 0 && !ordered.has(it.id)) it.errors.push({ message: "Depends on a circular definition" });
+      if (it.errors.length === 0 && !ordered.has(it.id)) it.errors.push({ message: "Depends on a circular definition", key: "dependsOnCycle" });
     }
 
     this.addAutoParams();
@@ -234,7 +235,7 @@ export class GraphEngine {
       id: it.id,
       latex: it.latex,
       parse,
-      type: { kind: "Unknown", reason: "not parsed" },
+      type: { kind: "Unknown", reason: "not parsed", key: "notParsed" },
       defines: [],
       uses: [],
       errors: parse.ok ? [] : parse.errors.slice(),
@@ -245,7 +246,7 @@ export class GraphEngine {
     state.type = t;
     if (t.kind === "Unknown") {
       // A line that cannot be drawn creates no sliders.
-      state.errors.push({ message: t.reason });
+      state.errors.push({ message: t.reason, key: t.key, params: t.params });
       return state;
     }
     let bodyForUses: Expr = parse.expr;
@@ -309,7 +310,7 @@ export class GraphEngine {
         if (defined.has(name) || params[name] || RESERVED_SYMBOLS.has(name)) continue;
         if (it.type.kind === "FunctionDef" && it.type.params.includes(name)) continue;
         if (count >= MAX_PARAMS) {
-          it.errors.push({ message: `Too many parameters (limit ${MAX_PARAMS}); "${name}" is undefined` });
+          it.errors.push({ message: `Too many parameters (limit ${MAX_PARAMS}); "${name}" is undefined`, key: "tooManyParams", params: { max: MAX_PARAMS, name } });
           continue;
         }
         params[name] = { ...DEFAULT_PARAM };
@@ -378,7 +379,7 @@ export class GraphEngine {
   /** A constant entry (matrix cell, right side); a non-finite value is an error at the item. */
   private constant(e: Expr): number {
     const v = this.compileWith(e, []).evaluate(this.envValues);
-    if (!Number.isFinite(v)) throw new Error("A matrix or right-side entry is not a finite number");
+    if (!Number.isFinite(v)) throw new KeyedError("A matrix or right-side entry is not a finite number", "entryNotFinite");
     return v;
   }
 
@@ -396,9 +397,10 @@ export class GraphEngine {
         const shown = displayName(name);
         if (!m) {
           const isMatrix = this.items.some((x) => (x.type.kind === "Matrix2" || x.type.kind === "Matrix3") && x.type.name === name);
-          throw new Error(isMatrix ? `The matrix "${shown}" has an error` : `"${shown}" is not a matrix defined in this graph`);
+          if (isMatrix) throw new KeyedError(`The matrix "${shown}" has an error`, "matrixError", { name: shown });
+          throw new KeyedError(`"${shown}" is not a matrix defined in this graph`, "notMatrix", { name: shown });
         }
-        if (m.length !== unknowns.length) throw new Error(`"${shown}" is ${m.length}×${m.length} but there are ${unknowns.length} unknowns`);
+        if (m.length !== unknowns.length) throw new KeyedError(`"${shown}" is ${m.length}×${m.length} but there are ${unknowns.length} unknowns`, "unknownCountMismatch", { name: shown, size: m.length, unknowns: unknowns.length });
         A = m.map((r) => r.slice());
       }
       return { A, b: src.b.map((v) => this.constant(v)) };
@@ -425,14 +427,14 @@ export class GraphEngine {
         const refined = (at(unknowns.map((__, k) => (k === j ? t : 0))) - c0) / t;
         return Number.isFinite(refined) ? refined : unit;
       });
-      if (!Number.isFinite(c0) || row.some((v) => !Number.isFinite(v))) throw new Error(`Equation ${i + 1} is not defined at 0`);
+      if (!Number.isFinite(c0) || row.some((v) => !Number.isFinite(v))) throw new KeyedError(`Equation ${i + 1} is not defined at 0`, "equationUndefinedAtZero", { n: i + 1 });
       for (const probe of LINEARITY_PROBES) {
         const p = probe.slice(0, n);
         const model = c0 + row.reduce((s, v, j) => s + v * p[j], 0);
         const actual = at(p);
         const scale = Math.abs(c0) + row.reduce((s, v, j) => s + Math.abs(v * p[j]), 0) + Math.abs(actual);
         if (!(Math.abs(actual - model) <= LINEARITY_RELATIVE_TOLERANCE * Math.max(scale, Number.MIN_VALUE))) {
-          throw new Error(`Equation ${i + 1} is not linear in ${unknowns.join(", ")}`);
+          throw new KeyedError(`Equation ${i + 1} is not linear in ${unknowns.join(", ")}`, "equationNotLinear", { n: i + 1, unknowns: unknowns.join(", ") });
         }
       }
       A.push(row);
@@ -515,7 +517,7 @@ export class GraphEngine {
           this.runtimes.set(it.id, null);
       }
     } catch (err) {
-      it.runtimeError = { message: err instanceof Error ? err.message : String(err) };
+      it.runtimeError = err instanceof KeyedError ? { message: err.message, key: err.key, params: err.params } : { message: err instanceof Error ? err.message : String(err) };
       it.errors.push(it.runtimeError);
       this.runtimes.set(it.id, null);
     }

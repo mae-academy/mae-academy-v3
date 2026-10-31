@@ -73,6 +73,17 @@ test("errors are shown at their line: syntax, cycles", async ({ page }) => {
   await expect(errors.filter({ hasText: "unexpected operator" })).toHaveCount(1);
 });
 
+for (const [lng, phrase] of [["ar", "تعريف دائري: c1 → c2 → c1"], ["es", "Definición circular: c1 → c2 → c1"]] as const) {
+  test(`engine errors are shown in the reader's language (${lng}), not in English`, async ({ page }) => {
+    await page.addInitScript((l) => localStorage.setItem("mae-locale", l), lng);
+    await page.goto(link(doc([["c1", "a=b+1"], ["c2", "b=2a"]])));
+    await ready(page);
+    const errors = page.locator(".mc-error");
+    await expect(errors.filter({ hasText: phrase })).toHaveCount(2);
+    await expect(errors.filter({ hasText: "Circular definition" })).toHaveCount(0);
+  });
+}
+
 test("retyping a slider line moves the slider (a = 2 → a = 5)", async ({ page }) => {
   await page.goto(link(doc([["a", "a=2"], ["f", "y=ax"]])));
   await ready(page);

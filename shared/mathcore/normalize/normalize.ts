@@ -16,9 +16,12 @@
 import type { Expr, FnExpr } from "../ast/expr";
 import { isFn, isSym } from "../ast/expr";
 import { RESERVED_SYMBOLS } from "../constants";
+import type { ErrorKey, ErrorParams } from "../errors";
 
 export interface NormalizeError {
   message: string;
+  key?: ErrorKey;
+  params?: ErrorParams;
   /** LaTeX fragment the error refers to, when Compute Engine supplied one. */
   fragment?: string;
 }
@@ -91,8 +94,8 @@ class Normalizer {
   readonly errors: NormalizeError[] = [];
   constructor(private readonly functions: ReadonlySet<string>) {}
 
-  fail(message: string, fragment?: string): Expr {
-    this.errors.push(fragment === undefined ? { message } : { message, fragment });
+  fail(message: string, key?: ErrorKey, params?: ErrorParams, fragment?: string): Expr {
+    this.errors.push({ message, ...(key ? { key, params: params ?? {} } : {}), ...(fragment === undefined ? {} : { fragment }) });
     return INVALID;
   }
 
@@ -112,7 +115,7 @@ class Normalizer {
     const node = this.compact(input);
     if (typeof node === "number") return node;
     if (typeof node === "string") return this.symbol(node);
-    if (!Array.isArray(node) || node.length === 0) return this.fail("Unrecognized expression");
+    if (!Array.isArray(node) || node.length === 0) return this.fail("Unrecognized expression", "unrecognized");
     const rawHead = this.compact(node[0]);
     const rest = node.slice(1) as Raw[];
     if (typeof rawHead !== "string") return this.applyExpression(rawHead, rest);
@@ -120,8 +123,8 @@ class Normalizer {
   }
 
   symbol(s: string): Expr {
-    if (isStringLiteral(s)) return this.fail(`Unexpected text "${unquote(s)}"`);
-    if (s === "ImaginaryUnit") return this.fail("Complex numbers are not available yet (decision D2)");
+    if (isStringLiteral(s)) return this.fail(`Unexpected text "${unquote(s)}"`, "unexpectedText", { text: unquote(s) });
+    if (s === "ImaginaryUnit") return this.fail("Complex numbers are not available yet (decision D2)", "complexNumbers");
     return SYMBOL_ALIASES[s] ?? s;
   }
 
@@ -130,7 +133,7 @@ class Normalizer {
     if (Array.isArray(h) && h[0] === "InverseFunction" && typeof h[1] === "string" && INVERSE[h[1]] && rest.length === 1) {
       return [INVERSE[h[1]], this.norm(rest[0])];
     }
-    return this.fail("Unsupported function form");
+    return this.fail("Unsupported function form", "unsupportedForm");
   }
 
   call(h: string, rest: Raw[]): Expr {
@@ -138,7 +141,7 @@ class Normalizer {
       case "Error":
         return this.error(rest);
       case "Sequence":
-        if (rest.length === 0) return this.fail("Empty expression");
+        if (rest.length === 0) return this.fail("Empty expression", "emptyExpression");
         if (rest.length === 1) return this.norm(rest[0]);
         return this.tuple(rest);
       case "Delimiter":
@@ -148,7 +151,7 @@ class Normalizer {
       case "Apply":
         if (Array.isArray(rest[0])) return this.applyExpression(rest[0], rest.slice(1));
         if (typeof rest[0] === "string") return this.callNamed(rest[0], rest.slice(1));
-        return this.fail("Unsupported function form");
+        return this.fail("Unsupported function form", "unsupportedForm");
       case "Divide":
         return this.leibniz(rest) ?? this.simple("Divide", rest, 2);
       case "Power":
@@ -179,12 +182,12 @@ class Normalizer {
         if (CORE_HEADS.has(h)) return [h, ...rest.map((r) => this.norm(r))] as FnExpr;
         // A plain symbol as head (`f'(x)` gives ["f", "x"]) is a user function call.
         if (/^[A-Za-z][A-Za-z0-9_]*$/.test(h) && !/^[A-Z]/.test(h)) return ["Apply", h, ...rest.map((r) => this.norm(r))];
-        return this.fail(`Unsupported operation: ${h}`);
+        return this.fail(`Unsupported operation: ${h}`, "unsupportedOperation", { name: h });
     }
   }
 
   simple(h: string, rest: Raw[], arity: number): Expr {
-    if (rest.length !== arity) return this.fail(`${h} expects ${arity} argument(s)`);
+    if (rest.length !== arity) return this.fail(`${h} expects ${arity} argument(s)`, "arity", { fn: h, count: arity });
     return [h, ...rest.map((r) => this.norm(r))] as FnExpr;
   }
 
@@ -193,7 +196,7 @@ class Normalizer {
     let fragment: string | undefined;
     const where = rest[1];
     if (Array.isArray(where) && where[0] === "LatexString" && typeof where[1] === "string") fragment = unquote(where[1]).trim();
-    return this.fail(code.replace(/-/g, " "), fragment);
+    return this.fail(code.replace(/-/g, " "), undefined, undefined, fragment);
   }
 
   tuple(items: Raw[]): Expr {
@@ -202,10 +205,10 @@ class Normalizer {
 
   delimiter(rest: Raw[]): Expr {
     const content = this.compact(rest[0]);
-    if (content === undefined) return this.fail("Empty parentheses");
+    if (content === undefined) return this.fail("Empty parentheses", "emptyParens");
     if (Array.isArray(content) && content[0] === "Sequence") {
       const items = content.slice(1) as Raw[];
-      if (items.length === 0) return this.fail("Empty parentheses");
+      if (items.length === 0) return this.fail("Empty parentheses", "emptyParens");
       if (items.length === 1) return this.norm(items[0]);
       return this.tuple(items);
     }
@@ -242,7 +245,7 @@ class Normalizer {
     const variadic = h === "Max" || h === "Min";
     const binary = h === "Mod";
     if (variadic ? args.length < 1 : binary ? args.length !== 2 : args.length !== 1) {
-      return this.fail(`${h} has the wrong number of arguments`);
+      return this.fail(`${h} has the wrong number of arguments`, "wrongArgCount", { fn: h });
     }
     return [h, ...args] as FnExpr;
   }
@@ -278,7 +281,7 @@ class Normalizer {
       }
       factors.push(this.norm(cur));
     }
-    if (factors.length === 0) return this.fail("Empty expression");
+    if (factors.length === 0) return this.fail("Empty expression", "emptyExpression");
     return factors.length === 1 ? factors[0] : ["Multiply", ...factors];
   }
 
@@ -308,7 +311,7 @@ class Normalizer {
   }
 
   power(rest: Raw[]): Expr {
-    if (rest.length !== 2) return this.fail("Power expects 2 arguments");
+    if (rest.length !== 2) return this.fail("Power expects 2 arguments", "powerArity");
     const base = this.norm(rest[0]);
     const exp = this.norm(rest[1]);
     if (base === "ExponentialE") return ["Exp", exp];
@@ -319,7 +322,7 @@ class Normalizer {
   prime(rest: Raw[]): Expr {
     const target = this.norm(rest[0]);
     const order = typeof rest[1] === "number" ? rest[1] : 1;
-    if (!isSym(target)) return this.fail("Prime notation needs a variable name");
+    if (!isSym(target)) return this.fail("Prime notation needs a variable name", "primeNeedsName");
     // y' is d/dx; x' is d/dt (a prime on x means time, as in x' = y for a 2D system).
     const independent = target === "x" ? "t" : "x";
     let e: Expr = target;
@@ -328,10 +331,10 @@ class Normalizer {
   }
 
   derivative(rest: Raw[]): Expr {
-    if (rest.length < 2) return this.fail("Derivative needs a variable");
+    if (rest.length < 2) return this.fail("Derivative needs a variable", "derivativeNeedsVariable");
     const body = this.compact(rest[0]);
     const vars = rest.slice(1).map((v) => this.compact(v));
-    if (!vars.every((v) => typeof v === "string" && !isStringLiteral(v))) return this.fail("Derivative variable must be a name");
+    if (!vars.every((v) => typeof v === "string" && !isStringLiteral(v))) return this.fail("Derivative variable must be a name", "derivativeVariableName");
     // `\frac{d}{dx} y = F` parses as D(Equal(y, F), x): move D onto the left side (Q2).
     if (Array.isArray(body) && body[0] === "Equal" && body.length === 3) {
       let lhs = this.norm(body[1]);
@@ -345,11 +348,11 @@ class Normalizer {
 
   matrix(rest: Raw[]): Expr {
     const rows = this.compact(rest[0]);
-    if (!Array.isArray(rows) || rows[0] !== "List") return this.fail("Matrix rows are missing");
+    if (!Array.isArray(rows) || rows[0] !== "List") return this.fail("Matrix rows are missing", "matrixRowsMissing");
     const out: Expr[] = [];
     for (const row of rows.slice(1) as Raw[]) {
       const r = this.compact(row);
-      if (!Array.isArray(r) || r[0] !== "List") return this.fail("Matrix row is not a list");
+      if (!Array.isArray(r) || r[0] !== "List") return this.fail("Matrix row is not a list", "matrixRowNotList");
       out.push(["List", ...(r.slice(1) as Raw[]).map((c) => this.norm(c))]);
     }
     return ["Matrix", ["List", ...out]];
@@ -361,7 +364,7 @@ class Normalizer {
     if (Array.isArray(lim) && (lim[0] === "Tuple" || lim[0] === "Limits") && lim.length === 4 && typeof lim[1] === "string") {
       return [h, body, lim[1], this.norm(lim[2]), this.norm(lim[3])];
     }
-    return this.fail(h === "Integrate" ? "Only definite integrals with both limits are supported" : `${h} needs an index and both limits`);
+    return this.fail(h === "Integrate" ? "Only definite integrals with both limits are supported" : `${h} needs an index and both limits`, h === "Integrate" ? "integralLimits" : "needsIndexLimits", { name: h });
   }
 }
 

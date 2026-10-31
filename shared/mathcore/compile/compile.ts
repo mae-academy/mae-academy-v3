@@ -14,8 +14,9 @@ import { CONSTANTS, args, hashExpr, head, isFn, isNum, isSym } from "../ast/expr
 import { integrate } from "../calculus/integrate";
 import { COMPILE_CACHE_LIMIT, DERIVATIVE_STEP_SCALE, MAX_CALL_DEPTH, MAX_SUM_TERMS } from "../constants";
 import { erf, erfc, gamma } from "../stats/special";
+import { KeyedError } from "../errors";
 
-export class CompileError extends Error {}
+export class CompileError extends KeyedError {}
 
 type Slots = Float64Array;
 type Node = (s: Slots) => number;
@@ -180,7 +181,7 @@ class Compiler {
         return () => c;
       }
       const i = this.slotOf.get(e);
-      if (i === undefined) throw new CompileError(`Undefined symbol: ${e}`);
+      if (i === undefined) throw new CompileError(`Undefined symbol: ${e}`, "undefinedSymbol", { name: e });
       return (s) => s[i];
     }
     const h = head(e) as string;
@@ -235,7 +236,7 @@ class Compiler {
       }
       case "Max":
       case "Min": {
-        if (a.length === 0) throw new CompileError(`${h} needs arguments`);
+        if (a.length === 0) throw new CompileError(`${h} needs arguments`, "needsArguments", { fn: h });
         const xs = a.map((n) => this.compile(n));
         const pick = h === "Max" ? Math.max : Math.min;
         return (s) => {
@@ -275,12 +276,12 @@ class Compiler {
       case "Apply":
         return this.apply(a);
       default:
-        throw new CompileError(`Cannot evaluate ${h} as a number`);
+        throw new CompileError(`Cannot evaluate ${h} as a number`, "notNumeric", { fn: h });
     }
   }
 
   private arity(h: string, a: Expr[], n: number) {
-    if (a.length !== n) throw new CompileError(`${h} expects ${n} argument(s)`);
+    if (a.length !== n) throw new CompileError(`${h} expects ${n} argument(s)`, "wrongArity", { fn: h, count: n });
   }
 
   private fold(a: Expr[], op: (x: number, y: number) => number, unit: number): Node {
@@ -299,7 +300,7 @@ class Compiler {
   }
 
   private comparison(cmp: (a: number, b: number) => boolean, a: Expr[]): Node {
-    if (a.length < 2) throw new CompileError("A comparison needs two sides");
+    if (a.length < 2) throw new CompileError("A comparison needs two sides", "comparisonSides");
     const xs = a.map((n) => this.compile(n));
     return (s) => {
       let prev = xs[0](s);
@@ -338,9 +339,9 @@ class Compiler {
   private derivative(a: Expr[]): Node {
     this.arity("D", a, 2);
     const v = a[1];
-    if (!isSym(v)) throw new CompileError("Derivative variable must be a name");
+    if (!isSym(v)) throw new CompileError("Derivative variable must be a name", "derivativeVariableName");
     const i = this.slotOf.get(v);
-    if (i === undefined) throw new CompileError(`Derivative variable ${v} is not defined here`);
+    if (i === undefined) throw new CompileError(`Derivative variable ${v} is not defined here`, "derivativeVariableUndefined", { name: v });
     const body = this.compile(a[0]);
     return (s) => {
       const x = s[i];
@@ -357,7 +358,7 @@ class Compiler {
   private series(h: string, a: Expr[]): Node {
     this.arity(h, a, 4);
     const v = a[1];
-    if (!isSym(v)) throw new CompileError(`${h} index must be a name`);
+    if (!isSym(v)) throw new CompileError(`${h} index must be a name`, "indexName", { fn: h });
     const lo = this.compile(a[2]);
     const hi = this.compile(a[3]);
     return this.withBound(v, (slot) => {
@@ -383,7 +384,7 @@ class Compiler {
   private integral(a: Expr[]): Node {
     this.arity("Integrate", a, 4);
     const v = a[1];
-    if (!isSym(v)) throw new CompileError("Integration variable must be a name");
+    if (!isSym(v)) throw new CompileError("Integration variable must be a name", "integrationVariableName");
     const lo = this.compile(a[2]);
     const hi = this.compile(a[3]);
     return this.withBound(v, (slot) => {
@@ -403,11 +404,11 @@ class Compiler {
 
   private apply(a: Expr[]): Node {
     const [name, ...rest] = a;
-    if (!isSym(name)) throw new CompileError("Function name must be a symbol");
+    if (!isSym(name)) throw new CompileError("Function name must be a symbol", "functionName");
     const def = this.functions.get(name);
-    if (!def) throw new CompileError(`Undefined function: ${name}`);
-    if (def.params.length !== rest.length) throw new CompileError(`${name} expects ${def.params.length} argument(s)`);
-    if (depth >= MAX_CALL_DEPTH) throw new CompileError(`Function calls nest deeper than ${MAX_CALL_DEPTH} (recursive definition?)`);
+    if (!def) throw new CompileError(`Undefined function: ${name}`, "undefinedFunction", { name });
+    if (def.params.length !== rest.length) throw new CompileError(`${name} expects ${def.params.length} argument(s)`, "userFunctionArity", { name, count: def.params.length });
+    if (depth >= MAX_CALL_DEPTH) throw new CompileError(`Function calls nest deeper than ${MAX_CALL_DEPTH} (recursive definition?)`, "recursionDepth", { max: MAX_CALL_DEPTH });
     depth++;
     let inner: Compiler;
     let body: Node;

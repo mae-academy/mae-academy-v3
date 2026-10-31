@@ -5,6 +5,7 @@
 import type { CurveDescription } from "@shared/mathcore/describe/describe";
 import type { MatrixAnalysis, SystemAnalysis } from "@shared/mathcore/linalg/analyze";
 import type { Camera3, GraphIR, Viewport } from "@shared/mathcore/ir/types";
+import type { ErrorKey, ErrorParams } from "@shared/mathcore/errors";
 import type { Frame3, Frame3Colors } from "@shared/mathcore/render3d/frame";
 import type { ParsedEntry } from "./parseProtocol";
 
@@ -39,7 +40,7 @@ export type EngineRequest =
 export interface ItemResult {
   id: string;
   kind: string;
-  errors: Array<{ message: string; start?: number; end?: number }>;
+  errors: Array<{ message: string; key?: ErrorKey; params?: ErrorParams; start?: number; end?: number }>;
   warnings: string[];
   /** Interleaved x, y polylines in world coordinates. */
   segments: Float64Array[];

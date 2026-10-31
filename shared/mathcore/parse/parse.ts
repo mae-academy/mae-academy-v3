@@ -7,12 +7,16 @@ import { nodeCount } from "../ast/expr";
 import { MAX_EXPR_NODES, MAX_LATEX_LENGTH } from "../constants";
 import type { NormalizeContext } from "../normalize/normalize";
 import { hasInvalid, normalizeStatement } from "../normalize/normalize";
+import type { ErrorKey, ErrorParams } from "../errors";
 
 /** `(latex) => ce.parse(latex, { form: "raw" }).json` (owner decision Q1). */
 export type RawParser = (latex: string) => unknown;
 
 export interface ParseError {
   message: string;
+  /** Catalog key and params: the page shows the translation of `errors.<key>`; `message` is the English text. */
+  key?: ErrorKey;
+  params?: ErrorParams;
   /** Character offset in the LaTeX source, when the fragment could be located. */
   start?: number;
   end?: number;
@@ -22,9 +26,9 @@ export type ParseResult = { ok: true; expr: Expr; nodes: number } | { ok: false;
 
 export function parseLatex(latex: string, parser: RawParser, ctx: NormalizeContext = {}): ParseResult {
   if (latex.length > MAX_LATEX_LENGTH) {
-    return { ok: false, errors: [{ message: `Expression is longer than ${MAX_LATEX_LENGTH} characters` }] };
+    return { ok: false, errors: [{ message: `Expression is longer than ${MAX_LATEX_LENGTH} characters`, key: "tooLong", params: { max: MAX_LATEX_LENGTH } }] };
   }
-  if (latex.trim() === "") return { ok: false, errors: [{ message: "Empty expression" }] };
+  if (latex.trim() === "") return { ok: false, errors: [{ message: "Empty expression", key: "emptyExpression" }] };
   let raw: unknown;
   try {
     raw = parser(latex);
@@ -34,18 +38,19 @@ export function parseLatex(latex: string, parser: RawParser, ctx: NormalizeConte
   }
   const { expr, errors } = normalizeStatement(raw, ctx);
   if (errors.length > 0 || hasInvalid(expr)) {
-    const list = errors.length > 0 ? errors : [{ message: "Invalid expression" }];
+    const list = errors.length > 0 ? errors : [{ message: "Invalid expression", key: "invalidExpression" as const }];
     return {
       ok: false,
       errors: list.map((e) => {
         const at = e.fragment ? latex.indexOf(e.fragment) : -1;
-        return at >= 0 ? { message: e.message, start: at, end: at + (e.fragment?.length ?? 0) } : { message: e.message };
+        const keyed = e.key ? { key: e.key, params: e.params ?? {} } : {};
+        return at >= 0 ? { message: e.message, ...keyed, start: at, end: at + (e.fragment?.length ?? 0) } : { message: e.message, ...keyed };
       }),
     };
   }
   const nodes = nodeCount(expr);
   if (nodes > MAX_EXPR_NODES) {
-    return { ok: false, errors: [{ message: `Expression has ${nodes} nodes; the limit is ${MAX_EXPR_NODES}` }] };
+    return { ok: false, errors: [{ message: `Expression has ${nodes} nodes; the limit is ${MAX_EXPR_NODES}`, key: "nodeLimit", params: { nodes, max: MAX_EXPR_NODES } }] };
   }
   return { ok: true, expr, nodes };
 }
