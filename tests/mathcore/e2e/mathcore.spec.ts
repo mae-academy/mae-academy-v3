@@ -272,4 +272,54 @@ test.describe("Phase 5: 3D linear algebra", () => {
     for (let k = 0; k < 3; k++) await page.keyboard.press("-");
     await expect.poll(() => linkCamera()?.distance).toBeCloseTo(30 * 1.2 ** 3, 6);
   });
+
+  test("rapid keys count from the fitted camera when the link has none", async ({ page }) => {
+    await page.goto(link(doc([["m", "M=\\begin{bmatrix}2&0&0\\\\0&1&0\\\\0&0&1\\end{bmatrix}"]], { view: { mode: "3d", grid: true, showSteps: false, locale: "en" } })));
+    await ready(page);
+    await expect(page.getByTestId("mc-linalg")).toBeVisible({ timeout: 15_000 });
+    await expect.poll(() => signature(page)).not.toBe("0");
+    await page.locator(".mc-canvas").focus();
+    await page.evaluate(async () => {
+      const el = document.querySelector<HTMLCanvasElement>(".mc-canvas");
+      if (!el) throw new Error("no canvas");
+      for (let k = 0; k < 16; k++) {
+        el.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true, cancelable: true }));
+        await new Promise<void>((r) => setTimeout(r, 1));
+      }
+    });
+    // DEFAULT_CAMERA3.azimuth is 1.1; ArrowRight turns by −0.1 rad.
+    await expect.poll(() => {
+      const g = new URL(page.url()).searchParams.get("g") ?? "";
+      return (JSON.parse(LZString.decompressFromEncodedURIComponent(g) ?? "{}") as { view?: { camera?: { azimuth: number } } }).view?.camera?.azimuth;
+    }, { timeout: 10_000 }).toBeCloseTo(1.1 - 1.6, 6);
+  });
+
+  // A4: events fired one after another inside the page (no round trip between them), in three rhythms: back to back,
+  // one per task, one per animation frame; keys and wheel interleaved. Every step must count.
+  for (const rhythm of ["back-to-back", "per task", "per frame", "per 2 ms", "per 7 ms"] as const) {
+    test(`rapid keys and wheel ticks all count (${rhythm})`, async ({ page }) => {
+      const camera = { azimuth: 0.3, elevation: 0.4, distance: 30 };
+      await page.goto(link(doc([["m", "M=\\begin{bmatrix}2&0&0\\\\0&1&0\\\\0&0&1\\end{bmatrix}"]], { view: { mode: "3d", grid: true, showSteps: false, locale: "en", camera } })));
+      await ready(page);
+      await expect(page.getByTestId("mc-linalg")).toBeVisible({ timeout: 15_000 });
+      const linkCamera = () => {
+        const g = new URL(page.url()).searchParams.get("g") ?? "";
+        return (JSON.parse(LZString.decompressFromEncodedURIComponent(g) ?? "{}") as { view?: { camera?: { azimuth: number; distance: number } } }).view?.camera;
+      };
+      await page.locator(".mc-canvas").focus();
+      // 24 key presses (ArrowLeft: +0.1 rad each) and 12 wheel ticks (deltaY > 0: distance × 1.2 each), interleaved 2:1.
+      await page.evaluate(async (mode) => {
+        const el = document.querySelector<HTMLCanvasElement>(".mc-canvas");
+        if (!el) throw new Error("no canvas");
+        const wait = () => (mode === "per 2 ms" ? new Promise<void>((r) => setTimeout(r, 2)) : mode === "per 7 ms" ? new Promise<void>((r) => setTimeout(r, 7)) : mode === "per task" ? new Promise<void>((r) => setTimeout(r, 0)) : mode === "per frame" ? new Promise<void>((r) => requestAnimationFrame(() => r())) : Promise.resolve());
+        for (let k = 0; k < 36; k++) {
+          if (k % 3 === 2) el.dispatchEvent(new WheelEvent("wheel", { deltaY: 100, bubbles: true, cancelable: true }));
+          else el.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true, cancelable: true }));
+          await wait();
+        }
+      }, rhythm);
+      await expect.poll(() => linkCamera()?.azimuth, { timeout: 10_000 }).toBeCloseTo(0.3 + 24 * 0.1, 6);
+      await expect.poll(() => linkCamera()?.distance, { timeout: 10_000 }).toBeCloseTo(30 * 1.2 ** 12, 6);
+    });
+  }
 });
