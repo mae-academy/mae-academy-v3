@@ -730,3 +730,64 @@ describe("contour and mask output is unchanged by the hot-loop restructuring", (
     });
   }
 });
+
+describe("visual cost of the drag-frame coarsening on sin(x² + y²) < 0 (measured 2026-10-31, kept by the owner's decision pending)", () => {
+  const F = (x: number, y: number) => Math.sin(x * x + y * y);
+  const view = { xmin: -5, xmax: 5, ymin: -3.125, ymax: 3.125, aspect: "equal" as const };
+  const lt0 = insideTest("<");
+  /** Share of mask pixels that differ from F evaluated at the pixel centre. */
+  const wrong = (m: { width: number; height: number; data: Uint8Array }) => {
+    let bad = 0;
+    for (let j = 0; j < m.height; j++) {
+      for (let i = 0; i < m.width; i++) {
+        const v = F(-5 + ((i + 0.5) * 10) / m.width, 3.125 - ((j + 0.5) * 6.25) / m.height);
+        if ((Number.isFinite(v) && lt0(v) ? 1 : 0) !== m.data[j * m.width + i]) bad++;
+      }
+    }
+    return bad / (m.width * m.height);
+  };
+
+  it("sampling refined blocks every second pixel makes 1–2.5 % of the 400×250 drag mask pixels wrong; every pixel makes none", () => {
+    expect(wrong(regionMask(F, view, 1600, 1000, 4, lt0, 12, 1))).toBe(0);
+    const w = wrong(regionMask(F, view, 1600, 1000, 4, lt0, 12, 2));
+    expect(w).toBeGreaterThan(0.01);
+    expect(w).toBeLessThan(0.025);
+  });
+
+  it("the coarse curve has the same pieces and length as the fine one, and every fine point is within 0.5 CSS px of it", () => {
+    const o = { width: 1600, height: 1000, cellPx: 12, refine: 2 };
+    const fine = contour(F, view, o);
+    const coarse = contour(F, view, { ...o, coarseWhenDense: 0.5 });
+    expect(coarse.polylines.length).toBe(fine.polylines.length);
+    const length = (ps: Float64Array[]) => ps.reduce((s, p) => { let l = 0; for (let i = 2; i < p.length; i += 2) l += Math.hypot(p[i] - p[i - 2], p[i + 1] - p[i - 1]); return s + l; }, 0);
+    expect(length(coarse.polylines) / length(fine.polylines)).toBeGreaterThan(0.99);
+    // Coarse curve resampled every 0.5 px, in a grid for the nearest search.
+    const px = 10 / 1600;
+    const cp: number[] = [];
+    for (const p of coarse.polylines) {
+      for (let i = 2; i < p.length; i += 2) {
+        const n = Math.max(1, Math.ceil(Math.hypot(p[i] - p[i - 2], p[i + 1] - p[i - 1]) / (px * 0.5)));
+        for (let k = 0; k <= n; k++) cp.push(p[i - 2] + ((p[i] - p[i - 2]) * k) / n, p[i - 1] + ((p[i + 1] - p[i - 1]) * k) / n);
+      }
+    }
+    const cell = px * 8;
+    const grid = new Map<string, number[]>();
+    for (let i = 0; i < cp.length; i += 2) {
+      const key = `${Math.floor(cp[i] / cell)},${Math.floor(cp[i + 1] / cell)}`;
+      const list = grid.get(key);
+      if (list) list.push(i);
+      else grid.set(key, [i]);
+    }
+    let worst = 0;
+    for (const p of fine.polylines) {
+      for (let i = 0; i < p.length; i += 2) {
+        const gx = Math.floor(p[i] / cell);
+        const gy = Math.floor(p[i + 1] / cell);
+        let best = Infinity;
+        for (let dx = -2; dx <= 2; dx++) for (let dy = -2; dy <= 2; dy++) for (const j of grid.get(`${gx + dx},${gy + dy}`) ?? []) best = Math.min(best, Math.hypot(p[i] - cp[j], p[i + 1] - cp[j + 1]));
+        worst = Math.max(worst, best / px);
+      }
+    }
+    expect(worst).toBeLessThan(0.5);
+  });
+});
