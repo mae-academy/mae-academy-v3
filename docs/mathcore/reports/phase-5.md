@@ -24,11 +24,11 @@ Measured with `scripts/mathcore/bench.ts` (Node, cloud machine) after the review
 | Same, 1600×1000 frame | ≤ 25 ms | 11.5 ms |
 | Phase 5 scene, fitted camera, 1600×1000 | ≤ 25 ms | 8.8 ms |
 | Phase 5 scene, camera inside the box, 800×500 (frames while the camera moves) | ≤ 25 ms | 9.9 ms |
-| Phase 5 scene, camera inside the box, 1600×1000 (the frame after release) | reference | 48 ms |
+| Phase 5 scene, camera inside the box, 1600×1000 (the frame after release) | ≤ 25 ms | 48 ms at the Phase 5 review; 18–23 ms after the follow-up (`follow-up-2026-10-31.md`, B9) |
 
 The 25 ms budget holds for every frame drawn while the camera moves (half resolution, `FRAME3_DRAG_SCALE`), at any
 zoom. A full-resolution frame after release with the camera close to the planes (most pixels covered by several
-translucent layers) takes about 48 ms; it is drawn once, like the release frame of implicit fields.
+translucent layers) took 48 ms at the Phase 5 review and meets the 25 ms budget since the follow-up (B9).
 
 Values: 3×3 determinants and eigenvalues match the mpmath reference within 10⁻⁹ (see the Phase 4 report for the
 measures). Repeated roots are found exactly from the discriminant of the characteristic polynomial, so defective
