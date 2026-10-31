@@ -8,7 +8,7 @@
  *    without deflation an exceptional shift breaks cycles. (Algorithm of EISPACK `hqr`.)
  * Repeated and complex eigenvalues are therefore handled explicitly, as the plan requires.
  */
-import { EIGEN_IMAG_RELATIVE } from "../constants";
+import { EIGEN_CLUSTER_RELATIVE, EIGEN_DISC_RELATIVE, EIGEN_IMAG_RELATIVE } from "../constants";
 import type { Mat } from "./matrix";
 import { detExact, powerOfTwoScale, toDyadic } from "./matrix";
 import { Fraction } from "./fraction";
@@ -306,6 +306,8 @@ export function eigen3(A: Mat): Eigen3 {
   return { kind: r.kind, values: r.values.map((e) => ({ re: e.re * k, im: e.im * k })), vectors: r.vectors.map((v) => ({ value: v.value * k, vector: v.vector })) };
 }
 
+const dist = (u: EigenValue, v: EigenValue) => Math.hypot(u.re - v.re, u.im - v.im);
+
 function eigen3Scaled(A: Mat): Eigen3 {
   const cub = cubic3(A);
   const three = new Fraction(BigInt(3));
@@ -314,13 +316,30 @@ function eigen3Scaled(A: Mat): Eigen3 {
     const { a, b, c } = cub;
     const p = a.mul(a).sub(b.mul(three));
     if (p.isZero()) roots = [{ value: a.neg().div(three).toNumber(), multiplicity: 3 }];
-    else {
+    // p = (sum of squared root gaps) / 2 = 2d² for a double root and a simple one d apart: a tiny p means the three
+    // roots coincide to working precision (rounded entries), which the tolerance path below handles.
+    else if (Math.sqrt(Math.abs(p.toNumber()) / 2) > EIGEN_CLUSTER_RELATIVE) {
       const double = c.mul(new Fraction(BigInt(9))).sub(a.mul(b)).div(p.mul(new Fraction(BigInt(2))));
       const simple = a.mul(b).mul(new Fraction(BigInt(4))).sub(c.mul(new Fraction(BigInt(9)))).sub(a.mul(a).mul(a)).div(p);
       roots = [{ value: double.toNumber(), multiplicity: 2 }, { value: simple.toNumber(), multiplicity: 1 }];
     }
   }
   const values = roots ? [] : eigenvalues(A);
+  if (!roots) {
+    // Product of squared root gaps (the discriminant), for a matrix of unit size.
+    const disc = cub ? Math.abs(cub.disc.toNumber()) : dist(values[0], values[1]) ** 2 * dist(values[0], values[2]) ** 2 * dist(values[1], values[2]) ** 2;
+    if (disc <= EIGEN_DISC_RELATIVE) {
+      const trace = A[0][0] + A[1][1] + A[2][2];
+      // The isolated root is the one farthest from the other two; if even that one is close, all three coincide.
+      const gap = values.map((v, i) => Math.min(...values.filter((_, j) => j !== i).map((w) => dist(v, w))));
+      const s = gap.indexOf(Math.max(...gap));
+      if (gap[s] <= EIGEN_CLUSTER_RELATIVE) roots = [{ value: trace / 3, multiplicity: 3 }];
+      else {
+        const simple = values[s].re;
+        roots = [{ value: (trace - simple) / 2, multiplicity: 2 }, { value: simple, multiplicity: 1 }];
+      }
+    }
+  }
   if (roots) {
     const flat: EigenValue[] = roots
       .flatMap((r) => Array.from({ length: r.multiplicity }, () => ({ re: r.value, im: 0 })))

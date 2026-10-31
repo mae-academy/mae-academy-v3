@@ -190,3 +190,43 @@ describe("A3: entries near 1e±200 (eigenvectors, eigenspaces, complex planes)",
   }
 });
 
+describe("A2: defective and repeated 3×3 matrices whose entries were rounded", () => {
+  const P = [[1, 1, 0], [0, 1, 1], [1, 0, 1]];
+  const Pinv = [[1, -1, 1], [1, 1, -1], [-1, 1, 1]].map((r) => r.map((v) => v / 2));
+  const mm = (X: number[][], Y: number[][]) => X.map((r) => Y[0].map((_, j) => r.reduce((s, v, k) => s + v * Y[k][j], 0)));
+  const jordan = (l: number, m: number, form: "J3" | "J21" | "D21") =>
+    form === "J3" ? [[l, 1, 0], [0, l, 1], [0, 0, l]] : form === "J21" ? [[l, 1, 0], [0, l, 0], [0, 0, m]] : [[l, 0, 0], [0, l, 0], [0, 0, m]];
+  // [form, eigenvalue multiset (descending), eigen-directions]
+  const expected = (l: number, m: number): Record<string, [number[], number]> => ({
+    J3: [[l, l, l], 1],
+    J21: [m > l ? [m, l, l] : [l, l, m], 2],
+    D21: [m > l ? [m, l, l] : [l, l, m], 3],
+  });
+  for (const l of [0.1, -3.7, 0.001, 2]) {
+    for (const form of ["J3", "J21", "D21"] as const) {
+      it(`P·${form}(${l})·P⁻¹ (rounded entries) is repeated with the right eigenspaces`, () => {
+        const m = 5;
+        const A = mm(mm(P, jordan(l, m, form)), Pinv);
+        const e = eigen3(A);
+        const [values, nvec] = expected(l, m)[form];
+        expect(e.kind).toBe("repeated-real");
+        expect(e.values.every((v) => v.im === 0)).toBe(true);
+        e.values.forEach((v, i) => expect(v.re).toBeCloseTo(values[i], 12));
+        expect(e.vectors).toHaveLength(nvec);
+        for (const { value, vector } of e.vectors) {
+          const res = A.map((row, i) => row[0] * vector[0] + row[1] * vector[1] + row[2] * vector[2] - value * vector[i]);
+          expect(Math.hypot(...res)).toBeLessThan(1e-7);
+        }
+      });
+    }
+  }
+  it("typed decimals: a Jordan block with λ = 1.1 keeps one direction and the triple value 1.1", () => {
+    const e = eigen3([[1.1, 1, 0], [0, 1.1, 1], [0, 0, 1.1]]);
+    expect(e.values.map((v) => v.re)).toEqual([1.1, 1.1, 1.1]);
+    expect(e.vectors).toHaveLength(1);
+  });
+  it("eigenvalues that really differ stay distinct", () => {
+    expect(eigen3([[1, 0, 0], [0, 1.001, 0], [0, 0, 5]]).kind).toBe("distinct-real");
+    expect(eigen3([[1, 0.5, 0], [0, 1.01, 0], [0, 0, 5]]).values.map((v) => v.re)).toEqual([5, 1.01, 1]);
+  });
+});
