@@ -111,7 +111,8 @@ describe("scene robustness (Phase 5 review)", () => {
       return n;
     };
     const pure = (r: number, g: number, b: number) => r === 0 && g === 255 && b === 0;
-    const tinted = (r: number, g: number) => g > 150 && r > 50 && !(r === 255 && g === 255);
+    // Line (0, 255, 0) under red at opacity 0.45: green keeps 55 % (140), red contributes 0.45 · 255 (≈ 114).
+    const tinted = (r: number, g: number) => Math.abs(g - 140) <= 2 && Math.abs(r - 114) <= 3;
     expect(count(front, pure)).toBeGreaterThan(10);
     expect(count(behind, pure)).toBe(0);
     expect(count(behind, tinted)).toBeGreaterThan(10);

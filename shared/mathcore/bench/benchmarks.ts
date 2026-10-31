@@ -180,7 +180,7 @@ export function runBenchmarks(): BenchResult[] {
   add("3d-linalg-zoom-drag", "Phase 5 scene zoomed in (camera inside the box), 800×500 frame while moving", 25, "ms", time(() => {
     render(scene3.meshes, scene3.lines, appCam(scene3.half * 0.8), 800, 500, bg);
   }, 5));
-  add("3d-linalg-zoom-full", "Phase 5 scene zoomed in, 1600×1000 frame on release (reference)", 150, "ms", time(() => {
+  add("3d-linalg-zoom-full", "Phase 5 scene zoomed in (camera inside the box), 1600×1000 frame on release", 25, "ms", time(() => {
     render(scene3.meshes, scene3.lines, appCam(scene3.half * 0.8), 1600, 1000, bg);
   }, 3));
 

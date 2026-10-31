@@ -204,8 +204,6 @@ export const AMBIENT_LIGHT = 0.3;
 export const LINE_DEPTH_BIAS = 0.999;
 /** Upper bound on the pixels walked along one line (a line whose ends project far off-screen). */
 export const MAX_LINE_STEPS = 20_000;
-/** A line behind a translucent surface keeps this share of the surface color over it (≈ the planes' opacity). */
-export const LINE_BEHIND_MIX = 0.45;
 /** 3D scene: smallest and largest box half-size, margin around the content, solution marker and arc sizes (fractions
  * of the half-size), and axis-label offset. */
 export const SCENE_MIN_HALF = 5;

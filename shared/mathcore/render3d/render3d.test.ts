@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { meshVolume, parallelepipedMesh, planeInCube, polygonMesh } from "./geometry";
+import { buildScene3 } from "./scene";
 import type { Camera, Mesh } from "./raster";
 import { DEFAULT_CAMERA, projector, render, surfaceMesh } from "./raster";
 
@@ -132,4 +133,55 @@ describe("A1: the near plane does not cut surfaces apart when the camera is clos
       }
     });
   }
+});
+
+describe("A6: lines are composited with translucent surfaces in depth order", () => {
+  const cam: Camera = { ...DEFAULT_CAMERA, azimuth: 0, elevation: Math.PI / 2 - 1e-6, distance: 10 };
+  const glass = (z: number, color: [number, number, number]): Mesh => ({
+    positions: Float32Array.of(-1, -1, z, 1, -1, z, 1, 1, z, -1, 1, z),
+    indices: Uint32Array.of(0, 1, 2, 0, 2, 3),
+    color,
+    opacity: 0.5,
+  });
+  const line = (z: number) => ({ from: [-0.5, 0, z] as [number, number, number], to: [0.5, 0, z] as [number, number, number], color: [255, 255, 255] as [number, number, number] });
+  const near = (got: number[], want: number[]) => got.forEach((v, i) => expect(Math.abs(v - want[i])).toBeLessThanOrEqual(2));
+
+  it("a line behind two translucent planes is tinted by both (camera above: higher z is nearer)", () => {
+    const f = render([glass(1, [200, 0, 0]), glass(2, [0, 0, 200])], [line(0)], cam, 101, 101, BG);
+    // white · 0.5 + red 100 → (227, 127, 127); · 0.5 + blue 100 → (114, 64, 164)
+    near(pixel(f, 50, 50), [114, 64, 164]);
+  });
+  it("a line between two translucent planes is tinted by the nearer one only", () => {
+    const f = render([glass(1, [200, 0, 0]), glass(-1, [0, 0, 200])], [line(0)], cam, 101, 101, BG);
+    // blue under the line is covered by the line; red over it: (227, 128, 128)
+    near(pixel(f, 50, 50), [227, 128, 128]);
+  });
+  it("the order of the meshes in the list does not matter", () => {
+    const a = render([glass(1, [200, 0, 0]), glass(2, [0, 0, 200])], [line(0)], cam, 101, 101, BG);
+    const b = render([glass(2, [0, 0, 200]), glass(1, [200, 0, 0])], [line(0)], cam, 101, 101, BG);
+    expect(a.rgba).toEqual(b.rgba);
+  });
+});
+
+describe("B9: the row blend equals the per-triangle blend", () => {
+  it("a translucent-only frame (row blend) matches the same frame drawn per triangle (forced by an opaque triangle far away)", () => {
+    const C: [number, number, number] = [40, 40, 40];
+    const scene = buildScene3(
+      [
+        { kind: "system", A: [[1, 1, 1], [1, -1, 0], [0, 1, -1]], b: [3, 0, 0], solution: [1, 1, 1], colors: [[37, 99, 235], [225, 29, 72], [124, 58, 237]] },
+        { kind: "matrix", values: [[1, 0.5, 0], [0, 1, 0.3], [0.2, 0, 1]], color: [0, 0, 0] },
+      ],
+      { background: [255, 255, 255], axis: C, box: C, positive: [37, 99, 235], negative: [225, 29, 72], arrow: C, eigen: C },
+    );
+    // An opaque triangle behind the camera: it switches the renderer to the per-triangle path but covers nothing.
+    const hidden: Mesh = { positions: Float32Array.of(0, 0, 1e6, 1, 0, 1e6, 0, 1, 1e6), indices: Uint32Array.of(0, 1, 2), color: [0, 0, 0] };
+    for (const distance of [scene.half * 3.2, scene.half * 0.8]) {
+      const cam = { ...DEFAULT_CAMERA, distance };
+      const rows = render(scene.meshes, scene.lines, cam, 320, 200, [255, 255, 255]);
+      const tri = render([...scene.meshes, hidden], scene.lines, cam, 320, 200, [255, 255, 255]);
+      let worst = 0;
+      for (let i = 0; i < rows.rgba.length; i++) worst = Math.max(worst, Math.abs(rows.rgba[i] - tri.rgba[i]));
+      expect(worst, `distance ${distance}`).toBeLessThanOrEqual(3);
+    }
+  });
 });
