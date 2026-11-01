@@ -545,6 +545,15 @@ export default defineConfig({
          *    components eagerly, so they land in one chunk; tab switching is
          *    synchronous (no per-tool lazy cascade).
          */
+        // Math Core chunks keep Rollup's natural split (forcing them with manualChunks would hoist shared helpers into
+        // them); only their file names change, to mathcore-ui-*, so the chunk-size audit can find and measure them.
+        chunkFileNames(chunk) {
+          const ids = chunk.moduleIds.filter((m) => !m.startsWith("\0"));
+          const isMathcore = (m: string) => m.includes("/client/src/features/mathcore/") || m.includes("/shared/mathcore/");
+          const entry = chunk.facadeModuleId ?? "";
+          if ((entry && isMathcore(entry)) || (ids.length > 0 && ids.every(isMathcore))) return "assets/mathcore-ui-[hash].js";
+          return "assets/[name]-[hash].js";
+        },
         manualChunks(id) {
           // ── Core React runtime ─────────────────────────────────────────
           if (
@@ -612,6 +621,14 @@ export default defineConfig({
   // The ngspice worker is constructed with { type: "module" }; Vite's default worker format is iife.
   worker: {
     format: "es",
+    rollupOptions: {
+      output: {
+        // Compute Engine is imported lazily inside the mathcore Worker; name it for the chunk-size audit.
+        manualChunks(id) {
+          return id.includes("node_modules/@cortex-js/compute-engine") ? "mathcore-compute" : undefined;
+        },
+      },
+    },
   },
   server: {
     port: 3000,

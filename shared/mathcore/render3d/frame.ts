@@ -1,0 +1,90 @@
+/**
+ * The 3D frame of a document (Phase 5): its visible 3×3 matrices and 3×3 systems, rendered by the CPU rasterizer
+ * (ADR-4) at canvas size, or at FRAME3_DRAG_SCALE of it while the camera moves. Labels are projected to CSS pixels
+ * here and drawn by the page. Runs in the engine Worker.
+ */
+import { CAMERA_FIT_MARGIN, CAMERA_FOV, FRAME3_DRAG_SCALE, FRAME3_MAX_SIDE } from "../constants";
+import type { GraphEngine } from "../engine/graphEngine";
+import type { Camera3, Viewport } from "../ir/types";
+import { DEFAULT_CAMERA3 } from "../ir/types";
+import type { SystemAnalysis } from "../linalg/analyze";
+import { analyzeSystem } from "../linalg/analyze";
+import type { Mat } from "../linalg/matrix";
+import { DEFAULT_CAMERA, projector, render } from "./raster";
+import type { RGB, Vec3 } from "./raster";
+import { buildScene3 } from "./scene";
+import type { Scene3Colors, Scene3Item } from "./scene";
+
+export interface Frame3Request {
+  viewport?: Viewport;
+  width: number;
+  height: number;
+  quality: "drag" | "full";
+  camera?: Camera3;
+}
+
+export type Frame3Colors = Scene3Colors & { planes: [RGB, RGB, RGB]; items: Record<string, RGB> };
+
+export interface Frame3 {
+  width: number;
+  height: number;
+  rgba: Uint8ClampedArray;
+  labels: Array<{ x: number; y: number; text: string }>;
+  /** The camera used: the request's, or the one fitted to the scene. */
+  camera: Camera3;
+  /** Half-size of the viewing box (the page limits zoom relative to it). */
+  half: number;
+}
+
+/**
+ * Camera distance at which the box's bounding sphere (radius √3·L) fits the narrower of the vertical and horizontal
+ * fields of view, with CAMERA_FIT_MARGIN.
+ */
+export function fitDistance(half: number, width: number, height: number): number {
+  const aspect = width > 0 && height > 0 ? width / height : 1;
+  const hfov = 2 * Math.atan(Math.tan(CAMERA_FOV / 2) * aspect);
+  const fov = Math.min(CAMERA_FOV, hfov);
+  return (CAMERA_FIT_MARGIN * Math.sqrt(3) * half) / Math.sin(fov / 2);
+}
+
+type Analyze = (id: string, A: Mat, b: number[], unknowns: string[]) => SystemAnalysis;
+
+export function renderFrame3(
+  e: GraphEngine,
+  req: Frame3Request,
+  colors: Frame3Colors,
+  analyze: Analyze = (_id, A, b, u) => analyzeSystem(A, b, u),
+): Frame3 {
+  const items: Scene3Item[] = [];
+  for (const it of e.graph.items) {
+    if (it.style?.hidden) continue;
+    const rt = e.runtime(it.id);
+    if (rt?.kind === "Matrix" && rt.size === 3) {
+      const t = e.item(it.id)?.type;
+      const name = t && (t.kind === "Matrix2" || t.kind === "Matrix3") && t.name ? t.name : undefined;
+      items.push({ kind: "matrix", values: rt.values, color: colors.items[it.id] ?? colors.arrow, name });
+    } else if (rt?.kind === "GaussSystem" && rt.unknowns.length === 3) {
+      // On the axes only when the unknowns are x, y and z (in any order); columns follow the axes.
+      const order = ["x", "y", "z"].map((u) => rt.unknowns.indexOf(u));
+      if (order.some((k) => k < 0)) continue;
+      const a = analyze(it.id, rt.A, rt.b, rt.unknowns);
+      const solution = a.solution.kind === "unique" ? (order.map((k) => a.solution.kind === "unique" ? a.solution.values[k] : 0) as Vec3) : null;
+      items.push({ kind: "system", A: rt.A.map((r) => order.map((k) => r[k])), b: rt.b, solution, colors: colors.planes });
+    }
+  }
+  const scene = buildScene3(items, colors);
+  const camera = req.camera ?? { ...DEFAULT_CAMERA3, distance: fitDistance(scene.half, req.width, req.height) };
+  const k = req.quality === "drag" ? FRAME3_DRAG_SCALE : 1;
+  const width = Math.min(FRAME3_MAX_SIDE, Math.max(1, Math.round(req.width * k) || 1));
+  const height = Math.min(FRAME3_MAX_SIDE, Math.max(1, Math.round(req.height * k) || 1));
+  // The scene is in world units divided by scene.scale (1 except for huge scenes); the camera follows.
+  const cam = { ...DEFAULT_CAMERA, ...camera, distance: camera.distance / scene.scale, target: [0, 0, 0] as Vec3 };
+  const f = render(scene.meshes, scene.lines, cam, width, height, colors.background);
+  const project = projector(cam, req.width, req.height);
+  const labels: Frame3["labels"] = [];
+  for (const l of scene.labels) {
+    const p = project(l.at);
+    if (p) labels.push({ x: p[0], y: p[1], text: l.text });
+  }
+  return { width, height, rgba: f.rgba, labels, camera, half: scene.half };
+}

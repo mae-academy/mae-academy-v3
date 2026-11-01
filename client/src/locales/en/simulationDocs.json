@@ -777,6 +777,94 @@
           "body": "Protective relays and metering devices run embedded firmware in which timers and interrupts sample line waveforms. Deterministic timing, set by the timer and interrupt configuration, makes protection responses predictable and repeatable."
         }
       ]
+    },
+    "mathcore": {
+      "title": "Math Core: theory and lab guide",
+      "intro": "Math Core is a graphing workbench for functions, curves and equations. Type an expression, and every letter that is not defined becomes a slider. The engine parses your LaTeX, builds one compiled function per expression, and draws it with adaptive sampling. The theory below explains what the engine does, so you can predict a graph by hand and then check it on the canvas.",
+      "principles": [
+        {
+          "heading": "From LaTeX to a compiled function",
+          "body": "Your input is parsed once into a tree. The tree is compiled into a closure, a small function that computes the value for any x without parsing again. Dragging a slider only calls the closures with a new parameter value, which is why the graph follows the pointer smoothly. The engine never runs the text as code."
+        },
+        {
+          "heading": "Adaptive sampling and discontinuities",
+          "body": "A curve is first sampled at evenly spaced points. Wherever the midpoint of an interval is far from the straight line between its ends, the interval is split again, up to a fixed depth. Where the function is undefined, such as the square root of a negative number, the curve is cut. A very large jump is bisected before it is accepted as an asymptote, so a steep but continuous curve stays connected while a pole such as 1/x is drawn in two pieces."
+        },
+        {
+          "heading": "Derivatives and tangents",
+          "body": "The tangent at a point uses a central difference, which averages a step forward and a step backward and cancels the first error term. The step size is the square root of the machine epsilon times the larger of 1 and the size of x, which balances truncation error against rounding error. Move the pointer over a curve to see the slope and the slope triangle with run and rise."
+        },
+        {
+          "heading": "Dependencies between lines",
+          "body": "Each line may define a name, such as a = 2 or f(x) = x^2, and may use names defined by other lines. These links form a directed graph. The engine evaluates definitions before their uses, and when a slider changes it re-evaluates only the lines that depend on it. Circular definitions, where a depends on b and b depends on a, are rejected and the message names the lines involved."
+        },
+        {
+          "heading": "Implicit curves and inequalities",
+          "body": "An equation such as x² + y² = 9 cannot always be solved for y, so the engine draws it as the set where F(x, y) = left side − right side is zero. It evaluates F on a coarse grid, refines only the cells where F changes sign or comes close to zero, and places each crossing by bisection along the cell edge. A sign change that grows instead of shrinking under bisection is a pole, not a curve, and is not drawn. An inequality such as y > x² is shaded where its side of F holds; a strict inequality draws its boundary dashed because the boundary itself is not included."
+        }
+      ],
+      "equations": [
+        "Parametric form of a polar curve r = f(θ)",
+        "Tangent line at the point x0",
+        "Central difference with the step used by the engine",
+        "Accuracy target of the golden corpus against 50-digit references",
+        "A dependency from line i to line j",
+        "Slider values are multiples of the step"
+      ],
+      "parameters": [
+        {
+          "term": "Slider range and step",
+          "body": "Each slider has a minimum, a maximum and a step. The value always stays inside the range and moves in multiples of the step. A small step gives a smooth animation, and a large one gives clear jumps."
+        },
+        {
+          "term": "Animation period",
+          "body": "An animated slider moves from one end of its range to the other and back. The period is between 0.5 and 60 seconds. Because the motion is a triangle wave, a looping animation has no sudden jump."
+        },
+        {
+          "term": "Viewport and aspect",
+          "body": "The viewport is the visible window in x and y. With equal aspect, one unit has the same length on both axes, so a circle looks like a circle. Zooming with the wheel or the plus and minus keys keeps the point under the pointer fixed."
+        },
+        {
+          "term": "Link and export",
+          "body": "The whole graph is stored in the address, so a copied link reopens the same graph. A very large graph is too big for a link, and the page then offers a JSON file instead. You can also export the picture as PNG or SVG."
+        }
+      ],
+      "experiments": [
+        {
+          "title": "Amplitude and period",
+          "body": "Type y = a sin(b x). Two sliders appear. Predict that a sets the height of the waves and that the period is 2π/b. Set b to 2 and check that the curve repeats every 3.14 units."
+        },
+        {
+          "title": "Secant to tangent",
+          "body": "Type y = x^2 and hover over the curve at x = 1. Predict a slope of 2. Then compare with the secant slope (f(1 + h) − f(1))/h for h = 1, 0.1 and 0.01, and notice that it approaches 2."
+        },
+        {
+          "title": "A pole and a steep curve",
+          "body": "Draw y = 1/x and y = 50 arctan(100 x) in the same graph. The first is cut at x = 0 into two pieces, and the second stays in one piece even though it is very steep. Zoom in on both to see the difference."
+        },
+        {
+          "title": "Dependent sliders",
+          "body": "Type a = 2, then k = 3a, then y = k x. Move a and watch k and the line change together. Change the unrelated line y = sin x and notice that its slider list does not change. The counter under the list shows how many lines were re-evaluated."
+        }
+      ],
+      "applications": [
+        {
+          "field": "Control systems",
+          "body": "Plot step responses, Bode magnitudes and root loci as parametric curves while a gain slider changes the poles. The same tangent tool reads the slope at the origin of a response."
+        },
+        {
+          "field": "Signal processing",
+          "body": "Compare a sinusoid with its partial Fourier sums by defining the sum with a slider for the number of terms, and watch the Gibbs overshoot near a jump."
+        },
+        {
+          "field": "Numerical methods",
+          "body": "Plot a function and a candidate root, then read the tangent at the guess to follow one Newton step by hand before using a numerical routine."
+        },
+        {
+          "field": "Teaching and exams",
+          "body": "Share a graph as a link so a student opens exactly the same sliders and curves, and export it as an SVG for printed exercises."
+        }
+      ]
     }
   }
 }

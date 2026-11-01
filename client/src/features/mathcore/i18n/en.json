@@ -1,0 +1,340 @@
+{
+  "title": "Math Core graphing",
+  "subtitle": "Type an expression. Undefined letters become sliders.",
+  "expressions": "Expressions",
+  "addExpression": "Add expression",
+  "removeExpression": "Remove expression {{n}}",
+  "expressionLabel": "Expression {{n}}",
+  "placeholder": "y = a\\sin(x)",
+  "loadingEngine": "Loading the math engine…",
+  "engineRestarted": "The calculation took longer than 5 seconds and was stopped.",
+  "engineError": "Engine error: {{message}}",
+  "parameters": "Sliders",
+  "play": "Animate {{name}}",
+  "pause": "Pause {{name}}",
+  "min": "Minimum",
+  "max": "Maximum",
+  "step": "Step",
+  "value": "Value of {{name}}",
+  "share": "Copy link",
+  "linkCopied": "Link copied",
+  "linkTooLarge": "Too large to share as a link. Use JSON export instead.",
+  "exportPng": "PNG",
+  "exportSvg": "SVG",
+  "exportJson": "JSON",
+  "importJson": "Import JSON",
+  "importFailed": "That file is not a valid graph.",
+  "resetView": "Reset view",
+  "zoomIn": "Zoom in",
+  "zoomOut": "Zoom out",
+  "trace": "Trace",
+  "tangentAt": "Tangent at x = {{x}}: slope f′(x) = {{slope}}",
+  "precision": "Values beyond 10⁸ lose precision in double arithmetic.",
+  "notYet": "{{kind}} items are drawn from Phase {{phase}} on.",
+  "kindWarning": "{{message}}",
+  "graphLabel": "Graph. Use the arrow keys to pan and plus or minus to zoom.",
+  "descriptions": "Text description of the graph",
+  "describe": {
+    "hidden": "{{label}}: not visible in this view.",
+    "pieces_one": "{{label}}: one piece from x = {{from}} to {{to}}",
+    "pieces_other": "{{label}}: {{count}} pieces from x = {{from}} to {{to}}",
+    "zeros": "crosses zero at x = {{list}}",
+    "noZeros": "no zeros in view",
+    "maxima": "local maxima near {{list}}",
+    "minima": "local minima near {{list}}",
+    "extent_one": "{{label}}: one piece spanning x from {{xmin}} to {{xmax}} and y from {{ymin}} to {{ymax}}",
+    "extent_other": "{{label}}: {{count}} pieces spanning x from {{xmin}} to {{xmax}} and y from {{ymin}} to {{ymax}}",
+    "region": "{{label}}: the shaded region covers about {{percent}}% of the view",
+    "regionAll": "{{label}}: the shaded region fills the whole view",
+    "regionNone": "{{label}}: no shaded region in this view",
+    "boundary": "its boundary spans x from {{xmin}} to {{xmax}} and y from {{ymin}} to {{ymax}}",
+    "matrix": "{{label}}: matrix with determinant {{det}}, {{orientation}}; eigenvalues {{eigen}}.",
+    "systemUnique": "{{label}}: linear system with the unique solution {{solution}}.",
+    "systemNone": "{{label}}: linear system with no solution.",
+    "systemInfinite": "{{label}}: linear system with infinitely many solutions."
+  },
+  "value_is": "= {{value}}",
+  "benchmarks": "Run benchmarks",
+  "benchHeader": "Benchmarks on this device (STEPS.md §7.2)",
+  "evaluations": "{{count}} item evaluations; last update re-evaluated {{changed}}",
+  "linkInvalid": "This link is not a valid graph, so a new graph is shown. The address stays until you edit.",
+  "benchPass": "Pass",
+  "benchFail": "Fail",
+  "showSteps": "Show steps",
+  "linalg": {
+    "loading": "Loading the matrix report…",
+    "orientation_kept": "orientation kept",
+    "orientation_reversed": "orientation reversed",
+    "orientation_singular": "singular matrix",
+    "eigenvalues": "Eigenvalues",
+    "eigenvectors": "Eigen-directions",
+    "rotation": "Complex eigenvalues α ± iβ: there is no real eigen-direction. In the basis of the real and imaginary parts of an eigenvector, the matrix rotates by θ = {{angle}}° and scales by r = {{scale}}.",
+    "stepsInverse": "Gauss-Jordan on [{{name}} | I] (inverse)",
+    "stepsSystem": "Gauss-Jordan on [A | b]",
+    "noInverse": "No inverse: the matrix is singular (rank {{rank}}).",
+    "solution": "Solution",
+    "noSolution": "No solution (inconsistent, rank of A = {{rank}})",
+    "infinite": "Infinitely many solutions (rank {{rank}})",
+    "planes3d": "Turn on the 3D view to see the three planes and where they meet.",
+    "matrix3d": "Turn on the 3D view to see the image of the unit cube.",
+    "panelFailed": "The matrix report could not load. Check the connection and reload the page."
+  },
+  "view3d": "3D view",
+  "view3dNote": "3D view: 3×3 matrices and systems. Drag to orbit, scroll to zoom. Curves and regions are drawn in the 2D view.",
+  "graphLabel3d": "3D graph. Use the arrow keys to orbit and plus or minus to zoom.",
+  "errors": {
+    "tooLong": "Expression is longer than {{max}} characters",
+    "invalidExpression": "Invalid expression",
+    "nodeLimit": "Expression has {{nodes}} nodes; the limit is {{max}}",
+    "unrecognized": "Unrecognized expression",
+    "unexpectedText": "Unexpected text \"{{text}}\"",
+    "complexNumbers": "Complex numbers are not available yet (decision D2)",
+    "unsupportedForm": "Unsupported function form",
+    "unsupportedOperation": "Unsupported operation: {{name}}",
+    "arity": "{{fn}} expects {{count}} argument(s)",
+    "emptyParens": "Empty parentheses",
+    "wrongArgCount": "{{fn}} has the wrong number of arguments",
+    "emptyExpression": "Empty expression",
+    "powerArity": "Power expects 2 arguments",
+    "primeNeedsName": "Prime notation needs a variable name",
+    "derivativeNeedsVariable": "Derivative needs a variable",
+    "derivativeVariableName": "Derivative variable must be a name",
+    "matrixRowsMissing": "Matrix rows are missing",
+    "matrixRowNotList": "Matrix row is not a list",
+    "integralLimits": "Only definite integrals with both limits are supported",
+    "needsIndexLimits": "{{name}} needs an index and both limits",
+    "undefinedSymbol": "Undefined symbol: {{name}}",
+    "needsArguments": "{{fn}} needs arguments",
+    "notNumeric": "Cannot evaluate {{fn}} as a number",
+    "wrongArity": "{{fn}} expects {{count}} argument(s)",
+    "comparisonSides": "A comparison needs two sides",
+    "derivativeVariableUndefined": "Derivative variable {{name}} is not defined here",
+    "indexName": "{{fn}} index must be a name",
+    "integrationVariableName": "Integration variable must be a name",
+    "functionName": "Function name must be a symbol",
+    "undefinedFunction": "Undefined function: {{name}}",
+    "userFunctionArity": "{{name}} expects {{count}} argument(s)",
+    "recursionDepth": "Function calls nest deeper than {{max}} (recursive definition?)",
+    "entryNotFinite": "A matrix or right-side entry is not a finite number",
+    "matrixError": "The matrix \"{{name}}\" has an error",
+    "notMatrix": "\"{{name}}\" is not a matrix defined in this graph",
+    "unknownCountMismatch": "\"{{name}}\" is {{size}}×{{size}} but there are {{unknowns}} unknowns",
+    "equationUndefinedAtZero": "Equation {{n}} is not defined at 0",
+    "equationNotLinear": "Equation {{n}} is not linear in {{unknowns}}",
+    "circularDefinition": "Circular definition: {{cycle}}",
+    "definedTwice": "\"{{name}}\" is defined more than once",
+    "dependsOnCycle": "Depends on a circular definition",
+    "tooManyParams": "Too many parameters (limit {{max}}); \"{{name}}\" is undefined",
+    "notParsed": "Not parsed",
+    "inferenceFailed": "inference failed: {{detail}}",
+    "needsEquation": "{{name}} alone needs an equation",
+    "malformedFunction": "malformed function definition",
+    "functionParamNames": "function parameters must be names",
+    "selfDerivative": "a variable cannot be differentiated with respect to itself",
+    "firstOrderOnly": "only first-order ODEs dy/dx = F(x, y) are supported",
+    "derivativeOnLeft": "write the derivative on the left: dy/dx = F(x, y)",
+    "surfaceNeeds3D": "z = f(x, y) surfaces need 3D (deferred by decision D3)",
+    "chainedComparison": "chained comparisons are only supported as restrictions {a < x < b}",
+    "points3D": "3D points need decision D3",
+    "pairsOnly": "only (x, y) pairs are supported",
+    "pairVariables": "a pair cannot use x or y; use t for parametric curves",
+    "complexMapDeferred": "w = f(z) complex maps are deferred by decision D2",
+    "yNeedsEquation": "an expression in y needs an equation, for example x = g(y) or F(x, y) = 0",
+    "zEquation": "equations in z need 3D or complex mode (decisions D2, D3)",
+    "equationNeedsXY": "an equation needs x or y to plot",
+    "malformedMatrix": "malformed matrix",
+    "malformedRow": "malformed matrix row",
+    "matrixSizeV1": "only 2×2 and 3×3 matrices are supported in v1",
+    "unknownsColumn": "write the unknowns as a column, for example [x; y]",
+    "rightSideColumn": "the right side of A x = b must be a column",
+    "systemSizeV1": "only 2×2 and 3×3 systems are supported in v1",
+    "rightSideEntries": "the right side needs {{n}} entries, one per unknown",
+    "unknownNames": "the unknowns must be names, for example x, y",
+    "unknownOnce": "each unknown may appear only once",
+    "rightSideUnknowns": "the right side cannot contain the unknowns",
+    "needsMatrixA": "A x = b needs a matrix A",
+    "matrixAsize": "A must be {{n}}×{{n}} for {{n}} unknowns",
+    "matrixUnknowns": "the matrix cannot contain the unknowns",
+    "systemShape": "a system needs 2 equations in x, y or 3 equations in x, y, z",
+    "strayUnknown": "a system of {{count}} equations uses only {{unknowns}}; {{stray}} is not allowed",
+    "qrNoConvergence": "QR iteration did not converge"
+  },
+  "categories": {
+    "navLabel": "Math categories",
+    "heading": "Categories",
+    "home": "Expressions",
+    "graphing": {
+      "title": "Graphing",
+      "blurb": "Explicit, implicit, inequalities, parametric and polar curves."
+    },
+    "calculus": {
+      "title": "Calculus",
+      "blurb": "Derivative with its tangent, definite integral with its area."
+    },
+    "algebra": {
+      "title": "Algebra",
+      "blurb": "Only what exists: the zeros of a curve."
+    },
+    "linearSystems": {
+      "title": "Linear systems",
+      "blurb": "Equation systems and Gauss-Jordan elimination."
+    },
+    "linearAlgebra": {
+      "title": "Linear algebra",
+      "blurb": "$2\\times2$ and $3\\times3$ matrices: determinant, inverse, eigenvalues."
+    },
+    "unsupported": {
+      "surface3d": "Surfaces $z=f(x,y)$: not yet supported.",
+      "indefiniteIntegral": "Indefinite integrals $\\int f(x)\\,dx$ as a formula: not yet supported (without bounds, $a$ and $b$ become sliders).",
+      "symbolicDerivative": "Symbolic derivatives (the formula of $f'$): not yet supported; $f'$ is computed numerically.",
+      "solve": "solve: not yet supported.",
+      "simplify": "simplify: not yet supported.",
+      "factor": "factor: not yet supported.",
+      "systemBeyond3": "Systems with more than 3 unknowns: not yet supported.",
+      "matrixBeyond3": "General $n\\times n$ matrices ($n>3$): not yet supported.",
+      "transpose": "Transpose $A^T$: not yet supported."
+    }
+  },
+  "template": {
+    "title": "Template",
+    "sample": "Sample",
+    "add": "Add to graph",
+    "added": "Sample added.",
+    "close": "Close template",
+    "worksNow": "Works now",
+    "notYet": "Not yet supported",
+    "runs": "This sample runs as shipped."
+  },
+  "samples": {
+    "explicit": {
+      "title": "Explicit curve",
+      "explain": "$y=f(x)$. A letter that is not defined, like $a$, becomes a slider: drag it to change the curve."
+    },
+    "implicit": {
+      "title": "Implicit curve",
+      "explain": "$F(x,y)=0$: the circle of radius 2, drawn by marching squares."
+    },
+    "inequality": {
+      "title": "Inequality",
+      "explain": "The region $y>x^2-2$ is shaded; the boundary is dashed because the inequality is strict."
+    },
+    "parametric": {
+      "title": "Parametric curve",
+      "explain": "$(x(t),y(t))$. Only $t$ is the parameter; it runs over a range chosen from the view."
+    },
+    "polar": {
+      "title": "Polar curve",
+      "explain": "$r=f(\\theta)$: a cardioid."
+    },
+    "derivative": {
+      "title": "Derivative and tangent",
+      "explain": "Draws $f'$ and the tangent of $f$ at $x_0$. Without a defined $x_0$, one slider $x_0$ is created. Drag the point or the slider."
+    },
+    "integral": {
+      "title": "Definite integral",
+      "explain": "Shades the area between $f$ and the $x$-axis from $a$ to $b$ and shows the value: $\\int_0^1 x^2\\,dx=\\tfrac13$. A missing bound becomes a slider $a$ or $b$."
+    },
+    "zeros": {
+      "title": "Zeros of a curve",
+      "explain": "The text description of the graph lists where the curve crosses zero: here $x=-2$ and $x=2$."
+    },
+    "system2": {
+      "title": "Two equations",
+      "explain": "Two lines; the solution is where they meet, with the Gauss-Jordan steps."
+    },
+    "systemMatrix": {
+      "title": "A x = b",
+      "explain": "A named matrix times the unknowns $[x;y]$ equals a column of constants."
+    },
+    "matrix2": {
+      "title": "2×2 matrix",
+      "explain": "$\\det A$, orientation, eigenvalues, inverse with steps, and the transformed grid. The second line reads $\\det(A)$ from the report."
+    },
+    "matrix3": {
+      "title": "3×3 matrix",
+      "explain": "A diagonal matrix: $\\det=24$, eigenvalues $2,3,4$. Turn on the 3D view to see the image of the unit cube."
+    }
+  },
+  "classify": {
+    "label": "Kind of statement",
+    "interpretAs": "Interpret as:",
+    "slider": "slider",
+    "input": "input variable",
+    "function": "function definition",
+    "matrix": "constant matrix",
+    "output": "output",
+    "unknown": "unknown",
+    "choice": {
+      "slider": "slider",
+      "constant": "constant",
+      "input": "input",
+      "line": "line"
+    },
+    "why": {
+      "slider": "A name equal to a number is a slider.",
+      "capitalScalar": "A capital letter equal to a number can be a slider or a constant.",
+      "xAssigned": "$x$ is an input variable. The engine reads $x=3$ as the vertical line; choose input to hide it.",
+      "tAssigned": "$t$ is the input variable of parametric curves and cannot be assigned. Use another name for a slider.",
+      "function": "A later use of the name calls this function.",
+      "matrix": "A named matrix is a constant. Edit its entries below.",
+      "matrixLiteral": "A matrix without a name.",
+      "definedValue": "A value computed from other names.",
+      "output": "Drawn or computed.",
+      "unknown": "Not understood: see the message.",
+      "pending": "Waiting for the engine."
+    },
+    "inputHidden": "Hidden: $x$ and $t$ are input variables.",
+    "constantNote": "Constant: no slider."
+  },
+  "calc": {
+    "tangentAt": "Tangent at the point $x_0$. Drag the point or the slider $x_0$.",
+    "integralBounds": "A missing bound is a slider: $a$ and $b$.",
+    "area": "Area",
+    "notFraction": "≈"
+  },
+  "matrixOps": {
+    "transpose": "Transpose is not supported yet.",
+    "singular": "No inverse: the matrix is singular.",
+    "notMatrix": "\"{{name}}\" is not a matrix defined in this graph."
+  },
+  "matrixEditor": {
+    "label": "Entries of {{name}}",
+    "entry": "{{name}}, row {{r}}, column {{c}}",
+    "symbolic": "Entries with letters can be edited in the expression above."
+  },
+  "color": {
+    "change": "Color of expression {{n}}",
+    "current": "Current color: {{name}}",
+    "pick": "Choose color {{name}}",
+    "palette": "Curve colors"
+  },
+  "palette": {
+    "blue": "blue",
+    "red": "red",
+    "violet": "violet",
+    "pink": "pink",
+    "sky": "sky blue",
+    "indigo": "indigo",
+    "ink": "ink",
+    "gray": "gray",
+    "custom": "custom"
+  },
+  "shortcuts": {
+    "open": "Keyboard shortcuts (?)",
+    "title": "Keyboard shortcuts",
+    "close": "Close",
+    "key": "Key",
+    "action": "Action",
+    "rows": {
+      "tab": "Move between controls",
+      "arrows": "Up / Down in an expression: go to the previous / next expression",
+      "enter": "Add a new expression below",
+      "escape": "Leave the input (focus returns to the row); close this panel",
+      "help": "Open this panel (when no input has focus)",
+      "canvasPan": "On the graph: pan (2D) or orbit (3D)",
+      "canvasZoom": "On the graph: zoom in / out",
+      "slider": "On a slider: change the value; Home / End: ends of the range"
+    }
+  },
+  "skipToGraph": "Skip to the graph"
+}

@@ -32,6 +32,7 @@ const CARD_ICON_SLUGS = new Set([
   "digital-logic-design",
   "arduino-studio",
   "pneumatics-and-hydraulics",
+  "mathcore",
 ]);
 
 export interface PracticalSimulationsProps {
@@ -97,6 +98,7 @@ export default function PracticalSimulations({
         { id: "systems-control", label: "التحكم والأنظمة" },
         { id: "circuits-power", label: "الدوائر والقدرة" },
         { id: "embedded-software", label: "الأنظمة المدمجة والبرمجة" },
+        { id: "mathematics", label: "الرياضيات" },
       ];
     }
     if (locale === "es") {
@@ -105,6 +107,7 @@ export default function PracticalSimulations({
         { id: "systems-control", label: "Sistemas y Control" },
         { id: "circuits-power", label: "Circuitos y Potencia" },
         { id: "embedded-software", label: "Embebidos y Código" },
+        { id: "mathematics", label: "Matemáticas" },
       ];
     }
     return [
@@ -112,6 +115,7 @@ export default function PracticalSimulations({
       { id: "systems-control", label: "Systems & Control" },
       { id: "circuits-power", label: "Circuits & Power" },
       { id: "embedded-software", label: "Embedded & Code" },
+      { id: "mathematics", label: "Mathematics" },
     ];
   }, [locale]);
 

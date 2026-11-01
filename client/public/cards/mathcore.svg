@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="881" height="705" viewBox="0 0 660.75 528.75" preserveAspectRatio="xMidYMid meet" version="1.0">
+  <!-- Math Core: axes, a sine curve, a tangent with its slope triangle, and the traced point. Used as a mask. -->
+  <g fill="none" stroke="#000" stroke-width="12" stroke-linejoin="round" stroke-linecap="round">
+    <!-- axes with arrow heads -->
+    <path d="M60 264H600M580 244l20 20-20 20"/>
+    <path d="M300 480V50M280 70l20-20 20 20"/>
+    <!-- sin(x) -->
+    <path d="M70 264C110 100 170 100 210 264S310 428 350 264S450 100 490 264S560 400 590 330"/>
+    <!-- tangent at the peak-side point -->
+    <path d="M385 120L585 400" stroke-width="9"/>
+  </g>
+  <g fill="none" stroke="#000" stroke-width="8" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="14 16">
+    <!-- slope triangle: run, then rise -->
+    <path d="M430 250H520V376"/>
+  </g>
+  <!-- traced point and tick marks -->
+  <g fill="#000" stroke="none">
+    <circle cx="430" cy="250" r="20"/>
+    <rect x="196" y="252" width="12" height="24" rx="6"/>
+    <rect x="344" y="252" width="12" height="24" rx="6"/>
+    <rect x="288" y="150" width="24" height="12" rx="6"/>
+  </g>
+</svg>

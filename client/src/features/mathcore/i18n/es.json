@@ -1,0 +1,340 @@
+{
+  "title": "Gráficas Math Core",
+  "subtitle": "Escribe una expresión. Las letras sin definir se convierten en deslizadores.",
+  "expressions": "Expresiones",
+  "addExpression": "Añadir expresión",
+  "removeExpression": "Eliminar la expresión {{n}}",
+  "expressionLabel": "Expresión {{n}}",
+  "placeholder": "y = a\\sin(x)",
+  "loadingEngine": "Cargando el motor matemático…",
+  "engineRestarted": "El cálculo tardó más de 5 segundos y se detuvo.",
+  "engineError": "Error del motor: {{message}}",
+  "parameters": "Deslizadores",
+  "play": "Animar {{name}}",
+  "pause": "Pausar {{name}}",
+  "min": "Mínimo",
+  "max": "Máximo",
+  "step": "Paso",
+  "value": "Valor de {{name}}",
+  "share": "Copiar enlace",
+  "linkCopied": "Enlace copiado",
+  "linkTooLarge": "Demasiado grande para compartir como enlace. Usa la exportación JSON.",
+  "exportPng": "PNG",
+  "exportSvg": "SVG",
+  "exportJson": "JSON",
+  "importJson": "Importar JSON",
+  "importFailed": "Ese archivo no es una gráfica válida.",
+  "resetView": "Restablecer vista",
+  "zoomIn": "Acercar",
+  "zoomOut": "Alejar",
+  "trace": "Trazar",
+  "tangentAt": "Tangente en x = {{x}}: pendiente f′(x) = {{slope}}",
+  "precision": "Los valores mayores que 10⁸ pierden precisión en doble precisión.",
+  "notYet": "Los elementos {{kind}} se dibujan a partir de la fase {{phase}}.",
+  "kindWarning": "{{message}}",
+  "graphLabel": "Gráfica. Usa las flechas para desplazar y más o menos para el zoom.",
+  "descriptions": "Descripción textual de la gráfica",
+  "describe": {
+    "hidden": "{{label}}: no visible en esta vista.",
+    "pieces_one": "{{label}}: una pieza de x = {{from}} a {{to}}",
+    "pieces_other": "{{label}}: {{count}} piezas de x = {{from}} a {{to}}",
+    "zeros": "cruza el cero en x = {{list}}",
+    "noZeros": "sin ceros en la vista",
+    "maxima": "máximos locales cerca de {{list}}",
+    "minima": "mínimos locales cerca de {{list}}",
+    "extent_one": "{{label}}: una pieza que abarca x de {{xmin}} a {{xmax}} y y de {{ymin}} a {{ymax}}",
+    "extent_other": "{{label}}: {{count}} piezas que abarcan x de {{xmin}} a {{xmax}} y y de {{ymin}} a {{ymax}}",
+    "region": "{{label}}: la región sombreada cubre cerca del {{percent}}% de la vista",
+    "regionAll": "{{label}}: la región sombreada llena toda la vista",
+    "regionNone": "{{label}}: no hay región sombreada en esta vista",
+    "boundary": "su borde abarca x de {{xmin}} a {{xmax}} y y de {{ymin}} a {{ymax}}",
+    "matrix": "{{label}}: matriz con determinante {{det}}, {{orientation}}; valores propios {{eigen}}.",
+    "systemUnique": "{{label}}: sistema lineal con solución única {{solution}}.",
+    "systemNone": "{{label}}: sistema lineal sin solución.",
+    "systemInfinite": "{{label}}: sistema lineal con infinitas soluciones."
+  },
+  "value_is": "= {{value}}",
+  "benchmarks": "Ejecutar mediciones",
+  "benchHeader": "Mediciones en este dispositivo (STEPS.md §7.2)",
+  "evaluations": "{{count}} evaluaciones; la última actualización reevaluó {{changed}}",
+  "linkInvalid": "Este enlace no es una gráfica válida, así que se muestra una nueva. La dirección se conserva hasta que edites.",
+  "benchPass": "Cumple",
+  "benchFail": "No cumple",
+  "showSteps": "Mostrar pasos",
+  "linalg": {
+    "loading": "Cargando el informe de la matriz…",
+    "orientation_kept": "orientación conservada",
+    "orientation_reversed": "orientación invertida",
+    "orientation_singular": "matriz singular",
+    "eigenvalues": "Valores propios",
+    "eigenvectors": "Direcciones propias",
+    "rotation": "Valores propios complejos α ± iβ: no hay dirección propia real. En la base de las partes real e imaginaria de un vector propio, la matriz gira θ = {{angle}}° y escala por r = {{scale}}.",
+    "stepsInverse": "Gauss-Jordan sobre [{{name}} | I] (inversa)",
+    "stepsSystem": "Gauss-Jordan sobre [A | b]",
+    "noInverse": "Sin inversa: la matriz es singular (rango {{rank}}).",
+    "solution": "Solución",
+    "noSolution": "Sin solución (sistema incompatible, rango de A = {{rank}})",
+    "infinite": "Infinitas soluciones (rango {{rank}})",
+    "planes3d": "Activa la vista 3D para ver los tres planos y dónde se cortan.",
+    "matrix3d": "Activa la vista 3D para ver la imagen del cubo unidad.",
+    "panelFailed": "No se pudo cargar el informe de la matriz. Revisa la conexión y recarga la página."
+  },
+  "view3d": "Vista 3D",
+  "view3dNote": "Vista 3D: matrices y sistemas 3×3. Arrastra para girar y desplaza para acercar. Las curvas y regiones se dibujan en la vista 2D.",
+  "graphLabel3d": "Gráfico 3D. Usa las flechas para girar y más o menos para acercar.",
+  "errors": {
+    "tooLong": "La expresión supera los {{max}} caracteres",
+    "invalidExpression": "Expresión no válida",
+    "nodeLimit": "La expresión tiene {{nodes}} nodos; el límite es {{max}}",
+    "unrecognized": "Expresión no reconocida",
+    "unexpectedText": "Texto inesperado «{{text}}»",
+    "complexNumbers": "Los números complejos aún no están disponibles (decisión D2)",
+    "unsupportedForm": "Forma de función no admitida",
+    "unsupportedOperation": "Operación no admitida: {{name}}",
+    "arity": "{{fn}} espera {{count}} argumento(s)",
+    "emptyParens": "Paréntesis vacíos",
+    "wrongArgCount": "{{fn}} tiene un número incorrecto de argumentos",
+    "emptyExpression": "Expresión vacía",
+    "powerArity": "La potencia espera 2 argumentos",
+    "primeNeedsName": "La notación prima necesita un nombre de variable",
+    "derivativeNeedsVariable": "La derivada necesita una variable",
+    "derivativeVariableName": "La variable de la derivada debe ser un nombre",
+    "matrixRowsMissing": "Faltan las filas de la matriz",
+    "matrixRowNotList": "Una fila de la matriz no es una lista",
+    "integralLimits": "Solo se admiten integrales definidas con ambos límites",
+    "needsIndexLimits": "{{name}} necesita un índice y ambos límites",
+    "undefinedSymbol": "Símbolo no definido: {{name}}",
+    "needsArguments": "{{fn}} necesita argumentos",
+    "notNumeric": "No se puede evaluar {{fn}} como número",
+    "wrongArity": "{{fn}} espera {{count}} argumento(s)",
+    "comparisonSides": "Una comparación necesita dos lados",
+    "derivativeVariableUndefined": "La variable de la derivada {{name}} no está definida aquí",
+    "indexName": "El índice de {{fn}} debe ser un nombre",
+    "integrationVariableName": "La variable de integración debe ser un nombre",
+    "functionName": "El nombre de la función debe ser un símbolo",
+    "undefinedFunction": "Función no definida: {{name}}",
+    "userFunctionArity": "{{name}} espera {{count}} argumento(s)",
+    "recursionDepth": "Las llamadas a funciones se anidan más de {{max}} niveles (¿definición recursiva?)",
+    "entryNotFinite": "Un elemento de la matriz o del lado derecho no es un número finito",
+    "matrixError": "La matriz «{{name}}» tiene un error",
+    "notMatrix": "«{{name}}» no es una matriz definida en esta gráfica",
+    "unknownCountMismatch": "«{{name}}» es de {{size}}×{{size}} pero hay {{unknowns}} incógnitas",
+    "equationUndefinedAtZero": "La ecuación {{n}} no está definida en 0",
+    "equationNotLinear": "La ecuación {{n}} no es lineal en {{unknowns}}",
+    "circularDefinition": "Definición circular: {{cycle}}",
+    "definedTwice": "«{{name}}» está definido más de una vez",
+    "dependsOnCycle": "Depende de una definición circular",
+    "tooManyParams": "Demasiados parámetros (límite {{max}}); «{{name}}» no está definido",
+    "notParsed": "Sin analizar",
+    "inferenceFailed": "falló la inferencia: {{detail}}",
+    "needsEquation": "{{name}} por sí solo necesita una ecuación",
+    "malformedFunction": "definición de función mal formada",
+    "functionParamNames": "los parámetros de la función deben ser nombres",
+    "selfDerivative": "una variable no puede derivarse respecto de sí misma",
+    "firstOrderOnly": "solo se admiten EDO de primer orden dy/dx = F(x, y)",
+    "derivativeOnLeft": "escribe la derivada a la izquierda: dy/dx = F(x, y)",
+    "surfaceNeeds3D": "las superficies z = f(x, y) necesitan 3D (aplazado por la decisión D3)",
+    "chainedComparison": "las comparaciones encadenadas solo se admiten como restricciones {a < x < b}",
+    "points3D": "los puntos 3D necesitan la decisión D3",
+    "pairsOnly": "solo se admiten pares (x, y)",
+    "pairVariables": "un par no puede usar x o y; usa t para curvas paramétricas",
+    "complexMapDeferred": "los mapas complejos w = f(z) están aplazados por la decisión D2",
+    "yNeedsEquation": "una expresión en y necesita una ecuación, por ejemplo x = g(y) o F(x, y) = 0",
+    "zEquation": "las ecuaciones en z necesitan 3D o modo complejo (decisiones D2 y D3)",
+    "equationNeedsXY": "una ecuación necesita x o y para trazarla",
+    "malformedMatrix": "matriz mal formada",
+    "malformedRow": "fila de matriz mal formada",
+    "matrixSizeV1": "solo se admiten matrices de 2×2 y 3×3 en la versión 1",
+    "unknownsColumn": "escribe las incógnitas como columna, por ejemplo [x; y]",
+    "rightSideColumn": "el lado derecho de A x = b debe ser una columna",
+    "systemSizeV1": "solo se admiten sistemas de 2×2 y 3×3 en la versión 1",
+    "rightSideEntries": "el lado derecho necesita {{n}} elementos, uno por incógnita",
+    "unknownNames": "las incógnitas deben ser nombres, por ejemplo x, y",
+    "unknownOnce": "cada incógnita puede aparecer solo una vez",
+    "rightSideUnknowns": "el lado derecho no puede contener las incógnitas",
+    "needsMatrixA": "A x = b necesita una matriz A",
+    "matrixAsize": "A debe ser de {{n}}×{{n}} para {{n}} incógnitas",
+    "matrixUnknowns": "la matriz no puede contener las incógnitas",
+    "systemShape": "un sistema necesita 2 ecuaciones en x, y o 3 ecuaciones en x, y, z",
+    "strayUnknown": "un sistema de {{count}} ecuaciones usa solo {{unknowns}}; {{stray}} no está permitido",
+    "qrNoConvergence": "la iteración QR no convergió"
+  },
+  "categories": {
+    "navLabel": "Categorías de matemáticas",
+    "heading": "Categorías",
+    "home": "Expresiones",
+    "graphing": {
+      "title": "Gráficas",
+      "blurb": "Curvas explícitas, implícitas, desigualdades, paramétricas y polares."
+    },
+    "calculus": {
+      "title": "Cálculo",
+      "blurb": "Derivada con su tangente, integral definida con su área."
+    },
+    "algebra": {
+      "title": "Álgebra",
+      "blurb": "Solo lo que existe: los ceros de una curva."
+    },
+    "linearSystems": {
+      "title": "Sistemas lineales",
+      "blurb": "Sistemas de ecuaciones y eliminación de Gauss-Jordan."
+    },
+    "linearAlgebra": {
+      "title": "Álgebra lineal",
+      "blurb": "Matrices $2\\times2$ y $3\\times3$: determinante, inversa, valores propios."
+    },
+    "unsupported": {
+      "surface3d": "Superficies $z=f(x,y)$: aún no disponible.",
+      "indefiniteIntegral": "Integrales indefinidas $\\int f(x)\\,dx$ como fórmula: aún no disponible (sin límites, $a$ y $b$ son deslizadores).",
+      "symbolicDerivative": "Derivadas simbólicas (la fórmula de $f'$): aún no disponible; $f'$ se calcula numéricamente.",
+      "solve": "solve: aún no disponible.",
+      "simplify": "simplify: aún no disponible.",
+      "factor": "factor: aún no disponible.",
+      "systemBeyond3": "Sistemas con más de 3 incógnitas: aún no disponible.",
+      "matrixBeyond3": "Matrices $n\\times n$ generales ($n>3$): aún no disponible.",
+      "transpose": "Transpuesta $A^T$: aún no disponible."
+    }
+  },
+  "template": {
+    "title": "Plantilla",
+    "sample": "Ejemplo",
+    "add": "Añadir a la gráfica",
+    "added": "Ejemplo añadido.",
+    "close": "Cerrar plantilla",
+    "worksNow": "Funciona ahora",
+    "notYet": "Aún no disponible",
+    "runs": "Este ejemplo funciona tal cual."
+  },
+  "samples": {
+    "explicit": {
+      "title": "Curva explícita",
+      "explain": "$y=f(x)$. Una letra sin definir, como $a$, se convierte en un deslizador: muévelo para cambiar la curva."
+    },
+    "implicit": {
+      "title": "Curva implícita",
+      "explain": "$F(x,y)=0$: la circunferencia de radio 2."
+    },
+    "inequality": {
+      "title": "Desigualdad",
+      "explain": "Se sombrea la región $y>x^2-2$; el borde es discontinuo porque la desigualdad es estricta."
+    },
+    "parametric": {
+      "title": "Curva paramétrica",
+      "explain": "$(x(t),y(t))$. Solo $t$ es el parámetro."
+    },
+    "polar": {
+      "title": "Curva polar",
+      "explain": "$r=f(\\theta)$: una cardioide."
+    },
+    "derivative": {
+      "title": "Derivada y tangente",
+      "explain": "Dibuja $f'$ y la tangente de $f$ en $x_0$. Si $x_0$ no está definido, se crea un deslizador $x_0$. Arrastra el punto o el deslizador."
+    },
+    "integral": {
+      "title": "Integral definida",
+      "explain": "Sombrea el área entre $f$ y el eje $x$ de $a$ a $b$ y muestra el valor: $\\int_0^1 x^2\\,dx=\\tfrac13$. Un límite ausente se convierte en un deslizador $a$ o $b$."
+    },
+    "zeros": {
+      "title": "Ceros de una curva",
+      "explain": "La descripción en texto de la gráfica indica dónde la curva cruza cero: aquí $x=-2$ y $x=2$."
+    },
+    "system2": {
+      "title": "Dos ecuaciones",
+      "explain": "Dos rectas; la solución es donde se cortan, con los pasos de Gauss-Jordan."
+    },
+    "systemMatrix": {
+      "title": "A x = b",
+      "explain": "Una matriz con nombre por las incógnitas $[x;y]$ es igual a una columna de constantes."
+    },
+    "matrix2": {
+      "title": "Matriz 2×2",
+      "explain": "$\\det A$, orientación, valores propios, inversa con pasos y la cuadrícula transformada. La segunda línea lee $\\det(A)$ del informe."
+    },
+    "matrix3": {
+      "title": "Matriz 3×3",
+      "explain": "Una matriz diagonal: $\\det=24$, valores propios $2,3,4$. Activa la vista 3D para ver la imagen del cubo unidad."
+    }
+  },
+  "classify": {
+    "label": "Tipo de enunciado",
+    "interpretAs": "Interpretar como:",
+    "slider": "deslizador",
+    "input": "variable de entrada",
+    "function": "definición de función",
+    "matrix": "matriz constante",
+    "output": "resultado",
+    "unknown": "desconocido",
+    "choice": {
+      "slider": "deslizador",
+      "constant": "constante",
+      "input": "entrada",
+      "line": "recta"
+    },
+    "why": {
+      "slider": "Un nombre igual a un número es un deslizador.",
+      "capitalScalar": "Una mayúscula igual a un número puede ser un deslizador o una constante.",
+      "xAssigned": "$x$ es una variable de entrada. El motor lee $x=3$ como la recta vertical; elige entrada para ocultarla.",
+      "tAssigned": "$t$ es la variable de entrada de las curvas paramétricas y no se puede asignar. Usa otro nombre para un deslizador.",
+      "function": "Un uso posterior del nombre llama a esta función.",
+      "matrix": "Una matriz con nombre es constante. Edita sus entradas abajo.",
+      "matrixLiteral": "Una matriz sin nombre.",
+      "definedValue": "Un valor calculado a partir de otros nombres.",
+      "output": "Dibujado o calculado.",
+      "unknown": "No entendido: mira el mensaje.",
+      "pending": "Esperando al motor."
+    },
+    "inputHidden": "Oculto: $x$ y $t$ son variables de entrada.",
+    "constantNote": "Constante: sin deslizador."
+  },
+  "calc": {
+    "tangentAt": "Tangente en el punto $x_0$. Arrastra el punto o el deslizador $x_0$.",
+    "integralBounds": "Un límite ausente es un deslizador: $a$ y $b$.",
+    "area": "Área",
+    "notFraction": "≈"
+  },
+  "matrixOps": {
+    "transpose": "La transpuesta aún no está disponible.",
+    "singular": "Sin inversa: la matriz es singular.",
+    "notMatrix": "\"{{name}}\" no es una matriz definida en esta gráfica."
+  },
+  "matrixEditor": {
+    "label": "Entradas de {{name}}",
+    "entry": "{{name}}, fila {{r}}, columna {{c}}",
+    "symbolic": "Las entradas con letras se editan en la expresión de arriba."
+  },
+  "color": {
+    "change": "Color de la expresión {{n}}",
+    "current": "Color actual: {{name}}",
+    "pick": "Elegir el color {{name}}",
+    "palette": "Colores de curvas"
+  },
+  "palette": {
+    "blue": "azul",
+    "red": "rojo",
+    "violet": "violeta",
+    "pink": "rosa",
+    "sky": "celeste",
+    "indigo": "índigo",
+    "ink": "tinta",
+    "gray": "gris",
+    "custom": "personalizado"
+  },
+  "shortcuts": {
+    "open": "Atajos de teclado (?)",
+    "title": "Atajos de teclado",
+    "close": "Cerrar",
+    "key": "Tecla",
+    "action": "Acción",
+    "rows": {
+      "tab": "Moverse entre controles",
+      "arrows": "Arriba / Abajo en una expresión: ir a la expresión anterior / siguiente",
+      "enter": "Añadir una expresión debajo",
+      "escape": "Salir del campo (el foco vuelve a la fila); cerrar este panel",
+      "help": "Abrir este panel (cuando ningún campo tiene el foco)",
+      "canvasPan": "En la gráfica: desplazar (2D) u orbitar (3D)",
+      "canvasZoom": "En la gráfica: acercar / alejar",
+      "slider": "En un deslizador: cambiar el valor; Home / End: extremos del rango"
+    }
+  },
+  "skipToGraph": "Ir a la gráfica"
+}

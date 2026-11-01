@@ -31,12 +31,12 @@ export const homeGatewayMeta: HomeGatewayMeta[] = [
   { href: "/simulations", index: "03", type: "simulations", visualVariant: 5, accent: "from-indigo-600 via-cyan-500 to-violet-600" },
 ];
 
-export type SimulationCategory = 'systems-control' | 'circuits-power' | 'embedded-software';
+export type SimulationCategory = 'systems-control' | 'circuits-power' | 'embedded-software' | 'mathematics';
 
 export interface SimulationItem {
   id: string;
   title: string;
-  category: 'systems-control' | 'circuits-power' | 'embedded-software';
+  category: SimulationCategory;
   description: string;
   isFeatured?: boolean; // For "Hot / Special"
   createdAt: string;     // ISO date for "Newest"
@@ -140,6 +140,17 @@ export const simulationsCatalog: SimulationItemMeta[] = [
     isFeatured: false,
     badge: "NEW",
     createdAt: "2026-10-03T00:00:00Z",
+  },
+  {
+    id: "mathcore",
+    slug: "mathcore",
+    index: 10,
+    category: "mathematics",
+    visualVariant: 5,
+    href: "/mathcore",
+    isFeatured: false,
+    badge: "NEW",
+    createdAt: "2026-10-30T00:00:00Z",
   },
 ];
 

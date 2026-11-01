@@ -1,0 +1,699 @@
+/**
+ * Math Core graphing page (route /mathcore). Phases 1–2 of STEPS.md §11: expression list, sliders, Canvas renderer,
+ * route-level lazy loading, Graph IR as the single state (ADR-9) in the link (?g=), PNG/SVG/JSON export and text
+ * descriptions. Compute Engine, parsing and sampling live in the engine Worker (ADR-1, ADR-11, ADR-12).
+ */
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { buildSvg } from "@shared/mathcore/export/svg";
+import { LINK_PARAM, decodeGraph, encodeGraph, exportJson, importJson } from "@shared/mathcore/ir/codec";
+import type { Camera3, GraphIR, Item, Param, Viewport } from "@shared/mathcore/ir/types";
+import { DEFAULT_VIEWPORT, emptyGraph } from "@shared/mathcore/ir/types";
+import { CANVAS_FALLBACK, DEFAULT_CURVE_WIDTH, LINK_DEBOUNCE_MS, PARSE_DEBOUNCE_MS, PARSE_RETRY_LIMIT, PARSE_RETRY_MAX_MS, PARSE_RETRY_MS } from "@shared/mathcore/constants";
+import { NS } from "../i18n/register";
+import type { DrawCurve, DrawField, DrawPoint, DrawTransform, Scene } from "../render/renderer";
+import { LINALG_TOKENS, SCENE3_TOKENS, cssRgb, resolveColor } from "../render/renderer";
+import { classifyStatement, effectiveInterpretation } from "@shared/mathcore/classify/classify";
+import type { Classification, Interpretation } from "@shared/mathcore/classify/classify";
+import { deriveHelpers, parseCalculus } from "@shared/mathcore/classify/derive";
+import type { CategoryId, Sample } from "./categories";
+import { CATEGORIES, STARTER_ID, STARTER_LATEX } from "./categories";
+import { CategorySidebar, TemplatePanel } from "./CategorySidebar";
+import { CURVE_PALETTE, defaultColorId } from "./curvePalette";
+import { describeItem, describeLinalg } from "./describeText";
+import type { CalcReadout } from "./ExpressionRow";
+import { ExpressionRow } from "./ExpressionRow";
+import { matrixOpResult, parseMatrixOp } from "./matrixOps";
+import { ShortcutsPanel } from "./ShortcutsPanel";
+import type { DraggablePoint, TraceTarget } from "./GraphCanvas";
+import { GraphCanvas } from "./GraphCanvas";
+import { SliderRow } from "./SliderRow";
+import type { EngineClient, WorkerLike } from "../workers/engineClient";
+import { createEngineClient } from "../workers/engineClient";
+import type { ParseClient, ParseWorkerLike } from "../workers/parseClient";
+import { createParseClient } from "../workers/parseClient";
+import type { EngineResponse, ItemResult, ViewRequest } from "../workers/protocol";
+import { mergeParams } from "./mergeParams";
+import "../mathcore.css";
+
+
+/** Theory section (STEPS.md §4, repo rule: every studio has one); loaded after the graph is usable. */
+const SimulationDocumentation = lazy(() => import("@/components/simulations/SimulationDocumentation"));
+
+type Result = Extract<EngineResponse, { type: "result" }>;
+type Trace = Extract<EngineResponse, { type: "trace" }>;
+
+/** Id infix of helper items (`<id>~tangent`); reader ids never contain it. */
+const HELPER_MARK = "~";
+
+let idCounter = 0;
+const newId = () => `e${Date.now().toString(36)}${(idCounter++).toString(36)}`;
+
+/** The graph in the address, or a starter graph; `invalid` when a `?g=` was present but could not be read. */
+function initialGraph(): { graph: GraphIR; invalid: boolean } {
+  const encoded = new URLSearchParams(window.location.search).get(LINK_PARAM);
+  let invalid = false;
+  if (encoded) {
+    const r = decodeGraph(encoded);
+    if (r.ok) return { graph: r.graph, invalid: false };
+    invalid = true;
+  }
+  return { graph: { ...emptyGraph(), items: [{ id: STARTER_ID, latex: STARTER_LATEX }] }, invalid };
+}
+
+/** The reader's lines plus the helper items the engine needs for tangents and integrals (Part D); never stored. */
+function withHelpers(items: Item[]): Item[] {
+  return [...items, ...deriveHelpers(items, defaultColorId).map((h) => h.item)];
+}
+
+/** What the engine must be reloaded for: the lines and the slider ranges (values travel as `param` requests). */
+function documentKey(g: GraphIR): string {
+  return JSON.stringify([g.items, Object.entries(g.params).sort(([a], [b]) => a.localeCompare(b)).map(([k, p]) => [k, p.min, p.max, p.step])]);
+}
+
+function download(name: string, blob: Blob) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+export default function MathcorePage() {
+  const { t, i18n } = useTranslation(NS);
+  const [initial] = useState(initialGraph);
+  const [graph, setGraph] = useState<GraphIR>(initial.graph);
+  const [linkNotice] = useState<string | null>(initial.invalid ? t("linkInvalid") : null);
+  const [themeTick, setThemeTick] = useState(0);
+  const traceAt = useRef<{ id: string; x: number } | null>(null);
+  const [result, setResult] = useState<Result | null>(null);
+  const [trace, setTrace] = useState<Trace | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [bench, setBench] = useState<unknown>(null);
+  const [linkTooLarge, setLinkTooLarge] = useState(false);
+  const [canvasEl, setCanvasEl] = useState<HTMLCanvasElement | null>(null);
+  /** Part B/D UI state: open template, the reader's choices for unclear statements, new row to focus, shortcuts panel. */
+  const [category, setCategory] = useState<CategoryId | null>(null);
+  const [addedSample, setAddedSample] = useState<string | null>(null);
+  const [interp, setInterp] = useState<Record<string, Interpretation>>({});
+  const [focusId, setFocusId] = useState<string | null>(null);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const shortcutsReturn = useRef<HTMLElement | null>(null);
+  const client = useRef<EngineClient | null>(null);
+  const parser = useRef<ParseClient | null>(null);
+  const loadRound = useRef(0);
+  /**
+   * Key (items and slider ranges) of the document the engine holds or is about to hold: set when a document is sent,
+   * then from each answer (only answers to the latest request arrive). Comparing against what was sent, not only
+   * what was answered, means an edit undone before its answer arrives is still sent (Phase 3 re-review defect 1).
+   */
+  const engineKey = useRef("");
+  /** Items of an unrelated document (first load, import, Worker restart): its load tells the engine to forget slider
+   * memory. Compared by identity, so an older round finishing first does not take the flag. */
+  /** Rounds started after this number load a fresh document (first load, import, Worker restart). */
+  const freshAfter = useRef<number | null>(0);
+  /** Sequence of the latest load sent, and of the latest request per slider. */
+  const latestLoadSeq = useRef(0);
+  const paramSeq = useRef(new Map<string, number>());
+  const retry = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const retryDelay = useRef(0);
+  const retries = useRef(0);
+  const sendDocument = useRef<() => void>(() => undefined);
+  const graphRef = useRef(graph);
+  useEffect(() => {
+    graphRef.current = graph;
+  }, [graph]);
+  const size = useRef<{ w: number; h: number }>({ w: CANVAS_FALLBACK.width, h: CANVAS_FALLBACK.height });
+
+  /** Token colors for the 3D frame, as RGB (the Worker has no CSS); refreshed with the theme and the items. */
+  const colors3d = useRef<ViewRequest["colors3d"]>(undefined);
+
+  /** View request from the current document; `patch` carries a change that is not in `graphRef` yet. */
+  const view = useCallback(
+    (quality: "drag" | "full", viewport: Viewport = graphRef.current.viewport, patch: Partial<ViewRequest> = {}): ViewRequest => {
+      const v = graphRef.current.view;
+      return {
+        viewport,
+        width: canvasEl?.clientWidth || size.current.w,
+        height: canvasEl?.clientHeight || size.current.h,
+        quality,
+        mode: v.mode,
+        camera: v.camera,
+        colors3d: colors3d.current,
+        ...patch,
+      };
+    },
+    [canvasEl],
+  );
+
+  useEffect(() => {
+    document.title = t("title");
+  }, [t]);
+
+  useEffect(() => {
+    const c = createEngineClient({
+      createWorker: () =>
+        new Worker(new URL("../workers/mathcore-engine-worker.ts", import.meta.url), { type: "module" }) as unknown as WorkerLike,
+      onResult: (res) => {
+        if (res.type === "result") {
+          setResult(res);
+          setNotice(null);
+          // Sliders moved after this answer's request keep their values (a late load answer must not undo a drag).
+          const moved = new Set(Array.from(paramSeq.current).filter(([, seq]) => seq > res.seq).map(([name]) => name));
+          setGraph((g) => mergeParams(g, res.graph, res.cause, moved));
+          // Only an answer that already holds the latest document may set the engine's key (sliders it created): an
+          // answer to an older request would make an edit undone meanwhile look already sent.
+          if (res.seq >= latestLoadSeq.current) engineKey.current = documentKey(res.graph);
+          // A tangent follows its curve when a slider moves it.
+          if (traceAt.current) c.trace(traceAt.current.id, traceAt.current.x);
+        } else if (res.type === "bench") setBench(res.results);
+        else if (res.type === "error") setNotice(t("engineError", { message: res.message }));
+      },
+      onTrace: setTrace,
+      onRestart: () => {
+        setNotice(t("engineRestarted"));
+        // The new Worker starts empty: parse the current document again and send it as a fresh one.
+        freshAfter.current = loadRound.current;
+        sendDocument.current();
+      },
+    });
+    client.current = c;
+    const p = createParseClient({
+      createWorker: () =>
+        new Worker(new URL("../workers/mathcore-parse-worker.ts", import.meta.url), { type: "module" }) as unknown as ParseWorkerLike,
+    });
+    parser.current = p;
+    return () => {
+      c.dispose();
+      p.dispose();
+    };
+    // One Worker per page visit; `view` reads refs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /**
+   * Parse (parse Worker, 200 ms limit per line), then hand the document and its parsed lines to the engine. The
+   * items sent are exactly the ones parsed (a keystroke during the parse starts its own round); slider values are the
+   * latest. A newer round makes this one stale; only the latest round reaches the engine.
+   */
+  useEffect(() => {
+    sendDocument.current = () => {
+      const round = ++loadRound.current;
+      const items = withHelpers(graphRef.current.items);
+      // The engine is about to hold these items: set now, so undoing an edit while it is still being parsed is a
+      // change again and starts its own round (Phase 3 re-review).
+      engineKey.current = documentKey({ ...graphRef.current, items });
+      clearTimeout(retry.current);
+      void parser.current?.parseAll(items.map((i) => i.latex)).then((parsed) => {
+        if (round !== loadRound.current) return;
+        const doc = { ...graphRef.current, items };
+        // Only the document that was imported or restarted is fresh, not an older round that happens to finish first.
+        // Only a round started after the import (or restart) is the fresh document, not an older one finishing first.
+        const fresh = freshAfter.current !== null && round > freshAfter.current;
+        if (fresh) freshAfter.current = null;
+        latestLoadSeq.current = client.current?.send({ type: "load", graph: doc, parsed, view: view("full"), fresh }) ?? latestLoadSeq.current;
+        // A line that failed for a passing reason (parser offline, crashed, still starting) is parsed again later.
+        // A bounded number of retries (PARSE_RETRY_LIMIT), then the line keeps its error until it is edited.
+        if (Object.values(parsed).some((e) => !e.ok && e.transient) && retries.current < PARSE_RETRY_LIMIT) {
+          retries.current++;
+          retryDelay.current = Math.min(PARSE_RETRY_MAX_MS, retryDelay.current * 2 || PARSE_RETRY_MS);
+          retry.current = setTimeout(() => sendDocument.current(), retryDelay.current);
+        } else if (!Object.values(parsed).some((e) => !e.ok && e.transient)) {
+          retryDelay.current = 0;
+          retries.current = 0;
+        }
+      });
+    };
+  }, [view]);
+
+  // Items or parameter ranges changed: send the document, debounced (STEPS.md §7.1 technique 5).
+  const allItems = useMemo(() => withHelpers(graph.items), [graph.items]);
+  const docKey = useMemo(() => documentKey({ ...graph, items: allItems }), [graph, allItems]);
+  useEffect(() => {
+    // The engine holds or is about to hold this document (for example a slider it just created itself).
+    if (docKey === engineKey.current) return;
+    const id = setTimeout(() => sendDocument.current(), PARSE_DEBOUNCE_MS);
+    return () => clearTimeout(id);
+  }, [docKey, view]);
+
+  // The theme class on <html> decides every token color: repaint when it changes.
+  useEffect(() => {
+    const observer = new MutationObserver(() => setThemeTick((n) => n + 1));
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class", "data-theme"] });
+    return () => observer.disconnect();
+  }, []);
+
+  // The link always carries the full Graph IR (?g=); too large → keep the address bar as it was and say so.
+  // A shared link that could not be read stays in the address bar until the user edits something.
+  useEffect(() => {
+    if (initial.invalid && graph.items === initial.graph.items) return;
+    const id = setTimeout(() => {
+      const enc = encodeGraph(graph);
+      setLinkTooLarge(!enc.ok);
+      if (enc.ok) {
+        const url = new URL(window.location.href);
+        url.searchParams.set(LINK_PARAM, enc.encoded);
+        window.history.replaceState(window.history.state, "", url);
+      }
+    }, LINK_DEBOUNCE_MS);
+    return () => clearTimeout(id);
+  }, [graph, initial]);
+
+  const setItems = (items: Item[]) => setGraph((g) => ({ ...g, items }));
+  const addRow = (after: number) => {
+    const id = newId();
+    setFocusId(id);
+    setItems([...graphRef.current.items.slice(0, after + 1), { id, latex: "" }, ...graphRef.current.items.slice(after + 1)]);
+  };
+
+  /** Adds a template's lines (Part B). A line already in the graph is not added twice; the untouched starter line goes. */
+  const addSample = (sample: Sample) => {
+    setGraph((g) => {
+      const kept = g.items.length === 1 && g.items[0].id === STARTER_ID && g.items[0].latex === STARTER_LATEX ? [] : g.items.filter((it) => it.latex.trim() !== "");
+      const have = new Set(kept.map((it) => it.latex.trim()));
+      const added = sample.items.filter((l) => !have.has(l)).map((latex) => ({ id: newId(), latex }));
+      return { ...g, items: [...kept, ...added] };
+    });
+    setAddedSample(sample.id);
+  };
+
+  const setColor = (id: string, color: string) =>
+    setGraph((g) => ({ ...g, items: g.items.map((it) => (it.id === id ? { ...it, style: { ...it.style, color } } : it)) }));
+
+  const setParam = (name: string, value: number, quality: "drag" | "full") => {
+    setGraph((g) => (g.params[name] ? { ...g, params: { ...g.params, [name]: { ...g.params[name], value } } } : g));
+    const seq = client.current?.send({ type: "param", name, value, view: view(quality) });
+    if (seq !== undefined) paramSeq.current.set(name, seq);
+  };
+
+  const setRange = (name: string, patch: Partial<Param>) =>
+    setGraph((g) => {
+      const p = { ...g.params[name], ...patch };
+      p.value = Math.min(p.max, Math.max(p.min, p.value));
+      return { ...g, params: { ...g.params, [name]: p } };
+    });
+
+  const setViewport = (v: Viewport, quality: "drag" | "full") => {
+    setGraph((g) => ({ ...g, viewport: v }));
+    client.current?.send({ type: "view", view: view(quality, v) });
+  };
+
+  // 3D view (Phase 5): the camera lives in the document (shared by links); undefined means "fit the scene".
+  const setCamera = (camera: Camera3 | undefined, quality: "drag" | "full") => {
+    setGraph((g) => ({ ...g, view: { ...g.view, camera } }));
+    client.current?.send({ type: "view", view: view(quality, undefined, { camera }) });
+  };
+  const setMode = (mode: "2d" | "3d") => {
+    setGraph((g) => ({ ...g, view: { ...g.view, mode } }));
+    client.current?.send({ type: "view", view: view("full", undefined, { mode }) });
+  };
+
+  const results = useMemo(() => new Map((result?.items ?? []).map((r) => [r.id, r])), [result]);
+
+  /** Part D: what each of the reader's lines is, what the reader chose where it was unclear, and what follows from it. */
+  const rowInfo = useMemo(() => {
+    const matrixItems = graph.items.map((it) => ({ it, name: /^\s*([A-Z](?:_\{?\w+\}?)?)\s*=/.exec(it.latex)?.[1] }));
+    return graph.items.map((it) => {
+      const r = results.get(it.id);
+      const op = parseMatrixOp(it.latex);
+      const calc = parseCalculus(it.latex);
+      let classification: Classification = classifyStatement(it.latex, r?.kind);
+      if (op || calc) classification = { class: "output", reason: "output" };
+      const eff = effectiveInterpretation(classification, interp[it.id]);
+      let matrixOp: { latex?: string; message?: string } | undefined;
+      if (op) {
+        const m = matrixItems.find((x) => x.name === op.name);
+        const report = m ? results.get(m.it.id)?.linalg : undefined;
+        const res = matrixOpResult(op, report?.type === "matrix" ? report.analysis : null);
+        matrixOp = res.ok ? { latex: res.latex } : { message: t(`matrixOps.${res.reason}`, { name: op.name }) };
+      }
+      let readout: CalcReadout | undefined;
+      let shown = r;
+      if (calc?.kind === "derivative" && calc.fn) {
+        const v = (role: string) => results.get(`${it.id}${HELPER_MARK}${role}`)?.value;
+        readout = { kind: "derivative", fn: calc.fn, x0: graph.params["x_0"]?.value, value: v("value"), slope: v("slope") };
+      } else if (calc?.kind === "integral") {
+        const h = results.get(`${it.id}${HELPER_MARK}integral`);
+        readout = { kind: "integral", latex: it.latex.trim(), value: h?.value, lower: calc.lower ?? "a", upper: calc.upper ?? "b", missingBounds: !!calc.missingBounds };
+        // The engine reads a bare ∫ as a later-phase item; the page's own helper answers, so its errors are the row's.
+        if (r) shown = { ...r, kind: "Integral", errors: h?.errors ?? [] };
+      }
+      return { id: it.id, classification, eff, matrixOp, readout, shown };
+    });
+  }, [graph.items, graph.params, results, interp, t]);
+
+  /** Lines the reader read as "input variable" are not drawn; "constant" names have no slider. */
+  const hiddenIds = useMemo(() => new Set(graph.items.filter((it, i) => rowInfo[i]?.eff === "input").map((it) => it.id)), [graph.items, rowInfo]);
+  const constantNames = useMemo(
+    () => new Set(graph.items.flatMap((it, i) => (rowInfo[i]?.eff === "constant" ? [it.latex.split("=")[0].trim()] : []))),
+    [graph.items, rowInfo],
+  );
+
+  const colors = useMemo(() => {
+    const root = document.documentElement;
+    return allItems.map((it, i) => resolveColor(root, it.style?.color, CURVE_PALETTE[i % CURVE_PALETTE.length].token));
+    // `result` and `themeTick` only trigger a re-read of the tokens.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allItems, result, themeTick]);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    const tokenRgb = (token: string) => cssRgb(resolveColor(root, undefined, token));
+    colors3d.current = {
+      background: tokenRgb(SCENE3_TOKENS.background),
+      axis: tokenRgb(SCENE3_TOKENS.axis),
+      box: tokenRgb(SCENE3_TOKENS.box),
+      positive: tokenRgb(LINALG_TOKENS.positive),
+      negative: tokenRgb(LINALG_TOKENS.negative),
+      arrow: tokenRgb(LINALG_TOKENS.arrow),
+      eigen: tokenRgb(LINALG_TOKENS.eigen),
+      planes: [tokenRgb(SCENE3_TOKENS.planes[0]), tokenRgb(SCENE3_TOKENS.planes[1]), tokenRgb(SCENE3_TOKENS.planes[2])],
+      items: Object.fromEntries(graph.items.map((it, i) => [it.id, cssRgb(colors[i])])),
+    };
+    // A theme change repaints the 3D frame with the new colors.
+    if (graphRef.current.view.mode === "3d" && themeTick > 0) client.current?.send({ type: "view", view: view("full") });
+  }, [colors, graph.items, themeTick, view]);
+
+  const scene: Scene = useMemo(() => {
+    const curves: DrawCurve[] = [];
+    const fields: DrawField[] = [];
+    const points: DrawPoint[] = [];
+    const transforms: DrawTransform[] = [];
+    const root = document.documentElement;
+    const linalgColors = {
+      positive: resolveColor(root, undefined, LINALG_TOKENS.positive),
+      negative: resolveColor(root, undefined, LINALG_TOKENS.negative),
+      arrow: resolveColor(root, undefined, LINALG_TOKENS.arrow),
+      eigen: resolveColor(root, undefined, LINALG_TOKENS.eigen),
+    };
+    allItems.forEach((it, i) => {
+      const r = results.get(it.id);
+      if (!r || it.style?.hidden || hiddenIds.has(it.id)) return;
+      if (r.field) fields.push({ ...r.field, color: colors[i] });
+      if (r.transform) transforms.push({ ...r.transform, color: colors[i], ...linalgColors });
+      // A strict inequality (< or >) does not include its boundary, so the boundary is dashed.
+      const strict = r.relation === "<" || r.relation === ">";
+      if (r.segments.length) {
+        curves.push({ segments: r.segments, color: colors[i], width: it.style?.width ?? DEFAULT_CURVE_WIDTH, dash: it.style?.dash ?? (strict ? "dashed" : undefined), highlighted: trace?.id === it.id, smooth: r.kind === "Implicit" });
+      }
+      if (r.point) points.push({ x: r.point.x, y: r.point.y, color: colors[i], label: r.label });
+    });
+    const traced = trace && Number.isFinite(trace.y) ? trace : null;
+    if (traced) points.push({ x: traced.x, y: traced.y, color: colors[graph.items.findIndex((it) => it.id === traced.id)] ?? colors[0], label: `(${traced.x.toPrecision(4)}, ${traced.y.toPrecision(4)})` });
+    return {
+      viewport: graph.viewport,
+      grid: graph.view.grid,
+      curves,
+      fields,
+      transforms,
+      points,
+      tangent:
+        traced && traced.slope !== null
+          ? { x0: traced.x, y0: traced.y, slope: traced.slope, color: resolveColor(document.documentElement, undefined, "--muted-foreground") }
+          : null,
+    };
+  }, [graph, allItems, hiddenIds, results, colors, trace]);
+
+  const traceTargets: TraceTarget[] = (result?.items ?? [])
+    // Helper items (tangents, areas) are not traced: only the reader's own curves.
+    .filter((r) => r.kind === "Explicit" && r.segments.length > 0 && !r.id.includes(HELPER_MARK))
+    .map((r) => ({ id: r.id, segments: r.segments }));
+
+  const draggable: DraggablePoint[] = (result?.items ?? [])
+    .filter((r): r is ItemResult & { point: { x: number; y: number } } => !!r.point && !!(r.dragParams?.x || r.dragParams?.y))
+    .map((r) => ({ id: r.id, x: r.point.x, y: r.point.y }));
+
+  // A dragged point snaps to its parameters' slider steps (Desmos behaviour), within [min, max].
+  const snap = (name: string, v: number) => {
+    const p = graphRef.current.params[name];
+    if (!p) return v;
+    const stepped = p.min + Math.round((v - p.min) / p.step) * p.step;
+    const digits = Math.max(0, -Math.floor(Math.log10(p.step)) + 1);
+    return Math.min(p.max, Math.max(p.min, Number(stepped.toFixed(digits))));
+  };
+
+  const onDragPoint = (id: string, x: number, y: number, quality: "drag" | "full") => {
+    const r = results.get(id);
+    if (r?.dragParams?.x) setParam(r.dragParams.x, snap(r.dragParams.x, x), quality);
+    if (r?.dragParams?.y) setParam(r.dragParams.y, snap(r.dragParams.y, y), quality);
+  };
+
+  const exportSvg = () => {
+    const root = document.documentElement;
+    const svg = buildSvg({
+      width: canvasEl?.clientWidth || size.current.w,
+      height: canvasEl?.clientHeight || size.current.h,
+      viewport: graph.viewport,
+      background: resolveColor(root, undefined, "--background"),
+      axis: resolveColor(root, undefined, "--muted-foreground"),
+      curves: scene.curves.map((c) => ({ segments: c.segments, stroke: c.color, width: c.width, dash: c.dash })),
+      title: t("title"),
+      description: descriptions.join(" "),
+    });
+    download("mathcore-graph.svg", new Blob([svg], { type: "image/svg+xml" }));
+  };
+
+  const share = async () => {
+    const enc = encodeGraph(graph);
+    if (!enc.ok) {
+      setNotice(t("linkTooLarge"));
+      return;
+    }
+    const url = new URL(window.location.href);
+    url.searchParams.set(LINK_PARAM, enc.encoded);
+    await navigator.clipboard?.writeText(url.toString());
+    setNotice(t("linkCopied"));
+  };
+
+  const onImport = async (file: File | undefined) => {
+    if (!file) return;
+    const r = importJson(await file.text());
+    if (r.ok) {
+      freshAfter.current = loadRound.current;
+      setGraph(r.graph);
+    }
+    else setNotice(t("importFailed"));
+  };
+
+  const descriptions = graph.items
+    .map((it, i) => {
+      const r = results.get(it.id);
+      const label = t("expressionLabel", { n: i + 1 });
+      if (r?.linalg && r.errors.length === 0) return describeLinalg(t, label, r.linalg);
+      return r?.description ? describeItem(t, label, r.description) : null;
+    })
+    .filter((d): d is string => d !== null);
+
+  const params = Object.entries(graph.params)
+    .filter(([name]) => !constantNames.has(name))
+    .sort(([a], [b]) => a.localeCompare(b));
+  const isRtl = i18n.language === "ar";
+
+  // `?` opens the shortcuts panel unless the reader is typing (a field would receive the character).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "?" || e.ctrlKey || e.metaKey || e.altKey) return;
+      const el = e.target as HTMLElement | null;
+      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.tagName === "MATH-FIELD" || el.isContentEditable)) return;
+      e.preventDefault();
+      shortcutsReturn.current = document.activeElement as HTMLElement | null;
+      setShortcutsOpen(true);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+  const closeShortcuts = () => {
+    setShortcutsOpen(false);
+    setTimeout(() => shortcutsReturn.current?.focus(), 0);
+  };
+  const openCategory = CATEGORIES.find((c) => c.id === category) ?? null;
+
+  return (
+    <div className="mc-page" dir={isRtl ? "rtl" : "ltr"}>
+      <a className="mc-skip" href="#mc-graph">
+        {t("skipToGraph")}
+      </a>
+      <header className="mc-header">
+        <div className="mc-heading">
+          <p className="mc-kicker font-mono" dir="ltr">MAE · MATH CORE</p>
+          <h1 className="mc-title mae-display">{t("title")}</h1>
+          <p className="mc-subtitle">{t("subtitle")}</p>
+        </div>
+        <div className="mc-toolbar" role="toolbar">
+          <button type="button" className="mc-button" onClick={() => void share()} disabled={linkTooLarge} title={linkTooLarge ? t("linkTooLarge") : undefined}>
+            {t("share")}
+          </button>
+          <button type="button" className="mc-button" onClick={() => canvasEl?.toBlob((b) => b && download("mathcore-graph.png", b))}>
+            {t("exportPng")}
+          </button>
+          <button type="button" className="mc-button" onClick={exportSvg}>
+            {t("exportSvg")}
+          </button>
+          <button type="button" className="mc-button" onClick={() => download("mathcore-graph.json", new Blob([exportJson(graph)], { type: "application/json" }))}>
+            {t("exportJson")}
+          </button>
+          <label className="mc-button">
+            {t("importJson")}
+            <input type="file" accept="application/json,.json" className="mc-sr" onChange={(e) => void onImport(e.target.files?.[0])} />
+          </label>
+          <button
+            type="button"
+            className="mc-button"
+            onClick={() => (graph.view.mode === "3d" ? setCamera(undefined, "full") : setViewport({ ...DEFAULT_VIEWPORT }, "full"))}
+          >
+            {t("resetView")}
+          </button>
+          <button
+            type="button"
+            className="mc-button"
+            aria-pressed={graph.view.mode === "3d"}
+            onClick={() => setMode(graph.view.mode === "3d" ? "2d" : "3d")}
+          >
+            {t("view3d")}
+          </button>
+          <button type="button" className="mc-button" data-testid="mc-shortcuts-button" aria-haspopup="dialog" aria-label={t("shortcuts.open")} title={t("shortcuts.open")} onClick={(e) => { shortcutsReturn.current = e.currentTarget; setShortcutsOpen(true); }}>
+            ?
+          </button>
+          <label className="mc-button">
+            <input
+              type="checkbox"
+              checked={graph.view.showSteps}
+              onChange={(e) => {
+                const showSteps = e.target.checked;
+                setGraph((g) => ({ ...g, view: { ...g.view, showSteps } }));
+              }}
+            />
+            {t("showSteps")}
+          </label>
+        </div>
+      </header>
+      {notice && (
+        <p className="mc-notice" role="status">
+          {notice}
+        </p>
+      )}
+      {linkTooLarge && <p className="mc-notice">{t("linkTooLarge")}</p>}
+      {linkNotice && (
+        <p className="mc-notice" role="status">
+          {linkNotice}
+        </p>
+      )}
+      <div className="mc-layout">
+        <CategorySidebar
+          active={category}
+          onSelect={(id) => {
+            setCategory(id);
+            setAddedSample(null);
+          }}
+        />
+        <aside className="mc-panel" aria-label={t("expressions")}>
+          {openCategory && <TemplatePanel category={openCategory} added={addedSample} onAdd={addSample} onClose={() => setCategory(null)} />}
+          {!result && <p className="mc-note">{t("loadingEngine")}</p>}
+          <ol className="mc-list">
+            {graph.items.map((it, i) => (
+              <ExpressionRow
+                key={it.id}
+                index={i}
+                latex={it.latex}
+                colorId={it.style?.color}
+                color={colors[i]}
+                result={rowInfo[i]?.shown}
+                showSteps={graph.view.showSteps}
+                mode={graph.view.mode}
+                classification={rowInfo[i]?.classification ?? { class: "unknown", reason: "pending" }}
+                interpretation={rowInfo[i]?.eff}
+                onInterpret={(choice) => setInterp((m) => ({ ...m, [it.id]: choice }))}
+                calc={rowInfo[i]?.readout}
+                matrixOp={rowInfo[i]?.matrixOp}
+                autoFocus={focusId === it.id}
+                onFocused={() => setFocusId(null)}
+                onColor={(color) => setColor(it.id, color)}
+                onChange={(latex) => setItems(graph.items.map((x) => (x.id === it.id ? { ...x, latex } : x)))}
+                onRemove={() => setItems(graph.items.filter((x) => x.id !== it.id))}
+                onEnter={() => addRow(i)}
+              />
+            ))}
+          </ol>
+          <button type="button" className="mc-button mc-add" onClick={() => addRow(graph.items.length - 1)}>
+            + {t("addExpression")}
+          </button>
+          {params.length > 0 && (
+            <section aria-label={t("parameters")}>
+              <h2 className="mc-section-title">{t("parameters")}</h2>
+              <ul className="mc-list">
+                {params.map(([name, p]) => (
+                  <SliderRow key={name} name={name} param={p} onValue={(v, q) => setParam(name, v, q)} onRange={(patch) => setRange(name, patch)} />
+                ))}
+              </ul>
+            </section>
+          )}
+          <details className="mc-details">
+            <summary>{t("descriptions")}</summary>
+            <div aria-live="polite">
+              {descriptions.map((d, i) => (
+                <p key={i}>{d}</p>
+              ))}
+            </div>
+          </details>
+          {result && (
+            <p className="mc-meta">
+              {t("evaluations", { count: result.evaluations, changed: result.reevaluated.length })}
+            </p>
+          )}
+          <details className="mc-details">
+            <summary>{t("benchHeader")}</summary>
+            <button type="button" className="mc-button" onClick={() => client.current?.send({ type: "bench" })}>
+              {t("benchmarks")}
+            </button>
+            {Array.isArray(bench) && (
+              <table className="mc-bench" dir="ltr">
+                <tbody>
+                  {(bench as Array<{ id: string; median: number; unit: string; target: number; pass: boolean }>).map((b) => (
+                    <tr key={b.id}>
+                      <td>{b.id}</td>
+                      <td>{b.unit === "ms" ? `${b.median.toFixed(3)} ms` : `${Math.round(b.median).toLocaleString()} /s`}</td>
+                      <td>{b.pass ? t("benchPass") : t("benchFail")}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </details>
+        </aside>
+        <section className="mc-graph" id="mc-graph">
+          <GraphCanvas
+            scene={scene}
+            onViewport={setViewport}
+            traceTargets={traceTargets}
+            onTrace={(target) => {
+              traceAt.current = target;
+              if (target) client.current?.trace(target.id, target.x);
+              else setTrace(null);
+            }}
+            draggable={draggable}
+            onDragPoint={onDragPoint}
+            equalAspect={graph.viewport.aspect === "equal"}
+            onCanvas={(el) => {
+              setCanvasEl(el);
+              if (el) size.current = { w: el.clientWidth, h: el.clientHeight };
+            }}
+            frame3={graph.view.mode === "3d" ? result?.frame3d ?? null : null}
+            camera={graph.view.camera}
+            onCamera={graph.view.mode === "3d" ? setCamera : undefined}
+          />
+          {graph.view.mode === "3d" && <p className="mc-note">{t("view3dNote")}</p>}
+          {trace && trace.slope !== null && (
+            <p className="mc-trace" dir="ltr" aria-live="polite">
+              {t("tangentAt", { x: trace.x.toPrecision(6), slope: trace.slope.toPrecision(6) })}
+            </p>
+          )}
+        </section>
+      </div>
+      {shortcutsOpen && <ShortcutsPanel onClose={closeShortcuts} />}
+      <Suspense fallback={null}>
+        <SimulationDocumentation topic="mathcore" />
+      </Suspense>
+    </div>
+  );
+}
