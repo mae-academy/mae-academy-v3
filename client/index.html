@@ -33,6 +33,23 @@
     ]
   }
   </script>
+  <script>
+    /* Apply the stored theme before first paint so the splash never flashes the wrong colour. */
+    try { if (localStorage.getItem("theme") === "dark") document.documentElement.classList.add("dark"); } catch (e) {}
+  </script>
+  <style>
+    html { background: #fff; }
+    html.dark { background: #000; color-scheme: dark; }
+    body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+    /* Crawler-readable fallback stays in the DOM but is never painted unstyled. */
+    #mae-seo { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+    #mae-splash { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: #fff; }
+    html.dark #mae-splash { background: #000; }
+    #mae-splash::before { content: ""; width: 34px; height: 34px; border-radius: 50%; border: 3px solid rgba(124,58,237,.18); border-top-color: #7c3aed; animation: mae-spin .8s linear infinite; }
+    @keyframes mae-spin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) { #mae-splash::before { animation-duration: 2s; } }
+  </style>
+  <noscript><style>#mae-splash{display:none}#mae-seo{position:static;width:auto;height:auto;margin:0;overflow:visible;clip:auto;white-space:normal}</style></noscript>
   <link rel="icon" type="image/svg+xml" href="/mae.svg" />
   <link rel="alternate icon" href="/favicon.ico" />
   <link rel="apple-touch-icon" href="/mae.svg" />
@@ -48,6 +65,8 @@
 
 <body>
   <div id="root">
+    <div id="mae-splash" aria-hidden="true"></div>
+    <div id="mae-seo">
     <!-- Crawler-readable fallback; React replaces it on mount. -->
     <header>
       <a href="/">MAE Academy</a>
@@ -69,6 +88,7 @@
       <a href="/about">About</a>
       <a href="/contact">Contact</a>
     </footer>
+    </div>
   </div>
   <noscript>This site needs JavaScript enabled to run its interactive engineering simulators.</noscript>
   <script type="module" src="/src/main.tsx"></script>
