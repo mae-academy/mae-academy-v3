@@ -1,5 +1,6 @@
 import express from "express";
 import { createServer } from "http";
+import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import "dotenv/config";
@@ -289,9 +290,18 @@ async function startServer() {
 
   app.use(express.static(staticPath));
 
-  // Handle client-side routing - serve index.html for all routes
-  app.get("*", (_req, res) => {
-    res.sendFile(path.join(staticPath, "index.html"));
+  // Same resolution as vercel.json: a route with build-time static HTML (scripts/prerender-static.ts) is served
+  // from prerendered/<route>.html; every other route gets the SPA shell. Identical for every user agent.
+  const prerenderedPath = path.join(staticPath, "prerendered");
+  const spaShell = fs.existsSync(path.join(staticPath, "spa-shell.html")) ? "spa-shell.html" : "index.html";
+  app.get("*", (req, res) => {
+    const route = req.path.replace(/\/+$/, "");
+    const candidate = path.join(prerenderedPath, `${route}.html`);
+    if (route && candidate.startsWith(prerenderedPath + path.sep) && fs.existsSync(candidate)) {
+      res.sendFile(candidate);
+      return;
+    }
+    res.sendFile(path.join(staticPath, spaShell));
   });
 
   const port = process.env.PORT || 5000;

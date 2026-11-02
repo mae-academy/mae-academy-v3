@@ -5,7 +5,7 @@ import { useLocale } from "@/contexts/LocaleContext";
 type Suite = { href: string; name: string; text: string };
 type GuideCopy = { title: string; intro: string[]; suitesTitle: string; suites: Suite[]; howTitle: string; how: string[] };
 
-const GUIDE: Record<"en" | "ar" | "es", GuideCopy> = {
+export const GUIDE: Record<"en" | "ar" | "es", GuideCopy> = {
   en: {
     title: "How the MAE Academy simulators work",
     intro: [

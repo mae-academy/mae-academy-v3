@@ -99,8 +99,136 @@
       "destination": "/index.html"
     },
     {
+      "source": "/simulations",
+      "destination": "/prerendered/simulations.html"
+    },
+    {
+      "source": "/simulations/control-systems/root-locus",
+      "destination": "/prerendered/simulations/control-systems/root-locus.html"
+    },
+    {
+      "source": "/simulations/control-systems/pid",
+      "destination": "/prerendered/simulations/control-systems/pid.html"
+    },
+    {
+      "source": "/simulations/control-systems/frequency-response",
+      "destination": "/prerendered/simulations/control-systems/frequency-response.html"
+    },
+    {
+      "source": "/simulations/control-systems/state-space",
+      "destination": "/prerendered/simulations/control-systems/state-space.html"
+    },
+    {
+      "source": "/simulations/power-electronics/rectifier",
+      "destination": "/prerendered/simulations/power-electronics/rectifier.html"
+    },
+    {
+      "source": "/simulations/power-electronics/inverter",
+      "destination": "/prerendered/simulations/power-electronics/inverter.html"
+    },
+    {
+      "source": "/simulations/power-electronics/acvc",
+      "destination": "/prerendered/simulations/power-electronics/acvc.html"
+    },
+    {
+      "source": "/simulations/power-electronics/chopper",
+      "destination": "/prerendered/simulations/power-electronics/chopper.html"
+    },
+    {
+      "source": "/simulations/signals-and-systems/signal-operations-and-properties",
+      "destination": "/prerendered/simulations/signals-and-systems/signal-operations-and-properties.html"
+    },
+    {
+      "source": "/simulations/signals-and-systems/system-classification",
+      "destination": "/prerendered/simulations/signals-and-systems/system-classification.html"
+    },
+    {
+      "source": "/simulations/signals-and-systems/convolution-engine",
+      "destination": "/prerendered/simulations/signals-and-systems/convolution-engine.html"
+    },
+    {
+      "source": "/simulations/signals-and-systems/fourier-analysis",
+      "destination": "/prerendered/simulations/signals-and-systems/fourier-analysis.html"
+    },
+    {
+      "source": "/simulations/signals-and-systems/laplace-s-plane",
+      "destination": "/prerendered/simulations/signals-and-systems/laplace-s-plane.html"
+    },
+    {
+      "source": "/simulations/circuit-lab",
+      "destination": "/prerendered/simulations/circuit-lab.html"
+    },
+    {
+      "source": "/simulations/code/python",
+      "destination": "/prerendered/simulations/code/python.html"
+    },
+    {
+      "source": "/simulations/code/cpp",
+      "destination": "/prerendered/simulations/code/cpp.html"
+    },
+    {
+      "source": "/simulations/code/c",
+      "destination": "/prerendered/simulations/code/c.html"
+    },
+    {
+      "source": "/simulations/code/masm8086",
+      "destination": "/prerendered/simulations/code/masm8086.html"
+    },
+    {
+      "source": "/simulations/plc",
+      "destination": "/prerendered/simulations/plc.html"
+    },
+    {
+      "source": "/simulations/digital-logic-design",
+      "destination": "/prerendered/simulations/digital-logic-design.html"
+    },
+    {
+      "source": "/simulations/arduino-studio",
+      "destination": "/prerendered/simulations/arduino-studio.html"
+    },
+    {
+      "source": "/simulations/pneumatics-and-hydraulics",
+      "destination": "/prerendered/simulations/pneumatics-and-hydraulics.html"
+    },
+    {
+      "source": "/about",
+      "destination": "/prerendered/about.html"
+    },
+    {
+      "source": "/contact",
+      "destination": "/prerendered/contact.html"
+    },
+    {
+      "source": "/library",
+      "destination": "/prerendered/library.html"
+    },
+    {
+      "source": "/research",
+      "destination": "/prerendered/research.html"
+    },
+    {
+      "source": "/privacy",
+      "destination": "/prerendered/privacy.html"
+    },
+    {
+      "source": "/privacy-policy",
+      "destination": "/prerendered/privacy-policy.html"
+    },
+    {
+      "source": "/terms",
+      "destination": "/prerendered/terms.html"
+    },
+    {
+      "source": "/terms-of-service",
+      "destination": "/prerendered/terms-of-service.html"
+    },
+    {
+      "source": "/attribution-policy",
+      "destination": "/prerendered/attribution-policy.html"
+    },
+    {
       "source": "/(research|library|courses|code|assembler|simulations|simulators|fluid-drive|about|contact|privacy|privacy-policy|terms|terms-of-service|attribution-policy)(/.*)?",
-      "destination": "/index.html"
+      "destination": "/spa-shell.html"
     }
   ]
 }

@@ -145,6 +145,12 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://maeacademy.org/simulations/pneumatics-and-hydraulics</loc>
+    <lastmod>2026-10-03</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://maeacademy.org/research</loc>
     <lastmod>2026-10-01</lastmod>
     <changefreq>weekly</changefreq>
