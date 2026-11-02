@@ -1,13 +1,11 @@
 import type { Request, Response } from "express";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { HOST_ALLOWLISTS, readLimited, safeFetch } from "./ssrf";
+import { ARCHIVE_ID_PATTERN, COVER_HEADERS, fetchArchiveCover } from "../api/_lib/library/catalog";
 
 const CACHE_DIR = path.resolve(process.env.PDF_CACHE_DIR ?? ".cache", "covers");
 /** Internet Archive identifiers only: the upstream URL is always archive.org/services/img/<id>. */
-const ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,120}$/;
-const FETCH_TIMEOUT_MS = 30_000;
-const MAX_COVER_BYTES = 2 * 1024 * 1024;
+const ID_PATTERN = ARCHIVE_ID_PATTERN;
 const CONCURRENCY = 6;
 
 let active = 0;
@@ -25,12 +23,11 @@ async function withSlot<T>(task: () => Promise<T>): Promise<T> {
   }
 }
 
+/** Fetch (shared with the Vercel function api/library/cover.ts, which relies on the CDN instead of a disk cache), then cache on disk. */
 async function download(id: string): Promise<Buffer | null> {
   try {
-    const res = await safeFetch(`https://archive.org/services/img/${encodeURIComponent(id)}`, { allowlist: [...HOST_ALLOWLISTS.archive], signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
-    if (!res.ok || !(res.headers.get("content-type") ?? "").startsWith("image/")) return null;
-    const image = await readLimited(res, MAX_COVER_BYTES);
-    if (image.length === 0) return null;
+    const image = await fetchArchiveCover(id);
+    if (!image) return null;
     await mkdir(CACHE_DIR, { recursive: true });
     await writeFile(path.join(CACHE_DIR, `${id}.img`), image);
     return image;
@@ -62,7 +59,6 @@ export async function libraryCoverHandler(req: Request, res: Response): Promise<
     res.status(404).end();
     return;
   }
-  res.setHeader("Content-Type", "image/jpeg");
-  res.setHeader("Cache-Control", "public, max-age=604800");
+  for (const [name, value] of Object.entries(COVER_HEADERS)) res.setHeader(name, value);
   res.send(image);
 }

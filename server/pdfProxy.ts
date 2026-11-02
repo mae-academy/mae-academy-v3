@@ -1,91 +1,15 @@
 import type { Request, Response } from "express";
-import { assertSafeTarget, configuredProxyAllowlist, SsrfError } from "./ssrf";
+import { fetchWithValidatedRedirects, openPdf, PDF_MAGIC, ProxyError, singleRange, TIMEOUT_MS, type Disposition } from "../api/_lib/library/pdf";
 
-const MAX_REDIRECTS = 5;
-const MAX_BYTES = 50 * 1024 * 1024; // inline viewer stream ceiling
-const MAX_DOWNLOAD_BYTES = 1024 * 1024 * 1024; // books can be 100+ MB; downloads are streamed, never buffered
-const TIMEOUT_MS = 20_000; // time to first byte only; a long transfer must not be cut off mid-stream
-export const PDF_MAGIC = Buffer.from("%PDF");
-
-class ProxyError extends Error {
-  constructor(readonly status: number, message: string) {
-    super(message);
-  }
-}
-
-/** Applies the shared outbound policy (https only, no IP literals / credentials / odd ports, public addresses only, optional host allowlist). */
-async function assertPublicHttpUrl(raw: string): Promise<URL> {
-  try {
-    return await assertSafeTarget(raw, configuredProxyAllowlist());
-  } catch (error) {
-    if (error instanceof SsrfError) throw new ProxyError(error.status, error.message);
-    throw error;
-  }
-}
-
-const UPSTREAM_ATTEMPTS = 3;
-const RETRY_DELAY_MS = 250;
-const isTransientStatus = (status: number): boolean => status === 429 || status === 502 || status === 503 || status === 504;
-
-/** One upstream GET, retried on network errors and transient 429 / 502 / 503 / 504 answers (never on an abort). */
-async function fetchUpstreamWithRetry(url: URL, signal: AbortSignal, range?: string): Promise<globalThis.Response> {
-  for (let attempt = 1; ; attempt++) {
-    try {
-      const upstream = await fetch(url, {
-        redirect: "manual",
-        signal,
-        headers: {
-          Accept: "application/pdf,*/*;q=0.8",
-          "User-Agent": "MAEAcademy-PdfProxy/1.0",
-          ...(range ? { Range: range } : {}),
-        },
-      });
-      if (!isTransientStatus(upstream.status) || attempt >= UPSTREAM_ATTEMPTS) return upstream;
-      await upstream.body?.cancel();
-    } catch (error) {
-      if (signal.aborted || attempt >= UPSTREAM_ATTEMPTS) throw error;
-    }
-    await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS * attempt));
-  }
-}
-
-/** Follows redirects manually so every hop is re-validated against the SSRF rules. */
-export async function fetchWithValidatedRedirects(start: string, signal: AbortSignal, range?: string): Promise<globalThis.Response> {
-  let current = start;
-  for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
-    const url = await assertPublicHttpUrl(current);
-    const upstream = await fetchUpstreamWithRetry(url, signal, range);
-    if (upstream.status >= 300 && upstream.status < 400) {
-      const location = upstream.headers.get("location");
-      if (!location) throw new ProxyError(502, "Redirect without location");
-      current = new URL(location, url).toString();
-      await upstream.body?.cancel();
-      continue;
-    }
-    return upstream;
-  }
-  throw new ProxyError(508, "Too many redirects");
-}
-
-type Disposition = "inline" | "attachment";
-
-const DEFAULT_FILENAME = "research_paper.pdf";
-
-/** ASCII-only, path-safe filename ending in .pdf (the value ends up inside a Content-Disposition header). */
-function safeFilename(raw: unknown): string {
-  if (typeof raw !== "string") return DEFAULT_FILENAME;
-  const base = raw
-    .replace(/\.pdf$/i, "")
-    .replace(/[^A-Za-z0-9._-]+/g, "_")
-    .replace(/^[._-]+|[._-]+$/g, "")
-    .slice(0, 80);
-  return base ? `${base}.pdf` : DEFAULT_FILENAME;
-}
+// The fetch / validation / header logic lives in api/_lib/library/pdf.ts, shared with the Vercel functions
+// api/pdf-proxy.ts and api/pdf-download.ts. This file is the Express transport, plus the research batch check below.
+export { fetchWithValidatedRedirects, PDF_MAGIC };
 
 /**
  * Streams a remote PDF back same-origin (dropping the publisher's X-Frame-Options / CSP).
  * Refuses private hosts, non-PDF payloads and oversized files with a plain-text error and a real status code.
  * `inline` renders in a viewer; `attachment` forces the browser to save the file to disk.
+ * Host policy: `PDF_PROXY_ALLOWED_HOSTS` when set, else any public https host (unchanged Express behaviour).
  */
 function createPdfHandler(disposition: Disposition) {
   return (req: Request, res: Response): Promise<void> => streamPdf(req, res, disposition);
@@ -104,48 +28,18 @@ async function streamPdf(req: Request, res: Response, disposition: Disposition):
   res.on("close", () => controller.abort());
 
   try {
-    if (!target) throw new ProxyError(400, "Missing url parameter");
-
-    // Forward a single byte range so pdf.js can fetch just the xref + needed pages of large PDFs.
-    const rangeHeader = req.headers.range;
-    const range = typeof rangeHeader === "string" && /^bytes=\d*-\d*$/.test(rangeHeader) ? rangeHeader : undefined;
-
-    const upstream = await fetchWithValidatedRedirects(target, controller.signal, range);
-    if (!upstream.ok || !upstream.body) throw new ProxyError(upstream.status === 404 ? 404 : 502, "Failed to fetch PDF from source");
-
-    const partial = upstream.status === 206;
-    const contentRange = upstream.headers.get("content-range");
-    const startsAtZero = !partial || /^bytes 0-/.test(contentRange ?? "");
-
-    const reader = upstream.body.getReader();
-    const first = await reader.read();
+    const { status, headers, reader, first, maxBytes } = await openPdf({
+      target,
+      range: singleRange(req.headers.range),
+      signal: controller.signal,
+      disposition,
+      filename: req.query.name,
+    });
     clearTimeout(timer); // headers + first chunk arrived: from here only client disconnects abort the transfer
-    // Only the first byte range of a document carries the %PDF header.
-    if (startsAtZero) {
-      const head = first.value ? Buffer.from(first.value.subarray(0, 1024)) : Buffer.alloc(0);
-      if (!head.includes(PDF_MAGIC)) {
-        await reader.cancel();
-        throw new ProxyError(415, "Source did not return a PDF document");
-      }
-    }
 
-    res.status(partial ? 206 : 200);
-    res.setHeader("Content-Type", "application/pdf");
-    res.setHeader(
-      "Content-Disposition",
-      disposition === "attachment" ? `attachment; filename="${safeFilename(req.query.name)}"` : "inline",
-    );
-    res.setHeader("X-Content-Type-Options", "nosniff");
-    res.setHeader("Cache-Control", disposition === "attachment" ? "private, no-store" : "public, max-age=3600");
+    res.status(status);
+    for (const [name, value] of Object.entries(headers)) res.setHeader(name, value);
 
-    // Advertise ranges only when the publisher really supports them; lengths are only trustworthy without content-encoding.
-    const encoded = upstream.headers.has("content-encoding");
-    const length = upstream.headers.get("content-length");
-    if (partial || upstream.headers.get("accept-ranges") === "bytes") res.setHeader("Accept-Ranges", "bytes");
-    if (partial && contentRange) res.setHeader("Content-Range", contentRange);
-    if (length && !encoded) res.setHeader("Content-Length", length);
-
-    const maxBytes = disposition === "attachment" ? MAX_DOWNLOAD_BYTES : MAX_BYTES;
     let sent = 0;
     let chunk = first;
     while (!chunk.done) {
