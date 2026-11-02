@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="description"
+    content="MAE Academy privacy policy, cookies and advertising disclosures." />
+  <meta name="google-adsense-account" content="ca-pub-1937330840014217" />
+  <link rel="canonical" href="https://maeacademy.org/privacy" />
+  <meta property="og:title" content="Privacy Policy — MAE Academy" />
+  <meta property="og:description" content="MAE Academy privacy policy, cookies and advertising disclosures." />
+  <meta property="og:url" content="https://maeacademy.org/privacy" />
+  <title>Privacy Policy — MAE Academy</title>
+  <script>
+    /* Apply the stored theme before first paint so the splash never flashes the wrong colour. */
+    try { if (localStorage.getItem("theme") === "dark") document.documentElement.classList.add("dark"); } catch (e) {}
+  </script>
+  <style>
+    html { background: #fff; }
+    html.dark { background: #000; color-scheme: dark; }
+    body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+    /* Crawler-readable fallback stays in the DOM but is never painted unstyled. */
+    #mae-seo { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+    #mae-splash { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: #fff; }
+    html.dark #mae-splash { background: #000; }
+    #mae-splash::before { content: ""; width: 34px; height: 34px; border-radius: 50%; border: 3px solid rgba(124,58,237,.18); border-top-color: #7c3aed; animation: mae-spin .8s linear infinite; }
+    @keyframes mae-spin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) { #mae-splash::before { animation-duration: 2s; } }
+  </style>
+  <noscript><style>#mae-splash{display:none}#mae-seo{position:static;width:auto;height:auto;margin:0;overflow:visible;clip:auto;white-space:normal}</style></noscript>
+  <link rel="icon" type="image/svg+xml" href="/mae.svg" />
+  <link rel="alternate icon" href="/favicon.ico" />
+  <link rel="apple-touch-icon" href="/mae.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1937330840014217"
+    crossorigin="anonymous"></script>
+  <!-- Fonts load without blocking first paint (swap shows the system font until they arrive). -->
+  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Poppins:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,400&family=Tajawal:wght@400;500;700;800;900&display=swap"
+    onload="this.onload=null;this.rel='stylesheet'" />
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Poppins:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,400&family=Tajawal:wght@400;500;700;800;900&display=swap" /></noscript>
+  <script type="module" crossorigin src="/assets/index-CuwLxTpB.js"></script>
+  <link rel="modulepreload" crossorigin href="/assets/vendor-i18n-C7e7LjlC.js">
+  <link rel="modulepreload" crossorigin href="/assets/vendor-react-CxR3fN16.js">
+  <link rel="modulepreload" crossorigin href="/assets/vendor-icons-CVX_FV2m.js">
+  <link rel="stylesheet" crossorigin href="/assets/index-CdC_kHz9.css">
+</head>
+
+<body>
+  <div id="root">
+    <div id="mae-splash" aria-hidden="true"></div>
+    <div id="mae-seo">
+<header><a href="/">MAE Academy</a><nav aria-label="Primary"><a href="/simulations">Simulations</a> <a href="/research">Research</a> <a href="/library">Library</a> <a href="/about">About</a> <a href="/contact">Contact</a></nav></header>
+<main>
+<h1>Privacy Policy</h1>
+<p>Effective Date: September 29, 2026 • MAE Academy</p>
+<p>MAE Academy (<a href="https://maeacademy.org" target="_blank" rel="noopener noreferrer">https://maeacademy.org</a>) is dedicated to safeguarding and respecting the privacy of our visitors. This Privacy Policy details the types of information we may collect and how it is used and protected.</p>
+<h2>Information Collection & User Accounts</h2>
+<p>MAE Academy does not require any user registration or account creation to access its tools, simulations, open-source literature, or academic resources.</p>
+<p>We do not collect or store any personally identifiable information (PII) unless you voluntarily reach out to us via our designated contact email (<a href="mailto:contact@maeacademy.org">contact@maeacademy.org</a>). In such instances, your email address and message are utilized solely to respond to your inquiry.</p>
+<h2>Server Log Files</h2>
+<p>Like most standard web servers, MAE Academy utilizes standard log files. The logged data includes Internet Protocol (IP) addresses, browser type, Internet Service Provider (ISP), date and time stamps, and referring/exit pages. This information is non-personally identifiable and is analyzed solely for technical administration, security, and optimizing site performance.</p>
+<h2>Cookies and Third-Party Advertising</h2>
+<p>Our website does not set first-party cookies for tracking user identities. However, we partner with third-party vendors, including Google, to serve advertisements when you visit our website:</p>
+<p>Google uses cookies, including the DART cookie, to serve targeted ads to our users based on their visits to our site and other destinations across the web.</p>
+<p>Third-party ad networks may also use cookies, JavaScript, or Web Beacons to gauge the effectiveness of their advertising campaigns and customize ad content.</p>
+<p>Users can opt out of personalized advertising by visiting <a href="https://adssettings.google.com" target="_blank" rel="noopener noreferrer">Google Ads Settings</a> or via the <a href="https://www.aboutads.info/choices/" target="_blank" rel="noopener noreferrer">Network Advertising Initiative Opt-Out Page</a>.</p>
+<h2>Open-Source Resources & Intellectual Property</h2>
+<p>Our platform references and links to open-access research papers, textbooks, and public domain materials. All referenced works remain the intellectual property of their respective authors and publishers, cited and distributed in compliance with their applicable open licenses.</p>
+<h2>Children's Online Privacy (COPPA Compliance)</h2>
+<p>We do not knowingly collect personal information from children under the age of 13. If you believe that a minor has provided us with personal information, please contact us immediately, and we will promptly remove such records from our systems.</p>
+<h2>Updates & Contact</h2>
+<p>We reserve the right to revise this policy to reflect operational, legal, or regulatory modifications. We encourage visitors to review this page periodically.</p>
+<p>For any legal or privacy inquiries, please contact us at: <a href="mailto:contact@maeacademy.org">contact@maeacademy.org</a></p>
+<h2>Instagram Automation & Educational Resource Integration</h2>
+<p>MAE Academy operates an automated Instagram comment-to-DM integration designed exclusively to deliver requested engineering simulation links, tutorials, and educational resources.</p>
+<p>When you post a public comment containing designated trigger keywords on official MAE Academy Instagram posts, our automated integration receives a secure webhook from Meta's Graph API. The system transiently processes the public comment ID, media ID, and Instagram username solely to dispatch the requested resource link directly to your Direct Messages (via Meta Private Reply) or provide a helpful public comment reply.</p>
+<p><strong>In-Memory Deduplication Only (No Persistent Storage):</strong> We do not store, harvest, or maintain personal profile data, usernames, or message contents in permanent databases. The system utilizes strictly ephemeral, in-memory deduplication (automatically purged within one hour) solely to avoid sending duplicate automated replies to the same comment.</p>
+<h2>User Data Deletion Instructions</h2>
+<p>In accordance with Meta Platform Terms and global data protection standards, users have the right to request the deletion of any data, interaction records, or identifiers associated with their Instagram account.</p>
+<p>Because MAE Academy does not operate persistent user accounts or maintain databases of Instagram user data (processing data transiently in memory only), your personal data is by default not stored beyond the immediate processing of your request. However, if you wish to formally submit a data deletion request or verify that no residual server records remain, please follow the instructions below:</p>
+<h2>1. Submit an Email Deletion Request</h2>
+<p>Send an email to our designated compliance address: <a href="mailto:contact@maeacademy.org">contact@maeacademy.org</a> with the subject line <strong>"Data Deletion Request - Instagram Automation"</strong>.</p>
+<h2>2. Provide Required Identifier</h2>
+<p>Include your public Instagram handle/username (@username) and the approximate date/time or post of your interaction so we can verify our temporary server logs.</p>
+<h2>3. Revoke Permissions via Instagram Settings</h2>
+<p>You can also revoke application interaction permissions at any time directly through your Instagram account: Navigate to <em>Settings and activity &rarr; Website permissions &rarr; Apps and websites</em>, locate MAE Academy, and click <strong>Remove</strong>.</p>
+<p><strong>Deletion Window:</strong> All verified data deletion requests are reviewed and fulfilled within a maximum of <strong>30 days</strong> from the receipt of the request. A confirmation email will be issued once the verification and deletion process is finalized.</p>
+<p><strong>Governing Jurisdiction:</strong> All data processing, privacy practices, and deletion policies are governed exclusively by the laws and regulations of the <strong>Hashemite Kingdom of Jordan</strong>.</p>
+</main>
+<footer><a href="/privacy">Privacy Policy</a> <a href="/terms">Terms of Service</a> <a href="/attribution-policy">Attribution Policy</a> <a href="/about">About</a> <a href="/contact">Contact</a></footer>
+</div>
+  </div>
+  <noscript>This site needs JavaScript enabled to run its interactive engineering simulators.</noscript>
+</body>
+
+</html>

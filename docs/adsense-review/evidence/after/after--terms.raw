@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="description"
+    content="MAE Academy terms of service." />
+  <meta name="google-adsense-account" content="ca-pub-1937330840014217" />
+  <link rel="canonical" href="https://maeacademy.org/terms" />
+  <meta property="og:title" content="Terms of Service — MAE Academy" />
+  <meta property="og:description" content="MAE Academy terms of service." />
+  <meta property="og:url" content="https://maeacademy.org/terms" />
+  <title>Terms of Service — MAE Academy</title>
+  <script>
+    /* Apply the stored theme before first paint so the splash never flashes the wrong colour. */
+    try { if (localStorage.getItem("theme") === "dark") document.documentElement.classList.add("dark"); } catch (e) {}
+  </script>
+  <style>
+    html { background: #fff; }
+    html.dark { background: #000; color-scheme: dark; }
+    body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+    /* Crawler-readable fallback stays in the DOM but is never painted unstyled. */
+    #mae-seo { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+    #mae-splash { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: #fff; }
+    html.dark #mae-splash { background: #000; }
+    #mae-splash::before { content: ""; width: 34px; height: 34px; border-radius: 50%; border: 3px solid rgba(124,58,237,.18); border-top-color: #7c3aed; animation: mae-spin .8s linear infinite; }
+    @keyframes mae-spin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) { #mae-splash::before { animation-duration: 2s; } }
+  </style>
+  <noscript><style>#mae-splash{display:none}#mae-seo{position:static;width:auto;height:auto;margin:0;overflow:visible;clip:auto;white-space:normal}</style></noscript>
+  <link rel="icon" type="image/svg+xml" href="/mae.svg" />
+  <link rel="alternate icon" href="/favicon.ico" />
+  <link rel="apple-touch-icon" href="/mae.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1937330840014217"
+    crossorigin="anonymous"></script>
+  <!-- Fonts load without blocking first paint (swap shows the system font until they arrive). -->
+  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Poppins:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,400&family=Tajawal:wght@400;500;700;800;900&display=swap"
+    onload="this.onload=null;this.rel='stylesheet'" />
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Poppins:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,400&family=Tajawal:wght@400;500;700;800;900&display=swap" /></noscript>
+  <script type="module" crossorigin src="/assets/index-CuwLxTpB.js"></script>
+  <link rel="modulepreload" crossorigin href="/assets/vendor-i18n-C7e7LjlC.js">
+  <link rel="modulepreload" crossorigin href="/assets/vendor-react-CxR3fN16.js">
+  <link rel="modulepreload" crossorigin href="/assets/vendor-icons-CVX_FV2m.js">
+  <link rel="stylesheet" crossorigin href="/assets/index-CdC_kHz9.css">
+</head>
+
+<body>
+  <div id="root">
+    <div id="mae-splash" aria-hidden="true"></div>
+    <div id="mae-seo">
+<header><a href="/">MAE Academy</a><nav aria-label="Primary"><a href="/simulations">Simulations</a> <a href="/research">Research</a> <a href="/library">Library</a> <a href="/about">About</a> <a href="/contact">Contact</a></nav></header>
+<main>
+<h1>Terms of Service</h1>
+<p>Effective Date: September 29, 2026 • MAE Academy</p>
+<p>Welcome to MAE Academy (<a href="https://maeacademy.org" target="_blank" rel="noopener noreferrer">https://maeacademy.org</a>). By accessing or using our website, interactive tools, and educational resources, you acknowledge that you have read, understood, and agreed to be bound by these Terms of Service.</p>
+<h2>Description of Service</h2>
+<p>MAE Academy is an open educational platform offering interactive engineering simulators, technical explanations, and curated references to open-access academic literature and publications, provided without mandatory registration or subscription fees.</p>
+<h2>Intellectual Property Rights & Permitted Use</h2>
+<p><strong>Proprietary Content:</strong> All original platform code, interactive simulations, custom diagrams, visual assets, and written tutorials are the property of MAE Academy. You may not copy, reverse-engineer, scrape, redistribute, or exploit this proprietary content for commercial gain without explicit prior written authorization.</p>
+<p><strong>Open-Source Literature:</strong> Open-access papers and third-party references are provided strictly for academic and educational purposes under their respective open-access licenses (e.g., Creative Commons).</p>
+<h2>Engineering & Educational Disclaimer</h2>
+<p>All simulators, computational tools, and technical explanations are provided strictly on an "as-is" and "as-available" basis for educational and self-study purposes only.</p>
+<p>While we strive for mathematical and theoretical accuracy, MAE Academy disclaims all liability for any computational inaccuracies, unintended errors, or practical decisions made based directly on these tools without independent professional verification and standard industrial compliance checks.</p>
+<h2>External Links and Advertisements</h2>
+<p>Our site may contain links to external third-party websites or advertisements provided by advertising networks (such as Google). We do not control, endorse, or assume responsibility for the content, privacy practices, or accuracy of third-party domains.</p>
+<h2>Governing Law and Jurisdiction</h2>
+<p>These Terms and any disputes arising out of or related to your use of this platform shall be governed by and construed in accordance with the laws of the Hashemite Kingdom of Jordan, and the competent courts of Jordan shall have exclusive jurisdiction.</p>
+<h2>Contact Information</h2>
+<p>For any legal inquiries, copyright concerns, or questions regarding these terms, please contact: <a href="mailto:contact@maeacademy.org">contact@maeacademy.org</a></p>
+<h2>Automated Instagram Services & Resource Delivery</h2>
+<p>MAE Academy provides automated social media integrations (including Instagram comment-to-DM delivery) to facilitate seamless, free access to open educational simulation tools and academic references.</p>
+<p>Users agree to interact with these automated systems solely for bona fide educational purposes. Any attempt to flood, exploit, spam, reverse-engineer, or disrupt the automated messaging infrastructure or Meta Graph API endpoints is strictly prohibited.</p>
+<p>MAE Academy reserves the right to rate-limit or suspend automated interactions for any user or account exhibiting abusive or automated bot activity.</p>
+</main>
+<footer><a href="/privacy">Privacy Policy</a> <a href="/terms">Terms of Service</a> <a href="/attribution-policy">Attribution Policy</a> <a href="/about">About</a> <a href="/contact">Contact</a></footer>
+</div>
+  </div>
+  <noscript>This site needs JavaScript enabled to run its interactive engineering simulators.</noscript>
+</body>
+
+</html>

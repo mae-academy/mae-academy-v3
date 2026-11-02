@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="description"
+    content="MAE Academy: a global platform for academic research, engineering courses, and practical simulations." />
+  <meta name="google-adsense-account" content="ca-pub-1937330840014217" />
+  <link rel="canonical" href="https://maeacademy.org/" />
+  <meta property="og:title" content="Model. Analyze. Engineering — MAE Academy" />
+  <meta property="og:description" content="MAE Academy: a global platform for academic research, engineering courses, and practical simulations." />
+  <meta property="og:url" content="https://maeacademy.org/" />
+  <title>Model. Analyze. Engineering — MAE Academy</title>
+  <script type="application/ld+json" id="mae-landing-jsonld">
+  {
+    "@context": "https://schema.org",
+    "@type": ["WebApplication", "EducationalApplication"],
+    "name": "MAE Academy Engineering Simulators",
+    "description": "Free online engineering simulators: PLC ladder logic, Arduino UNO, Python/C++/8086 code studio, digital logic, signals and systems, control systems, power electronics and circuits.",
+    "url": "https://maeacademy.org/",
+    "applicationCategory": "EducationalApplication",
+    "operatingSystem": "Any (web browser)",
+    "inLanguage": ["en", "ar", "es"],
+    "isAccessibleForFree": true,
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+    "provider": { "@type": "Organization", "name": "MAE Academy", "url": "https://maeacademy.org/" },
+    "featureList": [
+      "PLC ladder logic and Siemens LOGO! simulator",
+      "Arduino UNO simulator with serial monitor",
+      "Online Python, C++, C and 8086 assembly visualizer",
+      "Digital logic: gates, K-map, FSM, timing diagrams",
+      "Signals and systems: Fourier, Laplace, convolution",
+      "Control systems: root locus, Bode, PID, state space",
+      "Power electronics: rectifiers, choppers, inverters"
+    ]
+  }
+  </script>
+  <script>
+    /* Apply the stored theme before first paint so the splash never flashes the wrong colour. */
+    try { if (localStorage.getItem("theme") === "dark") document.documentElement.classList.add("dark"); } catch (e) {}
+  </script>
+  <style>
+    html { background: #fff; }
+    html.dark { background: #000; color-scheme: dark; }
+    body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+    /* Crawler-readable fallback stays in the DOM but is never painted unstyled. */
+    #mae-seo { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+    #mae-splash { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: #fff; }
+    html.dark #mae-splash { background: #000; }
+    #mae-splash::before { content: ""; width: 34px; height: 34px; border-radius: 50%; border: 3px solid rgba(124,58,237,.18); border-top-color: #7c3aed; animation: mae-spin .8s linear infinite; }
+    @keyframes mae-spin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) { #mae-splash::before { animation-duration: 2s; } }
+  </style>
+  <noscript><style>#mae-splash{display:none}#mae-seo{position:static;width:auto;height:auto;margin:0;overflow:visible;clip:auto;white-space:normal}</style></noscript>
+  <link rel="icon" type="image/svg+xml" href="/mae.svg" />
+  <link rel="alternate icon" href="/favicon.ico" />
+  <link rel="apple-touch-icon" href="/mae.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1937330840014217"
+    crossorigin="anonymous"></script>
+  <!-- Fonts load without blocking first paint (swap shows the system font until they arrive). -->
+  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Poppins:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,400&family=Tajawal:wght@400;500;700;800;900&display=swap"
+    onload="this.onload=null;this.rel='stylesheet'" />
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Poppins:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,400&family=Tajawal:wght@400;500;700;800;900&display=swap" /></noscript>
+  <script type="module" crossorigin src="/assets/index-CuwLxTpB.js"></script>
+  <link rel="modulepreload" crossorigin href="/assets/vendor-i18n-C7e7LjlC.js">
+  <link rel="modulepreload" crossorigin href="/assets/vendor-react-CxR3fN16.js">
+  <link rel="modulepreload" crossorigin href="/assets/vendor-icons-CVX_FV2m.js">
+  <link rel="stylesheet" crossorigin href="/assets/index-CdC_kHz9.css">
+</head>
+
+<body>
+  <div id="root">
+    <div id="mae-splash" aria-hidden="true"></div>
+    <div id="mae-seo">
+<header><a href="/">MAE Academy</a><nav aria-label="Primary"><a href="/simulations">Simulations</a> <a href="/research">Research</a> <a href="/library">Library</a> <a href="/about">About</a> <a href="/contact">Contact</a></nav></header>
+<main>
+<h1>Welcome to MAE Academy</h1>
+<p>Model-Analyze-Engineering</p>
+<p>Interactive labs for control systems, power electronics, and signal analysis — build intuition by running the model, not just reading about it.</p>
+<p>Launch a Simulation</p>
+<p>Explore Library</p>
+<p>Engineering education becomes powerful when it remains close to the real system.</p>
+<p>Engineering education becomes powerful when it remains close to the real system. MAE Academy turns abstract engineering curiosity into structured models, analytical clarity, and hands-on simulation.</p>
+<p>Mohammad AbuElyan</p>
+<p>Founder & Engineering Educator // MAE</p>
+<p>Meet the founder and the MAE premise behind the platform: Model. Analyze. Engineering.</p>
+<p>Meet the Founder & About MAE</p>
+<p>Core Engineering Platforms</p>
+<p>Three interconnected learning layers bridging rigorous mathematical theory with interactive, real-time hardware intuition.</p>
+<p>Practical Simulations & Virtual Lab Benches</p>
+<p>Bridge abstract mathematics with interactive, real-time physical simulation. Explore state transitions, transient settling curves, and feedback responses instantly in your browser.</p>
+<p>Control Systems Simulator</p>
+<p>Electrical Circuits Simulator</p>
+<p>Power Electronics Simulator</p>
+<p>Explore All Simulations</p>
+<p>Open Textbooks & Engineering Manuals</p>
+<p>Open textbooks, technical manuals, and foundational references in engineering, computing, mathematics, and physics, readable in the browser straight from open archives.</p>
+<p>Electrical & Electronics</p>
+<p>Computer Science</p>
+<p>Robotics & Control</p>
+<p>Mechanical & Structural</p>
+<p>Explore Academic Library</p>
+<p>Mathematical Research & System Identification</p>
+<p>Open research notes, mathematical formulations, transfer functions, and algorithmic proofs behind our simulations. Grounded in numerical physics and validated against benchmark experiments.</p>
+<p>Nonlinear System Identification</p>
+<p>Dynamic Simulation Solvers</p>
+<p>Algorithmic Derivations & Proofs</p>
+<p>Explore Research Notes</p>
+</main>
+<footer><a href="/privacy">Privacy Policy</a> <a href="/terms">Terms of Service</a> <a href="/attribution-policy">Attribution Policy</a> <a href="/about">About</a> <a href="/contact">Contact</a></footer>
+</div>
+  </div>
+  <noscript>This site needs JavaScript enabled to run its interactive engineering simulators.</noscript>
+</body>
+
+</html>

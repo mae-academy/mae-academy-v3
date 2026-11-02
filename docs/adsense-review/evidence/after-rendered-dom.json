@@ -1,0 +1,75 @@
+[
+ {
+  "u": "/",
+  "staticTitle": "Model. Analyze. Engineering — MAE Academy",
+  "seoLeft": false,
+  "title": "Model. Analyze. Engineering — MAE Academy",
+  "canonical": "https://maeacademy.org/",
+  "canonicalCount": 1,
+  "h2": [],
+  "words": 357,
+  "pageErrors": []
+ },
+ {
+  "u": "/simulations/control-systems/pid",
+  "staticTitle": "Online PID Tuner &amp; Controller Simulator – Step Response | MAE Academy",
+  "seoLeft": false,
+  "title": "Online PID Tuner & Controller Simulator – Step Response | MAE Academy",
+  "canonical": "https://maeacademy.org/simulations/control-systems/pid",
+  "canonicalCount": 1,
+  "h2": [
+   "PID Controller"
+  ],
+  "words": 2174,
+  "pageErrors": []
+ },
+ {
+  "u": "/simulations/plc",
+  "staticTitle": "Online PLC Ladder Logic Simulator (Siemens S7-200) | MAE Academy",
+  "seoLeft": false,
+  "title": "Online PLC Ladder Logic Simulator (Siemens S7-200) | MAE Academy",
+  "canonical": "https://maeacademy.org/simulations/plc",
+  "canonicalCount": 1,
+  "h2": [
+   "Ladder logic on the Siemens Simatic S7-200"
+  ],
+  "words": 1922,
+  "pageErrors": []
+ },
+ {
+  "u": "/privacy",
+  "staticTitle": "Privacy Policy — MAE Academy",
+  "seoLeft": false,
+  "title": "Privacy Policy — MAE Academy",
+  "canonical": "https://maeacademy.org/privacy",
+  "canonicalCount": 1,
+  "h2": [
+   "Information Collection & User Accounts",
+   "Instagram Automation & Educational Resource Integration"
+  ],
+  "words": 855,
+  "pageErrors": []
+ },
+ {
+  "u": "/about",
+  "staticTitle": "Founder &amp; Leadership — MAE Academy",
+  "seoLeft": false,
+  "title": "Founder & Leadership — MAE Academy",
+  "canonical": "https://maeacademy.org/about",
+  "canonicalCount": 1,
+  "h2": [],
+  "words": 637,
+  "pageErrors": []
+ },
+ {
+  "u": "/library",
+  "staticTitle": "Academic Library — MAE Academy",
+  "seoLeft": false,
+  "title": "Academic Library — MAE Academy",
+  "canonical": "https://maeacademy.org/library",
+  "canonicalCount": 1,
+  "h2": [],
+  "words": 123,
+  "pageErrors": []
+ }
+]

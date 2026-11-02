@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="description"
+    content="Applied laboratories for control, electronics, computation, mathematics, and connected engineering systems." />
+  <meta name="google-adsense-account" content="ca-pub-1937330840014217" />
+  <link rel="canonical" href="https://maeacademy.org/simulations" />
+  <meta property="og:title" content="Interactive Simulations — MAE Academy" />
+  <meta property="og:description" content="Applied laboratories for control, electronics, computation, mathematics, and connected engineering systems." />
+  <meta property="og:url" content="https://maeacademy.org/simulations" />
+  <title>Interactive Simulations — MAE Academy</title>
+  <script>
+    /* Apply the stored theme before first paint so the splash never flashes the wrong colour. */
+    try { if (localStorage.getItem("theme") === "dark") document.documentElement.classList.add("dark"); } catch (e) {}
+  </script>
+  <style>
+    html { background: #fff; }
+    html.dark { background: #000; color-scheme: dark; }
+    body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+    /* Crawler-readable fallback stays in the DOM but is never painted unstyled. */
+    #mae-seo { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+    #mae-splash { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: #fff; }
+    html.dark #mae-splash { background: #000; }
+    #mae-splash::before { content: ""; width: 34px; height: 34px; border-radius: 50%; border: 3px solid rgba(124,58,237,.18); border-top-color: #7c3aed; animation: mae-spin .8s linear infinite; }
+    @keyframes mae-spin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) { #mae-splash::before { animation-duration: 2s; } }
+  </style>
+  <noscript><style>#mae-splash{display:none}#mae-seo{position:static;width:auto;height:auto;margin:0;overflow:visible;clip:auto;white-space:normal}</style></noscript>
+  <link rel="icon" type="image/svg+xml" href="/mae.svg" />
+  <link rel="alternate icon" href="/favicon.ico" />
+  <link rel="apple-touch-icon" href="/mae.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1937330840014217"
+    crossorigin="anonymous"></script>
+  <!-- Fonts load without blocking first paint (swap shows the system font until they arrive). -->
+  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Poppins:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,400&family=Tajawal:wght@400;500;700;800;900&display=swap"
+    onload="this.onload=null;this.rel='stylesheet'" />
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Poppins:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,400&family=Tajawal:wght@400;500;700;800;900&display=swap" /></noscript>
+  <script type="module" crossorigin src="/assets/index-CuwLxTpB.js"></script>
+  <link rel="modulepreload" crossorigin href="/assets/vendor-i18n-C7e7LjlC.js">
+  <link rel="modulepreload" crossorigin href="/assets/vendor-react-CxR3fN16.js">
+  <link rel="modulepreload" crossorigin href="/assets/vendor-icons-CVX_FV2m.js">
+  <link rel="stylesheet" crossorigin href="/assets/index-CdC_kHz9.css">
+</head>
+
+<body>
+  <div id="root">
+    <div id="mae-splash" aria-hidden="true"></div>
+    <div id="mae-seo">
+<header><a href="/">MAE Academy</a><nav aria-label="Primary"><a href="/simulations">Simulations</a> <a href="/research">Research</a> <a href="/library">Library</a> <a href="/about">About</a> <a href="/contact">Contact</a></nav></header>
+<main>
+<h1>Build, test, and read the system response.</h1><p>Applied laboratories for control, electronics, computation, mathematics, and connected engineering systems.</p>
+<ul><li><a href="/simulations/control-systems">Control Systems</a> — Tune feedback, stability, and transient response inside a visible control loop.</li><li><a href="/simulations/circuit-lab">Electrical Circuits</a> — Probe current, voltage, and signal behavior across an interactive circuit bench.</li><li><a href="/simulations/power-electronics">Power Electronics</a> — Test switching topologies, conversion stages, and power-flow decisions.</li><li><a href="/simulations/code">Code Studio</a> — Interactive Multi-Language Simulation &amp; Trace Studio (MASM 8086, Python, C++, C).</li><li><a href="/simulations/plc">PLC</a> — Build ladder logic and observe industrial control sequences in motion.</li><li><a href="/simulations/signals-and-systems">Signals and Systems</a> — Transform, filter, and interpret signals across time and frequency domains.</li><li><a href="/simulations/digital-logic-design">Digital Logic Design</a> — Compose gates, truth states, and logic paths into working digital systems.</li><li><a href="/simulators/arduino-studio">Arduino Studio</a> — Embedded Systems &amp; Microcontrollers: write Arduino C++ and watch an interactive UNO board, serial monitor, and live plotter respond.</li><li><a href="/simulations/pneumatics-and-hydraulics">Pneumatics and Hydraulic Drive</a> — Interactive electro-pneumatic and hydraulic circuit simulation with animated component dissection.</li></ul>
+<section><h2>How the MAE Academy simulators work</h2><p>MAE Academy is a free set of browser-based engineering labs. Each simulator runs a real numerical model behind the interface, so changing a parameter changes the computed response instead of replaying a canned animation. Nothing needs to be installed and there is no sign-up.</p><p>The labs are built for students and self-taught engineers who want to check a hand calculation, see why a circuit or controller behaves the way it does, or practise a technique before an exam or a project.</p>
+<h3>What you can explore</h3><ul><li><a href="/simulations/plc">PLC and Siemens LOGO!</a><p>Write ladder logic or function block diagrams, force inputs and watch scan-by-scan outputs, timers and counters. Useful for learning interlocks, start/stop circuits and sequencing.</p></li><li><a href="/simulations/arduino-studio">Arduino UNO</a><p>Run sketches against a virtual board with pins, a serial monitor and a plotter, so you can debug timing and I/O logic without hardware.</p></li><li><a href="/simulations/code/python">Python, C, C++ and 8086 assembly</a><p>Step through programs line by line and see variables, memory, registers and the stack change, which makes pointers, recursion and flags much easier to understand.</p></li><li><a href="/simulations/digital-logic-design?tool=schematic">Digital logic design</a><p>Build gate-level circuits, minimise expressions with Karnaugh maps, analyse timing diagrams and design finite state machines.</p></li><li><a href="/simulations/signals-and-systems/fourier-analysis">Signals and systems</a><p>Explore convolution, Fourier series and transforms, Laplace and Z-transforms, and classify systems as linear, causal, stable or time-invariant.</p></li><li><a href="/simulations/control-systems/root-locus">Control systems</a><p>Plot root locus, Bode and Nyquist diagrams, tune PID controllers against a step response and study state-space models.</p></li><li><a href="/simulations/power-electronics/rectifier">Power electronics</a><p>Study controlled rectifiers, AC voltage controllers, DC-DC converters and PWM inverters with waveforms for voltage, current and harmonic content.</p></li><li><a href="/simulations/circuit-lab">Electrical circuits</a><p>Draw a schematic and run DC, AC and transient analysis to read node voltages and branch currents.</p></li></ul>
+<h3>Getting the most out of a lab</h3><ul><li>Start from a known case, such as a textbook circuit or a transfer function from your course, and compare the result with your hand solution before changing anything.</li><li>Change one parameter at a time and note what moves. Most simulators show the governing equations or documentation below the workspace so you can connect the plot to the theory.</li><li>Treat results as a learning aid. For safety-critical or production designs, confirm with the relevant standards and your own verification.</li></ul></section>
+</main>
+<footer><a href="/privacy">Privacy Policy</a> <a href="/terms">Terms of Service</a> <a href="/attribution-policy">Attribution Policy</a> <a href="/about">About</a> <a href="/contact">Contact</a></footer>
+</div>
+  </div>
+  <noscript>This site needs JavaScript enabled to run its interactive engineering simulators.</noscript>
+</body>
+
+</html>

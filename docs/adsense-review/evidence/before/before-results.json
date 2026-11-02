@@ -1,0 +1,232 @@
+[
+ {
+  "url": "/",
+  "status": 200,
+  "bytes": 5798,
+  "words": 62,
+  "adsense_in_head": true,
+  "canonical": null,
+  "title": "MAE Academy \u2014 Free Online Engineering Simulators & Courses",
+  "challenge": false
+ },
+ {
+  "url": "/simulations",
+  "status": 200,
+  "bytes": 5798,
+  "words": 62,
+  "adsense_in_head": true,
+  "canonical": null,
+  "title": "MAE Academy \u2014 Free Online Engineering Simulators & Courses",
+  "challenge": false
+ },
+ {
+  "url": "/simulations/control-systems/pid",
+  "status": 200,
+  "bytes": 5798,
+  "words": 62,
+  "adsense_in_head": true,
+  "canonical": null,
+  "title": "MAE Academy \u2014 Free Online Engineering Simulators & Courses",
+  "challenge": false
+ },
+ {
+  "url": "/simulations/control-systems/root-locus",
+  "status": 200,
+  "bytes": 5798,
+  "words": 62,
+  "adsense_in_head": true,
+  "canonical": null,
+  "title": "MAE Academy \u2014 Free Online Engineering Simulators & Courses",
+  "challenge": false
+ },
+ {
+  "url": "/simulations/power-electronics/rectifier",
+  "status": 200,
+  "bytes": 5798,
+  "words": 62,
+  "adsense_in_head": true,
+  "canonical": null,
+  "title": "MAE Academy \u2014 Free Online Engineering Simulators & Courses",
+  "challenge": false
+ },
+ {
+  "url": "/simulations/plc",
+  "status": 200,
+  "bytes": 5798,
+  "words": 62,
+  "adsense_in_head": true,
+  "canonical": null,
+  "title": "MAE Academy \u2014 Free Online Engineering Simulators & Courses",
+  "challenge": false
+ },
+ {
+  "url": "/simulations/code/masm8086",
+  "status": 200,
+  "bytes": 5798,
+  "words": 62,
+  "adsense_in_head": true,
+  "canonical": null,
+  "title": "MAE Academy \u2014 Free Online Engineering Simulators & Courses",
+  "challenge": false
+ },
+ {
+  "url": "/library",
+  "status": 200,
+  "bytes": 5798,
+  "words": 62,
+  "adsense_in_head": true,
+  "canonical": null,
+  "title": "MAE Academy \u2014 Free Online Engineering Simulators & Courses",
+  "challenge": false
+ },
+ {
+  "url": "/library/ia:example-id",
+  "status": 200,
+  "bytes": 5798,
+  "words": 62,
+  "adsense_in_head": true,
+  "canonical": null,
+  "title": "MAE Academy \u2014 Free Online Engineering Simulators & Courses",
+  "challenge": false
+ },
+ {
+  "url": "/research",
+  "status": 200,
+  "bytes": 5798,
+  "words": 62,
+  "adsense_in_head": true,
+  "canonical": null,
+  "title": "MAE Academy \u2014 Free Online Engineering Simulators & Courses",
+  "challenge": false
+ },
+ {
+  "url": "/research/W2741809807",
+  "status": 200,
+  "bytes": 5798,
+  "words": 62,
+  "adsense_in_head": true,
+  "canonical": null,
+  "title": "MAE Academy \u2014 Free Online Engineering Simulators & Courses",
+  "challenge": false
+ },
+ {
+  "url": "/about",
+  "status": 200,
+  "bytes": 5798,
+  "words": 62,
+  "adsense_in_head": true,
+  "canonical": null,
+  "title": "MAE Academy \u2014 Free Online Engineering Simulators & Courses",
+  "challenge": false
+ },
+ {
+  "url": "/contact",
+  "status": 200,
+  "bytes": 5798,
+  "words": 62,
+  "adsense_in_head": true,
+  "canonical": null,
+  "title": "MAE Academy \u2014 Free Online Engineering Simulators & Courses",
+  "challenge": false
+ },
+ {
+  "url": "/privacy",
+  "status": 200,
+  "bytes": 5798,
+  "words": 62,
+  "adsense_in_head": true,
+  "canonical": null,
+  "title": "MAE Academy \u2014 Free Online Engineering Simulators & Courses",
+  "challenge": false
+ },
+ {
+  "url": "/privacy-policy",
+  "status": 200,
+  "bytes": 5798,
+  "words": 62,
+  "adsense_in_head": true,
+  "canonical": null,
+  "title": "MAE Academy \u2014 Free Online Engineering Simulators & Courses",
+  "challenge": false
+ },
+ {
+  "url": "/terms",
+  "status": 200,
+  "bytes": 5798,
+  "words": 62,
+  "adsense_in_head": true,
+  "canonical": null,
+  "title": "MAE Academy \u2014 Free Online Engineering Simulators & Courses",
+  "challenge": false
+ },
+ {
+  "url": "/attribution-policy",
+  "status": 200,
+  "bytes": 5798,
+  "words": 62,
+  "adsense_in_head": true,
+  "canonical": null,
+  "title": "MAE Academy \u2014 Free Online Engineering Simulators & Courses",
+  "challenge": false
+ },
+ {
+  "url": "/ar",
+  "status": 404,
+  "bytes": 1029,
+  "words": 25,
+  "adsense_in_head": false,
+  "canonical": null,
+  "title": "Page not found | MAE Academy",
+  "challenge": false
+ },
+ {
+  "url": "/es",
+  "status": 404,
+  "bytes": 1029,
+  "words": 25,
+  "adsense_in_head": false,
+  "canonical": null,
+  "title": "Page not found | MAE Academy",
+  "challenge": false
+ },
+ {
+  "url": "/robots.txt",
+  "status": 200,
+  "bytes": 198,
+  "words": null,
+  "adsense_in_head": false,
+  "canonical": null,
+  "title": null,
+  "challenge": false
+ },
+ {
+  "url": "/sitemap.xml",
+  "status": 200,
+  "bytes": 5774,
+  "words": null,
+  "adsense_in_head": false,
+  "canonical": null,
+  "title": null,
+  "challenge": false
+ },
+ {
+  "url": "/ads.txt",
+  "status": 200,
+  "bytes": 59,
+  "words": null,
+  "adsense_in_head": false,
+  "canonical": null,
+  "title": null,
+  "challenge": false
+ },
+ {
+  "url": "/this-page-does-not-exist",
+  "status": 404,
+  "bytes": 1029,
+  "words": 25,
+  "adsense_in_head": false,
+  "canonical": null,
+  "title": "Page not found | MAE Academy",
+  "challenge": false
+ }
+]

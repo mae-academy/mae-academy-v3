@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Page not found | MAE Academy</title>
+  <link rel="icon" type="image/svg+xml" href="/mae.svg" />
+  <style>
+    body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; font-family: system-ui, sans-serif; background: #0b0b0f; color: #e7e7ee; text-align: center; padding: 1rem; }
+    main { max-width: 32rem; }
+    h1 { font-size: 3rem; margin: 0 0 .5rem; }
+    a { color: #a78bfa; }
+    nav a { margin: 0 .5rem; }
+  </style>
+</head>
+
+<body>
+  <main>
+    <h1>404</h1>
+    <h2>Page not found</h2>
+    <p>The page you are looking for does not exist or has moved.</p>
+    <nav aria-label="Primary">
+      <a href="/">Home</a>
+      <a href="/simulations">Simulations</a>
+      <a href="/about">About</a>
+      <a href="/contact">Contact</a>
+    </nav>
+  </main>
+</body>
+
+</html>
