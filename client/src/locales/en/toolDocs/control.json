@@ -67,7 +67,7 @@
     },
     "applications": [
       { "field": "Robotics", "body": "Choosing the proportional gain of a joint position loop so that the dominant poles stay well damped and away from the imaginary axis." },
-      { "field": "Aerospace", "body": "Studying how an autopilot gain moves the short-period and phugoid poles, and finding the gain at which flutter-like oscillation begins." },
+      { "field": "Aerospace", "body": "Studying how an autopilot gain moves the short-period and phugoid poles as the gain changes." },
       { "field": "Manufacturing", "body": "Tuning the loop gain of a motorised conveyor or press drive to avoid sustained oscillation when load inertia changes." },
       { "field": "Power systems", "body": "Setting automatic voltage regulator gain so that generator excitation control stays stable across operating points." }
     ]
@@ -83,11 +83,11 @@
       },
       {
         "heading": "Derivative filter",
-        "body": "A pure derivative is not realisable and amplifies measurement noise. The filter coefficient $N$ adds a pole at $s = -N/T_d$ and limits the high-frequency gain of the controller to $K_p(1 + N)$. Typical values lie between $5$ and $20$, and a larger $N$ gives a faster derivative at the price of more noise."
+        "body": "A pure derivative is not realisable and amplifies measurement noise. In this tool the filter is applied only by the modified subtypes (Parallel Modified and Series Modified), where the derivative term is $K_d s/(1 + s/N)$: the filter pole sits at $s = -N$ and the high-frequency derivative gain is $K_d N$. The textbook ISA form, $C(s) = K_p(1 + 1/(T_i s) + T_d s/((T_d/N)s + 1))$, has its filter pole at $s = -N/T_d$ and high-frequency gain $K_p(1 + N)$; it is the reference form, not a setting of this tool. The default subtype, Parallel Standard, has no filter, so $N$ has no effect on it. Typical values of $N$ lie between $5$ and $20$, and a larger $N$ gives a faster derivative at the price of more noise."
       },
       {
         "heading": "Integrator anti-windup",
-        "body": "When the actuator saturates, the integral state keeps growing and later causes a long overshoot. Clamping freezes the integrator whenever the unsaturated command $v$ lies outside $[u_{min}, u_{max}]$ and the error has the same sign as $v$. The integrator resumes as soon as the error drives the command back into range."
+        "body": "Background, not simulated by this tool: the simulator is linear and has no actuator saturation, so the clamp below is never active in any scope shown here. In a real controller, when the actuator saturates, the integral state keeps growing and later causes a long overshoot. Clamping freezes the integrator whenever the unsaturated command $v$ lies outside $[u_{min}, u_{max}]$ and the error has the same sign as $v$. The integrator resumes as soon as the error drives the command back into range."
       },
       {
         "heading": "Transient metrics",
@@ -107,10 +107,10 @@
     "mapping": [
       { "term": "Plant transfer function", "body": "The numerator and denominator you enter define $G(s)$. The closed loop is built as $C(s)G(s)/(1 + C(s)G(s))$." },
       { "term": "Controller Architecture: P, I, D, PI, PD, PID", "body": "Selects which terms are active. Only the gain sliders that apply to the chosen structure are shown, for example $K_i$ is hidden for P and PD." },
-      { "term": "Controller Form", "body": "Chooses between the parallel, series, parallel standard, parallel modified, series standard and series modified forms, which change how $K_p$, $T_i$ and $T_d$ interact." },
-      { "term": "Gain sliders $K_p$, $K_i$, $K_d$, $N$", "body": "Set the controller coefficients. The defaults are $K_p = 2$, $K_i = 1$, $K_d = 0.2$ and $N = 100$, with $N$ limited to the range from $1$ to $500$." },
+      { "term": "Controller Form", "body": "Chooses between the parallel, series, parallel standard, parallel modified, series standard and series modified forms. The default is Parallel Standard, which uses $K_p$, $K_i$ and $K_d$ directly with no derivative filter. The modified forms add the filter $1 + s/N$, so $N$ affects only them." },
+      { "term": "Gain sliders $K_p$, $K_i$, $K_d$, $N$", "body": "Set the controller coefficients. The defaults are $K_p = 2$, $K_i = 1$, $K_d = 0.2$ and $N = 100$, with $N$ limited to the range from $1$ to $500$. $N$ is used only by the modified forms (see Controller Form)." },
       { "term": "Reference signal", "body": "Impulse, step, ramp, parabolic, exponential, sine or cosine, with a magnitude and a parameter. Ramp and parabolic inputs expose steady-state error of higher system types." },
-      { "term": "Interactive scope", "body": "Plots $r(t)$ and $y(t)$ over a horizon of $1$ to $60$ seconds, starting at $12\\text{ s}$." },
+      { "term": "Interactive scope", "body": "Plots $r(t)$ and $y(t)$ from $t = 0$ to a maximum time $t_{max}$ that can be set from $1$ to $60$ seconds; the default is $12$ seconds." },
       { "term": "Design by Specs", "body": "Takes a target $\\zeta$ in the range $0.01$ to $2$ and a target $\\omega_n$, and proposes gains for the second-order specification." },
       { "term": "Transient Metrics card", "body": "Reports the measured overshoot, peak time, settling time and steady-state error from the simulated response." }
     ],
@@ -139,7 +139,7 @@
           "tex": "t_r \\approx \\frac{\\pi - 1.047}{3.464} \\approx 0.605\\text{ s}"
         }
       ],
-      "result": "The parallel gains are $K_i = 4$ and $K_d = 0.2$, the filter pole is at $-100\\text{ rad/s}$, and the loop is expected to show $M_p \\approx 16.3\\%$, $t_s \\approx 2\\text{ s}$, $t_p \\approx 0.907\\text{ s}$ and $t_r \\approx 0.605\\text{ s}$."
+      "result": "The parallel gains are $K_i = 4$ and $K_d = 0.2$, and the textbook ISA filter pole is at $-100\\text{ rad/s}$. For a second-order closed loop with $\\zeta = 0.5$ and $\\omega_n = 4\\text{ rad/s}$, the metrics are $M_p \\approx 16.3\\%$, $t_s \\approx 2\\text{ s}$, $t_p \\approx 0.907\\text{ s}$ and $t_r \\approx 0.605\\text{ s}$. This is a calculation only: the tool takes $K_i$ and $K_d$ directly, and these metrics hold only for a plant that produces a dominant second-order closed loop with those values."
     },
     "applications": [
       { "field": "Motor drives", "body": "Speed and current loops of servo drives, where anti-windup protects against voltage and current limits during acceleration." },
@@ -186,7 +186,7 @@
       { "term": "Gain Compensation slider", "body": "Multiplies the loop by a constant $K$ from $0.01$ to $10$. It shifts the magnitude curve vertically by $20\\log_{10}K$ and leaves the phase unchanged, so the gain margin changes while $\\omega_{pc}$ stays fixed." },
       { "term": "Margin markers", "body": "Show $\\omega_{gc}$, $\\omega_{pc}$, $GM$ and $PM$ directly on the plot." },
       { "term": "Factor selection", "body": "Lets you toggle individual first-order and second-order factors to see their separate contributions to magnitude slope and phase." },
-      { "term": "Step response horizon", "body": "Sets the simulated window, from $1$ to $100$ seconds, for the closed-loop step plot." },
+      { "term": "Step response horizon", "body": "Sets the simulated window, from $1$ to $100$ seconds, for the closed-loop step plot. The default is $12$ seconds." },
       { "term": "Time-domain correlation", "body": "Reports $M_p$, $t_r$, $t_s$ and $e_{ss}$ so you can compare them with the margins." },
       { "term": "Step-by-step sketch tutor", "body": "Lists the corner frequencies $\\omega_c$ in order and the slope change at each one." }
     ],

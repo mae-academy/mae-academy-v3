@@ -397,7 +397,7 @@
     ],
     "example": {
       "title": "Sizing buck and boost stages at twenty kilohertz",
-      "problem": "Both converters switch at $f_s = 20\\text{ kHz}$. The buck has $V_{in} = 48\\text{ V}$, $D = 0.75$, $R = 6\\text{ }\\Omega$ and $L = 300\\text{ }\\mu\\text{H}$. The boost has $V_{in} = 12\\text{ V}$, $D = 0.6$, $R = 15\\text{ }\\Omega$ and $C = 100\\text{ }\\mu\\text{F}$. Find outputs, ripple and operating mode.",
+      "problem": "Both converters switch at $f_s = 20\\text{ kHz}$. The buck has $V_{in} = 48\\text{ V}$, $D = 0.75$, $R = 6\\text{ }\\Omega$ and $L = 300\\text{ }\\mu\\text{H}$. The boost has $V_{in} = 12\\text{ V}$, $D = 0.6$, $R = 15\\text{ }\\Omega$, $L = 100\\text{ }\\mu\\text{H}$ and $C = 100\\text{ }\\mu\\text{F}$. In the tool's millihenry fields, enter $0.3$ mH for the buck and $0.1$ mH for the boost. Find outputs, ripple and operating mode.",
       "steps": [
         {
           "text": "Buck output voltage and load current.",
@@ -416,11 +416,11 @@
           "tex": "V_o = \\frac{12}{1 - 0.6} = 30\\text{ V}, \\quad I_o = \\frac{30}{15} = 2\\text{ A}, \\quad \\Delta V_o = \\frac{2 \\times 0.6}{20000 \\times 100\\times 10^{-6}} = 0.6\\text{ V}"
         },
         {
-          "text": "Boost critical inductance, and the buck-boost output for the same $V_{in}$ and $D$ for comparison.",
+          "text": "Boost critical inductance: $L = 100\\,\\mu\\text{H}$ is above $36\\,\\mu\\text{H}$, so the boost operates in CCM. The buck-boost output for the same $V_{in}$ and $D$ is shown for comparison.",
           "tex": "L_{crit} = \\frac{0.6 \\times 0.4^2 \\times 15}{2 \\times 20000} = 36\\text{ }\\mu\\text{H}, \\qquad V_o = -\\frac{0.6}{0.4}\\times 12 = -18\\text{ V}"
         }
       ],
-      "result": "The buck delivers $36\\text{ V}$ at $6\\text{ A}$ with $\\Delta I_L = 1.5\\text{ A}$ in CCM, and the boost delivers $30\\text{ V}$ at $2\\text{ A}$ with $\\Delta V_o = 0.6\\text{ V}$. The buck-boost would output $-18\\text{ V}$ from the same source."
+      "result": "The buck delivers $36\\text{ V}$ at $6\\text{ A}$ with $\\Delta I_L = 1.5\\text{ A}$ in CCM, and the boost delivers $30\\text{ V}$ at $2\\text{ A}$ with $\\Delta V_o = 0.6\\text{ V}$. The boost is in CCM because its inductor exceeds the $36\\,\\mu\\text{H}$ critical value. The buck-boost would output $-18\\text{ V}$ from the same source."
     },
     "applications": [
       {

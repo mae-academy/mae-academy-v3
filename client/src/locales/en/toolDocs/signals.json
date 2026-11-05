@@ -237,7 +237,7 @@
   "laplace-s-plane": {
     "title": "3D Laplace and S-Plane",
     "intro": "This lab connects a transfer function to its pole-zero geometry, its region of convergence, its three-dimensional magnitude surface and its time response.",
-    "purpose": "The tool takes a transfer function $H(s)$, or an impulse response $h(t)$ from which it derives $H(s)$, and draws the Cartesian s-plane with draggable poles and zeros. It shades the region of convergence, reports causality and BIBO stability, and renders the magnitude $\\lvert H(\\sigma + j\\omega)\\rvert$ as a landscape in which poles are tall peaks and zeros are dips to the floor. A Discrete / Z-Transform mode offers the analogous unit-circle picture, but this article concerns the continuous Laplace mode.",
+    "purpose": "The tool takes a transfer function $H(s)$, or an impulse response $h(t)$ from which it derives $H(s)$, and draws the Cartesian s-plane with draggable poles and zeros. It shades the region of convergence, reports causality and BIBO stability, and renders the magnitude $\\lvert H(\\sigma + j\\omega)\\rvert$ as a landscape in which poles are tall peaks and zeros are dips to the floor. A Discrete / Z-Transform mode offers the analogous unit-circle picture, This page covers the continuous Laplace mode.",
     "model": [
       {
         "heading": "The bilateral Laplace transform",

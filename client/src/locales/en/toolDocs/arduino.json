@@ -18,7 +18,7 @@
       },
       {
         "heading": "External interrupts and UART",
-        "body": "attachInterrupt links an ISR to a pin edge on $\\texttt{INT0}$ or $\\texttt{INT1}$. The hardware needs at least four cycles, about $0.25\\text{ }\\mu\\text{s}$, before the first ISR instruction, and variables shared with loop must be declared $\\texttt{volatile}$. The USART divides the clock with $\\text{UBRR} = f_{osc}/(16 \\cdot \\text{Baud}) - 1$, rounded to an integer, so the real rate differs from the request by the error $e$ shown above. Errors beyond roughly $2\\text{ percent}$ make frames unreliable. The studio models the serial console and reports the baud passed to Serial.begin; its interrupt handling is a concept to practise on real hardware."
+        "body": "attachInterrupt links an ISR to a pin edge on $\\texttt{INT0}$ or $\\texttt{INT1}$. The hardware needs at least four cycles, about $0.25\\text{ }\\mu\\text{s}$, before the first ISR instruction, and variables shared with loop must be declared $\\texttt{volatile}$. The USART divides the clock with $\\text{UBRR} = f_{osc}/(16 \\cdot \\text{Baud}) - 1$, rounded to an integer, so the real rate differs from the request by the relative error $e = (\\text{Baud}_{real} - \\text{Baud})/\\text{Baud}$, worked out in the example below. Errors beyond roughly $2\\text{ percent}$ make frames unreliable. The studio models the serial console and reports the baud passed to Serial.begin; its interrupt handling is a concept to practise on real hardware."
       }
     ],
     "equations": [
@@ -59,7 +59,7 @@
       { "field": "Building automation", "body": "LM35 and LDR readings control fans and lamps, with thresholds set on the ADC code." },
       { "field": "Industrial monitoring", "body": "Serial links at a verified baud rate stream sensor data to a supervisory computer." },
       { "field": "Power conversion", "body": "Timer PWM at a chosen $N$ generates the switching signal of a buck converter controller." },
-      { "field": "Security systems", "body": "A PIR sensor wired to an external interrupt wakes the microcontroller only when motion occurs, saving energy." }
+      { "field": "Security systems", "body": "A PIR sensor wired to an external interrupt can wake a microcontroller on motion, the general pattern for saving energy. The studio itself has no sleep mode." }
     ]
   }
 }

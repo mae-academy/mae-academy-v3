@@ -293,7 +293,7 @@
           "text": "The population count of the mask is $\\vert S \\vert = 3$, which matches the three bit positions that differ in the toggle case, since $\\texttt{0x0F}$ and $\\texttt{0x5D}$ differ in bits $1$, $4$ and $6$."
         }
       ],
-      "result": "The mask is $M = \\texttt{0x52}$, and the three operations give $\\texttt{0x5F}$, $\\texttt{0x0D}$ and $\\texttt{0x5D}$, each in a single instruction on a $\\texttt{volatile}$ register."
+      "result": "The mask is $M = \\texttt{0x52}$, and the three operations give $\\texttt{0x5F}$, $\\texttt{0x0D}$ and $\\texttt{0x5D}$, each as one read-modify-write on a $\\texttt{volatile}$ register."
     },
     "applications": [
       {

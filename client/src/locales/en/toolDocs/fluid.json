@@ -10,7 +10,7 @@
       },
       {
         "heading": "Cylinder force",
-        "body": "A single-acting cylinder has a return spring, so the available extension force is reduced by the spring: $F_{ext} = PA_{piston} - F_{spring}$, and the pressure must first exceed $F_{spring}/A_{piston}$ before the rod moves. A double-acting cylinder with bore $D$ and rod diameter $d$ produces $F_{ext} = P\\pi D^2/4$ on the full piston face and $F_{ret} = P\\pi(D^2 - d^2)/4$ on the annular rod side, so the return force is always smaller. Friction and back pressure are subtracted in practice, typically costing $5$ to $20$ percent of the ideal figure."
+        "body": "A single-acting cylinder has a return spring, so the available extension force is reduced by the spring: $F_{ext} = PA_{piston} - F_{spring}$, and the pressure must first exceed $F_{spring}/A_{piston}$ before the rod moves. A double-acting cylinder with bore $D$ and rod diameter $d$ produces $F_{ext} = P\\pi D^2/4$ on the full piston face and $F_{ret} = P\\pi(D^2 - d^2)/4$ on the annular rod side, so the return force is always smaller. Friction and back pressure are subtracted in practice, so the measured force is always below the ideal figure."
       },
       {
         "heading": "Air consumption and free air delivery",
@@ -86,7 +86,7 @@
       },
       {
         "heading": "Pressure relief dynamics",
-        "body": "A pilot-operated relief valve keeps a small pilot poppet closed by a spring set to $P_{set}$. When the system pressure exceeds it, the pilot flow creates a pressure drop across the main stage, which lifts the main poppet and diverts the pump flow to the tank. The flow through the opened valve follows the orifice law with discharge coefficient $C_d$ and opening area $A_{rv}$, so the pressure rises slightly with flow above $P_{set}$ (pressure override). Because oil has a finite bulk modulus, the pressure transient between closed and open states is fast but not instantaneous."
+        "body": "A pilot-operated relief valve keeps a small pilot poppet closed by a spring set to $P_{set}$. When the system pressure exceeds it, the pilot flow creates a pressure drop across the main stage, which lifts the main poppet and diverts the pump flow to the tank. The flow through the opened valve follows the orifice law with discharge coefficient $C_d$ and opening area $A_{rv}$, so the pressure rises slightly with flow above $P_{set}$ (pressure override). The override is visible in the simulator only while the relief valve is open. Because oil has a finite bulk modulus, the pressure transient between closed and open states is fast but not instantaneous."
       }
     ],
     "equations": [
@@ -111,7 +111,7 @@
     ],
     "example": {
       "title": "Pump, press cylinder and supply line",
-      "problem": "A pump with $V_d = 20\\text{ cm}^3$ per revolution runs at $n = 1450\\text{ rpm}$ with $\\eta_{vol} = 0.95$ and $\\eta_{total} = 0.85$ at $P = 150\\text{ bar}$. It drives a cylinder of area $A_2 = 50\\text{ cm}^2$ through a line of $D = 16\\text{ mm}$ and $L = 5\\text{ m}$ carrying oil with $\\rho = 870\\text{ kg/m}^3$ and $\\mu = 0.03\\text{ Pa}\\cdot\\text{s}$.",
+      "problem": "A pump with $V_d = 20\\text{ cm}^3$ per revolution runs at $n = 1450\\text{ rpm}$ with $\\eta_{vol} = 0.95$ and $\\eta_{total} = 0.85$ at $P = 150\\text{ bar}$. It drives a cylinder of area $A_2 = 50\\text{ cm}^2$ through a line of $D = 16\\text{ mm}$ and $L = 5\\text{ m}$ carrying oil with $\\rho = 870\\text{ kg/m}^3$ and $\\mu = 0.03\\text{ Pa}\\cdot\\text{s}$. To reproduce it in the tool, set the pump pressure to $150\\text{ bar}$ and the relief set pressure above that, because the default relief setting of $60\\text{ bar}$ would open first.",
       "steps": [
         { "text": "Pump flow, converting $1450\\text{ rpm}$ to a flow in $\\text{m}^3/\\text{s}$.", "tex": "Q = 20\\times10^{-6} \\times \\frac{1450}{60} \\times 0.95 = 4.592\\times10^{-4}\\text{ m}^3/\\text{s} = 27.55\\text{ L/min}" },
         { "text": "Hydraulic and shaft power at $P = 15\\text{ MPa}$.", "tex": "P_{hyd} = 15\\times10^{6} \\times 4.592\\times10^{-4} = 6888\\text{ W},\\quad P_{mech} = \\frac{6888}{0.85} = 8103\\text{ W}" },

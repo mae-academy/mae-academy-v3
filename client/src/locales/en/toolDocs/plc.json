@@ -32,7 +32,7 @@
       "Rising edge EU and falling edge ED detectors."
     ],
     "mapping": [
-      { "term": "Input and output indicators", "body": "The input switches and output lamps display the images of $\\texttt{I0.0}$ to $\\texttt{I0.7}$ and $\\texttt{Q0.0}$ to $\\texttt{Q0.7}$. The hardware profile limits which bytes exist, for example the larger CPU offers more input bytes." },
+      { "term": "Input and output indicators", "body": "The input switches and output lamps display the images of $\\texttt{I0.0}$ to $\\texttt{I0.7}$ and $\\texttt{Q0.0}$ to $\\texttt{Q0.7}$. The hardware profile limits which bytes exist." },
       { "term": "Contact variants", "body": "Choosing normal open or normal closed selects the polarity $b$ or $\\overline{b}$ in the rung. The positive and negative edge contacts implement the $EU$ and $ED$ equations." },
       { "term": "Output and internal coils", "body": "An output coil writes a $\\texttt{Q}$ bit and an internal coil writes an $\\texttt{M}$ bit, which is invisible to the field but readable by later rungs." },
       { "term": "Set and reset coils", "body": "The count field of a set or reset coil gives the number of consecutive bits $n$ starting at the target address that are forced together." },
@@ -46,7 +46,7 @@
       "steps": [
         { "text": "Add the four phase durations to obtain the scan time.", "tex": "T_{scan} = 1 + 5 + 1 + 1 = 8\\ \\mathrm{ms}" },
         { "text": "A change just after the input copy waits one scan to be read and is latched in the next.", "tex": "t_{resp,\\max} \\approx 2 \\times 8 = 16\\ \\mathrm{ms}" },
-        { "text": "Press start with $\\texttt{I0.0} = 1$ and $\\texttt{I0.1} = 0$, then release it. The seal-in keeps the motor on until stop is pressed.", "tex": "\\texttt{Q0.0} = (1 + 0)\\cdot 1 = 1, \\qquad (0 + 1)\\cdot 1 = 1, \\qquad (0 + 1)\\cdot 0 = 0" },
+        { "text": "Press start with $\\texttt{I0.0} = 1$ and $\\texttt{I0.1} = 0$, then release it. The seal-in keeps the motor on until stop is pressed.", "tex": "\\texttt{Q0.0} = (\\texttt{I0.0} + \\texttt{Q0.0})\\cdot\\overline{\\texttt{I0.1}}: \\quad (1 + 0)\\cdot 1 = 1 \\text{ (press start)}, \\quad (0 + 1)\\cdot 1 = 1 \\text{ (released, sealed)}, \\quad (0 + 1)\\cdot 0 = 0 \\text{ (stop pressed)}" },
         { "text": "Multiply the preset by the time base for the horn delay.", "tex": "T_{d} = 50 \\times 100\\ \\mathrm{ms} = 5000\\ \\mathrm{ms} = 5\\ \\mathrm{s}" },
         { "text": "Each batch needs $PV = 12$ rising edges, so the sixty parts fill whole batches as follows.", "tex": "\\frac{60}{12} = 5" }
       ],
@@ -108,7 +108,7 @@
         { "text": "Apply gain and offset to get engineering units.", "tex": "\\mathrm{Output} = 600 \\times 0.1 + (-30) = 30" },
         { "text": "Compare with the thresholds. Since $30 \\ge 30$ the trigger switches on, and it will stay on until the value falls to $25$ or below.", "tex": "Q_{thr} = [\\,30 \\ge 30\\,] = 1" },
         { "text": "Convert the delay parameter to milliseconds.", "tex": "N_{ms} = 500 \\times 10\\ \\mathrm{ms} = 5000\\ \\mathrm{ms}" },
-        { "text": "For comparison, a loop current $I_{in} = 12\\ \\mathrm{mA}$ would give the same midrange value.", "tex": "x_{mA} = 62.5\\,(12 - 4) = 500" }
+        { "text": "For comparison, a loop current $I_{in} = 12\\ \\mathrm{mA}$ gives $500$ units, the midrange of the $0$ to $1000$ scale, whereas the $6\\ \\mathrm{V}$ signal gives $600$ units.", "tex": "x_{mA} = 62.5\\,(12 - 4) = 500" }
       ],
       "result": "The scaled value is $30$, the threshold is on, and the fan starts after $5\\ \\mathrm{s}$. A $12\\ \\mathrm{mA}$ signal corresponds to $500$ units."
     },

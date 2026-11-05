@@ -581,7 +581,7 @@
           "tex": "T_1=Q_0"
         },
         {
-          "text": "Check the first step with the characteristic equation: from $Q_1Q_0=01$ the inputs are $T_1=1$ and $T_0=1$, which toggle both bits.",
+          "text": "Check the step $01 \\to 10$ with the characteristic equation: from $Q_1Q_0=01$ the inputs are $T_1=1$ and $T_0=1$, which toggle both bits.",
           "tex": "Q_1^{+}=1\\oplus 0=1,\\quad Q_0^{+}=1\\oplus 1=0"
         }
       ],
