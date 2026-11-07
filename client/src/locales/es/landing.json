@@ -44,14 +44,14 @@
       "cta": "Explorar Biblioteca Académica"
     },
     "research": {
-      "title": "Investigación Matemática e Identificación de Sistemas",
-      "description": "Notas de investigación abiertas, formulaciones matemáticas, funciones de transferencia y pruebas algorítmicas detrás de nuestras simulaciones. Basado en física numérica y validado contra experimentos de referencia.",
+      "title": "Búsqueda de investigación de acceso abierto",
+      "description": "Un catálogo de artículos de ingeniería de acceso abierto y motor de descubrimiento. Busca, lee y descarga investigaciones en vivo directamente a través de OpenAlex y DOAB.",
       "links": {
-        "identification": "Identificación de Sistemas No Lineales",
-        "solvers": "Solucionadores de Simulación Dinámica",
-        "proofs": "Derivaciones y Pruebas Algorítmicas"
+        "identification": "Artículos de OpenAlex",
+        "solvers": "Libros de DOAB",
+        "proofs": "Descarga de PDF"
       },
-      "cta": "Explorar Notas de Investigación"
+      "cta": "Explorar investigación"
     }
   },
   "socialMetrics": {

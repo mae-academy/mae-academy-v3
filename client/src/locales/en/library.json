@@ -73,5 +73,42 @@
     "downloadPdf": "Download PDF",
     "pages": "Pages",
     "year": "Year", "downloads": "downloads", "catalogEntry": "Catalog entry", "variousAuthors": "Various Authors", "details": "Details"
+  },
+  "mae": {
+    "tabs": {
+      "label": "Library collections",
+      "open": "Open Library",
+      "mae": "MAE Library"
+    },
+    "eyebrow": "03 / MAE Library",
+    "title": "Study materials written by MAE Academy.",
+    "description": "Test banks, study guides, summaries and lab manuals written by MAE Academy and its contributors, with the contents and a sample of each shown here.",
+    "all": "All",
+    "types": {
+      "test-bank": "Test banks",
+      "study-guide": "Study guides",
+      "summary": "Summaries",
+      "lab-manual": "Lab manuals",
+      "video-course": "Video courses",
+      "project": "Graduation projects"
+    },
+    "item": {
+      "back": "Back to MAE Library",
+      "by": "By",
+      "download": "Download",
+      "watch": "Watch the course",
+      "contents": "Contents",
+      "sample": "Sample",
+      "about": "About this material",
+      "updated": "Updated",
+      "published": "Published",
+      "language": "Language",
+      "pages": "pages",
+      "rightsOwner": "Written by MAE Academy.",
+      "rightsPermission": "Published with the author's permission.",
+      "more": "More from MAE Library",
+      "open": "Open",
+      "count": "items"
+    }
   }
 }

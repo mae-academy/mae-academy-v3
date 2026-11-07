@@ -77,5 +77,42 @@
     "catalogEntry": "Entrada de catálogo",
     "variousAuthors": "Varios Autores",
     "details": "Detalles"
+  },
+  "mae": {
+    "tabs": {
+      "label": "Colecciones de la biblioteca",
+      "open": "Biblioteca abierta",
+      "mae": "Biblioteca MAE"
+    },
+    "eyebrow": "03 / Biblioteca MAE",
+    "title": "Materiales de estudio escritos por MAE Academy.",
+    "description": "Bancos de preguntas, guías de estudio, resúmenes y manuales de laboratorio escritos por MAE Academy y sus colaboradores, con el contenido y una muestra de cada uno.",
+    "all": "Todo",
+    "types": {
+      "test-bank": "Bancos de preguntas",
+      "study-guide": "Guías de estudio",
+      "summary": "Resúmenes",
+      "lab-manual": "Manuales de laboratorio",
+      "video-course": "Cursos en vídeo",
+      "project": "Proyectos de grado"
+    },
+    "item": {
+      "back": "Volver a la Biblioteca MAE",
+      "by": "Por",
+      "download": "Descargar",
+      "watch": "Ver el curso",
+      "contents": "Contenido",
+      "sample": "Muestra",
+      "about": "Acerca de este material",
+      "updated": "Actualizado",
+      "published": "Publicado",
+      "language": "Idioma",
+      "pages": "páginas",
+      "rightsOwner": "Escrito por MAE Academy.",
+      "rightsPermission": "Publicado con permiso del autor.",
+      "more": "Más de la Biblioteca MAE",
+      "open": "Abrir",
+      "count": "materiales"
+    }
   }
 }

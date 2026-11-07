@@ -87,7 +87,13 @@
       "permanent": true
     },
     { "source": "/ai", "destination": "/", "permanent": false },
-    { "source": "/ai/:path*", "destination": "/", "permanent": false }
+    { "source": "/ai/:path*", "destination": "/", "permanent": false },
+    { "source": "/fluid-drive", "destination": "/simulations/pneumatics-and-hydraulics", "permanent": true },
+    { "source": "/simulators/arduino-studio", "destination": "/simulations/arduino-studio", "permanent": true },
+    { "source": "/simulators/plc-simulator", "destination": "/simulations/plc", "permanent": true },
+    { "source": "/code", "destination": "/simulations/code", "permanent": true },
+    { "source": "/code/:lang", "destination": "/simulations/code/:lang", "permanent": true },
+    { "source": "/assembler", "destination": "/simulations/code", "permanent": true }
   ],
   "rewrites": [
     {
@@ -227,7 +233,7 @@
       "destination": "/prerendered/attribution-policy.html"
     },
     {
-      "source": "/(research|library|courses|code|assembler|simulations|simulators|fluid-drive|about|contact|privacy|privacy-policy|terms|terms-of-service|attribution-policy)(/.*)?",
+      "source": "/(research|library|code|assembler|simulations|simulators|fluid-drive|about|contact|privacy|privacy-policy|terms|terms-of-service|attribution-policy)(/.*)?",
       "destination": "/spa-shell.html"
     }
   ]

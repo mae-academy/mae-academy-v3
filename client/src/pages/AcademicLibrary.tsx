@@ -17,6 +17,8 @@ import { searchAllBooks } from "@/lib/unifiedBooks";
 import type { UnifiedBook } from "@/lib/bookSources";
 import LibraryBookCard from "@/components/LibraryBookCard";
 import { usePageTitle } from "@/hooks/usePageTitle";
+import LibraryCollectionTabs from "@/components/library/LibraryCollectionTabs";
+import { visibleMaeItems } from "@/data/maeLibrary";
 
 const containerVariants: Variants = {
   hidden: {},
@@ -241,6 +243,12 @@ export default function AcademicLibrary() {
       initial="hidden"
       animate="visible"
     >
+      {visibleMaeItems().length > 0 && (
+        <motion.div variants={itemVariants}>
+          <LibraryCollectionTabs active="open" />
+        </motion.div>
+      )}
+
       {/* ── Header ── */}
       <motion.div variants={itemVariants} className="mb-10 grid gap-6 lg:grid-cols-[1.2fr_.8fr] lg:items-end">
         <div>

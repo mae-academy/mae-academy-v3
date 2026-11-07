@@ -397,7 +397,7 @@
     ],
     "example": {
       "title": "تحجيم مرحلتي Buck وBoost عند عشرين كيلوهرتز",
-      "problem": "يعمل المحوّلان بتردد تبديل $f_s = 20\\text{ kHz}$. للمحوّل Buck الدخل $V_{in} = 48\\text{ V}$ و$D = 0.75$ و$R = 6\\text{ }\\Omega$ و$L = 300\\text{ }\\mu\\text{H}$. وللمحوّل Boost الدخل $V_{in} = 12\\text{ V}$ و$D = 0.6$ و$R = 15\\text{ }\\Omega$ و$C = 100\\text{ }\\mu\\text{F}$. أوجد المخارج والتموج ونمط التشغيل.",
+      "problem": "يعمل المحوّلان بتردد تبديل $f_s = 20\\text{ kHz}$. للمحوّل Buck الدخل $V_{in} = 48\\text{ V}$ و$D = 0.75$ و$R = 6\\text{ }\\Omega$ و$L = 300\\text{ }\\mu\\text{H}$. وللمحوّل Boost الدخل $V_{in} = 12\\text{ V}$ و$D = 0.6$ و$R = 15\\text{ }\\Omega$ و$L = 100\\text{ }\\mu\\text{H}$ و$C = 100\\text{ }\\mu\\text{F}$. في حقول الملّي‑هنري بالأداة أدخل $0.3$ mH للمحوّل Buck و$0.1$ mH للمحوّل Boost. أوجد المخارج والتموج ونمط التشغيل.",
       "steps": [
         {
           "text": "جهد خرج Buck وتيار الحمل.",
@@ -416,11 +416,11 @@
           "tex": "V_o = \\frac{12}{1 - 0.6} = 30\\text{ V}, \\quad I_o = \\frac{30}{15} = 2\\text{ A}, \\quad \\Delta V_o = \\frac{2 \\times 0.6}{20000 \\times 100\\times 10^{-6}} = 0.6\\text{ V}"
         },
         {
-          "text": "المحاثة الحرجة لـ Boost، وخرج Buck-Boost لنفس $V_{in}$ و$D$ للمقارنة.",
+          "text": "المحاثة الحرجة لـ Boost: قيمة $L = 100\\,\\mu\\text{H}$ أكبر من $36\\,\\mu\\text{H}$، لذلك يعمل Boost في CCM. يُعرض خرج Buck-Boost لنفس $V_{in}$ و$D$ للمقارنة.",
           "tex": "L_{crit} = \\frac{0.6 \\times 0.4^2 \\times 15}{2 \\times 20000} = 36\\text{ }\\mu\\text{H}, \\qquad V_o = -\\frac{0.6}{0.4}\\times 12 = -18\\text{ V}"
         }
       ],
-      "result": "يعطي Buck جهد $36\\text{ V}$ وتيار $6\\text{ A}$ مع $\\Delta I_L = 1.5\\text{ A}$ في CCM، ويعطي Boost جهد $30\\text{ V}$ وتيار $2\\text{ A}$ مع $\\Delta V_o = 0.6\\text{ V}$. أما Buck-Boost فكان سيعطي $-18\\text{ V}$ من المصدر نفسه."
+      "result": "يعطي Buck جهد $36\\text{ V}$ وتيار $6\\text{ A}$ مع $\\Delta I_L = 1.5\\text{ A}$ في CCM، ويعطي Boost جهد $30\\text{ V}$ وتيار $2\\text{ A}$ مع $\\Delta V_o = 0.6\\text{ V}$. يعمل Boost في CCM لأن محاثته أكبر من قيمة الحرجة $36\\,\\mu\\text{H}$. أما Buck-Boost فكان سيعطي $-18\\text{ V}$ من المصدر نفسه."
     },
     "applications": [
       {

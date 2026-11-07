@@ -44,14 +44,14 @@
       "cta": "Explore Academic Library"
     },
     "research": {
-      "title": "Mathematical Research & System Identification",
-      "description": "Open research notes, mathematical formulations, transfer functions, and algorithmic proofs behind our simulations. Grounded in numerical physics and validated against benchmark experiments.",
+      "title": "Open-Access Research Search",
+      "description": "An open-access engineering paper catalog and discovery engine. Search, read, and download live research directly through OpenAlex and DOAB.",
       "links": {
-        "identification": "Nonlinear System Identification",
-        "solvers": "Dynamic Simulation Solvers",
-        "proofs": "Algorithmic Derivations & Proofs"
+        "identification": "OpenAlex papers",
+        "solvers": "DOAB books",
+        "proofs": "PDF downloads"
       },
-      "cta": "Explore Research Notes"
+      "cta": "Explore Research"
     }
   },
   "socialMetrics": {

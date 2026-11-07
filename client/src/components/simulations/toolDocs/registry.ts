@@ -30,11 +30,17 @@ export function resolveToolId(topic: SimulationDocsTopic, tool: string | undefin
   return tool && ids.includes(tool) ? tool : ids[0];
 }
 
-/** The tool's doc in `locale`, falling back to English (Spanish has no per-tool docs yet). */
+/**
+ * The tool's doc in `locale`. Spanish has no per-tool docs yet, so it returns null and the page shows the
+ * Spanish topic overview instead of English text inside a Spanish page. Other locales fall back to English.
+ */
 export function getToolDoc(topic: SimulationDocsTopic, tool: string | undefined, locale: string): ToolDoc | null {
   const id = resolveToolId(topic, tool);
   if (!id) return null;
-  return docsByLocale[locale]?.[topic]?.[id] ?? docsByLocale.en?.[topic]?.[id] ?? null;
+  const localized = docsByLocale[locale]?.[topic]?.[id];
+  if (localized) return localized;
+  if (locale === "es") return null;
+  return docsByLocale.en?.[topic]?.[id] ?? null;
 }
 
 /** Raw tables, for tests. */

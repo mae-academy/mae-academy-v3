@@ -153,7 +153,7 @@ const pages: Page[] = [
     route: "/",
     home: true,
     title: "Model. Analyze. Engineering — MAE Academy", // Home.tsx usePageTitle
-    description: "MAE Academy: a global platform for academic research, engineering courses, and practical simulations.",
+    description: "MAE Academy: free online engineering simulators, an open-access research search and a library of open textbooks.",
     canonical: "/",
     // Home.tsx + EngineeringPlatformsSection; the AI callout is hidden in production (SHOW_MAE_AI = false).
     body: () => copyBlocks(keysFromSource(["client/src/pages/Home.tsx", "client/src/components/EngineeringPlatformsSection.tsx"], "landing", /^aiCallout\./)),

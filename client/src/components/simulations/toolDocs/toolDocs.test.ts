@@ -87,3 +87,12 @@ describe.each(entries)("%s / %s", (topic, tool, en) => {
     }
   });
 });
+
+describe("locale fallback", () => {
+  it("does not show English tool docs on a Spanish page (Spanish has none yet)", async () => {
+    const { getToolDoc } = await import("./registry");
+    expect(getToolDoc("control", "pid", "es")).toBeNull();
+    expect(getToolDoc("control", "pid", "en")).not.toBeNull();
+    expect(getToolDoc("control", "pid", "ar")).not.toBeNull();
+  });
+});

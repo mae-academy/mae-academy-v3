@@ -28,6 +28,8 @@ const Research = lazyRetry(() => import("./pages/Research"));
 const ResearchDetail = lazyRetry(() => import("./pages/ResearchDetail"));
 const AcademicLibrary = lazyRetry(() => import("./pages/AcademicLibrary"));
 const LibraryDetail = lazyRetry(() => import("./pages/LibraryDetail"));
+const MaeLibrary = lazyRetry(() => import("./pages/MaeLibrary"));
+const MaeLibraryItem = lazyRetry(() => import("./pages/MaeLibraryItem"));
 const Simulations = lazyRetry(() => import("./pages/Simulations"));
 const SimulationDetail = lazyRetry(() => import("./pages/SimulationDetail"));
 const About = lazyRetry(() => import("./pages/About"));
@@ -91,8 +93,9 @@ function AnimatedRoutes() {
             <Route path="/research" component={Research} />
             <Route path="/research/:id" component={ResearchDetail} />
             <Route path="/library" component={AcademicLibrary} />
+            <Route path="/library/mae" component={MaeLibrary} />
+            <Route path="/library/mae/:slug" component={MaeLibraryItem} />
             <Route path="/library/:id" component={LibraryDetail} />
-            <Route path="/courses"><Redirect to="/library" /></Route>
             <Route path="/code/:lang" component={SimulationDetail} />
             <Route path="/code" component={SimulationDetail} />
             <Route path="/assembler/:tool" component={SimulationDetail} />
