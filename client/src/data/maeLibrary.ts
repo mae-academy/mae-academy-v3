@@ -2,7 +2,7 @@
  * MAE Library: study materials written by MAE Academy and its contributors.
  *
  * Publishing rules (they follow Google's AdSense content policy, https://support.google.com/adsense/answer/10015918):
- *  - Only items with `status: "published"` appear on the live site. Drafts show in development only, so no empty or
+ *  - Only items with `status: "published"` appear on the live site. Drafts show in development and Vercel Preview only, so no empty or
  *    "coming soon" entry is ever public.
  *  - Every published item needs real text on its page: a description, the contents, and a sample written by the author.
  *  - `rights` states who owns the item. Items by contributors need `permission` and the author's name in `authors`.
@@ -60,7 +60,10 @@ export const MAE_LIBRARY: MaeLibraryItem[] = [
   draft("sensors-lab-manual", "lab-manual", "Sensors lab manual"),
 ];
 
-export function visibleMaeItems(includeDrafts: boolean = Boolean(import.meta.env?.DEV)): MaeLibraryItem[] {
+/** Drafts are shown in development and in Vercel Preview deployments (flag set in vite.config.ts), never in production. */
+const DEFAULT_INCLUDE_DRAFTS = Boolean(import.meta.env?.DEV) || (typeof __SHOW_MAE_DRAFTS__ !== "undefined" && __SHOW_MAE_DRAFTS__);
+
+export function visibleMaeItems(includeDrafts: boolean = DEFAULT_INCLUDE_DRAFTS): MaeLibraryItem[] {
   return MAE_LIBRARY.filter((item) => item.status === "published" || includeDrafts);
 }
 

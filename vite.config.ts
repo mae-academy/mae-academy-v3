@@ -480,6 +480,10 @@ const plugins = [
 
 export default defineConfig({
   plugins,
+  // MAE Library drafts are visible in development and in Vercel Preview deployments only, never in production.
+  define: {
+    __SHOW_MAE_DRAFTS__: JSON.stringify(process.env.VERCEL_ENV === "preview"),
+  },
   resolve: {
     dedupe: ["react", "react-dom"],
     alias: [
